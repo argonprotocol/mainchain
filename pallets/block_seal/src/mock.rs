@@ -131,7 +131,13 @@ impl FindAuthor<AccountId> for StaticFindAuthor {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		todo!()
+	}
 	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn elapsed_ticks() -> Tick {
 		CurrentTick::get()
 	}
 	fn ticker() -> Ticker {

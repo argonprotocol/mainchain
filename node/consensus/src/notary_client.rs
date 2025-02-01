@@ -768,7 +768,9 @@ where
 			let mut counter = 0;
 			while latest_notebook_in_runtime >= notebook_number {
 				counter += 1;
-				if counter > 500 {
+				// NOTE: if this goes past 256 finalized blocks, it will hit the limit that nodes
+				// store by default
+				if counter >= 500 {
 					return Err(Error::NotaryError(format!(
 						"Could not find place to audit this notebook {} in runtime",
 						notebook_number

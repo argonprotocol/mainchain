@@ -316,6 +316,7 @@ declare module '@polkadot/types/lookup' {
     readonly ownershipTokens: Compact<u128>;
     readonly rewardSharing: Option<ArgonPrimitivesBlockSealRewardSharing>;
     readonly authorityKeys: ArgonRuntimeSessionKeys;
+    readonly slotId: Compact<u64>;
   }
 
   /** @name ArgonRuntimeSessionKeys (42) */

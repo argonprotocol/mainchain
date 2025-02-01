@@ -15,7 +15,7 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, AuthorityHashByIndex,
-		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MiningConfig, NextSlotCohort,
+		CurrentSlotId, HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MiningConfig, NextSlotCohort,
 		OwnershipBondAmount,
 	},
 	Error, Event, HoldReason, MiningSlotBid,
@@ -42,7 +42,8 @@ fn it_doesnt_add_cohorts_until_time() {
 			bond_amount: 0,
 			reward_destination: RewardDestination::Owner,
 			reward_sharing: None,
-			authority_keys: 1.into()
+			authority_keys: 1.into(),
+			slot_id: 1,
 		}]);
 
 		MiningSlots::on_initialize(1);
@@ -178,6 +179,7 @@ fn it_adds_new_cohorts_on_block() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
+		CurrentSlotId::<Test>::put(1);
 
 		for i in 0..4u32 {
 			let account_id: u64 = (i + 4).into();
@@ -191,6 +193,7 @@ fn it_adds_new_cohorts_on_block() {
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
 					authority_keys: account_id.into(),
+					slot_id: 1,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -211,6 +214,7 @@ fn it_adds_new_cohorts_on_block() {
 			reward_destination: RewardDestination::Owner,
 			reward_sharing: None,
 			authority_keys: 1.into(),
+			slot_id: 2,
 		}]);
 
 		NextSlotCohort::<Test>::set(cohort.clone());
@@ -272,7 +276,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 
 	new_test_ext().execute_with(|| {
 		OwnershipBondAmount::<Test>::set(1000);
-
+		CurrentSlotId::<Test>::put(1);
 		System::set_block_number(7);
 
 		for i in 0..4u32 {
@@ -294,6 +298,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
 					authority_keys: 1.into(),
+					slot_id: 1,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -324,6 +329,7 @@ fn it_unbonds_accounts_when_a_window_closes() {
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
 					authority_keys: 1.into(),
+					slot_id: 2,
 				}]),
 			}
 			.into(),
@@ -469,6 +475,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		System::set_block_number(12);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
+		CurrentSlotId::<Test>::put(1);
 
 		assert_eq!(MiningSlots::get_slot_era(), (16, 16 + (4 * 3)));
 		assert_eq!(MiningSlots::get_next_slot_starting_index(), 0);
@@ -498,6 +505,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
 					authority_keys: 1.into(),
+					slot_id: 3,
 				}]),
 			}
 			.into(),
@@ -743,7 +751,8 @@ fn it_will_cancel_bids_if_new_vault() {
 				bond_amount: 1001,
 				reward_destination: RewardDestination::Owner,
 				reward_sharing: None,
-				authority_keys: 1.into()
+				authority_keys: 1.into(),
+				slot_id: 1,
 			},
 			MiningRegistration {
 				account_id: 2,
@@ -752,7 +761,8 @@ fn it_will_cancel_bids_if_new_vault() {
 				bond_amount: 1000,
 				reward_destination: RewardDestination::Owner,
 				reward_sharing: None,
-				authority_keys: 1.into()
+				authority_keys: 1.into(),
+				slot_id: 1,
 			},
 			MiningRegistration {
 				account_id: 3,
@@ -761,7 +771,8 @@ fn it_will_cancel_bids_if_new_vault() {
 				bond_amount: 999,
 				reward_destination: RewardDestination::Owner,
 				reward_sharing: None,
-				authority_keys: 1.into()
+				authority_keys: 1.into(),
+				slot_id: 1,
 			}
 		]);
 
@@ -927,6 +938,7 @@ fn it_can_get_closest_authority() {
 					reward_destination: RewardDestination::Owner,
 					reward_sharing: None,
 					authority_keys: account_id.into(),
+					slot_id: 1,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -1133,6 +1145,30 @@ fn it_can_change_the_compute_mining_block() {
 			}
 			.into(),
 		);
+	});
+}
+
+#[test]
+fn it_should_rotate_grandpas() {
+	SlotBiddingStartTick::set(12_960);
+	GrandpaRotationFrequency::set(4);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MiningSlots::on_initialize(1);
+		assert_eq!(GrandaRotations::get(), vec![0]);
+
+		CurrentSlotId::<Test>::put(1);
+		System::set_block_number(4);
+		MiningSlots::on_initialize(4);
+		assert_eq!(GrandaRotations::get(), vec![0, 1]);
+
+		// should auto-increment and rotate
+		System::set_block_number(12_960);
+		TicksSinceGenesis::set(12_960);
+		MiningSlots::on_initialize(12_960);
+
+		assert_eq!(GrandaRotations::get(), vec![0, 1, 2]);
 	});
 }
 

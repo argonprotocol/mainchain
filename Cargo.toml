@@ -46,7 +46,7 @@ authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
 homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.79.0"
+rust-version = "1.80.0"
 repository = "https://github.com/argonprotocol/mainchain"
 documentation = "https://argonprotocol.org/docs"
 
@@ -135,25 +135,79 @@ yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
 [patch.crates-io]
-pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
-pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" }
+pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp" }
+pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp/runtime-api" }
+pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/hyperbridge" }
+pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp/rpc" }
+ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/ismp/clients/grandpa" }
+substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/ismp/state-machines/substrate" }
+grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/consensus/grandpa/verifier" }
+ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } #  path = "../../hyperbridge/modules/ismp/core" }
+pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/token-gateway" }
 
-#pallet-ismp = { path = "../../hyperbridge/modules/pallets/ismp" }
-#pallet-ismp-runtime-api = { path = "../../hyperbridge/modules/pallets/ismp/runtime-api" }
-#pallet-hyperbridge = { path = "../../hyperbridge/modules/pallets/hyperbridge" }
-#pallet-ismp-rpc = { path = "../../hyperbridge/modules/pallets/ismp/rpc" }
-#ismp-grandpa = { path = "../../hyperbridge/modules/ismp/clients/grandpa" }
-#substrate-state-machine = { path = "../../hyperbridge/modules/ismp/state-machines/substrate" }
-#grandpa-verifier = { path = "../../hyperbridge/modules/consensus/grandpa/verifier" }
-#ismp = { path = "../../hyperbridge/modules/ismp/core" }
-#pallet-token-gateway = { path = "../../hyperbridge/modules/pallets/token-gateway" }
+sc-basic-authorship = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/basic-authorship" }
+sc-block-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/block-builder" }
+sc-chain-spec = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/chain-spec" }
+sc-cli = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/cli" }
+sc-client-api = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/api" }
+sc-client-db = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/db" }
+sc-consensus = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/consensus/common" }
+sc-consensus-grandpa = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/consensus/grandpa" }
+sc-executor = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/executor" }
+sc-keystore = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/keystore" }
+sc-network = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/network" }
+sc-offchain = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/offchain" }
+sc-rpc = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/rpc" }
+sc-rpc-api = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/rpc-api" }
+sc-rpc-spec-v2 = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/rpc-spec-v2" }
+sc-service = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/service" }
+sc-sysinfo = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/sysinfo" }
+sc-telemetry = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/telemetry" }
+sc-tracing = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/tracing" }
+sc-transaction-pool = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/transaction-pool" }
+sc-transaction-pool-api = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/transaction-pool/api" }
+sp-api = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/api" }
+sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/application-crypto" }
+sp-arithmetic = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/arithmetic" }
+sp-block-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/block-builder" }
+sp-blockchain = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/blockchain" }
+sp-core = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/core" }
+sp-consensus = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/consensus/common" }
+sp-consensus-grandpa = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/consensus/grandpa" }
+sp-consensus-slots = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/consensus/slots" }
+sp-debug-derive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/debug-derive" }
+sp-offchain = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/offchain" }
+sp-externalities = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/externalities" }
+sp-genesis-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/genesis-builder" }
+sp-io = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/io" }
+sp-inherents = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/inherents" }
+sp-keyring = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/keyring" }
+sp-keystore = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/keystore" }
+sp-mixnet = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/mixnet" }
+sp-mmr-primitives = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/merkle-mountain-range" }
+sp-panic-handler = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/panic-handler" }
+sp-rpc = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/rpc" }
+sp-runtime = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/runtime" }
+sp-session = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/session" }
+sp-staking = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/staking" }
+sp-state-machine = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/state-machine" }
+sp-statement-store = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/statement-store" }
+sp-storage = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/storage" }
+sp-timestamp = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/timestamp" }
+sp-transaction-pool = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/transaction-pool" }
+sp-transaction-storage-proof = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/transaction-storage-proof" }
+sp-trie = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/primitives/trie" }
+sp-version = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/version" }
+sp-wasm-interface = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/wasm-interface" }
+sp-weights = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/primitives/weights" }
+frame-support = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/support" }
+frame-support-procedural = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/support/procedural" }
+frame-executive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/frame/executive" }
+frame-system = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/system" }
+pallet-timestamp = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/frame/timestamp" }
+pallet-grandpa = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/grandpa" }
+
+
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -168,6 +222,7 @@ rand = { version = "0.8.5" }
 lazy_static = "1.4.0"
 smallvec = { version = "1.13" }
 hex = { version = "0.4" }
+hex-literal = { version = "0.4.1", default-features = false }
 url = "2.5.0"
 num_cpus = "1.16"
 reqwest = { version = "0.12", features = ["json"], default-features = false }
@@ -252,6 +307,7 @@ pallet-utility = { version = "38.0.0", default-features = false }
 pallet-transaction-payment = { version = "38.0.0", default-features = false }
 pallet-transaction-payment-rpc-runtime-api = { version = "38.0.0", default-features = false }
 
+finality-grandpa = { version = "0.16.2", default-features = false }
 substrate-wasm-builder = { version = "24.0.1" }
 # node-side
 pallet-transaction-payment-rpc = { version = "41.0.0" }
@@ -276,7 +332,7 @@ sc-consensus-grandpa = { version = "0.30.0" }
 sc-consensus-grandpa-rpc = { version = "0.30.0" }
 sc-executor = { version = "0.40.1" }
 sc-basic-authorship = { version = "0.45.0" }
-sc-network = { version = "0.45.3" }
+sc-network = { version = "0.45.5" }
 sc-network-types = { version = "0.12.1" }
 sc-offchain = { version = "40.0.0" }
 sc-rpc = { version = "40.0.0" }
@@ -305,7 +361,7 @@ bitcoin = { version = "0.32.0", default-features = false }
 bip39 = { version = "2.0.0" }
 miniscript = { version = "12.0.0", default-features = false }
 hwi = { version = "0.10", default-features = false }
-bitcoind = { version = "0.36", features = ["26_0"] }
+bitcoind = { version = "0.36.1", features = ["26_0"] }
 age = { version = "0.10.0" }
 k256 = { version = "0.13.3", default-features = false }
 bip32 = { version = "0.5.1", default-features = false }

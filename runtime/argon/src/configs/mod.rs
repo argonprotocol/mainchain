@@ -34,6 +34,7 @@ pub use frame_support::{
 };
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 
+use argon_primitives::block_seal::SlotId;
 use frame_system::EnsureRoot;
 use pallet_block_rewards::GrowthPath;
 use pallet_bond::BitcoinVerifier;
@@ -272,6 +273,7 @@ parameter_types! {
 	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const MaximumOwnershipBondAmountPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 12; // Ideally we want 12 bids per slot
+	pub const GrandpaRotationBlocks: BlockNumber = 260;
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
 	pub const MinimumBondAmount: u128 = 100_000;
@@ -334,10 +336,10 @@ pub struct GrandpaSlotRotation;
 
 impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	type Key = GrandpaId;
-	fn on_new_slot(
+	fn rotate_grandpas(
+		_current_slot_id: SlotId,
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
 		_added_authorities: Vec<(&AccountId, Self::Key)>,
-		delay: bool,
 	) {
 		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
 
@@ -353,11 +355,11 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 		// 	next_authorities.push((authority_id, 1));
 		// }
 
-		let in_blocks = if delay { 1 } else { 0 };
 		log::info!("Scheduling grandpa change");
-		if let Err(err) = Grandpa::schedule_change(next_authorities, in_blocks, None) {
+		if let Err(err) = Grandpa::schedule_change(next_authorities, 0, None) {
 			log::error!("Failed to schedule grandpa change: {:?}", err);
 		}
+		pallet_grandpa::CurrentSetId::<Runtime>::mutate(|x| *x += 1);
 	}
 }
 
@@ -373,15 +375,16 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
+	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type MinimumOwnershipBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type MaximumOwnershipBondAmountPercent = MaximumOwnershipBondAmountPercent;
-	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BondProvider = Bonds;
 	type SlotEvents = (GrandpaSlotRotation,);
+	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
 	type TicksSinceGenesis = TicksSinceGenesis;

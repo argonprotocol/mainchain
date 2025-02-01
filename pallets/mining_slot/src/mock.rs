@@ -1,14 +1,15 @@
 use crate as pallet_mining_slot;
 use crate::OnNewSlot;
 use argon_primitives::{
-	block_seal::{MiningSlotConfig, RewardSharing},
+	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
 	bond::{BondError, BondProvider},
-	VaultId,
+	BlockNumber, VaultId,
 };
 use env_logger::{Builder, Env};
 use frame_support::{
 	derive_impl, parameter_types,
 	traits::{Currency, StorageMapShim},
+	weights::constants::RocksDbWeight,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128, Percent};
@@ -30,6 +31,7 @@ frame_support::construct_runtime!(
 impl frame_system::Config for Test {
 	type Block = Block;
 	type AccountData = pallet_balances::AccountData<Balance>;
+	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {
@@ -105,9 +107,12 @@ parameter_types! {
 
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
+	pub static GrandaRotations: Vec<SlotId> = vec![];
 
 	// set slot bidding active by default
 	pub static TicksSinceGenesis: u64 = 3;
+
+	pub static GrandpaRotationFrequency: BlockNumber = 10;
 }
 
 pub struct StaticBondProvider;
@@ -156,13 +161,14 @@ impl BondProvider for StaticBondProvider {
 pub struct StaticNewSlotEvent;
 impl OnNewSlot<u64> for StaticNewSlotEvent {
 	type Key = UintAuthorityId;
-	fn on_new_slot(
+	fn rotate_grandpas(
+		current_slot_id: SlotId,
 		removed_authorities: Vec<(&u64, Self::Key)>,
 		added_authorities: Vec<(&u64, Self::Key)>,
-		_force: bool,
 	) {
 		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
+		GrandaRotations::mutate(|a| a.push(current_slot_id));
 	}
 }
 
@@ -201,6 +207,8 @@ impl pallet_mining_slot::Config for Test {
 	type MiningAuthorityId = UintAuthorityId;
 	type Keys = MockSessionKeys;
 	type TicksSinceGenesis = TicksSinceGenesis;
+
+	type GrandpaRotationBlocks = GrandpaRotationFrequency;
 }
 
 // Build genesis storage according to the mock runtime.

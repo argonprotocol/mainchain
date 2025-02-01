@@ -191,8 +191,12 @@ where
 }
 
 pub trait TickProvider<B: BlockT> {
+	/// The previous tick
+	fn previous_tick() -> Tick;
 	/// The current tick supplied by the Node tier
 	fn current_tick() -> Tick;
+	/// Ticks elapsed since genesis
+	fn elapsed_ticks() -> Tick;
 	/// The schedule for when voting is eligible
 	fn voting_schedule() -> VotingSchedule;
 	fn ticker() -> Ticker;
