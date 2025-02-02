@@ -162,7 +162,7 @@ impl Contains<RuntimeCall> for BaseCallFilter {
 
 const FINAL_ARGONS_PER_BLOCK: Balance = 5_000_000;
 const INCREMENTAL_REWARD_AMOUNT: Balance = 1_000;
-const INCREMENT_TICKS: u32 = 118;
+const INCREMENT_TICKS: Tick = 118;
 
 parameter_types! {
 	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(49, 100); // aim for less than full compute time so it can wait for notebooks
@@ -177,8 +177,8 @@ parameter_types! {
 	pub const StartingArgonsPerBlock: Balance = 500_000;
 	pub const StartingOwnershipTokensPerBlock: Balance = 500_000;
 	pub const IncrementalGrowth: GrowthPath<Runtime> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership tokens
-	pub const HalvingBeginBlock: u32 = INCREMENT_TICKS * (FINAL_ARGONS_PER_BLOCK as u32 - StartingArgonsPerBlock::get() as u32) / INCREMENTAL_REWARD_AMOUNT as u32; // starts after ~ one year of increments
-	pub const HalvingBlocks: u32 = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
+	pub const HalvingBeginTick: Tick = INCREMENT_TICKS  * (FINAL_ARGONS_PER_BLOCK as Tick - StartingArgonsPerBlock::get() as Tick) / INCREMENTAL_REWARD_AMOUNT as Tick; // starts after ~ one year of increments
+	pub const HalvingTicks: Tick = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
@@ -216,12 +216,12 @@ impl pallet_block_rewards::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 	type NotaryProvider = Notaries;
 	type NotebookProvider = Notebook;
-	type NotebookTick = NotebookTickProvider;
+	type TickProvider = Ticks;
 	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type IncrementalGrowth = IncrementalGrowth;
-	type HalvingBlocks = HalvingBlocks;
-	type HalvingBeginBlock = HalvingBeginBlock;
+	type HalvingTicks = HalvingTicks;
+	type HalvingBeginTick = HalvingBeginTick;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;

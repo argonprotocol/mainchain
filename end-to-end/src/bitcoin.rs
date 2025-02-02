@@ -208,7 +208,7 @@ async fn test_bitcoin_minting_e2e() {
 		miner_node.client.get_ownership(&vote_miner_account, None).await.unwrap();
 	let ownership_needed = mining_slot_ownership_needed(&test_node).await.unwrap();
 	assert!(vote_miner_ownership.free >= ownership_needed);
-	let keys = register_miner_keys(&miner_node, vote_miner)
+	let keys = register_miner_keys(&miner_node, vote_miner, 1)
 		.await
 		.expect("Couldn't register vote miner");
 

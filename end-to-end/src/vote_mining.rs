@@ -34,7 +34,7 @@ async fn test_end_to_end_default_vote_mining() {
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
 				{
-					if ownership.free >= 500_000 && !authors.contains(&author) {
+					if ownership.free >= 200_000 && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);
 						authors.insert(author);
 					}
@@ -58,23 +58,31 @@ async fn test_end_to_end_default_vote_mining() {
 	}
 
 	let miner_1_keyring = miner_1.keyring();
+	let miner_1_second_account = miner_1.keyring().numeric_id(1);
+	bankroll_miners(&miner_1, &miner_1_keyring, vec![miner_1_second_account.clone()], true)
+		.await
+		.unwrap();
+
 	let miner_2_keyring = miner_2.keyring();
 
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
-	let (keys1, keys2) = join!(
-		register_miner_keys(&miner_1, miner_1_keyring),
-		register_miner_keys(&miner_2, miner_2_keyring)
+	let (keys1, keys_1_2, keys2) = join!(
+		register_miner_keys(&miner_1, miner_1_keyring, 1),
+		register_miner_keys(&miner_1, miner_1_keyring, 2),
+		register_miner_keys(&miner_2, miner_2_keyring, 1)
 	);
-	let (miner2_res, miner1_res) = join!(
+	let (miner2_res, miner1_res, miner1_2_res) = join!(
 		register_miner(&miner_2, miner_2_keyring, keys2.unwrap()),
-		register_miner(&miner_1, miner_1_keyring, keys1.unwrap())
+		register_miner(&miner_1, miner_1_keyring, keys1.unwrap()),
+		register_miner(&miner_1, miner_1_second_account, keys_1_2.unwrap())
 	);
 	miner2_res.unwrap();
 	miner1_res.unwrap();
+	miner1_2_res.unwrap();
 	let mut miner_registrations = 0;
 	let mut block_loops = 0;
 	let mut vote_blocks = 0;
-	let mut miner_vote_blocks = (0, 0);
+	let mut miner_vote_blocks = (0, 0, 0);
 	authors.clear();
 	loop {
 		if let Some(Ok(block)) = blocks_sub.next().await {
@@ -106,9 +114,12 @@ async fn test_end_to_end_default_vote_mining() {
 					miner_vote_blocks.0 += 1;
 				} else if author == miner_2_keyring.to_account_id() {
 					miner_vote_blocks.1 += 1;
+				} else if author == miner_1_second_account.to_account_id() {
+					miner_vote_blocks.2 += 1;
 				}
 				vote_blocks += 1;
-				if miner_vote_blocks.0 >= 1 && miner_vote_blocks.1 >= 1 {
+				if miner_vote_blocks.0 >= 1 && miner_vote_blocks.1 >= 1 && miner_vote_blocks.2 >= 1
+				{
 					break;
 				}
 			}
@@ -123,9 +134,10 @@ async fn test_end_to_end_default_vote_mining() {
 	assert!(vote_blocks >= 2);
 	assert!(miner_vote_blocks.0 >= 1);
 	assert!(miner_vote_blocks.1 >= 1);
+	assert!(miner_vote_blocks.2 >= 1);
 	println!(
-		"Vote Blocks: {}. Miner 1 ({}), Miner 2 ({})",
-		vote_blocks, miner_vote_blocks.0, miner_vote_blocks.1
+		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({})",
+		vote_blocks, miner_vote_blocks.0, miner_vote_blocks.2, miner_vote_blocks.1
 	);
 
 	drop(miner_1);

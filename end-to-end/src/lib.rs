@@ -156,10 +156,11 @@ pub(crate) mod utils {
 	pub(crate) async fn register_miner_keys(
 		node: &ArgonTestNode,
 		miner: Sr25519Keyring,
+		counter: u16,
 	) -> anyhow::Result<SessionKeys> {
-		let grandpa_seed = format!("{}//grandpa", miner.to_seed());
+		let grandpa_seed = format!("{}//grandpa//{counter}", miner.to_seed());
 		let grandpa_public = node.insert_ed25519_keystore_key(GRANDPA, grandpa_seed).await?;
-		let mining_seed = format!("{}//seal", miner.to_seed());
+		let mining_seed = format!("{}//seal//{counter}", miner.to_seed());
 		let seal_public =
 			node.insert_ed25519_keystore_key(BLOCK_SEAL_KEY_TYPE, mining_seed).await?;
 		Ok(SessionKeys {

@@ -8,9 +8,9 @@ use crate::GrowthPath;
 use argon_primitives::{
 	block_seal::RewardSharing,
 	notary::{NotaryProvider, NotarySignature},
-	tick::Tick,
+	tick::{Tick, Ticker},
 	BlockRewardAccountsProvider, BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber,
-	NotebookProvider, NotebookSecret, RewardShare,
+	NotebookProvider, NotebookSecret, RewardShare, TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -88,6 +88,7 @@ parameter_types! {
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
 	pub static NotebookTick: Tick = 0;
+	pub static ElapsedTicks: Tick = 0;
 
 	pub static GetRewardSharing: Option<RewardSharing<u64>> = None;
 	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
@@ -152,6 +153,28 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 	}
 }
 
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		todo!()
+	}
+	fn current_tick() -> Tick {
+		NotebookTick::get() + 1
+	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(2000, 2)
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		vec![]
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::on_notebook_tick_state(NotebookTick::get())
+	}
+}
+
 impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -162,13 +185,13 @@ impl pallet_block_rewards::Config for Test {
 	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
 	type IncrementalGrowth = IncrementalGrowth;
-	type HalvingBlocks = HalvingBlocks;
-	type HalvingBeginBlock = HalvingBeginBlock;
+	type HalvingTicks = HalvingBlocks;
+	type HalvingBeginTick = HalvingBeginBlock;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = StaticBlockSealerProvider;
 	type NotaryProvider = TestProvider;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type NotebookTick = NotebookTick;
+	type TickProvider = StaticTickProvider;
 	type NotebookProvider = TestProvider;
 	type EventHandler = ();
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;

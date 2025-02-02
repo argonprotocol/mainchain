@@ -214,6 +214,7 @@ fn it_should_halve_rewards() {
 	new_test_ext().execute_with(|| {
 		let halving = HalvingBlocks::get() + HalvingBeginBlock::get() + 1;
 		System::set_block_number(halving.into());
+		ElapsedTicks::set(halving as u64);
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
 		NotebookTick::set(1);
 		BlockRewards::on_initialize(halving.into());
