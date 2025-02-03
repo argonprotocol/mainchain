@@ -2015,9 +2015,10 @@ pub mod api {
 						"next_slot_era",
 						types::NextSlotEra {},
 						[
-							101u8, 27u8, 62u8, 52u8, 219u8, 204u8, 173u8, 178u8, 17u8, 87u8, 198u8,
-							186u8, 162u8, 215u8, 162u8, 64u8, 214u8, 87u8, 101u8, 112u8, 128u8,
-							160u8, 134u8, 183u8, 46u8, 141u8, 167u8, 2u8, 15u8, 77u8, 5u8, 224u8,
+							159u8, 133u8, 37u8, 43u8, 175u8, 113u8, 139u8, 67u8, 82u8, 249u8,
+							125u8, 243u8, 231u8, 166u8, 47u8, 202u8, 162u8, 96u8, 3u8, 139u8,
+							123u8, 157u8, 127u8, 117u8, 159u8, 233u8, 172u8, 98u8, 247u8, 12u8,
+							2u8, 132u8,
 						],
 					)
 				}
@@ -2028,7 +2029,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = (::core::primitive::u32, ::core::primitive::u32);
+						pub type Output = (::core::primitive::u64, ::core::primitive::u64);
 					}
 				}
 				#[derive(
@@ -3736,9 +3737,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				143u8, 223u8, 188u8, 76u8, 106u8, 212u8, 192u8, 152u8, 199u8, 63u8, 82u8, 108u8,
-				47u8, 162u8, 168u8, 111u8, 170u8, 244u8, 238u8, 40u8, 24u8, 74u8, 43u8, 66u8, 7u8,
-				187u8, 38u8, 169u8, 202u8, 2u8, 231u8, 129u8,
+				237u8, 82u8, 245u8, 76u8, 48u8, 222u8, 173u8, 18u8, 65u8, 211u8, 218u8, 173u8,
+				153u8, 157u8, 210u8, 237u8, 250u8, 101u8, 164u8, 158u8, 43u8, 70u8, 24u8, 137u8,
+				194u8, 181u8, 247u8, 153u8, 140u8, 199u8, 96u8, 91u8,
 			]
 	}
 	pub mod system {
@@ -4889,10 +4890,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							143u8, 210u8, 227u8, 68u8, 120u8, 80u8, 172u8, 186u8, 99u8, 36u8,
-							253u8, 32u8, 35u8, 145u8, 213u8, 95u8, 68u8, 143u8, 146u8, 17u8, 105u8,
-							170u8, 205u8, 19u8, 189u8, 235u8, 18u8, 215u8, 167u8, 207u8, 178u8,
-							21u8,
+							37u8, 119u8, 111u8, 60u8, 168u8, 19u8, 52u8, 66u8, 22u8, 51u8, 110u8,
+							25u8, 6u8, 247u8, 59u8, 229u8, 168u8, 37u8, 178u8, 168u8, 115u8, 43u8,
+							117u8, 20u8, 197u8, 135u8, 22u8, 231u8, 226u8, 89u8, 222u8, 7u8,
 						],
 					)
 				}
@@ -7534,7 +7534,7 @@ pub mod api {
 				#[doc = "this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
-				#[doc = "`mining_config.blocks_before_bid_end_for_vrf_close` blocks of the slot end time."]
+				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
 				#[doc = ""]
 				#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
 				#[doc = ""]
@@ -7615,7 +7615,7 @@ pub mod api {
 				#[doc = "this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
-				#[doc = "`mining_config.blocks_before_bid_end_for_vrf_close` blocks of the slot end time."]
+				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
 				#[doc = ""]
 				#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
 				#[doc = ""]
@@ -7817,16 +7817,16 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct MiningConfigurationUpdated {
-				pub blocks_before_bid_end_for_vrf_close:
-					mining_configuration_updated::BlocksBeforeBidEndForVrfClose,
-				pub blocks_between_slots: mining_configuration_updated::BlocksBetweenSlots,
+				pub ticks_before_bid_end_for_vrf_close:
+					mining_configuration_updated::TicksBeforeBidEndForVrfClose,
+				pub ticks_between_slots: mining_configuration_updated::TicksBetweenSlots,
 				pub slot_bidding_start_after_ticks:
 					mining_configuration_updated::SlotBiddingStartAfterTicks,
 			}
 			pub mod mining_configuration_updated {
 				use super::runtime_types;
-				pub type BlocksBeforeBidEndForVrfClose = ::core::primitive::u32;
-				pub type BlocksBetweenSlots = ::core::primitive::u32;
+				pub type TicksBeforeBidEndForVrfClose = ::core::primitive::u64;
+				pub type TicksBetweenSlots = ::core::primitive::u64;
 				pub type SlotBiddingStartAfterTicks = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MiningConfigurationUpdated {
@@ -7898,9 +7898,7 @@ pub mod api {
 				pub mod mining_config {
 					use super::runtime_types;
 					pub type MiningConfig =
-						runtime_types::argon_primitives::block_seal::MiningSlotConfig<
-							::core::primitive::u32,
-						>;
+						runtime_types::argon_primitives::block_seal::MiningSlotConfig;
 				}
 				pub mod current_slot_id {
 					use super::runtime_types;
@@ -8173,9 +8171,9 @@ pub mod api {
 						"MiningConfig",
 						(),
 						[
-							2u8, 214u8, 45u8, 133u8, 59u8, 0u8, 123u8, 159u8, 108u8, 147u8, 220u8,
-							94u8, 60u8, 42u8, 152u8, 197u8, 23u8, 167u8, 150u8, 227u8, 193u8,
-							178u8, 84u8, 137u8, 49u8, 22u8, 151u8, 161u8, 196u8, 92u8, 159u8, 10u8,
+							36u8, 76u8, 177u8, 112u8, 216u8, 179u8, 229u8, 248u8, 222u8, 245u8,
+							1u8, 80u8, 149u8, 252u8, 91u8, 81u8, 98u8, 190u8, 12u8, 183u8, 242u8,
+							228u8, 99u8, 72u8, 82u8, 198u8, 93u8, 212u8, 157u8, 167u8, 6u8, 91u8,
 						],
 					)
 				}
@@ -9467,12 +9465,12 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultMiningBondsChangeScheduled {
 				pub vault_id: vault_mining_bonds_change_scheduled::VaultId,
-				pub change_block: vault_mining_bonds_change_scheduled::ChangeBlock,
+				pub change_tick: vault_mining_bonds_change_scheduled::ChangeTick,
 			}
 			pub mod vault_mining_bonds_change_scheduled {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type ChangeBlock = ::core::primitive::u32;
+				pub type ChangeTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultMiningBondsChangeScheduled {
 				const PALLET: &'static str = "Vaults";
@@ -9491,12 +9489,12 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultTermsChangeScheduled {
 				pub vault_id: vault_terms_change_scheduled::VaultId,
-				pub change_block: vault_terms_change_scheduled::ChangeBlock,
+				pub change_tick: vault_terms_change_scheduled::ChangeTick,
 			}
 			pub mod vault_terms_change_scheduled {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type ChangeBlock = ::core::primitive::u32;
+				pub type ChangeTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultTermsChangeScheduled {
 				const PALLET: &'static str = "Vaults";
@@ -9588,7 +9586,6 @@ pub mod api {
 					pub type VaultsById = runtime_types::argon_primitives::bond::Vault<
 						crate::types::AccountId32,
 						::core::primitive::u128,
-						::core::primitive::u32,
 					>;
 					pub type Param0 = ::core::primitive::u32;
 				}
@@ -9600,21 +9597,21 @@ pub mod api {
 					);
 					pub type Param0 = ::core::primitive::u32;
 				}
-				pub mod pending_terms_modifications_by_block {
+				pub mod pending_terms_modifications_by_tick {
 					use super::runtime_types;
-					pub type PendingTermsModificationsByBlock =
+					pub type PendingTermsModificationsByTick =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u32,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod pending_funding_modifications_by_block {
+				pub mod pending_funding_modifications_by_tick {
 					use super::runtime_types;
-					pub type PendingFundingModificationsByBlock =
+					pub type PendingFundingModificationsByTick =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u32,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
 			}
 			pub struct StorageApi;
@@ -9655,9 +9652,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							90u8, 56u8, 243u8, 114u8, 205u8, 185u8, 41u8, 230u8, 146u8, 93u8, 44u8,
-							187u8, 193u8, 173u8, 194u8, 39u8, 77u8, 32u8, 220u8, 187u8, 239u8,
-							17u8, 223u8, 103u8, 69u8, 25u8, 152u8, 228u8, 173u8, 255u8, 4u8, 181u8,
+							199u8, 43u8, 167u8, 59u8, 254u8, 37u8, 211u8, 179u8, 108u8, 109u8,
+							140u8, 107u8, 75u8, 87u8, 147u8, 185u8, 57u8, 16u8, 255u8, 222u8,
+							137u8, 140u8, 23u8, 223u8, 236u8, 232u8, 114u8, 244u8, 172u8, 135u8,
+							44u8, 106u8,
 						],
 					)
 				}
@@ -9681,9 +9679,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							90u8, 56u8, 243u8, 114u8, 205u8, 185u8, 41u8, 230u8, 146u8, 93u8, 44u8,
-							187u8, 193u8, 173u8, 194u8, 39u8, 77u8, 32u8, 220u8, 187u8, 239u8,
-							17u8, 223u8, 103u8, 69u8, 25u8, 152u8, 228u8, 173u8, 255u8, 4u8, 181u8,
+							199u8, 43u8, 167u8, 59u8, 254u8, 37u8, 211u8, 179u8, 108u8, 109u8,
+							140u8, 107u8, 75u8, 87u8, 147u8, 185u8, 57u8, 16u8, 255u8, 222u8,
+							137u8, 140u8, 23u8, 223u8, 236u8, 232u8, 114u8, 244u8, 172u8, 135u8,
+							44u8, 106u8,
 						],
 					)
 				}
@@ -9738,78 +9737,103 @@ pub mod api {
 				}
 				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1 slot"]
 				#[doc = " change away)"]
-				pub fn pending_terms_modifications_by_block_iter(
+				pub fn pending_terms_modifications_by_tick_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::pending_terms_modifications_by_block::PendingTermsModificationsByBlock,
+					types::pending_terms_modifications_by_tick::PendingTermsModificationsByTick,
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingTermsModificationsByBlock",
+						"PendingTermsModificationsByTick",
 						(),
 						[
-							73u8, 78u8, 166u8, 219u8, 56u8, 178u8, 50u8, 224u8, 11u8, 41u8, 148u8,
-							28u8, 137u8, 75u8, 207u8, 172u8, 199u8, 18u8, 175u8, 112u8, 91u8, 46u8,
-							21u8, 226u8, 48u8, 43u8, 135u8, 247u8, 45u8, 100u8, 124u8, 211u8,
+							221u8, 142u8, 99u8, 230u8, 77u8, 103u8, 135u8, 97u8, 170u8, 170u8,
+							144u8, 160u8, 166u8, 244u8, 100u8, 17u8, 180u8, 187u8, 171u8, 179u8,
+							78u8, 168u8, 163u8, 149u8, 230u8, 210u8, 228u8, 178u8, 133u8, 210u8,
+							121u8, 195u8,
 						],
 					)
 				}
 				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1 slot"]
 				#[doc = " change away)"]
-				pub fn pending_terms_modifications_by_block(
+				pub fn pending_terms_modifications_by_tick(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::pending_terms_modifications_by_block::Param0>,
+					_0: impl ::core::borrow::Borrow<types::pending_terms_modifications_by_tick::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::pending_terms_modifications_by_block::Param0,
+						types::pending_terms_modifications_by_tick::Param0,
 					>,
-					types::pending_terms_modifications_by_block::PendingTermsModificationsByBlock,
+					types::pending_terms_modifications_by_tick::PendingTermsModificationsByTick,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingTermsModificationsByBlock",
+						"PendingTermsModificationsByTick",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							73u8, 78u8, 166u8, 219u8, 56u8, 178u8, 50u8, 224u8, 11u8, 41u8, 148u8,
-							28u8, 137u8, 75u8, 207u8, 172u8, 199u8, 18u8, 175u8, 112u8, 91u8, 46u8,
-							21u8, 226u8, 48u8, 43u8, 135u8, 247u8, 45u8, 100u8, 124u8, 211u8,
+							221u8, 142u8, 99u8, 230u8, 77u8, 103u8, 135u8, 97u8, 170u8, 170u8,
+							144u8, 160u8, 166u8, 244u8, 100u8, 17u8, 180u8, 187u8, 171u8, 179u8,
+							78u8, 168u8, 163u8, 149u8, 230u8, 210u8, 228u8, 178u8, 133u8, 210u8,
+							121u8, 195u8,
 						],
 					)
 				}
 				#[doc = " Pending funding that will be committed at the given block number (must be a minimum of 1"]
-				#[doc = " slot change away)"]				pub fn pending_funding_modifications_by_block_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_funding_modifications_by_block :: PendingFundingModificationsByBlock , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+				#[doc = " slot change away)"]
+				pub fn pending_funding_modifications_by_tick_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_funding_modifications_by_tick::PendingFundingModificationsByTick,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingFundingModificationsByBlock",
+						"PendingFundingModificationsByTick",
 						(),
 						[
-							161u8, 132u8, 124u8, 107u8, 139u8, 70u8, 52u8, 177u8, 12u8, 221u8,
-							147u8, 54u8, 173u8, 162u8, 68u8, 123u8, 53u8, 12u8, 155u8, 238u8, 9u8,
-							242u8, 78u8, 20u8, 203u8, 21u8, 226u8, 159u8, 156u8, 4u8, 28u8, 6u8,
+							216u8, 198u8, 102u8, 90u8, 39u8, 26u8, 75u8, 182u8, 95u8, 167u8, 114u8,
+							110u8, 253u8, 255u8, 201u8, 96u8, 2u8, 120u8, 136u8, 156u8, 246u8,
+							107u8, 215u8, 73u8, 24u8, 82u8, 250u8, 40u8, 19u8, 93u8, 141u8, 188u8,
 						],
 					)
 				}
 				#[doc = " Pending funding that will be committed at the given block number (must be a minimum of 1"]
-				#[doc = " slot change away)"]				pub fn pending_funding_modifications_by_block (& self , _0 : impl :: core :: borrow :: Borrow < types :: pending_funding_modifications_by_block :: Param0 > ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_funding_modifications_by_block :: Param0 > , types :: pending_funding_modifications_by_block :: PendingFundingModificationsByBlock , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+				#[doc = " slot change away)"]
+				pub fn pending_funding_modifications_by_tick(
+					&self,
+					_0: impl ::core::borrow::Borrow<
+						types::pending_funding_modifications_by_tick::Param0,
+					>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_funding_modifications_by_tick::Param0,
+					>,
+					types::pending_funding_modifications_by_tick::PendingFundingModificationsByTick,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"PendingFundingModificationsByBlock",
+						"PendingFundingModificationsByTick",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							161u8, 132u8, 124u8, 107u8, 139u8, 70u8, 52u8, 177u8, 12u8, 221u8,
-							147u8, 54u8, 173u8, 162u8, 68u8, 123u8, 53u8, 12u8, 155u8, 238u8, 9u8,
-							242u8, 78u8, 20u8, 203u8, 21u8, 226u8, 159u8, 156u8, 4u8, 28u8, 6u8,
+							216u8, 198u8, 102u8, 90u8, 39u8, 26u8, 75u8, 182u8, 95u8, 167u8, 114u8,
+							110u8, 253u8, 255u8, 201u8, 96u8, 2u8, 120u8, 136u8, 156u8, 246u8,
+							107u8, 215u8, 73u8, 24u8, 82u8, 250u8, 40u8, 19u8, 93u8, 141u8, 188u8,
 						],
 					)
 				}
@@ -9836,31 +9860,31 @@ pub mod api {
 					)
 				}
 				#[doc = " Argon blocks per day"]
-				pub fn blocks_per_day(
+				pub fn ticks_per_day(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
-						"BlocksPerDay",
+						"TicksPerDay",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
 				#[doc = " The max pending vault term changes per block"]
-				pub fn max_pending_term_modifications_per_block(
+				pub fn max_pending_term_modifications_per_tick(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
-						"MaxPendingTermModificationsPerBlock",
+						"MaxPendingTermModificationsPerTick",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -9869,39 +9893,39 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The number of blocks that a change in terms will take before applying. Terms only apply"]
+				#[doc = " The number of ticks that a change in terms will take before applying. Terms only apply"]
 				#[doc = " on a slot changeover, so this setting is the minimum blocks that must pass, in"]
 				#[doc = " addition to the time to the next slot after that"]
-				pub fn min_terms_modification_block_delay(
+				pub fn min_terms_modification_tick_delay(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
-						"MinTermsModificationBlockDelay",
+						"MinTermsModificationTickDelay",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
-				#[doc = " The number of blocks that a funding change will be delayed before it takes effect"]
-				pub fn mining_argon_increase_block_delay(
+				#[doc = " The number of ticks that a funding change will be delayed before it takes effect"]
+				pub fn mining_argon_increase_tick_delay(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
-						"MiningArgonIncreaseBlockDelay",
+						"MiningArgonIncreaseTickDelay",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -10135,8 +10159,7 @@ pub mod api {
 				pub type BondedAccountId = crate::types::AccountId32;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
-				pub type Expiration =
-					runtime_types::argon_primitives::bond::BondExpiration<::core::primitive::u32>;
+				pub type Expiration = runtime_types::argon_primitives::bond::BondExpiration;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BondCreated {
 				const PALLET: &'static str = "Bonds";
@@ -10404,7 +10427,6 @@ pub mod api {
 					pub type BondsById = runtime_types::argon_primitives::bond::Bond<
 						crate::types::AccountId32,
 						::core::primitive::u128,
-						::core::primitive::u32,
 					>;
 					pub type Param0 = ::core::primitive::u64;
 				}
@@ -10414,7 +10436,7 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u64,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
 				pub mod bitcoin_bond_completions {
 					use super::runtime_types;
@@ -10497,10 +10519,10 @@ pub mod api {
 						"BondsById",
 						(),
 						[
-							158u8, 187u8, 215u8, 201u8, 244u8, 72u8, 204u8, 128u8, 109u8, 224u8,
-							87u8, 206u8, 173u8, 162u8, 16u8, 128u8, 179u8, 158u8, 251u8, 149u8,
-							168u8, 79u8, 252u8, 207u8, 206u8, 17u8, 171u8, 28u8, 3u8, 30u8, 197u8,
-							210u8,
+							193u8, 211u8, 192u8, 239u8, 149u8, 43u8, 221u8, 68u8, 60u8, 231u8,
+							203u8, 239u8, 223u8, 40u8, 63u8, 21u8, 78u8, 191u8, 166u8, 69u8, 37u8,
+							147u8, 94u8, 141u8, 222u8, 190u8, 219u8, 144u8, 16u8, 102u8, 14u8,
+							214u8,
 						],
 					)
 				}
@@ -10524,10 +10546,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							158u8, 187u8, 215u8, 201u8, 244u8, 72u8, 204u8, 128u8, 109u8, 224u8,
-							87u8, 206u8, 173u8, 162u8, 16u8, 128u8, 179u8, 158u8, 251u8, 149u8,
-							168u8, 79u8, 252u8, 207u8, 206u8, 17u8, 171u8, 28u8, 3u8, 30u8, 197u8,
-							210u8,
+							193u8, 211u8, 192u8, 239u8, 149u8, 43u8, 221u8, 68u8, 60u8, 231u8,
+							203u8, 239u8, 223u8, 40u8, 63u8, 21u8, 78u8, 191u8, 166u8, 69u8, 37u8,
+							147u8, 94u8, 141u8, 222u8, 190u8, 219u8, 144u8, 16u8, 102u8, 14u8,
+							214u8,
 						],
 					)
 				}
@@ -10546,9 +10568,10 @@ pub mod api {
 						"MiningBondCompletions",
 						(),
 						[
-							153u8, 181u8, 17u8, 224u8, 255u8, 219u8, 239u8, 203u8, 112u8, 13u8,
-							124u8, 44u8, 185u8, 1u8, 71u8, 170u8, 230u8, 196u8, 81u8, 84u8, 173u8,
-							193u8, 68u8, 17u8, 231u8, 0u8, 26u8, 21u8, 175u8, 242u8, 152u8, 133u8,
+							207u8, 27u8, 116u8, 191u8, 164u8, 75u8, 216u8, 144u8, 254u8, 177u8,
+							119u8, 136u8, 118u8, 127u8, 75u8, 26u8, 169u8, 90u8, 3u8, 0u8, 88u8,
+							149u8, 128u8, 252u8, 131u8, 172u8, 35u8, 253u8, 87u8, 223u8, 149u8,
+							110u8,
 						],
 					)
 				}
@@ -10572,9 +10595,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							153u8, 181u8, 17u8, 224u8, 255u8, 219u8, 239u8, 203u8, 112u8, 13u8,
-							124u8, 44u8, 185u8, 1u8, 71u8, 170u8, 230u8, 196u8, 81u8, 84u8, 173u8,
-							193u8, 68u8, 17u8, 231u8, 0u8, 26u8, 21u8, 175u8, 242u8, 152u8, 133u8,
+							207u8, 27u8, 116u8, 191u8, 164u8, 75u8, 216u8, 144u8, 254u8, 177u8,
+							119u8, 136u8, 118u8, 127u8, 75u8, 26u8, 169u8, 90u8, 3u8, 0u8, 88u8,
+							149u8, 128u8, 252u8, 131u8, 172u8, 35u8, 253u8, 87u8, 223u8, 149u8,
+							110u8,
 						],
 					)
 				}
@@ -10845,19 +10869,19 @@ pub mod api {
 					)
 				}
 				#[doc = " Argon blocks per day"]
-				pub fn argon_blocks_per_day(
+				pub fn argon_ticks_per_day(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Bonds",
-						"ArgonBlocksPerDay",
+						"ArgonTicksPerDay",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -15094,50 +15118,50 @@ pub mod api {
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<(
 					::core::primitive::u128,
-					::core::primitive::u32,
+					::core::primitive::u64,
 					::core::primitive::u128,
 				)> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
 						"IncrementalGrowth",
 						[
-							1u8, 241u8, 87u8, 117u8, 186u8, 191u8, 55u8, 21u8, 58u8, 119u8, 175u8,
-							141u8, 32u8, 155u8, 16u8, 151u8, 43u8, 63u8, 217u8, 103u8, 78u8, 32u8,
-							84u8, 226u8, 174u8, 67u8, 111u8, 223u8, 207u8, 239u8, 135u8, 238u8,
+							230u8, 162u8, 24u8, 82u8, 222u8, 208u8, 96u8, 36u8, 100u8, 253u8, 85u8,
+							101u8, 120u8, 227u8, 245u8, 106u8, 81u8, 41u8, 33u8, 138u8, 19u8,
+							254u8, 39u8, 216u8, 14u8, 148u8, 134u8, 93u8, 34u8, 0u8, 46u8, 210u8,
 						],
 					)
 				}
-				#[doc = " Number of blocks for halving of ownership share rewards"]
-				pub fn halving_blocks(
+				#[doc = " Number of ticks for halving of ownership share rewards"]
+				pub fn halving_ticks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
-						"HalvingBlocks",
+						"HalvingTicks",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
-				#[doc = " The block number at which the halving begins for ownership tokens"]
-				pub fn halving_begin_block(
+				#[doc = " The tick number at which the halving begins for ownership tokens"]
+				pub fn halving_begin_tick(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
-						"HalvingBeginBlock",
+						"HalvingBeginTick",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -23037,11 +23061,11 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct MiningSlotConfig<_0> {
+				pub struct MiningSlotConfig {
 					#[codec(compact)]
-					pub blocks_before_bid_end_for_vrf_close: _0,
+					pub ticks_before_bid_end_for_vrf_close: ::core::primitive::u64,
 					#[codec(compact)]
-					pub blocks_between_slots: _0,
+					pub ticks_between_slots: ::core::primitive::u64,
 					#[codec(compact)]
 					pub slot_bidding_start_after_ticks: ::core::primitive::u64,
 				}
@@ -23161,10 +23185,10 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct Bond<_0, _1, _2> {
+				pub struct Bond<_0, _1> {
 					pub bond_type: runtime_types::argon_primitives::bond::BondType,
 					#[codec(compact)]
-					pub vault_id: _2,
+					pub vault_id: ::core::primitive::u32,
 					pub utxo_id: ::core::option::Option<::core::primitive::u64>,
 					pub bonded_account_id: _0,
 					#[codec(compact)]
@@ -23174,8 +23198,8 @@ pub mod api {
 					#[codec(compact)]
 					pub amount: _1,
 					#[codec(compact)]
-					pub start_block: _2,
-					pub expiration: runtime_types::argon_primitives::bond::BondExpiration<_2>,
+					pub start_tick: ::core::primitive::u64,
+					pub expiration: runtime_types::argon_primitives::bond::BondExpiration,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -23249,9 +23273,9 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub enum BondExpiration<_0> {
+				pub enum BondExpiration {
 					#[codec(index = 0)]
-					ArgonBlock(#[codec(compact)] _0),
+					AtTick(#[codec(compact)] ::core::primitive::u64),
 					#[codec(index = 1)]
 					BitcoinBlock(#[codec(compact)] ::core::primitive::u64),
 				}
@@ -23291,7 +23315,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct Vault<_0, _1, _2> {
+				pub struct Vault<_0, _1> {
 					pub operator_account_id: _0,
 					pub bitcoin_argons: runtime_types::argon_primitives::bond::VaultArgons<_1>,
 					#[codec(compact)]
@@ -23305,10 +23329,10 @@ pub mod api {
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					pub is_closed: ::core::primitive::bool,
 					pub pending_terms: ::core::option::Option<(
-						_2,
+						::core::primitive::u64,
 						runtime_types::argon_primitives::bond::VaultTerms<_1>,
 					)>,
-					pub pending_mining_argons: ::core::option::Option<(_2, _1)>,
+					pub pending_mining_argons: ::core::option::Option<(::core::primitive::u64, _1)>,
 					pub pending_bitcoins: _1,
 				}
 				#[derive(
@@ -27013,9 +27037,7 @@ pub mod api {
 						bonded_account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
-						expiration: runtime_types::argon_primitives::bond::BondExpiration<
-							::core::primitive::u32,
-						>,
+						expiration: runtime_types::argon_primitives::bond::BondExpiration,
 					},
 					#[codec(index = 1)]
 					BondCompleted {
@@ -28134,7 +28156,7 @@ pub mod api {
 					#[doc = "this event, you will be able to ensure your bid is accepted."]
 					#[doc = ""]
 					#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
-					#[doc = "`mining_config.blocks_before_bid_end_for_vrf_close` blocks of the slot end time."]
+					#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
 					#[doc = ""]
 					#[doc = "The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`."]
 					#[doc = ""]
@@ -28281,8 +28303,8 @@ pub mod api {
 					},
 					#[codec(index = 5)]
 					MiningConfigurationUpdated {
-						blocks_before_bid_end_for_vrf_close: ::core::primitive::u32,
-						blocks_between_slots: ::core::primitive::u32,
+						ticks_before_bid_end_for_vrf_close: ::core::primitive::u64,
+						ticks_between_slots: ::core::primitive::u64,
 						slot_bidding_start_after_ticks: ::core::primitive::u64,
 					},
 				}
@@ -30602,12 +30624,12 @@ pub mod api {
 					#[codec(index = 3)]
 					VaultMiningBondsChangeScheduled {
 						vault_id: ::core::primitive::u32,
-						change_block: ::core::primitive::u32,
+						change_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 4)]
 					VaultTermsChangeScheduled {
 						vault_id: ::core::primitive::u32,
-						change_block: ::core::primitive::u32,
+						change_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 5)]
 					VaultTermsChanged { vault_id: ::core::primitive::u32 },

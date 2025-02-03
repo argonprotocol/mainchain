@@ -27,7 +27,7 @@ pub(crate) mod utils {
 	};
 	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
-	use sp_core::{crypto::key_types::GRANDPA, Pair};
+	use sp_core::{crypto::key_types::GRANDPA, sr25519, Pair};
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring};
 	use subxt::tx::TxInBlock;
 
@@ -171,7 +171,7 @@ pub(crate) mod utils {
 
 	pub(crate) async fn register_miner(
 		node: &ArgonTestNode,
-		miner: Sr25519Keyring,
+		miner: sr25519::Pair,
 		keys: SessionKeys,
 	) -> anyhow::Result<()> {
 		let client = node.client.clone();
@@ -181,12 +181,14 @@ pub(crate) mod utils {
 			.await?
 			.unwrap();
 		println!("ownership needed {:?}", ownership_needed);
+		let balance = client.get_argons(&miner.public().into()).await.unwrap();
+		println!("Account argons {:#?}", balance);
 
 		println!("Registering miner");
 		let register = client
 			.submit_tx(
 				&tx().mining_slot().bid(None, RewardDestination::Owner, keys),
-				&Sr25519Signer::new(miner.pair()),
+				&Sr25519Signer::new(miner),
 				None,
 				true,
 			)

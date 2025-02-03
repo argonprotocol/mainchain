@@ -268,7 +268,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * this event, you will be able to ensure your bid is accepted.
        *
        * NOTE: bidding for each slot will be closed at a random block within
-       * `mining_config.blocks_before_bid_end_for_vrf_close` blocks of the slot end time.
+       * `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
        *
        * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
        *

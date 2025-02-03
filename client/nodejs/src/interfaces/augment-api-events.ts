@@ -298,7 +298,7 @@ declare module '@polkadot/api-base/types/events' {
       StateMachineRemoved: AugmentedEvent<ApiType, [stateMachines: Vec<IsmpHostStateMachine>], { stateMachines: Vec<IsmpHostStateMachine> }>;
     };
     miningSlot: {
-      MiningConfigurationUpdated: AugmentedEvent<ApiType, [blocksBeforeBidEndForVrfClose: u32, blocksBetweenSlots: u32, slotBiddingStartAfterTicks: u64], { blocksBeforeBidEndForVrfClose: u32, blocksBetweenSlots: u32, slotBiddingStartAfterTicks: u64 }>;
+      MiningConfigurationUpdated: AugmentedEvent<ApiType, [ticksBeforeBidEndForVrfClose: u64, ticksBetweenSlots: u64, slotBiddingStartAfterTicks: u64], { ticksBeforeBidEndForVrfClose: u64, ticksBetweenSlots: u64, slotBiddingStartAfterTicks: u64 }>;
       NewMiners: AugmentedEvent<ApiType, [startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>], { startIndex: u32, newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration> }>;
       SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
       SlotBidderReplaced: AugmentedEvent<ApiType, [accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool], { accountId: AccountId32, bondId: Option<u64>, keptOwnershipBond: bool }>;
@@ -590,11 +590,11 @@ declare module '@polkadot/api-base/types/events' {
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
       VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
-      VaultMiningBondsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeBlock: u32], { vaultId: u32, changeBlock: u32 }>;
+      VaultMiningBondsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
       VaultMiningBondsIncreased: AugmentedEvent<ApiType, [vaultId: u32, miningArgons: u128], { vaultId: u32, miningArgons: u128 }>;
       VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
-      VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeBlock: u32], { vaultId: u32, changeBlock: u32 }>;
+      VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
     };
   } // AugmentedEvents
 } // declare module

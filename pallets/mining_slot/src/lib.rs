@@ -10,8 +10,9 @@ use argon_primitives::{
 	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
+	tick::Tick,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
-	RewardShare,
+	RewardShare, TickProvider,
 };
 use codec::Codec;
 use frame_support::{
@@ -21,7 +22,6 @@ use frame_support::{
 		tokens::Precision,
 	},
 };
-use frame_system::pallet_prelude::BlockNumberFor;
 pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
@@ -45,7 +45,7 @@ pub mod weights;
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
 /// `Cohort` of miners to operate for a given number of blocks (an `Era`).
 ///
-/// New miner slots are rotated in every `mining_config.blocks_between_slots` blocks. Each cohort
+/// New miner slots are rotated in every `mining_config.ticks_between_slots` blocks. Each cohort
 /// will have `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
 ///
 /// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
@@ -88,6 +88,7 @@ pub mod pallet {
 		block_seal::{MiningRegistration, RewardDestination},
 		bond::{BondError, BondProvider},
 		prelude::*,
+		TickProvider,
 	};
 
 	use super::*;
@@ -157,11 +158,7 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BondProvider: BondProvider<
-			Balance = Self::Balance,
-			AccountId = Self::AccountId,
-			BlockNumber = BlockNumberFor<Self>,
-		>;
+		type BondProvider: BondProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 
@@ -175,7 +172,7 @@ pub mod pallet {
 		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
 
 		/// The current tick
-		type TicksSinceGenesis: Get<Tick>;
+		type TickProvider: TickProvider<Self::Block>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -227,8 +224,7 @@ pub mod pallet {
 
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
-	pub(super) type MiningConfig<T: Config> =
-		StorageValue<_, MiningSlotConfig<BlockNumberFor<T>>, ValueQuery>;
+	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
 
 	/// The current slot id
 	#[pallet::storage]
@@ -237,7 +233,7 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub mining_config: MiningSlotConfig<BlockNumberFor<T>>,
+		pub mining_config: MiningSlotConfig,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
@@ -281,8 +277,8 @@ pub mod pallet {
 			error: DispatchError,
 		},
 		MiningConfigurationUpdated {
-			blocks_before_bid_end_for_vrf_close: BlockNumberFor<T>,
-			blocks_between_slots: BlockNumberFor<T>,
+			ticks_before_bid_end_for_vrf_close: Tick,
+			ticks_between_slots: Tick,
 			slot_bidding_start_after_ticks: Tick,
 		},
 	}
@@ -341,26 +337,33 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let block_number_u32: u32 =
-				UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
-			let blocks_between_slots = Self::blocks_between_slots();
-			let mining_config = MiningConfig::<T>::get();
-
-			if T::TicksSinceGenesis::get() >= mining_config.slot_bidding_start_after_ticks &&
-				block_number_u32 % blocks_between_slots == 0
-			{
+			let current_slot_id = CurrentSlotId::<T>::get();
+			let next_slot_id = Self::calculate_slot_id();
+			if next_slot_id > current_slot_id {
+				log::trace!("Starting Slot {}", next_slot_id);
 				Self::adjust_ownership_bond_amount();
-				Self::start_new_slot(block_number_u32);
+				Self::start_new_slot(next_slot_id);
 				return T::DbWeight::get().reads_writes(0, 2);
 			}
 
+			if current_slot_id == 0 &&
+				!IsNextSlotBiddingOpen::<T>::get() &&
+				T::TickProvider::elapsed_ticks() >=
+					MiningConfig::<T>::get().slot_bidding_start_after_ticks
+			{
+				log::trace!(
+					"Opening Slot 1 bidding {}",
+					MiningConfig::<T>::get().slot_bidding_start_after_ticks
+				);
+				IsNextSlotBiddingOpen::<T>::put(true);
+			}
+
 			// rotate grandpas on off rotations
-			let current_slot = CurrentSlotId::<T>::get();
 			let rotate_grandpa_blocks =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
-			if !HasAddedGrandpaRotation::<T>::get() || block_number_u32 % rotate_grandpa_blocks == 0
-			{
-				T::SlotEvents::rotate_grandpas::<T::Keys>(current_slot, vec![], vec![]);
+			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
+			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
+				T::SlotEvents::rotate_grandpas::<T::Keys>(current_slot_id, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
 				return T::DbWeight::get().reads_writes(3, 2)
 			}
@@ -402,7 +405,7 @@ pub mod pallet {
 		/// this event, you will be able to ensure your bid is accepted.
 		///
 		/// NOTE: bidding for each slot will be closed at a random block within
-		/// `mining_config.blocks_before_bid_end_for_vrf_close` blocks of the slot end time.
+		/// `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
 		///
 		/// The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
 		///
@@ -427,7 +430,7 @@ pub mod pallet {
 
 			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
 
-			let next_cohort_block_number = Self::get_next_slot_block_number();
+			let next_cohort_tick = Self::get_next_slot_tick();
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&who) {
 				let cohort_start_index = Self::get_next_slot_starting_index();
 				let is_in_next_cohort = current_index >= cohort_start_index &&
@@ -444,7 +447,7 @@ pub mod pallet {
 			let mut bid = 0u128.into();
 
 			if let Some(bond_info) = bond_info {
-				let bond_end_block = next_cohort_block_number + Self::get_mining_window_blocks();
+				let bond_end_tick = next_cohort_tick + Self::get_mining_window_ticks();
 				let modify_bond_id = NextSlotCohort::<T>::get()
 					.iter()
 					.find(|x| x.account_id == who)
@@ -453,7 +456,7 @@ pub mod pallet {
 					bond_info.vault_id,
 					who.clone(),
 					bond_info.amount,
-					bond_end_block,
+					bond_end_tick,
 					modify_bond_id,
 				)
 				.map_err(Error::<T>::from)?;
@@ -548,8 +551,8 @@ pub mod pallet {
 				if a.slot_bidding_start_after_ticks != mining_slot_delay {
 					a.slot_bidding_start_after_ticks = mining_slot_delay;
 					Self::deposit_event(Event::<T>::MiningConfigurationUpdated {
-						blocks_before_bid_end_for_vrf_close: a.blocks_before_bid_end_for_vrf_close,
-						blocks_between_slots: a.blocks_between_slots,
+						ticks_before_bid_end_for_vrf_close: a.ticks_before_bid_end_for_vrf_close,
+						ticks_between_slots: a.ticks_between_slots,
 						slot_bidding_start_after_ticks: a.slot_bidding_start_after_ticks,
 					});
 				}
@@ -615,8 +618,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn is_registered_mining_active() -> bool {
-		T::TicksSinceGenesis::get() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks &&
-			ActiveMinersCount::<T>::get() > 0
+		CurrentSlotId::<T>::get() > 0 && ActiveMinersCount::<T>::get() > 0
 	}
 
 	pub fn get_mining_authority(
@@ -640,10 +642,10 @@ impl<T: Config> Pallet<T> {
 			})
 	}
 
-	pub(crate) fn start_new_slot(block_number_u32: u32) {
-		let blocks_between_slots = Self::blocks_between_slots();
+	pub(crate) fn start_new_slot(slot_id: SlotId) {
 		let max_miners = T::MaxMiners::get();
 		let cohort_size = T::MaxCohortSize::get();
+
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
 			if bids.is_full() {
 				bids.pop();
@@ -651,12 +653,8 @@ impl<T: Config> Pallet<T> {
 			let _ = bids.try_insert(0, MiningBidStats::default());
 		});
 
-		let start_index_to_replace_miners = Self::get_slot_starting_index(
-			block_number_u32,
-			blocks_between_slots,
-			max_miners,
-			cohort_size,
-		);
+		let start_index_to_replace_miners =
+			Self::get_slot_starting_index(slot_id, max_miners, cohort_size);
 
 		let slot_cohort = NextSlotCohort::<T>::take();
 		IsNextSlotBiddingOpen::<T>::put(true);
@@ -774,15 +772,15 @@ impl<T: Config> Pallet<T> {
 	///    overall network security
 	///
 	/// Threshold is calculated so that it should be true 1 in
-	/// `MiningConfig.blocks_before_bid_end_for_vrf_close` times.
+	/// `MiningConfig.ticks_before_bid_end_for_vrf_close` times.
 	pub(crate) fn check_for_bidding_close(seal: &BlockSealInherent) -> bool {
-		let block_number = <frame_system::Pallet<T>>::block_number();
-		let next_slot_block_number = Self::calculate_next_slot_block_number(block_number);
+		let next_slot_tick = Self::get_next_slot_tick();
+		let current_tick = T::TickProvider::current_tick();
 		let mining_config = MiningConfig::<T>::get();
 
 		// Are we in the closing eligibility window?
-		if next_slot_block_number.saturating_sub(block_number) >
-			mining_config.blocks_before_bid_end_for_vrf_close
+		if next_slot_tick.saturating_sub(current_tick) >
+			mining_config.ticks_before_bid_end_for_vrf_close
 		{
 			return false;
 		}
@@ -791,12 +789,10 @@ impl<T: Config> Pallet<T> {
 			BlockSealInherent::Vote { seal_strength, .. } => {
 				let vrf_hash = blake2_256(seal_strength.encode().as_ref());
 				let vrf = U256::from_big_endian(&vrf_hash);
-				let block_close: u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
-					mining_config.blocks_before_bid_end_for_vrf_close,
-				);
+				let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
 				// Calculate the threshold for VRF comparison to achieve a probability of 1 in
-				// `MiningConfig.blocks_before_bid_end_for_vrf_close`
-				let threshold = U256::MAX / U256::from(block_close);
+				// `MiningConfig.ticks_before_bid_end_for_vrf_close`
+				let threshold = U256::MAX / U256::from(ticks_before_close);
 
 				vrf < threshold
 			},
@@ -804,55 +800,71 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
-	pub(crate) fn get_next_slot_block_number() -> BlockNumberFor<T> {
-		let block_number = <frame_system::Pallet<T>>::block_number();
-		Self::calculate_next_slot_block_number(block_number)
+	pub fn slot_1_tick() -> Tick {
+		let mining_config = MiningConfig::<T>::get();
+		let slot_1_ticks =
+			mining_config.slot_bidding_start_after_ticks + mining_config.ticks_between_slots;
+		let genesis_tick =
+			T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks());
+		genesis_tick.saturating_add(slot_1_ticks)
 	}
 
-	pub(crate) fn calculate_next_slot_block_number(
-		block_number: BlockNumberFor<T>,
-	) -> BlockNumberFor<T> {
-		let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
-		let offset_blocks = block_number % Self::blocks_between_slots();
-		(block_number + (Self::blocks_between_slots() - offset_blocks)).into()
+	pub fn ticks_since_mining_start() -> Tick {
+		T::TickProvider::current_tick().saturating_sub(Self::slot_1_tick())
 	}
 
-	pub fn get_slot_era() -> (BlockNumberFor<T>, BlockNumberFor<T>) {
-		let next_block = Self::get_next_slot_block_number();
-		(next_block, next_block + Self::get_mining_window_blocks())
+	pub(crate) fn get_next_slot_tick() -> Tick {
+		Self::tick_for_slot(CurrentSlotId::<T>::get() + 1)
+	}
+
+	pub fn get_next_slot_era() -> (Tick, Tick) {
+		let start_tick = Self::get_next_slot_tick();
+		(start_tick, start_tick + Self::get_mining_window_ticks())
+	}
+
+	pub(crate) fn calculate_slot_id() -> SlotId {
+		let mining_config = MiningConfig::<T>::get();
+		let slot_1_tick_start =
+			mining_config.slot_bidding_start_after_ticks + mining_config.ticks_between_slots;
+		if T::TickProvider::elapsed_ticks() < slot_1_tick_start {
+			return 0
+		}
+		let ticks_since_mining_start = Self::ticks_since_mining_start();
+		let slot_id = ticks_since_mining_start / mining_config.ticks_between_slots;
+		slot_id as SlotId + 1
+	}
+
+	pub fn tick_for_slot(slot_id: SlotId) -> Tick {
+		if slot_id == 0 {
+			// return genesis tick for slot 0
+			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks())
+		}
+		let slot_1_tick = Self::slot_1_tick();
+		let added_ticks = (slot_id - 1) * Self::ticks_between_slots();
+		slot_1_tick.saturating_add(added_ticks)
 	}
 
 	pub(crate) fn get_slot_starting_index(
-		block_number: u32,
-		blocks_between_slots: u32,
+		slot_id: SlotId,
 		max_miners: u32,
 		cohort_size: u32,
 	) -> u32 {
-		let cohort = block_number / blocks_between_slots;
-		(cohort * cohort_size) % max_miners
+		(slot_id as u32 * cohort_size) % max_miners
 	}
 
 	pub(crate) fn get_next_slot_starting_index() -> u32 {
-		let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(
-			<frame_system::Pallet<T>>::block_number(),
-		);
+		let current_slot_id = CurrentSlotId::<T>::get();
 		let cohort_size = T::MaxCohortSize::get();
 
-		Self::get_slot_starting_index(
-			block_number + 1,
-			Self::blocks_between_slots(),
-			T::MaxMiners::get(),
-			cohort_size,
-		)
+		Self::get_slot_starting_index(current_slot_id + 1, T::MaxMiners::get(), cohort_size)
 	}
 
-	pub fn get_mining_window_blocks() -> BlockNumberFor<T> {
-		let miners = T::MaxMiners::get();
-		let blocks_between_slots = Self::blocks_between_slots();
-		let cohort_size = T::MaxCohortSize::get();
+	pub fn get_mining_window_ticks() -> Tick {
+		let miners = T::MaxMiners::get() as u64;
+		let ticks_between_slots = Self::ticks_between_slots();
+		let cohort_size = T::MaxCohortSize::get() as u64;
 
-		let blocks_per_miner = miners.saturating_mul(blocks_between_slots) / cohort_size;
-		blocks_per_miner.into()
+		miners.saturating_mul(ticks_between_slots) / cohort_size
 	}
 
 	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
@@ -967,20 +979,18 @@ impl<T: Config> Pallet<T> {
 		});
 	}
 
-	fn blocks_between_slots() -> u32 {
-		UniqueSaturatedInto::<u32>::unique_saturated_into(
-			MiningConfig::<T>::get().blocks_between_slots,
-		)
+	fn ticks_between_slots() -> Tick {
+		MiningConfig::<T>::get().ticks_between_slots
 	}
 }
 
-impl<T: Config> MiningSlotProvider<BlockNumberFor<T>> for Pallet<T> {
-	fn get_next_slot_block_number() -> BlockNumberFor<T> {
-		Self::get_next_slot_block_number()
+impl<T: Config> MiningSlotProvider for Pallet<T> {
+	fn get_next_slot_tick() -> Tick {
+		Self::get_next_slot_tick()
 	}
 
-	fn mining_window_blocks() -> BlockNumberFor<T> {
-		Self::get_mining_window_blocks()
+	fn mining_window_tick() -> Tick {
+		Self::get_mining_window_ticks()
 	}
 }
 
@@ -1028,9 +1038,8 @@ impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 
 sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
-	pub trait MiningSlotApi<BlockNumber> where
-		BlockNumber: Codec {
-		fn next_slot_era() -> (BlockNumber, BlockNumber);
+	pub trait MiningSlotApi {
+		fn next_slot_era() -> (Tick, Tick);
 	}
 }
 

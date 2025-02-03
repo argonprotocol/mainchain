@@ -4,7 +4,7 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::Ticker,
-	AccountId, Balance, BlockNumber, BlockSealAuthorityId, ComputeDifficulty, Signature,
+	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
 use argon_runtime::{
 	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, ChainTransferConfig,
@@ -65,7 +65,7 @@ pub struct GenesisSettings {
 	pub initial_difficulty: ComputeDifficulty,
 	pub ticker: Ticker,
 	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
-	pub mining_config: MiningSlotConfig<BlockNumber>,
+	pub mining_config: MiningSlotConfig,
 	pub minimum_bitcoin_bond_satoshis: Satoshis,
 	pub hyperbridge_token_admin: AccountId,
 }

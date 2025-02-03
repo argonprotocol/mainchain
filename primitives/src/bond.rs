@@ -10,13 +10,13 @@ use crate::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, UtxoId,
 	},
 	block_seal::RewardSharing,
+	tick::Tick,
 	BondId, RewardShare, VaultId,
 };
 
 pub trait BondProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
-	type BlockNumber: Codec;
 
 	#[allow(clippy::type_complexity)]
 	/// Create a mining bond
@@ -24,7 +24,7 @@ pub trait BondProvider {
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
-		bond_until_block: Self::BlockNumber,
+		bond_until_tick: Tick,
 		modify_bond_id: Option<BondId>,
 	) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError>;
 
@@ -35,9 +35,8 @@ pub trait BondProvider {
 pub trait VaultProvider {
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
-	type BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>>;
+	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>>;
 
 	/// Recoup funds from the vault. This will be called if a vault does not move cosigned UTXOs in
 	/// the appropriate timeframe. Steps are taken to repay the bitcoin holder at the market rate.
@@ -52,14 +51,14 @@ pub trait VaultProvider {
 	///
 	/// Returns the amount that was recouped
 	fn compensate_lost_bitcoin(
-		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		bond: &Bond<Self::AccountId, Self::Balance>,
 		market_rate: Self::Balance,
 	) -> Result<Self::Balance, BondError>;
 
 	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
 	/// the system. It is assumed that the vault is in cahoots with the bonded account.
 	fn burn_vault_bitcoin_funds(
-		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		bond: &Bond<Self::AccountId, Self::Balance>,
 		amount_to_burn: Self::Balance,
 	) -> Result<(), BondError>;
 
@@ -69,14 +68,14 @@ pub trait VaultProvider {
 		vault_id: VaultId,
 		amount: Self::Balance,
 		bond_type: BondType,
-		blocks: Self::BlockNumber,
+		ticks: Tick,
 		bond_account_id: &Self::AccountId,
 	) -> Result<(Self::Balance, Self::Balance), BondError>;
 
 	/// Release the bonded funds for the given bond. This will be called when the bond is completed
 	/// or canceled. The remaining fee will be charged/returned based on the pro-rata owed
 	fn release_bonded_funds(
-		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		bond: &Bond<Self::AccountId, Self::Balance>,
 	) -> Result<Self::Balance, BondError>;
 
 	fn create_utxo_script_pubkey(
@@ -132,7 +131,6 @@ pub enum BondError {
 pub struct Vault<
 	AccountId: Codec,
 	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
-	BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
 > {
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
@@ -154,9 +152,9 @@ pub struct Vault<
 	/// If the vault is closed, no new bonds can be issued
 	pub is_closed: bool,
 	/// The terms that are pending to be applied to this vault at the given block number
-	pub pending_terms: Option<(BlockNumber, VaultTerms<Balance>)>,
+	pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
 	/// Any pending increase in mining bonds
-	pub pending_mining_argons: Option<(BlockNumber, Balance)>,
+	pub pending_mining_argons: Option<(Tick, Balance)>,
 	/// Bitcoins pending verification
 	pub pending_bitcoins: Balance,
 }
@@ -191,8 +189,7 @@ impl<
 			+ TypeInfo
 			+ PartialEq
 			+ Eq,
-		BlockNumber: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
-	> Vault<AccountId, Balance, BlockNumber>
+	> Vault<AccountId, Balance>
 {
 	pub fn bonded(&self) -> Balance {
 		self.bitcoin_argons.bonded.saturating_add(self.mining_argons.bonded)
@@ -287,7 +284,7 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> Vau
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
+pub struct Bond<AccountId: Codec, Balance: Codec> {
 	pub bond_type: BondType,
 	#[codec(compact)]
 	pub vault_id: VaultId,
@@ -300,14 +297,14 @@ pub struct Bond<AccountId: Codec, Balance: Codec, BlockNumber: Codec> {
 	#[codec(compact)]
 	pub amount: Balance,
 	#[codec(compact)]
-	pub start_block: BlockNumber,
-	pub expiration: BondExpiration<BlockNumber>,
+	pub start_tick: Tick,
+	pub expiration: BondExpiration,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-pub enum BondExpiration<BlockNumber: Codec> {
-	/// The bond will expire at the given block number
-	ArgonBlock(#[codec(compact)] BlockNumber),
+pub enum BondExpiration {
+	/// The bond will expire at the given tick
+	AtTick(#[codec(compact)] Tick),
 	/// The bond will expire at a bitcoin block height
 	BitcoinBlock(#[codec(compact)] BitcoinHeight),
 }

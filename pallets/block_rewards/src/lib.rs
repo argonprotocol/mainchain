@@ -97,11 +97,11 @@ pub mod pallet {
 		#[pallet::constant]
 		type IncrementalGrowth: Get<GrowthPath<Self>>;
 
-		/// Number of blocks for halving of ownership share rewards
+		/// Number of ticks for halving of ownership share rewards
 		#[pallet::constant]
 		type HalvingTicks: Get<Tick>;
 
-		/// The block number at which the halving begins for ownership tokens
+		/// The tick number at which the halving begins for ownership tokens
 		#[pallet::constant]
 		type HalvingBeginTick: Get<Tick>;
 

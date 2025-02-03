@@ -57,17 +57,17 @@ declare module '@polkadot/api-base/types/consts' {
     };
     blockRewards: {
       /**
-       * The block number at which the halving begins for ownership tokens
+       * The tick number at which the halving begins for ownership tokens
        **/
-      halvingBeginBlock: u32 & AugmentedConst<ApiType>;
+      halvingBeginTick: u64 & AugmentedConst<ApiType>;
       /**
-       * Number of blocks for halving of ownership share rewards
+       * Number of ticks for halving of ownership share rewards
        **/
-      halvingBlocks: u32 & AugmentedConst<ApiType>;
+      halvingTicks: u64 & AugmentedConst<ApiType>;
       /**
        * The growth path for both ownership and argons before halving
        **/
-      incrementalGrowth: ITuple<[u128, u32, u128]> & AugmentedConst<ApiType>;
+      incrementalGrowth: ITuple<[u128, u64, u128]> & AugmentedConst<ApiType>;
       /**
        * Blocks until a block reward is mature
        **/
@@ -112,7 +112,7 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * Argon blocks per day
        **/
-      argonBlocksPerDay: u32 & AugmentedConst<ApiType>;
+      argonTicksPerDay: u64 & AugmentedConst<ApiType>;
       /**
        * The number of bitcoin blocks a bitcoin bond is locked for
        **/
@@ -425,27 +425,27 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
-       * Argon blocks per day
-       **/
-      blocksPerDay: u32 & AugmentedConst<ApiType>;
-      /**
        * The max pending vault term changes per block
        **/
-      maxPendingTermModificationsPerBlock: u32 & AugmentedConst<ApiType>;
+      maxPendingTermModificationsPerTick: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum amount for a bond
        **/
       minimumBondAmount: u128 & AugmentedConst<ApiType>;
       /**
-       * The number of blocks that a funding change will be delayed before it takes effect
+       * The number of ticks that a funding change will be delayed before it takes effect
        **/
-      miningArgonIncreaseBlockDelay: u32 & AugmentedConst<ApiType>;
+      miningArgonIncreaseTickDelay: u64 & AugmentedConst<ApiType>;
       /**
-       * The number of blocks that a change in terms will take before applying. Terms only apply
+       * The number of ticks that a change in terms will take before applying. Terms only apply
        * on a slot changeover, so this setting is the minimum blocks that must pass, in
        * addition to the time to the next slot after that
        **/
-      minTermsModificationBlockDelay: u32 & AugmentedConst<ApiType>;
+      minTermsModificationTickDelay: u64 & AugmentedConst<ApiType>;
+      /**
+       * Argon blocks per day
+       **/
+      ticksPerDay: u64 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

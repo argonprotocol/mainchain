@@ -3,7 +3,8 @@ use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
 	bond::{BondError, BondProvider},
-	BlockNumber, VaultId,
+	tick::{Tick, Ticker},
+	BlockNumber, TickProvider, VaultId, VotingSchedule,
 };
 use env_logger::{Builder, Env};
 use frame_support::{
@@ -11,7 +12,7 @@ use frame_support::{
 	traits::{Currency, StorageMapShim},
 	weights::constants::RocksDbWeight,
 };
-use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::H256;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128, Percent};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -35,11 +36,11 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-	pub static BlocksBetweenSlots: u64 = 1;
+	pub static TicksBetweenSlots: u64 = 1;
 	pub static MaxCohortSize: u32 = 5;
 	pub static MaxMiners: u32 = 10;
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
-	pub static SlotBiddingStartTick: u64 = 3;
+	pub static SlotBiddingStartAfterTicks: u64 = 3;
 	pub static TargetBidsPerSlot: u32 = 5;
 	pub static MinOwnershipBondAmount: Balance = 1;
 	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
@@ -110,7 +111,8 @@ parameter_types! {
 	pub static GrandaRotations: Vec<SlotId> = vec![];
 
 	// set slot bidding active by default
-	pub static TicksSinceGenesis: u64 = 3;
+	pub static ElapsedTicks: u64 = 3;
+	pub static CurrentTick: Tick = 1;
 
 	pub static GrandpaRotationFrequency: BlockNumber = 10;
 }
@@ -119,13 +121,12 @@ pub struct StaticBondProvider;
 impl BondProvider for StaticBondProvider {
 	type Balance = Balance;
 	type AccountId = u64;
-	type BlockNumber = BlockNumberFor<Test>;
 
 	fn bond_mining_slot(
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
-		_bond_until_block: Self::BlockNumber,
+		_bond_until_tick: Tick,
 		modify_bond_id: Option<BondId>,
 	) -> Result<(argon_primitives::BondId, Option<RewardSharing<u64>>, Self::Balance), BondError> {
 		if let Some(modify_bond_id) = modify_bond_id {
@@ -190,6 +191,28 @@ impl From<u64> for MockSessionKeys {
 	}
 }
 
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		CurrentTick::get() - 1
+	}
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		todo!()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 2)
+	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		todo!()
+	}
+}
+
 impl pallet_mining_slot::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -206,7 +229,7 @@ impl pallet_mining_slot::Config for Test {
 	type SlotEvents = (StaticNewSlotEvent,);
 	type MiningAuthorityId = UintAuthorityId;
 	type Keys = MockSessionKeys;
-	type TicksSinceGenesis = TicksSinceGenesis;
+	type TickProvider = StaticTickProvider;
 
 	type GrandpaRotationBlocks = GrandpaRotationFrequency;
 }
@@ -216,10 +239,10 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let env = Env::new().default_filter_or("debug");
 	let _ = Builder::from_env(env).is_test(true).try_init();
 
-	let mining_config = MiningSlotConfig::<BlockNumberFor<Test>> {
-		slot_bidding_start_after_ticks: SlotBiddingStartTick::get(),
-		blocks_between_slots: BlocksBetweenSlots::get(),
-		blocks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
+	let mining_config = MiningSlotConfig {
+		slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),
+		ticks_between_slots: TicksBetweenSlots::get(),
+		ticks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
 	};
 
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();

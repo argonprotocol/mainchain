@@ -50,8 +50,8 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		initial_difficulty: (TICK_MILLIS * hashes_per_second / 1_000) as ComputeDifficulty,
 		initial_notaries: vec![], // No notaries
 		mining_config: MiningSlotConfig {
-			blocks_before_bid_end_for_vrf_close: 1,
-			blocks_between_slots: 4,
+			ticks_before_bid_end_for_vrf_close: 1,
+			ticks_between_slots: 4,
 			slot_bidding_start_after_ticks: 4,
 		},
 		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,

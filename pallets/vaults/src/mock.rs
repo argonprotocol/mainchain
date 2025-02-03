@@ -1,11 +1,15 @@
 use crate as pallet_vaults;
-use argon_primitives::{bitcoin::BitcoinNetwork, MiningSlotProvider};
+use argon_primitives::{
+	bitcoin::BitcoinNetwork,
+	tick::{Tick, Ticker},
+	MiningSlotProvider, TickProvider, VotingSchedule,
+};
 use env_logger::{Builder, Env};
 use frame_support::{
 	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{ConstU32, ConstU64};
+use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::BuildStorage;
 
 pub type Balance = u128;
@@ -62,30 +66,57 @@ parameter_types! {
 	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
 	pub const MinTermsModificationBlockDelay: BlockNumberFor<Test> = 25;
 	pub const FundingChangeBlockDelay: BlockNumberFor<Test> = 60;
+
+	pub static CurrentTick: Tick = 1;
+	pub static ElapsedTicks: Tick = 4;
 }
 pub struct StaticMiningSlotProvider;
-impl MiningSlotProvider<BlockNumberFor<Test>> for StaticMiningSlotProvider {
-	fn get_next_slot_block_number() -> BlockNumberFor<Test> {
+impl MiningSlotProvider for StaticMiningSlotProvider {
+	fn get_next_slot_tick() -> Tick {
 		NextSlot::get()
 	}
 
-	fn mining_window_blocks() -> BlockNumberFor<Test> {
+	fn mining_window_tick() -> Tick {
 		MiningWindowBlocks::get()
 	}
 }
+
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		CurrentTick::get() - 1
+	}
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		todo!()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 2)
+	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		todo!()
+	}
+}
+
 impl pallet_vaults::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type BlocksPerDay = ConstU64<1440>;
+	type TicksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MiningSlotProvider = StaticMiningSlotProvider;
-	type MaxPendingTermModificationsPerBlock = ConstU32<100>;
-	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
+	type MaxPendingTermModificationsPerTick = ConstU32<100>;
+	type MinTermsModificationTickDelay = MinTermsModificationBlockDelay;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
-	type MiningArgonIncreaseBlockDelay = FundingChangeBlockDelay;
+	type MiningArgonIncreaseTickDelay = FundingChangeBlockDelay;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.

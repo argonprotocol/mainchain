@@ -300,8 +300,8 @@ declare module '@polkadot/types/lookup' {
     } & Struct;
     readonly isMiningConfigurationUpdated: boolean;
     readonly asMiningConfigurationUpdated: {
-      readonly blocksBeforeBidEndForVrfClose: u32;
-      readonly blocksBetweenSlots: u32;
+      readonly ticksBeforeBidEndForVrfClose: u64;
+      readonly ticksBetweenSlots: u64;
       readonly slotBiddingStartAfterTicks: u64;
     } & Struct;
     readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderReplaced' | 'UnbondedMiner' | 'UnbondMinerError' | 'MiningConfigurationUpdated';
@@ -431,12 +431,12 @@ declare module '@polkadot/types/lookup' {
     readonly isVaultMiningBondsChangeScheduled: boolean;
     readonly asVaultMiningBondsChangeScheduled: {
       readonly vaultId: u32;
-      readonly changeBlock: u32;
+      readonly changeTick: u64;
     } & Struct;
     readonly isVaultTermsChangeScheduled: boolean;
     readonly asVaultTermsChangeScheduled: {
       readonly vaultId: u32;
-      readonly changeBlock: u32;
+      readonly changeTick: u64;
     } & Struct;
     readonly isVaultTermsChanged: boolean;
     readonly asVaultTermsChanged: {
@@ -540,11 +540,11 @@ declare module '@polkadot/types/lookup' {
 
   /** @name ArgonPrimitivesBondBondExpiration (61) */
   interface ArgonPrimitivesBondBondExpiration extends Enum {
-    readonly isArgonBlock: boolean;
-    readonly asArgonBlock: Compact<u32>;
+    readonly isAtTick: boolean;
+    readonly asAtTick: Compact<u64>;
     readonly isBitcoinBlock: boolean;
     readonly asBitcoinBlock: Compact<u64>;
-    readonly type: 'ArgonBlock' | 'BitcoinBlock';
+    readonly type: 'AtTick' | 'BitcoinBlock';
   }
 
   /** @name PalletNotariesEvent (64) */
@@ -2540,8 +2540,8 @@ declare module '@polkadot/types/lookup' {
 
   /** @name ArgonPrimitivesBlockSealMiningSlotConfig (334) */
   interface ArgonPrimitivesBlockSealMiningSlotConfig extends Struct {
-    readonly blocksBeforeBidEndForVrfClose: Compact<u32>;
-    readonly blocksBetweenSlots: Compact<u32>;
+    readonly ticksBeforeBidEndForVrfClose: Compact<u64>;
+    readonly ticksBetweenSlots: Compact<u64>;
     readonly slotBiddingStartAfterTicks: Compact<u64>;
   }
 
@@ -2649,8 +2649,8 @@ declare module '@polkadot/types/lookup' {
     readonly miningArgons: ArgonPrimitivesBondVaultArgons;
     readonly miningRewardSharingPercentTake: Compact<u128>;
     readonly isClosed: bool;
-    readonly pendingTerms: Option<ITuple<[u32, ArgonPrimitivesBondVaultTerms]>>;
-    readonly pendingMiningArgons: Option<ITuple<[u32, u128]>>;
+    readonly pendingTerms: Option<ITuple<[u64, ArgonPrimitivesBondVaultTerms]>>;
+    readonly pendingMiningArgons: Option<ITuple<[u64, u128]>>;
     readonly pendingBitcoins: u128;
   }
 
@@ -2731,7 +2731,7 @@ declare module '@polkadot/types/lookup' {
     readonly totalFee: Compact<u128>;
     readonly prepaidFee: Compact<u128>;
     readonly amount: Compact<u128>;
-    readonly startBlock: Compact<u32>;
+    readonly startTick: Compact<u64>;
     readonly expiration: ArgonPrimitivesBondBondExpiration;
   }
 

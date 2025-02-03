@@ -207,7 +207,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Completion of mining bonds, upon which funds are returned to the vault
        **/
-      miningBondCompletions: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u32]>;
+      miningBondCompletions: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u64]>;
       nextBondId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
        * Stores Utxos that were not paid back in full
@@ -695,12 +695,12 @@ declare module '@polkadot/api-base/types/storage' {
        * Pending funding that will be committed at the given block number (must be a minimum of 1
        * slot change away)
        **/
-      pendingFundingModificationsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
+      pendingFundingModificationsByTick: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u64]>;
       /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)
        **/
-      pendingTermsModificationsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32]>;
+      pendingTermsModificationsByTick: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u64]>;
       /**
        * Vaults by id
        **/

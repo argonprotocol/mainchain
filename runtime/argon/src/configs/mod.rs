@@ -277,8 +277,8 @@ parameter_types! {
 
 	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
 	pub const MinimumBondAmount: u128 = 100_000;
-	pub const BlocksPerDay: u32 = 1440;
-	pub const BlocksPerYear: u32 = 1440 * 365;
+	pub const TicksPerDay: Tick = 1440;
+	pub const TicksPerYear: Tick = 1440 * 365;
 
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
@@ -288,9 +288,9 @@ parameter_types! {
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
 	pub const MaxUnlockingUtxos: u32 = 1000;
-	pub const MaxPendingTermModificationsPerBlock: u32 = 100;
-	pub const MinTermsModificationBlockDelay: u32 = 1439; // must be at least one slot (day)
-	pub const VaultFundingModificationDelay: u32 = 60; // 1 hour
+	pub const MaxPendingTermModificationsPerTick: u32 = 100;
+	pub const MinTermsModificationTickDelay: Tick = TicksPerDay::get() - 1; // must be at least one slot (day)
+	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
 }
 
 impl pallet_vaults::Config for Runtime {
@@ -300,12 +300,13 @@ impl pallet_vaults::Config for Runtime {
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumBondAmount = MinimumBondAmount;
-	type BlocksPerDay = BlocksPerDay;
-	type MaxPendingTermModificationsPerBlock = MaxPendingTermModificationsPerBlock;
-	type MinTermsModificationBlockDelay = MinTermsModificationBlockDelay;
+	type TicksPerDay = TicksPerDay;
+	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
+	type MinTermsModificationTickDelay = MinTermsModificationTickDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type MiningArgonIncreaseBlockDelay = VaultFundingModificationDelay;
+	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
+	type TickProvider = Ticks;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -324,12 +325,13 @@ impl pallet_bond::Config for Runtime {
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type VaultProvider = Vaults;
 	type MinimumBondAmount = MinimumBondAmount;
-	type ArgonBlocksPerDay = BlocksPerDay;
+	type ArgonTicksPerDay = TicksPerDay;
 	type MaxUnlockingUtxos = MaxUnlockingUtxos;
 	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
 	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
 	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type TickProvider = Ticks;
 }
 
 pub struct GrandpaSlotRotation;
@@ -387,7 +389,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
-	type TicksSinceGenesis = TicksSinceGenesis;
+	type TickProvider = Ticks;
 }
 
 impl pallet_block_seal::Config for Runtime {
