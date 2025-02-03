@@ -8,7 +8,7 @@ use argon_primitives::{
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use sc_client_api::{self, backend::AuxStore};
+use sc_client_api::{self, backend::AuxStore, blockchain::BlockStatus};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
 	ForkChoiceStrategy, ImportResult, Verifier as VerifierT,
@@ -49,7 +49,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ProvideRuntimeApi<B> + Send + Sync + AuxStore + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + Send + Sync + AuxStore + 'static,
 	C::Api: BlockCreatorApis<B, AC, NotebookVerifyError>,
 	AC: Codec + Send + Sync + 'static,
 {
@@ -63,12 +63,21 @@ where
 		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
-		let parent_hash = *block.header.parent_hash();
+		let mut best_hash = *block.header.parent_hash();
+		// if we're importing a block with state, the parent might not be available yet, so use best
+		// hash
+		if block.with_state() &&
+			self.client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown
+		{
+			best_hash = self.client.info().best_hash;
+		}
 
+		// decode at best hash since we might be just importing state, in which case the parent
+		// state is not stored yet
 		let (block_author, tick, voting_key) = self
 			.client
 			.runtime_api()
-			.decode_voting_author(parent_hash, block.header.digest())
+			.decode_voting_author(best_hash, block.header.digest())
 			.map_err(Error::Api)?
 			.map_err(|e| {
 				Error::MissingRuntimeData(format!("Failed to get voting author power: {:?}", e))
@@ -146,6 +155,8 @@ where
 		// This is done for example when gap syncing and it is expected that the block after the gap
 		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
 		if block_params.state_action.skip_execution_checks() || block_params.with_state() {
+			// When we are importing only the state of a block, it will be the best block.
+			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(block_params.with_state()));
 			return Ok(block_params)
 		}
 

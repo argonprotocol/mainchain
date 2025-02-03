@@ -48,6 +48,9 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
+	pub(super) type PreviousTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn current_tick)]
 	pub(super) type CurrentTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
@@ -95,6 +98,7 @@ pub mod pallet {
 		fn on_initialize(_block_number: BlockNumberFor<T>) -> Weight {
 			// kinda weird, but we don't know the current block hash
 			let parent_tick = <CurrentTick<T>>::get();
+			PreviousTick::<T>::put(parent_tick);
 			let digests = T::Digests::get().expect("Digests must be loadable");
 			let proposed_tick = digests.tick.0;
 			// if we're past the max recent blocks, remove the oldest
@@ -135,8 +139,21 @@ pub mod pallet {
 	}
 
 	impl<T: Config> TickProvider<T::Block> for Pallet<T> {
+		fn previous_tick() -> Tick {
+			<PreviousTick<T>>::get()
+		}
+
 		fn current_tick() -> Tick {
 			<CurrentTick<T>>::get()
+		}
+
+		fn elapsed_ticks() -> Tick {
+			Self::ticks_since_genesis()
+		}
+
+		fn voting_schedule() -> VotingSchedule {
+			let current_tick = Self::current_tick();
+			VotingSchedule::from_runtime_current_tick(current_tick)
 		}
 
 		fn ticker() -> Ticker {
@@ -145,11 +162,6 @@ pub mod pallet {
 
 		fn blocks_at_tick(tick: Tick) -> Vec<<T::Block as BlockT>::Hash> {
 			<RecentBlocksAtTicks<T>>::get(tick).to_vec()
-		}
-
-		fn voting_schedule() -> VotingSchedule {
-			let current_tick = Self::current_tick();
-			VotingSchedule::from_runtime_current_tick(current_tick)
 		}
 	}
 

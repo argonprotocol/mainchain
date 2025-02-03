@@ -1,19 +1,9 @@
 [config]
 default_to_workspace = false
 skip_core_tasks = true
-init_task = "prep"
-end_task = "stat"
 
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = "true"
-SCCACHE_CACHE_SIZE = "20G"
-
-[tasks.prep]
-description = "Ensure all tools are installed"
-script = [
-    "sccache --show-stats || cargo binstall sccache@^0.7 --no-confirm || true",
-    "sccache --start-server || true"
-]
 
 [tasks.lint]
 description = "Run clippy"
@@ -77,11 +67,6 @@ args = ["sqlx", "prepare", "--workspace", "--", "--profile=test"]
 dependencies = ["sqlx-setup"]
 install_crate_args = ["--no-confirm"]
 
-[tasks.stat]
-description = "Show sccache stats"
-command = "sccache"
-args = ["--show-stats"]
-
 [tasks.testnet-spec]
 description = "Generate testnet spec"
 script = [
@@ -92,14 +77,12 @@ script = [
 description = "Compiles the project"
 command = "cargo"
 args = ["build", "--features", "simulated-prices"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
 [tasks.build-node]
 description = "Compiles the project"
 command = "cargo"
 args = ["build", "--bin", "argon-node"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
 
@@ -107,7 +90,6 @@ dependencies = ["sqlx-setup"]
 description = "Compiles the project as a release"
 command = "cargo"
 args = ["build", "--release", "--bin", "argon-node"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 dependencies = ["sqlx-setup"]
 
 [tasks.update-metadata]
@@ -124,14 +106,12 @@ description = "Run tests with cargo,"
 command = "cargo"
 args = ["test", "--features", "try-runtime", "--lib", "--no-fail-fast", "${@}"]
 dependencies = ["build", "minio"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 
 [tasks.nextest]
 description = "Run tests with nextest,"
 command = "cargo"
 args = ["nextest", "run"]
 dependencies = ["build"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
 
 [tasks.nextest.install_crate]
@@ -144,7 +124,6 @@ install_command = "binstall"
 description = "Watch for changes and rebuild"
 command = "cargo"
 args = ["watch", "-x", "build"]
-env = { "RUSTC_WRAPPER" = "sccache" }
 install_crate_args = ["--no-confirm"]
 dependencies = ["sqlx-setup"]
 

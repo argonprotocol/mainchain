@@ -368,6 +368,10 @@ declare module '@polkadot/api-base/types/storage' {
        * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
        **/
       authorityHashByIndex: AugmentedQuery<ApiType, () => Observable<BTreeMap<u32, U256>>, []>;
+      /**
+       * The current slot id
+       **/
+      currentSlotId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       hasAddedGrandpaRotation: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
        * The number of bids per slot for the last 10 slots (newest first)
@@ -631,6 +635,7 @@ declare module '@polkadot/api-base/types/storage' {
       currentTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       genesisTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       genesisTicker: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesTickTicker>, []>;
+      previousTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * Blocks from the last 100 ticks. Trimmed in on_initialize.
        * NOTE: cannot include the current block hash until next block

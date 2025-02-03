@@ -45,6 +45,8 @@ pub struct ArgonNodeStartArgs {
 	pub compute_miners: u16,
 	pub bitcoin_rpc: String,
 	pub notebook_archive_urls: Vec<String>,
+	pub extra_flags: Vec<String>,
+	pub is_archive_node: bool,
 }
 
 impl ArgonNodeStartArgs {
@@ -94,6 +96,8 @@ impl ArgonNodeStartArgs {
 			authority: authority.to_lowercase().to_string(),
 			rpc_port: 0,
 			notebook_archive_urls: vec![],
+			extra_flags: vec![],
+			is_archive_node: true,
 		})
 	}
 
@@ -147,20 +151,29 @@ impl ArgonTestNode {
 	}
 
 	pub async fn fork_node(&self, authority: &str, miner_threads: u16) -> anyhow::Result<Self> {
+		let fork_args = self.get_fork_args(authority, miner_threads);
+		self.fork_node_with(fork_args).await
+	}
+
+	pub fn get_fork_args(&self, authority: &str, miner_threads: u16) -> ArgonNodeStartArgs {
 		let mut new_args = self.start_args.clone();
-		let base_data_path = ArgonNodeStartArgs::get_temp_dir()?;
+		let base_data_path = ArgonNodeStartArgs::get_temp_dir().unwrap();
 		new_args.authority = authority.to_string();
 		new_args.rpc_port = 0;
 		new_args.base_data_path = base_data_path;
 		new_args.bootnodes = self.boot_url.clone();
 		new_args.compute_miners = miner_threads;
-		Self::start(new_args).await
+		new_args
+	}
+
+	pub async fn fork_node_with(&self, fork_args: ArgonNodeStartArgs) -> anyhow::Result<Self> {
+		Self::start(fork_args).await
 	}
 
 	async fn start_process(
 		args: &mut ArgonNodeStartArgs,
 	) -> anyhow::Result<(process::Child, LogWatcher)> {
-		let mut more_args = vec![];
+		let mut more_args = args.extra_flags.clone();
 		if !args.bootnodes.is_empty() {
 			more_args.push(format!("--bootnodes={}", &args.bootnodes))
 		};
@@ -168,6 +181,11 @@ impl ArgonTestNode {
 			more_args
 				.push(format!("--notebook-archive-hosts={}", args.notebook_archive_urls.join(",")))
 		};
+
+		if args.is_archive_node {
+			more_args.push("--state-pruning=archive".to_string());
+			more_args.push("--blocks-pruning=archive".to_string());
+		}
 
 		println!("Starting argon-node with args: {:?}. {:?}", args, more_args);
 
@@ -179,10 +197,10 @@ impl ArgonTestNode {
 			.arg("--no-mdns")
 			.arg(format!("--base-path={}", args.base_data_path.display()))
 			.arg("--detailed-log-output")
+			.arg("--unsafe-force-node-key-generation")
 			.arg("--allow-private-ipv4")
-			.arg("--dev")
-			.arg("--state-pruning=archive")
-			.arg("--blocks-pruning=archive")
+			.arg("--no-telemetry")
+			.arg("--chain=dev")
 			.arg(format!("--{}", &args.authority.to_lowercase()))
 			.arg(format!("--name={}", &args.authority.to_lowercase()))
 			.arg("--port=0")

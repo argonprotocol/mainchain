@@ -1,11 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+extern crate core;
 
 use alloc::{vec, vec::Vec};
 use argon_primitives::{
 	block_seal::{
 		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
-		RewardSharing,
+		RewardSharing, SlotId,
 	},
 	bond::BondProvider,
 	inherents::BlockSealInherent,
@@ -38,6 +39,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 pub mod weights;
 
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
@@ -90,7 +92,7 @@ pub mod pallet {
 
 	use super::*;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -163,6 +165,9 @@ pub mod pallet {
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 
+		/// How often to rotate grandpas
+		type GrandpaRotationBlocks: Get<BlockNumberFor<Self>>;
+
 		/// The mining authority runtime public key
 		type MiningAuthorityId: RuntimeAppPublic + Decode;
 
@@ -224,6 +229,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MiningConfig<T: Config> =
 		StorageValue<_, MiningSlotConfig<BlockNumberFor<T>>, ValueQuery>;
+
+	/// The current slot id
+	#[pallet::storage]
+	pub(super) type CurrentSlotId<T: Config> = StorageValue<_, SlotId, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -345,8 +354,13 @@ pub mod pallet {
 				return T::DbWeight::get().reads_writes(0, 2);
 			}
 
-			if !HasAddedGrandpaRotation::<T>::get() {
-				T::SlotEvents::on_new_slot::<T::Keys>(vec![], vec![], true);
+			// rotate grandpas on off rotations
+			let current_slot = CurrentSlotId::<T>::get();
+			let rotate_grandpa_blocks =
+				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
+			if !HasAddedGrandpaRotation::<T>::get() || block_number_u32 % rotate_grandpa_blocks == 0
+			{
+				T::SlotEvents::rotate_grandpas::<T::Keys>(current_slot, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
 				return T::DbWeight::get().reads_writes(3, 2)
 			}
@@ -455,6 +469,7 @@ pub mod pallet {
 			}
 
 			let ownership_tokens = Self::hold_ownership_bond(&who, current_registration)?;
+			let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
 
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) = cohort.iter().position(|x| x.account_id == who) {
@@ -492,6 +507,7 @@ pub mod pallet {
 							ownership_tokens,
 							reward_sharing,
 							authority_keys: keys,
+							slot_id: next_slot_id,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -682,11 +698,13 @@ impl<T: Config> Pallet<T> {
 		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
+		let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 		});
-		T::SlotEvents::on_new_slot(removed_miners, added_miners, false);
+		CurrentSlotId::<T>::put(next_slot_id);
+		T::SlotEvents::rotate_grandpas(next_slot_id, removed_miners, added_miners);
 	}
 
 	/// Adjust the ownership bond amount based on a rolling 10 slot average of bids.
@@ -1018,28 +1036,28 @@ sp_api::decl_runtime_apis! {
 
 pub trait OnNewSlot<AccountId> {
 	type Key: Decode + RuntimeAppPublic;
-	fn on_new_slot(
+	fn rotate_grandpas(
+		current_slot_id: SlotId,
 		removed_authorities: Vec<(&AccountId, Self::Key)>,
 		added_authorities: Vec<(&AccountId, Self::Key)>,
-		with_delay: bool,
 	);
 }
 
 pub trait SlotEvents<AccountId> {
-	fn on_new_slot<Ks: OpaqueKeys>(
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		current_slot_id: SlotId,
 		removed_authorities: Vec<(AccountId, Ks)>,
 		added_authorities: Vec<(AccountId, Ks)>,
-		with_delay: bool,
 	);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(0, 5)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
-	fn on_new_slot<Ks: OpaqueKeys>(
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		current_slot_id: SlotId,
 		removed_authorities: Vec<(AId, Ks)>,
 		added_authorities: Vec<(AId, Ks)>,
-		with_delay: bool,
 	) {
 		for_tuples!(
 		#(
@@ -1051,7 +1069,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 				added_authorities.iter().filter_map(|k| {
 					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
 				}).collect::<Vec<_>>();
-			Tuple::on_new_slot(removed_keys, added_keys, with_delay);
+			Tuple::rotate_grandpas(current_slot_id, removed_keys, added_keys);
 		)*
 		)
 	}

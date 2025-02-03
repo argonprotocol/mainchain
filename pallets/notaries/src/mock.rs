@@ -40,16 +40,22 @@ parameter_types! {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		todo!()
+	}
 	fn current_tick() -> Tick {
 		CurrentTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		todo!()
 	}
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
 	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
-		todo!()
+	fn elapsed_ticks() -> Tick {
+		CurrentTick::get()
 	}
-	fn voting_schedule() -> VotingSchedule {
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()
 	}
 }

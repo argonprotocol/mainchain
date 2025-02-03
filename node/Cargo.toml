@@ -51,6 +51,7 @@ sp-timestamp = { workspace = true, features = ["default"] }
 sp-inherents = { workspace = true, features = ["default"] }
 sp-transaction-pool = { workspace = true, features = ["default"] }
 hex = { workspace = true }
+hex-literal = { workspace = true }
 sp-keystore = { workspace = true, features = ["default"] }
 sp-keyring = { workspace = true, features = ["default"] }
 frame-system = { workspace = true, features = ["default"] }

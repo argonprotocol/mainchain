@@ -368,3 +368,35 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	handle.spawn("main-block-building-loop", Some("block-authoring"), block_finder_task);
 	handle.spawn("block-creator", Some("block-authoring"), block_creator_task);
 }
+
+#[cfg(test)]
+mod test {
+	use argon_runtime::{Block, Header};
+	use codec::{Decode, Encode};
+	use sc_consensus_grandpa::{FinalityProof, GrandpaJustification};
+	use sp_runtime::RuntimeAppPublic;
+	#[test]
+	fn decode_finality() {
+		// First block in mainnet on 105 is 17572. Version deployed on
+		// set id 1 at 17574
+		// set id 0
+		let encoded_17573 = hex::decode("7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712e9062d560600000000007927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400000c7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400005c9a28ed3f1a5bb94bd8780e9ad3640edd55652dd516fd303d539c64b25572de7b31a99ad3e0e8d636a5615978b107da853b3d9e2360fcbf2e3b1542e77fce0a45a74d33ead0b5ff58607fc60556cf1b291d4c503254ae07f17b3d54f8c5c27f7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a5440000b5c9b05beb4413ed4565492339a1735ff25f419d100d6cea8e5c7947f3ffb9e6079c034c23720f4cbb6151e260b2bd5fedfd3667589c338f5271787b27f08b0c803c5c3c4059380a8603f785a093c227a8a2f4a7437c466f1f7233a6881400e67927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400009230a62facc51e07b1210eb52d7257d12257c66106aa723439019070b647efc9d25e7d58dde8cc2e4a8abec11601895c069ad09ad98e77e9af76aa2fb72e560f962abf1be4e94bb80e6488a2af551c529571fdd1d972b5c7e311d7507f0882ec0000").unwrap();
+
+		let finality_proof = FinalityProof::<Header>::decode(&mut &encoded_17573[..]).unwrap();
+
+		let justification =
+			GrandpaJustification::<Block>::decode(&mut &finality_proof.justification[..]).unwrap();
+
+		for signed in justification.justification.commit.precommits.iter() {
+			let message = finality_grandpa::Message::Precommit(signed.precommit.clone());
+
+			for i in 0..10u64 {
+				let buf = (message.clone(), justification.justification.round, i).encode();
+				if signed.id.verify(&buf, &signed.signature) {
+					println!("Signature verified at {}", i);
+					assert_eq!(i, 0);
+				}
+			}
+		}
+	}
+}
