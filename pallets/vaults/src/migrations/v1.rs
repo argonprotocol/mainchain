@@ -1,7 +1,7 @@
-use crate::{pallet::VaultsById, Config, Pallet};
+use crate::{Config, Pallet};
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
-use argon_primitives::{bond::Vault, VaultId};
+use argon_primitives::VaultId;
 use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
 use log::info;
 
@@ -48,6 +48,42 @@ mod v0 {
 		StorageMap<crate::Pallet<T>, Twox64Concat, VaultId, Vault<T>, OptionQuery>;
 }
 
+pub mod v1_storage {
+	use crate::Config;
+	use argon_primitives::{
+		bond::{VaultArgons, VaultTerms},
+		RewardShare, VaultId,
+	};
+	use codec::{Decode, Encode, MaxEncodedLen};
+	use frame_support::{
+		__private::RuntimeDebug,
+		pallet_prelude::{OptionQuery, TypeInfo},
+		storage_alias, Twox64Concat,
+	};
+	use frame_system::pallet_prelude::BlockNumberFor;
+	use sp_runtime::FixedU128;
+
+	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub struct Vault<T: Config> {
+		pub operator_account_id: T::AccountId,
+		pub bitcoin_argons: VaultArgons<T::Balance>,
+		#[codec(compact)]
+		pub securitization_percent: FixedU128,
+		#[codec(compact)]
+		pub securitized_argons: T::Balance,
+		pub mining_argons: VaultArgons<T::Balance>,
+		#[codec(compact)]
+		pub mining_reward_sharing_percent_take: RewardShare,
+		pub is_closed: bool,
+		pub pending_terms: Option<(BlockNumberFor<T>, VaultTerms<T::Balance>)>,
+		pub pending_mining_argons: Option<(BlockNumberFor<T>, T::Balance)>,
+		pub pending_bitcoins: T::Balance,
+	}
+	#[storage_alias]
+	pub type VaultsById<T: Config> =
+		StorageMap<crate::Pallet<T>, Twox64Concat, VaultId, Vault<T>, OptionQuery>;
+}
+
 pub struct InnerMigrateV0ToV1<T: crate::Config>(core::marker::PhantomData<T>);
 
 impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV0ToV1<T> {
@@ -64,14 +100,14 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV0ToV1<T> {
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
 		info!("Migrating Vaults from v0 to v1");
-		VaultsById::<T>::translate::<v0::Vault<T>, _>(|id, vault| {
+		v1_storage::VaultsById::<T>::translate::<v0::Vault<T>, _>(|id, vault| {
 			let pending_bitcoins = v0::PendingBitcoinsByVault::<T>::take(id);
 			info!(
 				"Migration: Translating vault with id {:?} and pending bitcoins {:?}",
 				id, pending_bitcoins
 			);
 			count += 1;
-			let vault = Vault {
+			let vault = v1_storage::Vault {
 				operator_account_id: vault.operator_account_id,
 				bitcoin_argons: vault.bitcoin_argons,
 				securitization_percent: vault.securitization_percent,
@@ -99,7 +135,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV0ToV1<T> {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
 
-		let actual_new_value = crate::VaultsById::<T>::iter().collect::<Vec<_>>();
+		let actual_new_value = v1_storage::VaultsById::<T>::iter().collect::<Vec<_>>();
 
 		ensure!(old_value.len() == actual_new_value.len(), "New value not set correctly");
 		for vault in actual_new_value {
@@ -182,10 +218,10 @@ mod test {
 
 			// After the migration, the new value should be set as the `current` value.
 			assert_eq!(crate::VaultsById::<Test>::iter_keys().collect::<Vec<_>>(), vec![1]);
-			let new_value = crate::VaultsById::<Test>::get(1).unwrap();
+			let new_value = v1_storage::VaultsById::<Test>::get(1).unwrap();
 			assert_eq!(
 				new_value,
-				Vault {
+				v1_storage::Vault {
 					operator_account_id: Default::default(),
 					bitcoin_argons,
 					securitization_percent,

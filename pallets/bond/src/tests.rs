@@ -71,6 +71,7 @@ fn cleans_up_a_rejected_bitcoin() {
 		let who = 1;
 		set_argons(who, 2_000_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		CurrentTick::set(1);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -154,6 +155,7 @@ fn burns_a_spent_bitcoin() {
 		set_argons(who, 2_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().bitcoin_argons.allocated;
+		CurrentTick::set(1);
 
 		assert_ok!(Bonds::bond_bitcoin(
 			RuntimeOrigin::signed(who),
@@ -190,7 +192,7 @@ fn burns_a_spent_bitcoin() {
 				vault_id: 1,
 				expiration: BondExpiration::BitcoinBlock(expiration_block),
 				bonded_account_id: who,
-				start_block: 1,
+				start_tick: 1,
 			})
 		);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
@@ -578,6 +580,7 @@ fn it_can_create_a_mining_bond() {
 		set_argons(who, 2_000_000);
 		let amount = 1_000_000;
 		let vault = DefaultVault::get();
+		CurrentTick::set(1);
 		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10, None));
 		assert_eq!(
 			BondsById::<Test>::get(1).unwrap(),
@@ -588,9 +591,9 @@ fn it_can_create_a_mining_bond() {
 				total_fee: 0,
 				prepaid_fee: 0,
 				vault_id: 1,
-				expiration: BondExpiration::ArgonBlock(10),
+				expiration: BondExpiration::AtTick(10),
 				bonded_account_id: who,
-				start_block: 1,
+				start_tick: 1,
 			}
 		);
 		assert_eq!(DefaultVault::get().mining_argons.bonded, amount);
@@ -602,7 +605,7 @@ fn it_can_create_a_mining_bond() {
 				bond_id: 1,
 				amount,
 				bond_type: BondType::Mining,
-				expiration: BondExpiration::ArgonBlock(10),
+				expiration: BondExpiration::AtTick(10),
 				bonded_account_id: who,
 				utxo_id: None,
 			}
@@ -611,6 +614,7 @@ fn it_can_create_a_mining_bond() {
 
 		// expire it
 		System::set_block_number(10);
+		CurrentTick::set(10);
 		Bonds::on_initialize(10);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().mining_argons.bonded, 0);
@@ -630,6 +634,7 @@ fn it_can_modify_a_mining_bond() {
 		DefaultVault::set(vault);
 		MockFeeResult::set((100_000, 100));
 		MinimumBondAmount::set(1000);
+		CurrentTick::set(1);
 
 		assert_ok!(Bonds::bond_mining_slot(1, who, amount, 10, None));
 		assert_eq!(
@@ -641,9 +646,9 @@ fn it_can_modify_a_mining_bond() {
 				total_fee: 100_000,
 				prepaid_fee: 100,
 				vault_id: 1,
-				expiration: BondExpiration::ArgonBlock(10),
+				expiration: BondExpiration::AtTick(10),
 				bonded_account_id: who,
-				start_block: 1,
+				start_tick: 1,
 			}
 		);
 
@@ -657,11 +662,28 @@ fn it_can_modify_a_mining_bond() {
 				total_fee: 200_000,
 				prepaid_fee: 200,
 				vault_id: 1,
-				expiration: BondExpiration::ArgonBlock(10),
+				expiration: BondExpiration::AtTick(10),
 				bonded_account_id: who,
-				start_block: 1,
+				start_tick: 1,
 			}
 		);
+	});
+}
+
+#[test]
+fn should_cleanup_multiple_completion_ticks() {
+	new_test_ext().execute_with(|| {
+		CurrentTick::set(10);
+		PreviousTick::set(5);
+
+		MiningBondCompletions::<Test>::set(6, BoundedVec::truncate_from(vec![1, 2]));
+		MiningBondCompletions::<Test>::set(9, BoundedVec::truncate_from(vec![3]));
+		MiningBondCompletions::<Test>::set(10, BoundedVec::truncate_from(vec![4]));
+
+		Bonds::on_initialize(10);
+		assert_eq!(MiningBondCompletions::<Test>::get(6).len(), 0);
+		assert_eq!(MiningBondCompletions::<Test>::get(9).len(), 0);
+		assert_eq!(MiningBondCompletions::<Test>::get(10).len(), 0);
 	});
 }
 

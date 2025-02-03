@@ -199,7 +199,10 @@ pub type SignedExtra = (
 type Migrations = (
 	pallet_vaults::migrations::MigrateV0ToV1<Runtime>,
 	migrations::UpdateMissingGrandpaSetId<Runtime>,
+	// spec 110
 	pallet_mining_slot::migrations::MigrateV1ToV2<Runtime>,
+	pallet_bond::migrations::MigrateV0ToV1<Runtime>,
+	pallet_vaults::migrations::MigrateV1ToV2<Runtime>,
 );
 
 /// Unchecked extrinsic type as expected by this runtime.
@@ -431,9 +434,9 @@ impl_runtime_apis! {
 		}
 	}
 
-	impl pallet_mining_slot::MiningSlotApi<Block, BlockNumber> for Runtime {
-		fn next_slot_era() -> (BlockNumber, BlockNumber) {
-			MiningSlot::get_slot_era()
+	impl pallet_mining_slot::MiningSlotApi<Block> for Runtime {
+		fn next_slot_era() -> (Tick, Tick) {
+			MiningSlot::get_next_slot_era()
 		}
 	}
 

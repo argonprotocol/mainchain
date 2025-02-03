@@ -1,5 +1,5 @@
 use crate::{tick::Tick, Balance, BondId};
-use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
+use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -86,13 +86,13 @@ pub struct MiningRegistration<
 	Clone, Serialize, Deserialize, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct MiningSlotConfig<BlockNumber: Codec + HasCompact> {
+pub struct MiningSlotConfig {
 	/// How many blocks before the end of a slot can the bid close
 	#[codec(compact)]
-	pub blocks_before_bid_end_for_vrf_close: BlockNumber,
-	/// How many blocks transpire between slots
+	pub ticks_before_bid_end_for_vrf_close: Tick,
+	/// How many ticks transpire between slots
 	#[codec(compact)]
-	pub blocks_between_slots: BlockNumber,
+	pub ticks_between_slots: Tick,
 	/// The tick when bidding will start (eg, Slot "1")
 	#[codec(compact)]
 	pub slot_bidding_start_after_ticks: Tick,

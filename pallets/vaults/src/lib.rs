@@ -55,10 +55,11 @@ pub mod pallet {
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, UtxoId,
 		},
 		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
-		MiningSlotProvider, VaultId,
+		tick::Tick,
+		MiningSlotProvider, TickProvider, VaultId,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -93,27 +94,29 @@ pub mod pallet {
 
 		/// Argon blocks per day
 		#[pallet::constant]
-		type BlocksPerDay: Get<BlockNumberFor<Self>>;
+		type TicksPerDay: Get<Tick>;
 
 		/// The max pending vault term changes per block
 		#[pallet::constant]
-		type MaxPendingTermModificationsPerBlock: Get<u32>;
+		type MaxPendingTermModificationsPerTick: Get<u32>;
 
-		/// The number of blocks that a change in terms will take before applying. Terms only apply
+		/// The number of ticks that a change in terms will take before applying. Terms only apply
 		/// on a slot changeover, so this setting is the minimum blocks that must pass, in
 		/// addition to the time to the next slot after that
 		#[pallet::constant]
-		type MinTermsModificationBlockDelay: Get<BlockNumberFor<Self>>;
+		type MinTermsModificationTickDelay: Get<Tick>;
 
-		/// The number of blocks that a funding change will be delayed before it takes effect
+		/// The number of ticks that a funding change will be delayed before it takes effect
 		#[pallet::constant]
-		type MiningArgonIncreaseBlockDelay: Get<BlockNumberFor<Self>>;
+		type MiningArgonIncreaseTickDelay: Get<Tick>;
 
 		/// A provider of mining slot information
-		type MiningSlotProvider: MiningSlotProvider<BlockNumberFor<Self>>;
+		type MiningSlotProvider: MiningSlotProvider;
 
 		/// Provides the bitcoin network this blockchain is connected to
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
+
+		type TickProvider: TickProvider<Self::Block>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -128,13 +131,8 @@ pub mod pallet {
 
 	/// Vaults by id
 	#[pallet::storage]
-	pub(super) type VaultsById<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		VaultId,
-		Vault<T::AccountId, T::Balance, BlockNumberFor<T>>,
-		OptionQuery,
-	>;
+	pub(super) type VaultsById<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, Vault<T::AccountId, T::Balance>, OptionQuery>;
 
 	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
@@ -144,21 +142,21 @@ pub mod pallet {
 	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
 	/// change away)
 	#[pallet::storage]
-	pub(super) type PendingTermsModificationsByBlock<T: Config> = StorageMap<
+	pub(super) type PendingTermsModificationsByTick<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		BlockNumberFor<T>,
-		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
+		Tick,
+		BoundedVec<VaultId, T::MaxPendingTermModificationsPerTick>,
 		ValueQuery,
 	>;
 	/// Pending funding that will be committed at the given block number (must be a minimum of 1
 	/// slot change away)
 	#[pallet::storage]
-	pub(super) type PendingFundingModificationsByBlock<T: Config> = StorageMap<
+	pub(super) type PendingFundingModificationsByTick<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		BlockNumberFor<T>,
-		BoundedVec<VaultId, T::MaxPendingTermModificationsPerBlock>,
+		Tick,
+		BoundedVec<VaultId, T::MaxPendingTermModificationsPerTick>,
 		ValueQuery,
 	>;
 
@@ -184,11 +182,11 @@ pub mod pallet {
 		},
 		VaultMiningBondsChangeScheduled {
 			vault_id: VaultId,
-			change_block: BlockNumberFor<T>,
+			change_tick: Tick,
 		},
 		VaultTermsChangeScheduled {
 			vault_id: VaultId,
-			change_block: BlockNumberFor<T>,
+			change_tick: Tick,
 		},
 		VaultTermsChanged {
 			vault_id: VaultId,
@@ -333,8 +331,11 @@ pub mod pallet {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			T::DbWeight::get().reads_writes(0, 2)
 		}
-		fn on_finalize(n: BlockNumberFor<T>) {
-			let terms = PendingTermsModificationsByBlock::<T>::take(n);
+		fn on_finalize(_n: BlockNumberFor<T>) {
+			let previous_tick = T::TickProvider::previous_tick();
+			let current_tick = T::TickProvider::current_tick();
+			let terms =
+				(previous_tick..=current_tick).flat_map(PendingTermsModificationsByTick::<T>::take);
 			for vault_id in terms {
 				VaultsById::<T>::mutate(vault_id, |vault| {
 					let Some(vault) = vault else {
@@ -353,7 +354,8 @@ pub mod pallet {
 				});
 			}
 
-			let funding = PendingFundingModificationsByBlock::<T>::take(n);
+			let funding = (previous_tick..=current_tick)
+				.flat_map(PendingFundingModificationsByTick::<T>::take);
 			for vault_id in funding {
 				VaultsById::<T>::mutate(vault_id, |vault| {
 					let Some(vault) = vault else {
@@ -511,12 +513,12 @@ pub mod pallet {
 					balance_to_i128::<T>(vault.mining_argons.allocated);
 				// if increasing, must go into delay pool
 				if total_mining_amount_offered > vault.mining_argons.allocated {
-					let current_block = frame_system::Pallet::<T>::block_number();
-					let change_block = T::MiningArgonIncreaseBlockDelay::get() + current_block;
-					vault.pending_mining_argons = Some((change_block, total_mining_amount_offered));
+					let current_tick = T::TickProvider::current_tick();
+					let change_tick = T::MiningArgonIncreaseTickDelay::get() + current_tick;
+					vault.pending_mining_argons = Some((change_tick, total_mining_amount_offered));
 					total_mining_amount_offered = vault.mining_argons.allocated;
 
-					PendingFundingModificationsByBlock::<T>::mutate(change_block, |a| {
+					PendingFundingModificationsByTick::<T>::mutate(change_tick, |a| {
 						if !a.iter().any(|x| *x == vault_id) {
 							return a.try_push(vault_id);
 						}
@@ -525,7 +527,7 @@ pub mod pallet {
 					.map_err(|_| Error::<T>::FundingChangeAlreadyScheduled)?;
 					Self::deposit_event(Event::VaultMiningBondsChangeScheduled {
 						vault_id,
-						change_block,
+						change_tick,
 					});
 				} else {
 					vault.mining_argons.allocated = total_mining_amount_offered;
@@ -584,18 +586,18 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
 
-			let block_number = frame_system::Pallet::<T>::block_number();
-			let mut terms_change_block = T::MiningSlotProvider::get_next_slot_block_number();
+			let current_tick = T::TickProvider::current_tick();
+			let mut terms_change_tick = T::MiningSlotProvider::get_next_slot_tick();
 
-			if terms_change_block.saturating_sub(block_number) <
-				T::MinTermsModificationBlockDelay::get()
+			if terms_change_tick.saturating_sub(current_tick) <
+				T::MinTermsModificationTickDelay::get()
 			{
 				// delay until next slot
-				let window = T::MiningSlotProvider::mining_window_blocks();
-				terms_change_block = terms_change_block.saturating_add(window);
+				let window = T::MiningSlotProvider::mining_window_tick();
+				terms_change_tick = terms_change_tick.saturating_add(window);
 			}
 
-			PendingTermsModificationsByBlock::<T>::mutate(terms_change_block, |a| {
+			PendingTermsModificationsByTick::<T>::mutate(terms_change_tick, |a| {
 				if !a.iter().any(|x| *x == vault_id) {
 					return a.try_push(vault_id);
 				}
@@ -603,12 +605,12 @@ pub mod pallet {
 			})
 			.map_err(|_| Error::<T>::TermsModificationOverflow)?;
 
-			vault.pending_terms = Some((terms_change_block, terms));
+			vault.pending_terms = Some((terms_change_tick, terms));
 			VaultsById::<T>::insert(vault_id, vault);
 
 			Self::deposit_event(Event::VaultTermsChangeScheduled {
 				vault_id,
-				change_block: terms_change_block,
+				change_tick: terms_change_tick,
 			});
 
 			Ok(())
@@ -737,25 +739,23 @@ pub mod pallet {
 			T::Currency::release(&reason.into(), who, amount, Precision::Exact)
 		}
 
-		pub(crate) fn calculate_block_fees(
+		pub(crate) fn calculate_tick_fees(
 			annual_percentage_rate: FixedU128,
 			amount: T::Balance,
-			blocks: BlockNumberFor<T>,
+			ticks: Tick,
 		) -> T::Balance {
-			let blocks_per_day = FixedU128::saturating_from_integer(T::BlocksPerDay::get());
+			let ticks_per_day = FixedU128::saturating_from_integer(T::TicksPerDay::get());
 
-			let blocks_per_year = blocks_per_day * FixedU128::saturating_from_integer(365);
-			let blocks = FixedU128::saturating_from_integer(blocks);
+			let ticks_per_year = ticks_per_day * FixedU128::saturating_from_integer(365);
+			let ticks = FixedU128::saturating_from_integer(ticks);
 
-			let block_ratio = blocks.checked_div(&blocks_per_year).unwrap_or_default();
+			let ratio = ticks.checked_div(&ticks_per_year).unwrap_or_default();
 
 			let amount = FixedU128::saturating_from_integer(amount);
 
-			let fee = amount
-				.saturating_mul(annual_percentage_rate)
-				.saturating_mul(block_ratio)
-				.into_inner() /
-				FixedU128::accuracy();
+			let fee =
+				amount.saturating_mul(annual_percentage_rate).saturating_mul(ratio).into_inner() /
+					FixedU128::accuracy();
 			fee.unique_saturated_into()
 		}
 	}
@@ -763,11 +763,8 @@ pub mod pallet {
 	impl<T: Config> VaultProvider for Pallet<T> {
 		type AccountId = T::AccountId;
 		type Balance = T::Balance;
-		type BlockNumber = BlockNumberFor<T>;
 
-		fn get(
-			vault_id: VaultId,
-		) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>> {
+		fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>> {
 			VaultsById::<T>::get(vault_id)
 		}
 
@@ -775,7 +772,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			amount: Self::Balance,
 			bond_type: BondType,
-			blocks: Self::BlockNumber,
+			ticks: Tick,
 			bond_account_id: &Self::AccountId,
 		) -> Result<(Self::Balance, Self::Balance), BondError> {
 			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
@@ -802,7 +799,7 @@ pub mod pallet {
 			let apr = vault_argons.annual_percent_rate;
 			let base_fee = vault_argons.base_fee;
 
-			let fee = Self::calculate_block_fees(apr, amount, blocks).saturating_add(base_fee);
+			let fee = Self::calculate_tick_fees(apr, amount, ticks).saturating_add(base_fee);
 
 			T::Currency::transfer(
 				bond_account_id,
@@ -826,7 +823,7 @@ pub mod pallet {
 		}
 
 		fn burn_vault_bitcoin_funds(
-			bond: &Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
+			bond: &Bond<T::AccountId, T::Balance>,
 			amount_to_burn: T::Balance,
 		) -> Result<(), BondError> {
 			let vault_id = bond.vault_id;
@@ -861,7 +858,7 @@ pub mod pallet {
 		///
 		/// Returns the amount that was recouped
 		fn compensate_lost_bitcoin(
-			bond: &Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
+			bond: &Bond<T::AccountId, T::Balance>,
 			market_rate: Self::Balance,
 		) -> Result<Self::Balance, BondError> {
 			let vault_id = bond.vault_id;
@@ -923,7 +920,7 @@ pub mod pallet {
 		}
 
 		fn release_bonded_funds(
-			bond: &Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
+			bond: &Bond<T::AccountId, T::Balance>,
 		) -> Result<T::Balance, BondError> {
 			let vault_id = bond.vault_id;
 			let vault = {
@@ -954,9 +951,9 @@ pub mod pallet {
 
 			let apr = vault.argons(&bond.bond_type).annual_percent_rate;
 
-			let current_block = frame_system::Pallet::<T>::block_number();
-			let blocks = current_block.saturating_sub(bond.start_block);
-			let remaining_fee = Self::calculate_block_fees(apr, bond.amount, blocks);
+			let current_tick = T::TickProvider::current_tick();
+			let ticks = current_tick.saturating_sub(bond.start_tick);
+			let remaining_fee = Self::calculate_tick_fees(apr, bond.amount, ticks);
 			if remaining_fee > 0u128.into() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::BondFee.into(),

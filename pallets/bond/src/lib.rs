@@ -13,9 +13,9 @@ pub use weights::*;
 #[cfg(test)]
 mod mock;
 
+pub mod migrations;
 #[cfg(test)]
 mod tests;
-
 pub mod weights;
 
 /// The bond pallet allows users to manage the lifecycle of Bitcoin bonds, and stores the state for
@@ -112,11 +112,15 @@ pub mod pallet {
 		},
 		block_seal::RewardSharing,
 		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare,
+		tick::Tick,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare, TickProvider,
 		UtxoBondedEvents, VaultId,
 	};
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -158,11 +162,7 @@ pub mod pallet {
 
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 
-		type VaultProvider: VaultProvider<
-			AccountId = Self::AccountId,
-			Balance = Self::Balance,
-			BlockNumber = BlockNumberFor<Self>,
-		>;
+		type VaultProvider: VaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
 
 		/// Minimum amount for a bond
 		#[pallet::constant]
@@ -170,7 +170,7 @@ pub mod pallet {
 
 		/// Argon blocks per day
 		#[pallet::constant]
-		type ArgonBlocksPerDay: Get<BlockNumberFor<Self>>;
+		type ArgonTicksPerDay: Get<Tick>;
 
 		/// Maximum unlocking utxos at a time
 		#[pallet::constant]
@@ -192,6 +192,8 @@ pub mod pallet {
 		/// Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
 		#[pallet::constant]
 		type UtxoUnlockCosignDeadlineBlocks: Get<BitcoinHeight>;
+
+		type TickProvider: TickProvider<Self::Block>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -205,19 +207,14 @@ pub mod pallet {
 
 	/// Bonds by id
 	#[pallet::storage]
-	pub(super) type BondsById<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		BondId,
-		Bond<T::AccountId, T::Balance, BlockNumberFor<T>>,
-		OptionQuery,
-	>;
+	pub(super) type BondsById<T: Config> =
+		StorageMap<_, Twox64Concat, BondId, Bond<T::AccountId, T::Balance>, OptionQuery>;
 	/// Completion of mining bonds, upon which funds are returned to the vault
 	#[pallet::storage]
 	pub(super) type MiningBondCompletions<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		BlockNumberFor<T>,
+		Tick,
 		BoundedVec<BondId, T::MaxConcurrentlyExpiringBonds>,
 		ValueQuery,
 	>;
@@ -313,7 +310,7 @@ pub mod pallet {
 			bonded_account_id: T::AccountId,
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
-			expiration: BondExpiration<BlockNumberFor<T>>,
+			expiration: BondExpiration,
 		},
 		BondCompleted {
 			vault_id: VaultId,
@@ -460,8 +457,11 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let bond_completions = MiningBondCompletions::<T>::take(block_number);
+		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let previous_tick = T::TickProvider::previous_tick();
+			let current_tick = T::TickProvider::current_tick();
+			let bond_completions =
+				(previous_tick..=current_tick).flat_map(MiningBondCompletions::<T>::take);
 			for bond_id in bond_completions {
 				let res = with_storage_layer(|| Self::bond_completed(bond_id));
 				if let Err(e) = res {
@@ -539,8 +539,8 @@ pub mod pallet {
 				vault_id,
 				amount,
 				BondType::Bitcoin,
-				// charge in 1 year of blocks (even though we'll expire off bitcoin time)
-				T::ArgonBlocksPerDay::get() * 365u32.into(),
+				// charge in 1 year of ticks (even though we'll expire off bitcoin time)
+				T::ArgonTicksPerDay::get() * 365u64,
 				&account_id,
 			)
 			.map_err(Error::<T>::from)?;
@@ -827,7 +827,7 @@ pub mod pallet {
 			account_id: T::AccountId,
 			bond_type: BondType,
 			amount: T::Balance,
-			expiration: BondExpiration<BlockNumberFor<T>>,
+			expiration: BondExpiration,
 			total_fee: T::Balance,
 			prepaid_fee: T::Balance,
 			utxo_id: Option<UtxoId>,
@@ -845,13 +845,13 @@ pub mod pallet {
 				amount,
 				expiration: expiration.clone(),
 				total_fee,
-				start_block: frame_system::Pallet::<T>::block_number(),
+				start_tick: T::TickProvider::current_tick(),
 				prepaid_fee,
 			};
 			BondsById::<T>::set(bond_id, Some(bond));
 			match expiration {
-				BondExpiration::ArgonBlock(block) => {
-					MiningBondCompletions::<T>::try_mutate(block, |a| {
+				BondExpiration::AtTick(tick) => {
+					MiningBondCompletions::<T>::try_mutate(tick, |a| {
 						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
 					})?;
 				},
@@ -986,7 +986,7 @@ pub mod pallet {
 
 			Ok(())
 		}
-		fn remove_bond_completion(bond_id: BondId, expiration: BondExpiration<BlockNumberFor<T>>) {
+		fn remove_bond_completion(bond_id: BondId, expiration: BondExpiration) {
 			match expiration {
 				BondExpiration::BitcoinBlock(completion_block) => {
 					if !BitcoinBondCompletions::<T>::contains_key(completion_block) {
@@ -998,11 +998,11 @@ pub mod pallet {
 						}
 					});
 				},
-				BondExpiration::ArgonBlock(completion_block) => {
-					if !MiningBondCompletions::<T>::contains_key(completion_block) {
+				BondExpiration::AtTick(completion_tick) => {
+					if !MiningBondCompletions::<T>::contains_key(completion_tick) {
 						return;
 					}
-					MiningBondCompletions::<T>::mutate(completion_block, |bonds| {
+					MiningBondCompletions::<T>::mutate(completion_tick, |bonds| {
 						if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
 							bonds.remove(index);
 						}
@@ -1045,25 +1045,24 @@ pub mod pallet {
 	impl<T: Config> BondProvider for Pallet<T> {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
-		type BlockNumber = BlockNumberFor<T>;
 
 		fn bond_mining_slot(
 			vault_id: VaultId,
 			account_id: Self::AccountId,
 			amount: Self::Balance,
-			bond_until_block: Self::BlockNumber,
+			bond_until_tick: Tick,
 			modify_bond_id: Option<BondId>,
 		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError> {
 			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
 
-			let block_number = frame_system::Pallet::<T>::block_number();
-			ensure!(bond_until_block > block_number, BondError::ExpirationTooSoon);
+			let current_tick = T::TickProvider::current_tick();
+			ensure!(bond_until_tick > current_tick, BondError::ExpirationTooSoon);
 
 			let (total_fee, prepaid_fee) = T::VaultProvider::bond_funds(
 				vault_id,
 				amount,
 				BondType::Mining,
-				bond_until_block - block_number,
+				bond_until_tick - current_tick,
 				&account_id,
 			)?;
 
@@ -1096,7 +1095,7 @@ pub mod pallet {
 				account_id,
 				BondType::Mining,
 				amount,
-				BondExpiration::ArgonBlock(bond_until_block),
+				BondExpiration::AtTick(bond_until_tick),
 				total_fee,
 				prepaid_fee,
 				None,

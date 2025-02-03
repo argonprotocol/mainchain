@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use bitcoin::PublicKey;
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency};
-use frame_system::pallet_prelude::BlockNumberFor;
+use frame_support::{
+	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
+};
 use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
@@ -17,7 +18,9 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
-	ensure, BitcoinUtxoTracker, PriceProvider, UtxoBondedEvents, VaultId,
+	ensure,
+	tick::{Tick, Ticker},
+	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoBondedEvents, VaultId, VotingSchedule,
 };
 
 pub type Balance = u128;
@@ -37,6 +40,7 @@ frame_support::construct_runtime!(
 impl frame_system::Config for Test {
 	type Block = Block;
 	type AccountData = pallet_balances::AccountData<Balance>;
+	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {
@@ -77,7 +81,7 @@ parameter_types! {
 	pub static BitcoinBondDurationBlocks: BitcoinHeight = 365;
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
 	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
-	pub static DefaultVault: Vault<u64, Balance, BlockNumberFor<Test>> = Vault {
+	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		mining_argons: VaultArgons {
 			allocated: 100_000_000_000,
 			bonded: 0,
@@ -114,6 +118,10 @@ parameter_types! {
 	pub static DefaultVaultReclaimBitcoinPubkey: PublicKey = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766".parse::<PublicKey>().unwrap();
 
 	pub static MockFeeResult: (Balance, Balance) = (0, 0);
+
+	pub static CurrentTick: Tick = 2;
+	pub static PreviousTick: Tick = 1;
+	pub static ElapsedTicks: Tick = 0;
 }
 
 pub struct EventHandler;
@@ -154,9 +162,8 @@ pub struct StaticVaultProvider;
 impl VaultProvider for StaticVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
-	type BlockNumber = BlockNumberFor<Test>;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance, Self::BlockNumber>> {
+	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>> {
 		if vault_id == 1 {
 			Some(DefaultVault::get())
 		} else {
@@ -165,7 +172,7 @@ impl VaultProvider for StaticVaultProvider {
 	}
 
 	fn compensate_lost_bitcoin(
-		_bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		_bond: &Bond<Self::AccountId, Self::Balance>,
 		market_rate: Self::Balance,
 	) -> Result<Self::Balance, BondError> {
 		DefaultVault::mutate(|a| {
@@ -175,7 +182,7 @@ impl VaultProvider for StaticVaultProvider {
 	}
 
 	fn burn_vault_bitcoin_funds(
-		_bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		_bond: &Bond<Self::AccountId, Self::Balance>,
 		amount_to_burn: Self::Balance,
 	) -> Result<(), BondError> {
 		DefaultVault::mutate(|a| {
@@ -189,7 +196,7 @@ impl VaultProvider for StaticVaultProvider {
 		_vault_id: VaultId,
 		amount: Self::Balance,
 		bond_type: BondType,
-		_blocks: Self::BlockNumber,
+		_ticks: Tick,
 		_bond_account_id: &Self::AccountId,
 	) -> Result<(Self::Balance, Self::Balance), BondError> {
 		ensure!(
@@ -201,7 +208,7 @@ impl VaultProvider for StaticVaultProvider {
 	}
 
 	fn release_bonded_funds(
-		bond: &Bond<Self::AccountId, Self::Balance, Self::BlockNumber>,
+		bond: &Bond<Self::AccountId, Self::Balance>,
 	) -> Result<Self::Balance, BondError> {
 		DefaultVault::mutate(|a| a.mut_argons(&bond.bond_type).reduce_bonded(bond.amount));
 		Ok(bond.total_fee.saturating_sub(bond.prepaid_fee))
@@ -287,13 +294,35 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	}
 }
 
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		PreviousTick::get()
+	}
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		todo!()
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1, 2)
+	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
+	}
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		todo!()
+	}
+}
+
 impl pallet_bond::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type ArgonBlocksPerDay = ConstU64<1440>;
+	type ArgonTicksPerDay = ConstU64<1440>;
 	type MinimumBondAmount = MinimumBondAmount;
 	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
 	type BondEvents = EventHandler;
@@ -307,6 +336,7 @@ impl pallet_bond::Config for Test {
 	type BitcoinBlockHeight = BitcoinBlockHeight;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
+	type TickProvider = StaticTickProvider;
 }
 
 // Build genesis storage according to the mock runtime.

@@ -79,8 +79,8 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				name: "Argon Foundation".into(),
 			}],
 			mining_config: MiningSlotConfig {
-				blocks_before_bid_end_for_vrf_close: 200,
-				blocks_between_slots: 1440,
+				ticks_before_bid_end_for_vrf_close: 200,
+				ticks_between_slots: 1440,
 				slot_bidding_start_after_ticks: 0,
 			},
 			minimum_bitcoin_bond_satoshis: 5_000,

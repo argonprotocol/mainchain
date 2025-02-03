@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-use frame_system::pallet_prelude::BlockNumberFor;
+use argon_primitives::tick::Tick;
 pub use pallet::*;
 pub use weights::*;
 
@@ -16,7 +16,7 @@ mod benchmarking;
 pub mod weights;
 
 /// (Incremental increase per block, blocks between increments, max value)
-pub type GrowthPath<T> = (<T as Config>::Balance, BlockNumberFor<T>, <T as Config>::Balance);
+pub type GrowthPath<T> = (<T as Config>::Balance, Tick, <T as Config>::Balance);
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
@@ -38,7 +38,7 @@ pub mod pallet {
 		notary::NotaryProvider,
 		tick::Tick,
 		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerProvider,
-		NotebookProvider,
+		NotebookProvider, TickProvider,
 	};
 	use sp_arithmetic::per_things::SignedRounding;
 
@@ -82,7 +82,9 @@ pub mod pallet {
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
 		type NotaryProvider: NotaryProvider<Self::Block, Self::AccountId>;
 		type NotebookProvider: NotebookProvider;
-		type NotebookTick: Get<Tick>;
+		/// Get a tick provider
+		type TickProvider: TickProvider<Self::Block>;
+
 		/// Number of argons minted per block
 		#[pallet::constant]
 		type StartingArgonsPerBlock: Get<Self::Balance>;
@@ -95,13 +97,13 @@ pub mod pallet {
 		#[pallet::constant]
 		type IncrementalGrowth: Get<GrowthPath<Self>>;
 
-		/// Number of blocks for halving of ownership share rewards
+		/// Number of ticks for halving of ownership share rewards
 		#[pallet::constant]
-		type HalvingBlocks: Get<u32>;
+		type HalvingTicks: Get<Tick>;
 
-		/// The block number at which the halving begins for ownership tokens
+		/// The tick number at which the halving begins for ownership tokens
 		#[pallet::constant]
-		type HalvingBeginBlock: Get<BlockNumberFor<Self>>;
+		type HalvingBeginTick: Get<Tick>;
 
 		/// Percent as a number out of 100 of the block reward that goes to the miner.
 		#[pallet::constant]
@@ -211,16 +213,17 @@ pub mod pallet {
 			}
 			let authors = T::BlockSealerProvider::get_sealer_info();
 
-			let RewardAmounts { argons, ownership } = Self::get_reward_amounts(n);
+			let elapsed_ticks = T::TickProvider::elapsed_ticks();
+			let RewardAmounts { argons, ownership } = Self::get_reward_amounts(elapsed_ticks);
 
 			let mut block_ownership = ownership.into();
 			let mut block_argons = argons.into();
 
 			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
 			let block_notebooks = T::NotebookProvider::notebooks_in_block();
-			let current_tick = T::NotebookTick::get();
+			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
 			let tick_notebooks = block_notebooks.iter().fold(0u128, |acc, (_, _, tick)| {
-				if *tick == current_tick {
+				if *tick == notebook_tick {
 					acc + 1u128
 				} else {
 					acc
@@ -400,17 +403,16 @@ pub mod pallet {
 				.saturating_mul_int(T::Balance::one())
 		}
 
-		pub(crate) fn get_reward_amounts(block_number: BlockNumberFor<T>) -> RewardAmounts<T> {
-			let block_number = block_as_u32::<T>(block_number);
-			let (increment, blocks_between_increments, final_starting_amount) =
+		pub(crate) fn get_reward_amounts(elapsed_ticks: Tick) -> RewardAmounts<T> {
+			let (increment, ticks_between_increments, final_starting_amount) =
 				T::IncrementalGrowth::get();
 
 			let final_starting_amount: u128 = final_starting_amount.into();
-			let halving_being_block = block_as_u32::<T>(T::HalvingBeginBlock::get());
-			if block_number >= halving_being_block {
-				let blocks_after_halving = block_number.saturating_sub(halving_being_block);
+			let halving_begin_tick = T::HalvingBeginTick::get();
+			if elapsed_ticks >= halving_begin_tick {
+				let ticks_after_halving = elapsed_ticks.saturating_sub(halving_begin_tick);
 				let halvings: u128 =
-					blocks_after_halving.saturating_div(T::HalvingBlocks::get()).into();
+					ticks_after_halving.saturating_div(T::HalvingTicks::get()).into();
 				return RewardAmounts {
 					ownership: final_starting_amount.saturating_div(halvings + 1).into(),
 					argons: final_starting_amount.into(),
@@ -419,8 +421,8 @@ pub mod pallet {
 
 			let start_block_argons = T::StartingArgonsPerBlock::get().into();
 			let start_block_ownership = T::StartingOwnershipTokensPerBlock::get().into();
-			let blocks_between_increments = block_as_u32::<T>(blocks_between_increments);
-			let increments = block_number.saturating_div(blocks_between_increments) as u128;
+
+			let increments = elapsed_ticks.saturating_div(ticks_between_increments) as u128;
 			let increment_sum = increments.saturating_mul(increment.into());
 
 			RewardAmounts {
@@ -428,10 +430,6 @@ pub mod pallet {
 				ownership: (start_block_ownership + increment_sum).into(),
 			}
 		}
-	}
-
-	fn block_as_u32<T: Config>(n: BlockNumberFor<T>) -> u32 {
-		UniqueSaturatedInto::<u32>::unique_saturated_into(n)
 	}
 }
 

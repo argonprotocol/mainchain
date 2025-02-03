@@ -277,8 +277,8 @@ export default {
         error: 'SpRuntimeDispatchError',
       },
       MiningConfigurationUpdated: {
-        blocksBeforeBidEndForVrfClose: 'u32',
-        blocksBetweenSlots: 'u32',
+        ticksBeforeBidEndForVrfClose: 'u64',
+        ticksBetweenSlots: 'u64',
         slotBiddingStartAfterTicks: 'u64'
       }
     }
@@ -405,11 +405,11 @@ export default {
       },
       VaultMiningBondsChangeScheduled: {
         vaultId: 'u32',
-        changeBlock: 'u32',
+        changeTick: 'u64',
       },
       VaultTermsChangeScheduled: {
         vaultId: 'u32',
-        changeBlock: 'u32',
+        changeTick: 'u64',
       },
       VaultTermsChanged: {
         vaultId: 'u32',
@@ -499,11 +499,11 @@ export default {
     _enum: ['Mining', 'Bitcoin']
   },
   /**
-   * Lookup61: argon_primitives::bond::BondExpiration<BlockNumber>
+   * Lookup61: argon_primitives::bond::BondExpiration
    **/
   ArgonPrimitivesBondBondExpiration: {
     _enum: {
-      ArgonBlock: 'Compact<u32>',
+      AtTick: 'Compact<u64>',
       BitcoinBlock: 'Compact<u64>'
     }
   },
@@ -2457,11 +2457,11 @@ export default {
     bidAmountSum: 'u128'
   },
   /**
-   * Lookup334: argon_primitives::block_seal::MiningSlotConfig<BlockNumber>
+   * Lookup334: argon_primitives::block_seal::MiningSlotConfig
    **/
   ArgonPrimitivesBlockSealMiningSlotConfig: {
-    blocksBeforeBidEndForVrfClose: 'Compact<u32>',
-    blocksBetweenSlots: 'Compact<u32>',
+    ticksBeforeBidEndForVrfClose: 'Compact<u64>',
+    ticksBetweenSlots: 'Compact<u64>',
     slotBiddingStartAfterTicks: 'Compact<u64>'
   },
   /**
@@ -2531,7 +2531,7 @@ export default {
     _enum: ['NoPermissions', 'NoBitcoinConfirmedBlock', 'InsufficientBitcoinAmount', 'NoBitcoinPricesAvailable', 'ScriptPubkeyConflict', 'UtxoNotLocked', 'RedemptionsUnavailable', 'InvalidBitcoinSyncHeight', 'BitcoinHeightNotConfirmed', 'MaxUtxosExceeded', 'InvalidBitcoinScript']
   },
   /**
-   * Lookup348: argon_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup348: argon_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance>
    **/
   ArgonPrimitivesBondVault: {
     operatorAccountId: 'AccountId32',
@@ -2541,8 +2541,8 @@ export default {
     miningArgons: 'ArgonPrimitivesBondVaultArgons',
     miningRewardSharingPercentTake: 'Compact<u128>',
     isClosed: 'bool',
-    pendingTerms: 'Option<(u32,ArgonPrimitivesBondVaultTerms)>',
-    pendingMiningArgons: 'Option<(u32,u128)>',
+    pendingTerms: 'Option<(u64,ArgonPrimitivesBondVaultTerms)>',
+    pendingMiningArgons: 'Option<(u64,u128)>',
     pendingBitcoins: 'u128'
   },
   /**
@@ -2578,7 +2578,7 @@ export default {
     _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'InvalidXpubkey', 'WrongXpubNetwork', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey', 'FundingChangeAlreadyScheduled']
   },
   /**
-   * Lookup361: argon_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance, BlockNumber>
+   * Lookup361: argon_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance>
    **/
   ArgonPrimitivesBond: {
     bondType: 'ArgonPrimitivesBondBondType',
@@ -2588,7 +2588,7 @@ export default {
     totalFee: 'Compact<u128>',
     prepaidFee: 'Compact<u128>',
     amount: 'Compact<u128>',
-    startBlock: 'Compact<u32>',
+    startTick: 'Compact<u64>',
     expiration: 'ArgonPrimitivesBondBondExpiration'
   },
   /**

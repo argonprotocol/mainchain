@@ -221,7 +221,9 @@ where
 				best_seal_strength.saturating_sub(U256::one()),
 			);
 
-			if theoretical_power >= fork_power_to_beat {
+			// needs to be greater or we will start creating blocks to match our own and out-pace
+			// the fork depth
+			if theoretical_power > fork_power_to_beat {
 				trace!(
 					"Adding parent block (at tick {}) since we can beat the competition {:?}",
 					parent_tick,
@@ -235,7 +237,7 @@ where
 				self.client.runtime_api().has_eligible_votes(*block).unwrap_or_default();
 			let block_tick = self.client.runtime_api().current_tick(*block).unwrap_or_default();
 			trace!(
-				"Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
+				"Looking at parent blocks to build on. Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
 				block,
 				strength,
 				has_eligible_votes,

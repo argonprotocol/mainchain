@@ -340,6 +340,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				continue;
 			};
 			if stale_branches.get(&best_hash).is_some() {
+				trace!(?best_hash, "Best hash branch is stale, trying again.");
 				continue;
 			}
 

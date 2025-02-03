@@ -164,8 +164,8 @@ author_rotateKeys"}' http://localhost:9944/
 Mining requires you to have two tokens: Argons and Argonots (Ownership Tokens). There are initially 100 mining slots
 available in
 Argon, each lasting 10 days. So every day, you are bidding for 1 of 10 available slots. This will grow to 10,000 slots
-as the network grows. Bidding will continue until a random block less than or equal to 200 blocks before the next slot
-begins (slots start every 1440 blocks).
+as the network grows. Bidding will continue until a random block less than or equal to 200 ticks before the next slot
+begins (slots start every 1440 ticks).
 
 At any given time, a mining slot requires you to own and lock 1/100th (or current mining slots) of the total Ownership
 Tokens in circulation. And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons
@@ -205,7 +205,7 @@ the [Argon Faucet](./account-setup.md#requesting-testnet-funds), but you'll use 
 ## 3. Bid for a Mining Slot
 
 Now that you have an account with Argons and Argonots (Ownership Tokens), you can bid for a mining slot. You're bidding
-for a 10- day period starting at the next block that is divisible by 1440 blocks (eg, every 1440 blocks from the genesis
+for a 10- day period starting at the next block that is divisible by 1440 ticks (eg, every ticks blocks from the genesis
 block). Mining bids close in a randomly chosen block within 200 blocks of the next slot. Mining bids begin
 after a 10-day bootstrap period called "Slot Zero".
 
@@ -296,7 +296,7 @@ notebooks included in a block vs the active notaries. If no "current" notebooks 
 microgon (eg, you are mostly just earning fees). Current means the notebook tick is one prior to the block tick.
 
 Block rewards start at 0.5 Argons and 0.5 Ownership Tokens per block, and increase by 1 milligon (1/10th of an Argon)
-every 118 blocks. This will continue until the block reward reaches 5 Argons and 5 Ownership Tokens per block. After
+every 118 ticks. This will continue until the block reward reaches 5 Argons and 5 Ownership Tokens per block. After
 this point, the Ownership Tokens will become deflationary, with the block reward halving every 2.1 million blocks.
 Argons are currently slated to stay level, but we anticipate a future model where Argons are related to the total
 circulation to ensure sustainable economic security.

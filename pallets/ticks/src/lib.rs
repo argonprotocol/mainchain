@@ -131,6 +131,7 @@ pub mod pallet {
 
 			<CurrentTick<T>>::put(proposed_tick);
 			if <GenesisTick<T>>::get() == 0 {
+				PreviousTick::<T>::put(proposed_tick);
 				<GenesisTick<T>>::put(proposed_tick);
 			}
 

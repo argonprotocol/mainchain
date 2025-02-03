@@ -16,7 +16,7 @@ use sp_runtime::{traits::Zero, FixedU128};
 use crate::{
 	mock::{Vaults, *},
 	pallet::{
-		NextVaultId, PendingFundingModificationsByBlock, PendingTermsModificationsByBlock,
+		NextVaultId, PendingFundingModificationsByTick, PendingTermsModificationsByTick,
 		VaultXPubById, VaultsById,
 	},
 	Error, Event, HoldReason, VaultConfig,
@@ -231,7 +231,7 @@ fn it_delays_mining_argon_increases() {
 		assert_eq!(vault.securitization_percent, FixedU128::from_float(0.0));
 		assert_eq!(vault.securitized_argons, 0);
 		assert_eq!(vault.get_minimum_securitization_needed(), 0);
-		assert_eq!(PendingFundingModificationsByBlock::<Test>::get(61).to_vec(), vec![1]);
+		assert_eq!(PendingFundingModificationsByTick::<Test>::get(61).to_vec(), vec![1]);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
@@ -242,18 +242,18 @@ fn it_delays_mining_argon_increases() {
 			.into(),
 		);
 		System::assert_has_event(
-			Event::VaultMiningBondsChangeScheduled { vault_id: 1, change_block: 61 }.into(),
+			Event::VaultMiningBondsChangeScheduled { vault_id: 1, change_tick: 61 }.into(),
 		);
 		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
 
-		System::set_block_number(61);
+		CurrentTick::set(61);
 		Vaults::on_initialize(61);
 		Vaults::on_finalize(61);
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.mining_argons.allocated, 2000);
 		assert_eq!(vault.pending_mining_argons, None);
 		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
-		assert!(PendingFundingModificationsByBlock::<Test>::get(61).is_empty());
+		assert!(PendingFundingModificationsByTick::<Test>::get(61).is_empty());
 	});
 }
 
@@ -398,7 +398,7 @@ fn it_can_close_a_vault() {
 		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
 		// set to full fee block
-		System::set_block_number(1440 * 365 + 1);
+		CurrentTick::set(1440 * 365 + 1);
 		// now when we complete a bond, it should return the funds to the vault
 		assert_ok!(Vaults::release_bonded_funds(&Bond {
 			vault_id: 1,
@@ -408,7 +408,7 @@ fn it_can_close_a_vault() {
 			total_fee: fee,
 			expiration: BondExpiration::BitcoinBlock(5000),
 			bond_type: BondType::Bitcoin,
-			start_block: 1,
+			start_tick: 1,
 			utxo_id: Some(1)
 		},));
 		// should release the 1000 from the bitcoin bond and the 2000 in securitization
@@ -468,7 +468,7 @@ fn it_can_bond_funds() {
 			expiration: BondExpiration::BitcoinBlock(2440),
 			bond_type: BondType::Bitcoin,
 			utxo_id: Some(1),
-			start_block: 5
+			start_tick: 5
 		},));
 		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 		assert_eq!(Balances::free_balance(2), 2_000 - paid);
@@ -547,7 +547,7 @@ fn it_can_charge_prorated_bond_funds() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::BondFee.into(), &2), apr_fee);
 		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 
-		System::set_block_number(5 + 1440);
+		CurrentTick::set(5 + 1440);
 		// if we cancel the bond, the prepaid won't be returned
 		let to_return_res = Vaults::release_bonded_funds(&Bond {
 			vault_id: 1,
@@ -558,7 +558,7 @@ fn it_can_charge_prorated_bond_funds() {
 			expiration: BondExpiration::BitcoinBlock(14_405),
 			bond_type: BondType::Bitcoin,
 			utxo_id: Some(1),
-			start_block: 5,
+			start_tick: 5,
 		});
 		assert!(to_return_res.is_ok());
 		let expected_apr_fee = (per_block_fee * 1440f64) as u128;
@@ -609,7 +609,7 @@ fn it_can_burn_a_bond() {
 				expiration: BondExpiration::BitcoinBlock(2440),
 				bond_type: BondType::Bitcoin,
 				utxo_id: Some(1),
-				start_block: 5,
+				start_tick: 5,
 			},
 			100_000
 		));
@@ -664,7 +664,7 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 					expiration: BondExpiration::BitcoinBlock(1440),
 					bond_type: BondType::Bitcoin,
 					utxo_id: Some(1),
-					start_block: 5
+					start_tick: 5
 				},
 				50_000
 			)
@@ -724,7 +724,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 					expiration: BondExpiration::BitcoinBlock(1440),
 					bond_type: BondType::Bitcoin,
 					utxo_id: Some(1),
-					start_block: 5
+					start_tick: 5
 				},
 				200_000
 			)
@@ -853,9 +853,9 @@ fn it_can_schedule_term_changes() {
 			FixedU128::from_float(0.03)
 		);
 		System::assert_last_event(
-			Event::VaultTermsChangeScheduled { vault_id: 1, change_block: 100 }.into(),
+			Event::VaultTermsChangeScheduled { vault_id: 1, change_tick: 100 }.into(),
 		);
-		assert_eq!(PendingTermsModificationsByBlock::<Test>::get(100).first().unwrap().clone(), 1);
+		assert_eq!(PendingTermsModificationsByTick::<Test>::get(100).first().unwrap().clone(), 1);
 
 		// should not be able to schedule another change
 		assert_err!(
@@ -863,25 +863,25 @@ fn it_can_schedule_term_changes() {
 			Error::<Test>::TermsChangeAlreadyScheduled
 		);
 
-		System::set_block_number(100);
+		CurrentTick::set(100);
 		Vaults::on_finalize(100);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
 			FixedU128::from_float(0.03)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().pending_terms, None);
-		assert_eq!(PendingTermsModificationsByBlock::<Test>::get(100).first(), None);
+		assert_eq!(PendingTermsModificationsByTick::<Test>::get(100).first(), None);
 	});
 }
 #[test]
 fn it_can_calculate_apr() {
 	new_test_ext().execute_with(|| {
 		let percent = FixedU128::from_float(10.0); // 1000%
-		assert_eq!(Vaults::calculate_block_fees(percent, 1000, 1440), 27);
-		assert_eq!(Vaults::calculate_block_fees(percent, 100, 1440 * 365), 1000);
-		assert_eq!(Vaults::calculate_block_fees(percent, 99, 1440 * 365), 990);
-		assert_eq!(Vaults::calculate_block_fees(percent, 365000, 1440 * 365), 3650000);
-		assert_eq!(Vaults::calculate_block_fees(percent, 365000, 1440), 9999);
+		assert_eq!(Vaults::calculate_tick_fees(percent, 1000, 1440), 27);
+		assert_eq!(Vaults::calculate_tick_fees(percent, 100, 1440 * 365), 1000);
+		assert_eq!(Vaults::calculate_tick_fees(percent, 99, 1440 * 365), 990);
+		assert_eq!(Vaults::calculate_tick_fees(percent, 365000, 1440 * 365), 3650000);
+		assert_eq!(Vaults::calculate_tick_fees(percent, 365000, 1440), 9999);
 	})
 }
 

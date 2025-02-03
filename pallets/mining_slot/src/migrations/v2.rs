@@ -1,17 +1,19 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, NextSlotCohort},
+	pallet::{ActiveMinersByIndex, MiningConfig, NextSlotCohort},
 	Config,
 };
 use alloc::vec::Vec;
-use argon_primitives::block_seal::MiningRegistration;
+use argon_primitives::block_seal::{MiningRegistration, MiningSlotConfig};
 use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
 use log::info;
+use sp_runtime::traits::UniqueSaturatedInto;
 
 mod v1 {
 	use crate::Config;
 	use argon_primitives::{
 		block_seal::{MinerIndex, RewardDestination, RewardSharing},
-		BondId,
+		prelude::Tick,
+		BlockNumber, BondId,
 	};
 	use codec::MaxEncodedLen;
 	use frame_support::{pallet_prelude::*, storage_alias, Blake2_128Concat, BoundedVec};
@@ -47,12 +49,30 @@ mod v1 {
 		ValueQuery,
 	>;
 
+	#[derive(Encode, Decode, Default, TypeInfo)]
+	pub struct MiningSlotConfig {
+		/// How many blocks before the end of a slot can the bid close
+		#[codec(compact)]
+		pub blocks_before_bid_end_for_vrf_close: BlockNumber,
+		/// How many ticks transpire between slots
+		#[codec(compact)]
+		pub blocks_between_slots: BlockNumber,
+		/// The tick when bidding will start (eg, Slot "1")
+		#[codec(compact)]
+		pub slot_bidding_start_after_ticks: Tick,
+	}
+
+	#[storage_alias]
+	pub(super) type MiningConfig<T: Config> =
+		StorageValue<crate::Pallet<T>, MiningSlotConfig, ValueQuery>;
+
 	#[cfg(feature = "try-runtime")]
-	#[derive(Encode, Decode, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
 	pub struct MiningStructure<T: Config> {
 		pub active_miners: alloc::vec::Vec<(MinerIndex, MiningRegistration<T>)>,
 		pub next_cohort: BoundedVec<MiningRegistration<T>, <T as Config>::MaxCohortSize>,
+		pub mining_config: MiningSlotConfig,
 	}
 }
 
@@ -66,13 +86,14 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 		// Access the old value using the `storage_alias` type
 		let active_miners = v1::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 		let next_cohort = v1::NextSlotCohort::<T>::get();
+		let mining_config = v1::MiningConfig::<T>::get();
 		// Return it as an encoded `Vec<u8>`
-		Ok(v1::MiningStructure { active_miners, next_cohort }.encode())
+		Ok(v1::MiningStructure { mining_config, active_miners, next_cohort }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating Vaults from v0 to v1");
+		info!("Migrating Mining Slots from v1 to v2");
 		ActiveMinersByIndex::<T>::translate::<v1::MiningRegistration<T>, _>(|id, reg| {
 			info!("Migration: Translating mining registration with id {:?}", id);
 			count += 1;
@@ -115,6 +136,21 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 			None
 		});
 
+		MiningConfig::<T>::translate::<v1::MiningSlotConfig, _>(|config| {
+			let config = config.unwrap();
+			Some(MiningSlotConfig {
+				slot_bidding_start_after_ticks: config.slot_bidding_start_after_ticks,
+				ticks_between_slots: UniqueSaturatedInto::<u64>::unique_saturated_into(
+					config.blocks_between_slots,
+				),
+				ticks_before_bid_end_for_vrf_close:
+					UniqueSaturatedInto::<u64>::unique_saturated_into(
+						config.blocks_before_bid_end_for_vrf_close,
+					),
+			})
+		})
+		.expect("Should translate");
+
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
 	}
 
@@ -123,10 +159,13 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 		use frame_support::ensure;
 		use sp_core::Decode;
 
-		let v1::MiningStructure { active_miners: old_active_miners, next_cohort: old_next_cohort } =
-			<v1::MiningStructure<T>>::decode(&mut &state[..]).map_err(|_| {
-				sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
-			})?;
+		let v1::MiningStructure {
+			active_miners: old_active_miners,
+			next_cohort: old_next_cohort,
+			mining_config: old_config,
+		} = <v1::MiningStructure<T>>::decode(&mut &state[..]).map_err(|_| {
+			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
+		})?;
 
 		let new_active_miners = ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 
@@ -139,6 +178,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 		}
 
 		ensure!(NextSlotCohort::<T>::get().len() == old_next_cohort.len(), "read cohort correctly");
+		ensure!(
+			old_config.blocks_before_bid_end_for_vrf_close as u32 ==
+				old_config.blocks_before_bid_end_for_vrf_close,
+			"vrf matches"
+		);
 		Ok(())
 	}
 }
