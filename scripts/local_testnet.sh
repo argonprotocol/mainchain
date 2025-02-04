@@ -17,6 +17,7 @@ RUNID=${1:-$(date "+%Y%m%d-%H%M%S")}
 BUCKET_NAME="notary-$RUNID"
 NOTEBOOK_ARCHIVE="http://127.0.0.1:9000/$BUCKET_NAME"
 DBPATH=postgres://postgres:password@localhost:5432/notary-$RUNID
+ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json
 
 set -x  # Print commands and their arguments as they are executed
 # drop db if no arg is passed
@@ -26,12 +27,22 @@ if [ -z "$1" ]; then
 fi
 createdb notary-$RUNID || true;
 mkdir -p /tmp/argon/$RUNID;
-mkdir -p /tmp/argon/bitcoin;
+mkdir -p /tmp/argon/$RUNID/bitcoin;
 
 # listen for sighup and kill all child processes
 trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 
-$("$BASEDIR/target/debug/argon-testing-bitcoin") -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/bitcoin -blockfilterindex -txindex -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin &
+BTC_CLI="$("$BASEDIR/target/debug/argon-testing-bitcoin") -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
+
+$BTC_CLI -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/$RUNID/bitcoin \
+  -blockfilterindex -txindex -wallet=1  2>&1 | \
+  awk -v name="bitcoin" '{printf "%-8s %s\n", name, $0; fflush()}' &
+
+# try to create wallet, but if it already exists, ignore error
+$BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default"
+
+# go to point of generating funds
+$BTC_CLI -generate 101
 
 # Function to check if the Bitcoin node is ready
 is_node_ready() {
@@ -79,7 +90,8 @@ for i in {0..2} ; do
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
     --pruning=archive -lRUST_LOG=info,argon=info,ismp=trace \
     --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \
-    --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
+    --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 2>&1 | \
+    awk -v name="${validators[$i]}" '{printf "%-8s %s\n", name, $0; fflush()}' &
 done
 
 # Function to check if the Substrate node is ready
@@ -103,18 +115,21 @@ RUST_LOG=info "$BASEDIR/target/debug/argon-notary" run \
   --keystore-path /tmp/notary_keystore \
   --archive-bucket "$BUCKET_NAME" \
   --dev \
-  -b "0.0.0.0:9925" &
+  -b "0.0.0.0:9925" 2>&1 | \
+  awk -v name="notary" '{printf "%-8s %s\n", name, $0; fflush()}' &
 
 echo -e "Starting a bitcoin oracle...\n\n"
 "$BASEDIR/target/debug/argon-oracle" insert-key --crypto-type=sr25519 --keystore-path /tmp/bitcoin_keystore --suri //Dave
 RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/bitcoin_keystore \
   --signer-crypto=sr25519 --signer-address=5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy \
-  -t ws://127.0.0.1:9944 bitcoin --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
+  -t ws://127.0.0.1:9944 bitcoin --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444  2>&1 | \
+  awk -v name="orclbtc" '{printf "%-8s %s\n", name, $0; fflush()}' &
 
 echo -e "Starting a pricing oracle...\n\n"
 "$BASEDIR/target/debug/argon-oracle" insert-key --crypto-type=sr25519 --keystore-path /tmp/price_keystore  --suri //Eve
 RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/price_keystore \
   --signer-crypto=sr25519 --signer-address=5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw \
-  -t ws://127.0.0.1:9944 price-index --simulate-prices &
+  -t ws://127.0.0.1:9944 price-index --simulate-prices   2>&1 | \
+  awk -v name="orclprc" '{printf "%-8s %s\n", name, $0; fflush()}' &
 
 wait
