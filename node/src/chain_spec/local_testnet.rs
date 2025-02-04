@@ -8,7 +8,7 @@ use crate::chain_spec::{
 };
 use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
-	bitcoin::{BitcoinNetwork, SATOSHIS_PER_BITCOIN},
+	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::Ticker,
@@ -66,7 +66,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			ticks_between_slots: 10,
 			slot_bidding_start_after_ticks: 10,
 		},
-		minimum_bitcoin_bond_satoshis: SATOSHIS_PER_BITCOIN / 1_000,
+		minimum_bitcoin_bond_satoshis: 100,
 		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),
 	}))
 	.build())

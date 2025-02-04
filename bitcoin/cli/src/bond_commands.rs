@@ -173,8 +173,9 @@ impl BondCommands {
 
 				let owner_pubkey: CompressedBitcoinPubkey =
 					CompressedPublicKey::from_str(&owner_pubkey)?.into();
+				let best_block = client.best_block_hash().await?;
 				let vault = client
-					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), None)
+					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), Some(best_block))
 					.await?
 					.ok_or(anyhow!("Vault not found"))?;
 				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
