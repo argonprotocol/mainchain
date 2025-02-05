@@ -4,7 +4,7 @@ use crate::{
 };
 use alloc::vec::Vec;
 use argon_primitives::{
-	bond::{Bond, BondExpiration},
+	vault::{Bond, BondExpiration},
 	TickProvider,
 };
 use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
@@ -17,7 +17,7 @@ mod v0 {
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		bitcoin::{BitcoinHeight, UtxoId},
-		bond::BondType,
+		vault::BondType,
 		BondId, VaultId,
 	};
 	use codec::Codec;
@@ -180,7 +180,7 @@ mod test {
 	use self::InnerMigrateV0ToV1;
 	use super::*;
 	use crate::mock::{new_test_ext, CurrentTick, System, Test};
-	use argon_primitives::bond::BondType;
+	use argon_primitives::vault::BondType;
 	use frame_support::assert_ok;
 
 	#[test]

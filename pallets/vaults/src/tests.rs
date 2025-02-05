@@ -23,7 +23,7 @@ use crate::{
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
-	bond::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
+	vault::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
@@ -46,9 +46,9 @@ fn keys() -> OpaqueBitcoinXpub {
 fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 	VaultTerms {
 		bitcoin_annual_percent_rate: pct,
-		mining_annual_percent_rate: pct,
+		bonded_argons_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
-		mining_base_fee: 0,
+		bonded_argons_base_fee: 0,
 		mining_reward_sharing_percent_take: FixedU128::zero(),
 	}
 }
@@ -58,8 +58,8 @@ fn default_vault() -> VaultConfig<Balance> {
 		terms: default_terms(TEN_PCT),
 		bitcoin_xpubkey: keys(),
 		bitcoin_amount_allocated: 50_000,
-		mining_amount_allocated: 50_000,
-		securitization_percent: FixedU128::zero(),
+		bonded_argons_allocated: 50_000,
+		added_securitization_percent: FixedU128::zero(),
 	}
 }
 
@@ -82,8 +82,8 @@ fn it_can_create_a_vault() {
 				vault_id: 1,
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
-				mining_argons: 50_000,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons: 50_000,
+				added_securitization_percent: FixedU128::zero(),
 			}
 			.into(),
 		);
@@ -105,7 +105,7 @@ fn it_can_add_securitization_to_a_vault() {
 		System::set_block_number(1);
 
 		let mut config = default_vault();
-		config.securitization_percent = TEN_PCT;
+		config.added_securitization_percent = TEN_PCT;
 		set_argons(1, 110_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
 
@@ -114,8 +114,8 @@ fn it_can_add_securitization_to_a_vault() {
 				vault_id: 1,
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
-				mining_argons: 50_000,
-				securitization_percent: TEN_PCT,
+				bonded_argons: 50_000,
+				added_securitization_percent: TEN_PCT,
 			}
 			.into(),
 		);
@@ -157,7 +157,7 @@ fn it_can_modify_a_vault_funds() {
 		System::set_block_number(1);
 
 		let mut config = default_vault();
-		config.mining_amount_allocated = 1000;
+		config.bonded_argons_allocated = 1000;
 		config.bitcoin_amount_allocated = 1000;
 
 		set_argons(1, 20_000);
@@ -183,19 +183,16 @@ fn it_can_modify_a_vault_funds() {
 			FixedU128::from_float(2.0)
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().securitization_percent,
+			VaultsById::<Test>::get(1).unwrap().added_securitization_percent,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().get_minimum_securitization_needed(),
-			1010 * 2
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_added_securitization_needed(), 1010 * 2);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
 				bitcoin_argons: 1010,
-				mining_argons: 1000,
-				securitization_percent: FixedU128::from_float(2.0),
+				bonded_argons: 1000,
+				added_securitization_percent: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
@@ -210,7 +207,7 @@ fn it_delays_mining_argon_increases() {
 		System::set_block_number(1);
 
 		let mut config = default_vault();
-		config.mining_amount_allocated = 1000;
+		config.bonded_argons_allocated = 1000;
 		config.bitcoin_amount_allocated = 1000;
 
 		set_argons(1, 20_000);
@@ -225,19 +222,19 @@ fn it_delays_mining_argon_increases() {
 			FixedU128::from_float(0.0)
 		));
 		let vault = VaultsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.mining_argons.allocated, 1000); // scheduled!
-		assert_eq!(vault.pending_mining_argons.map(|a| a.1), Some(2000));
+		assert_eq!(vault.bonded_argons.allocated, 1000); // scheduled!
+		assert_eq!(vault.pending_bonded_argons.map(|a| a.1), Some(2000));
 		assert_eq!(vault.bitcoin_argons.allocated, 1010);
-		assert_eq!(vault.securitization_percent, FixedU128::from_float(0.0));
-		assert_eq!(vault.securitized_argons, 0);
-		assert_eq!(vault.get_minimum_securitization_needed(), 0);
+		assert_eq!(vault.added_securitization_percent, FixedU128::from_float(0.0));
+		assert_eq!(vault.added_securitization_argons, 0);
+		assert_eq!(vault.get_added_securitization_needed(), 0);
 		assert_eq!(PendingFundingModificationsByTick::<Test>::get(61).to_vec(), vec![1]);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
 				bitcoin_argons: 1010,
-				mining_argons: 1000,
-				securitization_percent: FixedU128::from_float(0.0),
+				bonded_argons: 1000,
+				added_securitization_percent: FixedU128::from_float(0.0),
 			}
 			.into(),
 		);
@@ -250,8 +247,8 @@ fn it_delays_mining_argon_increases() {
 		Vaults::on_initialize(61);
 		Vaults::on_finalize(61);
 		let vault = VaultsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.mining_argons.allocated, 2000);
-		assert_eq!(vault.pending_mining_argons, None);
+		assert_eq!(vault.bonded_argons.allocated, 2000);
+		assert_eq!(vault.pending_bonded_argons, None);
 		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
 		assert!(PendingFundingModificationsByTick::<Test>::get(61).is_empty());
 	});
@@ -270,22 +267,19 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 				terms: default_terms(TEN_PCT),
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 1000,
-				mining_amount_allocated: 1000,
-				securitization_percent: FixedU128::from_float(2.0),
+				bonded_argons_allocated: 1000,
+				added_securitization_percent: FixedU128::from_float(2.0),
 			}
 		));
 		assert_eq!(Balances::reserved_balance(1), 4000);
 
 		VaultsById::<Test>::mutate(1, |vault| {
 			if let Some(vault) = vault {
-				vault.bitcoin_argons.bonded = 500;
+				vault.bitcoin_argons.reserved = 500;
 			}
 		});
 		// amount eligible for mining is 2x the bitcoin argons
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().amount_eligible_for_mining(),
-			500 * 200 / 100
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 500 * 200 / 100);
 
 		assert_err!(
 			Vaults::modify_funding(
@@ -317,19 +311,16 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 			FixedU128::from_float(2.0)
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().securitization_percent,
+			VaultsById::<Test>::get(1).unwrap().added_securitization_percent,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().get_minimum_securitization_needed(),
-			500 * 2
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_added_securitization_needed(), 500 * 2);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
 				bitcoin_argons: 500,
-				mining_argons: 1000,
-				securitization_percent: FixedU128::from_float(2.0),
+				bonded_argons: 1000,
+				added_securitization_percent: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
@@ -337,10 +328,7 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 		assert_eq!(Balances::reserved_balance(1), 1500 + 1000);
 
 		// amount eligible for mining doesn't change
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().amount_eligible_for_mining(),
-			500 * 200 / 100
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 500 * 200 / 100);
 	});
 }
 
@@ -355,15 +343,15 @@ fn it_can_close_a_vault() {
 		set_argons(2, 100_000);
 		let mut terms = default_terms(FixedU128::from_float(0.01));
 		terms.bitcoin_base_fee = 1;
-		terms.mining_base_fee = 1;
+		terms.bonded_argons_base_fee = 1;
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 50_000,
-				mining_amount_allocated: 50_000,
-				securitization_percent: FixedU128::from_float(2.0),
+				bonded_argons_allocated: 50_000,
+				added_securitization_percent: FixedU128::from_float(2.0),
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 1000);
@@ -377,7 +365,7 @@ fn it_can_close_a_vault() {
 		let mining_bond = 400;
 		VaultsById::<Test>::mutate(1, |vault| {
 			if let Some(vault) = vault {
-				vault.mining_argons.bonded = mining_bond;
+				vault.bonded_argons.reserved = mining_bond;
 			}
 		});
 
@@ -431,7 +419,7 @@ fn it_can_bond_funds() {
 		set_argons(1, 1_000_000);
 		let mut terms = default_terms(FixedU128::from_float(0.01));
 		terms.bitcoin_base_fee = 1000;
-		terms.mining_annual_percent_rate = FixedU128::zero();
+		terms.bonded_argons_annual_percent_rate = FixedU128::zero();
 		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
@@ -439,8 +427,8 @@ fn it_can_bond_funds() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 500_000,
-				mining_amount_allocated: 0,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 0,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 500_000);
@@ -490,8 +478,8 @@ fn it_accounts_for_pending_bitcoins() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
-				mining_amount_allocated: 100_000,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 100_000,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 800_000);
@@ -518,7 +506,7 @@ fn it_can_charge_prorated_bond_funds() {
 		set_argons(1, 1_000_000);
 		let mut terms = default_terms(FixedU128::from_float(0.1));
 		terms.bitcoin_base_fee = 123;
-		terms.mining_annual_percent_rate = FixedU128::from_float(0.001);
+		terms.bonded_argons_annual_percent_rate = FixedU128::from_float(0.001);
 
 		assert_ok!(Vaults::create(
 			RuntimeOrigin::signed(1),
@@ -526,8 +514,8 @@ fn it_can_charge_prorated_bond_funds() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 500_000,
-				mining_amount_allocated: 0,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 0,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 500_000);
@@ -585,8 +573,8 @@ fn it_can_burn_a_bond() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
-				mining_amount_allocated: 100_000,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 100_000,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 800_000);
@@ -617,7 +605,7 @@ fn it_can_burn_a_bond() {
 		assert_eq!(Balances::free_balance(1), 800_000);
 		assert_eq!(Balances::total_balance(&1), 900_000);
 		assert_eq!(Balances::free_balance(2), 2_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.bonded, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.reserved, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.allocated, 0);
 	});
 }
@@ -640,8 +628,8 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
-				mining_amount_allocated: 100_000,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 100_000,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 
@@ -650,12 +638,20 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 
 		let (total_fee, paid) = Vaults::bond_funds(1, 100_000, BondType::Bitcoin, 1440 * 365, &2)
 			.expect("bonding failed");
+
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::BondFee.into(), &2),
+			100,
+			"should hold fee"
+		);
+		assert_eq!(Balances::free_balance(&2), 1900, "fee on hold");
+		assert_eq!(Balances::free_balance(1), 200, "it doesn't actually mint anything");
 		assert_eq!(total_fee, 100);
 		assert_eq!(paid, 0);
 
 		assert_eq!(
 			Vaults::compensate_lost_bitcoin(
-				&Bond {
+				&mut Bond {
 					vault_id: 1,
 					bonded_account_id: 2,
 					amount: 100_000,
@@ -666,17 +662,23 @@ fn it_can_recoup_reduced_value_bitcoins_from_bond_funds() {
 					utxo_id: Some(1),
 					start_tick: 5
 				},
+				50_000,
 				50_000
 			)
 			.expect("compensation failed"),
-			50_000
+			(0, 0)
 		);
-		assert_eq!(Balances::total_balance(&1), 200 + 150_000);
+
+		assert_eq!(
+			Balances::total_balance(&1),
+			200 + 150_000,
+			"should burn 50 from the held funds"
+		);
 		// should keep the rest on hold
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 150_000);
 		// returns the fee
-		assert_eq!(Balances::free_balance(2), 2_000 + 50_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.bonded, 50_000);
+		assert_eq!(Balances::free_balance(2), 2_000, "has back original funds");
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.reserved, 50_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.allocated, 50_000);
 	});
 }
@@ -699,8 +701,8 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
-				mining_amount_allocated: 50_000,
-				securitization_percent: FixedU128::from_float(2.0),
+				bonded_argons_allocated: 50_000,
+				added_securitization_percent: FixedU128::from_float(2.0),
 			}
 		));
 
@@ -715,7 +717,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 
 		assert_eq!(
 			Vaults::compensate_lost_bitcoin(
-				&Bond {
+				&mut Bond {
 					vault_id: 1,
 					bonded_account_id: 2,
 					amount: 50_000,
@@ -726,21 +728,24 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 					utxo_id: Some(1),
 					start_tick: 5
 				},
-				200_000
+				200_000,
+				50_000
 			)
 			.expect("compensation failed"),
-			200_000,
+			(0, 100_000), /* should max out at an extra 2x bond amount, with 50k already paid to
+			               * user */
 			"gets back out of securitization"
 		);
-		assert_eq!(Balances::total_balance(&1), 350_200 - 200_000);
+		// 50k burned, 100k sent to
+		assert_eq!(Balances::total_balance(&1), 350_200 - 100_000 - 50000);
 		// mining bonds are not at risk
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1),
-			350_000 - 200_000
+			350_000 - 150_000
 		);
 		// returns the fee
-		assert_eq!(Balances::free_balance(2), 2_000 + 200_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.bonded, 0);
+		assert_eq!(Balances::free_balance(2), 2_000 + 100_000);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.reserved, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_argons.allocated, 0);
 	});
 }
@@ -759,8 +764,8 @@ fn it_should_allow_vaults_to_rotate_xpubs() {
 				terms,
 				bitcoin_xpubkey: keys(),
 				bitcoin_amount_allocated: 100_000,
-				mining_amount_allocated: 100_000,
-				securitization_percent: FixedU128::zero(),
+				bonded_argons_allocated: 100_000,
+				added_securitization_percent: FixedU128::zero(),
 			}
 		));
 
@@ -803,8 +808,8 @@ fn it_should_allow_multiple_vaults_per_account() {
 			terms,
 			bitcoin_xpubkey: keys(),
 			bitcoin_amount_allocated: 100_000,
-			mining_amount_allocated: 100_000,
-			securitization_percent: FixedU128::zero(),
+			bonded_argons_allocated: 100_000,
+			added_securitization_percent: FixedU128::zero(),
 		};
 		set_argons(1, 1_000_000);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
@@ -828,8 +833,8 @@ fn it_can_schedule_term_changes() {
 			terms: terms.clone(),
 			bitcoin_xpubkey: keys(),
 			bitcoin_amount_allocated: 100_000,
-			mining_amount_allocated: 100_000,
-			securitization_percent: FixedU128::zero(),
+			bonded_argons_allocated: 100_000,
+			added_securitization_percent: FixedU128::zero(),
 		};
 		set_argons(1, 1_000_000);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));

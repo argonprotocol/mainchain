@@ -8,10 +8,7 @@ use log::info;
 mod v0 {
 	use super::*;
 	use crate::Config;
-	use argon_primitives::{
-		bond::{VaultArgons, VaultTerms},
-		RewardShare,
-	};
+	use argon_primitives::{vault::VaultTerms, RewardShare};
 	use codec::{Decode, MaxEncodedLen};
 	use frame_support::storage_alias;
 	use frame_system::pallet_prelude::*;
@@ -22,12 +19,12 @@ mod v0 {
 	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	pub struct Vault<T: Config> {
 		pub operator_account_id: T::AccountId,
-		pub bitcoin_argons: VaultArgons<T::Balance>,
+		pub bitcoin_argons: v1_storage::VaultArgons<T::Balance>,
 		#[codec(compact)]
-		pub securitization_percent: FixedU128,
+		pub added_securitization_percent: FixedU128,
 		#[codec(compact)]
 		pub securitized_argons: T::Balance,
-		pub mining_argons: VaultArgons<T::Balance>,
+		pub bonded_argons: v1_storage::VaultArgons<T::Balance>,
 		#[codec(compact)]
 		pub mining_reward_sharing_percent_take: RewardShare,
 		pub is_closed: bool,
@@ -50,34 +47,45 @@ mod v0 {
 
 pub mod v1_storage {
 	use crate::Config;
-	use argon_primitives::{
-		bond::{VaultArgons, VaultTerms},
-		RewardShare, VaultId,
-	};
-	use codec::{Decode, Encode, MaxEncodedLen};
+	use argon_primitives::{vault::VaultTerms, RewardShare, VaultId};
+	use codec::{Codec, Decode, Encode, MaxEncodedLen};
 	use frame_support::{
-		__private::RuntimeDebug,
 		pallet_prelude::{OptionQuery, TypeInfo},
 		storage_alias, Twox64Concat,
 	};
 	use frame_system::pallet_prelude::BlockNumberFor;
-	use sp_runtime::FixedU128;
+	use sp_core::RuntimeDebug;
+	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedU128};
 
 	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	pub struct Vault<T: Config> {
 		pub operator_account_id: T::AccountId,
 		pub bitcoin_argons: VaultArgons<T::Balance>,
 		#[codec(compact)]
-		pub securitization_percent: FixedU128,
+		pub added_securitization_percent: FixedU128,
 		#[codec(compact)]
 		pub securitized_argons: T::Balance,
-		pub mining_argons: VaultArgons<T::Balance>,
+		pub bonded_argons: VaultArgons<T::Balance>,
 		#[codec(compact)]
 		pub mining_reward_sharing_percent_take: RewardShare,
 		pub is_closed: bool,
 		pub pending_terms: Option<(BlockNumberFor<T>, VaultTerms<T::Balance>)>,
-		pub pending_mining_argons: Option<(BlockNumberFor<T>, T::Balance)>,
+		pub pending_bonded_argons: Option<(BlockNumberFor<T>, T::Balance)>,
 		pub pending_bitcoins: T::Balance,
+	}
+
+	#[derive(
+		Clone, Eq, PartialEq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen, Default,
+	)]
+	pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
+		#[codec(compact)]
+		pub annual_percent_rate: FixedU128,
+		#[codec(compact)]
+		pub allocated: Balance,
+		#[codec(compact)]
+		pub bonded: Balance,
+		#[codec(compact)]
+		pub base_fee: Balance,
 	}
 	#[storage_alias]
 	pub type VaultsById<T: Config> =
@@ -110,13 +118,13 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV0ToV1<T> {
 			let vault = v1_storage::Vault {
 				operator_account_id: vault.operator_account_id,
 				bitcoin_argons: vault.bitcoin_argons,
-				securitization_percent: vault.securitization_percent,
+				added_securitization_percent: vault.added_securitization_percent,
 				securitized_argons: vault.securitized_argons,
-				mining_argons: vault.mining_argons,
+				bonded_argons: vault.bonded_argons,
 				mining_reward_sharing_percent_take: vault.mining_reward_sharing_percent_take,
 				is_closed: vault.is_closed,
 				pending_terms: vault.pending_terms,
-				pending_mining_argons: None,
+				pending_bonded_argons: None,
 				pending_bitcoins,
 			};
 			Some(vault)
@@ -141,7 +149,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV0ToV1<T> {
 		for vault in actual_new_value {
 			ensure!(old_value.iter().any(|(id, _)| id == &vault.0), "Vault missing in translation");
 			ensure!(
-				vault.1.pending_mining_argons.is_none(),
+				vault.1.pending_bonded_argons.is_none(),
 				"New value not set cor\
 				rectly"
 			);
@@ -162,20 +170,19 @@ mod test {
 	use self::InnerMigrateV0ToV1;
 	use super::*;
 	use crate::mock::{new_test_ext, Test};
-	use argon_primitives::bond::VaultArgons;
 	use frame_support::assert_ok;
 	use sp_runtime::FixedU128;
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
-			let mining_argons = VaultArgons {
+			let bonded_argons = v1_storage::VaultArgons {
 				allocated: 10,
 				base_fee: 0,
 				annual_percent_rate: FixedU128::from(0),
 				bonded: 10,
 			};
-			let bitcoin_argons = VaultArgons {
+			let bitcoin_argons = v1_storage::VaultArgons {
 				allocated: 15,
 				base_fee: 0,
 				annual_percent_rate: FixedU128::from(1),
@@ -183,19 +190,19 @@ mod test {
 			};
 			v0::PendingBitcoinsByVault::<Test>::insert(1, 10);
 			let mining_reward_sharing_percent_take = FixedU128::from_float(0.1);
-			let securitization_percent = FixedU128::from_float(0.1);
+			let added_securitization_percent = FixedU128::from_float(0.1);
 			let is_closed = false;
 
 			v0::VaultsById::<Test>::insert(
 				1,
 				v0::Vault {
-					mining_argons: mining_argons.clone(),
+					bonded_argons: bonded_argons.clone(),
 					bitcoin_argons: bitcoin_argons.clone(),
 					mining_reward_sharing_percent_take,
 					operator_account_id: Default::default(),
 					pending_terms: None,
 					securitized_argons: 0,
-					securitization_percent,
+					added_securitization_percent,
 					is_closed,
 				},
 			);
@@ -224,11 +231,11 @@ mod test {
 				v1_storage::Vault {
 					operator_account_id: Default::default(),
 					bitcoin_argons,
-					securitization_percent,
+					added_securitization_percent,
 					securitized_argons: 0,
-					mining_argons,
+					bonded_argons,
 					is_closed,
-					pending_mining_argons: None,
+					pending_bonded_argons: None,
 					pending_bitcoins: 10,
 					mining_reward_sharing_percent_take,
 					pending_terms: None,

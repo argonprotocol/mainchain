@@ -4,7 +4,11 @@ use crate::{
 	Config,
 };
 use alloc::vec::Vec;
-use argon_primitives::{bond::Vault, prelude::Tick, TickProvider};
+use argon_primitives::{
+	prelude::Tick,
+	vault::{Vault, VaultArgons},
+	TickProvider,
+};
 use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
 use log::info;
 use sp_runtime::{
@@ -64,7 +68,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 				);
 				(current_tick + offset, terms)
 			});
-			let pending_mining_argons = vault.pending_mining_argons.map(|(bl, ar)| {
+			let pending_bonded_argons = vault.pending_bonded_argons.map(|(bl, ar)| {
 				let offset = UniqueSaturatedInto::<Tick>::unique_saturated_into(
 					bl.saturating_sub(current_block),
 				);
@@ -74,14 +78,24 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 			count += 1;
 			let vault = Vault {
 				operator_account_id: vault.operator_account_id,
-				bitcoin_argons: vault.bitcoin_argons,
-				securitization_percent: vault.securitization_percent,
-				securitized_argons: vault.securitized_argons,
-				mining_argons: vault.mining_argons,
+				bitcoin_argons: VaultArgons {
+					annual_percent_rate: vault.bitcoin_argons.annual_percent_rate,
+					allocated: vault.bitcoin_argons.allocated,
+					reserved: vault.bitcoin_argons.bonded,
+					base_fee: vault.bitcoin_argons.base_fee,
+				},
+				added_securitization_percent: vault.added_securitization_percent,
+				added_securitization_argons: vault.securitized_argons,
+				bonded_argons: VaultArgons {
+					annual_percent_rate: vault.bonded_argons.annual_percent_rate,
+					allocated: vault.bonded_argons.allocated,
+					reserved: vault.bonded_argons.bonded,
+					base_fee: vault.bonded_argons.base_fee,
+				},
 				mining_reward_sharing_percent_take: vault.mining_reward_sharing_percent_take,
 				is_closed: vault.is_closed,
 				pending_terms,
-				pending_mining_argons,
+				pending_bonded_argons,
 				pending_bitcoins: vault.pending_bitcoins,
 			};
 			Some(vault)
@@ -130,8 +144,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 		for vault in actual_new_value {
 			let old = old_value.iter().find(|(id, _)| id == &vault.0);
 			ensure!(old.is_some(), "Vault missing in translation");
-			if let Some(old_mining) = old.unwrap().1.pending_mining_argons {
-				if let Some((_tick, amount)) = vault.1.pending_mining_argons {
+			if let Some(old_mining) = old.unwrap().1.pending_bonded_argons {
+				if let Some((_tick, amount)) = vault.1.pending_bonded_argons {
 					ensure!(amount == old_mining.1, "amounts must match");
 				}
 			}
@@ -152,7 +166,7 @@ pub type MigrateV1ToV2<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use super::*;
 	use crate::mock::{new_test_ext, CurrentTick, System, Test};
-	use argon_primitives::bond::VaultArgons;
+	use argon_primitives::vault::VaultArgons;
 	use frame_support::assert_ok;
 	use sp_runtime::FixedU128;
 
@@ -161,34 +175,44 @@ mod test {
 		new_test_ext().execute_with(|| {
 			CurrentTick::set(1000);
 			System::set_block_number(1000);
-			let mining_argons = VaultArgons {
+			let bonded_argons = VaultArgons {
 				allocated: 10,
 				base_fee: 0,
 				annual_percent_rate: FixedU128::from(0),
-				bonded: 10,
+				reserved: 10,
 			};
 			let bitcoin_argons = VaultArgons {
 				allocated: 15,
 				base_fee: 0,
 				annual_percent_rate: FixedU128::from(1),
-				bonded: 15,
+				reserved: 15,
 			};
 			let mining_reward_sharing_percent_take = FixedU128::from_float(0.1);
-			let securitization_percent = FixedU128::from_float(0.1);
+			let added_securitization_percent = FixedU128::from_float(0.1);
 			let is_closed = false;
 
 			v1::VaultsById::<Test>::insert(
 				1,
 				v1::Vault {
-					mining_argons: mining_argons.clone(),
-					bitcoin_argons: bitcoin_argons.clone(),
+					bonded_argons: v1::VaultArgons {
+						allocated: bonded_argons.allocated,
+						base_fee: bonded_argons.base_fee,
+						annual_percent_rate: bonded_argons.annual_percent_rate,
+						bonded: bonded_argons.reserved,
+					},
+					bitcoin_argons: v1::VaultArgons {
+						allocated: bitcoin_argons.allocated,
+						base_fee: bitcoin_argons.base_fee,
+						annual_percent_rate: bitcoin_argons.annual_percent_rate,
+						bonded: bitcoin_argons.reserved,
+					},
 					mining_reward_sharing_percent_take,
 					operator_account_id: Default::default(),
 					pending_terms: None,
 					securitized_argons: 0,
-					securitization_percent,
+					added_securitization_percent,
 					is_closed,
-					pending_mining_argons: Some((1010, 10)),
+					pending_bonded_argons: Some((1010, 10)),
 					pending_bitcoins: 0,
 				},
 			);
@@ -221,11 +245,11 @@ mod test {
 				Vault {
 					operator_account_id: Default::default(),
 					bitcoin_argons,
-					securitization_percent,
-					securitized_argons: 0,
-					mining_argons,
+					added_securitization_percent,
+					added_securitization_argons: 0,
+					bonded_argons,
 					is_closed,
-					pending_mining_argons: Some((1010, 10)),
+					pending_bonded_argons: Some((1010, 10)),
 					pending_bitcoins: 0,
 					mining_reward_sharing_percent_take,
 					pending_terms: None,

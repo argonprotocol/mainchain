@@ -153,9 +153,9 @@ whatever you'd like to offer.
 
 ```bash
 $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
-  --mining-apr=1% --mining-base-fee=₳1.00 --mining-argons=₳100 \
+  --bonded-argons-apr=1% --bonded-argons-base-fee=₳1.00 --bonded-argons=₳100 \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 --bitcoin-argons=₳100 \
-  --securitization-percent=100% --mining-reward-sharing-percent-take=0% \
+  --added-securitization-percent=100% --mining-reward-sharing-percent-take=0% \
   --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
 

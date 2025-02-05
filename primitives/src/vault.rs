@@ -49,11 +49,12 @@ pub trait VaultProvider {
 	///
 	/// The funds will be returned to the bond.bonded_account_id
 	///
-	/// Returns the amount that was recouped
+	/// Returns the amount (still owed, repaid)
 	fn compensate_lost_bitcoin(
-		bond: &Bond<Self::AccountId, Self::Balance>,
+		bond: &mut Bond<Self::AccountId, Self::Balance>,
 		market_rate: Self::Balance,
-	) -> Result<Self::Balance, BondError>;
+		unlock_amount_paid: Self::Balance,
+	) -> Result<(Self::Balance, Self::Balance), BondError>;
 
 	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
 	/// the system. It is assumed that the vault is in cahoots with the bonded account.
@@ -134,17 +135,17 @@ pub struct Vault<
 > {
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
-	/// The assignment and allocation of bitcoin bonds
+	/// The assignment and allocation of LockedBitcoins
 	pub bitcoin_argons: VaultArgons<Balance>,
 	/// The additional securitization percent that has been added to the vault (recoverable by
 	/// bonder in case of fraud or theft)
 	#[codec(compact)]
-	pub securitization_percent: FixedU128,
+	pub added_securitization_percent: FixedU128,
 	/// The amount of argons that have been securitized
 	#[codec(compact)]
-	pub securitized_argons: Balance,
-	/// The assignment and allocation of mining bonds
-	pub mining_argons: VaultArgons<Balance>,
+	pub added_securitization_argons: Balance,
+	/// The assignment and allocation of BondedArgons
+	pub bonded_argons: VaultArgons<Balance>,
 	/// The percent of argon mining rewards (minted and mined, not including fees) that this vault
 	/// "charges"
 	#[codec(compact)]
@@ -153,11 +154,12 @@ pub struct Vault<
 	pub is_closed: bool,
 	/// The terms that are pending to be applied to this vault at the given block number
 	pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
-	/// Any pending increase in mining bonds
-	pub pending_mining_argons: Option<(Tick, Balance)>,
+	/// Any pending increase in bonded argons
+	pub pending_bonded_argons: Option<(Tick, Balance)>,
 	/// Bitcoins pending verification
 	pub pending_bitcoins: Balance,
 }
+
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq> {
 	/// The annual percent rate per argon vaulted for bitcoin bonds
@@ -166,13 +168,14 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	/// The base fee for a bitcoin bond
 	#[codec(compact)]
 	pub bitcoin_base_fee: Balance,
-	/// The annual percent rate per argon vaulted for mining bonds
+	/// The annual percent rate per argon vaulted for bonded argons
 	#[codec(compact)]
-	pub mining_annual_percent_rate: FixedU128,
-	/// A base fee for mining bonds
+	pub bonded_argons_annual_percent_rate: FixedU128,
+	/// A base fee for bonded argons
 	#[codec(compact)]
-	pub mining_base_fee: Balance,
-	/// The optional sharing of any argons minted for stabilization or mined from blocks
+	pub bonded_argons_base_fee: Balance,
+	/// The percent of argon mining rewards (minted and mined, not including fees) that this vault
+	/// "charges"
 	#[codec(compact)]
 	pub mining_reward_sharing_percent_take: FixedU128, // max 100, actual percent
 }
@@ -191,31 +194,28 @@ impl<
 			+ Eq,
 	> Vault<AccountId, Balance>
 {
-	pub fn bonded(&self) -> Balance {
-		self.bitcoin_argons.bonded.saturating_add(self.mining_argons.bonded)
-	}
-
-	pub fn allocated(&self) -> Balance {
-		self.bitcoin_argons.allocated.saturating_add(self.mining_argons.allocated)
-	}
-
-	pub fn amount_eligible_for_mining(&self) -> Balance {
-		let allocated = self.mining_argons.free_balance();
-		let mut bitcoins_bonded = self.bitcoin_argons.bonded.saturating_sub(self.pending_bitcoins);
-		if self.securitized_argons > Balance::zero() {
-			let allowed_securities =
-				bitcoins_bonded.saturating_mul(2u32.into()).min(self.securitized_argons);
+	pub fn available_bonded_argons(&self) -> Balance {
+		let free = self.bonded_argons.free_balance();
+		let mut bitcoins_bonded =
+			self.bitcoin_argons.reserved.saturating_sub(self.pending_bitcoins);
+		if self.added_securitization_argons > Balance::zero() {
+			let allowed_securities = bitcoins_bonded
+				.saturating_mul(2u32.into())
+				.min(self.added_securitization_argons);
 			bitcoins_bonded = bitcoins_bonded.saturating_add(allowed_securities);
 		}
-		allocated.min(bitcoins_bonded)
+		free.min(bitcoins_bonded)
 	}
 
-	pub fn get_minimum_securitization_needed(&self) -> Balance {
-		let allocated =
-			if self.is_closed { self.bitcoin_argons.bonded } else { self.bitcoin_argons.allocated };
+	pub fn get_added_securitization_needed(&self) -> Balance {
+		let allocated = if self.is_closed {
+			self.bitcoin_argons.reserved
+		} else {
+			self.bitcoin_argons.allocated
+		};
 
 		let argons = self
-			.securitization_percent
+			.added_securitization_percent
 			.saturating_mul_int::<u128>(allocated.unique_saturated_into());
 
 		argons.unique_saturated_into()
@@ -223,14 +223,14 @@ impl<
 
 	pub fn mut_argons(&mut self, bond_type: &BondType) -> &mut VaultArgons<Balance> {
 		match *bond_type {
-			BondType::Mining => &mut self.mining_argons,
+			BondType::Mining => &mut self.bonded_argons,
 			BondType::Bitcoin => &mut self.bitcoin_argons,
 		}
 	}
 
 	pub fn argons(&self, bond_type: &BondType) -> &VaultArgons<Balance> {
 		match *bond_type {
-			BondType::Mining => &self.mining_argons,
+			BondType::Mining => &self.bonded_argons,
 			BondType::Bitcoin => &self.bitcoin_argons,
 		}
 	}
@@ -243,7 +243,7 @@ pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast
 	#[codec(compact)]
 	pub allocated: Balance,
 	#[codec(compact)]
-	pub bonded: Balance,
+	pub reserved: Balance,
 	#[codec(compact)]
 	pub base_fee: Balance,
 }
@@ -252,12 +252,12 @@ impl<Balance> VaultArgons<Balance>
 where
 	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned,
 {
-	pub fn destroy_bond_funds(&mut self, amount: Balance) -> Result<(), BondError> {
-		if self.bonded < amount {
+	pub fn destroy_funds(&mut self, amount: Balance) -> Result<(), BondError> {
+		if self.reserved < amount {
 			return Err(BondError::InsufficientFunds);
 		}
 		self.reduce_allocated(amount);
-		self.reduce_bonded(amount);
+		self.reduce_reserved(amount);
 		Ok(())
 	}
 
@@ -272,14 +272,15 @@ where
 	pub fn reduce_allocated(&mut self, amount: Balance) {
 		self.allocated = self.allocated.saturating_sub(amount);
 	}
-	pub fn reduce_bonded(&mut self, amount: Balance) {
-		self.bonded = self.bonded.saturating_sub(amount);
+
+	pub fn reduce_reserved(&mut self, amount: Balance) {
+		self.reserved = self.reserved.saturating_sub(amount);
 	}
 }
 
 impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> VaultArgons<Balance> {
 	pub fn free_balance(&self) -> Balance {
-		self.allocated.saturating_sub(self.bonded)
+		self.allocated.saturating_sub(self.reserved)
 	}
 }
 

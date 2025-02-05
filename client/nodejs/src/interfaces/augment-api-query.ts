@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/
 import type { BTreeMap, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningBidStats, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesBond, ArgonPrimitivesBondVault, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletMintMintAction, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningBidStats, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, ArgonPrimitivesVault, ArgonPrimitivesVaultBond, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletMintMintAction, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -199,7 +199,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Bonds by id
        **/
-      bondsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBond>>, [u64]>;
+      bondsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVaultBond>>, [u64]>;
       /**
        * The minimum number of satoshis that can be bonded
        **/
@@ -704,7 +704,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Vaults by id
        **/
-      vaultsById: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBondVault>>, [u32]>;
+      vaultsById: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVault>>, [u32]>;
       /**
        * Vault Bitcoin Xpub and current child counter by VaultId
        **/

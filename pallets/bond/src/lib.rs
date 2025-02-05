@@ -111,8 +111,8 @@ pub mod pallet {
 			XPubFingerprint,
 		},
 		block_seal::RewardSharing,
-		bond::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
 		tick::Tick,
+		vault::{Bond, BondError, BondExpiration, BondProvider, BondType, VaultProvider},
 		BitcoinUtxoEvents, BitcoinUtxoTracker, BondId, PriceProvider, RewardShare, TickProvider,
 		UtxoBondedEvents, VaultId,
 	};
@@ -949,11 +949,16 @@ pub mod pallet {
 			let market_price = T::PriceProvider::get_bitcoin_argon_price(utxo.satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-			let repaid = T::VaultProvider::compensate_lost_bitcoin(&bond, market_price)
-				.map_err(Error::<T>::from)?;
+			// 1. Return funds to user
+			// 2. Any difference from market rate comes from vault, capped by securitization pct
+			// 3. Everything else up to market is burned from the vault
+			let (still_owed, repaid) = T::VaultProvider::compensate_lost_bitcoin(
+				&mut bond,
+				market_price,
+				redemption_amount_held,
+			)
+			.map_err(Error::<T>::from)?;
 
-			bond.amount = bond.amount.saturating_sub(market_price);
-			let still_owed = market_price.saturating_sub(repaid);
 			if still_owed > 0u128.into() {
 				<OwedUtxoAggrieved<T>>::insert(
 					utxo_id,

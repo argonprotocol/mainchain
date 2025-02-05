@@ -54,8 +54,8 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, UtxoId,
 		},
-		bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
 		tick::Tick,
+		vault::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider, VaultTerms},
 		MiningSlotProvider, TickProvider, VaultId,
 	};
 
@@ -166,19 +166,19 @@ pub mod pallet {
 		VaultCreated {
 			vault_id: VaultId,
 			bitcoin_argons: T::Balance,
-			mining_argons: T::Balance,
-			securitization_percent: FixedU128,
+			bonded_argons: T::Balance,
+			added_securitization_percent: FixedU128,
 			operator_account_id: T::AccountId,
 		},
 		VaultModified {
 			vault_id: VaultId,
 			bitcoin_argons: T::Balance,
-			mining_argons: T::Balance,
-			securitization_percent: FixedU128,
+			bonded_argons: T::Balance,
+			added_securitization_percent: FixedU128,
 		},
 		VaultMiningBondsIncreased {
 			vault_id: VaultId,
-			mining_argons: T::Balance,
+			bonded_argons: T::Balance,
 		},
 		VaultMiningBondsChangeScheduled {
 			vault_id: VaultId,
@@ -318,12 +318,13 @@ pub mod pallet {
 		pub bitcoin_amount_allocated: Balance,
 		/// Bytes for a hardened XPub. Will be used to generate child public keys
 		pub bitcoin_xpubkey: OpaqueBitcoinXpub,
-		/// The amount of argons to be vaulted for mining bonds
+		/// The amount of argons to be vaulted for bonded argons
 		#[codec(compact)]
-		pub mining_amount_allocated: Balance,
-		/// The securitization percent for the vault (must be maintained going forward)
+		pub bonded_argons_allocated: Balance,
+		/// The additional/extra securitization percent for the vault (must be maintained going
+		/// forward)
 		#[codec(compact)]
-		pub securitization_percent: FixedU128,
+		pub added_securitization_percent: FixedU128,
 	}
 
 	#[pallet::hooks]
@@ -345,8 +346,9 @@ pub mod pallet {
 						vault.bitcoin_argons.annual_percent_rate =
 							terms.bitcoin_annual_percent_rate;
 						vault.bitcoin_argons.base_fee = terms.bitcoin_base_fee;
-						vault.mining_argons.annual_percent_rate = terms.mining_annual_percent_rate;
-						vault.mining_argons.base_fee = terms.mining_base_fee;
+						vault.bonded_argons.annual_percent_rate =
+							terms.bonded_argons_annual_percent_rate;
+						vault.bonded_argons.base_fee = terms.bonded_argons_base_fee;
 						vault.mining_reward_sharing_percent_take =
 							terms.mining_reward_sharing_percent_take;
 						Self::deposit_event(Event::VaultTermsChanged { vault_id });
@@ -361,11 +363,11 @@ pub mod pallet {
 					let Some(vault) = vault else {
 						return;
 					};
-					if let Some((_, mining_argons)) = vault.pending_mining_argons.take() {
-						vault.mining_argons.allocated = mining_argons;
+					if let Some((_, bonded_argons)) = vault.pending_bonded_argons.take() {
+						vault.bonded_argons.allocated = bonded_argons;
 						Self::deposit_event(Event::VaultMiningBondsIncreased {
 							vault_id,
-							mining_argons,
+							bonded_argons,
 						});
 					}
 				});
@@ -382,22 +384,22 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let VaultConfig {
-				securitization_percent,
+				added_securitization_percent,
 				terms,
 				bitcoin_amount_allocated,
-				mining_amount_allocated,
+				bonded_argons_allocated,
 				bitcoin_xpubkey,
 			} = vault_config;
 			let VaultTerms {
 				bitcoin_annual_percent_rate,
 				bitcoin_base_fee,
-				mining_base_fee,
-				mining_annual_percent_rate,
+				bonded_argons_base_fee,
+				bonded_argons_annual_percent_rate,
 				mining_reward_sharing_percent_take,
 			} = terms;
 
 			ensure!(
-				bitcoin_amount_allocated.checked_add(&mining_amount_allocated).is_some(),
+				bitcoin_amount_allocated.checked_add(&bonded_argons_allocated).is_some(),
 				Error::<T>::InvalidVaultAmount
 			);
 
@@ -423,29 +425,31 @@ pub mod pallet {
 				bitcoin_argons: VaultArgons {
 					annual_percent_rate: bitcoin_annual_percent_rate,
 					allocated: bitcoin_amount_allocated,
-					bonded: 0u32.into(),
+					reserved: 0u32.into(),
 					base_fee: bitcoin_base_fee,
 				},
-				mining_argons: VaultArgons {
-					annual_percent_rate: mining_annual_percent_rate,
-					allocated: mining_amount_allocated,
-					bonded: 0u32.into(),
-					base_fee: mining_base_fee,
+				bonded_argons: VaultArgons {
+					annual_percent_rate: bonded_argons_annual_percent_rate,
+					allocated: bonded_argons_allocated,
+					reserved: 0u32.into(),
+					base_fee: bonded_argons_base_fee,
 				},
 				mining_reward_sharing_percent_take,
-				securitization_percent,
-				securitized_argons: 0u32.into(),
+				added_securitization_percent,
+				added_securitization_argons: 0u32.into(),
 				is_closed: false,
 				pending_terms: None,
-				pending_mining_argons: None,
+				pending_bonded_argons: None,
 				pending_bitcoins: 0u32.into(),
 			};
-			vault.securitized_argons = vault.get_minimum_securitization_needed();
+			vault.added_securitization_argons = vault.get_added_securitization_needed();
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
 			Self::hold(
 				&who,
-				bitcoin_amount_allocated + mining_amount_allocated + vault.securitized_argons,
+				bitcoin_amount_allocated +
+					bonded_argons_allocated +
+					vault.added_securitization_argons,
 				HoldReason::EnterVault,
 			)
 			.map_err(Error::<T>::from)?;
@@ -454,8 +458,8 @@ pub mod pallet {
 			Self::deposit_event(Event::VaultCreated {
 				vault_id,
 				bitcoin_argons: bitcoin_amount_allocated,
-				mining_argons: mining_amount_allocated,
-				securitization_percent,
+				bonded_argons: bonded_argons_allocated,
+				added_securitization_percent,
 				operator_account_id: who,
 			});
 
@@ -465,7 +469,7 @@ pub mod pallet {
 		/// Modify funds offered by the vault. This will not affect existing bonds, but will affect
 		/// the amount of funds available for new bonds.
 		///
-		/// The securitization percent must be maintained or increased.
+		/// The additional securitization percent must be maintained or increased.
 		///
 		/// The amount offered may not go below the existing bonded amounts, but you can release
 		/// funds in this vault as bonds are released. To stop issuing any more bonds, use the
@@ -477,7 +481,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			total_mining_amount_offered: T::Balance,
 			total_bitcoin_amount_offered: T::Balance,
-			securitization_percent: FixedU128,
+			added_securitization_percent: FixedU128,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
@@ -490,7 +494,7 @@ pub mod pallet {
 			// about the ratio of mining to bitcoin
 			if vault.bitcoin_argons.allocated != total_bitcoin_amount_offered {
 				ensure!(
-					vault.bitcoin_argons.bonded <= total_bitcoin_amount_offered,
+					vault.bitcoin_argons.reserved <= total_bitcoin_amount_offered,
 					Error::<T>::VaultReductionBelowAllocatedFunds
 				);
 
@@ -499,24 +503,24 @@ pub mod pallet {
 				vault.bitcoin_argons.allocated = total_bitcoin_amount_offered;
 			}
 
-			if vault.mining_argons.allocated != total_mining_amount_offered {
+			if vault.bonded_argons.allocated != total_mining_amount_offered {
 				ensure!(
-					vault.mining_argons.bonded <= total_mining_amount_offered,
+					vault.bonded_argons.reserved <= total_mining_amount_offered,
 					Error::<T>::VaultReductionBelowAllocatedFunds
 				);
 				ensure!(
-					vault.pending_mining_argons.is_none(),
+					vault.pending_bonded_argons.is_none(),
 					Error::<T>::FundingChangeAlreadyScheduled
 				);
 
 				amount_to_hold += balance_to_i128::<T>(total_mining_amount_offered) -
-					balance_to_i128::<T>(vault.mining_argons.allocated);
+					balance_to_i128::<T>(vault.bonded_argons.allocated);
 				// if increasing, must go into delay pool
-				if total_mining_amount_offered > vault.mining_argons.allocated {
+				if total_mining_amount_offered > vault.bonded_argons.allocated {
 					let current_tick = T::TickProvider::current_tick();
 					let change_tick = T::MiningArgonIncreaseTickDelay::get() + current_tick;
-					vault.pending_mining_argons = Some((change_tick, total_mining_amount_offered));
-					total_mining_amount_offered = vault.mining_argons.allocated;
+					vault.pending_bonded_argons = Some((change_tick, total_mining_amount_offered));
+					total_mining_amount_offered = vault.bonded_argons.allocated;
 
 					PendingFundingModificationsByTick::<T>::mutate(change_tick, |a| {
 						if !a.iter().any(|x| *x == vault_id) {
@@ -530,22 +534,22 @@ pub mod pallet {
 						change_tick,
 					});
 				} else {
-					vault.mining_argons.allocated = total_mining_amount_offered;
+					vault.bonded_argons.allocated = total_mining_amount_offered;
 				}
 			}
 
 			ensure!(
-				securitization_percent >= vault.securitization_percent,
+				added_securitization_percent >= vault.added_securitization_percent,
 				Error::<T>::InvalidSecuritization
 			);
 
-			vault.securitization_percent = securitization_percent;
+			vault.added_securitization_percent = added_securitization_percent;
 
-			let total_securities = vault.get_minimum_securitization_needed();
+			let total_securities = vault.get_added_securitization_needed();
 
 			amount_to_hold += balance_to_i128::<T>(total_securities) -
-				balance_to_i128::<T>(vault.securitized_argons);
-			vault.securitized_argons = total_securities;
+				balance_to_i128::<T>(vault.added_securitization_argons);
+			vault.added_securitization_argons = total_securities;
 
 			#[allow(clippy::comparison_chain)]
 			if amount_to_hold > 0 {
@@ -562,8 +566,8 @@ pub mod pallet {
 			Self::deposit_event(Event::VaultModified {
 				vault_id,
 				bitcoin_argons: total_bitcoin_amount_offered,
-				mining_argons: total_mining_amount_offered,
-				securitization_percent,
+				bonded_argons: total_mining_amount_offered,
+				added_securitization_percent,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 
@@ -630,12 +634,12 @@ pub mod pallet {
 
 			vault.is_closed = true;
 
-			let securitization_still_needed = vault.get_minimum_securitization_needed();
+			let securitization_still_needed = vault.get_added_securitization_needed();
 			let free_securitization =
-				vault.securitized_argons.saturating_sub(securitization_still_needed);
+				vault.added_securitization_argons.saturating_sub(securitization_still_needed);
 
 			let return_amount = vault.bitcoin_argons.free_balance() +
-				vault.mining_argons.free_balance() +
+				vault.bonded_argons.free_balance() +
 				free_securitization;
 
 			ensure!(
@@ -645,13 +649,13 @@ pub mod pallet {
 
 			Self::release_hold(&who, return_amount, HoldReason::EnterVault)?;
 
-			vault.bitcoin_argons.allocated = vault.bitcoin_argons.bonded;
-			vault.mining_argons.allocated = vault.mining_argons.bonded;
-			vault.securitized_argons = securitization_still_needed;
+			vault.bitcoin_argons.allocated = vault.bitcoin_argons.reserved;
+			vault.bonded_argons.allocated = vault.bonded_argons.reserved;
+			vault.added_securitization_argons = securitization_still_needed;
 			Self::deposit_event(Event::VaultClosed {
 				vault_id,
-				bitcoin_amount_still_bonded: vault.bitcoin_argons.bonded,
-				mining_amount_still_bonded: vault.mining_argons.bonded,
+				bitcoin_amount_still_bonded: vault.bitcoin_argons.reserved,
+				mining_amount_still_bonded: vault.bonded_argons.reserved,
 				securitization_still_bonded: securitization_still_needed,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
@@ -790,9 +794,9 @@ pub mod pallet {
 					&mut vault.bitcoin_argons
 				},
 				BondType::Mining => {
-					let amount_eligible = vault.amount_eligible_for_mining();
+					let amount_eligible = vault.available_bonded_argons();
 					ensure!(amount_eligible >= amount, BondError::InsufficientVaultFunds);
-					&mut vault.mining_argons
+					&mut vault.bonded_argons
 				},
 			};
 
@@ -816,7 +820,7 @@ pub mod pallet {
 				Self::hold(bond_account_id, fee - base_fee, HoldReason::BondFee)?;
 			}
 
-			vault_argons.bonded = vault_argons.bonded.saturating_add(amount);
+			vault_argons.reserved = vault_argons.reserved.saturating_add(amount);
 			VaultsById::<T>::set(vault_id, Some(vault));
 
 			Ok((fee, base_fee))
@@ -829,7 +833,7 @@ pub mod pallet {
 			let vault_id = bond.vault_id;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
 
-			vault.bitcoin_argons.destroy_bond_funds(amount_to_burn)?;
+			vault.bitcoin_argons.destroy_funds(amount_to_burn)?;
 
 			T::Currency::burn_held(
 				&HoldReason::EnterVault.into(),
@@ -848,6 +852,8 @@ pub mod pallet {
 		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
 		/// activity, like not moving cosigned UTXOs in the appropriate timeframe.
 		///
+		/// The recouped funds are market rate capped at securitization rate of the vault.
+		///
 		/// This will take funds from the vault in the following order:
 		/// 1. From the bonded funds
 		/// 2. From the allocated funds
@@ -856,11 +862,13 @@ pub mod pallet {
 		///
 		/// The funds will be returned to the owed_to_account_id
 		///
-		/// Returns the amount that was recouped
+		/// Returns the amount (still owed, repaid)
 		fn compensate_lost_bitcoin(
-			bond: &Bond<T::AccountId, T::Balance>,
+			bond: &mut Bond<T::AccountId, T::Balance>,
 			market_rate: Self::Balance,
-		) -> Result<Self::Balance, BondError> {
+			redemption_rate: Self::Balance,
+		) -> Result<(Self::Balance, Self::Balance), BondError> {
+			let zero = T::Balance::zero();
 			let vault_id = bond.vault_id;
 			let bonded_account_id = &bond.bonded_account_id;
 			let remaining_fee = bond.total_fee.saturating_sub(bond.prepaid_fee);
@@ -874,11 +882,30 @@ pub mod pallet {
 				Self::release_hold(bonded_account_id, remaining_fee, HoldReason::BondFee)
 					.map_err(|_| BondError::UnrecoverableHold)?;
 			}
-			// 1. take away from the vault first
-			vault.bitcoin_argons.destroy_bond_funds(bonded_amount.min(market_rate))?;
 
-			let mut still_owed = market_rate.saturating_sub(bonded_amount);
-			let zero = T::Balance::zero();
+			// 1. burn redemption rate from the vault (or min of market rate)
+			let burn_amount = redemption_rate.min(market_rate);
+			vault.bitcoin_argons.destroy_funds(burn_amount)?;
+			bond.amount = bond.amount.saturating_sub(burn_amount);
+			T::Currency::burn_held(
+				&HoldReason::EnterVault.into(),
+				&vault_operator,
+				burn_amount,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| BondError::UnrecoverableHold)?;
+
+			// the max amount to recoup, which is the market rate capped by securitization
+			let securitized_bond_amount = vault
+				.added_securitization_percent
+				.saturating_mul_int(bonded_amount)
+				.saturating_add(bonded_amount)
+				.min(market_rate);
+
+			// Still owed is diff of securitized bond amount and bonded amount
+			let amount_owed = securitized_bond_amount.saturating_sub(bonded_amount);
+			let mut still_owed = amount_owed;
 
 			// 2: use bitcoin argons
 			if still_owed > zero && vault.bitcoin_argons.free_balance() >= zero {
@@ -889,20 +916,19 @@ pub mod pallet {
 			}
 
 			// 3. Use securitized argons
-			if still_owed > zero && vault.securitized_argons >= zero {
-				let amount_to_pull = still_owed.min(vault.securitized_argons);
-				vault.securitized_argons = vault
-					.securitized_argons
+			if still_owed > zero && vault.added_securitization_argons >= zero {
+				let amount_to_pull = still_owed.min(vault.added_securitization_argons);
+				vault.added_securitization_argons = vault
+					.added_securitization_argons
 					.checked_sub(&amount_to_pull)
 					.ok_or(BondError::InternalError)?;
 				still_owed =
 					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
 			}
 
-			// 3. Use ownership tokens at current value
-			// TODO
+			// TODO: 4. Use ownership tokens at current value
 
-			let recouped = market_rate.saturating_sub(still_owed);
+			let recouped = amount_owed.saturating_sub(still_owed);
 			T::Currency::transfer_on_hold(
 				&HoldReason::EnterVault.into(),
 				&vault_operator,
@@ -916,7 +942,7 @@ pub mod pallet {
 
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok(recouped)
+			Ok((still_owed, recouped))
 		}
 
 		fn release_bonded_funds(
@@ -925,18 +951,18 @@ pub mod pallet {
 			let vault_id = bond.vault_id;
 			let vault = {
 				let mut vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
-				vault.mut_argons(&bond.bond_type).reduce_bonded(bond.amount);
+				vault.mut_argons(&bond.bond_type).reduce_reserved(bond.amount);
 				vault
 			};
 
 			// after reducing the bonded, we can check the minimum securitization needed (can't be
 			// mut)
-			let minimum_securitization = vault.get_minimum_securitization_needed();
+			let minimum_securitization = vault.get_added_securitization_needed();
 			// working around borrow checker
 			let mut vault = vault;
 			if vault.is_closed {
 				let free_securitization =
-					vault.securitized_argons.saturating_sub(minimum_securitization);
+					vault.added_securitization_argons.saturating_sub(minimum_securitization);
 
 				Self::release_hold(
 					&vault.operator_account_id,
@@ -945,7 +971,7 @@ pub mod pallet {
 				)
 				.map_err(|_| BondError::UnrecoverableHold)?;
 
-				vault.securitized_argons = minimum_securitization;
+				vault.added_securitization_argons = minimum_securitization;
 				vault.mut_argons(&bond.bond_type).reduce_allocated(bond.amount);
 			}
 

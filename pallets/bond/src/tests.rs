@@ -19,7 +19,7 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature,
 		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
-	bond::{Bond, BondExpiration, BondProvider, BondType},
+	vault::{Bond, BondExpiration, BondProvider, BondType},
 	BitcoinUtxoEvents, BondId, PriceProvider,
 };
 
@@ -81,13 +81,13 @@ fn cleans_up_a_rejected_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
 
 		assert_ok!(Bonds::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
 		assert_eq!(UtxosById::<Test>::get(1), None);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
 	});
 }
 
@@ -109,7 +109,7 @@ fn marks_a_verified_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
 
 		assert_ok!(Bonds::utxo_verified(1));
 		assert!(UtxosById::<Test>::get(1).unwrap().is_verified);
@@ -167,7 +167,7 @@ fn burns_a_spent_bitcoin() {
 
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
 		// first verify
 		assert_ok!(Bonds::utxo_verified(1));
 
@@ -196,7 +196,7 @@ fn burns_a_spent_bitcoin() {
 			})
 		);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, price - new_price);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price - new_price);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated - new_price);
 		// should still exist in completions
 		assert_eq!(BitcoinBondCompletions::<Test>::get(expiration_block).to_vec(), vec![1]);
@@ -218,7 +218,7 @@ fn burns_a_spent_bitcoin() {
 		assert_eq!(LastUnlockEvent::get(), Some((1, true, new_price)));
 		assert!(BitcoinBondCompletions::<Test>::get(expiration_block).is_empty());
 		assert_eq!(BondsById::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated - new_price);
 	});
 }
@@ -249,7 +249,7 @@ fn cancels_an_unverified_spent_bitcoin() {
 		assert_ok!(Bonds::utxo_spent(1));
 
 		assert_eq!(WatchedUtxosById::get().len(), 0);
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert!(BitcoinBondCompletions::<Test>::get(expiration_block).is_empty());
@@ -287,7 +287,7 @@ fn can_unlock_a_bitcoin() {
 			BondExpiration::BitcoinBlock(block) => block,
 			_ => panic!("should be bitcoin block"),
 		};
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, bond.amount);
 		// first verify
 		assert_ok!(Bonds::utxo_verified(1));
 		// Mint the argons into account
@@ -369,7 +369,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
 		let vault = DefaultVault::get();
 		let mut bond = BondsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
+		assert_eq!(vault.bitcoin_argons.reserved, bond.amount);
 		// first verify
 		assert_ok!(Bonds::utxo_verified(1));
 		// Mint the argons into account
@@ -413,7 +413,7 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 				bond_id: 1,
 				vault_id: 1,
 				utxo_id: 1,
-				compensation_amount: market_price,
+				compensation_amount: redemption_price,
 				compensation_still_owed: 0,
 				compensated_account_id: who,
 			}
@@ -421,9 +421,12 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		);
 		let original_bond_amount = bond.amount;
 		assert_eq!(LastUnlockEvent::get(), Some((1, false, bond.amount)));
-		bond.amount = original_bond_amount - market_price;
+		bond.amount = original_bond_amount - redemption_price;
 		assert_eq!(BondsById::<Test>::get(1), Some(bond));
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, original_bond_amount - market_price);
+		assert_eq!(
+			DefaultVault::get().bitcoin_argons.reserved,
+			original_bond_amount - market_price
+		);
 		assert_eq!(
 			DefaultVault::get().bitcoin_argons.allocated,
 			vault.bitcoin_argons.allocated.saturating_sub(market_price)
@@ -450,7 +453,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(who), 1, satoshis, pubkey.into()));
 		let vault = DefaultVault::get();
 		let bond = BondsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.bitcoin_argons.bonded, bond.amount);
+		assert_eq!(vault.bitcoin_argons.reserved, bond.amount);
 		// first verify
 		assert_ok!(Bonds::utxo_verified(1));
 		// Mint the argons into account
@@ -499,7 +502,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		// should keep bond for the year
 		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, bond.amount);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, bond.amount);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
 		assert_eq!(UtxosCosignReleaseHeightById::<Test>::get(1), Some(1));
 
@@ -527,7 +530,7 @@ fn clears_unlocked_bitcoin_bonds() {
 		};
 		Bonds::on_initialize(2);
 		assert_eq!(BondsById::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().bitcoin_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
 		assert_ok!(Bonds::utxo_spent(1));
 	});
@@ -596,8 +599,8 @@ fn it_can_create_a_mining_bond() {
 				start_tick: 1,
 			}
 		);
-		assert_eq!(DefaultVault::get().mining_argons.bonded, amount);
-		assert_eq!(DefaultVault::get().mining_argons.allocated, vault.mining_argons.allocated);
+		assert_eq!(DefaultVault::get().bonded_argons.reserved, amount);
+		assert_eq!(DefaultVault::get().bonded_argons.allocated, vault.bonded_argons.allocated);
 		assert_eq!(MiningBondCompletions::<Test>::get(10).to_vec(), vec![1]);
 		System::assert_last_event(
 			Event::<Test>::BondCreated {
@@ -617,7 +620,7 @@ fn it_can_create_a_mining_bond() {
 		CurrentTick::set(10);
 		Bonds::on_initialize(10);
 		assert_eq!(BondsById::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().mining_argons.bonded, 0);
+		assert_eq!(DefaultVault::get().bonded_argons.reserved, 0);
 	});
 }
 
@@ -629,8 +632,8 @@ fn it_can_modify_a_mining_bond() {
 		set_argons(who, 2_000_000);
 		let amount = 1_000_000;
 		let mut vault = DefaultVault::get();
-		vault.mining_argons.annual_percent_rate = FixedU128::from_float(0.1);
-		vault.mining_argons.base_fee = 100;
+		vault.bonded_argons.annual_percent_rate = FixedU128::from_float(0.1);
+		vault.bonded_argons.base_fee = 100;
 		DefaultVault::set(vault);
 		MockFeeResult::set((100_000, 100));
 		MinimumBondAmount::set(1000);

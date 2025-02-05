@@ -2,8 +2,8 @@ use crate as pallet_mining_slot;
 use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
-	bond::{BondError, BondProvider},
 	tick::{Tick, Ticker},
+	vault::{BondError, BondProvider},
 	BlockNumber, TickProvider, VaultId, VotingSchedule,
 };
 use env_logger::{Builder, Env};

@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBondBondExpiration, ArgonPrimitivesBondBondType, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, ArgonRuntimeConfigsProxyType, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpEventsRequestResponseHandled, IsmpEventsTimeoutHandled, IsmpHostStateMachine, PalletDomainsDomainRegistration, PalletHyperbridgeVersionedHostParams, PalletIsmpErrorsHandlingError, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesVaultBondExpiration, ArgonPrimitivesVaultBondType, ArgonRuntimeConfigsProxyType, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpEventsRequestResponseHandled, IsmpEventsTimeoutHandled, IsmpHostStateMachine, PalletDomainsDomainRegistration, PalletHyperbridgeVersionedHostParams, PalletIsmpErrorsHandlingError, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -132,13 +132,13 @@ declare module '@polkadot/api-base/types/events' {
       BitcoinCosignPastDue: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32], { bondId: u64, vaultId: u32, utxoId: u64, compensationAmount: u128, compensationStillOwed: u128, compensatedAccountId: AccountId32 }>;
       BitcoinUtxoCosigned: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes], { bondId: u64, vaultId: u32, utxoId: u64, signature: Bytes }>;
       BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [bondId: u64, vaultId: u32, utxoId: u64], { bondId: u64, vaultId: u32, utxoId: u64 }>;
-      BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesBondBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesBondBondType, returnedFee: u128 }>;
+      BondCanceled: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesVaultBondType, returnedFee: u128], { vaultId: u32, bondId: u64, bondedAccountId: AccountId32, bondType: ArgonPrimitivesVaultBondType, returnedFee: u128 }>;
       BondCompleted: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64], { vaultId: u32, bondId: u64 }>;
       /**
        * An error occurred while completing a bond
        **/
       BondCompletionError: AugmentedEvent<ApiType, [bondId: u64, error: SpRuntimeDispatchError], { bondId: u64, error: SpRuntimeDispatchError }>;
-      BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration], { vaultId: u32, bondId: u64, bondType: ArgonPrimitivesBondBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesBondBondExpiration }>;
+      BondCreated: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, bondType: ArgonPrimitivesVaultBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesVaultBondExpiration], { vaultId: u32, bondId: u64, bondType: ArgonPrimitivesVaultBondType, bondedAccountId: AccountId32, utxoId: Option<u64>, amount: u128, expiration: ArgonPrimitivesVaultBondExpiration }>;
       BondModified: AugmentedEvent<ApiType, [vaultId: u32, bondId: u64, amount: u128], { vaultId: u32, bondId: u64, amount: u128 }>;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin bond
@@ -589,10 +589,10 @@ declare module '@polkadot/api-base/types/events' {
     vaults: {
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128], { vaultId: u32, bitcoinAmountStillBonded: u128, miningAmountStillBonded: u128, securitizationStillBonded: u128 }>;
-      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128, operatorAccountId: AccountId32 }>;
+      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32 }>;
       VaultMiningBondsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
-      VaultMiningBondsIncreased: AugmentedEvent<ApiType, [vaultId: u32, miningArgons: u128], { vaultId: u32, miningArgons: u128 }>;
-      VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, miningArgons: u128, securitizationPercent: u128 }>;
+      VaultMiningBondsIncreased: AugmentedEvent<ApiType, [vaultId: u32, bondedArgons: u128], { vaultId: u32, bondedArgons: u128 }>;
+      VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128 }>;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
     };

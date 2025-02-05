@@ -17,9 +17,9 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
-	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	ensure,
 	tick::{Tick, Ticker},
+	vault::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoBondedEvents, VaultId, VotingSchedule,
 };
 
@@ -82,25 +82,25 @@ parameter_types! {
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
 	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
-		mining_argons: VaultArgons {
+		bonded_argons: VaultArgons {
 			allocated: 100_000_000_000,
-			bonded: 0,
+			reserved: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
 		bitcoin_argons: VaultArgons {
 			allocated: 200_000_000_000,
-			bonded: 0,
+			reserved: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
 		operator_account_id: 1,
-		securitization_percent: FixedU128::from_float(0.0),
+		added_securitization_percent: FixedU128::from_float(0.0),
 		mining_reward_sharing_percent_take: FixedU128::from_float(0.0),
-		securitized_argons: 0,
+		added_securitization_argons: 0,
 		is_closed: false,
 		pending_terms: None,
-		pending_mining_argons: None,
+		pending_bonded_argons: None,
 		pending_bitcoins: 0,
 	};
 
@@ -172,13 +172,16 @@ impl VaultProvider for StaticVaultProvider {
 	}
 
 	fn compensate_lost_bitcoin(
-		_bond: &Bond<Self::AccountId, Self::Balance>,
+		bond: &mut Bond<Self::AccountId, Self::Balance>,
 		market_rate: Self::Balance,
-	) -> Result<Self::Balance, BondError> {
+		redemption_rate: Self::Balance,
+	) -> Result<(Self::Balance, Self::Balance), BondError> {
+		let rate = redemption_rate.min(redemption_rate);
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_bond_funds(market_rate).expect("should not fail");
+			a.bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
 		});
-		Ok(market_rate)
+		bond.amount -= rate;
+		Ok((0, rate))
 	}
 
 	fn burn_vault_bitcoin_funds(
@@ -186,7 +189,7 @@ impl VaultProvider for StaticVaultProvider {
 		amount_to_burn: Self::Balance,
 	) -> Result<(), BondError> {
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_bond_funds(amount_to_burn).expect("should not fail")
+			a.bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
 		});
 
 		Ok(())
@@ -203,14 +206,14 @@ impl VaultProvider for StaticVaultProvider {
 			DefaultVault::get().mut_argons(&bond_type).allocated >= amount,
 			BondError::InsufficientVaultFunds
 		);
-		DefaultVault::mutate(|a| a.mut_argons(&bond_type).bonded += amount);
+		DefaultVault::mutate(|a| a.mut_argons(&bond_type).reserved += amount);
 		Ok(MockFeeResult::get())
 	}
 
 	fn release_bonded_funds(
 		bond: &Bond<Self::AccountId, Self::Balance>,
 	) -> Result<Self::Balance, BondError> {
-		DefaultVault::mutate(|a| a.mut_argons(&bond.bond_type).reduce_bonded(bond.amount));
+		DefaultVault::mutate(|a| a.mut_argons(&bond.bond_type).reduce_reserved(bond.amount));
 		Ok(bond.total_fee.saturating_sub(bond.prepaid_fee))
 	}
 

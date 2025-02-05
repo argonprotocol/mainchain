@@ -31,7 +31,6 @@ mod apis;
 pub mod balance_change;
 pub mod block_seal;
 pub mod block_vote;
-pub mod bond;
 pub mod digests;
 mod domain;
 pub mod domain_top_level;
@@ -39,6 +38,7 @@ pub mod host;
 pub mod inherents;
 pub mod macros;
 pub mod notary;
+pub mod vault;
 
 pub mod account;
 pub mod bitcoin;

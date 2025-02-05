@@ -8,9 +8,9 @@ use argon_primitives::{
 		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
 		RewardSharing, SlotId,
 	},
-	bond::BondProvider,
 	inherents::BlockSealInherent,
 	tick::Tick,
+	vault::BondProvider,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	RewardShare, TickProvider,
 };
@@ -86,8 +86,8 @@ pub mod pallet {
 
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
-		bond::{BondError, BondProvider},
 		prelude::*,
+		vault::{BondError, BondProvider},
 		TickProvider,
 	};
 

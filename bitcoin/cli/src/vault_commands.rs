@@ -80,7 +80,7 @@ impl VaultCommands {
 						"Id",
 						"Available argons",
 						"Bonded argons",
-						"Securitization",
+						"Added Securitization",
 						"Fee",
 					]);
 
@@ -90,7 +90,7 @@ impl VaultCommands {
 						continue;
 					};
 					let bitcoin_argons_available =
-						vault.bitcoin_argons.allocated - vault.bitcoin_argons.bonded;
+						vault.bitcoin_argons.allocated - vault.bitcoin_argons.reserved;
 					if bitcoin_argons_available >= argons_needed {
 						let fee = vault.bitcoin_argons.base_fee +
 							from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
@@ -99,8 +99,8 @@ impl VaultCommands {
 						table.add_row(vec![
 							vault_id.to_string(),
 							ArgonFormatter(bitcoin_argons_available).to_string(),
-							ArgonFormatter(vault.bitcoin_argons.bonded).to_string(),
-							ArgonFormatter(vault.securitized_argons).to_string(),
+							ArgonFormatter(vault.bitcoin_argons.reserved).to_string(),
+							ArgonFormatter(vault.added_securitization_argons).to_string(),
 							ArgonFormatter(fee).to_string(),
 						]);
 					}
