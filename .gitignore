@@ -24,3 +24,4 @@ node_modules
 /client/nodejs/**/*.d.ts
 /oracle/.env
 /scripts/hyperbridge/**/*-messaging-relayer.toml
+/docs/.obsidian

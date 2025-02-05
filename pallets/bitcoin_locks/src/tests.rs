@@ -9,17 +9,17 @@ use sp_core::H256;
 use crate::{
 	mock::*,
 	pallet::{
-		BitcoinBondCompletions, BondsById, MiningBondCompletions, OwedUtxoAggrieved, UtxosById,
-		UtxosCosignReleaseHeightById, UtxosPendingUnlockByUtxoId,
+		BitcoinBondCompletions, BondsById, LocksByUtxoId, MiningBondCompletions, OwedUtxoAggrieved,
+		UtxosCosignReleaseHeightById, UtxosPendingUnlockByLockId,
 	},
-	Error, Event, HoldReason, UtxoCosignRequest, UtxoState,
+	BitcoinLock, Error, Event, HoldReason, UtxoCosignRequest,
 };
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature,
 		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
-	vault::{Bond, BondExpiration, BondProvider, BondType},
+	vault::{Bond, BondExpiration, BondType, BondedArgonsProvider},
 	BitcoinUtxoEvents, BondId, PriceProvider,
 };
 
@@ -37,7 +37,10 @@ fn can_bond_a_bitcoin_utxo() {
 			Error::<Test>::InsufficientSatoshisBonded
 		);
 		assert_ok!(Bonds::bond_bitcoin(RuntimeOrigin::signed(2), 1, SATOSHIS_PER_BITCOIN, pubkey));
-		assert_eq!(UtxosById::<Test>::get(1).unwrap(), default_utxo_state(1, SATOSHIS_PER_BITCOIN));
+		assert_eq!(
+			LocksByUtxoId::<Test>::get(1).unwrap(),
+			default_utxo_state(1, SATOSHIS_PER_BITCOIN)
+		);
 		assert_eq!(
 			BondsById::<Test>::get(1).unwrap().amount,
 			StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
@@ -56,7 +59,7 @@ fn can_bond_a_bitcoin_utxo() {
 		System::set_block_number(2);
 		BitcoinBlockHeight::set(12 + BitcoinBondDurationBlocks::get());
 		Bonds::on_initialize(2);
-		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
 	});
@@ -84,7 +87,7 @@ fn cleans_up_a_rejected_bitcoin() {
 		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
 
 		assert_ok!(Bonds::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
-		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(BondsById::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
 		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
@@ -112,7 +115,7 @@ fn marks_a_verified_bitcoin() {
 		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
 
 		assert_ok!(Bonds::utxo_verified(1));
-		assert!(UtxosById::<Test>::get(1).unwrap().is_verified);
+		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert_eq!(LastBondEvent::get(), Some((1, who, price)));
 	});
@@ -180,7 +183,7 @@ fn burns_a_spent_bitcoin() {
 		assert_eq!(new_price, 49_350_000_000);
 
 		assert_ok!(Bonds::utxo_spent(1));
-		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(
 			BondsById::<Test>::get(1),
 			Some(Bond {
@@ -325,13 +328,13 @@ fn can_unlock_a_bitcoin() {
 			unlock_script_pubkey.clone(),
 			1000
 		));
-		assert!(UtxosById::<Test>::get(1).is_some());
+		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 		let redemption_price =
 			Bonds::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
 		assert!(redemption_price > bond.amount);
 		// redemption price should be the bond price since current redemption price is above
 		assert_eq!(
-			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
+			UtxosPendingUnlockByLockId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
 				vault_id: 1,
 				bond_id: 1,
@@ -381,12 +384,12 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 			unlock_script_pubkey.clone(),
 			2000
 		));
-		assert!(UtxosById::<Test>::get(1).is_some());
+		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
+			UtxosPendingUnlockByLockId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
 				vault_id: 1,
 				bond_id: 1,
@@ -405,8 +408,8 @@ fn penalizes_vault_if_not_unlock_countersigned() {
 		// should pay back at market price (not the discounted rate)
 		let market_price =
 			StaticPriceProvider::get_bitcoin_argon_price(satoshis).expect("should have price");
-		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
-		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(UtxosPendingUnlockByLockId::<Test>::get().get(&1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		System::assert_last_event(
 			Event::<Test>::BitcoinCosignPastDue {
@@ -465,12 +468,12 @@ fn clears_unlocked_bitcoin_bonds() {
 			unlock_script_pubkey.clone(),
 			11
 		));
-		assert!(UtxosById::<Test>::get(1).is_some());
+		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
 		let redemption_price = Bonds::get_redemption_price(&satoshis).expect("should have price");
 		let cosign_due_block = BitcoinBlockHeight::get() + UtxoUnlockCosignDeadlineBlocks::get();
 		assert_eq!(
-			UtxosPendingUnlockByUtxoId::<Test>::get().get(&1),
+			UtxosPendingUnlockByLockId::<Test>::get().get(&1),
 			Some(UtxoCosignRequest {
 				vault_id: 1,
 				bond_id: 1,
@@ -497,8 +500,8 @@ fn clears_unlocked_bitcoin_bonds() {
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
 		assert_eq!(LastUnlockEvent::get(), Some((1, false, redemption_price)));
-		assert_eq!(UtxosPendingUnlockByUtxoId::<Test>::get().get(&1), None);
-		assert_eq!(UtxosById::<Test>::get(1), None);
+		assert_eq!(UtxosPendingUnlockByLockId::<Test>::get().get(&1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
 		// should keep bond for the year
 		assert_eq!(BondsById::<Test>::get(1), Some(bond.clone()));
@@ -690,9 +693,9 @@ fn should_cleanup_multiple_completion_ticks() {
 	});
 }
 
-fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> UtxoState {
+fn default_utxo_state(bond_id: BondId, satoshis: Satoshis) -> BitcoinLock {
 	let current_height = BitcoinBlockHeight::get();
-	UtxoState {
+	BitcoinLock {
 		bond_id,
 		satoshis,
 		vault_claim_height: current_height + BitcoinBondDurationBlocks::get(),

@@ -14,7 +14,7 @@ use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
 use argon_bitcoin::{Amount, CosignScript, CosignScriptArgs, UnlockStep, UtxoUnlocker};
 use argon_client::{
 	api,
-	api::{apis, runtime_types::pallet_bond::pallet::UtxoCosignRequest, storage, tx},
+	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::UtxoCosignRequest, storage, tx},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
@@ -29,7 +29,7 @@ use argon_primitives::{
 use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
 
 #[derive(Subcommand, Debug)]
-pub enum BondCommands {
+pub enum LockCommands {
 	/// Create a bond application
 	Apply {
 		/// The vault id
@@ -163,10 +163,10 @@ pub enum BitcoinClaimer {
 	Vault,
 }
 
-impl BondCommands {
+impl LockCommands {
 	pub async fn process(self, rpc_url: String) -> anyhow::Result<()> {
 		match self {
-			BondCommands::Apply { vault_id, keypair: _, owner_pubkey, btc } => {
+			LockCommands::Apply { vault_id, keypair: _, owner_pubkey, btc } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -195,7 +195,7 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to complete transaction:\n\t{}", url);
 			},
-			BondCommands::SendToAddress { bond_id } => {
+			LockCommands::SendToAddress { bond_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -217,7 +217,7 @@ impl BondCommands {
 				// bitcoin-cli finalizepsbt "processed_psbt_base64"
 				// bitcoin-cli sendrawtransaction "finalized_hex"
 			},
-			BondCommands::Get { bond_id, at_block } => {
+			LockCommands::Get { bond_id, at_block } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -330,7 +330,7 @@ impl BondCommands {
 
 				println!("{table}");
 			},
-			BondCommands::RequestUnlock {
+			LockCommands::RequestUnlock {
 				bond_id,
 				dest_pubkey,
 				fee_rate_sats_per_kb,
@@ -381,7 +381,7 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::VaultCosign { bond_id, xpriv_file, master_xpub_hd_path } => {
+			LockCommands::VaultCosign { bond_id, xpriv_file, master_xpub_hd_path } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -430,7 +430,7 @@ impl BondCommands {
 				let url = client.create_polkadotjs_deeplink(&unlock_fulfill)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::OwnerCosignPsbt {
+			LockCommands::OwnerCosignPsbt {
 				utxo_id,
 				parent_fingerprint,
 				hd_path,
@@ -574,7 +574,7 @@ impl BondCommands {
 				);
 				return Ok(());
 			},
-			BondCommands::ClaimUtxoPsbt {
+			LockCommands::ClaimUtxoPsbt {
 				bond_id,
 				at_block: block_number,
 				claimer,
@@ -675,7 +675,7 @@ impl BondCommands {
 async fn load_unlocker(
 	client: &MainchainClient,
 	utxo_id: UtxoId,
-	utxo: &api::runtime_types::pallet_bond::pallet::UtxoState,
+	utxo: &api::runtime_types::pallet_bitcoin_locks::pallet::UtxoState,
 	at_block: Option<H256>,
 ) -> anyhow::Result<UtxoUnlocker> {
 	let utxo_ref = client
@@ -729,7 +729,7 @@ async fn get_utxo_from_bond_id(
 	at_block: Option<H256>,
 ) -> anyhow::Result<(
 	UtxoId,
-	api::runtime_types::pallet_bond::pallet::UtxoState,
+	api::runtime_types::pallet_bitcoin_locks::pallet::UtxoState,
 	api::bonds::storage::types::bonds_by_id::BondsById,
 )> {
 	let query = storage().bonds().bonds_by_id(bond_id);
@@ -749,7 +749,7 @@ async fn get_utxo_from_bond_id(
 }
 
 fn get_cosign_script(
-	utxo: &api::runtime_types::pallet_bond::pallet::UtxoState,
+	utxo: &api::runtime_types::pallet_bitcoin_locks::pallet::UtxoState,
 	network: Network,
 ) -> anyhow::Result<CosignScript> {
 	let script_args = CosignScriptArgs {

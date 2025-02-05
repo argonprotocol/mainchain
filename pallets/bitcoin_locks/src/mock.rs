@@ -9,7 +9,7 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
 
-use crate as pallet_bond;
+use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
 use argon_bitcoin::UtxoUnlocker;
 use argon_primitives::{
@@ -19,8 +19,8 @@ use argon_primitives::{
 	},
 	ensure,
 	tick::{Tick, Ticker},
-	vault::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
-	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoBondedEvents, VaultId, VotingSchedule,
+	vault::{BitcoinObligationProvider, Bond, BondError, BondType, Vault, VaultArgons},
+	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VaultId, VotingSchedule,
 };
 
 pub type Balance = u128;
@@ -32,7 +32,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
-		Bonds: pallet_bond
+		Bonds: pallet_bitcoin_locks
 	}
 );
 
@@ -125,8 +125,8 @@ parameter_types! {
 }
 
 pub struct EventHandler;
-impl UtxoBondedEvents<u64, Balance> for EventHandler {
-	fn utxo_bonded(
+impl UtxoLockEvents<u64, Balance> for EventHandler {
+	fn utxo_locked(
 		utxo_id: UtxoId,
 		account_id: &u64,
 		amount: Balance,
@@ -159,7 +159,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticVaultProvider;
 
-impl VaultProvider for StaticVaultProvider {
+impl BitcoinObligationProvider for StaticVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
@@ -268,12 +268,6 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn new_utxo_id() -> UtxoId {
-		let id = NextUtxoId::get();
-		NextUtxoId::set(id + 1);
-		id
-	}
-
 	fn get(_utxo_id: UtxoId) -> Option<UtxoRef> {
 		GetUtxoRef::get()
 	}
@@ -319,7 +313,7 @@ impl TickProvider<Block> for StaticTickProvider {
 	}
 }
 
-impl pallet_bond::Config for Test {
+impl pallet_bitcoin_locks::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
@@ -330,7 +324,7 @@ impl pallet_bond::Config for Test {
 	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
 	type BondEvents = EventHandler;
 	type PriceProvider = StaticPriceProvider;
-	type VaultProvider = StaticVaultProvider;
+	type BitcoinObligationProvider = StaticVaultProvider;
 	type MaxUnlockingUtxos = MaxUnlockingUtxos;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
@@ -349,7 +343,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
-	pallet_bond::GenesisConfig::<Test> {
+	pallet_bitcoin_locks::GenesisConfig::<Test> {
 		minimum_bitcoin_bond_satoshis: MinimumBondSatoshis::get(),
 		_phantom: Default::default(),
 	}

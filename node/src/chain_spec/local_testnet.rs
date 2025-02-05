@@ -66,7 +66,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			ticks_between_slots: 10,
 			slot_bidding_start_after_ticks: 10,
 		},
-		minimum_bitcoin_bond_satoshis: 100,
+		minimum_bitcoin_lock_satoshis: 100,
 		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),
 	}))
 	.build())

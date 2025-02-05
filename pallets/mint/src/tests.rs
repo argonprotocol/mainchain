@@ -5,7 +5,7 @@ use crate::{
 };
 use argon_primitives::{
 	block_seal::{BlockPayout, BlockRewardType},
-	BlockRewardsEventHandler, UtxoBondedEvents,
+	BlockRewardsEventHandler, UtxoLockEvents,
 };
 use frame_support::{
 	assert_ok,
@@ -244,7 +244,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 		let utxo_id = 1;
 		let account_id = 1;
 		let amount = 1000u128;
-		assert_ok!(Mint::utxo_bonded(utxo_id, &account_id, amount));
+		assert_ok!(Mint::utxo_locked(utxo_id, &account_id, amount));
 
 		assert_eq!(Balances::total_issuance(), 0u128);
 
@@ -272,8 +272,8 @@ fn it_pays_bitcoin_mints() {
 		let utxo_id = 1;
 		let account_id = 1;
 		let amount = 62_000_000u128;
-		assert_ok!(Mint::utxo_bonded(utxo_id, &account_id, amount));
-		assert_ok!(Mint::utxo_bonded(2, &2, 500));
+		assert_ok!(Mint::utxo_locked(utxo_id, &account_id, amount));
+		assert_ok!(Mint::utxo_locked(2, &2, 500));
 		assert_eq!(
 			PendingMintUtxos::<Test>::get().to_vec(),
 			vec![(utxo_id, account_id, amount), (2, 2, 500)]

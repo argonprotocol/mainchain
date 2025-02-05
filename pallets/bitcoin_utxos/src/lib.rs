@@ -50,9 +50,6 @@ pub mod pallet {
 		type MaxPendingConfirmationBlocks: Get<BitcoinHeight>;
 	}
 
-	#[pallet::storage]
-	pub(super) type NextUtxoId<T: Config> = StorageValue<_, UtxoId, OptionQuery>;
-
 	/// Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
 	/// the expiration block, the bond is burned and the UTXO is unlocked.
 	#[pallet::storage]
@@ -320,13 +317,6 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BitcoinUtxoTracker for Pallet<T> {
-		fn new_utxo_id() -> UtxoId {
-			let utxo_id = NextUtxoId::<T>::get().unwrap_or(1u32.into());
-
-			NextUtxoId::<T>::set(Some(utxo_id + 1));
-			utxo_id
-		}
-
 		fn watch_for_utxo(
 			utxo_id: UtxoId,
 			script_pubkey: BitcoinCosignScriptPubkey,

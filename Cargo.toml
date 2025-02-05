@@ -4,13 +4,13 @@ members = [
     "node/consensus",
     "node/bitcoin_utxo_tracker",
     "node/randomx",
+    "pallets/bitcoin_locks",
     "pallets/bitcoin_utxos",
     "pallets/block_rewards",
     "pallets/block_seal",
     "pallets/block_seal_spec",
     "pallets/domains",
     "pallets/digests",
-    "pallets/bond",
     "pallets/chain_transfer",
     "pallets/mining_slot",
     "pallets/notaries",
@@ -422,9 +422,9 @@ argon-bitcoin-cli-macros = { path = "bitcoin/cli/macros" }
 
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }
+pallet-bitcoin-locks = { path = "pallets/bitcoin_locks", default-features = false }
 pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
-pallet-bond = { path = "pallets/bond", default-features = false }
 pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
 pallet-digests = { path = "pallets/digests", default-features = false }
 pallet-domains = { path = "pallets/domains", default-features = false }

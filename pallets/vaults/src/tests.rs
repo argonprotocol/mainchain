@@ -23,7 +23,7 @@ use crate::{
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
-	vault::{Bond, BondError, BondExpiration, BondType, VaultProvider, VaultTerms},
+	vault::{BitcoinObligationProvider, Bond, BondError, BondExpiration, BondType, VaultTerms},
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);

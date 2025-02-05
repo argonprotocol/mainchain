@@ -9937,9 +9937,9 @@ pub mod api {
 	pub mod bonds {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_bond::pallet::Error;
+		pub type Error = runtime_types::pallet_bitcoin_locks::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_bond::pallet::Call;
+		pub type Call = runtime_types::pallet_bitcoin_locks::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -10130,7 +10130,7 @@ pub mod api {
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_bond::pallet::Event;
+		pub type Event = runtime_types::pallet_bitcoin_locks::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -10450,7 +10450,7 @@ pub mod api {
 				}
 				pub mod utxos_by_id {
 					use super::runtime_types;
-					pub type UtxosById = runtime_types::pallet_bond::pallet::UtxoState;
+					pub type UtxosById = runtime_types::pallet_bitcoin_locks::pallet::UtxoState;
 					pub type Param0 = ::core::primitive::u64;
 				}
 				pub mod utxos_cosign_release_height_by_id {
@@ -10468,7 +10468,7 @@ pub mod api {
 						crate::types::AccountId32,
 						::core::primitive::u32,
 						::core::primitive::u128,
-						runtime_types::pallet_bond::pallet::UtxoState,
+						runtime_types::pallet_bitcoin_locks::pallet::UtxoState,
 					);
 					pub type Param0 = ::core::primitive::u64;
 				}
@@ -10477,7 +10477,7 @@ pub mod api {
 					pub type UtxosPendingUnlockByUtxoId =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
 							::core::primitive::u64,
-							runtime_types::pallet_bond::pallet::UtxoCosignRequest<
+							runtime_types::pallet_bitcoin_locks::pallet::UtxoCosignRequest<
 								::core::primitive::u128,
 							>,
 						>;
@@ -24233,7 +24233,7 @@ pub mod api {
 				#[codec(index = 8)]
 				Vaults(runtime_types::pallet_vaults::pallet::Call),
 				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Call),
+				Bonds(runtime_types::pallet_bitcoin_locks::pallet::Call),
 				#[codec(index = 10)]
 				Notaries(runtime_types::pallet_notaries::pallet::Call),
 				#[codec(index = 11)]
@@ -24300,7 +24300,7 @@ pub mod api {
 				#[codec(index = 8)]
 				Vaults(runtime_types::pallet_vaults::pallet::Error),
 				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Error),
+				Bonds(runtime_types::pallet_bitcoin_locks::pallet::Error),
 				#[codec(index = 10)]
 				Notaries(runtime_types::pallet_notaries::pallet::Error),
 				#[codec(index = 11)]
@@ -24365,7 +24365,7 @@ pub mod api {
 				#[codec(index = 8)]
 				Vaults(runtime_types::pallet_vaults::pallet::Event),
 				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::Event),
+				Bonds(runtime_types::pallet_bitcoin_locks::pallet::Event),
 				#[codec(index = 10)]
 				Notaries(runtime_types::pallet_notaries::pallet::Event),
 				#[codec(index = 11)]
@@ -24437,7 +24437,7 @@ pub mod api {
 				#[codec(index = 8)]
 				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
 				#[codec(index = 9)]
-				Bonds(runtime_types::pallet_bond::pallet::HoldReason),
+				Bonds(runtime_types::pallet_bitcoin_locks::pallet::HoldReason),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
 			}
@@ -26868,7 +26868,7 @@ pub mod api {
 				}
 			}
 		}
-		pub mod pallet_bond {
+		pub mod pallet_bitcoin_locks {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;

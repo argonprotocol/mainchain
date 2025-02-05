@@ -10,7 +10,7 @@ use argon_primitives::{
 	},
 	inherents::BlockSealInherent,
 	tick::Tick,
-	vault::BondProvider,
+	vault::BondedArgonsProvider,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	RewardShare, TickProvider,
 };
@@ -87,7 +87,7 @@ pub mod pallet {
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		prelude::*,
-		vault::{BondError, BondProvider},
+		vault::{BondError, BondedArgonsProvider},
 		TickProvider,
 	};
 
@@ -158,7 +158,10 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BondProvider: BondProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+		type BondedArgonsProvider: BondedArgonsProvider<
+			Balance = Self::Balance,
+			AccountId = Self::AccountId,
+		>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 
@@ -452,7 +455,7 @@ pub mod pallet {
 					.iter()
 					.find(|x| x.account_id == who)
 					.and_then(|x| x.bond_id);
-				let bond = T::BondProvider::bond_mining_slot(
+				let bond = T::BondedArgonsProvider::create_bonded_argons(
 					bond_info.vault_id,
 					who.clone(),
 					bond_info.amount,
@@ -466,7 +469,8 @@ pub mod pallet {
 				// if the modified bond id is not the bond id we created, need to cancel it
 				if let Some(modify_bond_id) = modify_bond_id {
 					if bond.0 != modify_bond_id {
-						T::BondProvider::cancel_bond(modify_bond_id).map_err(Error::<T>::from)?;
+						T::BondedArgonsProvider::cancel_obligation(modify_bond_id)
+							.map_err(Error::<T>::from)?;
 					}
 				}
 			}
@@ -911,7 +915,7 @@ impl<T: Config> Pallet<T> {
 		let account_id = registration.account_id;
 
 		if let Some(bond_id) = registration.bond_id {
-			T::BondProvider::cancel_bond(bond_id).map_err(Error::<T>::from)?;
+			T::BondedArgonsProvider::cancel_obligation(bond_id).map_err(Error::<T>::from)?;
 		}
 
 		let mut kept_ownership_bond = false;

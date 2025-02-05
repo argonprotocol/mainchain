@@ -206,7 +206,7 @@ When you encounter a Bitcoin Unlock request, you will need to know:
 3. The `HD Path` used to create the master XPub key that was used by Argon to generate this bitcoin cosign script.
 
 ```bash
-$ argon-bitcoin-cli bond vault-cosign --bond-id=1 \
+$ argon-bitcoin-cli lock vault-cosign --bond-id=1 \
   --xpriv-path=~/.xpriv/vault.xpub --password=supersecret --hd-path="m/84'/0'/0'" \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
 ```
@@ -228,7 +228,7 @@ You'll need to provide a destination script pubkey to send the Bitcoin to. You c
 you'd like to use for the transaction. You can find current rates here: https://mempool.space/testnet.
 
 ```bash
-$ argon-bitcoin-cli bond claim-utxo-psbt --bond-id=1 \
+$ argon-bitcoin-cli lock claim-utxo-psbt --bond-id=1 \
   --xpriv-path=~/.xpriv/vault.xpub --password=supersecret --master-xpub-hd-path="m/84'/0'/0'" \
   --dest_pubkey=tb1q3hkkt02k975ddxzeeeupy9cpysr2cy929ck4qp \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org

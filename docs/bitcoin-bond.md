@@ -194,7 +194,7 @@ NOTE: you'll need to prefix it with 0x to paste into the UI.
 #### Using the CLI:
 
 ```bash
-$ argon-bitcoin-cli bond apply --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
+$ argon-bitcoin-cli lock apply --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
 ```
 
 This will generate a link to complete the transaction on the Polkadot.js interface along with the fee that needs to be
@@ -222,7 +222,7 @@ NOTE: The resulting utxo must have the same amount of Satoshis as you specify in
 to add on top of the amount you specify.
 
 ```bash
-$ argon-bitcoin-cli bond send-to-address --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock send-to-address --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This will output a Pay to Address that you need to send the EXACT funds into. You can use Electrum (or whichever tool
@@ -238,7 +238,7 @@ Argon will sync your UTXO once it has 6 confirmations. You can use the CLI to ch
 bond:
 
 ```bash
-$ argon-bitcoin-cli bond get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 You can also use Polkadot.js to verify your Bitcoin UTXO by looking at the
@@ -250,7 +250,7 @@ _Storage_: `BitcoinUtxos -> utxosPendingConfirmation()`.
 You can monitor your Bitcoin Bond status using the `bond get` cli command.
 
 ```bash
-$ argon-bitcoin-cli bond get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 ![Argon Cli Bond-Get](images/cli-bondget.png)
@@ -265,7 +265,7 @@ To unlock your Bitcoin, you'll need to have enough Argons in your account to cov
 "redemption price" using the `bond get` command.
 
 ```bash
-$ argon-bitcoin-cli bond get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
 ```
 
 ### 1. Submit an unlock request
@@ -283,7 +283,7 @@ You'll want to get a destination address from Electrum, and see what the current
 The CLI can help you calculate the network fee:
 
 ```bash
-$ argon-bitcoin-cli bond request-unlock --bond-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock request-unlock --bond-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This will provide a link to complete the transaction on the Polkadot.js interface.
@@ -300,7 +300,7 @@ parameter on the CLI to wait for the transaction to be included in a block.
 > ![Electrum - Private key](images/electrum-privatekey.png)
 
 ```bash
-$ argon-bitcoin-cli bond owner-cosign-psbt --bond-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock owner-cosign-psbt --bond-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see

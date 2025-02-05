@@ -70,7 +70,7 @@ pallet-bitcoin-utxos = { workspace = true }
 pallet-block-seal = { workspace = true }
 pallet-block-seal-spec = { workspace = true }
 pallet-block-rewards = { workspace = true }
-pallet-bond = { workspace = true }
+pallet-bitcoin-locks = { workspace = true }
 pallet-chain-transfer = { workspace = true }
 pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
@@ -107,11 +107,11 @@ std = [
 	"log/std",
 	"pallet-authorship/std",
 	"pallet-balances/std",
+	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
 	"pallet-block-rewards/std",
 	"pallet-block-seal-spec/std",
 	"pallet-block-seal/std",
-	"pallet-bond/std",
 	"pallet-chain-transfer/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
@@ -162,11 +162,11 @@ runtime-benchmarks = [
 	"frame-system/runtime-benchmarks",
 	"ismp-grandpa/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
+	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
 	"pallet-block-rewards/runtime-benchmarks",
 	"pallet-block-seal-spec/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
-	"pallet-bond/runtime-benchmarks",
 	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
@@ -197,11 +197,11 @@ try-runtime = [
 	"ismp-grandpa/try-runtime",
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
+	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",
 	"pallet-block-rewards/try-runtime",
 	"pallet-block-seal-spec/try-runtime",
 	"pallet-block-seal/try-runtime",
-	"pallet-bond/try-runtime",
 	"pallet-chain-transfer/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",

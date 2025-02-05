@@ -2,7 +2,7 @@ mod fees;
 mod hyperbridge;
 
 use super::{
-	Balances, BitcoinUtxos, Block, BlockSeal, BlockSealSpec, Bonds, ChainTransfer, Digests,
+	Balances, BitcoinLocks, BitcoinUtxos, Block, BlockSeal, BlockSealSpec, ChainTransfer, Digests,
 	Domains, Grandpa, Ismp, MiningSlot, Mint, Notaries, Notebook, OriginCaller, Ownership,
 	PalletInfo, PriceIndex, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
 	RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, Ticks, Timestamp, TxPause, Vaults,
@@ -36,8 +36,8 @@ use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList};
 
 use argon_primitives::block_seal::SlotId;
 use frame_system::EnsureRoot;
+use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_block_rewards::GrowthPath;
-use pallet_bond::BitcoinVerifier;
 use pallet_mining_slot::OnNewSlot;
 use pallet_notebook::NotebookVerifyError;
 use pallet_tx_pause::RuntimeCallNameOf;
@@ -281,8 +281,8 @@ parameter_types! {
 	pub const TicksPerYear: Tick = 1440 * 365;
 
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
-	pub const BitcoinBondDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
-	pub const BitcoinBondReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
+	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
+	pub const BitcoinLockReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
 	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
@@ -303,33 +303,34 @@ impl pallet_vaults::Config for Runtime {
 	type TicksPerDay = TicksPerDay;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
 	type MinTermsModificationTickDelay = MinTermsModificationTickDelay;
+	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
+	type BitcoinBlockHeight = BitcoinUtxos;
 	type TickProvider = Ticks;
+	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
+	type EventHandler = (BitcoinLocks,);
 }
 
 pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
-impl pallet_bond::Config for Runtime {
+impl pallet_bitcoin_locks::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bond::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_bitcoin_locks::weights::SubstrateWeight<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondEvents = Mint;
+	type LockEvents = Mint;
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type PriceProvider = PriceIndex;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
 	type BitcoinBlockHeight = BitcoinUtxos;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type VaultProvider = Vaults;
-	type MinimumBondAmount = MinimumBondAmount;
+	type BitcoinObligationProvider = Vaults;
 	type ArgonTicksPerDay = TicksPerDay;
 	type MaxUnlockingUtxos = MaxUnlockingUtxos;
-	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
-	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
-	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
+	type LockDurationBlocks = BitcoinLockDurationBlocks;
+	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
 	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
 	type TickProvider = Ticks;
 }
@@ -384,7 +385,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondProvider = Bonds;
+	type BondedArgonsProvider = Vaults;
 	type SlotEvents = (GrandpaSlotRotation,);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
@@ -588,7 +589,7 @@ impl pallet_proxy::Config for Runtime {
 }
 
 parameter_types! {
-	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
+	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
 
@@ -619,7 +620,7 @@ impl pallet_price_index::Config for Runtime {
 impl pallet_bitcoin_utxos::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
-	type EventHandler = Bonds;
+	type EventHandler = BitcoinLocks;
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 }

@@ -1,20 +1,8 @@
-use crate::{
-	migrations::v1::v1_storage as v1,
-	pallet::{PendingFundingModificationsByTick, PendingTermsModificationsByTick, VaultsById},
-	Config,
-};
+use crate::{pallet::VaultsById, Config};
 use alloc::vec::Vec;
-use argon_primitives::{
-	prelude::Tick,
-	vault::{Vault, VaultArgons},
-	TickProvider,
-};
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
+use argon_primitives::bitcoin::Satoshis;
+use frame_support::{migration, pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
 use log::info;
-use sp_runtime::{
-	traits::{BlockNumberProvider, UniqueSaturatedInto},
-	Saturating,
-};
 
 pub mod v1_p2 {
 	use crate::Config;
@@ -48,108 +36,35 @@ pub struct InnerMigrateV1ToV2<T: crate::Config>(core::marker::PhantomData<T>);
 impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
-		use codec::Encode;
-
-		// Access the old value using the `storage_alias` type
-		let all_values = v1::VaultsById::<T>::iter().collect::<Vec<_>>();
-		// Return it as an encoded `Vec<u8>`
-		Ok(all_values.encode())
+		Ok(Vec::new())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
-		let mut count = 0;
-		info!("Migrating Vaults from v1 to v2");
-		let current_block = <frame_system::Pallet<T>>::current_block_number();
-		let current_tick = T::TickProvider::current_tick();
-		VaultsById::<T>::translate::<v1::Vault<T>, _>(|_id, vault| {
-			let pending_terms = vault.pending_terms.map(|(bl, terms)| {
-				let offset = UniqueSaturatedInto::<Tick>::unique_saturated_into(
-					bl.saturating_sub(current_block),
-				);
-				(current_tick + offset, terms)
-			});
-			let pending_bonded_argons = vault.pending_bonded_argons.map(|(bl, ar)| {
-				let offset = UniqueSaturatedInto::<Tick>::unique_saturated_into(
-					bl.saturating_sub(current_block),
-				);
-				(current_tick + offset, ar)
-			});
+		info!("Clearing testnet data for Vaults from v1 to v2");
+		let a = VaultsById::<T>::drain().collect::<Vec<_>>();
 
-			count += 1;
-			let vault = Vault {
-				operator_account_id: vault.operator_account_id,
-				bitcoin_argons: VaultArgons {
-					annual_percent_rate: vault.bitcoin_argons.annual_percent_rate,
-					allocated: vault.bitcoin_argons.allocated,
-					reserved: vault.bitcoin_argons.bonded,
-					base_fee: vault.bitcoin_argons.base_fee,
-				},
-				added_securitization_percent: vault.added_securitization_percent,
-				added_securitization_argons: vault.securitized_argons,
-				bonded_argons: VaultArgons {
-					annual_percent_rate: vault.bonded_argons.annual_percent_rate,
-					allocated: vault.bonded_argons.allocated,
-					reserved: vault.bonded_argons.bonded,
-					base_fee: vault.bonded_argons.base_fee,
-				},
-				mining_reward_sharing_percent_take: vault.mining_reward_sharing_percent_take,
-				is_closed: vault.is_closed,
-				pending_terms,
-				pending_bonded_argons,
-				pending_bitcoins: vault.pending_bitcoins,
-			};
-			Some(vault)
-		});
-
-		let terms = v1_p2::PendingTermsModificationsByBlock::<T>::drain().collect::<Vec<_>>();
-		for (bl, list) in terms {
-			let offset = UniqueSaturatedInto::<Tick>::unique_saturated_into(
-				bl.saturating_sub(current_block),
-			);
-			count += 1;
-			PendingTermsModificationsByTick::<T>::insert(
-				current_tick + offset,
-				BoundedVec::truncate_from(list.to_vec()),
-			);
+		let b = v1_p2::PendingTermsModificationsByBlock::<T>::drain().collect::<Vec<_>>();
+		let c = v1_p2::PendingFundingModificationsByBlock::<T>::drain().collect::<Vec<_>>();
+		let minimum_satoshis =
+			migration::get_storage_value::<Satoshis>(b"bonds", b"MinimumBitcoinBondSatoshis", &[]);
+		if let Some(minimum_sats) = minimum_satoshis {
+			info!("Setting minimum BitcoinLock satoshis to {}", minimum_sats);
+			migration::put_storage_value(b"bitcoin_locks", b"MinimumSatoshis", &[], minimum_sats);
 		}
-
-		let terms = v1_p2::PendingFundingModificationsByBlock::<T>::drain().collect::<Vec<_>>();
-		for (bl, list) in terms {
-			let offset = UniqueSaturatedInto::<Tick>::unique_saturated_into(
-				bl.saturating_sub(current_block),
-			);
-			count += 1;
-			PendingFundingModificationsByTick::<T>::insert(
-				current_tick + offset,
-				BoundedVec::truncate_from(list.to_vec()),
-			);
-		}
+		let result = migration::clear_storage_prefix(b"bonds", &[], &[], None, None);
+		let count = (a.len() + b.len() + c.len() + result.backend as usize) as u64;
 
 		T::DbWeight::get().reads_writes(count, count)
 	}
 
 	#[cfg(feature = "try-runtime")]
-	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-		use argon_primitives::VaultId;
+	fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
 		use codec::Decode;
 		use frame_support::ensure;
 
-		let old_value = <Vec<(VaultId, v1::Vault<T>)>>::decode(&mut &state[..]).map_err(|_| {
-			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
-		})?;
-
 		let actual_new_value = VaultsById::<T>::iter().collect::<Vec<_>>();
 
-		ensure!(old_value.len() == actual_new_value.len(), "New value not set correctly");
-		for vault in actual_new_value {
-			let old = old_value.iter().find(|(id, _)| id == &vault.0);
-			ensure!(old.is_some(), "Vault missing in translation");
-			if let Some(old_mining) = old.unwrap().1.pending_bonded_argons {
-				if let Some((_tick, amount)) = vault.1.pending_bonded_argons {
-					ensure!(amount == old_mining.1, "amounts must match");
-				}
-			}
-		}
+		ensure!(actual_new_value.len() == 0, "New value not set correctly");
 		Ok(())
 	}
 }
@@ -165,7 +80,10 @@ pub type MigrateV1ToV2<T> = frame_support::migrations::VersionedMigration<
 #[cfg(all(feature = "try-runtime", test))]
 mod test {
 	use super::*;
-	use crate::mock::{new_test_ext, CurrentTick, System, Test};
+	use crate::{
+		migrations::v1::v1_storage as v1,
+		mock::{new_test_ext, CurrentTick, System, Test},
+	};
 	use argon_primitives::vault::VaultArgons;
 	use frame_support::assert_ok;
 	use sp_runtime::FixedU128;
@@ -238,26 +156,13 @@ mod test {
 			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(2, 2));
 
 			// After the migration, the new value should be set as the `current` value.
-			assert_eq!(crate::VaultsById::<Test>::iter_keys().collect::<Vec<_>>(), vec![1]);
-			let new_value = crate::VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(crate::VaultsById::<Test>::iter_keys().collect::<Vec<_>>().len(), 0);
 			assert_eq!(
-				new_value,
-				Vault {
-					operator_account_id: Default::default(),
-					bitcoin_argons,
-					added_securitization_percent,
-					added_securitization_argons: 0,
-					bonded_argons,
-					is_closed,
-					pending_bonded_argons: Some((1010, 10)),
-					pending_bitcoins: 0,
-					mining_reward_sharing_percent_take,
-					pending_terms: None,
-				}
+				crate::PendingFundingModificationsByTick::<Test>::iter_keys()
+					.collect::<Vec<_>>()
+					.len(),
+				0
 			);
-
-			let pending = crate::PendingFundingModificationsByTick::<Test>::get(1010);
-			assert_eq!(pending.to_vec(), vec![1]);
 		})
 	}
 }

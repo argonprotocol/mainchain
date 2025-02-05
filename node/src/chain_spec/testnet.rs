@@ -83,7 +83,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				ticks_between_slots: 1440,
 				slot_bidding_start_after_ticks: 0,
 			},
-			minimum_bitcoin_bond_satoshis: 5_000,
+			minimum_bitcoin_lock_satoshis: 5_000,
 			hyperbridge_token_admin: token_admin,
 		}
 	))

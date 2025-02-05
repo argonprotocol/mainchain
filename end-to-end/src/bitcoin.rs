@@ -142,7 +142,7 @@ async fn test_bitcoin_minting_e2e() {
 
 	let send_to_address = run_bitcoin_cli(
 		&test_node,
-		vec!["bond", "send-to-address", "--bond-id", &bond_id.to_string()],
+		vec!["lock", "send-to-address", "--bond-id", &bond_id.to_string()],
 	)
 	.await
 	.unwrap();
@@ -219,7 +219,7 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 
-	let _ = run_bitcoin_cli(&test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()])
+	let _ = run_bitcoin_cli(&test_node, vec!["lock", "get", "--bond-id", &bond_id.to_string()])
 		.await
 		.unwrap();
 
@@ -415,7 +415,7 @@ async fn create_bond(
 	let bond_cli_result = run_bitcoin_cli(
 		test_node,
 		vec![
-			"bond",
+			"lock",
 			"apply",
 			"--vault-id",
 			&vault_id.to_string(),
@@ -457,7 +457,7 @@ async fn confirm_bond(
 	bond_id: &BondId,
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
 	let bond_cli_get =
-		run_bitcoin_cli(test_node, vec!["bond", "get", "--bond-id", &bond_id.to_string()]).await?;
+		run_bitcoin_cli(test_node, vec!["lock", "get", "--bond-id", &bond_id.to_string()]).await?;
 
 	let xpubkey = Xpub::from_str(xpubkey).expect("valid xpub");
 
@@ -614,7 +614,7 @@ async fn owner_requests_unlock(
 	let unlock_request_cli = run_bitcoin_cli(
 		test_node,
 		vec![
-			"bond",
+			"lock",
 			"request-unlock",
 			"--bond-id",
 			&bond_id.to_string(),
@@ -667,7 +667,7 @@ async fn vault_cosigns_unlock(
 	let unlock_fulfill_cli = run_bitcoin_cli(
 		test_node,
 		vec![
-			"bond",
+			"lock",
 			"vault-cosign",
 			"--bond-id",
 			&bond_id.to_string(),
@@ -700,7 +700,7 @@ async fn owner_sees_signature_and_unlocks(
 	let owner_cosign_cli = run_bitcoin_cli(
 		test_node,
 		vec![
-			"bond",
+			"lock",
 			"owner-cosign-psbt",
 			"--utxo-id",
 			&utxo_id.to_string(),

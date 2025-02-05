@@ -3,7 +3,7 @@ use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
 	tick::{Tick, Ticker},
-	vault::{BondError, BondProvider},
+	vault::{BondError, BondedArgonsProvider},
 	BlockNumber, TickProvider, VaultId, VotingSchedule,
 };
 use env_logger::{Builder, Env};
@@ -118,11 +118,11 @@ parameter_types! {
 }
 
 pub struct StaticBondProvider;
-impl BondProvider for StaticBondProvider {
+impl BondedArgonsProvider for StaticBondProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
-	fn bond_mining_slot(
+	fn create_bonded_argons(
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
@@ -149,7 +149,7 @@ impl BondProvider for StaticBondProvider {
 		Ok((bond_id, VaultSharing::get(), amount))
 	}
 
-	fn cancel_bond(bond_id: argon_primitives::BondId) -> Result<(), BondError> {
+	fn cancel_bonded_argons(bond_id: argon_primitives::BondId) -> Result<(), BondError> {
 		Bonds::mutate(|a| {
 			if let Some(pos) = a.iter().position(|(id, _, _, _)| *id == bond_id) {
 				a.remove(pos);
@@ -225,7 +225,7 @@ impl pallet_mining_slot::Config for Test {
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondProvider = StaticBondProvider;
+	type BondedArgonsProvider = StaticBondProvider;
 	type SlotEvents = (StaticNewSlotEvent,);
 	type MiningAuthorityId = UintAuthorityId;
 	type Keys = MockSessionKeys;

@@ -6,37 +6,48 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
-	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, UtxoId,
-	},
+	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey},
 	block_seal::RewardSharing,
 	tick::Tick,
 	BondId, RewardShare, VaultId,
 };
 
-pub trait BondProvider {
+pub trait BondedArgonsProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
 	#[allow(clippy::type_complexity)]
-	/// Create a mining bond
-	fn bond_mining_slot(
+	/// Create bonded argons for a mining seat
+	fn create_bonded_argons(
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
 		bond_until_tick: Tick,
 		modify_bond_id: Option<BondId>,
 	) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError>;
-
-	/// Return the bond to the originator with a prorated refund
-	fn cancel_bond(bond_id: BondId) -> Result<(), BondError>;
+	/// Return the obligation to the originator with a prorated refund
+	fn cancel_obligation(bond_id: BondId) -> Result<(), BondError>;
 }
 
-pub trait VaultProvider {
+pub trait BitcoinObligationProvider {
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>>;
+	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
+
+	/// Return the bond to the originator with a prorated refund
+	fn cancel_bond(bond_id: BondId) -> Result<(), BondError>;
+
+	/// Bonds the given amount of funds for the given vault. The fee is calculated based on the
+	/// amount and the duration of the bond.
+	fn create_bond(
+		vault_id: VaultId,
+		bond_account_id: &Self::AccountId,
+		bond_type: BondType,
+		amount: Self::Balance,
+		bond_expiration: BondExpiration,
+		ticks: Tick,
+	) -> Result<Bond<Self::AccountId, Self::Balance>, BondError>;
 
 	/// Recoup funds from the vault. This will be called if a vault does not move cosigned UTXOs in
 	/// the appropriate timeframe. Steps are taken to repay the bitcoin holder at the market rate.
@@ -51,7 +62,7 @@ pub trait VaultProvider {
 	///
 	/// Returns the amount (still owed, repaid)
 	fn compensate_lost_bitcoin(
-		bond: &mut Bond<Self::AccountId, Self::Balance>,
+		bond_id: BondId,
 		market_rate: Self::Balance,
 		unlock_amount_paid: Self::Balance,
 	) -> Result<(Self::Balance, Self::Balance), BondError>;
@@ -59,29 +70,12 @@ pub trait VaultProvider {
 	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
 	/// the system. It is assumed that the vault is in cahoots with the bonded account.
 	fn burn_vault_bitcoin_funds(
-		bond: &Bond<Self::AccountId, Self::Balance>,
+		bond_id: BondId,
 		amount_to_burn: Self::Balance,
-	) -> Result<(), BondError>;
-
-	/// Bonds the given amount of funds for the given vault. The fee is calculated based on the
-	/// amount and the duration of the bond.
-	fn bond_funds(
-		vault_id: VaultId,
-		amount: Self::Balance,
-		bond_type: BondType,
-		ticks: Tick,
-		bond_account_id: &Self::AccountId,
-	) -> Result<(Self::Balance, Self::Balance), BondError>;
-
-	/// Release the bonded funds for the given bond. This will be called when the bond is completed
-	/// or canceled. The remaining fee will be charged/returned based on the pro-rata owed
-	fn release_bonded_funds(
-		bond: &Bond<Self::AccountId, Self::Balance>,
-	) -> Result<Self::Balance, BondError>;
+	) -> Result<Bond<Self::AccountId, Self::Balance>, BondError>;
 
 	fn create_utxo_script_pubkey(
 		vault_id: VaultId,
-		utxo_id: UtxoId,
 		owner_pubkey: CompressedBitcoinPubkey,
 		vault_claim_height: BitcoinHeight,
 		open_claim_height: BitcoinHeight,
@@ -126,6 +120,8 @@ pub enum BondError {
 	InvalidBitcoinScript,
 	/// An internal processing error occurred that is too technical to be useful to the user
 	InternalError,
+	/// Event handler error
+	EventHandlerError,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -286,10 +282,11 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> Vau
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub struct Bond<AccountId: Codec, Balance: Codec> {
+	#[codec(compact)]
+	pub bond_id: BondId,
 	pub bond_type: BondType,
 	#[codec(compact)]
 	pub vault_id: VaultId,
-	pub utxo_id: Option<UtxoId>,
 	pub bonded_account_id: AccountId,
 	#[codec(compact)]
 	pub total_fee: Balance,
