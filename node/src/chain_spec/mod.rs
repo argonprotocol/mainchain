@@ -7,9 +7,9 @@ use argon_primitives::{
 	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
 use argon_runtime::{
-	BalancesConfig, BitcoinUtxosConfig, BlockSealSpecConfig, BondsConfig, ChainTransferConfig,
-	GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig, PriceIndexConfig,
-	RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
+	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig,
+	ChainTransferConfig, GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig,
+	PriceIndexConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityWeight};
 use sp_core::{Pair, Public};
@@ -66,7 +66,7 @@ pub struct GenesisSettings {
 	pub ticker: Ticker,
 	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
 	pub mining_config: MiningSlotConfig,
-	pub minimum_bitcoin_bond_satoshis: Satoshis,
+	pub minimum_bitcoin_lock_satoshis: Satoshis,
 	pub hyperbridge_token_admin: AccountId,
 }
 
@@ -85,13 +85,13 @@ pub(crate) fn testnet_genesis(
 		ticker,
 		initial_notaries,
 		mining_config,
-		minimum_bitcoin_bond_satoshis,
+		minimum_bitcoin_lock_satoshis,
 		hyperbridge_token_admin,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let config = RuntimeGenesisConfig {
 		balances: BalancesConfig { balances: endowed_accounts },
-		bonds: BondsConfig { minimum_bitcoin_bond_satoshis, ..Default::default() },
+		bitcoin_locks: BitcoinLocksConfig { minimum_bitcoin_lock_satoshis, ..Default::default() },
 		price_index: PriceIndexConfig { operator: Some(price_index_operator) },
 		bitcoin_utxos: BitcoinUtxosConfig {
 			tip_oracle_operator: Some(bitcoin_tip_operator),

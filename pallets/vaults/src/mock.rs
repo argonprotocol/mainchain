@@ -1,6 +1,6 @@
 use crate as pallet_vaults;
 use argon_primitives::{
-	bitcoin::BitcoinNetwork,
+	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::{Tick, Ticker},
 	MiningSlotProvider, TickProvider, VotingSchedule,
 };
@@ -35,25 +35,25 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub const MinimumBondAmount:u128 = 1_000;
+	pub static MinimumObligationAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 }
 
 impl pallet_balances::Config for Test {
-	type MaxLocks = ConstU32<0>;
-	type MaxReserves = ConstU32<0>;
-	type ReserveIdentifier = ();
-	type Balance = Balance;
 	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = ();
+	type Balance = Balance;
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
-	type WeightInfo = ();
+	type ReserveIdentifier = ();
 	type FreezeIdentifier = ();
+	type MaxLocks = ConstU32<0>;
+	type MaxReserves = ConstU32<0>;
 	type MaxFreezes = ();
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {
@@ -68,7 +68,10 @@ parameter_types! {
 	pub const FundingChangeBlockDelay: BlockNumberFor<Test> = 60;
 
 	pub static CurrentTick: Tick = 1;
+	pub static PreviousTick: Tick = 1;
 	pub static ElapsedTicks: Tick = 4;
+
+	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 }
 pub struct StaticMiningSlotProvider;
 impl MiningSlotProvider for StaticMiningSlotProvider {
@@ -84,19 +87,19 @@ impl MiningSlotProvider for StaticMiningSlotProvider {
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
 	fn previous_tick() -> Tick {
-		CurrentTick::get() - 1
+		PreviousTick::get()
 	}
 	fn current_tick() -> Tick {
 		CurrentTick::get()
+	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
 	}
 	fn voting_schedule() -> VotingSchedule {
 		todo!()
 	}
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
-	}
-	fn elapsed_ticks() -> Tick {
-		ElapsedTicks::get()
 	}
 	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()
@@ -107,16 +110,19 @@ impl pallet_vaults::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MinimumObligationAmount = MinimumObligationAmount;
 	type TicksPerDay = ConstU64<1440>;
-	type MinimumBondAmount = MinimumBondAmount;
-	type MiningSlotProvider = StaticMiningSlotProvider;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
 	type MinTermsModificationTickDelay = MinTermsModificationBlockDelay;
-	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type MiningArgonIncreaseTickDelay = FundingChangeBlockDelay;
+	type MiningSlotProvider = StaticMiningSlotProvider;
+	type GetBitcoinNetwork = GetBitcoinNetwork;
+	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
 	type TickProvider = StaticTickProvider;
+	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
+	type EventHandler = ();
 }
 
 // Build genesis storage according to the mock runtime.

@@ -148,7 +148,7 @@ pub(crate) mod utils {
 	) -> anyhow::Result<Balance> {
 		Ok(test_node
 			.client
-			.fetch_storage(&storage().mining_slot().ownership_bond_amount(), None)
+			.fetch_storage(&storage().mining_slot().argonots_per_mining_seat(), None)
 			.await?
 			.unwrap_or_default())
 	}
@@ -177,7 +177,7 @@ pub(crate) mod utils {
 		let client = node.client.clone();
 		// how much ownership is needed
 		let ownership_needed = client
-			.fetch_storage(&storage().mining_slot().ownership_bond_amount(), None)
+			.fetch_storage(&storage().mining_slot().argonots_per_mining_seat(), None)
 			.await?
 			.unwrap();
 		println!("ownership needed {:?}", ownership_needed);

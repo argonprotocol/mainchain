@@ -263,17 +263,17 @@ export default {
       },
       SlotBidderReplaced: {
         accountId: 'AccountId32',
-        bondId: 'Option<u64>',
-        keptOwnershipBond: 'bool',
+        obligationId: 'Option<u64>',
+        preservedArgonotHold: 'bool',
       },
-      UnbondedMiner: {
+      ReleasedMinerSeat: {
         accountId: 'AccountId32',
-        bondId: 'Option<u64>',
-        keptOwnershipBond: 'bool',
+        obligationId: 'Option<u64>',
+        preservedArgonotHold: 'bool',
       },
-      UnbondMinerError: {
+      ReleaseMinerSeatError: {
         accountId: 'AccountId32',
-        bondId: 'Option<u64>',
+        obligationId: 'Option<u64>',
         error: 'SpRuntimeDispatchError',
       },
       MiningConfigurationUpdated: {
@@ -289,9 +289,9 @@ export default {
   ArgonPrimitivesBlockSealMiningRegistration: {
     accountId: 'AccountId32',
     rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination',
-    bondId: 'Option<u64>',
-    bondAmount: 'Compact<u128>',
-    ownershipTokens: 'Compact<u128>',
+    obligationId: 'Option<u64>',
+    bondedArgons: 'Compact<u128>',
+    argonots: 'Compact<u128>',
     rewardSharing: 'Option<ArgonPrimitivesBlockSealRewardSharing>',
     authorityKeys: 'ArgonRuntimeSessionKeys',
     slotId: 'Compact<u64>'
@@ -389,21 +389,21 @@ export default {
       VaultCreated: {
         vaultId: 'u32',
         bitcoinArgons: 'u128',
-        miningArgons: 'u128',
-        securitizationPercent: 'u128',
+        bondedArgons: 'u128',
+        addedSecuritizationPercent: 'u128',
         operatorAccountId: 'AccountId32',
       },
       VaultModified: {
         vaultId: 'u32',
         bitcoinArgons: 'u128',
-        miningArgons: 'u128',
-        securitizationPercent: 'u128',
+        bondedArgons: 'u128',
+        addedSecuritizationPercent: 'u128',
       },
-      VaultMiningBondsIncreased: {
+      VaultBondedArgonsIncreased: {
         vaultId: 'u32',
-        miningArgons: 'u128',
+        bondedArgons: 'u128',
       },
-      VaultMiningBondsChangeScheduled: {
+      VaultBondedArgonsChangeScheduled: {
         vaultId: 'u32',
         changeTick: 'u64',
       },
@@ -416,95 +416,101 @@ export default {
       },
       VaultClosed: {
         vaultId: 'u32',
-        bitcoinAmountStillBonded: 'u128',
-        miningAmountStillBonded: 'u128',
-        securitizationStillBonded: 'u128',
+        bitcoinAmountStillReserved: 'u128',
+        miningAmountStillReserved: 'u128',
+        securitizationStillReserved: 'u128',
       },
       VaultBitcoinXpubChange: {
-        vaultId: 'u32'
-      }
-    }
-  },
-  /**
-   * Lookup59: pallet_bond::pallet::Event<T>
-   **/
-  PalletBondEvent: {
-    _enum: {
-      BondCreated: {
         vaultId: 'u32',
-        bondId: 'u64',
-        bondType: 'ArgonPrimitivesBondBondType',
-        bondedAccountId: 'AccountId32',
-        utxoId: 'Option<u64>',
+      },
+      ObligationCreated: {
+        vaultId: 'u32',
+        obligationId: 'u64',
+        fundType: 'ArgonPrimitivesVaultFundType',
+        beneficiary: 'AccountId32',
         amount: 'u128',
-        expiration: 'ArgonPrimitivesBondBondExpiration',
+        expiration: 'ArgonPrimitivesVaultObligationExpiration',
       },
-      BondCompleted: {
+      ObligationCompleted: {
         vaultId: 'u32',
-        bondId: 'u64',
+        obligationId: 'u64',
       },
-      BondModified: {
+      ObligationModified: {
         vaultId: 'u32',
-        bondId: 'u64',
+        obligationId: 'u64',
         amount: 'u128',
       },
-      BondCanceled: {
+      ObligationCanceled: {
         vaultId: 'u32',
-        bondId: 'u64',
-        bondedAccountId: 'AccountId32',
-        bondType: 'ArgonPrimitivesBondBondType',
+        obligationId: 'u64',
+        beneficiary: 'AccountId32',
+        fundType: 'ArgonPrimitivesVaultFundType',
         returnedFee: 'u128',
       },
-      BitcoinBondBurned: {
-        vaultId: 'u32',
-        bondId: 'u64',
-        utxoId: 'u64',
-        amountBurned: 'u128',
-        amountHeld: 'u128',
-        wasUtxoSpent: 'bool',
-      },
-      BitcoinUtxoCosignRequested: {
-        bondId: 'u64',
-        vaultId: 'u32',
-        utxoId: 'u64',
-      },
-      BitcoinUtxoCosigned: {
-        bondId: 'u64',
-        vaultId: 'u32',
-        utxoId: 'u64',
-        signature: 'Bytes',
-      },
-      BitcoinCosignPastDue: {
-        bondId: 'u64',
-        vaultId: 'u32',
-        utxoId: 'u64',
-        compensationAmount: 'u128',
-        compensationStillOwed: 'u128',
-        compensatedAccountId: 'AccountId32',
-      },
-      BondCompletionError: {
-        bondId: 'u64',
-        error: 'SpRuntimeDispatchError',
-      },
-      CosignOverdueError: {
-        utxoId: 'u64',
+      ObligationCompletionError: {
+        obligationId: 'u64',
         error: 'SpRuntimeDispatchError'
       }
     }
   },
   /**
-   * Lookup60: argon_primitives::bond::BondType
+   * Lookup59: argon_primitives::vault::FundType
    **/
-  ArgonPrimitivesBondBondType: {
-    _enum: ['Mining', 'Bitcoin']
+  ArgonPrimitivesVaultFundType: {
+    _enum: ['BondedArgons', 'Bitcoin']
   },
   /**
-   * Lookup61: argon_primitives::bond::BondExpiration
+   * Lookup60: argon_primitives::vault::ObligationExpiration
    **/
-  ArgonPrimitivesBondBondExpiration: {
+  ArgonPrimitivesVaultObligationExpiration: {
     _enum: {
       AtTick: 'Compact<u64>',
       BitcoinBlock: 'Compact<u64>'
+    }
+  },
+  /**
+   * Lookup61: pallet_bitcoin_locks::pallet::Event<T>
+   **/
+  PalletBitcoinLocksEvent: {
+    _enum: {
+      BitcoinLockCreated: {
+        utxoId: 'u64',
+        vaultId: 'u32',
+        obligationId: 'u64',
+        lockPrice: 'u128',
+        accountId: 'AccountId32',
+      },
+      BitcoinLockBurned: {
+        utxoId: 'u64',
+        vaultId: 'u32',
+        obligationId: 'u64',
+        amountBurned: 'u128',
+        amountHeld: 'u128',
+        wasUtxoSpent: 'bool',
+      },
+      BitcoinUtxoCosignRequested: {
+        utxoId: 'u64',
+        obligationId: 'u64',
+        vaultId: 'u32',
+      },
+      BitcoinUtxoCosigned: {
+        utxoId: 'u64',
+        obligationId: 'u64',
+        vaultId: 'u32',
+        signature: 'Bytes',
+      },
+      BitcoinCosignPastDue: {
+        utxoId: 'u64',
+        obligationId: 'u64',
+        vaultId: 'u32',
+        compensationAmount: 'u128',
+        compensationStillOwed: 'u128',
+        compensatedAccountId: 'AccountId32',
+      },
+      CosignOverdueError: {
+        utxoId: 'u64',
+        error: 'SpRuntimeDispatchError'
+      }
     }
   },
   /**
@@ -1560,7 +1566,7 @@ export default {
         _alias: {
           keys_: 'keys',
         },
-        bondInfo: 'Option<PalletMiningSlotMiningSlotBid>',
+        bondedArgons: 'Option<PalletMiningSlotMiningSlotBid>',
         rewardDestination: 'ArgonPrimitivesBlockSealRewardDestination',
         keys_: 'ArgonRuntimeSessionKeys',
       },
@@ -1621,11 +1627,11 @@ export default {
         vaultId: 'u32',
         totalMiningAmountOffered: 'u128',
         totalBitcoinAmountOffered: 'u128',
-        securitizationPercent: 'u128',
+        addedSecuritizationPercent: 'u128',
       },
       modify_terms: {
         vaultId: 'u32',
-        terms: 'ArgonPrimitivesBondVaultTerms',
+        terms: 'ArgonPrimitivesVaultVaultTerms',
       },
       close: {
         vaultId: 'u32',
@@ -1640,20 +1646,20 @@ export default {
    * Lookup198: pallet_vaults::pallet::VaultConfig<Balance>
    **/
   PalletVaultsVaultConfig: {
-    terms: 'ArgonPrimitivesBondVaultTerms',
+    terms: 'ArgonPrimitivesVaultVaultTerms',
     bitcoinAmountAllocated: 'Compact<u128>',
     bitcoinXpubkey: 'ArgonPrimitivesBitcoinOpaqueBitcoinXpub',
-    miningAmountAllocated: 'Compact<u128>',
-    securitizationPercent: 'Compact<u128>'
+    bondedArgonsAllocated: 'Compact<u128>',
+    addedSecuritizationPercent: 'Compact<u128>'
   },
   /**
-   * Lookup199: argon_primitives::bond::VaultTerms<Balance>
+   * Lookup199: argon_primitives::vault::VaultTerms<Balance>
    **/
-  ArgonPrimitivesBondVaultTerms: {
+  ArgonPrimitivesVaultVaultTerms: {
     bitcoinAnnualPercentRate: 'Compact<u128>',
     bitcoinBaseFee: 'Compact<u128>',
-    miningAnnualPercentRate: 'Compact<u128>',
-    miningBaseFee: 'Compact<u128>',
+    bondedArgonsAnnualPercentRate: 'Compact<u128>',
+    bondedArgonsBaseFee: 'Compact<u128>',
     miningRewardSharingPercentTake: 'Compact<u128>'
   },
   /**
@@ -1661,26 +1667,26 @@ export default {
    **/
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub: '[u8;78]',
   /**
-   * Lookup202: pallet_bond::pallet::Call<T>
+   * Lookup202: pallet_bitcoin_locks::pallet::Call<T>
    **/
-  PalletBondCall: {
+  PalletBitcoinLocksCall: {
     _enum: {
-      bond_bitcoin: {
+      initialize: {
         vaultId: 'u32',
         satoshis: 'Compact<u64>',
         bitcoinPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
       },
-      __Unused1: 'Null',
-      __Unused2: 'Null',
-      __Unused3: 'Null',
-      unlock_bitcoin_bond: {
-        bondId: 'u64',
+      request_release: {
+        utxoId: 'u64',
         toScriptPubkey: 'Bytes',
         bitcoinNetworkFee: 'u64',
       },
-      cosign_bitcoin_unlock: {
-        bondId: 'u64',
-        signature: 'Bytes'
+      cosign_release: {
+        utxoId: 'u64',
+        signature: 'Bytes',
+      },
+      admin_modify_minimum_locked_sats: {
+        satoshis: 'u64'
       }
     }
   },
@@ -2474,10 +2480,10 @@ export default {
       InsufficientOwnershipTokens: 'Null',
       BidTooLow: 'Null',
       CannotRegisterOverlappingSessions: 'Null',
-      BondNotFound: 'Null',
-      NoMoreBondIds: 'Null',
+      ObligationNotFound: 'Null',
+      NoMoreObligationIds: 'Null',
       VaultClosed: 'Null',
-      MinimumBondAmountNotMet: 'Null',
+      MinimumObligationAmountNotMet: 'Null',
       ExpirationAtBlockOverflow: 'Null',
       InsufficientFunds: 'Null',
       InsufficientVaultFunds: 'Null',
@@ -2486,17 +2492,15 @@ export default {
       HoldUnexpectedlyModified: 'Null',
       UnrecoverableHold: 'Null',
       VaultNotFound: 'Null',
-      BondAlreadyClosed: 'Null',
-      FeeExceedsBondAmount: 'Null',
       AccountWouldBeBelowMinimum: 'Null',
-      GenericBondError: 'ArgonPrimitivesBondBondError'
+      GenericObligationError: 'ArgonPrimitivesVaultObligationError'
     }
   },
   /**
-   * Lookup337: argon_primitives::bond::BondError
+   * Lookup337: argon_primitives::vault::ObligationError
    **/
-  ArgonPrimitivesBondBondError: {
-    _enum: ['BondNotFound', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'VaultClosed', 'ExpirationAtBlockOverflow', 'AccountWouldBeBelowMinimum', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey', 'FeeExceedsBondAmount', 'InvalidBitcoinScript', 'InternalError']
+  ArgonPrimitivesVaultObligationError: {
+    _enum: ['ObligationNotFound', 'NoMoreObligationIds', 'MinimumObligationAmountNotMet', 'VaultClosed', 'ExpirationAtBlockOverflow', 'AccountWouldBeBelowMinimum', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBondedArgons', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'UnableToGenerateVaultBitcoinPubkey', 'InvalidBitcoinScript', 'InternalError', 'ObligationCompletionError']
   },
   /**
    * Lookup338: argon_primitives::bitcoin::UtxoValue
@@ -2531,27 +2535,27 @@ export default {
     _enum: ['NoPermissions', 'NoBitcoinConfirmedBlock', 'InsufficientBitcoinAmount', 'NoBitcoinPricesAvailable', 'ScriptPubkeyConflict', 'UtxoNotLocked', 'RedemptionsUnavailable', 'InvalidBitcoinSyncHeight', 'BitcoinHeightNotConfirmed', 'MaxUtxosExceeded', 'InvalidBitcoinScript']
   },
   /**
-   * Lookup348: argon_primitives::bond::Vault<sp_core::crypto::AccountId32, Balance>
+   * Lookup348: argon_primitives::vault::Vault<sp_core::crypto::AccountId32, Balance>
    **/
-  ArgonPrimitivesBondVault: {
+  ArgonPrimitivesVault: {
     operatorAccountId: 'AccountId32',
-    bitcoinArgons: 'ArgonPrimitivesBondVaultArgons',
-    securitizationPercent: 'Compact<u128>',
-    securitizedArgons: 'Compact<u128>',
-    miningArgons: 'ArgonPrimitivesBondVaultArgons',
+    bitcoinArgons: 'ArgonPrimitivesVaultVaultArgons',
+    addedSecuritizationPercent: 'Compact<u128>',
+    addedSecuritizationArgons: 'Compact<u128>',
+    bondedArgons: 'ArgonPrimitivesVaultVaultArgons',
     miningRewardSharingPercentTake: 'Compact<u128>',
     isClosed: 'bool',
-    pendingTerms: 'Option<(u64,ArgonPrimitivesBondVaultTerms)>',
-    pendingMiningArgons: 'Option<(u64,u128)>',
+    pendingTerms: 'Option<(u64,ArgonPrimitivesVaultVaultTerms)>',
+    pendingBondedArgons: 'Option<(u64,u128)>',
     pendingBitcoins: 'u128'
   },
   /**
-   * Lookup349: argon_primitives::bond::VaultArgons<Balance>
+   * Lookup349: argon_primitives::vault::VaultArgons<Balance>
    **/
-  ArgonPrimitivesBondVaultArgons: {
+  ArgonPrimitivesVaultVaultArgons: {
     annualPercentRate: 'Compact<u128>',
     allocated: 'Compact<u128>',
-    bonded: 'Compact<u128>',
+    reserved: 'Compact<u128>',
     baseFee: 'Compact<u128>'
   },
   /**
@@ -2572,30 +2576,33 @@ export default {
     _enum: ['Main', 'Test']
   },
   /**
-   * Lookup360: pallet_vaults::pallet::Error<T>
+   * Lookup360: argon_primitives::vault::Obligation<sp_core::crypto::AccountId32, Balance>
    **/
-  PalletVaultsError: {
-    _enum: ['BondNotFound', 'NoMoreVaultIds', 'NoMoreBondIds', 'MinimumBondAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBitcoinsForMining', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'MaxSecuritizationPercentExceeded', 'InvalidBondType', 'BitcoinUtxoNotFound', 'InsufficientSatoshisBonded', 'NoBitcoinPricesAvailable', 'InvalidBitcoinScript', 'InvalidXpubkey', 'WrongXpubNetwork', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'FeeExceedsBondAmount', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'UnableToDecodeVaultBitcoinPubkey', 'FundingChangeAlreadyScheduled']
-  },
-  /**
-   * Lookup361: argon_primitives::bond::Bond<sp_core::crypto::AccountId32, Balance>
-   **/
-  ArgonPrimitivesBond: {
-    bondType: 'ArgonPrimitivesBondBondType',
+  ArgonPrimitivesVaultObligation: {
+    obligationId: 'Compact<u64>',
+    fundType: 'ArgonPrimitivesVaultFundType',
     vaultId: 'Compact<u32>',
-    utxoId: 'Option<u64>',
-    bondedAccountId: 'AccountId32',
+    beneficiary: 'AccountId32',
     totalFee: 'Compact<u128>',
     prepaidFee: 'Compact<u128>',
     amount: 'Compact<u128>',
     startTick: 'Compact<u64>',
-    expiration: 'ArgonPrimitivesBondBondExpiration'
+    expiration: 'ArgonPrimitivesVaultObligationExpiration'
   },
   /**
-   * Lookup364: pallet_bond::pallet::UtxoState
+   * Lookup363: pallet_vaults::pallet::Error<T>
    **/
-  PalletBondUtxoState: {
-    bondId: 'Compact<u64>',
+  PalletVaultsError: {
+    _enum: ['ObligationNotFound', 'NoMoreVaultIds', 'NoMoreObligationIds', 'MinimumObligationAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBondedArgons', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'InvalidBitcoinScript', 'InvalidXpubkey', 'WrongXpubNetwork', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'FundingChangeAlreadyScheduled', 'ObligationCompletionError']
+  },
+  /**
+   * Lookup364: pallet_bitcoin_locks::pallet::LockedBitcoin<T>
+   **/
+  PalletBitcoinLocksLockedBitcoin: {
+    obligationId: 'Compact<u64>',
+    vaultId: 'Compact<u32>',
+    lockPrice: 'u128',
+    ownerAccount: 'AccountId32',
     satoshis: 'Compact<u64>',
     vaultPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
     vaultClaimPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
@@ -2608,10 +2615,11 @@ export default {
     isVerified: 'bool'
   },
   /**
-   * Lookup368: pallet_bond::pallet::UtxoCosignRequest<Balance>
+   * Lookup368: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
    **/
-  PalletBondUtxoCosignRequest: {
-    bondId: 'Compact<u64>',
+  PalletBitcoinLocksLockReleaseRequest: {
+    utxoId: 'Compact<u64>',
+    obligationId: 'Compact<u64>',
     vaultId: 'Compact<u32>',
     bitcoinNetworkFee: 'Compact<u64>',
     cosignDueBlock: 'Compact<u64>',
@@ -2619,30 +2627,29 @@ export default {
     redemptionPrice: 'Compact<u128>'
   },
   /**
-   * Lookup372: pallet_bond::pallet::Error<T>
+   * Lookup372: pallet_bitcoin_locks::pallet::Error<T>
    **/
-  PalletBondError: {
+  PalletBitcoinLocksError: {
     _enum: {
-      BondNotFound: 'Null',
-      NoMoreBondIds: 'Null',
-      MinimumBondAmountNotMet: 'Null',
+      ObligationNotFound: 'Null',
+      NoMoreObligationIds: 'Null',
+      MinimumObligationAmountNotMet: 'Null',
       ExpirationAtBlockOverflow: 'Null',
       InsufficientFunds: 'Null',
       InsufficientVaultFunds: 'Null',
-      InsufficientBitcoinsForMining: 'Null',
+      InsufficientBondedArgons: 'Null',
       AccountWouldGoBelowMinimumBalance: 'Null',
       VaultClosed: 'Null',
       InvalidVaultAmount: 'Null',
-      BondRedemptionNotLocked: 'Null',
-      BitcoinUnlockInitiationDeadlinePassed: 'Null',
+      RedemptionNotLocked: 'Null',
+      BitcoinReleaseInitiationDeadlinePassed: 'Null',
       BitcoinFeeTooHigh: 'Null',
-      InvalidBondType: 'Null',
       BitcoinUtxoNotFound: 'Null',
-      BitcoinUnableToBeDecodedForUnlock: 'Null',
+      BitcoinUnableToBeDecodedForRelease: 'Null',
       BitcoinSignatureUnableToBeDecoded: 'Null',
       BitcoinPubkeyUnableToBeDecoded: 'Null',
       BitcoinInvalidCosignature: 'Null',
-      InsufficientSatoshisBonded: 'Null',
+      InsufficientSatoshisLocked: 'Null',
       NoBitcoinPricesAvailable: 'Null',
       InvalidBitcoinScript: 'Null',
       ExpirationTooSoon: 'Null',
@@ -2650,8 +2657,10 @@ export default {
       HoldUnexpectedlyModified: 'Null',
       UnrecoverableHold: 'Null',
       VaultNotFound: 'Null',
-      FeeExceedsBondAmount: 'Null',
-      GenericBondError: 'ArgonPrimitivesBondBondError'
+      GenericObligationError: 'ArgonPrimitivesVaultObligationError',
+      LockNotFound: 'Null',
+      NoVaultBitcoinPubkeysAvailable: 'Null',
+      UnableToGenerateVaultBitcoinPubkey: 'Null'
     }
   },
   /**
@@ -2829,7 +2838,7 @@ export default {
       MiningSlot: 'PalletMiningSlotHoldReason',
       __Unused7: 'Null',
       Vaults: 'PalletVaultsHoldReason',
-      Bonds: 'PalletBondHoldReason',
+      BitcoinLocks: 'PalletBitcoinLocksHoldReason',
       __Unused10: 'Null',
       __Unused11: 'Null',
       __Unused12: 'Null',
@@ -2852,13 +2861,13 @@ export default {
    * Lookup443: pallet_vaults::pallet::HoldReason
    **/
   PalletVaultsHoldReason: {
-    _enum: ['EnterVault', 'BondFee']
+    _enum: ['EnterVault', 'ObligationFee']
   },
   /**
-   * Lookup444: pallet_bond::pallet::HoldReason
+   * Lookup444: pallet_bitcoin_locks::pallet::HoldReason
    **/
-  PalletBondHoldReason: {
-    _enum: ['UnlockingBitcoin']
+  PalletBitcoinLocksHoldReason: {
+    _enum: ['ReleaseBitcoinLock']
   },
   /**
    * Lookup445: pallet_block_rewards::pallet::HoldReason

@@ -1,5 +1,5 @@
 [package]
-name = "pallet-bond"
+name = "pallet-bitcoin-locks"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

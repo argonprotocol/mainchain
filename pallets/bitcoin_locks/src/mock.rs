@@ -9,18 +9,22 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
 
-use crate as pallet_bond;
+use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
-use argon_bitcoin::UtxoUnlocker;
+use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
-	bond::{Bond, BondError, BondType, Vault, VaultArgons, VaultProvider},
 	ensure,
 	tick::{Tick, Ticker},
-	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoBondedEvents, VaultId, VotingSchedule,
+	vault::{
+		BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
+		Vault, VaultArgons,
+	},
+	BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider, TickProvider,
+	UtxoLockEvents, VaultId, VotingSchedule,
 };
 
 pub type Balance = u128;
@@ -32,7 +36,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
-		Bonds: pallet_bond
+		BitcoinLocks: pallet_bitcoin_locks
 	}
 );
 
@@ -72,45 +76,46 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-	pub static MaxUnlockingUtxos: u32 = 10;
+	pub static MaxConcurrentlyReleasingLocks: u32 = 10;
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
-	pub static UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = 5;
-	pub static BitcoinBondReclamationBlocks: BitcoinHeight = 30;
-	pub static BitcoinBondDurationBlocks: BitcoinHeight = 365;
+	pub static LockReleaseCosignDeadlineBlocks: BitcoinHeight = 5;
+	pub static LockReclamationBlocks: BitcoinHeight = 30;
+	pub static LockDurationBlocks: BitcoinHeight = 365;
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
-	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
+	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
-		mining_argons: VaultArgons {
+		bonded_argons: VaultArgons {
 			allocated: 100_000_000_000,
-			bonded: 0,
+			reserved: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
 		bitcoin_argons: VaultArgons {
 			allocated: 200_000_000_000,
-			bonded: 0,
+			reserved: 0,
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
 		operator_account_id: 1,
-		securitization_percent: FixedU128::from_float(0.0),
+		added_securitization_percent: FixedU128::from_float(0.0),
 		mining_reward_sharing_percent_take: FixedU128::from_float(0.0),
-		securitized_argons: 0,
+		added_securitization_argons: 0,
 		is_closed: false,
 		pending_terms: None,
-		pending_mining_argons: None,
+		pending_bonded_argons: None,
 		pending_bitcoins: 0,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
+	pub static NextObligationId: ObligationId = 1;
 	pub static WatchedUtxosById: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)> = BTreeMap::new();
 
 	pub static GetUtxoRef: Option<UtxoRef> = None;
 
-	pub static LastBondEvent: Option<(UtxoId, u64, Balance)> = None;
-	pub static LastUnlockEvent: Option<(UtxoId, bool, Balance)> = None;
+	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
+	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance)> = None;
 
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 
@@ -122,106 +127,145 @@ parameter_types! {
 	pub static CurrentTick: Tick = 2;
 	pub static PreviousTick: Tick = 1;
 	pub static ElapsedTicks: Tick = 0;
+
+	pub static CanceledObligations: Vec<ObligationId> = vec![];
 }
 
 pub struct EventHandler;
-impl UtxoBondedEvents<u64, Balance> for EventHandler {
-	fn utxo_bonded(
+impl UtxoLockEvents<u64, Balance> for EventHandler {
+	fn utxo_locked(
 		utxo_id: UtxoId,
 		account_id: &u64,
 		amount: Balance,
 	) -> Result<(), DispatchError> {
-		LastBondEvent::set(Some((utxo_id, *account_id, amount)));
+		LastLockEvent::set(Some((utxo_id, *account_id, amount)));
 		Ok(())
 	}
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		amount_burned: Balance,
 	) -> DispatchResult {
-		LastUnlockEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
+		LastReleaseEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
+
 		Ok(())
 	}
 }
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
-		ArgonCPI::get()
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
+		BitcoinPricePerUsd::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}
-	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
-		BitcoinPricePerUsd::get()
+	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
+		ArgonCPI::get()
 	}
 }
 
 pub struct StaticVaultProvider;
 
-impl VaultProvider for StaticVaultProvider {
+impl BitcoinObligationProvider for StaticVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
-	fn get(vault_id: VaultId) -> Option<Vault<Self::AccountId, Self::Balance>> {
+	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
 		if vault_id == 1 {
-			Some(DefaultVault::get())
-		} else {
-			None
+			return DefaultVault::get().operator_account_id == *account_id
 		}
+		false
+	}
+
+	fn cancel_obligation(obligation_id: ObligationId) -> Result<Self::Balance, ObligationError> {
+		CanceledObligations::mutate(|a| a.push(obligation_id));
+		let _ = BitcoinLocks::on_canceled(&Obligation {
+			obligation_id,
+			prepaid_fee: 0,
+			total_fee: 0,
+			beneficiary: 1,
+			amount: 1,
+			fund_type: FundType::Bitcoin,
+			vault_id: 1,
+			expiration: ObligationExpiration::BitcoinBlock(100),
+			start_tick: CurrentTick::get(),
+		});
+		Ok(0)
+	}
+
+	fn create_obligation(
+		vault_id: VaultId,
+		beneficiary: &Self::AccountId,
+		fund_type: FundType,
+		amount: Self::Balance,
+		expiration: ObligationExpiration,
+		_ticks: Tick,
+	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
+		ensure!(
+			DefaultVault::get().mut_argons(&fund_type).allocated >= amount,
+			ObligationError::InsufficientVaultFunds
+		);
+		DefaultVault::mutate(|a| a.mut_argons(&fund_type).reserved += amount);
+		let next_obligation_id = NextObligationId::mutate(|a| {
+			let id = *a;
+			*a += 1;
+			id
+		});
+		let (total_fee, prepaid) = MockFeeResult::get();
+		Ok(Obligation {
+			obligation_id: next_obligation_id,
+			prepaid_fee: prepaid,
+			total_fee,
+			beneficiary: *beneficiary,
+			amount,
+			fund_type,
+			vault_id,
+			expiration,
+			start_tick: CurrentTick::get(),
+		})
 	}
 
 	fn compensate_lost_bitcoin(
-		_bond: &Bond<Self::AccountId, Self::Balance>,
+		_obligation_id: ObligationId,
 		market_rate: Self::Balance,
-	) -> Result<Self::Balance, BondError> {
+		release_amount_paid: Self::Balance,
+	) -> Result<(Self::Balance, Self::Balance), ObligationError> {
+		let rate = release_amount_paid.min(market_rate);
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_bond_funds(market_rate).expect("should not fail");
+			a.bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
 		});
-		Ok(market_rate)
+		Ok((0, rate))
 	}
 
-	fn burn_vault_bitcoin_funds(
-		_bond: &Bond<Self::AccountId, Self::Balance>,
+	fn burn_vault_bitcoin_obligation(
+		obligation_id: ObligationId,
 		amount_to_burn: Self::Balance,
-	) -> Result<(), BondError> {
+	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_bond_funds(amount_to_burn).expect("should not fail")
+			a.bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
 		});
 
-		Ok(())
-	}
-
-	fn bond_funds(
-		_vault_id: VaultId,
-		amount: Self::Balance,
-		bond_type: BondType,
-		_ticks: Tick,
-		_bond_account_id: &Self::AccountId,
-	) -> Result<(Self::Balance, Self::Balance), BondError> {
-		ensure!(
-			DefaultVault::get().mut_argons(&bond_type).allocated >= amount,
-			BondError::InsufficientVaultFunds
-		);
-		DefaultVault::mutate(|a| a.mut_argons(&bond_type).bonded += amount);
-		Ok(MockFeeResult::get())
-	}
-
-	fn release_bonded_funds(
-		bond: &Bond<Self::AccountId, Self::Balance>,
-	) -> Result<Self::Balance, BondError> {
-		DefaultVault::mutate(|a| a.mut_argons(&bond.bond_type).reduce_bonded(bond.amount));
-		Ok(bond.total_fee.saturating_sub(bond.prepaid_fee))
+		Ok(Obligation {
+			obligation_id,
+			prepaid_fee: 0,
+			total_fee: 0,
+			beneficiary: 1,
+			amount: amount_to_burn,
+			fund_type: FundType::Bitcoin,
+			vault_id: 1,
+			expiration: ObligationExpiration::BitcoinBlock(365),
+			start_tick: CurrentTick::get(),
+		})
 	}
 
 	fn create_utxo_script_pubkey(
 		_vault_id: VaultId,
-		_utxo_id: UtxoId,
 		_owner_pubkey: CompressedBitcoinPubkey,
 		_vault_claim_height: BitcoinHeight,
 		_open_claim_height: BitcoinHeight,
 		_current_height: BitcoinHeight,
-	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), ObligationError> {
 		Ok((
 			BitcoinXPub {
 				public_key: DefaultVaultBitcoinPubkey::get().into(),
@@ -247,7 +291,7 @@ impl VaultProvider for StaticVaultProvider {
 		_vault_id: VaultId,
 		_amount: Self::Balance,
 		_remove_pending: bool,
-	) -> Result<(), BondError> {
+	) -> Result<(), ObligationError> {
 		Ok(())
 	}
 }
@@ -255,7 +299,7 @@ impl VaultProvider for StaticVaultProvider {
 pub struct StaticBitcoinVerifier;
 impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 	fn verify_signature(
-		_utxo_unlocker: UtxoUnlocker,
+		_utxo_releaseer: CosignReleaser,
 		_pubkey: CompressedBitcoinPubkey,
 		_signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
@@ -265,12 +309,6 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn new_utxo_id() -> UtxoId {
-		let id = NextUtxoId::get();
-		NextUtxoId::set(id + 1);
-		id
-	}
-
 	fn get(_utxo_id: UtxoId) -> Option<UtxoRef> {
 		GetUtxoRef::get()
 	}
@@ -302,40 +340,38 @@ impl TickProvider<Block> for StaticTickProvider {
 	fn current_tick() -> Tick {
 		CurrentTick::get()
 	}
+	fn elapsed_ticks() -> Tick {
+		ElapsedTicks::get()
+	}
 	fn voting_schedule() -> VotingSchedule {
 		todo!()
 	}
 	fn ticker() -> Ticker {
 		Ticker::new(1, 2)
 	}
-	fn elapsed_ticks() -> Tick {
-		ElapsedTicks::get()
-	}
 	fn blocks_at_tick(_: Tick) -> Vec<H256> {
 		todo!()
 	}
 }
 
-impl pallet_bond::Config for Test {
+impl pallet_bitcoin_locks::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type Balance = Balance;
-	type ArgonTicksPerDay = ConstU64<1440>;
-	type MinimumBondAmount = MinimumBondAmount;
-	type MaxConcurrentlyExpiringBonds = ConstU32<10>;
-	type BondEvents = EventHandler;
-	type PriceProvider = StaticPriceProvider;
-	type VaultProvider = StaticVaultProvider;
-	type MaxUnlockingUtxos = MaxUnlockingUtxos;
-	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type LockEvents = (EventHandler,);
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
-	type BitcoinBondReclamationBlocks = BitcoinBondReclamationBlocks;
-	type BitcoinBondDurationBlocks = BitcoinBondDurationBlocks;
-	type BitcoinBlockHeight = BitcoinBlockHeight;
+	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
+	type BitcoinBlockHeight = BitcoinBlockHeight;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
+	type BitcoinObligationProvider = StaticVaultProvider;
+	type ArgonTicksPerDay = ConstU64<1440>;
+	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
+	type LockDurationBlocks = LockDurationBlocks;
+	type LockReclamationBlocks = LockReclamationBlocks;
+	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
 	type TickProvider = StaticTickProvider;
 }
 
@@ -346,8 +382,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
-	pallet_bond::GenesisConfig::<Test> {
-		minimum_bitcoin_bond_satoshis: MinimumBondSatoshis::get(),
+	pallet_bitcoin_locks::GenesisConfig::<Test> {
+		minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),
 		_phantom: Default::default(),
 	}
 	.assimilate_storage(&mut t)

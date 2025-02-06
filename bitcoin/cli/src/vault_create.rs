@@ -17,11 +17,11 @@ use argon_primitives::bitcoin::BitcoinXPub;
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
-	/// Argons to move to the vault to be available for bitcoin bonds.
+	/// Argons to move to the vault to be available for bitcoin locks.
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_argons: Option<f32>,
 	/// A serialized xpub string to be uploaded to the vault. Child pubkeys will have a single
-	/// incrementing index used for each bond.
+	/// incrementing index used for each bitcoin lock.
 	#[clap(long)]
 	bitcoin_xpub: Option<String>,
 
@@ -29,43 +29,43 @@ pub struct VaultConfig {
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_base_fee: Option<f32>,
 
-	/// The bitcoin bonds annual percent return. A bitcoin bond is 1 year, so returns are the
+	/// The bitcoin locks annual percent return. A bitcoin lock is 1 year, so returns are the
 	/// amount of argons borrowed times this rate.
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_apr: Option<f32>,
-
-	/// The mining bond annual percent return. NOTE: this will be adjusted down to the mining slot
-	/// duration
+	/// Number of argons to move into the vault for mining. NOTE: mining can only be done at a 1-1
+	/// ratio with the amount of bonded bitcoin argons (or securitization up to 2x bitcoin locks).
 	#[clap(long, value_parser=parse_number)]
-	mining_apr: Option<f32>,
+	bonded_argons: Option<f32>,
+
 	/// The base fee in argons. Up to 6 decimal points
 	#[clap(long, value_parser=parse_number)]
-	mining_base_fee: Option<f32>,
+	bonded_argons_base_fee: Option<f32>,
+	/// The bonded argons annual percent return. NOTE: this will be adjusted down to the mining
+	/// slot duration
+	#[clap(long, value_parser=parse_number)]
+	bonded_argons_apr: Option<f32>,
 	/// An optional profit sharing setup where any argons mined or minted (not including fees) are
 	/// split between miner and this vault.
 	#[clap(long, value_parser=parse_number)]
 	mining_reward_sharing_percent_take: Option<f32>,
-	/// Number of argons to move into the vault for mining. NOTE: mining can only be done at a 1-1
-	/// ratio with the amount of bonded bitcoin argons (or securitization up to 2x bitcoin bonds).
-	#[clap(long, value_parser=parse_number)]
-	mining_argons: Option<f32>,
 	/// A percentage of additional argons to add to a securitization pool. These argons are a
-	/// guarantee for bitcoin bonders in the case of loss or fraud. They maybe be up to 2x the
-	/// amount of bitcoin argons.
+	/// guarantee for bitcoin lockers in the case of loss or fraud if the price is above the
+	/// original lock price. They may be up to 2x the amount of bitcoin argons.
 	#[clap(long, value_parser=parse_number)]
-	securitization_percent: Option<f32>,
+	added_securitization_percent: Option<f32>,
 }
 
 const FIELD_TO_LABEL: [(&str, &str); 9] = [
-	("bitcoin_argons", "Bitcoin Bond Argons"),
+	("bitcoin_argons", "bitcoin lock Argons"),
 	("bitcoin_xpub", "Bitcoin XPub"),
 	("bitcoin_base_fee", "Bitcoin Base Fee Argons"),
 	("bitcoin_apr", "Bitcoin APR"),
-	("mining_apr", "Mining APR"),
-	("mining_base_fee", "Mining Base Fee Argons"),
+	("bonded_argons", "Bonded Argons"),
+	("bonded_argons_apr", "Bonded Argons APR"),
+	("bonded_argons_base_fee", "Bonded Argons Base Fee"),
 	("mining_reward_sharing_percent_take", "Mining Reward Sharing %"),
-	("mining_argons", "Mining Bond Argons"),
-	("securitization_percent", "Securitization %"),
+	("added_securitization_percent", "Added Securitization %"),
 ];
 
 fn label(field: &str) -> &str {
@@ -95,31 +95,32 @@ impl VaultConfig {
 
 		api::vaults::calls::types::create::VaultConfig {
 			bitcoin_xpubkey: opaque_xpub.0.into(),
-			terms: runtime_types::argon_primitives::bond::VaultTerms::<u128> {
+			terms: runtime_types::argon_primitives::vault::VaultTerms::<u128> {
 				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1_000_000.0) as u128,
 				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.bitcoin_apr.unwrap_or(0.0),
 				)),
-				mining_base_fee: (self.mining_base_fee.unwrap_or(0.0) * 1_000_000.0) as u128,
-				mining_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
-					self.mining_apr.unwrap_or(0.0),
+				bonded_argons_base_fee: (self.bonded_argons_base_fee.unwrap_or(0.0) * 1_000_000.0)
+					as u128,
+				bonded_argons_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
+					self.bonded_argons_apr.unwrap_or(0.0),
 				)),
 				mining_reward_sharing_percent_take: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.mining_reward_sharing_percent_take.unwrap_or(0.0),
 				)),
 			},
-			securitization_percent: to_api_fixed_u128(read_percent_to_fixed_128(
-				self.securitization_percent.unwrap_or(0.0),
+			added_securitization_percent: to_api_fixed_u128(read_percent_to_fixed_128(
+				self.added_securitization_percent.unwrap_or(0.0),
 			)),
 			bitcoin_amount_allocated: (self.bitcoin_argons.unwrap_or(0.0) * 1_000_000.0) as u128,
-			mining_amount_allocated: (self.mining_argons.unwrap_or(0.0) * 1_000_000.0) as u128,
+			bonded_argons_allocated: (self.bonded_argons.unwrap_or(0.0) * 1_000_000.0) as u128,
 		}
 	}
 
 	pub fn argons_needed(&self) -> String {
 		let mut argons_needed = self.bitcoin_argons.unwrap_or(0.0);
-		argons_needed += (self.securitization_percent.unwrap_or(0.0) / 100.0) * argons_needed;
-		argons_needed += self.mining_argons.unwrap_or(0.0);
+		argons_needed += (self.added_securitization_percent.unwrap_or(0.0) / 100.0) * argons_needed;
+		argons_needed += self.bonded_argons.unwrap_or(0.0);
 		Argons(argons_needed).to_string()
 	}
 
@@ -169,12 +170,12 @@ impl VaultConfig {
 				"bitcoin_xpub" => self.prompt_bitcoin_xpub()?,
 				"bitcoin_base_fee" => self.prompt_bitcoin_base_fee()?,
 				"bitcoin_apr" => self.prompt_bitcoin_apr()?,
-				"mining_apr" => self.prompt_mining_apr()?,
-				"mining_base_fee" => self.prompt_mining_base_fee()?,
+				"bonded_argons_apr" => self.prompt_bonded_argons_apr()?,
+				"bonded_argons_base_fee" => self.prompt_bonded_argons_base_fee()?,
 				"mining_reward_sharing_percent_take" =>
 					self.prompt_mining_reward_sharing_percent_take()?,
-				"mining_argons" => self.prompt_mining_argons()?,
-				"securitization_percent" => self.prompt_securitization()?,
+				"bonded_argons" => self.prompt_bonded_argons()?,
+				"added_securitization_percent" => self.prompt_securitization()?,
 				_ => unreachable!(),
 			}
 
@@ -236,9 +237,9 @@ impl VaultConfig {
 		Ok(())
 	}
 
-	fn prompt_mining_base_fee(&mut self) -> Result<(), String> {
-		self.mining_base_fee = Some(
-			self.text_field("mining_base_fee", "0.00")
+	fn prompt_bonded_argons_base_fee(&mut self) -> Result<(), String> {
+		self.bonded_argons_base_fee = Some(
+			self.text_field("bonded_argons_base_fee", "0.00")
 				.with_positive_f32()
 				.prompt_with_f32()?,
 		);
@@ -263,24 +264,27 @@ impl VaultConfig {
 		Ok(())
 	}
 
-	fn prompt_mining_argons(&mut self) -> Result<(), String> {
-		self.mining_argons =
-			Some(self.text_field("mining_argons", "0.00").with_positive_f32().prompt_with_f32()?);
+	fn prompt_bonded_argons(&mut self) -> Result<(), String> {
+		self.bonded_argons =
+			Some(self.text_field("bonded_argons", "0.00").with_positive_f32().prompt_with_f32()?);
 		Ok(())
 	}
 
 	fn prompt_securitization(&mut self) -> Result<(), String> {
-		self.securitization_percent = Some(
-			self.text_field("securitization_percent", "100.0")
+		self.added_securitization_percent = Some(
+			self.text_field("added_securitization_percent", "100.0")
 				.with_positive_f32()
 				.prompt_with_f32()?,
 		);
 		Ok(())
 	}
 
-	fn prompt_mining_apr(&mut self) -> Result<(), String> {
-		self.mining_apr =
-			Some(self.text_field("mining_apr", "0.0").with_positive_f32().prompt_with_f32()?);
+	fn prompt_bonded_argons_apr(&mut self) -> Result<(), String> {
+		self.bonded_argons_apr = Some(
+			self.text_field("bonded_argons_apr", "0.0")
+				.with_positive_f32()
+				.prompt_with_f32()?,
+		);
 		Ok(())
 	}
 
@@ -296,14 +300,14 @@ impl VaultConfig {
 				self.bitcoin_argons = None;
 			}
 		}
-		if let Some(val) = self.mining_argons {
+		if let Some(val) = self.bonded_argons {
 			if val < 0.0 {
-				self.mining_argons = None;
+				self.bonded_argons = None;
 			}
 		}
-		if let Some(val) = self.securitization_percent {
+		if let Some(val) = self.added_securitization_percent {
 			if val < 0.0 {
-				self.securitization_percent = None;
+				self.added_securitization_percent = None;
 			}
 		}
 
@@ -312,15 +316,15 @@ impl VaultConfig {
 				self.bitcoin_apr = None;
 			}
 		}
-		if let Some(val) = self.mining_apr {
+		if let Some(val) = self.bonded_argons_apr {
 			if val < 0.0 {
-				self.mining_apr = None;
+				self.bonded_argons_apr = None;
 			}
 		}
 
-		if let Some(val) = self.mining_base_fee {
+		if let Some(val) = self.bonded_argons_base_fee {
 			if val < 0.0 {
-				self.mining_base_fee = None;
+				self.bonded_argons_base_fee = None;
 			}
 		}
 		if let Some(val) = self.bitcoin_base_fee {
@@ -355,12 +359,13 @@ impl VaultConfig {
 			"bitcoin_xpub" => self.bitcoin_xpub.clone(),
 			"bitcoin_base_fee" => self.format_type(field, &self.bitcoin_base_fee),
 			"bitcoin_apr" => self.format_type(field, &self.bitcoin_apr),
-			"mining_apr" => self.format_type(field, &self.mining_apr),
-			"mining_base_fee" => self.format_type(field, &self.mining_base_fee),
+			"bonded_argons_apr" => self.format_type(field, &self.bonded_argons_apr),
+			"bonded_argons_base_fee" => self.format_type(field, &self.bonded_argons_base_fee),
 			"mining_reward_sharing_percent_take" =>
 				self.format_type(field, &self.mining_reward_sharing_percent_take),
-			"mining_argons" => self.format_type(field, &self.mining_argons),
-			"securitization_percent" => self.format_type(field, &self.securitization_percent),
+			"bonded_argons" => self.format_type(field, &self.bonded_argons),
+			"added_securitization_percent" =>
+				self.format_type(field, &self.added_securitization_percent),
 			_ => None,
 		}
 	}
@@ -373,14 +378,14 @@ impl VaultConfig {
 		}
 
 		match field {
-			"bitcoin_argons" | "mining_argons" | "bitcoin_base_fee" | "mining_base_fee" => {
+			"bitcoin_argons" | "bonded_argons" | "bitcoin_base_fee" | "bonded_argons_base_fee" => {
 				let argons = parse_number(&value).unwrap();
 				Some(Argons(argons).to_string())
 			},
 			"bitcoin_apr" |
-			"mining_apr" |
+			"bonded_argons_apr" |
 			"mining_reward_sharing_percent_take" |
-			"securitization_percent" => {
+			"added_securitization_percent" => {
 				let pct = parse_number(&value).unwrap();
 				Some(Pct(pct).to_string())
 			},

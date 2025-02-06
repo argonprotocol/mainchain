@@ -11,10 +11,10 @@ use clap::{Subcommand, ValueEnum};
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
 
-use argon_bitcoin::{Amount, CosignScript, CosignScriptArgs, UnlockStep, UtxoUnlocker};
+use argon_bitcoin::{Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep};
 use argon_client::{
 	api,
-	api::{apis, runtime_types::pallet_bond::pallet::UtxoCosignRequest, storage, tx},
+	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::LockReleaseRequest, storage, tx},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
@@ -23,20 +23,20 @@ use argon_primitives::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoId,
 		SATOSHIS_PER_BITCOIN,
 	},
-	BlockNumber, BondId, KeystoreParams, VaultId,
+	BlockNumber, KeystoreParams, ObligationId, VaultId,
 };
 
 use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
 
 #[derive(Subcommand, Debug)]
-pub enum BondCommands {
-	/// Create a bond application
-	Apply {
+pub enum LockCommands {
+	/// Initialize a LockedBitcoin
+	Initialize {
 		/// The vault id
 		#[clap(short, long)]
 		vault_id: VaultId,
 
-		/// The amount of btc to bond
+		/// The amount of btc to lock
 		#[clap(short, long)]
 		btc: f64,
 
@@ -47,26 +47,26 @@ pub enum BondCommands {
 		#[clap(flatten)]
 		keypair: KeystoreParams,
 	},
-	/// Outputs the address that must be funded to activate the bond
+	/// Outputs the address that must be funded to activate the LockedBitcoin
 	SendToAddress {
-		/// The bond id
+		/// The utxo id
 		#[clap(short, long)]
-		bond_id: BondId,
+		utxo_id: UtxoId,
 	},
-	/// Show the current state of the bond
-	Get {
-		/// The bond id
+	/// Show the current state of the lock
+	Status {
+		/// The utxo id
 		#[clap(short, long)]
-		bond_id: BondId,
-		/// Retrieve the bond at a specific block
+		utxo_id: UtxoId,
+		/// Retrieve the lock at a specific block
 		#[clap(short, long)]
 		at_block: Option<BlockNumber>,
 	},
-	/// Helps create an unlock request
-	RequestUnlock {
-		/// The bond id
+	/// Starts te process to release a utxo
+	RequestRelease {
+		/// The bitcoin lock id
 		#[clap(short, long)]
-		bond_id: BondId,
+		utxo_id: UtxoId,
 
 		/// The destination to send the bitcoin to
 		#[clap(short, long)]
@@ -79,11 +79,11 @@ pub enum BondCommands {
 		#[clap(flatten)]
 		keypair: KeystoreParams,
 	},
-	/// Create the vault side of this unlock request to submit to Argon
-	VaultCosign {
-		/// The bond id to unlock
+	/// Create the vault side of this release request to submit to Argon
+	VaultCosignRelease {
+		/// The bitcoin lock id
 		#[clap(short, long)]
-		bond_id: BondId,
+		utxo_id: UtxoId,
 
 		#[clap(flatten)]
 		xpriv_file: XprivFile,
@@ -92,10 +92,10 @@ pub enum BondCommands {
 		#[clap(long)]
 		master_xpub_hd_path: String,
 	},
-	/// Create an unlock psbt to submit to bitcoin
-	OwnerCosignPsbt {
-		/// The utxo id in Argon. NOTE: bonds are cleaned up on release, so you need this id. You
-		/// can use the `bond get` command at a previous block to look this up.
+	/// Create a release psbt to submit to bitcoin
+	OwnerCosignRelease {
+		/// The utxo id in Argon. NOTE: locks are cleaned up on release, so you need this id. You
+		/// can use the `lock status` command at a previous block to look this up.
 		#[clap(short, long)]
 		utxo_id: UtxoId,
 
@@ -118,15 +118,15 @@ pub enum BondCommands {
 	},
 	/// Create a psbt to claim back the utxo
 	ClaimUtxoPsbt {
-		/// The bond id that held this bitcoin utxo in Argon.
+		/// The bitcoin lock id
 		#[clap(short, long)]
-		bond_id: BondId,
+		utxo_id: UtxoId,
 
-		/// The block height when this bond existed
+		/// The block height when this lock existed
 		#[clap(short, long)]
 		at_block: BlockNumber,
 
-		/// The claimer of the bond
+		/// The claimer of the lock
 		#[clap(long)]
 		claimer: BitcoinClaimer,
 
@@ -163,18 +163,19 @@ pub enum BitcoinClaimer {
 	Vault,
 }
 
-impl BondCommands {
+impl LockCommands {
 	pub async fn process(self, rpc_url: String) -> anyhow::Result<()> {
 		match self {
-			BondCommands::Apply { vault_id, keypair: _, owner_pubkey, btc } => {
+			LockCommands::Initialize { vault_id, keypair: _, owner_pubkey, btc } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
 
 				let owner_pubkey: CompressedBitcoinPubkey =
 					CompressedPublicKey::from_str(&owner_pubkey)?.into();
+				let best_block = client.best_block_hash().await?;
 				let vault = client
-					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), None)
+					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), Some(best_block))
 					.await?
 					.ok_or(anyhow!("Vault not found"))?;
 				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
@@ -187,36 +188,37 @@ impl BondCommands {
 				let fee = vault.bitcoin_argons.base_fee +
 					from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
 						.saturating_mul_int(argons_minted);
-				println!("You're bonding {} sats in exchange for {}. Your Argon account needs {} for the bond cost",
+				println!("You're locking {} sats in exchange for {}. Your Argon account needs {} for the lock cost",
 						 satoshis, ArgonFormatter(argons_minted), ArgonFormatter(fee));
 
-				let call = tx().bonds().bond_bitcoin(vault_id, satoshis, owner_pubkey.into());
+				let call = tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into());
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to complete transaction:\n\t{}", url);
 			},
-			BondCommands::SendToAddress { bond_id } => {
+			LockCommands::SendToAddress { utxo_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
 
-				let (_utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, None).await?;
+				let (_utxo_id, lock) =
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, None).await?;
 				let network = get_bitcoin_network(&client, None).await?;
 
-				let unlocker = get_cosign_script(&utxo, network)?;
-				let compressed_pubkey: CompressedBitcoinPubkey = utxo.owner_pubkey.into();
+				let cosign_script = get_cosign_script(&lock, network)?;
+				let compressed_pubkey: CompressedBitcoinPubkey = lock.owner_pubkey.into();
 				let compressed_pubkey: CompressedPublicKey = compressed_pubkey.try_into()?;
 
 				println!(
 					"You must send exactly {} satoshis to {}, which is a multisig with your public key {}.",
-					utxo.satoshis,
-					unlocker.get_script_address(),
+					lock.satoshis,
+					cosign_script.get_script_address(),
 					compressed_pubkey
 				);
 				// bitcoin-cli walletprocesspsbt "psbt_base64"
 				// bitcoin-cli finalizepsbt "processed_psbt_base64"
 				// bitcoin-cli sendrawtransaction "finalized_hex"
 			},
-			BondCommands::Get { bond_id, at_block } => {
+			LockCommands::Status { utxo_id, at_block } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -231,19 +233,19 @@ impl BondCommands {
 					Some(latest_block.hash())
 				};
 
-				let (utxo_id, utxo, bond) =
-					get_utxo_from_bond_id(&client, bond_id, at_block).await?;
+				let (utxo_id, lock) =
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
 
 				let utxo_ref = client
 					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
 					.await?;
 
-				let unlock_request = find_unlock_request(&client, at_block, utxo_id).await?;
+				let release_request = find_release_request(&client, at_block, utxo_id).await?;
 
-				let status = match utxo.is_verified {
+				let status = match lock.is_verified {
 					true =>
-						if unlock_request.is_some() {
-							"Unlock Requested"
+						if release_request.is_some() {
+							"Release Requested"
 						} else {
 							"Verified"
 						},
@@ -265,27 +267,27 @@ impl BondCommands {
 					})
 					.unwrap_or_default();
 
-				let redemption_price = if let Some(ref unlock_request) = unlock_request {
-					unlock_request.redemption_price
+				let redemption_price = if let Some(ref request) = release_request {
+					request.redemption_price
 				} else {
 					let redemption_price_query =
-						apis().bitcoin_apis().redemption_rate(utxo.satoshis);
+						apis().bitcoin_apis().redemption_rate(lock.satoshis);
 					client.call(redemption_price_query, at_block).await?.unwrap_or_default()
 				};
 
-				let minted = if utxo.is_verified { bond.amount - remaining } else { 0 };
+				let minted = if lock.is_verified { lock.lock_price - remaining } else { 0 };
 				let utxo_ref_str = utxo_ref
 					.map(|a| {
 						let utxo_txid: Txid = H256Le(a.txid.0).into();
 						format!("{}, vout={}", utxo_txid, a.output_index)
 					})
 					.unwrap_or("-".to_string());
-				let cosign_script = get_cosign_script(&utxo, Network::Bitcoin)?;
+				let cosign_script = get_cosign_script(&lock, Network::Bitcoin)?;
 
-				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.into();
+				let vault_pubkey: CompressedBitcoinPubkey = lock.vault_pubkey.into();
 				let vault_bitcoin_pubkey: bitcoin::CompressedPublicKey = vault_pubkey.try_into()?;
 
-				let owner_pubkey: CompressedBitcoinPubkey = utxo.owner_pubkey.into();
+				let owner_pubkey: CompressedBitcoinPubkey = lock.owner_pubkey.into();
 				let owner_bitcoin_pubkey: bitcoin::CompressedPublicKey = owner_pubkey.try_into()?;
 
 				let mut rows = vec![
@@ -295,27 +297,31 @@ impl BondCommands {
 					vec!["Output Descriptor".into(), format!("{}", cosign_script.descriptor)],
 					vec![
 						"Minted Argons".into(),
-						format!("{} of {}", ArgonFormatter(minted), ArgonFormatter(bond.amount)),
+						format!(
+							"{} of {}",
+							ArgonFormatter(minted),
+							ArgonFormatter(lock.lock_price)
+						),
 					],
 					vec!["Status".into(), status.into()],
 					vec![
 						format!(
 							"Redemption Price{}",
-							if unlock_request.is_some() { " (paid)" } else { "" }
+							if release_request.is_some() { " (paid)" } else { "" }
 						),
 						format!("{}", ArgonFormatter(redemption_price)),
 					],
-					vec!["Expiration Bitcoin Block".into(), format!("{}", utxo.vault_claim_height)],
+					vec!["Expiration Bitcoin Block".into(), format!("{}", lock.vault_claim_height)],
 					vec![
 						"Owner Reclaim Bitcoin Block".into(),
-						format!("{}", utxo.open_claim_height),
+						format!("{}", lock.open_claim_height),
 					],
 				];
 
-				if let Some(ref unlock_request) = unlock_request {
+				if let Some(ref request) = release_request {
 					rows.push(vec![
-						"Unlock Requested".into(),
-						format!("due at block {}", unlock_request.cosign_due_block),
+						"Release Requested".into(),
+						format!("due at block {}", request.cosign_due_block),
 					])
 				}
 
@@ -329,8 +335,8 @@ impl BondCommands {
 
 				println!("{table}");
 			},
-			BondCommands::RequestUnlock {
-				bond_id,
+			LockCommands::RequestRelease {
+				utxo_id,
 				dest_pubkey,
 				fee_rate_sats_per_kb,
 				keypair: _,
@@ -342,8 +348,8 @@ impl BondCommands {
 				let at_block = Some(latest_block.hash());
 				let network = get_bitcoin_network(&client, at_block).await?;
 
-				let (_, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
-				let redemption_price_query = apis().bitcoin_apis().redemption_rate(utxo.satoshis);
+				let (_, lock) = get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
+				let redemption_price_query = apis().bitcoin_apis().redemption_rate(lock.satoshis);
 
 				let redemption_price = client
 					.live
@@ -357,7 +363,7 @@ impl BondCommands {
 					.map_err(|e| anyhow!("Unable to parse bitcoin destination pubkey: {e:?}"))?
 					.require_network(network)?
 					.script_pubkey();
-				let cosign = get_cosign_script(&utxo, network)?;
+				let cosign = get_cosign_script(&lock, network)?;
 
 				let network_fee = cosign.calculate_fee(
 					true,
@@ -367,20 +373,20 @@ impl BondCommands {
 				)?;
 
 				println!(
-					"The price to unlock this bond is: {}\nBitcoin fee: {:?}",
+					"The price to release this lock is: {}\nBitcoin fee: {:?}",
 					ArgonFormatter(redemption_price),
 					network_fee
 				);
 				let argon_bitcoin_script_pubkey: BitcoinScriptPubkey = bitcoin_dest_pubkey.into();
-				let call = tx().bonds().unlock_bitcoin_bond(
-					bond_id,
+				let call = tx().bitcoin_locks().request_release(
+					utxo_id,
 					argon_bitcoin_script_pubkey.into(),
 					network_fee.to_sat(),
 				);
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::VaultCosign { bond_id, xpriv_file, master_xpub_hd_path } => {
+			LockCommands::VaultCosignRelease { utxo_id, xpriv_file, master_xpub_hd_path } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
@@ -391,20 +397,21 @@ impl BondCommands {
 					&DerivationPath::from_str(&master_xpub_hd_path)?,
 				)?;
 
-				let (utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
-				let mut unlocker = load_unlocker(&client, utxo_id, &utxo, at_block).await?;
+				let (utxo_id, lock) =
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
+				let mut releaser = load_cosign_releaser(&client, utxo_id, &lock, at_block).await?;
 				let owner_pubkey: CompressedPublicKey =
-					unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
+					releaser.cosign_script.script_args.owner_pubkey.try_into()?;
 				let compressed: CompressedPublicKey = owner_pubkey;
-				let fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+				let fingerprint = Fingerprint::from(lock.vault_xpub_sources.0);
 
 				let hd_path =
-					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.1)]);
+					DerivationPath::from(vec![ChildNumber::from(lock.vault_xpub_sources.1)]);
 
-				unlocker.psbt.inputs[0]
+				releaser.psbt.inputs[0]
 					.bip32_derivation
 					.insert(compressed.0, (fingerprint, hd_path));
-				let mut psbt = unlocker.psbt;
+				let mut psbt = releaser.psbt;
 				psbt.sign(&child_xpriv, &Secp256k1::new()).map_err(|e| {
 					anyhow!(
 						"Unable to sign this bitcoin transaction with the given XPriv -> {:#?}",
@@ -415,7 +422,7 @@ impl BondCommands {
 					"Your xpriv was used to sign the following psbt:\n\n{}",
 					general_purpose::STANDARD.encode(&psbt.serialize()[..])
 				);
-				let compressed_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.clone().into();
+				let compressed_pubkey: CompressedBitcoinPubkey = lock.vault_pubkey.clone().into();
 				let compressed_pubkey: CompressedPublicKey = compressed_pubkey.try_into()?;
 
 				let signature: BitcoinSignature = (*psbt.inputs[0]
@@ -425,11 +432,12 @@ impl BondCommands {
 				.try_into()
 				.map_err(|_| anyhow!("Unable to translate signature to bytes"))?;
 
-				let unlock_fulfill = tx().bonds().cosign_bitcoin_unlock(bond_id, signature.into());
-				let url = client.create_polkadotjs_deeplink(&unlock_fulfill)?;
+				let release_fulfill =
+					tx().bitcoin_locks().cosign_release(utxo_id, signature.into());
+				let url = client.create_polkadotjs_deeplink(&release_fulfill)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			BondCommands::OwnerCosignPsbt {
+			LockCommands::OwnerCosignRelease {
 				utxo_id,
 				parent_fingerprint,
 				hd_path,
@@ -452,7 +460,7 @@ impl BondCommands {
 				let mut active_height: Option<H256> = None;
 				if let Some(release_height) = client
 					.fetch_storage(
-						&storage().bonds().utxos_cosign_release_height_by_id(utxo_id),
+						&storage().bitcoin_locks().lock_release_cosign_height_by_id(utxo_id),
 						at_block,
 					)
 					.await?
@@ -464,7 +472,7 @@ impl BondCommands {
 					let release_events =
 						client.live.blocks().at(release_block).await?.events().await?;
 					let release_event = release_events
-                        .find_first::<api::bonds::events::BitcoinUtxoCosigned>()?.ok_or(anyhow!("No corresponding event found for the cosign release height in the blockchain."))?;
+                        .find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>()?.ok_or(anyhow!("No corresponding event found for the cosign release height in the blockchain."))?;
 
 					signature = Some(
 						release_event
@@ -475,9 +483,9 @@ impl BondCommands {
 
 					active_height = client.block_at_height(release_height - 1).await?;
 				} else {
-					let pending_unlock =
-						find_unlock_request(&client, at_block, utxo_id).await?.ok_or(anyhow!(
-							"This utxo isn't pending unlock and has no pending signatures.\
+					let pending_release =
+						find_release_request(&client, at_block, utxo_id).await?.ok_or(anyhow!(
+							"This lock isn't pending release and has no pending signatures.\
 						\nPossibilities:\
 							\n - the cosign period expired\
 							\n - the request was already processed"
@@ -489,15 +497,15 @@ impl BondCommands {
 						while let Some(block) = finalized_sub.next().await {
 							print!(".");
 							let block = block?;
-							let utxo_unlock = block
+							let cosign = block
 								.events()
 								.await?
-								.find_first::<api::bonds::events::BitcoinUtxoCosigned>(
+								.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>(
 							)?;
-							if let Some(utxo_unlock) = utxo_unlock {
-								if utxo_unlock.bond_id == pending_unlock.bond_id {
+							if let Some(cosign_release) = cosign {
+								if cosign_release.utxo_id == pending_release.utxo_id {
 									signature = Some(
-										utxo_unlock
+										cosign_release
 											.signature
 											.try_into()
 											.map_err(|_| anyhow!("Unable to decode signature"))?,
@@ -509,8 +517,8 @@ impl BondCommands {
 						}
 					} else {
 						bail!(
-							"This unlock request hasn't been processed yet. It is due by block {} (current={})",
-							pending_unlock.cosign_due_block,
+							"This lock release request hasn't been processed yet. It is due by block {} (current={})",
+							pending_release.cosign_due_block,
 							client.latest_finalized_block().await?
 						)
 					}
@@ -522,13 +530,17 @@ impl BondCommands {
 				};
 
 				let utxo = client
-					.fetch_storage(&storage().bonds().utxos_by_id(utxo_id), active_height)
+					.fetch_storage(
+						&storage().bitcoin_locks().locks_by_utxo_id(utxo_id),
+						active_height,
+					)
 					.await?
-					.ok_or(anyhow::anyhow!("No utxo found for bond"))?;
+					.ok_or(anyhow::anyhow!("No utxo found for lock"))?;
 
-				let mut unlocker = load_unlocker(&client, utxo_id, &utxo, active_height).await?;
-				unlocker.add_signature(
-					unlocker
+				let mut releaser =
+					load_cosign_releaser(&client, utxo_id, &utxo, active_height).await?;
+				releaser.add_signature(
+					releaser
 						.cosign_script
 						.script_args
 						.bitcoin_vault_pubkey()
@@ -540,14 +552,14 @@ impl BondCommands {
 					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.1)]);
 				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_pubkey.into();
 				let vault_pubkey: CompressedPublicKey = vault_pubkey.try_into()?;
-				unlocker.psbt.inputs[0]
+				releaser.psbt.inputs[0]
 					.bip32_derivation
 					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
 				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
 					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
 					let hd_path = DerivationPath::from_str(&hd_path)?;
 					let keysource = (fingerprint, hd_path);
-					let owner_pubkey = unlocker
+					let owner_pubkey = releaser
 						.cosign_script
 						.script_args
 						.bitcoin_owner_pubkey()
@@ -556,16 +568,16 @@ impl BondCommands {
 						"Adding owner pubkey to psbt bip32 derivation: {:?}, {:?}",
 						owner_pubkey, keysource
 					);
-					unlocker.psbt.inputs[0].bip32_derivation.insert(
+					releaser.psbt.inputs[0].bip32_derivation.insert(
 						secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes()[..])?,
 						keysource,
 					);
 				}
 				if let Some(private_key) = private_key {
-					unlocker.sign(private_key)?;
+					releaser.sign(private_key)?;
 				}
 
-				let psbt = unlocker.psbt;
+				let psbt = releaser.psbt;
 
 				println!(
 					"Import this psbt to sign and broadcast the transaction:\n\n{}",
@@ -573,8 +585,8 @@ impl BondCommands {
 				);
 				return Ok(());
 			},
-			BondCommands::ClaimUtxoPsbt {
-				bond_id,
+			LockCommands::ClaimUtxoPsbt {
+				utxo_id,
 				at_block: block_number,
 				claimer,
 				dest_pubkey,
@@ -593,14 +605,15 @@ impl BondCommands {
 					.ok_or(anyhow::anyhow!("No block found for the given block number"))?;
 
 				let at_block = Some(block_hash.into());
-				let (utxo_id, utxo, _) = get_utxo_from_bond_id(&client, bond_id, at_block).await?;
+				let (utxo_id, lock) =
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
 
 				let utxo_ref = client
 					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
 					.await?
-					.ok_or(anyhow::anyhow!("No utxo ref found for bond"))?;
+					.ok_or(anyhow::anyhow!("No utxo ref found for lock"))?;
 				let network = get_bitcoin_network(&client, at_block).await?;
-				let cosign_script = get_cosign_script(&utxo, network)?;
+				let cosign_script = get_cosign_script(&lock, network)?;
 				let txid: Txid = H256Le(utxo_ref.txid.0).into();
 				let fee_rate = FeeRate::from_sat_per_vb(fee_rate_sats_per_kb)
 					.ok_or(anyhow!("Invalid fee rate"))?;
@@ -614,37 +627,37 @@ impl BondCommands {
 				let fee =
 					cosign_script.calculate_fee(true, pay_scriptpub.clone().into(), fee_rate)?;
 
-				let mut unlocker = UtxoUnlocker::from_script(
+				let mut releaser = CosignReleaser::from_script(
 					cosign_script,
-					utxo.satoshis,
+					lock.satoshis,
 					txid,
 					utxo_ref.output_index,
 					match claimer {
-						BitcoinClaimer::Owner => UnlockStep::OwnerClaim,
-						BitcoinClaimer::Vault => UnlockStep::VaultClaim,
+						BitcoinClaimer::Owner => ReleaseStep::OwnerClaim,
+						BitcoinClaimer::Vault => ReleaseStep::VaultClaim,
 					},
 					fee,
 					pay_scriptpub.into(),
 				)?;
-				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
+				let vault_fingerprint = Fingerprint::from(lock.vault_xpub_sources.0);
 				let vault_hd_path =
-					DerivationPath::from(vec![ChildNumber::from(utxo.vault_xpub_sources.2)]);
-				let vault_pubkey: CompressedBitcoinPubkey = utxo.vault_claim_pubkey.into();
+					DerivationPath::from(vec![ChildNumber::from(lock.vault_xpub_sources.2)]);
+				let vault_pubkey: CompressedBitcoinPubkey = lock.vault_claim_pubkey.into();
 				let vault_pubkey: CompressedPublicKey = vault_pubkey.try_into()?;
-				unlocker.psbt.inputs[0]
+				releaser.psbt.inputs[0]
 					.bip32_derivation
 					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
 
 				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
 					let owner_pubkey: CompressedPublicKey =
-						unlocker.cosign_script.script_args.owner_pubkey.try_into()?;
+						releaser.cosign_script.script_args.owner_pubkey.try_into()?;
 					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
 					let hd_path = DerivationPath::from_str(&hd_path)?;
-					unlocker.psbt.inputs[0]
+					releaser.psbt.inputs[0]
 						.bip32_derivation
 						.insert(owner_pubkey.0, (fingerprint, hd_path));
 				}
-				let mut psbt = unlocker.psbt;
+				let mut psbt = releaser.psbt;
 				if matches!(claimer, BitcoinClaimer::Vault) {
 					let master_xpub_hd_path = master_xpub_hd_path.ok_or(anyhow!(
 						"Master xpub hd path is required when claiming as the vault"
@@ -671,45 +684,45 @@ impl BondCommands {
 	}
 }
 
-async fn load_unlocker(
+async fn load_cosign_releaser(
 	client: &MainchainClient,
 	utxo_id: UtxoId,
-	utxo: &api::runtime_types::pallet_bond::pallet::UtxoState,
+	lock: &api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin,
 	at_block: Option<H256>,
-) -> anyhow::Result<UtxoUnlocker> {
+) -> anyhow::Result<CosignReleaser> {
 	let utxo_ref = client
 		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
 		.await?
-		.ok_or(anyhow::anyhow!("No utxo ref found for bond"))?;
-	let unlock_info = find_unlock_request(client, at_block, utxo_id)
+		.ok_or(anyhow::anyhow!("No utxo ref found for lock"))?;
+	let release_info = find_release_request(client, at_block, utxo_id)
 		.await?
-		.ok_or(anyhow!("No unlock request found"))?;
+		.ok_or(anyhow!("No lock release request found"))?;
 	let network = get_bitcoin_network(client, at_block).await?;
 
 	let txid: Txid = H256Le(utxo_ref.txid.0).into();
-	let pay_scriptpub: BitcoinScriptPubkey = unlock_info
+	let pay_scriptpub: BitcoinScriptPubkey = release_info
 		.to_script_pubkey
 		.try_into()
 		.map_err(|_| anyhow!("Unable to decode the destination pubkey"))?;
-	let unlocker = UtxoUnlocker::from_script(
-		get_cosign_script(utxo, network)?,
-		utxo.satoshis,
+	let releaser = CosignReleaser::from_script(
+		get_cosign_script(lock, network)?,
+		lock.satoshis,
 		txid,
 		utxo_ref.output_index,
-		UnlockStep::VaultCosign,
-		Amount::from_sat(unlock_info.bitcoin_network_fee),
+		ReleaseStep::VaultCosign,
+		Amount::from_sat(release_info.bitcoin_network_fee),
 		pay_scriptpub.into(),
 	)?;
-	Ok(unlocker)
+	Ok(releaser)
 }
 
-async fn find_unlock_request(
+async fn find_release_request(
 	client: &MainchainClient,
 	at_block: Option<H256>,
 	utxo_id: UtxoId,
-) -> anyhow::Result<Option<UtxoCosignRequest<u128>>> {
-	let unlock_request = client
-		.fetch_storage(&storage().bonds().utxos_pending_unlock_by_utxo_id(), at_block)
+) -> anyhow::Result<Option<LockReleaseRequest<u128>>> {
+	let release_request = client
+		.fetch_storage(&storage().bitcoin_locks().locks_pending_release_by_utxo_id(), at_block)
 		.await?
 		.map(|a| a.0)
 		.unwrap_or_default()
@@ -720,44 +733,33 @@ async fn find_unlock_request(
 			}
 			None
 		});
-	Ok(unlock_request)
+	Ok(release_request)
 }
-async fn get_utxo_from_bond_id(
+async fn get_bitcoin_lock_from_utxo_id(
 	client: &MainchainClient,
-	bond_id: BondId,
+	utxo_id: ObligationId,
 	at_block: Option<H256>,
-) -> anyhow::Result<(
-	UtxoId,
-	api::runtime_types::pallet_bond::pallet::UtxoState,
-	api::bonds::storage::types::bonds_by_id::BondsById,
-)> {
-	let query = storage().bonds().bonds_by_id(bond_id);
-	let bond = client
+) -> anyhow::Result<(UtxoId, api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin)> {
+	let query = storage().bitcoin_locks().locks_by_utxo_id(utxo_id);
+	let lock = client
 		.fetch_storage(&query, at_block)
 		.await?
-		.ok_or(anyhow!("No finalized bond found"))?;
-	let Some(utxo_id) = bond.utxo_id else {
-		bail!("This isn't a bitcoin bond");
-	};
+		.ok_or(anyhow!("No finalized LockedBitcoin found"))?;
 
-	let utxo = client
-		.fetch_storage(&storage().bonds().utxos_by_id(utxo_id), at_block)
-		.await?
-		.ok_or(anyhow!("No utxo found for bond"))?;
-	Ok((utxo_id, utxo, bond))
+	Ok((utxo_id, lock))
 }
 
 fn get_cosign_script(
-	utxo: &api::runtime_types::pallet_bond::pallet::UtxoState,
+	lock: &api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin,
 	network: Network,
 ) -> anyhow::Result<CosignScript> {
 	let script_args = CosignScriptArgs {
-		vault_pubkey: utxo.vault_pubkey.clone().into(),
-		vault_claim_pubkey: utxo.vault_claim_pubkey.clone().into(),
-		owner_pubkey: utxo.owner_pubkey.clone().into(),
-		vault_claim_height: utxo.vault_claim_height,
-		open_claim_height: utxo.open_claim_height,
-		created_at_height: utxo.created_at_height,
+		vault_pubkey: lock.vault_pubkey.clone().into(),
+		vault_claim_pubkey: lock.vault_claim_pubkey.clone().into(),
+		owner_pubkey: lock.owner_pubkey.clone().into(),
+		vault_claim_height: lock.vault_claim_height,
+		open_claim_height: lock.open_claim_height,
+		created_at_height: lock.created_at_height,
 	};
 
 	Ok(CosignScript::new(script_args, network)?)

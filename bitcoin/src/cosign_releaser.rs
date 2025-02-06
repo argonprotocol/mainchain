@@ -19,28 +19,28 @@ use k256::ecdsa::signature::Verifier;
 use miniscript::psbt::PsbtExt;
 
 use crate::{
-	cosign_script::{CosignScript, CosignScriptArgs, UnlockStep},
+	cosign_script::{CosignScript, CosignScriptArgs, ReleaseStep},
 	errors::Error,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UtxoUnlocker {
+pub struct CosignReleaser {
 	pub cosign_script: CosignScript,
-	pub unlock_step: UnlockStep,
+	pub release_step: ReleaseStep,
 	pub psbt: Psbt,
 }
 
-impl UtxoUnlocker {
+impl CosignReleaser {
 	pub fn from_script(
 		cosign_script: CosignScript,
 		utxo_satoshis: Satoshis,
 		utxo_txid: bitcoin::Txid,
 		utxo_vout: u32,
-		unlock_step: UnlockStep,
+		release_step: ReleaseStep,
 		fee: Amount,
 		to_script_pubkey: ScriptBuf,
 	) -> Result<Self, Error> {
-		let lock_time = cosign_script.unlock_height(unlock_step);
+		let lock_time = cosign_script.unlock_height(release_step);
 		let out_point = OutPoint { txid: utxo_txid, vout: utxo_vout };
 		let out_amount = Amount::from_sat(utxo_satoshis);
 		let unsigned_tx = Transaction {
@@ -75,7 +75,7 @@ impl UtxoUnlocker {
 			Error::PsbtFinalizeError
 		})?;
 
-		Ok(Self { cosign_script, unlock_step, psbt })
+		Ok(Self { cosign_script, release_step, psbt })
 	}
 
 	#[allow(clippy::too_many_arguments)]
@@ -84,7 +84,7 @@ impl UtxoUnlocker {
 		utxo_satoshis: Satoshis,
 		utxo_txid: bitcoin::Txid,
 		utxo_vout: u32,
-		unlock_step: UnlockStep,
+		release_step: ReleaseStep,
 		fee: Amount,
 		pay_to_script_pubkey: ScriptBuf,
 		network: Network,
@@ -94,7 +94,7 @@ impl UtxoUnlocker {
 			utxo_satoshis,
 			utxo_txid,
 			utxo_vout,
-			unlock_step,
+			release_step,
 			fee,
 			pay_to_script_pubkey,
 		)
@@ -227,7 +227,7 @@ mod hwi_ext {
 	use anyhow::{anyhow, bail, Result};
 	use hwi::{types::HWIDevice, HWIClient};
 
-	impl UtxoUnlocker {
+	impl CosignReleaser {
 		pub fn sign_hwi(
 			&mut self,
 			key_source: KeySource,

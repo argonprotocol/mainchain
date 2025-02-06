@@ -20,7 +20,7 @@ use argon_primitives::bitcoin::{BitcoinError, BitcoinHeight, CompressedBitcoinPu
 use crate::errors::Error;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum UnlockStep {
+pub enum ReleaseStep {
 	VaultCosign,
 	OwnerCosign,
 	VaultClaim,
@@ -92,11 +92,12 @@ impl CosignScript {
 		self.script_args.created_at_height = height;
 	}
 
-	pub fn unlock_height(&self, unlock_step: UnlockStep) -> u32 {
-		(match unlock_step {
-			UnlockStep::OwnerCosign | UnlockStep::VaultCosign => self.script_args.created_at_height,
-			UnlockStep::VaultClaim => self.script_args.vault_claim_height,
-			UnlockStep::OwnerClaim => self.script_args.open_claim_height,
+	pub fn unlock_height(&self, release_step: ReleaseStep) -> u32 {
+		(match release_step {
+			ReleaseStep::OwnerCosign | ReleaseStep::VaultCosign =>
+				self.script_args.created_at_height,
+			ReleaseStep::VaultClaim => self.script_args.vault_claim_height,
+			ReleaseStep::OwnerClaim => self.script_args.open_claim_height,
 		}) as u32
 	}
 
@@ -214,7 +215,7 @@ mod test {
 	};
 	use argon_testing::*;
 
-	use crate::{UnlockStep, UtxoSpendFilter, UtxoUnlocker};
+	use crate::{CosignReleaser, ReleaseStep, UtxoSpendFilter};
 
 	use super::*;
 
@@ -302,12 +303,12 @@ mod test {
 
 		// fails locktime if not cleared
 		{
-			let mut unlocker = UtxoUnlocker::from_script(
+			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
 				Amount::ONE_BTC.to_sat(),
 				txid,
 				vout,
-				UnlockStep::VaultClaim,
+				ReleaseStep::VaultClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
 			)
@@ -322,12 +323,12 @@ mod test {
 		}
 		// fails to allow vault_reclaim key too
 		{
-			let mut unlocker = UtxoUnlocker::from_script(
+			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
 				Amount::ONE_BTC.to_sat(),
 				txid,
 				vout,
-				UnlockStep::VaultClaim,
+				ReleaseStep::VaultClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
 			)
@@ -341,12 +342,12 @@ mod test {
 			assert!(unlocker.extract_tx().is_err());
 		}
 
-		let mut unlocker = UtxoUnlocker::from_script(
+		let mut unlocker = CosignReleaser::from_script(
 			cosign_script.clone(),
 			Amount::ONE_BTC.to_sat(),
 			txid,
 			vout,
-			UnlockStep::VaultClaim,
+			ReleaseStep::VaultClaim,
 			fee,
 			pay_to_script_pubkey.clone(),
 		)
@@ -460,12 +461,12 @@ mod test {
 		// cannot accept until the cosign height
 		let mut block_height = block_height;
 		while block_height < open_claim_height {
-			let mut unlocker = UtxoUnlocker::from_script(
+			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
 				amount,
 				txid,
 				vout,
-				UnlockStep::OwnerClaim,
+				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
 			)
@@ -483,12 +484,12 @@ mod test {
 
 		assert_eq!(bitcoind.client.get_block_count().unwrap(), open_claim_height);
 		{
-			let mut unlocker = UtxoUnlocker::from_script(
+			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
 				amount,
 				txid,
 				vout,
-				UnlockStep::OwnerClaim,
+				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
 			)
@@ -581,12 +582,12 @@ mod test {
 
 		assert_eq!(bitcoind.client.get_block_count().unwrap(), open_claim_height);
 		{
-			let unlocker = UtxoUnlocker::from_script(
+			let unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
 				amount,
 				txid,
 				vout,
-				UnlockStep::OwnerClaim,
+				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
 			)
@@ -751,12 +752,12 @@ mod test {
 				open_claim_height,
 				created_at_height: register_height,
 			};
-			let mut unlocker = UtxoUnlocker::new(
+			let mut unlocker = CosignReleaser::new(
 				script_args,
 				amount,
 				utxo.txid.clone().into(),
 				utxo.output_index,
-				UnlockStep::VaultCosign,
+				ReleaseStep::VaultCosign,
 				fee,
 				out_script_pubkey.clone().into(),
 				network,
@@ -776,12 +777,12 @@ mod test {
 
 		// 6. User sees the transaction and cosigns
 		let tx = {
-			let mut unlocker = UtxoUnlocker::from_script(
+			let mut unlocker = CosignReleaser::from_script(
 				user_cosign_script.clone(),
 				amount,
 				utxo.txid.clone().into(),
 				utxo.output_index,
-				UnlockStep::OwnerCosign,
+				ReleaseStep::OwnerCosign,
 				fee,
 				out_script_pubkey.clone().into(),
 			)

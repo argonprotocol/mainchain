@@ -33,7 +33,7 @@ pub mod pallet {
 
 	use argon_primitives::{
 		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
-		UtxoBondedEvents,
+		UtxoLockEvents,
 	};
 
 	use super::*;
@@ -310,12 +310,12 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> UtxoBondedEvents<T::AccountId, T::Balance> for Pallet<T>
+	impl<T: Config> UtxoLockEvents<T::AccountId, T::Balance> for Pallet<T>
 	where
 		<T as Config>::Balance: From<u128>,
 		<T as Config>::Balance: Into<u128>,
 	{
-		fn utxo_bonded(
+		fn utxo_locked(
 			utxo_id: UtxoId,
 			account_id: &T::AccountId,
 			amount: T::Balance,
@@ -327,7 +327,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn utxo_unlocked(
+		fn utxo_released(
 			utxo_id: UtxoId,
 			remove_pending_mints: bool,
 			amount_burned: T::Balance,

@@ -170,14 +170,15 @@ begins (slots start every 1440 ticks).
 At any given time, a mining slot requires you to own and lock 1/100th (or current mining slots) of the total Ownership
 Tokens in circulation. And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons
 than they have. You will get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this
-process must come from a [Vault](./running-a-vault#mining-bonds).
+process must come from a [Vault](./running-a-vault#bonded-argons).
 
-Vault Argons are allowed to be rented for mining bonds at a ratio of 3:1 with the Bitcoins bonded in a vault, capped by
-the amount of securitization locked up by the vault. In other words, if a vault has 100k of bitcoin and 200k of
-securitization in the vault, the vault is able to offer up to 300k of mining bonds. If
-there is 0 securitization, then only 100k of mining bonds are eligible. A vault offers an allocated amount of both
-Bitcoin and Mining bonds. You can view a vault's current allocation by looking at the Chain State in Polkadot.js under
-`Vaults -> VaultsById`, and then viewing `allocated` and `bonded` amounts of each. Some Vault operators will also offer
+BondedArgons are allowed to be rented for mining at a ratio of 3:1 with the Bitcoins bonded in a vault, capped by
+the amount of added securitization locked up by the vault. In other words, if a vault has 100k of bitcoin and 200k of
+added securitization in the vault, the vault is able to offer up to 300k of BondedArgons. If
+there is 0 added securitization, then only 100k of BondedArgons are eligible. A vault offers an allocated amount of both
+Bitcoin and BondedArgons. You can view a vault's current allocation by looking at the Chain State in Polkadot.js under
+`Vaults -> VaultsById`, and then viewing `allocated` and `reserved` amounts of each. Some Vault operators will also
+offer
 profit sharing terms, where you don't need to rent Argons for as high a cost, but will need to share argons minted
 during your slot.
 
@@ -280,7 +281,7 @@ based on a target number of miners applying for the slots). These variables can 
 
 - `TargetBidsPerSlot`: the current number of bids per slot that are targeted (20% more than slots available)
 - `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
-- `OwnershipBondAmount`: the total number of Ownership Tokens needed to bid for a slot
+- `ArgonotsPerMiningSeat`: the total number of Ownership Tokens (argonots) needed to bid for a slot
 - `NextSlotCohort`: the currently slotted miners for the slot ending tomorrow
 
 #### Slot Bid End-time

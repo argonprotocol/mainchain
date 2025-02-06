@@ -97,7 +97,7 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 				ticks_between_slots: 1_440,
 				slot_bidding_start_after_ticks: 14_400 - 1_440, // start at day 9
 			},
-			minimum_bitcoin_bond_satoshis: 1_000,
+			minimum_bitcoin_lock_satoshis: 1_000,
 			hyperbridge_token_admin: token_admin,
 		}))
 		.build())

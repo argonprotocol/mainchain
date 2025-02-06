@@ -84,7 +84,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_version: 110,
 	impl_version: 5,
 	apis: RUNTIME_API_VERSIONS,
-	transaction_version: 1,
+	transaction_version: 2,
 	state_version: 1,
 };
 
@@ -127,7 +127,7 @@ mod runtime {
 	#[runtime::pallet_index(8)]
 	pub type Vaults = pallet_vaults;
 	#[runtime::pallet_index(9)]
-	pub type Bonds = pallet_bond;
+	pub type BitcoinLocks = pallet_bitcoin_locks;
 	#[runtime::pallet_index(10)]
 	pub type Notaries = pallet_notaries;
 	#[runtime::pallet_index(11)]
@@ -201,7 +201,6 @@ type Migrations = (
 	migrations::UpdateMissingGrandpaSetId<Runtime>,
 	// spec 110
 	pallet_mining_slot::migrations::MigrateV1ToV2<Runtime>,
-	pallet_bond::migrations::MigrateV0ToV1<Runtime>,
 	pallet_vaults::migrations::MigrateV1ToV2<Runtime>,
 );
 
@@ -485,7 +484,7 @@ impl_runtime_apis! {
 		}
 
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
-			Bonds::get_redemption_price(&satoshis).ok()
+			BitcoinLocks::get_redemption_price(&satoshis).ok()
 		}
 
 		fn market_rate(satoshis: Satoshis) -> Option<Balance> {

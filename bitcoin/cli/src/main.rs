@@ -1,7 +1,7 @@
 use crate::{
-	bond_commands::BondCommands,
 	formatters::{parse_number, Pct64},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
+	lock_commands::LockCommands,
 	vault_commands::VaultCommands,
 	xpriv_commands::XPrivCommands,
 };
@@ -10,9 +10,9 @@ use clap::{crate_version, Parser, Subcommand};
 use sp_runtime::FixedU128;
 use std::{env, str::FromStr};
 
-mod bond_commands;
 mod formatters;
 mod helpers;
+mod lock_commands;
 mod vault_commands;
 mod vault_create;
 mod xpriv_commands;
@@ -37,10 +37,10 @@ enum Commands {
 		#[clap(subcommand)]
 		subcommand: VaultCommands,
 	},
-	/// Create, unlock and monitor bonds
-	Bond {
+	/// Create, release and monitor BitcoinLocks
+	Lock {
 		#[clap(subcommand)]
-		subcommand: BondCommands,
+		subcommand: LockCommands,
 	},
 	#[clap(name = "xpriv")]
 	XPriv {
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
 	match cli.command {
 		Commands::Vault { subcommand } => subcommand.process(rpc_url).await?,
-		Commands::Bond { subcommand } => subcommand.process(rpc_url).await?,
+		Commands::Lock { subcommand } => subcommand.process(rpc_url).await?,
 		Commands::Utils { subcommand } => subcommand.process(rpc_url).await?,
 		Commands::XPriv { subcommand } => subcommand.process(rpc_url).await?,
 	};

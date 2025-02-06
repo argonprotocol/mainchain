@@ -17,6 +17,7 @@ use crate::{
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
+	vault::Obligation,
 	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
 	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 };
@@ -66,7 +67,6 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
 }
 
 pub trait BitcoinUtxoTracker {
-	fn new_utxo_id() -> UtxoId;
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
@@ -110,28 +110,45 @@ impl BitcoinUtxoEvents for Tuple {
 	}
 }
 
-pub trait UtxoBondedEvents<AccountId: Codec, Balance: Codec + Copy> {
-	fn utxo_bonded(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
-	/// Called when a utxo is removed from bond (whether from being spent outside the system, or
+pub trait UtxoLockEvents<AccountId: Codec, Balance: Codec + Copy> {
+	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
+	/// Called when a bitcoin is unlocked (whether from being spent outside the system, or
 	/// from being unlocked)
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
 	) -> DispatchResult;
 }
 #[impl_trait_for_tuples::impl_for_tuples(5)]
-impl<AccountId: Codec, Balance: Codec + Copy> UtxoBondedEvents<AccountId, Balance> for Tuple {
-	fn utxo_bonded(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_bonded(utxo_id, account_id, amount)?; )* );
+impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance> for Tuple {
+	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
+		for_tuples!( #( Tuple::utxo_locked(utxo_id, account_id, amount)?; )* );
 		Ok(())
 	}
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_unlocked(utxo_id, remove_pending_mints, burned_argons)?; )* );
+		for_tuples!( #( Tuple::utxo_released(utxo_id, remove_pending_mints, burned_argons)?; )* );
+		Ok(())
+	}
+}
+
+pub trait ObligationEvents<AccountId: Codec, Balance: Codec + Copy> {
+	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
+	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<AccountId: Codec, Balance: Codec + Copy> ObligationEvents<AccountId, Balance> for Tuple {
+	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
+		for_tuples!( #( Tuple::on_canceled(obligation)?; )* );
+		Ok(())
+	}
+	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
+		for_tuples!( #( Tuple::on_completed(obligation)?; )* );
 		Ok(())
 	}
 }

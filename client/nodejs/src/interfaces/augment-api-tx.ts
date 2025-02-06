@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedSubmittable, SubmittableExtrinsic, SubmittableE
 import type { BTreeMap, Bytes, Compact, Option, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
-import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesBondVaultTerms, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletTokenGatewayAssetRegistration, PalletTokenGatewayPrecisionUpdate, PalletTokenGatewayTeleportParams, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight, TokenGatewayPrimitivesGatewayAssetUpdate } from '@polkadot/types/lookup';
+import type { ArgonPrimitivesBitcoinCompressedBitcoinPubkey, ArgonPrimitivesBitcoinH256Le, ArgonPrimitivesBitcoinOpaqueBitcoinXpub, ArgonPrimitivesBlockSealRewardDestination, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesInherentsBitcoinUtxoSync, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotebookSignedNotebookHeader, ArgonPrimitivesVaultVaultTerms, ArgonRuntimeConfigsProxyType, ArgonRuntimeOriginCaller, ArgonRuntimeSessionKeys, IsmpGrandpaAddStateMachine, IsmpHostStateMachine, IsmpMessagingCreateConsensusState, IsmpMessagingMessage, PalletBalancesAdjustmentDirection, PalletIsmpUtilsFundMessageParams, PalletIsmpUtilsUpdateConsensusState, PalletMiningSlotMiningSlotBid, PalletMultisigTimepoint, PalletPriceIndexPriceIndex, PalletTokenGatewayAssetRegistration, PalletTokenGatewayPrecisionUpdate, PalletTokenGatewayTeleportParams, PalletVaultsVaultConfig, SpConsensusGrandpaEquivocationProof, SpCoreVoid, SpWeightsWeightV2Weight, TokenGatewayPrimitivesGatewayAssetUpdate } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
 export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
@@ -102,6 +102,37 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       upgradeAccounts: AugmentedSubmittable<(who: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>, [Vec<AccountId32>]>;
     };
+    bitcoinLocks: {
+      adminModifyMinimumLockedSats: AugmentedSubmittable<(satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64]>;
+      /**
+       * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
+       * release fee will be burned, and the obligation will be allowed to expire without penalty.
+       *
+       * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
+       * wallets.
+       **/
+      cosignRelease: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
+      /**
+       * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and
+       * log the Bitcoin Script hash to Events.
+       *
+       * The pubkey submitted here will be used to create a script pubkey that will be used in a
+       * timelock multisig script to lock the bitcoin.
+       *
+       * NOTE: A "lock-er" must sends btc to the cosign UTXO address in order to "complete" the
+       * LockedBitcoin and be added to the Bitcoin Mint line.
+       **/
+      initialize: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]>;
+      /**
+       * Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
+       * script. A transaction spending the UTXO should be pre-created so that the sighash
+       * can be submitted here. The vault operator will have 10 days to counter-sign the
+       * transaction. It will be published with the public key as a BitcoinUtxoCosigned Event.
+       *
+       * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
+       **/
+      requestRelease: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
+    };
     bitcoinUtxos: {
       /**
        * Sets the most recent confirmed bitcoin block height (only executable by the Oracle
@@ -131,34 +162,6 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     blockSealSpec: {
       configure: AugmentedSubmittable<(voteMinimum: Option<u128> | null | Uint8Array | u128 | AnyNumber, computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber) => SubmittableExtrinsic<ApiType>, [Option<u128>, Option<u128>]>;
-    };
-    bonds: {
-      /**
-       * Bond a bitcoin. This will create a bond for the submitting account and log the Bitcoin
-       * Script hash to Events. A bondee must create the UTXO in order to be added to the Bitcoin
-       * Mint line.
-       *
-       * The pubkey submitted here will be used to create a script pubkey that will be used in a
-       * timelock multisig script to lock the bitcoin.
-       **/
-      bondBitcoin: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]>;
-      /**
-       * Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
-       * unlock fee will be burned, and the bond will be allowed to expire without penalty.
-       *
-       * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
-       * wallets.
-       **/
-      cosignBitcoinUnlock: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
-      /**
-       * Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction
-       * spending the UTXO from the given bond should be pre-created so that the sighash can be
-       * submitted here. The vault operator will have 10 days to counter-sign the transaction. It
-       * will be published with the public key as a BitcoinUtxoCosigned Event.
-       *
-       * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
-       **/
-      unlockBitcoinBond: AugmentedSubmittable<(bondId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     chainTransfer: {
       sendToLocalchain: AugmentedSubmittable<(amount: Compact<u128> | AnyNumber | Uint8Array, notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [Compact<u128>, u32]>;
@@ -254,9 +257,9 @@ declare module '@polkadot/api-base/types/submittable' {
     miningSlot: {
       /**
        * Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
-       * a slot can be supplanted by supplying a higher mining bond amount. Bond terms can be
-       * found in the `vaults` pallet. You will supply the bond amount and the vault id to bond
-       * with.
+       * a slot can be supplanted by supplying a higher number of Bonded Argons. Bonded Argon
+       * terms can be found in the `vaults` pallet. You will supply the amount and the
+       * vault id to work with.
        *
        * Each slot has `MaxCohortSize` spots available.
        *
@@ -273,16 +276,16 @@ declare module '@polkadot/api-base/types/submittable' {
        * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
        *
        * Parameters:
-       * - `bond_info`: The bond information to submit for the bid. If `None`, the bid will be
+       * - `bonded_argons`: The information to submit for the bid. If `None`, the bid will be
        * considered a zero-bid.
-       * - `vault_id`: The vault id to bond with. Terms are taken from the vault at time of bid
+       * - `vault_id`: The vault id to used. Terms are taken from the vault at time of bid
        * inclusion in the block.
-       * - `amount`: The amount to bond with the vault.
+       * - `amount`: The amount to reserve from the vault.
        * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
        * submitting user.
        * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
        **/
-      bid: AugmentedSubmittable<(bondInfo: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonRuntimeSessionKeys]>;
+      bid: AugmentedSubmittable<(bondedArgons: Option<PalletMiningSlotMiningSlotBid> | null | Uint8Array | PalletMiningSlotMiningSlotBid | { vaultId?: any; amount?: any } | string, rewardDestination: ArgonPrimitivesBlockSealRewardDestination | { Owner: any } | { Account: any } | string | Uint8Array, keys: ArgonRuntimeSessionKeys | { grandpa?: any; blockSealAuthority?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [Option<PalletMiningSlotMiningSlotBid>, ArgonPrimitivesBlockSealRewardDestination, ArgonRuntimeSessionKeys]>;
       /**
        * Admin function to update the mining slot delay.
        **/
@@ -927,30 +930,31 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     vaults: {
       /**
-       * Stop offering additional bonds from this vault. Will not affect existing bond.
-       * As funds are returned, they will be released to the vault owner.
+       * Stop offering additional obligations from this vault. Will not affect existing
+       * obligations. As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32]>;
-      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { terms?: any; bitcoinAmountAllocated?: any; bitcoinXpubkey?: any; miningAmountAllocated?: any; securitizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
+      create: AugmentedSubmittable<(vaultConfig: PalletVaultsVaultConfig | { terms?: any; bitcoinAmountAllocated?: any; bitcoinXpubkey?: any; bondedArgonsAllocated?: any; addedSecuritizationPercent?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [PalletVaultsVaultConfig]>;
       /**
-       * Modify funds offered by the vault. This will not affect existing bonds, but will affect
-       * the amount of funds available for new bonds.
+       * Modify funds offered by the vault. This will not affect issued obligations, but will
+       * affect the amount of funds available for new ones.
        *
-       * The securitization percent must be maintained or increased.
+       * The additional securitization percent must be maintained or increased.
        *
-       * The amount offered may not go below the existing bonded amounts, but you can release
-       * funds in this vault as bonds are released. To stop issuing any more bonds, use the
-       * `close` api.
+       * The amount offered may not go below the existing reserved amounts, but you can release
+       * funds in this vault as obligations are released. To stop issuing any more obligations,
+       * use the `close` api.
        **/
-      modifyFunding: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, securitizationPercent: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u128]>;
+      modifyFunding: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, totalMiningAmountOffered: u128 | AnyNumber | Uint8Array, totalBitcoinAmountOffered: u128 | AnyNumber | Uint8Array, addedSecuritizationPercent: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, u128, u128, u128]>;
       /**
        * Change the terms of this vault. The change will be applied at the next mining slot
        * change that is at least `MinTermsModificationBlockDelay` blocks away.
        **/
-      modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: ArgonPrimitivesBondVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; miningAnnualPercentRate?: any; miningBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, ArgonPrimitivesBondVaultTerms]>;
+      modifyTerms: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, terms: ArgonPrimitivesVaultVaultTerms | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; bondedArgonsAnnualPercentRate?: any; bondedArgonsBaseFee?: any; miningRewardSharingPercentTake?: any } | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, ArgonPrimitivesVaultVaultTerms]>;
       /**
-       * Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
-       * will be used for any bonds after this point. Will be rejected if already used.
+       * Replace the bitcoin xpubkey for this vault. This will not affect existing obligations,
+       * but will be used for any obligations after this point. Will be rejected if already
+       * used.
        **/
       replaceBitcoinXpub: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, bitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]>;
     };

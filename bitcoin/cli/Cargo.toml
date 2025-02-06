@@ -1,6 +1,6 @@
 [package]
 name = "argon-bitcoin-cli"
-description = "A cli used to bond bitcoins, create and manage Vaults"
+description = "A cli used to lock bitcoins, create and manage Vaults"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

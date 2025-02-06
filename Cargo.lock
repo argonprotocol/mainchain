@@ -1416,11 +1416,11 @@ dependencies = [
  "log",
  "pallet-authorship 38.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pallet-balances",
+ "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
- "pallet-bond",
  "pallet-chain-transfer",
  "pallet-digests",
  "pallet-domains",
@@ -10964,6 +10964,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-bitcoin-locks"
+version = "1.0.9"
+dependencies = [
+ "argon-bitcoin",
+ "argon-primitives",
+ "bitcoin",
+ "env_logger 0.11.6",
+ "frame-benchmarking 38.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "rand",
+ "scale-info",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-bitcoin-utxos"
 version = "1.0.9"
 dependencies = [
@@ -11036,28 +11058,6 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "sp-api",
- "sp-core",
- "sp-io",
- "sp-runtime",
-]
-
-[[package]]
-name = "pallet-bond"
-version = "1.0.9"
-dependencies = [
- "argon-bitcoin",
- "argon-primitives",
- "bitcoin",
- "env_logger 0.11.6",
- "frame-benchmarking 38.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "parity-scale-codec",
- "rand",
- "scale-info",
- "sp-arithmetic",
  "sp-core",
  "sp-io",
  "sp-runtime",

@@ -61,6 +61,80 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       VestingBalance: AugmentedError<ApiType>;
     };
+    bitcoinLocks: {
+      /**
+       * The proposed transaction would take the account below the minimum (existential) balance
+       **/
+      AccountWouldGoBelowMinimumBalance: AugmentedError<ApiType>;
+      /**
+       * The fee for this bitcoin release is too high
+       **/
+      BitcoinFeeTooHigh: AugmentedError<ApiType>;
+      /**
+       * The cosign signature is not valid for the bitcoin release
+       **/
+      BitcoinInvalidCosignature: AugmentedError<ApiType>;
+      /**
+       * This bitcoin pubkey couldn't be decoded for release
+       **/
+      BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * The bitcoin has passed the deadline to release it
+       **/
+      BitcoinReleaseInitiationDeadlinePassed: AugmentedError<ApiType>;
+      /**
+       * This bitcoin signature couldn't be decoded for release
+       **/
+      BitcoinSignatureUnableToBeDecoded: AugmentedError<ApiType>;
+      /**
+       * This bitcoin cosign script couldn't be decoded for release
+       **/
+      BitcoinUnableToBeDecodedForRelease: AugmentedError<ApiType>;
+      BitcoinUtxoNotFound: AugmentedError<ApiType>;
+      /**
+       * There are too many obligations expiring in the given expiration block
+       **/
+      ExpirationAtBlockOverflow: AugmentedError<ApiType>;
+      ExpirationTooSoon: AugmentedError<ApiType>;
+      GenericObligationError: AugmentedError<ApiType>;
+      HoldUnexpectedlyModified: AugmentedError<ApiType>;
+      /**
+       * The vault does not have enough bitcoins to cover the bonded argons
+       **/
+      InsufficientBondedArgons: AugmentedError<ApiType>;
+      InsufficientFunds: AugmentedError<ApiType>;
+      InsufficientSatoshisLocked: AugmentedError<ApiType>;
+      InsufficientVaultFunds: AugmentedError<ApiType>;
+      /**
+       * The bitcoin script to lock this bitcoin has errors
+       **/
+      InvalidBitcoinScript: AugmentedError<ApiType>;
+      /**
+       * Funding would result in an overflow of the balance type
+       **/
+      InvalidVaultAmount: AugmentedError<ApiType>;
+      LockNotFound: AugmentedError<ApiType>;
+      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
+      NoBitcoinPricesAvailable: AugmentedError<ApiType>;
+      NoMoreObligationIds: AugmentedError<ApiType>;
+      NoPermissions: AugmentedError<ApiType>;
+      /**
+       * No Vault public keys are available
+       **/
+      NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      ObligationNotFound: AugmentedError<ApiType>;
+      /**
+       * This bitcoin redemption has not been locked in
+       **/
+      RedemptionNotLocked: AugmentedError<ApiType>;
+      /**
+       * Unable to generate a new vault public key
+       **/
+      UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
+      UnrecoverableHold: AugmentedError<ApiType>;
+      VaultClosed: AugmentedError<ApiType>;
+      VaultNotFound: AugmentedError<ApiType>;
+    };
     bitcoinUtxos: {
       /**
        * Bitcoin height not confirmed yet
@@ -192,76 +266,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The maximum number of notebooks at the current tick has been exceeded
        **/
       MaxNotebooksAtTickExceeded: AugmentedError<ApiType>;
-    };
-    bonds: {
-      /**
-       * The proposed transaction would take the account below the minimum (existential) balance
-       **/
-      AccountWouldGoBelowMinimumBalance: AugmentedError<ApiType>;
-      /**
-       * The fee for this bitcoin unlock is too high
-       **/
-      BitcoinFeeTooHigh: AugmentedError<ApiType>;
-      /**
-       * The cosign signature is not valid for the bitcoin unlock
-       **/
-      BitcoinInvalidCosignature: AugmentedError<ApiType>;
-      /**
-       * This bitcoin pubkey couldn't be decoded for unlock
-       **/
-      BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
-      /**
-       * This bitcoin signature couldn't be decoded for unlock
-       **/
-      BitcoinSignatureUnableToBeDecoded: AugmentedError<ApiType>;
-      /**
-       * This bitcoin cosign script couldn't be decoded for unlock
-       **/
-      BitcoinUnableToBeDecodedForUnlock: AugmentedError<ApiType>;
-      /**
-       * The bitcoin has passed the deadline to unlock it
-       **/
-      BitcoinUnlockInitiationDeadlinePassed: AugmentedError<ApiType>;
-      BitcoinUtxoNotFound: AugmentedError<ApiType>;
-      BondNotFound: AugmentedError<ApiType>;
-      /**
-       * This bitcoin redemption has not been locked in
-       **/
-      BondRedemptionNotLocked: AugmentedError<ApiType>;
-      /**
-       * There are too many bond or bond funds expiring in the given expiration block
-       **/
-      ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      ExpirationTooSoon: AugmentedError<ApiType>;
-      /**
-       * The fee for this bond exceeds the amount of the bond, which is unsafe
-       **/
-      FeeExceedsBondAmount: AugmentedError<ApiType>;
-      GenericBondError: AugmentedError<ApiType>;
-      HoldUnexpectedlyModified: AugmentedError<ApiType>;
-      /**
-       * The vault does not have enough bitcoins to cover the mining bond
-       **/
-      InsufficientBitcoinsForMining: AugmentedError<ApiType>;
-      InsufficientFunds: AugmentedError<ApiType>;
-      InsufficientSatoshisBonded: AugmentedError<ApiType>;
-      InsufficientVaultFunds: AugmentedError<ApiType>;
-      /**
-       * The bitcoin script to lock this bitcoin has errors
-       **/
-      InvalidBitcoinScript: AugmentedError<ApiType>;
-      InvalidBondType: AugmentedError<ApiType>;
-      /**
-       * Funding would result in an overflow of the balance type
-       **/
-      InvalidVaultAmount: AugmentedError<ApiType>;
-      MinimumBondAmountNotMet: AugmentedError<ApiType>;
-      NoBitcoinPricesAvailable: AugmentedError<ApiType>;
-      NoMoreBondIds: AugmentedError<ApiType>;
-      NoPermissions: AugmentedError<ApiType>;
-      UnrecoverableHold: AugmentedError<ApiType>;
-      VaultClosed: AugmentedError<ApiType>;
-      VaultNotFound: AugmentedError<ApiType>;
     };
     chainTransfer: {
       /**
@@ -417,29 +421,21 @@ declare module '@polkadot/api-base/types/errors' {
     miningSlot: {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
       BidTooLow: AugmentedError<ApiType>;
-      BondAlreadyClosed: AugmentedError<ApiType>;
-      BondNotFound: AugmentedError<ApiType>;
-      /**
-       * A Non-Mining bond was submitted as part of a bid
-       **/
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
       /**
-       * There are too many bond or bond funds expiring in the given expiration block
+       * There are too many obligations expiring in the given expiration block
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       ExpirationTooSoon: AugmentedError<ApiType>;
-      /**
-       * The fee for this bond exceeds the amount of the bond, which is unsafe
-       **/
-      FeeExceedsBondAmount: AugmentedError<ApiType>;
-      GenericBondError: AugmentedError<ApiType>;
+      GenericObligationError: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientOwnershipTokens: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
-      MinimumBondAmountNotMet: AugmentedError<ApiType>;
-      NoMoreBondIds: AugmentedError<ApiType>;
+      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
+      NoMoreObligationIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
+      ObligationNotFound: AugmentedError<ApiType>;
       SlotNotTakingBids: AugmentedError<ApiType>;
       TooManyBlockRegistrants: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
@@ -827,28 +823,21 @@ declare module '@polkadot/api-base/types/errors' {
        * Bitcoin conversion to compressed pubkey failed
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;
-      BitcoinUtxoNotFound: AugmentedError<ApiType>;
-      BondNotFound: AugmentedError<ApiType>;
       /**
-       * There are too many bond or bond funds expiring in the given expiration block
+       * There are too many obligations expiring in the given expiration block
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       ExpirationTooSoon: AugmentedError<ApiType>;
-      /**
-       * The fee for this bond exceeds the amount of the bond, which is unsafe
-       **/
-      FeeExceedsBondAmount: AugmentedError<ApiType>;
       /**
        * A funding change is already scheduled
        **/
       FundingChangeAlreadyScheduled: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       /**
-       * The vault does not have enough bitcoins to cover the mining bond
+       * The vault does not have enough bonded argons for the request
        **/
-      InsufficientBitcoinsForMining: AugmentedError<ApiType>;
+      InsufficientBondedArgons: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
-      InsufficientSatoshisBonded: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
        * An internal processing error occurred
@@ -858,7 +847,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
-      InvalidBondType: AugmentedError<ApiType>;
       /**
        * An invalid securitization percent was provided for the vault. NOTE: it cannot be
        * decreased (or negative)
@@ -872,19 +860,19 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to decode xpubkey
        **/
       InvalidXpubkey: AugmentedError<ApiType>;
-      /**
-       * Securitization percent would exceed the maximum allowed
-       **/
-      MaxSecuritizationPercentExceeded: AugmentedError<ApiType>;
-      MinimumBondAmountNotMet: AugmentedError<ApiType>;
-      NoBitcoinPricesAvailable: AugmentedError<ApiType>;
-      NoMoreBondIds: AugmentedError<ApiType>;
+      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
+      NoMoreObligationIds: AugmentedError<ApiType>;
       NoMoreVaultIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
       /**
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * An error occurred processing an obligation completion
+       **/
+      ObligationCompletionError: AugmentedError<ApiType>;
+      ObligationNotFound: AugmentedError<ApiType>;
       /**
        * The vault bitcoin xpubkey has already been used
        **/
@@ -897,10 +885,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The terms modification list could not handle any more items
        **/
       TermsModificationOverflow: AugmentedError<ApiType>;
-      /**
-       * Unable to decode vault bitcoin pubkey
-       **/
-      UnableToDecodeVaultBitcoinPubkey: AugmentedError<ApiType>;
       /**
        * Unable to derive xpubkey child
        **/
@@ -917,7 +901,8 @@ declare module '@polkadot/api-base/types/errors' {
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
       /**
-       * This reduction in bond funds offered goes below the amount that is already committed to
+       * This reduction in obligation funds offered goes below the amount that is already
+       * committed to
        **/
       VaultReductionBelowAllocatedFunds: AugmentedError<ApiType>;
       /**
