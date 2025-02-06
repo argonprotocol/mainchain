@@ -38,6 +38,7 @@ parameter_types! {
 	pub static MinimumObligationAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
+	pub static EnableRewardSharing: bool = true;
 }
 
 impl pallet_balances::Config for Test {
@@ -123,6 +124,7 @@ impl pallet_vaults::Config for Test {
 	type TickProvider = StaticTickProvider;
 	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
 	type EventHandler = ();
+	type EnableRewardSharing = EnableRewardSharing;
 }
 
 // Build genesis storage according to the mock runtime.

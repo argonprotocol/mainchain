@@ -291,6 +291,8 @@ parameter_types! {
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 	pub const MinTermsModificationTickDelay: Tick = TicksPerDay::get() - 1; // must be at least one slot (day)
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
+
+	pub const EnableRewardSharing: bool = false;
 }
 
 impl pallet_vaults::Config for Runtime {
@@ -310,6 +312,7 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
+	type EnableRewardSharing = EnableRewardSharing;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -320,7 +323,7 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LockEvents = Mint;
+	type LockEvents = (Mint,);
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type PriceProvider = PriceIndex;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
