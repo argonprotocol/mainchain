@@ -5,7 +5,7 @@ use sp_runtime::{FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
 use argon_client::{
-	api::{apis, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
+	api::{apis, constants, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
@@ -110,13 +110,22 @@ impl VaultCommands {
 				}
 			},
 			VaultCommands::Create { config, keypair } => {
-				let mut config = config;
-				if !config.complete_prompt(keypair.keystore_path.is_some()).await {
-					return Ok(());
-				}
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
+
+				let is_sharing_enabled = client
+					.live
+					.constants()
+					.at(&constants().vaults().enable_reward_sharing())
+					.unwrap_or_default();
+				let mut config = config;
+				if !config
+					.complete_prompt(keypair.keystore_path.is_some(), is_sharing_enabled)
+					.await
+				{
+					return Ok(());
+				}
 				let call = tx().vaults().create(config.as_call_data());
 
 				let url = client.create_polkadotjs_deeplink(&call)?;

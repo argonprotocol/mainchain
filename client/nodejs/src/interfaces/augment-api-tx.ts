@@ -106,15 +106,16 @@ declare module '@polkadot/api-base/types/submittable' {
       adminModifyMinimumLockedSats: AugmentedSubmittable<(satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64]>;
       /**
        * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
-       * release fee will be burned, and the obligation will be allowed to expire without penalty.
+       * release fee will be burned, and the obligation will be allowed to expire without
+       * penalty.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
        **/
       cosignRelease: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
       /**
-       * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and
-       * log the Bitcoin Script hash to Events.
+       * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account
+       * and log the Bitcoin Script hash to Events.
        *
        * The pubkey submitted here will be used to create a script pubkey that will be used in a
        * timelock multisig script to lock the bitcoin.

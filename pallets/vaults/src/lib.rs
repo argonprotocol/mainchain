@@ -132,6 +132,10 @@ pub mod pallet {
 
 		/// Callbacks for various vault obligation events
 		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
+
+		/// Is reward sharing enabled
+		#[pallet::constant]
+		type EnableRewardSharing: Get<bool>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -501,7 +505,7 @@ pub mod pallet {
 				bitcoin_base_fee,
 				bonded_argons_base_fee,
 				bonded_argons_annual_percent_rate,
-				mining_reward_sharing_percent_take,
+				mut mining_reward_sharing_percent_take,
 			} = terms;
 
 			ensure!(
@@ -525,6 +529,10 @@ pub mod pallet {
 			let vault_id = NextVaultId::<T>::get().unwrap_or(1);
 			let next_vault_id = vault_id.increment().ok_or(Error::<T>::NoMoreVaultIds)?;
 			NextVaultId::<T>::set(Some(next_vault_id));
+
+			if !T::EnableRewardSharing::get() {
+				mining_reward_sharing_percent_take = RewardShare::zero();
+			}
 
 			let mut vault = Vault {
 				operator_account_id: who.clone(),
@@ -687,7 +695,7 @@ pub mod pallet {
 		pub fn modify_terms(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
-			terms: VaultTerms<T::Balance>,
+			mut terms: VaultTerms<T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault =
@@ -714,7 +722,9 @@ pub mod pallet {
 				Ok(())
 			})
 			.map_err(|_| Error::<T>::TermsModificationOverflow)?;
-
+			if !T::EnableRewardSharing::get() {
+				terms.mining_reward_sharing_percent_take = RewardShare::zero();
+			}
 			vault.pending_terms = Some((terms_change_tick, terms));
 			VaultsById::<T>::insert(vault_id, vault);
 

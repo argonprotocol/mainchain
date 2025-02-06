@@ -1,12 +1,5 @@
 use std::{fmt, io, io::Write, iter::Iterator, string::ToString};
 
-use clap::Args;
-use inquire::{
-	error::InquireResult,
-	validator::{StringValidator, Validation},
-	CustomUserError, InquireError, Select, Text,
-};
-
 use crate::{
 	formatters::{parse_number, Argons, Pct},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
@@ -14,6 +7,12 @@ use crate::{
 use argon_bitcoin_cli_macros::ReadDocs;
 use argon_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
 use argon_primitives::bitcoin::BitcoinXPub;
+use clap::Args;
+use inquire::{
+	error::InquireResult,
+	validator::{StringValidator, Validation},
+	CustomUserError, InquireError, Select, Text,
+};
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
@@ -73,15 +72,19 @@ fn label(field: &str) -> &str {
 }
 
 impl VaultConfig {
-	pub async fn complete_prompt(&mut self, has_keypair: bool) -> bool {
+	pub async fn complete_prompt(&mut self, has_keypair: bool, is_sharing_enabled: bool) -> bool {
 		self.sanitize_bad_values();
+		if !is_sharing_enabled && self.mining_reward_sharing_percent_take.is_some() {
+			println!("NOTE: Mining Reward Sharing is not enabled in the runtime. Setting to 0.");
+			self.mining_reward_sharing_percent_take = Some(0.0);
+		}
 
 		if self.next_incomplete_field().is_none() {
 			return true;
 		}
 
 		loop {
-			match self.update_state(has_keypair) {
+			match self.update_state(has_keypair, is_sharing_enabled) {
 				Ok(false) => continue,
 				Ok(true) => return true,
 				Err(_) => return false,
@@ -124,7 +127,11 @@ impl VaultConfig {
 		Argons(argons_needed).to_string()
 	}
 
-	fn update_state(&mut self, has_keypair: bool) -> Result<bool, String> {
+	fn update_state(
+		&mut self,
+		has_keypair: bool,
+		is_sharing_enabled: bool,
+	) -> Result<bool, String> {
 		print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 		io::stdout().flush().unwrap();
 
@@ -173,7 +180,7 @@ impl VaultConfig {
 				"bonded_argons_apr" => self.prompt_bonded_argons_apr()?,
 				"bonded_argons_base_fee" => self.prompt_bonded_argons_base_fee()?,
 				"mining_reward_sharing_percent_take" =>
-					self.prompt_mining_reward_sharing_percent_take()?,
+					self.prompt_mining_reward_sharing_percent_take(is_sharing_enabled)?,
 				"bonded_argons" => self.prompt_bonded_argons()?,
 				"added_securitization_percent" => self.prompt_securitization()?,
 				_ => unreachable!(),
@@ -218,7 +225,14 @@ impl VaultConfig {
 		Ok(())
 	}
 
-	fn prompt_mining_reward_sharing_percent_take(&mut self) -> Result<(), String> {
+	fn prompt_mining_reward_sharing_percent_take(
+		&mut self,
+		is_sharing_enabled: bool,
+	) -> Result<(), String> {
+		if !is_sharing_enabled {
+			self.mining_reward_sharing_percent_take = Some(0.0);
+			return Ok(())
+		}
 		self.mining_reward_sharing_percent_take = Some(
 			self.text_field("mining_reward_sharing_percent_take", "0.0")
 				.with_validator(|input: &str| {

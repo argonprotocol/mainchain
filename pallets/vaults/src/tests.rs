@@ -29,6 +29,7 @@ use argon_primitives::{
 		BitcoinObligationProvider, BondedArgonsProvider, FundType, Obligation, ObligationError,
 		ObligationExpiration, VaultTerms,
 	},
+	RewardShare,
 };
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(10, 100);
@@ -416,6 +417,45 @@ fn it_can_close_a_vault() {
 				1440 * 365
 			),
 			ObligationError::VaultClosed
+		);
+	});
+}
+
+#[test]
+fn it_can_disable_reward_sharing() {
+	EnableRewardSharing::set(false);
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::from_float(0.01));
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.02);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms: terms.clone(),
+				bitcoin_xpubkey: keys(),
+				bitcoin_amount_allocated: 500_000,
+				bonded_argons_allocated: 0,
+				added_securitization_percent: FixedU128::zero(),
+			}
+		));
+
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
+			RewardShare::zero()
+		);
+
+		System::set_block_number(10);
+		Vaults::on_finalize(10);
+
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.03);
+		assert_ok!(Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()));
+
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
+			RewardShare::zero()
 		);
 	});
 }

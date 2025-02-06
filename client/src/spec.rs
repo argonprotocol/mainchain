@@ -3739,9 +3739,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				169u8, 8u8, 95u8, 174u8, 255u8, 70u8, 228u8, 217u8, 89u8, 173u8, 190u8, 108u8,
-				229u8, 135u8, 62u8, 248u8, 164u8, 77u8, 164u8, 120u8, 169u8, 29u8, 3u8, 182u8,
-				120u8, 177u8, 190u8, 154u8, 82u8, 0u8, 201u8, 57u8,
+				94u8, 106u8, 25u8, 72u8, 2u8, 124u8, 139u8, 221u8, 50u8, 227u8, 197u8, 135u8, 75u8,
+				88u8, 165u8, 10u8, 123u8, 50u8, 74u8, 22u8, 3u8, 105u8, 75u8, 80u8, 169u8, 173u8,
+				12u8, 182u8, 66u8, 49u8, 74u8, 189u8,
 			]
 	}
 	pub mod system {
@@ -10279,6 +10279,22 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Is reward sharing enabled"]
+				pub fn enable_reward_sharing(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::bool,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"EnableRewardSharing",
+						[
+							165u8, 28u8, 112u8, 190u8, 18u8, 129u8, 182u8, 206u8, 237u8, 1u8, 68u8,
+							252u8, 125u8, 234u8, 185u8, 50u8, 149u8, 164u8, 47u8, 126u8, 134u8,
+							100u8, 14u8, 86u8, 209u8, 39u8, 20u8, 4u8, 233u8, 115u8, 102u8, 131u8,
+						],
+					)
+				}
 			}
 		}
 	}
@@ -10308,8 +10324,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and"]
-				#[doc = "log the Bitcoin Script hash to Events."]
+				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
+				#[doc = "and log the Bitcoin Script hash to Events."]
 				#[doc = ""]
 				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 				#[doc = "timelock multisig script to lock the bitcoin."]
@@ -10386,7 +10402,8 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-				#[doc = "release fee will be burned, and the obligation will be allowed to expire without penalty."]
+				#[doc = "release fee will be burned, and the obligation will be allowed to expire without"]
+				#[doc = "penalty."]
 				#[doc = ""]
 				#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 				#[doc = "wallets."]
@@ -10432,8 +10449,8 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and"]
-				#[doc = "log the Bitcoin Script hash to Events."]
+				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
+				#[doc = "and log the Bitcoin Script hash to Events."]
 				#[doc = ""]
 				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 				#[doc = "timelock multisig script to lock the bitcoin."]
@@ -10483,7 +10500,8 @@ pub mod api {
 					)
 				}
 				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-				#[doc = "release fee will be burned, and the obligation will be allowed to expire without penalty."]
+				#[doc = "release fee will be burned, and the obligation will be allowed to expire without"]
+				#[doc = "penalty."]
 				#[doc = ""]
 				#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 				#[doc = "wallets."]
@@ -26553,8 +26571,8 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and"]
-					#[doc = "log the Bitcoin Script hash to Events."]
+					#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
+					#[doc = "and log the Bitcoin Script hash to Events."]
 					#[doc = ""]
 					#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 					#[doc = "timelock multisig script to lock the bitcoin."]
@@ -26583,7 +26601,8 @@ pub mod api {
 					},
 					#[codec(index = 2)]
 					#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-					#[doc = "release fee will be burned, and the obligation will be allowed to expire without penalty."]
+					#[doc = "release fee will be burned, and the obligation will be allowed to expire without"]
+					#[doc = "penalty."]
 					#[doc = ""]
 					#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 					#[doc = "wallets."]
