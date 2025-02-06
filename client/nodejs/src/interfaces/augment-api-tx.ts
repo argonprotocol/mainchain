@@ -105,31 +105,33 @@ declare module '@polkadot/api-base/types/submittable' {
     bitcoinLocks: {
       adminModifyMinimumLockedSats: AugmentedSubmittable<(satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64]>;
       /**
-       * Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
-       * unlock fee will be burned, and the obligation will be allowed to expire without penalty.
+       * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
+       * release fee will be burned, and the obligation will be allowed to expire without penalty.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
        **/
-      cosignUnlock: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
+      cosignRelease: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, signature: Bytes | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes]>;
       /**
-       * Request a bitcoin lock. This will create a BitcoinLock for the submitting account and
-       * log the Bitcoin Script hash to Events. A locker must create the UTXO in order to be
-       * added to the Bitcoin Mint line.
+       * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account and
+       * log the Bitcoin Script hash to Events.
        *
        * The pubkey submitted here will be used to create a script pubkey that will be used in a
        * timelock multisig script to lock the bitcoin.
+       *
+       * NOTE: A "lock-er" must sends btc to the cosign UTXO address in order to "complete" the
+       * LockedBitcoin and be added to the Bitcoin Mint line.
        **/
-      request: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]>;
+      initialize: AugmentedSubmittable<(vaultId: u32 | AnyNumber | Uint8Array, satoshis: Compact<u64> | AnyNumber | Uint8Array, bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array) => SubmittableExtrinsic<ApiType>, [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]>;
       /**
-       * Submitted by a Bitcoin holder to trigger the unlock of their Utxo. A transaction
-       * spending the UTXO should be pre-created so that the sighash can be
-       * submitted here. The vault operator will have 10 days to counter-sign the transaction. It
-       * will be published with the public key as a BitcoinUtxoCosigned Event.
+       * Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
+       * script. A transaction spending the UTXO should be pre-created so that the sighash
+       * can be submitted here. The vault operator will have 10 days to counter-sign the
+       * transaction. It will be published with the public key as a BitcoinUtxoCosigned Event.
        *
        * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
        **/
-      requestUnlock: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
+      requestRelease: AugmentedSubmittable<(utxoId: u64 | AnyNumber | Uint8Array, toScriptPubkey: Bytes | string | Uint8Array, bitcoinNetworkFee: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>, [u64, Bytes, u64]>;
     };
     bitcoinUtxos: {
       /**
@@ -274,8 +276,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
        *
        * Parameters:
-       * - `bonded_argons`: The information to submit for the bid. If `None`, the bid will
-       * be
+       * - `bonded_argons`: The information to submit for the bid. If `None`, the bid will be
        * considered a zero-bid.
        * - `vault_id`: The vault id to used. Terms are taken from the vault at time of bid
        * inclusion in the block.

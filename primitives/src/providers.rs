@@ -114,7 +114,7 @@ pub trait UtxoLockEvents<AccountId: Codec, Balance: Codec + Copy> {
 	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
 	/// Called when a bitcoin is unlocked (whether from being spent outside the system, or
 	/// from being unlocked)
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
@@ -126,12 +126,12 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 		for_tuples!( #( Tuple::utxo_locked(utxo_id, account_id, amount)?; )* );
 		Ok(())
 	}
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_unlocked(utxo_id, remove_pending_mints, burned_argons)?; )* );
+		for_tuples!( #( Tuple::utxo_released(utxo_id, remove_pending_mints, burned_argons)?; )* );
 		Ok(())
 	}
 }

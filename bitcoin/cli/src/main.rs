@@ -37,7 +37,7 @@ enum Commands {
 		#[clap(subcommand)]
 		subcommand: VaultCommands,
 	},
-	/// Create, unlock and monitor bitcoin locks
+	/// Create, release and monitor BitcoinLocks
 	Lock {
 		#[clap(subcommand)]
 		subcommand: LockCommands,

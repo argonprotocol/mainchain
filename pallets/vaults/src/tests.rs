@@ -400,7 +400,7 @@ fn it_can_close_a_vault() {
 
 		// set to full fee block
 		CurrentTick::set(1440 * 365 + 1);
-		// now when we complete a bond, it should return the funds to the vault
+		// now when we complete an obligation, it should return the funds to the vault
 		assert_ok!(Vaults::cancel_obligation(1));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
 		assert_eq!(Balances::free_balance(1), vault_owner_balance - bonded_argons + fee);
@@ -465,7 +465,7 @@ fn it_can_create_obligation() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &2), fee);
 		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 
-		// if we cancel the bond, the prepaid won't be returned
+		// if we cancel the obligation, the prepaid won't be returned
 		assert_ok!(Vaults::cancel_obligation(1));
 		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 		assert_eq!(Balances::free_balance(2), 2_000 - paid);
@@ -575,7 +575,7 @@ fn it_can_charge_prorated_create_obligation() {
 		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 
 		CurrentTick::set(5 + 1440);
-		// if we cancel the bond, the prepaid won't be returned
+		// if we cancel the obligation, the prepaid won't be returned
 		let to_return_res = Vaults::cancel_obligation(1);
 		assert!(to_return_res.is_ok());
 		let expected_apr_fee = (per_block_fee * 1440f64) as u128;
@@ -745,13 +745,13 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 
 		assert_eq!(
 			Vaults::compensate_lost_bitcoin(1, 200_000, 50_000).expect("compensation failed"),
-			(0, 100_000), /* should max out at an extra 2x bond amount, with 50k already paid to
-			               * user */
+			(0, 100_000), /* should max out at an extra 2x obligation amount, with 50k already
+			               * paid to user */
 			"gets back out of securitization"
 		);
 		// 50k burned, 100k sent to
 		assert_eq!(Balances::total_balance(&1), 350_200 - 100_000 - 50000);
-		// mining bonds are not at risk
+		// bonded argons are not at risk
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1),
 			350_000 - 150_000

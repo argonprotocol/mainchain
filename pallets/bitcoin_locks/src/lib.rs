@@ -5,7 +5,7 @@ extern crate core;
 
 use sp_runtime::DispatchError;
 
-use argon_bitcoin::UtxoUnlocker;
+use argon_bitcoin::CosignReleaser;
 use argon_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
 pub use pallet::*;
 pub use weights::*;
@@ -29,8 +29,8 @@ pub mod weights;
 ///
 /// Bitcoin locks allow a user to mint new argons equal to the current market price of the locked
 /// UTXO's satoshis. The lock must lock up the equivalent argons for a year's time. At any time
-/// during the locked year, a Bitcoin holder is eligible to unlock their
-/// bitcoin. To unlock a bitcoin, a user must pay back the current market price of bitcoin (capped
+/// during the locked year, a Bitcoin holder is eligible to release their
+/// bitcoin. To release a bitcoin, a user must pay back the current market price of bitcoin (capped
 /// at their locked price). Should they move their UTXO via the bitcoin network, the current value
 /// of the UTXO will be burned from the vault funds.
 ///
@@ -38,15 +38,15 @@ pub mod weights;
 /// A bitcoin holder retains ownership of their UTXO via a pubkey script that is pre-agreed by the
 /// vault user and the bitcoin holder. The vault's hashed public key can be obtained in this pallet,
 /// and will be combined with a hashed pubkey provided by the user. The pre-agreed script will be
-/// such that both signatures are required to unlock the bitcoin before 370 days of blocks. After
-/// 370 days, only the Vault's signature will be required to unlock the bitcoin for 30 days. After
-/// 400 days, either party will be able to unlock.
+/// such that both signatures are required to release the bitcoin before 370 days of blocks. After
+/// 370 days, only the Vault's signature will be required to release the bitcoin for 30 days. After
+/// 400 days, either party will be able to release.
 ///
 /// NOTE: the lock will end on day 365, which gives a 5-day grace period for a bitcoin owner to buy
 /// back their bitcoin before the vault can claim it.
 ///
-/// _Unlocking a Bitcoin_
-/// A bitcoin owner will pre-create a transaction to unlock their UTXO and submit the sighash to
+/// _Releasing a Bitcoin_
+/// A bitcoin owner will pre-create a transaction to release their UTXO and submit the sighash to
 /// this pallet. The vault operator has 10 days to publish a counter signature along with the public
 /// key. If the vault operator fails to do so, they will lose their ownership tokens and all
 /// underlying Bitcoin locks. A user will be made whole via a governance vote.
@@ -79,7 +79,7 @@ pub mod pallet {
 	};
 
 	use super::*;
-	use argon_bitcoin::{Amount, CosignScriptArgs, UnlockStep, UtxoUnlocker};
+	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
@@ -148,9 +148,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type ArgonTicksPerDay: Get<Tick>;
 
-		/// Maximum unlocking utxos at a time
+		/// Maximum releasing utxos at a time
 		#[pallet::constant]
-		type MaxUnlockingUtxos: Get<u32>;
+		type MaxConcurrentlyReleasingLocks: Get<u32>;
 
 		/// The number of bitcoin blocks a bitcoin is locked for
 		#[pallet::constant]
@@ -161,9 +161,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type LockReclamationBlocks: Get<BitcoinHeight>;
 
-		/// Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
+		/// Number of bitcoin blocks a vault has to counter-sign a bitcoin release
 		#[pallet::constant]
-		type UtxoUnlockCosignDeadlineBlocks: Get<BitcoinHeight>;
+		type LockReleaseCosignDeadlineBlocks: Get<BitcoinHeight>;
 
 		type TickProvider: TickProvider<Self::Block>;
 	}
@@ -171,25 +171,25 @@ pub mod pallet {
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
 	pub enum HoldReason {
-		UnlockingBitcoin,
+		ReleaseBitcoinLock,
 	}
 
 	#[pallet::storage]
 	pub(super) type NextUtxoId<T: Config> = StorageValue<_, UtxoId, OptionQuery>;
 
-	/// Stores bitcoin utxos that have requested to be unlocked
+	/// Stores bitcoin utxos that have requested to be released
 	#[pallet::storage]
 	pub(super) type LocksByUtxoId<T: Config> =
-		StorageMap<_, Twox64Concat, UtxoId, BitcoinLock<T>, OptionQuery>;
+		StorageMap<_, Twox64Concat, UtxoId, LockedBitcoin<T>, OptionQuery>;
 
 	/// Mapping of obligation id to lock id
 	#[pallet::storage]
 	pub(super) type ObligationIdToUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, ObligationId, UtxoId, OptionQuery>;
 
-	/// Stores the block number where the utxo was unlocked
+	/// Stores the block number where the lock was released
 	#[pallet::storage]
-	pub(super) type UtxosCosignReleaseHeightById<T: Config> =
+	pub(super) type LockReleaseCosignHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
 
 	/// The minimum number of satoshis that can be locked
@@ -204,21 +204,21 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		UtxoId,
-		(T::AccountId, VaultId, T::Balance, BitcoinLock<T>),
+		(T::AccountId, VaultId, T::Balance, LockedBitcoin<T>),
 		OptionQuery,
 	>;
 
-	/// Utxos that have been requested to be cosigned for unlocking
+	/// Utxos that have been requested to be cosigned for releasing
 	#[pallet::storage]
-	pub(super) type UtxosPendingUnlockByUtxoId<T: Config> = StorageValue<
+	pub(super) type LocksPendingReleaseByUtxoId<T: Config> = StorageValue<
 		_,
-		BoundedBTreeMap<UtxoId, UtxoCosignRequest<T::Balance>, T::MaxUnlockingUtxos>,
+		BoundedBTreeMap<UtxoId, LockReleaseRequest<T::Balance>, T::MaxConcurrentlyReleasingLocks>,
 		ValueQuery,
 	>;
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct BitcoinLock<T: Config> {
+	pub struct LockedBitcoin<T: Config> {
 		#[codec(compact)]
 		pub obligation_id: ObligationId,
 		#[codec(compact)]
@@ -243,7 +243,7 @@ pub mod pallet {
 	}
 
 	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
-	pub struct UtxoCosignRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
+	pub struct LockReleaseRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
 		#[codec(compact)]
 		pub utxo_id: UtxoId,
 		#[codec(compact)]
@@ -318,18 +318,18 @@ pub mod pallet {
 		InvalidVaultAmount,
 		/// This bitcoin redemption has not been locked in
 		RedemptionNotLocked,
-		/// The bitcoin has passed the deadline to unlock it
-		BitcoinUnlockInitiationDeadlinePassed,
-		/// The fee for this bitcoin unlock is too high
+		/// The bitcoin has passed the deadline to release it
+		BitcoinReleaseInitiationDeadlinePassed,
+		/// The fee for this bitcoin release is too high
 		BitcoinFeeTooHigh,
 		BitcoinUtxoNotFound,
-		/// This bitcoin cosign script couldn't be decoded for unlock
-		BitcoinUnableToBeDecodedForUnlock,
-		/// This bitcoin signature couldn't be decoded for unlock
+		/// This bitcoin cosign script couldn't be decoded for release
+		BitcoinUnableToBeDecodedForRelease,
+		/// This bitcoin signature couldn't be decoded for release
 		BitcoinSignatureUnableToBeDecoded,
-		/// This bitcoin pubkey couldn't be decoded for unlock
+		/// This bitcoin pubkey couldn't be decoded for release
 		BitcoinPubkeyUnableToBeDecoded,
-		/// The cosign signature is not valid for the bitcoin unlock
+		/// The cosign signature is not valid for the bitcoin release
 		BitcoinInvalidCosignature,
 		InsufficientSatoshisLocked,
 		NoBitcoinPricesAvailable,
@@ -399,7 +399,7 @@ pub mod pallet {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let mut overdue = vec![];
 			let bitcoin_block_height = T::BitcoinBlockHeight::get();
-			<UtxosPendingUnlockByUtxoId<T>>::mutate(|pending| {
+			<LocksPendingReleaseByUtxoId<T>>::mutate(|pending| {
 				pending.retain(|id, x| {
 					if x.cosign_due_block > bitcoin_block_height {
 						return true;
@@ -426,15 +426,17 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Request a bitcoin lock. This will create a BitcoinLock for the submitting account and
-		/// log the Bitcoin Script hash to Events. A locker must create the UTXO in order to be
-		/// added to the Bitcoin Mint line.
+		/// Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account
+		/// and log the Bitcoin Script hash to Events.
 		///
 		/// The pubkey submitted here will be used to create a script pubkey that will be used in a
 		/// timelock multisig script to lock the bitcoin.
+		///
+		/// NOTE: A "lock-er" must sends btc to the cosign UTXO address in order to "complete" the
+		/// LockedBitcoin and be added to the Bitcoin Mint line.
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)]
-		pub fn request(
+		pub fn initialize(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			#[pallet::compact] satoshis: Satoshis,
@@ -502,7 +504,7 @@ pub mod pallet {
 
 			LocksByUtxoId::<T>::insert(
 				utxo_id,
-				BitcoinLock {
+				LockedBitcoin {
 					owner_account: account_id.clone(),
 					vault_id,
 					lock_price,
@@ -531,15 +533,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Submitted by a Bitcoin holder to trigger the unlock of their Utxo. A transaction
-		/// spending the UTXO should be pre-created so that the sighash can be
-		/// submitted here. The vault operator will have 10 days to counter-sign the transaction. It
-		/// will be published with the public key as a BitcoinUtxoCosigned Event.
+		/// Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
+		/// script. A transaction spending the UTXO should be pre-created so that the sighash
+		/// can be submitted here. The vault operator will have 10 days to counter-sign the
+		/// transaction. It will be published with the public key as a BitcoinUtxoCosigned Event.
 		///
 		/// Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
-		pub fn request_unlock(
+		pub fn request_release(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,
 			to_script_pubkey: BitcoinScriptPubkey,
@@ -548,21 +550,22 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::ObligationNotFound)?;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
-			let unlock_due_date =
-				lock.vault_claim_height.saturating_sub(T::UtxoUnlockCosignDeadlineBlocks::get());
+			let release_due_date = lock
+				.vault_claim_height
+				.saturating_sub(T::LockReleaseCosignDeadlineBlocks::get());
 			ensure!(
-				T::BitcoinBlockHeight::get() <= unlock_due_date,
-				Error::<T>::BitcoinUnlockInitiationDeadlinePassed
+				T::BitcoinBlockHeight::get() <= release_due_date,
+				Error::<T>::BitcoinReleaseInitiationDeadlinePassed
 			);
 			let obligation_id = lock.obligation_id;
 
-			// If this is a confirmed utxo, we require the unlock price to be paid
+			// If this is a confirmed utxo, we require the release price to be paid
 			if lock.is_verified {
 				ensure!(bitcoin_network_fee < lock.satoshis, Error::<T>::BitcoinFeeTooHigh);
 				let redemption_price =
 					Self::get_redemption_price(&lock.satoshis)?.min(lock.lock_price);
 				let cosign_due_block =
-					T::UtxoUnlockCosignDeadlineBlocks::get() + T::BitcoinBlockHeight::get();
+					T::LockReleaseCosignDeadlineBlocks::get() + T::BitcoinBlockHeight::get();
 
 				// hold funds until the utxo is seen in the chain
 				let balance = T::Currency::balance(&who);
@@ -571,18 +574,18 @@ pub mod pallet {
 					Error::<T>::AccountWouldGoBelowMinimumBalance
 				);
 
-				T::Currency::hold(&HoldReason::UnlockingBitcoin.into(), &who, redemption_price)
+				T::Currency::hold(&HoldReason::ReleaseBitcoinLock.into(), &who, redemption_price)
 					.map_err(|e| match e {
-						Token(TokenError::BelowMinimum) =>
-							Error::<T>::AccountWouldGoBelowMinimumBalance,
-						_ => Error::<T>::InsufficientFunds,
-					})?;
+					Token(TokenError::BelowMinimum) =>
+						Error::<T>::AccountWouldGoBelowMinimumBalance,
+					_ => Error::<T>::InsufficientFunds,
+				})?;
 				frame_system::Pallet::<T>::inc_providers(&who);
 
-				<UtxosPendingUnlockByUtxoId<T>>::try_mutate(|a| {
+				<LocksPendingReleaseByUtxoId<T>>::try_mutate(|a| {
 					a.try_insert(
 						utxo_id,
-						UtxoCosignRequest {
+						LockReleaseRequest {
 							utxo_id,
 							obligation_id,
 							vault_id: lock.vault_id,
@@ -607,14 +610,15 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
-		/// unlock fee will be burned, and the obligation will be allowed to expire without penalty.
+		/// Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
+		/// release fee will be burned, and the obligation will be allowed to expire without
+		/// penalty.
 		///
 		/// This is submitted as a no-fee transaction off chain to allow keys to remain in cold
 		/// wallets.
 		#[pallet::call_index(2)]
 		#[pallet::weight((0, DispatchClass::Operational))]
-		pub fn cosign_unlock(
+		pub fn cosign_release(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,
 			signature: BitcoinSignature,
@@ -628,7 +632,7 @@ pub mod pallet {
 				T::BitcoinObligationProvider::is_owner(vault_id, &who),
 				Error::<T>::NoPermissions
 			);
-			let request = UtxosPendingUnlockByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
+			let request = LocksPendingReleaseByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
 				.ok_or(Error::<T>::RedemptionNotLocked)?;
 
 			let utxo_ref =
@@ -642,35 +646,35 @@ pub mod pallet {
 				vault_claim_height: lock.vault_claim_height,
 				open_claim_height: lock.open_claim_height,
 			};
-			let unlocker = UtxoUnlocker::new(
+			let releaser = CosignReleaser::new(
 				script_args,
 				lock.satoshis,
 				utxo_ref.txid.into(),
 				utxo_ref.output_index,
-				UnlockStep::VaultCosign,
+				ReleaseStep::VaultCosign,
 				Amount::from_sat(request.bitcoin_network_fee),
 				request.to_script_pubkey.into(),
 				T::GetBitcoinNetwork::get().into(),
 			)
-			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForUnlock)?;
+			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForRelease)?;
 
-			T::BitcoinSignatureVerifier::verify_signature(unlocker, lock.vault_pubkey, &signature)?;
+			T::BitcoinSignatureVerifier::verify_signature(releaser, lock.vault_pubkey, &signature)?;
 
 			// burn the owner's held funds
 			let burn_amount = request.redemption_price;
 			let _ = T::Currency::burn_held(
-				&HoldReason::UnlockingBitcoin.into(),
+				&HoldReason::ReleaseBitcoinLock.into(),
 				&lock.owner_account,
 				burn_amount,
 				Precision::Exact,
 				Fortitude::Force,
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
-			T::LockEvents::utxo_unlocked(utxo_id, false, burn_amount)?;
+			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
 
 			LocksByUtxoId::<T>::take(utxo_id);
 			ObligationIdToUtxoId::<T>::take(lock.obligation_id);
-			UtxosCosignReleaseHeightById::<T>::insert(
+			LockReleaseCosignHeightById::<T>::insert(
 				utxo_id,
 				frame_system::Pallet::<T>::block_number(),
 			);
@@ -748,7 +752,7 @@ pub mod pallet {
 		fn burn_bitcoin_obligation(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			let obligation_id = lock.obligation_id;
-			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
+			LockReleaseCosignHeightById::<T>::remove(utxo_id);
 			ObligationIdToUtxoId::<T>::take(obligation_id);
 
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
@@ -770,7 +774,7 @@ pub mod pallet {
 			)
 			.map_err(Error::<T>::from)?;
 
-			T::LockEvents::utxo_unlocked(utxo_id, is_externally_spent, amount_to_burn)?;
+			T::LockEvents::utxo_released(utxo_id, is_externally_spent, amount_to_burn)?;
 
 			Self::deposit_event(Event::BitcoinLockBurned {
 				utxo_id,
@@ -816,14 +820,14 @@ pub mod pallet {
 
 			// we return this amount to the bitcoin holder
 			T::Currency::release(
-				&HoldReason::UnlockingBitcoin.into(),
+				&HoldReason::ReleaseBitcoinLock.into(),
 				&lock.owner_account,
 				redemption_amount_held,
 				Precision::Exact,
 			)?;
 			frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
 			// count the amount we took from the vault as the burn amount
-			T::LockEvents::utxo_unlocked(utxo_id, false, market_price)?;
+			T::LockEvents::utxo_released(utxo_id, false, market_price)?;
 
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				utxo_id,
@@ -834,7 +838,7 @@ pub mod pallet {
 				compensated_account_id: lock.owner_account.clone(),
 			});
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
-			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
+			LockReleaseCosignHeightById::<T>::remove(utxo_id);
 
 			Ok(())
 		}
@@ -885,7 +889,7 @@ pub mod pallet {
 						.map_err(Error::<T>::from)?;
 					}
 				}
-				UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
+				LockReleaseCosignHeightById::<T>::remove(utxo_id);
 				T::BitcoinUtxoTracker::unwatch(utxo_id);
 			}
 			Ok(())
@@ -906,17 +910,18 @@ pub mod pallet {
 
 pub trait BitcoinVerifier<T: Config> {
 	fn verify_signature(
-		utxo_unlocker: UtxoUnlocker,
+		utxo_releaseer: CosignReleaser,
 		pubkey: CompressedBitcoinPubkey,
 		signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
-		let is_ok = utxo_unlocker.verify_signature_raw(pubkey, signature).map_err(|e| match e {
-			argon_bitcoin::Error::InvalidCompressPubkeyBytes =>
-				Error::<T>::BitcoinPubkeyUnableToBeDecoded,
-			argon_bitcoin::Error::InvalidSignatureBytes =>
-				Error::<T>::BitcoinSignatureUnableToBeDecoded,
-			_ => Error::<T>::BitcoinInvalidCosignature,
-		})?;
+		let is_ok =
+			utxo_releaseer.verify_signature_raw(pubkey, signature).map_err(|e| match e {
+				argon_bitcoin::Error::InvalidCompressPubkeyBytes =>
+					Error::<T>::BitcoinPubkeyUnableToBeDecoded,
+				argon_bitcoin::Error::InvalidSignatureBytes =>
+					Error::<T>::BitcoinSignatureUnableToBeDecoded,
+				_ => Error::<T>::BitcoinInvalidCosignature,
+			})?;
 		Ok(is_ok)
 	}
 }

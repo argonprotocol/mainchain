@@ -283,11 +283,11 @@ parameter_types! {
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
 	pub const BitcoinLockReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
-	pub const UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
+	pub const LockReleaseCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
-	pub const MaxUnlockingUtxos: u32 = 1000;
+	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 	pub const MinTermsModificationTickDelay: Tick = TicksPerDay::get() - 1; // must be at least one slot (day)
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
@@ -328,10 +328,10 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinObligationProvider = Vaults;
 	type ArgonTicksPerDay = TicksPerDay;
-	type MaxUnlockingUtxos = MaxUnlockingUtxos;
+	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
-	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
 	type TickProvider = Ticks;
 }
 

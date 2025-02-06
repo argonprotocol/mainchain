@@ -250,7 +250,7 @@ fn it_adds_new_cohorts_on_block() {
 }
 
 #[test]
-fn it_unbonds_accounts_when_a_window_closes() {
+fn it_releases_argonots_when_a_window_closes() {
 	TicksBetweenSlots::set(2);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -523,7 +523,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 }
 
 #[test]
-fn it_will_order_bids_with_argon_bonds() {
+fn it_will_order_bids_with_bonded_argons() {
 	TicksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -610,10 +610,10 @@ fn it_will_order_bids_with_argon_bonds() {
 			vec![2, 3]
 		);
 
-		let bonds = Obligations::get();
-		let acc_3_obligation_id = bonds.iter().find(|(_, _, a, _)| *a == 3).map(|a| a.0);
-		assert!(!bonds.iter().any(|(_, _, a, _)| *a == 1));
-		assert_eq!(bonds.len(), 2);
+		let obligations = Obligations::get();
+		let acc_3_obligation_id = obligations.iter().find(|(_, _, a, _)| *a == 3).map(|a| a.0);
+		assert!(!obligations.iter().any(|(_, _, a, _)| *a == 1));
+		assert_eq!(obligations.len(), 2);
 		{
 			let events = frame_system::Pallet::<Test>::events();
 			let frame_system::EventRecord { event, .. } = &events[events.len() - 2];
@@ -1033,7 +1033,7 @@ fn bid_stats(count: u32, amount: Balance) -> MiningBidStats {
 }
 
 #[test]
-fn it_adjusts_ownership_bonds() {
+fn it_adjusts_locked_argonots() {
 	TicksBetweenSlots::set(10);
 	MaxMiners::set(100);
 	MaxCohortSize::set(10);

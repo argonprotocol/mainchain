@@ -1671,17 +1671,17 @@ export default {
    **/
   PalletBitcoinLocksCall: {
     _enum: {
-      request: {
+      initialize: {
         vaultId: 'u32',
         satoshis: 'Compact<u64>',
         bitcoinPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
       },
-      request_unlock: {
+      request_release: {
         utxoId: 'u64',
         toScriptPubkey: 'Bytes',
         bitcoinNetworkFee: 'u64',
       },
-      cosign_unlock: {
+      cosign_release: {
         utxoId: 'u64',
         signature: 'Bytes',
       },
@@ -2596,9 +2596,9 @@ export default {
     _enum: ['ObligationNotFound', 'NoMoreVaultIds', 'NoMoreObligationIds', 'MinimumObligationAmountNotMet', 'ExpirationAtBlockOverflow', 'InsufficientFunds', 'InsufficientVaultFunds', 'InsufficientBondedArgons', 'AccountBelowMinimumBalance', 'VaultClosed', 'InvalidVaultAmount', 'VaultReductionBelowAllocatedFunds', 'InvalidSecuritization', 'ReusedVaultBitcoinXpub', 'InvalidBitcoinScript', 'InvalidXpubkey', 'WrongXpubNetwork', 'UnsafeXpubkey', 'UnableToDeriveVaultXpubChild', 'BitcoinConversionFailed', 'ExpirationTooSoon', 'NoPermissions', 'HoldUnexpectedlyModified', 'UnrecoverableHold', 'VaultNotFound', 'NoVaultBitcoinPubkeysAvailable', 'TermsModificationOverflow', 'TermsChangeAlreadyScheduled', 'InternalError', 'UnableToGenerateVaultBitcoinPubkey', 'FundingChangeAlreadyScheduled', 'ObligationCompletionError']
   },
   /**
-   * Lookup364: pallet_bitcoin_locks::pallet::BitcoinLock<T>
+   * Lookup364: pallet_bitcoin_locks::pallet::LockedBitcoin<T>
    **/
-  PalletBitcoinLocksBitcoinLock: {
+  PalletBitcoinLocksLockedBitcoin: {
     obligationId: 'Compact<u64>',
     vaultId: 'Compact<u32>',
     lockPrice: 'u128',
@@ -2615,9 +2615,9 @@ export default {
     isVerified: 'bool'
   },
   /**
-   * Lookup368: pallet_bitcoin_locks::pallet::UtxoCosignRequest<Balance>
+   * Lookup368: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
    **/
-  PalletBitcoinLocksUtxoCosignRequest: {
+  PalletBitcoinLocksLockReleaseRequest: {
     utxoId: 'Compact<u64>',
     obligationId: 'Compact<u64>',
     vaultId: 'Compact<u32>',
@@ -2642,10 +2642,10 @@ export default {
       VaultClosed: 'Null',
       InvalidVaultAmount: 'Null',
       RedemptionNotLocked: 'Null',
-      BitcoinUnlockInitiationDeadlinePassed: 'Null',
+      BitcoinReleaseInitiationDeadlinePassed: 'Null',
       BitcoinFeeTooHigh: 'Null',
       BitcoinUtxoNotFound: 'Null',
-      BitcoinUnableToBeDecodedForUnlock: 'Null',
+      BitcoinUnableToBeDecodedForRelease: 'Null',
       BitcoinSignatureUnableToBeDecoded: 'Null',
       BitcoinPubkeyUnableToBeDecoded: 'Null',
       BitcoinInvalidCosignature: 'Null',
@@ -2867,7 +2867,7 @@ export default {
    * Lookup444: pallet_bitcoin_locks::pallet::HoldReason
    **/
   PalletBitcoinLocksHoldReason: {
-    _enum: ['UnlockingBitcoin']
+    _enum: ['ReleaseBitcoinLock']
   },
   /**
    * Lookup445: pallet_block_rewards::pallet::HoldReason

@@ -28,9 +28,9 @@ pub enum VaultCommands {
 		#[clap(flatten)]
 		keypair: KeystoreParams,
 	},
-	/// List pending unlock requests (vault claim, cosign)
-	PendingUnlock {
-		/// The vault id to list pending unlock requests for
+	/// List pending release requests (vault claim, cosign)
+	PendingRelease {
+		/// The vault id to list pending release requests
 		#[clap(short, long)]
 		vault_id: VaultId,
 		#[clap(flatten)]
@@ -123,13 +123,13 @@ impl VaultCommands {
 				println!("Vault funds needed: {}", config.argons_needed());
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			VaultCommands::PendingUnlock { vault_id, keypair: _ } => {
+			VaultCommands::PendingRelease { vault_id, keypair: _ } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let call = storage().bitcoin_locks().utxos_pending_unlock_by_utxo_id();
+				let call = storage().bitcoin_locks().locks_pending_release_by_utxo_id();
 				let Some(pending) = client.fetch_storage(&call, None).await? else {
-					println!("No pending unlock requests found");
+					println!("No pending cosign requests found");
 					return Ok(());
 				};
 				let current_block = client.live.blocks().at_latest().await?.number();
@@ -139,8 +139,8 @@ impl VaultCommands {
 					.apply_modifier(UTF8_ROUND_CORNERS)
 					.set_content_arrangement(ContentArrangement::Dynamic)
 					.set_header(vec![
-						"obligation id",
 						"Utxo Id",
+						"Obligation Id",
 						"Cosign Due Block",
 						"Type",
 						"Redemption Price",
@@ -150,8 +150,8 @@ impl VaultCommands {
 						continue;
 					}
 					table.add_row(vec![
-						pending.obligation_id.to_string(),
 						utxo_id.to_string(),
+						pending.obligation_id.to_string(),
 						pending.cosign_due_block.to_string(),
 						"Cosign Request".to_string(),
 						ArgonFormatter(pending.redemption_price).to_string(),

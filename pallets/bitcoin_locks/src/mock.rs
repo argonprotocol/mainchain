@@ -11,7 +11,7 @@ use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
 
 use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
-use argon_bitcoin::UtxoUnlocker;
+use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
@@ -76,15 +76,15 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-	pub static MaxUnlockingUtxos: u32 = 10;
+	pub static MaxConcurrentlyReleasingLocks: u32 = 10;
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
-	pub static UtxoUnlockCosignDeadlineBlocks: BitcoinHeight = 5;
+	pub static LockReleaseCosignDeadlineBlocks: BitcoinHeight = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 365;
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
-	pub static MinimumBondSatoshis: Satoshis = 10_000_000;
+	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		bonded_argons: VaultArgons {
 			allocated: 100_000_000_000,
@@ -115,7 +115,7 @@ parameter_types! {
 	pub static GetUtxoRef: Option<UtxoRef> = None;
 
 	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
-	pub static LastUnlockEvent: Option<(UtxoId, bool, Balance)> = None;
+	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance)> = None;
 
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 
@@ -141,12 +141,12 @@ impl UtxoLockEvents<u64, Balance> for EventHandler {
 		LastLockEvent::set(Some((utxo_id, *account_id, amount)));
 		Ok(())
 	}
-	fn utxo_unlocked(
+	fn utxo_released(
 		utxo_id: UtxoId,
 		remove_pending_mints: bool,
 		amount_burned: Balance,
 	) -> DispatchResult {
-		LastUnlockEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
+		LastReleaseEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
 
 		Ok(())
 	}
@@ -229,9 +229,9 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 	fn compensate_lost_bitcoin(
 		_obligation_id: ObligationId,
 		market_rate: Self::Balance,
-		unlock_amount_paid: Self::Balance,
+		release_amount_paid: Self::Balance,
 	) -> Result<(Self::Balance, Self::Balance), ObligationError> {
-		let rate = unlock_amount_paid.min(market_rate);
+		let rate = release_amount_paid.min(market_rate);
 		DefaultVault::mutate(|a| {
 			a.bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
 		});
@@ -299,7 +299,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 pub struct StaticBitcoinVerifier;
 impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 	fn verify_signature(
-		_utxo_unlocker: UtxoUnlocker,
+		_utxo_releaseer: CosignReleaser,
 		_pubkey: CompressedBitcoinPubkey,
 		_signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
@@ -368,10 +368,10 @@ impl pallet_bitcoin_locks::Config for Test {
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinObligationProvider = StaticVaultProvider;
 	type ArgonTicksPerDay = ConstU64<1440>;
-	type MaxUnlockingUtxos = MaxUnlockingUtxos;
+	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
-	type UtxoUnlockCosignDeadlineBlocks = UtxoUnlockCosignDeadlineBlocks;
+	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
 	type TickProvider = StaticTickProvider;
 }
 
@@ -383,7 +383,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_bitcoin_locks::GenesisConfig::<Test> {
-		minimum_bitcoin_lock_satoshis: MinimumBondSatoshis::get(),
+		minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),
 		_phantom: Default::default(),
 	}
 	.assimilate_storage(&mut t)

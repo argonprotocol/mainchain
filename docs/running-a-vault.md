@@ -4,52 +4,54 @@ Vaults are a core part of the Argon network. They lend Argons to both Bitcoin ho
 Vaults commit to lock up the market value of Bitcoin in Argons for a year. A Vault may choose the Annual Percentage
 Rate (APR) per Argon they charge for this service.
 
-## Bitcoin Bonds
+## Locked Bitcoins
 
-A Bitcoin Bond is a one-year commitment to lock up the market value of Bitcoin in Argons. These funds are not at risk as
-long as a Vault performs the following two functions:
+A LockedBitcoin is a one-year commitment to lock up the market value of Bitcoin in Argons. These funds are not at risk
+as long as a Vault performs the following two functions:
 
 1. A Vault acts as a co-signer for a Bitcoin UTXO that is locked in Argon. The Vault must respond to requests to co-sign
-   Bitcoin Unlocks within 10 days, or they will forfeit funds. NOTE: a Vault must perform this function for a full year
-   from the last Bitcoin they allow to be bonded. In other words, a Vault commits to remaining operational for up to one
-   year past when they "_close_" the vault.
-2. A Vault must never move a Bitcoin on the Bitcoin network without unlocking first on Argon (ie, collude with the
-   Bitcoin holder to bypass Argon). If they do so, they will forfeit funds.
+   LockedBitcoin Release Requests within 10 days, or they will forfeit funds. NOTE: a Vault must perform this function
+   for
+   a full year from the last Bitcoin they allow to be locked. In other words, a Vault commits to remaining operational
+   for up to one year past when they "_close_" the vault.
+2. A Vault must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon (ie, collude with
+   the Bitcoin holder to bypass Argon). If they do so, they will forfeit funds.
 
-### Variables for Bitcoin Bonds
+### Variables for LockedBitcoins
 
 - `Annual Percentage Rate (apr)`: An annual percentage rate charged per argon for the service of locking up Bitcoin.
   The Satoshi value in Argons is calculated by using prices of Bitcoin and Argon in USD. The APR multiplied by the argon
   value to determine the yearly fee.
 - `Base Fee`: A flat fee charged for the service of locking up Bitcoin.
-- `Securitization Percent`: The percentage (of offered _Bitcoin Argons_) the Vault is willing to put up to cover the
-  loss of Bitcoins in case of fraud. These funds are not eligible for bonds, but allow a Vault to offer an equivalent
-  amount of Mining Bonds (up to 2x the Bitcoin BondedArgons).
-- `Bitcoin Argons`: The number of argons a Vault will offer for Bitcoin Bonds. Once an argon is locked for the year, it
-  will not be returned to the Vault until the bond is complete.
+- `Added Securitization Percent`: The added percentage (of offered _Bitcoin Argons_) the Vault is willing to put up to
+  cover the loss of Bitcoins in case of fraud. These funds are not eligible for LockedBitcoins themselves, but allow a
+  Vault to offer an equivalent amount of BondedArgons (up to 2x the Bitcoin Argons).
+- `Bitcoin Argons`: The number of argons a Vault will offer for LockedBitcoins. Once an argon is locked for the year, it
+  will not be returned to the Vault until the term is complete.
 
-## Mining Bonds
+## BondedArgons
 
-A Mining Bond lasts only for the duration of a Mining Slot (10 days). A Vault can rent out up to 2x the amount of
-Bitcoin BondedArgons in Mining Bonds. The Vault does not need to perform any actions to maintain their Mining Bonds.
+A BondedArgon obligation lasts only for the duration of a Mining Slot (10 days). A Vault can rent out up to 2x the
+amount of Bitcoin Argons in BondedArgons. The Vault does not need to perform any actions to maintain their BondedArgons.
 These are completely not at risk.
 
-### Variables for Mining Bonds
+### Variables for BondedArgons
 
 - `Annual Percentage Rate (apr)`: An annual percentage rate that is charged at 10 days worth of blocks (10/365) times
   the amount of Argons a miner wishes to submit for their mining bid.
-- `Base Fee`: A flat fee charged for the service of locking up Argons for a Mining Bond. This fee is most relevant to
-  Mining Bonds so that a Vault cannot be "gamed" by a miner submitting and cancelling a large number of Mining Bonds.
-- `Mining Reward Sharing Percent Take`: A Vault can optionally offer a very low percentage rate for a Mining Bond in
+- `Base Fee`: A flat fee charged for the service of locking up Argons for a BondedArgon. This fee is most relevant to
+  BondedArgons so that a Vault cannot be "gamed" by a miner submitting and cancelling a large number of BondedArgons.
+- `Mining Reward Sharing Percent Take`: A Vault can optionally offer a very low percentage rate for a BondedArgon in
   exchange for profit sharing on any minted Argons during the Mining Slot. This can be an appealing offer for miners so
   they don't have to try to predict an optimal bid that will out-pace the slot earnings (eg, by looking at the pattern
   of previous slots and hoping the demand for new argons remains the same or above).
-- `Mining Argons`: The number of argons a Vault will offer for Mining Bonds. Once an argon is locked for the 10 days, it
-  will not be returned to the Vault until the bond is complete.
+- `Mining Argons`: The number of argons a Vault will offer for BondedArgons. Once an argon is locked for the 10 days, it
+  will not be returned to the Vault until the term is complete.
 
 ## The Argon Bitcoin CLI
 
-Argon publishes a CLI that allows Bitcoin bonders and Vault operators to simplify their operations on the Argon network.
+Argon publishes a CLI that allows Bitcoin Lock-ers and Vault operators to simplify their operations on the Argon
+network.
 
 > This will ultimately be replaced by an app interface, so feedback on the flow would be appreciated when testing the
 > CLI.
@@ -58,13 +60,13 @@ You can find the latest release on the [releases page](https://github.com/argonp
 
 ```bash
 $ argon-bitcoin-cli --help
-A cli used to bond bitcoins, create and manage Vaults
+A cli used to lock bitcoins, create and manage Vaults
 
 Usage: argon-bitcoin-cli [OPTIONS] <COMMAND>
 
 Commands:
   vault  List, create and manage vaults
-  bond   Create, unlock and monitor bonds
+  locks  Create, release and monitor LockedBitcoins
   xpriv  Create, secure, and manage your Bitcoin Master XPriv Key
   utils  Utilities for working with Bitcoin and Argon primitives
   help   Print this message or the help of the given subcommand(s)
@@ -130,9 +132,9 @@ $ argon-bitcoin-cli xpriv master --password=supersecret --xpriv-path=/tmp/vault1
 ### 2. Create an upload-able XPub key
 
 Now you need to generate an XPub key that will be used in the Argon mainchain to auto-generate two normal public keys
-for each Vaulted Bitcoin. One of those public keys will be to cosign unlock requests with the bitcoin owner, and one is
-to claim the bitcoin if the owner never unlocks the bitcoin. These details will be retrievable during the steps you need
-them.
+for each Vaulted Bitcoin. One of those public keys will be to cosign LockedBitcoin "release requests" with the bitcoin
+owner, and one is to claim the bitcoin if the owner never releases the LockedBitcoin. These details will be retrievable
+during the steps you need them.
 
 You _do_ need to keep track of your XPriv key and password, in addition to the HD Path you use to generate the master
 XPub. During a switch of keys, you'll need to pay close attention to _which_ master XPub was used for a request (and
@@ -174,39 +176,40 @@ Once your vault is created, you can look at the block it was included in to see 
 
 ![Polkadot.js Vault Id](images/pjs-vaultid.png)
 
-## Monitoring Unlock Requests
+## Monitoring Cosign Requests
 
-As a Vault operator, you need to monitor the Argon mainchain for Bitcoin Unlock requests. The simplest option is to use
-the CLI to monitor the mainchain for these requests.
+As a Vault operator, you need to monitor the Argon mainchain for LockedBitcoin `release requests`. The simplest option
+is
+to use the CLI to monitor the mainchain for these requests.
 
 ```bash
-$ argon-bitcoin-cli vault pending-unlock --vault-id=1 --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli vault pending-release --vault-id=1 --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
 Pending as of block #15167
 
 NOTE: does not include eligible for reclaim by vault.
 
-╭─────────┬─────────┬──────────────────────┬────────────────┬──────────────────╮
-│ Bond Id ┆ Utxo Id ┆ Expiration Due Block ┆ Type           ┆ Redemption Price │
-╞═════════╪═════════╪══════════════════════╪════════════════╪══════════════════╡
-│ 1       ┆ 1       ┆ 2903776              ┆ Cosign Request ┆ ₳2.80            │
-╰─────────┴─────────┴──────────────────────┴────────────────┴──────────────────╯
+╭─────────┬───────────────┬──────────────────────┬────────────────┬──────────────────╮
+│ Utxo Id ┆ Obligation Id ┆ Expiration Due Block ┆ Type           ┆ Redemption Price │
+╞═════════╪═══════════════╪══════════════════════╪════════════════╪══════════════════╡
+│ 1       ┆ 1             ┆ 2903776              ┆ Cosign Request ┆ ₳2.80            │
+╰─────────┴───────────────┴──────────────────────┴────────────────┴──────────────────╯
 ```
 
-## Cosigning Unlock Requests
+## Cosigning Release Requests
 
-When you see a Bitcoin Unlock request, you need to cosign the request to allow the Bitcoin to be unlocked. You can use
-the CLI to cosign the request.
+When you see a request to release a LockedBitcoin, you need to cosign the request to allow it to be released. You
+can use the CLI to cosign the request.
 
 ### 1. Provide your cosignature
 
-When you encounter a Bitcoin Unlock request, you will need to know:
+When you encounter a LockedBitcoin Cosign Request, you will need to know:
 
-1. The `BondId` - looked up in the previous step
+1. The `UtxoId` - looked up in the previous step
 2. The `XPriv Path` and `Decryption Password` - used to generate the XPub key
 3. The `HD Path` used to create the master XPub key that was used by Argon to generate this bitcoin cosign script.
 
 ```bash
-$ argon-bitcoin-cli lock vault-cosign --utxo-id=1 \
+$ argon-bitcoin-cli lock vault-cosign-release --utxo-id=1 \
   --xpriv-path=~/.xpriv/vault.xpub --password=supersecret --hd-path="m/84'/0'/0'" \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
 ```
@@ -214,13 +217,13 @@ $ argon-bitcoin-cli lock vault-cosign --utxo-id=1 \
 ### 2. Complete the transaction in Polkadot.js
 
 This will output a URL that you can use to complete the transaction on the Polkadot.js interface. It will provide your
-half of the co-signature to the Bitcoin Unlock request, and you have now fulfilled all your duties for this Bitcoin
-bond.
+half of the co-signature to the LockedBitcoin Cosign request, and you have now fulfilled all your duties for this
+LockedBitcoin.
 
 ## Reclaiming Bitcoin
 
-If you get to the end of the year and the Bitcoin owner has not requested an unlock in Argon, you will lose possession
-of the bonded argons. As compensation, you can claim the Bitcoin.
+If you get to the end of the year and the Bitcoin owner has not requested a LockedBitcoin Release in Argon, you will
+lose possession of the BondedArgons. As compensation, you can claim the Bitcoin.
 
 ### 1. Sign the "Claim Bitcoin" Partially Signed Bitcoin Transaction
 

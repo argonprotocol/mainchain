@@ -166,7 +166,7 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	// 4. Owner funds the BitcoinLock utxo and submits it
+	// 4. Owner funds the LockedBitcoin utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
 	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
 	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
@@ -421,7 +421,7 @@ async fn request_bitcoin_lock(
 		test_node,
 		vec![
 			"lock",
-			"request",
+			"initialize",
 			"--vault-id",
 			&vault_id.to_string(),
 			"--btc",
@@ -614,11 +614,11 @@ async fn owner_requests_unlock(
 		.get_new_address(Some("takeback"), Some(AddressType::Bech32m))
 		.unwrap()
 		.require_network(network)?;
-	let unlock_request_cli = run_bitcoin_cli(
+	let release_cli = run_bitcoin_cli(
 		test_node,
 		vec![
 			"lock",
-			"request-unlock",
+			"request-release",
 			"--utxo-id",
 			&utxo_id.to_string(),
 			"--dest-pubkey",
@@ -627,18 +627,14 @@ async fn owner_requests_unlock(
 	)
 	.await?;
 
-	let unlock_request_tx = client
-		.submit_from_polkadot_url(
-			&unlock_request_cli,
-			&Sr25519Signer::new(bitcoin_owner.clone()),
-			None,
-		)
+	let release_tx = client
+		.submit_from_polkadot_url(&release_cli, &Sr25519Signer::new(bitcoin_owner.clone()), None)
 		.await?
 		.wait_for_finalized_success()
 		.await?;
 	println!("bitcoin unlock request finalized");
 	// this is the event that a vault would also monitor
-	let unlock_event = unlock_request_tx
+	let unlock_event = release_tx
 		.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosignRequested>()?
 		.expect("unlock event");
 	assert_eq!(unlock_event.utxo_id, utxo_id);
@@ -660,7 +656,7 @@ async fn vault_cosigns_unlock(
 ) -> anyhow::Result<()> {
 	let pending_unlock = run_bitcoin_cli(
 		test_node,
-		vec!["vault", "pending-unlock", "--vault-id", &vault_id.to_string()],
+		vec!["vault", "pending-release", "--vault-id", &vault_id.to_string()],
 	)
 	.await?;
 
@@ -671,7 +667,7 @@ async fn vault_cosigns_unlock(
 		test_node,
 		vec![
 			"lock",
-			"vault-cosign",
+			"vault-cosign-release",
 			"--utxo-id",
 			&utxo_id.to_string(),
 			"--xpriv-path",
@@ -704,7 +700,7 @@ async fn owner_sees_signature_and_unlocks(
 		test_node,
 		vec![
 			"lock",
-			"owner-cosign-psbt",
+			"owner-cosign-release",
 			"--utxo-id",
 			&utxo_id.to_string(),
 			"--hd-path",

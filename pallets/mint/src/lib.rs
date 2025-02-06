@@ -327,7 +327,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn utxo_unlocked(
+		fn utxo_released(
 			utxo_id: UtxoId,
 			remove_pending_mints: bool,
 			amount_burned: T::Balance,

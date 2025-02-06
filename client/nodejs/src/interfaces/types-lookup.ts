@@ -1765,20 +1765,20 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletBitcoinLocksCall (202) */
   interface PalletBitcoinLocksCall extends Enum {
-    readonly isRequest: boolean;
-    readonly asRequest: {
+    readonly isInitialize: boolean;
+    readonly asInitialize: {
       readonly vaultId: u32;
       readonly satoshis: Compact<u64>;
       readonly bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
     } & Struct;
-    readonly isRequestUnlock: boolean;
-    readonly asRequestUnlock: {
+    readonly isRequestRelease: boolean;
+    readonly asRequestRelease: {
       readonly utxoId: u64;
       readonly toScriptPubkey: Bytes;
       readonly bitcoinNetworkFee: u64;
     } & Struct;
-    readonly isCosignUnlock: boolean;
-    readonly asCosignUnlock: {
+    readonly isCosignRelease: boolean;
+    readonly asCosignRelease: {
       readonly utxoId: u64;
       readonly signature: Bytes;
     } & Struct;
@@ -1786,7 +1786,7 @@ declare module '@polkadot/types/lookup' {
     readonly asAdminModifyMinimumLockedSats: {
       readonly satoshis: u64;
     } & Struct;
-    readonly type: 'Request' | 'RequestUnlock' | 'CosignUnlock' | 'AdminModifyMinimumLockedSats';
+    readonly type: 'Initialize' | 'RequestRelease' | 'CosignRelease' | 'AdminModifyMinimumLockedSats';
   }
 
   /** @name ArgonPrimitivesBitcoinCompressedBitcoinPubkey (203) */
@@ -2737,8 +2737,8 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'ObligationNotFound' | 'NoMoreVaultIds' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'WrongXpubNetwork' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'FundingChangeAlreadyScheduled' | 'ObligationCompletionError';
   }
 
-  /** @name PalletBitcoinLocksBitcoinLock (364) */
-  interface PalletBitcoinLocksBitcoinLock extends Struct {
+  /** @name PalletBitcoinLocksLockedBitcoin (364) */
+  interface PalletBitcoinLocksLockedBitcoin extends Struct {
     readonly obligationId: Compact<u64>;
     readonly vaultId: Compact<u32>;
     readonly lockPrice: u128;
@@ -2755,8 +2755,8 @@ declare module '@polkadot/types/lookup' {
     readonly isVerified: bool;
   }
 
-  /** @name PalletBitcoinLocksUtxoCosignRequest (368) */
-  interface PalletBitcoinLocksUtxoCosignRequest extends Struct {
+  /** @name PalletBitcoinLocksLockReleaseRequest (368) */
+  interface PalletBitcoinLocksLockReleaseRequest extends Struct {
     readonly utxoId: Compact<u64>;
     readonly obligationId: Compact<u64>;
     readonly vaultId: Compact<u32>;
@@ -2779,10 +2779,10 @@ declare module '@polkadot/types/lookup' {
     readonly isVaultClosed: boolean;
     readonly isInvalidVaultAmount: boolean;
     readonly isRedemptionNotLocked: boolean;
-    readonly isBitcoinUnlockInitiationDeadlinePassed: boolean;
+    readonly isBitcoinReleaseInitiationDeadlinePassed: boolean;
     readonly isBitcoinFeeTooHigh: boolean;
     readonly isBitcoinUtxoNotFound: boolean;
-    readonly isBitcoinUnableToBeDecodedForUnlock: boolean;
+    readonly isBitcoinUnableToBeDecodedForRelease: boolean;
     readonly isBitcoinSignatureUnableToBeDecoded: boolean;
     readonly isBitcoinPubkeyUnableToBeDecoded: boolean;
     readonly isBitcoinInvalidCosignature: boolean;
@@ -2799,7 +2799,7 @@ declare module '@polkadot/types/lookup' {
     readonly isLockNotFound: boolean;
     readonly isNoVaultBitcoinPubkeysAvailable: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
-    readonly type: 'ObligationNotFound' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'AccountWouldGoBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'RedemptionNotLocked' | 'BitcoinUnlockInitiationDeadlinePassed' | 'BitcoinFeeTooHigh' | 'BitcoinUtxoNotFound' | 'BitcoinUnableToBeDecodedForUnlock' | 'BitcoinSignatureUnableToBeDecoded' | 'BitcoinPubkeyUnableToBeDecoded' | 'BitcoinInvalidCosignature' | 'InsufficientSatoshisLocked' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'GenericObligationError' | 'LockNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey';
+    readonly type: 'ObligationNotFound' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'AccountWouldGoBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'RedemptionNotLocked' | 'BitcoinReleaseInitiationDeadlinePassed' | 'BitcoinFeeTooHigh' | 'BitcoinUtxoNotFound' | 'BitcoinUnableToBeDecodedForRelease' | 'BitcoinSignatureUnableToBeDecoded' | 'BitcoinPubkeyUnableToBeDecoded' | 'BitcoinInvalidCosignature' | 'InsufficientSatoshisLocked' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'GenericObligationError' | 'LockNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey';
   }
 
   /** @name PalletNotariesError (384) */
@@ -3040,8 +3040,8 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletBitcoinLocksHoldReason (444) */
   interface PalletBitcoinLocksHoldReason extends Enum {
-    readonly isUnlockingBitcoin: boolean;
-    readonly type: 'UnlockingBitcoin';
+    readonly isReleaseBitcoinLock: boolean;
+    readonly type: 'ReleaseBitcoinLock';
   }
 
   /** @name PalletBlockRewardsHoldReason (445) */

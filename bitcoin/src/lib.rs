@@ -2,14 +2,14 @@
 extern crate alloc;
 extern crate core;
 
-pub use cosign_script::{Amount, CosignScript, CosignScriptArgs, UnlockStep};
+pub use cosign_releaser::CosignReleaser;
+pub use cosign_script::{Amount, CosignScript, CosignScriptArgs, ReleaseStep};
 pub use errors::Error;
 #[cfg(feature = "std")]
 pub use utxo_spend_filter::{BlockFilter, UtxoSpendFilter};
-pub use utxo_unlocker::UtxoUnlocker;
 
+mod cosign_releaser;
 mod cosign_script;
-mod utxo_unlocker;
 
 mod errors;
 #[cfg(feature = "std")]

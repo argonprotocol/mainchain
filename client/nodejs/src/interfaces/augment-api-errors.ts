@@ -67,29 +67,29 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountWouldGoBelowMinimumBalance: AugmentedError<ApiType>;
       /**
-       * The fee for this bitcoin unlock is too high
+       * The fee for this bitcoin release is too high
        **/
       BitcoinFeeTooHigh: AugmentedError<ApiType>;
       /**
-       * The cosign signature is not valid for the bitcoin unlock
+       * The cosign signature is not valid for the bitcoin release
        **/
       BitcoinInvalidCosignature: AugmentedError<ApiType>;
       /**
-       * This bitcoin pubkey couldn't be decoded for unlock
+       * This bitcoin pubkey couldn't be decoded for release
        **/
       BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
       /**
-       * This bitcoin signature couldn't be decoded for unlock
+       * The bitcoin has passed the deadline to release it
+       **/
+      BitcoinReleaseInitiationDeadlinePassed: AugmentedError<ApiType>;
+      /**
+       * This bitcoin signature couldn't be decoded for release
        **/
       BitcoinSignatureUnableToBeDecoded: AugmentedError<ApiType>;
       /**
-       * This bitcoin cosign script couldn't be decoded for unlock
+       * This bitcoin cosign script couldn't be decoded for release
        **/
-      BitcoinUnableToBeDecodedForUnlock: AugmentedError<ApiType>;
-      /**
-       * The bitcoin has passed the deadline to unlock it
-       **/
-      BitcoinUnlockInitiationDeadlinePassed: AugmentedError<ApiType>;
+      BitcoinUnableToBeDecodedForRelease: AugmentedError<ApiType>;
       BitcoinUtxoNotFound: AugmentedError<ApiType>;
       /**
        * There are too many obligations expiring in the given expiration block

@@ -98,21 +98,20 @@ PostgresSQL database to keep track of its history and users' balance tips.
       spent).
     - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
     - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-    - `bond`: Allows users to lock and unlock bitcoin bonds, and tracks the mining bonds (pairs with the vaults pallet,
-      and the mining slots).
+    - `bitcoin_locks`: Allows users to lock and unlock bitcoins.
     - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
     - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
       akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
     - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
       mine blocks created by the notebook commit reveal scheme.
-    - `mint`: Mints Argons to bonded bitcoins and miners when the Argon price is above target
+    - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
     - `notaries`: Registers the notaries and metadata to connect to them
     - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
       notebook. Also tracks the last changed notebook per localchain.
     - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
       inflation since the starting time.
     - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-    - `vaults`: Register and manage vaults that offer bonded bitcoins to miners and bitcoin holders.
+    - `vaults`: Register and manage vaults that offer BondedArgons to miners and LockedBitcoins to bitcoin holders.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets
@@ -177,7 +176,7 @@ Here are some tutorials to get you started:
 
 - [How to set up an Account](./docs/account-setup.md)
 - [How to use the Argon Localchain CLI](./docs/localchain.md#command-line-interface)
-- [How to bond Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-bond.md)
+- [How to lock Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-lock)
 - [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault.md)
 - [How to run a miner](./docs/run-a-miner.md)
 

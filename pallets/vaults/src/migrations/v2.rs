@@ -48,7 +48,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 		let minimum_satoshis =
 			migration::get_storage_value::<Satoshis>(b"bonds", b"MinimumBitcoinBondSatoshis", &[]);
 		if let Some(minimum_sats) = minimum_satoshis {
-			info!("Setting minimum BitcoinLock satoshis to {}", minimum_sats);
+			info!("Setting minimum LockedBitcoin satoshis to {}", minimum_sats);
 			migration::put_storage_value(b"bitcoin_locks", b"MinimumSatoshis", &[], minimum_sats);
 		}
 		let result = migration::clear_storage_prefix(b"bonds", &[], &[], None, None);

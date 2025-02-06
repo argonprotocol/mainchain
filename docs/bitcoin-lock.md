@@ -12,9 +12,9 @@ the market rate at time of unlock, you can protect yourself against price decrea
 at the "lock price", you still benefit from price increases.
 
 In addition to the Bitcoin prices, you can capitalize on variations in the Argon's price. If the Argon price falls, it
-will be cheaper in relative terms to unlock your Bitcoin, allowing you to make a profit on the difference between the
-market rate in local currency and the argon price. In addition, there is an early mover incentive to buy back first when
-the Argon price falls, allowing an additional profit.
+will be cheaper in relative terms to release your LockedBitcoin, allowing you to make a profit on the difference between
+the market rate in local currency and the argon price. In addition, there is an early mover incentive to buy back first
+when the Argon price falls, allowing an additional profit.
 
 ## Why does Argon do this?
 
@@ -26,10 +26,10 @@ When a Bitcoin is locked into a Vault, the equivalent amount of argons are locke
 the argon supply, but it nets out to zero because the Bitcoin will gain rights to mint new argons. Eg, new argons minted
 are equal to argon collateral.
 
-However, to unlock my Bitcoin, I am required to _burn_ the unlock price from existence (the current market rate capped
-at the lock price). If many people are wanting to move out of the Argon, the price will fall, and the increased number
-of argons representing the market price of my Bitcoin will remove many more argons from circulation. This removes a
-proportional amount of argons from the system, while costing the same amount of fiat currency to the Bitcoin holder.
+However, to release my LockedBitcoin, I am required to _burn_ the release price from existence (the current market rate
+capped at the lock price). If many people are wanting to move out of the Argon, the price will fall, and the increased
+number of argons representing the market price of my Bitcoin will remove many more argons from circulation. This removes
+a proportional amount of argons from the system, while costing the same amount of fiat currency to the Bitcoin holder.
 Removing the excess currency allows the price to rise.
 
 ## Lock Flow
@@ -96,7 +96,7 @@ Usage: argon-bitcoin-cli [OPTIONS] <COMMAND>
 
 Commands:
   vault  List, create and manage vaults
-  lock   Create, unlock and monitor locks
+  lock   Create, release and monitor locks
   xpriv  Create, secure, and manage your Bitcoin Master XPriv Key
   utils  Utilities for working with Bitcoin and Argon primitives
   help   Print this message or the help of the given subcommand(s)
@@ -186,15 +186,14 @@ send the funds to (eg, select the address of the next pubkey from Electrum).
 > Replace your wss:// url below as appropriate for your network
 
 Submit
-a [lock request](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000)
-to the mainchain.
+a [lock initialize](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000) request to the mainchain.
 
 NOTE: you'll need to prefix it with 0x to paste into the UI.
 
 #### Using the CLI:
 
 ```bash
-$ argon-bitcoin-cli lock request --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
+$ argon-bitcoin-cli lock initialize --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
 ```
 
 This will generate a link to complete the transaction on the Polkadot.js interface along with the fee that needs to be
@@ -259,19 +258,19 @@ You can also use the Polkadot.js interface to look at the MintQueue (_Storage_: 
 is a list of UTXOs that are waiting to be minted (`UtxoId`, `AccountId`, `Amount Remaining`). Find the entry with your
 UtxoId in as the first parameter.
 
-## Unlocking your Bitcoin
+## Releasing your LockedBitcoin
 
-To unlock your Bitcoin, you'll need to have enough Argons in your account to cover the unlock fee. You can see the
-"redemption price" using the `lock status` command.
+To release your LockedBitcoin, you'll need to have enough Argons in your account to cover the release fee. You can see
+the "redemption price" using the `lock status` command.
 
 ```bash
 $ argon-bitcoin-cli lock status --utxo-id=1 -t wss://rpc.testnet.argonprotocol.org
 ```
 
-### 1. Submit an unlock request
+### 1. Submit an release request
 
-The first step is to submit an unlock request to the mainchain. Your unlock request requires the `UtxoId`, an address
-you'd like to send the Bitcoin to, and the `Network Fee` you are willing to pay to unlock the Bitcoin.
+The first step is to submit a release request to the mainchain. Your release request requires the `UtxoId`, an address
+you'd like to send the Bitcoin to, and the `Network Fee` you are willing to pay to release the LockedBitcoin.
 
 NOTE: the network fee will normally change from when you submit the request to when it is processed. However, in the
 custom Signet, fees will be stable. The Vault will co-sign the transaction so that you can add additional inputs to
@@ -283,16 +282,16 @@ You'll want to get a destination address from Electrum, and see what the current
 The CLI can help you calculate the network fee:
 
 ```bash
-$ argon-bitcoin-cli lock request-unlock --utxo-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock request-release --utxo-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This will provide a link to complete the transaction on the Polkadot.js interface.
 
-### 2. Wait for the Vault to Unlock
+### 2. Wait for the Vault to Cosign the Release
 
-Once you've submitted your unlock request, you'll need to wait for the Vault to unlock your Bitcoin. You can monitor the
-Polkadot.js interface for the Vault to sign the transaction, or you can pre-sign the transaction and use the "wait"
-parameter on the CLI to wait for the transaction to be included in a block.
+Once you've submitted your release request, you'll need to wait for the Vault to Cosign the release of your LockedBitcoin.
+
+You can monitor the Polkadot.js interface for the Vault to sign the transaction, or you can pre-sign the transaction and use the "wait"parameter on the CLI to wait for the transaction to be included in a block.
 
 > TEMPORARY HACK!: Electrum doesn't support miniscript yet, so can't understand the PSBT. You can use the Argon CLI to
 > sign the PSBT instead. See below to copy out the private key and sign the PSBT.
@@ -300,11 +299,10 @@ parameter on the CLI to wait for the transaction to be included in a block.
 > ![Electrum - Private key](images/electrum-privatekey.png)
 
 ```bash
-$ argon-bitcoin-cli lock owner-cosign-psbt --utxo-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
 ```
 
-This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see
-a psbt output that you can import into Electrum.
+This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see a psbt output that you can import into Electrum.
 ![Electrum - Import](images/electrum-import-psbt.png)
 
 You'll want to double-check it and then broadcast the transaction (it should be fully signed now)

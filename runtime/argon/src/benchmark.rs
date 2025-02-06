@@ -11,7 +11,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_block_seal_spec, VoteEligibility]
 	[pallet_block_rewards, BlockRewards]
 	[pallet_mining_slot, MiningSlot]
-	[pallet_bitcoin_locks, Bonds]
+	[pallet_bitcoin_locks, BitcoinLocks]
 	[pallet_bitcoin_utxos, BitcoinMint]
 	[pallet_mint, Mint]
 	[pallet_block_seal, BlockSeal]

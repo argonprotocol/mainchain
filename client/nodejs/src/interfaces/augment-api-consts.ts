@@ -60,13 +60,13 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       lockReclamationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * Maximum unlocking utxos at a time
+       * Number of bitcoin blocks a vault has to counter-sign a bitcoin release
        **/
-      maxUnlockingUtxos: u32 & AugmentedConst<ApiType>;
+      lockReleaseCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
+       * Maximum releasing utxos at a time
        **/
-      utxoUnlockCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
+      maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
     };
     bitcoinUtxos: {
       /**

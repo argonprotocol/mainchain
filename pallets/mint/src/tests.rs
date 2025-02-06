@@ -376,18 +376,18 @@ fn it_decrements_unlocked_bitcoins() {
 		System::set_block_number(1);
 		MintedBitcoinArgons::<Test>::set(U256::from(100));
 
-		assert_ok!(Mint::utxo_unlocked(1, true, 50));
+		assert_ok!(Mint::utxo_released(1, true, 50));
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(50));
 
 		PendingMintUtxos::<Test>::try_append((1, 1, 10)).unwrap();
 
-		assert_ok!(Mint::utxo_unlocked(1, false, 10));
+		assert_ok!(Mint::utxo_released(1, false, 10));
 
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(40));
 		// should still be in line
 		assert_eq!(PendingMintUtxos::<Test>::get().to_vec(), vec![(1, 1, 10)]);
 
-		assert_ok!(Mint::utxo_unlocked(1, true, 40));
+		assert_ok!(Mint::utxo_released(1, true, 40));
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(0));
 		assert!(PendingMintUtxos::<Test>::get().is_empty());
 	});
