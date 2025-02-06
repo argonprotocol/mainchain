@@ -3,7 +3,7 @@ use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
 	tick::{Tick, Ticker},
-	vault::{BondError, BondedArgonsProvider},
+	vault::{BondedArgonsProvider, ObligationError},
 	BlockNumber, TickProvider, VaultId, VotingSchedule,
 };
 use env_logger::{Builder, Env};
@@ -13,7 +13,9 @@ use frame_support::{
 	weights::constants::RocksDbWeight,
 };
 use sp_core::H256;
-use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128, Percent};
+use sp_runtime::{
+	impl_opaque_keys, testing::UintAuthorityId, traits::Zero, BuildStorage, FixedU128, Percent,
+};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -44,13 +46,13 @@ parameter_types! {
 	pub static TargetBidsPerSlot: u32 = 5;
 	pub static MinOwnershipBondAmount: Balance = 1;
 	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
-	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 
 	pub static ExistentialDeposit: Balance = 1;
 	pub const MinimumBondAmount:u128 = 1_000_000;
 }
 
-pub type BondId = u64;
+pub type ObligationId = u64;
 pub type Balance = u128;
 
 type ArgonToken = pallet_balances::Instance1;
@@ -102,8 +104,8 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 }
 
 parameter_types! {
-	pub static Bonds: Vec<(BondId, VaultId, u64, Balance)> = vec![];
-	pub static NextBondId: u64 = 1;
+	pub static Obligations: Vec<(ObligationId, VaultId, u64, Balance)> = vec![];
+	pub static NextObligationId: u64 = 1;
 	pub static VaultSharing: Option<RewardSharing<u64>> = None;
 
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
@@ -126,13 +128,17 @@ impl BondedArgonsProvider for StaticBondProvider {
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
-		_bond_until_tick: Tick,
-		modify_bond_id: Option<BondId>,
-	) -> Result<(argon_primitives::BondId, Option<RewardSharing<u64>>, Self::Balance), BondError> {
-		if let Some(modify_bond_id) = modify_bond_id {
-			let res = Bonds::mutate(|a| {
-				let existing =
-					a.iter_mut().find(|(id, v, _, _)| *id == modify_bond_id && *v == vault_id);
+		_reserve_until_tick: Tick,
+		modify_obligation_id: Option<ObligationId>,
+	) -> Result<
+		(argon_primitives::ObligationId, Option<RewardSharing<u64>>, Self::Balance),
+		ObligationError,
+	> {
+		if let Some(modify_obligation_id) = modify_obligation_id {
+			let res = Obligations::mutate(|a| {
+				let existing = a
+					.iter_mut()
+					.find(|(id, v, _, _)| *id == modify_obligation_id && *v == vault_id);
 				if let Some((_, _, _, a)) = existing {
 					*a = a.saturating_add(amount);
 					return Some(*a);
@@ -140,22 +146,26 @@ impl BondedArgonsProvider for StaticBondProvider {
 				None
 			});
 			if let Some(total) = res {
-				return Ok((modify_bond_id, VaultSharing::get(), total));
+				return Ok((modify_obligation_id, VaultSharing::get(), total));
 			}
 		}
-		let bond_id = NextBondId::get();
-		NextBondId::set(bond_id + 1);
-		Bonds::mutate(|a| a.push((bond_id, vault_id, account_id, amount)));
-		Ok((bond_id, VaultSharing::get(), amount))
+		let obligation_id = NextObligationId::get();
+		NextObligationId::set(obligation_id + 1);
+		Obligations::mutate(|a| a.push((obligation_id, vault_id, account_id, amount)));
+		Ok((obligation_id, VaultSharing::get(), amount))
 	}
 
-	fn cancel_bonded_argons(bond_id: argon_primitives::BondId) -> Result<(), BondError> {
-		Bonds::mutate(|a| {
-			if let Some(pos) = a.iter().position(|(id, _, _, _)| *id == bond_id) {
-				a.remove(pos);
+	fn cancel_bonded_argons(
+		obligation_id: argon_primitives::ObligationId,
+	) -> Result<Self::Balance, ObligationError> {
+		let mut amount = Self::Balance::zero();
+		Obligations::mutate(|a| {
+			if let Some(pos) = a.iter().position(|(id, _, _, _)| *id == obligation_id) {
+				let (_, _, _, amt) = a.remove(pos);
+				amount = amt
 			}
 		});
-		Ok(())
+		Ok(amount)
 	}
 }
 
@@ -218,9 +228,9 @@ impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
-	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type MinimumOwnershipBondAmount = MinOwnershipBondAmount;
-	type MaximumOwnershipBondAmountPercent = MaxOwnershipPercent;
+	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
+	type MinimumArgonotsPerSeat = MinOwnershipBondAmount;
+	type MaximumArgonotProrataPercent = MaxOwnershipPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;

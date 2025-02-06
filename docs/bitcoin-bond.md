@@ -1,6 +1,6 @@
-# Bitcoin Bonds
+# Bitcoin Locks
 
-Bitcoin Bonds allow you to lock up your Bitcoin in exchange for liquidity on the Argon Network. You retain ownership of
+Bitcoin Locks allow you to lock up your Bitcoin in exchange for liquidity on the Argon Network. You retain ownership of
 your Bitcoin via a multi-signature script pubkey that you are a co-custodian of. You can redeem your Bitcoin at any time
 by "burning" the current market rate of your Bitcoins, but notably capped at the price at "lock time" (your lock price).
 
@@ -32,7 +32,7 @@ of argons representing the market price of my Bitcoin will remove many more argo
 proportional amount of argons from the system, while costing the same amount of fiat currency to the Bitcoin holder.
 Removing the excess currency allows the price to rise.
 
-## Bond Flow
+## Lock Flow
 
 We'll show examples in this flow using Electrum. After you have opened Electrum, follow the flow to create a new wallet
 or access your existing wallet.
@@ -83,20 +83,20 @@ project for self-custody of Bitcoins to be supported with a wide range of tools,
 currently limited. For now, we'll show you how to use Electrum for most commands (simply to bypass synching the entire
 Bitcoin blockchain - ie, Bitcoin Core QT), and we'll sign the psbt using the Argon CLI.
 
-### Bitcoin Bond Command Line
+### Bitcoin Lock Command Line
 
-Argon has a command line interface to simplify the process of creating a Bitcoin Bond. You can find the latest release
+Argon has a command line interface to simplify the process of creating a Bitcoin Lock. You can find the latest release
 on the [releases page](https://github.com/argonprotocol/mainchain/releases/latest).
 
 ```bash
 $ argon-bitcoin-cli --help
-A cli used to bond bitcoins, create and manage Vaults
+A cli used to lock bitcoins, create and manage Vaults
 
 Usage: argon-bitcoin-cli [OPTIONS] <COMMAND>
 
 Commands:
   vault  List, create and manage vaults
-  bond   Create, unlock and monitor bonds
+  lock   Create, unlock and monitor locks
   xpriv  Create, secure, and manage your Bitcoin Master XPriv Key
   utils  Utilities for working with Bitcoin and Argon primitives
   help   Print this message or the help of the given subcommand(s)
@@ -151,11 +151,11 @@ $ argon-bitcoin-cli vault list --btc=0.00005
 
 Showing for: 5e-5 btc
 Current mint value: ₳2.79 argons
-╭────┬──────────────────┬───────────────┬────────────────┬───────╮
-│ Id ┆ Available argons ┆ Bonded argons ┆ Securitization ┆ Fee   │
-╞════╪══════════════════╪═══════════════╪════════════════╪═══════╡
-│ 1  ┆ ₳97.09           ┆ ₳2.90         ┆ ₳100           ┆ ₳0.51 │
-╰────┴──────────────────┴───────────────┴────────────────┴───────╯
+╭────┬──────────────────┬─────────────────┬────────────────┬───────╮
+│ Id ┆ Available argons ┆ Reserved argons ┆ Securitization ┆ Fee   │
+╞════╪══════════════════╪═════════════════╪════════════════╪═══════╡
+│ 1  ┆ ₳97.09           ┆ ₳2.90           ┆ ₳100           ┆ ₳0.51 │
+╰────┴──────────────────┴─────────────────┴────────────────┴───────╯
 ```
 
 #### Fee Calculation
@@ -169,11 +169,11 @@ found in the Vault Storage and Price Index Storage (plug-in your `satoshis` and 
 - *Base Fee:* _Storage:_ `[Chosen Vault] -> bitcoinArgons -> baseFee`
 - *Annual Percent Rate:* _Storage:_ `[Chosen Vault] -> bitcoinArgons -> apr`
 
-### 2. Submit a bond request
+### 2. Submit a lock request
 
-You need to set-up an account on the [Argon Network](./account-setup.md) to submit a `Bond.bondBitcoin` request. Based
-on the Vault terms, you will need enough `balance` (eg, _Storage_: `System -> Account -> data -> free`) in your account
-to cover the Vault Fee as well as the Fee to submit the transaction to the network.
+You need to set-up an account on the [Argon Network](./account-setup.md) to submit a `BitcoinLocks.request` request.
+Based on the Vault terms, you will need enough `balance` (eg, _Storage_: `System -> Account -> data -> free`) in your
+account to cover the Vault Fee as well as the Fee to submit the transaction to the network.
 
 You'll need to fill in your Satoshis, the Vault ID and you need to tell the Vault what Pubkey you'll
 send the funds to (eg, select the address of the next pubkey from Electrum).
@@ -194,51 +194,51 @@ NOTE: you'll need to prefix it with 0x to paste into the UI.
 #### Using the CLI:
 
 ```bash
-$ argon-bitcoin-cli lock apply --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
+$ argon-bitcoin-cli lock request --btc=0.00005 --vault-id=1 --owner-pubkey=03b1fb97851d1cee35df30e0b5ac5be87c608c71b383b1c3b97a9704335acf83c1
 ```
 
 This will generate a link to complete the transaction on the Polkadot.js interface along with the fee that needs to be
 available in your account.
 
-![Bond Apply](images/pjs-bondbitcoin.png)
+![Lock Apply](images/pjs-lockbitcoin.png)
 
-### 3. Wait for your Bond Id
+### 3. Wait for your Utxo Id
 
-Once you've submitted your bond application, you'll need to wait for your bond to be accepted (a green checkmark will
+Once you've submitted your lock application, you'll need to wait for your lock to be accepted (a green checkmark will
 appear on Polkadot.js).
 
-![Bond Approved](images/pjs-bondcheck.png)
+![Lock Approved](images/pjs-lockcheck.png)
 
-Now head to the block Explorer and find your bond in the most recent Block. You can find the `bondId` in the event:
+Now head to the block Explorer and find your lock in the most recent Block. You can find the `utxoId` in the event:
 
-![BondId](images/pjs-bondid.png)
+![UtxoId](images/pjs-utxoid.png)
 
 ### 4. Send funds to the Bitcoin UTXO
 
-The information in the bond event will tell you the details needed to recreate the UTXO you need to send your Bitcoin
-to. The easiest way to generate the UTXO address is to use the bitcoin CLI command (replace your bond id):
+The information in the lock event will tell you the details needed to recreate the UTXO you need to send your Bitcoin
+to. The easiest way to generate the UTXO address is to use the bitcoin CLI command (replace your utxo id):
 
 NOTE: The resulting utxo must have the same amount of Satoshis as you specify in the command. Ensure your fees are set
 to add on top of the amount you specify.
 
 ```bash
-$ argon-bitcoin-cli lock send-to-address --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock send-to-address --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This will output a Pay to Address that you need to send the EXACT funds into. You can use Electrum (or whichever tool
 holds your BTC) to send the funds to the MultiSig address.
 ![Electrum - Multisig](images/electrum-pay.png)
 
-> IMPORTANT: The resulting utxo must have the same amount of Satoshis as you requested to bond. Ensure your fees
+> IMPORTANT: The resulting utxo must have the same amount of Satoshis as you requested to lock. Ensure your fees
 > are set to add on top of the amount you specify.
 
 ### 5. Wait for Argon Verification
 
 Argon will sync your UTXO once it has 6 confirmations. You can use the CLI to check the verification status of your
-bond:
+lock:
 
 ```bash
-$ argon-bitcoin-cli lock get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 You can also use Polkadot.js to verify your Bitcoin UTXO by looking at the
@@ -247,30 +247,30 @@ _Storage_: `BitcoinUtxos -> utxosPendingConfirmation()`.
 
 ### 6. Monitoring for Minting
 
-You can monitor your Bitcoin Bond status using the `bond get` cli command.
+You can monitor your Bitcoin Lock status using the `lock status` cli command.
 
 ```bash
-$ argon-bitcoin-cli lock get --bond-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
-![Argon Cli Bond-Get](images/cli-bondget.png)
+![Argon Cli Lock-Status](images/cli-lockstatus.png)
 
 You can also use the Polkadot.js interface to look at the MintQueue (_Storage_: `Mint -> pendingMintUtxos`). The result
-is a list of UTXOs that are waiting to be minted (`BondId`, `AccountId`, `Amount Remaining`). Find the entry with your
-BondId in as the first parameter.
+is a list of UTXOs that are waiting to be minted (`UtxoId`, `AccountId`, `Amount Remaining`). Find the entry with your
+UtxoId in as the first parameter.
 
 ## Unlocking your Bitcoin
 
 To unlock your Bitcoin, you'll need to have enough Argons in your account to cover the unlock fee. You can see the
-"redemption price" using the `bond get` command.
+"redemption price" using the `lock status` command.
 
 ```bash
-$ argon-bitcoin-cli lock get --bond-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1 -t wss://rpc.testnet.argonprotocol.org
 ```
 
 ### 1. Submit an unlock request
 
-The first step is to submit an unlock request to the mainchain. Your unlock request requires the `BondId`, an address
+The first step is to submit an unlock request to the mainchain. Your unlock request requires the `UtxoId`, an address
 you'd like to send the Bitcoin to, and the `Network Fee` you are willing to pay to unlock the Bitcoin.
 
 NOTE: the network fee will normally change from when you submit the request to when it is processed. However, in the
@@ -283,7 +283,7 @@ You'll want to get a destination address from Electrum, and see what the current
 The CLI can help you calculate the network fee:
 
 ```bash
-$ argon-bitcoin-cli lock request-unlock --bond-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock request-unlock --utxo-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This will provide a link to complete the transaction on the Polkadot.js interface.
@@ -300,7 +300,7 @@ parameter on the CLI to wait for the transaction to be included in a block.
 > ![Electrum - Private key](images/electrum-privatekey.png)
 
 ```bash
-$ argon-bitcoin-cli lock owner-cosign-psbt --bond-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock owner-cosign-psbt --utxo-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
 ```
 
 This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see

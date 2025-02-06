@@ -17,7 +17,7 @@ use crate::{
 	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	vault::Bond,
+	vault::Obligation,
 	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
 	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 };
@@ -112,7 +112,7 @@ impl BitcoinUtxoEvents for Tuple {
 
 pub trait UtxoLockEvents<AccountId: Codec, Balance: Codec + Copy> {
 	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
-	/// Called when a utxo is removed from bond (whether from being spent outside the system, or
+	/// Called when a bitcoin is unlocked (whether from being spent outside the system, or
 	/// from being unlocked)
 	fn utxo_unlocked(
 		utxo_id: UtxoId,
@@ -136,19 +136,19 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 	}
 }
 
-pub trait BondEvents<AccountId: Codec, Balance: Codec + Copy> {
-	fn bond_canceled(bond: &Bond<AccountId, Balance>) -> DispatchResult;
-	fn bond_completed(bond: &Bond<AccountId, Balance>) -> DispatchResult;
+pub trait ObligationEvents<AccountId: Codec, Balance: Codec + Copy> {
+	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
+	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
-impl<AccountId: Codec, Balance: Codec + Copy> BondEvents<AccountId, Balance> for Tuple {
-	fn bond_canceled(bond: &Bond<AccountId, Balance>) -> DispatchResult {
-		for_tuples!( #( Tuple::bond_canceled(bond)?; )* );
+impl<AccountId: Codec, Balance: Codec + Copy> ObligationEvents<AccountId, Balance> for Tuple {
+	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
+		for_tuples!( #( Tuple::on_canceled(obligation)?; )* );
 		Ok(())
 	}
-	fn bond_completed(bond: &Bond<AccountId, Balance>) -> DispatchResult {
-		for_tuples!( #( Tuple::bond_completed(bond)?; )* );
+	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
+		for_tuples!( #( Tuple::on_completed(obligation)?; )* );
 		Ok(())
 	}
 }

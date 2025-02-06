@@ -1,5 +1,5 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, MiningConfig, NextSlotCohort},
+	pallet::{ActiveMinersByIndex, ArgonotsPerMiningSeat, MiningConfig, NextSlotCohort},
 	Config,
 };
 use alloc::vec::Vec;
@@ -13,7 +13,7 @@ mod v1 {
 	use argon_primitives::{
 		block_seal::{MinerIndex, RewardDestination, RewardSharing},
 		prelude::Tick,
-		BlockNumber, BondId,
+		BlockNumber, ObligationId,
 	};
 	use codec::MaxEncodedLen;
 	use frame_support::{pallet_prelude::*, storage_alias, Blake2_128Concat, BoundedVec};
@@ -24,7 +24,7 @@ mod v1 {
 	pub struct MiningRegistration<T: Config> {
 		pub account_id: <T as frame_system::Config>::AccountId,
 		pub reward_destination: RewardDestination<<T as frame_system::Config>::AccountId>,
-		pub bond_id: Option<BondId>,
+		pub obligation_id: Option<ObligationId>,
 		#[codec(compact)]
 		pub bond_amount: <T as Config>::Balance,
 		#[codec(compact)]
@@ -66,6 +66,10 @@ mod v1 {
 	pub(super) type MiningConfig<T: Config> =
 		StorageValue<crate::Pallet<T>, MiningSlotConfig, ValueQuery>;
 
+	#[storage_alias]
+	pub(super) type OwnershipBondAmount<T: Config> =
+		StorageValue<crate::Pallet<T>, <T as Config>::Balance, ValueQuery>;
+
 	#[cfg(feature = "try-runtime")]
 	#[derive(Encode, Decode, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
@@ -100,9 +104,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 			Some(MiningRegistration {
 				account_id: reg.account_id,
 				reward_destination: reg.reward_destination,
-				bond_id: reg.bond_id,
-				bond_amount: reg.bond_amount,
-				ownership_tokens: reg.ownership_tokens,
+				obligation_id: reg.obligation_id,
+				bonded_argons: reg.bond_amount,
+				argonots: reg.ownership_tokens,
 				reward_sharing: reg.reward_sharing,
 				authority_keys: reg.authority_keys,
 				// since this is only possible on testnet, we'll set to 0
@@ -121,9 +125,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 						MiningRegistration {
 							account_id: reg.account_id,
 							reward_destination: reg.reward_destination,
-							bond_id: reg.bond_id,
-							bond_amount: reg.bond_amount,
-							ownership_tokens: reg.ownership_tokens,
+							obligation_id: reg.obligation_id,
+							bonded_argons: reg.bond_amount,
+							argonots: reg.ownership_tokens,
 							reward_sharing: reg.reward_sharing,
 							authority_keys: reg.authority_keys,
 							// since this is only possible on testnet, we'll set to 0
@@ -135,6 +139,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 			}
 			None
 		});
+
+		count += 1;
+		ArgonotsPerMiningSeat::<T>::put(v1::OwnershipBondAmount::<T>::take());
 
 		MiningConfig::<T>::translate::<v1::MiningSlotConfig, _>(|config| {
 			let config = config.unwrap();
@@ -209,7 +216,7 @@ mod test {
 				1,
 				v1::MiningRegistration {
 					account_id: 1,
-					bond_id: Some(1),
+					obligation_id: Some(1),
 					bond_amount: 100u128,
 					authority_keys: 1u64.into(),
 					ownership_tokens: 100u128,
@@ -221,7 +228,7 @@ mod test {
 				2,
 				v1::MiningRegistration {
 					account_id: 2,
-					bond_id: Some(2),
+					obligation_id: Some(2),
 					bond_amount: 100u128,
 					authority_keys: 2u64.into(),
 					ownership_tokens: 100u128,
@@ -233,7 +240,7 @@ mod test {
 			v1::NextSlotCohort::<Test>::put(BoundedVec::truncate_from(vec![
 				v1::MiningRegistration {
 					account_id: 3,
-					bond_id: None,
+					obligation_id: None,
 					bond_amount: 100u128,
 					authority_keys: 2u64.into(),
 					ownership_tokens: 100u128,
@@ -256,7 +263,7 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(3, 3));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(4, 4));
 
 			// After the migration, the new value should be set as the `current` value.
 			assert_eq!(
@@ -271,10 +278,10 @@ mod test {
 				new_value,
 				MiningRegistration {
 					account_id: 1,
-					bond_id: Some(1),
-					bond_amount: 100u128,
+					obligation_id: Some(1),
+					bonded_argons: 100u128,
 					authority_keys: 1u64.into(),
-					ownership_tokens: 100u128,
+					argonots: 100u128,
 					reward_destination: Owner,
 					reward_sharing: None,
 					slot_id: 0

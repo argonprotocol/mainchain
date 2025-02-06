@@ -5,14 +5,11 @@ use sp_runtime::{FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
 use argon_client::{
-	api::{
-		apis, bonds::events::bond_created::VaultId, storage, tx,
-		vaults::storage::types::vaults_by_id::VaultsById,
-	},
+	api::{apis, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
-use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams, VaultId};
 
 use crate::{formatters::ArgonFormatter, vault_create};
 
@@ -20,7 +17,7 @@ use crate::{formatters::ArgonFormatter, vault_create};
 pub enum VaultCommands {
 	/// Show vaults that can support the given amount of btc
 	List {
-		/// The amount of btc to bond
+		/// The amount of btc to lock
 		#[clap(short, long, default_value = "1.0")]
 		btc: f32,
 	},
@@ -130,7 +127,7 @@ impl VaultCommands {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let call = storage().bonds().utxos_pending_unlock_by_utxo_id();
+				let call = storage().bitcoin_locks().utxos_pending_unlock_by_utxo_id();
 				let Some(pending) = client.fetch_storage(&call, None).await? else {
 					println!("No pending unlock requests found");
 					return Ok(());
@@ -142,7 +139,7 @@ impl VaultCommands {
 					.apply_modifier(UTF8_ROUND_CORNERS)
 					.set_content_arrangement(ContentArrangement::Dynamic)
 					.set_header(vec![
-						"Bond Id",
+						"obligation id",
 						"Utxo Id",
 						"Cosign Due Block",
 						"Type",
@@ -153,7 +150,7 @@ impl VaultCommands {
 						continue;
 					}
 					table.add_row(vec![
-						pending.bond_id.to_string(),
+						pending.obligation_id.to_string(),
 						utxo_id.to_string(),
 						pending.cosign_due_block.to_string(),
 						"Cosign Request".to_string(),

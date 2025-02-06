@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/
 import type { BTreeMap, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningBidStats, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, ArgonPrimitivesVault, ArgonPrimitivesVaultBond, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBondUtxoCosignRequest, PalletBondUtxoState, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletMintMintAction, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningBidStats, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, ArgonPrimitivesVault, ArgonPrimitivesVaultObligation, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBitcoinLocksBitcoinLock, PalletBitcoinLocksUtxoCosignRequest, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletMintMintAction, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, SpConsensusGrandpaAppPublic, SpRuntimeDigest } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -81,6 +81,35 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
+    bitcoinLocks: {
+      /**
+       * Stores bitcoin utxos that have requested to be unlocked
+       **/
+      locksByUtxoId: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksBitcoinLock>>, [u64]>;
+      /**
+       * The minimum number of satoshis that can be locked
+       **/
+      minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
+      /**
+       * Mapping of obligation id to lock id
+       **/
+      obligationIdToUtxoId: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u64>>, [u64]>;
+      /**
+       * Stores Utxos that were not paid back in full
+       *
+       * Tuple stores Account, Vault, Still Owed, State
+       **/
+      owedUtxoAggrieved: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[AccountId32, u32, u128, PalletBitcoinLocksBitcoinLock]>>>, [u64]>;
+      /**
+       * Stores the block number where the utxo was unlocked
+       **/
+      utxosCosignReleaseHeightById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u64]>;
+      /**
+       * Utxos that have been requested to be cosigned for unlocking
+       **/
+      utxosPendingUnlockByUtxoId: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBitcoinLocksUtxoCosignRequest>>, []>;
+    };
     bitcoinUtxos: {
       /**
        * The genesis set bitcoin network that this chain is tied to
@@ -100,14 +129,14 @@ declare module '@polkadot/api-base/types/storage' {
       lockedUtxoExpirationsByBlock: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBitcoinUtxoRef>>, [u64]>;
       /**
        * Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
-       * the expiration block, the bond is burned and the UTXO is unlocked.
+       * the expiration block, the obligation is burned and the UTXO is unlocked.
        **/
       lockedUtxos: AugmentedQuery<ApiType, (arg: ArgonPrimitivesBitcoinUtxoRef | { txid?: any; outputIndex?: any } | string | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoValue>>, [ArgonPrimitivesBitcoinUtxoRef]>;
-      nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
        * Bitcoin Oracle Operator Account
        **/
       oracleOperatorAccount: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
+      previousBitcoinBlockTip: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
       /**
        * The last synched bitcoin block
        **/
@@ -189,44 +218,6 @@ declare module '@polkadot/api-base/types/storage' {
        * Keeps the last 3 vote minimums. The first one applies to the current block.
        **/
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
-    };
-    bonds: {
-      /**
-       * Completion of bitcoin bonds by bitcoin height. Bond funds are returned to the vault if
-       * unlocked or used as the price of the bitcoin
-       **/
-      bitcoinBondCompletions: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u64]>;
-      /**
-       * Bonds by id
-       **/
-      bondsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVaultBond>>, [u64]>;
-      /**
-       * The minimum number of satoshis that can be bonded
-       **/
-      minimumBitcoinBondSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
-       * Completion of mining bonds, upon which funds are returned to the vault
-       **/
-      miningBondCompletions: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u64]>;
-      nextBondId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
-      /**
-       * Stores Utxos that were not paid back in full
-       *
-       * Tuple stores Account, Vault, Still Owed, State
-       **/
-      owedUtxoAggrieved: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[AccountId32, u32, u128, PalletBondUtxoState]>>>, [u64]>;
-      /**
-       * Stores bitcoin utxos that have requested to be unlocked
-       **/
-      utxosById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBondUtxoState>>, [u64]>;
-      /**
-       * Stores the block number where the utxo was unlocked
-       **/
-      utxosCosignReleaseHeightById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u64]>;
-      /**
-       * Utxos that have been requested to be cosigned for unlocking
-       **/
-      utxosPendingUnlockByUtxoId: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, PalletBondUtxoCosignRequest>>, []>;
     };
     chainTransfer: {
       expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u64]>;
@@ -364,6 +355,10 @@ declare module '@polkadot/api-base/types/storage' {
       activeMinersByIndex: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBlockSealMiningRegistration>>, [u32]>;
       activeMinersCount: AugmentedQuery<ApiType, () => Observable<u16>, []>;
       /**
+       * Argonots that must be locked to take a Miner role
+       **/
+      argonotsPerMiningSeat: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
        * Authorities are the session keys that are actively participating in the network.
        * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
        **/
@@ -390,10 +385,6 @@ declare module '@polkadot/api-base/types/storage' {
        * registrants with their bid amount
        **/
       nextSlotCohort: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>, []>;
-      /**
-       * Tokens that must be bonded to take a Miner role
-       **/
-      ownershipBondAmount: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
     mint: {
       blockMintAction: AugmentedQuery<ApiType, () => Observable<ITuple<[u32, PalletMintMintAction]>>, []>;
@@ -690,7 +681,21 @@ declare module '@polkadot/api-base/types/storage' {
       pausedCalls: AugmentedQuery<ApiType, (arg: ITuple<[Bytes, Bytes]> | [Bytes | string | Uint8Array, Bytes | string | Uint8Array]) => Observable<Option<Null>>, [ITuple<[Bytes, Bytes]>]>;
     };
     vaults: {
+      /**
+       * Completion of bitcoin locks by bitcoin height. Funds are returned to the vault if
+       * unlocked or used as the price of the bitcoin
+       **/
+      bitcoinLockCompletions: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u64]>;
+      /**
+       * Completion of mining obligation, upon which funds are returned to the vault
+       **/
+      bondedArgonCompletions: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>, [u64]>;
+      nextObligationId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Obligation  by id
+       **/
+      obligationsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVaultObligation>>, [u64]>;
       /**
        * Pending funding that will be committed at the given block number (must be a minimum of 1
        * slot change away)

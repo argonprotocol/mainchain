@@ -80,7 +80,7 @@ pub type Nonce = u32;
 /// A timestamp: milliseconds since the unix epoch.
 pub type Moment = u64;
 
-pub type BondId = u64;
+pub type ObligationId = u64;
 pub type VaultId = u32;
 
 /// A hash of some data used by the chain.
@@ -94,8 +94,8 @@ pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
 pub mod prelude {
 	pub use super::{
-		localchain::*, tick::Tick, AccountId, Balance, BlockNumber, BondId, Chain, ChainIdentity,
-		Moment, Nonce, NotaryId, NotebookNumber, VaultId,
+		localchain::*, tick::Tick, AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment,
+		Nonce, NotaryId, NotebookNumber, ObligationId, VaultId,
 	};
 }
 pub mod localchain {

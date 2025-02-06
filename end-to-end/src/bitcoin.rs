@@ -31,7 +31,7 @@ use argon_client::{
 use argon_primitives::{
 	argon_utils::format_argons,
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, Satoshis, UtxoId, SATOSHIS_PER_BITCOIN},
-	Balance, BondId, VaultId,
+	Balance, VaultId,
 };
 use argon_testing::{
 	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
@@ -134,20 +134,25 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 
-	// 3. Owner calls bond api to start a bitcoin bond
-	let (utxo_id, bond_id) =
-		create_bond(&test_node, vault_id, utxo_btc, &owner_compressed_pubkey, &bitcoin_owner_pair)
-			.await
-			.unwrap();
-
-	let send_to_address = run_bitcoin_cli(
+	// 3. Owner calls api to request a bitcoin lock
+	let utxo_id = request_bitcoin_lock(
 		&test_node,
-		vec!["lock", "send-to-address", "--bond-id", &bond_id.to_string()],
+		vault_id,
+		utxo_btc,
+		&owner_compressed_pubkey,
+		&bitcoin_owner_pair,
 	)
 	.await
 	.unwrap();
 
-	let (script_address, bond_amount) = confirm_bond(
+	let send_to_address = run_bitcoin_cli(
+		&test_node,
+		vec!["lock", "send-to-address", "--utxo-id", &utxo_id.to_string()],
+	)
+	.await
+	.unwrap();
+
+	let (script_address, lock_amount) = confirm_bond(
 		&test_node,
 		&secp,
 		owner_compressed_pubkey,
@@ -156,12 +161,12 @@ async fn test_bitcoin_minting_e2e() {
 		&vault_xpub,
 		network,
 		vault_id,
-		&bond_id,
+		&utxo_id,
 	)
 	.await
 	.unwrap();
 
-	// 4. Owner funds the bond utxo and submits it
+	// 4. Owner funds the BitcoinLock utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
 	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
 	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
@@ -215,11 +220,11 @@ async fn test_bitcoin_minting_e2e() {
 	// Register the miner against the test node since we are having fork issues
 	register_miner(&test_node, vote_miner.pair(), keys).await.unwrap();
 
-	wait_for_mint(&bitcoin_owner_pair, &client, &utxo_id, bond_amount, txid, vout)
+	wait_for_mint(&bitcoin_owner_pair, &client, &utxo_id, lock_amount, txid, vout)
 		.await
 		.unwrap();
 
-	let _ = run_bitcoin_cli(&test_node, vec!["lock", "get", "--bond-id", &bond_id.to_string()])
+	let _ = run_bitcoin_cli(&test_node, vec!["lock", "status", "--utxo-id", &utxo_id.to_string()])
 		.await
 		.unwrap();
 
@@ -232,7 +237,7 @@ async fn test_bitcoin_minting_e2e() {
 		&bitcoin_owner_pair,
 		&client,
 		vault_id,
-		bond_id,
+		utxo_id,
 	)
 	.await
 	.unwrap();
@@ -244,7 +249,7 @@ async fn test_bitcoin_minting_e2e() {
 		client,
 		&vault_signer,
 		&vault_id,
-		&bond_id,
+		&utxo_id,
 		&vault_xpriv_path,
 		&vault_xpriv_pwd,
 		&vault_xpub_hd_path,
@@ -405,18 +410,18 @@ async fn create_vault(
 	Ok(vault_creation.vault_id)
 }
 
-async fn create_bond(
+async fn request_bitcoin_lock(
 	test_node: &ArgonTestNode,
 	vault_id: VaultId,
 	utxo_btc: f64,
 	owner_compressed_pubkey: &bitcoin::PublicKey,
 	bitcoin_owner: &sr25519::Pair,
-) -> anyhow::Result<(UtxoId, BondId)> {
-	let bond_cli_result = run_bitcoin_cli(
+) -> anyhow::Result<UtxoId> {
+	let lock_cli_result = run_bitcoin_cli(
 		test_node,
 		vec![
 			"lock",
-			"apply",
+			"request",
 			"--vault-id",
 			&vault_id.to_string(),
 			"--btc",
@@ -427,21 +432,22 @@ async fn create_bond(
 	)
 	.await?;
 
-	let bond_tx = test_node
+	let lock_tx = test_node
 		.client
 		.submit_from_polkadot_url(
-			&bond_cli_result,
+			&lock_cli_result,
 			&Sr25519Signer::new(bitcoin_owner.clone()),
 			None,
 		)
 		.await?
 		.wait_for_finalized_success()
 		.await?;
-	println!("bitcoin bond submitted (owner watches for bond id)");
-	let bond_event = bond_tx.find_first::<api::bonds::events::BondCreated>()?.expect("bond event");
-	let utxo_id = bond_event.utxo_id.unwrap();
-	let bond_id = bond_event.bond_id;
-	Ok((utxo_id, bond_id))
+	println!("bitcoin lock submitted (owner watches for utxo id)");
+	let lock_event = lock_tx
+		.find_first::<api::bitcoin_locks::events::BitcoinLockCreated>()?
+		.expect("lock event");
+	let utxo_id = lock_event.utxo_id;
+	Ok(utxo_id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -454,32 +460,29 @@ async fn confirm_bond(
 	xpubkey: &str,
 	bitcoin_network: Network,
 	vault_id: VaultId,
-	bond_id: &BondId,
+	utxo_id: &UtxoId,
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
-	let bond_cli_get =
-		run_bitcoin_cli(test_node, vec!["lock", "get", "--bond-id", &bond_id.to_string()]).await?;
+	let lock_cli_get =
+		run_bitcoin_cli(test_node, vec!["lock", "status", "--utxo-id", &utxo_id.to_string()])
+			.await?;
 
 	let xpubkey = Xpub::from_str(xpubkey).expect("valid xpub");
 
-	let bond_api = client
-		.fetch_storage(&storage().bonds().bonds_by_id(bond_id), None)
+	let lock_api = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), None)
 		.await?
 		.expect("should be able to retrieve");
-	assert_eq!(bond_api.vault_id, vault_id);
-	let utxo_api = client
-		.fetch_storage(&storage().bonds().utxos_by_id(bond_api.utxo_id.expect("")), None)
-		.await?
-		.unwrap();
+	assert_eq!(lock_api.vault_id, vault_id);
 	{
-		assert_eq!(utxo_api.satoshis, utxo_satoshis);
-		assert_eq!(utxo_api.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
-		assert_eq!(utxo_api.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
+		assert_eq!(lock_api.satoshis, utxo_satoshis);
+		assert_eq!(lock_api.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
+		assert_eq!(lock_api.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
 		assert_eq!(
-			utxo_api.vault_xpub_sources.1,
+			lock_api.vault_xpub_sources.1,
 			Into::<u32>::into(ChildNumber::from_normal_idx(1)?)
 		);
 		assert_eq!(
-			utxo_api.vault_pubkey.0,
+			lock_api.vault_pubkey.0,
 			xpubkey
 				.derive_pub(secp, &DerivationPath::from_str("1")?)?
 				.public_key
@@ -487,12 +490,12 @@ async fn confirm_bond(
 		);
 		let cosign_script = CosignScript::new(
 			CosignScriptArgs {
-				vault_pubkey: utxo_api.vault_pubkey.clone().into(),
-				owner_pubkey: utxo_api.owner_pubkey.into(),
-				vault_claim_pubkey: utxo_api.vault_claim_pubkey.into(),
-				vault_claim_height: utxo_api.vault_claim_height,
-				open_claim_height: utxo_api.open_claim_height,
-				created_at_height: utxo_api.created_at_height,
+				vault_pubkey: lock_api.vault_pubkey.clone().into(),
+				owner_pubkey: lock_api.owner_pubkey.into(),
+				vault_claim_pubkey: lock_api.vault_claim_pubkey.into(),
+				vault_claim_height: lock_api.vault_claim_height,
+				open_claim_height: lock_api.open_claim_height,
+				created_at_height: lock_api.created_at_height,
 			},
 			bitcoin_network,
 		)
@@ -500,23 +503,23 @@ async fn confirm_bond(
 		let cosign_key = cosign_script.script.to_p2wsh();
 		let cosign_script_pubkey: BitcoinCosignScriptPubkey =
 			cosign_key.try_into().map_err(|_| anyhow!("Unable to convert script pubkey"))?;
-		assert_eq!(cosign_script_pubkey, utxo_api.utxo_script_pubkey.clone().into());
+		assert_eq!(cosign_script_pubkey, lock_api.utxo_script_pubkey.clone().into());
 	}
 
-	assert!(bond_cli_get
+	assert!(lock_cli_get
 		.lines()
 		.find(|line| line.contains("Minted Argons"))
 		.unwrap()
-		.contains(&format!("₳0 of {}", format_argons(bond_api.amount))));
-	let bond_amount = bond_api.amount;
-	Ok((utxo_api.utxo_script_pubkey.into(), bond_amount))
+		.contains(&format!("₳0 of {}", format_argons(lock_api.lock_price))));
+	let lock_amount = lock_api.lock_price;
+	Ok((lock_api.utxo_script_pubkey.into(), lock_amount))
 }
 
 async fn wait_for_mint(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	utxo_id: &UtxoId,
-	bond_amount: Balance,
+	lock_amount: Balance,
 	txid: Txid,
 	vout: u32,
 ) -> anyhow::Result<()> {
@@ -564,17 +567,17 @@ async fn wait_for_mint(
 	let owner_account_id32: AccountId32 = bitcoin_owner.clone().public().into();
 	let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 	if pending_mint.0.is_empty() {
-		assert!(balance.free >= bond_amount);
+		assert!(balance.free >= lock_amount);
 	} else {
 		assert_eq!(pending_mint.0.len(), 1);
 		assert_eq!(pending_mint.0[0].1, owner_account_id32.into());
 		// should have minted some amount
-		assert!(pending_mint.0[0].2 < bond_amount);
+		assert!(pending_mint.0[0].2 < lock_amount);
 		println!(
 			"Owner mint pending remaining = {} (balance={})",
 			pending_mint.0[0].2, balance.free
 		);
-		assert!(balance.free > (bond_amount - pending_mint.0[0].2));
+		assert!(balance.free > (lock_amount - pending_mint.0[0].2));
 
 		// 4. Wait for the full payout
 		let mut counter = 0;
@@ -604,7 +607,7 @@ async fn owner_requests_unlock(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	vault_id: VaultId,
-	bond_id: BondId,
+	utxo_id: UtxoId,
 ) -> anyhow::Result<()> {
 	let out_script_pubkey = bitcoind
 		.client
@@ -616,8 +619,8 @@ async fn owner_requests_unlock(
 		vec![
 			"lock",
 			"request-unlock",
-			"--bond-id",
-			&bond_id.to_string(),
+			"--utxo-id",
+			&utxo_id.to_string(),
 			"--dest-pubkey",
 			&out_script_pubkey.to_string(),
 		],
@@ -636,9 +639,9 @@ async fn owner_requests_unlock(
 	println!("bitcoin unlock request finalized");
 	// this is the event that a vault would also monitor
 	let unlock_event = unlock_request_tx
-		.find_first::<api::bonds::events::BitcoinUtxoCosignRequested>()?
+		.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosignRequested>()?
 		.expect("unlock event");
-	assert_eq!(unlock_event.bond_id, bond_id);
+	assert_eq!(unlock_event.utxo_id, utxo_id);
 	assert_eq!(unlock_event.vault_id, vault_id);
 
 	Ok(())
@@ -650,7 +653,7 @@ async fn vault_cosigns_unlock(
 	client: Arc<MainchainClient>,
 	vault_signer: &Sr25519Signer,
 	vault_id: &VaultId,
-	bond_id: &BondId,
+	utxo_id: &UtxoId,
 	xpriv_path: &str,
 	xpriv_pwd: &str,
 	uploaded_xpub_hd_path: &str,
@@ -669,8 +672,8 @@ async fn vault_cosigns_unlock(
 		vec![
 			"lock",
 			"vault-cosign",
-			"--bond-id",
-			&bond_id.to_string(),
+			"--utxo-id",
+			&utxo_id.to_string(),
 			"--xpriv-path",
 			xpriv_path,
 			"--password",

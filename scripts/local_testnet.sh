@@ -32,14 +32,20 @@ mkdir -p /tmp/argon/$RUNID/bitcoin;
 # listen for sighup and kill all child processes
 trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 
-BTC_CLI="$("$BASEDIR/target/debug/argon-testing-bitcoin") -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
-
-$BTC_CLI -regtest -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/$RUNID/bitcoin \
+$("$BASEDIR/target/debug/argon-testing-bitcoin") -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin \
+  -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/$RUNID/bitcoin \
   -blockfilterindex -txindex -wallet=1  2>&1 | \
   awk -v name="bitcoin" '{printf "%-8s %s\n", name, $0; fflush()}' &
 
+if ! command -v bitcoin-cli &> /dev/null
+then
+    echo "bitcoin-cli could not be found, installing..."
+    brew install bitcoin
+fi
+
+BTC_CLI="bitcoin-cli -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
 # try to create wallet, but if it already exists, ignore error
-$BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default"
+$BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default" || true
 
 # go to point of generating funds
 $BTC_CLI -generate 101

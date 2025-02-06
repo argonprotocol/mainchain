@@ -1,4 +1,4 @@
-use crate::{tick::Tick, Balance, BondId};
+use crate::{tick::Tick, Balance, ObligationId};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use scale_info::TypeInfo;
@@ -71,11 +71,11 @@ pub struct MiningRegistration<
 > {
 	pub account_id: AccountId,
 	pub reward_destination: RewardDestination<AccountId>,
-	pub bond_id: Option<BondId>,
+	pub obligation_id: Option<ObligationId>,
 	#[codec(compact)]
-	pub bond_amount: Balance,
+	pub bonded_argons: Balance,
 	#[codec(compact)]
-	pub ownership_tokens: Balance,
+	pub argonots: Balance,
 	pub reward_sharing: Option<RewardSharing<AccountId>>,
 	pub authority_keys: Keys,
 	#[codec(compact)]

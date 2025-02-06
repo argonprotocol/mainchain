@@ -17,11 +17,11 @@ use argon_primitives::bitcoin::BitcoinXPub;
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
-	/// Argons to move to the vault to be available for bitcoin bonds.
+	/// Argons to move to the vault to be available for bitcoin locks.
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_argons: Option<f32>,
 	/// A serialized xpub string to be uploaded to the vault. Child pubkeys will have a single
-	/// incrementing index used for each bond.
+	/// incrementing index used for each bitcoin lock.
 	#[clap(long)]
 	bitcoin_xpub: Option<String>,
 
@@ -29,12 +29,12 @@ pub struct VaultConfig {
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_base_fee: Option<f32>,
 
-	/// The bitcoin bonds annual percent return. A bitcoin bond is 1 year, so returns are the
+	/// The bitcoin locks annual percent return. A bitcoin lock is 1 year, so returns are the
 	/// amount of argons borrowed times this rate.
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_apr: Option<f32>,
 	/// Number of argons to move into the vault for mining. NOTE: mining can only be done at a 1-1
-	/// ratio with the amount of bonded bitcoin argons (or securitization up to 2x bitcoin bonds).
+	/// ratio with the amount of bonded bitcoin argons (or securitization up to 2x bitcoin locks).
 	#[clap(long, value_parser=parse_number)]
 	bonded_argons: Option<f32>,
 
@@ -57,7 +57,7 @@ pub struct VaultConfig {
 }
 
 const FIELD_TO_LABEL: [(&str, &str); 9] = [
-	("bitcoin_argons", "Bitcoin Bond Argons"),
+	("bitcoin_argons", "bitcoin lock Argons"),
 	("bitcoin_xpub", "Bitcoin XPub"),
 	("bitcoin_base_fee", "Bitcoin Base Fee Argons"),
 	("bitcoin_apr", "Bitcoin APR"),

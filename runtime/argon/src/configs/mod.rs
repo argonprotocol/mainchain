@@ -270,13 +270,13 @@ impl pallet_ticks::Config for Runtime {
 parameter_types! {
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
 	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
-	pub const OwnershipPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
-	pub const MaximumOwnershipBondAmountPercent: Percent = Percent::from_percent(80);
+	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 12; // Ideally we want 12 bids per slot
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
 
-	pub const MaxConcurrentlyExpiringBonds: u32 = 1_000;
-	pub const MinimumBondAmount: u128 = 100_000;
+	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
+	pub const MinimumObligationAmount: u128 = 100_000;
 	pub const TicksPerDay: Tick = 1440;
 	pub const TicksPerYear: Tick = 1440 * 365;
 
@@ -299,16 +299,16 @@ impl pallet_vaults::Config for Runtime {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumBondAmount = MinimumBondAmount;
+	type MinimumObligationAmount = MinimumObligationAmount;
 	type TicksPerDay = TicksPerDay;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
 	type MinTermsModificationTickDelay = MinTermsModificationTickDelay;
 	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type BitcoinBlockHeight = BitcoinUtxos;
+	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type TickProvider = Ticks;
-	type MaxConcurrentlyExpiringBonds = MaxConcurrentlyExpiringBonds;
+	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
 }
 
@@ -378,9 +378,9 @@ impl pallet_mining_slot::Config for Runtime {
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
-	type OwnershipPercentAdjustmentDamper = OwnershipPercentAdjustmentDamper;
-	type MinimumOwnershipBondAmount = ConstU128<EXISTENTIAL_DEPOSIT>;
-	type MaximumOwnershipBondAmountPercent = MaximumOwnershipBondAmountPercent;
+	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
+	type MinimumArgonotsPerSeat = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;

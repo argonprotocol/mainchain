@@ -51,7 +51,7 @@ pub mod pallet {
 	}
 
 	/// Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
-	/// the expiration block, the bond is burned and the UTXO is unlocked.
+	/// the expiration block, the obligation is burned and the UTXO is unlocked.
 	#[pallet::storage]
 	pub(super) type LockedUtxos<T: Config> =
 		StorageMap<_, Blake2_128Concat, UtxoRef, UtxoValue, OptionQuery>;
@@ -77,6 +77,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type ConfirmedBitcoinBlockTip<T: Config> =
 		StorageValue<_, BitcoinBlock, OptionQuery>;
+
+	#[pallet::storage]
+	pub(super) type PreviousBitcoinBlockTip<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
 
 	/// Stores if parent block had a confirmed bitcoin block
 	#[pallet::storage]
@@ -164,6 +167,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			TempParentHasSyncState::<T>::put(ConfirmedBitcoinBlockTip::<T>::get().is_some());
+			PreviousBitcoinBlockTip::<T>::set(ConfirmedBitcoinBlockTip::<T>::get());
 			// 1 write is temporary
 			T::DbWeight::get().reads_writes(2, 1)
 		}
@@ -523,6 +527,16 @@ pub mod pallet {
 	impl<T: Config> Get<BitcoinHeight> for Pallet<T> {
 		fn get() -> BitcoinHeight {
 			<ConfirmedBitcoinBlockTip<T>>::get().map(|a| a.block_height).unwrap_or_default()
+		}
+	}
+
+	impl<T: Config> Get<(BitcoinHeight, BitcoinHeight)> for Pallet<T> {
+		fn get() -> (BitcoinHeight, BitcoinHeight) {
+			let current =
+				ConfirmedBitcoinBlockTip::<T>::get().map(|a| a.block_height).unwrap_or_default();
+			let previous =
+				PreviousBitcoinBlockTip::<T>::get().map(|a| a.block_height).unwrap_or(current);
+			(previous, current)
 		}
 	}
 }

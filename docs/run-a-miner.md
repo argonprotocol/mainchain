@@ -177,7 +177,8 @@ the amount of securitization locked up by the vault. In other words, if a vault 
 securitization in the vault, the vault is able to offer up to 300k of mining bonds. If
 there is 0 securitization, then only 100k of mining bonds are eligible. A vault offers an allocated amount of both
 Bitcoin and Mining bonds. You can view a vault's current allocation by looking at the Chain State in Polkadot.js under
-`Vaults -> VaultsById`, and then viewing `allocated` and `bonded` amounts of each. Some Vault operators will also offer
+`Vaults -> VaultsById`, and then viewing `allocated` and `reserved` amounts of each. Some Vault operators will also
+offer
 profit sharing terms, where you don't need to rent Argons for as high a cost, but will need to share argons minted
 during your slot.
 
@@ -280,7 +281,7 @@ based on a target number of miners applying for the slots). These variables can 
 
 - `TargetBidsPerSlot`: the current number of bids per slot that are targeted (20% more than slots available)
 - `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
-- `OwnershipBondAmount`: the total number of Ownership Tokens needed to bid for a slot
+- `ArgonotsPerMiningSeat`: the total number of Ownership Tokens (argonots) needed to bid for a slot
 - `NextSlotCohort`: the currently slotted miners for the slot ending tomorrow
 
 #### Slot Bid End-time

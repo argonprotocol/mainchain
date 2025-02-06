@@ -283,19 +283,19 @@ declare module '@polkadot/types/lookup' {
     readonly isSlotBidderReplaced: boolean;
     readonly asSlotBidderReplaced: {
       readonly accountId: AccountId32;
-      readonly bondId: Option<u64>;
-      readonly keptOwnershipBond: bool;
+      readonly obligationId: Option<u64>;
+      readonly preservedArgonotHold: bool;
     } & Struct;
-    readonly isUnbondedMiner: boolean;
-    readonly asUnbondedMiner: {
+    readonly isReleasedMinerSeat: boolean;
+    readonly asReleasedMinerSeat: {
       readonly accountId: AccountId32;
-      readonly bondId: Option<u64>;
-      readonly keptOwnershipBond: bool;
+      readonly obligationId: Option<u64>;
+      readonly preservedArgonotHold: bool;
     } & Struct;
-    readonly isUnbondMinerError: boolean;
-    readonly asUnbondMinerError: {
+    readonly isReleaseMinerSeatError: boolean;
+    readonly asReleaseMinerSeatError: {
       readonly accountId: AccountId32;
-      readonly bondId: Option<u64>;
+      readonly obligationId: Option<u64>;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
     readonly isMiningConfigurationUpdated: boolean;
@@ -304,16 +304,16 @@ declare module '@polkadot/types/lookup' {
       readonly ticksBetweenSlots: u64;
       readonly slotBiddingStartAfterTicks: u64;
     } & Struct;
-    readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderReplaced' | 'UnbondedMiner' | 'UnbondMinerError' | 'MiningConfigurationUpdated';
+    readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderReplaced' | 'ReleasedMinerSeat' | 'ReleaseMinerSeatError' | 'MiningConfigurationUpdated';
   }
 
   /** @name ArgonPrimitivesBlockSealMiningRegistration (41) */
   interface ArgonPrimitivesBlockSealMiningRegistration extends Struct {
     readonly accountId: AccountId32;
     readonly rewardDestination: ArgonPrimitivesBlockSealRewardDestination;
-    readonly bondId: Option<u64>;
-    readonly bondAmount: Compact<u128>;
-    readonly ownershipTokens: Compact<u128>;
+    readonly obligationId: Option<u64>;
+    readonly bondedArgons: Compact<u128>;
+    readonly argonots: Compact<u128>;
     readonly rewardSharing: Option<ArgonPrimitivesBlockSealRewardSharing>;
     readonly authorityKeys: ArgonRuntimeSessionKeys;
     readonly slotId: Compact<u64>;
@@ -423,13 +423,13 @@ declare module '@polkadot/types/lookup' {
       readonly bondedArgons: u128;
       readonly addedSecuritizationPercent: u128;
     } & Struct;
-    readonly isVaultMiningBondsIncreased: boolean;
-    readonly asVaultMiningBondsIncreased: {
+    readonly isVaultBondedArgonsIncreased: boolean;
+    readonly asVaultBondedArgonsIncreased: {
       readonly vaultId: u32;
       readonly bondedArgons: u128;
     } & Struct;
-    readonly isVaultMiningBondsChangeScheduled: boolean;
-    readonly asVaultMiningBondsChangeScheduled: {
+    readonly isVaultBondedArgonsChangeScheduled: boolean;
+    readonly asVaultBondedArgonsChangeScheduled: {
       readonly vaultId: u32;
       readonly changeTick: u64;
     } & Struct;
@@ -445,106 +445,113 @@ declare module '@polkadot/types/lookup' {
     readonly isVaultClosed: boolean;
     readonly asVaultClosed: {
       readonly vaultId: u32;
-      readonly bitcoinAmountStillBonded: u128;
-      readonly miningAmountStillBonded: u128;
-      readonly securitizationStillBonded: u128;
+      readonly bitcoinAmountStillReserved: u128;
+      readonly miningAmountStillReserved: u128;
+      readonly securitizationStillReserved: u128;
     } & Struct;
     readonly isVaultBitcoinXpubChange: boolean;
     readonly asVaultBitcoinXpubChange: {
       readonly vaultId: u32;
     } & Struct;
-    readonly type: 'VaultCreated' | 'VaultModified' | 'VaultMiningBondsIncreased' | 'VaultMiningBondsChangeScheduled' | 'VaultTermsChangeScheduled' | 'VaultTermsChanged' | 'VaultClosed' | 'VaultBitcoinXpubChange';
-  }
-
-  /** @name PalletBondEvent (59) */
-  interface PalletBondEvent extends Enum {
-    readonly isBondCreated: boolean;
-    readonly asBondCreated: {
+    readonly isObligationCreated: boolean;
+    readonly asObligationCreated: {
       readonly vaultId: u32;
-      readonly bondId: u64;
-      readonly bondType: ArgonPrimitivesVaultBondType;
-      readonly bondedAccountId: AccountId32;
-      readonly utxoId: Option<u64>;
+      readonly obligationId: u64;
+      readonly fundType: ArgonPrimitivesVaultFundType;
+      readonly beneficiary: AccountId32;
       readonly amount: u128;
-      readonly expiration: ArgonPrimitivesVaultBondExpiration;
+      readonly expiration: ArgonPrimitivesVaultObligationExpiration;
     } & Struct;
-    readonly isBondCompleted: boolean;
-    readonly asBondCompleted: {
+    readonly isObligationCompleted: boolean;
+    readonly asObligationCompleted: {
       readonly vaultId: u32;
-      readonly bondId: u64;
+      readonly obligationId: u64;
     } & Struct;
-    readonly isBondModified: boolean;
-    readonly asBondModified: {
+    readonly isObligationModified: boolean;
+    readonly asObligationModified: {
       readonly vaultId: u32;
-      readonly bondId: u64;
+      readonly obligationId: u64;
       readonly amount: u128;
     } & Struct;
-    readonly isBondCanceled: boolean;
-    readonly asBondCanceled: {
+    readonly isObligationCanceled: boolean;
+    readonly asObligationCanceled: {
       readonly vaultId: u32;
-      readonly bondId: u64;
-      readonly bondedAccountId: AccountId32;
-      readonly bondType: ArgonPrimitivesVaultBondType;
+      readonly obligationId: u64;
+      readonly beneficiary: AccountId32;
+      readonly fundType: ArgonPrimitivesVaultFundType;
       readonly returnedFee: u128;
     } & Struct;
-    readonly isBitcoinBondBurned: boolean;
-    readonly asBitcoinBondBurned: {
-      readonly vaultId: u32;
-      readonly bondId: u64;
+    readonly isObligationCompletionError: boolean;
+    readonly asObligationCompletionError: {
+      readonly obligationId: u64;
+      readonly error: SpRuntimeDispatchError;
+    } & Struct;
+    readonly type: 'VaultCreated' | 'VaultModified' | 'VaultBondedArgonsIncreased' | 'VaultBondedArgonsChangeScheduled' | 'VaultTermsChangeScheduled' | 'VaultTermsChanged' | 'VaultClosed' | 'VaultBitcoinXpubChange' | 'ObligationCreated' | 'ObligationCompleted' | 'ObligationModified' | 'ObligationCanceled' | 'ObligationCompletionError';
+  }
+
+  /** @name ArgonPrimitivesVaultFundType (59) */
+  interface ArgonPrimitivesVaultFundType extends Enum {
+    readonly isBondedArgons: boolean;
+    readonly isBitcoin: boolean;
+    readonly type: 'BondedArgons' | 'Bitcoin';
+  }
+
+  /** @name ArgonPrimitivesVaultObligationExpiration (60) */
+  interface ArgonPrimitivesVaultObligationExpiration extends Enum {
+    readonly isAtTick: boolean;
+    readonly asAtTick: Compact<u64>;
+    readonly isBitcoinBlock: boolean;
+    readonly asBitcoinBlock: Compact<u64>;
+    readonly type: 'AtTick' | 'BitcoinBlock';
+  }
+
+  /** @name PalletBitcoinLocksEvent (61) */
+  interface PalletBitcoinLocksEvent extends Enum {
+    readonly isBitcoinLockCreated: boolean;
+    readonly asBitcoinLockCreated: {
       readonly utxoId: u64;
+      readonly vaultId: u32;
+      readonly obligationId: u64;
+      readonly lockPrice: u128;
+      readonly accountId: AccountId32;
+    } & Struct;
+    readonly isBitcoinLockBurned: boolean;
+    readonly asBitcoinLockBurned: {
+      readonly utxoId: u64;
+      readonly vaultId: u32;
+      readonly obligationId: u64;
       readonly amountBurned: u128;
       readonly amountHeld: u128;
       readonly wasUtxoSpent: bool;
     } & Struct;
     readonly isBitcoinUtxoCosignRequested: boolean;
     readonly asBitcoinUtxoCosignRequested: {
-      readonly bondId: u64;
-      readonly vaultId: u32;
       readonly utxoId: u64;
+      readonly obligationId: u64;
+      readonly vaultId: u32;
     } & Struct;
     readonly isBitcoinUtxoCosigned: boolean;
     readonly asBitcoinUtxoCosigned: {
-      readonly bondId: u64;
-      readonly vaultId: u32;
       readonly utxoId: u64;
+      readonly obligationId: u64;
+      readonly vaultId: u32;
       readonly signature: Bytes;
     } & Struct;
     readonly isBitcoinCosignPastDue: boolean;
     readonly asBitcoinCosignPastDue: {
-      readonly bondId: u64;
-      readonly vaultId: u32;
       readonly utxoId: u64;
+      readonly obligationId: u64;
+      readonly vaultId: u32;
       readonly compensationAmount: u128;
       readonly compensationStillOwed: u128;
       readonly compensatedAccountId: AccountId32;
-    } & Struct;
-    readonly isBondCompletionError: boolean;
-    readonly asBondCompletionError: {
-      readonly bondId: u64;
-      readonly error: SpRuntimeDispatchError;
     } & Struct;
     readonly isCosignOverdueError: boolean;
     readonly asCosignOverdueError: {
       readonly utxoId: u64;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'BondCreated' | 'BondCompleted' | 'BondModified' | 'BondCanceled' | 'BitcoinBondBurned' | 'BitcoinUtxoCosignRequested' | 'BitcoinUtxoCosigned' | 'BitcoinCosignPastDue' | 'BondCompletionError' | 'CosignOverdueError';
-  }
-
-  /** @name ArgonPrimitivesVaultBondType (60) */
-  interface ArgonPrimitivesVaultBondType extends Enum {
-    readonly isMining: boolean;
-    readonly isBitcoin: boolean;
-    readonly type: 'Mining' | 'Bitcoin';
-  }
-
-  /** @name ArgonPrimitivesVaultBondExpiration (61) */
-  interface ArgonPrimitivesVaultBondExpiration extends Enum {
-    readonly isAtTick: boolean;
-    readonly asAtTick: Compact<u64>;
-    readonly isBitcoinBlock: boolean;
-    readonly asBitcoinBlock: Compact<u64>;
-    readonly type: 'AtTick' | 'BitcoinBlock';
+    readonly type: 'BitcoinLockCreated' | 'BitcoinLockBurned' | 'BitcoinUtxoCosignRequested' | 'BitcoinUtxoCosigned' | 'BitcoinCosignPastDue' | 'CosignOverdueError';
   }
 
   /** @name PalletNotariesEvent (64) */
@@ -1656,7 +1663,7 @@ declare module '@polkadot/types/lookup' {
   interface PalletMiningSlotCall extends Enum {
     readonly isBid: boolean;
     readonly asBid: {
-      readonly bondInfo: Option<PalletMiningSlotMiningSlotBid>;
+      readonly bondedArgons: Option<PalletMiningSlotMiningSlotBid>;
       readonly rewardDestination: ArgonPrimitivesBlockSealRewardDestination;
       readonly keys_: ArgonRuntimeSessionKeys;
     } & Struct;
@@ -1756,26 +1763,30 @@ declare module '@polkadot/types/lookup' {
   /** @name ArgonPrimitivesBitcoinOpaqueBitcoinXpub (200) */
   interface ArgonPrimitivesBitcoinOpaqueBitcoinXpub extends U8aFixed {}
 
-  /** @name PalletBondCall (202) */
-  interface PalletBondCall extends Enum {
-    readonly isBondBitcoin: boolean;
-    readonly asBondBitcoin: {
+  /** @name PalletBitcoinLocksCall (202) */
+  interface PalletBitcoinLocksCall extends Enum {
+    readonly isRequest: boolean;
+    readonly asRequest: {
       readonly vaultId: u32;
       readonly satoshis: Compact<u64>;
       readonly bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
     } & Struct;
-    readonly isUnlockBitcoinBond: boolean;
-    readonly asUnlockBitcoinBond: {
-      readonly bondId: u64;
+    readonly isRequestUnlock: boolean;
+    readonly asRequestUnlock: {
+      readonly utxoId: u64;
       readonly toScriptPubkey: Bytes;
       readonly bitcoinNetworkFee: u64;
     } & Struct;
-    readonly isCosignBitcoinUnlock: boolean;
-    readonly asCosignBitcoinUnlock: {
-      readonly bondId: u64;
+    readonly isCosignUnlock: boolean;
+    readonly asCosignUnlock: {
+      readonly utxoId: u64;
       readonly signature: Bytes;
     } & Struct;
-    readonly type: 'BondBitcoin' | 'UnlockBitcoinBond' | 'CosignBitcoinUnlock';
+    readonly isAdminModifyMinimumLockedSats: boolean;
+    readonly asAdminModifyMinimumLockedSats: {
+      readonly satoshis: u64;
+    } & Struct;
+    readonly type: 'Request' | 'RequestUnlock' | 'CosignUnlock' | 'AdminModifyMinimumLockedSats';
   }
 
   /** @name ArgonPrimitivesBitcoinCompressedBitcoinPubkey (203) */
@@ -2552,10 +2563,10 @@ declare module '@polkadot/types/lookup' {
     readonly isInsufficientOwnershipTokens: boolean;
     readonly isBidTooLow: boolean;
     readonly isCannotRegisterOverlappingSessions: boolean;
-    readonly isBondNotFound: boolean;
-    readonly isNoMoreBondIds: boolean;
+    readonly isObligationNotFound: boolean;
+    readonly isNoMoreObligationIds: boolean;
     readonly isVaultClosed: boolean;
-    readonly isMinimumBondAmountNotMet: boolean;
+    readonly isMinimumObligationAmountNotMet: boolean;
     readonly isExpirationAtBlockOverflow: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isInsufficientVaultFunds: boolean;
@@ -2564,25 +2575,23 @@ declare module '@polkadot/types/lookup' {
     readonly isHoldUnexpectedlyModified: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly isVaultNotFound: boolean;
-    readonly isBondAlreadyClosed: boolean;
-    readonly isFeeExceedsBondAmount: boolean;
     readonly isAccountWouldBeBelowMinimum: boolean;
-    readonly isGenericBondError: boolean;
-    readonly asGenericBondError: ArgonPrimitivesVaultBondError;
-    readonly type: 'SlotNotTakingBids' | 'TooManyBlockRegistrants' | 'InsufficientOwnershipTokens' | 'BidTooLow' | 'CannotRegisterOverlappingSessions' | 'BondNotFound' | 'NoMoreBondIds' | 'VaultClosed' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'BondAlreadyClosed' | 'FeeExceedsBondAmount' | 'AccountWouldBeBelowMinimum' | 'GenericBondError';
+    readonly isGenericObligationError: boolean;
+    readonly asGenericObligationError: ArgonPrimitivesVaultObligationError;
+    readonly type: 'SlotNotTakingBids' | 'TooManyBlockRegistrants' | 'InsufficientOwnershipTokens' | 'BidTooLow' | 'CannotRegisterOverlappingSessions' | 'ObligationNotFound' | 'NoMoreObligationIds' | 'VaultClosed' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'AccountWouldBeBelowMinimum' | 'GenericObligationError';
   }
 
-  /** @name ArgonPrimitivesVaultBondError (337) */
-  interface ArgonPrimitivesVaultBondError extends Enum {
-    readonly isBondNotFound: boolean;
-    readonly isNoMoreBondIds: boolean;
-    readonly isMinimumBondAmountNotMet: boolean;
+  /** @name ArgonPrimitivesVaultObligationError (337) */
+  interface ArgonPrimitivesVaultObligationError extends Enum {
+    readonly isObligationNotFound: boolean;
+    readonly isNoMoreObligationIds: boolean;
+    readonly isMinimumObligationAmountNotMet: boolean;
     readonly isVaultClosed: boolean;
     readonly isExpirationAtBlockOverflow: boolean;
     readonly isAccountWouldBeBelowMinimum: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isInsufficientVaultFunds: boolean;
-    readonly isInsufficientBitcoinsForMining: boolean;
+    readonly isInsufficientBondedArgons: boolean;
     readonly isExpirationTooSoon: boolean;
     readonly isNoPermissions: boolean;
     readonly isHoldUnexpectedlyModified: boolean;
@@ -2590,11 +2599,10 @@ declare module '@polkadot/types/lookup' {
     readonly isVaultNotFound: boolean;
     readonly isNoVaultBitcoinPubkeysAvailable: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
-    readonly isUnableToDecodeVaultBitcoinPubkey: boolean;
-    readonly isFeeExceedsBondAmount: boolean;
     readonly isInvalidBitcoinScript: boolean;
     readonly isInternalError: boolean;
-    readonly type: 'BondNotFound' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'VaultClosed' | 'ExpirationAtBlockOverflow' | 'AccountWouldBeBelowMinimum' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey' | 'FeeExceedsBondAmount' | 'InvalidBitcoinScript' | 'InternalError';
+    readonly isObligationCompletionError: boolean;
+    readonly type: 'ObligationNotFound' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'VaultClosed' | 'ExpirationAtBlockOverflow' | 'AccountWouldBeBelowMinimum' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey' | 'InvalidBitcoinScript' | 'InternalError' | 'ObligationCompletionError';
   }
 
   /** @name ArgonPrimitivesBitcoinUtxoValue (338) */
@@ -2679,27 +2687,35 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Main' | 'Test';
   }
 
-  /** @name PalletVaultsError (360) */
+  /** @name ArgonPrimitivesVaultObligation (360) */
+  interface ArgonPrimitivesVaultObligation extends Struct {
+    readonly obligationId: Compact<u64>;
+    readonly fundType: ArgonPrimitivesVaultFundType;
+    readonly vaultId: Compact<u32>;
+    readonly beneficiary: AccountId32;
+    readonly totalFee: Compact<u128>;
+    readonly prepaidFee: Compact<u128>;
+    readonly amount: Compact<u128>;
+    readonly startTick: Compact<u64>;
+    readonly expiration: ArgonPrimitivesVaultObligationExpiration;
+  }
+
+  /** @name PalletVaultsError (363) */
   interface PalletVaultsError extends Enum {
-    readonly isBondNotFound: boolean;
+    readonly isObligationNotFound: boolean;
     readonly isNoMoreVaultIds: boolean;
-    readonly isNoMoreBondIds: boolean;
-    readonly isMinimumBondAmountNotMet: boolean;
+    readonly isNoMoreObligationIds: boolean;
+    readonly isMinimumObligationAmountNotMet: boolean;
     readonly isExpirationAtBlockOverflow: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isInsufficientVaultFunds: boolean;
-    readonly isInsufficientBitcoinsForMining: boolean;
+    readonly isInsufficientBondedArgons: boolean;
     readonly isAccountBelowMinimumBalance: boolean;
     readonly isVaultClosed: boolean;
     readonly isInvalidVaultAmount: boolean;
     readonly isVaultReductionBelowAllocatedFunds: boolean;
     readonly isInvalidSecuritization: boolean;
     readonly isReusedVaultBitcoinXpub: boolean;
-    readonly isMaxSecuritizationPercentExceeded: boolean;
-    readonly isInvalidBondType: boolean;
-    readonly isBitcoinUtxoNotFound: boolean;
-    readonly isInsufficientSatoshisBonded: boolean;
-    readonly isNoBitcoinPricesAvailable: boolean;
     readonly isInvalidBitcoinScript: boolean;
     readonly isInvalidXpubkey: boolean;
     readonly isWrongXpubNetwork: boolean;
@@ -2711,33 +2727,22 @@ declare module '@polkadot/types/lookup' {
     readonly isHoldUnexpectedlyModified: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly isVaultNotFound: boolean;
-    readonly isFeeExceedsBondAmount: boolean;
     readonly isNoVaultBitcoinPubkeysAvailable: boolean;
     readonly isTermsModificationOverflow: boolean;
     readonly isTermsChangeAlreadyScheduled: boolean;
     readonly isInternalError: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
-    readonly isUnableToDecodeVaultBitcoinPubkey: boolean;
     readonly isFundingChangeAlreadyScheduled: boolean;
-    readonly type: 'BondNotFound' | 'NoMoreVaultIds' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'MaxSecuritizationPercentExceeded' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'WrongXpubNetwork' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'UnableToDecodeVaultBitcoinPubkey' | 'FundingChangeAlreadyScheduled';
+    readonly isObligationCompletionError: boolean;
+    readonly type: 'ObligationNotFound' | 'NoMoreVaultIds' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowAllocatedFunds' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'WrongXpubNetwork' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'FundingChangeAlreadyScheduled' | 'ObligationCompletionError';
   }
 
-  /** @name ArgonPrimitivesVaultBond (361) */
-  interface ArgonPrimitivesVaultBond extends Struct {
-    readonly bondType: ArgonPrimitivesVaultBondType;
+  /** @name PalletBitcoinLocksBitcoinLock (364) */
+  interface PalletBitcoinLocksBitcoinLock extends Struct {
+    readonly obligationId: Compact<u64>;
     readonly vaultId: Compact<u32>;
-    readonly utxoId: Option<u64>;
-    readonly bondedAccountId: AccountId32;
-    readonly totalFee: Compact<u128>;
-    readonly prepaidFee: Compact<u128>;
-    readonly amount: Compact<u128>;
-    readonly startTick: Compact<u64>;
-    readonly expiration: ArgonPrimitivesVaultBondExpiration;
-  }
-
-  /** @name PalletBondUtxoState (364) */
-  interface PalletBondUtxoState extends Struct {
-    readonly bondId: Compact<u64>;
+    readonly lockPrice: u128;
+    readonly ownerAccount: AccountId32;
     readonly satoshis: Compact<u64>;
     readonly vaultPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
     readonly vaultClaimPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
@@ -2750,9 +2755,10 @@ declare module '@polkadot/types/lookup' {
     readonly isVerified: bool;
   }
 
-  /** @name PalletBondUtxoCosignRequest (368) */
-  interface PalletBondUtxoCosignRequest extends Struct {
-    readonly bondId: Compact<u64>;
+  /** @name PalletBitcoinLocksUtxoCosignRequest (368) */
+  interface PalletBitcoinLocksUtxoCosignRequest extends Struct {
+    readonly utxoId: Compact<u64>;
+    readonly obligationId: Compact<u64>;
     readonly vaultId: Compact<u32>;
     readonly bitcoinNetworkFee: Compact<u64>;
     readonly cosignDueBlock: Compact<u64>;
@@ -2760,28 +2766,27 @@ declare module '@polkadot/types/lookup' {
     readonly redemptionPrice: Compact<u128>;
   }
 
-  /** @name PalletBondError (372) */
-  interface PalletBondError extends Enum {
-    readonly isBondNotFound: boolean;
-    readonly isNoMoreBondIds: boolean;
-    readonly isMinimumBondAmountNotMet: boolean;
+  /** @name PalletBitcoinLocksError (372) */
+  interface PalletBitcoinLocksError extends Enum {
+    readonly isObligationNotFound: boolean;
+    readonly isNoMoreObligationIds: boolean;
+    readonly isMinimumObligationAmountNotMet: boolean;
     readonly isExpirationAtBlockOverflow: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isInsufficientVaultFunds: boolean;
-    readonly isInsufficientBitcoinsForMining: boolean;
+    readonly isInsufficientBondedArgons: boolean;
     readonly isAccountWouldGoBelowMinimumBalance: boolean;
     readonly isVaultClosed: boolean;
     readonly isInvalidVaultAmount: boolean;
-    readonly isBondRedemptionNotLocked: boolean;
+    readonly isRedemptionNotLocked: boolean;
     readonly isBitcoinUnlockInitiationDeadlinePassed: boolean;
     readonly isBitcoinFeeTooHigh: boolean;
-    readonly isInvalidBondType: boolean;
     readonly isBitcoinUtxoNotFound: boolean;
     readonly isBitcoinUnableToBeDecodedForUnlock: boolean;
     readonly isBitcoinSignatureUnableToBeDecoded: boolean;
     readonly isBitcoinPubkeyUnableToBeDecoded: boolean;
     readonly isBitcoinInvalidCosignature: boolean;
-    readonly isInsufficientSatoshisBonded: boolean;
+    readonly isInsufficientSatoshisLocked: boolean;
     readonly isNoBitcoinPricesAvailable: boolean;
     readonly isInvalidBitcoinScript: boolean;
     readonly isExpirationTooSoon: boolean;
@@ -2789,10 +2794,12 @@ declare module '@polkadot/types/lookup' {
     readonly isHoldUnexpectedlyModified: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly isVaultNotFound: boolean;
-    readonly isFeeExceedsBondAmount: boolean;
-    readonly isGenericBondError: boolean;
-    readonly asGenericBondError: ArgonPrimitivesVaultBondError;
-    readonly type: 'BondNotFound' | 'NoMoreBondIds' | 'MinimumBondAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBitcoinsForMining' | 'AccountWouldGoBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'BondRedemptionNotLocked' | 'BitcoinUnlockInitiationDeadlinePassed' | 'BitcoinFeeTooHigh' | 'InvalidBondType' | 'BitcoinUtxoNotFound' | 'BitcoinUnableToBeDecodedForUnlock' | 'BitcoinSignatureUnableToBeDecoded' | 'BitcoinPubkeyUnableToBeDecoded' | 'BitcoinInvalidCosignature' | 'InsufficientSatoshisBonded' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'FeeExceedsBondAmount' | 'GenericBondError';
+    readonly isGenericObligationError: boolean;
+    readonly asGenericObligationError: ArgonPrimitivesVaultObligationError;
+    readonly isLockNotFound: boolean;
+    readonly isNoVaultBitcoinPubkeysAvailable: boolean;
+    readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
+    readonly type: 'ObligationNotFound' | 'NoMoreObligationIds' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'InsufficientBondedArgons' | 'AccountWouldGoBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'RedemptionNotLocked' | 'BitcoinUnlockInitiationDeadlinePassed' | 'BitcoinFeeTooHigh' | 'BitcoinUtxoNotFound' | 'BitcoinUnableToBeDecodedForUnlock' | 'BitcoinSignatureUnableToBeDecoded' | 'BitcoinPubkeyUnableToBeDecoded' | 'BitcoinInvalidCosignature' | 'InsufficientSatoshisLocked' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'GenericObligationError' | 'LockNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey';
   }
 
   /** @name PalletNotariesError (384) */
@@ -3011,11 +3018,11 @@ declare module '@polkadot/types/lookup' {
     readonly asMiningSlot: PalletMiningSlotHoldReason;
     readonly isVaults: boolean;
     readonly asVaults: PalletVaultsHoldReason;
-    readonly isBonds: boolean;
-    readonly asBonds: PalletBondHoldReason;
+    readonly isBitcoinLocks: boolean;
+    readonly asBitcoinLocks: PalletBitcoinLocksHoldReason;
     readonly isBlockRewards: boolean;
     readonly asBlockRewards: PalletBlockRewardsHoldReason;
-    readonly type: 'MiningSlot' | 'Vaults' | 'Bonds' | 'BlockRewards';
+    readonly type: 'MiningSlot' | 'Vaults' | 'BitcoinLocks' | 'BlockRewards';
   }
 
   /** @name PalletMiningSlotHoldReason (442) */
@@ -3027,12 +3034,12 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletVaultsHoldReason (443) */
   interface PalletVaultsHoldReason extends Enum {
     readonly isEnterVault: boolean;
-    readonly isBondFee: boolean;
-    readonly type: 'EnterVault' | 'BondFee';
+    readonly isObligationFee: boolean;
+    readonly type: 'EnterVault' | 'ObligationFee';
   }
 
-  /** @name PalletBondHoldReason (444) */
-  interface PalletBondHoldReason extends Enum {
+  /** @name PalletBitcoinLocksHoldReason (444) */
+  interface PalletBitcoinLocksHoldReason extends Enum {
     readonly isUnlockingBitcoin: boolean;
     readonly type: 'UnlockingBitcoin';
   }

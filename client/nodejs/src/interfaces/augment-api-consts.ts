@@ -45,6 +45,29 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;
     };
+    bitcoinLocks: {
+      /**
+       * Argon blocks per day
+       **/
+      argonTicksPerDay: u64 & AugmentedConst<ApiType>;
+      /**
+       * The number of bitcoin blocks a bitcoin is locked for
+       **/
+      lockDurationBlocks: u64 & AugmentedConst<ApiType>;
+      /**
+       * The bitcoin blocks after an obligation expires which the vault will be allowed to claim
+       * a bitcoin
+       **/
+      lockReclamationBlocks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Maximum unlocking utxos at a time
+       **/
+      maxUnlockingUtxos: u32 & AugmentedConst<ApiType>;
+      /**
+       * Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
+       **/
+      utxoUnlockCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
+    };
     bitcoinUtxos: {
       /**
        * Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
@@ -108,38 +131,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
     };
-    bonds: {
-      /**
-       * Argon blocks per day
-       **/
-      argonTicksPerDay: u64 & AugmentedConst<ApiType>;
-      /**
-       * The number of bitcoin blocks a bitcoin bond is locked for
-       **/
-      bitcoinBondDurationBlocks: u64 & AugmentedConst<ApiType>;
-      /**
-       * The bitcoin blocks after a bond expires which the vault will be allowed to claim a
-       * bitcoin
-       **/
-      bitcoinBondReclamationBlocks: u64 & AugmentedConst<ApiType>;
-      /**
-       * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
-       * single block
-       **/
-      maxConcurrentlyExpiringBonds: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum unlocking utxos at a time
-       **/
-      maxUnlockingUtxos: u32 & AugmentedConst<ApiType>;
-      /**
-       * Minimum amount for a bond
-       **/
-      minimumBondAmount: u128 & AugmentedConst<ApiType>;
-      /**
-       * Number of bitcoin blocks a vault has to counter-sign a bitcoin unlock
-       **/
-      utxoUnlockCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
-    };
     chainTransfer: {
       /**
        * How many transfers out can be queued per block
@@ -173,28 +164,28 @@ declare module '@polkadot/api-base/types/consts' {
     };
     miningSlot: {
       /**
+       * The max percent swing for the argonots per slot (from the last percent
+       **/
+      argonotsPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
+      /**
        * How many new miners can be in the cohort for each slot
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum percent of ownership shares in the network that should be required for
-       * ownership mining bonds
+       * The maximum percent of argonots in the network that should be required for
+       * mining seats
        **/
-      maximumOwnershipBondAmountPercent: Percent & AugmentedConst<ApiType>;
+      maximumArgonotProrataPercent: Percent & AugmentedConst<ApiType>;
       /**
        * The maximum number of Miners that the pallet can hold.
        **/
       maxMiners: u32 & AugmentedConst<ApiType>;
       /**
-       * The minimum bond amount possible
+       * The minimum argonots needed per seat
        **/
-      minimumOwnershipBondAmount: u128 & AugmentedConst<ApiType>;
+      minimumArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
       /**
-       * The max percent swing for the ownership bond amount per slot (from the last percent
-       **/
-      ownershipPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
-      /**
-       * The target number of bids per slot. This will adjust the ownership bond amount up or
+       * The target number of bids per slot. This will adjust the argonots per seat up or
        * down to ensure mining slots are filled.
        **/
       targetBidsPerSlot: u32 & AugmentedConst<ApiType>;
@@ -425,13 +416,18 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
+       * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
+       * single block
+       **/
+      maxConcurrentlyExpiringObligations: u32 & AugmentedConst<ApiType>;
+      /**
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerTick: u32 & AugmentedConst<ApiType>;
       /**
-       * Minimum amount for a bond
+       * Minimum amount for an obligation
        **/
-      minimumBondAmount: u128 & AugmentedConst<ApiType>;
+      minimumObligationAmount: u128 & AugmentedConst<ApiType>;
       /**
        * The number of ticks that a funding change will be delayed before it takes effect
        **/

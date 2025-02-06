@@ -87,9 +87,11 @@ pub mod pallet {
 			XPubFingerprint,
 		},
 		tick::Tick,
-		vault::{BitcoinObligationProvider, Bond, BondError, BondExpiration, BondType},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, BondEvents, BondId, PriceProvider, TickProvider,
-		UtxoLockEvents, VaultId,
+		vault::{
+			BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
+		},
+		BitcoinUtxoEvents, BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider,
+		TickProvider, UtxoLockEvents, VaultId,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
@@ -154,8 +156,8 @@ pub mod pallet {
 		#[pallet::constant]
 		type LockDurationBlocks: Get<BitcoinHeight>;
 
-		/// The bitcoin blocks after a bond expires which the vault will be allowed to claim a
-		/// bitcoin
+		/// The bitcoin blocks after an obligation expires which the vault will be allowed to claim
+		/// a bitcoin
 		#[pallet::constant]
 		type LockReclamationBlocks: Get<BitcoinHeight>;
 
@@ -180,17 +182,17 @@ pub mod pallet {
 	pub(super) type LocksByUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BitcoinLock<T>, OptionQuery>;
 
-	/// Mapping of bond id to lock id
+	/// Mapping of obligation id to lock id
 	#[pallet::storage]
-	pub(super) type BondIdToUtxoId<T: Config> =
-		StorageMap<_, Twox64Concat, BondId, UtxoId, OptionQuery>;
+	pub(super) type ObligationIdToUtxoId<T: Config> =
+		StorageMap<_, Twox64Concat, ObligationId, UtxoId, OptionQuery>;
 
 	/// Stores the block number where the utxo was unlocked
 	#[pallet::storage]
 	pub(super) type UtxosCosignReleaseHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
 
-	/// The minimum number of satoshis that can be bonded
+	/// The minimum number of satoshis that can be locked
 	#[pallet::storage]
 	pub(super) type MinimumSatoshis<T: Config> = StorageValue<_, Satoshis, ValueQuery>;
 
@@ -218,7 +220,7 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	pub struct BitcoinLock<T: Config> {
 		#[codec(compact)]
-		pub bond_id: BondId,
+		pub obligation_id: ObligationId,
 		#[codec(compact)]
 		pub vault_id: VaultId,
 		pub lock_price: T::Balance,
@@ -243,7 +245,9 @@ pub mod pallet {
 	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
 	pub struct UtxoCosignRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
 		#[codec(compact)]
-		pub bond_id: BondId,
+		pub utxo_id: UtxoId,
+		#[codec(compact)]
+		pub obligation_id: ObligationId,
 		#[codec(compact)]
 		pub vault_id: VaultId,
 		#[codec(compact)]
@@ -258,63 +262,66 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		BitcoinLockCreated {
+			utxo_id: UtxoId,
+			vault_id: VaultId,
+			obligation_id: ObligationId,
+			lock_price: T::Balance,
+			account_id: T::AccountId,
+		},
 		BitcoinLockBurned {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			amount_burned: T::Balance,
 			amount_held: T::Balance,
 			was_utxo_spent: bool,
 		},
 		BitcoinUtxoCosignRequested {
 			utxo_id: UtxoId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			vault_id: VaultId,
 		},
 		BitcoinUtxoCosigned {
 			utxo_id: UtxoId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			vault_id: VaultId,
 			signature: BitcoinSignature,
 		},
 		BitcoinCosignPastDue {
 			utxo_id: UtxoId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			vault_id: VaultId,
 			compensation_amount: T::Balance,
 			compensation_still_owed: T::Balance,
 			compensated_account_id: T::AccountId,
 		},
 		/// An error occurred while refunding an overdue cosigned bitcoin lock
-		CosignOverdueError {
-			utxo_id: UtxoId,
-			error: DispatchError,
-		},
+		CosignOverdueError { utxo_id: UtxoId, error: DispatchError },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		BondNotFound,
-		NoMoreBondIds,
-		MinimumBondAmountNotMet,
-		/// There are too many bond or bond funds expiring in the given expiration block
+		ObligationNotFound,
+		NoMoreObligationIds,
+		MinimumObligationAmountNotMet,
+		/// There are too many obligations expiring in the given expiration block
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
 		InsufficientVaultFunds,
-		/// The vault does not have enough bitcoins to cover the mining bond
-		InsufficientBitcoinsForMining,
+		/// The vault does not have enough bitcoins to cover the bonded argons
+		InsufficientBondedArgons,
 		/// The proposed transaction would take the account below the minimum (existential) balance
 		AccountWouldGoBelowMinimumBalance,
 		VaultClosed,
 		/// Funding would result in an overflow of the balance type
 		InvalidVaultAmount,
 		/// This bitcoin redemption has not been locked in
-		BondRedemptionNotLocked,
+		RedemptionNotLocked,
 		/// The bitcoin has passed the deadline to unlock it
 		BitcoinUnlockInitiationDeadlinePassed,
 		/// The fee for this bitcoin unlock is too high
 		BitcoinFeeTooHigh,
-		InvalidBondType,
 		BitcoinUtxoNotFound,
 		/// This bitcoin cosign script couldn't be decoded for unlock
 		BitcoinUnableToBeDecodedForUnlock,
@@ -324,7 +331,7 @@ pub mod pallet {
 		BitcoinPubkeyUnableToBeDecoded,
 		/// The cosign signature is not valid for the bitcoin unlock
 		BitcoinInvalidCosignature,
-		InsufficientSatoshisBonded,
+		InsufficientSatoshisLocked,
 		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
 		InvalidBitcoinScript,
@@ -333,34 +340,40 @@ pub mod pallet {
 		HoldUnexpectedlyModified,
 		UnrecoverableHold,
 		VaultNotFound,
-		/// The fee for this bond exceeds the amount of the bond, which is unsafe
-		FeeExceedsBondAmount,
-		GenericBondError(BondError),
+		GenericObligationError(ObligationError),
 		LockNotFound,
+		/// No Vault public keys are available
+		NoVaultBitcoinPubkeysAvailable,
+		/// Unable to generate a new vault public key
+		UnableToGenerateVaultBitcoinPubkey,
 	}
 
-	impl<T> From<BondError> for Error<T> {
-		fn from(e: BondError) -> Error<T> {
+	impl<T> From<ObligationError> for Error<T> {
+		fn from(e: ObligationError) -> Error<T> {
 			match e {
-				BondError::BondNotFound => Error::<T>::BondNotFound,
-				BondError::NoMoreBondIds => Error::<T>::NoMoreBondIds,
-				BondError::MinimumBondAmountNotMet => Error::<T>::MinimumBondAmountNotMet,
-				BondError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
-				BondError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				BondError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
-				BondError::NoPermissions => Error::<T>::NoPermissions,
-				BondError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				BondError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				BondError::VaultNotFound => Error::<T>::VaultNotFound,
-				BondError::FeeExceedsBondAmount => Error::<T>::FeeExceedsBondAmount,
-				BondError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
-				BondError::InsufficientBitcoinsForMining =>
-					Error::<T>::InsufficientBitcoinsForMining,
-				BondError::VaultClosed => Error::<T>::VaultClosed,
-				BondError::AccountWouldBeBelowMinimum =>
+				ObligationError::ObligationNotFound => Error::<T>::ObligationNotFound,
+				ObligationError::NoMoreObligationIds => Error::<T>::NoMoreObligationIds,
+				ObligationError::MinimumObligationAmountNotMet =>
+					Error::<T>::MinimumObligationAmountNotMet,
+				ObligationError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
+				ObligationError::InsufficientFunds => Error::<T>::InsufficientFunds,
+				ObligationError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
+				ObligationError::NoPermissions => Error::<T>::NoPermissions,
+				ObligationError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
+				ObligationError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
+				ObligationError::VaultNotFound => Error::<T>::VaultNotFound,
+				ObligationError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
+				ObligationError::InsufficientBondedArgons => Error::<T>::InsufficientBondedArgons,
+				ObligationError::VaultClosed => Error::<T>::VaultClosed,
+				ObligationError::AccountWouldBeBelowMinimum =>
 					Error::<T>::AccountWouldGoBelowMinimumBalance,
-				BondError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
-				_ => Error::<T>::GenericBondError(e),
+				ObligationError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
+				ObligationError::NoVaultBitcoinPubkeysAvailable =>
+					Error::<T>::NoVaultBitcoinPubkeysAvailable,
+				ObligationError::UnableToGenerateVaultBitcoinPubkey =>
+					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
+
+				e => Error::<T>::GenericObligationError(e),
 			}
 		}
 	}
@@ -368,7 +381,7 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		/// The minimum number of satoshis that can be bonded
+		/// The minimum number of satoshis that can be locked
 		pub minimum_bitcoin_lock_satoshis: Satoshis,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
@@ -431,7 +444,7 @@ pub mod pallet {
 
 			ensure!(
 				satoshis >= MinimumSatoshis::<T>::get(),
-				Error::<T>::InsufficientSatoshisBonded
+				Error::<T>::InsufficientSatoshisLocked
 			);
 
 			let current_bitcoin_height = T::BitcoinBlockHeight::get();
@@ -441,12 +454,12 @@ pub mod pallet {
 			let lock_price = T::PriceProvider::get_bitcoin_argon_price(satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-			let bond = T::BitcoinObligationProvider::create_bond(
+			let obligation = T::BitcoinObligationProvider::create_obligation(
 				vault_id,
 				&account_id,
-				BondType::Bitcoin,
+				FundType::Bitcoin,
 				lock_price,
-				BondExpiration::BitcoinBlock(vault_claim_height),
+				ObligationExpiration::BitcoinBlock(vault_claim_height),
 				// charge in 1 year of ticks (even though we'll expire off bitcoin time)
 				T::ArgonTicksPerDay::get() * 365u64,
 			)
@@ -490,10 +503,10 @@ pub mod pallet {
 			LocksByUtxoId::<T>::insert(
 				utxo_id,
 				BitcoinLock {
-					owner_account: account_id,
+					owner_account: account_id.clone(),
 					vault_id,
 					lock_price,
-					bond_id: bond.bond_id,
+					obligation_id: obligation.obligation_id,
 					satoshis,
 					vault_pubkey,
 					vault_claim_pubkey,
@@ -506,13 +519,20 @@ pub mod pallet {
 					is_verified: false,
 				},
 			);
-			BondIdToUtxoId::<T>::insert(bond.bond_id, utxo_id);
+			ObligationIdToUtxoId::<T>::insert(obligation.obligation_id, utxo_id);
+			Self::deposit_event(Event::<T>::BitcoinLockCreated {
+				utxo_id,
+				obligation_id: obligation.obligation_id,
+				vault_id,
+				lock_price,
+				account_id,
+			});
 
 			Ok(())
 		}
 
-		/// Submitted by a Bitcoin holder to trigger the unlock of their Bitcoin. A transaction
-		/// spending the UTXO from the given bond should be pre-created so that the sighash can be
+		/// Submitted by a Bitcoin holder to trigger the unlock of their Utxo. A transaction
+		/// spending the UTXO should be pre-created so that the sighash can be
 		/// submitted here. The vault operator will have 10 days to counter-sign the transaction. It
 		/// will be published with the public key as a BitcoinUtxoCosigned Event.
 		///
@@ -526,7 +546,7 @@ pub mod pallet {
 			bitcoin_network_fee: Satoshis,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::BondNotFound)?;
+			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::ObligationNotFound)?;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
 			let unlock_due_date =
 				lock.vault_claim_height.saturating_sub(T::UtxoUnlockCosignDeadlineBlocks::get());
@@ -534,7 +554,7 @@ pub mod pallet {
 				T::BitcoinBlockHeight::get() <= unlock_due_date,
 				Error::<T>::BitcoinUnlockInitiationDeadlinePassed
 			);
-			let bond_id = lock.bond_id;
+			let obligation_id = lock.obligation_id;
 
 			// If this is a confirmed utxo, we require the unlock price to be paid
 			if lock.is_verified {
@@ -563,7 +583,8 @@ pub mod pallet {
 					a.try_insert(
 						utxo_id,
 						UtxoCosignRequest {
-							bond_id,
+							utxo_id,
+							obligation_id,
 							vault_id: lock.vault_id,
 							bitcoin_network_fee,
 							cosign_due_block,
@@ -576,18 +597,18 @@ pub mod pallet {
 
 				Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested {
 					utxo_id,
-					bond_id,
+					obligation_id,
 					vault_id: lock.vault_id,
 				});
 			} else {
-				T::BitcoinObligationProvider::cancel_bond(lock.bond_id)
+				T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
 					.map_err(Error::<T>::from)?;
 			}
 			Ok(())
 		}
 
 		/// Submitted by a Vault operator to cosign the unlock of a bitcoin utxo. The Bitcoin owner
-		/// unlock fee will be burned, and the bond will be allowed to expire without penalty.
+		/// unlock fee will be burned, and the obligation will be allowed to expire without penalty.
 		///
 		/// This is submitted as a no-fee transaction off chain to allow keys to remain in cold
 		/// wallets.
@@ -599,7 +620,7 @@ pub mod pallet {
 			signature: BitcoinSignature,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::BondNotFound)?;
+			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::ObligationNotFound)?;
 
 			let vault_id = lock.vault_id;
 
@@ -608,7 +629,7 @@ pub mod pallet {
 				Error::<T>::NoPermissions
 			);
 			let request = UtxosPendingUnlockByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
-				.ok_or(Error::<T>::BondRedemptionNotLocked)?;
+				.ok_or(Error::<T>::RedemptionNotLocked)?;
 
 			let utxo_ref =
 				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
@@ -648,14 +669,17 @@ pub mod pallet {
 			T::LockEvents::utxo_unlocked(utxo_id, false, burn_amount)?;
 
 			LocksByUtxoId::<T>::take(utxo_id);
-			<UtxosCosignReleaseHeightById<T>>::insert(
+			ObligationIdToUtxoId::<T>::take(lock.obligation_id);
+			UtxosCosignReleaseHeightById::<T>::insert(
 				utxo_id,
 				frame_system::Pallet::<T>::block_number(),
 			);
 
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
+
 			Self::deposit_event(Event::BitcoinUtxoCosigned {
 				utxo_id,
-				bond_id: lock.bond_id,
+				obligation_id: lock.obligation_id,
 				vault_id,
 				signature,
 			});
@@ -697,25 +721,23 @@ pub mod pallet {
 
 		fn utxo_rejected(utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {
 			if let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) {
-				T::BitcoinObligationProvider::cancel_bond(lock.bond_id)
+				T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
 					.map_err(Error::<T>::from)?;
 			}
 			Ok(())
 		}
 
 		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
-			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if LocksByUtxoId::<T>::contains_key(utxo_id) {
-				Self::burn_bitcoin_bond(utxo_id, true)
+				Self::burn_bitcoin_obligation(utxo_id, true)
 			} else {
 				Ok(())
 			}
 		}
 
 		fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
-			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 			if LocksByUtxoId::<T>::contains_key(utxo_id) {
-				Self::burn_bitcoin_bond(utxo_id, false)
+				Self::burn_bitcoin_obligation(utxo_id, false)
 			} else {
 				Ok(())
 			}
@@ -723,39 +745,41 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn burn_bitcoin_bond(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
+		fn burn_bitcoin_obligation(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
-			let bond_id = lock.bond_id;
-			BondIdToUtxoId::<T>::take(bond_id);
+			let obligation_id = lock.obligation_id;
+			UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
+			ObligationIdToUtxoId::<T>::take(obligation_id);
+
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			if !lock.is_verified {
-				T::BitcoinObligationProvider::cancel_bond(bond_id).map_err(Error::<T>::from)?;
+				T::BitcoinObligationProvider::cancel_obligation(obligation_id)
+					.map_err(Error::<T>::from)?;
 				return Ok(());
 			}
 
-			// burn the current redemption price from the bond
+			// burn the current redemption price from the obligation
 			let amount_to_burn = Self::get_redemption_price(&lock.satoshis)
 				.unwrap_or(lock.lock_price)
 				.min(lock.lock_price);
 
-			let bond = T::BitcoinObligationProvider::burn_vault_bitcoin_funds(
-				lock.bond_id,
+			let obligation = T::BitcoinObligationProvider::burn_vault_bitcoin_obligation(
+				lock.obligation_id,
 				amount_to_burn,
 			)
 			.map_err(Error::<T>::from)?;
-			let vault_id = lock.vault_id;
+
 			T::LockEvents::utxo_unlocked(utxo_id, is_externally_spent, amount_to_burn)?;
 
 			Self::deposit_event(Event::BitcoinLockBurned {
 				utxo_id,
-				vault_id,
-				bond_id,
+				vault_id: lock.vault_id,
+				obligation_id,
 				amount_burned: amount_to_burn,
-				amount_held: bond.amount,
+				amount_held: obligation.amount,
 				was_utxo_spent: is_externally_spent,
 			});
-
-			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Ok(())
 		}
@@ -766,7 +790,7 @@ pub mod pallet {
 			redemption_amount_held: T::Balance,
 		) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
-			let bond_id = lock.bond_id;
+			let obligation_id = lock.obligation_id;
 			let vault_id = lock.vault_id;
 
 			// need to compensate with market price, not the redemption price
@@ -777,7 +801,7 @@ pub mod pallet {
 			// 2. Any difference from market rate comes from vault, capped by securitization pct
 			// 3. Everything else up to market is burned from the vault
 			let (still_owed, repaid) = T::BitcoinObligationProvider::compensate_lost_bitcoin(
-				lock.bond_id,
+				lock.obligation_id,
 				market_price,
 				redemption_amount_held,
 			)
@@ -804,7 +828,7 @@ pub mod pallet {
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				utxo_id,
 				vault_id,
-				bond_id,
+				obligation_id,
 				compensation_amount: repaid,
 				compensation_still_owed: still_owed,
 				compensated_account_id: lock.owner_account.clone(),
@@ -846,28 +870,34 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> BondEvents<T::AccountId, T::Balance> for Pallet<T> {
-		fn bond_canceled(bond: &Bond<T::AccountId, T::Balance>) -> sp_runtime::DispatchResult {
-			if let Some(utxo_id) = BondIdToUtxoId::<T>::take(bond.bond_id) {
+	impl<T: Config> ObligationEvents<T::AccountId, T::Balance> for Pallet<T> {
+		fn on_canceled(
+			obligation: &Obligation<T::AccountId, T::Balance>,
+		) -> sp_runtime::DispatchResult {
+			if let Some(utxo_id) = ObligationIdToUtxoId::<T>::take(obligation.obligation_id) {
 				if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
 					if !lock.is_verified {
 						T::BitcoinObligationProvider::modify_pending_bitcoin_funds(
-							bond.vault_id,
-							bond.amount,
+							obligation.vault_id,
+							obligation.amount,
 							true,
 						)
 						.map_err(Error::<T>::from)?;
 					}
 				}
+				UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
 				T::BitcoinUtxoTracker::unwatch(utxo_id);
 			}
 			Ok(())
 		}
 
-		fn bond_completed(bond: &Bond<T::AccountId, T::Balance>) -> sp_runtime::DispatchResult {
-			if let Some(utxo_id) = BondIdToUtxoId::<T>::take(bond.bond_id) {
-				UtxosCosignReleaseHeightById::<T>::remove(utxo_id);
-				Self::burn_bitcoin_bond(utxo_id, false)?;
+		/// If an obligation carries through to completion, the vault has access to the bitcoin, so
+		/// we need to burn the corresponding funds from the vault
+		fn on_completed(
+			obligation: &Obligation<T::AccountId, T::Balance>,
+		) -> sp_runtime::DispatchResult {
+			if let Some(utxo_id) = ObligationIdToUtxoId::<T>::take(obligation.obligation_id) {
+				Self::burn_bitcoin_obligation(utxo_id, false)?;
 			}
 			Ok(())
 		}

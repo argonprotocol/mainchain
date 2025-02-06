@@ -59,7 +59,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-		use codec::Decode;
 		use frame_support::ensure;
 
 		let actual_new_value = VaultsById::<T>::iter().collect::<Vec<_>>();

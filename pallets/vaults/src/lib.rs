@@ -14,16 +14,17 @@ pub mod migrations;
 pub mod weights;
 
 /// The vaults pallet allows a user to offer argons for lease to other users. There are two types of
-/// bonds offered in the system, Bitcoin and Mining bonds. Vaults can define the amount of argons
-/// available for each type of bond, and the interest rate for each. However, mining bonds may only
-/// issued up to the amount of bitcoin argons that are locked.
+/// obligations offered in the system, Bitcoin and Mining obligations. Vaults can define the amount
+/// of argons available for each type of obligation (bonded argons and bitcoin locks), and the
+/// interest rate for each. However, Bonded Argons may only issued up to the amount of bitcoins that
+/// are locked.
 ///
-/// ** Bitcoin Securitization **
+/// ** Additional Bitcoin Securitization **
 ///
-/// A vault may apply a securitization bond to their account up to 2x the locked value of their
-/// bitcoin argons. This allows a vault to issue more mining bonds, but the funds are locked up for
-/// the duration of the bitcoin bonds, and will be taken in the case of bitcoins not being cosiged
-/// on unlock.
+/// A vault may apply added bitcoin securitization to their account up to 2x the locked value of
+/// their bitcoin argons. This allows a vault to issue more mining obligations, but the funds are
+/// locked up for the duration of the bitcoin locks, and will be taken in the case of bitcoins not
+/// being cosigned on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::vec;
@@ -58,10 +59,10 @@ pub mod pallet {
 		block_seal::RewardSharing,
 		tick::Tick,
 		vault::{
-			BitcoinObligationProvider, Bond, BondError, BondExpiration, BondType,
-			BondedArgonsProvider, Vault, VaultArgons, VaultTerms,
+			BitcoinObligationProvider, BondedArgonsProvider, FundType, Obligation, ObligationError,
+			ObligationExpiration, Vault, VaultArgons, VaultTerms,
 		},
-		BondEvents, BondId, MiningSlotProvider, RewardShare, TickProvider, VaultId,
+		MiningSlotProvider, ObligationEvents, ObligationId, RewardShare, TickProvider, VaultId,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
@@ -93,9 +94,9 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		/// Minimum amount for a bond
+		/// Minimum amount for an obligation
 		#[pallet::constant]
-		type MinimumBondAmount: Get<Self::Balance>;
+		type MinimumObligationAmount: Get<Self::Balance>;
 
 		/// Argon blocks per day
 		#[pallet::constant]
@@ -121,23 +122,23 @@ pub mod pallet {
 		/// Provides the bitcoin network this blockchain is connected to
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 		/// Bitcoin time provider
-		type BitcoinBlockHeight: Get<BitcoinHeight>;
+		type BitcoinBlockHeightChange: Get<(BitcoinHeight, BitcoinHeight)>;
 
 		type TickProvider: TickProvider<Self::Block>;
 		/// Pallet storage requires bounds, so we have to set a maximum number that can expire in a
 		/// single block
 		#[pallet::constant]
-		type MaxConcurrentlyExpiringBonds: Get<u32>;
+		type MaxConcurrentlyExpiringObligations: Get<u32>;
 
-		/// Callbacks for various bond events
-		type EventHandler: BondEvents<Self::AccountId, Self::Balance>;
+		/// Callbacks for various vault obligation events
+		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
 	pub enum HoldReason {
 		EnterVault,
-		BondFee,
+		ObligationFee,
 	}
 
 	#[pallet::storage]
@@ -175,30 +176,35 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type NextBondId<T: Config> = StorageValue<_, BondId, OptionQuery>;
+	pub(super) type NextObligationId<T: Config> = StorageValue<_, ObligationId, OptionQuery>;
 
-	/// Bonds by id
+	/// Obligation  by id
 	#[pallet::storage]
-	pub(super) type BondsById<T: Config> =
-		StorageMap<_, Twox64Concat, BondId, Bond<T::AccountId, T::Balance>, OptionQuery>;
-	/// Completion of mining bonds, upon which funds are returned to the vault
+	pub(super) type ObligationsById<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		ObligationId,
+		Obligation<T::AccountId, T::Balance>,
+		OptionQuery,
+	>;
+	/// Completion of mining obligation, upon which funds are returned to the vault
 	#[pallet::storage]
-	pub(super) type MiningBondCompletions<T: Config> = StorageMap<
+	pub(super) type BondedArgonCompletions<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		Tick,
-		BoundedVec<BondId, T::MaxConcurrentlyExpiringBonds>,
+		BoundedVec<ObligationId, T::MaxConcurrentlyExpiringObligations>,
 		ValueQuery,
 	>;
 
-	/// Completion of bitcoin bonds by bitcoin height. Bond funds are returned to the vault if
+	/// Completion of bitcoin locks by bitcoin height. Funds are returned to the vault if
 	/// unlocked or used as the price of the bitcoin
 	#[pallet::storage]
-	pub(super) type BitcoinBondCompletions<T: Config> = StorageMap<
+	pub(super) type BitcoinLockCompletions<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BitcoinHeight,
-		BoundedVec<BondId, T::MaxConcurrentlyExpiringBonds>,
+		BoundedVec<ObligationId, T::MaxConcurrentlyExpiringObligations>,
 		ValueQuery,
 	>;
 
@@ -218,11 +224,11 @@ pub mod pallet {
 			bonded_argons: T::Balance,
 			added_securitization_percent: FixedU128,
 		},
-		VaultMiningBondsIncreased {
+		VaultBondedArgonsIncreased {
 			vault_id: VaultId,
 			bonded_argons: T::Balance,
 		},
-		VaultMiningBondsChangeScheduled {
+		VaultBondedArgonsChangeScheduled {
 			vault_id: VaultId,
 			change_tick: Tick,
 		},
@@ -235,74 +241,69 @@ pub mod pallet {
 		},
 		VaultClosed {
 			vault_id: VaultId,
-			bitcoin_amount_still_bonded: T::Balance,
-			mining_amount_still_bonded: T::Balance,
-			securitization_still_bonded: T::Balance,
+			bitcoin_amount_still_reserved: T::Balance,
+			mining_amount_still_reserved: T::Balance,
+			securitization_still_reserved: T::Balance,
 		},
 		VaultBitcoinXpubChange {
 			vault_id: VaultId,
 		},
-		BondCreated {
+		ObligationCreated {
 			vault_id: VaultId,
-			bond_id: BondId,
-			bond_type: BondType,
-			bonded_account_id: T::AccountId,
+			obligation_id: ObligationId,
+			fund_type: FundType,
+			beneficiary: T::AccountId,
 			amount: T::Balance,
-			expiration: BondExpiration,
+			expiration: ObligationExpiration,
 		},
-		BondCompleted {
+		ObligationCompleted {
 			vault_id: VaultId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 		},
-		BondModified {
+		ObligationModified {
 			vault_id: VaultId,
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			amount: T::Balance,
 		},
-		BondCanceled {
+		ObligationCanceled {
 			vault_id: VaultId,
-			bond_id: BondId,
-			bonded_account_id: T::AccountId,
-			bond_type: BondType,
+			obligation_id: ObligationId,
+			beneficiary: T::AccountId,
+			fund_type: FundType,
 			returned_fee: T::Balance,
 		},
-		/// An error occurred while completing a bond
-		BondCompletionError {
-			bond_id: BondId,
+		/// An error occurred while completing an obligation
+		ObligationCompletionError {
+			obligation_id: ObligationId,
 			error: DispatchError,
 		},
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		BondNotFound,
+		ObligationNotFound,
 		NoMoreVaultIds,
-		NoMoreBondIds,
-		MinimumBondAmountNotMet,
-		/// There are too many bond or bond funds expiring in the given expiration block
+		NoMoreObligationIds,
+		MinimumObligationAmountNotMet,
+		/// There are too many obligations expiring in the given expiration block
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
 		InsufficientVaultFunds,
-		/// The vault does not have enough bitcoins to cover the mining bond
-		InsufficientBitcoinsForMining,
+		/// The vault does not have enough bonded argons for the request
+		InsufficientBondedArgons,
 		/// The proposed transaction would take the account below the minimum (existential) balance
 		AccountBelowMinimumBalance,
 		VaultClosed,
 		/// Funding would result in an overflow of the balance type
 		InvalidVaultAmount,
-		/// This reduction in bond funds offered goes below the amount that is already committed to
+		/// This reduction in obligation funds offered goes below the amount that is already
+		/// committed to
 		VaultReductionBelowAllocatedFunds,
 		/// An invalid securitization percent was provided for the vault. NOTE: it cannot be
 		/// decreased (or negative)
 		InvalidSecuritization,
 		/// The vault bitcoin xpubkey has already been used
 		ReusedVaultBitcoinXpub,
-		/// Securitization percent would exceed the maximum allowed
-		MaxSecuritizationPercentExceeded,
-		InvalidBondType,
-		BitcoinUtxoNotFound,
-		InsufficientSatoshisBonded,
-		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
 		InvalidBitcoinScript,
 		/// Unable to decode xpubkey
@@ -320,8 +321,6 @@ pub mod pallet {
 		HoldUnexpectedlyModified,
 		UnrecoverableHold,
 		VaultNotFound,
-		/// The fee for this bond exceeds the amount of the bond, which is unsafe
-		FeeExceedsBondAmount,
 		/// No Vault public keys are available
 		NoVaultBitcoinPubkeysAvailable,
 		/// The terms modification list could not handle any more items
@@ -332,41 +331,38 @@ pub mod pallet {
 		InternalError,
 		/// Unable to generate a new vault bitcoin pubkey
 		UnableToGenerateVaultBitcoinPubkey,
-		/// Unable to decode vault bitcoin pubkey
-		UnableToDecodeVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
-		EventHandlerError,
+		/// An error occurred processing an obligation completion
+		ObligationCompletionError,
 	}
 
-	impl<T> From<BondError> for Error<T> {
-		fn from(e: BondError) -> Error<T> {
+	impl<T> From<ObligationError> for Error<T> {
+		fn from(e: ObligationError) -> Error<T> {
 			match e {
-				BondError::BondNotFound => Error::<T>::BondNotFound,
-				BondError::NoMoreBondIds => Error::<T>::NoMoreBondIds,
-				BondError::MinimumBondAmountNotMet => Error::<T>::MinimumBondAmountNotMet,
-				BondError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
-				BondError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				BondError::InsufficientBitcoinsForMining =>
-					Error::<T>::InsufficientBitcoinsForMining,
-				BondError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
-				BondError::NoPermissions => Error::<T>::NoPermissions,
-				BondError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				BondError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				BondError::VaultNotFound => Error::<T>::VaultNotFound,
-				BondError::FeeExceedsBondAmount => Error::<T>::FeeExceedsBondAmount,
-				BondError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
-				BondError::VaultClosed => Error::<T>::VaultClosed,
-				BondError::AccountWouldBeBelowMinimum => Error::<T>::AccountBelowMinimumBalance,
-				BondError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
-				BondError::NoVaultBitcoinPubkeysAvailable =>
+				ObligationError::ObligationNotFound => Error::<T>::ObligationNotFound,
+				ObligationError::NoMoreObligationIds => Error::<T>::NoMoreObligationIds,
+				ObligationError::MinimumObligationAmountNotMet =>
+					Error::<T>::MinimumObligationAmountNotMet,
+				ObligationError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
+				ObligationError::InsufficientFunds => Error::<T>::InsufficientFunds,
+				ObligationError::InsufficientBondedArgons => Error::<T>::InsufficientBondedArgons,
+				ObligationError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
+				ObligationError::NoPermissions => Error::<T>::NoPermissions,
+				ObligationError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
+				ObligationError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
+				ObligationError::VaultNotFound => Error::<T>::VaultNotFound,
+				ObligationError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
+				ObligationError::VaultClosed => Error::<T>::VaultClosed,
+				ObligationError::AccountWouldBeBelowMinimum =>
+					Error::<T>::AccountBelowMinimumBalance,
+				ObligationError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
+				ObligationError::NoVaultBitcoinPubkeysAvailable =>
 					Error::<T>::NoVaultBitcoinPubkeysAvailable,
-				BondError::InternalError => Error::<T>::InternalError,
-				BondError::UnableToGenerateVaultBitcoinPubkey =>
+				ObligationError::InternalError => Error::<T>::InternalError,
+				ObligationError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
-				BondError::UnableToDecodeVaultBitcoinPubkey =>
-					Error::<T>::UnableToDecodeVaultBitcoinPubkey,
-				BondError::EventHandlerError => Error::<T>::EventHandlerError,
+				ObligationError::ObligationCompletionError => Error::<T>::ObligationCompletionError,
 			}
 		}
 	}
@@ -386,7 +382,7 @@ pub mod pallet {
 	> {
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
-		/// The amount of argons to be vaulted for bitcoin bonds
+		/// The amount of argons to be vaulted for bitcoin locks
 		#[codec(compact)]
 		pub bitcoin_amount_allocated: Balance,
 		/// Bytes for a hardened XPub. Will be used to generate child public keys
@@ -405,24 +401,38 @@ pub mod pallet {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let previous_tick = T::TickProvider::previous_tick();
 			let current_tick = T::TickProvider::current_tick();
-			let bond_completions =
-				(previous_tick..=current_tick).flat_map(MiningBondCompletions::<T>::take);
-			for bond_id in bond_completions {
-				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+			let bonded_argon_completions =
+				(previous_tick..=current_tick).flat_map(BondedArgonCompletions::<T>::take);
+			for obligation_id in bonded_argon_completions {
+				let res = with_storage_layer(|| Self::obligation_completed(obligation_id));
 				if let Err(e) = res {
-					log::error!("Mining bond id {:?} failed to `complete` {:?}", bond_id, e);
-					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
+					log::error!(
+						"Mining obligation id {:?} failed to `complete` {:?}",
+						obligation_id,
+						e
+					);
+					Self::deposit_event(Event::<T>::ObligationCompletionError {
+						obligation_id,
+						error: e,
+					});
 				}
 			}
-			// TODO: Bitcoin is only looking at last height to roll off bonds, but we could jump
-			// forward multiple heights
-			let bitcoin_block_height = T::BitcoinBlockHeight::get();
-			let bitcoin_bond_completions = BitcoinBondCompletions::<T>::take(bitcoin_block_height);
-			for bond_id in bitcoin_bond_completions {
-				let res = with_storage_layer(|| Self::bond_completed(bond_id));
+
+			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
+			let bitcoin_completions = (start_bitcoin_height..=bitcoin_block_height)
+				.flat_map(BitcoinLockCompletions::<T>::take);
+			for obligation_id in bitcoin_completions {
+				let res = with_storage_layer(|| Self::obligation_completed(obligation_id));
 				if let Err(e) = res {
-					log::error!("Bitcoin bond id {:?} failed to `complete` {:?}", bond_id, e);
-					Self::deposit_event(Event::<T>::BondCompletionError { bond_id, error: e });
+					log::error!(
+						"Bitcoin obligation id {:?} failed to `complete` {:?}",
+						obligation_id,
+						e
+					);
+					Self::deposit_event(Event::<T>::ObligationCompletionError {
+						obligation_id,
+						error: e,
+					});
 				}
 			}
 			T::DbWeight::get().reads_writes(0, 2)
@@ -461,7 +471,7 @@ pub mod pallet {
 					};
 					if let Some((_, bonded_argons)) = vault.pending_bonded_argons.take() {
 						vault.bonded_argons.allocated = bonded_argons;
-						Self::deposit_event(Event::VaultMiningBondsIncreased {
+						Self::deposit_event(Event::VaultBondedArgonsIncreased {
 							vault_id,
 							bonded_argons,
 						});
@@ -562,14 +572,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Modify funds offered by the vault. This will not affect existing bonds, but will affect
-		/// the amount of funds available for new bonds.
+		/// Modify funds offered by the vault. This will not affect issued obligations, but will
+		/// affect the amount of funds available for new ones.
 		///
 		/// The additional securitization percent must be maintained or increased.
 		///
-		/// The amount offered may not go below the existing bonded amounts, but you can release
-		/// funds in this vault as bonds are released. To stop issuing any more bonds, use the
-		/// `close` api.
+		/// The amount offered may not go below the existing reserved amounts, but you can release
+		/// funds in this vault as obligations are released. To stop issuing any more obligations,
+		/// use the `close` api.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn modify_funding(
@@ -625,7 +635,7 @@ pub mod pallet {
 						Ok(())
 					})
 					.map_err(|_| Error::<T>::FundingChangeAlreadyScheduled)?;
-					Self::deposit_event(Event::VaultMiningBondsChangeScheduled {
+					Self::deposit_event(Event::VaultBondedArgonsChangeScheduled {
 						vault_id,
 						change_tick,
 					});
@@ -716,8 +726,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Stop offering additional bonds from this vault. Will not affect existing bond.
-		/// As funds are returned, they will be released to the vault owner.
+		/// Stop offering additional obligations from this vault. Will not affect existing
+		/// obligations. As funds are returned, they will be released to the vault owner.
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
@@ -750,17 +760,18 @@ pub mod pallet {
 			vault.added_securitization_argons = securitization_still_needed;
 			Self::deposit_event(Event::VaultClosed {
 				vault_id,
-				bitcoin_amount_still_bonded: vault.bitcoin_argons.reserved,
-				mining_amount_still_bonded: vault.bonded_argons.reserved,
-				securitization_still_bonded: securitization_still_needed,
+				bitcoin_amount_still_reserved: vault.bitcoin_argons.reserved,
+				mining_amount_still_reserved: vault.bonded_argons.reserved,
+				securitization_still_reserved: securitization_still_needed,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 
 			Ok(())
 		}
 
-		/// Replace the bitcoin xpubkey for this vault. This will not affect existing bonds, but
-		/// will be used for any bonds after this point. Will be rejected if already used.
+		/// Replace the bitcoin xpubkey for this vault. This will not affect existing obligations,
+		/// but will be used for any obligations after this point. Will be rejected if already
+		/// used.
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
 		pub fn replace_bitcoin_xpub(
@@ -799,7 +810,7 @@ pub mod pallet {
 			who: &T::AccountId,
 			amount: T::Balance,
 			reason: HoldReason,
-		) -> Result<(), BondError> {
+		) -> Result<(), ObligationError> {
 			if amount == T::Balance::zero() {
 				return Ok(());
 			}
@@ -807,16 +818,16 @@ pub mod pallet {
 			let needs_providers = T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into();
 
 			T::Currency::hold(&reason.into(), who, amount).map_err(|e| match e {
-				Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
+				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
 				_ => {
 					let balance = T::Currency::balance(who);
 					if balance.checked_sub(&amount).is_some() &&
 						balance.saturating_sub(amount) < T::Currency::minimum_balance()
 					{
-						return BondError::AccountWouldBeBelowMinimum;
+						return ObligationError::AccountWouldBeBelowMinimum;
 					}
 
-					BondError::InsufficientFunds
+					ObligationError::InsufficientFunds
 				},
 			})?;
 			if needs_providers {
@@ -859,38 +870,43 @@ pub mod pallet {
 			fee.unique_saturated_into()
 		}
 
-		/// Return bonded funds to the vault and complete the bond
-		fn bond_completed(bond_id: BondId) -> DispatchResult {
-			let bond = BondsById::<T>::get(bond_id).ok_or(Error::<T>::BondNotFound)?;
-			Self::remove_bond_completion(bond_id, bond.expiration.clone());
+		/// Return bonded funds to the vault and complete the obligation
+		fn obligation_completed(obligation_id: ObligationId) -> DispatchResult {
+			let obligation =
+				ObligationsById::<T>::get(obligation_id).ok_or(Error::<T>::ObligationNotFound)?;
+			Self::remove_bond_completion(obligation_id, obligation.expiration.clone());
 
-			T::EventHandler::bond_completed(&bond)?;
-			// reload bond
-			let bond = BondsById::<T>::take(bond_id).ok_or(Error::<T>::BondNotFound)?;
-			Self::release_bonded_funds(&bond).map_err(Error::<T>::from)?;
-			Self::deposit_event(Event::BondCompleted { vault_id: bond.vault_id, bond_id });
+			T::EventHandler::on_completed(&obligation)?;
+			// reload obligation
+			let obligation =
+				ObligationsById::<T>::take(obligation_id).ok_or(Error::<T>::ObligationNotFound)?;
+			Self::release_bonded_funds(&obligation).map_err(Error::<T>::from)?;
+			Self::deposit_event(Event::ObligationCompleted {
+				vault_id: obligation.vault_id,
+				obligation_id,
+			});
 			Ok(())
 		}
 
-		fn remove_bond_completion(bond_id: BondId, expiration: BondExpiration) {
+		fn remove_bond_completion(obligation_id: ObligationId, expiration: ObligationExpiration) {
 			match expiration {
-				BondExpiration::BitcoinBlock(completion_block) => {
-					if !BitcoinBondCompletions::<T>::contains_key(completion_block) {
+				ObligationExpiration::BitcoinBlock(completion_block) => {
+					if !BitcoinLockCompletions::<T>::contains_key(completion_block) {
 						return;
 					}
-					BitcoinBondCompletions::<T>::mutate(completion_block, |bonds| {
-						if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
-							bonds.remove(index);
+					BitcoinLockCompletions::<T>::mutate(completion_block, |obligations| {
+						if let Some(index) = obligations.iter().position(|b| *b == obligation_id) {
+							obligations.remove(index);
 						}
 					});
 				},
-				BondExpiration::AtTick(completion_tick) => {
-					if !MiningBondCompletions::<T>::contains_key(completion_tick) {
+				ObligationExpiration::AtTick(completion_tick) => {
+					if !BondedArgonCompletions::<T>::contains_key(completion_tick) {
 						return;
 					}
-					MiningBondCompletions::<T>::mutate(completion_tick, |bonds| {
-						if let Some(index) = bonds.iter().position(|b| *b == bond_id) {
-							bonds.remove(index);
+					BondedArgonCompletions::<T>::mutate(completion_tick, |obligations| {
+						if let Some(index) = obligations.iter().position(|b| *b == obligation_id) {
+							obligations.remove(index);
 						}
 					});
 				},
@@ -900,27 +916,30 @@ pub mod pallet {
 		fn bond_funds(
 			vault_id: VaultId,
 			amount: T::Balance,
-			bond_type: BondType,
+			fund_type: FundType,
 			ticks: Tick,
-			bond_account_id: &T::AccountId,
-		) -> Result<(T::Balance, T::Balance), BondError> {
-			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
-			let mut vault =
-				VaultsById::<T>::get(vault_id).ok_or::<BondError>(BondError::VaultNotFound)?;
+			beneficiary: &T::AccountId,
+		) -> Result<(T::Balance, T::Balance), ObligationError> {
+			ensure!(
+				amount >= T::MinimumObligationAmount::get(),
+				ObligationError::MinimumObligationAmountNotMet
+			);
+			let mut vault = VaultsById::<T>::get(vault_id)
+				.ok_or::<ObligationError>(ObligationError::VaultNotFound)?;
 
-			ensure!(!vault.is_closed, BondError::VaultClosed);
+			ensure!(!vault.is_closed, ObligationError::VaultClosed);
 
-			let vault_argons = match bond_type {
-				BondType::Bitcoin => {
+			let vault_argons = match fund_type {
+				FundType::Bitcoin => {
 					ensure!(
 						vault.bitcoin_argons.free_balance() >= amount,
-						BondError::InsufficientVaultFunds
+						ObligationError::InsufficientVaultFunds
 					);
 					&mut vault.bitcoin_argons
 				},
-				BondType::Mining => {
+				FundType::BondedArgons => {
 					let amount_eligible = vault.available_bonded_argons();
-					ensure!(amount_eligible >= amount, BondError::InsufficientVaultFunds);
+					ensure!(amount_eligible >= amount, ObligationError::InsufficientVaultFunds);
 					&mut vault.bonded_argons
 				},
 			};
@@ -931,18 +950,18 @@ pub mod pallet {
 			let fee = Self::calculate_tick_fees(apr, amount, ticks).saturating_add(base_fee);
 
 			T::Currency::transfer(
-				bond_account_id,
+				beneficiary,
 				&vault.operator_account_id,
 				base_fee,
 				Preservation::Preserve,
 			)
 			.map_err(|e| match e {
-				Token(TokenError::BelowMinimum) => BondError::AccountWouldBeBelowMinimum,
-				_ => BondError::InsufficientFunds,
+				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
+				_ => ObligationError::InsufficientFunds,
 			})?;
 
 			if fee > base_fee {
-				Self::hold(bond_account_id, fee - base_fee, HoldReason::BondFee)?;
+				Self::hold(beneficiary, fee - base_fee, HoldReason::ObligationFee)?;
 			}
 
 			vault_argons.reserved = vault_argons.reserved.saturating_add(amount);
@@ -952,12 +971,13 @@ pub mod pallet {
 		}
 
 		fn release_bonded_funds(
-			bond: &Bond<T::AccountId, T::Balance>,
-		) -> Result<T::Balance, BondError> {
-			let vault_id = bond.vault_id;
+			obligation: &Obligation<T::AccountId, T::Balance>,
+		) -> Result<T::Balance, ObligationError> {
+			let vault_id = obligation.vault_id;
 			let vault = {
-				let mut vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
-				vault.mut_argons(&bond.bond_type).reduce_reserved(bond.amount);
+				let mut vault =
+					VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
+				vault.mut_argons(&obligation.fund_type).reduce_reserved(obligation.amount);
 				vault
 			};
 
@@ -972,38 +992,38 @@ pub mod pallet {
 
 				Self::release_hold(
 					&vault.operator_account_id,
-					bond.amount.saturating_add(free_securitization),
+					obligation.amount.saturating_add(free_securitization),
 					HoldReason::EnterVault,
 				)
-				.map_err(|_| BondError::UnrecoverableHold)?;
+				.map_err(|_| ObligationError::UnrecoverableHold)?;
 
 				vault.added_securitization_argons = minimum_securitization;
-				vault.mut_argons(&bond.bond_type).reduce_allocated(bond.amount);
+				vault.mut_argons(&obligation.fund_type).reduce_allocated(obligation.amount);
 			}
 
-			let apr = vault.argons(&bond.bond_type).annual_percent_rate;
+			let apr = vault.argons(&obligation.fund_type).annual_percent_rate;
 
 			let current_tick = T::TickProvider::current_tick();
-			let ticks = current_tick.saturating_sub(bond.start_tick);
-			let remaining_fee = Self::calculate_tick_fees(apr, bond.amount, ticks);
+			let ticks = current_tick.saturating_sub(obligation.start_tick);
+			let remaining_fee = Self::calculate_tick_fees(apr, obligation.amount, ticks);
 			if remaining_fee > 0u128.into() {
 				T::Currency::transfer_on_hold(
-					&HoldReason::BondFee.into(),
-					&bond.bonded_account_id,
+					&HoldReason::ObligationFee.into(),
+					&obligation.beneficiary,
 					&vault.operator_account_id,
 					remaining_fee,
 					Precision::Exact,
 					Restriction::Free,
 					Fortitude::Force,
 				)
-				.map_err(|_| BondError::UnrecoverableHold)?;
+				.map_err(|_| ObligationError::UnrecoverableHold)?;
 			}
-			let amount_on_hold = bond.total_fee.saturating_sub(bond.prepaid_fee);
+			let amount_on_hold = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
 			let to_return = amount_on_hold.saturating_sub(remaining_fee);
 
 			if to_return > 0u128.into() {
-				Self::release_hold(&bond.bonded_account_id, to_return, HoldReason::BondFee)
-					.map_err(|_| BondError::UnrecoverableHold)?;
+				Self::release_hold(&obligation.beneficiary, to_return, HoldReason::ObligationFee)
+					.map_err(|_| ObligationError::UnrecoverableHold)?;
 			}
 
 			VaultsById::<T>::insert(vault_id, vault);
@@ -1022,16 +1042,17 @@ pub mod pallet {
 			false
 		}
 
-		fn burn_vault_bitcoin_funds(
-			bond_id: BondId,
+		fn burn_vault_bitcoin_obligation(
+			obligation_id: ObligationId,
 			amount_to_burn: T::Balance,
-		) -> Result<Bond<T::AccountId, T::Balance>, BondError> {
-			let mut bond = BondsById::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			let vault_id = bond.vault_id;
-			let mut vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
+		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
+			let mut obligation = ObligationsById::<T>::get(obligation_id)
+				.ok_or(ObligationError::ObligationNotFound)?;
+			let vault_id = obligation.vault_id;
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
 
 			vault.bitcoin_argons.destroy_funds(amount_to_burn)?;
-			bond.amount = bond.amount.saturating_sub(amount_to_burn);
+			obligation.amount = obligation.amount.saturating_sub(amount_to_burn);
 
 			T::Currency::burn_held(
 				&HoldReason::EnterVault.into(),
@@ -1040,12 +1061,12 @@ pub mod pallet {
 				Precision::Exact,
 				Fortitude::Force,
 			)
-			.map_err(|_| BondError::UnrecoverableHold)?;
+			.map_err(|_| ObligationError::UnrecoverableHold)?;
 
 			VaultsById::<T>::insert(vault_id, vault);
-			BondsById::<T>::insert(bond_id, bond.clone());
+			ObligationsById::<T>::insert(obligation_id, obligation.clone());
 
-			Ok(bond)
+			Ok(obligation)
 		}
 
 		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
@@ -1063,30 +1084,32 @@ pub mod pallet {
 		///
 		/// Returns the amount (still owed, repaid)
 		fn compensate_lost_bitcoin(
-			bond_id: BondId,
+			obligation_id: ObligationId,
 			market_rate: Self::Balance,
 			redemption_rate: Self::Balance,
-		) -> Result<(Self::Balance, Self::Balance), BondError> {
+		) -> Result<(Self::Balance, Self::Balance), ObligationError> {
 			let zero = T::Balance::zero();
-			let bond = BondsById::<T>::get(bond_id).ok_or(BondError::BondNotFound)?;
-			let vault_id = bond.vault_id;
-			let bonded_account_id = &bond.bonded_account_id;
-			let remaining_fee = bond.total_fee.saturating_sub(bond.prepaid_fee);
-			let original_bonded_amount = bond.amount;
-			let mut vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
+			let obligation = ObligationsById::<T>::get(obligation_id)
+				.ok_or(ObligationError::ObligationNotFound)?;
 
-			let vault_operator = vault.operator_account_id.clone();
+			let vault_id = obligation.vault_id;
+			let beneficiary = &obligation.beneficiary;
+			let remaining_fee = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
+			let original_bonded_amount = obligation.amount;
 
 			// the remaining fee is not paid
 			if remaining_fee > 0u128.into() {
-				Self::release_hold(bonded_account_id, remaining_fee, HoldReason::BondFee)
-					.map_err(|_| BondError::UnrecoverableHold)?;
+				Self::release_hold(beneficiary, remaining_fee, HoldReason::ObligationFee)
+					.map_err(|_| ObligationError::UnrecoverableHold)?;
 			}
 
 			// 1. burn redemption rate from the vault (or min of market rate)
-
 			let burn_amount = redemption_rate.min(market_rate);
-			Self::burn_vault_bitcoin_funds(bond.bond_id, burn_amount)?;
+			Self::burn_vault_bitcoin_obligation(obligation.obligation_id, burn_amount)?;
+
+			// don't load until we've already burned
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
+			let vault_operator = vault.operator_account_id.clone();
 
 			// the max amount to recoup, which is the market rate capped by securitization
 			let securitized_bond_amount = vault
@@ -1095,7 +1118,7 @@ pub mod pallet {
 				.saturating_add(original_bonded_amount)
 				.min(market_rate);
 
-			// Still owed is diff of securitized bond amount and bonded amount
+			// Still owed is diff of securitized obligation amount and bonded amount
 			let amount_owed = securitized_bond_amount.saturating_sub(original_bonded_amount);
 			let mut still_owed = amount_owed;
 
@@ -1103,8 +1126,9 @@ pub mod pallet {
 			if still_owed > zero && vault.bitcoin_argons.free_balance() >= zero {
 				let amount_to_pull = still_owed.min(vault.bitcoin_argons.free_balance());
 				vault.bitcoin_argons.destroy_allocated_funds(amount_to_pull)?;
-				still_owed =
-					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
+				still_owed = still_owed
+					.checked_sub(&amount_to_pull)
+					.ok_or(ObligationError::InternalError)?;
 			}
 
 			// 3. Use securitized argons
@@ -1113,9 +1137,10 @@ pub mod pallet {
 				vault.added_securitization_argons = vault
 					.added_securitization_argons
 					.checked_sub(&amount_to_pull)
-					.ok_or(BondError::InternalError)?;
-				still_owed =
-					still_owed.checked_sub(&amount_to_pull).ok_or(BondError::InternalError)?;
+					.ok_or(ObligationError::InternalError)?;
+				still_owed = still_owed
+					.checked_sub(&amount_to_pull)
+					.ok_or(ObligationError::InternalError)?;
 			}
 
 			// TODO: 4. Use ownership tokens at current value
@@ -1124,13 +1149,13 @@ pub mod pallet {
 			T::Currency::transfer_on_hold(
 				&HoldReason::EnterVault.into(),
 				&vault_operator,
-				bonded_account_id,
+				beneficiary,
 				recouped,
 				Precision::Exact,
 				Restriction::Free,
 				Fortitude::Force,
 			)
-			.map_err(|_| BondError::UnrecoverableHold)?;
+			.map_err(|_| ObligationError::UnrecoverableHold)?;
 
 			VaultsById::<T>::insert(vault_id, vault);
 
@@ -1143,21 +1168,24 @@ pub mod pallet {
 			vault_claim_height: BitcoinHeight,
 			open_claim_height: BitcoinHeight,
 			current_height: BitcoinHeight,
-		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), BondError> {
+		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), ObligationError> {
 			let (vault_xpubkey, vault_claim_pubkey) = VaultXPubById::<T>::mutate(vault_id, |a| {
 				let (xpub, counter) =
-					a.as_mut().ok_or(BondError::NoVaultBitcoinPubkeysAvailable)?;
+					a.as_mut().ok_or(ObligationError::NoVaultBitcoinPubkeysAvailable)?;
 
-				let mut next =
-					counter.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
+				let mut next = counter
+					.checked_add(1)
+					.ok_or(ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
 				let pubkey = xpub
 					.derive_pubkey(next)
-					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+					.map_err(|_| ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
 
-				next = next.checked_add(1).ok_or(BondError::UnableToGenerateVaultBitcoinPubkey)?;
+				next = next
+					.checked_add(1)
+					.ok_or(ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
 				let pubkey2 = xpub
 					.derive_pubkey(next)
-					.map_err(|_| BondError::UnableToGenerateVaultBitcoinPubkey)?;
+					.map_err(|_| ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
 
 				*a = Some((xpub.clone(), next));
 				Ok((pubkey, pubkey2))
@@ -1174,7 +1202,7 @@ pub mod pallet {
 
 			let network = T::GetBitcoinNetwork::get();
 			let script_pubkey = CosignScript::new(script_args, network.into())
-				.map_err(|_| BondError::InvalidBitcoinScript)?;
+				.map_err(|_| ObligationError::InvalidBitcoinScript)?;
 
 			Ok((
 				vault_xpubkey,
@@ -1183,7 +1211,7 @@ pub mod pallet {
 					.script
 					.to_p2wsh()
 					.try_into()
-					.map_err(|_| BondError::InvalidBitcoinScript)?,
+					.map_err(|_| ObligationError::InvalidBitcoinScript)?,
 			))
 		}
 
@@ -1191,9 +1219,9 @@ pub mod pallet {
 			vault_id: VaultId,
 			amount: Self::Balance,
 			remove_pending: bool,
-		) -> Result<(), BondError> {
+		) -> Result<(), ObligationError> {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
-				let vault = vault.as_mut().ok_or(BondError::VaultNotFound)?;
+				let vault = vault.as_mut().ok_or(ObligationError::VaultNotFound)?;
 				vault.pending_bitcoins = if remove_pending {
 					vault.pending_bitcoins.saturating_sub(amount)
 				} else {
@@ -1203,73 +1231,78 @@ pub mod pallet {
 			})
 		}
 
-		fn create_bond(
+		fn create_obligation(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			bond_type: BondType,
+			fund_type: FundType,
 			amount: T::Balance,
-			expiration: BondExpiration,
+			expiration: ObligationExpiration,
 			ticks: Tick,
-		) -> Result<Bond<T::AccountId, T::Balance>, BondError> {
-			let bond_id = NextBondId::<T>::get().unwrap_or(1);
+		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
+			let obligation_id = NextObligationId::<T>::get().unwrap_or(1);
 
 			let (total_fee, prepaid_fee) =
-				Self::bond_funds(vault_id, amount, bond_type.clone(), ticks, &account_id)?;
+				Self::bond_funds(vault_id, amount, fund_type.clone(), ticks, account_id)?;
 
-			let next_bond_id = bond_id.increment().ok_or(BondError::NoMoreBondIds)?;
-			NextBondId::<T>::set(Some(next_bond_id));
+			let next_obligation_id =
+				obligation_id.increment().ok_or(ObligationError::NoMoreObligationIds)?;
+			NextObligationId::<T>::set(Some(next_obligation_id));
 
-			let bond = Bond {
-				bond_id,
+			let obligation = Obligation {
+				obligation_id,
 				vault_id,
-				bond_type: bond_type.clone(),
-				bonded_account_id: account_id.clone(),
+				fund_type: fund_type.clone(),
+				beneficiary: account_id.clone(),
 				amount,
 				expiration: expiration.clone(),
 				total_fee,
 				start_tick: T::TickProvider::current_tick(),
 				prepaid_fee,
 			};
-			BondsById::<T>::set(bond_id, Some(bond.clone()));
+			ObligationsById::<T>::set(obligation_id, Some(obligation.clone()));
 			match expiration {
-				BondExpiration::AtTick(tick) => {
-					MiningBondCompletions::<T>::try_mutate(tick, |a| {
-						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
+				ObligationExpiration::AtTick(tick) => {
+					BondedArgonCompletions::<T>::try_mutate(tick, |a| {
+						a.try_push(obligation_id)
+							.map_err(|_| ObligationError::ExpirationAtBlockOverflow)
 					})?;
 				},
-				BondExpiration::BitcoinBlock(block) => {
-					BitcoinBondCompletions::<T>::try_mutate(block, |a| {
-						a.try_push(bond_id).map_err(|_| BondError::ExpirationAtBlockOverflow)
+				ObligationExpiration::BitcoinBlock(block) => {
+					BitcoinLockCompletions::<T>::try_mutate(block, |a| {
+						a.try_push(obligation_id)
+							.map_err(|_| ObligationError::ExpirationAtBlockOverflow)
 					})?;
 				},
 			}
 
-			Self::deposit_event(Event::BondCreated {
+			Self::deposit_event(Event::ObligationCreated {
 				vault_id,
-				bond_id,
-				bonded_account_id: account_id.clone(),
+				obligation_id,
+				beneficiary: account_id.clone(),
 				amount,
 				expiration,
-				bond_type,
+				fund_type,
 			});
-			Ok(bond)
+			Ok(obligation)
 		}
 
-		fn cancel_bond(bond_id: BondId) -> Result<(), BondError> {
-			let bond = BondsById::<T>::take(bond_id).ok_or(BondError::BondNotFound)?;
+		fn cancel_obligation(obligation_id: ObligationId) -> Result<T::Balance, ObligationError> {
+			let obligation = ObligationsById::<T>::take(obligation_id)
+				.ok_or(ObligationError::ObligationNotFound)?;
 
-			let returned_fee = Self::release_bonded_funds(&bond)?;
+			let returned_fee = Self::release_bonded_funds(&obligation)?;
 
-			Self::deposit_event(Event::BondCanceled {
-				vault_id: bond.vault_id,
-				bond_id,
-				bonded_account_id: bond.bonded_account_id.clone(),
-				bond_type: bond.bond_type.clone(),
+			Self::deposit_event(Event::ObligationCanceled {
+				vault_id: obligation.vault_id,
+				obligation_id,
+				beneficiary: obligation.beneficiary.clone(),
+				fund_type: obligation.fund_type.clone(),
 				returned_fee,
 			});
-			Self::remove_bond_completion(bond_id, bond.expiration.clone());
-			T::EventHandler::bond_canceled(&bond).map_err(|_| BondError::EventHandlerError)?;
-			Ok(())
+			Self::remove_bond_completion(obligation_id, obligation.expiration.clone());
+			T::EventHandler::on_canceled(&obligation)
+				.map_err(|_| ObligationError::ObligationCompletionError)?;
+			Ok(returned_fee)
 		}
 	}
 
@@ -1277,24 +1310,26 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn cancel_obligation(bond_id: BondId) -> Result<(), BondError> {
-			Self::cancel_bond(bond_id)
-		}
-
 		fn create_bonded_argons(
 			vault_id: VaultId,
 			account_id: Self::AccountId,
 			amount: Self::Balance,
-			bond_until_tick: Tick,
-			modify_bond_id: Option<BondId>,
-		) -> Result<(BondId, Option<RewardSharing<Self::AccountId>>, Self::Balance), BondError> {
-			ensure!(amount >= T::MinimumBondAmount::get(), BondError::MinimumBondAmountNotMet);
+			reserve_until_tick: Tick,
+			modify_obligation_id: Option<ObligationId>,
+		) -> Result<
+			(ObligationId, Option<RewardSharing<Self::AccountId>>, Self::Balance),
+			ObligationError,
+		> {
+			ensure!(
+				amount >= T::MinimumObligationAmount::get(),
+				ObligationError::MinimumObligationAmountNotMet
+			);
 
 			let current_tick = T::TickProvider::current_tick();
-			ensure!(bond_until_tick > current_tick, BondError::ExpirationTooSoon);
-			let bond_ticks = bond_until_tick - current_tick;
+			ensure!(reserve_until_tick > current_tick, ObligationError::ExpirationTooSoon);
+			let bond_ticks = reserve_until_tick - current_tick;
 
-			let vault = VaultsById::<T>::get(vault_id).ok_or(BondError::VaultNotFound)?;
+			let vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
 			let sharing = if vault.mining_reward_sharing_percent_take > RewardShare::zero() {
 				Some(RewardSharing {
 					percent_take: vault.mining_reward_sharing_percent_take,
@@ -1304,37 +1339,47 @@ pub mod pallet {
 				None
 			};
 
-			if let Some(bond_id) = modify_bond_id {
-				if let Some(mut bond) = BondsById::<T>::get(bond_id) {
-					if bond.vault_id == vault_id {
+			if let Some(obligation_id) = modify_obligation_id {
+				if let Some(mut obligation) = ObligationsById::<T>::get(obligation_id) {
+					if obligation.vault_id == vault_id {
 						let (total_fee, prepaid_fee) = Self::bond_funds(
 							vault_id,
 							amount,
-							BondType::Mining,
+							FundType::BondedArgons,
 							bond_ticks,
 							&account_id,
 						)?;
 
-						bond.amount = bond.amount.saturating_add(amount);
-						let new_total = bond.amount;
-						bond.total_fee = bond.total_fee.saturating_add(total_fee);
-						bond.prepaid_fee = bond.prepaid_fee.saturating_add(prepaid_fee);
-						BondsById::<T>::insert(bond_id, bond);
+						obligation.amount = obligation.amount.saturating_add(amount);
+						let new_total = obligation.amount;
+						obligation.total_fee = obligation.total_fee.saturating_add(total_fee);
+						obligation.prepaid_fee = obligation.prepaid_fee.saturating_add(prepaid_fee);
+						ObligationsById::<T>::insert(obligation_id, obligation);
 
-						Self::deposit_event(Event::BondModified { vault_id, bond_id, amount });
-						return Ok((bond_id, sharing, new_total));
+						Self::deposit_event(Event::ObligationModified {
+							vault_id,
+							obligation_id,
+							amount,
+						});
+						return Ok((obligation_id, sharing, new_total));
 					}
 				}
 			}
-			let bond = Self::create_bond(
+			let obligation = Self::create_obligation(
 				vault_id,
 				&account_id,
-				BondType::Mining,
+				FundType::BondedArgons,
 				amount,
-				BondExpiration::AtTick(bond_until_tick),
+				ObligationExpiration::AtTick(reserve_until_tick),
 				bond_ticks,
 			)?;
-			Ok((bond.bond_id, sharing, amount))
+			Ok((obligation.obligation_id, sharing, amount))
+		}
+
+		fn cancel_bonded_argons(
+			obligation_id: ObligationId,
+		) -> Result<T::Balance, ObligationError> {
+			Self::cancel_obligation(obligation_id)
 		}
 	}
 
