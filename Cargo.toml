@@ -65,7 +65,7 @@ overflow-checks = true
 [profile.dev]
 debug = 1
 debug-assertions = true
-incremental = false
+incremental = true
 codegen-units = 256
 opt-level = 0
 split-debuginfo = "unpacked"
@@ -135,16 +135,6 @@ yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
 [patch.crates-io]
-pallet-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp" }
-pallet-ismp-runtime-api = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp/runtime-api" }
-pallet-hyperbridge = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/hyperbridge" }
-pallet-ismp-rpc = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/ismp/rpc" }
-ismp-grandpa = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/ismp/clients/grandpa" }
-substrate-state-machine = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/ismp/state-machines/substrate" }
-grandpa-verifier = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/consensus/grandpa/verifier" }
-ismp = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } #  path = "../../hyperbridge/modules/ismp/core" }
-pallet-token-gateway = { git = "https://github.com/argonprotocol/hyperbridge", branch = "main0128" } # path = "../../hyperbridge/modules/pallets/token-gateway" }
-
 sc-basic-authorship = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/client/basic-authorship" }
 sc-block-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/block-builder" }
 sc-chain-spec = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/client/chain-spec" }
@@ -392,12 +382,12 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # hyperprocessor bridge
-pallet-ismp = { version = "15.0.0", default-features = false }
-pallet-ismp-runtime-api = { version = "15.0.0", default-features = false }
-pallet-hyperbridge = { version = "15.0.0", default-features = false }
-pallet-token-gateway = { version = "15.1.1", default-features = false }
-pallet-ismp-rpc = { version = "15.0.0", default-features = false }
-ismp-grandpa = { version = "15.0.1", default-features = false }
+pallet-ismp = { version = "16.0.0", default-features = false }
+pallet-ismp-runtime-api = { version = "16.0.0", default-features = false }
+pallet-hyperbridge = { version = "16.0.0", default-features = false }
+pallet-token-gateway = { version = "16.0.0", default-features = false }
+pallet-ismp-rpc = { version = "16.0.0", default-features = false }
+ismp-grandpa = { version = "16.0.0", default-features = false }
 ismp = { version = "0.2.2", default-features = false }
 sp-mmr-primitives = { version = "34.0.0", default-features = false }
 
