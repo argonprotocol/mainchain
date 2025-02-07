@@ -1,14 +1,20 @@
 # Changelog
 
-## [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...3e6ebd79822913a697972c7502136f60b974da66) (2025-02-06)
+## [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...636c016ea477d40db1f88f5fb829ab52a8d2b997) (2025-02-07)
 
-### Features
+### [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...v1.0.10) (2025-02-07)
+
+#### Features
 
 * **rewards:** increment rewards on ticks
 ([74418b1](https://github.com/argonprotocol/mainchain/commit/74418b13591069ad4141913643ef8f03ab4be435))
 
-### Fixes
+#### Fixes
 
+* migration broken for clearing bonds
+([7e5455e](https://github.com/argonprotocol/mainchain/commit/7e5455e8482f76ce19929ddad0fc53e32aebdfa8))
+* attempt fix for windows release assets
+([4e26676](https://github.com/argonprotocol/mainchain/commit/4e2667655de818c3c7cf903c5869d0300a423da8))
 * **vault:** disable reward sharing for now
 ([768351b](https://github.com/argonprotocol/mainchain/commit/768351b19cdd30b023b05a185f6195492ea82c7c))
 * convert mining slots gap to ticks
