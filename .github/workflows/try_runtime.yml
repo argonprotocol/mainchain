@@ -10,28 +10,72 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  try-canary-runtime:
+  build-runtimes:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Install
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+          components: rust-src
+
+      - name: Fetch cache
+        uses: Swatinem/rust-cache@v2.7.0
+        with:
+          shared-key: try-runtime
+
+      - name: Build Runtimes
+        run: |
+          cargo build --profile release -p argon-canary-runtime -p argon-runtime --features try-runtime -q --locked
+        shell: bash
+
+      - name: Flatten Runtimes
+        run: |
+          mkdir -p runtimes
+          cp target/release/wbuild/*/*.compact.compressed.wasm runtimes/
+
+      - name: Upload Debug Assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtimes
+          path: ./runtimes
+          if-no-files-found: error
+
+  try-runtime-upgrade:
+    needs: build-runtimes
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        runtime:
+          - { artifact: "argon_canary_runtime", uri: "wss://rpc.testnet.argonprotocol.org" }
+          - { artifact: "argon_runtime", uri: "wss://rpc.argon.network" }
+    steps:
+      - name: Download try-runtime-cli
+        run: |
+          curl -sL https://github.com/paritytech/try-runtime-cli/releases/download/v0.8.0/try-runtime-x86_64-unknown-linux-musl -o try-runtime
+          chmod +x ./try-runtime
+        shell: bash
+
+      - name: Download runtime artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: runtimes
+          path: ./runtimes
+
+      - name: List runtimes
+        run: ls -R runtimes
+
       - name: Try testnet runtime upgrades
-        uses: paritytech/try-runtime-gha@v0.2.0
-        with:
-          runtime-package: argon-canary-runtime
-          node-uri: wss://rpc.testnet.argonprotocol.org
-          # Try State checks are currently broken on Polkadot. So only run migration checks for now.
-          checks: "pre-and-post"
-  try-argon-runtime:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Try argon runtime upgrades
-        uses: paritytech/try-runtime-gha@v0.2.0
-        with:
-          runtime-package: argon-runtime
-          node-uri: wss://rpc.argon.network
-          checks: "pre-and-post"
+        run: |
+          ./try-runtime \
+            --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
+            on-runtime-upgrade \
+              --print-storage-diff \
+              --blocktime 60000 \
+              --disable-mbm-checks \
+            live --uri ${{ matrix.runtime.uri }}
