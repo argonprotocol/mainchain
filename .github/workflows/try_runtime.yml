@@ -1,0 +1,37 @@
+name: Try runtime upgrades
+
+on:
+  push:
+    branches:
+      - v[0-9]+.*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  try-canary-runtime:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Try testnet runtime upgrades
+        uses: paritytech/try-runtime-gha@v0.2.0
+        with:
+          runtime-package: argon-canary-runtime
+          node-uri: wss://rpc.testnet.argonprotocol.org
+          # Try State checks are currently broken on Polkadot. So only run migration checks for now.
+          checks: "pre-and-post"
+  try-argon-runtime:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Try argon runtime upgrades
+        uses: paritytech/try-runtime-gha@v0.2.0
+        with:
+          runtime-package: argon-runtime
+          node-uri: wss://rpc.argon.network
+          checks: "pre-and-post"

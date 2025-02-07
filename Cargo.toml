@@ -55,6 +55,9 @@ lto = true
 opt-level = 3
 panic = "unwind"
 
+[profile.production]
+inherits = "release"
+
 [profile.testnet]
 inherits = "release"
 lto = false

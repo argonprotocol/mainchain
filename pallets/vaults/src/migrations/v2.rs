@@ -2,15 +2,55 @@ use crate::{pallet::VaultsById, Config};
 use alloc::vec::Vec;
 use argon_primitives::bitcoin::Satoshis;
 use frame_support::{migration, pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use log::{info, warn};
 
-pub mod v1_p2 {
+pub mod v1 {
 	use crate::Config;
 	use argon_primitives::VaultId;
 	use frame_support::{pallet_prelude::ValueQuery, storage_alias, Twox64Concat};
 	use frame_system::pallet_prelude::BlockNumberFor;
 	use sp_core::ConstU32;
 	use sp_runtime::BoundedVec;
+
+	use argon_primitives::{vault::VaultTerms, RewardShare};
+	use codec::{Codec, Decode, Encode, MaxEncodedLen};
+	use frame_support::pallet_prelude::{OptionQuery, TypeInfo};
+	use sp_core::RuntimeDebug;
+	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedU128};
+
+	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub struct Vault<T: Config> {
+		pub operator_account_id: T::AccountId,
+		pub bitcoin_argons: VaultArgons<T::Balance>,
+		#[codec(compact)]
+		pub added_securitization_percent: FixedU128,
+		#[codec(compact)]
+		pub securitized_argons: T::Balance,
+		pub bonded_argons: VaultArgons<T::Balance>,
+		#[codec(compact)]
+		pub mining_reward_sharing_percent_take: RewardShare,
+		pub is_closed: bool,
+		pub pending_terms: Option<(BlockNumberFor<T>, VaultTerms<T::Balance>)>,
+		pub pending_bonded_argons: Option<(BlockNumberFor<T>, T::Balance)>,
+		pub pending_bitcoins: T::Balance,
+	}
+
+	#[derive(
+		Clone, Eq, PartialEq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen, Default,
+	)]
+	pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
+		#[codec(compact)]
+		pub annual_percent_rate: FixedU128,
+		#[codec(compact)]
+		pub allocated: Balance,
+		#[codec(compact)]
+		pub bonded: Balance,
+		#[codec(compact)]
+		pub base_fee: Balance,
+	}
+	#[storage_alias]
+	pub type VaultsById<T: Config> =
+		StorageMap<crate::Pallet<T>, Twox64Concat, VaultId, Vault<T>, OptionQuery>;
 
 	#[storage_alias]
 	pub(super) type PendingTermsModificationsByBlock<T: Config> = StorageMap<
@@ -40,18 +80,18 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrateV1ToV2<T> {
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
-		info!("Clearing testnet data for Vaults from v1 to v2");
+		warn!("Clearing testnet data for Vaults from v1 to v2. Remove after implemented.");
 		let a = VaultsById::<T>::drain().collect::<Vec<_>>();
 
-		let b = v1_p2::PendingTermsModificationsByBlock::<T>::drain().collect::<Vec<_>>();
-		let c = v1_p2::PendingFundingModificationsByBlock::<T>::drain().collect::<Vec<_>>();
+		let b = v1::PendingTermsModificationsByBlock::<T>::drain().collect::<Vec<_>>();
+		let c = v1::PendingFundingModificationsByBlock::<T>::drain().collect::<Vec<_>>();
 		let minimum_satoshis =
-			migration::get_storage_value::<Satoshis>(b"bonds", b"MinimumBitcoinBondSatoshis", &[]);
+			migration::get_storage_value::<Satoshis>(b"Bonds", b"MinimumBitcoinBondSatoshis", &[]);
 		if let Some(minimum_sats) = minimum_satoshis {
 			info!("Setting minimum LockedBitcoin satoshis to {}", minimum_sats);
-			migration::put_storage_value(b"bitcoin_locks", b"MinimumSatoshis", &[], minimum_sats);
+			migration::put_storage_value(b"BitcoinLocks", b"MinimumSatoshis", &[], minimum_sats);
 		}
-		let result = migration::clear_storage_prefix(b"bonds", &[], &[], None, None);
+		let result = migration::clear_storage_prefix(b"Bonds", &[], &[], None, None);
 		let count = (a.len() + b.len() + c.len() + result.backend as usize) as u64;
 
 		T::DbWeight::get().reads_writes(count, count)
@@ -79,13 +119,32 @@ pub type MigrateV1ToV2<T> = frame_support::migrations::VersionedMigration<
 #[cfg(all(feature = "try-runtime", test))]
 mod test {
 	use super::*;
-	use crate::{
-		migrations::v1::v1_storage as v1,
-		mock::{new_test_ext, CurrentTick, System, Test},
-	};
+	use crate::mock::{new_test_ext, CurrentTick, System, Test};
 	use argon_primitives::vault::VaultArgons;
 	use frame_support::assert_ok;
+	use sp_core::{bytes::from_hex, twox_128};
 	use sp_runtime::FixedU128;
+
+	#[test]
+	fn test_storage_key() {
+		let pallet = twox_128(b"Bonds");
+		assert_eq!(&pallet[..], from_hex("0x5641285262b8f970e4cbaafbff8d6ab0").unwrap());
+		let item = twox_128(b"MinimumBitcoinBondSatoshis");
+		let full_key = [&pallet[..], &item[..]].concat();
+		assert_eq!(
+			full_key,
+			from_hex("0x5641285262b8f970e4cbaafbff8d6ab0ccb9b113756ea330a7f7a6b80846c92b").unwrap()
+		);
+
+		let new_pallet = twox_128(b"BitcoinLocks");
+		let new_key = twox_128(b"MinimumSatoshis");
+		let full_key_2 = [&new_pallet[..], &new_key[..]].concat();
+
+		assert_eq!(
+			full_key_2,
+			from_hex("0x65316696a1984feaeb8d9b9dfc309d2bcf354d16aa0766f4192f3883dfcf0a05").unwrap()
+		);
+	}
 
 	#[test]
 	fn handles_existing_value() {
@@ -133,7 +192,7 @@ mod test {
 					pending_bitcoins: 0,
 				},
 			);
-			v1_p2::PendingFundingModificationsByBlock::<Test>::insert(
+			v1::PendingFundingModificationsByBlock::<Test>::insert(
 				1010,
 				BoundedVec::truncate_from(vec![1]),
 			);
