@@ -1,6 +1,8 @@
 # Changelog
 
-## [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...23b7152d6c4ed49224bbe407fb6504a935561af0) (2025-01-28)
+## [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...3e6ebd79822913a697972c7502136f60b974da66) (2025-02-06)
+
+### [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...v1.0.9) (2025-01-28)
 
 ### [v1.0.8](https://github.com/argonprotocol/mainchain/compare/v1.0.7...v1.0.8) (2025-01-27)
 
@@ -8,7 +10,7 @@
 
 ### [v1.0.6](https://github.com/argonprotocol/mainchain/compare/v1.0.5...v1.0.6) (2025-01-24)
 
-### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-24)
+### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-23)
 
 ### [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...v1.0.4) (2025-01-21)
 
@@ -31,7 +33,7 @@
 
 ### [v0.0.25](https://github.com/argonprotocol/mainchain/compare/v0.0.24...v0.0.25) (2025-01-06)
 
-### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-20)
+### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-19)
 
 #### Fixes
 
@@ -40,7 +42,7 @@
 
 ### [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...v0.0.23) (2024-12-19)
 
-### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-17)
+### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-16)
 
 #### Features
 
@@ -52,16 +54,16 @@
 * **localchain:** gh actions openssl build issues
 ([ea1186d](https://github.com/argonprotocol/mainchain/commit/ea1186d2f5d2e34963000bc1a88a09073e4d8468))
 
-### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-08)
+### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-07)
 
-### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-07)
+### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-06)
 
 #### Fixes
 
 * **localchain:** improve lock hold durations
 ([025cbe4](https://github.com/argonprotocol/mainchain/commit/025cbe4aa6aa3606ad9e181c5da3879e0455bded))
 
-### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-06)
+### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-05)
 
 ### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
 
@@ -91,7 +93,7 @@
 
 ### [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...v0.0.16) (2024-10-25)
 
-### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-25)
+### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-24)
 
 #### Features
 
@@ -105,7 +107,7 @@
 * **ticks:** only allow a single block per tick
 ([cdf295a](https://github.com/argonprotocol/mainchain/commit/cdf295aae082adae7f72deb4ddc9517b48e9ccbd))
 
-### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-11)
+### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-10)
 
 #### Fixes
 
@@ -125,7 +127,7 @@
 
 ### [v0.0.12](https://github.com/argonprotocol/mainchain/compare/v0.0.11...v0.0.12) (2024-10-08)
 
-### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-08)
+### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-07)
 
 ### [v0.0.10](https://github.com/argonprotocol/mainchain/compare/v0.0.9...v0.0.10) (2024-10-07)
 
@@ -192,7 +194,7 @@
 
 ### [v0.0.3](https://github.com/argonprotocol/mainchain/compare/v0.0.2...v0.0.3) (2024-08-29)
 
-### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-28)
+### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-27)
 
 #### Fixes
 
