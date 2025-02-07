@@ -889,7 +889,7 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "argon-bitcoin"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -917,7 +917,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "age",
  "anyhow",
@@ -945,7 +945,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli-macros"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -954,7 +954,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-utxo-tracker"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -981,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "argon-canary-runtime"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-runtime",
  "substrate-wasm-builder",
@@ -989,7 +989,7 @@ dependencies = [
 
 [[package]]
 name = "argon-client"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1016,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "argon-localchain"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
@@ -1140,7 +1140,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node-consensus"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-bitcoin-utxo-tracker",
@@ -1205,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1259,7 +1259,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-apis"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-notary-audit",
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-audit"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "argon-oracle"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "alloy-eips",
  "alloy-primitives 0.8.19",
@@ -1344,7 +1344,7 @@ dependencies = [
 
 [[package]]
 name = "argon-primitives"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "argon-randomx"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "bindgen 0.70.1",
  "cmake",
@@ -1399,7 +1399,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1468,7 +1468,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1497,7 +1497,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing-bitcoin"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "bitcoind",
 ]
@@ -5474,7 +5474,7 @@ dependencies = [
 
 [[package]]
 name = "end-to-end"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -6486,14 +6486,13 @@ dependencies = [
 
 [[package]]
 name = "frame-decode"
-version = "0.4.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "055387e30382aec12f626c6d9086b7a7a08844f2a2074c14b415eef48237cff4"
+checksum = "b7af3d1149d6063985bb62d97f3ea83060ce4d6f2d04c21f551d270e8d84a27c"
 dependencies = [
- "frame-metadata",
- "hex",
+ "frame-metadata 18.0.0",
  "parity-scale-codec",
- "scale-decode 0.13.1",
+ "scale-decode 0.16.0",
  "scale-info",
  "scale-type-resolver",
  "sp-crypto-hashing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6559,6 +6558,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame-metadata"
+version = "18.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daaf440c68eb2c3d88e5760fe8c7af3f9fee9181fab6c2f2c4e7cc48dcc40bb8"
+dependencies = [
+ "cfg-if",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+]
+
+[[package]]
 name = "frame-metadata-hash-extension"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6584,7 +6595,7 @@ dependencies = [
  "bitflags 1.3.2",
  "docify",
  "environmental",
- "frame-metadata",
+ "frame-metadata 16.0.0",
  "frame-support-procedural 30.0.3",
  "impl-trait-for-tuples",
  "k256",
@@ -9659,7 +9670,7 @@ checksum = "f313fcff1d2a4bcaa2deeaa00bf7530d77d5f7bd0467a117dde2e29a75a7a17a"
 dependencies = [
  "array-bytes",
  "blake3",
- "frame-metadata",
+ "frame-metadata 16.0.0",
  "parity-scale-codec",
  "scale-decode 0.13.1",
  "scale-info",
@@ -10534,9 +10545,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.68"
+version = "0.10.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6174bc48f102d208783c2c84bf931bb75927a617866870de8a4ea85597f871f5"
+checksum = "61cfb4e166a8bb8c9b55c500bc2308550148ece889be90f609377e58140f42c6"
 dependencies = [
  "bitflags 2.8.0",
  "cfg-if",
@@ -10575,9 +10586,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.104"
+version = "0.9.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45abf306cbf99debc8195b66b7346498d7b10c210de50418b5ccd7ceba08c741"
+checksum = "8b22d5b84be05a8d6947c7cb71f7c849aa0f112acd4bf51c2a7c1c988ac0a9dc"
 dependencies = [
  "cc",
  "libc",
@@ -10965,7 +10976,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-locks"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -10987,7 +10998,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-utxos"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -11005,7 +11016,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-rewards"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -11024,7 +11035,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -11046,7 +11057,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -11188,7 +11199,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-chain-transfer"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -11461,7 +11472,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-digests"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -11481,7 +11492,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-domains"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -11821,7 +11832,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mining-slot"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -11841,7 +11852,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mint"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -12044,7 +12055,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notaries"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -12063,7 +12074,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notebook"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -12179,7 +12190,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-price-index"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.6",
@@ -12675,7 +12686,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ticks"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-notary-audit",
  "argon-primitives",
@@ -12889,7 +12900,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-vaults"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -18403,6 +18414,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e57b1e7f6b65ed1f04e79a85a57d755ad56d76fdf1e9bddcc9ae14f71fcdcf54"
 dependencies = [
  "parity-scale-codec",
+ "scale-type-resolver",
+]
+
+[[package]]
+name = "scale-bits"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27243ab0d2d6235072b017839c5f0cd1a3b1ce45c0f7a715363b0c7d36c76c94"
+dependencies = [
+ "parity-scale-codec",
  "scale-info",
  "scale-type-resolver",
  "serde",
@@ -18416,31 +18437,31 @@ checksum = "e98f3262c250d90e700bb802eb704e1f841e03331c2eb815e46516c4edbf5b27"
 dependencies = [
  "derive_more 0.99.18",
  "parity-scale-codec",
- "scale-bits",
+ "scale-bits 0.6.0",
  "scale-type-resolver",
  "smallvec",
 ]
 
 [[package]]
 name = "scale-decode"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ae9cc099ae85ff28820210732b00f019546f36f33225f509fe25d5816864a0"
+checksum = "4d78196772d25b90a98046794ce0fe2588b39ebdfbdc1e45b4c6c85dd43bebad"
 dependencies = [
- "derive_more 1.0.0",
  "parity-scale-codec",
  "primitive-types 0.13.1",
- "scale-bits",
+ "scale-bits 0.7.0",
  "scale-decode-derive",
  "scale-type-resolver",
  "smallvec",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
 name = "scale-decode-derive"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ed9401effa946b493f9f84dc03714cca98119b230497df6f3df6b84a2b03648"
+checksum = "2f4b54a1211260718b92832b661025d1f1a4b6930fbadd6908e00edd265fa5f7"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -18450,24 +18471,24 @@ dependencies = [
 
 [[package]]
 name = "scale-encode"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f9271284d05d0749c40771c46180ce89905fd95aa72a2a2fddb4b7c0aa424db"
+checksum = "64901733157f9d25ef86843bd783eda439fac7efb0ad5a615d12d2cf3a29464b"
 dependencies = [
- "derive_more 1.0.0",
  "parity-scale-codec",
  "primitive-types 0.13.1",
- "scale-bits",
+ "scale-bits 0.7.0",
  "scale-encode-derive",
  "scale-type-resolver",
  "smallvec",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
 name = "scale-encode-derive"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "102fbc6236de6c53906c0b262f12c7aa69c2bdc604862c12728f5f4d370bc137"
+checksum = "78a3993a13b4eafa89350604672c8757b7ea84c7c5947d4b3691e3169c96379b"
 dependencies = [
  "darling",
  "proc-macro-crate 3.2.0",
@@ -18514,34 +18535,33 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dc4c70c7fea2eef1740f0081d3fe385d8bee1eef11e9272d3bec7dc8e5438e0"
+checksum = "dc3173be608895eb117cf397ab4f31f00e2ed2c7af1c6e0b8f5d51d0a0967053"
 dependencies = [
  "proc-macro2",
  "quote",
  "scale-info",
  "syn 2.0.96",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
 name = "scale-value"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5e0ef2a0ee1e02a69ada37feb87ea1616ce9808aca072befe2d3131bf28576e"
+checksum = "8ca8b26b451ecb7fd7b62b259fa28add63d12ec49bbcac0e01fcb4b5ae0c09aa"
 dependencies = [
  "base58",
  "blake2 0.10.6",
- "derive_more 1.0.0",
  "either",
  "parity-scale-codec",
- "scale-bits",
- "scale-decode 0.14.0",
+ "scale-bits 0.7.0",
+ "scale-decode 0.16.0",
  "scale-encode",
- "scale-info",
  "scale-type-resolver",
  "serde",
+ "thiserror 2.0.11",
  "yap",
 ]
 
@@ -20396,7 +20416,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a616fa51350b35326682a472ee8e6ba742fdacb18babac38ecd46b3e05ead869"
 dependencies = [
- "frame-metadata",
+ "frame-metadata 16.0.0",
  "parity-scale-codec",
  "scale-info",
 ]
@@ -20406,7 +20426,7 @@ name = "sp-metadata-ir"
 version = "0.7.0"
 source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2409-grandpa-fix#911c796972c1092b16c6ec6e3bade19e2518c1c8"
 dependencies = [
- "frame-metadata",
+ "frame-metadata 16.0.0",
  "parity-scale-codec",
  "scale-info",
 ]
@@ -21475,7 +21495,7 @@ dependencies = [
  "cargo_metadata 0.15.4",
  "console",
  "filetime",
- "frame-metadata",
+ "frame-metadata 16.0.0",
  "jobserver",
  "merkleized-metadata",
  "parity-scale-codec",
@@ -21514,13 +21534,14 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "subxt"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "797dd0ed45245ea027fc6a2afadcf4c03027aa7bcb06dc7043e75a060d7ce180"
 dependencies = [
  "async-trait",
  "derive-where",
  "either",
- "frame-metadata",
+ "frame-metadata 18.0.0",
  "futures",
  "hex",
  "impl-serde 0.5.0",
@@ -21528,8 +21549,8 @@ dependencies = [
  "parity-scale-codec",
  "polkadot-sdk",
  "primitive-types 0.13.1",
- "scale-bits",
- "scale-decode 0.14.0",
+ "scale-bits 0.7.0",
+ "scale-decode 0.16.0",
  "scale-encode",
  "scale-info",
  "scale-value",
@@ -21539,7 +21560,7 @@ dependencies = [
  "subxt-lightclient",
  "subxt-macro",
  "subxt-metadata",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-util",
  "tracing",
@@ -21550,13 +21571,11 @@ dependencies = [
 
 [[package]]
 name = "subxt-codegen"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b622b426e571fdd86b08ad0bec4ef0e323d937bb56ff5edcfaf4716f50384ca"
 dependencies = [
- "frame-metadata",
  "heck 0.5.0",
- "hex",
- "jsonrpsee",
  "parity-scale-codec",
  "proc-macro2",
  "quote",
@@ -21564,20 +21583,20 @@ dependencies = [
  "scale-typegen",
  "subxt-metadata",
  "syn 2.0.96",
- "thiserror 1.0.69",
- "tokio",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
 name = "subxt-core"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e7617b6c7ed846d3f69c0eafb11884730c9161217c82e1edc370e3872c2e5cf"
 dependencies = [
  "base58",
  "blake2 0.10.6",
  "derive-where",
  "frame-decode",
- "frame-metadata",
+ "frame-metadata 18.0.0",
  "hashbrown 0.14.5",
  "hex",
  "impl-serde 0.5.0",
@@ -21585,28 +21604,30 @@ dependencies = [
  "parity-scale-codec",
  "polkadot-sdk",
  "primitive-types 0.13.1",
- "scale-bits",
- "scale-decode 0.14.0",
+ "scale-bits 0.7.0",
+ "scale-decode 0.16.0",
  "scale-encode",
  "scale-info",
  "scale-value",
  "serde",
  "serde_json",
  "subxt-metadata",
+ "thiserror 2.0.11",
  "tracing",
 ]
 
 [[package]]
 name = "subxt-lightclient"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcf5e44c8eb70f4f95e7017df85bc626356c633384b2615900ee09825ee79ef1"
 dependencies = [
  "futures",
  "futures-util",
  "serde",
  "serde_json",
  "smoldot-light 0.16.2",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -21614,8 +21635,9 @@ dependencies = [
 
 [[package]]
 name = "subxt-macro"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a12ac44222225bf0eb96a32d663d00fac8d2917f4873e4f6b5d00cdd1f5b6e7b"
 dependencies = [
  "darling",
  "parity-scale-codec",
@@ -21623,20 +21645,34 @@ dependencies = [
  "quote",
  "scale-typegen",
  "subxt-codegen",
+ "subxt-utils-fetchmetadata",
  "syn 2.0.96",
 ]
 
 [[package]]
 name = "subxt-metadata"
-version = "0.37.0"
-source = "git+https://github.com/paritytech/subxt?rev=50fc73a2a5563e1b051b4a738c42a3319f79ac26#50fc73a2a5563e1b051b4a738c42a3319f79ac26"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330f692b6e2c590265d222be717e9f88c017ee4b2ddb50907f31fffdf26072a5"
 dependencies = [
  "frame-decode",
- "frame-metadata",
+ "frame-metadata 18.0.0",
  "hashbrown 0.14.5",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
+ "thiserror 2.0.11",
+]
+
+[[package]]
+name = "subxt-utils-fetchmetadata"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "526a07767a8f16a9471dda6e3d41c23f9656b302e9cdefdcd7d5a74830284a5d"
+dependencies = [
+ "hex",
+ "parity-scale-codec",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -22713,7 +22749,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-cli"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "uniffi",
 ]
@@ -24286,9 +24322,9 @@ checksum = "09041cd90cf85f7f8b2df60c646f853b7f535ce68f85244eb6731cf89fa498ec"
 
 [[package]]
 name = "yap"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff4524214bc4629eba08d78ceb1d6507070cc0bcbbed23af74e19e6e924a24cf"
+checksum = "bfe269e7b803a5e8e20cbd97860e136529cd83bf2c9c6d37b142467e7e1f051f"
 
 [[package]]
 name = "yasna"

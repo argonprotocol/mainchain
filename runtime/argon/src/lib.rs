@@ -197,9 +197,8 @@ pub type SignedExtra = (
 ///
 /// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 type Migrations = (
-	pallet_vaults::migrations::MigrateV0ToV1<Runtime>,
-	migrations::UpdateMissingGrandpaSetId<Runtime>,
 	// spec 110
+	migrations::UpdateMissingGrandpaSetId<Runtime>,
 	pallet_mining_slot::migrations::MigrateV1ToV2<Runtime>,
 	pallet_vaults::migrations::MigrateV1ToV2<Runtime>,
 );

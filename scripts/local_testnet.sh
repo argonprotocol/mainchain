@@ -42,14 +42,6 @@ then
     echo "bitcoin-cli could not be found, installing..."
     brew install bitcoin
 fi
-
-BTC_CLI="bitcoin-cli -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
-# try to create wallet, but if it already exists, ignore error
-$BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default" || true
-
-# go to point of generating funds
-$BTC_CLI -generate 101
-
 # Function to check if the Bitcoin node is ready
 is_node_ready() {
   curl -s --user bitcoin:bitcoin --data-binary '{"jsonrpc": "1.0", "id": "curltest", "method": "getblockchaininfo", "params": [] }' -H 'content-type: text/plain;' http://127.0.0.1:18444/ | grep -q "result"
@@ -60,6 +52,14 @@ echo -e "Waiting for Bitcoin node to start...\n"
 until is_node_ready; do
   sleep 1
 done
+
+
+BTC_CLI="bitcoin-cli -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
+# try to create wallet, but if it already exists, ignore error
+$BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default" || true
+
+# go to point of generating funds
+$BTC_CLI -generate 101
 
 
 # If we're using iphone simulator (ACTIVATE_IOS), set up ngrok and delete all simulators

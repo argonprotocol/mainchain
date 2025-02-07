@@ -366,22 +366,6 @@ pub mod pallet {
 
 			T::DbWeight::get().reads_writes(2, 0)
 		}
-
-		fn on_runtime_upgrade() -> Weight {
-			let version = Pallet::<T>::on_chain_storage_version();
-			if version == 0 {
-				log::info!("🚚 Migrating MiningSlot to storage version 1 - delay bidding start.",);
-				StorageVersion::new(1).put::<Pallet<T>>();
-				// delay slot bidding until we can get liquidity, or there's no way to mine without
-				// existing tokens
-				MiningConfig::<T>::mutate(|a| {
-					a.slot_bidding_start_after_ticks = 12 * 1440;
-				});
-
-				return T::DbWeight::get().reads_writes(2, 1)
-			}
-			T::DbWeight::get().reads_writes(1, 0)
-		}
 	}
 
 	#[pallet::call]

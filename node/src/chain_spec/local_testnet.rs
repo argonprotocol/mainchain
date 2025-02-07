@@ -25,7 +25,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 		.unwrap_or("ws://127.0.0.1:9925".to_string())
 		.into();
 	const HASHES_PER_SECOND: u64 = 1_000;
-	const TICK_MILLIS: u64 = 10000;
+	const TICK_MILLIS: u64 = 10_000;
 	let ticker = Ticker::new(TICK_MILLIS, 2);
 
 	Ok(ChainSpec::builder(

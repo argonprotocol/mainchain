@@ -1,8 +1,24 @@
 # Changelog
 
-## [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...23b7152d6c4ed49224bbe407fb6504a935561af0) (2025-01-28)
+## [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...3e6ebd79822913a697972c7502136f60b974da66) (2025-02-06)
 
 ### Features
+
+* **rewards:** increment rewards on ticks
+([74418b1](https://github.com/argonprotocol/mainchain/commit/74418b13591069ad4141913643ef8f03ab4be435))
+
+### Fixes
+
+* **vault:** disable reward sharing for now
+([768351b](https://github.com/argonprotocol/mainchain/commit/768351b19cdd30b023b05a185f6195492ea82c7c))
+* convert mining slots gap to ticks
+([4035bfd](https://github.com/argonprotocol/mainchain/commit/4035bfd774449087a8cf60b1c5d22efbdc23a01b))
+* **runtme:** fixup grandpa set id history
+([4614da2](https://github.com/argonprotocol/mainchain/commit/4614da20284fecb01488ddb0fe30c5d3538a14b9))
+
+### [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...v1.0.9) (2025-01-28)
+
+#### Features
 
 * **block_rewards:** ability to pause rewards
 ([a81c547](https://github.com/argonprotocol/mainchain/commit/a81c547149a2d5a13e378c5be13ac4478635ffdc))
@@ -37,7 +53,7 @@
 * **notary:** don’t fail audit for wrong tick
 ([d6d2975](https://github.com/argonprotocol/mainchain/commit/d6d29753c08333f20d0d32f5ab3139ccb5e2f735))
 
-### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-24)
+### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-23)
 
 #### Features
 
@@ -176,7 +192,7 @@
 * **mining:** starts slots after ticks vs blocks
 ([ff4428f](https://github.com/argonprotocol/mainchain/commit/ff4428f53acdf0735121492cd2a6a810d75db8e6))
 
-### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-20)
+### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-19)
 
 #### Fixes
 
@@ -197,7 +213,7 @@
 * **node:** notaries not dialed
 ([825965c](https://github.com/argonprotocol/mainchain/commit/825965c57ec58e730dea56a2ad833f3733a6121b))
 
-### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-17)
+### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-16)
 
 #### Features
 
@@ -215,21 +231,21 @@
 * **node:** reconnect to notary to verify blocks
 ([a8f2383](https://github.com/argonprotocol/mainchain/commit/a8f23836ec947d7b4af46b236e8443bb8d2e0d93))
 
-### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-08)
+### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-07)
 
 #### Fixes
 
 * **notary:** handle blocks re-downloaded
 ([359cbbb](https://github.com/argonprotocol/mainchain/commit/359cbbbdcfe9ff74f39852348cb6b43364f21a0f))
 
-### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-07)
+### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-06)
 
 #### Fixes
 
 * **localchain:** improve lock hold durations
 ([025cbe4](https://github.com/argonprotocol/mainchain/commit/025cbe4aa6aa3606ad9e181c5da3879e0455bded))
 
-### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-06)
+### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-05)
 
 #### Fixes
 
@@ -332,7 +348,7 @@
 * rewards should be for notebook tick
 ([60a5b63](https://github.com/argonprotocol/mainchain/commit/60a5b63b1a28a750f49e43e16b889ee57174eced))
 
-### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-25)
+### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-24)
 
 #### Features
 
@@ -356,7 +372,7 @@
 * **ticks:** only allow a single block per tick
 ([cdf295a](https://github.com/argonprotocol/mainchain/commit/cdf295aae082adae7f72deb4ddc9517b48e9ccbd))
 
-### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-11)
+### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-10)
 
 #### Fixes
 
@@ -385,7 +401,7 @@
 * publish task
 ([67d60f6](https://github.com/argonprotocol/mainchain/commit/67d60f6ff1787a982c475d7d815657b8bce3312f))
 
-### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-08)
+### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-07)
 
 #### Fixes
 
@@ -461,7 +477,7 @@
 
 ### [v0.0.3](https://github.com/argonprotocol/mainchain/compare/v0.0.2...v0.0.3) (2024-08-29)
 
-### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-28)
+### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-27)
 
 #### Fixes
 

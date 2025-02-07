@@ -40,7 +40,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "1.0.9"
+version = "1.0.10"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
@@ -54,6 +54,9 @@ documentation = "https://argonprotocol.org/docs"
 lto = true
 opt-level = 3
 panic = "unwind"
+
+[profile.production]
+inherits = "release"
 
 [profile.testnet]
 inherits = "release"
@@ -402,7 +405,7 @@ alloy-transport-http = { version = "0.6.4" }
 alloy-eips = { version = "0.6.4" }
 
 # releases are using old versions of jsonrpsee
-subxt = { git = "https://github.com/paritytech/subxt", rev = "50fc73a2a5563e1b051b4a738c42a3319f79ac26" }
+subxt = { version = "0.39.0" }
 
 argon-testing = { path = "testing" }
 argon-localchain = { path = "localchain" }

@@ -1,8 +1,19 @@
 # Changelog
 
-## [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...23b7152d6c4ed49224bbe407fb6504a935561af0) (2025-01-28)
+## [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...3e6ebd79822913a697972c7502136f60b974da66) (2025-02-06)
 
-### Features
+### Fixes
+
+* **vault:** disable reward sharing for now
+([768351b](https://github.com/argonprotocol/mainchain/commit/768351b19cdd30b023b05a185f6195492ea82c7c))
+* convert mining slots gap to ticks
+([4035bfd](https://github.com/argonprotocol/mainchain/commit/4035bfd774449087a8cf60b1c5d22efbdc23a01b))
+* **runtme:** fixup grandpa set id history
+([4614da2](https://github.com/argonprotocol/mainchain/commit/4614da20284fecb01488ddb0fe30c5d3538a14b9))
+
+### [v1.0.9](https://github.com/argonprotocol/mainchain/compare/v1.0.8...v1.0.9) (2025-01-28)
+
+#### Features
 
 * **block_rewards:** ability to pause rewards
 ([a81c547](https://github.com/argonprotocol/mainchain/commit/a81c547149a2d5a13e378c5be13ac4478635ffdc))
@@ -13,7 +24,7 @@
 
 ### [v1.0.6](https://github.com/argonprotocol/mainchain/compare/v1.0.5...v1.0.6) (2025-01-24)
 
-### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-24)
+### [v1.0.5](https://github.com/argonprotocol/mainchain/compare/v1.0.4...v1.0.5) (2025-01-23)
 
 ### [v1.0.4](https://github.com/argonprotocol/mainchain/compare/v1.0.3...v1.0.4) (2025-01-21)
 
@@ -67,17 +78,17 @@
 * **mining:** starts slots after ticks vs blocks
 ([ff4428f](https://github.com/argonprotocol/mainchain/commit/ff4428f53acdf0735121492cd2a6a810d75db8e6))
 
-### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-20)
+### [v0.0.24](https://github.com/argonprotocol/mainchain/compare/v0.0.23...v0.0.24) (2024-12-19)
 
 ### [v0.0.23](https://github.com/argonprotocol/mainchain/compare/v0.0.22...v0.0.23) (2024-12-19)
 
-### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-17)
+### [v0.0.22](https://github.com/argonprotocol/mainchain/compare/v0.0.21...v0.0.22) (2024-12-16)
 
-### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-08)
+### [v0.0.21](https://github.com/argonprotocol/mainchain/compare/v0.0.20...v0.0.21) (2024-12-07)
 
-### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-07)
+### [v0.0.20](https://github.com/argonprotocol/mainchain/compare/v0.0.19...v0.0.20) (2024-12-06)
 
-### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-06)
+### [v0.0.19](https://github.com/argonprotocol/mainchain/compare/v0.0.18...v0.0.19) (2024-12-05)
 
 ### [v0.0.18](https://github.com/argonprotocol/mainchain/compare/v0.0.17...v0.0.18) (2024-12-05)
 
@@ -117,7 +128,7 @@
 
 ### [v0.0.16](https://github.com/argonprotocol/mainchain/compare/v0.0.15...v0.0.16) (2024-10-25)
 
-### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-25)
+### [v0.0.15](https://github.com/argonprotocol/mainchain/compare/v0.0.14...v0.0.15) (2024-10-24)
 
 #### Features
 
@@ -131,13 +142,13 @@
 * **ticks:** only allow a single block per tick
 ([cdf295a](https://github.com/argonprotocol/mainchain/commit/cdf295aae082adae7f72deb4ddc9517b48e9ccbd))
 
-### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-11)
+### [v0.0.14](https://github.com/argonprotocol/mainchain/compare/v0.0.13...v0.0.14) (2024-10-10)
 
 ### [v0.0.13](https://github.com/argonprotocol/mainchain/compare/v0.0.12...v0.0.13) (2024-10-09)
 
 ### [v0.0.12](https://github.com/argonprotocol/mainchain/compare/v0.0.11...v0.0.12) (2024-10-08)
 
-### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-08)
+### [v0.0.11](https://github.com/argonprotocol/mainchain/compare/v0.0.10...v0.0.11) (2024-10-07)
 
 ### [v0.0.10](https://github.com/argonprotocol/mainchain/compare/v0.0.9...v0.0.10) (2024-10-07)
 
@@ -177,7 +188,7 @@
 
 ### [v0.0.3](https://github.com/argonprotocol/mainchain/compare/v0.0.2...v0.0.3) (2024-08-29)
 
-### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-28)
+### [v0.0.2](https://github.com/argonprotocol/mainchain/compare/v0.0.1...v0.0.2) (2024-08-27)
 
 #### Fixes
 
