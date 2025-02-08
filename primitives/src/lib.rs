@@ -27,7 +27,7 @@ pub use crate::{apis::*, notary::NotaryId, note::*, notebook::*, providers::*};
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
 
-mod apis;
+pub mod apis;
 pub mod balance_change;
 pub mod block_seal;
 pub mod block_vote;
@@ -44,7 +44,7 @@ pub mod account;
 pub mod bitcoin;
 pub mod note;
 pub mod notebook;
-mod providers;
+pub mod providers;
 pub mod tick;
 
 pub mod argon_utils;

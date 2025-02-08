@@ -1,5 +1,5 @@
 [package]
-name = "argon-runtime"
+name = "argon-runtime-common"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -82,17 +82,13 @@ pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
 argon-primitives = { workspace = true }
-argon-runtime-common = { workspace = true, default-features = false }
-
-[build-dependencies]
-substrate-wasm-builder = { workspace = true, optional = true }
 
 [features]
 default = [ "std" ]
+canary = []
 std = [
 	"anyhow/std",
 	"argon-primitives/std",
-	"argon-runtime-common/std",
 	"codec/std",
 	"frame-benchmarking?/std",
 	"frame-executive/std",
@@ -153,10 +149,8 @@ std = [
 	"sp-session/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
-	"substrate-wasm-builder",
 ]
 runtime-benchmarks = [
-	"argon-runtime-common/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
 	"frame-system-benchmarking/runtime-benchmarks",
@@ -191,7 +185,6 @@ runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
 ]
 try-runtime = [
-	"argon-runtime-common/try-runtime",
 	"frame-executive/try-runtime",
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
@@ -228,12 +221,3 @@ try-runtime = [
 	"pallet-vaults/try-runtime",
 	"sp-runtime/try-runtime",
 ]
-
-# Enable the metadata hash generation.
-#
-# This is hidden behind a feature because it increases the compile time.
-# The wasm binary needs to be compiled twice, once to fetch the metadata,
-# generate the metadata hash and then a second time with the
-# `RUNTIME_METADATA_HASH` environment variable set for the `CheckMetadataHash`
-# extension.
-metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]

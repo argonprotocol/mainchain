@@ -233,7 +233,7 @@ declare module '@polkadot/types/lookup' {
     readonly asPureCreated: {
       readonly pure: AccountId32;
       readonly who: AccountId32;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly disambiguationIndex: u16;
     } & Struct;
     readonly isAnnounced: boolean;
@@ -246,21 +246,21 @@ declare module '@polkadot/types/lookup' {
     readonly asProxyAdded: {
       readonly delegator: AccountId32;
       readonly delegatee: AccountId32;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isProxyRemoved: boolean;
     readonly asProxyRemoved: {
       readonly delegator: AccountId32;
       readonly delegatee: AccountId32;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly delay: u32;
     } & Struct;
     readonly type: 'ProxyExecuted' | 'PureCreated' | 'Announced' | 'ProxyAdded' | 'ProxyRemoved';
   }
 
-  /** @name ArgonRuntimeConfigsProxyType (37) */
-  interface ArgonRuntimeConfigsProxyType extends Enum {
+  /** @name ArgonRuntimeProxyType (37) */
+  interface ArgonRuntimeProxyType extends Enum {
     readonly isAny: boolean;
     readonly isNonTransfer: boolean;
     readonly isPriceIndex: boolean;
@@ -1601,32 +1601,32 @@ declare module '@polkadot/types/lookup' {
     readonly isProxy: boolean;
     readonly asProxy: {
       readonly real: MultiAddress;
-      readonly forceProxyType: Option<ArgonRuntimeConfigsProxyType>;
+      readonly forceProxyType: Option<ArgonRuntimeProxyType>;
       readonly call: Call;
     } & Struct;
     readonly isAddProxy: boolean;
     readonly asAddProxy: {
       readonly delegate: MultiAddress;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isRemoveProxy: boolean;
     readonly asRemoveProxy: {
       readonly delegate: MultiAddress;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly delay: u32;
     } & Struct;
     readonly isRemoveProxies: boolean;
     readonly isCreatePure: boolean;
     readonly asCreatePure: {
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly delay: u32;
       readonly index: u16;
     } & Struct;
     readonly isKillPure: boolean;
     readonly asKillPure: {
       readonly spawner: MultiAddress;
-      readonly proxyType: ArgonRuntimeConfigsProxyType;
+      readonly proxyType: ArgonRuntimeProxyType;
       readonly index: u16;
       readonly height: Compact<u32>;
       readonly extIndex: Compact<u32>;
@@ -1650,7 +1650,7 @@ declare module '@polkadot/types/lookup' {
     readonly asProxyAnnounced: {
       readonly delegate: MultiAddress;
       readonly real: MultiAddress;
-      readonly forceProxyType: Option<ArgonRuntimeConfigsProxyType>;
+      readonly forceProxyType: Option<ArgonRuntimeProxyType>;
       readonly call: Call;
     } & Struct;
     readonly type: 'Proxy' | 'AddProxy' | 'RemoveProxy' | 'RemoveProxies' | 'CreatePure' | 'KillPure' | 'Announce' | 'RemoveAnnouncement' | 'RejectAnnouncement' | 'ProxyAnnounced';
@@ -2508,7 +2508,7 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletProxyProxyDefinition (317) */
   interface PalletProxyProxyDefinition extends Struct {
     readonly delegate: AccountId32;
-    readonly proxyType: ArgonRuntimeConfigsProxyType;
+    readonly proxyType: ArgonRuntimeProxyType;
     readonly delay: u32;
   }
 

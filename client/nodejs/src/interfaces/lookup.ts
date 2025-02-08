@@ -219,7 +219,7 @@ export default {
       PureCreated: {
         pure: 'AccountId32',
         who: 'AccountId32',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         disambiguationIndex: 'u16',
       },
       Announced: {
@@ -230,21 +230,21 @@ export default {
       ProxyAdded: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32',
       },
       ProxyRemoved: {
         delegator: 'AccountId32',
         delegatee: 'AccountId32',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32'
       }
     }
   },
   /**
-   * Lookup37: argon_runtime::configs::ProxyType
+   * Lookup37: argon_runtime::ProxyType
    **/
-  ArgonRuntimeConfigsProxyType: {
+  ArgonRuntimeProxyType: {
     _enum: ['Any', 'NonTransfer', 'PriceIndex']
   },
   /**
@@ -1507,28 +1507,28 @@ export default {
     _enum: {
       proxy: {
         real: 'MultiAddress',
-        forceProxyType: 'Option<ArgonRuntimeConfigsProxyType>',
+        forceProxyType: 'Option<ArgonRuntimeProxyType>',
         call: 'Call',
       },
       add_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32',
       },
       remove_proxy: {
         delegate: 'MultiAddress',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32',
       },
       remove_proxies: 'Null',
       create_pure: {
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32',
         index: 'u16',
       },
       kill_pure: {
         spawner: 'MultiAddress',
-        proxyType: 'ArgonRuntimeConfigsProxyType',
+        proxyType: 'ArgonRuntimeProxyType',
         index: 'u16',
         height: 'Compact<u32>',
         extIndex: 'Compact<u32>',
@@ -1548,7 +1548,7 @@ export default {
       proxy_announced: {
         delegate: 'MultiAddress',
         real: 'MultiAddress',
-        forceProxyType: 'Option<ArgonRuntimeConfigsProxyType>',
+        forceProxyType: 'Option<ArgonRuntimeProxyType>',
         call: 'Call'
       }
     }
@@ -2421,11 +2421,11 @@ export default {
     _enum: ['MinimumThreshold', 'AlreadyApproved', 'NoApprovalsNeeded', 'TooFewSignatories', 'TooManySignatories', 'SignatoriesOutOfOrder', 'SenderInSignatories', 'NotFound', 'NotOwner', 'NoTimepoint', 'WrongTimepoint', 'UnexpectedTimepoint', 'MaxWeightTooLow', 'AlreadyStored']
   },
   /**
-   * Lookup317: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_runtime::configs::ProxyType, BlockNumber>
+   * Lookup317: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_runtime::ProxyType, BlockNumber>
    **/
   PalletProxyProxyDefinition: {
     delegate: 'AccountId32',
-    proxyType: 'ArgonRuntimeConfigsProxyType',
+    proxyType: 'ArgonRuntimeProxyType',
     delay: 'u32'
   },
   /**

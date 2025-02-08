@@ -26,6 +26,7 @@ members = [
     "primitives",
     "runtime/argon",
     "runtime/canary",
+    'runtime/common',
     "notary",
     "notary/audit",
     "notary/apis",
@@ -34,7 +35,7 @@ members = [
     "oracle",
     "bitcoin",
     "bitcoin/cli",
-    "bitcoin/cli/macros",
+    "bitcoin/cli/macros", "runtime/common",
 ]
 resolver = "2"
 
@@ -416,6 +417,7 @@ argon-bitcoin-utxo-tracker = { path = "node/bitcoin_utxo_tracker" }
 argon-node = { path = "node" }
 argon-runtime = { path = "runtime/argon", default-features = false }
 argon-canary-runtime = { path = "runtime/canary", default-features = false }
+argon-runtime-common = { path = "runtime/common", default-features = false }
 argon-randomx = { path = "node/randomx" }
 argon-notary = { path = "notary" }
 argon-notary-apis = { path = "notary/apis" }

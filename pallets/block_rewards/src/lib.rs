@@ -16,7 +16,7 @@ mod benchmarking;
 pub mod weights;
 
 /// (Incremental increase per block, blocks between increments, max value)
-pub type GrowthPath<T> = (<T as Config>::Balance, Tick, <T as Config>::Balance);
+pub type GrowthPath<Balance> = (Balance, Tick, Balance);
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
@@ -95,7 +95,7 @@ pub mod pallet {
 
 		/// The growth path for both ownership and argons before halving
 		#[pallet::constant]
-		type IncrementalGrowth: Get<GrowthPath<Self>>;
+		type IncrementalGrowth: Get<GrowthPath<Self::Balance>>;
 
 		/// Number of ticks for halving of ownership share rewards
 		#[pallet::constant]

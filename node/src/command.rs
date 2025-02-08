@@ -14,8 +14,8 @@ use sp_keyring::AccountKeyring::Alice;
 use std::cmp::max;
 use url::Url;
 
-type CanaryRuntimeApi = argon_runtime::RuntimeApi;
-type ArgonRuntimeApi = argon_canary_runtime::RuntimeApi;
+type CanaryRuntimeApi = argon_canary_runtime::RuntimeApi;
+type ArgonRuntimeApi = argon_runtime::RuntimeApi;
 type BlockHashT = <Block as sp_runtime::traits::Block>::Hash;
 
 impl SubstrateCli for Cli {
@@ -46,6 +46,7 @@ impl SubstrateCli for Cli {
 	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		Ok(match id {
 			"dev" => Box::new(chain_spec::development_config()?),
+			"meta" => Box::new(chain_spec::metadata_config()?),
 			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
 			// This creates a whole new, incompatible genesis, so label it as such
 			"gen-testnet" => Box::new(chain_spec::testnet_config()?),
@@ -76,15 +77,17 @@ macro_rules! construct_async_run {
 	(|$components:ident, $cli:ident, $cmd:ident, $config:ident| $( $code:tt )* ) => {{
 		let runner = $cli.create_runner($cmd)?;
 		let mining_config = MiningConfig::new(&$cli);
-		runner.async_run(|$config| {
-			let $components = if $config.chain_spec.is_canary() {
-				new_partial::<CanaryRuntimeApi>(&$config, &mining_config)?
-			} else {
-				new_partial::<ArgonRuntimeApi>(&$config, &mining_config)?
-			};
-			let task_manager = $components.task_manager;
-			{ $( $code )* }.map(|v| (v, task_manager))
-		})
+		if runner.config().chain_spec.is_canary() {
+			runner.async_run(|$config| {
+				let $components = new_partial::<CanaryRuntimeApi>(&$config, &mining_config)?;
+				Ok::<_, sc_cli::Error>(( { $( $code )* }, $components.task_manager))
+			})
+		} else {
+			runner.async_run(|$config| {
+				let $components = new_partial::<ArgonRuntimeApi>(&$config, &mining_config)?;
+				Ok::<_, sc_cli::Error>(( { $( $code )* }, $components.task_manager))
+			})
+		}
 	}}
 }
 
@@ -101,27 +104,27 @@ pub fn run() -> sc_cli::Result<()> {
 		},
 		Some(Subcommand::CheckBlock(cmd)) => {
 			construct_async_run!(|components, cli, cmd, config| {
-				Ok(cmd.run(components.client, components.import_queue))
+				cmd.run(components.client, components.import_queue)
 			})
 		},
 		Some(Subcommand::ExportBlocks(cmd)) => {
 			construct_async_run!(|components, cli, cmd, config| {
-				Ok(cmd.run(components.client, config.database))
+				cmd.run(components.client, config.database)
 			})
 		},
 		Some(Subcommand::ExportState(cmd)) => {
 			construct_async_run!(|components, cli, cmd, config| {
-				Ok(cmd.run(components.client, config.chain_spec))
+				cmd.run(components.client, config.chain_spec)
 			})
 		},
 		Some(Subcommand::ImportBlocks(cmd)) => {
 			construct_async_run!(|components, cli, cmd, config| {
-				Ok(cmd.run(components.client, components.import_queue))
+				cmd.run(components.client, components.import_queue)
 			})
 		},
 		Some(Subcommand::Revert(cmd)) => {
 			construct_async_run!(|components, cli, cmd, config| {
-				Ok(cmd.run(components.client, components.backend, None))
+				cmd.run(components.client, components.backend, None)
 			})
 		},
 		Some(Subcommand::PurgeChain(cmd)) => {
@@ -146,12 +149,13 @@ pub fn run() -> sc_cli::Result<()> {
 					},
 				BenchmarkCmd::Block(cmd) => runner.sync_run(|config| {
 					let mining_config = MiningConfig::new(&cli);
-					let partials = if config.chain_spec.is_canary() {
-						new_partial::<CanaryRuntimeApi>(&config, &mining_config)?
+					if config.chain_spec.is_canary() {
+						let partials = new_partial::<CanaryRuntimeApi>(&config, &mining_config)?;
+						cmd.run(partials.client)
 					} else {
-						new_partial::<ArgonRuntimeApi>(&config, &mining_config)?
-					};
-					cmd.run(partials.client)
+						let partials = new_partial::<ArgonRuntimeApi>(&config, &mining_config)?;
+						cmd.run(partials.client)
+					}
 				}),
 				#[cfg(not(feature = "runtime-benchmarks"))]
 				BenchmarkCmd::Storage(_) => Err(Error::Input(
@@ -162,14 +166,17 @@ pub fn run() -> sc_cli::Result<()> {
 				#[cfg(feature = "runtime-benchmarks")]
 				BenchmarkCmd::Storage(cmd) => runner.sync_run(|config| {
 					let mining_config = cli.into();
-					let partials = if config.chain_spec.is_canary() {
-						new_partial::<CanaryRuntimeApi>(&config, &mining_config)?
+					if config.chain_spec.is_canary() {
+						let partials = new_partial::<CanaryRuntimeApi>(&config, &mining_config)?;
+						let db = partials.backend.expose_db();
+						let storage = partials.backend.expose_storage();
+						cmd.run(config, partials.client.clone(), db, storage)
 					} else {
-						new_partial::<ArgonRuntimeApi>(&config, &mining_config)?
-					};
-					let db = partials.backend.expose_db();
-					let storage = partials.backend.expose_storage();
-					cmd.run(config, partials.client.clone(), db, storage)
+						let partials = new_partial::<ArgonRuntimeApi>(&config, &mining_config)?;
+						let db = partials.backend.expose_db();
+						let storage = partials.backend.expose_storage();
+						cmd.run(config, partials.client.clone(), db, storage)
+					}
 				}),
 				BenchmarkCmd::Machine(cmd) =>
 					runner.sync_run(|config| cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())),
