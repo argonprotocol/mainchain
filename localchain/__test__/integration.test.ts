@@ -31,7 +31,7 @@ describeIntegration("Integration tests", () => {
         const mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
-        const notaryUrl = await notary.start(mainchainUrl);
+        const notaryUrl = await notary.start({uuid: mainchain.uuid, mainchainUrl});
         expect(notaryUrl).toBeTruthy();
         const url = new URL(notaryUrl);
         expect(url.protocol).toEqual("ws:");

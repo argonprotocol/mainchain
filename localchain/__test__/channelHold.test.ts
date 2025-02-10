@@ -63,7 +63,7 @@ describeIntegration("ChannelHold integration", () => {
         let mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
-        await notary.start(mainchainUrl);
+        await notary.start({uuid: mainchain.uuid, mainchainUrl});
 
         const ferdiekeys = await KeyringSigner.load("//Ferdie");
 

@@ -1,13 +1,18 @@
 import {customAlphabet} from "nanoid";
 import {Client} from 'pg';
 import * as child_process from "node:child_process";
-import {checkForExtrinsicSuccess, Keyring, KeyringPair, ArgonClient} from "@argonprotocol/mainchain";
+import {ArgonClient, checkForExtrinsicSuccess, Keyring, KeyringPair} from "@argonprotocol/mainchain";
 import fs from "node:fs";
 import * as readline from "node:readline";
 import {addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,} from "./testHelpers";
 import * as process from "node:process";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+
+export function createUid(): string {
+    return nanoid();
+}
+
 export default class TestNotary implements ITeardownable {
     public operator: KeyringPair;
     public ip = '127.0.0.1';
@@ -38,13 +43,14 @@ export default class TestNotary implements ITeardownable {
     /**
      * Returns the localhost address of the notary (NOTE: not accessible from containers)
      */
-    public async start(mainchainUrl: string, pathToNotaryBin?: string): Promise<string> {
+    public async start(options: { mainchainUrl: string, uuid: string, pathToNotaryBin?: string }): Promise<string> {
+        const {pathToNotaryBin, uuid, mainchainUrl} = options;
         this.operator = new Keyring({type: 'sr25519'}).createFromUri('//Bob');
         this.registeredPublicKey = new Keyring({type: 'ed25519'}).createFromUri('//Ferdie//notary').publicKey;
 
         let notaryPath = pathToNotaryBin ?? `${__dirname}/../../target/debug/argon-notary`;
         if (process.env.ARGON_USE_DOCKER_BINS) {
-            this.containerName = "notary_" + nanoid();
+            this.containerName = "notary_" + uuid;
             const addHost = process.env.ADD_DOCKER_HOST ? ` --add-host=host.docker.internal:host-gateway` : '';
 
             notaryPath = `docker run --rm -p=0:9925${addHost} --name=${this.containerName} -e RUST_LOG=warn ghcr.io/argonprotocol/argon-notary:dev`;
@@ -56,12 +62,11 @@ export default class TestNotary implements ITeardownable {
         }
 
         const client = await this.connect();
+        let dbName = '';
         try {
             let tries = 10;
-            let dbName = '';
             while (tries > 0) {
-                const uid = nanoid();
-                dbName = `notary_${uid}`;
+                dbName = `notary_${uuid}`;
                 // check if the db path  notary_{id} exists
                 const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [
                     dbName,
@@ -86,11 +91,13 @@ export default class TestNotary implements ITeardownable {
         }
         console.log("Notary >> connecting to mainchain '%s', db %s", mainchainUrl, `${this.#dbConnectionString}/${this.#dbName}`);
 
+        const bucketName = `notary-${uuid}`;
         const execArgs = [
             'run',
             `--db-url=${this.#dbConnectionString}/${this.#dbName}`,
             `--dev`,
             `-t ${mainchainUrl}`,
+            `--archive-bucket=${bucketName}`,
             `--operator-address=${this.operator.address}`
         ];
         if (process.env.AWS_S3_ENDPOINT) {

@@ -21,7 +21,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         const mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
-        await notary.start(mainchainUrl);
+        await notary.start({uuid: mainchain.uuid, mainchainUrl});
 
         const mainchainClient = await getClient(mainchainUrl);
         disconnectOnTeardown(mainchainClient);
@@ -55,7 +55,7 @@ describeIntegration("Transfer Localchain <-> Mainchain", () => {
         const mainchain = new TestMainchain();
         const mainchainUrl = await mainchain.launch();
         const notary = new TestNotary();
-        await notary.start(mainchainUrl);
+        await notary.start({uuid: mainchain.uuid, mainchainUrl});
 
         const mainchainClient = await getClient(mainchainUrl);
         disconnectOnTeardown(mainchainClient);
