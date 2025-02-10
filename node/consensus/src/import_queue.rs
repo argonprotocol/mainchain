@@ -96,10 +96,9 @@ where
 			fork_power.is_latest_vote,
 		)?;
 
-		let mut is_best_fork = fork_power > max_fork_power;
-		if fork_power == max_fork_power {
-			is_best_fork = block.origin == BlockOrigin::Own;
-		}
+		// NOTE: only import as best block if it beats the best stored block. There are cases where
+		// importing a tie will yield too many blocks at a height and break substrate
+		let is_best_fork = fork_power > max_fork_power;
 
 		if is_best_fork {
 			tracing::info!(
