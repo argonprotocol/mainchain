@@ -630,7 +630,6 @@ impl BalanceSync {
     &self,
     options: VoteCreationOptions,
   ) -> Result<Vec<NotarizationTracker>> {
-    println!("convert_tax_to_votes");
     let Some(ref mainchain_client) = *(self.mainchain_client.read().await) else {
       bail!("Cannot create votes.. No mainchain client available!");
     };
@@ -664,7 +663,7 @@ impl BalanceSync {
             ) = e
             {
               tracing::warn!(
-                "Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
+                "Need to retry. Voted on an invalid vote tick {} vs notebook tick {}: {:?}",
                 tick,
                 notebook_tick,
                 e.to_string()

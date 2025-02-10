@@ -202,7 +202,7 @@ impl NotaryClient {
           }
           let json = serde_json::to_string_pretty(&notarization)
             .unwrap_or("<UNABLE TO PRETTIFY".to_string());
-          tracing::error!("Error sending notarization: {:?} {}", e, json);
+          tracing::error!("Error notarizing: {:?} {}", e, json);
           Err(e)
         }
       };
