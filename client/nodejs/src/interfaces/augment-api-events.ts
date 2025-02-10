@@ -9,7 +9,7 @@ import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesVaultFundType, ArgonPrimitivesVaultObligationExpiration, ArgonRuntimeConfigsProxyType, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpEventsRequestResponseHandled, IsmpEventsTimeoutHandled, IsmpHostStateMachine, PalletDomainsDomainRegistration, PalletHyperbridgeVersionedHostParams, PalletIsmpErrorsHandlingError, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesVaultFundType, ArgonPrimitivesVaultObligationExpiration, ArgonRuntimeProxyType, FrameSupportDispatchDispatchInfo, FrameSupportTokensMiscBalanceStatus, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpEventsRequestResponseHandled, IsmpEventsTimeoutHandled, IsmpHostStateMachine, PalletDomainsDomainRegistration, PalletHyperbridgeVersionedHostParams, PalletIsmpErrorsHandlingError, PalletMintMintType, PalletMultisigTimepoint, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -454,7 +454,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A proxy was added.
        **/
-      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, delay: u32 }>;
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32 }>;
       /**
        * A proxy was executed correctly, with the given.
        **/
@@ -462,12 +462,12 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A proxy was removed.
        **/
-      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, delay: u32 }>;
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32 }>;
       /**
        * A pure account has been created by new proxy with given
        * disambiguation index and proxy type.
        **/
-      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeConfigsProxyType, disambiguationIndex: u16 }>;
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16 }>;
     };
     sudo: {
       /**

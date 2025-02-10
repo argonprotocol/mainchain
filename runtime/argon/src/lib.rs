@@ -6,92 +6,32 @@ extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmark;
 
-pub mod configs;
 mod migrations;
 pub mod weights;
 
-pub use crate::configs::NotaryRecordT;
+use frame_support::weights::ConstantMultiplier;
+use frame_system::EnsureSignedBy;
+use ismp::{module::IsmpModule, router::IsmpRouter, Error};
 pub use pallet_notebook::NotebookVerifyError;
+use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 
-use crate::configs::ArgonToken;
-
-use alloc::{collections::BTreeMap, vec, vec::Vec};
-use argon_primitives::{
-	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
-	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
-	notary::{
-		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
-		NotaryNotebookVoteDigestDetails, NotaryRecordWithState,
-	},
-	prelude::*,
-	tick::Ticker,
-	BestBlockVoteSeal, BlockHash, BlockSealAuthorityId, BlockSealDigest, BlockSealSpecProvider,
-	BlockVoteDigest, NotebookAuditResult, NotebookNumber, PriceProvider, Signature, TickProvider,
-	VoteMinimum, VotingKey,
-};
-use frame_support::{
-	genesis_builder_helper::{build_state, get_preset},
-	traits::ConstU32,
-	weights::Weight,
-};
-use ismp::{
-	consensus::{ConsensusClientId, StateMachineHeight, StateMachineId},
-	host::StateMachine,
-	router::{Request, Response},
-};
-use sp_api::{decl_runtime_apis, impl_runtime_apis};
-use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata, H256, U256};
-use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
-	traits::{Block as BlockT, NumberFor},
-	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, BoundedVec, Digest, DispatchError,
-};
-use sp_version::RuntimeVersion;
+pub use argon_runtime_common::config::NotaryRecordT;
+use argon_runtime_common::prelude::*;
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use sp_runtime::impl_opaque_keys;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
-
-pub type BalancesCall = pallet_balances::Call<Runtime, ArgonToken>;
-// A few exports that help ease life for downstream crates.
-pub type AccountData = pallet_balances::AccountData<Balance>;
 
 impl_opaque_keys! {
 	pub struct SessionKeys {
 	pub grandpa: Grandpa,
 	pub block_seal_authority: MiningSlot,
 	}
-}
-
-// To learn more about runtime versioning, see:
-// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
-#[sp_version::runtime_version]
-pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("argon"),
-	impl_name: create_runtime_str!("argon"),
-	authoring_version: 1,
-	// The version of the runtime specification. A full node will not attempt to use its native
-	//   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
-	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
-	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
-	//   the compatible custom types.
-	spec_version: 110,
-	impl_version: 5,
-	apis: RUNTIME_API_VERSIONS,
-	transaction_version: 2,
-	state_version: 1,
-};
-
-/// The version information used to identify this runtime when compiled natively.
-#[cfg(feature = "std")]
-pub fn native_version() -> NativeVersion {
-	NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
 }
 
 #[frame_support::runtime]
@@ -175,481 +115,488 @@ mod runtime {
 	pub type TokenGateway = pallet_token_gateway;
 }
 
-/// The address format for describing accounts.
-pub type Address = sp_runtime::MultiAddress<AccountId, ()>;
-/// Block header type as expected by this runtime.
-pub type Header = generic::Header<BlockNumber, BlockHash>;
-/// Block type as expected by this runtime.
-pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-/// The SignedExtension to the basic transaction logic.
-pub type SignedExtra = (
-	frame_system::CheckNonZeroSender<Runtime>,
-	frame_system::CheckSpecVersion<Runtime>,
-	frame_system::CheckTxVersion<Runtime>,
-	frame_system::CheckGenesis<Runtime>,
-	frame_system::CheckMortality<Runtime>,
-	frame_system::CheckNonce<Runtime>,
-	frame_system::CheckWeight<Runtime>,
-	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-	frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
-);
-/// All migrations of the runtime, aside from the ones declared in the pallets.
-///
-/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-type Migrations = (
-	// spec 110
-	migrations::UpdateMissingGrandpaSetId<Runtime>,
-	pallet_mining_slot::migrations::MigrateV1ToV2<Runtime>,
-	pallet_vaults::migrations::MigrateV1ToV2<Runtime>,
-);
+argon_runtime_common::inject_runtime_vars!();
+argon_runtime_common::inject_common_apis!();
+argon_runtime_common::call_filters!();
+argon_runtime_common::deal_with_fees!();
 
-/// Unchecked extrinsic type as expected by this runtime.
-pub type UncheckedExtrinsic =
-	generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
-/// The payload being signed in transactions.
-pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
-/// Executive: handles dispatch to the various modules.
-pub type Executive = frame_executive::Executive<
-	Runtime,
-	Block,
-	frame_system::ChainContext<Runtime>,
-	Runtime,
-	AllPalletsWithSystem,
-	Migrations,
->;
+parameter_types! {
+	// The hyperbridge parachain on Polkadot
+	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Polkadot(3367));
+}
 
-decl_runtime_apis! {
-	/// Configuration items exposed via rpc so they can be confirmed externally
-	pub trait ConfigurationApis {
-		fn ismp_coprocessor() -> Option<StateMachine>;
+#[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
+impl frame_system::Config for Runtime {
+	/// The basic call filter to use in dispatchable.
+	type BaseCallFilter = InsideBoth<BaseCallFilter, TxPause>;
+	/// The block type for the runtime.
+	type Block = Block;
+	/// Block & extrinsics weights: base values and limits.
+	type BlockWeights = BlockWeights;
+	/// The maximum length of a block (in bytes).
+	type BlockLength = BlockLength;
+	/// The identifier used to distinguish between accounts.
+	type AccountId = AccountId;
+	/// The type for storing how many extrinsics an account has signed.
+	type Nonce = Nonce;
+	/// The type for hashing blocks and tries.
+	type Hash = HashOutput;
+	/// The hashing algorithm used.
+	type Hashing = BlakeTwo256;
+	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
+	type BlockHashCount = BlockHashCount;
+	/// The weight of database operations that the runtime can invoke.
+	type DbWeight = RocksDbWeight;
+	/// Version of the runtime.
+	type Version = Version;
+	/// The data to be stored in an account.
+	type AccountData = pallet_balances::AccountData<Balance>;
+	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
+	type SS58Prefix = ConstU16<{ argon_primitives::ADDRESS_PREFIX }>;
+	type MaxConsumers = ConstU32<16>;
+}
+
+/// This pallet is intended to be used as a shortterm security measure.
+impl pallet_tx_pause::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PauseOrigin = EnsureRoot<AccountId>;
+	type UnpauseOrigin = EnsureRoot<AccountId>;
+	type WhitelistedCalls = TxPauseWhitelistedCalls;
+	type MaxNameLen = ConstU32<256>;
+	type WeightInfo = pallet_tx_pause::weights::SubstrateWeight<Runtime>;
+}
+
+impl pallet_block_seal_spec::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type TargetComputeBlockPercent = TargetComputeBlockPercent;
+	type AuthorityProvider = MiningSlot;
+	type MaxActiveNotaries = MaxActiveNotaries;
+	type NotebookProvider = Notebook;
+	type TickProvider = Ticks;
+	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
+	type TargetBlockVotes = TargetBlockVotes;
+	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
+	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
+	type ComputeDifficultyChangePeriod = SealSpecComputeDifficultyChangePeriod;
+	type SealInherent = BlockSeal;
+}
+
+pub struct NotebookTickProvider;
+impl Get<Tick> for NotebookTickProvider {
+	fn get() -> Tick {
+		let schedule = Ticks::voting_schedule();
+		schedule.notebook_tick()
+	}
+}
+impl pallet_block_rewards::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
+	type ArgonCurrency = Balances;
+	type OwnershipCurrency = Ownership;
+	type Balance = Balance;
+	type BlockSealerProvider = BlockSeal;
+	type BlockRewardAccountsProvider = MiningSlot;
+	type NotaryProvider = Notaries;
+	type NotebookProvider = Notebook;
+	type TickProvider = Ticks;
+	type StartingArgonsPerBlock = StartingArgonsPerBlock;
+	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
+	type IncrementalGrowth = IncrementalGrowth;
+	type HalvingTicks = HalvingTicks;
+	type HalvingBeginTick = HalvingBeginTick;
+	type MinerPayoutPercent = MinerPayoutPercent;
+	type MaturationBlocks = MaturationBlocks;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type EventHandler = Mint;
+}
+
+impl pallet_domains::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_domains::weights::SubstrateWeight<Runtime>;
+	type DomainExpirationTicks = DomainExpirationTicks;
+	type NotebookTick = NotebookTickProvider;
+	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
+}
+
+impl pallet_authorship::Config for Runtime {
+	type FindAuthor = Digests;
+	type EventHandler = ();
+}
+
+impl pallet_digests::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_digests::weights::SubstrateWeight<Runtime>;
+	type NotebookVerifyError = NotebookVerifyError;
+}
+
+impl pallet_timestamp::Config for Runtime {
+	/// A timestamp: milliseconds since the unix epoch.
+	type Moment = Moment;
+	type OnTimestampSet = (BlockSealSpec, Ticks);
+	type MinimumPeriod = ConstU64<1000>;
+	type WeightInfo = ();
+}
+
+pub struct MultiBlockPerTickEnabled;
+impl Get<bool> for MultiBlockPerTickEnabled {
+	fn get() -> bool {
+		!MiningSlot::is_registered_mining_active()
 	}
 }
 
-impl_runtime_apis! {
-	impl sp_api::Core<Block> for Runtime {
-		fn version() -> RuntimeVersion {
-			VERSION
-		}
+impl pallet_ticks::Config for Runtime {
+	type WeightInfo = ();
+	type Digests = Digests;
+}
 
-		fn execute_block(block: Block) {
-			Executive::execute_block(block);
-		}
+impl pallet_vaults::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
+	type Balance = Balance;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MinimumObligationAmount = MinimumObligationAmount;
+	type TicksPerDay = TicksPerDay;
+	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
+	type MinTermsModificationTickDelay = MinTermsModificationTickDelay;
+	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
+	type MiningSlotProvider = MiningSlot;
+	type GetBitcoinNetwork = BitcoinUtxos;
+	type BitcoinBlockHeightChange = BitcoinUtxos;
+	type TickProvider = Ticks;
+	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
+	type EventHandler = (BitcoinLocks,);
+	type EnableRewardSharing = EnableRewardSharing;
+}
 
-		fn initialize_block(header: &<Block as BlockT>::Header) -> sp_runtime::ExtrinsicInclusionMode {
-			Executive::initialize_block(header)
+pub struct BitcoinSignatureVerifier;
+impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
+impl pallet_bitcoin_locks::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_bitcoin_locks::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
+	type Balance = Balance;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type LockEvents = (Mint,);
+	type BitcoinUtxoTracker = BitcoinUtxos;
+	type PriceProvider = PriceIndex;
+	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
+	type BitcoinBlockHeight = BitcoinUtxos;
+	type GetBitcoinNetwork = BitcoinUtxos;
+	type BitcoinObligationProvider = Vaults;
+	type ArgonTicksPerDay = TicksPerDay;
+	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
+	type LockDurationBlocks = BitcoinLockDurationBlocks;
+	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
+	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
+	type TickProvider = Ticks;
+}
+
+pub struct GrandpaSlotRotation;
+
+impl OnNewSlot<AccountId> for GrandpaSlotRotation {
+	type Key = GrandpaId;
+	fn rotate_grandpas(
+		_current_slot_id: SlotId,
+		_removed_authorities: Vec<(&AccountId, Self::Key)>,
+		_added_authorities: Vec<(&AccountId, Self::Key)>,
+	) {
+		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
+
+		// TODO: we need to be able to run multiple grandpas on a single miner before activating
+		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
+		//  blocks to activate a more decentralized grandpa process
+		// for (_, authority_id) in removed_authorities {
+		// 	if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
+		// 		next_authorities.remove(index);
+		// 	}
+		// }
+		// for (_, authority_id) in added_authorities {
+		// 	next_authorities.push((authority_id, 1));
+		// }
+
+		log::info!("Scheduling grandpa change");
+		if let Err(err) = Grandpa::schedule_change(next_authorities, 0, None) {
+			log::error!("Failed to schedule grandpa change: {:?}", err);
 		}
+		pallet_grandpa::CurrentSetId::<Runtime>::mutate(|x| *x += 1);
 	}
+}
 
-	impl sp_api::Metadata<Block> for Runtime {
-		fn metadata() -> OpaqueMetadata {
-			OpaqueMetadata::new(Runtime::metadata().into())
-		}
-
-		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
-			Runtime::metadata_at_version(version)
-		}
-
-		fn metadata_versions() -> Vec<u32> {
-			Runtime::metadata_versions()
-		}
+pub struct TicksSinceGenesis;
+impl Get<Tick> for TicksSinceGenesis {
+	fn get() -> Tick {
+		Ticks::ticks_since_genesis()
 	}
+}
 
-	impl sp_block_builder::BlockBuilder<Block> for Runtime {
-		fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
-			Executive::apply_extrinsic(extrinsic)
-		}
+impl pallet_mining_slot::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
+	type MaxMiners = MaxMiners;
+	type MaxCohortSize = MaxCohortSize;
+	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
+	type MinimumArgonotsPerSeat = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
+	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type Balance = Balance;
+	type OwnershipCurrency = Ownership;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type BondedArgonsProvider = Vaults;
+	type SlotEvents = (GrandpaSlotRotation,);
+	type GrandpaRotationBlocks = GrandpaRotationBlocks;
+	type MiningAuthorityId = BlockSealAuthorityId;
+	type Keys = SessionKeys;
+	type TickProvider = Ticks;
+}
 
-		fn finalize_block() -> <Block as BlockT>::Header {
-			Executive::finalize_block()
-		}
+impl pallet_block_seal::Config for Runtime {
+	type AuthorityId = BlockSealAuthorityId;
+	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
+	type AuthorityProvider = MiningSlot;
+	type NotebookProvider = Notebook;
+	type BlockSealSpecProvider = BlockSealSpec;
+	type FindAuthor = Digests;
+	type TickProvider = Ticks;
+	type EventHandler = MiningSlot;
+	type Digests = Digests;
+}
 
-		fn inherent_extrinsics(data: sp_inherents::InherentData) -> Vec<<Block as BlockT>::Extrinsic> {
-			data.create_extrinsics()
-		}
+impl pallet_grandpa::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type MaxAuthorities = MaxMiners;
+	type MaxNominators = ConstU32<0>;
+	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
+	type KeyOwnerProof = sp_core::Void;
+	type EquivocationReportSystem = ();
+}
 
-		fn check_inherents(
-			block: Block,
-			data: sp_inherents::InherentData,
-		) -> sp_inherents::CheckInherentsResult {
-			data.check_extrinsics(&block)
-		}
-	}
+impl pallet_chain_transfer::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
+	type Argon = Balances;
+	type Balance = Balance;
+	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type NotebookProvider = Notebook;
+	type NotebookTick = NotebookTickProvider;
+	type EventHandler = Mint;
+	type PalletId = ChainTransferPalletId;
+	type TransferExpirationTicks = TransferExpirationTicks;
+	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
+}
 
-	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
-		fn validate_transaction(
-			source: TransactionSource,
-			tx: <Block as BlockT>::Extrinsic,
-			block_hash: <Block as BlockT>::Hash,
-		) -> TransactionValidity {
-			Executive::validate_transaction(source, tx, block_hash)
-		}
-	}
+impl pallet_notebook::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
+	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
+	type NotaryProvider = Notaries;
+	type ChainTransferLookup = ChainTransfer;
+	type BlockSealSpecProvider = BlockSealSpec;
+	type TickProvider = Ticks;
+	type Digests = Digests;
+}
 
-	impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
-		fn offchain_worker(header: &<Block as BlockT>::Header) {
-			Executive::offchain_worker(header)
-		}
-	}
+impl pallet_notaries::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_notaries::weights::SubstrateWeight<Runtime>;
+	type MaxActiveNotaries = MaxActiveNotaries;
+	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
+	type MaxProposalsPerBlock = MaxProposalsPerBlock;
+	type MetaChangesTickDelay = MetaChangesTickDelay;
+	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
+	type MaxNotaryHosts = MaxNotaryHosts;
+	type TickProvider = Ticks;
+}
+pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
-	impl frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce> for Runtime {
-		fn account_nonce(account: AccountId) -> Nonce {
-			System::account_nonce(account)
-		}
-	}
+pub type ArgonToken = pallet_balances::Instance1;
+impl pallet_balances::Config<ArgonToken> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type Balance = Balance;
+	type DustRemoval = ();
+	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type AccountStore = System;
+	type ReserveIdentifier = [u8; 8];
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type MaxLocks = ConstU32<50>;
+	type MaxReserves = ();
+	type MaxFreezes = ConstU32<2>;
+}
 
-	impl sp_session::SessionKeys<Block> for Runtime {
-		fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-			SessionKeys::generate(seed)
-		}
+impl pallet_multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type DepositBase = DepositBase;
+	type DepositFactor = DepositFactor;
+	type MaxSignatories = MaxSignatories;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+}
+impl pallet_proxy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type ProxyType = ProxyType;
+	type ProxyDepositBase = ProxyDepositBase;
+	type ProxyDepositFactor = ProxyDepositFactor;
+	type MaxProxies = MaxProxies;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+	type MaxPending = MaxPending;
+	type CallHasher = BlakeTwo256;
+	type AnnouncementDepositBase = AnnouncementDepositBase;
+	type AnnouncementDepositFactor = AnnouncementDepositFactor;
+}
 
-		fn decode_session_keys(
-			encoded: Vec<u8>,
-		) -> Option<Vec<(Vec<u8>, KeyTypeId)>> {
-			SessionKeys::decode_into_raw_public_keys(&encoded)
-		}
-	}
+impl pallet_price_index::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
 
-	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime {
-		fn query_info(
-			uxt: <Block as BlockT>::Extrinsic,
-			len: u32,
-		) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
-			TransactionPayment::query_info(uxt, len)
-		}
-		fn query_fee_details(
-			uxt: <Block as BlockT>::Extrinsic,
-			len: u32,
-		) -> pallet_transaction_payment::FeeDetails<Balance> {
-			TransactionPayment::query_fee_details(uxt, len)
-		}
-		fn query_weight_to_fee(weight: Weight) -> Balance {
-			TransactionPayment::weight_to_fee(weight)
-		}
-		fn query_length_to_fee(length: u32) -> Balance {
-			TransactionPayment::length_to_fee(length)
-		}
-	}
+	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
+	type Balance = Balance;
+	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
+	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
+	type CurrentTick = Ticks;
+	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
+	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
+}
 
-	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
-		for Runtime
-	{
-		fn query_call_info(
-			call: RuntimeCall,
-			len: u32,
-		) -> pallet_transaction_payment::RuntimeDispatchInfo<Balance> {
-			TransactionPayment::query_call_info(call, len)
-		}
-		fn query_call_fee_details(
-			call: RuntimeCall,
-			len: u32,
-		) -> pallet_transaction_payment::FeeDetails<Balance> {
-			TransactionPayment::query_call_fee_details(call, len)
-		}
-		fn query_weight_to_fee(weight: Weight) -> Balance {
-			TransactionPayment::weight_to_fee(weight)
-		}
-		fn query_length_to_fee(length: u32) -> Balance {
-			TransactionPayment::length_to_fee(length)
-		}
-	}
+impl pallet_bitcoin_utxos::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
+	type EventHandler = BitcoinLocks;
+	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+}
 
-	impl argon_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
-		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority< BlockSealAuthorityId, AccountId>> {
-			MiningSlot::get_mining_authority(account_id)
-		}
-		fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>> {
-			BlockRewards::block_payouts()
-		}
-	}
+impl pallet_mint::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
+	type Currency = Balances;
+	type PriceProvider = PriceIndex;
+	type Balance = Balance;
+	type MaxPendingMintUtxos = MaxPendingMintUtxos;
+	type BlockRewardAccountsProvider = MiningSlot;
+}
 
-	impl argon_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
-		fn vote_minimum() -> VoteMinimum {
-			BlockSealSpec::vote_minimum()
-		}
+pub(crate) type OwnershipToken = pallet_balances::Instance2;
+impl pallet_balances::Config<OwnershipToken> for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	/// The type for recording an account's balance.
+	type Balance = Balance;
+	type DustRemoval = ();
+	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type AccountStore = StorageMapShim<
+		pallet_balances::Account<Runtime, OwnershipToken>,
+		AccountId,
+		pallet_balances::AccountData<Balance>,
+	>;
 
-		fn compute_puzzle() -> ComputePuzzle<Block> {
-			ComputePuzzle {
-				difficulty: BlockSealSpec::compute_difficulty(),
-				randomx_key_block: BlockSealSpec::compute_key_block_hash(),
-			}
-		}
+	type ReserveIdentifier = [u8; 8];
+	type FreezeIdentifier = RuntimeFreezeReason;
+	type MaxLocks = ConstU32<50>;
+	type MaxReserves = ();
+	type MaxFreezes = ConstU32<2>;
+}
 
-		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest {
-			BlockSealSpec::create_block_vote_digest(notebook_tick, included_notebooks)
-		}
+impl pallet_sudo::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
+}
 
-		fn find_vote_block_seals(
-			votes: Vec<NotaryNotebookRawVotes>,
-			with_better_strength: U256,
-			expected_notebook_tick: Tick,
-		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
-			Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength, expected_notebook_tick)?)
-		}
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+}
 
-		fn has_eligible_votes() -> bool {
-			BlockSeal::has_eligible_votes()
-		}
+impl pallet_transaction_payment::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
+	type OperationalFeeMultiplier = ConstU8<5>;
+	type WeightToFee = WeightToFee;
+	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
+	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+}
 
-		fn is_valid_signature(block_hash: <Block as BlockT>::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool {
-			BlockSeal::is_valid_miner_signature(block_hash, seal, digest)
-		}
+impl pallet_token_gateway::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	// Configured as Pallet Ismp
+	type Dispatcher = Ismp;
+	// Configured as Pallet balances
+	type NativeCurrency = Balances;
+	// AssetAdmin account to register new assets on the chain. We don't use this
+	type AssetAdmin = TokenAdmin;
+	// Configured as Pallet Assets
+	type Assets = OwnershipTokenAsset;
+	// The Native asset Id
+	type NativeAssetId = NativeAssetId;
+	// The precision of the native asset
+	type Decimals = Decimals;
+	type CreateOrigin = EnsureSignedBy<TokenAdmins, AccountId>;
+	type WeightInfo = ();
+	type EvmToSubstrate = ();
+}
 
-		fn is_bootstrap_mining() -> bool {
-			!MiningSlot::is_registered_mining_active()
-		}
-	}
+impl pallet_ismp::Config for Runtime {
+	// configure the runtime event
+	type RuntimeEvent = RuntimeEvent;
+	// Permissioned origin who can create or update consensus clients
+	type AdminOrigin = EnsureRoot<AccountId>;
+	// The pallet_timestamp pallet
+	type TimestampProvider = Timestamp;
+	// The balance type for the currency implementation
+	type Balance = Balance;
+	// The currency implementation that is offered to relayers
+	type Currency = Balances;
+	// The state machine identifier for this state machine
+	type HostStateMachine = HostStateMachine;
+	// Optional coprocessor for incoming requests/responses
+	type Coprocessor = Coprocessor;
+	// Router implementation for routing requests/responses to their respective modules
+	type Router = Router;
+	// Supported consensus clients
+	type ConsensusClients = (
+		// Add the grandpa or beefy consensus client here
+		ismp_grandpa::consensus::GrandpaConsensusClient<Runtime>,
+	);
+	// Weight provider for local modules
+	type WeightProvider = ();
+	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
+	// You most likely don't need it, just use the `NoOpMmrTree`
+	type OffchainDB = ();
+}
 
-	impl argon_primitives::BlockCreatorApis<Block, AccountId, NotebookVerifyError> for Runtime {
-		fn decode_voting_author(digest: &Digest) -> Result<(AccountId, Tick, Option<VotingKey>), DispatchError> {
-			Digests::decode_voting_author(digest)
-		}
+impl ismp_grandpa::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type IsmpHost = Ismp;
+	type WeightInfo = weights::ismp_grandpa::WeightInfo<Runtime>;
+}
 
-		fn digest_notebooks(
-			digests: &Digest,
-		) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, DispatchError> {
-			let digests = Digests::decode(digests)?;
-			Ok(digests.notebooks.notebooks.clone())
-		}
-	}
+impl pallet_hyperbridge::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type IsmpHost = Ismp;
+}
 
-	impl argon_primitives::NotaryApis<Block, NotaryRecordT> for Runtime {
-		fn notary_by_id(notary_id: NotaryId) -> Option<NotaryRecordT> {
-			Self::notaries().iter().find(|a| a.notary_id == notary_id).cloned()
-		}
-		fn notaries() -> Vec<NotaryRecordT> {
-			Notaries::notaries().iter().map(|n| {
-				let state = Notebook::get_state(n.notary_id);
-				NotaryRecordWithState {
-					notary_id: n.notary_id,
-					operator_account_id: n.operator_account_id.clone(),
-					activated_block: n.activated_block,
-					meta_updated_block: n.meta_updated_block,
-					meta_updated_tick: n.meta_updated_tick,
-					meta: n.meta.clone(),
-					state,
-				}
-			}).collect()
-		}
-	}
+// Add the token gateway pallet to your ISMP router
+#[derive(Default)]
+pub struct Router;
 
-	impl pallet_mining_slot::MiningSlotApi<Block> for Runtime {
-		fn next_slot_era() -> (Tick, Tick) {
-			MiningSlot::get_next_slot_era()
-		}
-	}
-
-	impl argon_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
-		fn audit_notebook_and_get_votes(
-			version: u32,
-			notary_id: NotaryId,
-			notebook_number: NotebookNumber,
-			notebook_tick: Tick,
-			header_hash: H256,
-			vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
-			bytes: &Vec<u8>,
-			audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
-		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
-			Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, vote_minimums, bytes, audit_dependency_summaries)
-		}
-
-		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails <<Block as BlockT>::Hash>, DispatchError> {
-			Notebook::decode_signed_raw_notebook_header(raw_header)
-		}
-
-		fn latest_notebook_by_notary() -> BTreeMap<NotaryId, (NotebookNumber, Tick)> {
-			Notebook::latest_notebook_by_notary()
-		}
-	}
-
-	impl argon_primitives::TickApis<Block> for Runtime {
-		fn current_tick() -> Tick {
-			Ticks::current_tick()
-		}
-		fn ticker() -> Ticker {
-			Ticks::ticker()
-		}
-		fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
-			Ticks::blocks_at_tick(tick)
-		}
-	}
-
-	impl argon_primitives::BitcoinApis<Block,Balance> for Runtime {
-		fn get_sync_status() -> Option<BitcoinSyncStatus> {
-			BitcoinUtxos::get_sync_status()
-		}
-
-		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>{
-			BitcoinUtxos::active_utxos()
-		}
-
-		fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
-			BitcoinLocks::get_redemption_price(&satoshis).ok()
-		}
-
-		fn market_rate(satoshis: Satoshis) -> Option<Balance> {
-			PriceIndex::get_bitcoin_argon_price(satoshis)
-		}
-
-		fn get_bitcoin_network() -> BitcoinNetwork {
-			<BitcoinUtxos as Get<BitcoinNetwork>>::get()
-		}
-	}
-
-	impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
-		fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {
-			Grandpa::grandpa_authorities()
-		}
-
-		fn current_set_id() -> sp_consensus_grandpa::SetId {
-			Grandpa::current_set_id()
-		}
-
-		fn submit_report_equivocation_unsigned_extrinsic(
-			_equivocation_proof: sp_consensus_grandpa::EquivocationProof<
-				<Block as BlockT>::Hash,
-				NumberFor<Block>,
-			>,
-			_key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
-		) -> Option<()> {
-			None
-		}
-
-		fn generate_key_ownership_proof(
-			_set_id: sp_consensus_grandpa::SetId,
-			_authority_id: GrandpaId,
-		) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
-			None
-		}
-	}
-
-
-	#[cfg(feature = "runtime-benchmarks")]
-	impl frame_benchmarking::Benchmark<Block> for Runtime {
-		fn benchmark_metadata(extra: bool) -> (
-			Vec<frame_benchmarking::BenchmarkList>,
-			Vec<frame_support::traits::StorageInfo>,
-		) {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkList};
-			use frame_support::traits::StorageInfoTrait;
-			use frame_system_benchmarking::Pallet as SystemBench;
-			use baseline::Pallet as BaselineBench;
-
-			let mut list = Vec::<BenchmarkList>::new();
-			list_benchmarks!(list, extra);
-
-			let storage_info = AllPalletsWithSystem::storage_info();
-
-			(list, storage_info)
-		}
-
-		fn dispatch_benchmark(
-			config: frame_benchmarking::BenchmarkConfig
-		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
-			use frame_support::traits::TrackedStorageKey;
-
-			use frame_system_benchmarking::Pallet as SystemBench;
-			use baseline::Pallet as BaselineBench;
-
-			impl frame_system_benchmarking::Config for Runtime {}
-			impl baseline::Config for Runtime {}
-
-			use frame_support::traits::WhitelistedStorageKeys;
-			let whitelist: Vec<TrackedStorageKey> = AllPalletsWithSystem::whitelisted_storage_keys();
-
-			let mut batches = Vec::<BenchmarkBatch>::new();
-			let params = (&config, &whitelist);
-			add_benchmarks!(params, batches);
-
-			Ok(batches)
-		}
-	}
-
-	#[cfg(feature = "try-runtime")]
-	impl frame_try_runtime::TryRuntime<Block> for Runtime {
-		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
-			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
-			// have a backtrace here. If any of the pre/post migration checks fail, we shall stop
-			// right here and right now.
-			let weight = Executive::try_runtime_upgrade(checks).unwrap();
-			(weight, configs::BlockWeights::get().max_block)
-		}
-
-		fn execute_block(
-			block: Block,
-			state_root_check: bool,
-			signature_check: bool,
-			select: frame_try_runtime::TryStateSelect
-		) -> Weight {
-			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
-			// have a backtrace here.
-			Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
-		}
-	}
-
-	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
-		fn build_state(config: Vec<u8>) -> sp_genesis_builder::Result {
-			build_state::<RuntimeGenesisConfig>(config)
-		}
-
-		fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
-			get_preset::<RuntimeGenesisConfig>(id, |_| None)
-		}
-
-		fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
-			vec![]
-		}
-	}
-
-	impl pallet_ismp_runtime_api::IsmpRuntimeApi<Block, <Block as BlockT>::Hash> for Runtime {
-		fn host_state_machine() -> StateMachine {
-			<Runtime as pallet_ismp::Config>::HostStateMachine::get()
-		}
-
-		fn challenge_period(state_machine_id: StateMachineId) -> Option<u64> {
-			Ismp::challenge_period(state_machine_id)
-		}
-
-		/// Fetch all ISMP events in the block, should only be called from runtime-api.
-		fn block_events() -> Vec<::ismp::events::Event> {
-			Ismp::block_events()
-		}
-
-		/// Fetch all ISMP events and their extrinsic metadata, should only be called from runtime-api.
-		fn block_events_with_metadata() -> Vec<(::ismp::events::Event, Option<u32>)> {
-			Ismp::block_events_with_metadata()
-		}
-
-		/// Return the scale encoded consensus state
-		fn consensus_state(id: ConsensusClientId) -> Option<Vec<u8>> {
-			Ismp::consensus_states(id)
-		}
-
-		/// Return the timestamp this client was last updated in seconds
-		fn state_machine_update_time(height: StateMachineHeight) -> Option<u64> {
-			Ismp::state_machine_update_time(height)
-		}
-
-		/// Return the latest height of the state machine
-		fn latest_state_machine_height(id: StateMachineId) -> Option<u64> {
-			Ismp::latest_state_machine_height(id)
-		}
-
-
-		/// Get actual requests
-		fn requests(commitments: Vec<H256>) -> Vec<Request> {
-			Ismp::requests(commitments)
-		}
-
-		/// Get actual requests
-		fn responses(commitments: Vec<H256>) -> Vec<Response> {
-			Ismp::responses(commitments)
-		}
-	}
-
-	impl crate::ConfigurationApis<Block> for Runtime {
-		fn ismp_coprocessor() -> Option<StateMachine> {
-			<Runtime as pallet_ismp::Config>::Coprocessor::get()
+impl IsmpRouter for Router {
+	fn module_for_id(&self, id: Vec<u8>) -> Result<Box<dyn IsmpModule>, anyhow::Error> {
+		match id.as_slice() {
+			id if TokenGateway::is_token_gateway(id) => Ok(Box::new(TokenGateway::default())),
+			_ => Err(Error::ModuleNotFound(id))?,
 		}
 	}
 }
+
+argon_runtime_common::token_asset!(Ownership, ChainTransfer::hyperbridge_token_admin());

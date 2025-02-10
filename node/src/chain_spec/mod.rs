@@ -18,11 +18,13 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 mod development;
 mod local_testnet;
 mod mainnet;
+mod metadata;
 mod testnet;
 
 pub use development::development_config;
 pub use local_testnet::local_testnet_config;
 pub use mainnet::mainnet_config;
+pub use metadata::metadata_config;
 pub use testnet::testnet_config;
 
 // The URL for the telemetry server.

@@ -81,7 +81,7 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 parameter_types! {
 	pub static ArgonsPerBlock :u32 = 5_000;
 	pub static StartingOwnershipTokensPerBlock :u32 = 5_000;
-	pub static IncrementalGrowth :GrowthPath<Test> = (1_000, 100, 500_000);
+	pub static IncrementalGrowth :GrowthPath<Balance> = (1_000, 100, 500_000);
 	pub static HalvingBeginBlock: u32 = 1000;
 	pub static HalvingBlocks :u32 = 100;
 	pub static MaturationBlocks :u32 = 5;

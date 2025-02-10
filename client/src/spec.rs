@@ -6222,7 +6222,7 @@ pub mod api {
 						(),
 					>;
 					pub type ForceProxyType =
-						::core::option::Option<runtime_types::argon_runtime::configs::ProxyType>;
+						::core::option::Option<runtime_types::argon_runtime::ProxyType>;
 					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Proxy {
@@ -6264,7 +6264,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AddProxy {
@@ -6304,7 +6304,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RemoveProxy {
@@ -6377,7 +6377,7 @@ pub mod api {
 				}
 				pub mod create_pure {
 					use super::runtime_types;
-					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 					pub type Delay = ::core::primitive::u32;
 					pub type Index = ::core::primitive::u16;
 				}
@@ -6431,7 +6431,7 @@ pub mod api {
 						crate::types::AccountId32,
 						(),
 					>;
-					pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+					pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 					pub type Index = ::core::primitive::u16;
 					pub type Height = ::core::primitive::u32;
 					pub type ExtIndex = ::core::primitive::u32;
@@ -6611,7 +6611,7 @@ pub mod api {
 						(),
 					>;
 					pub type ForceProxyType =
-						::core::option::Option<runtime_types::argon_runtime::configs::ProxyType>;
+						::core::option::Option<runtime_types::argon_runtime::ProxyType>;
 					pub type Call = runtime_types::argon_runtime::RuntimeCall;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProxyAnnounced {
@@ -6969,7 +6969,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Pure = crate::types::AccountId32;
 				pub type Who = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 				pub type DisambiguationIndex = ::core::primitive::u16;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for PureCreated {
@@ -7025,7 +7025,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Delegator = crate::types::AccountId32;
 				pub type Delegatee = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ProxyAdded {
@@ -7054,7 +7054,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type Delegator = crate::types::AccountId32;
 				pub type Delegatee = crate::types::AccountId32;
-				pub type ProxyType = runtime_types::argon_runtime::configs::ProxyType;
+				pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 				pub type Delay = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ProxyRemoved {
@@ -7072,7 +7072,7 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::pallet_proxy::ProxyDefinition<
 								crate::types::AccountId32,
-								runtime_types::argon_runtime::configs::ProxyType,
+								runtime_types::argon_runtime::ProxyType,
 								::core::primitive::u32,
 							>,
 						>,
@@ -24290,32 +24290,6 @@ pub mod api {
 		}
 		pub mod argon_runtime {
 			use super::runtime_types;
-			pub mod configs {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub enum ProxyType {
-					#[codec(index = 0)]
-					Any,
-					#[codec(index = 1)]
-					NonTransfer,
-					#[codec(index = 2)]
-					PriceIndex,
-				}
-			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
@@ -24334,6 +24308,25 @@ pub mod api {
 				),
 				#[codec(index = 1)]
 				Void(runtime_types::sp_core::Void),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum ProxyType {
+				#[codec(index = 0)]
+				Any,
+				#[codec(index = 1)]
+				NonTransfer,
+				#[codec(index = 2)]
+				PriceIndex,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -29306,9 +29299,8 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						force_proxy_type: ::core::option::Option<
-							runtime_types::argon_runtime::configs::ProxyType,
-						>,
+						force_proxy_type:
+							::core::option::Option<runtime_types::argon_runtime::ProxyType>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
 							runtime_types::argon_runtime::RuntimeCall,
 						>,
@@ -29328,7 +29320,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
@@ -29344,7 +29336,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 3)]
@@ -29375,7 +29367,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "Fails if there are insufficient funds to pay for deposit."]
 					create_pure {
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 						index: ::core::primitive::u16,
 					},
@@ -29401,7 +29393,7 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						index: ::core::primitive::u16,
 						#[codec(compact)]
 						height: ::core::primitive::u32,
@@ -29488,9 +29480,8 @@ pub mod api {
 							crate::types::AccountId32,
 							(),
 						>,
-						force_proxy_type: ::core::option::Option<
-							runtime_types::argon_runtime::configs::ProxyType,
-						>,
+						force_proxy_type:
+							::core::option::Option<runtime_types::argon_runtime::ProxyType>,
 						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
 							runtime_types::argon_runtime::RuntimeCall,
 						>,
@@ -29567,7 +29558,7 @@ pub mod api {
 					PureCreated {
 						pure: crate::types::AccountId32,
 						who: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						disambiguation_index: ::core::primitive::u16,
 					},
 					#[codec(index = 2)]
@@ -29582,7 +29573,7 @@ pub mod api {
 					ProxyAdded {
 						delegator: crate::types::AccountId32,
 						delegatee: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 					#[codec(index = 4)]
@@ -29590,7 +29581,7 @@ pub mod api {
 					ProxyRemoved {
 						delegator: crate::types::AccountId32,
 						delegatee: crate::types::AccountId32,
-						proxy_type: runtime_types::argon_runtime::configs::ProxyType,
+						proxy_type: runtime_types::argon_runtime::ProxyType,
 						delay: ::core::primitive::u32,
 					},
 				}

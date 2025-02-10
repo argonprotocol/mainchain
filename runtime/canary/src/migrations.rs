@@ -1,23 +1,16 @@
-use crate::{
-	configs::{Get, Weight},
-	Runtime,
-};
-use frame_support::traits::OnRuntimeUpgrade;
+use crate::Runtime;
+use frame_support::{traits::OnRuntimeUpgrade, weights::Weight};
 use log::info;
 use pallet_grandpa::{Config, CurrentSetId};
 use sp_api::runtime_decl_for_core::Core;
 use sp_arithmetic::traits::{Saturating, UniqueSaturatedInto};
+use sp_core::Get;
 use sp_runtime::traits::NumberFor;
-
 /// This migration adds a missing set id to the CurrentSetId storage item in Grandpa
 pub struct UpdateMissingGrandpaSetId<T>(core::marker::PhantomData<T>);
 impl<T: Config> OnRuntimeUpgrade for UpdateMissingGrandpaSetId<T> {
 	fn on_runtime_upgrade() -> Weight {
 		if CurrentSetId::<T>::get() == 0 && Runtime::version().spec_version == 110 {
-			#[cfg(not(feature = "canary"))]
-			let set_id = 1;
-
-			#[cfg(feature = "canary")]
 			let set_id = calculate_testnet_set_id::<T>(<frame_system::Pallet<T>>::block_number());
 
 			info!("Migration: setting missing Grandpa set id to {}", set_id);
