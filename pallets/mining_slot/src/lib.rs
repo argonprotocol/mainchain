@@ -678,13 +678,12 @@ impl<T: Config> Pallet<T> {
 		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
-		let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 		});
-		CurrentSlotId::<T>::put(next_slot_id);
-		T::SlotEvents::rotate_grandpas(next_slot_id, removed_miners, added_miners);
+		CurrentSlotId::<T>::put(slot_id);
+		T::SlotEvents::rotate_grandpas(slot_id, removed_miners, added_miners);
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
