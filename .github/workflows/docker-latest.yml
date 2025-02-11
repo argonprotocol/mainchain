@@ -1,0 +1,41 @@
+name: Update latest release on docker
+
+on:
+  release:
+    types: [ edited ]
+
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+
+      - name: Determine if release is marked as latest
+        id: get_latest
+        run: |
+          LATEST_RELEASE=$(gh release list --exclude-pre-releases --json tagName,isLatest --jq ".[] | select(.isLatest == true) | .tagName" | head -n 1)
+          echo "latest=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to container registry
+        if: ${{ github.event.release.draft == false }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update latest
+        if: ${{ github.event.release.draft == false }}
+        run: |
+          docker tag ghcr.io/argonprotocol/argon-miner:${{ env.VERSION }} ghcr.io/argonprotocol/argon-miner:latest
+          docker tag ghcr.io/argonprotocol/argon-notary:${{ env.VERSION }} ghcr.io/argonprotocol/argon-notary:latest
+          docker push ghcr.io/argonprotocol/argon-miner:latest
+          docker push ghcr.io/argonprotocol/argon-notary:latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get_latest.outputs.latest }}
