@@ -18,7 +18,7 @@ use argon_primitives::{
 	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
 	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DomainHash,
 	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
-	NotebookNumber, TransferToLocalchainId, VoteMinimum, CHANNEL_HOLD_CLAWBACK_TICKS,
+	NotebookNumber, TransferToLocalchainId, ABSOLUTE_TAX_VOTE_MINIMUM, CHANNEL_HOLD_CLAWBACK_TICKS,
 	DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
@@ -70,7 +70,6 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 	lookup: &T,
 	notebook: &Notebook,
 	notary_operator_account_id: &AccountId,
-	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 	channel_hold_expiration_ticks: Tick,
 ) -> anyhow::Result<bool, VerifyError> {
 	let mut state = NotebookVerifyState::default();
@@ -95,7 +94,7 @@ pub fn notebook_verify<T: NotebookHistoryLookup>(
 		verify_changeset_signatures(changeset)?;
 		verify_balance_sources(lookup, &mut state, header, changeset)?;
 		track_block_votes(&mut state, block_votes)?;
-		verify_voting_sources(block_votes, header.tick, notary_operator_account_id, vote_minimums)?;
+		verify_voting_sources(block_votes, header.tick, notary_operator_account_id)?;
 	}
 
 	ensure!(!state.block_votes.is_empty(), VerifyError::NoDefaultBlockVote);
@@ -339,7 +338,6 @@ pub fn verify_voting_sources(
 	block_votes: &Vec<BlockVote>,
 	notebook_tick: Tick,
 	notary_operator_account_id: &AccountId,
-	vote_minimums: &BTreeMap<H256, VoteMinimum>,
 ) -> anyhow::Result<(), VerifyError> {
 	for block_vote in block_votes {
 		ensure!(
@@ -358,11 +356,10 @@ pub fn verify_voting_sources(
 			continue;
 		}
 
-		let minimum = vote_minimums
-			.get(&block_vote.block_hash)
-			.ok_or(VerifyError::InvalidBlockVoteSource)?;
-
-		ensure!(block_vote.power >= *minimum, VerifyError::InsufficientBlockVoteMinimum);
+		ensure!(
+			block_vote.power >= ABSOLUTE_TAX_VOTE_MINIMUM,
+			VerifyError::InsufficientBlockVoteMinimum
+		);
 
 		ensure!(
 			block_vote.signature.verify(&block_vote.hash()[..], &block_vote.account_id),

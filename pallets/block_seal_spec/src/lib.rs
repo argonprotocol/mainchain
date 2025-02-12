@@ -2,8 +2,8 @@
 extern crate alloc;
 extern crate core;
 
+use argon_primitives::ABSOLUTE_TAX_VOTE_MINIMUM;
 use frame_support::traits::OnTimestampSet;
-
 pub use pallet::*;
 pub use weights::*;
 
@@ -23,7 +23,7 @@ const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
 const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
-const MIN_TAX_MINIMUM: u128 = 1_000;
+const MIN_TAX_MINIMUM: u128 = ABSOLUTE_TAX_VOTE_MINIMUM;
 pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 
 /// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.

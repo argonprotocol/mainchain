@@ -31,7 +31,6 @@ pub mod pallet {
 	use super::*;
 	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use argon_primitives::{
-		block_vote::VoteMinimum,
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{
 			NotaryId, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
@@ -597,7 +596,6 @@ pub mod pallet {
 			notebook_number: NotebookNumber,
 			notebook_tick: Tick,
 			header_hash: H256,
-			block_vote_minimums: &BTreeMap<<T::Block as BlockT>::Hash, VoteMinimum>,
 			bytes: &Vec<u8>,
 			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
 		) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
@@ -707,7 +705,6 @@ pub mod pallet {
 				&history_lookup,
 				&notebook,
 				&notary_operator,
-				block_vote_minimums,
 				channel_hold_expiration_ticks,
 			)
 			.inspect_err(|e| {

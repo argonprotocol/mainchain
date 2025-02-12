@@ -61,6 +61,7 @@ pub type BlockVote = BlockVoteT<H256>;
 
 pub type VotingKey = H256;
 const PROXY_VOTE: [u8; 32] = [0; 32];
+pub const ABSOLUTE_TAX_VOTE_MINIMUM: u128 = 1_000;
 impl<Hash: Codec + Clone + PartialEq + From<[u8; 32]>> BlockVoteT<Hash> {
 	pub fn hash(&self) -> H256 {
 		const PREFIX: &str = "BlockVote";

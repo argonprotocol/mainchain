@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use frame_support::{assert_err, assert_ok};
 use sp_core::{bounded_vec, sr25519::Signature, H256};
 use sp_keyring::{
@@ -797,7 +795,7 @@ fn test_vote_sources() {
 			block_hash: vote_block_hash,
 			index: 1,
 			tick: 1,
-			power: 400_000,
+			power: 100,
 			block_rewards_account_id: Bob.to_account_id(),
 			signature: Signature::from_raw([0u8; 64]).into(),
 		}
@@ -805,26 +803,24 @@ fn test_vote_sources() {
 		.clone(),
 	];
 
-	let vote_minimums = BTreeMap::from([(vote_block_hash, 500_000)]);
-
 	let operator = Ferdie.to_account_id();
 	assert_err!(
-		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 1, &operator),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 
 	votes[1].power = 500_000;
 	assert_err!(
-		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 1, &operator),
 		VerifyError::BlockVoteInvalidSignature
 	);
 	votes[1].sign(Bob.pair());
 
 	assert_err!(
-		verify_voting_sources(&votes, 2, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 2, &operator),
 		VerifyError::InvalidBlockVoteTick { tick: 1, notebook_tick: 2 }
 	);
-	assert_ok!(verify_voting_sources(&votes, 1, &operator, &vote_minimums),);
+	assert_ok!(verify_voting_sources(&votes, 1, &operator),);
 }
 
 #[test]
@@ -832,14 +828,12 @@ fn test_default_votes() {
 	let operator = Ferdie.to_account_id();
 	let mut votes = vec![BlockVote::create_default_vote(Bob.to_account_id(), 10)];
 
-	let vote_minimums = BTreeMap::from([(H256::zero(), 500_000)]);
-
 	assert_err!(
-		verify_voting_sources(&votes, 1, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 1, &operator),
 		VerifyError::InvalidBlockVoteTick { tick: 10, notebook_tick: 1 }
 	);
 	assert_err!(
-		verify_voting_sources(&votes, 10, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 10, &operator),
 		VerifyError::InvalidDefaultBlockVoteAuthor {
 			author: Bob.to_account_id(),
 			expected: operator.clone()
@@ -847,11 +841,11 @@ fn test_default_votes() {
 	);
 
 	votes[0].account_id = operator.clone();
-	assert_ok!(verify_voting_sources(&votes, 10, &operator, &vote_minimums),);
+	assert_ok!(verify_voting_sources(&votes, 10, &operator),);
 	// if there's any power, not a default vote anymore
 	votes[0].power = 1;
 	assert_err!(
-		verify_voting_sources(&votes, 10, &operator, &vote_minimums),
+		verify_voting_sources(&votes, 10, &operator),
 		VerifyError::InsufficientBlockVoteMinimum
 	);
 

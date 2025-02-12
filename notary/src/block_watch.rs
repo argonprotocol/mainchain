@@ -96,7 +96,6 @@ async fn get_notary_activation(
 
 async fn process_block(
 	db: &mut PgConnection,
-	client: &ArgonOnlineClient,
 	block: &Block<ArgonConfig, ArgonOnlineClient>,
 	notary_id: NotaryId,
 ) -> anyhow::Result<()> {
@@ -105,12 +104,6 @@ async fn process_block(
 		info!("Duplicated block {} ({})", block.hash(), block.number());
 		return Ok(())
 	}
-	let next_vote_minimum = client
-		.storage()
-		.at(block.hash())
-		.fetch(&api::storage().block_seal_spec().current_vote_minimum())
-		.await?
-		.unwrap_or_default();
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {
 		DigestItem::PreRuntime(argon_primitives::NOTEBOOKS_DIGEST_ID, data) =>
@@ -149,15 +142,7 @@ async fn process_block(
 	}
 
 	let parent_hash = block.header().parent_hash;
-	BlocksStore::record(
-		db,
-		block.number(),
-		block.hash(),
-		parent_hash,
-		next_vote_minimum,
-		notebooks,
-	)
-	.await?;
+	BlocksStore::record(db, block.number(), block.hash(), parent_hash, notebooks).await?;
 
 	Ok(())
 }
@@ -193,7 +178,7 @@ async fn process_fork(
 
 	let missing_blocks = find_missing_blocks(db, client, block.hash()).await?;
 	for missing_block in missing_blocks {
-		process_block(db, client, &missing_block, notary_id).await?;
+		process_block(db, &missing_block, notary_id).await?;
 	}
 	Ok(())
 }
@@ -363,7 +348,7 @@ async fn subscribe_to_blocks(
 		);
 
 		for block in missing_blocks.into_iter() {
-			process_block(&mut tx, &mainchain_client.live, &block, notary_id).await?;
+			process_block(&mut tx, &block, notary_id).await?;
 			process_finalized_block(&mut tx, block, notary_id, ticker).await?;
 		}
 		tx.commit().await?;
@@ -390,7 +375,7 @@ async fn subscribe_to_blocks(
 				match block_next {
 					Some(Ok(block)) => {
 						let mut tx = pool.begin().await?;
-						process_block(&mut tx, &mainchain_client.live, &block, notary_id).await?;
+						process_block(&mut tx, &block, notary_id).await?;
 						process_finalized_block(&mut tx, block, notary_id, ticker).await?;
 						tx.commit().await?;
 					},
@@ -447,7 +432,7 @@ mod tests {
 
 		let mut db = pool.acquire().await?;
 		assert!(BlocksStore::has_block(&mut db, finalized_hash).await?);
-		process_block(&mut db, &node.client.live, &finalized_block, 1)
+		process_block(&mut db, &finalized_block, 1)
 			.await
 			.expect("should not fail with a duplicate");
 		assert!(process_finalized_block(&mut db, finalized_block, 1, &ticker).await.is_ok());

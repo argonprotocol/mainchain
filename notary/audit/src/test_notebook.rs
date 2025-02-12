@@ -247,7 +247,7 @@ fn test_verify_notebook() {
 
 	// must have a default vote
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook1, &operator, &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook1, &operator, 2),
 		VerifyError::NoDefaultBlockVote
 	);
 	notebook1.header.block_votes_count = 1;
@@ -262,13 +262,13 @@ fn test_verify_notebook() {
 	notebook1.header.block_votes_root = block_votes_root(notebook1.notarizations.to_vec());
 
 	notebook1.hash = notebook1.calculate_hash();
-	assert_ok!(notebook_verify(&TestLookup, &notebook1, &operator, &BTreeMap::new(), 2),);
+	assert_ok!(notebook_verify(&TestLookup, &notebook1, &operator, 2),);
 
 	let mut bad_hash = hash;
 	bad_hash.0[0] = 1;
 	notebook1.hash = bad_hash;
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook1, &operator, &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook1, &operator, 2),
 		VerifyError::InvalidNotebookHash
 	);
 
@@ -280,7 +280,7 @@ fn test_verify_notebook() {
 	bad_notebook1.hash = hash;
 
 	assert_err!(
-		notebook_verify(&TestLookup, &bad_notebook1, &operator, &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &bad_notebook1, &operator, 2),
 		VerifyError::InvalidChainTransfersList
 	);
 
@@ -289,7 +289,7 @@ fn test_verify_notebook() {
 	bad_notebook1.hash = hash;
 
 	assert_err!(
-		notebook_verify(&TestLookup, &bad_notebook, &operator, &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &bad_notebook, &operator, 2),
 		VerifyError::InvalidBalanceChangeRoot
 	);
 }
@@ -358,7 +358,7 @@ fn test_disallows_double_claim() {
 	notebook1.signature = Ed25519Keyring::Alice.pair().sign(&notebook1.hash[..]);
 
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook1, &notary_operator(), &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook1, &notary_operator(), 2),
 		VerifyError::DuplicateChainTransfer
 	);
 }
@@ -492,7 +492,7 @@ fn test_multiple_changesets_in_a_notebook() {
 
 	notebook.header.block_votes_root = block_votes_root(notebook.notarizations.to_vec());
 	notebook.hash = notebook.calculate_hash();
-	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),);
+	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),);
 
 	let changeset2 = vec![
 		BalanceChange {
@@ -567,7 +567,7 @@ fn test_multiple_changesets_in_a_notebook() {
 		.expect("should insert");
 	notebook.hash = notebook.calculate_hash();
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 		VerifyError::MissingBalanceProof
 	);
 	notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(
@@ -600,7 +600,7 @@ fn test_multiple_changesets_in_a_notebook() {
 	notebook.header.tax = 400_000;
 	notebook.hash = notebook.calculate_hash();
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 		VerifyError::InvalidPreviousBalanceProof
 	);
 	notebook
@@ -611,7 +611,7 @@ fn test_multiple_changesets_in_a_notebook() {
 
 	notebook.notarizations[2].balance_changes[2].previous_balance_proof = None;
 	notebook.hash = notebook.calculate_hash();
-	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),);
+	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),);
 }
 
 #[test]
@@ -710,7 +710,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 
 	// test that the change root records the hold note
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 		VerifyError::InvalidBalanceChangeRoot
 	);
 
@@ -726,7 +726,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	}
 	.encode()]);
 	notebook.hash = notebook.calculate_hash();
-	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),);
+	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),);
 
 	// now confirm we can't remove the hold in the same set of changes
 	{
@@ -774,7 +774,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		}
 		.encode()]);
 		assert_err!(
-			notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),
+			notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 			VerifyError::InvalidChannelHoldNote
 		);
 	}
@@ -825,7 +825,7 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		}
 		.encode()]);
 		assert!(matches!(
-			notebook_verify(&TestLookup, &notebook, &notary_operator(), &BTreeMap::new(), 2),
+			notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 			Err(VerifyError::ChannelHoldNotReadyForClaim { .. })
 		),);
 	}
@@ -1095,38 +1095,31 @@ fn test_votes_must_add_up() {
 			),
 		)
 	});
-	// 1. Test a vote minimum > the votes
-	let minimums = BTreeMap::from([(vote_block_hash, 100_000)]);
-	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2),
-		VerifyError::InsufficientBlockVoteMinimum
-	);
-	let minimums = BTreeMap::from([(vote_block_hash, 2_000)]);
 
-	// 2. One of the votes had the wrong signature
+	// One of the votes had the wrong signature
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),
 		VerifyError::BlockVoteInvalidSignature
 	);
 	notebook.notarizations[0].block_votes[1].sign(Alice.pair());
 
-	// 3. Once vote minimums are allowed, the "vote root is wrong"
+	// Once vote minimums are allowed, the "vote root is wrong"
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),
 		VerifyError::InvalidBlockVoteRoot
 	);
 	notebook.header.block_votes_root = block_votes_root(notebook.notarizations.to_vec());
 
-	// 4. The votes must add up
+	// The votes must add up
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),
 		VerifyError::InvalidBlockVotesCount
 	);
 	notebook.header.block_votes_count = 2;
 
 	// The summed voting power must also add up
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),
 		VerifyError::InvalidBlockVotingPower
 	);
 	notebook.header.block_voting_power =
@@ -1134,13 +1127,13 @@ fn test_votes_must_add_up() {
 
 	// The list of blocks voted on must match the list of votes
 	assert_err!(
-		notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),
+		notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),
 		VerifyError::InvalidBlockVoteList
 	);
 	notebook.header.blocks_with_votes = bounded_vec![vote_block_hash];
 
 	notebook.hash = notebook.calculate_hash();
-	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), &minimums, 2,),);
+	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), 2,),);
 }
 
 fn proof(leaves: Vec<BalanceTip>, index: usize) -> MerkleProof {

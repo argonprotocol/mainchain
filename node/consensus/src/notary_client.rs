@@ -12,8 +12,8 @@ use argon_primitives::{
 	},
 	notebook::NotebookNumber,
 	tick::{Tick, Ticker},
-	Balance, BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId,
-	NotebookApis, NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
+	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
+	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
@@ -64,7 +64,6 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 		notebook_number: NotebookNumber,
 		notebook_tick: Tick,
 		header_hash: H256,
-		vote_minimums: &BTreeMap<B::Hash, Balance>,
 		notebook: &[u8],
 		notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
 	) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error>;
@@ -109,19 +108,17 @@ where
 		notebook_number: NotebookNumber,
 		notebook_tick: Tick,
 		header_hash: H256,
-		vote_minimums: &BTreeMap<B::Hash, Balance>,
 		notebook: &[u8],
 		notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
 	) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {
 		self.runtime_api()
-			.audit_notebook_and_get_votes(
+			.audit_notebook_and_get_votes_v2(
 				block_hash,
 				version,
 				notary_id,
 				notebook_number,
 				notebook_tick,
 				header_hash,
-				vote_minimums,
 				&notebook.to_vec(),
 				notebook_dependencies,
 			)
@@ -976,20 +973,6 @@ where
 			"Attempting to audit notebook. Notary {notary_id}, #{notebook_number}, tick {tick}.",
 		);
 
-		let mut vote_minimums = BTreeMap::new();
-		for block_hash in &notebook_details.blocks_with_votes {
-			vote_minimums.insert(
-				*block_hash,
-				self.client.vote_minimum(*block_hash).map_err(|e| {
-					let message = format!(
-						"Error getting vote minimums for block {}. Notary {}, notebook {}. {:?}",
-						block_hash, notary_id, notebook_number, e
-					);
-					Error::StringError(message)
-				})?,
-			);
-		}
-
 		let full_notebook = self.download_notebook(notary_id, notebook_number).await?;
 		trace!(
 			"Notebook downloaded. Notary {notary_id}, #{notebook_number}, tick {tick}. {} bytes.",
@@ -1004,7 +987,6 @@ where
 			notebook_number,
 			tick,
 			notebook_details.header_hash,
-			&vote_minimums,
 			&full_notebook.0,
 			notebook_dependencies.clone(),
 		)? {
@@ -1258,7 +1240,7 @@ mod test {
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
 			NotaryNotebookRawVotes, NotaryRecordWithState,
 		},
-		AccountId, Balance, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
+		AccountId, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	};
 	use argon_runtime::Block;
 	use codec::{Decode, Encode};
@@ -1364,7 +1346,6 @@ mod test {
 			notebook_number: NotebookNumber,
 			_tick: Tick,
 			_header_hash: H256,
-			_vote_minimums: &BTreeMap<<Block as BlockT>::Hash, Balance>,
 			_notebook: &[u8],
 			notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
 		) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {

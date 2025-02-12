@@ -94,7 +94,7 @@ for i in {0..2} ; do
     --notebook-archive-hosts="$NOTEBOOK_ARCHIVE" \
     --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
-    --pruning=archive -lRUST_LOG=info,argon=info,ismp=trace \
+    --pruning=archive -lRUST_LOG=info,argon=trace,ismp=trace \
     --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \
     --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 2>&1 | \
     awk -v name="${validators[$i]}" '{printf "%-8s %s\n", name, $0; fflush()}' &

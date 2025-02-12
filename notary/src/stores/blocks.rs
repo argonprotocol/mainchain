@@ -1,7 +1,5 @@
-use std::collections::{BTreeMap, BTreeSet};
-
 use argon_notary_audit::VerifyError;
-use argon_primitives::{ensure, NotebookAuditResult, VoteMinimum};
+use argon_primitives::{ensure, NotebookAuditResult};
 use chrono::Utc;
 use serde_json::json;
 use sp_core::H256;
@@ -25,33 +23,6 @@ pub struct BlockRow {
 }
 
 impl BlocksStore {
-	pub(crate) async fn get_vote_minimums(
-		&self,
-		db: &mut PgConnection,
-		block_hashes: &BTreeSet<H256>,
-	) -> anyhow::Result<BTreeMap<H256, VoteMinimum>, crate::Error> {
-		let mut map = BTreeMap::new();
-		let block_hashes_vec = block_hashes.iter().map(|h| h.0.to_vec()).collect::<Vec<_>>();
-		let rows = sqlx::query!(
-			r#"
-		SELECT block_hash, block_vote_minimum FROM blocks where block_hash = ANY($1)
-		"#,
-			&block_hashes_vec
-		)
-		.fetch_all(db)
-		.await?;
-
-		for row in rows {
-			map.insert(
-				H256::from_slice(&row.block_hash[..]),
-				row.block_vote_minimum.parse::<u128>().map_err(|e| {
-					Error::InternalError(format!("Unable to parse minimum: {:?}", e))
-				})?,
-			);
-		}
-		Ok(map)
-	}
-
 	pub async fn lock(db: &mut PgConnection) -> anyhow::Result<(), crate::Error> {
 		let _ = sqlx::query_scalar!(
 			"SELECT key FROM block_sync_lock where key = 1 FOR UPDATE NOWAIT LIMIT 1"
@@ -159,7 +130,6 @@ impl BlocksStore {
 		block_number: u32,
 		block_hash: H256,
 		parent_hash: H256,
-		vote_minimum: VoteMinimum,
 		notebook_digests: Vec<NotebookAuditResult<VerifyError>>,
 	) -> anyhow::Result<(), Error> {
 		let latest_notebook_number =
@@ -175,7 +145,7 @@ impl BlocksStore {
 			block_hash.0.to_vec(),
 			block_number as i32,
 			parent_hash.0.to_vec(),
-			vote_minimum.to_string(),
+			"0",
 			Utc::now(),
 			false,
 			latest_notebook_number,
@@ -220,21 +190,13 @@ mod tests {
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
 		{
 			let mut tx = pool.begin().await?;
-			BlocksStore::record(
-				&mut tx,
-				0,
-				H256::from_slice(&[1u8; 32]),
-				H256::zero(),
-				100,
-				vec![],
-			)
-			.await?;
+			BlocksStore::record(&mut tx, 0, H256::from_slice(&[1u8; 32]), H256::zero(), vec![])
+				.await?;
 			BlocksStore::record(
 				&mut tx,
 				1,
 				H256::from_slice(&[2u8; 32]),
 				H256::from_slice(&[1u8; 32]),
-				100,
 				vec![NotebookAuditResult {
 					notebook_number: 1,
 					notary_id: 1,
@@ -248,7 +210,6 @@ mod tests {
 				2,
 				H256::from_slice(&[3u8; 32]),
 				H256::from_slice(&[2u8; 32]),
-				100,
 				vec![],
 			)
 			.await?;
@@ -268,18 +229,16 @@ mod tests {
 	#[sqlx::test]
 	async fn test_ignores_duplicates(pool: PgPool) -> anyhow::Result<()> {
 		let mut tx = pool.begin().await?;
-		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 100, vec![])
-			.await?;
+		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), vec![]).await?;
 		tx.commit().await?;
 
 		let mut tx = pool.begin().await?;
-		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), 200, vec![])
-			.await?;
+		BlocksStore::record(&mut tx, 1, H256::from_slice(&[1u8; 32]), H256::zero(), vec![]).await?;
 		tx.commit().await?;
 
 		let mut db = pool.acquire().await?;
 		let block = BlocksStore::get_by_hash(&mut db, H256::from_slice(&[1u8; 32])).await?;
-		assert_eq!(block.block_vote_minimum, "100");
+		assert_eq!(block.block_vote_minimum, "0");
 		Ok(())
 	}
 }

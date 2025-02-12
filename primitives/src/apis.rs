@@ -68,7 +68,20 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
+
+	#[api_version(2)]
 	pub trait NotebookApis<VerifyError: Codec> {
+		#[api_version(2)]
+		fn audit_notebook_and_get_votes_v2(
+			version: u32,
+			notary_id: NotaryId,
+			notebook_number: NotebookNumber,
+			notebook_tick: Tick,
+			header_hash: H256,
+			bytes: &Vec<u8>,
+			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+		) -> Result<NotaryNotebookRawVotes, VerifyError>;
+
 		fn audit_notebook_and_get_votes(
 			version: u32,
 			notary_id: NotaryId,

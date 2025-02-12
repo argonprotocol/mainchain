@@ -2056,6 +2056,38 @@ pub mod api {
 			use super::{root_mod, runtime_types};
 			pub struct NotebookApis;
 			impl NotebookApis {
+				pub fn audit_notebook_and_get_votes_v2(
+					&self,
+					version: types::audit_notebook_and_get_votes_v2::Version,
+					notary_id: types::audit_notebook_and_get_votes_v2::NotaryId,
+					notebook_number: types::audit_notebook_and_get_votes_v2::NotebookNumber,
+					notebook_tick: types::audit_notebook_and_get_votes_v2::NotebookTick,
+					header_hash: types::audit_notebook_and_get_votes_v2::HeaderHash,
+					bytes: types::audit_notebook_and_get_votes_v2::Bytes,
+					raw_audit_dependency_summaries : types :: audit_notebook_and_get_votes_v2 :: RawAuditDependencySummaries,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::AuditNotebookAndGetVotesV2,
+					types::audit_notebook_and_get_votes_v2::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"NotebookApis",
+						"audit_notebook_and_get_votes_v2",
+						types::AuditNotebookAndGetVotesV2 {
+							version,
+							notary_id,
+							notebook_number,
+							notebook_tick,
+							header_hash,
+							bytes,
+							raw_audit_dependency_summaries,
+						},
+						[
+							196u8, 142u8, 5u8, 231u8, 43u8, 25u8, 4u8, 11u8, 233u8, 98u8, 66u8,
+							12u8, 23u8, 203u8, 28u8, 166u8, 195u8, 120u8, 118u8, 250u8, 207u8,
+							57u8, 11u8, 169u8, 186u8, 227u8, 38u8, 107u8, 117u8, 147u8, 26u8, 95u8,
+						],
+					)
+				}
 				pub fn audit_notebook_and_get_votes(
 					&self,
 					version: types::audit_notebook_and_get_votes::Version,
@@ -2129,6 +2161,52 @@ pub mod api {
 			}
 			pub mod types {
 				use super::runtime_types;
+				pub mod audit_notebook_and_get_votes_v2 {
+					use super::runtime_types;
+					pub type Version = ::core::primitive::u32;
+					pub type NotaryId = ::core::primitive::u32;
+					pub type NotebookNumber = ::core::primitive::u32;
+					pub type NotebookTick = ::core::primitive::u64;
+					pub type HeaderHash = crate::types::H256;
+					pub type Bytes =
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
+					pub type RawAuditDependencySummaries =
+						::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::argon_primitives::notary::NotaryNotebookAuditSummary,
+						>;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::result::Result<
+							runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
+							runtime_types::argon_notary_audit::error::VerifyError,
+						>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct AuditNotebookAndGetVotesV2 {
+					pub version: audit_notebook_and_get_votes_v2::Version,
+					pub notary_id: audit_notebook_and_get_votes_v2::NotaryId,
+					pub notebook_number: audit_notebook_and_get_votes_v2::NotebookNumber,
+					pub notebook_tick: audit_notebook_and_get_votes_v2::NotebookTick,
+					pub header_hash: audit_notebook_and_get_votes_v2::HeaderHash,
+					pub bytes: audit_notebook_and_get_votes_v2::Bytes,
+					pub raw_audit_dependency_summaries:
+						audit_notebook_and_get_votes_v2::RawAuditDependencySummaries,
+				}
 				pub mod audit_notebook_and_get_votes {
 					use super::runtime_types;
 					pub type Version = ::core::primitive::u32;
@@ -3739,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				82u8, 200u8, 3u8, 161u8, 182u8, 76u8, 215u8, 115u8, 231u8, 92u8, 164u8, 9u8, 41u8,
-				146u8, 238u8, 120u8, 90u8, 245u8, 217u8, 43u8, 243u8, 200u8, 194u8, 72u8, 79u8,
-				112u8, 78u8, 122u8, 17u8, 103u8, 69u8, 89u8,
+				36u8, 159u8, 5u8, 155u8, 207u8, 181u8, 188u8, 32u8, 166u8, 238u8, 61u8, 239u8,
+				101u8, 18u8, 129u8, 177u8, 165u8, 33u8, 221u8, 90u8, 117u8, 74u8, 186u8, 82u8,
+				243u8, 36u8, 78u8, 22u8, 198u8, 23u8, 95u8, 112u8,
 			]
 	}
 	pub mod system {
