@@ -593,6 +593,11 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 		}
 		result
 	}
+
+	/// Compute blocks only get rewards prior to registered mining being active
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		!Self::is_registered_mining_active()
+	}
 }
 
 impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> for Pallet<T> {

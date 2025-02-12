@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				36u8, 159u8, 5u8, 155u8, 207u8, 181u8, 188u8, 32u8, 166u8, 238u8, 61u8, 239u8,
-				101u8, 18u8, 129u8, 177u8, 165u8, 33u8, 221u8, 90u8, 117u8, 74u8, 186u8, 82u8,
-				243u8, 36u8, 78u8, 22u8, 198u8, 23u8, 95u8, 112u8,
+				186u8, 46u8, 193u8, 32u8, 72u8, 123u8, 188u8, 108u8, 16u8, 167u8, 158u8, 82u8,
+				125u8, 244u8, 164u8, 14u8, 91u8, 94u8, 86u8, 249u8, 234u8, 127u8, 109u8, 10u8,
+				133u8, 255u8, 102u8, 5u8, 101u8, 25u8, 114u8, 116u8,
 			]
 	}
 	pub mod system {
@@ -14939,6 +14939,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type LastTickWithVoteSeal = ::core::primitive::u64;
 				}
+				pub mod is_block_from_vote_seal {
+					use super::runtime_types;
+					pub type IsBlockFromVoteSeal = ::core::primitive::bool;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -15069,6 +15073,27 @@ pub mod api {
 							250u8, 223u8, 9u8, 126u8, 102u8, 151u8, 192u8, 50u8, 223u8, 99u8,
 							167u8, 114u8, 225u8, 29u8, 102u8, 203u8, 105u8, 139u8, 69u8, 78u8,
 							74u8, 43u8,
+						],
+					)
+				}
+				#[doc = " Is the block from a vote seal?"]
+				pub fn is_block_from_vote_seal(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::is_block_from_vote_seal::IsBlockFromVoteSeal,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BlockSeal",
+						"IsBlockFromVoteSeal",
+						(),
+						[
+							231u8, 202u8, 50u8, 187u8, 69u8, 1u8, 172u8, 11u8, 67u8, 130u8, 140u8,
+							127u8, 200u8, 90u8, 142u8, 244u8, 96u8, 103u8, 89u8, 39u8, 246u8,
+							191u8, 97u8, 114u8, 155u8, 120u8, 87u8, 137u8, 94u8, 70u8, 65u8, 194u8,
 						],
 					)
 				}

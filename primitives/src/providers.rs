@@ -182,6 +182,7 @@ pub struct BlockSealerInfo<AccountId: FullCodec> {
 
 pub trait BlockSealerProvider<AccountId: FullCodec> {
 	fn get_sealer_info() -> BlockSealerInfo<AccountId>;
+	fn is_block_vote_seal() -> bool;
 }
 
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
@@ -190,6 +191,8 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	) -> (Option<AccountId>, Option<RewardSharing<AccountId>>);
 	/// Returns all rewards accounts and the share they receive
 	fn get_all_rewards_accounts() -> Vec<(AccountId, Option<RewardShare>)>;
+	/// Is a compute block still eligible for rewards?
+	fn is_compute_block_eligible_for_rewards() -> bool;
 }
 
 pub trait MiningSlotProvider {

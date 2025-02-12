@@ -102,6 +102,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type LastTickWithVoteSeal<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
+	/// Is the block from a vote seal?
+	#[pallet::storage]
+	pub(super) type IsBlockFromVoteSeal<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	type FindBlockVoteSealResult<T> = BoundedVec<
 		BestBlockVoteSeal<
 			<T as frame_system::Config>::AccountId,
@@ -277,6 +281,7 @@ pub mod pallet {
 						block_author_account_id: block_author,
 						block_seal_authority: None,
 					});
+					IsBlockFromVoteSeal::<T>::put(false);
 					// a compute block cannot be stacked on top of a vote in the same tick
 					ensure!(
 						LastTickWithVoteSeal::<T>::get() != current_tick,
@@ -293,6 +298,7 @@ pub mod pallet {
 					let voting_schedule =
 						VotingSchedule::when_evaluating_runtime_seals(current_tick);
 					LastTickWithVoteSeal::<T>::put(current_tick);
+					IsBlockFromVoteSeal::<T>::put(true);
 
 					ensure!(voting_schedule.is_voting_started(), Error::<T>::NoEligibleVotingRoot);
 
@@ -621,6 +627,12 @@ pub mod pallet {
 	impl<T: Config> BlockSealerProvider<T::AccountId> for Pallet<T> {
 		fn get_sealer_info() -> BlockSealerInfo<T::AccountId> {
 			<LastBlockSealerInfo<T>>::get().expect("BlockSealer must be set")
+		}
+
+		/// Returns true if the block was from a vote seal. NOTE: available AFTER inherents are
+		/// processed
+		fn is_block_vote_seal() -> bool {
+			IsBlockFromVoteSeal::<T>::get()
 		}
 	}
 
