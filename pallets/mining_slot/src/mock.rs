@@ -12,7 +12,7 @@ use frame_support::{
 	traits::{Currency, StorageMapShim},
 	weights::constants::RocksDbWeight,
 };
-use sp_core::H256;
+use sp_core::{Get, H256};
 use sp_runtime::{
 	impl_opaque_keys, testing::UintAuthorityId, traits::Zero, BuildStorage, FixedU128, Percent,
 };
@@ -186,6 +186,12 @@ impl OnNewSlot<u64> for StaticNewSlotEvent {
 impl_opaque_keys! {
 	pub struct MockSessionKeys {
 		pub dummy: UintAuthorityId,
+	}
+}
+
+impl Get<UintAuthorityId> for MockSessionKeys {
+	fn get() -> UintAuthorityId {
+		MockSessionKeys { dummy: 0.into() }.dummy
 	}
 }
 

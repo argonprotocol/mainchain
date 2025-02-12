@@ -3739,9 +3739,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				94u8, 106u8, 25u8, 72u8, 2u8, 124u8, 139u8, 221u8, 50u8, 227u8, 197u8, 135u8, 75u8,
-				88u8, 165u8, 10u8, 123u8, 50u8, 74u8, 22u8, 3u8, 105u8, 75u8, 80u8, 169u8, 173u8,
-				12u8, 182u8, 66u8, 49u8, 74u8, 189u8,
+				82u8, 200u8, 3u8, 161u8, 182u8, 76u8, 215u8, 115u8, 231u8, 92u8, 164u8, 9u8, 41u8,
+				146u8, 238u8, 120u8, 90u8, 245u8, 217u8, 43u8, 243u8, 200u8, 194u8, 72u8, 79u8,
+				112u8, 78u8, 122u8, 17u8, 103u8, 69u8, 89u8,
 			]
 	}
 	pub mod system {
@@ -7864,6 +7864,11 @@ pub mod api {
 							runtime_types::primitive_types::U256,
 						>;
 				}
+				pub mod authority_id_to_miner_id {
+					use super::runtime_types;
+					pub type AuthorityIdToMinerId = crate::types::AccountId32;
+					pub type Param0 = runtime_types::argon_primitives::block_seal::app::Public;
+				}
 				pub mod argonots_per_mining_seat {
 					use super::runtime_types;
 					pub type ArgonotsPerMiningSeat = ::core::primitive::u128;
@@ -8015,6 +8020,55 @@ pub mod api {
 							216u8, 125u8, 247u8, 249u8, 19u8, 245u8, 208u8, 89u8, 206u8, 47u8,
 							93u8, 41u8, 38u8, 62u8, 5u8, 114u8, 70u8, 152u8, 25u8, 109u8, 151u8,
 							135u8,
+						],
+					)
+				}
+				#[doc = " Keys in use"]
+				pub fn authority_id_to_miner_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::authority_id_to_miner_id::AuthorityIdToMinerId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"AuthorityIdToMinerId",
+						(),
+						[
+							57u8, 143u8, 197u8, 43u8, 116u8, 254u8, 16u8, 181u8, 230u8, 160u8,
+							215u8, 200u8, 51u8, 39u8, 29u8, 184u8, 191u8, 170u8, 240u8, 232u8,
+							216u8, 59u8, 151u8, 228u8, 91u8, 195u8, 29u8, 146u8, 0u8, 58u8, 101u8,
+							16u8,
+						],
+					)
+				}
+				#[doc = " Keys in use"]
+				pub fn authority_id_to_miner_id(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::authority_id_to_miner_id::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::authority_id_to_miner_id::Param0,
+					>,
+					types::authority_id_to_miner_id::AuthorityIdToMinerId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"AuthorityIdToMinerId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							57u8, 143u8, 197u8, 43u8, 116u8, 254u8, 16u8, 181u8, 230u8, 160u8,
+							215u8, 200u8, 51u8, 39u8, 29u8, 184u8, 191u8, 170u8, 240u8, 232u8,
+							216u8, 59u8, 151u8, 228u8, 91u8, 195u8, 29u8, 146u8, 0u8, 58u8, 101u8,
+							16u8,
 						],
 					)
 				}
@@ -13391,23 +13445,6 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockSealSpec",
 						"HistoricalVoteBlocksForAverage",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " The frequency we should update the compute difficulty"]
-				pub fn compute_difficulty_change_period(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"BlockSealSpec",
-						"ComputeDifficultyChangePeriod",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -28369,6 +28406,12 @@ pub mod api {
 					AccountWouldBeBelowMinimum,
 					#[codec(index = 18)]
 					GenericObligationError(runtime_types::argon_primitives::vault::ObligationError),
+					#[codec(index = 19)]
+					#[doc = "Keys cannot be registered by multiple accounts"]
+					CannotRegisterDuplicateKeys,
+					#[codec(index = 20)]
+					#[doc = "Unable to decode the key format"]
+					InvalidKeyFormat,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

@@ -2493,7 +2493,9 @@ export default {
       UnrecoverableHold: 'Null',
       VaultNotFound: 'Null',
       AccountWouldBeBelowMinimum: 'Null',
-      GenericObligationError: 'ArgonPrimitivesVaultObligationError'
+      GenericObligationError: 'ArgonPrimitivesVaultObligationError',
+      CannotRegisterDuplicateKeys: 'Null',
+      InvalidKeyFormat: 'Null'
     }
   },
   /**

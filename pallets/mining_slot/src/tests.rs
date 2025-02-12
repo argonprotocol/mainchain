@@ -14,8 +14,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
-		AuthorityHashByIndex, CurrentSlotId, HistoricalBidsPerSlot, IsNextSlotBiddingOpen,
-		MiningConfig, NextSlotCohort,
+		AuthorityHashByIndex, AuthorityIdToMinerId, CurrentSlotId, HistoricalBidsPerSlot,
+		IsNextSlotBiddingOpen, MiningConfig, NextSlotCohort,
 	},
 	Error, Event, HoldReason, MiningSlotBid,
 };
@@ -176,7 +176,7 @@ fn it_adds_new_cohorts_on_block() {
 			AccountIndexLookup::<Test>::insert(account_id, i);
 			AuthorityHashByIndex::<Test>::try_mutate(|index| {
 				let hash = blake2_256(&account_id.to_le_bytes());
-				index.try_insert(i, U256::from(hash))
+				index.try_insert(i, U256::from_big_endian(&hash))
 			})
 			.unwrap();
 		}
@@ -575,7 +575,7 @@ fn it_will_order_bids_with_bonded_argons() {
 			RuntimeOrigin::signed(2),
 			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
 			RewardDestination::Owner,
-			1.into()
+			2.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 1001u32.into(), index: 0 }.into(),
@@ -598,7 +598,7 @@ fn it_will_order_bids_with_bonded_argons() {
 			RuntimeOrigin::signed(3),
 			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
 			RewardDestination::Owner,
-			1.into()
+			3.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }.into(),
@@ -627,6 +627,7 @@ fn it_will_order_bids_with_bonded_argons() {
 					}
 				)
 			);
+			assert_eq!(AuthorityIdToMinerId::<Test>::get::<UintAuthorityId>(1.into()), None);
 		}
 		assert_eq!(Ownership::free_balance(1), 1000);
 		assert!(Ownership::hold_available(&HoldReason::RegisterAsMiner.into(), &1));
@@ -830,21 +831,26 @@ fn handles_a_max_of_bids_per_block() {
 			1.into()
 		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 1);
+		assert_eq!(AuthorityIdToMinerId::<Test>::get::<UintAuthorityId>(1.into()), Some(1));
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
+		);
+		assert_err!(
+			MiningSlots::bid(RuntimeOrigin::signed(2), None, RewardDestination::Owner, 1.into()),
+			Error::<Test>::CannotRegisterDuplicateKeys
 		);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			None,
 			RewardDestination::Owner,
-			1.into()
+			2.into()
 		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(3), None, RewardDestination::Owner, 1.into()),
+			MiningSlots::bid(RuntimeOrigin::signed(3), None, RewardDestination::Owner, 3.into()),
 			Error::<Test>::BidTooLow,
 		);
 		// should not have changed
