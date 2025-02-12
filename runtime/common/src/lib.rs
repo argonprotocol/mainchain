@@ -119,7 +119,7 @@ macro_rules! inject_runtime_vars {
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = ();
+		type Migrations = (pallet_block_seal_spec::migrations::MigrateV0ToV1<Runtime>,);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =

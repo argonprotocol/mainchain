@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
+use frame_support::{derive_impl, parameter_types, weights::constants::RocksDbWeight};
 use sp_core::{ConstU32, ConstU64, H256, U256};
 use sp_runtime::{BuildStorage, Percent};
 
@@ -37,11 +37,11 @@ impl pallet_timestamp::Config for Test {
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type Block = Block;
+	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {
 	pub const TargetBlockVotes: u64 = 100;
-	pub const ChangePeriod: u32 = 10;
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
 	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
@@ -123,7 +123,6 @@ impl pallet_block_seal_spec::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
-	type ComputeDifficultyChangePeriod = ChangePeriod;
 	type AuthorityProvider = StaticAuthorityProvider;
 	type NotebookProvider = StaticNotebookProvider;
 	type SealInherent = CurrentSeal;
