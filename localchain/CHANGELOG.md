@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...636c016ea477d40db1f88f5fb829ab52a8d2b997) (2025-02-07)
+## [v1.0.12](https://github.com/argonprotocol/mainchain/compare/v1.0.11...ce0e6f56c6a6700321bfe5c90c19ee81d07f1c88) (2025-02-12)
+
+### Fixes
+
+* **localchain:** add notebook archive to tests
+([9588c35](https://github.com/argonprotocol/mainchain/commit/9588c35661e7372fd5c30be1e84cf06831dd6daf))
+
+### [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...v1.0.11) (2025-02-10)
 
 ### [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...v1.0.10) (2025-02-07)
 

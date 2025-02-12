@@ -1,6 +1,18 @@
 # Changelog
 
-## [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...636c016ea477d40db1f88f5fb829ab52a8d2b997) (2025-02-07)
+## [v1.0.12](https://github.com/argonprotocol/mainchain/compare/v1.0.11...ce0e6f56c6a6700321bfe5c90c19ee81d07f1c88) (2025-02-12)
+
+### Features
+
+* **mining_slot:** disallow duplicate key reg
+([4660021](https://github.com/argonprotocol/mainchain/commit/4660021aa2f77ddb0ca62cb712a9ac74fb433f82))
+
+### [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...v1.0.11) (2025-02-10)
+
+#### Fixes
+
+* separate runtimes
+([5c5df56](https://github.com/argonprotocol/mainchain/commit/5c5df562356a7f2143e6e2fd0f99c35f4f00bbe4))
 
 ### [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...v1.0.10) (2025-02-07)
 
