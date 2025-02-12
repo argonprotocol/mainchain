@@ -178,7 +178,6 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type TargetBlockVotes = TargetBlockVotes;
 	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
 	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
-	type ComputeDifficultyChangePeriod = SealSpecComputeDifficultyChangePeriod;
 	type SealInherent = BlockSeal;
 }
 
@@ -189,6 +188,7 @@ impl Get<Tick> for NotebookTickProvider {
 		schedule.notebook_tick()
 	}
 }
+
 impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;

@@ -278,6 +278,7 @@ export class NotaryClient {
   isConnected(): Promise<boolean>
   static connect(notaryId: number, publicKey: Uint8Array, host: string, autoVerifyHeaderSignatures: boolean): Promise<NotaryClient>
   getBalanceTip(address: string, accountType: AccountType): Promise<BalanceTipResult>
+  subscribeHeaders(callback: (arg0: NotebookNumber, arg1: Tick) => any): Promise<Subscription>
   get metadata(): Promise<NotebookMeta>
 }
 
@@ -307,6 +308,11 @@ export class OpenChannelHoldsStore {
 
 export class OverviewStore {
   get(): Promise<LocalchainOverview>
+}
+
+export class Subscription {
+  /** Cancels the subscription. */
+  cancel(): Promise<void>
 }
 
 export class TickerRef {

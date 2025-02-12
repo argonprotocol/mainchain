@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use crate::{
 	mock::*,
 	pallet::{
@@ -577,15 +575,12 @@ fn it_can_audit_notebooks() {
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
 		let header_hash = notebook.header.hash();
 
-		let eligibility = BTreeMap::new();
-
 		assert_ok!(Notebook::audit_notebook(
 			1,
 			notary_id,
 			1,
 			1,
 			header_hash,
-			&eligibility,
 			&notebook.encode(),
 			vec![]
 		));
@@ -725,8 +720,6 @@ fn it_can_audit_notebooks_with_history() {
 		notebook.hash = notebook.calculate_hash();
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
 
-		let eligibility = BTreeMap::new();
-
 		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
 			v.try_insert(
 				0,
@@ -752,7 +745,6 @@ fn it_can_audit_notebooks_with_history() {
 				notebook_number,
 				tick,
 				header_hash,
-				&eligibility,
 				&notebook.encode(),
 				vec![]
 			),
@@ -766,7 +758,6 @@ fn it_can_audit_notebooks_with_history() {
 				notebook_number,
 				tick,
 				header_hash,
-				&eligibility,
 				&notebook.encode(),
 				vec![NotaryNotebookAuditSummary {
 					notary_id,
@@ -793,7 +784,6 @@ fn it_can_audit_notebooks_with_history() {
 			notebook_number,
 			tick,
 			header_hash,
-			&eligibility,
 			&notebook.encode(),
 			vec![NotaryNotebookAuditSummary {
 				notary_id,
@@ -964,7 +954,6 @@ fn it_can_audit_notebooks_with_history() {
 				notebook_number,
 				tick,
 				header_hash,
-				&eligibility,
 				&notebook.encode(),
 				vec![NotaryNotebookAuditSummary {
 					notary_id,
@@ -992,7 +981,6 @@ fn it_can_audit_notebooks_with_history() {
 			notebook_number,
 			tick,
 			header_hash,
-			&eligibility,
 			&notebook.encode(),
 			vec![NotaryNotebookAuditSummary {
 				notary_id,

@@ -200,6 +200,7 @@ frame-executive = { git = "https://github.com/argonprotocol/polkadot-sdk", branc
 frame-system = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/system" }
 pallet-timestamp = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } # path = "../polkadot-clone/substrate/frame/timestamp" }
 pallet-grandpa = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/grandpa" }
+frame-benchmarking = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2409-grandpa-fix" } #  path = "../polkadot-clone/substrate/frame/benchmarking" }
 
 
 
@@ -281,7 +282,7 @@ sp-io = { version = "38.0.0", default-features = false }
 sc-keystore = { version = "33.0.0", default-features = false }
 sp-keystore = { version = "0.40.0", default-features = false }
 sp-keyring = { version = "39.0.0", default-features = false }
-sp-runtime = { version = "39.0.2", default-features = false }
+sp-runtime = { version = "39.0.5", default-features = false }
 sc-utils = { version = "17.0.0", default-features = false }
 sp-offchain = { version = "34.0.0", default-features = false }
 sp-session = { version = "36.0.0", default-features = false }
@@ -298,7 +299,7 @@ pallet-sudo = { version = "38.0.0", default-features = false }
 pallet-tx-pause = { version = "19.0.0", default-features = false }
 pallet-timestamp = { version = "37.0.0", default-features = false }
 pallet-utility = { version = "38.0.0", default-features = false }
-pallet-transaction-payment = { version = "38.0.0", default-features = false }
+pallet-transaction-payment = { version = "38.0.2", default-features = false }
 pallet-transaction-payment-rpc-runtime-api = { version = "38.0.0", default-features = false }
 
 finality-grandpa = { version = "0.16.2", default-features = false }
@@ -386,7 +387,7 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # hyperprocessor bridge
-pallet-ismp = { version = "16.0.0", default-features = false }
+pallet-ismp = { version = "16.1.0", default-features = false }
 pallet-ismp-runtime-api = { version = "16.0.0", default-features = false }
 pallet-hyperbridge = { version = "16.0.0", default-features = false }
 pallet-token-gateway = { version = "16.0.0", default-features = false }

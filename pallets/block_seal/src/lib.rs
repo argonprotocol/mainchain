@@ -298,17 +298,18 @@ pub mod pallet {
 
 					let parent_voting_key =
 						<ParentVotingKey<T>>::get().ok_or(Error::<T>::ParentVotingKeyNotFound)?;
+
 					ensure!(
 						seal_strength == block_vote.get_seal_strength(notary_id, parent_voting_key),
 						Error::<T>::InvalidVoteSealStrength
 					);
+					let seal_xor = BlockVote::get_xor_target(
+						block_vote.encode(),
+						notary_id,
+						parent_voting_key,
+					);
 
-					Self::verify_block_vote(
-						seal_strength,
-						block_vote,
-						&block_author,
-						&voting_schedule,
-					)?;
+					Self::verify_block_vote(seal_xor, block_vote, &block_author, &voting_schedule)?;
 					Self::verify_vote_source(
 						notary_id,
 						&voting_schedule,
@@ -355,7 +356,7 @@ pub mod pallet {
 		}
 
 		pub fn verify_block_vote(
-			seal_strength: U256,
+			seal_xor: U256,
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
@@ -390,7 +391,7 @@ pub mod pallet {
 				.ok_or(Error::<T>::UnregisteredBlockAuthor)?;
 
 			// ensure this miner is eligible to submit this tax proof
-			let block_peer = T::AuthorityProvider::xor_closest_authority(seal_strength)
+			let block_peer = T::AuthorityProvider::xor_closest_authority(seal_xor)
 				.ok_or(Error::<T>::InvalidSubmitter)?;
 
 			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
@@ -516,22 +517,23 @@ pub mod pallet {
 						.or_insert_with(Vec::new)
 						.push(vote_bytes.clone());
 
-					let seal_strength = BlockVote::calculate_seal_strength(
-						*power,
-						vote_bytes.clone(),
-						notary_id,
-						parent_key,
-					);
+					// NOTE: track seal xor separately from the strength because the power can throw
+					// off xor distribution
+					let seal_xor =
+						BlockVote::get_xor_target(vote_bytes.clone(), notary_id, parent_key);
+
+					let seal_strength = BlockVote::calculate_seal_strength(*power, seal_xor);
 					if seal_strength >= with_better_strength {
 						continue;
 					}
-					best_votes.push((seal_strength, notary_id, notebook_number, index));
+					best_votes.push((seal_strength, seal_xor, notary_id, notebook_number, index));
 				}
 			}
 			best_votes.sort_by(|a, b| a.0.cmp(&b.0));
 
 			let mut result = BoundedVec::new();
-			for (seal_strength, notary_id, source_notebook_number, index) in best_votes.into_iter()
+			for (seal_strength, seal_xor, notary_id, source_notebook_number, index) in
+				best_votes.into_iter()
 			{
 				let leafs = leafs_by_notary.get(&notary_id).expect("just created");
 
@@ -550,7 +552,7 @@ pub mod pallet {
 					continue;
 				}
 
-				let closest_authority = T::AuthorityProvider::xor_closest_authority(seal_strength)
+				let closest_authority = T::AuthorityProvider::xor_closest_authority(seal_xor)
 					.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
 				let best_nonce = BestBlockVoteSeal {
 					notary_id,

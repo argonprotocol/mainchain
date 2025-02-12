@@ -1,16 +1,11 @@
 import * as fs from "node:fs";
-import {execSync, ChildProcess, spawn} from 'node:child_process';
+import {ChildProcess, execSync, spawn} from 'node:child_process';
 import * as path from "node:path";
 import * as readline from "node:readline";
-import {
-    addTeardown,
-    cleanHostForDocker,
-    getDockerPortMapping,
-    getProxy,
-    ITeardownable,
-} from "./testHelpers";
+import {addTeardown, cleanHostForDocker, getDockerPortMapping, getProxy, ITeardownable,} from "./testHelpers";
 import {customAlphabet} from "nanoid";
 import * as os from "node:os";
+import {createUid} from "./TestNotary";
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -18,6 +13,7 @@ export default class TestMainchain implements ITeardownable {
     public ip = '127.0.0.1';
     public port: string;
     public loglevel = 'warn';
+    public uuid: string;
     #binPath: string;
     #process: ChildProcess;
     #interfaces: readline.Interface[] = [];
@@ -39,6 +35,7 @@ export default class TestMainchain implements ITeardownable {
         if (!process.env.ARGON_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
             throw new Error(`Mainchain binary not found at ${this.#binPath}`);
         }
+        this.uuid = createUid();
         addTeardown(this);
     }
 
@@ -66,7 +63,10 @@ export default class TestMainchain implements ITeardownable {
         }
 
         const bitcoinRpcUrl = await this.startBitcoin();
-        execArgs.push('--dev', '--alice', `--compute-miners=${miningThreads}`, `--port=${port}`, `--rpc-port=${rpcPort}`, '--rpc-external', `--bitcoin-rpc-url=${bitcoinRpcUrl}`)
+        execArgs.push('--dev', '--alice', `--compute-miners=${miningThreads}`,
+            `--port=${port}`, `--rpc-port=${rpcPort}`, '--rpc-external',
+            `--bitcoin-rpc-url=${bitcoinRpcUrl}`,
+            `--notebook-archive-hosts=http://127.0.0.1:9000/${this.uuid}`)
         this.#process = spawn(this.#binPath, execArgs, {
             stdio: ['ignore', 'pipe', 'pipe', "ignore"],
             env: {...process.env, RUST_LOG: `${this.loglevel},sc_rpc_server=info`}

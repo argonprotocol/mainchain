@@ -386,6 +386,7 @@ module.exports.NotaryClients = nativeBinding.NotaryClients
 module.exports.OpenChannelHold = nativeBinding.OpenChannelHold
 module.exports.OpenChannelHoldsStore = nativeBinding.OpenChannelHoldsStore
 module.exports.OverviewStore = nativeBinding.OverviewStore
+module.exports.Subscription = nativeBinding.Subscription
 module.exports.TickerRef = nativeBinding.TickerRef
 module.exports.Transactions = nativeBinding.Transactions
 module.exports.AccountType = nativeBinding.AccountType

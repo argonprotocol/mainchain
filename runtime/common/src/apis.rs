@@ -224,17 +224,29 @@ macro_rules! inject_common_apis {
         }
 
         impl argon_primitives::NotebookApis<Block, NotebookVerifyError> for Runtime {
+            fn audit_notebook_and_get_votes_v2(
+                version: u32,
+                notary_id: NotaryId,
+                notebook_number: NotebookNumber,
+                notebook_tick: Tick,
+                header_hash: H256,
+                bytes: &Vec<u8>,
+                audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
+            ) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
+                Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, bytes, audit_dependency_summaries)
+            }
+
             fn audit_notebook_and_get_votes(
                 version: u32,
                 notary_id: NotaryId,
                 notebook_number: NotebookNumber,
                 notebook_tick: Tick,
                 header_hash: H256,
-                vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
+                _vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
                 bytes: &Vec<u8>,
                 audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
             ) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
-                Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, vote_minimums, bytes, audit_dependency_summaries)
+                Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, bytes, audit_dependency_summaries)
             }
 
             fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails <<Block as BlockT>::Hash>, DispatchError> {

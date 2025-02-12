@@ -2,8 +2,8 @@
 extern crate alloc;
 extern crate core;
 
+use argon_primitives::ABSOLUTE_TAX_VOTE_MINIMUM;
 use frame_support::traits::OnTimestampSet;
-
 pub use pallet::*;
 pub use weights::*;
 
@@ -15,6 +15,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 pub mod weights;
 
 const MAX_ADJUST_UP: u128 = 4; // Represents 4x adjustment
@@ -22,7 +23,7 @@ const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
 const MIN_COMPUTE_DIFFICULTY: u128 = 4;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
-const MIN_TAX_MINIMUM: u128 = 1_000;
+const MIN_TAX_MINIMUM: u128 = ABSOLUTE_TAX_VOTE_MINIMUM;
 pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 
 /// This pallet adjusts the BlockSeal Specification after every block for both voting and compute.
@@ -55,7 +56,10 @@ pub mod pallet {
 		traits::{Block, UniqueSaturatedInto},
 		DigestItem, FixedPointNumber, FixedU128,
 	};
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -93,10 +97,6 @@ pub mod pallet {
 		/// The number of historical vote blocks to use to calculate the rolling vote average
 		#[pallet::constant]
 		type HistoricalVoteBlocksForAverage: Get<u32>;
-
-		/// The frequency we should update the compute difficulty
-		#[pallet::constant]
-		type ComputeDifficultyChangePeriod: Get<u32>;
 
 		type SealInherent: Get<BlockSealInherent>;
 	}
@@ -341,14 +341,9 @@ pub mod pallet {
 				return;
 			}
 
-			// should be infallible
-			let block_as_u32 = UniqueSaturatedInto::<u32>::unique_saturated_into(
-				<frame_system::Pallet<T>>::block_number(),
-			);
 			// only adjust difficulty every `ChangePeriod` blocks
-			if block_as_u32 % T::ComputeDifficultyChangePeriod::get() == 0u32 {
-				let mut timestamps = <PastComputeBlockTimes<T>>::get().to_vec();
-				// trim off the max 90th percentile and bottom 10th
+			if <PastComputeBlockTimes<T>>::get().is_full() {
+				let mut timestamps = <PastComputeBlockTimes<T>>::take().to_vec();
 				timestamps.sort();
 
 				let tick_millis = T::TickProvider::ticker().tick_duration_millis;
@@ -384,12 +379,7 @@ pub mod pallet {
 				.map(UniqueSaturatedInto::<u64>::unique_saturated_into)
 				.unwrap_or(now);
 			let block_period = now.saturating_sub(previous);
-			let _ = <PastComputeBlockTimes<T>>::try_mutate(|x| {
-				if x.is_full() {
-					x.remove(0);
-				}
-				x.try_push(block_period)
-			});
+			let _ = <PastComputeBlockTimes<T>>::try_append(block_period);
 		}
 
 		pub fn create_block_vote_digest(

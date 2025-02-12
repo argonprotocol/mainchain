@@ -202,7 +202,7 @@ impl NotaryClient {
           }
           let json = serde_json::to_string_pretty(&notarization)
             .unwrap_or("<UNABLE TO PRETTIFY".to_string());
-          tracing::error!("Error sending notarization: {:?} {}", e, json);
+          tracing::error!("Error notarizing: {:?} {}", e, json);
           Err(e)
         }
       };
@@ -295,13 +295,16 @@ impl NotaryClient {
 
 #[cfg(feature = "napi")]
 pub mod napi_ext {
-  use crate::error::NapiOk;
-  use crate::{MainchainClient, NotebookMeta};
-  use argon_primitives::AccountType;
-  use napi::bindgen_prelude::*;
-
   use super::NotaryClient;
   use super::NotaryClients;
+  use super::*;
+  use crate::error::NapiOk;
+  use crate::MainchainClient;
+  use argon_notary_apis::NotebookRpcClient;
+  use argon_primitives::{tick::Tick, AccountType, NotebookNumber};
+  use napi::bindgen_prelude::*;
+  use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
+  use std::sync::Arc;
 
   #[napi]
   pub struct BalanceTipResult {
@@ -373,9 +376,55 @@ pub mod napi_ext {
       })
     }
 
+    #[napi(js_name = "subscribeHeaders")]
+    pub async fn subscribe_headers(
+      &self,
+      callback: ThreadsafeFunction<(NotebookNumber, Tick), ErrorStrategy::Fatal>,
+    ) -> napi::Result<Subscription> {
+      let client = self.client.read().await;
+      let mut subscription = (*client)
+        .subscribe_headers()
+        .await
+        .map_err(|e| napi::Error::from_reason(format!("{:#?}", e)))?;
+
+      // Spawn the subscription loop in the background.
+      let join_handle = tokio::spawn(async move {
+        while let Some(info) = subscription.next().await {
+          let info = info?;
+          callback.call(
+            (info.notebook_number, info.tick),
+            napi::threadsafe_function::ThreadsafeFunctionCallMode::Blocking,
+          );
+        }
+        Ok::<(), napi::Error>(())
+      });
+
+      Ok(Subscription {
+        join_handle: Arc::new(Mutex::new(Some(join_handle))),
+      })
+    }
+
     #[napi(getter, js_name = "metadata")]
     pub async fn get_metadata_napi(&self) -> napi::Result<NotebookMeta> {
       self.metadata().await.napi_ok()
+    }
+  }
+  #[napi]
+  pub struct Subscription {
+    // Use a Mutex to allow mutation in the cancel method.
+    join_handle: Arc<Mutex<Option<tokio::task::JoinHandle<napi::Result<()>>>>>,
+  }
+
+  #[napi]
+  impl Subscription {
+    /// Cancels the subscription.
+    #[napi]
+    pub async fn cancel(&self) -> napi::Result<()> {
+      let mut guard = self.join_handle.lock().await;
+      if let Some(handle) = guard.take() {
+        handle.abort();
+      }
+      Ok(())
     }
   }
 }

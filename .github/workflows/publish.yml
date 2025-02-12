@@ -40,13 +40,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine if release is marked as latest
+        id: check_latest
+        run: |
+          LATEST_RELEASE=$(gh release list --exclude-pre-releases --json tagName,isLatest --jq ".[] | select(.isLatest == true) | .tagName" | head -n 1)
+           if [ "${{ env.VERSION }}" == "$LATEST_RELEASE" ]; then
+            echo "isLatest=true" >> $GITHUB_OUTPUT
+          else
+            echo "isLatest=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Argon Node
         uses: ./.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-miner
           bin: argon-node
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          flavor: latest=true
+          flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
           tags: |
             type=semver,pattern=${{env.VERSION}}
             type=semver,pattern={{major}}.{{minor}}
@@ -58,7 +70,7 @@ jobs:
           image: ghcr.io/argonprotocol/argon-notary
           bin: argon-notary
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          flavor: latest=true
+          flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
           tags: |
             type=semver,pattern=${{env.VERSION}}
             type=semver,pattern={{major}}.{{minor}}

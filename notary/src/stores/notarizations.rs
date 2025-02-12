@@ -4,7 +4,6 @@ use crate::{
 	notary_metrics::NotaryMetrics,
 	stores::{
 		balance_tip::BalanceTipStore,
-		blocks::BlocksStore,
 		chain_transfer::ChainTransferStore,
 		notebook::NotebookStore,
 		notebook_constraints::{MaxNotebookCounts, NotarizationCounts, NotebookConstraintsStore},
@@ -216,9 +215,6 @@ impl NotarizationsStore {
 			)?;
 		}
 
-		let block_vote_specifications =
-			BlocksStore.get_vote_minimums(&mut tx, &voted_blocks).await?;
-
 		let mut new_account_origins = BTreeMap::<LocalchainAccountId, AccountOrigin>::new();
 
 		let mut changes_with_proofs = changes.clone();
@@ -394,7 +390,7 @@ impl NotarizationsStore {
 			.await?;
 		}
 
-		verify_voting_sources(&block_votes, tick, operator_account_id, &block_vote_specifications)?;
+		verify_voting_sources(&block_votes, tick, operator_account_id)?;
 
 		NotebookConstraintsStore::try_increment(
 			&mut tx,

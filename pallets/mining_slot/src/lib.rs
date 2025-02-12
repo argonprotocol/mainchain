@@ -67,8 +67,8 @@ pub mod weights;
 /// authorityIds matching registered "controller" accounts.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use codec::FullCodec;
 	use core::cmp::Ordering;
-
 	use frame_support::{
 		pallet_prelude::*,
 		traits::fungible::{Inspect, MutateHold},
@@ -165,7 +165,7 @@ pub mod pallet {
 		type GrandpaRotationBlocks: Get<BlockNumberFor<Self>>;
 
 		/// The mining authority runtime public key
-		type MiningAuthorityId: RuntimeAppPublic + Decode;
+		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo;
 
 		/// The authority signing keys.
 		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
@@ -196,6 +196,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type AuthorityHashByIndex<T: Config> =
 		StorageValue<_, BoundedBTreeMap<MinerIndex, U256, T::MaxMiners>, ValueQuery>;
+
+	/// Keys in use
+	#[pallet::storage]
+	pub(super) type AuthorityIdToMinerId<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::MiningAuthorityId, T::AccountId, OptionQuery>;
 
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
@@ -305,6 +310,10 @@ pub mod pallet {
 		VaultNotFound,
 		AccountWouldBeBelowMinimum,
 		GenericObligationError(ObligationError),
+		/// Keys cannot be registered by multiple accounts
+		CannotRegisterDuplicateKeys,
+		/// Unable to decode the key format
+		InvalidKeyFormat,
 	}
 
 	impl<T> From<ObligationError> for Error<T> {
@@ -410,6 +419,12 @@ pub mod pallet {
 
 			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
 
+			let miner_authority_id = keys
+				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+				.ok_or(Error::<T>::InvalidKeyFormat)?;
+			if let Some(registrant) = AuthorityIdToMinerId::<T>::get(&miner_authority_id) {
+				ensure!(registrant == who, Error::<T>::CannotRegisterDuplicateKeys);
+			}
 			let next_cohort_tick = Self::get_next_slot_tick();
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&who) {
 				let cohort_start_index = Self::get_next_slot_starting_index();
@@ -455,7 +470,6 @@ pub mod pallet {
 
 			let ownership_tokens = Self::hold_argonots(&who, current_registration)?;
 			let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
-
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) = cohort.iter().position(|x| x.account_id == who) {
 					cohort.remove(existing_position);
@@ -508,6 +522,7 @@ pub mod pallet {
 						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
 					}
 				});
+				AuthorityIdToMinerId::<T>::insert(miner_authority_id.clone(), who.clone());
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: who.clone(),
 					bid_amount: bid,
@@ -655,6 +670,11 @@ impl<T: Config> Pallet<T> {
 				active_miners -= 1;
 
 				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
+				if let Some(authority_id) =
+					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+				{
+					AuthorityIdToMinerId::<T>::remove(authority_id);
+				}
 				removed_miners.push((account_id, entry.authority_keys.clone()));
 				Self::release_mining_seat_obligations(entry, registered_for_next);
 			}
@@ -669,7 +689,7 @@ impl<T: Config> Pallet<T> {
 				{
 					let hash = blake2_256(&authority_id.to_raw_vec());
 					authority_hash_by_index
-						.try_insert(index, U256::from(hash))
+						.try_insert(index, U256::from_big_endian(&hash))
 						.expect("only insert if we've removed first, ergo, should be impossible");
 				}
 			}
@@ -678,13 +698,12 @@ impl<T: Config> Pallet<T> {
 		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
-		let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 		});
-		CurrentSlotId::<T>::put(next_slot_id);
-		T::SlotEvents::rotate_grandpas(next_slot_id, removed_miners, added_miners);
+		CurrentSlotId::<T>::put(slot_id);
+		T::SlotEvents::rotate_grandpas(slot_id, removed_miners, added_miners);
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
@@ -902,6 +921,11 @@ impl<T: Config> Pallet<T> {
 		if let Some(active) = Self::get_active_registration(&account_id) {
 			amount_to_unhold -= active.argonots;
 			held_argonots = true;
+		} else if let Some(authority_id) = registration
+			.authority_keys
+			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+		{
+			AuthorityIdToMinerId::<T>::remove(authority_id);
 		}
 
 		Self::release_argonots_hold(&account_id, amount_to_unhold)?;

@@ -2578,7 +2578,9 @@ declare module '@polkadot/types/lookup' {
     readonly isAccountWouldBeBelowMinimum: boolean;
     readonly isGenericObligationError: boolean;
     readonly asGenericObligationError: ArgonPrimitivesVaultObligationError;
-    readonly type: 'SlotNotTakingBids' | 'TooManyBlockRegistrants' | 'InsufficientOwnershipTokens' | 'BidTooLow' | 'CannotRegisterOverlappingSessions' | 'ObligationNotFound' | 'NoMoreObligationIds' | 'VaultClosed' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'AccountWouldBeBelowMinimum' | 'GenericObligationError';
+    readonly isCannotRegisterDuplicateKeys: boolean;
+    readonly isInvalidKeyFormat: boolean;
+    readonly type: 'SlotNotTakingBids' | 'TooManyBlockRegistrants' | 'InsufficientOwnershipTokens' | 'BidTooLow' | 'CannotRegisterOverlappingSessions' | 'ObligationNotFound' | 'NoMoreObligationIds' | 'VaultClosed' | 'MinimumObligationAmountNotMet' | 'ExpirationAtBlockOverflow' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'ExpirationTooSoon' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'AccountWouldBeBelowMinimum' | 'GenericObligationError' | 'CannotRegisterDuplicateKeys' | 'InvalidKeyFormat';
   }
 
   /** @name ArgonPrimitivesVaultObligationError (337) */

@@ -421,6 +421,10 @@ declare module '@polkadot/api-base/types/errors' {
     miningSlot: {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
       BidTooLow: AugmentedError<ApiType>;
+      /**
+       * Keys cannot be registered by multiple accounts
+       **/
+      CannotRegisterDuplicateKeys: AugmentedError<ApiType>;
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
       /**
        * There are too many obligations expiring in the given expiration block
@@ -432,6 +436,10 @@ declare module '@polkadot/api-base/types/errors' {
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientOwnershipTokens: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
+      /**
+       * Unable to decode the key format
+       **/
+      InvalidKeyFormat: AugmentedError<ApiType>;
       MinimumObligationAmountNotMet: AugmentedError<ApiType>;
       NoMoreObligationIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
