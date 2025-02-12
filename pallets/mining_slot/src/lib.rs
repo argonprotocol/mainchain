@@ -921,13 +921,11 @@ impl<T: Config> Pallet<T> {
 		if let Some(active) = Self::get_active_registration(&account_id) {
 			amount_to_unhold -= active.argonots;
 			held_argonots = true;
-		} else {
-			if let Some(authority_id) = registration
-				.authority_keys
-				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-			{
-				AuthorityIdToMinerId::<T>::remove(authority_id);
-			}
+		} else if let Some(authority_id) = registration
+			.authority_keys
+			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+		{
+			AuthorityIdToMinerId::<T>::remove(authority_id);
 		}
 
 		Self::release_argonots_hold(&account_id, amount_to_unhold)?;
