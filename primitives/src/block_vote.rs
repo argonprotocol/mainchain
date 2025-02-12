@@ -102,19 +102,22 @@ impl<Hash: Codec + Clone + PartialEq + From<[u8; 32]>> BlockVoteT<Hash> {
 	}
 
 	pub fn get_seal_strength(&self, notary_id: NotaryId, voting_key: H256) -> U256 {
-		Self::calculate_seal_strength(self.power, self.encode(), notary_id, voting_key)
+		let seal = Self::get_xor_target(self.encode(), notary_id, voting_key);
+		Self::calculate_seal_strength(self.power, seal)
 	}
 
-	pub fn calculate_seal_strength(
-		power: BlockVotingPower,
-		vote_bytes: Vec<u8>,
-		notary_id: NotaryId,
-		voting_key: H256,
-	) -> U256 {
+	pub fn get_xor_target(vote_bytes: Vec<u8>, notary_id: NotaryId, voting_key: H256) -> U256 {
 		let hash = BlockVoteProofHashMessage { notary_id, vote_bytes, voting_key }
 			.using_encoded(blake2_256);
-		let power = if power < 1 { U256::one() } else { U256::from(power) };
-		U256::from_big_endian(&hash[..]).checked_div(power).unwrap_or(U256::MAX)
+		U256::from_big_endian(&hash[..])
+	}
+
+	pub fn calculate_seal_strength(power: BlockVotingPower, seal_u256: U256) -> U256 {
+		if power <= 1 {
+			return seal_u256;
+		}
+		let power = U256::from(power);
+		seal_u256.checked_div(power).unwrap_or(U256::MAX)
 	}
 
 	pub fn seal_signature_message<H: AsRef<[u8]>>(block_hash: H) -> [u8; 32] {
