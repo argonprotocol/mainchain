@@ -225,6 +225,7 @@ async function transferMainchainToLocalchain(mainchainClient: ArgonClient, local
     const transferId = await transferToLocalchain(account, amount, notaryId, mainchainClient);
     const locMainchainClient = await localchain.mainchainClient;
     const transfer = await locMainchainClient.waitForLocalchainTransfer(transferId);
+    await new Promise(resolve => setTimeout(resolve, 500));
     const notarization = localchain.beginChange();
     const balanceChange = await notarization.claimFromMainchain(transfer);
     return {notarization, balanceChange};
