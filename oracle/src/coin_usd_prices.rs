@@ -46,18 +46,14 @@ impl CoinUsdPriceLookup {
 			}
 		}
 
-		let (a, b, c, d) = join![
-			self.get_coinbase_prices(),
-			self.get_coindesk_price(),
-			self.get_kraken_price(),
-			self.get_coingecko_price()
-		];
+		let (a, b, c) =
+			join![self.get_coinbase_prices(), self.get_kraken_price(), self.get_coingecko_price()];
 
 		let mut usdc_total = FixedU128::zero();
 		let mut usdc_count = FixedU128::zero();
 		let mut btc_total = FixedU128::zero();
 		let mut btc_count = FixedU128::zero();
-		for price in [a, b, c, d] {
+		for price in [a, b, c] {
 			match price {
 				Ok(price) => {
 					if let Some(usdc) = price.usdc {
@@ -79,20 +75,6 @@ impl CoinUsdPriceLookup {
 		self.last_refresh = Some((Instant::now(), latest));
 
 		Ok(latest)
-	}
-
-	async fn get_coindesk_price(&self) -> Result<PriceLookupMaybe> {
-		let response = self
-			.client
-			.get("https://api.coindesk.com/v1/bpi/currentprice.json")
-			.send()
-			.await?
-			.json::<CoinDeskResponse>()
-			.await?;
-		Ok(PriceLookupMaybe {
-			bitcoin: FixedU128::from_float(response.bpi.usd.rate_float),
-			usdc: None,
-		})
 	}
 
 	async fn get_kraken_price(&self) -> Result<PriceLookupMaybe> {
@@ -174,21 +156,6 @@ struct CoinGeckoPriceData {
 	usd: f64,
 }
 
-#[derive(Deserialize)]
-struct CoinDeskResponse {
-	bpi: CoindeskBpi,
-}
-
-#[derive(Deserialize)]
-struct CoindeskBpi {
-	#[serde(rename = "USD")]
-	usd: CoindeskBpiData,
-}
-
-#[derive(Deserialize)]
-struct CoindeskBpiData {
-	rate_float: f64,
-}
 #[derive(Deserialize, Debug)]
 pub struct CoinbasePrice {
 	pub data: CoinbasePriceData,
@@ -226,12 +193,6 @@ mod tests {
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
 		assert!(price_lookups.usdc > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc < FixedU128::from_float(1.1));
-	}
-
-	#[tokio::test]
-	async fn test_get_coindesk_price() {
-		let price_lookups = CoinUsdPriceLookup::new().get_coindesk_price().await.unwrap();
-		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
 	}
 
 	#[tokio::test]
