@@ -27,6 +27,7 @@ pub mod pallet {
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
 	};
 	use frame_system::pallet_prelude::*;
+	use log::info;
 	use sp_runtime::{
 		traits::{AtLeast32BitUnsigned, One, UniqueSaturatedInto},
 		FixedPointNumber, FixedU128, Saturating,
@@ -209,6 +210,13 @@ pub mod pallet {
 
 		fn on_finalize(n: BlockNumberFor<T>) {
 			if <BlockRewardsPaused<T>>::get() {
+				return;
+			}
+
+			if !T::BlockSealerProvider::is_block_vote_seal() &&
+				!T::BlockRewardAccountsProvider::is_compute_block_eligible_for_rewards()
+			{
+				info!("Compute block is not eligible for rewards");
 				return;
 			}
 			let authors = T::BlockSealerProvider::get_sealer_info();

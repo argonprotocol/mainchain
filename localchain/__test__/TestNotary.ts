@@ -100,14 +100,15 @@ export default class TestNotary implements ITeardownable {
             `--archive-bucket=${bucketName}`,
             `--operator-address=${this.operator.address}`
         ];
-        if (process.env.AWS_S3_ENDPOINT) {
-            execArgs.push(`--archive-endpoint=${process.env.AWS_S3_ENDPOINT}`);
-        }
         if (process.env.ARGON_USE_DOCKER_BINS) {
+            process.env.AWS_S3_ENDPOINT = 'http://host.docker.internal:9000';
             execArgs.unshift(...notaryPath.replace("docker run", "run").split(' '));
             execArgs.push('-b=0.0.0.0:9925');
 
             notaryPath = 'docker';
+        }
+        if (process.env.AWS_S3_ENDPOINT) {
+            execArgs.push(`--archive-endpoint=${process.env.AWS_S3_ENDPOINT}`);
         }
         this.#childProcess = child_process.spawn(notaryPath, execArgs, {
             stdio: ['ignore', 'pipe', 'pipe'],

@@ -17,7 +17,6 @@ RUNID=${1:-$(date "+%Y%m%d-%H%M%S")}
 BUCKET_NAME="notary-$RUNID"
 NOTEBOOK_ARCHIVE="http://127.0.0.1:9000/$BUCKET_NAME"
 DBPATH=postgres://postgres:password@localhost:5432/notary-$RUNID
-ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json
 
 set -x  # Print commands and their arguments as they are executed
 # drop db if no arg is passed
@@ -133,7 +132,7 @@ RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/bitcoin_
 
 echo -e "Starting a pricing oracle...\n\n"
 "$BASEDIR/target/debug/argon-oracle" insert-key --crypto-type=sr25519 --keystore-path /tmp/price_keystore  --suri //Eve
-RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/price_keystore \
+ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/price_keystore \
   --signer-crypto=sr25519 --signer-address=5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw \
   -t ws://127.0.0.1:9944 price-index --simulate-prices   2>&1 | \
   awk -v name="orclprc" '{printf "%-8s %s\n", name, $0; fflush()}' &

@@ -1,6 +1,33 @@
 # Changelog
 
-## [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...636c016ea477d40db1f88f5fb829ab52a8d2b997) (2025-02-07)
+## [v1.0.12](https://github.com/argonprotocol/mainchain/compare/v1.0.11...ce0e6f56c6a6700321bfe5c90c19ee81d07f1c88) (2025-02-12)
+
+### Features
+
+* **mining_slot:** disallow duplicate key reg
+([4660021](https://github.com/argonprotocol/mainchain/commit/4660021aa2f77ddb0ca62cb712a9ac74fb433f82))
+* **block_seal_spec:** reset difficulty every 10 blocks
+([1a2fc75](https://github.com/argonprotocol/mainchain/commit/1a2fc75a2f54e3e1c6e9e61027d3ed9eff1ba0e4))
+
+### Fixes
+
+* **hyperbridge:** upgrade hyperbridge to fix trie
+([303c074](https://github.com/argonprotocol/mainchain/commit/303c074981e918b131d50ff3009413c6e6e5b267))
+* **block_seal:** run xor closest before weight
+([36c533d](https://github.com/argonprotocol/mainchain/commit/36c533d50869274e7dbbd64cdef0021a9369c81a))
+* **ghactions:** don’t set as latest unless latest
+([2d062be](https://github.com/argonprotocol/mainchain/commit/2d062be553580ae16f9f99ed72384ff4f27eb3a2))
+* **node:** don’t stack same weight blocks
+([301605a](https://github.com/argonprotocol/mainchain/commit/301605a2753ff2a6037aec01ebce1a8f79ecf8c2))
+* **localchain:** add notebook archive to tests
+([9588c35](https://github.com/argonprotocol/mainchain/commit/9588c35661e7372fd5c30be1e84cf06831dd6daf))
+
+### [v1.0.11](https://github.com/argonprotocol/mainchain/compare/v1.0.10...v1.0.11) (2025-02-10)
+
+#### Fixes
+
+* separate runtimes
+([5c5df56](https://github.com/argonprotocol/mainchain/commit/5c5df562356a7f2143e6e2fd0f99c35f4f00bbe4))
 
 ### [v1.0.10](https://github.com/argonprotocol/mainchain/compare/v1.0.9...v1.0.10) (2025-02-07)
 

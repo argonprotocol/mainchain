@@ -305,6 +305,7 @@ pub mod napi_ext {
   use napi::bindgen_prelude::*;
   use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
   use std::sync::Arc;
+  use tokio::sync::Mutex;
 
   #[napi]
   pub struct BalanceTipResult {

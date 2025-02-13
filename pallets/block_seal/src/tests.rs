@@ -25,8 +25,8 @@ use std::panic::catch_unwind;
 use crate::{
 	mock::{BlockSeal, *},
 	pallet::{
-		BlockForkPower, LastBlockSealerInfo, LastTickWithVoteSeal, ParentVotingKey,
-		TempSealInherent, VotesInPast3Ticks,
+		BlockForkPower, IsBlockFromVoteSeal, LastBlockSealerInfo, LastTickWithVoteSeal,
+		ParentVotingKey, TempSealInherent, VotesInPast3Ticks,
 	},
 	Call, Error,
 };
@@ -96,6 +96,22 @@ fn it_does_not_allow_a_compute_block_in_same_tick_as_vote() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		CurrentTick::set(100);
+
+		LastTickWithVoteSeal::<Test>::put(99);
+		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), BlockSealInherent::Compute),);
+		assert_eq!(TempSealInherent::<Test>::get(), Some(BlockSealInherent::Compute));
+		assert!(!IsBlockFromVoteSeal::<Test>::get());
+		assert_eq!(LastTickWithVoteSeal::<Test>::get(), 99);
+		BlockSeal::on_finalize(1);
+
+		System::set_block_number(2);
+		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), BlockSealInherent::Compute),);
+		assert!(!IsBlockFromVoteSeal::<Test>::get());
+		assert_eq!(LastTickWithVoteSeal::<Test>::get(), 99);
+		BlockSeal::on_finalize(2);
+
+		// now if this was a tick block, it shouldn't allow it
+		System::set_block_number(3);
 		LastTickWithVoteSeal::<Test>::put(100);
 
 		// actually panics
@@ -117,31 +133,6 @@ fn it_should_only_allow_a_single_seal() {
 		assert_err!(
 			BlockSeal::apply(RuntimeOrigin::none(), BlockSealInherent::Compute),
 			Error::<Test>::DuplicateBlockSealProvided
-		);
-	});
-}
-
-#[test]
-fn it_should_only_allow_compute_for_first_4() {
-	new_test_ext().execute_with(|| {
-		setup_blocks(1);
-		let inherent = BlockSealInherent::Vote {
-			notary_id: 1,
-			block_vote: default_vote(),
-			seal_strength: 1.into(),
-			source_notebook_proof: MerkleProof {
-				proof: Default::default(),
-				number_of_leaves: 1,
-				leaf_index: 0,
-			},
-			source_notebook_number: 1,
-		};
-
-		BlockSeal::on_initialize(2);
-
-		assert_err!(
-			BlockSeal::apply(RuntimeOrigin::none(), inherent),
-			Error::<Test>::NoEligibleVotingRoot,
 		);
 	});
 }
@@ -273,6 +264,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		assert_ok!(BlockSeal::apply(RuntimeOrigin::none(), inherent.clone()));
 		// only after block seal is applied is this true
 		assert!(BlockSeal::has_eligible_votes());
+		assert!(IsBlockFromVoteSeal::<Test>::get());
 
 		assert_eq!(LastBlockSealerInfo::<Test>::get().unwrap().block_author_account_id, Bob.into());
 

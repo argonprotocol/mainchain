@@ -6,11 +6,12 @@ use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
 use crate as pallet_block_rewards;
 use crate::GrowthPath;
 use argon_primitives::{
-	block_seal::RewardSharing,
+	block_seal::{BlockPayout, RewardSharing},
 	notary::{NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
-	BlockRewardAccountsProvider, BlockSealerInfo, BlockSealerProvider, NotaryId, NotebookNumber,
-	NotebookProvider, NotebookSecret, RewardShare, TickProvider, VotingSchedule,
+	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
+	NotaryId, NotebookNumber, NotebookProvider, NotebookSecret, RewardShare, TickProvider,
+	VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -98,12 +99,18 @@ parameter_types! {
 		block_author_account_id: 1,
 		block_seal_authority: None
 	};
+	pub static IsMiningSlotsActive: bool = false;
+	pub static IsBlockVoteSeal: bool = false;
+	pub static LastRewards: Vec<BlockPayout<AccountId, Balance>> = vec![];
 }
 
 pub struct StaticBlockSealerProvider;
 impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
 	fn get_sealer_info() -> BlockSealerInfo<u64> {
 		BlockSealer::get()
+	}
+	fn is_block_vote_seal() -> bool {
+		IsBlockVoteSeal::get()
 	}
 }
 
@@ -151,6 +158,9 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
 		todo!("not used by rewards")
 	}
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		IsBlockVoteSeal::get() || !IsMiningSlotsActive::get()
+	}
 }
 
 pub struct StaticTickProvider;
@@ -175,6 +185,13 @@ impl TickProvider<Block> for StaticTickProvider {
 	}
 }
 
+pub struct RewardEvents;
+impl BlockRewardsEventHandler<AccountId, Balance> for RewardEvents {
+	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
+		LastRewards::set(payout.to_vec());
+	}
+}
+
 impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
@@ -193,7 +210,7 @@ impl pallet_block_rewards::Config for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type TickProvider = StaticTickProvider;
 	type NotebookProvider = TestProvider;
-	type EventHandler = ();
+	type EventHandler = (RewardEvents,);
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
 }
 

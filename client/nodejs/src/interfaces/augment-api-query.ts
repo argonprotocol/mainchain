@@ -164,6 +164,10 @@ declare module '@polkadot/api-base/types/storage' {
        * upgraded, but is used by the node to determine which fork to follow
        **/
       blockForkPower: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesForkPower>, []>;
+      /**
+       * Is the block from a vote seal?
+       **/
+      isBlockFromVoteSeal: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       lastBlockSealerInfo: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesProvidersBlockSealerInfo>>, []>;
       lastTickWithVoteSeal: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**

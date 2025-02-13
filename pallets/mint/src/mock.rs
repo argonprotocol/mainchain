@@ -78,6 +78,9 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
 		MinerRewardsAccounts::get()
 	}
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		todo!()
+	}
 }
 
 impl pallet_mint::Config for Test {

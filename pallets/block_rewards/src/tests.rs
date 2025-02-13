@@ -327,6 +327,40 @@ fn it_should_scale_rewards_based_on_notaries() {
 }
 
 #[test]
+fn it_should_disable_compute_rewards_after_bidding_begins() {
+	ActiveNotaries::set(vec![1]);
+	BlockSealer::set(BlockSealerInfo {
+		block_author_account_id: 1,
+		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
+	});
+	NotebooksInBlock::set(vec![(1, 1, 1)]);
+	NotebookTick::set(1);
+	new_test_ext().execute_with(|| {
+		IsBlockVoteSeal::set(false);
+		IsMiningSlotsActive::set(false);
+		System::set_block_number(1);
+		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
+		assert_eq!(LastRewards::get().len(), 2);
+
+		IsMiningSlotsActive::set(true);
+		IsBlockVoteSeal::set(true);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
+		BlockRewards::on_initialize(2);
+		BlockRewards::on_finalize(2);
+		assert_eq!(LastRewards::get().len(), 2);
+
+		LastRewards::set(vec![]);
+		IsBlockVoteSeal::set(false);
+		System::initialize(&3, &System::parent_hash(), &Default::default());
+		BlockRewards::on_initialize(3);
+		BlockRewards::on_finalize(3);
+		assert_eq!(LastRewards::get().len(), 0);
+	});
+}
+
+#[test]
 fn it_should_not_fail_with_no_notebooks() {
 	ActiveNotaries::set(vec![1, 2]);
 	BlockSealer::set(BlockSealerInfo {
