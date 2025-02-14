@@ -11,9 +11,8 @@ as long as a Vault performs the following two functions:
 
 1. A Vault acts as a co-signer for a Bitcoin UTXO that is locked in Argon. The Vault must respond to requests to co-sign
    LockedBitcoin Release Requests within 10 days, or they will forfeit funds. NOTE: a Vault must perform this function
-   for
-   a full year from the last Bitcoin they allow to be locked. In other words, a Vault commits to remaining operational
-   for up to one year past when they "_close_" the vault.
+   for a full year from the last Bitcoin they allow to be locked. In other words, a Vault commits to remaining
+   operational for up to one year past when they "_close_" the vault.
 2. A Vault must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon (ie, collude with
    the Bitcoin holder to bypass Argon). If they do so, they will forfeit funds.
 
@@ -21,8 +20,9 @@ as long as a Vault performs the following two functions:
 
 - `Annual Percentage Rate (apr)`: An annual percentage rate charged per argon for the service of locking up Bitcoin.
   The Satoshi value in Argons is calculated by using prices of Bitcoin and Argon in USD. The APR multiplied by the argon
-  value to determine the yearly fee.
-- `Base Fee`: A flat fee charged for the service of locking up Bitcoin.
+  value to determine the yearly fee. This fee is paid out at the end of the term.
+- `Base Fee`: A non-refundable flat fee charged for the service of locking up Bitcoin. This fee is held for a day before
+  being spendable.
 - `Added Securitization Percent`: The added percentage (of offered _Bitcoin Argons_) the Vault is willing to put up to
   cover the loss of Bitcoins in case of fraud. These funds are not eligible for LockedBitcoins themselves, but allow a
   Vault to offer an equivalent amount of BondedArgons (up to 2x the Bitcoin Argons).
@@ -38,9 +38,11 @@ These are completely not at risk.
 ### Variables for BondedArgons
 
 - `Annual Percentage Rate (apr)`: An annual percentage rate that is charged at 10 days worth of blocks (10/365) times
-  the amount of Argons a miner wishes to submit for their mining bid.
-- `Base Fee`: A flat fee charged for the service of locking up Argons for a BondedArgon. This fee is most relevant to
-  BondedArgons so that a Vault cannot be "gamed" by a miner submitting and cancelling a large number of BondedArgons.
+  the amount of Argons a miner wishes to submit for their mining bid. This fee is paid out at the end of the Mining
+  Slot.
+- `Base Fee`: A non-refundable flat fee charged for the service of locking up Argons for a BondedArgon. This fee is most
+  relevant to BondedArgons so that a Vault cannot be "gamed" by a miner submitting and cancelling a large number of
+  BondedArgons. This fee is held for a day before being spendable.
 - `Mining Reward Sharing Percent Take`: A Vault can optionally offer a very low percentage rate for a BondedArgon in
   exchange for profit sharing on any minted Argons during the Mining Slot. This can be an appealing offer for miners so
   they don't have to try to predict an optimal bid that will out-pace the slot earnings (eg, by looking at the pattern
@@ -257,4 +259,9 @@ The following are a few rules around how and when you can add funding to a vault
 - Vaults must maintain or exceed the promised additional securitization percentage for the duration of any
   LockedBitcoins
 - Vault terms will take effect in the next Mining Slot (every day at noon EST). This also applies to new vaults. The
-  exception is that prior to bidding for Slot 1, there are no delays.
+  exception is that prior to bidding for Slot 1, there are no delays
+- Vaults must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon. If they do so, they
+  will forfeit funds
+- Base fees may be required for both LockedBitcoins and BondedArgons. These fees are a non-refundable fee charged to
+  anyone who creates an obligation with a Vault. However, any APR charges are refundable based on the duration of the
+  funds being held in ticks.

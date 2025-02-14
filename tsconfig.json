@@ -3,12 +3,7 @@
     "target": "es2022",
     "module": "es2022"
   },
-  "exclude": [
-    "node_modules",
-    "target",
-    "client/nodejs",
-    "localchain"
-  ],
+  "exclude": ["node_modules", "target", "client/nodejs", "localchain"],
   "references": [
     {
       "path": "localchain/tsconfig.json"

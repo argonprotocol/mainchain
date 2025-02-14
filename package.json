@@ -2,8 +2,9 @@
   "name": "@argonprotocol/mainchain-monorepo",
   "version": "0.0.3",
   "scripts": {
-    "build": "yarn workspaces foreach --all run build",
+    "build": "yarn workspaces foreach --all run build && yarn lint",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
+    "lint": "yarn prettier --write \"**/*.{ts,js,json,md}\"",
     "test": "yarn pretest && yarn workspaces foreach --all run test",
     "test:js-only": "yarn workspace @argonprotocol/mainchain test && ARGON_USE_DOCKER_BINS=1 yarn workspace @argonprotocol/localchain test",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@lerna-lite/version": "^3.9.1",
     "@types/node": "^18.19.6",
+    "prettier": "^3.5.1",
     "tslib": "^2.6.2",
     "typescript": "^5.3.3"
   },

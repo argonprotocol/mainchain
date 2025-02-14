@@ -12,7 +12,7 @@ If you want to protect wages against inflation or deflation of the Argon, there 
 used. You can use it a single time:
 
 ```javascript
-const {WageProtector} = require('@argonprotocol/mainchain');
+const { WageProtector } = require('@argonprotocol/mainchain');
 const basePrice = 1_000_000n; // 1 Argon
 const protector = await WageProtector.create(client);
 const protectedPrice = protector.getProtectedWage(basePrice);
@@ -21,26 +21,29 @@ const protectedPrice = protector.getProtectedWage(basePrice);
 Or you can subscribe to changes (for instance, to track a series of valid cpi adjustments):
 
 ```javascript
-
-const {WageProtector} = require('@argonprotocol/mainchain');
+const { WageProtector } = require('@argonprotocol/mainchain');
 const basePrice = 1_000_000n; // 1 Argon
-const {unsubscribe} = await WageProtector.subscribe(client, (protectedPrice) => {
-    console.log(`Protected price: ${protectedPrice.getProtectedWage(basePrice)}`);
-});
+const { unsubscribe } = await WageProtector.subscribe(
+  client,
+  protectedPrice => {
+    console.log(
+      `Protected price: ${protectedPrice.getProtectedWage(basePrice)}`,
+    );
+  },
+);
 ```
 
 Each `WageProtector` instance has the details of the Argon Target Price and USD price at the time of creation.
 
 ```typescript
-
 interface IArgonCpiSnapshot {
-    // The target price of the argon as a fixed point number (18 decimals)
-    argonUsdTargetPrice: bigint;
-    // The current price of the argon as a fixed point number (18 decimals)
-    argonUsdPrice: bigint;
-    // The block hash in which the cpi was finalized
-    finalizedBlock: Uint8Array;
-    // The tick that the cpi applies to
-    tick: bigint;
+  // The target price of the argon as a fixed point number (18 decimals)
+  argonUsdTargetPrice: bigint;
+  // The current price of the argon as a fixed point number (18 decimals)
+  argonUsdPrice: bigint;
+  // The block hash in which the cpi was finalized
+  finalizedBlock: Uint8Array;
+  // The tick that the cpi applies to
+  tick: bigint;
 }
 ```

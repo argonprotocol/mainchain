@@ -17,10 +17,7 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": false,
-    "types": [
-      "node",
-      "jest"
-    ],
+    "types": ["node", "jest"],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "skipDefaultLibCheck": true
