@@ -5,8 +5,8 @@ extern crate core;
 use alloc::{vec, vec::Vec};
 use argon_primitives::{
 	block_seal::{
-		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
-		RewardSharing, SlotId,
+		CohortId, MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
+		RewardSharing,
 	},
 	inherents::BlockSealInherent,
 	tick::Tick,
@@ -43,13 +43,14 @@ pub mod migrations;
 pub mod weights;
 
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
-/// `Cohort` of miners to operate for a given number of blocks (an `Era`).
+/// `Cohort` of miners to operate for a given number of ticks (the `MiningWindow`).
 ///
-/// New miner slots are rotated in every `mining_config.ticks_between_slots` blocks. Each cohort
+/// New miner slots are rotated in every `mining_config.ticks_between_slots` ticks. Each cohort
 /// will have `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
 ///
-/// When a new Slot begins, the Miners with the corresponding Slot indices will be replaced with
-/// the new cohort members (or emptied out).
+/// When a new Slot begins, the Miners with the corresponding Slot Indices will be replaced with
+/// the new cohort members (or emptied out). A Slot Index is similar to a Mining "Seat", but
+/// 0-based.
 ///
 /// To be eligible for mining, you must reserve a percent of the total supply of argonots (ownership
 /// tokens). `BondedArgons` leased from a vault will allow operators to out-bid others for cohort
@@ -57,14 +58,11 @@ pub mod weights;
 /// ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper` (NOTE: this
 /// percent is the max increase or reduction in the amount of ownership issued).
 ///
-/// Options are provided to lease Bonded Argons from the `vault pallet`
+/// Options are provided to lease Bonded Argons from the `Vaults` pallet.
 ///
 /// ### Registration
 /// To register for a Slot, you must submit a bid. At any given time, only the next Slot is being
 /// bid on.
-///
-/// AuthorityIds are created by watching the Session pallet for new sessions and recording the
-/// authorityIds matching registered "controller" accounts.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use codec::FullCodec;
@@ -89,7 +87,7 @@ pub mod pallet {
 
 	use super::*;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -230,9 +228,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
 
-	/// The current slot id
+	/// The last activated cohort id
 	#[pallet::storage]
-	pub(super) type CurrentSlotId<T: Config> = StorageValue<_, SlotId, ValueQuery>;
+	pub(super) type LastActivatedCohortId<T: Config> = StorageValue<_, CohortId, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -259,6 +257,7 @@ pub mod pallet {
 		NewMiners {
 			start_index: MinerIndex,
 			new_miners: BoundedVec<Registration<T>, T::MaxCohortSize>,
+			cohort_id: CohortId,
 		},
 		SlotBidderAdded {
 			account_id: T::AccountId,
@@ -342,16 +341,16 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
-			let current_slot_id = CurrentSlotId::<T>::get();
-			let next_slot_id = Self::calculate_slot_id();
-			if next_slot_id > current_slot_id {
-				log::trace!("Starting Slot {}", next_slot_id);
+			let current_cohort_id = LastActivatedCohortId::<T>::get();
+			let next_cohort_id = Self::calculate_cohort_id();
+			if next_cohort_id > current_cohort_id {
+				log::trace!("Starting Slot {}", next_cohort_id);
 				Self::adjust_argonots_per_seat();
-				Self::start_new_slot(next_slot_id);
+				Self::start_new_slot(next_cohort_id);
 				return T::DbWeight::get().reads_writes(0, 2);
 			}
 
-			if current_slot_id == 0 &&
+			if current_cohort_id == 0 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
 				Self::is_slot_bidding_started()
 			{
@@ -367,7 +366,7 @@ pub mod pallet {
 				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
 			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
 			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
-				T::SlotEvents::rotate_grandpas::<T::Keys>(current_slot_id, vec![], vec![]);
+				T::SlotEvents::rotate_grandpas::<T::Keys>(current_cohort_id, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
 				return T::DbWeight::get().reads_writes(3, 2)
 			}
@@ -468,7 +467,7 @@ pub mod pallet {
 			}
 
 			let ownership_tokens = Self::hold_argonots(&who, current_registration)?;
-			let next_slot_id = CurrentSlotId::<T>::get().saturating_add(1);
+			let next_cohort_id = LastActivatedCohortId::<T>::get().saturating_add(1);
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) = cohort.iter().position(|x| x.account_id == who) {
 					cohort.remove(existing_position);
@@ -505,7 +504,7 @@ pub mod pallet {
 							argonots: ownership_tokens,
 							reward_sharing,
 							authority_keys: keys,
-							slot_id: next_slot_id,
+							cohort_id: next_cohort_id,
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
@@ -619,7 +618,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn is_registered_mining_active() -> bool {
-		CurrentSlotId::<T>::get() > 0 && ActiveMinersCount::<T>::get() > 0
+		LastActivatedCohortId::<T>::get() > 0 && ActiveMinersCount::<T>::get() > 0
 	}
 
 	pub fn get_mining_authority(
@@ -643,7 +642,7 @@ impl<T: Config> Pallet<T> {
 			})
 	}
 
-	pub(crate) fn start_new_slot(slot_id: SlotId) {
+	pub(crate) fn start_new_slot(cohort_id: CohortId) {
 		let max_miners = T::MaxMiners::get();
 		let cohort_size = T::MaxCohortSize::get();
 
@@ -655,7 +654,7 @@ impl<T: Config> Pallet<T> {
 		});
 
 		let start_index_to_replace_miners =
-			Self::get_slot_starting_index(slot_id, max_miners, cohort_size);
+			Self::get_slot_starting_index(cohort_id, max_miners, cohort_size);
 
 		let slot_cohort = NextSlotCohort::<T>::take();
 		IsNextSlotBiddingOpen::<T>::put(true);
@@ -705,9 +704,10 @@ impl<T: Config> Pallet<T> {
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
+			cohort_id,
 		});
-		CurrentSlotId::<T>::put(slot_id);
-		T::SlotEvents::rotate_grandpas(slot_id, removed_miners, added_miners);
+		LastActivatedCohortId::<T>::put(cohort_id);
+		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
@@ -819,7 +819,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn get_next_slot_tick() -> Tick {
-		Self::tick_for_slot(CurrentSlotId::<T>::get() + 1)
+		Self::tick_for_slot(LastActivatedCohortId::<T>::get() + 1)
 	}
 
 	pub fn get_next_slot_era() -> (Tick, Tick) {
@@ -827,7 +827,7 @@ impl<T: Config> Pallet<T> {
 		(start_tick, start_tick + Self::get_mining_window_ticks())
 	}
 
-	pub(crate) fn calculate_slot_id() -> SlotId {
+	pub(crate) fn calculate_cohort_id() -> CohortId {
 		let mining_config = MiningConfig::<T>::get();
 		let slot_1_tick_start =
 			mining_config.slot_bidding_start_after_ticks + mining_config.ticks_between_slots;
@@ -835,33 +835,33 @@ impl<T: Config> Pallet<T> {
 			return 0
 		}
 		let ticks_since_mining_start = Self::ticks_since_mining_start();
-		let slot_id = ticks_since_mining_start / mining_config.ticks_between_slots;
-		slot_id as SlotId + 1
+		let cohort_id = ticks_since_mining_start / mining_config.ticks_between_slots;
+		cohort_id as CohortId + 1
 	}
 
-	pub fn tick_for_slot(slot_id: SlotId) -> Tick {
-		if slot_id == 0 {
+	pub fn tick_for_slot(cohort_id: CohortId) -> Tick {
+		if cohort_id == 0 {
 			// return genesis tick for slot 0
 			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks())
 		}
 		let slot_1_tick = Self::slot_1_tick();
-		let added_ticks = (slot_id - 1) * Self::ticks_between_slots();
+		let added_ticks = (cohort_id - 1) * Self::ticks_between_slots();
 		slot_1_tick.saturating_add(added_ticks)
 	}
 
 	pub(crate) fn get_slot_starting_index(
-		slot_id: SlotId,
+		cohort_id: CohortId,
 		max_miners: u32,
 		cohort_size: u32,
 	) -> u32 {
-		(slot_id as u32 * cohort_size) % max_miners
+		(cohort_id as u32 * cohort_size) % max_miners
 	}
 
 	pub(crate) fn get_next_slot_starting_index() -> u32 {
-		let current_slot_id = CurrentSlotId::<T>::get();
+		let current_cohort_id = LastActivatedCohortId::<T>::get();
 		let cohort_size = T::MaxCohortSize::get();
 
-		Self::get_slot_starting_index(current_slot_id + 1, T::MaxMiners::get(), cohort_size)
+		Self::get_slot_starting_index(current_cohort_id + 1, T::MaxMiners::get(), cohort_size)
 	}
 
 	pub fn get_mining_window_ticks() -> Tick {
@@ -1059,7 +1059,7 @@ sp_api::decl_runtime_apis! {
 pub trait OnNewSlot<AccountId> {
 	type Key: Decode + RuntimeAppPublic;
 	fn rotate_grandpas(
-		current_slot_id: SlotId,
+		current_cohort_id: CohortId,
 		removed_authorities: Vec<(&AccountId, Self::Key)>,
 		added_authorities: Vec<(&AccountId, Self::Key)>,
 	);
@@ -1067,7 +1067,7 @@ pub trait OnNewSlot<AccountId> {
 
 pub trait SlotEvents<AccountId> {
 	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_slot_id: SlotId,
+		current_cohort_id: CohortId,
 		removed_authorities: Vec<(AccountId, Ks)>,
 		added_authorities: Vec<(AccountId, Ks)>,
 	);
@@ -1077,7 +1077,7 @@ pub trait SlotEvents<AccountId> {
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_slot_id: SlotId,
+		current_cohort_id: CohortId,
 		removed_authorities: Vec<(AId, Ks)>,
 		added_authorities: Vec<(AId, Ks)>,
 	) {
@@ -1091,7 +1091,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 				added_authorities.iter().filter_map(|k| {
 					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
 				}).collect::<Vec<_>>();
-			Tuple::rotate_grandpas(current_slot_id, removed_keys, added_keys);
+			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
 		)*
 		)
 	}

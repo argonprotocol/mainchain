@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # This script is meant to be run on Unix/Linux based systems
-set -ex
+set -e
+set -x
 
 BASEDIR=$(dirname "$0")
 PIPE="/tmp/argon-node-output"
@@ -18,6 +19,7 @@ cleanup() {
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
 "$BASEDIR/../target/debug/argon-node" --tmp --no-mdns --chain=meta --rpc-port=9944 --compute-miners=0 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
+set +x
 argon_PID=$!
 
 while IFS= read -r line; do
@@ -27,6 +29,7 @@ while IFS= read -r line; do
         break
     fi
 done <"$PIPE"
+set -x
 
 subxt codegen  --derive Clone \
   --derive-for-type bounded_collections::bounded_vec::BoundedVec=serde::Serialize \

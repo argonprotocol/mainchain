@@ -1,7 +1,7 @@
 use crate as pallet_mining_slot;
 use crate::OnNewSlot;
 use argon_primitives::{
-	block_seal::{MiningSlotConfig, RewardSharing, SlotId},
+	block_seal::{CohortId, MiningSlotConfig, RewardSharing},
 	tick::{Tick, Ticker},
 	vault::{BondedArgonsProvider, ObligationError},
 	BlockNumber, TickProvider, VaultId, VotingSchedule,
@@ -110,7 +110,7 @@ parameter_types! {
 
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
-	pub static GrandaRotations: Vec<SlotId> = vec![];
+	pub static GrandaRotations: Vec<CohortId> = vec![];
 
 	// set slot bidding active by default
 	pub static ElapsedTicks: u64 = 3;
@@ -173,13 +173,13 @@ pub struct StaticNewSlotEvent;
 impl OnNewSlot<u64> for StaticNewSlotEvent {
 	type Key = UintAuthorityId;
 	fn rotate_grandpas(
-		current_slot_id: SlotId,
+		current_cohort_id: CohortId,
 		removed_authorities: Vec<(&u64, Self::Key)>,
 		added_authorities: Vec<(&u64, Self::Key)>,
 	) {
 		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
-		GrandaRotations::mutate(|a| a.push(current_slot_id));
+		GrandaRotations::mutate(|a| a.push(current_cohort_id));
 	}
 }
 

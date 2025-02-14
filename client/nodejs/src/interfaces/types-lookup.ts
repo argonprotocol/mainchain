@@ -393,7 +393,7 @@ declare module '@polkadot/types/lookup' {
     readonly argonots: Compact<u128>;
     readonly rewardSharing: Option<ArgonPrimitivesBlockSealRewardSharing>;
     readonly authorityKeys: ArgonRuntimeSessionKeys;
-    readonly slotId: Compact<u64>;
+    readonly cohortId: Compact<u64>;
   }
 
   /** @name ArgonRuntimeSessionKeys (42) */
