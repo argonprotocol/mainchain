@@ -259,7 +259,6 @@ impl pallet_vaults::Config for Runtime {
 	type MinimumObligationAmount = MinimumObligationAmount;
 	type TicksPerDay = TicksPerDay;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
-	type MinTermsModificationTickDelay = MinTermsModificationTickDelay;
 	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
@@ -268,6 +267,7 @@ impl pallet_vaults::Config for Runtime {
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
 	type EnableRewardSharing = EnableRewardSharing;
+	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
 }
 
 pub struct BitcoinSignatureVerifier;

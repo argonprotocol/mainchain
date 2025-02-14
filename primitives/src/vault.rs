@@ -121,6 +121,10 @@ pub enum ObligationError {
 	InternalError,
 	/// An error occurred during completion of an obligation
 	ObligationCompletionError,
+	/// This vault is not yet active
+	VaultNotYetActive,
+	/// Too many base fee maturations were inserted per tick
+	BaseFeeOverflow,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -153,6 +157,8 @@ pub struct Vault<
 	pub pending_bonded_argons: Option<(Tick, Balance)>,
 	/// Bitcoins pending verification
 	pub pending_bitcoins: Balance,
+	/// A tick at which this vault is active
+	pub activation_tick: Tick,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]

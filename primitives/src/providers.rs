@@ -197,7 +197,8 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 
 pub trait MiningSlotProvider {
 	fn get_next_slot_tick() -> Tick;
-	fn mining_window_tick() -> Tick;
+	fn mining_window_ticks() -> Tick;
+	fn is_slot_bidding_started() -> bool;
 }
 
 pub type RewardShare = FixedU128;

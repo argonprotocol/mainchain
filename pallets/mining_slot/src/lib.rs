@@ -353,8 +353,7 @@ pub mod pallet {
 
 			if current_slot_id == 0 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
-				T::TickProvider::elapsed_ticks() >=
-					MiningConfig::<T>::get().slot_bidding_start_after_ticks
+				Self::is_slot_bidding_started()
 			{
 				log::trace!(
 					"Opening Slot 1 bidding {}",
@@ -999,8 +998,12 @@ impl<T: Config> MiningSlotProvider for Pallet<T> {
 		Self::get_next_slot_tick()
 	}
 
-	fn mining_window_tick() -> Tick {
+	fn mining_window_ticks() -> Tick {
 		Self::get_mining_window_ticks()
+	}
+
+	fn is_slot_bidding_started() -> bool {
+		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks
 	}
 }
 

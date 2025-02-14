@@ -433,12 +433,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       miningArgonIncreaseTickDelay: u64 & AugmentedConst<ApiType>;
       /**
-       * The number of ticks that a change in terms will take before applying. Terms only apply
-       * on a slot changeover, so this setting is the minimum blocks that must pass, in
-       * addition to the time to the next slot after that
-       **/
-      minTermsModificationTickDelay: u64 & AugmentedConst<ApiType>;
-      /**
        * Argon blocks per day
        **/
       ticksPerDay: u64 & AugmentedConst<ApiType>;

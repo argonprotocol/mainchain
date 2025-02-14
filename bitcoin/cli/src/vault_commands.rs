@@ -60,6 +60,15 @@ impl VaultCommands {
 					return Ok(());
 				};
 
+				let current_tick = client
+					.live
+					.storage()
+					.at_latest()
+					.await?
+					.fetch(&storage().ticks().current_tick())
+					.await?
+					.expect("current tick not found");
+
 				println!("Showing for: {:#?} btc", btc);
 				println!("Current mint value: {} argons", ArgonFormatter(argons_needed));
 
@@ -79,6 +88,7 @@ impl VaultCommands {
 						"Bonded argons",
 						"Added Securitization",
 						"Fee",
+						"State",
 					]);
 
 				while let Some(Ok(kv)) = vaults.next().await {
@@ -88,6 +98,13 @@ impl VaultCommands {
 					};
 					let bitcoin_argons_available =
 						vault.bitcoin_argons.allocated - vault.bitcoin_argons.reserved;
+					let state = if vault.is_closed {
+						"Closed"
+					} else if vault.activation_tick > current_tick {
+						"Pending"
+					} else {
+						"Active"
+					};
 					if bitcoin_argons_available >= argons_needed {
 						let fee = vault.bitcoin_argons.base_fee +
 							from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
@@ -99,6 +116,7 @@ impl VaultCommands {
 							ArgonFormatter(vault.bitcoin_argons.reserved).to_string(),
 							ArgonFormatter(vault.added_securitization_argons).to_string(),
 							ArgonFormatter(fee).to_string(),
+							state.to_string(),
 						]);
 					}
 				}

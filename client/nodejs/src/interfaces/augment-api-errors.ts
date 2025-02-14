@@ -828,6 +828,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountBelowMinimumBalance: AugmentedError<ApiType>;
       /**
+       * Too many base fee maturations were inserted per tick
+       **/
+      BaseFeeOverflow: AugmentedError<ApiType>;
+      /**
        * Bitcoin conversion to compressed pubkey failed
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;
@@ -908,6 +912,10 @@ declare module '@polkadot/api-base/types/errors' {
       UnsafeXpubkey: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
+      /**
+       * The vault is not yet active
+       **/
+      VaultNotYetActive: AugmentedError<ApiType>;
       /**
        * This reduction in obligation funds offered goes below the amount that is already
        * committed to

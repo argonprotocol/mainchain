@@ -705,6 +705,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       obligationsById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVaultObligation>>, [u64]>;
       /**
+       * Pending base fee hold releases
+       **/
+      pendingBaseFeeMaturationByTick: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u128, u32, u64]>>>, [u64]>;
+      /**
        * Pending funding that will be committed at the given block number (must be a minimum of 1
        * slot change away)
        **/
