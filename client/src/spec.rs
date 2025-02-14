@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				196u8, 126u8, 16u8, 134u8, 55u8, 147u8, 14u8, 48u8, 116u8, 15u8, 123u8, 199u8,
-				191u8, 142u8, 135u8, 102u8, 106u8, 208u8, 12u8, 60u8, 82u8, 157u8, 151u8, 152u8,
-				141u8, 130u8, 178u8, 202u8, 149u8, 88u8, 8u8, 124u8,
+				211u8, 239u8, 136u8, 72u8, 105u8, 128u8, 97u8, 250u8, 129u8, 159u8, 107u8, 141u8,
+				50u8, 76u8, 207u8, 182u8, 96u8, 237u8, 166u8, 117u8, 107u8, 255u8, 27u8, 195u8,
+				152u8, 31u8, 64u8, 155u8, 85u8, 155u8, 68u8, 38u8,
 			]
 	}
 	pub mod system {
@@ -4970,9 +4970,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							150u8, 46u8, 198u8, 24u8, 44u8, 86u8, 27u8, 150u8, 105u8, 152u8, 103u8,
-							11u8, 118u8, 107u8, 240u8, 227u8, 59u8, 98u8, 105u8, 144u8, 78u8, 42u8,
-							208u8, 12u8, 126u8, 81u8, 101u8, 113u8, 244u8, 162u8, 241u8, 182u8,
+							88u8, 148u8, 85u8, 138u8, 242u8, 215u8, 11u8, 173u8, 172u8, 127u8,
+							246u8, 188u8, 107u8, 166u8, 223u8, 181u8, 105u8, 81u8, 136u8, 100u8,
+							180u8, 221u8, 251u8, 24u8, 145u8, 19u8, 118u8, 67u8, 217u8, 164u8,
+							168u8, 151u8,
 						],
 					)
 				}
@@ -7983,9 +7984,9 @@ pub mod api {
 					pub type MiningConfig =
 						runtime_types::argon_primitives::block_seal::MiningSlotConfig;
 				}
-				pub mod current_slot_id {
+				pub mod last_activated_cohort_id {
 					use super::runtime_types;
-					pub type CurrentSlotId = ::core::primitive::u64;
+					pub type LastActivatedCohortId = ::core::primitive::u64;
 				}
 			}
 			pub struct StorageApi;
@@ -8026,9 +8027,10 @@ pub mod api {
 						"ActiveMinersByIndex",
 						(),
 						[
-							119u8, 104u8, 127u8, 30u8, 104u8, 39u8, 80u8, 191u8, 16u8, 73u8, 163u8,
-							213u8, 89u8, 69u8, 9u8, 34u8, 174u8, 9u8, 153u8, 241u8, 61u8, 65u8,
-							56u8, 106u8, 88u8, 90u8, 40u8, 91u8, 61u8, 174u8, 153u8, 61u8,
+							203u8, 163u8, 42u8, 210u8, 142u8, 116u8, 136u8, 222u8, 39u8, 222u8,
+							205u8, 127u8, 2u8, 17u8, 214u8, 57u8, 221u8, 104u8, 47u8, 99u8, 65u8,
+							101u8, 182u8, 227u8, 33u8, 26u8, 184u8, 134u8, 249u8, 205u8, 234u8,
+							188u8,
 						],
 					)
 				}
@@ -8052,9 +8054,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							119u8, 104u8, 127u8, 30u8, 104u8, 39u8, 80u8, 191u8, 16u8, 73u8, 163u8,
-							213u8, 89u8, 69u8, 9u8, 34u8, 174u8, 9u8, 153u8, 241u8, 61u8, 65u8,
-							56u8, 106u8, 88u8, 90u8, 40u8, 91u8, 61u8, 174u8, 153u8, 61u8,
+							203u8, 163u8, 42u8, 210u8, 142u8, 116u8, 136u8, 222u8, 39u8, 222u8,
+							205u8, 127u8, 2u8, 17u8, 214u8, 57u8, 221u8, 104u8, 47u8, 99u8, 65u8,
+							101u8, 182u8, 227u8, 33u8, 26u8, 184u8, 134u8, 249u8, 205u8, 234u8,
+							188u8,
 						],
 					)
 				}
@@ -8237,9 +8240,10 @@ pub mod api {
 						"NextSlotCohort",
 						(),
 						[
-							56u8, 141u8, 64u8, 251u8, 71u8, 160u8, 209u8, 61u8, 171u8, 142u8, 93u8,
-							64u8, 78u8, 210u8, 248u8, 253u8, 8u8, 202u8, 221u8, 143u8, 74u8, 113u8,
-							106u8, 236u8, 206u8, 213u8, 35u8, 116u8, 75u8, 181u8, 6u8, 150u8,
+							181u8, 96u8, 254u8, 236u8, 218u8, 69u8, 249u8, 62u8, 186u8, 83u8, 98u8,
+							245u8, 86u8, 140u8, 132u8, 112u8, 122u8, 199u8, 8u8, 172u8, 227u8,
+							175u8, 99u8, 51u8, 192u8, 197u8, 23u8, 193u8, 189u8, 215u8, 113u8,
+							212u8,
 						],
 					)
 				}
@@ -8306,24 +8310,24 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The current slot id"]
-				pub fn current_slot_id(
+				#[doc = " The last activated cohort id"]
+				pub fn last_activated_cohort_id(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::current_slot_id::CurrentSlotId,
+					types::last_activated_cohort_id::LastActivatedCohortId,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"CurrentSlotId",
+						"LastActivatedCohortId",
 						(),
 						[
-							7u8, 104u8, 45u8, 85u8, 217u8, 13u8, 134u8, 192u8, 179u8, 232u8, 28u8,
-							201u8, 154u8, 255u8, 176u8, 220u8, 2u8, 161u8, 199u8, 79u8, 190u8,
-							86u8, 225u8, 116u8, 65u8, 165u8, 234u8, 34u8, 162u8, 236u8, 167u8, 5u8,
+							66u8, 134u8, 40u8, 119u8, 180u8, 55u8, 113u8, 201u8, 173u8, 112u8,
+							220u8, 164u8, 58u8, 186u8, 248u8, 7u8, 60u8, 210u8, 54u8, 237u8, 26u8,
+							83u8, 79u8, 220u8, 25u8, 167u8, 96u8, 17u8, 184u8, 143u8, 43u8, 0u8,
 						],
 					)
 				}
@@ -23402,7 +23406,7 @@ pub mod api {
 					>,
 					pub authority_keys: _2,
 					#[codec(compact)]
-					pub slot_id: ::core::primitive::u64,
+					pub cohort_id: ::core::primitive::u64,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

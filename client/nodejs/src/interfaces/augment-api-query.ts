@@ -799,10 +799,6 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Option<AccountId32>>,
         [ArgonPrimitivesBlockSealAppPublic]
       >;
-      /**
-       * The current slot id
-       **/
-      currentSlotId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       hasAddedGrandpaRotation: AugmentedQuery<
         ApiType,
         () => Observable<bool>,
@@ -824,6 +820,10 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<bool>,
         []
       >;
+      /**
+       * The last activated cohort id
+       **/
+      lastActivatedCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The mining slot configuration set in genesis
        **/

@@ -305,7 +305,7 @@ export default {
     argonots: 'Compact<u128>',
     rewardSharing: 'Option<ArgonPrimitivesBlockSealRewardSharing>',
     authorityKeys: 'ArgonRuntimeSessionKeys',
-    slotId: 'Compact<u64>',
+    cohortId: 'Compact<u64>',
   },
   /**
    * Lookup42: argon_runtime::SessionKeys

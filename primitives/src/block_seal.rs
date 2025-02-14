@@ -56,7 +56,7 @@ impl<B: Block> ComputePuzzle<B> {
 	}
 }
 
-pub type SlotId = u64;
+pub type CohortId = u64;
 
 #[derive(
 	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
@@ -79,7 +79,7 @@ pub struct MiningRegistration<
 	pub reward_sharing: Option<RewardSharing<AccountId>>,
 	pub authority_keys: Keys,
 	#[codec(compact)]
-	pub slot_id: SlotId,
+	pub cohort_id: CohortId,
 }
 
 #[derive(

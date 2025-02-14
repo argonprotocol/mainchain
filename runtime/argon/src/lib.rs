@@ -298,7 +298,7 @@ pub struct GrandpaSlotRotation;
 impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	type Key = GrandpaId;
 	fn rotate_grandpas(
-		_current_slot_id: SlotId,
+		_current_cohort_id: CohortId,
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
 		_added_authorities: Vec<(&AccountId, Self::Key)>,
 	) {
