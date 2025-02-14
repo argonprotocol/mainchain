@@ -98,6 +98,7 @@ parameter_types! {
 			annual_percent_rate: FixedU128::from_float(10.0),
 			base_fee: 0,
 		},
+		activation_tick: 1,
 		operator_account_id: 1,
 		added_securitization_percent: FixedU128::from_float(0.0),
 		mining_reward_sharing_percent_take: FixedU128::from_float(0.0),

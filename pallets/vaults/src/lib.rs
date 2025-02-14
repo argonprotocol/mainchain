@@ -65,7 +65,7 @@ pub mod pallet {
 		MiningSlotProvider, ObligationEvents, ObligationId, RewardShare, TickProvider, VaultId,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -106,12 +106,6 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxPendingTermModificationsPerTick: Get<u32>;
 
-		/// The number of ticks that a change in terms will take before applying. Terms only apply
-		/// on a slot changeover, so this setting is the minimum blocks that must pass, in
-		/// addition to the time to the next slot after that
-		#[pallet::constant]
-		type MinTermsModificationTickDelay: Get<Tick>;
-
 		/// The number of ticks that a funding change will be delayed before it takes effect
 		#[pallet::constant]
 		type MiningArgonIncreaseTickDelay: Get<Tick>;
@@ -136,6 +130,9 @@ pub mod pallet {
 		/// Is reward sharing enabled
 		#[pallet::constant]
 		type EnableRewardSharing: Get<bool>;
+
+		/// Maturation period for base fees
+		type BaseFeeMaturationTicks: Get<Tick>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -176,6 +173,16 @@ pub mod pallet {
 		Twox64Concat,
 		Tick,
 		BoundedVec<VaultId, T::MaxPendingTermModificationsPerTick>,
+		ValueQuery,
+	>;
+
+	/// Pending base fee hold releases
+	#[pallet::storage]
+	pub(super) type PendingBaseFeeMaturationByTick<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		Tick,
+		BoundedVec<(T::AccountId, T::Balance, VaultId, ObligationId), ConstU32<1000>>,
 		ValueQuery,
 	>;
 
@@ -221,6 +228,7 @@ pub mod pallet {
 			bonded_argons: T::Balance,
 			added_securitization_percent: FixedU128,
 			operator_account_id: T::AccountId,
+			activation_tick: Tick,
 		},
 		VaultModified {
 			vault_id: VaultId,
@@ -281,6 +289,13 @@ pub mod pallet {
 			obligation_id: ObligationId,
 			error: DispatchError,
 		},
+		/// An error occurred releasing a base fee hold
+		ObligationBaseFeeMaturationError {
+			obligation_id: ObligationId,
+			base_fee: T::Balance,
+			vault_id: VaultId,
+			error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -325,6 +340,8 @@ pub mod pallet {
 		HoldUnexpectedlyModified,
 		UnrecoverableHold,
 		VaultNotFound,
+		/// The vault is not yet active
+		VaultNotYetActive,
 		/// No Vault public keys are available
 		NoVaultBitcoinPubkeysAvailable,
 		/// The terms modification list could not handle any more items
@@ -339,6 +356,8 @@ pub mod pallet {
 		FundingChangeAlreadyScheduled,
 		/// An error occurred processing an obligation completion
 		ObligationCompletionError,
+		/// Too many base fee maturations were inserted per tick
+		BaseFeeOverflow,
 	}
 
 	impl<T> From<ObligationError> for Error<T> {
@@ -367,6 +386,8 @@ pub mod pallet {
 				ObligationError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
 				ObligationError::ObligationCompletionError => Error::<T>::ObligationCompletionError,
+				ObligationError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
+				ObligationError::BaseFeeOverflow => Error::<T>::BaseFeeOverflow,
 			}
 		}
 	}
@@ -422,6 +443,33 @@ pub mod pallet {
 				}
 			}
 
+			let pending_base_hold_releases =
+				(previous_tick..=current_tick).flat_map(PendingBaseFeeMaturationByTick::<T>::take);
+			for (who, amount, vault_id, obligation_id) in pending_base_hold_releases {
+				let res = with_storage_layer(|| {
+					T::Currency::release(
+						&HoldReason::ObligationFee.into(),
+						&who,
+						amount,
+						Precision::Exact,
+					)
+				});
+				if let Err(e) = res {
+					log::error!(
+						"Base fee failed to release for vault {:?} {:?}, {:?}",
+						vault_id,
+						amount,
+						e
+					);
+					Self::deposit_event(Event::<T>::ObligationBaseFeeMaturationError {
+						obligation_id,
+						vault_id,
+						base_fee: amount,
+						error: e,
+					});
+				}
+			}
+
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let bitcoin_completions = (start_bitcoin_height..=bitcoin_block_height)
 				.flat_map(BitcoinLockCompletions::<T>::take);
@@ -439,6 +487,7 @@ pub mod pallet {
 					});
 				}
 			}
+
 			T::DbWeight::get().reads_writes(0, 2)
 		}
 
@@ -534,6 +583,8 @@ pub mod pallet {
 				mining_reward_sharing_percent_take = RewardShare::zero();
 			}
 
+			let activation_tick = Self::get_terms_activation_tick();
+
 			let mut vault = Vault {
 				operator_account_id: who.clone(),
 				bitcoin_argons: VaultArgons {
@@ -550,6 +601,7 @@ pub mod pallet {
 				},
 				mining_reward_sharing_percent_take,
 				added_securitization_percent,
+				activation_tick,
 				added_securitization_argons: 0u32.into(),
 				is_closed: false,
 				pending_terms: None,
@@ -575,6 +627,7 @@ pub mod pallet {
 				bonded_argons: bonded_argons_allocated,
 				added_securitization_percent,
 				operator_account_id: who,
+				activation_tick,
 			});
 
 			Ok(())
@@ -704,16 +757,7 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
 
-			let current_tick = T::TickProvider::current_tick();
-			let mut terms_change_tick = T::MiningSlotProvider::get_next_slot_tick();
-
-			if terms_change_tick.saturating_sub(current_tick) <
-				T::MinTermsModificationTickDelay::get()
-			{
-				// delay until next slot
-				let window = T::MiningSlotProvider::mining_window_tick();
-				terms_change_tick = terms_change_tick.saturating_add(window);
-			}
+			let terms_change_tick = Self::get_terms_activation_tick();
 
 			PendingTermsModificationsByTick::<T>::mutate(terms_change_tick, |a| {
 				if !a.iter().any(|x| *x == vault_id) {
@@ -816,6 +860,13 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub(crate) fn get_terms_activation_tick() -> Tick {
+			if T::MiningSlotProvider::is_slot_bidding_started() {
+				return T::MiningSlotProvider::get_next_slot_tick();
+			}
+			T::TickProvider::current_tick()
+		}
+
 		fn hold(
 			who: &T::AccountId,
 			amount: T::Balance,
@@ -929,6 +980,7 @@ pub mod pallet {
 			fund_type: FundType,
 			ticks: Tick,
 			beneficiary: &T::AccountId,
+			obligation_id: ObligationId,
 		) -> Result<(T::Balance, T::Balance), ObligationError> {
 			ensure!(
 				amount >= T::MinimumObligationAmount::get(),
@@ -936,6 +988,11 @@ pub mod pallet {
 			);
 			let mut vault = VaultsById::<T>::get(vault_id)
 				.ok_or::<ObligationError>(ObligationError::VaultNotFound)?;
+
+			ensure!(
+				vault.activation_tick <= T::TickProvider::current_tick(),
+				ObligationError::VaultNotYetActive
+			);
 
 			ensure!(!vault.is_closed, ObligationError::VaultClosed);
 
@@ -959,16 +1016,27 @@ pub mod pallet {
 
 			let fee = Self::calculate_tick_fees(apr, amount, ticks).saturating_add(base_fee);
 
-			T::Currency::transfer(
+			T::Currency::transfer_and_hold(
+				&HoldReason::ObligationFee.into(),
 				beneficiary,
 				&vault.operator_account_id,
 				base_fee,
+				Precision::Exact,
 				Preservation::Preserve,
+				Fortitude::Force,
 			)
 			.map_err(|e| match e {
 				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
 				_ => ObligationError::InsufficientFunds,
 			})?;
+
+			let base_fee_maturation =
+				T::TickProvider::current_tick().saturating_add(T::BaseFeeMaturationTicks::get());
+			PendingBaseFeeMaturationByTick::<T>::try_append(
+				base_fee_maturation,
+				(vault.operator_account_id.clone(), base_fee, vault_id, obligation_id),
+			)
+			.map_err(|_| ObligationError::BaseFeeOverflow)?;
 
 			if fee > base_fee {
 				Self::hold(beneficiary, fee - base_fee, HoldReason::ObligationFee)?;
@@ -1251,8 +1319,14 @@ pub mod pallet {
 		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
 			let obligation_id = NextObligationId::<T>::get().unwrap_or(1);
 
-			let (total_fee, prepaid_fee) =
-				Self::bond_funds(vault_id, amount, fund_type.clone(), ticks, account_id)?;
+			let (total_fee, prepaid_fee) = Self::bond_funds(
+				vault_id,
+				amount,
+				fund_type.clone(),
+				ticks,
+				account_id,
+				obligation_id,
+			)?;
 
 			let next_obligation_id =
 				obligation_id.increment().ok_or(ObligationError::NoMoreObligationIds)?;
@@ -1358,6 +1432,7 @@ pub mod pallet {
 							FundType::BondedArgons,
 							bond_ticks,
 							&account_id,
+							obligation_id,
 						)?;
 
 						obligation.amount = obligation.amount.saturating_add(amount);

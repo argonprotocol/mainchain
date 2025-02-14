@@ -18,8 +18,8 @@ use crate::{
 	mock::{Vaults, *},
 	pallet::{
 		BitcoinLockCompletions, BondedArgonCompletions, NextVaultId, ObligationsById,
-		PendingFundingModificationsByTick, PendingTermsModificationsByTick, VaultXPubById,
-		VaultsById,
+		PendingBaseFeeMaturationByTick, PendingFundingModificationsByTick,
+		PendingTermsModificationsByTick, VaultXPubById, VaultsById,
 	},
 	Error, Event, HoldReason, VaultConfig,
 };
@@ -86,6 +86,7 @@ fn it_can_create_a_vault() {
 		System::assert_last_event(
 			Event::VaultCreated {
 				vault_id: 1,
+				activation_tick: CurrentTick::get(),
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
 				bonded_argons: 50_000,
@@ -105,6 +106,47 @@ fn it_can_create_a_vault() {
 }
 
 #[test]
+fn it_delays_vault_activation_after_bidding() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		assert_noop!(
+			Vaults::create(RuntimeOrigin::signed(1), default_vault()),
+			Error::<Test>::InsufficientFunds
+		);
+
+		set_argons(1, 100_010);
+		IsSlotBiddingStarted::set(true);
+
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		System::assert_last_event(
+			Event::VaultCreated {
+				vault_id: 1,
+				activation_tick: 100,
+				operator_account_id: 1,
+				bitcoin_argons: 50_000,
+				bonded_argons: 50_000,
+				added_securitization_percent: FixedU128::zero(),
+			}
+			.into(),
+		);
+
+		assert_err!(
+			Vaults::create_obligation(
+				1,
+				&2,
+				FundType::Bitcoin,
+				50_000,
+				ObligationExpiration::AtTick(100),
+				100,
+			),
+			ObligationError::VaultNotYetActive
+		);
+	});
+}
+
+#[test]
 fn it_can_add_securitization_to_a_vault() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -118,6 +160,7 @@ fn it_can_add_securitization_to_a_vault() {
 		System::assert_last_event(
 			Event::VaultCreated {
 				vault_id: 1,
+				activation_tick: CurrentTick::get(),
 				operator_account_id: 1,
 				bitcoin_argons: 50_000,
 				bonded_argons: 50_000,
@@ -395,7 +438,7 @@ fn it_can_close_a_vault() {
 		);
 		assert_eq!(
 			Balances::free_balance(1),
-			vault_owner_balance - (amount * 2) - amount - bonded_argons + 1
+			vault_owner_balance - (amount * 2) - amount - bonded_argons
 		);
 		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
@@ -404,8 +447,15 @@ fn it_can_close_a_vault() {
 		// now when we complete an obligation, it should return the funds to the vault
 		assert_ok!(Vaults::cancel_obligation(1));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
-		assert_eq!(Balances::free_balance(1), vault_owner_balance - bonded_argons + fee);
+		assert_eq!(
+			Balances::free_balance(1),
+			vault_owner_balance - bonded_argons + fee - obligation.prepaid_fee
+		);
 		assert_eq!(Balances::free_balance(2), 100_000 - fee);
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &1),
+			obligation.prepaid_fee
+		);
 
 		assert_err!(
 			Vaults::create_obligation(
@@ -493,6 +543,11 @@ fn it_can_create_obligation() {
 			2440,
 		)
 		.expect("bonding failed");
+		let maturation = CurrentTick::get() + BaseFeeMaturationTicks::get();
+		assert_eq!(
+			PendingBaseFeeMaturationByTick::<Test>::get(maturation).to_vec()[0],
+			(1, obligation.prepaid_fee, 1, 1)
+		);
 
 		let total_fee = obligation.total_fee;
 		let paid = obligation.prepaid_fee;
@@ -503,12 +558,18 @@ fn it_can_create_obligation() {
 		assert_eq!(paid, 1000);
 		assert_eq!(Balances::free_balance(2), 2_000 - fee - paid);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &2), fee);
-		assert_eq!(Balances::free_balance(1), 500_000 + paid);
+		assert_eq!(Balances::free_balance(1), 500_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &1), paid);
 
 		// if we cancel the obligation, the prepaid won't be returned
 		assert_ok!(Vaults::cancel_obligation(1));
-		assert_eq!(Balances::free_balance(1), 500_000 + paid);
+		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::free_balance(2), 2_000 - paid);
+
+		CurrentTick::set(maturation);
+		Vaults::on_initialize(2);
+		Vaults::on_finalize(2);
+		assert_eq!(Balances::free_balance(1), 500_000 + paid);
 	});
 }
 
@@ -602,6 +663,11 @@ fn it_can_charge_prorated_create_obligation() {
 		.expect("bonding failed");
 		let total_fee = obligation.total_fee;
 		let paid = obligation.prepaid_fee;
+		let maturation = CurrentTick::get() + BaseFeeMaturationTicks::get();
+		assert_eq!(
+			PendingBaseFeeMaturationByTick::<Test>::get(maturation).to_vec()[0],
+			(1, obligation.prepaid_fee, 1, 1)
+		);
 
 		let per_block_fee = 0.1f64 * 100_000f64 / (1440f64 * 365f64);
 		println!("per block fee: {}, total {:?}, paid {:}", per_block_fee, total_fee, paid);
@@ -612,7 +678,7 @@ fn it_can_charge_prorated_create_obligation() {
 		assert_eq!(paid, 123);
 		assert_eq!(Balances::free_balance(2), 2_000 - apr_fee - paid);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &2), apr_fee);
-		assert_eq!(Balances::free_balance(1), 500_000 + paid);
+		assert_eq!(Balances::free_balance(1), 500_000);
 
 		CurrentTick::set(5 + 1440);
 		// if we cancel the obligation, the prepaid won't be returned
@@ -621,9 +687,14 @@ fn it_can_charge_prorated_create_obligation() {
 		let expected_apr_fee = (per_block_fee * 1440f64) as u128;
 		assert_eq!(to_return_res.unwrap(), total_fee - expected_apr_fee - paid);
 
-		assert_eq!(Balances::free_balance(1), 500_000 + paid + expected_apr_fee);
+		assert_eq!(Balances::free_balance(1), 500_000 + expected_apr_fee);
 		assert_eq!(Balances::free_balance(2), 2_000 - paid - expected_apr_fee);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ObligationFee.into(), &2), 0);
+
+		CurrentTick::set(maturation);
+		Vaults::on_initialize(maturation);
+		Vaults::on_finalize(maturation);
+		assert_eq!(Balances::free_balance(1), 500_000 + paid + expected_apr_fee);
 	});
 }
 
@@ -895,6 +966,7 @@ fn it_can_schedule_term_changes() {
 
 		System::set_block_number(10);
 		Vaults::on_finalize(10);
+		IsSlotBiddingStarted::set(true);
 
 		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.03);
 		assert_ok!(Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()));
@@ -932,6 +1004,39 @@ fn it_can_schedule_term_changes() {
 		assert_eq!(PendingTermsModificationsByTick::<Test>::get(100).first(), None);
 	});
 }
+
+#[test]
+fn it_can_schedule_terms_changes_before_bidding_starts() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut terms = default_terms(TEN_PCT);
+		let config = VaultConfig {
+			terms: terms.clone(),
+			bitcoin_xpubkey: keys(),
+			bitcoin_amount_allocated: 100_000,
+			bonded_argons_allocated: 100_000,
+			added_securitization_percent: FixedU128::zero(),
+		};
+		set_argons(1, 1_000_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
+
+		System::set_block_number(10);
+		Vaults::on_finalize(10);
+		IsSlotBiddingStarted::set(false);
+
+		terms.mining_reward_sharing_percent_take = FixedU128::from_float(0.03);
+		System::initialize(&11, &System::parent_hash(), &Default::default());
+		Vaults::on_initialize(11);
+		assert_ok!(Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms.clone()));
+		Vaults::on_finalize(11);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().mining_reward_sharing_percent_take,
+			FixedU128::from_float(0.03)
+		);
+	});
+}
+
 #[test]
 fn it_can_calculate_apr() {
 	new_test_ext().execute_with(|| {

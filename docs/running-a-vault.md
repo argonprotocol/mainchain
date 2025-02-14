@@ -45,7 +45,7 @@ These are completely not at risk.
   exchange for profit sharing on any minted Argons during the Mining Slot. This can be an appealing offer for miners so
   they don't have to try to predict an optimal bid that will out-pace the slot earnings (eg, by looking at the pattern
   of previous slots and hoping the demand for new argons remains the same or above).
-- `Mining Argons`: The number of argons a Vault will offer for BondedArgons. Once an argon is locked for the 10 days, it
+- `Bonded Argons`: The number of argons a Vault will offer for BondedArgons. Once an argon is locked for the 10 days, it
   will not be returned to the Vault until the term is complete.
 
 ## The Argon Bitcoin CLI
@@ -176,11 +176,16 @@ Once your vault is created, you can look at the block it was included in to see 
 
 ![Polkadot.js Vault Id](images/pjs-vaultid.png)
 
+### 4. Wait for your Vault to be Active
+
+Your vault will be active in the next Mining Slot (every day at noon EST). NOTE: this rule only applies once bidding has
+begun for Slot 1. The field to look at is `activation_tick`. The current tick is available under `Storage` -> `Ticks` ->
+`CurrentTick` in the Polkadotjs UI.
+
 ## Monitoring Cosign Requests
 
 As a Vault operator, you need to monitor the Argon mainchain for LockedBitcoin `release requests`. The simplest option
-is
-to use the CLI to monitor the mainchain for these requests.
+is to use the CLI to monitor the mainchain for these requests.
 
 ```bash
 $ argon-bitcoin-cli vault pending-release --vault-id=1 --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
@@ -240,3 +245,16 @@ $ argon-bitcoin-cli lock claim-utxo-psbt --utxo-id=1 \
 This will output a psbt string you can import into bitcoin-core or another wallet that supports PSBTs. Here's an example
 of where you can import (and broadcast) into Electrum:
 ![Electrum PSBT Import](images/electrum-import-psbt.png)
+
+## Vault Rules
+
+The following are a few rules around how and when you can add funding to a vault:
+
+- Vault funding can be added at any time, but will only be available for use after 1 hour
+- Vault funding can be removed at any time down to the level of current obligations (BitcoinLocks or BondedArgons)
+- Vaults must cosign any BitcoinLock release requests within 10 days of the request, or they will forfeit the market
+  value of the Bitcoins
+- Vaults must maintain or exceed the promised additional securitization percentage for the duration of any
+  LockedBitcoins
+- Vault terms will take effect in the next Mining Slot (every day at noon EST). This also applies to new vaults. The
+  exception is that prior to bidding for Slot 1, there are no delays.

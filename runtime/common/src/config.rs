@@ -103,9 +103,9 @@ parameter_types! {
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
+	pub const BaseFeeMaturationTicks: Tick = 60 * 24; // 1 day maturation time
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
-	pub const MinTermsModificationTickDelay: Tick = TicksPerDay::get() - 1; // must be at least one slot (day)
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
 
 	pub const EnableRewardSharing: bool = false;

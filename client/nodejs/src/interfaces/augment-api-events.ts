@@ -580,6 +580,10 @@ declare module '@polkadot/api-base/types/events' {
       ItemFailed: AugmentedEvent<ApiType, [error: SpRuntimeDispatchError], { error: SpRuntimeDispatchError }>;
     };
     vaults: {
+      /**
+       * An error occurred releasing a base fee hold
+       **/
+      ObligationBaseFeeMaturationError: AugmentedEvent<ApiType, [obligationId: u64, baseFee: u128, vaultId: u32, error: SpRuntimeDispatchError], { obligationId: u64, baseFee: u128, vaultId: u32, error: SpRuntimeDispatchError }>;
       ObligationCanceled: AugmentedEvent<ApiType, [vaultId: u32, obligationId: u64, beneficiary: AccountId32, fundType: ArgonPrimitivesVaultFundType, returnedFee: u128], { vaultId: u32, obligationId: u64, beneficiary: AccountId32, fundType: ArgonPrimitivesVaultFundType, returnedFee: u128 }>;
       ObligationCompleted: AugmentedEvent<ApiType, [vaultId: u32, obligationId: u64], { vaultId: u32, obligationId: u64 }>;
       /**
@@ -592,7 +596,7 @@ declare module '@polkadot/api-base/types/events' {
       VaultBondedArgonsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
       VaultBondedArgonsIncreased: AugmentedEvent<ApiType, [vaultId: u32, bondedArgons: u128], { vaultId: u32, bondedArgons: u128 }>;
       VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, bitcoinAmountStillReserved: u128, miningAmountStillReserved: u128, securitizationStillReserved: u128], { vaultId: u32, bitcoinAmountStillReserved: u128, miningAmountStillReserved: u128, securitizationStillReserved: u128 }>;
-      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32], { vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32 }>;
+      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32, activationTick: u64], { vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128, operatorAccountId: AccountId32, activationTick: u64 }>;
       VaultModified: AugmentedEvent<ApiType, [vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128], { vaultId: u32, bitcoinArgons: u128, bondedArgons: u128, addedSecuritizationPercent: u128 }>;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;

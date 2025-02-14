@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				186u8, 46u8, 193u8, 32u8, 72u8, 123u8, 188u8, 108u8, 16u8, 167u8, 158u8, 82u8,
-				125u8, 244u8, 164u8, 14u8, 91u8, 94u8, 86u8, 249u8, 234u8, 127u8, 109u8, 10u8,
-				133u8, 255u8, 102u8, 5u8, 101u8, 25u8, 114u8, 116u8,
+				196u8, 126u8, 16u8, 134u8, 55u8, 147u8, 14u8, 48u8, 116u8, 15u8, 123u8, 199u8,
+				191u8, 142u8, 135u8, 102u8, 106u8, 208u8, 12u8, 60u8, 82u8, 157u8, 151u8, 152u8,
+				141u8, 130u8, 178u8, 202u8, 149u8, 88u8, 8u8, 124u8,
 			]
 	}
 	pub mod system {
@@ -4970,9 +4970,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							120u8, 139u8, 93u8, 223u8, 7u8, 180u8, 212u8, 159u8, 67u8, 47u8, 103u8,
-							89u8, 168u8, 67u8, 182u8, 149u8, 138u8, 12u8, 197u8, 171u8, 57u8,
-							160u8, 211u8, 97u8, 113u8, 39u8, 86u8, 157u8, 180u8, 51u8, 64u8, 78u8,
+							150u8, 46u8, 198u8, 24u8, 44u8, 86u8, 27u8, 150u8, 105u8, 152u8, 103u8,
+							11u8, 118u8, 107u8, 240u8, 227u8, 59u8, 98u8, 105u8, 144u8, 78u8, 42u8,
+							208u8, 12u8, 126u8, 81u8, 101u8, 113u8, 244u8, 162u8, 241u8, 182u8,
 						],
 					)
 				}
@@ -9516,6 +9516,7 @@ pub mod api {
 				pub bonded_argons: vault_created::BondedArgons,
 				pub added_securitization_percent: vault_created::AddedSecuritizationPercent,
 				pub operator_account_id: vault_created::OperatorAccountId,
+				pub activation_tick: vault_created::ActivationTick,
 			}
 			pub mod vault_created {
 				use super::runtime_types;
@@ -9525,6 +9526,7 @@ pub mod api {
 				pub type AddedSecuritizationPercent =
 					runtime_types::sp_arithmetic::fixed_point::FixedU128;
 				pub type OperatorAccountId = crate::types::AccountId32;
+				pub type ActivationTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultCreated {
 				const PALLET: &'static str = "Vaults";
@@ -9840,6 +9842,35 @@ pub mod api {
 				const PALLET: &'static str = "Vaults";
 				const EVENT: &'static str = "ObligationCompletionError";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An error occurred releasing a base fee hold"]
+			pub struct ObligationBaseFeeMaturationError {
+				pub obligation_id: obligation_base_fee_maturation_error::ObligationId,
+				pub base_fee: obligation_base_fee_maturation_error::BaseFee,
+				pub vault_id: obligation_base_fee_maturation_error::VaultId,
+				pub error: obligation_base_fee_maturation_error::Error,
+			}
+			pub mod obligation_base_fee_maturation_error {
+				use super::runtime_types;
+				pub type ObligationId = ::core::primitive::u64;
+				pub type BaseFee = ::core::primitive::u128;
+				pub type VaultId = ::core::primitive::u32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ObligationBaseFeeMaturationError {
+				const PALLET: &'static str = "Vaults";
+				const EVENT: &'static str = "ObligationBaseFeeMaturationError";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -9879,6 +9910,17 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u32,
 						>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod pending_base_fee_maturation_by_tick {
+					use super::runtime_types;
+					pub type PendingBaseFeeMaturationByTick =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+							crate::types::AccountId32,
+							::core::primitive::u128,
+							::core::primitive::u32,
+							::core::primitive::u64,
+						)>;
 					pub type Param0 = ::core::primitive::u64;
 				}
 				pub mod next_obligation_id {
@@ -9948,10 +9990,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							222u8, 112u8, 132u8, 125u8, 224u8, 150u8, 13u8, 97u8, 190u8, 68u8,
-							108u8, 163u8, 61u8, 134u8, 148u8, 63u8, 155u8, 20u8, 112u8, 74u8,
-							130u8, 207u8, 61u8, 240u8, 204u8, 137u8, 139u8, 182u8, 253u8, 39u8,
-							252u8, 108u8,
+							183u8, 1u8, 124u8, 44u8, 31u8, 43u8, 172u8, 255u8, 19u8, 25u8, 86u8,
+							136u8, 201u8, 240u8, 104u8, 62u8, 63u8, 209u8, 224u8, 133u8, 243u8,
+							16u8, 133u8, 70u8, 105u8, 97u8, 134u8, 76u8, 132u8, 12u8, 91u8, 63u8,
 						],
 					)
 				}
@@ -9975,10 +10016,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							222u8, 112u8, 132u8, 125u8, 224u8, 150u8, 13u8, 97u8, 190u8, 68u8,
-							108u8, 163u8, 61u8, 134u8, 148u8, 63u8, 155u8, 20u8, 112u8, 74u8,
-							130u8, 207u8, 61u8, 240u8, 204u8, 137u8, 139u8, 182u8, 253u8, 39u8,
-							252u8, 108u8,
+							183u8, 1u8, 124u8, 44u8, 31u8, 43u8, 172u8, 255u8, 19u8, 25u8, 86u8,
+							136u8, 201u8, 240u8, 104u8, 62u8, 63u8, 209u8, 224u8, 133u8, 243u8,
+							16u8, 133u8, 70u8, 105u8, 97u8, 134u8, 76u8, 132u8, 12u8, 91u8, 63u8,
 						],
 					)
 				}
@@ -10130,6 +10170,55 @@ pub mod api {
 							216u8, 198u8, 102u8, 90u8, 39u8, 26u8, 75u8, 182u8, 95u8, 167u8, 114u8,
 							110u8, 253u8, 255u8, 201u8, 96u8, 2u8, 120u8, 136u8, 156u8, 246u8,
 							107u8, 215u8, 73u8, 24u8, 82u8, 250u8, 40u8, 19u8, 93u8, 141u8, 188u8,
+						],
+					)
+				}
+				#[doc = " Pending base fee hold releases"]
+				pub fn pending_base_fee_maturation_by_tick_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_base_fee_maturation_by_tick::PendingBaseFeeMaturationByTick,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"PendingBaseFeeMaturationByTick",
+						(),
+						[
+							142u8, 211u8, 128u8, 129u8, 177u8, 217u8, 114u8, 246u8, 29u8, 187u8,
+							194u8, 231u8, 62u8, 37u8, 225u8, 140u8, 243u8, 242u8, 217u8, 59u8,
+							66u8, 139u8, 87u8, 26u8, 30u8, 130u8, 119u8, 110u8, 114u8, 64u8, 64u8,
+							119u8,
+						],
+					)
+				}
+				#[doc = " Pending base fee hold releases"]
+				pub fn pending_base_fee_maturation_by_tick(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::pending_base_fee_maturation_by_tick::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_base_fee_maturation_by_tick::Param0,
+					>,
+					types::pending_base_fee_maturation_by_tick::PendingBaseFeeMaturationByTick,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"PendingBaseFeeMaturationByTick",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							142u8, 211u8, 128u8, 129u8, 177u8, 217u8, 114u8, 246u8, 29u8, 187u8,
+							194u8, 231u8, 62u8, 37u8, 225u8, 140u8, 243u8, 242u8, 217u8, 59u8,
+							66u8, 139u8, 87u8, 26u8, 30u8, 130u8, 119u8, 110u8, 114u8, 64u8, 64u8,
+							119u8,
 						],
 					)
 				}
@@ -10354,25 +10443,6 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
-						],
-					)
-				}
-				#[doc = " The number of ticks that a change in terms will take before applying. Terms only apply"]
-				#[doc = " on a slot changeover, so this setting is the minimum blocks that must pass, in"]
-				#[doc = " addition to the time to the next slot after that"]
-				pub fn min_terms_modification_tick_delay(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"MinTermsModificationTickDelay",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
 						],
 					)
 				}
@@ -24314,6 +24384,10 @@ pub mod api {
 					InternalError,
 					#[codec(index = 18)]
 					ObligationCompletionError,
+					#[codec(index = 19)]
+					VaultNotYetActive,
+					#[codec(index = 20)]
+					BaseFeeOverflow,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24370,6 +24444,7 @@ pub mod api {
 					)>,
 					pub pending_bonded_argons: ::core::option::Option<(::core::primitive::u64, _1)>,
 					pub pending_bitcoins: _1,
+					pub activation_tick: ::core::primitive::u64,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -30814,26 +30889,32 @@ pub mod api {
 					#[codec(index = 24)]
 					VaultNotFound,
 					#[codec(index = 25)]
+					#[doc = "The vault is not yet active"]
+					VaultNotYetActive,
+					#[codec(index = 26)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 26)]
+					#[codec(index = 27)]
 					#[doc = "The terms modification list could not handle any more items"]
 					TermsModificationOverflow,
-					#[codec(index = 27)]
+					#[codec(index = 28)]
 					#[doc = "Terms are already scheduled to be changed"]
 					TermsChangeAlreadyScheduled,
-					#[codec(index = 28)]
+					#[codec(index = 29)]
 					#[doc = "An internal processing error occurred"]
 					InternalError,
-					#[codec(index = 29)]
+					#[codec(index = 30)]
 					#[doc = "Unable to generate a new vault bitcoin pubkey"]
 					UnableToGenerateVaultBitcoinPubkey,
-					#[codec(index = 30)]
+					#[codec(index = 31)]
 					#[doc = "A funding change is already scheduled"]
 					FundingChangeAlreadyScheduled,
-					#[codec(index = 31)]
+					#[codec(index = 32)]
 					#[doc = "An error occurred processing an obligation completion"]
 					ObligationCompletionError,
+					#[codec(index = 33)]
+					#[doc = "Too many base fee maturations were inserted per tick"]
+					BaseFeeOverflow,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -30860,6 +30941,7 @@ pub mod api {
 						added_securitization_percent:
 							runtime_types::sp_arithmetic::fixed_point::FixedU128,
 						operator_account_id: crate::types::AccountId32,
+						activation_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
 					VaultModified {
@@ -30927,6 +31009,14 @@ pub mod api {
 					#[doc = "An error occurred while completing an obligation"]
 					ObligationCompletionError {
 						obligation_id: ::core::primitive::u64,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 13)]
+					#[doc = "An error occurred releasing a base fee hold"]
+					ObligationBaseFeeMaturationError {
+						obligation_id: ::core::primitive::u64,
+						base_fee: ::core::primitive::u128,
+						vault_id: ::core::primitive::u32,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}

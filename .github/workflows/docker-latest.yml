@@ -1,4 +1,4 @@
-name: Update latest release on docker
+name: Set Latest Docker Image
 
 on:
   release:
@@ -16,7 +16,7 @@ jobs:
       contents: write
       packages: write
     steps:
-
+      - uses: actions/checkout@v4
       - name: Determine if release is marked as latest
         id: get_latest
         run: |
@@ -36,6 +36,8 @@ jobs:
       - name: Update latest
         if: ${{ github.event.release.draft == false }}
         run: |
+          docker pull ghcr.io/argonprotocol/argon-miner:${{ env.VERSION }}
+          docker pull ghcr.io/argonprotocol/argon-notary:${{ env.VERSION }}
           docker tag ghcr.io/argonprotocol/argon-miner:${{ env.VERSION }} ghcr.io/argonprotocol/argon-miner:latest
           docker tag ghcr.io/argonprotocol/argon-notary:${{ env.VERSION }} ghcr.io/argonprotocol/argon-notary:latest
           docker push ghcr.io/argonprotocol/argon-miner:latest

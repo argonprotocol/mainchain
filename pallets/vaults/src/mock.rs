@@ -65,7 +65,6 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 parameter_types! {
 	pub static NextSlot: BlockNumberFor<Test> = 100;
 	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
-	pub const MinTermsModificationBlockDelay: BlockNumberFor<Test> = 25;
 	pub const FundingChangeBlockDelay: BlockNumberFor<Test> = 60;
 
 	pub static CurrentTick: Tick = 1;
@@ -73,6 +72,8 @@ parameter_types! {
 	pub static ElapsedTicks: Tick = 4;
 
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
+	pub static IsSlotBiddingStarted: bool = false;
+	pub static BaseFeeMaturationTicks: Tick = 1000;
 }
 pub struct StaticMiningSlotProvider;
 impl MiningSlotProvider for StaticMiningSlotProvider {
@@ -80,8 +81,11 @@ impl MiningSlotProvider for StaticMiningSlotProvider {
 		NextSlot::get()
 	}
 
-	fn mining_window_tick() -> Tick {
+	fn mining_window_ticks() -> Tick {
 		MiningWindowBlocks::get()
+	}
+	fn is_slot_bidding_started() -> bool {
+		IsSlotBiddingStarted::get()
 	}
 }
 
@@ -116,7 +120,6 @@ impl pallet_vaults::Config for Test {
 	type MinimumObligationAmount = MinimumObligationAmount;
 	type TicksPerDay = ConstU64<1440>;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
-	type MinTermsModificationTickDelay = MinTermsModificationBlockDelay;
 	type MiningArgonIncreaseTickDelay = FundingChangeBlockDelay;
 	type MiningSlotProvider = StaticMiningSlotProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
@@ -125,6 +128,7 @@ impl pallet_vaults::Config for Test {
 	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
 	type EventHandler = ();
 	type EnableRewardSharing = EnableRewardSharing;
+	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
 }
 
 // Build genesis storage according to the mock runtime.
