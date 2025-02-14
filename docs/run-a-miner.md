@@ -71,6 +71,7 @@ rpcallowip=127.0.0.1/0
 ```
 
 ---
+
 NOTE: this does not exclude other configs you may need to run your bitcoin node. We are pruning by default in our own
 [setup](https://github.com/argonprotocol/argon-ansible/tree/main/roles/bitcoin/templates/bitcoin.conf.j2).
 
@@ -95,8 +96,7 @@ signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
 
 ### Node Setup 3. The Argon software
 
-The Argon software. You can find the latest release on the [releases page](
-https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
+The Argon software. You can find the latest release on the [releases page](https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
 named `argon-node-v<VERSION>-x86_64-unknown-linux-gnu.tar.gz`. Download it to your server. You probably want to
 set
 this up as a systemd service on your own server. The ansible playbook will do this for you.
@@ -126,27 +126,27 @@ Here are some examples:
 **Start Script**
 You need to launch your node with configurations to connect to the Argon Testnet.
 
-   ```bash
-   NOTEBOOK_ARCHIVES="https://notebook-archives.argon.network"
-   ./argon-node --validator \
-      --name "Your Node Name" \
-      # Control the data location for your node
-      # --base-path /path/to/your/node/data \
-      # or a path to your testnet chain spec
-      --chain testnet \
-      # one or more archive host for the notebooks
-      --notebook-archive-hosts=$NOTEBOOK_ARCHIVES \
-      # the rpc url for your signet bitcoin node with blockfilters enabled
-      --bitcoin-rpc-url="http://bitcoin:<ENCODED_PASS>@127.0.0.1:38332" \
-      # allow rpc on your local host only by default
-      --rpc-port 9944 \
-      # don't connect to local peers
-      --no-mdns \
-      # add detailed logs
-      --detailed-log-output \
-      # your node identity file for connecting to the network
-      --node-key-file /home/argon/argon-node.key
-   ```
+```bash
+NOTEBOOK_ARCHIVES="https://notebook-archives.argon.network"
+./argon-node --validator \
+   --name "Your Node Name" \
+   # Control the data location for your node
+   # --base-path /path/to/your/node/data \
+   # or a path to your testnet chain spec
+   --chain testnet \
+   # one or more archive host for the notebooks
+   --notebook-archive-hosts=$NOTEBOOK_ARCHIVES \
+   # the rpc url for your signet bitcoin node with blockfilters enabled
+   --bitcoin-rpc-url="http://bitcoin:<ENCODED_PASS>@127.0.0.1:38332" \
+   # allow rpc on your local host only by default
+   --rpc-port 9944 \
+   # don't connect to local peers
+   --no-mdns \
+   # add detailed logs
+   --detailed-log-output \
+   # your node identity file for connecting to the network
+   --node-key-file /home/argon/argon-node.key
+```
 
 **Session Keys:**
 Once your node is up (the first time ONLY), you need to create session keys for your node. You can do this
@@ -246,7 +246,7 @@ Once you have successfully bid for a mining slot, you can start mining. You will
 with however many other active miners there are. A miner wins blocks in two ways:
 
 1. Your node is selected as the XOR closest node to a block vote submitted in a notebook for the current tick. The miner
-   with the closest XOR distance of their Authority ID (the key you registered as a *BlockSealAuthority Key*) to the
+   with the closest XOR distance of their Authority ID (the key you registered as a _BlockSealAuthority Key_) to the
    block vote key will win the block. This block will always take priority over the second method.
 2. Your node solves a Proof of Compute (RandomX) hash that is less than the current difficulty target. These blocks are
    considered "secondary" and will only be included if no primary block is available. You can fill in as many "compute"

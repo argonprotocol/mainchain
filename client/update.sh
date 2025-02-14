@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # This script is meant to be run on Unix/Linux based systems
-set -e
+set -ex
 
 BASEDIR=$(dirname "$0")
 PIPE="/tmp/argon-node-output"
@@ -37,8 +37,9 @@ subxt codegen  --derive Clone \
 
 curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"
 
-cd "$BASEDIR" && yarn
-cd "nodejs" && yarn build
+(cd "$BASEDIR" && yarn)
+(cd "$BASEDIR/nodejs" && yarn build)
+(cd "$BASEDIR" && yarn lint)
 
 # Cleanup and exit (this will be called automatically via trap)
 cleanup

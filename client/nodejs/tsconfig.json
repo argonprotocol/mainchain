@@ -1,18 +1,10 @@
 {
   "compilerOptions": {
     "paths": {
-      "@argonprotocol/mainchain/*": [
-        "src/*"
-      ],
-      "@polkadot/api/augment": [
-        "src/interfaces/augment-api.ts"
-      ],
-      "@polkadot/types/lookup": [
-        "src/interfaces/types-lookup.ts"
-      ],
-      "@polkadot/types/augment": [
-        "src/interfaces/augment-types.ts"
-      ]
+      "@argonprotocol/mainchain/*": ["src/*"],
+      "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
+      "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
+      "@polkadot/types/augment": ["src/interfaces/augment-types.ts"]
     },
     "target": "es2022",
     "module": "es2022",
@@ -26,10 +18,7 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitOverride": true,
-    "types": [
-      "node",
-      "jest"
-    ],
+    "types": ["node", "jest"],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
@@ -46,10 +35,5 @@
     "./src/examples/*",
     "./src/__test__/*"
   ],
-  "exclude": [
-    "**/localchain",
-    "build/**/*",
-    "node_modules",
-    "target"
-  ]
+  "exclude": ["**/localchain", "build/**/*", "node_modules", "target"]
 }

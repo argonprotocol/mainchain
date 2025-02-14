@@ -13,28 +13,15 @@
     "strict": false,
     "noImplicitOverride": true,
     "strictBindCallApply": true,
-    "types": [
-      "node",
-      "jest"
-    ],
+    "types": ["node", "jest"],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "sourceMap": true,
     "importHelpers": true,
     "skipDefaultLibCheck": true,
-    "typeRoots": [
-      "./index.d.ts",
-      "./node_modules/@types"
-    ]
+    "typeRoots": ["./index.d.ts", "./node_modules/@types"]
   },
-  "include": [
-    "__test__",
-    "./"
-  ],
-  "exclude": [
-    "build/**/*",
-    "node_modules",
-    "target"
-  ]
+  "include": ["__test__", "./"],
+  "exclude": ["build/**/*", "node_modules", "target"]
 }

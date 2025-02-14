@@ -27,8 +27,8 @@ The main difference is in how much control you have over your keys, and how secu
 the least secure, but also the most convenient. A hardware wallet is the most secure, but also the least convenient. A
 browser extension is somewhere in the middle.
 
-When keys are not connected to the internet, this is called a *"cold wallet"* or *"cold storage"*. When keys are
-connected to the internet in some form, this is called a *"hot wallet"* or *"hot storage"*. A hardware wallet is
+When keys are not connected to the internet, this is called a _"cold wallet"_ or _"cold storage"_. When keys are
+connected to the internet in some form, this is called a _"hot wallet"_ or _"hot storage"_. A hardware wallet is
 considered a cold wallet, while a browser extension is considered a hot wallet.
 
 ### Testnet (reduced security)

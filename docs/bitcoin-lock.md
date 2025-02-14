@@ -117,13 +117,13 @@ Network. You can replace the urls in the examples or set the environment variabl
 NOTE: the images in this document show using the Testnet, but the same general scheme applies to the Mainnet
 with the appropriate URLs.
 
-*Argon Foundation Mainnet*
+_Argon Foundation Mainnet_
 
 ```bash
 $ export TRUSTED_MAINCHAIN_URL=wss://rpc.argon.network
 ```
 
-*Testnet*
+_Testnet_
 
 ```bash
 $ export TRUSTED_MAINCHAIN_URL=wss://rpc.testnet.argonprotocol.org
@@ -160,14 +160,14 @@ Current mint value: ₳2.79 argons
 
 #### Fee Calculation
 
-The fee is calculated as `Base Fee` + `Annual Percent Rate` * `Market rate of Satoshis in Argons`. The parameters can be
+The fee is calculated as `Base Fee` + `Annual Percent Rate` \* `Market rate of Satoshis in Argons`. The parameters can be
 found in the Vault Storage and Price Index Storage (plug-in your `satoshis` and `chosen vault`):
 
-- *Bitcoin USD Price:* _Storage:_ `PriceIndex -> current -> btcUsdPrice`
-- *Argon USD Price:* _Storage:_ `PriceIndex -> current -> argonUsdPrice`
-- *Market Rate of Satoshis in Argons:* `[satoshis] * bitcoinUsdPrice / 100_000_000 / argonUsdPrice`
-- *Base Fee:* _Storage:_ `[Chosen Vault] -> bitcoinArgons -> baseFee`
-- *Annual Percent Rate:* _Storage:_ `[Chosen Vault] -> bitcoinArgons -> apr`
+- _Bitcoin USD Price:_ _Storage:_ `PriceIndex -> current -> btcUsdPrice`
+- _Argon USD Price:_ _Storage:_ `PriceIndex -> current -> argonUsdPrice`
+- _Market Rate of Satoshis in Argons:_ `[satoshis] * bitcoinUsdPrice / 100_000_000 / argonUsdPrice`
+- _Base Fee:_ _Storage:_ `[Chosen Vault] -> bitcoinArgons -> baseFee`
+- _Annual Percent Rate:_ _Storage:_ `[Chosen Vault] -> bitcoinArgons -> apr`
 
 ### 2. Submit a lock request
 

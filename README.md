@@ -79,12 +79,12 @@ PostgresSQL database to keep track of its history and users' balance tips.
   localchain [here](./docs/localchain.md).
 - `node`: The node implementation is the entry point for the Argon blockchain. It is responsible for networking,
   consensus, and running the blockchain.
-    - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
-      for creating all blocks during "Slot 0", before miners register for slots.
-    - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
-      has logic for retrieving notebooks from notaries and prioritizing blocks.
-    - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
-      back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
+  - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
+    for creating all blocks during "Slot 0", before miners register for slots.
+  - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
+    has logic for retrieving notebooks from notaries and prioritizing blocks.
+  - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
+    back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
 - `notary`: The notary validates localchain transactions and confirms they are operating on their latest tip. A notary
   runs on a Postgres database. It must submit notebooks rolling up all the localchain balance changes, votes and
   registered domains. Notebooks are submitted for each system "tick".
@@ -93,25 +93,25 @@ PostgresSQL database to keep track of its history and users' balance tips.
 - `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
 - `pallets`: The pallets are the various "tables" that make up the blockchain. They define the storage, dispatchables,
   events, and errors of the blockchain.
-    - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
-    - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
-      spent).
-    - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
-    - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-    - `bitcoin_locks`: Allows users to lock and unlock bitcoins.
-    - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
-    - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
-      akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
-    - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
-      mine blocks created by the notebook commit reveal scheme.
-    - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
-    - `notaries`: Registers the notaries and metadata to connect to them
-    - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
-      notebook. Also tracks the last changed notebook per localchain.
-    - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
-      inflation since the starting time.
-    - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-    - `vaults`: Register and manage vaults that offer BondedArgons to miners and LockedBitcoins to bitcoin holders.
+  - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
+  - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
+    spent).
+  - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
+  - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
+  - `bitcoin_locks`: Allows users to lock and unlock bitcoins.
+  - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
+  - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
+    akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
+  - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
+    mine blocks created by the notebook commit reveal scheme.
+  - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
+  - `notaries`: Registers the notaries and metadata to connect to them
+  - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
+    notebook. Also tracks the last changed notebook per localchain.
+  - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
+    inflation since the starting time.
+  - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
+  - `vaults`: Register and manage vaults that offer BondedArgons to miners and LockedBitcoins to bitcoin holders.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets
