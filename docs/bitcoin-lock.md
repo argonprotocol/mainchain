@@ -160,7 +160,8 @@ Current mint value: ₳2.79 argons
 
 #### Fee Calculation
 
-The fee is calculated as `Base Fee` + `Annual Percent Rate` \* `Market rate of Satoshis in Argons`. The parameters can be
+The fee is calculated as `Base Fee` + `Annual Percent Rate` \* `Market rate of Satoshis in Argons`. The parameters can
+be
 found in the Vault Storage and Price Index Storage (plug-in your `satoshis` and `chosen vault`):
 
 - _Bitcoin USD Price:_ _Storage:_ `PriceIndex -> current -> btcUsdPrice`
@@ -176,7 +177,7 @@ Based on the Vault terms, you will need enough `balance` (eg, _Storage_: `System
 account to cover the Vault Fee as well as the Fee to submit the transaction to the network.
 
 You'll need to fill in your Satoshis, the Vault ID and you need to tell the Vault what Pubkey you'll
-send the funds to (eg, select the address of the next pubkey from Electrum).
+use for the "release" cosignature (eg, select the address of the next pubkey from Electrum).
 
 > To Extract from Electrum, double-click the next Address. You will copy the public key.
 > ![Electrum - Next Address](images/electrum-key-details.png)
@@ -185,8 +186,8 @@ send the funds to (eg, select the address of the next pubkey from Electrum).
 
 > Replace your wss:// url below as appropriate for your network
 
-Submit
-a [lock initialize](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000) request to the mainchain.
+Submit a [lock initialize](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000)
+request to the mainchain.
 
 NOTE: you'll need to prefix it with 0x to paste into the UI.
 
@@ -289,9 +290,11 @@ This will provide a link to complete the transaction on the Polkadot.js interfac
 
 ### 2. Wait for the Vault to Cosign the Release
 
-Once you've submitted your release request, you'll need to wait for the Vault to Cosign the release of your LockedBitcoin.
+Once you've submitted your release request, you'll need to wait for the Vault to Cosign the release of your
+LockedBitcoin.
 
-You can monitor the Polkadot.js interface for the Vault to sign the transaction, or you can pre-sign the transaction and use the "wait"parameter on the CLI to wait for the transaction to be included in a block.
+You can monitor the Polkadot.js interface for the Vault to sign the transaction, or you can pre-sign the transaction and
+use the "wait"parameter on the CLI to wait for the transaction to be included in a block.
 
 > TEMPORARY HACK!: Electrum doesn't support miniscript yet, so can't understand the PSBT. You can use the Argon CLI to
 > sign the PSBT instead. See below to copy out the private key and sign the PSBT.
@@ -302,7 +305,8 @@ You can monitor the Polkadot.js interface for the Vault to sign the transaction,
 $ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
 ```
 
-This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see a psbt output that you can import into Electrum.
+This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see
+a psbt output that you can import into Electrum.
 ![Electrum - Import](images/electrum-import-psbt.png)
 
 You'll want to double-check it and then broadcast the transaction (it should be fully signed now)
