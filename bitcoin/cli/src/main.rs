@@ -8,7 +8,7 @@ use crate::{
 use anyhow::anyhow;
 use clap::{crate_version, Parser, Subcommand};
 use sp_runtime::FixedU128;
-use std::{env, str::FromStr};
+use std::{env, process::exit, str::FromStr};
 
 mod formatters;
 mod helpers;
@@ -66,13 +66,16 @@ async fn main() -> anyhow::Result<()> {
 	let rpc_url = cli.trusted_rpc_url.clone();
 
 	match cli.command {
-		Commands::Vault { subcommand } => subcommand.process(rpc_url).await?,
-		Commands::Lock { subcommand } => subcommand.process(rpc_url).await?,
-		Commands::Utils { subcommand } => subcommand.process(rpc_url).await?,
-		Commands::XPriv { subcommand } => subcommand.process(rpc_url).await?,
-	};
-
-	Ok(())
+		Commands::Vault { subcommand } => subcommand.process(rpc_url).await,
+		Commands::Lock { subcommand } => subcommand.process(rpc_url).await,
+		Commands::Utils { subcommand } => subcommand.process(rpc_url).await,
+		Commands::XPriv { subcommand } => subcommand.process(rpc_url).await,
+	}
+	.map_err(|e| {
+		tracing::info!("{:?}", e);
+		tracing::error!("{:?}", e.to_string());
+		exit(1);
+	})
 }
 
 #[derive(Subcommand, Debug)]

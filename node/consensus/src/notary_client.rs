@@ -24,7 +24,7 @@ use rand::prelude::SliceRandom;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
 use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
-use sp_api::ProvideRuntimeApi;
+use sp_api::{Core, ProvideRuntimeApi, RuntimeApiInfo};
 use sp_blockchain::HeaderBackend;
 use sp_core::H256;
 use sp_runtime::{
@@ -66,6 +66,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 		header_hash: H256,
 		notebook: &[u8],
 		notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
+		block_hashes: &[B::Hash],
 	) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error>;
 	fn vote_minimum(&self, block_hash: B::Hash) -> Result<VoteMinimum, Error>;
 	fn decode_signed_raw_notebook_header(
@@ -110,7 +111,34 @@ where
 		header_hash: H256,
 		notebook: &[u8],
 		notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
+		block_hashes: &[B::Hash],
 	) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {
+		let api_version = self.runtime_api().version(block_hash)?;
+		let notebook_api_version = api_version
+			.api_version(&<dyn NotebookApis<B, NotebookVerifyError>>::ID)
+			.unwrap_or_default();
+
+		// There are no block votes prior to version 2, but this validation check is also
+		// unnecessary, which is why it was removed
+		if notebook_api_version < 2 {
+			return self
+				.runtime_api()
+				.audit_notebook_and_get_votes(
+					block_hash,
+					version,
+					notary_id,
+					notebook_number,
+					notebook_tick,
+					header_hash,
+					&block_hashes
+						.iter()
+						.map(|h| (*h, 0))
+						.collect::<BTreeMap<B::Hash, VoteMinimum>>(),
+					&notebook.to_vec(),
+					notebook_dependencies,
+				)
+				.map_err(Into::into);
+		}
 		self.runtime_api()
 			.audit_notebook_and_get_votes_v2(
 				block_hash,
@@ -989,6 +1017,7 @@ where
 			notebook_details.header_hash,
 			&full_notebook.0,
 			notebook_dependencies.clone(),
+			&notebook_details.blocks_with_votes,
 		)? {
 			Ok(votes) => {
 				let vote_count = votes.raw_votes.len();
@@ -1348,6 +1377,7 @@ mod test {
 			_header_hash: H256,
 			_notebook: &[u8],
 			notebook_dependencies: Vec<NotaryNotebookAuditSummary>,
+			_blocks_with_votes: &[<Block as BlockT>::Hash],
 		) -> Result<Result<NotaryNotebookRawVotes, NotebookVerifyError>, Error> {
 			if let Some(err) = self.audit_failure.lock().take() {
 				return Ok(Err(err));
