@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				211u8, 239u8, 136u8, 72u8, 105u8, 128u8, 97u8, 250u8, 129u8, 159u8, 107u8, 141u8,
-				50u8, 76u8, 207u8, 182u8, 96u8, 237u8, 166u8, 117u8, 107u8, 255u8, 27u8, 195u8,
-				152u8, 31u8, 64u8, 155u8, 85u8, 155u8, 68u8, 38u8,
+				100u8, 123u8, 198u8, 186u8, 94u8, 15u8, 73u8, 64u8, 10u8, 223u8, 5u8, 225u8, 107u8,
+				4u8, 39u8, 181u8, 142u8, 241u8, 207u8, 20u8, 67u8, 159u8, 43u8, 166u8, 172u8,
+				131u8, 7u8, 135u8, 122u8, 117u8, 100u8, 109u8,
 			]
 	}
 	pub mod system {
@@ -4970,10 +4970,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							88u8, 148u8, 85u8, 138u8, 242u8, 215u8, 11u8, 173u8, 172u8, 127u8,
-							246u8, 188u8, 107u8, 166u8, 223u8, 181u8, 105u8, 81u8, 136u8, 100u8,
-							180u8, 221u8, 251u8, 24u8, 145u8, 19u8, 118u8, 67u8, 217u8, 164u8,
-							168u8, 151u8,
+							77u8, 64u8, 69u8, 183u8, 81u8, 47u8, 224u8, 144u8, 42u8, 169u8, 127u8,
+							237u8, 146u8, 4u8, 179u8, 122u8, 156u8, 54u8, 16u8, 92u8, 45u8, 74u8,
+							142u8, 46u8, 116u8, 0u8, 9u8, 36u8, 57u8, 30u8, 41u8, 45u8,
 						],
 					)
 				}
@@ -7764,6 +7763,7 @@ pub mod api {
 			pub struct NewMiners {
 				pub start_index: new_miners::StartIndex,
 				pub new_miners: new_miners::NewMiners,
+				pub cohort_id: new_miners::CohortId,
 			}
 			pub mod new_miners {
 				use super::runtime_types;
@@ -7775,6 +7775,7 @@ pub mod api {
 						runtime_types::argon_runtime::SessionKeys,
 					>,
 				>;
+				pub type CohortId = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NewMiners {
 				const PALLET: &'static str = "MiningSlot";
@@ -28622,6 +28623,7 @@ pub mod api {
 								runtime_types::argon_runtime::SessionKeys,
 							>,
 						>,
+						cohort_id: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
 					SlotBidderAdded {
