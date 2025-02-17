@@ -117,8 +117,11 @@ async fn test_end_to_end_default_vote_mining() {
 		if let Some(Ok(block)) = blocks_sub.next().await {
 			let events = block.events().await.unwrap();
 			for event in events.iter().flatten() {
-				if let Ok(Some(api::mining_slot::events::NewMiners { new_miners, start_index })) =
-					event.as_event()
+				if let Ok(Some(api::mining_slot::events::NewMiners {
+					new_miners,
+					start_index,
+					..
+				})) = event.as_event()
 				{
 					println!("New Miners at index: {:?} {}", new_miners.0, start_index);
 					miner_registrations += new_miners.0.len();
