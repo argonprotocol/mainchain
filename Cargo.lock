@@ -935,6 +935,7 @@ dependencies = [
  "hex",
  "inquire",
  "parity-scale-codec",
+ "rand",
  "sp-runtime",
  "subxt",
  "tokio",
