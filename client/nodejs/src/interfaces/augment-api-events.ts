@@ -808,10 +808,12 @@ declare module '@polkadot/api-base/types/events' {
         [
           startIndex: u32,
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
+          cohortId: u64,
         ],
         {
           startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
+          cohortId: u64;
         }
       >;
       ReleasedMinerSeat: AugmentedEvent<

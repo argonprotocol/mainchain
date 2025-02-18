@@ -344,6 +344,7 @@ declare module '@polkadot/types/lookup' {
     readonly asNewMiners: {
       readonly startIndex: u32;
       readonly newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
+      readonly cohortId: u64;
     } & Struct;
     readonly isSlotBidderAdded: boolean;
     readonly asSlotBidderAdded: {

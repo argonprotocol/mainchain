@@ -266,6 +266,7 @@ export default {
       NewMiners: {
         startIndex: 'u32',
         newMiners: 'Vec<ArgonPrimitivesBlockSealMiningRegistration>',
+        cohortId: 'u64',
       },
       SlotBidderAdded: {
         accountId: 'AccountId32',

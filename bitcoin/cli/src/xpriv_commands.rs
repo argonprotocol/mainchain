@@ -8,6 +8,7 @@ use bitcoin::{
 	key::Secp256k1,
 };
 use clap::{Parser, Subcommand};
+use rand::Rng;
 use std::str::FromStr;
 
 /// Create, secure, and manage your Bitcoin Master XPriv Key
@@ -47,7 +48,10 @@ impl XPrivCommands {
 				let mnemonic = if let Some(x) = mnemonic {
 					Mnemonic::from_str(&x).map_err(|e| anyhow!(e))?
 				} else {
-					Mnemonic::from_entropy(&[0; 32]).map_err(|e| anyhow!(e))?
+					let mut rng = rand::thread_rng();
+					let mut bytes = [0u8; 32];
+					rng.fill(&mut bytes);
+					Mnemonic::from_entropy(&bytes[..]).map_err(|e| anyhow!(e))?
 				};
 				let seed = mnemonic.to_seed("");
 
