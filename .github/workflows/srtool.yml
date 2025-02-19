@@ -30,6 +30,9 @@ jobs:
         with:
           chain: ${{ matrix.runtime }}
           package: ${{ matrix.package }}
+        env:
+          # optional: will be passed to docker srtool run cmd
+          BUILD_OPTS: "--features on-chain-release-build metadata-hash"
 
       - name: Store srtool digest to disk
         run: |
