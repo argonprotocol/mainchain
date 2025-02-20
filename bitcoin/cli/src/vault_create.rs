@@ -56,7 +56,7 @@ pub struct VaultConfig {
 }
 
 const FIELD_TO_LABEL: [(&str, &str); 9] = [
-	("bitcoin_argons", "bitcoin lock Argons"),
+	("bitcoin_argons", "Bitcoin Argons"),
 	("bitcoin_xpub", "Bitcoin XPub"),
 	("bitcoin_base_fee", "Bitcoin Base Fee Argons"),
 	("bitcoin_apr", "Bitcoin APR"),
