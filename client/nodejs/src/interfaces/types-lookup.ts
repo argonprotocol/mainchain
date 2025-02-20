@@ -3074,6 +3074,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBitcoinHeightNotConfirmed: boolean;
     readonly isMaxUtxosExceeded: boolean;
     readonly isInvalidBitcoinScript: boolean;
+    readonly isDuplicateUtxoId: boolean;
     readonly type:
       | 'NoPermissions'
       | 'NoBitcoinConfirmedBlock'
@@ -3085,7 +3086,8 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidBitcoinSyncHeight'
       | 'BitcoinHeightNotConfirmed'
       | 'MaxUtxosExceeded'
-      | 'InvalidBitcoinScript';
+      | 'InvalidBitcoinScript'
+      | 'DuplicateUtxoId';
   }
 
   /** @name ArgonPrimitivesVault (348) */

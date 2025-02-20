@@ -145,6 +145,8 @@ pub mod pallet {
 		MaxUtxosExceeded,
 		/// Locking script has errors
 		InvalidBitcoinScript,
+		/// Duplicated UtxoId. Already in use
+		DuplicateUtxoId,
 	}
 
 	#[pallet::genesis_config]
@@ -327,7 +329,7 @@ pub mod pallet {
 			satoshis: Satoshis,
 			watch_for_spent_until: BitcoinHeight,
 		) -> Result<(), DispatchError> {
-			ensure!(!<UtxoIdToRef<T>>::contains_key(utxo_id), Error::<T>::ScriptPubkeyConflict);
+			ensure!(!<UtxoIdToRef<T>>::contains_key(utxo_id), Error::<T>::DuplicateUtxoId);
 			<UtxosPendingConfirmation<T>>::try_mutate(|utxo_pending_confirmation| {
 				ensure!(
 					!utxo_pending_confirmation

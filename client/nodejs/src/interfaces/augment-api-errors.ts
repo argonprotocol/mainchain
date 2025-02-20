@@ -142,6 +142,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinHeightNotConfirmed: AugmentedError<ApiType>;
       /**
+       * Duplicated UtxoId. Already in use
+       **/
+      DuplicateUtxoId: AugmentedError<ApiType>;
+      /**
        * Insufficient bitcoin amount
        **/
       InsufficientBitcoinAmount: AugmentedError<ApiType>;
