@@ -128,6 +128,8 @@ where
 			votes_tick, votes_count, blocks_to_build_on.len());
 
 		for (block_hash, best_seal_strength) in blocks_to_build_on.into_iter() {
+			// TODO: should we add more top seals to check to ensure someone matches a block?
+			//   - we could delay the later ones to publish only if still best after a delay
 			let Ok(stronger_seals) = self
 				.client
 				.runtime_api()
@@ -185,6 +187,7 @@ where
 		let leaves = self.select_chain.leaves().await?;
 
 		let mut blocks_to_build_on = HashMap::new();
+		let finalized_block = self.client.info().finalized_number;
 
 		// Blocks are always created with a tick at least notebook tick +1, so the parent will be at
 		// notebook tick
@@ -233,6 +236,22 @@ where
 			}
 		}
 		blocks_to_build_on.retain(|block, strength| {
+			let block_number = match self.client.header(*block) {
+				Ok(Some(header)) => *header.number(),
+				_ => {
+					trace!("Could not get block number for block {:?}", block);
+					return false
+				},
+			};
+			// don't try to build on something older than the latest finalized block
+			if block_number < finalized_block {
+				trace!(
+					"Block {:?} is older than finalized block {}. Not building on it",
+					block,
+					finalized_block
+				);
+				return false;
+			}
 			let has_eligible_votes =
 				self.client.runtime_api().has_eligible_votes(*block).unwrap_or_default();
 			let block_tick = self.client.runtime_api().current_tick(*block).unwrap_or_default();
