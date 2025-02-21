@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/localchain-win32-x64-msvc",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "publishConfig": {
     "access": "public"
   },

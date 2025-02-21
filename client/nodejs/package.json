@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/mainchain",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "A client for accessing the Argon mainchain apis.",
   "repository": {
     "type": "git",
