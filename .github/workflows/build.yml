@@ -71,7 +71,7 @@ jobs:
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: 1.0.84
           targets: wasm32-unknown-unknown
 
       - uses: taiki-e/setup-cross-toolchain-action@v1

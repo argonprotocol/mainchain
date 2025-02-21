@@ -113,3 +113,23 @@ https://sepolia.etherscan.io/tx/0x928934b04556706a6e60ea0c6596249787602a0dd63ab8
 
 _Asset Registration_
 https://sepolia.etherscan.io/tx/0x9451786d8c9c62ae1b82c747e1366d924f44d0d2b5ac3978c11a2d1604d77c4e#eventlog
+
+```ts
+const argon = <RegistryToken>{
+  name: 'Argon',
+  symbol: 'ARGN',
+  decimals: 6,
+  /** Scale-encoded asset ID for Substrate Chain\*/
+  assetId: '0x430a54a61bf037414def60e0d32b70c7f9194ed8cd6c8d6a11b64ca2aff7ed10',
+  recipientNetworks: [{ chainId: 'EVM-1' }],
+};
+
+const argonot = <RegistryToken>{
+  name: 'Argon Ownership Token',
+  symbol: 'ARGNOT',
+  decimals: 6,
+  /** Scale-encoded asset ID for Substrate Chain\*/
+  assetId: '0x7c58e6fea16e4ac0850b1d2f44e49524b6f8f075de4ea61a93d81dc4ca9ce1fa',
+  recipientNetworks: [{ chainId: 'EVM-1' }],
+};
+```

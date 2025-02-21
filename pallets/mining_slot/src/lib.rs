@@ -1003,7 +1003,8 @@ impl<T: Config> MiningSlotProvider for Pallet<T> {
 	}
 
 	fn is_slot_bidding_started() -> bool {
-		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks
+		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks ||
+			IsNextSlotBiddingOpen::<T>::get()
 	}
 }
 

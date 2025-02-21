@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				100u8, 123u8, 198u8, 186u8, 94u8, 15u8, 73u8, 64u8, 10u8, 223u8, 5u8, 225u8, 107u8,
-				4u8, 39u8, 181u8, 142u8, 241u8, 207u8, 20u8, 67u8, 159u8, 43u8, 166u8, 172u8,
-				131u8, 7u8, 135u8, 122u8, 117u8, 100u8, 109u8,
+				205u8, 117u8, 239u8, 236u8, 202u8, 75u8, 130u8, 240u8, 218u8, 178u8, 253u8, 74u8,
+				166u8, 7u8, 174u8, 209u8, 43u8, 46u8, 100u8, 108u8, 151u8, 197u8, 76u8, 78u8, 27u8,
+				20u8, 95u8, 98u8, 91u8, 159u8, 132u8, 43u8,
 			]
 	}
 	pub mod system {
@@ -27169,6 +27169,9 @@ pub mod api {
 					#[codec(index = 10)]
 					#[doc = "Locking script has errors"]
 					InvalidBitcoinScript,
+					#[codec(index = 11)]
+					#[doc = "Duplicated UtxoId. Already in use"]
+					DuplicateUtxoId,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

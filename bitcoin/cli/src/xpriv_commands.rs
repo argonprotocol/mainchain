@@ -45,6 +45,17 @@ impl XPrivCommands {
 			XPrivCommands::Master { xpriv_file, mnemonic } => {
 				let client = MainchainClient::from_url(&rpc_url).await?;
 				let network = get_bitcoin_network(&client, None).await?;
+				println!(
+					"Based on connected Argon chain, this will create an xpriv for Bitcoin {:?}",
+					match network {
+						bitcoin::Network::Bitcoin => "Mainnet",
+						bitcoin::Network::Testnet => "Testnet",
+						bitcoin::Network::Testnet4 => "Testnet4",
+						bitcoin::Network::Regtest => "Regtest",
+						bitcoin::Network::Signet => "Signet",
+						_ => "Network with Unknown Identity",
+					}
+				);
 				let mnemonic = if let Some(x) = mnemonic {
 					Mnemonic::from_str(&x).map_err(|e| anyhow!(e))?
 				} else {

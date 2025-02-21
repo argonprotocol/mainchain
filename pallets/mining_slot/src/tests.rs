@@ -135,6 +135,76 @@ fn calculate_cohort_id() {
 }
 
 #[test]
+fn extends_bidding_if_mining_slot_extends() {
+	MaxCohortSize::set(10);
+	MaxMiners::set(100);
+	let ticks_between_slots = 1440;
+	TicksBetweenSlots::set(ticks_between_slots);
+
+	SlotBiddingStartAfterTicks::set(20_000);
+	let mining_window = 14400;
+
+	let genesis = 28_000_000;
+	let mut current_tick = genesis + 19_999;
+	CurrentTick::set(current_tick);
+
+	new_test_ext().execute_with(|| {
+		set_ownership(1, 1000u32.into());
+		set_ownership(2, 1000u32.into());
+
+		LastActivatedCohortId::<Test>::set(0);
+		assert!(!IsNextSlotBiddingOpen::<Test>::get());
+		// now go to 20k
+		current_tick += 1;
+		CurrentTick::set(current_tick);
+		ElapsedTicks::set(current_tick - genesis);
+		MiningSlots::on_initialize(2);
+		assert!(IsNextSlotBiddingOpen::<Test>::get());
+
+		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1440);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			None,
+			RewardDestination::Owner,
+			1.into()
+		));
+		MiningConfig::<Test>::mutate(|a| {
+			a.slot_bidding_start_after_ticks = 21_000;
+		});
+		MiningSlots::on_initialize(3);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			None,
+			RewardDestination::Owner,
+			2.into()
+		));
+
+		current_tick += 1440;
+		ElapsedTicks::set(current_tick - genesis);
+		CurrentTick::set(current_tick);
+		MiningSlots::on_initialize(4);
+		assert!(IsNextSlotBiddingOpen::<Test>::get());
+		// now it's bumped out
+		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1000);
+		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
+		assert_eq!(MiningSlots::calculate_cohort_id(), 0);
+		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
+
+		current_tick += 1000;
+		ElapsedTicks::set(current_tick - genesis);
+		CurrentTick::set(current_tick);
+		MiningSlots::on_initialize(5);
+		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
+		assert_eq!(LastActivatedCohortId::<Test>::get(), 1,);
+		assert_eq!(
+			MiningSlots::get_next_slot_era(),
+			(current_tick + 1440, current_tick + 1440 + mining_window)
+		);
+		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1440);
+	});
+}
+
+#[test]
 fn starting_cohort_index() {
 	let max_cohort_size = 3;
 	let max_validators = 12;

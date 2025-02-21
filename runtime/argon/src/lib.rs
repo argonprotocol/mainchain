@@ -600,3 +600,18 @@ impl IsmpRouter for Router {
 }
 
 argon_runtime_common::token_asset!(Ownership, ChainTransfer::hyperbridge_token_admin());
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use sp_core::crypto::Ss58Codec;
+
+	#[test]
+	fn verify_token_gateway_account_id() {
+		let token_gateway_account = TokenGateway::pallet_account();
+		assert_eq!(
+			"5EYCAe5tP6WKwSDTkWBKWrrE5ApFrQFpKq46AQa5xdM1BWPA",
+			token_gateway_account.to_ss58check()
+		);
+	}
+}

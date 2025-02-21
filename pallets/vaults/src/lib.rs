@@ -798,9 +798,17 @@ pub mod pallet {
 			let free_securitization =
 				vault.added_securitization_argons.saturating_sub(securitization_still_needed);
 
-			let return_amount = vault.bitcoin_argons.free_balance() +
+			let mut return_amount = vault.bitcoin_argons.free_balance() +
 				vault.bonded_argons.free_balance() +
 				free_securitization;
+			if let Some((expr, pending)) = vault.pending_bonded_argons {
+				let added = pending.saturating_sub(vault.bonded_argons.allocated);
+				return_amount += added;
+				PendingFundingModificationsByTick::<T>::mutate(expr, |a| {
+					a.retain(|x| *x != vault_id);
+				});
+				vault.pending_bonded_argons = None;
+			}
 
 			ensure!(
 				T::Currency::balance_on_hold(&HoldReason::EnterVault.into(), &who) >= return_amount,
@@ -935,13 +943,13 @@ pub mod pallet {
 		fn obligation_completed(obligation_id: ObligationId) -> DispatchResult {
 			let obligation =
 				ObligationsById::<T>::get(obligation_id).ok_or(Error::<T>::ObligationNotFound)?;
-			Self::remove_bond_completion(obligation_id, obligation.expiration.clone());
+			Self::remove_obligation_completion(obligation_id, obligation.expiration.clone());
 
 			T::EventHandler::on_completed(&obligation)?;
 			// reload obligation
 			let obligation =
 				ObligationsById::<T>::take(obligation_id).ok_or(Error::<T>::ObligationNotFound)?;
-			Self::release_bonded_funds(&obligation).map_err(Error::<T>::from)?;
+			Self::release_reserved_funds(&obligation).map_err(Error::<T>::from)?;
 			Self::deposit_event(Event::ObligationCompleted {
 				vault_id: obligation.vault_id,
 				obligation_id,
@@ -949,7 +957,10 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn remove_bond_completion(obligation_id: ObligationId, expiration: ObligationExpiration) {
+		fn remove_obligation_completion(
+			obligation_id: ObligationId,
+			expiration: ObligationExpiration,
+		) {
 			match expiration {
 				ObligationExpiration::BitcoinBlock(completion_block) => {
 					if !BitcoinLockCompletions::<T>::contains_key(completion_block) {
@@ -974,7 +985,7 @@ pub mod pallet {
 			}
 		}
 
-		fn bond_funds(
+		fn reserve_funds(
 			vault_id: VaultId,
 			amount: T::Balance,
 			fund_type: FundType,
@@ -1048,7 +1059,7 @@ pub mod pallet {
 			Ok((fee, base_fee))
 		}
 
-		fn release_bonded_funds(
+		fn release_reserved_funds(
 			obligation: &Obligation<T::AccountId, T::Balance>,
 		) -> Result<T::Balance, ObligationError> {
 			let vault_id = obligation.vault_id;
@@ -1319,7 +1330,7 @@ pub mod pallet {
 		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
 			let obligation_id = NextObligationId::<T>::get().unwrap_or(1);
 
-			let (total_fee, prepaid_fee) = Self::bond_funds(
+			let (total_fee, prepaid_fee) = Self::reserve_funds(
 				vault_id,
 				amount,
 				fund_type.clone(),
@@ -1374,7 +1385,7 @@ pub mod pallet {
 			let obligation = ObligationsById::<T>::take(obligation_id)
 				.ok_or(ObligationError::ObligationNotFound)?;
 
-			let returned_fee = Self::release_bonded_funds(&obligation)?;
+			let returned_fee = Self::release_reserved_funds(&obligation)?;
 
 			Self::deposit_event(Event::ObligationCanceled {
 				vault_id: obligation.vault_id,
@@ -1383,7 +1394,7 @@ pub mod pallet {
 				fund_type: obligation.fund_type.clone(),
 				returned_fee,
 			});
-			Self::remove_bond_completion(obligation_id, obligation.expiration.clone());
+			Self::remove_obligation_completion(obligation_id, obligation.expiration.clone());
 			T::EventHandler::on_canceled(&obligation)
 				.map_err(|_| ObligationError::ObligationCompletionError)?;
 			Ok(returned_fee)
@@ -1426,7 +1437,7 @@ pub mod pallet {
 			if let Some(obligation_id) = modify_obligation_id {
 				if let Some(mut obligation) = ObligationsById::<T>::get(obligation_id) {
 					if obligation.vault_id == vault_id {
-						let (total_fee, prepaid_fee) = Self::bond_funds(
+						let (total_fee, prepaid_fee) = Self::reserve_funds(
 							vault_id,
 							amount,
 							FundType::BondedArgons,

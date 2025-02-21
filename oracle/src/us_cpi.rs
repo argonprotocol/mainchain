@@ -2,7 +2,7 @@ use crate::{
 	us_cpi_schedule::{load_cpi_schedule, CpiSchedule},
 	utils::{parse_date, parse_f64, to_fixed_i128},
 };
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use argon_primitives::tick::{Tick, Ticker};
 use chrono::{DateTime, Utc};
 use directories::BaseDirs;
@@ -14,6 +14,7 @@ use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128};
 use std::sync::{Arc, Mutex};
 use std::{env, fs::File, path::PathBuf};
 use tokio::time::Duration;
+use tracing::info;
 use url::Url;
 
 const MAX_SCHEDULE_DAYS: u32 = 35;
@@ -49,6 +50,7 @@ pub struct UsCpiRetriever {
 	pub previous_us_cpi: FixedU128,
 	pub cpi_change_per_tick: FixedI128,
 	pub last_schedule_check: DateTime<Utc>,
+	pub cpi_backoff: Option<DateTime<Utc>>,
 	pub last_cpi_check: DateTime<Utc>,
 	#[serde(skip)]
 	pub ticker: Ticker,
@@ -124,6 +126,7 @@ impl UsCpiRetriever {
 			ticker: *ticker,
 			last_cpi_check: Utc::now(),
 			cpi_change_per_tick: FixedI128::from_u32(0),
+			cpi_backoff: None,
 		};
 		entry.cpi_change_per_tick = entry.calculate_cpi_change_per_tick();
 		entry.save_state()?;
@@ -139,8 +142,18 @@ impl UsCpiRetriever {
 			self.last_schedule_check = now;
 			should_save = true;
 		}
-		if now.signed_duration_since(self.last_cpi_check).num_seconds() as u64 > ONE_HOUR {
-			let next_cpi = get_raw_cpi().await?;
+		if self.cpi_backoff.is_some() && now > self.cpi_backoff.unwrap() {
+			self.cpi_backoff = None;
+		}
+		if self.cpi_backoff.is_none() &&
+			now.signed_duration_since(self.last_cpi_check).num_seconds() as u64 > ONE_HOUR
+		{
+			let next_cpi = get_raw_cpi().await.inspect_err(|e| {
+				if e.to_string().contains("REQUEST_NOT_PROCESSED") {
+					info!("Failed to get CPI data. Backing off for 1 hour");
+					self.cpi_backoff = Some(now + Duration::from_secs(ONE_HOUR));
+				}
+			})?;
 			if next_cpi.ref_month == self.current_cpi_ref_month {
 				return Ok(());
 			}
@@ -279,6 +292,9 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 }
 
 fn parse_cpi_results(resp_price: &str) -> Result<Vec<RawCpiValue>> {
+	if resp_price.contains("REQUEST_NOT_PROCESSED") {
+		bail!("REQUEST_NOT_PROCESSED");
+	}
 	let resp_price: CpiResult = serde_json::from_str(resp_price)?;
 	ensure!(resp_price.status == "REQUEST_SUCCEEDED", "Failed to get CPI data");
 	let resp_price = resp_price.results.series.first().ok_or(anyhow!("No series data"))?;
@@ -425,6 +441,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
+			cpi_backoff: None,
 			ticker,
 		};
 		retriever.schedule = vec![
@@ -507,6 +524,7 @@ mod tests {
 			cpi_change_per_tick: FixedI128::from_u32(0),
 			last_schedule_check: Utc::now(),
 			last_cpi_check: Utc::now(),
+			cpi_backoff: None,
 			ticker,
 		};
 		let timestamp =

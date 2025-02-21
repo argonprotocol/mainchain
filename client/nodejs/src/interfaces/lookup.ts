@@ -2641,6 +2641,7 @@ export default {
       'BitcoinHeightNotConfirmed',
       'MaxUtxosExceeded',
       'InvalidBitcoinScript',
+      'DuplicateUtxoId',
     ],
   },
   /**

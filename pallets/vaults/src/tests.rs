@@ -250,7 +250,7 @@ fn it_can_modify_a_vault_funds() {
 }
 
 #[test]
-fn it_delays_mining_argon_increases() {
+fn it_delays_bonded_argon_increases() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
@@ -299,6 +299,38 @@ fn it_delays_mining_argon_increases() {
 		assert_eq!(vault.bonded_argons.allocated, 2000);
 		assert_eq!(vault.pending_bonded_argons, None);
 		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
+		assert!(PendingFundingModificationsByTick::<Test>::get(61).is_empty());
+	});
+}
+
+#[test]
+fn it_clears_bonded_argons_on_close() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.bonded_argons_allocated = 1000;
+		config.bitcoin_amount_allocated = 1000;
+
+		set_argons(1, 20_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
+		assert_eq!(Balances::reserved_balance(1), 2000);
+
+		assert_ok!(Vaults::modify_funding(
+			RuntimeOrigin::signed(1),
+			1,
+			2000,
+			1010,
+			FixedU128::from_float(0.0)
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.pending_bonded_argons.map(|a| a.1), Some(2000));
+		assert_eq!(Balances::reserved_balance(1), 2000 + 1010);
+
+		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().pending_bonded_argons, None);
+		assert_eq!(Balances::reserved_balance(1), 0);
 		assert!(PendingFundingModificationsByTick::<Test>::get(61).is_empty());
 	});
 }
