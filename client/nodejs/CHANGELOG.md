@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.0.13](https://github.com/argonprotocol/mainchain/compare/v1.0.12...25debdb87a7abfa0b74f149deaf624a4cf3e19dd) (2025-02-16)
+## [v1.0.14](https://github.com/argonprotocol/mainchain/compare/v1.0.13...ea5b71d2c7facc1ddc39c7371b794af35faa53ac) (2025-02-20)
 
-### Fixes
+### [v1.0.13](https://github.com/argonprotocol/mainchain/compare/v1.0.12...v1.0.13) (2025-02-17)
+
+#### Fixes
 
 * **vaults:** vault activation delay
 ([e04dcfc](https://github.com/argonprotocol/mainchain/commit/e04dcfcc188ea46276f8ea5024d7f14b1d6c1ff3))

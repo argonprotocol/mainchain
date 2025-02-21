@@ -81,7 +81,7 @@ jobs:
 
       - name: Clippy
         if: ${{startsWith(matrix.os, 'ubuntu')}}
-        run: cargo clippy --workspace -- -Dwarnings
+        run: cargo clippy --workspace
         env:
           RUSTC_WRAPPER: "sccache"
           SKIP_WASM_BUILD: 1

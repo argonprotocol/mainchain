@@ -1,9 +1,37 @@
 # Changelog
 
-## [v1.0.13](https://github.com/argonprotocol/mainchain/compare/v1.0.12...25debdb87a7abfa0b74f149deaf624a4cf3e19dd) (2025-02-16)
+## [v1.0.14](https://github.com/argonprotocol/mainchain/compare/v1.0.13...ea5b71d2c7facc1ddc39c7371b794af35faa53ac) (2025-02-20)
+
+### Features
+
+* indicate to user why xpriv needs rpc
+([f3255d7](https://github.com/argonprotocol/mainchain/commit/f3255d7052b97447d8fea28065084c378322640e))
 
 ### Fixes
 
+* pin toolchchain to 1.0.84 for lint
+([aeee3f0](https://github.com/argonprotocol/mainchain/commit/aeee3f08d88dd76b233f9f9747fe88687dd50530))
+* **node:** don’t build on unfinalizable blocks
+([f30240d](https://github.com/argonprotocol/mainchain/commit/f30240dc450758fb958c783a533201acf26d480f))
+* **gh:** slow down block creation in tests
+([bed41ec](https://github.com/argonprotocol/mainchain/commit/bed41ec62abb75cd28b7448d854f9e8754d40fc4))
+* **mining_slot:** fix slot bidding arg
+([02e5d14](https://github.com/argonprotocol/mainchain/commit/02e5d1457acf7c96301a7a960224b2661018c35d))
+* **oracle:** delay retrying cpi if fails
+([8373f47](https://github.com/argonprotocol/mainchain/commit/8373f474024347e0364dd641aae7a53d8bb346fd))
+* **runtime:** add on-chain-release-build feature
+([1b529ac](https://github.com/argonprotocol/mainchain/commit/1b529ac3f9d0f374742d062b5554bcfd4eefa054))
+* **gh:** srtool not building metadata hash
+([fb66221](https://github.com/argonprotocol/mainchain/commit/fb662216e8c2b4d9c19564adc78c9eb19a912eaf))
+* **vaults:** return pending bonded argons on close
+([954d3eb](https://github.com/argonprotocol/mainchain/commit/954d3eb9c12dd45a05b9b140b3dc0f01c2232361))
+
+### [v1.0.13](https://github.com/argonprotocol/mainchain/compare/v1.0.12...v1.0.13) (2025-02-17)
+
+#### Fixes
+
+* **end-to-end:** tests needed cohort id
+([1b9e313](https://github.com/argonprotocol/mainchain/commit/1b9e313494d83dcdaa6e9915406684e93871f302))
 * **node:** attempt to fix warp sync with new api
 ([3c1ac8c](https://github.com/argonprotocol/mainchain/commit/3c1ac8cb6b56f8b9ddf20f9b20c76f3b94fddbf7))
 * **vaults:** vault activation delay
