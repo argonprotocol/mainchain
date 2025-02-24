@@ -1025,7 +1025,12 @@ pub mod pallet {
 			let apr = vault_argons.annual_percent_rate;
 			let base_fee = vault_argons.base_fee;
 
-			let fee = Self::calculate_tick_fees(apr, amount, ticks).saturating_add(base_fee);
+			let total_fee = Self::calculate_tick_fees(apr, amount, ticks).saturating_add(base_fee);
+			log::trace!(
+				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
+				amount,
+				total_fee
+			);
 
 			T::Currency::transfer_and_hold(
 				&HoldReason::ObligationFee.into(),
@@ -1049,14 +1054,14 @@ pub mod pallet {
 			)
 			.map_err(|_| ObligationError::BaseFeeOverflow)?;
 
-			if fee > base_fee {
-				Self::hold(beneficiary, fee - base_fee, HoldReason::ObligationFee)?;
+			if total_fee > base_fee {
+				Self::hold(beneficiary, total_fee - base_fee, HoldReason::ObligationFee)?;
 			}
 
 			vault_argons.reserved = vault_argons.reserved.saturating_add(amount);
 			VaultsById::<T>::set(vault_id, Some(vault));
 
-			Ok((fee, base_fee))
+			Ok((total_fee, base_fee))
 		}
 
 		fn release_reserved_funds(
