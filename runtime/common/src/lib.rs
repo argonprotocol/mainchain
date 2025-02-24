@@ -119,10 +119,7 @@ macro_rules! inject_runtime_vars {
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = (
-			pallet_vaults::migrations::MigrateV2ToV3<Runtime>,
-			pallet_mining_slot::migrations::MigrateV2Tov3<Runtime>,
-		);
+		type Migrations = ();
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =
