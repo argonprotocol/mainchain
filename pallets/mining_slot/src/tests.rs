@@ -1,15 +1,3 @@
-use frame_support::{
-	assert_err, assert_noop, assert_ok,
-	traits::{
-		fungible::{InspectHold, Unbalanced},
-		Currency, OnInitialize,
-	},
-};
-use pallet_balances::Event as OwnershipEvent;
-use sp_core::{blake2_256, bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
-use sp_runtime::{testing::UintAuthorityId, BoundedVec, FixedU128};
-use std::{collections::HashMap, env};
-
 use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
@@ -20,12 +8,30 @@ use crate::{
 	Error, Event, HoldReason, MiningSlotBid,
 };
 use argon_primitives::{
+	bitcoin::OpaqueBitcoinXpub,
 	block_seal::{
 		MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination, RewardSharing,
 	},
 	inherents::BlockSealInherent,
+	vault::{BitcoinObligationProvider, FundType, ObligationExpiration, VaultTerms},
 	AuthorityProvider, BlockRewardAccountsProvider, BlockVote, MerkleProof,
 };
+use bitcoin::{
+	bip32::{ChildNumber, Xpriv, Xpub},
+	key::Secp256k1,
+};
+use frame_support::{
+	assert_err, assert_noop, assert_ok,
+	traits::{
+		fungible::{InspectHold, Unbalanced},
+		Currency, OnInitialize,
+	},
+};
+use k256::elliptic_curve::rand_core::{OsRng, RngCore};
+use pallet_balances::Event as OwnershipEvent;
+use sp_core::{blake2_256, bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
+use sp_runtime::{testing::UintAuthorityId, traits::Zero, BoundedVec, FixedU128};
+use std::{collections::HashMap, env};
 
 #[test]
 fn it_doesnt_add_cohorts_until_time() {
@@ -890,6 +896,163 @@ fn it_will_cancel_bids_if_new_vault() {
 	});
 }
 
+fn keys() -> OpaqueBitcoinXpub {
+	let mut seed = [0u8; 32];
+	OsRng.fill_bytes(&mut seed);
+
+	let xpriv = Xpriv::new_master(GetBitcoinNetwork::get(), &seed).unwrap();
+	let child = xpriv
+		.derive_priv(
+			&Secp256k1::new(),
+			&[ChildNumber::from_normal_idx(0).unwrap(), ChildNumber::from_hardened_idx(1).unwrap()],
+		)
+		.unwrap();
+	let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
+	OpaqueBitcoinXpub(xpub.encode())
+}
+
+#[test]
+fn it_handles_rebids() {
+	TicksBetweenSlots::set(3);
+	MaxMiners::set(12);
+	MaxCohortSize::set(4);
+	UseRealVaults::set(true);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(6);
+		SlotBiddingStartAfterTicks::set(0);
+		ArgonotsPerMiningSeat::<Test>::set(1000);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		set_argons(0, 10_000_000);
+
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(0),
+			pallet_vaults::VaultConfig {
+				terms: VaultTerms {
+					bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
+					bonded_argons_annual_percent_rate: FixedU128::from_float(0.1),
+					bitcoin_base_fee: 1000,
+					bonded_argons_base_fee: 1000,
+					mining_reward_sharing_percent_take: FixedU128::zero(),
+				},
+				bitcoin_xpubkey: keys(),
+				bitcoin_amount_allocated: 3_000_000,
+				bonded_argons_allocated: 3_000_000,
+				added_securitization_percent: FixedU128::from_float(0.0),
+			}
+		));
+
+		set_argons(10, 5_000_000);
+
+		// create bonded argons
+		assert_ok!(Vaults::create_obligation(
+			1,
+			&10,
+			FundType::Bitcoin,
+			3_000_000,
+			ObligationExpiration::BitcoinBlock(100),
+			365 * 24 * 60,
+		));
+
+		for i in 1..=4u64 {
+			set_ownership(i, 1_000_000u32.into());
+			set_argons(i, 1_000_000u32.into());
+
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(i),
+				Some(MiningSlotBid { vault_id: 1, amount: (i + 500_000u64).into() }),
+				RewardDestination::Owner,
+				i.into()
+			));
+			assert_eq!(
+				Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &i),
+				1
+			);
+		}
+
+		MiningSlots::on_initialize(6);
+
+		let next_cohort = NextSlotCohort::<Test>::get();
+		assert_eq!(next_cohort.len(), 4);
+		assert_eq!(next_cohort.iter().map(|a| a.account_id).collect::<Vec<_>>(), vec![4, 3, 2, 1]);
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &0),
+			5000
+		);
+		// ensure adding bids works
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			Some(MiningSlotBid { vault_id: 1, amount: 1005u64.into() }),
+			RewardDestination::Owner,
+			1.into()
+		));
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &1),
+			1
+		);
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &0),
+			6000
+		);
+		assert_eq!(
+			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
+			vec![1, 4, 3, 2]
+		);
+
+		set_argons(11, 10_000_000);
+
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(11),
+			pallet_vaults::VaultConfig {
+				terms: VaultTerms {
+					bitcoin_annual_percent_rate: FixedU128::from_float(2.0),
+					bonded_argons_annual_percent_rate: FixedU128::from_float(2.0),
+					bitcoin_base_fee: 10_000,
+					bonded_argons_base_fee: 10_000,
+					mining_reward_sharing_percent_take: FixedU128::zero(),
+				},
+				bitcoin_xpubkey: keys(),
+				bitcoin_amount_allocated: 2_000_000,
+				bonded_argons_allocated: 2_000_000,
+				added_securitization_percent: FixedU128::from_float(0.0),
+			}
+		));
+		set_argons(12, 5_000_000);
+		assert_ok!(Vaults::create_obligation(
+			2,
+			&12,
+			FundType::Bitcoin,
+			2_000_000,
+			ObligationExpiration::BitcoinBlock(100),
+			365 * 24 * 60,
+		));
+
+		CurrentTick::set(20);
+
+		// ensure adding bids works
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(3),
+			Some(MiningSlotBid { vault_id: 2, amount: 501_000u64.into() }),
+			RewardDestination::Owner,
+			3.into()
+		));
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &3),
+			22
+		);
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &0),
+			6000,
+			"Base fee didn't get refunded"
+		);
+		assert_eq!(
+			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &11),
+			20000
+		);
+	});
+}
+
 #[test]
 fn handles_a_max_of_bids_per_block() {
 	TicksBetweenSlots::set(1);
@@ -1095,6 +1258,10 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 		let invalid_strength = U256::from(1);
 		let seal = create_block_vote_seal(invalid_strength);
 		assert!(!MiningSlots::check_for_bidding_close(&seal));
+
+		System::assert_last_event(
+			Event::MiningBidsClosed { cohort_id: LastActivatedCohortId::<Test>::get() + 1 }.into(),
+		);
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
