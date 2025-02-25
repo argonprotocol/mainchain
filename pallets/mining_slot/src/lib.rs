@@ -284,6 +284,10 @@ pub mod pallet {
 			ticks_between_slots: Tick,
 			slot_bidding_start_after_ticks: Tick,
 		},
+		/// Bids are closed due to the VRF randomized function triggering
+		MiningBidsClosed {
+			cohort_id: CohortId,
+		},
 	}
 
 	#[pallet::error]
@@ -799,7 +803,13 @@ impl<T: Config> Pallet<T> {
 				// `MiningConfig.ticks_before_bid_end_for_vrf_close`
 				let threshold = U256::MAX / U256::from(ticks_before_close);
 
-				vrf < threshold
+				if vrf < threshold {
+					Self::deposit_event(Event::<T>::MiningBidsClosed {
+						cohort_id: LastActivatedCohortId::<T>::get() + 1,
+					});
+					return true
+				}
+				false
 			},
 			_ => false,
 		}
