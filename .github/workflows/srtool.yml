@@ -30,6 +30,7 @@ jobs:
         with:
           chain: ${{ matrix.runtime }}
           package: ${{ matrix.package }}
+          tag: 1.81.0
         env:
           # optional: will be passed to docker srtool run cmd
           BUILD_OPTS: "--features on-chain-release-build"
