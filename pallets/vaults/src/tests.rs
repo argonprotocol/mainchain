@@ -336,6 +336,90 @@ fn it_clears_bonded_argons_on_close() {
 }
 
 #[test]
+fn it_can_correctly_calculate_available_bonded_argons() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(1);
+
+		set_argons(1, 20_000);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms: default_terms(TEN_PCT),
+				bitcoin_xpubkey: keys(),
+				bitcoin_amount_allocated: 1000,
+				bonded_argons_allocated: 1000,
+				added_securitization_percent: FixedU128::from_float(0.0),
+			}
+		));
+
+		let mut vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.available_bonded_argons(), 0);
+		vault.bitcoin_argons.reserved = 500;
+		assert_eq!(vault.available_bonded_argons(), 500);
+		vault.bitcoin_argons.reserved = 1000;
+		assert_eq!(vault.available_bonded_argons(), 1000);
+
+		vault.bitcoin_argons.allocated = 1000;
+		vault.bitcoin_argons.reserved = 500; // 500 free
+		vault.bonded_argons.allocated = 500;
+		vault.bonded_argons.reserved = 0;
+		assert_eq!(vault.available_bonded_argons(), 500);
+		vault.bonded_argons.reserved = 500;
+		assert_eq!(vault.available_bonded_argons(), 0);
+		vault.bonded_argons.allocated = 1000;
+		assert_eq!(vault.available_bonded_argons(), 0);
+
+		////// ADDED Securitization
+
+		vault.added_securitization_percent = FixedU128::from_float(2.0);
+		vault.added_securitization_argons = 1000; // 1500 total now possible
+		vault.bonded_argons.allocated = 500;
+		vault.bonded_argons.reserved = 0;
+		assert_eq!(vault.available_bonded_argons(), 500);
+		vault.bonded_argons.reserved = 500;
+		assert_eq!(vault.available_bonded_argons(), 0);
+
+		// now we have 1000 allocated
+		vault.bonded_argons.reserved = 0;
+		vault.bonded_argons.allocated = 1000;
+		assert_eq!(vault.available_bonded_argons(), 1000);
+		vault.bonded_argons.reserved = 500;
+		assert_eq!(vault.available_bonded_argons(), 1000 - 500);
+
+		// can do up to 1x + 2x extra
+		vault.bonded_argons.reserved = 0;
+		vault.bonded_argons.allocated = 1500;
+		vault.bitcoin_argons.reserved = 500;
+		vault.bitcoin_argons.allocated = 1000;
+		assert_eq!(vault.available_bonded_argons(), 1500);
+
+		vault.bonded_argons.reserved = 1000;
+		assert_eq!(vault.available_bonded_argons(), 500);
+
+		vault.bonded_argons.reserved = 1500;
+		assert_eq!(vault.available_bonded_argons(), 0);
+
+		vault.added_securitization_argons = 2000;
+		vault.bitcoin_argons.reserved = 1000;
+		vault.bitcoin_argons.allocated = 1000;
+		vault.bonded_argons.reserved = 0;
+		vault.bonded_argons.allocated = 1500;
+		assert_eq!(vault.available_bonded_argons(), 1500);
+		vault.bonded_argons.allocated = 3000;
+		assert_eq!(vault.available_bonded_argons(), 3000);
+
+		vault.bitcoin_argons.reserved = 800;
+		// can only 2x the amount bonded
+		assert_eq!(vault.available_bonded_argons(), 800 + 1600);
+
+		// now check that the bonded is calculated right once more is reserved
+		vault.bonded_argons.reserved = 1000;
+		assert_eq!(vault.available_bonded_argons(), 800 + 1600 - 1000);
+	});
+}
+
+#[test]
 fn it_can_reduce_vault_funds_down_to_bonded() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -359,8 +443,9 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 				vault.bitcoin_argons.reserved = 500;
 			}
 		});
-		// amount eligible for mining is 2x the bitcoin argons
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 500 * 200 / 100);
+		// amount eligible for mining is 3x the bitcoin argons (+2x), but capped at the 1000 which
+		// have been allocated
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 1000);
 
 		assert_err!(
 			Vaults::modify_funding(
@@ -409,7 +494,7 @@ fn it_can_reduce_vault_funds_down_to_bonded() {
 		assert_eq!(Balances::reserved_balance(1), 1500 + 1000);
 
 		// amount eligible for mining doesn't change
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 500 * 200 / 100);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_bonded_argons(), 1000);
 	});
 }
 

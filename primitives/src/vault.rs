@@ -196,16 +196,19 @@ impl<
 	> Vault<AccountId, Balance>
 {
 	pub fn available_bonded_argons(&self) -> Balance {
-		let free = self.bonded_argons.free_balance();
-		let mut bitcoins_bonded =
+		let mut locked_bitcoin_space =
 			self.bitcoin_argons.reserved.saturating_sub(self.pending_bitcoins);
+
+		// you can increase the max allocation up to an additional 2x over the locked bitcoins
 		if self.added_securitization_argons > Balance::zero() {
-			let allowed_securities = bitcoins_bonded
+			let allowed_securities = locked_bitcoin_space
 				.saturating_mul(2u32.into())
 				.min(self.added_securitization_argons);
-			bitcoins_bonded = bitcoins_bonded.saturating_add(allowed_securities);
+			locked_bitcoin_space = locked_bitcoin_space.saturating_add(allowed_securities);
 		}
-		free.min(bitcoins_bonded)
+
+		let max_allocated = self.bonded_argons.allocated.min(locked_bitcoin_space);
+		max_allocated.saturating_sub(self.bonded_argons.reserved)
 	}
 
 	pub fn get_added_securitization_needed(&self) -> Balance {
