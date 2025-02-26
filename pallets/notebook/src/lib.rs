@@ -39,9 +39,9 @@ pub mod pallet {
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
 		tick::Tick,
-		AccountOriginUid, Balance, BlockSealSpecProvider, ChainTransfer, ChainTransferLookup,
-		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
-		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
+		AccountId, AccountOriginUid, Balance, BlockSealSpecProvider, BlockVote, ChainTransfer,
+		ChainTransferLookup, Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler,
+		NotebookProvider, NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
 		TransferToLocalchainId,
 	};
 
@@ -714,13 +714,16 @@ pub mod pallet {
 				);
 			})?;
 
-			let block_votes = notebook
-				.notarizations
-				.iter()
-				.flat_map(|notarization| {
-					notarization.block_votes.iter().map(|vote| (vote.encode(), vote.power))
-				})
-				.collect::<Vec<_>>();
+			let mut block_votes = BTreeMap::<(AccountId, u32), BlockVote>::new();
+			for notarization in notebook.notarizations.iter() {
+				for vote in notarization.block_votes.iter() {
+					let key = (vote.account_id.clone(), vote.index);
+					block_votes.insert(key, vote.clone());
+				}
+			}
+
+			let block_votes =
+				block_votes.values().map(|vote| (vote.encode(), vote.power)).collect::<Vec<_>>();
 			Ok(NotaryNotebookRawVotes { notary_id, notebook_number, raw_votes: block_votes })
 		}
 
