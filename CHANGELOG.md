@@ -1,13 +1,29 @@
 # Changelog
 
-## [v1.0.14](https://github.com/argonprotocol/mainchain/compare/v1.0.13...ea5b71d2c7facc1ddc39c7371b794af35faa53ac) (2025-02-20)
+## [v1.0.15](https://github.com/argonprotocol/mainchain/compare/v1.0.14...08e1c943b84747af9e6978f320c4829eb98f5610) (2025-02-26)
 
 ### Features
+
+* add vrf close event
+([4691608](https://github.com/argonprotocol/mainchain/commit/4691608df00f0f64e1400b156f53895cf7eec8af))
+
+### Fixes
+
+* **mining_slot:** don’t allow vault mismatch
+([5b5480b](https://github.com/argonprotocol/mainchain/commit/5b5480b4d7a00bd5979ff592dc4fb84949ff3ab6))
+* **vaults:** available bonded argons wrong
+([ab27a07](https://github.com/argonprotocol/mainchain/commit/ab27a07dfeb2c3b7e2f30690b63bb4285b84c680))
+* **notebook:** sort notarizations correctly
+([0d35a23](https://github.com/argonprotocol/mainchain/commit/0d35a2306d5c09131fb753c12b5a4a4b145063f0))
+
+### [v1.0.14](https://github.com/argonprotocol/mainchain/compare/v1.0.13...v1.0.14) (2025-02-21)
+
+#### Features
 
 * indicate to user why xpriv needs rpc
 ([f3255d7](https://github.com/argonprotocol/mainchain/commit/f3255d7052b97447d8fea28065084c378322640e))
 
-### Fixes
+#### Fixes
 
 * pin toolchchain to 1.0.84 for lint
 ([aeee3f0](https://github.com/argonprotocol/mainchain/commit/aeee3f08d88dd76b233f9f9747fe88687dd50530))
