@@ -96,7 +96,8 @@ signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
 
 ### Node Setup 3. The Argon software
 
-The Argon software. You can find the latest release on the [releases page](https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
+The Argon software. You can find the latest release on
+the [releases page](https://github.com/argonprotocol/mainchain/releases/latest). You're looking for a file
 named `argon-node-v<VERSION>-x86_64-unknown-linux-gnu.tar.gz`. Download it to your server. You probably want to
 set
 this up as a systemd service on your own server. The ansible playbook will do this for you.
@@ -218,18 +219,16 @@ rotate in. Over time, the number of miners will increase to 10,000.
 
 You are bidding for a slot, and can be outbid at any time by someone who "locks" more Argons than you. You can monitor
 if you currently have a winning slot by looking at
-the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate)
-under **miningSlot** -> **nextSlotCohort**. If you are in the nextSlotCohort, you have a winning bid. You can also
-monitor for events in
-each block matching `SlotBidderReplaced` to see if you have been outbid. (Events can be monitored programmatically using
-the `@argonprotocol/mainchain` node.js library, or using the `argon-client` rust library, which is
-a [`subxt`](https://github.com/paritytech/subxt) based rust library).
+the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) under **miningSlot
+** -> **nextSlotCohort**. If you are in the top 10 of the `nextSlotCohort`, you have a winning bid. You can also
+monitor for events in each block matching `SlotBidderOutOfContention` to see if you have been outbid. (Events can be
+monitored programmatically using the `@argonprotocol/mainchain` node.js library, or using the `argon-client` rust
+library, which is a [`subxt`](https://github.com/paritytech/subxt) based rust library).
 
 To submit your bid, you'll need to submit the signing keys you'll use for the slot. These are the keys you generated
-when
-you created your node [here](#node-setup-3-the-argon-software) -> Session Keys. You'll submit these as your keys in the
-mining bid. NOTE: If you want to more carefully create and backup your keys, you can also generate them individually as
-shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
+when you created your node [here](#node-setup-3-the-argon-software) -> Session Keys. You'll submit these as your keys in
+the mining bid. NOTE: If you want to more carefully create and backup your keys, you can also generate them individually
+as shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
 
 You can bid for a slot by using the Polkadot.js
 interface [here](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).

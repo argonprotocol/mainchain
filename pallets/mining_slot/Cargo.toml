@@ -29,7 +29,11 @@ impl-trait-for-tuples = { workspace = true }
 
 [dev-dependencies]
 pallet-balances = { workspace = true }
+pallet-vaults = { workspace = true }
 env_logger = { workspace = true }
+bitcoin = { workspace = true }
+k256 = { workspace = true }
+bip32 = { workspace = true, features = ["secp256k1"] }
 
 [features]
 default = [ "std" ]
@@ -42,6 +46,7 @@ std = [
 	"frame-system/std",
 	"log/std",
 	"pallet-balances/std",
+	"pallet-vaults/std",
 	"scale-info/std",
 	"sp-api/std",
 	"sp-core/std",

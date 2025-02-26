@@ -425,6 +425,10 @@ declare module '@polkadot/api-base/types/errors' {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
       BidTooLow: AugmentedError<ApiType>;
       /**
+       * You can't reduce the amount of bonded argons
+       **/
+      CannotReduceBondedArgons: AugmentedError<ApiType>;
+      /**
        * Keys cannot be registered by multiple accounts
        **/
       CannotRegisterDuplicateKeys: AugmentedError<ApiType>;
@@ -443,6 +447,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to decode the key format
        **/
       InvalidKeyFormat: AugmentedError<ApiType>;
+      /**
+       * Cannot change the bonded argon vault
+       **/
+      InvalidVaultSwitch: AugmentedError<ApiType>;
       MinimumObligationAmountNotMet: AugmentedError<ApiType>;
       NoMoreObligationIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
