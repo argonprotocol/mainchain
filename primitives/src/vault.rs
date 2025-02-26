@@ -18,7 +18,7 @@ pub trait BondedArgonsProvider {
 
 	#[allow(clippy::type_complexity)]
 	/// Create bonded argons for a mining seat
-	fn create_bonded_argons(
+	fn lease_bonded_argons(
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
@@ -125,6 +125,8 @@ pub enum ObligationError {
 	VaultNotYetActive,
 	/// Too many base fee maturations were inserted per tick
 	BaseFeeOverflow,
+	/// An obligation modification cannot switch vaults
+	InvalidVaultSwitch,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]

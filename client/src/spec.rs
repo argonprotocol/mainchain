@@ -3817,9 +3817,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				205u8, 117u8, 239u8, 236u8, 202u8, 75u8, 130u8, 240u8, 218u8, 178u8, 253u8, 74u8,
-				166u8, 7u8, 174u8, 209u8, 43u8, 46u8, 100u8, 108u8, 151u8, 197u8, 76u8, 78u8, 27u8,
-				20u8, 95u8, 98u8, 91u8, 159u8, 132u8, 43u8,
+				162u8, 246u8, 249u8, 54u8, 204u8, 183u8, 142u8, 213u8, 122u8, 159u8, 28u8, 201u8,
+				244u8, 143u8, 55u8, 133u8, 84u8, 85u8, 201u8, 137u8, 175u8, 254u8, 252u8, 88u8,
+				16u8, 236u8, 112u8, 144u8, 238u8, 251u8, 103u8, 117u8,
 			]
 	}
 	pub mod system {
@@ -4970,9 +4970,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							77u8, 64u8, 69u8, 183u8, 81u8, 47u8, 224u8, 144u8, 42u8, 169u8, 127u8,
-							237u8, 146u8, 4u8, 179u8, 122u8, 156u8, 54u8, 16u8, 92u8, 45u8, 74u8,
-							142u8, 46u8, 116u8, 0u8, 9u8, 36u8, 57u8, 30u8, 41u8, 45u8,
+							33u8, 21u8, 127u8, 219u8, 230u8, 154u8, 12u8, 125u8, 12u8, 183u8, 85u8,
+							156u8, 18u8, 61u8, 137u8, 146u8, 74u8, 253u8, 19u8, 169u8, 214u8,
+							157u8, 133u8, 91u8, 125u8, 113u8, 145u8, 140u8, 50u8, 61u8, 95u8, 35u8,
 						],
 					)
 				}
@@ -7609,8 +7609,8 @@ pub mod api {
 				#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
 				#[doc = "network. This percentage is adjusted before the beginning of each slot."]
 				#[doc = ""]
-				#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
-				#[doc = "this event, you will be able to ensure your bid is accepted."]
+				#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
+				#[doc = "for this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
@@ -7690,8 +7690,8 @@ pub mod api {
 				#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
 				#[doc = "network. This percentage is adjusted before the beginning of each slot."]
 				#[doc = ""]
-				#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
-				#[doc = "this event, you will be able to ensure your bid is accepted."]
+				#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
+				#[doc = "for this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
@@ -7818,20 +7818,46 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct SlotBidderReplaced {
-				pub account_id: slot_bidder_replaced::AccountId,
-				pub obligation_id: slot_bidder_replaced::ObligationId,
-				pub preserved_argonot_hold: slot_bidder_replaced::PreservedArgonotHold,
+			pub struct SlotBidderOut {
+				pub account_id: slot_bidder_out::AccountId,
+				pub bid_amount: slot_bidder_out::BidAmount,
+				pub obligation_id: slot_bidder_out::ObligationId,
 			}
-			pub mod slot_bidder_replaced {
+			pub mod slot_bidder_out {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type BidAmount = ::core::primitive::u128;
+				pub type ObligationId = ::core::option::Option<::core::primitive::u64>;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for SlotBidderOut {
+				const PALLET: &'static str = "MiningSlot";
+				const EVENT: &'static str = "SlotBidderOut";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct SlotBidderDropped {
+				pub account_id: slot_bidder_dropped::AccountId,
+				pub obligation_id: slot_bidder_dropped::ObligationId,
+				pub preserved_argonot_hold: slot_bidder_dropped::PreservedArgonotHold,
+			}
+			pub mod slot_bidder_dropped {
 				use super::runtime_types;
 				pub type AccountId = crate::types::AccountId32;
 				pub type ObligationId = ::core::option::Option<::core::primitive::u64>;
 				pub type PreservedArgonotHold = ::core::primitive::bool;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for SlotBidderReplaced {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for SlotBidderDropped {
 				const PALLET: &'static str = "MiningSlot";
-				const EVENT: &'static str = "SlotBidderReplaced";
+				const EVENT: &'static str = "SlotBidderDropped";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -7912,6 +7938,55 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MiningConfigurationUpdated {
 				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "MiningConfigurationUpdated";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Bids are closed due to the VRF randomized function triggering"]
+			pub struct MiningBidsClosed {
+				pub cohort_id: mining_bids_closed::CohortId,
+			}
+			pub mod mining_bids_closed {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MiningBidsClosed {
+				const PALLET: &'static str = "MiningSlot";
+				const EVENT: &'static str = "MiningBidsClosed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct ReleaseBidError {
+				pub account_id: release_bid_error::AccountId,
+				pub obligation_id: release_bid_error::ObligationId,
+				pub error: release_bid_error::Error,
+			}
+			pub mod release_bid_error {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type ObligationId = ::core::option::Option<::core::primitive::u64>;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ReleaseBidError {
+				const PALLET: &'static str = "MiningSlot";
+				const EVENT: &'static str = "ReleaseBidError";
 			}
 		}
 		pub mod storage {
@@ -24393,6 +24468,8 @@ pub mod api {
 					VaultNotYetActive,
 					#[codec(index = 20)]
 					BaseFeeOverflow,
+					#[codec(index = 21)]
+					InvalidVaultSwitch,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -28502,8 +28579,8 @@ pub mod api {
 					#[doc = "The required amount is calculated as a percentage of the total ownership tokens in the"]
 					#[doc = "network. This percentage is adjusted before the beginning of each slot."]
 					#[doc = ""]
-					#[doc = "If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for"]
-					#[doc = "this event, you will be able to ensure your bid is accepted."]
+					#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
+					#[doc = "for this event, you will be able to ensure your bid is accepted."]
 					#[doc = ""]
 					#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 					#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
@@ -28598,6 +28675,12 @@ pub mod api {
 					#[codec(index = 20)]
 					#[doc = "Unable to decode the key format"]
 					InvalidKeyFormat,
+					#[codec(index = 21)]
+					#[doc = "You can't reduce the amount of bonded argons"]
+					CannotReduceBondedArgons,
+					#[codec(index = 22)]
+					#[doc = "Cannot change the bonded argon vault"]
+					InvalidVaultSwitch,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -28635,28 +28718,43 @@ pub mod api {
 						index: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
-					SlotBidderReplaced {
+					SlotBidderOut {
 						account_id: crate::types::AccountId32,
+						bid_amount: ::core::primitive::u128,
 						obligation_id: ::core::option::Option<::core::primitive::u64>,
-						preserved_argonot_hold: ::core::primitive::bool,
 					},
 					#[codec(index = 3)]
-					ReleasedMinerSeat {
+					SlotBidderDropped {
 						account_id: crate::types::AccountId32,
 						obligation_id: ::core::option::Option<::core::primitive::u64>,
 						preserved_argonot_hold: ::core::primitive::bool,
 					},
 					#[codec(index = 4)]
+					ReleasedMinerSeat {
+						account_id: crate::types::AccountId32,
+						obligation_id: ::core::option::Option<::core::primitive::u64>,
+						preserved_argonot_hold: ::core::primitive::bool,
+					},
+					#[codec(index = 5)]
 					ReleaseMinerSeatError {
 						account_id: crate::types::AccountId32,
 						obligation_id: ::core::option::Option<::core::primitive::u64>,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 6)]
 					MiningConfigurationUpdated {
 						ticks_before_bid_end_for_vrf_close: ::core::primitive::u64,
 						ticks_between_slots: ::core::primitive::u64,
 						slot_bidding_start_after_ticks: ::core::primitive::u64,
+					},
+					#[codec(index = 7)]
+					#[doc = "Bids are closed due to the VRF randomized function triggering"]
+					MiningBidsClosed { cohort_id: ::core::primitive::u64 },
+					#[codec(index = 8)]
+					ReleaseBidError {
+						account_id: crate::types::AccountId32,
+						obligation_id: ::core::option::Option<::core::primitive::u64>,
+						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
 				#[derive(

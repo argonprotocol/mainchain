@@ -388,6 +388,7 @@ pub mod pallet {
 				ObligationError::ObligationCompletionError => Error::<T>::ObligationCompletionError,
 				ObligationError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
 				ObligationError::BaseFeeOverflow => Error::<T>::BaseFeeOverflow,
+				ObligationError::InvalidVaultSwitch => Error::<T>::InternalError,
 			}
 		}
 	}
@@ -1410,7 +1411,7 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn create_bonded_argons(
+		fn lease_bonded_argons(
 			vault_id: VaultId,
 			account_id: Self::AccountId,
 			amount: Self::Balance,
@@ -1441,31 +1442,33 @@ pub mod pallet {
 
 			if let Some(obligation_id) = modify_obligation_id {
 				if let Some(mut obligation) = ObligationsById::<T>::get(obligation_id) {
-					if obligation.vault_id == vault_id {
-						let (total_fee, prepaid_fee) = Self::reserve_funds(
-							vault_id,
-							amount,
-							FundType::BondedArgons,
-							bond_ticks,
-							&account_id,
-							obligation_id,
-						)?;
+					ensure!(obligation.vault_id == vault_id, ObligationError::InvalidVaultSwitch);
+					let additional_amount_needed = amount.saturating_sub(obligation.amount);
 
-						obligation.amount = obligation.amount.saturating_add(amount);
-						let new_total = obligation.amount;
-						obligation.total_fee = obligation.total_fee.saturating_add(total_fee);
-						obligation.prepaid_fee = obligation.prepaid_fee.saturating_add(prepaid_fee);
-						ObligationsById::<T>::insert(obligation_id, obligation);
+					let (total_fee, prepaid_fee) = Self::reserve_funds(
+						vault_id,
+						additional_amount_needed,
+						FundType::BondedArgons,
+						bond_ticks,
+						&account_id,
+						obligation_id,
+					)?;
 
-						Self::deposit_event(Event::ObligationModified {
-							vault_id,
-							obligation_id,
-							amount,
-						});
-						return Ok((obligation_id, sharing, new_total));
-					}
+					obligation.amount = obligation.amount.saturating_add(additional_amount_needed);
+					let new_total = obligation.amount;
+					obligation.total_fee = obligation.total_fee.saturating_add(total_fee);
+					obligation.prepaid_fee = obligation.prepaid_fee.saturating_add(prepaid_fee);
+					ObligationsById::<T>::insert(obligation_id, obligation);
+
+					Self::deposit_event(Event::ObligationModified {
+						vault_id,
+						obligation_id,
+						amount,
+					});
+					return Ok((obligation_id, sharing, new_total));
 				}
 			}
+
 			let obligation = Self::create_obligation(
 				vault_id,
 				&account_id,

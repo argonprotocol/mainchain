@@ -328,7 +328,7 @@ fn it_adds_new_cohorts_on_block() {
 		System::assert_last_event(
 			Event::NewMiners {
 				start_index: 2,
-				new_miners: cohort,
+				new_miners: BoundedVec::truncate_from(cohort.to_vec()),
 				cohort_id: LastActivatedCohortId::<Test>::get(),
 			}
 			.into(),
@@ -683,45 +683,42 @@ fn it_will_order_bids_with_bonded_argons() {
 		// 3. Account 2 bids above 1
 
 		// should be able to re-register
+
+		System::reset_events();
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(3),
 			Some(MiningSlotBid { vault_id: 1, amount: 1001u32.into() }),
 			RewardDestination::Owner,
 			3.into()
 		));
-		System::assert_last_event(
+		System::assert_has_event(
 			Event::SlotBidderAdded { account_id: 3, bid_amount: 1001u32.into(), index: 1 }.into(),
+		);
+		System::assert_last_event(
+			Event::SlotBidderOut {
+				account_id: 1,
+				bid_amount: 1000u32.into(),
+				obligation_id: Some(1),
+			}
+			.into(),
 		);
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 3);
 
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
-			vec![2, 3]
+			vec![2, 3, 1]
 		);
 
 		let obligations = Obligations::get();
-		let acc_3_obligation_id = obligations.iter().find(|(_, _, a, _)| *a == 3).map(|a| a.0);
-		assert!(!obligations.iter().any(|(_, _, a, _)| *a == 1));
-		assert_eq!(obligations.len(), 2);
-		{
-			let events = frame_system::Pallet::<Test>::events();
-			let frame_system::EventRecord { event, .. } = &events[events.len() - 2];
-			assert_eq!(
-				event,
-				&<Test as frame_system::Config>::RuntimeEvent::from(
-					Event::<Test>::SlotBidderReplaced {
-						obligation_id: Some(1u64),
-						account_id: 1u64,
-						preserved_argonot_hold: false,
-					}
-				)
-			);
-			assert_eq!(AuthorityIdToMinerId::<Test>::get::<UintAuthorityId>(1.into()), None);
-		}
-		assert_eq!(Ownership::free_balance(1), 1000);
+		assert_eq!(obligations.len(), 3);
+
+		// should still hold amount
+		assert_eq!(Ownership::free_balance(1), 500);
 		assert!(Ownership::hold_available(&HoldReason::RegisterAsMiner.into(), &1));
 
 		// 4. Account 1 increases bid and resubmits
+
+		System::reset_events();
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			Some(MiningSlotBid { vault_id: 1, amount: 1002u32.into() }),
@@ -734,37 +731,83 @@ fn it_will_order_bids_with_bonded_argons() {
 		assert_eq!(first_bid.bid_amount_max, 1002);
 		assert_eq!(first_bid.bid_amount_sum, 4004);
 
-		let events = frame_system::Pallet::<Test>::events();
 		// compare to the last event record
-		let frame_system::EventRecord { event, .. } = &events[events.len() - 2];
-		assert_eq!(
-			event,
-			&<Test as frame_system::Config>::RuntimeEvent::from(
-				Event::<Test>::SlotBidderReplaced {
-					obligation_id: acc_3_obligation_id,
-					account_id: 3u64,
-					preserved_argonot_hold: false
-				}
-			)
+		System::assert_last_event(
+			Event::SlotBidderOut {
+				account_id: 3,
+				bid_amount: 1001u32.into(),
+				obligation_id: Some(3),
+			}
+			.into(),
 		);
 
-		System::assert_last_event(
+		System::assert_has_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1002u32.into(), index: 0 }.into(),
 		);
-		assert_eq!(Ownership::free_balance(3), 1000);
+		assert_eq!(Ownership::free_balance(3), 500);
 
 		assert_eq!(
 			NextSlotCohort::<Test>::get().iter().map(|a| a.account_id).collect::<Vec<_>>(),
-			vec![1, 2]
+			vec![1, 2, 3]
 		);
 		assert!(System::account_exists(&1));
 		assert!(System::account_exists(&2));
 		assert!(System::account_exists(&3));
+
+		System::reset_events();
+		System::set_block_number(9);
+		CurrentTick::set(9);
+		ElapsedTicks::set(9);
+		System::on_initialize(9);
+		MiningSlots::on_initialize(9);
+		assert_eq!(
+			AuthorityIdToMinerId::<Test>::iter_keys().collect::<Vec<_>>(),
+			vec![1u64.into(), 2u64.into()]
+		);
+		System::assert_has_event(
+			Event::SlotBidderDropped {
+				account_id: 3,
+				obligation_id: Some(3),
+				preserved_argonot_hold: false,
+			}
+			.into(),
+		);
+		assert_eq!(Ownership::free_balance(3), 1000);
+		assert_eq!(Ownership::total_balance(&3), 1000);
+		System::assert_has_event(
+			Event::NewMiners {
+				cohort_id: 2,
+				start_index: 4,
+				new_miners: BoundedVec::truncate_from(vec![
+					MiningRegistration {
+						account_id: 1,
+						obligation_id: Some(1),
+						argonots: 500u32.into(),
+						bonded_argons: 1002u32.into(),
+						reward_destination: RewardDestination::Owner,
+						reward_sharing: None,
+						authority_keys: 1.into(),
+						cohort_id: 2,
+					},
+					MiningRegistration {
+						account_id: 2,
+						obligation_id: Some(2),
+						argonots: 500u32.into(),
+						bonded_argons: 1001u32.into(),
+						reward_destination: RewardDestination::Owner,
+						reward_sharing: None,
+						authority_keys: 2.into(),
+						cohort_id: 2,
+					},
+				]),
+			}
+			.into(),
+		);
 	});
 }
 
 #[test]
-fn it_will_add_to_bids() {
+fn it_will_set_bids_to_max() {
 	TicksBetweenSlots::set(3);
 	MaxMiners::set(6);
 	MaxCohortSize::set(2);
@@ -806,17 +849,17 @@ fn it_will_add_to_bids() {
 			1.into()
 		));
 		System::assert_last_event(
-			Event::SlotBidderAdded { account_id: 1, bid_amount: 3000u32.into(), index: 0 }.into(),
+			Event::SlotBidderAdded { account_id: 1, bid_amount: 2000u32.into(), index: 0 }.into(),
 		);
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
 		let entry = &NextSlotCohort::<Test>::get()[0];
-		assert_eq!(entry.bonded_argons, 3000u32.into());
+		assert_eq!(entry.bonded_argons, 2000u32.into());
 		assert_eq!(entry.obligation_id, obligation_id);
 	});
 }
 
 #[test]
-fn it_will_cancel_bids_if_new_vault() {
+fn it_will_disallow_bids_with_new_vault() {
 	TicksBetweenSlots::set(3);
 	MaxMiners::set(12);
 	MaxCohortSize::set(4);
@@ -877,22 +920,26 @@ fn it_will_cancel_bids_if_new_vault() {
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1000u32.into(), index: 2 }.into(),
 		);
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(1),
-			Some(MiningSlotBid { vault_id: 2, amount: 2000u32.into() }),
-			RewardDestination::Owner,
-			1.into()
-		));
-		assert_eq!(Obligations::get().len(), 1, "should still only be one bid");
-		assert_eq!(NextSlotCohort::<Test>::get().len(), 4);
-		let next_cohort = NextSlotCohort::<Test>::get();
-		let entry = next_cohort[0].clone();
-		System::assert_last_event(
-			Event::SlotBidderAdded { account_id: 1, bid_amount: 2000u32.into(), index: 0 }.into(),
+
+		assert_err!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				Some(MiningSlotBid { vault_id: 1, amount: 999u32.into() }),
+				RewardDestination::Owner,
+				1.into()
+			),
+			Error::<Test>::CannotReduceBondedArgons
 		);
-		assert_eq!(entry.account_id, 1);
-		assert_eq!(entry.bonded_argons, 2000u32.into(), "didn't add to bid");
-		assert_ne!(entry.obligation_id, obligation_id, "new obligation id should be different");
+
+		assert_err!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				Some(MiningSlotBid { vault_id: 2, amount: 2000u32.into() }),
+				RewardDestination::Owner,
+				1.into()
+			),
+			Error::<Test>::InvalidVaultSwitch
+		);
 	});
 }
 
@@ -956,8 +1003,8 @@ fn it_handles_rebids() {
 		));
 
 		for i in 1..=4u64 {
-			set_ownership(i, 1_000_000u32.into());
-			set_argons(i, 1_000_000u32.into());
+			set_ownership(i, 1000u32.into());
+			set_argons(i, 500_004u32.into());
 
 			assert_ok!(MiningSlots::bid(
 				RuntimeOrigin::signed(i),
@@ -981,9 +1028,18 @@ fn it_handles_rebids() {
 			5000
 		);
 		// ensure adding bids works
+		assert_err!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				Some(MiningSlotBid { vault_id: 1, amount: 1005u64.into() }),
+				RewardDestination::Owner,
+				1.into()
+			),
+			Error::<Test>::CannotReduceBondedArgons
+		);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
-			Some(MiningSlotBid { vault_id: 1, amount: 1005u64.into() }),
+			Some(MiningSlotBid { vault_id: 1, amount: 501_005u64.into() }),
 			RewardDestination::Owner,
 			1.into()
 		));
@@ -1029,27 +1085,6 @@ fn it_handles_rebids() {
 		));
 
 		CurrentTick::set(20);
-
-		// ensure adding bids works
-		assert_ok!(MiningSlots::bid(
-			RuntimeOrigin::signed(3),
-			Some(MiningSlotBid { vault_id: 2, amount: 501_000u64.into() }),
-			RewardDestination::Owner,
-			3.into()
-		));
-		assert_eq!(
-			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &3),
-			22
-		);
-		assert_eq!(
-			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &0),
-			6000,
-			"Base fee didn't get refunded"
-		);
-		assert_eq!(
-			Balances::balance_on_hold(&pallet_vaults::HoldReason::ObligationFee.into(), &11),
-			20000
-		);
 	});
 }
 

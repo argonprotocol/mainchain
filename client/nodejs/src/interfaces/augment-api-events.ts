@@ -790,6 +790,14 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     miningSlot: {
+      /**
+       * Bids are closed due to the VRF randomized function triggering
+       **/
+      MiningBidsClosed: AugmentedEvent<
+        ApiType,
+        [cohortId: u64],
+        { cohortId: u64 }
+      >;
       MiningConfigurationUpdated: AugmentedEvent<
         ApiType,
         [
@@ -814,6 +822,19 @@ declare module '@polkadot/api-base/types/events' {
           startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
           cohortId: u64;
+        }
+      >;
+      ReleaseBidError: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          obligationId: Option<u64>,
+          error: SpRuntimeDispatchError,
+        ],
+        {
+          accountId: AccountId32;
+          obligationId: Option<u64>;
+          error: SpRuntimeDispatchError;
         }
       >;
       ReleasedMinerSeat: AugmentedEvent<
@@ -847,7 +868,7 @@ declare module '@polkadot/api-base/types/events' {
         [accountId: AccountId32, bidAmount: u128, index: u32],
         { accountId: AccountId32; bidAmount: u128; index: u32 }
       >;
-      SlotBidderReplaced: AugmentedEvent<
+      SlotBidderDropped: AugmentedEvent<
         ApiType,
         [
           accountId: AccountId32,
@@ -859,6 +880,11 @@ declare module '@polkadot/api-base/types/events' {
           obligationId: Option<u64>;
           preservedArgonotHold: bool;
         }
+      >;
+      SlotBidderOut: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, bidAmount: u128, obligationId: Option<u64>],
+        { accountId: AccountId32; bidAmount: u128; obligationId: Option<u64> }
       >;
     };
     mint: {

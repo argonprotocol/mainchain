@@ -1284,7 +1284,7 @@ fn it_can_create_bonded_argons() {
 		let amount = 1_000_000;
 
 		CurrentTick::set(1);
-		assert_ok!(Vaults::create_bonded_argons(1, 2, amount, 10, None));
+		assert_ok!(Vaults::lease_bonded_argons(1, 2, amount, 10, None));
 		assert_eq!(
 			ObligationsById::<Test>::get(1).unwrap(),
 			Obligation {
@@ -1356,7 +1356,7 @@ fn it_can_modify_bonded_argons() {
 		MinimumObligationAmount::set(1000);
 		CurrentTick::set(1);
 
-		assert_ok!(Vaults::create_bonded_argons(1, 2, amount, 10, None));
+		assert_ok!(Vaults::lease_bonded_argons(1, 2, amount, 10, None));
 		assert_eq!(
 			ObligationsById::<Test>::get(1).unwrap(),
 			Obligation {
@@ -1372,7 +1372,7 @@ fn it_can_modify_bonded_argons() {
 			}
 		);
 
-		assert_ok!(Vaults::create_bonded_argons(1, 2, 10000, 10, Some(1)));
+		assert_ok!(Vaults::lease_bonded_argons(1, 2, amount + 10000, 10, Some(1)));
 		assert_eq!(
 			ObligationsById::<Test>::get(1).unwrap(),
 			Obligation {

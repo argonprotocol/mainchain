@@ -9,7 +9,7 @@ use argon_primitives::{
 };
 use env_logger::{Builder, Env};
 use frame_support::{
-	derive_impl, parameter_types,
+	derive_impl, ensure, parameter_types,
 	traits::{ConstU64, Currency, StorageMapShim},
 	weights::constants::RocksDbWeight,
 };
@@ -138,7 +138,7 @@ impl BondedArgonsProvider for StaticBondProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
-	fn create_bonded_argons(
+	fn lease_bonded_argons(
 		vault_id: VaultId,
 		account_id: Self::AccountId,
 		amount: Self::Balance,
@@ -149,7 +149,7 @@ impl BondedArgonsProvider for StaticBondProvider {
 		ObligationError,
 	> {
 		if UseRealVaults::get() {
-			return Vaults::create_bonded_argons(
+			return Vaults::lease_bonded_argons(
 				vault_id,
 				account_id,
 				amount,
@@ -159,16 +159,15 @@ impl BondedArgonsProvider for StaticBondProvider {
 		}
 		if let Some(modify_obligation_id) = modify_obligation_id {
 			let res = Obligations::mutate(|a| {
-				let existing = a
-					.iter_mut()
-					.find(|(id, v, _, _)| *id == modify_obligation_id && *v == vault_id);
-				if let Some((_, _, _, a)) = existing {
-					*a = a.saturating_add(amount);
-					return Some(*a);
+				let existing = a.iter_mut().find(|(_, _, a, _)| *a == account_id);
+				if let Some((_, v, _, a)) = existing {
+					ensure!(v == &vault_id, ObligationError::InvalidVaultSwitch);
+					*a = amount;
+					return Ok(Some(*a));
 				}
-				None
+				Ok(None)
 			});
-			if let Some(total) = res {
+			if let Some(total) = res? {
 				return Ok((modify_obligation_id, VaultSharing::get(), total));
 			}
 		}

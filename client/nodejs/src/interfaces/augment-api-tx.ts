@@ -635,8 +635,8 @@ declare module '@polkadot/api-base/types/submittable' {
        * The required amount is calculated as a percentage of the total ownership tokens in the
        * network. This percentage is adjusted before the beginning of each slot.
        *
-       * If your bid is replaced, a `SlotBidderReplaced` event will be emitted. By monitoring for
-       * this event, you will be able to ensure your bid is accepted.
+       * If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring
+       * for this event, you will be able to ensure your bid is accepted.
        *
        * NOTE: bidding for each slot will be closed at a random block within
        * `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
