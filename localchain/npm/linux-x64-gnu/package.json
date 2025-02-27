@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/localchain-linux-x64-gnu",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "publishConfig": {
     "access": "public"
   },

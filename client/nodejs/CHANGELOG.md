@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.0.15](https://github.com/argonprotocol/mainchain/compare/v1.0.14...08e1c943b84747af9e6978f320c4829eb98f5610) (2025-02-26)
+## [v1.0.16](https://github.com/argonprotocol/mainchain/compare/v1.0.15...96ceef8bca3e24941a9c9a19025025593eba9339) (2025-02-26)
 
-### Fixes
+### [v1.0.15](https://github.com/argonprotocol/mainchain/compare/v1.0.14...v1.0.15) (2025-02-26)
+
+#### Fixes
 
 * **mining_slot:** don’t allow vault mismatch
 ([5b5480b](https://github.com/argonprotocol/mainchain/commit/5b5480b4d7a00bd5979ff592dc4fb84949ff3ab6))
