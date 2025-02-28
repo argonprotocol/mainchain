@@ -187,7 +187,7 @@ pub(crate) mod utils {
 		println!("Registering miner");
 		let register = client
 			.submit_tx(
-				&tx().mining_slot().bid(None, RewardDestination::Owner, keys),
+				&tx().mining_slot().bid(0, RewardDestination::Owner, keys, None),
 				&Sr25519Signer::new(miner),
 				None,
 				true,

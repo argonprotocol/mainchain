@@ -290,6 +290,7 @@ pub mod pallet {
 		/// * `bitcoin_height` - the latest bitcoin block height to be confirmed
 		#[pallet::call_index(1)]
 		#[pallet::weight((0, DispatchClass::Operational))]
+		#[allow(clippy::useless_conversion)]
 		pub fn set_confirmed_block(
 			origin: OriginFor<T>,
 			bitcoin_height: BitcoinHeight,

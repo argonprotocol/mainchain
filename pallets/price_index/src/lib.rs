@@ -190,6 +190,7 @@ pub mod pallet {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
 		#[pallet::weight((0, DispatchClass::Operational))]
+		#[allow(clippy::useless_conversion)]
 		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 

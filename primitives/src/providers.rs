@@ -14,7 +14,7 @@ use crate::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
-	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
+	block_seal::{BlockPayout, CohortId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	vault::Obligation,
@@ -208,11 +208,9 @@ pub trait BlockSealerProvider<AccountId: FullCodec> {
 }
 
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
-	fn get_rewards_account(
-		author: &AccountId,
-	) -> (Option<AccountId>, Option<RewardSharing<AccountId>>);
+	fn get_rewards_account(author: &AccountId) -> Option<(AccountId, CohortId)>;
 	/// Returns all rewards accounts and the share they receive
-	fn get_all_rewards_accounts() -> Vec<(AccountId, Option<RewardShare>)>;
+	fn get_all_rewards_accounts() -> Vec<AccountId>;
 	/// Is a compute block still eligible for rewards?
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
@@ -223,7 +221,6 @@ pub trait MiningSlotProvider {
 	fn is_slot_bidding_started() -> bool;
 }
 
-pub type RewardShare = FixedU128;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,

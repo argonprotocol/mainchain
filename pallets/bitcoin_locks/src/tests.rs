@@ -83,7 +83,7 @@ fn cleans_up_a_rejected_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, price);
 
 		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
@@ -181,7 +181,7 @@ fn marks_a_verified_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, price);
 
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
@@ -229,7 +229,7 @@ fn burns_a_spent_bitcoin() {
 		let who = 1;
 		set_argons(who, 2_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let allocated = DefaultVault::get().bitcoin_argons.allocated;
+		let allocated = DefaultVault::get().locked_bitcoin_argons.allocated;
 		CurrentTick::set(1);
 
 		assert_ok!(BitcoinLocks::initialize(
@@ -242,7 +242,7 @@ fn burns_a_spent_bitcoin() {
 
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, price);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 
@@ -257,8 +257,8 @@ fn burns_a_spent_bitcoin() {
 		assert_ok!(BitcoinLocks::utxo_spent(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price - new_price);
-		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, allocated - new_price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, price - new_price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.allocated, allocated - new_price);
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinLockBurned {
@@ -322,7 +322,7 @@ fn can_release_a_bitcoin() {
 			pubkey
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, lock.lock_price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, lock.lock_price);
 		let expiration_block = lock.vault_claim_height;
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
@@ -407,7 +407,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
 		let vault = DefaultVault::get();
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(vault.bitcoin_argons.reserved, lock.lock_price);
+		assert_eq!(vault.locked_bitcoin_argons.reserved, lock.lock_price);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		// Mint the argons into account
@@ -486,7 +486,7 @@ fn clears_released_bitcoins() {
 		));
 		let vault = DefaultVault::get();
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(vault.bitcoin_argons.reserved, lock.lock_price);
+		assert_eq!(vault.locked_bitcoin_argons.reserved, lock.lock_price);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		// Mint the argons into account
@@ -535,8 +535,11 @@ fn clears_released_bitcoins() {
 		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, lock.lock_price);
-		assert_eq!(DefaultVault::get().bitcoin_argons.allocated, vault.bitcoin_argons.allocated);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, lock.lock_price);
+		assert_eq!(
+			DefaultVault::get().locked_bitcoin_argons.allocated,
+			vault.locked_bitcoin_argons.allocated
+		);
 		assert_eq!(LockReleaseCosignHeightById::<Test>::get(1), Some(1));
 
 		System::assert_last_event(

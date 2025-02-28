@@ -163,25 +163,16 @@ author_rotateKeys"}' http://localhost:9944/
 ## 2. Acquire Argons and Argonots (Ownership Tokens)
 
 Mining requires you to have two tokens: Argons and Argonots (Ownership Tokens). There are initially 100 mining slots
-available in
-Argon, each lasting 10 days. So every day, you are bidding for 1 of 10 available slots. This will grow to 10,000 slots
-as the network grows. Bidding will continue until a random block less than or equal to 200 ticks before the next slot
-begins (slots start every 1440 ticks).
+available in Argon, each lasting 10 days. So every day, you are bidding for 1 of 10 available slots. This will grow to
+10,000 slots as the network grows. Bidding will continue until a random block less than or equal to 200 ticks before the
+next slot begins (slots start every 1440 ticks).
 
 At any given time, a mining slot requires you to own and lock 1/100th (or current mining slots) of the total Ownership
 Tokens in circulation. And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons
-than they have. You will get these Argons back at the end of the slot (or if you lose your bid). Argons rented for this
-process must come from a [Vault](./running-a-vault#bonded-argons).
+than they have. You will be refunded if you lose out on a slot.
 
-BondedArgons are allowed to be rented for mining at a ratio of 3:1 with the Bitcoins bonded in a vault, capped by
-the amount of added securitization locked up by the vault. In other words, if a vault has 100k of bitcoin and 200k of
-added securitization in the vault, the vault is able to offer up to 300k of BondedArgons. If
-there is 0 added securitization, then only 100k of BondedArgons are eligible. A vault offers an allocated amount of both
-Bitcoin and BondedArgons. You can view a vault's current allocation by looking at the Chain State in Polkadot.js under
-`Vaults -> VaultsById`, and then viewing `allocated` and `reserved` amounts of each. Some Vault operators will also
-offer
-profit sharing terms, where you don't need to rent Argons for as high a cost, but will need to share argons minted
-during your slot.
+Your bids will go into a bid "pool" for your slot and paid to Vaults who have committed to backing the MiningSlot with
+"Bonded" Bitcoins.
 
 You need to set up an account and acquire Argons to bid for a mining slot.
 
@@ -217,11 +208,11 @@ There are initially 10 mining positions available every "slot", and 100 total mi
 days, so at any given time, there are 10 overlapping cohorts of miners. Each day, 1/10th will rotate out and 1/10th will
 rotate in. Over time, the number of miners will increase to 10,000.
 
-You are bidding for a slot, and can be outbid at any time by someone who "locks" more Argons than you. You can monitor
+You are bidding for a slot, and can be outbid at any time by someone who bids more Argons than you. You can monitor
 if you currently have a winning slot by looking at
-the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) under **miningSlot
-** -> **nextSlotCohort**. If you are in the top 10 of the `nextSlotCohort`, you have a winning bid. You can also
-monitor for events in each block matching `SlotBidderOutOfContention` to see if you have been outbid. (Events can be
+the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) under
+**miningSlot** -> **nextSlotCohort**. If you are in the `nextSlotCohort`, you have a winning bid. You can
+also monitor for events in each block matching `SlotBidderDropped` to see if you have been outbid. (Events can be
 monitored programmatically using the `@argonprotocol/mainchain` node.js library, or using the `argon-client` rust
 library, which is a [`subxt`](https://github.com/paritytech/subxt) based rust library).
 
@@ -232,12 +223,9 @@ as shown [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trust
 
 You can bid for a slot by using the Polkadot.js
 interface [here](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).
+
 If you toggle to "Submission", you can submit your bid.
 ![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
-
-> NOTE: you'll want to review the Vaults and the terms they are offering for renting the Argons you want to bid with.
-> That's available at Developer -> Chain State -> Vaults -> Vaults.
-> ![Polkadot.js - Vaults](images/pjs-vaults.png)
 
 ### 4. Start Mining and Watch for Rewards
 
@@ -307,12 +295,6 @@ involved, the 25% are not issued.
 ### Reward Maturation
 
 Block rewards are not immediately available. They are frozen and released after 5 blocks.
-
-### Profit Sharing
-
-If you are renting Argons from a Vault, you may have a profit-sharing agreement. This will be a percentage of the Argons
-minted during your slot. You can view the profit-sharing agreement in the Chain State under `Vaults -> VaultsById`. The
-percent will be allocated during block reward creation.
 
 ### Vote Creator
 

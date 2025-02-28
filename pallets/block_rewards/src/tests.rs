@@ -8,14 +8,14 @@ use frame_support::{
 };
 use sp_arithmetic::traits::UniqueSaturatedInto;
 use sp_core::ByteArray;
-use sp_runtime::{DispatchError, FixedU128, TokenError};
+use sp_runtime::{DispatchError, TokenError};
 
 use crate::{
 	mock::{Balances, BlockRewards, Ownership, *},
 	Event, FreezeReason, RewardAmounts,
 };
 use argon_primitives::{
-	block_seal::{BlockPayout, BlockRewardType, RewardSharing},
+	block_seal::{BlockPayout, BlockRewardType},
 	BlockSealAuthorityId, BlockSealerInfo,
 };
 
@@ -424,60 +424,5 @@ fn it_should_not_fail_with_no_notaries() {
 			}
 			.into(),
 		);
-	});
-}
-
-#[test]
-fn it_should_support_profit_sharing() {
-	ActiveNotaries::set(vec![1, 2]);
-	BlockSealer::set(BlockSealerInfo {
-		block_author_account_id: 1,
-		block_vote_rewards_account: Some(2),
-		block_seal_authority: None,
-	});
-	GetRewardSharing::set(Some(RewardSharing {
-		account_id: 3,
-		percent_take: FixedU128::from_rational(40, 100),
-	}));
-	NotebooksInBlock::set(vec![(1, 1, 1), (2, 1, 1)]);
-	NotebookTick::set(1);
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		BlockRewards::on_initialize(1);
-		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
-		let share_amount = (3750.0 * 0.4) as u128;
-		System::assert_last_event(
-			Event::RewardCreated {
-				maturation_block,
-				rewards: vec![
-					BlockPayout {
-						account_id: 1,
-						ownership: 3750,
-						argons: 3750 - share_amount,
-						block_seal_authority: None,
-						reward_type: BlockRewardType::Miner,
-					},
-					BlockPayout {
-						account_id: 3,
-						ownership: 0,
-						argons: share_amount,
-						block_seal_authority: None,
-						reward_type: BlockRewardType::ProfitShare,
-					},
-					BlockPayout {
-						account_id: 2,
-						ownership: 1250,
-						argons: 1250,
-						block_seal_authority: None,
-						reward_type: BlockRewardType::Voter,
-					},
-				],
-			}
-			.into(),
-		);
-		let freeze_id = FreezeReason::MaturationPeriod.into();
-
-		assert_eq!(Balances::balance_frozen(&freeze_id, &3), share_amount);
 	});
 }
