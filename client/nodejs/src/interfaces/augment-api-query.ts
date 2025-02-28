@@ -82,6 +82,7 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
+  PalletVaultsBidPoolEntrant,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
 } from '@polkadot/types/lookup';
@@ -1397,12 +1398,21 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * Completion of mining obligation, upon which funds are returned to the vault
+       * Completion of bonded bitcoin obligation, upon which funds are returned to the vault
        **/
-      bondedArgonCompletions: AugmentedQuery<
+      bondedBitcoinCompletions: AugmentedQuery<
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
+      >;
+      /**
+       * The entrants in the bonded bitcoin pool that will next be paid out. They apply to the next
+       * closed mining slot cohort bid pool.
+       **/
+      nextBondedBitcoinPoolEntrants: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletVaultsBidPoolEntrant>>,
+        []
       >;
       nextObligationId: AugmentedQuery<
         ApiType,
@@ -1428,15 +1438,6 @@ declare module '@polkadot/api-base/types/storage' {
         (
           arg: u64 | AnyNumber | Uint8Array,
         ) => Observable<Vec<ITuple<[AccountId32, u128, u32, u64]>>>,
-        [u64]
-      >;
-      /**
-       * Pending funding that will be committed at the given block number (must be a minimum of 1
-       * slot change away)
-       **/
-      pendingFundingModificationsByTick: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>,
         [u64]
       >;
       /**

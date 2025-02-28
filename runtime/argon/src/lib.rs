@@ -266,8 +266,11 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
-	type EnableRewardSharing = EnableRewardSharing;
 	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
+	type MaxBidPoolEntrants = ConstU32<100>;
+	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;
+	type PalletId = VaultBidPoolsOwnerPalletId;
+	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -342,13 +345,15 @@ impl pallet_mining_slot::Config for Runtime {
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
+	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondedArgonsProvider = Vaults;
+	type BidPoolProvider = Vaults;
 	type SlotEvents = (GrandpaSlotRotation,);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
 	type TickProvider = Ticks;
+	type BidIncrements = MiningSlotBidIncrement;
 }
 
 impl pallet_block_seal::Config for Runtime {
