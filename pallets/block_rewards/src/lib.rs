@@ -258,12 +258,11 @@ pub mod pallet {
 				Self::saturating_mul_ceil(miner_percent, block_ownership);
 			let miner_argons: T::Balance = Self::saturating_mul_ceil(miner_percent, block_argons);
 
-			let (assigned_rewards_account, reward_sharing) =
-				T::BlockRewardAccountsProvider::get_rewards_account(
-					&authors.block_author_account_id,
-				);
-			let miner_reward_account =
-				assigned_rewards_account.unwrap_or(authors.block_author_account_id.clone());
+			let assigned_rewards_account = T::BlockRewardAccountsProvider::get_rewards_account(
+				&authors.block_author_account_id,
+			);
+			let (miner_reward_account, _cohort_id) =
+				assigned_rewards_account.unwrap_or((authors.block_author_account_id.clone(), 0));
 
 			let mut rewards: Vec<BlockPayout<T::AccountId, T::Balance>> = vec![BlockPayout {
 				account_id: miner_reward_account.clone(),
@@ -272,18 +271,6 @@ pub mod pallet {
 				ownership: miner_ownership,
 				argons: miner_argons,
 			}];
-			if let Some(sharing) = reward_sharing {
-				let sharing_amount: T::Balance =
-					Self::saturating_mul_ceil(sharing.percent_take, miner_argons);
-				rewards[0].argons = miner_argons.saturating_sub(sharing_amount);
-				rewards.push(BlockPayout {
-					account_id: sharing.account_id,
-					reward_type: BlockRewardType::ProfitShare,
-					block_seal_authority: None,
-					ownership: 0u128.into(),
-					argons: sharing_amount,
-				});
-			}
 
 			if let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account {
 				rewards.push(BlockPayout {

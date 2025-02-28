@@ -89,6 +89,7 @@ parameter_types! {
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
+	pub const MiningSlotBidIncrement: Balance = ARGON;
 
 	// ### pallet_vaults
 	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
@@ -107,8 +108,9 @@ parameter_types! {
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
-
-	pub const EnableRewardSharing: bool = false;
+	pub const MinBidPoolProrataPercent: Perbill = Perbill::from_percent(1);
+	pub const VaultBidPoolsOwnerPalletId: PalletId = PalletId(*b"bidPools");
+	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 	// ### pallet chain transfer
 	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");

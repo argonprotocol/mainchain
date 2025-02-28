@@ -96,13 +96,8 @@ declare module '@polkadot/api-base/types/errors' {
        * There are too many obligations expiring in the given expiration block
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      ExpirationTooSoon: AugmentedError<ApiType>;
       GenericObligationError: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
-      /**
-       * The vault does not have enough bitcoins to cover the bonded argons
-       **/
-      InsufficientBondedArgons: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientSatoshisLocked: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
@@ -423,11 +418,11 @@ declare module '@polkadot/api-base/types/errors' {
     };
     miningSlot: {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
-      BidTooLow: AugmentedError<ApiType>;
       /**
-       * You can't reduce the amount of bonded argons
+       * The mining bid cannot be reduced
        **/
-      CannotReduceBondedArgons: AugmentedError<ApiType>;
+      BidCannotBeReduced: AugmentedError<ApiType>;
+      BidTooLow: AugmentedError<ApiType>;
       /**
        * Keys cannot be registered by multiple accounts
        **/
@@ -437,20 +432,18 @@ declare module '@polkadot/api-base/types/errors' {
        * There are too many obligations expiring in the given expiration block
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      ExpirationTooSoon: AugmentedError<ApiType>;
-      GenericObligationError: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientOwnershipTokens: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
+       * Bids must be whole argons
+       **/
+      InvalidBidAmount: AugmentedError<ApiType>;
+      /**
        * Unable to decode the key format
        **/
       InvalidKeyFormat: AugmentedError<ApiType>;
-      /**
-       * Cannot change the bonded argon vault
-       **/
-      InvalidVaultSwitch: AugmentedError<ApiType>;
       MinimumObligationAmountNotMet: AugmentedError<ApiType>;
       NoMoreObligationIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
@@ -849,16 +842,11 @@ declare module '@polkadot/api-base/types/errors' {
        * There are too many obligations expiring in the given expiration block
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      ExpirationTooSoon: AugmentedError<ApiType>;
       /**
        * A funding change is already scheduled
        **/
       FundingChangeAlreadyScheduled: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
-      /**
-       * The vault does not have enough bonded argons for the request
-       **/
-      InsufficientBondedArgons: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**

@@ -11,7 +11,7 @@ use frame_support::{
 	assert_ok,
 	traits::{fungible::Unbalanced, OnInitialize},
 };
-use sp_arithmetic::{FixedI128, FixedU128};
+use sp_arithmetic::FixedI128;
 use sp_core::U256;
 use sp_runtime::{DispatchError, TokenError};
 
@@ -110,7 +110,7 @@ fn it_calculates_per_miner_mint() {
 fn it_can_mint() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
-	MinerRewardsAccounts::set(vec![(1, None)]);
+	MinerRewardsAccounts::set(vec![1]);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -144,7 +144,7 @@ fn it_can_mint() {
 fn it_records_failed_mints() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
-	MinerRewardsAccounts::set(vec![(1, None)]);
+	MinerRewardsAccounts::set(vec![1]);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -191,66 +191,6 @@ fn it_doesnt_mint_before_active_miners() {
 
 		assert!(System::events().is_empty());
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
-	});
-}
-
-#[test]
-fn it_can_mint_profit_sharing() {
-	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
-
-	MinerRewardsAccounts::set(vec![
-		(1, Some(FixedU128::from_rational(30, 100))),
-		(2, Some(FixedU128::from_rational(70, 100))),
-		(3, None),
-	]);
-
-	let per_miner = (1000 / 3) as u128;
-
-	let amount_for_sharer = (per_miner as f64 * 0.3) as u128;
-	let amount_for_share_lender = (per_miner as f64 * 0.7) as u128;
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		Balances::set_total_issuance(60000);
-		UniswapLiquidity::set(60000);
-
-		// nothing to mint
-		MintedMiningArgons::<Test>::set(U256::from(0));
-		MintedBitcoinArgons::<Test>::set(U256::from(0));
-
-		Mint::on_initialize(1);
-		System::assert_last_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Mining,
-				account_id: 3,
-				utxo_id: None,
-				amount: per_miner,
-			}
-			.into(),
-		);
-		System::assert_has_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Mining,
-				account_id: 1,
-				utxo_id: None,
-				amount: amount_for_sharer,
-			}
-			.into(),
-		);
-		System::assert_has_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Mining,
-				account_id: 2,
-				utxo_id: None,
-				amount: amount_for_share_lender,
-			}
-			.into(),
-		);
-		let amount_minted = per_miner + amount_for_sharer + amount_for_share_lender;
-		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(amount_minted));
-		assert_eq!(Balances::total_issuance(), 60000 + amount_minted);
-		assert_eq!(Balances::free_balance(1), amount_for_sharer);
-		assert_eq!(Balances::free_balance(2), amount_for_share_lender);
-		assert_eq!(Balances::free_balance(3), per_miner);
 	});
 }
 
@@ -302,7 +242,7 @@ fn it_pays_bitcoin_mints() {
 		MintedMiningArgons::<Test>::set(U256::from(0));
 		MintedBitcoinArgons::<Test>::set(U256::from(0));
 		// must have miners to mint
-		MinerRewardsAccounts::set(vec![(10, None)]);
+		MinerRewardsAccounts::set(vec![10]);
 
 		Mint::on_initialize(1);
 		assert_eq!(Balances::total_issuance(), 0u128);
