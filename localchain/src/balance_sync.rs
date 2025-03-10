@@ -45,6 +45,9 @@ pub struct VoteCreationOptions {
   pub votes_address: Option<String>,
   /// What's the minimum amount of tax we should wait for before voting on blocks
   pub minimum_vote_amount: Option<i64>,
+
+  /// How many votes to create per tick loop
+  pub votes_per_tick: Option<i64>,
 }
 
 #[cfg_attr(feature = "napi", napi)]
@@ -703,48 +706,43 @@ impl BalanceSync {
       return Ok(None);
     };
 
-    let tax_for_vote = {
+    let votes = options.votes_per_tick.unwrap_or(1) as Balance;
+
+    let (total_tax_for_vote, tax_per_vote) = {
       let available_tax = balance_change.balance().await;
 
       if let Some(minimum_vote_amount) = options.minimum_vote_amount {
-        let minimum_tax = minimum_vote_amount as Balance;
+        let minimum_vote_amount = minimum_vote_amount as Balance;
+        let minimum_tax = minimum_vote_amount * votes;
         if available_tax < minimum_tax {
           return Ok(None);
         }
         ensure!(
-          minimum_tax >= best_block_for_vote.vote_minimum,
+          minimum_vote_amount >= best_block_for_vote.vote_minimum,
           format!(
             "Minimum vote amount {} is less than the best block vote minimum {}",
-            minimum_tax, best_block_for_vote.vote_minimum
+            minimum_vote_amount, best_block_for_vote.vote_minimum
           )
         );
-        minimum_tax
+        (minimum_tax, minimum_vote_amount)
       } else {
-        if available_tax < best_block_for_vote.vote_minimum {
+        let minimum_tax_needed = best_block_for_vote.vote_minimum * votes;
+        if available_tax < minimum_tax_needed {
           return Ok(None);
         }
-        best_block_for_vote.vote_minimum
+        (minimum_tax_needed, best_block_for_vote.vote_minimum)
       }
     };
 
     trace!(
-      "Checking if we should create a vote for account {}. Total to use: {}. Configured minimum for vote: {:?}",
+      "Checking if we should create a vote for account {}. Total to use: {}. Configured minimum for vote: {:?}. Votes {}",
       account.id,
-      tax_for_vote,
-      options.minimum_vote_amount
+      total_tax_for_vote,
+      options.minimum_vote_amount,
+      votes
     );
 
-    balance_change.send_to_vote(tax_for_vote).await?;
-
-    let tick_counter = {
-      let mut tick_counter = self.tick_counter.write().await;
-      if tick_counter.0 == current_tick {
-        tick_counter.1 += 1;
-      } else {
-        *tick_counter = (current_tick, 0);
-      }
-      *tick_counter
-    };
+    balance_change.send_to_vote(total_tax_for_vote).await?;
 
     let Some(votes_address) = options.votes_address.as_ref() else {
       bail!("No votes address provided to create votes with tax");
@@ -752,25 +750,37 @@ impl BalanceSync {
 
     let vote_address = votes_address.clone();
 
-    let mut vote = BlockVote {
-      account_id: account.get_account_id32()?,
-      power: tax_for_vote,
-      index: tick_counter.1,
-      block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
-      block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
-      signature: Signature::from_raw([0; 64]).into(),
-      tick: current_tick,
-    };
-    let signature = self
-      .keystore
-      .sign(account.address.clone(), vote.hash().as_bytes().to_vec())
-      .await?;
-    vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
-    notarization.add_vote(vote).await?;
+    for _ in 0..votes {
+      let tick_counter = {
+        let mut tick_counter = self.tick_counter.write().await;
+        if tick_counter.0 == current_tick {
+          tick_counter.1 += 1;
+        } else {
+          *tick_counter = (current_tick, 0);
+        }
+        *tick_counter
+      };
+
+      let mut vote = BlockVote {
+        account_id: account.get_account_id32()?,
+        power: tax_per_vote,
+        index: tick_counter.1,
+        block_hash: H256::from_slice(best_block_for_vote.block_hash.as_ref()),
+        block_rewards_account_id: AccountStore::parse_address(&vote_address)?,
+        signature: Signature::from_raw([0; 64]).into(),
+        tick: current_tick,
+      };
+      let signature = self
+        .keystore
+        .sign(account.address.clone(), vote.hash().as_bytes().to_vec())
+        .await?;
+      vote.signature = MultiSignature::decode(&mut signature.as_ref())?;
+      notarization.add_vote(vote).await?;
+    }
     let tracker = notarization.notarize().await?;
     info!(
       "Created vote for account {}. Used tax: {}.",
-      account.id, tax_for_vote
+      account.id, total_tax_for_vote
     );
     Ok(Some(tracker))
   }

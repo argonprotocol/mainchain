@@ -778,6 +778,8 @@ export interface VoteCreationOptions {
   votesAddress?: string;
   /** What's the minimum amount of tax we should wait for before voting on blocks */
   minimumVoteAmount?: number;
+  /** How many votes to create per tick loop */
+  votesPerTick?: number;
 }
 
 export interface ZoneRecord {

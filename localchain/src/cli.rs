@@ -268,6 +268,7 @@ where
       let sync_options = vote_address.map(|vote_address| VoteCreationOptions {
         votes_address: Some(vote_address),
         minimum_vote_amount: minimum_vote_amount.map(|v| v as i64),
+        votes_per_tick: None,
       });
 
       let sync = balance_sync.sync(sync_options.clone()).await?;

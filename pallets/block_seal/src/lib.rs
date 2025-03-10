@@ -173,8 +173,9 @@ pub mod pallet {
 			// tick of the parent voting key
 			let votes_tick = voting_schedule.eligible_votes_tick();
 
-			let notebooks_at_tick =
+			let mut notebooks_at_tick =
 				T::NotebookProvider::notebooks_at_tick(voting_schedule.notebook_tick());
+			notebooks_at_tick.sort_by(|(na, _, _), (nb, _, _)| na.cmp(nb));
 
 			let parent_voting_keys = notebooks_at_tick
 				.into_iter()
