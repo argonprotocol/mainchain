@@ -87,7 +87,7 @@ parameter_types! {
 	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
-	pub const TargetBidsPerSlot: u32 = 12; // Ideally we want 12 bids per slot
+	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
 
 	// ### pallet_vaults
