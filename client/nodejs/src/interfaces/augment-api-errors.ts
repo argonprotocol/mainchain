@@ -437,7 +437,7 @@ declare module '@polkadot/api-base/types/errors' {
       InsufficientOwnershipTokens: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
-       * Bids must be whole argons
+       * Bids must be in allowed increments
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
       /**

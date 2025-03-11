@@ -1,30 +1,30 @@
+use crate::{
+	mock::{Balances, BlockRewards, Ownership, *},
+	pallet::{ArgonsPerBlock, BlockRewardsByCohort},
+	Event, RewardAmounts,
+};
+use argon_primitives::{
+	block_seal::{BlockPayout, BlockRewardType},
+	BlockSealAuthorityId, BlockSealerInfo, OnNewSlot,
+};
 use frame_support::{
-	assert_err, assert_ok,
+	assert_ok,
 	traits::{
-		fungible::{Inspect, InspectFreeze, Mutate},
+		fungible::{Inspect, Mutate},
 		tokens::{Fortitude, Preservation},
 		OnFinalize, OnInitialize,
 	},
 };
-use sp_arithmetic::traits::UniqueSaturatedInto;
+use sp_arithmetic::{traits::UniqueSaturatedInto, FixedI128, FixedU128};
 use sp_core::ByteArray;
-use sp_runtime::{DispatchError, TokenError};
+use sp_runtime::{traits::One, DispatchError, TokenError};
 
-use crate::{
-	mock::{Balances, BlockRewards, Ownership, *},
-	Event, FreezeReason, RewardAmounts,
-};
-use argon_primitives::{
-	block_seal::{BlockPayout, BlockRewardType},
-	BlockSealAuthorityId, BlockSealerInfo,
-};
-
-fn test_authority(id: [u8; 32]) -> BlockSealAuthorityId {
+pub(crate) fn test_authority(id: [u8; 32]) -> BlockSealAuthorityId {
 	BlockSealAuthorityId::from_slice(&id).unwrap()
 }
 
 #[test]
-fn it_should_only_allow_a_single_seal() {
+fn it_mints_immediately_available_funds() {
 	let id = test_authority([1; 32]);
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
@@ -40,7 +40,6 @@ fn it_should_only_allow_a_single_seal() {
 		BlockRewards::on_finalize(1);
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block: (1 + MaturationBlocks::get()).into(),
 				rewards: vec![
 					BlockPayout {
 						account_id: 1,
@@ -60,7 +59,7 @@ fn it_should_only_allow_a_single_seal() {
 			}
 			.into(),
 		);
-		assert_eq!(Balances::reducible_balance(&1, Preservation::Expendable, Fortitude::Polite), 0);
+
 		assert_eq!(
 			Balances::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
 			3750
@@ -79,17 +78,8 @@ fn it_should_only_allow_a_single_seal() {
 			1250
 		);
 
-		assert_err!(
-			<Balances as Mutate<AccountId>>::transfer(&1, &2, 3000, Preservation::Expendable),
-			DispatchError::Token(TokenError::Frozen)
-		);
-
 		// test that we can transfer regular funds still
 		let _ = Balances::mint_into(&1, 3000);
-		assert_err!(
-			<Balances as Mutate<AccountId>>::transfer(&1, &2, 3001, Preservation::Expendable),
-			DispatchError::Token(TokenError::Frozen)
-		);
 		assert_ok!(<Balances as Mutate<AccountId>>::transfer(
 			&1,
 			&2,
@@ -113,10 +103,8 @@ fn it_should_unlock_rewards() {
 		NotebookTick::set(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block,
 				rewards: vec![
 					BlockPayout {
 						account_id: 1,
@@ -136,39 +124,10 @@ fn it_should_unlock_rewards() {
 			}
 			.into(),
 		);
-		let freeze_id = FreezeReason::MaturationPeriod.into();
-		assert_eq!(Balances::balance_frozen(&freeze_id, &1), 3750);
-		assert_eq!(Ownership::balance_frozen(&freeze_id, &1), 3750);
-		assert_eq!(Balances::balance_frozen(&freeze_id, &2), 1250);
-		assert_eq!(Ownership::balance_frozen(&freeze_id, &2), 1250);
-
-		System::set_block_number(maturation_block);
-		BlockRewards::on_initialize(maturation_block);
-		System::assert_last_event(
-			Event::RewardUnlocked {
-				rewards: vec![
-					BlockPayout {
-						account_id: 1,
-						ownership: 3750,
-						argons: 3750,
-						block_seal_authority: None,
-						reward_type: BlockRewardType::Miner,
-					},
-					BlockPayout {
-						account_id: 2,
-						ownership: 1250,
-						argons: 1250,
-						block_seal_authority: None,
-						reward_type: BlockRewardType::Voter,
-					},
-				],
-			}
-			.into(),
-		);
-		assert_eq!(Balances::free_balance(1), 3750);
-		assert_eq!(Ownership::free_balance(1), 3750);
-		assert_eq!(Balances::free_balance(2), 1250);
-		assert_eq!(Ownership::free_balance(2), 1250);
+		assert_eq!(Balances::balance(&1), 3750);
+		assert_eq!(Ownership::balance(&1), 3750);
+		assert_eq!(Balances::balance(&2), 1250);
+		assert_eq!(Ownership::balance(&2), 1250);
 	});
 }
 
@@ -186,10 +145,8 @@ fn it_should_payout_only_to_set_miners() {
 		NotebookTick::set(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block,
 				rewards: vec![BlockPayout {
 					account_id: 1,
 					ownership: 3750,
@@ -219,10 +176,8 @@ fn it_should_halve_rewards() {
 		NotebookTick::set(1);
 		BlockRewards::on_initialize(halving.into());
 		BlockRewards::on_finalize(halving.into());
-		let maturation_block = (halving + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block,
 				rewards: vec![
 					BlockPayout {
 						account_id: 1,
@@ -249,18 +204,18 @@ fn it_should_halve_rewards() {
 fn it_increments_rewards_until_halving() {
 	new_test_ext().execute_with(|| {
 		assert_eq!(
-			BlockRewards::get_reward_amounts(1),
+			BlockRewards::get_minimum_reward_amounts(1),
 			RewardAmounts { argons: 5000, ownership: 5000 }
 		);
 
 		let (increments, increment_blocks, final_reward) = IncrementalGrowth::get();
 		assert_eq!(
-			BlockRewards::get_reward_amounts(increment_blocks - 1),
+			BlockRewards::get_minimum_reward_amounts(increment_blocks - 1),
 			RewardAmounts { argons: 5000, ownership: 5000 }
 		);
 
 		assert_eq!(
-			BlockRewards::get_reward_amounts(increment_blocks),
+			BlockRewards::get_minimum_reward_amounts(increment_blocks),
 			RewardAmounts { argons: 5000 + increments, ownership: 5000 + increments }
 		);
 
@@ -272,7 +227,7 @@ fn it_increments_rewards_until_halving() {
 		let final_halvings = (halving_begin / increment_blocks) - 1;
 
 		assert_eq!(
-			BlockRewards::get_reward_amounts(halving_begin as u64 - 1),
+			BlockRewards::get_minimum_reward_amounts(halving_begin as u64 - 1),
 			RewardAmounts {
 				argons: (5000 + increments * final_halvings),
 				ownership: (5000 + increments * final_halvings)
@@ -280,7 +235,7 @@ fn it_increments_rewards_until_halving() {
 		);
 
 		assert_eq!(
-			BlockRewards::get_reward_amounts(HalvingBeginBlock::get() as u64),
+			BlockRewards::get_minimum_reward_amounts(HalvingBeginBlock::get() as u64),
 			RewardAmounts { argons: final_reward, ownership: final_reward }
 		);
 	})
@@ -300,10 +255,8 @@ fn it_should_scale_rewards_based_on_notaries() {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block,
 				rewards: vec![
 					BlockPayout {
 						account_id: 1,
@@ -401,10 +354,8 @@ fn it_should_not_fail_with_no_notaries() {
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
-		let maturation_block = (1 + MaturationBlocks::get()).into();
 		System::assert_last_event(
 			Event::RewardCreated {
-				maturation_block,
 				rewards: vec![
 					BlockPayout {
 						account_id: 1,
@@ -424,5 +375,92 @@ fn it_should_not_fail_with_no_notaries() {
 			}
 			.into(),
 		);
+	});
+}
+
+#[test]
+fn it_should_modify_block_rewards() {
+	ActiveNotaries::set(vec![1]);
+	NotebooksInBlock::set(vec![(1, 1, 1)]);
+	NotebookTick::set(1);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		UniswapLiquidity::set(1000);
+		ArgonsPerBlock::<Test>::set(11_000);
+		// negative cpi means price is growing, need to mint
+		ArgonCPI::set(FixedI128::from_float(-0.01));
+		BlockRewards::adjust_block_argons(10_000);
+
+		assert_eq!(ArgonsPerBlock::<Test>::get(), 11_000);
+
+		// test the reducer separately
+		BlockRewardsDampener::set(FixedU128::one());
+		// first change at 0.01^ is 14400 * 60 * 100
+		let minimum_change: Balance = 14400 * 60 * 100; // 86.4 argons
+		UniswapLiquidity::set(minimum_change);
+		BlockRewards::adjust_block_argons(10_000);
+		// won't add anything until we get to this
+		assert_eq!(ArgonsPerBlock::<Test>::get(), 11_001);
+
+		ArgonCPI::set(FixedI128::from_float(1.0));
+		BlockRewards::adjust_block_argons(10_000);
+
+		let minus_pct = 10_901;
+		assert_eq!(ArgonsPerBlock::<Test>::get(), minus_pct);
+
+		BlockRewards::on_new_cohort(2);
+		// it sets rewards for the next cohort
+		assert_eq!(
+			BlockRewardsByCohort::<Test>::get().into_iter().collect::<Vec<_>>(),
+			vec![(3, minus_pct)]
+		);
+
+		let rewards = BlockRewards::calculate_reward_amounts(
+			3,
+			RewardAmounts { argons: 10_000, ownership: 10_000 },
+		);
+		assert_eq!(rewards.argons, minus_pct);
+
+		assert_eq!(
+			BlockRewards::calculate_reward_amounts(
+				4,
+				RewardAmounts { argons: 10_000, ownership: 10_000 }
+			)
+			.argons,
+			10_000,
+			"returns minimum if unknown cohort"
+		);
+
+		// ensure we can't go below 100
+		ArgonCPI::set(FixedI128::from_float(10.0));
+		BlockRewards::adjust_block_argons(10_000);
+		assert_eq!(ArgonsPerBlock::<Test>::get(), 10_000);
+	});
+}
+
+#[test]
+fn it_should_dampen_block_rewards() {
+	ActiveNotaries::set(vec![1]);
+	NotebooksInBlock::set(vec![(1, 1, 1)]);
+	NotebookTick::set(1);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		UniswapLiquidity::set(1000);
+
+		ArgonsPerBlock::<Test>::set(25_000);
+		// test the reducer separately
+		BlockRewardsDampener::set(FixedU128::from_rational(75, 100));
+		UniswapLiquidity::set(14_400_000_000);
+		ArgonCPI::set(FixedI128::from_float(-0.1));
+		BlockRewards::adjust_block_argons(10_000);
+		// 10% of 14_400_000 is 1_440_000, divided by 14_400 blocks is 100_000
+		let incr = 100_000 / 60;
+		let incr_dampened = (incr as f64 * 0.75) as Balance;
+		assert_eq!(ArgonsPerBlock::<Test>::get(), 25_000 + incr_dampened);
+
+		// test other direction with dampener
+		ArgonCPI::set(FixedI128::from_float(0.1));
+		BlockRewards::adjust_block_argons(10_000);
+		assert_eq!(ArgonsPerBlock::<Test>::get(), 25_000);
 	});
 }

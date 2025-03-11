@@ -345,9 +345,25 @@ declare module '@polkadot/api-base/types/storage' {
     };
     blockRewards: {
       /**
+       * The current scaled block rewards. It will adjust based on the argon movement away from price
+       * target
+       **/
+      argonsPerBlock: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
+       * The cohort block rewards
+       **/
+      blockRewardsByCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<ITuple<[u64, u128]>>>,
+        []
+      >;
+      /**
        * Bool if block rewards are paused
        **/
       blockRewardsPaused: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * Historical payouts by block number
+       **/
       payoutsByBlock: AugmentedQuery<
         ApiType,
         (
