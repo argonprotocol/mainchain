@@ -11,7 +11,7 @@ use argon_primitives::{
 	tick::Tick,
 	vault::BondedBitcoinsBidPoolProvider,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
-	TickProvider,
+	SlotEvents, TickProvider,
 };
 use frame_support::{
 	pallet_prelude::*,
@@ -83,7 +83,7 @@ pub mod pallet {
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
 		vault::BondedBitcoinsBidPoolProvider,
-		TickProvider,
+		SlotEvents, TickProvider,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
@@ -681,6 +681,7 @@ impl<T: Config> Pallet<T> {
 		});
 		LastActivatedCohortId::<T>::put(cohort_id);
 		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
+		T::SlotEvents::on_new_cohort(cohort_id);
 		if needs_vault_bid_pool_rotation {
 			let end_tick = T::TickProvider::current_tick() + Self::mining_window_ticks();
 			T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
@@ -1086,46 +1087,5 @@ sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
 	pub trait MiningSlotApi {
 		fn next_slot_era() -> (Tick, Tick);
-	}
-}
-
-pub trait OnNewSlot<AccountId> {
-	type Key: Decode + RuntimeAppPublic;
-	fn rotate_grandpas(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(&AccountId, Self::Key)>,
-		added_authorities: Vec<(&AccountId, Self::Key)>,
-	);
-}
-
-pub trait SlotEvents<AccountId> {
-	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(AccountId, Ks)>,
-		added_authorities: Vec<(AccountId, Ks)>,
-	);
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
-#[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
-impl<AId> SlotEvents<AId> for Tuple {
-	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(AId, Ks)>,
-		added_authorities: Vec<(AId, Ks)>,
-	) {
-		for_tuples!(
-		#(
-			let removed_keys =
-				removed_authorities.iter().filter_map(|k| {
-					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
-				}).collect::<Vec<_>>();
-			let added_keys  =
-				added_authorities.iter().filter_map(|k| {
-					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
-				}).collect::<Vec<_>>();
-			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
-		)*
-		)
 	}
 }

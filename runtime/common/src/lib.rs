@@ -13,9 +13,17 @@ pub mod prelude {
 	pub use crate::config::*;
 	pub use alloc::{boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
-		apis::*, bitcoin::*, block_seal::*, digests::*, notary::*, note::*, notebook::*,
-		prelude::*, providers::*, tick::Ticker, Balance, BlockHash, BlockVotingKey, HashOutput,
-		Nonce, Signature, VotingKey,
+		apis::*,
+		bitcoin::*,
+		block_seal::*,
+		digests::*,
+		notary::*,
+		note::*,
+		notebook::*,
+		prelude::*,
+		providers::{OnNewSlot, *},
+		tick::Ticker,
+		Balance, BlockHash, BlockVotingKey, HashOutput, Nonce, Signature, VotingKey,
 	};
 	pub use frame_support::{
 		construct_runtime, derive_impl,
@@ -52,7 +60,6 @@ pub mod prelude {
 	pub use ismp::host::StateMachine;
 	pub use pallet_bitcoin_locks::BitcoinVerifier;
 	pub use pallet_block_rewards::GrowthPath;
-	pub use pallet_mining_slot::OnNewSlot;
 	pub use pallet_notebook::NotebookVerifyError;
 	pub use pallet_tx_pause::RuntimeCallNameOf;
 	pub use sp_api::{decl_runtime_apis, impl_runtime_apis};
@@ -122,7 +129,8 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
             pallet_mining_slot::migrations::BiddingMigration<Runtime>,
 			pallet_vaults::migrations::BondedBitcoinBidPoolMigration<Runtime>,
-        );
+			pallet_block_rewards::migrations::RewardFreezeMigration<Runtime>,
+		);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =

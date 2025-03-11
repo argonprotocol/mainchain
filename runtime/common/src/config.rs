@@ -78,9 +78,12 @@ parameter_types! {
 	pub const IncrementalGrowth: GrowthPath<Balance> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership tokens
 	pub const HalvingBeginTick: Tick = INCREMENT_TICKS  * (FINAL_ARGONS_PER_BLOCK as Tick - StartingArgonsPerBlock::get() as Tick) / INCREMENTAL_REWARD_AMOUNT as Tick; // starts after ~ one year of increments
 	pub const HalvingTicks: Tick = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
-	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
+	pub const BlockRewardsCohortHistoryToKeep: u32 = (MaxMiners::get() / MaxCohortSize::get()) + 1;
+	pub const MaxHourlyArgonDecreasePercent: Percent = Percent::from_percent(2);
+	pub const MaxHourlyArgonIncreasePercent: Percent = Percent::from_percent(1);
+	pub const PayoutHistoryBlocks: u32 = 5;
 
 	// ### pallet_mining_slot
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize

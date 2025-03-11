@@ -21,6 +21,15 @@ use crate::{
 	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
 	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 };
+use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use scale_info::TypeInfo;
+use sp_application_crypto::RuntimeAppPublic;
+use sp_arithmetic::{FixedI128, FixedPointNumber};
+use sp_core::{RuntimeDebug, H256, U256};
+use sp_runtime::{
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys, UniqueSaturatedInto},
+	DispatchError, DispatchResult, FixedU128, Saturating,
+};
 
 pub trait NotebookProvider {
 	/// Returns a block voting root only if submitted in time for previous block
@@ -289,5 +298,55 @@ impl<AccountId: Codec, Balance: Codec + MaxEncodedLen> BlockRewardsEventHandler<
 {
 	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
 		for_tuples!( #( Tuple::rewards_created(&payout); )* );
+	}
+}
+
+pub trait OnNewSlot<AccountId> {
+	type Key: Decode + RuntimeAppPublic;
+	fn on_new_cohort(_cohort_id: CohortId) {}
+
+	fn rotate_grandpas(
+		_current_cohort_id: CohortId,
+		_removed_authorities: Vec<(&AccountId, Self::Key)>,
+		_added_authorities: Vec<(&AccountId, Self::Key)>,
+	) {
+	}
+}
+
+pub trait SlotEvents<AccountId> {
+	fn on_new_cohort(_cohort_id: CohortId) {}
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		_current_cohort_id: CohortId,
+		_removed_authorities: Vec<(AccountId, Ks)>,
+		_added_authorities: Vec<(AccountId, Ks)>,
+	) {
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
+#[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
+impl<AId> SlotEvents<AId> for Tuple {
+	fn on_new_cohort(cohort_id: CohortId) {
+		for_tuples!( #( Tuple::on_new_cohort(cohort_id); )* );
+	}
+
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		current_cohort_id: CohortId,
+		removed_authorities: Vec<(AId, Ks)>,
+		added_authorities: Vec<(AId, Ks)>,
+	) {
+		for_tuples!(
+		#(
+			let removed_keys =
+				removed_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			let added_keys  =
+				added_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
+		)*
+		)
 	}
 }
