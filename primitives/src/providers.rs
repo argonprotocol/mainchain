@@ -238,13 +238,13 @@ impl NotebookEventHandler for Tuple {
 
 /// An event handler to listen for submitted block seals
 pub trait BlockSealEventHandler {
-	fn block_seal_read(seal: &BlockSealInherent);
+	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>);
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl BlockSealEventHandler for Tuple {
-	fn block_seal_read(seal: &BlockSealInherent) {
-		for_tuples!( #( Tuple::block_seal_read(seal); )* );
+	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>) {
+		for_tuples!( #( Tuple::block_seal_read(seal, vote_seal_proof); )* );
 	}
 }
 

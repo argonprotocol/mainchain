@@ -50,7 +50,6 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub static MinimumBondAmount:u128 = 1_000_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 }
 

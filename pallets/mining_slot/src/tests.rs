@@ -1270,41 +1270,38 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
-		let seal = BlockSealInherent::Compute;
-		// it's too soon
-		assert!(!MiningSlots::check_for_bidding_close(&seal));
-
 		// This seal strength was generated using the commented out loop below
 		let seal_strength = U256::from_dec_str(
-			"55660301883345363905660969606306034026269601808931936101802154266730817045052",
+			"11579208923731619542357098500868790785326998466564056403945758400791312963992",
 		)
 		.expect("can read seal strength u256");
 
-		let seal = create_block_vote_seal(seal_strength);
-		assert!(!MiningSlots::check_for_bidding_close(&seal));
+		assert!(!MiningSlots::check_for_bidding_close(seal_strength));
 
 		// now we're the right block
 		System::set_block_number(90);
 		ElapsedTicks::set(90);
 		CurrentTick::set(90);
-		assert!(MiningSlots::check_for_bidding_close(&seal));
-		assert!(!MiningSlots::check_for_bidding_close(&BlockSealInherent::Compute));
+		assert!(MiningSlots::check_for_bidding_close(seal_strength));
 
-		let invalid_strength = U256::from(1);
-		let seal = create_block_vote_seal(invalid_strength);
-		assert!(!MiningSlots::check_for_bidding_close(&seal));
+		let invalid_strength = U256::from_dec_str(
+			"11579208923731619542357098500868790785326998466564056403945758400791312963993",
+		)
+		.unwrap();
+		assert!(!MiningSlots::check_for_bidding_close(invalid_strength));
 
-		System::assert_last_event(
-			Event::MiningBidsClosed { cohort_id: LastActivatedCohortId::<Test>::get() + 1 }.into(),
-		);
+		let cohort_id = LastActivatedCohortId::<Test>::get() + 1;
+		System::assert_last_event(Event::MiningBidsClosed { cohort_id }.into());
+		let era = MiningSlots::get_next_slot_era();
+
+		assert_eq!(LastBidPoolDistribution::get(), (cohort_id, era.1));
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
 			for _ in 0..10u32 {
 				let seal_strength = U256::from_big_endian(H256::random().as_ref());
-				let seal = create_block_vote_seal(seal_strength);
 
-				if MiningSlots::check_for_bidding_close(&seal) {
+				if MiningSlots::check_for_bidding_close(seal_strength) {
 					valid_seals.push(seal_strength);
 				}
 			}
@@ -1481,22 +1478,4 @@ fn it_should_rotate_grandpas() {
 		MiningSlots::on_initialize(12_960);
 		assert_eq!(GrandaRotations::get(), vec![0, 1, 2]);
 	});
-}
-
-fn create_block_vote_seal(seal_strength: U256) -> BlockSealInherent {
-	BlockSealInherent::Vote {
-		seal_strength,
-		notary_id: 1,
-		block_vote: BlockVote {
-			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-			account_id: AccountId32::from_slice(&[2u8; 32]).expect("32 bytes"),
-			index: 1,
-			power: 500,
-			tick: 1,
-			block_rewards_account_id: AccountId32::from_slice(&[3u8; 32]).expect("32 bytes"),
-			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
-		},
-		source_notebook_number: 1,
-		source_notebook_proof: MerkleProof::default(),
-	}
 }

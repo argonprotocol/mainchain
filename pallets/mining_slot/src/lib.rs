@@ -23,6 +23,7 @@ use frame_support::{
 		tokens::Precision,
 	},
 };
+use log::info;
 pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
@@ -570,13 +571,29 @@ pub mod pallet {
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn configure_mining_slot_delay(
 			origin: OriginFor<T>,
-			mining_slot_delay: Tick,
+			mining_slot_delay: Option<Tick>,
+			ticks_before_bid_end_for_vrf_close: Option<Tick>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 
 			MiningConfig::<T>::mutate(|a| {
-				if a.slot_bidding_start_after_ticks != mining_slot_delay {
-					a.slot_bidding_start_after_ticks = mining_slot_delay;
+				let mut has_update = false;
+				if let Some(ticks_before_bid_end_for_vrf_close) = ticks_before_bid_end_for_vrf_close
+				{
+					if a.ticks_before_bid_end_for_vrf_close != ticks_before_bid_end_for_vrf_close {
+						a.ticks_before_bid_end_for_vrf_close = ticks_before_bid_end_for_vrf_close;
+						has_update = true;
+					}
+				}
+
+				if let Some(mining_slot_delay) = mining_slot_delay {
+					if a.slot_bidding_start_after_ticks != mining_slot_delay {
+						a.slot_bidding_start_after_ticks = mining_slot_delay;
+						has_update = true;
+					}
+				}
+
+				if has_update {
 					Self::deposit_event(Event::<T>::MiningConfigurationUpdated {
 						ticks_before_bid_end_for_vrf_close: a.ticks_before_bid_end_for_vrf_close,
 						ticks_between_slots: a.ticks_between_slots,
@@ -640,9 +657,9 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 	}
 
 	fn xor_closest_authority(
-		nonce: U256,
+		seal_proof: U256,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let closest = find_xor_closest(<AuthorityHashByIndex<T>>::get(), nonce)?;
+		let closest = find_xor_closest(<AuthorityHashByIndex<T>>::get(), seal_proof)?;
 
 		Self::get_mining_authority_by_index(closest)
 	}
@@ -816,19 +833,22 @@ impl<T: Config> Pallet<T> {
 	/// Check if the current block is in the closing window for the next slot
 	///
 	/// This is determined by looking at the block seal vote and using the following VRF formula:
-	///  `VRF = blake2(seal_strength)`
+	///  `VRF = blake2(seal_proof)`
 	/// If VRF < threshold, then the auction will be ended
 	///
 	/// The random seal strength is used to ensure that the VRF is unique for each block:
 	///  - the block votes was submitted in a previous notebook
-	///  - seal strength is the combination of the vote and the "voting key" (a hash of
-	///    commit/reveal nonces supplied by each notary for a given tick).
-	///  - this seal strength must be cryptographically secure and unique for each block for the
+	///  - seal proof is the combination of the vote and the "voting key" (a hash of commit/reveal
+	///    nonces supplied by each notary for a given tick).
+	///  - this seal proof must be cryptographically secure and unique for each block for the
 	///    overall network security
 	///
 	/// Threshold is calculated so that it should be true 1 in
 	/// `MiningConfig.ticks_before_bid_end_for_vrf_close` times.
-	pub(crate) fn check_for_bidding_close(seal: &BlockSealInherent) -> bool {
+	///
+	/// NOTE: seal_strength should not be used as it is a non-uniform distributed value (must be
+	/// seal_proof)
+	pub(crate) fn check_for_bidding_close(vote_seal_proof: U256) -> bool {
 		let next_slot_tick = Self::get_next_slot_tick();
 		let current_tick = T::TickProvider::current_tick();
 		let mining_config = MiningConfig::<T>::get();
@@ -840,25 +860,19 @@ impl<T: Config> Pallet<T> {
 			return false;
 		}
 
-		match seal {
-			BlockSealInherent::Vote { seal_strength, .. } => {
-				let vrf_hash = blake2_256(seal_strength.encode().as_ref());
-				let vrf = U256::from_big_endian(&vrf_hash);
-				let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
-				// Calculate the threshold for VRF comparison to achieve a probability of 1 in
-				// `MiningConfig.ticks_before_bid_end_for_vrf_close`
-				let threshold = U256::MAX / U256::from(ticks_before_close);
+		let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
+		// Calculate the threshold for VRF comparison to achieve a probability of 1 in
+		// `MiningConfig.ticks_before_bid_end_for_vrf_close`
+		let threshold = U256::MAX / U256::from(ticks_before_close);
 
-				if vrf < threshold {
-					Self::deposit_event(Event::<T>::MiningBidsClosed {
-						cohort_id: LastActivatedCohortId::<T>::get() + 1,
-					});
-					return true
-				}
-				false
-			},
-			_ => false,
+		if vote_seal_proof < threshold {
+			info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
+			let cohort_id = LastActivatedCohortId::<T>::get() + 1;
+			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_id });
+			return true
 		}
+
+		false
 	}
 
 	pub fn slot_1_tick() -> Tick {
@@ -935,7 +949,9 @@ impl<T: Config> Pallet<T> {
 		None
 	}
 
-	pub(crate) fn get_next_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
+	pub(crate) fn get_pending_cohort_registration(
+		account_id: &T::AccountId,
+	) -> Option<Registration<T>> {
 		NextSlotCohort::<T>::get().into_iter().find(|x| x.account_id == *account_id)
 	}
 
@@ -944,7 +960,7 @@ impl<T: Config> Pallet<T> {
 		current_registration: Option<Registration<T>>,
 	) -> Result<T::Balance, DispatchError> {
 		let argonots = ArgonotsPerMiningSeat::<T>::get();
-		let next_registration = Self::get_next_registration(who);
+		let next_registration = Self::get_pending_cohort_registration(who);
 		let mut argonots_needed = argonots;
 
 		// if we've already held for next, reduce now
@@ -1065,12 +1081,17 @@ impl<T: Config> MiningSlotProvider for Pallet<T> {
 }
 
 impl<T: Config> BlockSealEventHandler for Pallet<T> {
-	fn block_seal_read(seal: &BlockSealInherent) {
+	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>) {
+		if !matches!(seal, BlockSealInherent::Vote { .. }) {
+			return
+		}
 		// If bids are open, and we're in the closing-period, check if bidding should close.
 		// NOTE: This should run first to ensure bids in this block can't be manipulated once
 		// this state is known
-		if IsNextSlotBiddingOpen::<T>::get() && Self::check_for_bidding_close(seal) {
-			IsNextSlotBiddingOpen::<T>::put(false);
+		if let Some(proof) = vote_seal_proof {
+			if IsNextSlotBiddingOpen::<T>::get() && Self::check_for_bidding_close(proof) {
+				IsNextSlotBiddingOpen::<T>::put(false);
+			}
 		}
 	}
 }
