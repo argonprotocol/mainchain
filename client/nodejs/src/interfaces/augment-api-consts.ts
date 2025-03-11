@@ -99,10 +99,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       incrementalGrowth: ITuple<[u128, u64, u128]> & AugmentedConst<ApiType>;
       /**
-       * Blocks until a block reward is mature
-       **/
-      maturationBlocks: u32 & AugmentedConst<ApiType>;
-      /**
        * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
       minerPayoutPercent: u128 & AugmentedConst<ApiType>;

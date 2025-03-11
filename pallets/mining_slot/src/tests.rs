@@ -8,16 +8,8 @@ use crate::{
 	Error, Event, HoldReason, Registration,
 };
 use argon_primitives::{
-	bitcoin::OpaqueBitcoinXpub,
-	block_seal::{
-		MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination, RewardSharing,
-	},
-	vault::{BitcoinObligationProvider, FundType, ObligationExpiration, VaultTerms},
-	AuthorityProvider, BlockRewardAccountsProvider,
-};
-use bitcoin::{
-	bip32::{ChildNumber, Xpriv, Xpub},
-	key::Secp256k1,
+	block_seal::{MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination},
+	AuthorityProvider,
 };
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
@@ -28,7 +20,7 @@ use frame_support::{
 };
 use pallet_balances::Event as OwnershipEvent;
 use sp_core::{blake2_256, bounded_vec, H256, U256};
-use sp_runtime::{testing::UintAuthorityId, traits::Zero, BoundedVec, FixedU128};
+use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 use std::{collections::HashMap, env};
 
 #[test]

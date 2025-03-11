@@ -1039,8 +1039,8 @@ pub mod pallet {
 			let vault_id = obligation.vault_id;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
 
-			vault.bitcoin_argons.destroy_funds(amount_to_burn)?;
-            obligation.amount.saturating_reduce(amount_to_burn);
+			vault.locked_bitcoin_argons.destroy_funds(amount_to_burn)?;
+			obligation.amount.saturating_reduce(amount_to_burn);
 
 			T::Currency::burn_held(
 				&HoldReason::EnterVault.into(),

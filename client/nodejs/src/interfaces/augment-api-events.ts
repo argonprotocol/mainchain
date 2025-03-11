@@ -357,36 +357,10 @@ declare module '@polkadot/api-base/types/events' {
     blockRewards: {
       RewardCreated: AugmentedEvent<
         ApiType,
-        [
-          maturationBlock: u32,
-          rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>,
-        ],
-        {
-          maturationBlock: u32;
-          rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>;
-        }
-      >;
-      RewardCreateError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          argons: Option<u128>,
-          ownership: Option<u128>,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          argons: Option<u128>;
-          ownership: Option<u128>;
-          error: SpRuntimeDispatchError;
-        }
-      >;
-      RewardUnlocked: AugmentedEvent<
-        ApiType,
         [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>],
         { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }
       >;
-      RewardUnlockError: AugmentedEvent<
+      RewardCreateError: AugmentedEvent<
         ApiType,
         [
           accountId: AccountId32,
@@ -848,11 +822,6 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [accountId: AccountId32, preservedArgonotHold: bool],
         { accountId: AccountId32; preservedArgonotHold: bool }
-      >;
-      SlotBidderOut: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, bidAmount: u128],
-        { accountId: AccountId32; bidAmount: u128 }
       >;
     };
     mint: {
@@ -1524,8 +1493,18 @@ declare module '@polkadot/api-base/types/events' {
        **/
       BidPoolDistributed: AugmentedEvent<
         ApiType,
-        [cohortId: u64, bidPool: u128, bidPoolEntrants: u32],
-        { cohortId: u64; bidPool: u128; bidPoolEntrants: u32 }
+        [
+          cohortId: u64,
+          bidPoolDistributed: u128,
+          bidPoolBurned: u128,
+          bidPoolEntrants: u32,
+        ],
+        {
+          cohortId: u64;
+          bidPoolDistributed: u128;
+          bidPoolBurned: u128;
+          bidPoolEntrants: u32;
+        }
       >;
       /**
        * An error occurred allocating the next bid pool
@@ -1534,6 +1513,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [cohortId: u64, dispatchError: SpRuntimeDispatchError],
         { cohortId: u64; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
+       * An error occurred burning from the bid pool
+       **/
+      CouldNotBurnBidPool: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { cohortId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
        * An error occurred distributing a bid pool

@@ -1,7 +1,7 @@
 use crate as pallet_mining_slot;
-use crate::OnNewSlot;
 use argon_primitives::{
 	block_seal::{CohortId, MiningSlotConfig},
+	providers::OnNewSlot,
 	tick::{Tick, Ticker},
 	vault::BondedBitcoinsBidPoolProvider,
 	BlockNumber, TickProvider, VotingSchedule,

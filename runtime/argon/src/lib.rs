@@ -206,9 +206,13 @@ impl pallet_block_rewards::Config for Runtime {
 	type HalvingTicks = HalvingTicks;
 	type HalvingBeginTick = HalvingBeginTick;
 	type MinerPayoutPercent = MinerPayoutPercent;
-	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type EventHandler = Mint;
+	type PayoutHistoryBlocks = PayoutHistoryBlocks;
+	type PriceProvider = PriceIndex;
+	type CohortBlockRewardsToKeep = BlockRewardsCohortHistoryToKeep;
+	type SlotWindowTicks = SlotWindowTicks;
+	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 
 impl pallet_domains::Config for Runtime {
@@ -348,7 +352,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = Vaults;
-	type SlotEvents = (GrandpaSlotRotation,);
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

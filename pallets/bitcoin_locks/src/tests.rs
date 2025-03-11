@@ -114,7 +114,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, price);
 
 		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::SatoshisMismatch));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
@@ -159,7 +159,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
+		assert_eq!(DefaultVault::get().locked_bitcoin_argons.reserved, 0);
 	});
 }
 
