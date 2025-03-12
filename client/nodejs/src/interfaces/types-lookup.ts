@@ -1990,7 +1990,8 @@ declare module '@polkadot/types/lookup' {
     } & Struct;
     readonly isConfigureMiningSlotDelay: boolean;
     readonly asConfigureMiningSlotDelay: {
-      readonly miningSlotDelay: u64;
+      readonly miningSlotDelay: Option<u64>;
+      readonly ticksBeforeBidEndForVrfClose: Option<u64>;
     } & Struct;
     readonly type: 'Bid' | 'ConfigureMiningSlotDelay';
   }
@@ -3259,6 +3260,7 @@ declare module '@polkadot/types/lookup' {
     readonly createdAtHeight: Compact<u64>;
     readonly utxoScriptPubkey: ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey;
     readonly isVerified: bool;
+    readonly isRejectedNeedsRelease: bool;
   }
 
   /** @name PalletBitcoinLocksLockReleaseRequest (372) */

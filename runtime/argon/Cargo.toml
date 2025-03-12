@@ -237,4 +237,4 @@ try-runtime = [
 # `RUNTIME_METADATA_HASH` environment variable set for the `CheckMetadataHash`
 # extension.
 metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]
-on-chain-release-build = [ "metadata-hash", "sp-api/disable-logging" ]
+on-chain-release-build = [ "metadata-hash" ]

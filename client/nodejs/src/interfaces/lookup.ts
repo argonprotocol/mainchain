@@ -1632,7 +1632,8 @@ export default {
         keys_: 'ArgonRuntimeSessionKeys',
       },
       configure_mining_slot_delay: {
-        miningSlotDelay: 'u64',
+        miningSlotDelay: 'Option<u64>',
+        ticksBeforeBidEndForVrfClose: 'Option<u64>',
       },
     },
   },
@@ -2775,6 +2776,7 @@ export default {
     createdAtHeight: 'Compact<u64>',
     utxoScriptPubkey: 'ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey',
     isVerified: 'bool',
+    isRejectedNeedsRelease: 'bool',
   },
   /**
    * Lookup372: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>

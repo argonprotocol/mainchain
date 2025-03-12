@@ -157,10 +157,9 @@ parameter_types! {
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 
-	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
+	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 1 * (6 * 24); // 1 day of bitcoin blocks
 
 	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
-	pub const MaxBitcoinBirthBlocksOld: BitcoinHeight = 10 * (6 * 24); // 10 days of bitcoin blocks
 
 	// Fees
 	pub FeeMultiplier: Multiplier = Multiplier::one();

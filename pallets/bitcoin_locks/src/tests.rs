@@ -93,6 +93,77 @@ fn cleans_up_a_rejected_bitcoin() {
 }
 
 #[test]
+fn allows_users_to_reclaim_mismatched_bitcoins() {
+	BitcoinBlockHeight::set(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let secp = bitcoin::secp256k1::Secp256k1::new();
+		let rng = &mut rand::thread_rng();
+		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
+		let pubkey = keypair.public_key(&secp).serialize();
+		CurrentTick::set(1);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey.into()
+		));
+		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, price);
+
+		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::SatoshisMismatch));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.is_rejected_needs_release, true);
+
+		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			release_script_pubkey.clone(),
+			1000
+		));
+
+		assert_eq!(
+			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
+			Some(LockReleaseRequest {
+				utxo_id: 1,
+				vault_id: 1,
+				obligation_id: 1,
+				cosign_due_block: BitcoinBlockHeight::get() +
+					LockReleaseCosignDeadlineBlocks::get(),
+				redemption_price: 0,
+				to_script_pubkey: release_script_pubkey,
+				bitcoin_network_fee: 1000
+			})
+			.as_ref()
+		);
+		assert!(LocksByUtxoId::<Test>::get(1).is_some());
+		System::assert_last_event(
+			Event::<Test>::BitcoinUtxoCosignRequested { obligation_id: 1, vault_id: 1, utxo_id: 1 }
+				.into(),
+		);
+
+		GetUtxoRef::set(Some(UtxoRef { txid: H256Le([0; 32]), output_index: 0 }));
+
+		assert_ok!(BitcoinLocks::cosign_release(
+			RuntimeOrigin::signed(1),
+			1,
+			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
+		));
+		assert_eq!(LastReleaseEvent::get(), Some((1, false, 0)));
+		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
+		assert_eq!(OwedUtxoAggrieved::<Test>::get(1), None);
+		assert_eq!(DefaultVault::get().bitcoin_argons.reserved, 0);
+	});
+}
+
+#[test]
 fn marks_a_verified_bitcoin() {
 	BitcoinBlockHeight::set(12);
 	new_test_ext().execute_with(|| {

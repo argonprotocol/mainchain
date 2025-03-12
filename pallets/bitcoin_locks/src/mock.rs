@@ -129,6 +129,8 @@ parameter_types! {
 	pub static ElapsedTicks: Tick = 0;
 
 	pub static CanceledObligations: Vec<ObligationId> = vec![];
+
+	pub static Obligations: BTreeMap<ObligationId, Obligation<u64, Balance>> = BTreeMap::new();
 }
 
 pub struct EventHandler;
@@ -180,16 +182,12 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 
 	fn cancel_obligation(obligation_id: ObligationId) -> Result<Self::Balance, ObligationError> {
 		CanceledObligations::mutate(|a| a.push(obligation_id));
-		let _ = BitcoinLocks::on_canceled(&Obligation {
-			obligation_id,
-			prepaid_fee: 0,
-			total_fee: 0,
-			beneficiary: 1,
-			amount: 1,
-			fund_type: FundType::Bitcoin,
-			vault_id: 1,
-			expiration: ObligationExpiration::BitcoinBlock(100),
-			start_tick: CurrentTick::get(),
+		Obligations::mutate(|a| {
+			let obligation = a.remove(&obligation_id).expect("should exist");
+			let _ = BitcoinLocks::on_canceled(&obligation);
+			DefaultVault::mutate(|v| {
+				v.mut_argons(&obligation.fund_type).reserved -= obligation.amount;
+			});
 		});
 		Ok(0)
 	}
@@ -213,7 +211,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			id
 		});
 		let (total_fee, prepaid) = MockFeeResult::get();
-		Ok(Obligation {
+		let obligation = Obligation {
 			obligation_id: next_obligation_id,
 			prepaid_fee: prepaid,
 			total_fee,
@@ -223,7 +221,9 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			vault_id,
 			expiration,
 			start_tick: CurrentTick::get(),
-		})
+		};
+		Obligations::mutate(|a| a.insert(next_obligation_id, obligation.clone()));
+		Ok(obligation)
 	}
 
 	fn compensate_lost_bitcoin(
@@ -246,17 +246,10 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			a.bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
 		});
 
-		Ok(Obligation {
-			obligation_id,
-			prepaid_fee: 0,
-			total_fee: 0,
-			beneficiary: 1,
-			amount: amount_to_burn,
-			fund_type: FundType::Bitcoin,
-			vault_id: 1,
-			expiration: ObligationExpiration::BitcoinBlock(365),
-			start_tick: CurrentTick::get(),
-		})
+		let mut obligation = Obligations::get().get(&obligation_id).cloned().unwrap();
+		obligation.amount = amount_to_burn;
+
+		Ok(obligation)
 	}
 
 	fn create_utxo_script_pubkey(

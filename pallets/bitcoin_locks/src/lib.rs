@@ -13,6 +13,7 @@ pub use weights::*;
 #[cfg(test)]
 mod mock;
 
+pub mod migrations;
 #[cfg(test)]
 mod tests;
 pub mod weights;
@@ -94,7 +95,7 @@ pub mod pallet {
 		TickProvider, UtxoLockEvents, VaultId,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -240,6 +241,7 @@ pub mod pallet {
 		pub created_at_height: BitcoinHeight,
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		pub is_verified: bool,
+		pub is_rejected_needs_release: bool,
 	}
 
 	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
@@ -519,6 +521,7 @@ pub mod pallet {
 					created_at_height: T::BitcoinBlockHeight::get(),
 					utxo_script_pubkey: script_pubkey,
 					is_verified: false,
+					is_rejected_needs_release: false,
 				},
 			);
 			ObligationIdToUtxoId::<T>::insert(obligation.obligation_id, utxo_id);
@@ -603,6 +606,31 @@ pub mod pallet {
 					obligation_id,
 					vault_id: lock.vault_id,
 				});
+			} else if lock.is_rejected_needs_release {
+				let cosign_due_block =
+					T::LockReleaseCosignDeadlineBlocks::get() + T::BitcoinBlockHeight::get();
+
+				<LocksPendingReleaseByUtxoId<T>>::try_mutate(|a| {
+					a.try_insert(
+						utxo_id,
+						LockReleaseRequest {
+							utxo_id,
+							obligation_id,
+							vault_id: lock.vault_id,
+							bitcoin_network_fee,
+							cosign_due_block,
+							to_script_pubkey,
+							redemption_price: 0u32.into(),
+						},
+					)
+				})
+				.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
+
+				Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested {
+					utxo_id,
+					obligation_id,
+					vault_id: lock.vault_id,
+				});
 			} else {
 				T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
 					.map_err(Error::<T>::from)?;
@@ -660,17 +688,23 @@ pub mod pallet {
 
 			T::BitcoinSignatureVerifier::verify_signature(releaser, lock.vault_pubkey, &signature)?;
 
-			// burn the owner's held funds
-			let burn_amount = request.redemption_price;
-			let _ = T::Currency::burn_held(
-				&HoldReason::ReleaseBitcoinLock.into(),
-				&lock.owner_account,
-				burn_amount,
-				Precision::Exact,
-				Fortitude::Force,
-			)?;
-			frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
-			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+			if lock.is_rejected_needs_release {
+				T::LockEvents::utxo_released(utxo_id, false, 0u32.into())?;
+				T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
+					.map_err(Error::<T>::from)?;
+			} else {
+				// burn the owner's held funds
+				let burn_amount = request.redemption_price;
+				let _ = T::Currency::burn_held(
+					&HoldReason::ReleaseBitcoinLock.into(),
+					&lock.owner_account,
+					burn_amount,
+					Precision::Exact,
+					Fortitude::Force,
+				)?;
+				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
+				T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+			}
 
 			LocksByUtxoId::<T>::take(utxo_id);
 			ObligationIdToUtxoId::<T>::take(lock.obligation_id);
@@ -723,12 +757,20 @@ pub mod pallet {
 			})
 		}
 
-		fn utxo_rejected(utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {
-			if let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) {
-				T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
-					.map_err(Error::<T>::from)?;
+		fn utxo_rejected(utxo_id: UtxoId, reason: BitcoinRejectedReason) -> DispatchResult {
+			// if the failure is due to a satoshi mismatch, allow a user to reclaim it
+			if matches!(reason, BitcoinRejectedReason::SatoshisMismatch) {
+				LocksByUtxoId::<T>::mutate_extant(utxo_id, |lock| {
+					lock.is_rejected_needs_release = true;
+				});
+				Ok(())
+			} else {
+				if let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) {
+					T::BitcoinObligationProvider::cancel_obligation(lock.obligation_id)
+						.map_err(Error::<T>::from)?;
+				}
+				Ok::<(), DispatchError>(())
 			}
-			Ok(())
 		}
 
 		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
@@ -819,15 +861,19 @@ pub mod pallet {
 			}
 
 			// we return this amount to the bitcoin holder
-			T::Currency::release(
-				&HoldReason::ReleaseBitcoinLock.into(),
-				&lock.owner_account,
-				redemption_amount_held,
-				Precision::Exact,
-			)?;
-			frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
-			// count the amount we took from the vault as the burn amount
-			T::LockEvents::utxo_released(utxo_id, false, market_price)?;
+			if redemption_amount_held > 0u128.into() {
+				T::Currency::release(
+					&HoldReason::ReleaseBitcoinLock.into(),
+					&lock.owner_account,
+					redemption_amount_held,
+					Precision::Exact,
+				)?;
+				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
+			}
+			if !lock.is_rejected_needs_release {
+				// count the amount we took from the vault as the burn amount
+				T::LockEvents::utxo_released(utxo_id, false, market_price)?;
+			}
 
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				utxo_id,

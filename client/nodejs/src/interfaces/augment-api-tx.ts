@@ -685,9 +685,15 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       configureMiningSlotDelay: AugmentedSubmittable<
         (
-          miningSlotDelay: u64 | AnyNumber | Uint8Array,
+          miningSlotDelay: Option<u64> | null | Uint8Array | u64 | AnyNumber,
+          ticksBeforeBidEndForVrfClose:
+            | Option<u64>
+            | null
+            | Uint8Array
+            | u64
+            | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
-        [u64]
+        [Option<u64>, Option<u64>]
       >;
     };
     mint: {};
