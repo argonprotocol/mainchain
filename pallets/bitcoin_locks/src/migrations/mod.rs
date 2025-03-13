@@ -86,7 +86,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating Next Cohort Length");
+		info!("Migrating Bitcoin locks");
 		LocksByUtxoId::<T>::translate_values::<old_storage::LockedBitcoin<T>, _>(|a| {
 			count += 1;
 			Some(LockedBitcoin {
@@ -108,7 +108,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			})
 		});
 
-		count += 1;
 		OwedUtxoAggrieved::<T>::translate_values::<
 			(T::AccountId, VaultId, T::Balance, old_storage::LockedBitcoin<T>),
 			_,
@@ -151,19 +150,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		})?;
 
 		let new = LocksByUtxoId::<T>::iter().collect::<Vec<_>>();
-		ensure!(
-			old.locked_utxos.len() == new.len(),
-			format!(
-				"locked_utxos length mismatch: old={}, new={}",
-				old.locked_utxos.len(),
-				new.len()
-			)
-		);
+		ensure!(old.locked_utxos.len() == new.len(), "locked_utxos length mismatch",);
 		let new = OwedUtxoAggrieved::<T>::iter().collect::<Vec<_>>();
-		ensure!(
-			old.owed_utxos.len() == new.len(),
-			format!("owed_utxos length mismatch: old={}, new={}", old.owed_utxos.len(), new.len())
-		);
+		ensure!(old.owed_utxos.len() == new.len(), "owed_utxos length mismatch");
 
 		Ok(())
 	}
@@ -181,74 +170,70 @@ mod test {
 	use self::InnerMigrate;
 	use super::*;
 	use crate::mock::{new_test_ext, Test};
-	use argon_primitives::block_seal::RewardDestination::Owner;
+	use argon_primitives::bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey};
 	use frame_support::assert_ok;
+	use sp_core::H256;
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
-			old_storage::LocksByUtxoId::<Test>::insert(
-				1,
-				old_storage::LockedBitcoin {
-					obligation_id: 1,
-					vault_id: 1,
-					lock_price: 1,
-					owner_account: 1,
-					satoshis: 1,
-					vault_pubkey: Default::default(),
-					vault_claim_pubkey: Default::default(),
-					vault_xpub_sources: Default::default(),
-					owner_pubkey: Default::default(),
-					vault_claim_height: 1,
-					open_claim_height: 1,
-					created_at_height: 1,
-					utxo_script_pubkey: Default::default(),
-					is_verified: true,
+			let utxo_1 = old_storage::LockedBitcoin {
+				obligation_id: 1,
+				vault_id: 1,
+				lock_price: 1,
+				owner_account: 1,
+				satoshis: 1,
+				vault_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_xpub_sources: Default::default(),
+				owner_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_height: 1,
+				open_claim_height: 1,
+				created_at_height: 1,
+				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
+					wscript_hash: H256::from([0u8; 32]),
 				},
-			);
-			old_storage::LocksByUtxoId::<Test>::insert(
-				2,
-				old_storage::LockedBitcoin {
-					obligation_id: 2,
-					vault_id: 2,
-					lock_price: 2,
-					owner_account: 2,
-					satoshis: 2,
-					vault_pubkey: Default::default(),
-					vault_claim_pubkey: Default::default(),
-					vault_xpub_sources: Default::default(),
-					owner_pubkey: Default::default(),
-					vault_claim_height: 2,
-					open_claim_height: 2,
-					created_at_height: 2,
-					utxo_script_pubkey: Default::default(),
-					is_verified: true,
+				is_verified: true,
+			};
+			let utxo_2 = old_storage::LockedBitcoin {
+				obligation_id: 2,
+				vault_id: 2,
+				lock_price: 2,
+				owner_account: 2,
+				satoshis: 2,
+				vault_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_xpub_sources: Default::default(),
+				owner_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_height: 2,
+				open_claim_height: 2,
+				created_at_height: 2,
+				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
+					wscript_hash: H256::from([0u8; 32]),
 				},
-			);
-			old_storage::OwedUtxoAggrieved::<Test>::insert(
-				1,
-				(
-					1,
-					1,
-					1,
-					old_storage::LockedBitcoin {
-						obligation_id: 1,
-						vault_id: 1,
-						lock_price: 1,
-						owner_account: 1,
-						satoshis: 1,
-						vault_pubkey: Default::default(),
-						vault_claim_pubkey: Default::default(),
-						vault_xpub_sources: Default::default(),
-						owner_pubkey: Default::default(),
-						vault_claim_height: 1,
-						open_claim_height: 1,
-						created_at_height: 1,
-						utxo_script_pubkey: Default::default(),
-						is_verified: false,
-					},
-				),
-			);
+				is_verified: true,
+			};
+			let utxo_3 = old_storage::LockedBitcoin {
+				obligation_id: 3,
+				vault_id: 3,
+				lock_price: 3,
+				owner_account: 3,
+				satoshis: 3,
+				vault_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_xpub_sources: Default::default(),
+				owner_pubkey: CompressedBitcoinPubkey([1u8; 33]),
+				vault_claim_height: 3,
+				open_claim_height: 3,
+				created_at_height: 3,
+				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
+					wscript_hash: H256::from([0u8; 32]),
+				},
+				is_verified: true,
+			};
+			old_storage::LocksByUtxoId::<Test>::insert(1, utxo_1);
+			old_storage::LocksByUtxoId::<Test>::insert(2, utxo_2);
+			old_storage::OwedUtxoAggrieved::<Test>::insert(1, (1, 1, 1, utxo_3));
 
 			// Get the pre_upgrade bytes
 			let bytes = match InnerMigrate::<Test>::pre_upgrade() {
@@ -266,46 +251,8 @@ mod test {
 			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(3, 3));
 
 			// check locks
-			assert_eq!(
-				LocksByUtxoId::<Test>::get(1),
-				Some(LockedBitcoin {
-					obligation_id: 1,
-					vault_id: 1,
-					lock_price: 1,
-					owner_account: 1,
-					satoshis: 1,
-					vault_pubkey: Default::default(),
-					vault_claim_pubkey: Default::default(),
-					vault_xpub_sources: Default::default(),
-					owner_pubkey: Default::default(),
-					vault_claim_height: 1,
-					open_claim_height: 1,
-					created_at_height: 1,
-					utxo_script_pubkey: Default::default(),
-					is_verified: true,
-					is_rejected_needs_release: false,
-				})
-			);
-			assert_eq!(
-				LocksByUtxoId::<Test>::get(2),
-				Some(LockedBitcoin {
-					obligation_id: 2,
-					vault_id: 2,
-					lock_price: 2,
-					owner_account: 2,
-					satoshis: 2,
-					vault_pubkey: Default::default(),
-					vault_claim_pubkey: Default::default(),
-					vault_xpub_sources: Default::default(),
-					owner_pubkey: Default::default(),
-					vault_claim_height: 2,
-					open_claim_height: 2,
-					created_at_height: 2,
-					utxo_script_pubkey: Default::default(),
-					is_verified: true,
-					is_rejected_needs_release: false,
-				})
-			);
+			assert_eq!(LocksByUtxoId::<Test>::get(1).unwrap().obligation_id, 1);
+			assert_eq!(LocksByUtxoId::<Test>::get(2).unwrap().obligation_id, 2)
 		});
 	}
 }

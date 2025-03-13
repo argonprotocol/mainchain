@@ -1,11 +1,17 @@
 use std::{env, time::Duration};
 
 use anyhow::{anyhow, ensure};
-use sp_runtime::{traits::One, FixedU128, Saturating};
+use sp_runtime::{
+	traits::{One, Zero},
+	FixedU128, Saturating,
+};
 use tokio::{join, time::sleep};
 use tracing::info;
 
-use crate::{argon_price, coin_usd_prices, us_cpi::UsCpiRetriever};
+use crate::{
+	argon_price, argonot_price, coin_usd_prices, uniswap_oracle::PriceAndLiquidity,
+	us_cpi::UsCpiRetriever,
+};
 use argon_client::{
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
@@ -75,6 +81,7 @@ pub async fn price_index_loop(
 
 	let mut argon_price_lookup =
 		argon_price::ArgonPriceLookup::from_env(&ticker, last_price).await?;
+	let argonot_price_lookup = argonot_price::ArgonotPriceLookup::from_env().await?;
 
 	info!("Oracle Started.");
 	let account_id = signer.account_id();
@@ -107,11 +114,15 @@ pub async fn price_index_loop(
 			}
 			#[cfg(feature = "simulated-prices")]
 			argon_price_lookup
-				.get_simulated_price(target_price, tick, max_argon_change_per_tick_away_from_target)
+				.get_simulated_price_and_liquidity(
+					target_price,
+					tick,
+					max_argon_change_per_tick_away_from_target,
+				)
 				.await
 		} else {
 			argon_price_lookup
-				.get_latest_price(
+				.get_latest_price_and_liquidity(
 					tick,
 					max_argon_change_per_tick_away_from_target,
 					usd_price_lookup.usdc,
@@ -127,9 +138,17 @@ pub async fn price_index_loop(
 					target_price,
 					e
 				);
-				target_price
+				PriceAndLiquidity { price: target_price, liquidity: 0 }
 			},
 		};
+
+		let argonot_price_lookup = argonot_price_lookup
+			.get_latest_price(usd_price_lookup.usdc)
+			.await
+			.unwrap_or_else(|e| {
+				tracing::warn!("Couldn't update argonot prices {:?}", e);
+				FixedU128::zero()
+			});
 
 		info!(
 			"Current target price: {:?}, argon price {:?} at tick {:?}",
@@ -139,7 +158,9 @@ pub async fn price_index_loop(
 		let price_index = tx().price_index().submit(Index {
 			argon_usd_target_price: to_api_fixed_u128(target_price),
 			tick,
-			argon_usd_price: to_api_fixed_u128(argon_usd_price),
+			argon_usd_price: to_api_fixed_u128(argon_usd_price.price),
+			argon_time_weighted_average_liquidity: argon_usd_price.liquidity,
+			argonot_usd_price: to_api_fixed_u128(argonot_price_lookup),
 			btc_usd_price: to_api_fixed_u128(usd_price_lookup.bitcoin),
 		});
 		{
@@ -168,12 +189,15 @@ pub async fn price_index_loop(
 
 #[cfg(test)]
 mod tests {
+	use alloy_primitives::Address;
+	use dotenv::dotenv;
 	use sp_core::{
 		crypto::{key_types::ACCOUNT, AccountId32},
 		sr25519, Pair,
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sp_runtime::FixedU128;
+	use std::{env, str::FromStr};
 	use tokio::spawn;
 
 	use argon_client::{api, signer::KeystoreSigner};
@@ -183,7 +207,7 @@ mod tests {
 	use crate::{
 		coin_usd_prices::{use_mock_price_lookups, PriceLookups},
 		price_index_loop,
-		uniswap_oracle::use_mock_argon_prices,
+		uniswap_oracle::{use_mock_uniswap_prices, PriceAndLiquidity},
 		us_cpi::use_mock_cpi_values,
 	};
 
@@ -194,17 +218,36 @@ mod tests {
 		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
 		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();
 		let account_id: AccountId32 = keypair.public().into();
+		dotenv().ok();
+		dotenv::from_filename("oracle/.env").ok();
 
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
 		spawn(price_index_loop(node.client.url.clone(), signer, false));
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
+		let argon_token_address =
+			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
+		let argon_address = Address::from_str(&argon_token_address).unwrap();
+		use_mock_uniswap_prices(
+			argon_address,
+			vec![
+				PriceAndLiquidity { price: FixedU128::from_float(1.0), liquidity: 100_000_000 },
+				PriceAndLiquidity { price: FixedU128::from_float(1.01), liquidity: 100_000_000 },
+				PriceAndLiquidity { price: FixedU128::from_float(1.02), liquidity: 100_000_000 },
+			],
+		);
 
-		use_mock_argon_prices(vec![
-			FixedU128::from_float(1.0),
-			FixedU128::from_float(1.01),
-			FixedU128::from_float(1.02),
-		]);
+		let argonot_token_address =
+			env::var("ARGONOT_TOKEN_ADDRESS").expect("ARGONOT_TOKEN_ADDRESS must be set");
+		let argonot_address = Address::from_str(&argonot_token_address).unwrap();
+		use_mock_uniswap_prices(
+			argonot_address,
+			vec![
+				PriceAndLiquidity { price: FixedU128::from_float(2.0), liquidity: 1_000_000 },
+				PriceAndLiquidity { price: FixedU128::from_float(2.01), liquidity: 1_000_000 },
+				PriceAndLiquidity { price: FixedU128::from_float(2.02), liquidity: 1_000_000 },
+			],
+		);
 		use_mock_price_lookups(PriceLookups {
 			bitcoin: FixedU128::from_float(62_000.23),
 			usdc: FixedU128::from_float(1.0),

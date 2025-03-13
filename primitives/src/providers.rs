@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_arithmetic::{FixedI128, FixedPointNumber};
+use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
 use sp_core::{RuntimeDebug, H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
@@ -37,7 +37,7 @@ pub trait NotebookProvider {
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
 
-pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
+pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
 	/// Price of the given satoshis in argon microgons
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
@@ -62,8 +62,30 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned> {
 	/// Prices of a single argon in US cents
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128>;
 
+	/// Get argon liquidity in the pool
+	fn get_argon_pool_liquidity() -> Option<Balance>;
+
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
 	fn get_argon_cpi() -> Option<ArgonCPI>;
+
+	fn get_liquidity_change_needed() -> Option<i128> {
+		let argon_cpi = Self::get_argon_cpi()?;
+		if argon_cpi.is_zero() {
+			return None;
+		}
+		let circulation: u128 = Self::get_argon_pool_liquidity()?.into();
+
+		// divide mint over an hour
+		const MINT_TIME_SPREAD: i128 = 60;
+
+		// flip price to get liquidity change needed
+		Some(
+			argon_cpi
+				.saturating_abs()
+				.saturating_mul_int(circulation as i128)
+				.saturating_div(MINT_TIME_SPREAD),
+		)
+	}
 }
 
 pub trait BitcoinUtxoTracker {

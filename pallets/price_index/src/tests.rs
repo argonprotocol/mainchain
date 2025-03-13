@@ -96,6 +96,8 @@ fn can_convert_argon_prices() {
 			btc_usd_price: FixedU128::from_float(62_000.00), // 62,000.00
 			argon_usd_price: FixedU128::from_float(1.00),    // 100 cents
 			argon_usd_target_price: FixedU128::from_float(1.00),
+			argonot_usd_price: FixedU128::from_float(2.00),
+			argon_time_weighted_average_liquidity: 100_000_000,
 		};
 		Current::<Test>::put(index);
 
@@ -124,6 +126,8 @@ fn clamps_argon_price_changes_away_from_target() {
 			btc_usd_price: FixedU128::from_float(62_000.00), // 62,000.00
 			argon_usd_price: FixedU128::from_float(1.00),    // 100 cents
 			argon_usd_target_price: FixedU128::from_float(1.00),
+			argonot_usd_price: FixedU128::from_float(2.00),
+			argon_time_weighted_average_liquidity: 100_000_000,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -167,6 +171,8 @@ fn clamps_argon_target_price_changes() {
 			btc_usd_price: FixedU128::from_float(62_000.00), // 62,000.00
 			argon_usd_price: FixedU128::from_float(1.00),    // 100 cents
 			argon_usd_target_price: FixedU128::from_float(1.00),
+			argonot_usd_price: FixedU128::from_float(2.00),
+			argon_time_weighted_average_liquidity: 100_000_000,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -223,5 +229,7 @@ fn create_index() -> PriceIndexEntry {
 		btc_usd_price: FixedU128::from_float(62_000.00),
 		argon_usd_price: FixedU128::from_float(1.0),
 		argon_usd_target_price: FixedU128::from_float(1.0),
+		argonot_usd_price: FixedU128::from_float(2.00),
+		argon_time_weighted_average_liquidity: 100_000_000,
 	}
 }

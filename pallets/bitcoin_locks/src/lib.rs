@@ -119,7 +119,7 @@ pub mod pallet {
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
-			+ TryInto<u128>
+			+ Into<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
 

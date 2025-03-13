@@ -21,18 +21,14 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use core::fmt::Debug;
-	use frame_support::{
-		pallet_prelude::*,
-		traits::fungible::{Inspect, Mutate},
-	};
+	use frame_support::{pallet_prelude::*, traits::fungible::Mutate};
 	use frame_system::pallet_prelude::*;
 	use log::{trace, warn};
-	use sp_arithmetic::FixedI128;
 	use sp_core::U256;
 	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
 	use argon_primitives::{
-		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
+		bitcoin::UtxoId, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
 		UtxoLockEvents,
 	};
 
@@ -55,7 +51,7 @@ pub mod pallet {
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
-			+ TryInto<u128>
+			+ Into<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
 
@@ -127,7 +123,7 @@ pub mod pallet {
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative or 0
 			if argon_cpi.is_positive() {
-				trace!("Argon cpi is not-positive. Nothing to mint.");
+				trace!("Argon cpi is positive. Nothing to mint.");
 				return T::DbWeight::get().reads(2);
 			}
 
@@ -135,7 +131,7 @@ pub mod pallet {
 			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
 
 			let argons_to_print_per_miner =
-				Self::get_argons_to_print_per_miner(argon_cpi, reward_accounts.len() as u128);
+				Self::get_argons_to_print_per_miner(reward_accounts.len() as u128);
 
 			let mut bitcoin_mint = MintedBitcoinArgons::<T>::get();
 			let mut mining_mint = MintedMiningArgons::<T>::get();
@@ -241,30 +237,26 @@ pub mod pallet {
 		<T as Config>::Balance: Into<u128>,
 		<T as Config>::Balance: From<u128>,
 	{
-		pub fn get_argons_to_print_per_miner(
-			argon_cpi: ArgonCPI,
-			active_miners: u128,
-		) -> T::Balance {
+		pub fn get_argons_to_print_per_miner(active_miners: u128) -> T::Balance {
+			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			if !argon_cpi.is_negative() || active_miners == 0 {
 				return T::Balance::zero();
 			}
-			let circulation: u128 = T::Currency::total_issuance().into();
-			let circulation = FixedI128::saturating_from_integer(circulation);
-			let argons_to_print =
-				argon_cpi.saturating_abs().saturating_mul(circulation).saturating_mul_int(1u128);
-			if argons_to_print == 0 {
+
+			let Some(argons_to_print) = T::PriceProvider::get_liquidity_change_needed() else {
+				return T::Balance::zero();
+			};
+			if argons_to_print <= 0 {
 				return T::Balance::zero();
 			}
-			// divide mint over an hour
-			const MINT_TIME_SPREAD: u128 = 60;
+			let argons_to_print = argons_to_print as u128;
 
-			let per_miner = argons_to_print
-				.checked_div(active_miners.saturating_mul(MINT_TIME_SPREAD))
-				.unwrap_or_default();
+			let per_miner = argons_to_print.saturating_div(active_miners);
 			trace!(
-				"Minting {} microgons. Circulation = {}. Per miner {}",
+				"Minting {} microgons. CPI={:?}, Liquidity = {}. Per miner {}",
 				argons_to_print,
-				circulation.saturating_mul_int(1u128),
+				T::PriceProvider::get_argon_cpi().unwrap_or_default(),
+				T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default().into(),
 				per_miner
 			);
 

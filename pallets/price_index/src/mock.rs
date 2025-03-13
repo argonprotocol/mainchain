@@ -1,7 +1,7 @@
 use crate as pallet_price_index;
 use argon_primitives::tick::Tick;
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
+use frame_support::{derive_impl, parameter_types, weights::constants::RocksDbWeight};
 use sp_arithmetic::FixedU128;
 use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
@@ -21,6 +21,7 @@ impl frame_system::Config for Test {
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type AccountData = ();
+	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {

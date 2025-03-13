@@ -54,6 +54,7 @@ parameter_types! {
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
 	pub static MinerRewardsAccounts: Vec<(u64, Option<RewardShare>)> = vec![];
+	pub static UniswapLiquidity: Balance = 100_000;
 }
 
 pub struct StaticPriceProvider;
@@ -66,6 +67,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
+	}
+	fn get_argon_pool_liquidity() -> Option<Balance> {
+		Some(UniswapLiquidity::get())
 	}
 }
 

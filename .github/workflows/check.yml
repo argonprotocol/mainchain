@@ -95,7 +95,7 @@ jobs:
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
 
       - name: Run tests
-        run: cargo test --no-fail-fast --lib -- --nocapture
+        run: cargo test --no-fail-fast --lib --bins -- --nocapture
         timeout-minutes: 60
         env:
           RUSTC_WRAPPER: "sccache"

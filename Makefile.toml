@@ -104,7 +104,7 @@ script = "scripts/docker_minio.sh"
 [tasks.test]
 description = "Run tests with cargo,"
 command = "cargo"
-args = ["test", "--features", "try-runtime", "--lib", "--no-fail-fast", "${@}"]
+args = ["test", "--features", "try-runtime", "--lib", "--bins", "--no-fail-fast", "${@}"]
 dependencies = ["build", "minio"]
 
 [tasks.nextest]

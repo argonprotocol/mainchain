@@ -74,23 +74,35 @@ fn it_tracks_block_rewards() {
 	});
 }
 
+fn set_cpi(value: f64) {
+	ArgonCPI::set(Some(FixedI128::from_float(value)));
+}
+
 #[test]
 fn it_calculates_per_miner_mint() {
 	new_test_ext().execute_with(|| {
-		Balances::set_total_issuance(60000);
+		UniswapLiquidity::set(60000);
+		set_cpi(0.0);
 		// zero conditions
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 0), 0);
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(1.0), 100), 0);
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(0.01), 0), 0);
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(0.0), 1), 0);
+		assert_eq!(Mint::get_argons_to_print_per_miner(0), 0);
+		assert_eq!(Mint::get_argons_to_print_per_miner(1), 0);
+
+		set_cpi(1.0);
+		assert_eq!(Mint::get_argons_to_print_per_miner(100), 0);
+
+		set_cpi(0.01);
+		assert_eq!(Mint::get_argons_to_print_per_miner(0), 0);
 
 		// divides cleanly
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 1), 10);
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 2), 5);
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(-0.02), 2), 10);
+		set_cpi(-0.01);
+		assert_eq!(Mint::get_argons_to_print_per_miner(1), 10);
+		assert_eq!(Mint::get_argons_to_print_per_miner(2), 5);
+		set_cpi(-0.02);
+		assert_eq!(Mint::get_argons_to_print_per_miner(2), 10);
 
 		// handles uneven splits
-		assert_eq!(Mint::get_argons_to_print_per_miner(FixedI128::from_float(-0.01), 3), 3);
+		set_cpi(-0.01);
+		assert_eq!(Mint::get_argons_to_print_per_miner(3), 3);
 	});
 }
 
@@ -103,6 +115,7 @@ fn it_can_mint() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		Balances::set_total_issuance(25_000);
+		UniswapLiquidity::set(25_000);
 
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(500));
@@ -137,6 +150,7 @@ fn it_records_failed_mints() {
 		System::set_block_number(1);
 		let amount = 60 * ExistentialDeposit::get() - 1;
 		Balances::set_total_issuance(amount);
+		UniswapLiquidity::set(amount);
 
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(0));
@@ -167,6 +181,7 @@ fn it_doesnt_mint_before_active_miners() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		Balances::set_total_issuance(1000);
+		UniswapLiquidity::set(1000);
 
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(0));
@@ -196,6 +211,7 @@ fn it_can_mint_profit_sharing() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		Balances::set_total_issuance(60000);
+		UniswapLiquidity::set(60000);
 
 		// nothing to mint
 		MintedMiningArgons::<Test>::set(U256::from(0));
@@ -272,6 +288,7 @@ fn it_pays_bitcoin_mints() {
 		let utxo_id = 1;
 		let account_id = 1;
 		let amount = 62_000_000u128;
+		UniswapLiquidity::set(0);
 		assert_ok!(Mint::utxo_locked(utxo_id, &account_id, amount));
 		assert_ok!(Mint::utxo_locked(2, &2, 500));
 		assert_eq!(
@@ -320,6 +337,7 @@ fn it_pays_bitcoin_mints() {
 		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 100);
 		// now allow whole
 
+		UniswapLiquidity::set(100);
 		System::set_block_number(3);
 		MintedMiningArgons::<Test>::set(U256::from(amount + 100));
 		Mint::on_initialize(3);

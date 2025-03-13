@@ -1886,8 +1886,10 @@ export default {
    **/
   PalletPriceIndexPriceIndex: {
     btcUsdPrice: 'Compact<u128>',
+    argonotUsdPrice: 'u128',
     argonUsdPrice: 'Compact<u128>',
     argonUsdTargetPrice: 'u128',
+    argonTimeWeightedAverageLiquidity: 'u128',
     tick: 'Compact<u64>',
   },
   /**

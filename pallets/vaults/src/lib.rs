@@ -87,7 +87,7 @@ pub mod pallet {
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
-			+ TryInto<u128>
+			+ Into<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
 
@@ -1147,7 +1147,7 @@ pub mod pallet {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
 
 			vault.bitcoin_argons.destroy_funds(amount_to_burn)?;
-			obligation.amount = obligation.amount.saturating_sub(amount_to_burn);
+			obligation.amount.saturating_reduce(amount_to_burn);
 
 			T::Currency::burn_held(
 				&HoldReason::EnterVault.into(),
@@ -1183,12 +1183,6 @@ pub mod pallet {
 			market_rate: Self::Balance,
 			redemption_rate: Self::Balance,
 		) -> Result<(Self::Balance, Self::Balance), ObligationError> {
-			// 1. burn redemption rate from the vault (or min of market rate)
-			let burn_amount = redemption_rate.min(market_rate);
-			if burn_amount > 0u128.into() {
-				Self::burn_vault_bitcoin_obligation(obligation_id, burn_amount)?;
-			}
-
 			let zero = T::Balance::zero();
 			let obligation = ObligationsById::<T>::get(obligation_id)
 				.ok_or(ObligationError::ObligationNotFound)?;
@@ -1204,6 +1198,13 @@ pub mod pallet {
 					.map_err(|_| ObligationError::UnrecoverableHold)?;
 			}
 
+			// 1. burn redemption rate from the vault (or min of market rate)
+			let burn_amount = redemption_rate.min(market_rate);
+			if burn_amount > 0u128.into() {
+				Self::burn_vault_bitcoin_obligation(obligation_id, burn_amount)?;
+			}
+
+			// don't load until we've already burned
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
 			let vault_operator = vault.operator_account_id.clone();
 

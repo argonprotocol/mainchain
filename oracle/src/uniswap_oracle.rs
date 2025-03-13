@@ -3,9 +3,11 @@ use alloy_primitives::{aliases::I56, Address, U160};
 use alloy_provider::RootProvider;
 use alloy_transport::BoxTransport;
 use anyhow::{anyhow, Result};
+use argon_primitives::Balance;
 use sp_runtime::{FixedPointNumber, FixedU128};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
+use tracing::{error, trace};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
@@ -24,12 +26,12 @@ pub const SEPOLIA_FACTORY_ADDRESS: Address = address!("0227628f3F023bb0B980b67D5
 
 #[cfg(test)]
 lazy_static::lazy_static! {
-	static ref MOCK_PRICES: Arc<parking_lot::Mutex<Vec<FixedU128>>> = Default::default();
+	static ref MOCK_PRICES: Arc<parking_lot::Mutex<HashMap<Address, Vec<PriceAndLiquidity>>>> = Default::default();
 }
 
 #[cfg(test)]
-pub(crate) fn use_mock_argon_prices(mut prices: Vec<FixedU128>) {
-	MOCK_PRICES.lock().append(&mut prices)
+pub(crate) fn use_mock_uniswap_prices(token_address: Address, mut prices: Vec<PriceAndLiquidity>) {
+	MOCK_PRICES.lock().entry(token_address).or_default().append(&mut prices)
 }
 
 pub struct UniswapOracle {
@@ -40,6 +42,12 @@ pub struct UniswapOracle {
 	fee_tiers: Vec<FeeAmount>,
 	pool_cache_by_fee:
 		Mutex<HashMap<FeeAmount, IUniswapV3PoolInstance<BoxTransport, RootProvider<BoxTransport>>>>, /* Fee -> Pool Contract */
+}
+
+#[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Default)]
+pub struct PriceAndLiquidity {
+	pub price: FixedU128,
+	pub liquidity: Balance,
 }
 
 impl UniswapOracle {
@@ -66,20 +74,25 @@ impl UniswapOracle {
 		})
 	}
 
-	pub async fn get_current_price(&self) -> Result<FixedU128> {
+	pub async fn get_current_price(&self) -> Result<PriceAndLiquidity> {
 		#[cfg(test)]
 		{
-			if let Some(price) = MOCK_PRICES.lock().pop() {
-				return Ok(price);
+			if let Some(mock_tokens) = MOCK_PRICES.lock().get_mut(&self.lookup_token.address) {
+				if let Some(price) = mock_tokens.pop() {
+					return Ok(price);
+				}
 			}
 		}
-		let price = self
+		let (price, liquidity) = self
 			.get_aggregated_twap(60 * 60)
 			.await?
 			.ok_or(anyhow!("Failed to get price, using default"))?;
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
 		let float = scaled_numerator.to_u128().ok_or(anyhow!("Failed to convert to u128"))?;
-		Ok(FixedU128::from_inner(float))
+		Ok(PriceAndLiquidity {
+			price: FixedU128::from_inner(float),
+			liquidity: liquidity.to_u128().unwrap(),
+		})
 	}
 
 	/// Calculate TWAP and TWAL for a given fee tier
@@ -95,7 +108,16 @@ impl UniswapOracle {
 		let pool_contract = self.get_cached_pool_contract(fee).await?;
 
 		// Fetch tick_cumulatives and liquidity_cumulatives
-		let result = pool_contract.observe(vec![seconds_ago, 0]).block(block_id).call().await?;
+		let result = pool_contract
+			.observe(vec![seconds_ago, 0])
+			.block(block_id)
+			.call()
+			.await
+			.inspect_err(|e| {
+				if !format!("{:?}", e).contains("AbiError(SolTypes(Overrun))") {
+					error!(?fee, ?e, "Error calling observe {:?}", e.to_string());
+				}
+			})?;
 		let tick_cumulatives = result.tickCumulatives;
 		let liquidity_cumulatives = result.secondsPerLiquidityCumulativeX128s;
 
@@ -112,22 +134,48 @@ impl UniswapOracle {
 		let price = tick_to_price(self.lookup_token.clone(), self.usd_token.clone(), tick_twap)?;
 
 		// Compute average liquidity
-		let liquidity_diff = liquidity_cumulatives[1] - liquidity_cumulatives[0];
+		let liquidity_diff: U160 = liquidity_cumulatives[1] - liquidity_cumulatives[0];
 		let average_liquidity = {
-			let seconds_as_u256: U160 = seconds_ago.try_into()?;
-			(liquidity_diff / seconds_as_u256).to_big_int()
+			let seconds_between_x128: BigInt = BigInt::from(seconds_ago) << 128;
+			let liquidity_diff = liquidity_diff.to_big_int();
+			seconds_between_x128.checked_div(&liquidity_diff).unwrap_or_default()
 		};
+		// Uniswap's oracle treats our lookup token (Argon) as having 18 decimals (per erc20
+		// standard), even though on our mainchain Argon is actually represented with 6 decimals.
+		// Meanwhile, USDC has 6 decimals.
+		//
+		// The "over-assumption" is 18 - 6 = 12 decimals, meaning Uniswap’s liquidity values
+		// are 10^12 times too high if interpreted directly.
+		// However, because liquidity is expressed relative to USDC’s 6-decimal scale,
+		// we need to adjust this by "re-inflating" by 10^6 to get back to Argon's true scale.
+		// In other words, dividing by 10^12 (to remove the extra decimals) then multiplying by 10^6
+		// yields a net division by 10^(12 - 6) = 10^6.
+		//
+		// Thus, we compute the decimal difference as follows:
+		let usdc_decimal_adjustment = self.lookup_token.decimals() - self.usd_token.decimals();
+		// Now we multiply by 10^6 to get back to argon true decimals. The algebra here can be the
+		// same as just subtracting the existing by 6.
+		let argon_decimals = usdc_decimal_adjustment - 6;
+
+		let scaling_factor = BigInt::from(10).pow(argon_decimals as u32);
+		let average_liquidity = average_liquidity / scaling_factor;
 
 		Ok((price, average_liquidity))
 	}
 
 	/// Aggregate TWAPs across fee tiers, weighted by TWAL
-	async fn get_aggregated_twap(&self, seconds_ago: u32) -> Result<Option<Price<Token, Token>>> {
+	async fn get_aggregated_twap(
+		&self,
+		seconds_ago: u32,
+	) -> Result<Option<(Price<Token, Token>, BigInt)>> {
 		let mut total_numerator = BigInt::zero();
 		let mut total_denominator = BigInt::zero();
+		let mut total_liquidity = BigInt::zero();
 
 		for &fee in &self.fee_tiers {
 			if let Ok((price, average_liquidity)) = self.get_twap_and_twal(fee, seconds_ago).await {
+				trace!(?price, ?average_liquidity, "Got twap/twal for {:?}", fee);
+				total_liquidity += average_liquidity.clone();
 				total_numerator += price.numerator * average_liquidity.clone();
 				total_denominator += price.denominator * average_liquidity;
 			}
@@ -138,11 +186,14 @@ impl UniswapOracle {
 		}
 
 		// Combine prices into a single aggregated Price
-		Ok(Some(Price::new(
-			self.lookup_token.clone(),
-			self.usd_token.clone(),
-			total_denominator,
-			total_numerator,
+		Ok(Some((
+			Price::new(
+				self.lookup_token.clone(),
+				self.usd_token.clone(),
+				total_denominator,
+				total_numerator,
+			),
+			total_liquidity,
 		)))
 	}
 
@@ -183,23 +234,26 @@ mod test {
 	#[tokio::test]
 	async fn test_infura_lookup() {
 		dotenv::dotenv().ok();
+		let _ = env_logger::try_init();
 		let Ok(project_id) = env::var("INFURA_PROJECT_ID") else {
 			warn!("INFURA_PROJECT_ID not set, skipping test");
 			return;
 		};
 
-		const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
+		const _DAI_ADDRESS: &str = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+		const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";
 
 		let oracle = UniswapOracle::new(
 			project_id,
 			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
-			token!(ChainId::MAINNET as u64, DAI_ADDRESS, 18, "DAI"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "DAI"),
 		)
 		.await
 		.expect("Failed to create oracle");
 		let price = oracle.get_current_price().await.unwrap();
 		println!("Price: {:?}", price);
 		// should be around 1.0
-		assert!((price.to_float() - 1.0).abs() < 0.1);
+		assert!((price.price.to_float() - 1.0).abs() < 0.1);
+		assert!(price.liquidity > 1000);
 	}
 }

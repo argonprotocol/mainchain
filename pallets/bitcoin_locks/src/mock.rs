@@ -165,6 +165,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
+	fn get_argon_pool_liquidity() -> Option<Balance> {
+		todo!()
+	}
 }
 
 pub struct StaticVaultProvider;

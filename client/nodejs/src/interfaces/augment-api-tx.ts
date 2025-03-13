@@ -1166,8 +1166,10 @@ declare module '@polkadot/api-base/types/submittable' {
             | PalletPriceIndexPriceIndex
             | {
                 btcUsdPrice?: any;
+                argonotUsdPrice?: any;
                 argonUsdPrice?: any;
                 argonUsdTargetPrice?: any;
+                argonTimeWeightedAverageLiquidity?: any;
                 tick?: any;
               }
             | string

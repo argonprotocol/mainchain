@@ -2249,8 +2249,10 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletPriceIndexPriceIndex (228) */
   interface PalletPriceIndexPriceIndex extends Struct {
     readonly btcUsdPrice: Compact<u128>;
+    readonly argonotUsdPrice: u128;
     readonly argonUsdPrice: Compact<u128>;
     readonly argonUsdTargetPrice: u128;
+    readonly argonTimeWeightedAverageLiquidity: u128;
     readonly tick: Compact<u64>;
   }
 

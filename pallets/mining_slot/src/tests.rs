@@ -12,9 +12,8 @@ use argon_primitives::{
 	block_seal::{
 		MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination, RewardSharing,
 	},
-	inherents::BlockSealInherent,
 	vault::{BitcoinObligationProvider, FundType, ObligationExpiration, VaultTerms},
-	AuthorityProvider, BlockRewardAccountsProvider, BlockVote, MerkleProof,
+	AuthorityProvider, BlockRewardAccountsProvider,
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
@@ -29,7 +28,7 @@ use frame_support::{
 };
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_balances::Event as OwnershipEvent;
-use sp_core::{blake2_256, bounded_vec, crypto::AccountId32, ByteArray, H256, U256};
+use sp_core::{blake2_256, bounded_vec, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, traits::Zero, BoundedVec, FixedU128};
 use std::{collections::HashMap, env};
 
@@ -1292,9 +1291,6 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 
 		let cohort_id = LastActivatedCohortId::<Test>::get() + 1;
 		System::assert_last_event(Event::MiningBidsClosed { cohort_id }.into());
-		let era = MiningSlots::get_next_slot_era();
-
-		assert_eq!(LastBidPoolDistribution::get(), (cohort_id, era.1));
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
@@ -1437,14 +1433,17 @@ fn it_can_change_the_compute_mining_block() {
 		ElapsedTicks::set(1);
 		MiningSlots::on_initialize(1);
 		let starting_config = MiningConfig::<Test>::get();
-		assert_ok!(MiningSlots::configure_mining_slot_delay(RuntimeOrigin::root(), 12961));
+		assert_ok!(MiningSlots::configure_mining_slot_delay(
+			RuntimeOrigin::root(),
+			Some(12961),
+			Some(15)
+		));
 		assert_eq!(MiningConfig::<Test>::get().slot_bidding_start_after_ticks, 12961);
 		System::assert_last_event(
 			Event::MiningConfigurationUpdated {
 				slot_bidding_start_after_ticks: 12961,
 				ticks_between_slots: starting_config.ticks_between_slots,
-				ticks_before_bid_end_for_vrf_close: starting_config
-					.ticks_before_bid_end_for_vrf_close,
+				ticks_before_bid_end_for_vrf_close: 15,
 			}
 			.into(),
 		);

@@ -40,7 +40,7 @@ lazy_static! {
 	static ref BASELINE_CPI: FixedU128 = FixedU128::from_float(315.605); // CPI for 2024-12-01
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UsCpiRetriever {
 	pub schedule: Vec<CpiSchedule>,
 	pub current_cpi_release_tick: Tick,
@@ -371,8 +371,7 @@ pub(crate) async fn use_mock_cpi_values(cpi_offsets: Vec<f64>) {
 	let schedule = load_cpi_schedule().await.expect("should load schedule");
 
 	let mut mock = MOCK_RAW_CPIS.lock().unwrap();
-	let cpi = env::var("BASELINE_CPI").unwrap().parse::<f64>().unwrap();
-	let base_cpi = FixedU128::from_float(cpi);
+	let base_cpi = BASELINE_CPI.clone();
 	*mock = Some(
 		cpi_offsets
 			.into_iter()
@@ -423,7 +422,7 @@ mod tests {
 
 	#[test]
 	fn test_can_smooth_out_cpi() {
-		let previous_cpi = FixedU128::from_float(300.0);
+		let previous_cpi = BASELINE_CPI.clone();
 		let ticker = Ticker::new(60_000, 2);
 
 		let mut retriever = UsCpiRetriever {

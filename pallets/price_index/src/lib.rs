@@ -9,13 +9,14 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_core::RuntimeDebug;
 use sp_runtime::traits::{CheckedDiv, One};
 
-use argon_primitives::{tick::Tick, ArgonCPI};
+use argon_primitives::{tick::Tick, ArgonCPI, Balance};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub mod migrations;
 #[cfg(test)]
 mod tests;
 pub mod weights;
@@ -40,11 +41,15 @@ pub struct PriceIndex {
 	/// Bitcoin to usd price in cents
 	#[codec(compact)]
 	pub btc_usd_price: FixedU128,
+	/// Price of argon ownership tokens (argonot) in usd cents
+	pub argonot_usd_price: FixedU128,
 	/// Argon to usd price in cents
 	#[codec(compact)]
 	pub argon_usd_price: FixedU128,
 	/// The target price for argon based on inflation since start
 	pub argon_usd_target_price: FixedU128,
+	/// The argon liquidity in the pool
+	pub argon_time_weighted_average_liquidity: Balance,
 	/// Tick of price index
 	#[codec(compact)]
 	pub tick: Tick,
@@ -71,7 +76,10 @@ pub mod pallet {
 
 	use super::*;
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// ## Configuration
@@ -92,7 +100,7 @@ pub mod pallet {
 			+ Debug
 			+ Default
 			+ From<u128>
-			+ TryInto<u128>
+			+ Into<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
 
@@ -285,6 +293,10 @@ pub mod pallet {
 
 		fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.btc_usd_price)
+		}
+
+		fn get_argon_pool_liquidity() -> Option<T::Balance> {
+			Self::get_current().map(|a| a.argon_time_weighted_average_liquidity.into())
 		}
 	}
 }
