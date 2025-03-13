@@ -646,6 +646,7 @@ pub mod pallet {
 		/// wallets.
 		#[pallet::call_index(2)]
 		#[pallet::weight((0, DispatchClass::Operational))]
+		#[allow(clippy::useless_conversion)]
 		pub fn cosign_release(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,

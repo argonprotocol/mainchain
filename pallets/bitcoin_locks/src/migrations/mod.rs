@@ -45,6 +45,7 @@ mod old_storage {
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
 		pub locked_utxos: Vec<(UtxoId, LockedBitcoin<T>)>,
+		#[allow(clippy::type_complexity)]
 		pub owed_utxos: Vec<(
 			UtxoId,
 			(
