@@ -54,8 +54,8 @@ only has a single node with blocks timed to 10 minutes. You can connect to it us
 
 To launch in Signet:
 
-- [Electrum](https://electrum.org/#home): Open with --testnet. Eg, in Mac
-  OS: `open -a Electrum.app --args --oneserver --server=electrs.testnet.argonprotocol.org:50002:s`
+- [Electrum](https://electrum.org/#home): Open with --signet. Eg, in Mac
+  OS: `open -a Electrum.app --args --oneserver --signet --server=electrs.testnet.argonprotocol.org:50002:s`
 - [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
   and `signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333`
 
@@ -186,7 +186,8 @@ use for the "release" cosignature (eg, select the address of the next pubkey fro
 
 > Replace your wss:// url below as appropriate for your network
 
-Submit a [lock initialize](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000)
+Submit
+a [lock initialize](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.testnet.argonprotocol.org#/extrinsics/decode/0x080001000000214e000000000000000000000000000000000000000000000000000000000000000000)
 request to the mainchain.
 
 NOTE: you'll need to prefix it with 0x to paste into the UI.
