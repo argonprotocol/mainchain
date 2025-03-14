@@ -244,9 +244,15 @@ the [Block Explorer](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonpr
 blocks created by your account.
 ![Polkadot.js - Block Explorer](images/pjs-blockexplorer.png)
 
-Your rewards will consist of Argons and Ownership Tokens. Rewards start at 5 Argons and 5 Ownership Tokens per block,
-and will decrease by half ever 2.1 million blocks (blocks are on average every minute). You can view your accumulated
-Ownership tokens using
+Your rewards will consist of Argons and Ownership Tokens (Argonots).
+_Argons_ - Argons rewarded per block follow a growth curve like the system mint (which is based on the price difference
+from the target price on Uniswap). In any given block, the Argon rewards will fluctuate by dividing the mint amount by
+10 days worth of blocks. Every cohort has an assigned block reward, which can be found in Polkadot.js looking up
+`BlockRewards -> BlockRewardsByCohort (your cohort)`. These rewards have a floor that started at 0.5 Argons per block
+and will grow to 5 argons per block over the course of a year.
+_Argonots_ - Argonots per block have been set to low amounts to start and will grow over the course of a year to 5
+Ownership Tokens per block, then they will decrease by half every 2.1 million blocks (blocks are on average every
+minute). You can view your accumulated Ownership tokens using
 the [Chainstate](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) tab in Polkadot.js
 and looking up `Ownership -> Accounts (your account)`.
 ![Polkadot.js - Ownership](images/pjs-ownership.png)

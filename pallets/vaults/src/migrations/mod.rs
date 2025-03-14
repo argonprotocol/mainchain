@@ -171,7 +171,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			|_id, ob| {
 				count += 1;
 
-				info!("Migrated bitcoin obligation {} for {:?}", ob.obligation_id, ob.amount);
+				info!(
+					"Migrated {:?} obligation {} for {:?}",
+					ob.fund_type, ob.obligation_id, ob.amount
+				);
 				Some(Obligation {
 					obligation_id: ob.obligation_id,
 					fund_type: match ob.fund_type {
