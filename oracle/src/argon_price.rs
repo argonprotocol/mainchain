@@ -233,6 +233,7 @@ mod test {
 		env::set_var("USE_SEPOLIA", "true");
 		env::set_var("INFURA_PROJECT_ID", "test");
 		env::set_var("ARGON_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+		env::set_var("ARGONOT_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
 	}
 
 	#[tokio::test]
