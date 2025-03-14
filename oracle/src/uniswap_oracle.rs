@@ -227,18 +227,25 @@ impl UniswapOracle {
 #[cfg(test)]
 mod test {
 	use super::*;
+
 	use std::env;
 	use tracing::warn;
 	use uniswap_sdk_core::token;
 
 	#[tokio::test]
+	#[ignore] // only activate when turned on
 	async fn test_infura_lookup() {
 		dotenv::dotenv().ok();
+		dotenv::from_filename("oracle/.env").ok();
 		let _ = env_logger::try_init();
 		let Ok(project_id) = env::var("INFURA_PROJECT_ID") else {
 			warn!("INFURA_PROJECT_ID not set, skipping test");
 			return;
 		};
+		if project_id == "test" {
+			warn!("INFURA_PROJECT_ID is set to 'test', skipping test");
+			return;
+		}
 
 		const _DAI_ADDRESS: &str = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 		const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";

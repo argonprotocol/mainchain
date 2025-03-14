@@ -1,8 +1,8 @@
 # Bitcoin Vaults
 
-Vaults are a core part of the Argon network. They lend Argons to both Bitcoin holders and Miners. For Bitcoin bonders,
-Vaults commit to lock up the market value of Bitcoin in Argons for a year. A Vault may choose the Annual Percentage
-Rate (APR) per Argon they charge for this service.
+Vaults are a core part of the Argon network. They lend Argons to both Bitcoin holders and "back" the mining cohorts with
+BondedBitcoins. For Bitcoin bonders, Vaults commit to lock up the market value of Bitcoin in Argons for a year. A Vault
+may choose the Annual Percentage Rate (APR) per Argon they charge for this service.
 
 ## Locked Bitcoins
 
@@ -25,30 +25,24 @@ as long as a Vault performs the following two functions:
   being spendable.
 - `Added Securitization Percent`: The added percentage (of offered _Bitcoin Argons_) the Vault is willing to put up to
   cover the loss of Bitcoins in case of fraud. These funds are not eligible for LockedBitcoins themselves, but allow a
-  Vault to offer an equivalent amount of BondedArgons (up to 2x the Bitcoin Argons).
+  Vault to offer an equivalent amount of BondedBitcoins (up to 2x the Bitcoin Argons).
 - `Bitcoin Argons`: The number of argons a Vault will offer for LockedBitcoins. Once an argon is locked for the year, it
   will not be returned to the Vault until the term is complete.
 
-## BondedArgons
+## BondedBitcoins
 
-A BondedArgon obligation lasts only for the duration of a Mining Slot (10 days). A Vault can rent out up to 2x the
-amount of Bitcoin Argons in BondedArgons. The Vault does not need to perform any actions to maintain their BondedArgons.
-These are completely not at risk.
+BondedBitcoins allow a vault to earn a share of the Bids submitted for mining slots. Every time a mining slot is closed,
+the vaults with BondedBitcoins from the previous day divide up the bid pool at their prorata rate. Any vaults with
+available BondedBitcoins will automatically have 10% of them locked for the next Mining slot (10 days). A Vault can
+submit up to an additional 2x the amount of LockedBitcoins in BondedBitcoins by adding `Added Securitization`. The
+Vault does not need to perform any actions to maintain their BondedBitcoins other than to allocate them upfront. As new
+bitcoins are locked, bonded bitcoins are automatically provisioned and locked for the next Mining Slot. BondedBitcoin
+funds are completely not at risk.
 
-### Variables for BondedArgons
+### Variables for BondedBitcoins
 
-- `Annual Percentage Rate (apr)`: An annual percentage rate that is charged at 10 days worth of blocks (10/365) times
-  the amount of Argons a miner wishes to submit for their mining bid. This fee is paid out at the end of the Mining
-  Slot.
-- `Base Fee`: A non-refundable flat fee charged for the service of locking up Argons for a BondedArgon. This fee is most
-  relevant to BondedArgons so that a Vault cannot be "gamed" by a miner submitting and cancelling a large number of
-  BondedArgons. This fee is held for a day before being spendable.
-- `Mining Reward Sharing Percent Take`: A Vault can optionally offer a very low percentage rate for a BondedArgon in
-  exchange for profit sharing on any minted Argons during the Mining Slot. This can be an appealing offer for miners so
-  they don't have to try to predict an optimal bid that will out-pace the slot earnings (eg, by looking at the pattern
-  of previous slots and hoping the demand for new argons remains the same or above).
-- `Bonded Argons`: The number of argons a Vault will offer for BondedArgons. Once an argon is locked for the 10 days, it
-  will not be returned to the Vault until the term is complete.
+- `Bonded Bitcoin Argons`: The number of argons a Vault will offer for their prorata share of the Mining bid pool.
+  Once an argon is locked for the 10 days, it will not be returned to the Vault until the term is complete.
 
 ## The Argon Bitcoin CLI
 
@@ -157,9 +151,9 @@ whatever you'd like to offer.
 
 ```bash
 $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
-  --bonded-argons-apr=1% --bonded-argons-base-fee=₳1.00 --bonded-argons=₳100 \
-  --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 --bitcoin-argons=₳100 \
-  --added-securitization-percent=100% --mining-reward-sharing-percent-take=0% \
+  --bonded-bitcoin-argons=₳100 --locked-bitcoin-argons=₳100 \
+  --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 \
+  --added-securitization-percent=100% \
   --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
 
@@ -230,7 +224,7 @@ LockedBitcoin.
 ## Reclaiming Bitcoin
 
 If you get to the end of the year and the Bitcoin owner has not requested a LockedBitcoin Release in Argon, you will
-lose possession of the BondedArgons. As compensation, you can claim the Bitcoin.
+lose possession of the BondedBitcoins. As compensation, you can claim the Bitcoin.
 
 ### 1. Sign the "Claim Bitcoin" Partially Signed Bitcoin Transaction
 
@@ -252,8 +246,8 @@ of where you can import (and broadcast) into Electrum:
 
 The following are a few rules around how and when you can add funding to a vault:
 
-- Vault funding can be added at any time, but will only be available for use after 1 hour
-- Vault funding can be removed at any time down to the level of current obligations (BitcoinLocks or BondedArgons)
+- Vault funding can be added at any time
+- Vault funding can be removed at any time down to the level of current obligations (Locked or Bonded Bitcoins)
 - Vaults must cosign any BitcoinLock release requests within 10 days of the request, or they will forfeit the market
   value of the Bitcoins
 - Vaults must maintain or exceed the promised additional securitization percentage for the duration of any
@@ -262,6 +256,5 @@ The following are a few rules around how and when you can add funding to a vault
   exception is that prior to bidding for Slot 1, there are no delays
 - Vaults must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon. If they do so, they
   will forfeit funds
-- Base fees may be required for both LockedBitcoins and BondedArgons. These fees are a non-refundable fee charged to
-  anyone who creates an obligation with a Vault. However, any APR charges are refundable based on the duration of the
-  funds being held in ticks.
+- Bitcoin base fees are a non-refundable fee charged to the LockedBitcoin creator. However, any APR charges
+  will be refunded on "release" based on the duration of the funds being held in ticks.

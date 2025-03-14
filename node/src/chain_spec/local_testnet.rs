@@ -62,7 +62,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 			name: "FerdieStamp".into(),
 		}],
 		mining_config: MiningSlotConfig {
-			ticks_before_bid_end_for_vrf_close: 1,
+			ticks_before_bid_end_for_vrf_close: 5,
 			ticks_between_slots: 10,
 			slot_bidding_start_after_ticks: 10,
 		},

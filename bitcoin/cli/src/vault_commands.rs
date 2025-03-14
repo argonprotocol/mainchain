@@ -5,7 +5,7 @@ use sp_runtime::{FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
 use argon_client::{
-	api::{apis, constants, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
+	api::{apis, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
 	conversion::from_api_fixed_u128,
 	MainchainClient,
 };
@@ -85,7 +85,7 @@ impl VaultCommands {
 					.set_header(vec![
 						"Id",
 						"Available argons",
-						"Bonded argons",
+						"Locked argons",
 						"Added Securitization",
 						"Fee",
 						"State",
@@ -96,8 +96,9 @@ impl VaultCommands {
 					let Some(vault_id) = kv.keys[0].as_u128().map(|a| a as VaultId) else {
 						continue;
 					};
-					let bitcoin_argons_available =
-						vault.bitcoin_argons.allocated - vault.bitcoin_argons.reserved;
+					let bitcoin_argons_available = vault.locked_bitcoin_argons.allocated -
+						vault.locked_bitcoin_argons.reserved -
+						vault.pending_bitcoins;
 					let state = if vault.is_closed {
 						"Closed"
 					} else if vault.activation_tick > current_tick {
@@ -106,14 +107,14 @@ impl VaultCommands {
 						"Active"
 					};
 					if bitcoin_argons_available >= argons_needed {
-						let fee = vault.bitcoin_argons.base_fee +
-							from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
+						let fee = vault.terms.bitcoin_base_fee +
+							from_api_fixed_u128(vault.terms.bitcoin_annual_percent_rate)
 								.saturating_mul_int(argons_needed);
 
 						table.add_row(vec![
 							vault_id.to_string(),
 							ArgonFormatter(bitcoin_argons_available).to_string(),
-							ArgonFormatter(vault.bitcoin_argons.reserved).to_string(),
+							ArgonFormatter(vault.locked_bitcoin_argons.reserved).to_string(),
 							ArgonFormatter(vault.added_securitization_argons).to_string(),
 							ArgonFormatter(fee).to_string(),
 							state.to_string(),
@@ -132,16 +133,8 @@ impl VaultCommands {
 					.await
 					.context("Failed to connect to argon node")?;
 
-				let is_sharing_enabled = client
-					.live
-					.constants()
-					.at(&constants().vaults().enable_reward_sharing())
-					.unwrap_or_default();
 				let mut config = config;
-				if !config
-					.complete_prompt(keypair.keystore_path.is_some(), is_sharing_enabled)
-					.await
-				{
+				if !config.complete_prompt(keypair.keystore_path.is_some()).await {
 					return Ok(());
 				}
 				let call = tx().vaults().create(config.as_call_data());

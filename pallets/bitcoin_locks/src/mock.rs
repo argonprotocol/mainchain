@@ -21,7 +21,7 @@ use argon_primitives::{
 	tick::{Tick, Ticker},
 	vault::{
 		BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
-		Vault, VaultArgons,
+		ReleaseFundsResult, Vault, VaultArgons, VaultTerms,
 	},
 	BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider, TickProvider,
 	UtxoLockEvents, VaultId, VotingSchedule,
@@ -85,26 +85,24 @@ parameter_types! {
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
-		bonded_argons: VaultArgons {
+		bonded_bitcoin_argons : VaultArgons {
 			allocated: 100_000_000_000,
 			reserved: 0,
-			annual_percent_rate: FixedU128::from_float(10.0),
-			base_fee: 0,
 		},
-		bitcoin_argons: VaultArgons {
+		locked_bitcoin_argons: VaultArgons {
 			allocated: 200_000_000_000,
 			reserved: 0,
-			annual_percent_rate: FixedU128::from_float(10.0),
-			base_fee: 0,
+		},
+		terms: VaultTerms {
+			bitcoin_annual_percent_rate: FixedU128::from_float(10.0),
+			bitcoin_base_fee: 0,
 		},
 		activation_tick: 1,
 		operator_account_id: 1,
 		added_securitization_percent: FixedU128::from_float(0.0),
-		mining_reward_sharing_percent_take: FixedU128::from_float(0.0),
 		added_securitization_argons: 0,
 		is_closed: false,
 		pending_terms: None,
-		pending_bonded_argons: None,
 		pending_bitcoins: 0,
 	};
 
@@ -183,7 +181,9 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		false
 	}
 
-	fn cancel_obligation(obligation_id: ObligationId) -> Result<Self::Balance, ObligationError> {
+	fn cancel_obligation(
+		obligation_id: ObligationId,
+	) -> Result<ReleaseFundsResult<Self::Balance>, ObligationError> {
 		CanceledObligations::mutate(|a| a.push(obligation_id));
 		Obligations::mutate(|a| {
 			let obligation = a.remove(&obligation_id).expect("should exist");
@@ -192,17 +192,17 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 				v.mut_argons(&obligation.fund_type).reserved -= obligation.amount;
 			});
 		});
-		Ok(0)
+		Ok(ReleaseFundsResult { returned_to_beneficiary: 0u128, paid_to_vault: 0u128 })
 	}
 
 	fn create_obligation(
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
-		fund_type: FundType,
 		amount: Self::Balance,
-		expiration: ObligationExpiration,
+		expiration: BitcoinHeight,
 		_ticks: Tick,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
+		let fund_type = FundType::LockedBitcoin;
 		ensure!(
 			DefaultVault::get().mut_argons(&fund_type).allocated >= amount,
 			ObligationError::InsufficientVaultFunds
@@ -222,7 +222,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			amount,
 			fund_type,
 			vault_id,
-			expiration,
+			expiration: ObligationExpiration::BitcoinBlock(expiration),
 			start_tick: CurrentTick::get(),
 		};
 		Obligations::mutate(|a| a.insert(next_obligation_id, obligation.clone()));
@@ -236,7 +236,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 	) -> Result<(Self::Balance, Self::Balance), ObligationError> {
 		let rate = release_amount_paid.min(market_rate);
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
+			a.locked_bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
 		});
 		Ok((0, rate))
 	}
@@ -246,7 +246,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		amount_to_burn: Self::Balance,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
 		DefaultVault::mutate(|a| {
-			a.bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
+			a.locked_bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
 		});
 
 		let mut obligation = Obligations::get().get(&obligation_id).cloned().unwrap();

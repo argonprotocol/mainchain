@@ -29,7 +29,6 @@ import type {
   ArgonPrimitivesBlockSealMiningRegistration,
   ArgonPrimitivesBlockSealMiningSlotConfig,
   ArgonPrimitivesBlockSealRewardDestination,
-  ArgonPrimitivesBlockSealRewardSharing,
   ArgonPrimitivesBlockVoteBlockVoteT,
   ArgonPrimitivesDigestsBlockVoteDigest,
   ArgonPrimitivesDigestsDigestset,
@@ -181,7 +180,6 @@ import type {
   PalletMiningSlotError,
   PalletMiningSlotEvent,
   PalletMiningSlotHoldReason,
-  PalletMiningSlotMiningSlotBid,
   PalletMintCall,
   PalletMintError,
   PalletMintEvent,
@@ -228,6 +226,7 @@ import type {
   PalletUtilityCall,
   PalletUtilityError,
   PalletUtilityEvent,
+  PalletVaultsBidPoolEntrant,
   PalletVaultsCall,
   PalletVaultsError,
   PalletVaultsEvent,
@@ -278,7 +277,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesBlockSealMiningRegistration: ArgonPrimitivesBlockSealMiningRegistration;
     ArgonPrimitivesBlockSealMiningSlotConfig: ArgonPrimitivesBlockSealMiningSlotConfig;
     ArgonPrimitivesBlockSealRewardDestination: ArgonPrimitivesBlockSealRewardDestination;
-    ArgonPrimitivesBlockSealRewardSharing: ArgonPrimitivesBlockSealRewardSharing;
     ArgonPrimitivesBlockVoteBlockVoteT: ArgonPrimitivesBlockVoteBlockVoteT;
     ArgonPrimitivesDigestsBlockVoteDigest: ArgonPrimitivesDigestsBlockVoteDigest;
     ArgonPrimitivesDigestsDigestset: ArgonPrimitivesDigestsDigestset;
@@ -430,7 +428,6 @@ declare module '@polkadot/types/types/registry' {
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;
     PalletMiningSlotHoldReason: PalletMiningSlotHoldReason;
-    PalletMiningSlotMiningSlotBid: PalletMiningSlotMiningSlotBid;
     PalletMintCall: PalletMintCall;
     PalletMintError: PalletMintError;
     PalletMintEvent: PalletMintEvent;
@@ -477,6 +474,7 @@ declare module '@polkadot/types/types/registry' {
     PalletUtilityCall: PalletUtilityCall;
     PalletUtilityError: PalletUtilityError;
     PalletUtilityEvent: PalletUtilityEvent;
+    PalletVaultsBidPoolEntrant: PalletVaultsBidPoolEntrant;
     PalletVaultsCall: PalletVaultsCall;
     PalletVaultsError: PalletVaultsError;
     PalletVaultsEvent: PalletVaultsEvent;

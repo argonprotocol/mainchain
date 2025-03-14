@@ -185,8 +185,8 @@ impl LockCommands {
 					println!("No price conversion found in blockchain for bitcoin to argon");
 					return Ok(());
 				};
-				let fee = vault.bitcoin_argons.base_fee +
-					from_api_fixed_u128(vault.bitcoin_argons.annual_percent_rate)
+				let fee = vault.terms.bitcoin_base_fee +
+					from_api_fixed_u128(vault.terms.bitcoin_annual_percent_rate)
 						.saturating_mul_int(argons_minted);
 				println!("You're locking {} sats in exchange for {}. Your Argon account needs {} for the lock cost",
 						 satoshis, ArgonFormatter(argons_minted), ArgonFormatter(fee));

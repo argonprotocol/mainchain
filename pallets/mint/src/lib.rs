@@ -137,12 +137,8 @@ pub mod pallet {
 			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			if argons_to_print_per_miner > T::Balance::zero() {
-				for (miner, share) in reward_accounts {
-					let amount = if let Some(share) = share {
-						share.saturating_mul_int(argons_to_print_per_miner)
-					} else {
-						argons_to_print_per_miner
-					};
+				for miner in reward_accounts {
+					let amount = argons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());

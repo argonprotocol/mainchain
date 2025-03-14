@@ -569,7 +569,6 @@ pub mod pallet {
 					notary_id,
 					seal_strength,
 					block_vote_bytes: leafs[index].clone(),
-
 					source_notebook_number,
 					source_notebook_proof: MerkleProof {
 						proof: BoundedVec::truncate_from(proof.proof),

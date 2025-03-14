@@ -1,16 +1,19 @@
 use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::StorageMapShim};
-use sp_core::{ConstU32, H256};
+use frame_support::{
+	derive_impl, parameter_types, traits::StorageMapShim, weights::constants::RocksDbWeight,
+};
+use sp_arithmetic::FixedI128;
+use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
 
 use crate as pallet_block_rewards;
 use crate::GrowthPath;
 use argon_primitives::{
-	block_seal::{BlockPayout, RewardSharing},
+	block_seal::{BlockPayout, CohortId},
 	notary::{NotaryProvider, NotarySignature},
 	tick::{Tick, Ticker},
 	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
-	NotaryId, NotebookNumber, NotebookProvider, NotebookSecret, RewardShare, TickProvider,
+	NotaryId, NotebookNumber, NotebookProvider, NotebookSecret, PriceProvider, TickProvider,
 	VotingSchedule,
 };
 
@@ -33,6 +36,7 @@ impl frame_system::Config for Test {
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type AccountData = pallet_balances::AccountData<Balance>;
+	type DbWeight = RocksDbWeight;
 }
 
 pub type Balance = u128;
@@ -80,18 +84,16 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 }
 
 parameter_types! {
-	pub static ArgonsPerBlock :u32 = 5_000;
+	pub static StartingArgonsPerBlock :u32 = 5_000;
 	pub static StartingOwnershipTokensPerBlock :u32 = 5_000;
 	pub static IncrementalGrowth :GrowthPath<Balance> = (1_000, 100, 500_000);
 	pub static HalvingBeginBlock: u32 = 1000;
 	pub static HalvingBlocks :u32 = 100;
-	pub static MaturationBlocks :u32 = 5;
 	pub static MinerPayoutPercent :FixedU128 = FixedU128::from_rational(75, 100);
 	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
 	pub static NotebookTick: Tick = 0;
 	pub static ElapsedTicks: Tick = 0;
 
-	pub static GetRewardSharing: Option<RewardSharing<u64>> = None;
 	pub static NotebooksInBlock: Vec<(NotaryId, NotebookNumber, Tick)> = vec![];
 
 	pub static BlockSealer:BlockSealerInfo<u64> = BlockSealerInfo {
@@ -102,6 +104,7 @@ parameter_types! {
 	pub static IsMiningSlotsActive: bool = false;
 	pub static IsBlockVoteSeal: bool = false;
 	pub static LastRewards: Vec<BlockPayout<AccountId, Balance>> = vec![];
+	pub static AccountCohorts: Vec<(AccountId, CohortId)> = vec![];
 }
 
 pub struct StaticBlockSealerProvider;
@@ -146,16 +149,11 @@ impl NotebookProvider for TestProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_rewards_account(author: &u64) -> (Option<u64>, Option<RewardSharing<u64>>) {
-		let res = GetRewardSharing::get();
-		if let Some(delegate) = res {
-			(Some(*author), Some(delegate))
-		} else {
-			(None, None)
-		}
+	fn get_rewards_account(author: &u64) -> Option<(u64, CohortId)> {
+		AccountCohorts::get().iter().find(|(a, _)| a == author).cloned()
 	}
 
-	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
+	fn get_all_rewards_accounts() -> Vec<u64> {
 		todo!("not used by rewards")
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {
@@ -191,15 +189,38 @@ impl BlockRewardsEventHandler<AccountId, Balance> for RewardEvents {
 		LastRewards::set(payout.to_vec());
 	}
 }
+parameter_types! {
+	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
+	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static ArgonCPI: argon_primitives::ArgonCPI = FixedI128::from_float(0.00);
+	pub static ActiveCohorts: u32 = 10;
+	pub static UniswapLiquidity: Balance = 1_000_000;
+	pub static BlockRewardsDampener: FixedU128 = FixedU128::from_float(0.8);
+}
+
+pub struct StaticPriceProvider;
+impl PriceProvider<Balance> for StaticPriceProvider {
+	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
+		Some(ArgonCPI::get())
+	}
+	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
+		ArgonPricePerUsd::get()
+	}
+	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
+		BitcoinPricePerUsd::get()
+	}
+	fn get_argon_pool_liquidity() -> Option<Balance> {
+		Some(UniswapLiquidity::get())
+	}
+}
 
 impl pallet_block_rewards::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
-	type StartingArgonsPerBlock = ArgonsPerBlock;
+	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
-	type MaturationBlocks = MaturationBlocks;
 	type Balance = Balance;
 	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingTicks = HalvingBlocks;
@@ -212,6 +233,11 @@ impl pallet_block_rewards::Config for Test {
 	type NotebookProvider = TestProvider;
 	type EventHandler = (RewardEvents,);
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
+	type PriceProvider = StaticPriceProvider;
+	type CohortBlockRewardsToKeep = ActiveCohorts;
+	type PayoutHistoryBlocks = ConstU32<5>;
+	type SlotWindowTicks = ConstU64<14_400>;
+	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 
 // Build genesis storage according to the mock runtime.

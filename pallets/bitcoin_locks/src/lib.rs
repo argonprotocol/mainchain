@@ -88,9 +88,7 @@ pub mod pallet {
 			XPubFingerprint,
 		},
 		tick::Tick,
-		vault::{
-			BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
-		},
+		vault::{BitcoinObligationProvider, Obligation, ObligationError},
 		BitcoinUtxoEvents, BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider,
 		TickProvider, UtxoLockEvents, VaultId,
 	};
@@ -311,8 +309,6 @@ pub mod pallet {
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
 		InsufficientVaultFunds,
-		/// The vault does not have enough bitcoins to cover the bonded argons
-		InsufficientBondedArgons,
 		/// The proposed transaction would take the account below the minimum (existential) balance
 		AccountWouldGoBelowMinimumBalance,
 		VaultClosed,
@@ -337,7 +333,6 @@ pub mod pallet {
 		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
 		InvalidBitcoinScript,
-		ExpirationTooSoon,
 		NoPermissions,
 		HoldUnexpectedlyModified,
 		UnrecoverableHold,
@@ -359,13 +354,10 @@ pub mod pallet {
 					Error::<T>::MinimumObligationAmountNotMet,
 				ObligationError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
 				ObligationError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				ObligationError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
-				ObligationError::NoPermissions => Error::<T>::NoPermissions,
 				ObligationError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
 				ObligationError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
 				ObligationError::VaultNotFound => Error::<T>::VaultNotFound,
 				ObligationError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
-				ObligationError::InsufficientBondedArgons => Error::<T>::InsufficientBondedArgons,
 				ObligationError::VaultClosed => Error::<T>::VaultClosed,
 				ObligationError::AccountWouldBeBelowMinimum =>
 					Error::<T>::AccountWouldGoBelowMinimumBalance,
@@ -461,9 +453,8 @@ pub mod pallet {
 			let obligation = T::BitcoinObligationProvider::create_obligation(
 				vault_id,
 				&account_id,
-				FundType::Bitcoin,
 				lock_price,
-				ObligationExpiration::BitcoinBlock(vault_claim_height),
+				vault_claim_height,
 				// charge in 1 year of ticks (even though we'll expire off bitcoin time)
 				T::ArgonTicksPerDay::get() * 365u64,
 			)

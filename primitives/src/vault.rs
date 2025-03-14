@@ -7,29 +7,26 @@ use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey},
-	block_seal::RewardSharing,
+	block_seal::CohortId,
 	tick::Tick,
-	ObligationId, RewardShare, VaultId,
+	ObligationId, VaultId,
 };
 
-pub trait BondedArgonsProvider {
+pub trait BondedBitcoinsBidPoolProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
-	#[allow(clippy::type_complexity)]
-	/// Create bonded argons for a mining seat
-	fn lease_bonded_argons(
-		vault_id: VaultId,
-		account_id: Self::AccountId,
-		amount: Self::Balance,
-		reserve_until_tick: Tick,
-		modify_obligation_id: Option<ObligationId>,
-	) -> Result<
-		(ObligationId, Option<RewardSharing<Self::AccountId>>, Self::Balance),
-		ObligationError,
-	>;
-	/// Return the obligation to the originator with a prorated refund
-	fn cancel_bonded_argons(obligation_id: ObligationId) -> Result<Self::Balance, ObligationError>;
+	/// Transfer funds to the bid pool and hold
+	fn get_bid_pool_account() -> Self::AccountId;
+
+	/// Distribute the bid pool and allocate the next one
+	fn distribute_and_rotate_bid_pool(cohort_id: CohortId, cohort_window_end_tick: Tick);
+}
+
+#[derive(RuntimeDebug, Clone, PartialEq, Eq)]
+pub struct ReleaseFundsResult<Balance> {
+	pub returned_to_beneficiary: Balance,
+	pub paid_to_vault: Balance,
 }
 
 pub trait BitcoinObligationProvider {
@@ -38,17 +35,18 @@ pub trait BitcoinObligationProvider {
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 
-	/// Return the obligation  to the originator with a prorated refund
-	fn cancel_obligation(obligation_id: ObligationId) -> Result<Self::Balance, ObligationError>;
+	/// Return the obligation to the beneficiary with a prorated refund
+	fn cancel_obligation(
+		obligation_id: ObligationId,
+	) -> Result<ReleaseFundsResult<Self::Balance>, ObligationError>;
 
 	/// Holds the given amount of funds for the given vault. The fee is calculated based on the
 	/// amount and the duration of the hold.
 	fn create_obligation(
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
-		fund_type: FundType,
 		amount: Self::Balance,
-		expiration: ObligationExpiration,
+		expiration_block: BitcoinHeight,
 		ticks: Tick,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError>;
 
@@ -103,10 +101,6 @@ pub enum ObligationError {
 	AccountWouldBeBelowMinimum,
 	InsufficientFunds,
 	InsufficientVaultFunds,
-	/// The vault does not have enough bonded argons for the request
-	InsufficientBondedArgons,
-	ExpirationTooSoon,
-	NoPermissions,
 	HoldUnexpectedlyModified,
 	/// The hold could not be removed - it must have been modified
 	UnrecoverableHold,
@@ -125,8 +119,6 @@ pub enum ObligationError {
 	VaultNotYetActive,
 	/// Too many base fee maturations were inserted per tick
 	BaseFeeOverflow,
-	/// An obligation modification cannot switch vaults
-	InvalidVaultSwitch,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -137,7 +129,9 @@ pub struct Vault<
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
 	/// The assignment and allocation of LockedBitcoins
-	pub bitcoin_argons: VaultArgons<Balance>,
+	pub locked_bitcoin_argons: VaultArgons<Balance>,
+	/// The terms for locked bitcoin
+	pub terms: VaultTerms<Balance>,
 	/// The additional securitization percent that has been added to the vault (recoverable by
 	/// beneficiary in case of fraud or theft)
 	#[codec(compact)]
@@ -145,18 +139,12 @@ pub struct Vault<
 	/// The amount of argons that have been securitized
 	#[codec(compact)]
 	pub added_securitization_argons: Balance,
-	/// The assignment and allocation of BondedArgons
-	pub bonded_argons: VaultArgons<Balance>,
-	/// The percent of argon mining rewards (minted and mined, not including fees) that this vault
-	/// "charges"
-	#[codec(compact)]
-	pub mining_reward_sharing_percent_take: RewardShare,
+	/// The bonded bitcoins that are currently in the vault
+	pub bonded_bitcoin_argons: VaultArgons<Balance>,
 	/// If the vault is closed, no new obligations can be issued
 	pub is_closed: bool,
 	/// The terms that are pending to be applied to this vault at the given block number
 	pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
-	/// Any pending increase in bonded argons
-	pub pending_bonded_argons: Option<(Tick, Balance)>,
 	/// Bitcoins pending verification
 	pub pending_bitcoins: Balance,
 	/// A tick at which this vault is active
@@ -171,16 +159,6 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	/// The base fee for a bitcoin lock
 	#[codec(compact)]
 	pub bitcoin_base_fee: Balance,
-	/// The annual percent rate per argon vaulted for bonded argons
-	#[codec(compact)]
-	pub bonded_argons_annual_percent_rate: FixedU128,
-	/// A base fee for bonded argons
-	#[codec(compact)]
-	pub bonded_argons_base_fee: Balance,
-	/// The percent of argon mining rewards (minted and mined, not including fees) that this vault
-	/// "charges"
-	#[codec(compact)]
-	pub mining_reward_sharing_percent_take: FixedU128, // max 100, actual percent
 }
 
 impl<
@@ -193,13 +171,14 @@ impl<
 			+ MaxEncodedLen
 			+ Clone
 			+ TypeInfo
+			+ core::fmt::Debug
 			+ PartialEq
 			+ Eq,
 	> Vault<AccountId, Balance>
 {
-	pub fn available_bonded_argons(&self) -> Balance {
+	pub fn bonded_bitcoins_for_pool(&self, slots: u32) -> Balance {
 		let mut locked_bitcoin_space =
-			self.bitcoin_argons.reserved.saturating_sub(self.pending_bitcoins);
+			self.locked_bitcoin_argons.reserved.saturating_sub(self.pending_bitcoins);
 
 		// you can increase the max allocation up to an additional 2x over the locked bitcoins
 		if self.added_securitization_argons > Balance::zero() {
@@ -209,15 +188,22 @@ impl<
 			locked_bitcoin_space = locked_bitcoin_space.saturating_add(allowed_securities);
 		}
 
-		let max_allocated = self.bonded_argons.allocated.min(locked_bitcoin_space);
-		max_allocated.saturating_sub(self.bonded_argons.reserved)
+		let max_allocation = self.bonded_bitcoin_argons.allocated.min(locked_bitcoin_space);
+		let ideal_amount = max_allocation / slots.into();
+		let reserved = self.bonded_bitcoin_argons.reserved;
+		let remainder = max_allocation.saturating_sub(reserved);
+		if ideal_amount <= remainder {
+			ideal_amount
+		} else {
+			remainder
+		}
 	}
 
 	pub fn get_added_securitization_needed(&self) -> Balance {
 		let allocated = if self.is_closed {
-			self.bitcoin_argons.reserved
+			self.locked_bitcoin_argons.reserved
 		} else {
-			self.bitcoin_argons.allocated
+			self.locked_bitcoin_argons.allocated
 		};
 
 		let argons = self
@@ -226,18 +212,17 @@ impl<
 
 		argons.unique_saturated_into()
 	}
-
 	pub fn mut_argons(&mut self, fund_type: &FundType) -> &mut VaultArgons<Balance> {
 		match *fund_type {
-			FundType::BondedArgons => &mut self.bonded_argons,
-			FundType::Bitcoin => &mut self.bitcoin_argons,
+			FundType::BondedBitcoin => &mut self.bonded_bitcoin_argons,
+			FundType::LockedBitcoin => &mut self.locked_bitcoin_argons,
 		}
 	}
 
 	pub fn argons(&self, fund_type: &FundType) -> &VaultArgons<Balance> {
 		match *fund_type {
-			FundType::BondedArgons => &self.bonded_argons,
-			FundType::Bitcoin => &self.bitcoin_argons,
+			FundType::BondedBitcoin => &self.bonded_bitcoin_argons,
+			FundType::LockedBitcoin => &self.locked_bitcoin_argons,
 		}
 	}
 }
@@ -245,13 +230,9 @@ impl<
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
 pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
 	#[codec(compact)]
-	pub annual_percent_rate: FixedU128,
-	#[codec(compact)]
 	pub allocated: Balance,
 	#[codec(compact)]
 	pub reserved: Balance,
-	#[codec(compact)]
-	pub base_fee: Balance,
 }
 
 impl<Balance> VaultArgons<Balance>
@@ -321,6 +302,6 @@ pub enum ObligationExpiration {
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum FundType {
-	BondedArgons,
-	Bitcoin,
+	LockedBitcoin,
+	BondedBitcoin,
 }

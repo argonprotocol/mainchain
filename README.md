@@ -40,11 +40,13 @@ algorithm that is active during "Slot Zero" before miners register for slots. Ra
 Monero blockchain to create a proof of work that does not favor GPUs, allowing regular desktops to compete. The argon
 has no funds minted in the genesis block, so this period can be viewed as the bootstrapping period for the network.
 
-The second form of consensus is a registered mining phase, where miners bid for slots to mine blocks. They must bid by
-using bonded argons from a Vault in the system. All mining argons must have an equivalent amount of Bitcoin bonded,
-which will bring liquidity to the system. Miners are given priority to register blocks in the system over proof of
-compute blocks, so once this phase activates, the network will be secured by the miners and only use proof of compute
-when no miners are registered or active. Miners are matched to votes provided by Localchain users using an XOR closest
+The second form of consensus is a registered mining phase, where miners bid for slots to mine blocks. They must bid for
+a slot. Vaults can win a prorata of this bid pool by creating BondedBitcoins, which are issued equal to the amount of
+LockedBitcoin they have confirmed. Because it is expected that mining auctions will be near the expected earnings,
+Vaults are incented to bring new bitcoin liquidity into the system to compete on their prorata share. Miners are given
+priority to register blocks in the system over proof of compute blocks, so once this phase activates, the network will
+be secured by the miners and only use proof of compute when no miners are registered or active. Miners are matched to
+votes provided by Localchain users using an XOR closest
 algorithm (more details to come in the whitepaper).
 
 ## Technology Brief
@@ -111,7 +113,8 @@ PostgresSQL database to keep track of its history and users' balance tips.
   - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
     inflation since the starting time.
   - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-  - `vaults`: Register and manage vaults that offer BondedArgons to miners and LockedBitcoins to bitcoin holders.
+  - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and use BondedBitcoins to earn a
+    pro rata of the Mining Slot bid pool.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets

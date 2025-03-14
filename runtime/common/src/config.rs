@@ -78,9 +78,12 @@ parameter_types! {
 	pub const IncrementalGrowth: GrowthPath<Balance> = (INCREMENTAL_REWARD_AMOUNT, INCREMENT_TICKS, FINAL_ARGONS_PER_BLOCK); // we add 1 milligon every 118 blocks until we reach 5 argons/ownership tokens
 	pub const HalvingBeginTick: Tick = INCREMENT_TICKS  * (FINAL_ARGONS_PER_BLOCK as Tick - StartingArgonsPerBlock::get() as Tick) / INCREMENTAL_REWARD_AMOUNT as Tick; // starts after ~ one year of increments
 	pub const HalvingTicks: Tick = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
-	pub const MaturationBlocks: u32 = 5;
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
+	pub const BlockRewardsCohortHistoryToKeep: u32 = (MaxMiners::get() / MaxCohortSize::get()) + 1;
+	pub const SlotWindowTicks: Tick = 10 * 1440; // 10 days
+	pub const PayoutHistoryBlocks: u32 = 5;
+	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
 	// ### pallet_mining_slot
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
@@ -89,6 +92,7 @@ parameter_types! {
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
+	pub const MiningSlotBidIncrement: Balance = ARGON;
 
 	// ### pallet_vaults
 	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
@@ -107,8 +111,9 @@ parameter_types! {
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
-
-	pub const EnableRewardSharing: bool = false;
+	pub const MinBidPoolProrataPercent: Perbill = Perbill::from_percent(1);
+	pub const VaultBidPoolsOwnerPalletId: PalletId = PalletId(*b"bidPools");
+	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 	// ### pallet chain transfer
 	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");
@@ -157,7 +162,7 @@ parameter_types! {
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 
-	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 1 * (6 * 24); // 1 day of bitcoin blocks
+	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 6 * 24; // 1 day of bitcoin blocks
 
 	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
 

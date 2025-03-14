@@ -6,21 +6,18 @@ use alloc::{vec, vec::Vec};
 use argon_primitives::{
 	block_seal::{
 		CohortId, MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
-		RewardSharing,
 	},
 	inherents::BlockSealInherent,
 	tick::Tick,
-	vault::BondedArgonsProvider,
+	vault::BondedBitcoinsBidPoolProvider,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
-	RewardShare, TickProvider,
+	SlotEvents, TickProvider,
 };
-use codec::Codec;
 use frame_support::{
 	pallet_prelude::*,
-	storage::with_storage_layer,
 	traits::{
-		fungible::{Inspect, InspectHold, MutateHold},
-		tokens::Precision,
+		fungible::{Inspect, InspectHold, Mutate, MutateHold},
+		tokens::{Fortitude, Precision, Preservation},
 	},
 };
 use log::info;
@@ -28,7 +25,7 @@ pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{
-	traits::{One, OpaqueKeys, UniqueSaturatedInto},
+	traits::{One, OpaqueKeys, UniqueSaturatedInto, Zero},
 	FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
 };
 pub use weights::*;
@@ -55,23 +52,25 @@ pub mod weights;
 /// 0-based.
 ///
 /// To be eligible for mining, you must reserve a percent of the total supply of argonots (ownership
-/// tokens). `BondedArgons` leased from a vault will allow operators to out-bid others for cohort
-/// membership. The percent is configured to aim for `TargetBidsPerSlot`, with a maximum change in
-/// ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper` (NOTE: this
-/// percent is the max increase or reduction in the amount of ownership issued).
+/// tokens). The percent is configured to aim for `TargetBidsPerSlot`, with a
+/// maximum change in ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper`
+/// (NOTE: this percent is the max increase or reduction in the amount of ownership issued).
 ///
-/// Options are provided to lease Bonded Argons from the `Vaults` pallet.
+/// You can out-bid others for cohort membership by submitting a bid amount in `BidIncrements` argon
+/// to supplant other entrants (eg, 1.01 argon, 1.02 argons, etc.).
 ///
 /// ### Registration
 /// To register for a Slot, you must submit a bid. At any given time, only the next Slot is being
-/// bid on.
+/// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
+/// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
+/// BondedBitcoins.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use codec::FullCodec;
 	use core::cmp::Ordering;
 	use frame_support::{
 		pallet_prelude::*,
-		traits::fungible::{Inspect, MutateHold},
+		traits::fungible::{Inspect, Mutate, MutateHold},
 		BoundedVec,
 	};
 	use frame_system::pallet_prelude::*;
@@ -80,16 +79,14 @@ pub mod pallet {
 		BoundedBTreeMap, Percent,
 	};
 
+	use super::*;
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
-		prelude::*,
-		vault::{BondedArgonsProvider, ObligationError},
-		TickProvider,
+		vault::BondedBitcoinsBidPoolProvider,
+		SlotEvents, TickProvider,
 	};
 
-	use super::*;
-
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -151,10 +148,13 @@ pub mod pallet {
 		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Inspect<Self::AccountId, Balance = Self::Balance>;
 
+		/// The currency representing argons
+		type ArgonCurrency: Mutate<Self::AccountId, Balance = Self::Balance>;
+
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BondedArgonsProvider: BondedArgonsProvider<
+		type BidPoolProvider: BondedBitcoinsBidPoolProvider<
 			Balance = Self::Balance,
 			AccountId = Self::AccountId,
 		>;
@@ -172,6 +172,9 @@ pub mod pallet {
 
 		/// The current tick
 		type TickProvider: TickProvider<Self::Block>;
+
+		/// The increment that bids can be on (for instance, one cent increments)
+		type BidIncrements: Get<Self::Balance>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -215,7 +218,7 @@ pub mod pallet {
 	/// registrants with their bid amount
 	#[pallet::storage]
 	pub(super) type NextSlotCohort<T: Config> =
-		StorageValue<_, BoundedVec<Registration<T>, T::MaxMiners>, ValueQuery>;
+		StorageValue<_, BoundedVec<Registration<T>, T::MaxCohortSize>, ValueQuery>;
 
 	/// Is the next slot still open for bids
 	#[pallet::storage]
@@ -266,24 +269,16 @@ pub mod pallet {
 			bid_amount: T::Balance,
 			index: u32,
 		},
-		SlotBidderOut {
-			account_id: T::AccountId,
-			bid_amount: T::Balance,
-			obligation_id: Option<ObligationId>,
-		},
 		SlotBidderDropped {
 			account_id: T::AccountId,
-			obligation_id: Option<ObligationId>,
 			preserved_argonot_hold: bool,
 		},
 		ReleasedMinerSeat {
 			account_id: T::AccountId,
-			obligation_id: Option<ObligationId>,
 			preserved_argonot_hold: bool,
 		},
 		ReleaseMinerSeatError {
 			account_id: T::AccountId,
-			obligation_id: Option<ObligationId>,
 			error: DispatchError,
 		},
 		MiningConfigurationUpdated {
@@ -297,7 +292,6 @@ pub mod pallet {
 		},
 		ReleaseBidError {
 			account_id: T::AccountId,
-			obligation_id: Option<ObligationId>,
 			error: DispatchError,
 		},
 	}
@@ -318,45 +312,19 @@ pub mod pallet {
 		ExpirationAtBlockOverflow,
 		InsufficientFunds,
 		InsufficientVaultFunds,
-		ExpirationTooSoon,
 		NoPermissions,
 		HoldUnexpectedlyModified,
 		UnrecoverableHold,
 		VaultNotFound,
 		AccountWouldBeBelowMinimum,
-		GenericObligationError(ObligationError),
 		/// Keys cannot be registered by multiple accounts
 		CannotRegisterDuplicateKeys,
 		/// Unable to decode the key format
 		InvalidKeyFormat,
-		/// You can't reduce the amount of bonded argons
-		CannotReduceBondedArgons,
-		/// Cannot change the bonded argon vault
-		InvalidVaultSwitch,
-	}
-
-	impl<T> From<ObligationError> for Error<T> {
-		fn from(e: ObligationError) -> Error<T> {
-			match e {
-				ObligationError::ObligationNotFound => Error::<T>::ObligationNotFound,
-				ObligationError::NoMoreObligationIds => Error::<T>::NoMoreObligationIds,
-				ObligationError::MinimumObligationAmountNotMet =>
-					Error::<T>::MinimumObligationAmountNotMet,
-				ObligationError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
-				ObligationError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				ObligationError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
-				ObligationError::ExpirationTooSoon => Error::<T>::ExpirationTooSoon,
-				ObligationError::NoPermissions => Error::<T>::NoPermissions,
-				ObligationError::VaultClosed => Error::<T>::VaultClosed,
-				ObligationError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				ObligationError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				ObligationError::VaultNotFound => Error::<T>::VaultNotFound,
-				ObligationError::AccountWouldBeBelowMinimum =>
-					Error::<T>::AccountWouldBeBelowMinimum,
-				ObligationError::InvalidVaultSwitch => Error::<T>::InvalidVaultSwitch,
-				_ => Error::<T>::GenericObligationError(e),
-			}
-		}
+		/// The mining bid cannot be reduced
+		BidCannotBeReduced,
+		/// Bids must be in allowed increments
+		InvalidBidAmount,
 	}
 
 	#[pallet::hooks]
@@ -399,15 +367,13 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
-		/// a slot can be supplanted by supplying a higher number of Bonded Argons. Bonded Argon
-		/// terms can be found in the `vaults` pallet. You will supply the amount and the
-		/// vault id to work with.
+		/// a slot can be supplanted by supplying a higher bid.
 		///
 		/// Each slot has `MaxCohortSize` spots available.
 		///
-		/// To be eligible for a slot, you must have the required ownership tokens in this account.
-		/// The required amount is calculated as a percentage of the total ownership tokens in the
-		/// network. This percentage is adjusted before the beginning of each slot.
+		/// To be eligible for a slot, you must have the required ownership tokens (argonots) in
+		/// this account. The required amount is calculated as a percentage of the total ownership
+		/// tokens in the network. This percentage is adjusted before the beginning of each slot.
 		///
 		/// If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring
 		/// for this event, you will be able to ensure your bid is accepted.
@@ -418,34 +384,38 @@ pub mod pallet {
 		/// The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
 		///
 		/// Parameters:
-		/// - `bonded_argons`: The information to submit for the bid. If `None`, the bid will be
-		///  considered a zero-bid.
-		/// 	- `vault_id`: The vault id to used. Terms are taken from the vault at time of bid
-		///    inclusion in the block.
-		///   	- `amount`: The amount to reserve from the vault.
+		/// - `bid`: The amount of argons to bid
 		/// - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
 		///   submitting user.
 		/// - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
+		/// - `mining_account_id`: This account_id allows you to operate as this miner account id,
+		///   but use funding (argonots and bid) from the submitting account
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn bid(
 			origin: OriginFor<T>,
-			bonded_argons: Option<MiningSlotBid<VaultId, T::Balance>>,
+			bid: T::Balance,
 			reward_destination: RewardDestination<T::AccountId>,
 			keys: T::Keys,
+			mining_account_id: Option<T::AccountId>,
 		) -> DispatchResult {
-			let miner_account = ensure_signed(origin)?;
+			let funding_account = ensure_signed(origin)?;
+			let miner_account_id = mining_account_id.unwrap_or(funding_account.clone());
 
 			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
+			ensure!(
+				bid % T::BidIncrements::get() == T::Balance::zero(),
+				Error::<T>::InvalidBidAmount
+			);
 
 			let miner_authority_id = keys
 				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
 				.ok_or(Error::<T>::InvalidKeyFormat)?;
 			if let Some(registrant) = AuthorityIdToMinerId::<T>::get(&miner_authority_id) {
-				ensure!(registrant == miner_account, Error::<T>::CannotRegisterDuplicateKeys);
+				ensure!(registrant == miner_account_id, Error::<T>::CannotRegisterDuplicateKeys);
 			}
-			let next_cohort_tick = Self::get_next_slot_tick();
-			if let Some(current_index) = <AccountIndexLookup<T>>::get(&miner_account) {
+
+			if let Some(current_index) = <AccountIndexLookup<T>>::get(&miner_account_id) {
 				let cohort_start_index = Self::get_next_slot_starting_index();
 				let is_in_next_cohort = current_index >= cohort_start_index &&
 					current_index < (cohort_start_index + T::MaxCohortSize::get());
@@ -454,41 +424,14 @@ pub mod pallet {
 				ensure!(is_in_next_cohort, Error::<T>::CannotRegisterOverlappingSessions);
 			}
 
-			let current_registration = Self::get_active_registration(&miner_account);
+			Self::send_argons_to_pool(&funding_account, bid)?;
 
-			let mut obligation_id = None;
-			let mut reward_sharing = None;
-			let mut bid = 0u128.into();
-
-			if let Some(bonded_argons) = bonded_argons {
-				if let Some(existing_bid) =
-					NextSlotCohort::<T>::get().iter().find(|x| x.account_id == miner_account)
-				{
-					ensure!(
-						existing_bid.bonded_argons <= bonded_argons.amount,
-						Error::<T>::CannotReduceBondedArgons
-					);
-					obligation_id = existing_bid.obligation_id;
-				}
-
-				let reserve_until_tick = next_cohort_tick + Self::get_mining_window_ticks();
-				let lease = T::BondedArgonsProvider::lease_bonded_argons(
-					bonded_argons.vault_id,
-					miner_account.clone(),
-					bonded_argons.amount,
-					reserve_until_tick,
-					obligation_id,
-				)
-				.map_err(Error::<T>::from)?;
-				obligation_id = Some(lease.0);
-				(_, reward_sharing, bid) = lease;
-			}
-
-			let ownership_tokens = Self::hold_argonots(&miner_account, current_registration)?;
+			let current_registration = Self::get_active_registration(&miner_account_id);
+			let ownership_tokens = Self::hold_argonots(&funding_account, current_registration)?;
 			let next_cohort_id = LastActivatedCohortId::<T>::get().saturating_add(1);
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) =
-					cohort.iter().position(|x| x.account_id == miner_account)
+					cohort.iter().position(|x| x.account_id == miner_account_id)
 				{
 					cohort.remove(existing_position);
 				}
@@ -496,7 +439,7 @@ pub mod pallet {
 				// sort to lowest position at bid
 				let pos = cohort
 					.binary_search_by(|x| {
-						let comp = bid.cmp(&x.bonded_argons);
+						let comp = bid.cmp(&x.bid);
 						match comp {
 							Ordering::Equal => Ordering::Less,
 							Ordering::Greater => Ordering::Greater,
@@ -517,12 +460,15 @@ pub mod pallet {
 					.try_insert(
 						pos,
 						MiningRegistration {
-							account_id: miner_account.clone(),
+							account_id: miner_account_id.clone(),
 							reward_destination,
-							obligation_id,
-							bonded_argons: bid,
+							external_funding_account: if miner_account_id == funding_account {
+								None
+							} else {
+								Some(funding_account)
+							},
+							bid,
 							argonots: ownership_tokens,
-							reward_sharing,
 							authority_keys: keys,
 							cohort_id: next_cohort_id,
 						},
@@ -542,23 +488,13 @@ pub mod pallet {
 				});
 				AuthorityIdToMinerId::<T>::insert(
 					miner_authority_id.clone(),
-					miner_account.clone(),
+					miner_account_id.clone(),
 				);
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
-					account_id: miner_account.clone(),
+					account_id: miner_account_id.clone(),
 					bid_amount: bid,
 					index: UniqueSaturatedInto::<u32>::unique_saturated_into(pos),
 				});
-
-				if cohort.len() > T::MaxCohortSize::get() as usize {
-					let bumped_bidder = &cohort[T::MaxCohortSize::get() as usize];
-
-					Self::deposit_event(Event::<T>::SlotBidderOut {
-						account_id: bumped_bidder.account_id.clone(),
-						bid_amount: bumped_bidder.bonded_argons,
-						obligation_id: bumped_bidder.obligation_id,
-					});
-				}
 
 				Ok(())
 			})?;
@@ -607,36 +543,24 @@ pub mod pallet {
 	}
 }
 impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
-	fn get_rewards_account(
-		author: &T::AccountId,
-	) -> (Option<T::AccountId>, Option<RewardSharing<T::AccountId>>) {
-		let Some(registration) = Self::get_active_registration(author) else {
-			return (None, None);
-		};
+	fn get_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, CohortId)> {
+		let registration = Self::get_active_registration(author)?;
 
 		let reward_account = match registration.reward_destination {
 			RewardDestination::Owner => registration.account_id,
 			RewardDestination::Account(reward_id) => reward_id,
 		};
-		(Some(reward_account), registration.reward_sharing.clone())
+		Some((reward_account, registration.cohort_id))
 	}
 
-	fn get_all_rewards_accounts() -> Vec<(T::AccountId, Option<RewardShare>)> {
+	fn get_all_rewards_accounts() -> Vec<T::AccountId> {
 		let mut result = vec![];
 		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
 			let account = match registration.reward_destination {
 				RewardDestination::Owner => registration.account_id,
 				RewardDestination::Account(reward_id) => reward_id,
 			};
-			if let Some(reward_sharing) = registration.reward_sharing {
-				result.push((
-					account,
-					Some(FixedU128::one().saturating_sub(reward_sharing.percent_take)),
-				));
-				result.push((reward_sharing.account_id, Some(reward_sharing.percent_take)));
-			} else {
-				result.push((account, None));
-			}
+			result.push(account);
 		}
 		result
 	}
@@ -705,26 +629,13 @@ impl<T: Config> Pallet<T> {
 		let start_index_to_replace_miners =
 			Self::get_slot_starting_index(cohort_id, max_miners, cohort_size);
 
-		let mut all_bids = NextSlotCohort::<T>::take();
-		let max_size = (cohort_size as usize).min(all_bids.len());
-		let slot_cohort = all_bids.drain(..max_size).collect::<Vec<_>>();
-		for failed_bid in all_bids {
-			let res = with_storage_layer(|| Self::release_failed_bid(&failed_bid));
-			if let Err(e) = res {
-				log::error!(
-					"Failed to release failed bid for {:?}: {:?}",
-					failed_bid.account_id.clone(),
-					e
-				);
-				Self::deposit_event(Event::<T>::ReleaseBidError {
-					account_id: failed_bid.account_id,
-					obligation_id: failed_bid.obligation_id,
-					error: e,
-				});
-			}
-		}
+		let slot_cohort = NextSlotCohort::<T>::take();
+
+		// if we never vrf closed, we need to rotate the pool
+		let needs_vault_bid_pool_rotation = IsNextSlotBiddingOpen::<T>::get();
 
 		IsNextSlotBiddingOpen::<T>::put(true);
+
 		let mut active_miners = ActiveMinersCount::<T>::get();
 		let mut authority_hash_by_index = AuthorityHashByIndex::<T>::get();
 		let mut added_miners = vec![];
@@ -740,11 +651,6 @@ impl<T: Config> Pallet<T> {
 				active_miners -= 1;
 
 				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
-				if let Some(authority_id) =
-					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				{
-					AuthorityIdToMinerId::<T>::remove(authority_id);
-				}
 				removed_miners.push((account_id, entry.authority_keys.clone()));
 				Self::release_mining_seat_obligations(entry, registered_for_next);
 			}
@@ -770,11 +676,16 @@ impl<T: Config> Pallet<T> {
 
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
-			new_miners: BoundedVec::truncate_from(slot_cohort),
+			new_miners: slot_cohort,
 			cohort_id,
 		});
 		LastActivatedCohortId::<T>::put(cohort_id);
 		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
+		T::SlotEvents::on_new_cohort(cohort_id);
+		if needs_vault_bid_pool_rotation {
+			let end_tick = T::TickProvider::current_tick() + Self::mining_window_ticks();
+			T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
+		}
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
@@ -869,6 +780,8 @@ impl<T: Config> Pallet<T> {
 			info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
 			let cohort_id = LastActivatedCohortId::<T>::get() + 1;
 			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_id });
+			let end_tick = Self::get_next_slot_tick() + Self::mining_window_ticks();
+			T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
 			return true
 		}
 
@@ -984,35 +897,36 @@ impl<T: Config> Pallet<T> {
 		Ok(argonots)
 	}
 
-	pub(crate) fn release_failed_bid(registration: &Registration<T>) -> DispatchResult {
-		let account_id = registration.account_id.clone();
+	pub(crate) fn send_argons_to_pool(
+		miner_funding_account: &T::AccountId,
+		bid_amount: T::Balance,
+	) -> Result<T::Balance, DispatchError> {
+		let bid_registration = Self::get_pending_cohort_registration(miner_funding_account);
+		let mut needed = bid_amount;
 
-		if let Some(obligation_id) = registration.obligation_id {
-			T::BondedArgonsProvider::cancel_bonded_argons(obligation_id)
-				.map_err(Error::<T>::from)?;
+		// if we've already held for next, reduce now
+		if let Some(existing) = bid_registration {
+			ensure!(bid_amount > existing.bid, Error::<T>::BidCannotBeReduced);
+			needed -= existing.bid;
 		}
-
-		let mut held_argonots = false;
-		let mut amount_to_unhold: T::Balance = registration.argonots;
-		if let Some(active) = Self::get_active_registration(&account_id) {
-			amount_to_unhold -= active.argonots;
-			held_argonots = true;
-		} else if let Some(authority_id) = registration
-			.authority_keys
-			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-		{
-			AuthorityIdToMinerId::<T>::remove(authority_id);
+		if needed > 0u32.into() {
+			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			ensure!(
+				T::ArgonCurrency::reducible_balance(
+					miner_funding_account,
+					Preservation::Preserve,
+					Fortitude::Force
+				) >= needed,
+				Error::<T>::InsufficientFunds
+			);
+			T::ArgonCurrency::transfer(
+				miner_funding_account,
+				&pool_account,
+				needed,
+				Preservation::Preserve,
+			)?;
 		}
-
-		Self::release_argonots_hold(&account_id, amount_to_unhold)?;
-
-		Self::deposit_event(Event::<T>::SlotBidderDropped {
-			account_id,
-			obligation_id: registration.obligation_id,
-			preserved_argonot_hold: held_argonots,
-		});
-
-		Ok(())
+		Ok(needed)
 	}
 
 	fn release_argonots_hold(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
@@ -1036,17 +950,32 @@ impl<T: Config> Pallet<T> {
 		is_registered_for_next: bool,
 	) {
 		let account_id = active_registration.account_id;
-		let active_obligation_id = active_registration.obligation_id;
+
+		let funding_account =
+			active_registration.external_funding_account.unwrap_or(account_id.clone());
 
 		let mut preserved_argonot_hold = true;
 		if !is_registered_for_next {
 			preserved_argonot_hold = false;
 
-			if let Err(e) = Self::release_argonots_hold(&account_id, active_registration.argonots) {
-				log::error!("Failed to release argonots from account {:?}. {:?}", account_id, e,);
+			if let Some(authority_id) = active_registration
+				.authority_keys
+				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+			{
+				AuthorityIdToMinerId::<T>::remove(authority_id);
+			}
+
+			if let Err(e) =
+				Self::release_argonots_hold(&funding_account, active_registration.argonots)
+			{
+				log::error!(
+					"Failed to release argonots from funding account {:?} (account {:?}). {:?}",
+					funding_account,
+					account_id,
+					e,
+				);
 				Self::deposit_event(Event::<T>::ReleaseMinerSeatError {
 					account_id: account_id.clone(),
-					obligation_id: active_obligation_id,
 					error: e,
 				});
 				return;
@@ -1055,9 +984,47 @@ impl<T: Config> Pallet<T> {
 
 		Self::deposit_event(Event::<T>::ReleasedMinerSeat {
 			account_id: account_id.clone(),
-			obligation_id: active_obligation_id,
 			preserved_argonot_hold,
 		});
+	}
+
+	pub(crate) fn release_failed_bid(registration: &Registration<T>) -> DispatchResult {
+		let funding_account = registration
+			.external_funding_account
+			.clone()
+			.unwrap_or(registration.account_id.clone());
+		let account_id = registration.account_id.clone();
+
+		if registration.bid > T::Balance::zero() {
+			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			T::ArgonCurrency::transfer(
+				&pool_account,
+				&funding_account,
+				registration.bid,
+				Preservation::Expendable,
+			)?;
+		}
+
+		let mut held_argonots = false;
+		let mut argonots_to_unhold: T::Balance = registration.argonots;
+		if let Some(active) = Self::get_active_registration(&account_id) {
+			argonots_to_unhold -= active.argonots;
+			held_argonots = true;
+		} else if let Some(authority_id) = registration
+			.authority_keys
+			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
+		{
+			AuthorityIdToMinerId::<T>::remove(authority_id);
+		}
+
+		Self::release_argonots_hold(&funding_account, argonots_to_unhold)?;
+
+		Self::deposit_event(Event::<T>::SlotBidderDropped {
+			account_id,
+			preserved_argonot_hold: held_argonots,
+		});
+
+		Ok(())
 	}
 
 	fn ticks_between_slots() -> Tick {
@@ -1112,17 +1079,6 @@ where
 	closest
 }
 
-#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
-pub struct MinerHistory {
-	pub authority_index: MinerIndex,
-}
-
-#[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo)]
-pub struct MiningSlotBid<VaultId: Codec, Balance: Codec> {
-	pub vault_id: VaultId,
-	pub amount: Balance,
-}
-
 impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 	type Public = T::MiningAuthorityId;
 }
@@ -1131,46 +1087,5 @@ sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
 	pub trait MiningSlotApi {
 		fn next_slot_era() -> (Tick, Tick);
-	}
-}
-
-pub trait OnNewSlot<AccountId> {
-	type Key: Decode + RuntimeAppPublic;
-	fn rotate_grandpas(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(&AccountId, Self::Key)>,
-		added_authorities: Vec<(&AccountId, Self::Key)>,
-	);
-}
-
-pub trait SlotEvents<AccountId> {
-	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(AccountId, Ks)>,
-		added_authorities: Vec<(AccountId, Ks)>,
-	);
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
-#[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
-impl<AId> SlotEvents<AId> for Tuple {
-	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_cohort_id: CohortId,
-		removed_authorities: Vec<(AId, Ks)>,
-		added_authorities: Vec<(AId, Ks)>,
-	) {
-		for_tuples!(
-		#(
-			let removed_keys =
-				removed_authorities.iter().filter_map(|k| {
-					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
-				}).collect::<Vec<_>>();
-			let added_keys  =
-				added_authorities.iter().filter_map(|k| {
-					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
-				}).collect::<Vec<_>>();
-			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
-		)*
-		)
 	}
 }
