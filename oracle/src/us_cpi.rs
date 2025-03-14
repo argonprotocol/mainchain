@@ -371,7 +371,7 @@ pub(crate) async fn use_mock_cpi_values(cpi_offsets: Vec<f64>) {
 	let schedule = load_cpi_schedule().await.expect("should load schedule");
 
 	let mut mock = MOCK_RAW_CPIS.lock().unwrap();
-	let base_cpi = BASELINE_CPI.clone();
+	let base_cpi = *BASELINE_CPI;
 	*mock = Some(
 		cpi_offsets
 			.into_iter()
@@ -422,7 +422,7 @@ mod tests {
 
 	#[test]
 	fn test_can_smooth_out_cpi() {
-		let previous_cpi = BASELINE_CPI.clone();
+		let previous_cpi = *BASELINE_CPI;
 		let ticker = Ticker::new(60_000, 2);
 
 		let mut retriever = UsCpiRetriever {

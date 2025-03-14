@@ -118,7 +118,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 
 		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::SatoshisMismatch));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(lock.is_rejected_needs_release, true);
+		assert!(lock.is_rejected_needs_release);
 
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
 		assert_ok!(BitcoinLocks::request_release(
