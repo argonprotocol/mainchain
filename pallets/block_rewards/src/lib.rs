@@ -13,6 +13,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 pub mod weights;
 
 /// (Incremental increase per block, blocks between increments, max value)
@@ -27,21 +28,20 @@ pub mod pallet {
 		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
 	};
 	use frame_system::pallet_prelude::*;
-	use log::info;
+	use log::{info, trace};
 	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, One, UniqueSaturatedInto},
+		traits::{AtLeast32BitUnsigned, One, UniqueSaturatedInto, Zero},
 		FixedPointNumber, FixedU128, Saturating,
 	};
 
 	use super::*;
 	use argon_primitives::{
-		block_seal::{BlockPayout, BlockRewardType},
+		block_seal::{BlockPayout, BlockRewardType, CohortId},
 		notary::NotaryProvider,
 		tick::Tick,
-		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerProvider,
-		NotebookProvider, TickProvider,
+		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
+		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 	};
-	use sp_arithmetic::per_things::SignedRounding;
 
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
@@ -49,7 +49,10 @@ pub mod pallet {
 		MaturationPeriod,
 	}
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -83,6 +86,7 @@ pub mod pallet {
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
 		type NotaryProvider: NotaryProvider<Self::Block, Self::AccountId>;
 		type NotebookProvider: NotebookProvider;
+		type PriceProvider: PriceProvider<Self::Balance>;
 		/// Get a tick provider
 		type TickProvider: TickProvider<Self::Block>;
 
@@ -110,14 +114,24 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinerPayoutPercent: Get<FixedU128>;
 
-		/// Blocks until a block reward is mature
-		#[pallet::constant]
-		type MaturationBlocks: Get<u32>;
 		/// The overarching freeze reason.
 		type RuntimeFreezeReason: From<FreezeReason>;
 		type EventHandler: BlockRewardsEventHandler<Self::AccountId, Self::Balance>;
+
+		/// The number of argons to cohort id entries to keep in history
+		type CohortBlockRewardsToKeep: Get<u32>;
+
+		/// The number of blocks to keep payouts in history
+		type PayoutHistoryBlocks: Get<u32>;
+
+		/// Slot full duration of a slot
+		type SlotWindowTicks: Get<Tick>;
+
+		/// A percent reduction in mining argons vs the mint amount
+		type PerBlockArgonReducerPercent: Get<FixedU128>;
 	}
 
+	/// Historical payouts by block number
 	#[pallet::storage]
 	pub(super) type PayoutsByBlock<T: Config> = StorageMap<
 		_,
@@ -131,22 +145,24 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+	/// The cohort block rewards
+	#[pallet::storage]
+	pub(super) type BlockRewardsByCohort<T: Config> = StorageValue<
+		_,
+		BoundedVec<(CohortId, T::Balance), T::CohortBlockRewardsToKeep>,
+		ValueQuery,
+	>;
+
+	/// The current scaled block rewards. It will adjust based on the argon movement away from price
+	/// target
+	#[pallet::storage]
+	pub(super) type ArgonsPerBlock<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		RewardCreated {
-			maturation_block: BlockNumberFor<T>,
 			rewards: Vec<BlockPayout<T::AccountId, T::Balance>>,
-		},
-		RewardUnlocked {
-			rewards: Vec<BlockPayout<T::AccountId, T::Balance>>,
-		},
-
-		RewardUnlockError {
-			account_id: T::AccountId,
-			argons: Option<T::Balance>,
-			ownership: Option<T::Balance>,
-			error: DispatchError,
 		},
 		RewardCreateError {
 			account_id: T::AccountId,
@@ -175,40 +191,19 @@ pub mod pallet {
 	{
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			// Unlock any rewards
-			let unlocks = <PayoutsByBlock<T>>::take(n);
-			for reward in unlocks.iter() {
-				if let Err(e) =
-					Self::unfreeze_amount::<T::ArgonCurrency>(&reward.account_id, reward.argons)
-				{
-					log::error!("Failed to unfreeze argons for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::RewardUnlockError {
-						account_id: reward.account_id.clone(),
-						argons: Some(reward.argons),
-						ownership: None,
-						error: e,
-					});
-				}
+			let cleanup_block = n.saturating_sub(T::PayoutHistoryBlocks::get().into());
+			<PayoutsByBlock<T>>::take(cleanup_block);
 
-				if let Err(e) = Self::unfreeze_amount::<T::OwnershipCurrency>(
-					&reward.account_id,
-					reward.ownership,
-				) {
-					log::error!("Failed to unfreeze ownership for reward: {:?}, {:?}", reward, e);
-					Self::deposit_event(Event::RewardUnlockError {
-						account_id: reward.account_id.clone(),
-						argons: None,
-						ownership: Some(reward.ownership),
-						error: e,
-					});
-				}
-			}
-			if unlocks.len() > 0 {
-				Self::deposit_event(Event::RewardUnlocked { rewards: unlocks.to_vec() });
-			}
-			T::DbWeight::get().reads_writes(0, 0)
+			T::DbWeight::get().reads_writes(1, 1)
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
+			let elapsed_ticks = T::TickProvider::elapsed_ticks();
+			let minimums = Self::get_minimum_reward_amounts(elapsed_ticks);
+
+			// adjust the block rewards
+			Self::adjust_block_argons(minimums.argons);
+
 			if <BlockRewardsPaused<T>>::get() {
 				return;
 			}
@@ -219,51 +214,21 @@ pub mod pallet {
 				info!("Compute block is not eligible for rewards");
 				return;
 			}
+
 			let authors = T::BlockSealerProvider::get_sealer_info();
-
-			let elapsed_ticks = T::TickProvider::elapsed_ticks();
-			let RewardAmounts { argons, ownership } = Self::get_reward_amounts(elapsed_ticks);
-
-			let mut block_ownership = ownership.into();
-			let mut block_argons = argons.into();
-
-			let active_notaries = T::NotaryProvider::active_notaries().len() as u128;
-			let block_notebooks = T::NotebookProvider::notebooks_in_block();
-			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
-			let tick_notebooks = block_notebooks.iter().fold(0u128, |acc, (_, _, tick)| {
-				if *tick == notebook_tick {
-					acc + 1u128
-				} else {
-					acc
-				}
-			});
-
-			if active_notaries > tick_notebooks {
-				if tick_notebooks == 0 {
-					block_ownership = 1u128;
-					block_argons = 1u128;
-				} else {
-					block_ownership =
-						block_ownership.saturating_mul(tick_notebooks) / active_notaries;
-					block_argons = block_argons.saturating_mul(tick_notebooks) / active_notaries;
-				}
-			}
-
-			let block_ownership: T::Balance = block_ownership.into();
-			let block_argons: T::Balance = block_argons.into();
+			let assigned_rewards_account = T::BlockRewardAccountsProvider::get_rewards_account(
+				&authors.block_author_account_id,
+			);
+			let (miner_reward_account, cohort_id) =
+				assigned_rewards_account.unwrap_or((authors.block_author_account_id.clone(), 0));
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
-			let miner_ownership: T::Balance =
-				Self::saturating_mul_ceil(miner_percent, block_ownership);
-			let miner_argons: T::Balance = Self::saturating_mul_ceil(miner_percent, block_argons);
+			let RewardAmounts { argons: block_argons, ownership: block_ownership } =
+				Self::calculate_reward_amounts(cohort_id, minimums);
 
-			let (assigned_rewards_account, reward_sharing) =
-				T::BlockRewardAccountsProvider::get_rewards_account(
-					&authors.block_author_account_id,
-				);
-			let miner_reward_account =
-				assigned_rewards_account.unwrap_or(authors.block_author_account_id.clone());
+			let miner_ownership = miner_percent.saturating_mul_int(block_ownership);
+			let miner_argons = miner_percent.saturating_mul_int(block_argons);
 
 			let mut rewards: Vec<BlockPayout<T::AccountId, T::Balance>> = vec![BlockPayout {
 				account_id: miner_reward_account.clone(),
@@ -272,18 +237,6 @@ pub mod pallet {
 				ownership: miner_ownership,
 				argons: miner_argons,
 			}];
-			if let Some(sharing) = reward_sharing {
-				let sharing_amount: T::Balance =
-					Self::saturating_mul_ceil(sharing.percent_take, miner_argons);
-				rewards[0].argons = miner_argons.saturating_sub(sharing_amount);
-				rewards.push(BlockPayout {
-					account_id: sharing.account_id,
-					reward_type: BlockRewardType::ProfitShare,
-					block_seal_authority: None,
-					ownership: 0u128.into(),
-					argons: sharing_amount,
-				});
-			}
 
 			if let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account {
 				rewards.push(BlockPayout {
@@ -295,11 +248,10 @@ pub mod pallet {
 				});
 			}
 
-			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
 			for reward in rewards.iter_mut() {
 				let start_argons = reward.argons;
 				let start_ownership = reward.ownership;
-				if let Err(e) = Self::mint_and_freeze::<T::ArgonCurrency>(reward) {
+				if let Err(e) = Self::mint::<T::ArgonCurrency>(reward) {
 					log::error!("Failed to mint argons for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
@@ -308,7 +260,7 @@ pub mod pallet {
 						error: e,
 					});
 				}
-				if let Err(e) = Self::mint_and_freeze::<T::OwnershipCurrency>(reward) {
+				if let Err(e) = Self::mint::<T::OwnershipCurrency>(reward) {
 					log::error!("Failed to mint ownership for reward: {:?}, {:?}", reward, e);
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
@@ -318,6 +270,7 @@ pub mod pallet {
 					});
 				}
 			}
+
 			let rewards = rewards
 				.iter()
 				.filter(|r| r.argons > 0u128.into() || r.ownership > 0u128.into())
@@ -325,12 +278,9 @@ pub mod pallet {
 				.collect::<Vec<_>>();
 
 			if !rewards.is_empty() {
-				Self::deposit_event(Event::RewardCreated {
-					maturation_block: reward_height,
-					rewards: rewards.clone(),
-				});
+				Self::deposit_event(Event::RewardCreated { rewards: rewards.clone() });
 				T::EventHandler::rewards_created(&rewards);
-				<PayoutsByBlock<T>>::insert(reward_height, BoundedVec::truncate_from(rewards));
+				<PayoutsByBlock<T>>::insert(n, BoundedVec::truncate_from(rewards));
 			}
 		}
 	}
@@ -355,20 +305,12 @@ pub mod pallet {
 		/// together)
 		pub fn block_payouts() -> Vec<BlockPayout<T::AccountId, T::Balance>> {
 			let n = <frame_system::Pallet<T>>::block_number();
-			let reward_height = n.saturating_add(T::MaturationBlocks::get().into());
-			let rewards = <PayoutsByBlock<T>>::get(reward_height);
-			rewards.to_vec()
+			<PayoutsByBlock<T>>::get(n).to_vec()
 		}
 
-		pub fn mint_and_freeze<
-			C: MutateFreeze<T::AccountId, Balance = T::Balance>
-				+ Mutate<T::AccountId, Balance = T::Balance>
-				+ InspectFreeze<T::AccountId, Balance = T::Balance, Id = T::RuntimeFreezeReason>
-				+ 'static,
-		>(
+		pub fn mint<C: Mutate<T::AccountId, Balance = T::Balance> + 'static>(
 			reward: &mut BlockPayout<T::AccountId, T::Balance>,
 		) -> DispatchResult {
-			let freeze_id = FreezeReason::MaturationPeriod.into();
 			let is_ownership = TypeId::of::<C>() == TypeId::of::<T::OwnershipCurrency>();
 			let amount = if is_ownership { reward.ownership } else { reward.argons };
 			if amount == 0u128.into() {
@@ -383,35 +325,10 @@ pub mod pallet {
 				}
 			})?;
 
-			let frozen = C::balance_frozen(&freeze_id, &reward.account_id);
-			C::set_freeze(&freeze_id, &reward.account_id, amount + frozen)?;
 			Ok(())
 		}
 
-		pub fn unfreeze_amount<
-			C: MutateFreeze<T::AccountId, Balance = T::Balance>
-				+ InspectFreeze<T::AccountId, Balance = T::Balance, Id = T::RuntimeFreezeReason>,
-		>(
-			account: &T::AccountId,
-			amount: T::Balance,
-		) -> DispatchResult {
-			let freeze_id = FreezeReason::MaturationPeriod.into();
-			let frozen = C::balance_frozen(&freeze_id, account);
-			C::set_freeze(&freeze_id, account, frozen.saturating_sub(amount))?;
-			Ok(())
-		}
-
-		fn saturating_mul_ceil(percent: FixedU128, balance: T::Balance) -> T::Balance {
-			let other =
-				FixedU128::from_u32(UniqueSaturatedInto::<u32>::unique_saturated_into(balance));
-
-			percent
-				.const_checked_mul_with_rounding(other, SignedRounding::High)
-				.unwrap_or_default()
-				.saturating_mul_int(T::Balance::one())
-		}
-
-		pub(crate) fn get_reward_amounts(elapsed_ticks: Tick) -> RewardAmounts<T> {
+		pub(crate) fn get_minimum_reward_amounts(elapsed_ticks: Tick) -> RewardAmounts<T> {
 			let (increment, ticks_between_increments, final_starting_amount) =
 				T::IncrementalGrowth::get();
 
@@ -437,6 +354,83 @@ pub mod pallet {
 				argons: (start_block_argons + increment_sum).into(),
 				ownership: (start_block_ownership + increment_sum).into(),
 			}
+		}
+
+		pub(crate) fn adjust_block_argons(argon_minimum: T::Balance) {
+			let liquidity_change =
+				T::PriceProvider::get_liquidity_change_needed().unwrap_or_default();
+			let mut block_argons = ArgonsPerBlock::<T>::get();
+
+			let mining_window = T::SlotWindowTicks::get();
+			let rewards_change = T::PerBlockArgonReducerPercent::get().saturating_mul_int(
+				liquidity_change.saturating_div(mining_window.unique_saturated_into()),
+			);
+			let change_amount: T::Balance = rewards_change.unsigned_abs().into();
+			if rewards_change.is_negative() {
+				block_argons = block_argons.saturating_sub(change_amount);
+			} else {
+				block_argons = block_argons.saturating_add(change_amount);
+			}
+
+			if !rewards_change.is_zero() {
+				trace!(
+					"Argons per block adjusted to {:?} (change: {:?})",
+					block_argons,
+					rewards_change
+				);
+			}
+
+			ArgonsPerBlock::<T>::put(block_argons.max(argon_minimum));
+		}
+
+		pub(crate) fn calculate_reward_amounts(
+			cohort_id: CohortId,
+			minimums: RewardAmounts<T>,
+		) -> RewardAmounts<T> {
+			let mut block_ownership = minimums.ownership;
+			let mut block_argons = BlockRewardsByCohort::<T>::get()
+				.iter()
+				.find(|x| x.0 == cohort_id)
+				.map(|x| x.1)
+				.unwrap_or(minimums.argons);
+
+			let active_notaries: T::Balance =
+				T::NotaryProvider::active_notaries().len().unique_saturated_into();
+			let block_notebooks = T::NotebookProvider::notebooks_in_block();
+			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
+			let tick_notebooks =
+				block_notebooks.iter().fold(T::Balance::zero(), |acc, (_, _, tick)| {
+					if *tick == notebook_tick {
+						acc + T::Balance::one()
+					} else {
+						acc
+					}
+				});
+
+			if active_notaries > tick_notebooks {
+				if tick_notebooks == Zero::zero() {
+					block_ownership = T::Balance::one();
+					block_argons = T::Balance::one();
+				} else {
+					block_ownership =
+						block_ownership.saturating_mul(tick_notebooks) / active_notaries;
+					block_argons = block_argons.saturating_mul(tick_notebooks) / active_notaries;
+				}
+			}
+
+			RewardAmounts { ownership: block_ownership, argons: block_argons }
+		}
+	}
+
+	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
+		type Key = BlockSealAuthorityId;
+		fn on_new_cohort(cohort_id: CohortId) {
+			let _ = BlockRewardsByCohort::<T>::mutate(|rewards| {
+				if rewards.is_full() {
+					rewards.remove(0);
+				}
+				rewards.try_push((cohort_id + 1, ArgonsPerBlock::<T>::get()))
+			});
 		}
 	}
 }

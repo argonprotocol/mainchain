@@ -13,9 +13,17 @@ pub mod prelude {
 	pub use crate::config::*;
 	pub use alloc::{boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
-		apis::*, bitcoin::*, block_seal::*, digests::*, notary::*, note::*, notebook::*,
-		prelude::*, providers::*, tick::Ticker, Balance, BlockHash, BlockVotingKey, HashOutput,
-		Nonce, Signature, VotingKey,
+		apis::*,
+		bitcoin::*,
+		block_seal::*,
+		digests::*,
+		notary::*,
+		note::*,
+		notebook::*,
+		prelude::*,
+		providers::{OnNewSlot, *},
+		tick::Ticker,
+		Balance, BlockHash, BlockVotingKey, HashOutput, Nonce, Signature, VotingKey,
 	};
 	pub use frame_support::{
 		construct_runtime, derive_impl,
@@ -52,7 +60,6 @@ pub mod prelude {
 	pub use ismp::host::StateMachine;
 	pub use pallet_bitcoin_locks::BitcoinVerifier;
 	pub use pallet_block_rewards::GrowthPath;
-	pub use pallet_mining_slot::OnNewSlot;
 	pub use pallet_notebook::NotebookVerifyError;
 	pub use pallet_tx_pause::RuntimeCallNameOf;
 	pub use sp_api::{decl_runtime_apis, impl_runtime_apis};
@@ -82,7 +89,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 115,
+			spec_version: 116,
 			impl_version: 6,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 2,
@@ -120,8 +127,9 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_bitcoin_locks::migrations::RejectedBitcoinMigration<Runtime>,
-			pallet_price_index::migrations::PriceIndexTwal<Runtime>,
+			pallet_mining_slot::migrations::BiddingMigration<Runtime>,
+			pallet_vaults::migrations::BondedBitcoinBidPoolMigration<Runtime>,
+			pallet_block_rewards::migrations::RewardFreezeMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

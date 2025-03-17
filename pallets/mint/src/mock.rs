@@ -5,9 +5,7 @@ use sp_arithmetic::{FixedI128, FixedU128};
 use sp_runtime::BuildStorage;
 
 use crate as pallet_mint;
-use argon_primitives::{
-	block_seal::RewardSharing, BlockRewardAccountsProvider, PriceProvider, RewardShare,
-};
+use argon_primitives::{block_seal::CohortId, BlockRewardAccountsProvider, PriceProvider};
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -53,7 +51,7 @@ parameter_types! {
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
-	pub static MinerRewardsAccounts: Vec<(u64, Option<RewardShare>)> = vec![];
+	pub static MinerRewardsAccounts: Vec<u64> = vec![];
 	pub static UniswapLiquidity: Balance = 100_000;
 }
 
@@ -75,11 +73,11 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_rewards_account(_author: &u64) -> (Option<u64>, Option<RewardSharing<u64>>) {
+	fn get_rewards_account(_author: &u64) -> Option<(u64, CohortId)> {
 		todo!("not used by mint")
 	}
 
-	fn get_all_rewards_accounts() -> Vec<(u64, Option<RewardShare>)> {
+	fn get_all_rewards_accounts() -> Vec<u64> {
 		MinerRewardsAccounts::get()
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {

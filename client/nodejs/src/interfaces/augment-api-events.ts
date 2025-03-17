@@ -357,36 +357,10 @@ declare module '@polkadot/api-base/types/events' {
     blockRewards: {
       RewardCreated: AugmentedEvent<
         ApiType,
-        [
-          maturationBlock: u32,
-          rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>,
-        ],
-        {
-          maturationBlock: u32;
-          rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>;
-        }
-      >;
-      RewardCreateError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          argons: Option<u128>,
-          ownership: Option<u128>,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          argons: Option<u128>;
-          ownership: Option<u128>;
-          error: SpRuntimeDispatchError;
-        }
-      >;
-      RewardUnlocked: AugmentedEvent<
-        ApiType,
         [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>],
         { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }
       >;
-      RewardUnlockError: AugmentedEvent<
+      RewardCreateError: AugmentedEvent<
         ApiType,
         [
           accountId: AccountId32,
@@ -826,42 +800,18 @@ declare module '@polkadot/api-base/types/events' {
       >;
       ReleaseBidError: AugmentedEvent<
         ApiType,
-        [
-          accountId: AccountId32,
-          obligationId: Option<u64>,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          obligationId: Option<u64>;
-          error: SpRuntimeDispatchError;
-        }
+        [accountId: AccountId32, error: SpRuntimeDispatchError],
+        { accountId: AccountId32; error: SpRuntimeDispatchError }
       >;
       ReleasedMinerSeat: AugmentedEvent<
         ApiType,
-        [
-          accountId: AccountId32,
-          obligationId: Option<u64>,
-          preservedArgonotHold: bool,
-        ],
-        {
-          accountId: AccountId32;
-          obligationId: Option<u64>;
-          preservedArgonotHold: bool;
-        }
+        [accountId: AccountId32, preservedArgonotHold: bool],
+        { accountId: AccountId32; preservedArgonotHold: bool }
       >;
       ReleaseMinerSeatError: AugmentedEvent<
         ApiType,
-        [
-          accountId: AccountId32,
-          obligationId: Option<u64>,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          obligationId: Option<u64>;
-          error: SpRuntimeDispatchError;
-        }
+        [accountId: AccountId32, error: SpRuntimeDispatchError],
+        { accountId: AccountId32; error: SpRuntimeDispatchError }
       >;
       SlotBidderAdded: AugmentedEvent<
         ApiType,
@@ -870,21 +820,8 @@ declare module '@polkadot/api-base/types/events' {
       >;
       SlotBidderDropped: AugmentedEvent<
         ApiType,
-        [
-          accountId: AccountId32,
-          obligationId: Option<u64>,
-          preservedArgonotHold: bool,
-        ],
-        {
-          accountId: AccountId32;
-          obligationId: Option<u64>;
-          preservedArgonotHold: bool;
-        }
-      >;
-      SlotBidderOut: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, bidAmount: u128, obligationId: Option<u64>],
-        { accountId: AccountId32; bidAmount: u128; obligationId: Option<u64> }
+        [accountId: AccountId32, preservedArgonotHold: bool],
+        { accountId: AccountId32; preservedArgonotHold: bool }
       >;
     };
     mint: {
@@ -1552,6 +1489,66 @@ declare module '@polkadot/api-base/types/events' {
     };
     vaults: {
       /**
+       * Funds fro the active bid pool have been distributed
+       **/
+      BidPoolDistributed: AugmentedEvent<
+        ApiType,
+        [
+          cohortId: u64,
+          bidPoolDistributed: u128,
+          bidPoolBurned: u128,
+          bidPoolEntrants: u32,
+        ],
+        {
+          cohortId: u64;
+          bidPoolDistributed: u128;
+          bidPoolBurned: u128;
+          bidPoolEntrants: u32;
+        }
+      >;
+      /**
+       * An error occurred allocating the next bid pool
+       **/
+      CouldNotAllocateNextBidPool: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, dispatchError: SpRuntimeDispatchError],
+        { cohortId: u64; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
+       * An error occurred burning from the bid pool
+       **/
+      CouldNotBurnBidPool: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { cohortId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
+       * An error occurred distributing a bid pool
+       **/
+      CouldNotDistributeBidPool: AugmentedEvent<
+        ApiType,
+        [
+          cohortId: u64,
+          vaultId: u32,
+          amount: u128,
+          dispatchError: SpRuntimeDispatchError,
+        ],
+        {
+          cohortId: u64;
+          vaultId: u32;
+          amount: u128;
+          dispatchError: SpRuntimeDispatchError;
+        }
+      >;
+      /**
+       * The next bid pool has been allocated
+       **/
+      NextBidPoolAllocated: AugmentedEvent<
+        ApiType,
+        [bondedBitcoinPool: u128, bidPoolEntrants: u32],
+        { bondedBitcoinPool: u128; bidPoolEntrants: u32 }
+      >;
+      /**
        * An error occurred releasing a base fee hold
        **/
       ObligationBaseFeeMaturationError: AugmentedEvent<
@@ -1588,8 +1585,13 @@ declare module '@polkadot/api-base/types/events' {
       >;
       ObligationCompleted: AugmentedEvent<
         ApiType,
-        [vaultId: u32, obligationId: u64],
-        { vaultId: u32; obligationId: u64 }
+        [vaultId: u32, obligationId: u64, returnedFee: u128, releasedFee: u128],
+        {
+          vaultId: u32;
+          obligationId: u64;
+          returnedFee: u128;
+          releasedFee: u128;
+        }
       >;
       /**
        * An error occurred while completing an obligation
@@ -1628,28 +1630,18 @@ declare module '@polkadot/api-base/types/events' {
         [vaultId: u32],
         { vaultId: u32 }
       >;
-      VaultBondedArgonsChangeScheduled: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, changeTick: u64],
-        { vaultId: u32; changeTick: u64 }
-      >;
-      VaultBondedArgonsIncreased: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, bondedArgons: u128],
-        { vaultId: u32; bondedArgons: u128 }
-      >;
       VaultClosed: AugmentedEvent<
         ApiType,
         [
           vaultId: u32,
-          bitcoinAmountStillReserved: u128,
-          miningAmountStillReserved: u128,
+          lockedBitcoinAmountStillReserved: u128,
+          bondedBitcoinAmountStillReserved: u128,
           securitizationStillReserved: u128,
         ],
         {
           vaultId: u32;
-          bitcoinAmountStillReserved: u128;
-          miningAmountStillReserved: u128;
+          lockedBitcoinAmountStillReserved: u128;
+          bondedBitcoinAmountStillReserved: u128;
           securitizationStillReserved: u128;
         }
       >;
@@ -1657,16 +1649,16 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           vaultId: u32,
-          bitcoinArgons: u128,
-          bondedArgons: u128,
+          lockedBitcoinArgons: u128,
+          bondedBitcoinArgons: u128,
           addedSecuritizationPercent: u128,
           operatorAccountId: AccountId32,
           activationTick: u64,
         ],
         {
           vaultId: u32;
-          bitcoinArgons: u128;
-          bondedArgons: u128;
+          lockedBitcoinArgons: u128;
+          bondedBitcoinArgons: u128;
           addedSecuritizationPercent: u128;
           operatorAccountId: AccountId32;
           activationTick: u64;
@@ -1676,14 +1668,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           vaultId: u32,
-          bitcoinArgons: u128,
-          bondedArgons: u128,
+          lockedBitcoinArgons: u128,
+          bondedBitcoinArgons: u128,
           addedSecuritizationPercent: u128,
         ],
         {
           vaultId: u32;
-          bitcoinArgons: u128;
-          bondedArgons: u128;
+          lockedBitcoinArgons: u128;
+          bondedBitcoinArgons: u128;
           addedSecuritizationPercent: u128;
         }
       >;

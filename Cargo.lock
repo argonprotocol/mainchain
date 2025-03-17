@@ -12018,17 +12018,13 @@ name = "pallet-mining-slot"
 version = "1.0.17"
 dependencies = [
  "argon-primitives",
- "bip32",
- "bitcoin",
  "env_logger 0.11.6",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "impl-trait-for-tuples",
- "k256",
  "log",
  "pallet-balances",
- "pallet-vaults",
  "parity-scale-codec",
  "scale-info",
  "sp-api",

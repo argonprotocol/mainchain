@@ -203,9 +203,13 @@ impl pallet_block_rewards::Config for Runtime {
 	type HalvingTicks = HalvingTicks;
 	type HalvingBeginTick = HalvingBeginTick;
 	type MinerPayoutPercent = MinerPayoutPercent;
-	type MaturationBlocks = MaturationBlocks;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type EventHandler = Mint;
+	type PayoutHistoryBlocks = PayoutHistoryBlocks;
+	type PriceProvider = PriceIndex;
+	type CohortBlockRewardsToKeep = BlockRewardsCohortHistoryToKeep;
+	type SlotWindowTicks = SlotWindowTicks;
+	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 
 impl pallet_domains::Config for Runtime {
@@ -263,8 +267,11 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
-	type EnableRewardSharing = EnableRewardSharing;
 	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
+	type MaxBidPoolEntrants = ConstU32<100>;
+	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;
+	type PalletId = VaultBidPoolsOwnerPalletId;
+	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -339,13 +346,15 @@ impl pallet_mining_slot::Config for Runtime {
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
+	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BondedArgonsProvider = Vaults;
-	type SlotEvents = (GrandpaSlotRotation,);
+	type BidPoolProvider = Vaults;
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
 	type TickProvider = Ticks;
+	type BidIncrements = MiningSlotBidIncrement;
 }
 
 impl pallet_block_seal::Config for Runtime {

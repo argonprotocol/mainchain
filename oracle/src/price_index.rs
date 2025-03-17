@@ -190,7 +190,6 @@ pub async fn price_index_loop(
 #[cfg(test)]
 mod tests {
 	use alloy_primitives::Address;
-	use dotenv::dotenv;
 	use sp_core::{
 		crypto::{key_types::ACCOUNT, AccountId32},
 		sr25519, Pair,
@@ -218,16 +217,18 @@ mod tests {
 		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
 		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();
 		let account_id: AccountId32 = keypair.public().into();
-		dotenv().ok();
-		dotenv::from_filename("oracle/.env").ok();
+
+		const ARGON_TOKEN_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
+		const ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
+		env::set_var("ARGON_TOKEN_ADDRESS", ARGON_TOKEN_ADDRESS);
+		env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
+		env::set_var("INFURA_PROJECT_ID", "test");
 
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
 		spawn(price_index_loop(node.client.url.clone(), signer, false));
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
-		let argon_token_address =
-			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
-		let argon_address = Address::from_str(&argon_token_address).unwrap();
+		let argon_address = Address::from_str(ARGON_TOKEN_ADDRESS).unwrap();
 		use_mock_uniswap_prices(
 			argon_address,
 			vec![
@@ -237,9 +238,7 @@ mod tests {
 			],
 		);
 
-		let argonot_token_address =
-			env::var("ARGONOT_TOKEN_ADDRESS").expect("ARGONOT_TOKEN_ADDRESS must be set");
-		let argonot_address = Address::from_str(&argonot_token_address).unwrap();
+		let argonot_address = Address::from_str(ARGONOT_TOKEN_ADDRESS).unwrap();
 		use_mock_uniswap_prices(
 			argonot_address,
 			vec![

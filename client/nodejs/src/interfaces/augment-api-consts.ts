@@ -6,7 +6,7 @@
 import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
-import type { bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { Percent } from '@polkadot/types/interfaces/runtime';
 import type {
@@ -98,10 +98,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The growth path for both ownership and argons before halving
        **/
       incrementalGrowth: ITuple<[u128, u64, u128]> & AugmentedConst<ApiType>;
-      /**
-       * Blocks until a block reward is mature
-       **/
-      maturationBlocks: u32 & AugmentedConst<ApiType>;
       /**
        * Percent as a number out of 100 of the block reward that goes to the miner.
        **/
@@ -419,9 +415,10 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
-       * Is reward sharing enabled
+       * Max entrants allowed in the bid pool. This is only present because substrate prefers
+       * limits
        **/
-      enableRewardSharing: bool & AugmentedConst<ApiType>;
+      maxBidPoolEntrants: u32 & AugmentedConst<ApiType>;
       /**
        * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
        * single block
@@ -439,6 +436,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The number of ticks that a funding change will be delayed before it takes effect
        **/
       miningArgonIncreaseTickDelay: u64 & AugmentedConst<ApiType>;
+      /**
+       * A pallet id that is used to hold the bid pool
+       **/
+      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
        * Argon blocks per day
        **/

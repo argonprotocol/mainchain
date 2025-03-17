@@ -1,25 +1,25 @@
 use alloc::vec::Vec;
 
-use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
-use scale_info::TypeInfo;
-use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
-use sp_core::{RuntimeDebug, H256, U256};
-use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, UniqueSaturatedInto},
-	DispatchError, DispatchResult, FixedU128, Saturating,
-};
-
 use crate::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
-	block_seal::{BlockPayout, MiningAuthority, RewardSharing},
+	block_seal::{BlockPayout, CohortId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	vault::Obligation,
 	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
 	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
+};
+use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use scale_info::TypeInfo;
+use sp_application_crypto::RuntimeAppPublic;
+use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
+use sp_core::{RuntimeDebug, H256, U256};
+use sp_runtime::{
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys, UniqueSaturatedInto},
+	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 
 pub trait NotebookProvider {
@@ -81,7 +81,7 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
 		// flip price to get liquidity change needed
 		Some(
 			argon_cpi
-				.saturating_abs()
+				.mul(FixedI128::from(-1))
 				.saturating_mul_int(circulation as i128)
 				.saturating_div(MINT_TIME_SPREAD),
 		)
@@ -208,11 +208,9 @@ pub trait BlockSealerProvider<AccountId: FullCodec> {
 }
 
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
-	fn get_rewards_account(
-		author: &AccountId,
-	) -> (Option<AccountId>, Option<RewardSharing<AccountId>>);
+	fn get_rewards_account(author: &AccountId) -> Option<(AccountId, CohortId)>;
 	/// Returns all rewards accounts and the share they receive
-	fn get_all_rewards_accounts() -> Vec<(AccountId, Option<RewardShare>)>;
+	fn get_all_rewards_accounts() -> Vec<AccountId>;
 	/// Is a compute block still eligible for rewards?
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
@@ -223,7 +221,6 @@ pub trait MiningSlotProvider {
 	fn is_slot_bidding_started() -> bool;
 }
 
-pub type RewardShare = FixedU128;
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
@@ -292,5 +289,55 @@ impl<AccountId: Codec, Balance: Codec + MaxEncodedLen> BlockRewardsEventHandler<
 {
 	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
 		for_tuples!( #( Tuple::rewards_created(&payout); )* );
+	}
+}
+
+pub trait OnNewSlot<AccountId> {
+	type Key: Decode + RuntimeAppPublic;
+	fn on_new_cohort(_cohort_id: CohortId) {}
+
+	fn rotate_grandpas(
+		_current_cohort_id: CohortId,
+		_removed_authorities: Vec<(&AccountId, Self::Key)>,
+		_added_authorities: Vec<(&AccountId, Self::Key)>,
+	) {
+	}
+}
+
+pub trait SlotEvents<AccountId> {
+	fn on_new_cohort(_cohort_id: CohortId) {}
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		_current_cohort_id: CohortId,
+		_removed_authorities: Vec<(AccountId, Ks)>,
+		_added_authorities: Vec<(AccountId, Ks)>,
+	) {
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
+#[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
+impl<AId> SlotEvents<AId> for Tuple {
+	fn on_new_cohort(cohort_id: CohortId) {
+		for_tuples!( #( Tuple::on_new_cohort(cohort_id); )* );
+	}
+
+	fn rotate_grandpas<Ks: OpaqueKeys>(
+		current_cohort_id: CohortId,
+		removed_authorities: Vec<(AId, Ks)>,
+		added_authorities: Vec<(AId, Ks)>,
+	) {
+		for_tuples!(
+		#(
+			let removed_keys =
+				removed_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			let added_keys  =
+				added_authorities.iter().filter_map(|k| {
+					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
+				}).collect::<Vec<_>>();
+			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
+		)*
+		)
 	}
 }
