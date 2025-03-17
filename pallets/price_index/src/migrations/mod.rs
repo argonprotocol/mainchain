@@ -1,4 +1,4 @@
-use crate::{Config, Current};
+use crate::Config;
 #[cfg(feature = "try-runtime")]
 use alloc::{vec, vec::Vec};
 use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
@@ -53,7 +53,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
 		info!("Migrating price index (removing)");
-		Current::<T>::take();
+		old_storage::Current::<T>::take();
 		count += 1;
 
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
@@ -76,7 +76,10 @@ pub type PriceIndexTwal<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{new_test_ext, Test};
+	use crate::{
+		mock::{new_test_ext, Test},
+		Current,
+	};
 	use frame_support::assert_ok;
 	use sp_arithmetic::FixedU128;
 
