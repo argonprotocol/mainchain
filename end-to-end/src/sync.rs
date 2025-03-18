@@ -56,7 +56,9 @@ async fn test_can_prove_finality() {
 	let mut miner_3_args = grandpa_miner.get_fork_args("charlie", miner_threads);
 	miner_3_args.is_archive_node = false;
 	miner_3_args.extra_flags.push("--sync=warp".to_string());
-	// miner_3_args.rust_log += ",sync=trace";
+	// miner_3_args.rust_log = "debug".to_string();
+
+	miner_3_args.rust_log += ",sync=trace,warp=trace";
 	let miner_2 = grandpa_miner.fork_node_with(miner_3_args).await.unwrap();
 	let mut blocks_sub = miner_2.client.live.blocks().subscribe_finalized().await.unwrap();
 

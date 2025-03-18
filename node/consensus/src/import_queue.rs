@@ -63,7 +63,19 @@ where
 		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
+		if block.state_action.skip_execution_checks() {
+			tracing::trace!(block_hash=?block.post_hash(), "Skipping import checks for warp/gap-filled block.");
+			block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+			return self.inner.import_block(block).await.map_err(Into::into);
+		}
+
 		let mut best_hash = *block.header.parent_hash();
+		tracing::trace!(
+			parent_hash=?best_hash,
+			block_hash=?block.post_hash,
+			has_state=block.with_state(),
+			"Begin import."
+		);
 		// if we're importing a block with state, the parent might not be available yet, so use best
 		// hash
 		if block.with_state() &&
@@ -154,6 +166,12 @@ where
 		// This is done for example when gap syncing and it is expected that the block after the gap
 		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
 		if block_params.state_action.skip_execution_checks() || block_params.with_state() {
+			tracing::trace!(
+				block_hash=?block_params.post_hash(),
+				has_state = block_params.with_state(),
+				skip_execution = block_params.state_action.skip_execution_checks(),
+				"Verify block skipping."
+			);
 			// When we are importing only the state of a block, it will be the best block.
 			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(block_params.with_state()));
 			return Ok(block_params)
