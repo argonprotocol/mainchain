@@ -167,6 +167,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       argonotsPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
+       * The increment that bids can be on (for instance, one cent increments)
+       **/
+      bidIncrements: u128 & AugmentedConst<ApiType>;
+      /**
        * How many new miners can be in the cohort for each slot
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;

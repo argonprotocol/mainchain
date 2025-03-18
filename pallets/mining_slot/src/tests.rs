@@ -18,7 +18,8 @@ use frame_support::{
 		Currency, OnInitialize,
 	},
 };
-use pallet_balances::Event as OwnershipEvent;
+use frame_system::AccountInfo;
+use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use sp_core::{blake2_256, bounded_vec, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 use std::{collections::HashMap, env};
@@ -348,7 +349,8 @@ fn it_releases_argonots_when_a_window_closes() {
 			set_argons(account_id, 10_000u32.into());
 
 			let bond_amount = (1000u32 + i).into();
-			let ownership_tokens = MiningSlots::hold_argonots(&account_id, None).ok().unwrap();
+			let ownership_tokens =
+				MiningSlots::hold_argonots(&account_id, &None, None).ok().unwrap();
 
 			ActiveMinersByIndex::<Test>::insert(
 				i,
@@ -1183,8 +1185,10 @@ fn it_doesnt_accept_bids_until_first_slot() {
 	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
-		set_ownership(2, 1000u32.into());
-		ArgonotsPerMiningSeat::<Test>::set(1_000);
+		let argonots_per_seat = 1_000;
+		// use this test to ensure we can hold the entire ownership balance
+		set_ownership(2, argonots_per_seat + ExistentialDeposit::get());
+		ArgonotsPerMiningSeat::<Test>::set(argonots_per_seat);
 
 		System::set_block_number(1);
 		ElapsedTicks::set(12959);
@@ -1270,5 +1274,63 @@ fn it_should_rotate_grandpas() {
 		CurrentTick::set(12_960);
 		MiningSlots::on_initialize(12_960);
 		assert_eq!(GrandaRotations::get(), vec![0, 1, 2]);
+	});
+}
+
+#[test]
+fn it_allows_a_bidder_to_use_their_full_balance() {
+	ExistentialDeposit::set(10_000);
+	new_test_ext().execute_with(|| {
+		set_argons(1, 1_000_000);
+		set_ownership(1, 1_000_000);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ArgonotsPerMiningSeat::<Test>::set(10_000);
+		// ### Use most of balance
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			900_000,
+			RewardDestination::Owner,
+			1.into(),
+			None
+		));
+
+		assert_eq!(Balances::free_balance(1), 100_000);
+		assert_eq!(System::providers(&1), 3);
+
+		// Can send the rest
+		assert_ok!(Balances::transfer_allow_death(RuntimeOrigin::signed(1), 2, 100_000));
+		assert!(System::account_exists(&1));
+
+		set_argons(2, 1_000_000);
+		set_ownership(2, 10_000);
+		System::inc_account_nonce(2);
+		// ### Use all of argonots and balance
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			1_000_000,
+			RewardDestination::Owner,
+			2.into(),
+			None
+		));
+		assert_eq!(Balances::free_balance(2), 0);
+		assert_eq!(System::providers(&2), 1);
+		assert!(System::account_exists(&2));
+		assert_eq!(System::account_nonce(2), 1);
+
+		// verify account is still here
+		assert_eq!(
+			System::account(2),
+			AccountInfo {
+				nonce: 1,
+				consumers: 1,
+				providers: 1,
+				sufficients: 0,
+				data: AccountData { free: 0, reserved: 0, flags: ExtraFlags::default(), frozen: 0 },
+			}
+		);
+		assert_eq!(Ownership::free_balance(2), 0);
+		assert_eq!(Ownership::total_balance(&2), 10_000);
+		assert_eq!(MiningSlots::bid_pool_balance(), 1_900_000);
 	});
 }

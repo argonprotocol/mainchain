@@ -13,10 +13,7 @@ use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 use std::{env, str::FromStr, sync::Arc};
 
-use crate::utils::{
-	bankroll_miners, create_active_notary, mining_slot_ownership_needed, register_miner,
-	register_miner_keys,
-};
+use crate::utils::{create_active_notary, register_miner_keys, register_miners};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
@@ -181,10 +178,6 @@ async fn test_bitcoin_minting_e2e() {
 	let vote_miner = Eve;
 	let vote_miner_account = vote_miner.to_account_id();
 	let miner_node = test_node.fork_node("eve", 0).await.unwrap();
-	// start miners so that we have ownership tokens to mint against
-	bankroll_miners(&test_node, &alice_signer, vec![vote_miner_account.clone()], true)
-		.await
-		.unwrap();
 	// wait for miner_node to catch up
 
 	let finalized =
@@ -211,16 +204,14 @@ async fn test_bitcoin_minting_e2e() {
 	let nonce_test_node = client.get_account_nonce(&vote_miner_account).await.unwrap();
 	assert_eq!(nonce_miner_node, nonce_test_node);
 	println!("System health of miner node {:?}", miner_node.client.methods.system_health().await);
-	let vote_miner_ownership =
-		miner_node.client.get_ownership(&vote_miner_account, None).await.unwrap();
-	let ownership_needed = mining_slot_ownership_needed(&test_node).await.unwrap();
-	assert!(vote_miner_ownership.free >= ownership_needed);
 	let keys = register_miner_keys(&miner_node, vote_miner, 1)
 		.await
 		.expect("Couldn't register vote miner");
 
 	// Register the miner against the test node since we are having fork issues
-	register_miner(&test_node, vote_miner.pair(), keys).await.unwrap();
+	register_miners(&test_node, alice_signer, vec![(vote_miner_account.clone(), keys)])
+		.await
+		.unwrap();
 
 	wait_for_mint(&bitcoin_owner_pair, &client, &utxo_id, lock_amount, txid, vout)
 		.await

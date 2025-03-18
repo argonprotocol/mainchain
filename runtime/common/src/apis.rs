@@ -217,9 +217,12 @@ macro_rules! inject_common_apis {
             }
         }
 
-        impl pallet_mining_slot::MiningSlotApi<Block> for Runtime {
+        impl pallet_mining_slot::MiningSlotApi<Block, Balance> for Runtime {
             fn next_slot_era() -> (Tick, Tick) {
                 MiningSlot::get_next_slot_era()
+            }
+            fn bid_pool() -> Balance {
+                MiningSlot::bid_pool_balance()
             }
         }
 

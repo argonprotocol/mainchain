@@ -110,7 +110,6 @@ impl pallet_chain_transfer::Config for Test {
 	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;
-	type ExistentialDeposit = ExistentialDeposit;
 	type NotebookProvider = StaticNotebookProvider;
 	type NotebookTick = NotebookTick;
 	type EventHandler = ();

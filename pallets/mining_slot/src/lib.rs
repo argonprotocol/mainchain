@@ -13,6 +13,7 @@ use argon_primitives::{
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	SlotEvents, TickProvider,
 };
+use codec::Codec;
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -174,6 +175,7 @@ pub mod pallet {
 		type TickProvider: TickProvider<Self::Block>;
 
 		/// The increment that bids can be on (for instance, one cent increments)
+		#[pallet::constant]
 		type BidIncrements: Get<Self::Balance>;
 	}
 
@@ -366,8 +368,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
-		/// a slot can be supplanted by supplying a higher bid.
+		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
+		/// cohort, a bidder can be supplanted by supplying a higher bid.
 		///
 		/// Each slot has `MaxCohortSize` spots available.
 		///
@@ -375,8 +377,8 @@ pub mod pallet {
 		/// this account. The required amount is calculated as a percentage of the total ownership
 		/// tokens in the network. This percentage is adjusted before the beginning of each slot.
 		///
-		/// If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring
-		/// for this event, you will be able to ensure your bid is accepted.
+		/// If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
+		/// monitoring for this event, you will be able to ensure your bid is accepted.
 		///
 		/// NOTE: bidding for each slot will be closed at a random block within
 		/// `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
@@ -424,10 +426,12 @@ pub mod pallet {
 				ensure!(is_in_next_cohort, Error::<T>::CannotRegisterOverlappingSessions);
 			}
 
-			Self::send_argons_to_pool(&funding_account, bid)?;
-
+			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
 			let current_registration = Self::get_active_registration(&miner_account_id);
-			let ownership_tokens = Self::hold_argonots(&funding_account, current_registration)?;
+
+			Self::send_argons_to_pool(&funding_account, &existing_bid, bid)?;
+			let ownership_tokens =
+				Self::hold_argonots(&funding_account, &existing_bid, current_registration)?;
 			let next_cohort_id = LastActivatedCohortId::<T>::get().saturating_add(1);
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) =
@@ -869,16 +873,16 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn hold_argonots(
-		who: &T::AccountId,
+		funding_account_id: &T::AccountId,
+		existing_bid: &Option<Registration<T>>,
 		current_registration: Option<Registration<T>>,
 	) -> Result<T::Balance, DispatchError> {
 		let argonots = ArgonotsPerMiningSeat::<T>::get();
-		let next_registration = Self::get_pending_cohort_registration(who);
 		let mut argonots_needed = argonots;
 
 		// if we've already held for next, reduce now
-		if let Some(next) = next_registration {
-			argonots_needed -= next.argonots;
+		if let Some(existing) = existing_bid {
+			argonots_needed -= existing.argonots;
 		} else if let Some(current_registration) = current_registration {
 			argonots_needed -= current_registration.argonots;
 		}
@@ -888,24 +892,26 @@ impl<T: Config> Pallet<T> {
 		}
 
 		let hold_reason = HoldReason::RegisterAsMiner;
-		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), who) == 0u32.into() {
-			frame_system::Pallet::<T>::inc_providers(who);
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), funding_account_id) ==
+			0u32.into()
+		{
+			frame_system::Pallet::<T>::inc_providers(funding_account_id);
 		}
 
-		T::OwnershipCurrency::hold(&hold_reason.into(), who, argonots_needed)
+		T::OwnershipCurrency::hold(&hold_reason.into(), funding_account_id, argonots_needed)
 			.map_err(|_| Error::<T>::InsufficientOwnershipTokens)?;
 		Ok(argonots)
 	}
 
 	pub(crate) fn send_argons_to_pool(
 		miner_funding_account: &T::AccountId,
+		existing_bid: &Option<Registration<T>>,
 		bid_amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
-		let bid_registration = Self::get_pending_cohort_registration(miner_funding_account);
 		let mut needed = bid_amount;
 
 		// if we've already held for next, reduce now
-		if let Some(existing) = bid_registration {
+		if let Some(existing) = existing_bid {
 			ensure!(bid_amount > existing.bid, Error::<T>::BidCannotBeReduced);
 			needed -= existing.bid;
 		}
@@ -914,7 +920,7 @@ impl<T: Config> Pallet<T> {
 			ensure!(
 				T::ArgonCurrency::reducible_balance(
 					miner_funding_account,
-					Preservation::Preserve,
+					Preservation::Protect,
 					Fortitude::Force
 				) >= needed,
 				Error::<T>::InsufficientFunds
@@ -923,7 +929,7 @@ impl<T: Config> Pallet<T> {
 				miner_funding_account,
 				&pool_account,
 				needed,
-				Preservation::Preserve,
+				Preservation::Expendable,
 			)?;
 		}
 		Ok(needed)
@@ -1030,6 +1036,11 @@ impl<T: Config> Pallet<T> {
 	fn ticks_between_slots() -> Tick {
 		MiningConfig::<T>::get().ticks_between_slots
 	}
+
+	pub fn bid_pool_balance() -> T::Balance {
+		let account_id = T::BidPoolProvider::get_bid_pool_account();
+		T::ArgonCurrency::balance(&account_id)
+	}
 }
 
 impl<T: Config> MiningSlotProvider for Pallet<T> {
@@ -1085,7 +1096,8 @@ impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 
 sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
-	pub trait MiningSlotApi {
+	pub trait MiningSlotApi<Balance> where Balance: Codec {
 		fn next_slot_era() -> (Tick, Tick);
+		fn bid_pool() -> Balance;
 	}
 }

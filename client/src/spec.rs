@@ -2022,6 +2022,24 @@ pub mod api {
 						],
 					)
 				}
+				pub fn bid_pool(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::BidPool,
+					types::bid_pool::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"MiningSlotApi",
+						"bid_pool",
+						types::BidPool {},
+						[
+							192u8, 169u8, 244u8, 164u8, 27u8, 67u8, 1u8, 128u8, 202u8, 220u8, 1u8,
+							121u8, 69u8, 126u8, 85u8, 179u8, 142u8, 158u8, 104u8, 156u8, 110u8,
+							226u8, 92u8, 33u8, 233u8, 70u8, 146u8, 198u8, 185u8, 186u8, 172u8,
+							110u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -2048,6 +2066,29 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct NextSlotEra {}
+				pub mod bid_pool {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::primitive::u128;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BidPool {}
 			}
 		}
 		pub mod notebook_apis {
@@ -3815,9 +3856,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				6u8, 77u8, 54u8, 186u8, 214u8, 66u8, 104u8, 152u8, 114u8, 59u8, 61u8, 57u8, 50u8,
-				197u8, 95u8, 180u8, 69u8, 128u8, 62u8, 213u8, 212u8, 141u8, 100u8, 66u8, 55u8,
-				172u8, 147u8, 246u8, 113u8, 151u8, 173u8, 13u8,
+				81u8, 26u8, 215u8, 72u8, 63u8, 51u8, 13u8, 121u8, 78u8, 235u8, 174u8, 53u8, 22u8,
+				178u8, 4u8, 111u8, 52u8, 167u8, 204u8, 34u8, 47u8, 222u8, 167u8, 104u8, 31u8,
+				232u8, 138u8, 95u8, 67u8, 61u8, 1u8, 40u8,
 			]
 	}
 	pub mod system {
@@ -7598,8 +7639,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
-				#[doc = "a slot can be supplanted by supplying a higher bid."]
+				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next"]
+				#[doc = "cohort, a bidder can be supplanted by supplying a higher bid."]
 				#[doc = ""]
 				#[doc = "Each slot has `MaxCohortSize` spots available."]
 				#[doc = ""]
@@ -7607,8 +7648,8 @@ pub mod api {
 				#[doc = "this account. The required amount is calculated as a percentage of the total ownership"]
 				#[doc = "tokens in the network. This percentage is adjusted before the beginning of each slot."]
 				#[doc = ""]
-				#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
-				#[doc = "for this event, you will be able to ensure your bid is accepted."]
+				#[doc = "If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By"]
+				#[doc = "monitoring for this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
@@ -7676,8 +7717,8 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
-				#[doc = "a slot can be supplanted by supplying a higher bid."]
+				#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next"]
+				#[doc = "cohort, a bidder can be supplanted by supplying a higher bid."]
 				#[doc = ""]
 				#[doc = "Each slot has `MaxCohortSize` spots available."]
 				#[doc = ""]
@@ -7685,8 +7726,8 @@ pub mod api {
 				#[doc = "this account. The required amount is calculated as a percentage of the total ownership"]
 				#[doc = "tokens in the network. This percentage is adjusted before the beginning of each slot."]
 				#[doc = ""]
-				#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
-				#[doc = "for this event, you will be able to ensure your bid is accepted."]
+				#[doc = "If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By"]
+				#[doc = "monitoring for this event, you will be able to ensure your bid is accepted."]
 				#[doc = ""]
 				#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 				#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]
@@ -8474,6 +8515,22 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " The increment that bids can be on (for instance, one cent increments)"]
+				pub fn bid_increments(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningSlot",
+						"BidIncrements",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -28531,8 +28588,8 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,"]
-					#[doc = "a slot can be supplanted by supplying a higher bid."]
+					#[doc = "Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next"]
+					#[doc = "cohort, a bidder can be supplanted by supplying a higher bid."]
 					#[doc = ""]
 					#[doc = "Each slot has `MaxCohortSize` spots available."]
 					#[doc = ""]
@@ -28540,8 +28597,8 @@ pub mod api {
 					#[doc = "this account. The required amount is calculated as a percentage of the total ownership"]
 					#[doc = "tokens in the network. This percentage is adjusted before the beginning of each slot."]
 					#[doc = ""]
-					#[doc = "If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring"]
-					#[doc = "for this event, you will be able to ensure your bid is accepted."]
+					#[doc = "If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By"]
+					#[doc = "monitoring for this event, you will be able to ensure your bid is accepted."]
 					#[doc = ""]
 					#[doc = "NOTE: bidding for each slot will be closed at a random block within"]
 					#[doc = "`mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time."]

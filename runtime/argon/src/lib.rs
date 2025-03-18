@@ -344,7 +344,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type MaxMiners = MaxMiners;
 	type MaxCohortSize = MaxCohortSize;
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
-	type MinimumArgonotsPerSeat = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type MinimumArgonotsPerSeat = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
 	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
 	type Balance = Balance;
@@ -387,7 +387,6 @@ impl pallet_chain_transfer::Config for Runtime {
 	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
 	type Argon = Balances;
 	type Balance = Balance;
-	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type NotebookProvider = Notebook;
 	type NotebookTick = NotebookTickProvider;
 	type EventHandler = Mint;
@@ -428,7 +427,7 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type Balance = Balance;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type ExistentialDeposit = ConstU128<ARGON_EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
 	type ReserveIdentifier = [u8; 8];
 	type FreezeIdentifier = RuntimeFreezeReason;
@@ -500,7 +499,7 @@ impl pallet_balances::Config<OwnershipToken> for Runtime {
 	/// The type for recording an account's balance.
 	type Balance = Balance;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type ExistentialDeposit = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
 	type AccountStore = StorageMapShim<
 		pallet_balances::Account<Runtime, OwnershipToken>,
 		AccountId,
