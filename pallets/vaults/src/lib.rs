@@ -1443,6 +1443,9 @@ pub mod pallet {
 				}
 
 				let bonded_bitcoins: T::Balance = vault.bonded_bitcoins_for_pool(slots);
+				if bonded_bitcoins == T::Balance::zero() {
+					continue;
+				}
 
 				let prorata =
 					Perbill::from_rational(bonded_bitcoins, first_pass_bonded_bitcoins_pool);

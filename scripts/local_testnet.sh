@@ -94,7 +94,7 @@ for i in {0..2} ; do
     --notebook-archive-hosts="$NOTEBOOK_ARCHIVE" \
     --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
-    --pruning=archive -lRUST_LOG=info,argon=trace,ismp=trace \
+    --pruning=archive -lRUST_LOG=info,argon=trace,pallet=trace,argon_notary_apis=info,argon_node_consensus::notary_client=info,argon_node_consensus::aux_client=info \
     --unsafe-rpc-external --rpc-methods=unsafe \
     --no-mdns \
     $(if [ "$i" -eq 0 ]; then echo "--node-key=16ec4f460237d066d15d09a44959a7d49ea6405e98429826f1c28b9087bd60ea"; else echo "--unsafe-force-node-key-generation"; fi) \
