@@ -1202,6 +1202,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1267,6 +1270,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1308,6 +1314,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
@@ -1346,6 +1355,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1392,6 +1404,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1488,6 +1503,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,

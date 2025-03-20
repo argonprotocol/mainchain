@@ -35,7 +35,6 @@ import type {
   ArgonPrimitivesBitcoinBitcoinXPub,
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesBitcoinUtxoValue,
-  ArgonPrimitivesBlockSealAppPublic,
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealMiningBidStats,
   ArgonPrimitivesBlockSealMiningRegistration,
@@ -797,25 +796,6 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<u128>,
         []
       >;
-      /**
-       * Authorities are the session keys that are actively participating in the network.
-       * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
-       **/
-      authorityHashByIndex: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u32, U256>>,
-        []
-      >;
-      /**
-       * Keys in use
-       **/
-      authorityIdToMinerId: AugmentedQuery<
-        ApiType,
-        (
-          arg: ArgonPrimitivesBlockSealAppPublic | string | Uint8Array,
-        ) => Observable<Option<AccountId32>>,
-        [ArgonPrimitivesBlockSealAppPublic]
-      >;
       hasAddedGrandpaRotation: AugmentedQuery<
         ApiType,
         () => Observable<bool>,
@@ -841,6 +821,15 @@ declare module '@polkadot/api-base/types/storage' {
        * The last activated cohort id
        **/
       lastActivatedCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
+       * the miner and the block hash at time of activation.
+       **/
+      minerXorKeyByIndex: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u32, U256>>,
+        []
+      >;
       /**
        * The mining slot configuration set in genesis
        **/

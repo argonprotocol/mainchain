@@ -336,7 +336,16 @@ declare module '@polkadot/types/lookup' {
     readonly isAny: boolean;
     readonly isNonTransfer: boolean;
     readonly isPriceIndex: boolean;
-    readonly type: 'Any' | 'NonTransfer' | 'PriceIndex';
+    readonly isMiningBid: boolean;
+    readonly isBitcoinCosign: boolean;
+    readonly isVaultAdmin: boolean;
+    readonly type:
+      | 'Any'
+      | 'NonTransfer'
+      | 'PriceIndex'
+      | 'MiningBid'
+      | 'BitcoinCosign'
+      | 'VaultAdmin';
   }
 
   /** @name PalletMiningSlotEvent (39) */

@@ -256,7 +256,14 @@ export default {
    * Lookup37: argon_runtime::ProxyType
    **/
   ArgonRuntimeProxyType: {
-    _enum: ['Any', 'NonTransfer', 'PriceIndex'],
+    _enum: [
+      'Any',
+      'NonTransfer',
+      'PriceIndex',
+      'MiningBid',
+      'BitcoinCosign',
+      'VaultAdmin',
+    ],
   },
   /**
    * Lookup39: pallet_mining_slot::pallet::Event<T>

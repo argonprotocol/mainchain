@@ -196,16 +196,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
-	/// Authorities are the session keys that are actively participating in the network.
-	/// The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
+	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
+	/// the miner and the block hash at time of activation.
 	#[pallet::storage]
-	pub(super) type AuthorityHashByIndex<T: Config> =
+	pub(super) type MinerXorKeyByIndex<T: Config> =
 		StorageValue<_, BoundedBTreeMap<MinerIndex, U256, T::MaxMiners>, ValueQuery>;
-
-	/// Keys in use
-	#[pallet::storage]
-	pub(super) type AuthorityIdToMinerId<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::MiningAuthorityId, T::AccountId, OptionQuery>;
 
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
@@ -410,13 +405,6 @@ pub mod pallet {
 				Error::<T>::InvalidBidAmount
 			);
 
-			let miner_authority_id = keys
-				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				.ok_or(Error::<T>::InvalidKeyFormat)?;
-			if let Some(registrant) = AuthorityIdToMinerId::<T>::get(&miner_authority_id) {
-				ensure!(registrant == miner_account_id, Error::<T>::CannotRegisterDuplicateKeys);
-			}
-
 			if let Some(current_index) = <AccountIndexLookup<T>>::get(&miner_account_id) {
 				let cohort_start_index = Self::get_next_slot_starting_index();
 				let is_in_next_cohort = current_index >= cohort_start_index &&
@@ -490,10 +478,7 @@ pub mod pallet {
 						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
 					}
 				});
-				AuthorityIdToMinerId::<T>::insert(
-					miner_authority_id.clone(),
-					miner_account_id.clone(),
-				);
+
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: miner_account_id.clone(),
 					bid_amount: bid,
@@ -587,7 +572,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 	fn xor_closest_authority(
 		seal_proof: U256,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let closest = find_xor_closest(<AuthorityHashByIndex<T>>::get(), seal_proof)?;
+		let closest = find_xor_closest(<MinerXorKeyByIndex<T>>::get(), seal_proof)?;
 
 		Self::get_mining_authority_by_index(closest)
 	}
@@ -641,14 +626,16 @@ impl<T: Config> Pallet<T> {
 		IsNextSlotBiddingOpen::<T>::put(true);
 
 		let mut active_miners = ActiveMinersCount::<T>::get();
-		let mut authority_hash_by_index = AuthorityHashByIndex::<T>::get();
+		let mut miner_xor_by_index = MinerXorKeyByIndex::<T>::get();
 		let mut added_miners = vec![];
 		let mut removed_miners = vec![];
+
+		let parent_hash: T::Hash = frame_system::Pallet::<T>::parent_hash();
 
 		for i in 0..cohort_size {
 			let index = i + start_index_to_replace_miners;
 
-			authority_hash_by_index.remove(&index);
+			miner_xor_by_index.remove(&index);
 			if let Some(entry) = ActiveMinersByIndex::<T>::take(index) {
 				let account_id = entry.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
@@ -664,18 +651,17 @@ impl<T: Config> Pallet<T> {
 				active_miners += 1;
 				ActiveMinersByIndex::<T>::insert(index, entry.clone());
 				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
-				if let Some(authority_id) =
-					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				{
-					let hash = blake2_256(&authority_id.to_raw_vec());
-					authority_hash_by_index
-						.try_insert(index, U256::from_big_endian(&hash))
-						.expect("only insert if we've removed first, ergo, should be impossible");
-				}
+
+				let hash =
+					MinerXor::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
+						.using_encoded(blake2_256);
+				miner_xor_by_index
+					.try_insert(index, U256::from_big_endian(&hash))
+					.expect("only insert if we've removed first, ergo, should be impossible");
 			}
 		}
 
-		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
+		<MinerXorKeyByIndex<T>>::put(miner_xor_by_index);
 		ActiveMinersCount::<T>::put(active_miners);
 
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
@@ -964,13 +950,6 @@ impl<T: Config> Pallet<T> {
 		if !is_registered_for_next {
 			preserved_argonot_hold = false;
 
-			if let Some(authority_id) = active_registration
-				.authority_keys
-				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-			{
-				AuthorityIdToMinerId::<T>::remove(authority_id);
-			}
-
 			if let Err(e) =
 				Self::release_argonots_hold(&funding_account, active_registration.argonots)
 			{
@@ -1016,11 +995,6 @@ impl<T: Config> Pallet<T> {
 		if let Some(active) = Self::get_active_registration(&account_id) {
 			argonots_to_unhold -= active.argonots;
 			held_argonots = true;
-		} else if let Some(authority_id) = registration
-			.authority_keys
-			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-		{
-			AuthorityIdToMinerId::<T>::remove(authority_id);
 		}
 
 		Self::release_argonots_hold(&funding_account, argonots_to_unhold)?;
@@ -1041,6 +1015,12 @@ impl<T: Config> Pallet<T> {
 		let account_id = T::BidPoolProvider::get_bid_pool_account();
 		T::ArgonCurrency::balance(&account_id)
 	}
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+pub struct MinerXor<T: Config> {
+	pub account_id: T::AccountId,
+	pub block_hash: T::Hash,
 }
 
 impl<T: Config> MiningSlotProvider for Pallet<T> {

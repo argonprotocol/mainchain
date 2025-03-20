@@ -43,6 +43,9 @@ macro_rules! call_filters {
 			Any,
 			NonTransfer,
 			PriceIndex,
+			MiningBid,
+			BitcoinCosign,
+			VaultAdmin,
 		}
 		impl Default for ProxyType {
 			fn default() -> Self {
@@ -59,7 +62,22 @@ macro_rules! call_filters {
 							RuntimeCall::Ownership(..) |
 							RuntimeCall::ChainTransfer(..)
 					),
+					ProxyType::MiningBid =>
+						matches!(c, RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })),
 					ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
+					ProxyType::BitcoinCosign => matches!(
+						c,
+						RuntimeCall::BitcoinLocks(
+							pallet_bitcoin_locks::Call::cosign_release { .. }
+						)
+					),
+					ProxyType::VaultAdmin => matches!(
+						c,
+						RuntimeCall::Vaults(..) |
+							RuntimeCall::BitcoinLocks(
+								pallet_bitcoin_locks::Call::cosign_release { .. }
+							)
+					),
 				}
 			}
 			fn is_superset(&self, o: &Self) -> bool {

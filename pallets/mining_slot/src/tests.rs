@@ -2,8 +2,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
-		AuthorityHashByIndex, AuthorityIdToMinerId, HistoricalBidsPerSlot, IsNextSlotBiddingOpen,
-		LastActivatedCohortId, MiningConfig, NextSlotCohort,
+		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastActivatedCohortId, MinerXorKeyByIndex,
+		MiningConfig, NextSlotCohort,
 	},
 	Error, Event, HoldReason, Registration,
 };
@@ -245,7 +245,7 @@ fn it_adds_new_cohorts_on_block() {
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
-			AuthorityHashByIndex::<Test>::try_mutate(|index| {
+			MinerXorKeyByIndex::<Test>::try_mutate(|index| {
 				let hash = blake2_256(&account_id.to_le_bytes());
 				index.try_insert(i, U256::from_big_endian(&hash))
 			})
@@ -280,7 +280,7 @@ fn it_adds_new_cohorts_on_block() {
 			"Should have 3 validators still after insertion"
 		);
 		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
-		let authority_hashes = AuthorityHashByIndex::<Test>::get().into_inner();
+		let authority_hashes = MinerXorKeyByIndex::<Test>::get().into_inner();
 		assert_eq!(
 			NextSlotCohort::<Test>::get().len(),
 			0,
@@ -764,10 +764,6 @@ fn it_will_order_bids() {
 		ElapsedTicks::set(9);
 		System::on_initialize(9);
 		MiningSlots::on_initialize(9);
-		assert_eq!(
-			AuthorityIdToMinerId::<Test>::iter_keys().collect::<Vec<_>>(),
-			vec![1u64.into(), 2u64.into()]
-		);
 		assert_eq!(Ownership::free_balance(3), 100_500);
 		assert_eq!(Ownership::total_balance(&3), 100_500);
 		assert_eq!(Balances::free_balance(3), 5_000_000);
@@ -831,14 +827,9 @@ fn handles_a_max_of_bids_per_block() {
 			None
 		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 1);
-		assert_eq!(AuthorityIdToMinerId::<Test>::get::<UintAuthorityId>(1.into()), Some(1));
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
-		);
-		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), 0, RewardDestination::Owner, 1.into(), None),
-			Error::<Test>::CannotRegisterDuplicateKeys
 		);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
@@ -921,18 +912,6 @@ fn it_allows_bids_from_an_external_funding_account() {
 		);
 
 		// bid again as account 3
-
-		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(1),
-				1_000_000,
-				RewardDestination::Owner,
-				1.into(),
-				Some(3)
-			),
-			Error::<Test>::CannotRegisterDuplicateKeys
-		);
-
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			2_000_000,
@@ -1025,7 +1004,7 @@ fn it_can_get_closest_authority() {
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
 		}
-		AuthorityHashByIndex::<Test>::try_mutate(|a| {
+		MinerXorKeyByIndex::<Test>::try_mutate(|a| {
 			for i in 0..100u32 {
 				// these are normally hashed, but we'll simplify to ease the xor calculation
 				let hash = U256::from(i);
