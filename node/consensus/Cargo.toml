@@ -79,3 +79,7 @@ axum = { workspace = true }
 sc-consensus-grandpa = { workspace = true }
 hex = { workspace = true }
 finality-grandpa = { workspace = true, default-features = false }
+
+[features]
+default = []
+ci = []

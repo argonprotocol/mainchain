@@ -1,5 +1,5 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, NextSlotCohort},
+	pallet::{ActiveMinersByIndex, MinerXorKeyByIndex, NextSlotCohort},
 	Config, Registration,
 };
 use alloc::vec::Vec;
@@ -13,6 +13,7 @@ mod old_storage {
 		ObligationId,
 	};
 
+	use crate::runtime_decl_for_mining_slot_api::U256;
 	#[cfg(feature = "try-runtime")]
 	use alloc::vec::Vec;
 	use frame_support::{pallet_prelude::*, storage_alias, BoundedVec};
@@ -29,6 +30,7 @@ mod old_storage {
 	pub struct Model<T: Config> {
 		pub next_cohort: BoundedVec<Registration<T>, <T as Config>::MaxMiners>,
 		pub active_miners_by_index: Vec<(u32, Registration<T>)>,
+		pub old_hash_count: u32,
 	}
 
 	#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -76,6 +78,13 @@ mod old_storage {
 	#[storage_alias]
 	pub(super) type ActiveMinersByIndex<T: Config> =
 		StorageMap<crate::Pallet<T>, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
+
+	#[storage_alias]
+	pub(super) type AuthorityHashByIndex<T: Config> = StorageValue<
+		crate::Pallet<T>,
+		BoundedBTreeMap<MinerIndex, U256, <T as Config>::MaxMiners>,
+		ValueQuery,
+	>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -90,7 +99,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let active_miners_by_index =
 			old_storage::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 
-		Ok(old_storage::Model::<T> { next_cohort, active_miners_by_index }.encode())
+		let old_hash_count = old_storage::AuthorityHashByIndex::<T>::get().len() as u32;
+
+		Ok(old_storage::Model::<T> { next_cohort, active_miners_by_index, old_hash_count }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
@@ -125,6 +136,13 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		});
 		info!("{} mining registrations migrated", count);
 
+		let authority_hash = old_storage::AuthorityHashByIndex::<T>::take();
+		MinerXorKeyByIndex::<T>::set(authority_hash);
+		count += 2;
+
+		old_storage::AuthorityHashByIndex::<T>::take();
+		count += 1;
+
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
 	}
 
@@ -138,14 +156,18 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		})?;
 
 		let new = NextSlotCohort::<T>::get();
-		ensure!(old.next_cohort.len() == new.len(), "New value not set correctly");
+		ensure!(old.next_cohort.len() == new.len(), "New next cohort not set correctly");
 
 		let old_active_miners_by_index = old.active_miners_by_index;
 		let new_active_miners_by_index = ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 		ensure!(
 			old_active_miners_by_index.len() == new_active_miners_by_index.len(),
-			"New value not set correctly"
+			"New active miners value not set correctly"
 		);
+
+		let old_hash_count = old.old_hash_count;
+		let new_hash_count = MinerXorKeyByIndex::<T>::get().len() as u32;
+		ensure!(old_hash_count == new_hash_count, "New hash count not set correctly");
 
 		Ok(())
 	}
@@ -165,6 +187,7 @@ mod test {
 	use crate::mock::{new_test_ext, Test};
 	use argon_primitives::block_seal::RewardDestination::Owner;
 	use frame_support::assert_ok;
+	use sp_core::bounded_btree_map;
 
 	#[test]
 	fn handles_existing_value() {
@@ -219,6 +242,10 @@ mod test {
 				},
 			);
 
+			old_storage::AuthorityHashByIndex::<Test>::set(
+				bounded_btree_map!(0 => 100u128.into(), 1 => 123u128.into()),
+			);
+
 			// Get the pre_upgrade bytes
 			let bytes = match InnerMigrate::<Test>::pre_upgrade() {
 				Ok(bytes) => bytes,
@@ -232,7 +259,7 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(3, 3));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(6, 6));
 
 			// Check the new value
 			let new = NextSlotCohort::<Test>::get();

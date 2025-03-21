@@ -48,13 +48,13 @@
     }
   },
   "dependencies": {
-    "@polkadot/api": "^15.4.1",
-    "@polkadot/keyring": "^13.3.1",
-    "@polkadot/util-crypto": "^13.3.1",
+    "@polkadot/api": "^15.8.1",
+    "@polkadot/keyring": "^13.4.3",
+    "@polkadot/util-crypto": "^13.4.3",
     "tslib": "^2.6.2"
   },
   "devDependencies": {
-    "@polkadot/typegen": "^15.4.1",
+    "@polkadot/typegen": "^15.8.1",
     "@substrate/ss58-registry": "^1.49.0",
     "@types/jest": "^29.5.11",
     "@types/node": "^18.19.6",

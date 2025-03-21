@@ -844,7 +844,9 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			let needs_providers = T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into();
+			if T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into() {
+				let _ = frame_system::Pallet::<T>::inc_providers(who);
+			}
 
 			T::Currency::hold(&reason.into(), who, amount).map_err(|e| match e {
 				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
@@ -859,9 +861,6 @@ pub mod pallet {
 					ObligationError::InsufficientFunds
 				},
 			})?;
-			if needs_providers {
-				let _ = frame_system::Pallet::<T>::inc_providers(who);
-			}
 			Ok(())
 		}
 
@@ -873,10 +872,12 @@ pub mod pallet {
 			if amount == T::Balance::zero() {
 				return Ok(amount);
 			}
-			if amount == T::Currency::balance_on_hold(&reason.into(), who) {
+			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)?;
+
+			if T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into() {
 				let _ = frame_system::Pallet::<T>::dec_providers(who);
 			}
-			T::Currency::release(&reason.into(), who, amount, Precision::Exact)
+			Ok(balance)
 		}
 
 		pub(crate) fn calculate_tick_fees(
@@ -1348,10 +1349,8 @@ pub mod pallet {
 		}
 
 		fn distribute_and_rotate_bid_pool(cohort_id: CohortId, mining_window_end_tick: Tick) {
-			if cohort_id > 0 {
-				Self::distribute_open_bid_pool(cohort_id - 1);
-			}
-			Self::allocate_next_bid_pool(cohort_id, mining_window_end_tick);
+			Self::distribute_open_bid_pool(cohort_id);
+			Self::allocate_next_bid_pool(cohort_id + 1, mining_window_end_tick);
 		}
 	}
 
@@ -1442,6 +1441,9 @@ pub mod pallet {
 				}
 
 				let bonded_bitcoins: T::Balance = vault.bonded_bitcoins_for_pool(slots);
+				if bonded_bitcoins == T::Balance::zero() {
+					continue;
+				}
 
 				let prorata =
 					Perbill::from_rational(bonded_bitcoins, first_pass_bonded_bitcoins_pool);

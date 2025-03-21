@@ -12,6 +12,7 @@ mod vote_mining;
 #[cfg(test)]
 pub(crate) mod utils {
 	use argon_client::{
+		api,
 		api::{
 			runtime_types::{
 				argon_primitives::{block_seal, block_seal::RewardDestination},
@@ -27,7 +28,7 @@ pub(crate) mod utils {
 	};
 	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
-	use sp_core::{crypto::key_types::GRANDPA, sr25519, Pair};
+	use sp_core::{crypto::key_types::GRANDPA, Pair};
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring};
 	use subxt::tx::TxInBlock;
 
@@ -106,43 +107,6 @@ pub(crate) mod utils {
 			.await
 	}
 
-	pub(crate) async fn bankroll_miners(
-		test_node: &ArgonTestNode,
-		from: &Sr25519Signer,
-		to: Vec<AccountId>,
-		wait_for_finalized: bool,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, ArgonOnlineClient>> {
-		let client = test_node.client.clone();
-		let params = client.params_with_best_nonce(&from.account_id()).await?.build();
-
-		let amount = mining_slot_ownership_needed(test_node).await?;
-
-		let account_id: AccountId = from.account_id();
-		let sugar_daddy_account_id = client.api_account(&account_id);
-		let alice_balance = client
-			.fetch_storage(&storage().ownership().account(sugar_daddy_account_id.clone()), None)
-			.await?;
-		println!("alice balance {:?}", alice_balance);
-
-		let calls = to
-			.iter()
-			.map(|a| {
-				let api_account_id = client.api_account(a);
-				RuntimeCall::Ownership(
-					argon_client::api::runtime_types::pallet_balances::pallet::Call::transfer_allow_death {
-						dest: api_account_id.into(),
-						value: amount,
-					}
-				)
-			})
-			.collect::<Vec<_>>();
-		let ownership_transfer = client
-			.submit_tx(&tx().utility().batch_all(calls), from, Some(params), wait_for_finalized)
-			.await?;
-		println!("ownership transfer {:?}", ownership_transfer.extrinsic_hash());
-		Ok(ownership_transfer)
-	}
-
 	pub(crate) async fn mining_slot_ownership_needed(
 		test_node: &ArgonTestNode,
 	) -> anyhow::Result<Balance> {
@@ -169,29 +133,30 @@ pub(crate) mod utils {
 		})
 	}
 
-	pub(crate) async fn register_miner(
+	pub(crate) async fn register_miners(
 		node: &ArgonTestNode,
-		miner: sr25519::Pair,
-		keys: SessionKeys,
+		funding: Sr25519Signer,
+		miner_accounts: Vec<(AccountId, SessionKeys)>,
 	) -> anyhow::Result<()> {
 		let client = node.client.clone();
-		// how much ownership is needed
-		let ownership_needed = client
-			.fetch_storage(&storage().mining_slot().argonots_per_mining_seat(), None)
-			.await?
-			.unwrap();
-		println!("ownership needed {:?}", ownership_needed);
-		let balance = client.get_argons(&miner.public().into()).await.unwrap();
-		println!("Account argons {:#?}", balance);
 
-		println!("Registering miner");
+		println!("Registering miners");
+		let bids = miner_accounts
+			.into_iter()
+			.map(|(a, keys)| {
+				let account = client.api_account(&a);
+				RuntimeCall::MiningSlot(api::runtime_types::pallet_mining_slot::pallet::Call::bid {
+					mining_account_id: Some(account),
+					keys,
+					bid: 0,
+					reward_destination: RewardDestination::Owner,
+				})
+			})
+			.collect::<Vec<_>>();
+		let params = client.params_with_best_nonce(&funding.account_id()).await?.build();
+
 		let register = client
-			.submit_tx(
-				&tx().mining_slot().bid(0, RewardDestination::Owner, keys, None),
-				&Sr25519Signer::new(miner),
-				None,
-				true,
-			)
+			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)
 			.await?;
 		println!(
 			"miner registered. ext hash: {:?}, block {:?}",

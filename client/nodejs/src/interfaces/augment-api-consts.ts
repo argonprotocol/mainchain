@@ -167,6 +167,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       argonotsPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
+       * The increment that bids can be on (for instance, one cent increments)
+       **/
+      bidIncrements: u128 & AugmentedConst<ApiType>;
+      /**
        * How many new miners can be in the cohort for each slot
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
@@ -190,6 +194,10 @@ declare module '@polkadot/api-base/types/consts' {
       targetBidsPerSlot: u32 & AugmentedConst<ApiType>;
     };
     mint: {
+      /**
+       * The maximum number of mint histories to keep
+       **/
+      maxMintHistoryToMaintain: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of UTXOs that can be waiting for minting
        **/

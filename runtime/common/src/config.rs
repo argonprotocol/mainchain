@@ -20,7 +20,8 @@ pub const MAXIMUM_BLOCK_WEIGHT: Weight =
 	Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(10), u64::MAX);
 
 /// The existential deposit.
-pub const EXISTENTIAL_DEPOSIT: Balance = 100_000;
+pub const ARGON_EXISTENTIAL_DEPOSIT: Balance = 10_000;
+pub const ARGONOT_EXISTENTIAL_DEPOSIT: Balance = 10_000;
 
 pub const ARGON: Balance = 1_000_000;
 pub const CENTS: Balance = ARGON / 100_000;
@@ -92,7 +93,7 @@ parameter_types! {
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
-	pub const MiningSlotBidIncrement: Balance = ARGON;
+	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
 	// ### pallet_vaults
 	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
@@ -155,6 +156,7 @@ parameter_types! {
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
+	pub const MaxMintHistoryToMaintain: u32 = 10; // keep all active sessions + the rollover
 
 	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices

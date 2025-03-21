@@ -568,13 +568,13 @@ pub mod pallet {
 					Error::<T>::AccountWouldGoBelowMinimumBalance
 				);
 
+				frame_system::Pallet::<T>::inc_providers(&who);
 				T::Currency::hold(&HoldReason::ReleaseBitcoinLock.into(), &who, redemption_price)
 					.map_err(|e| match e {
 					Token(TokenError::BelowMinimum) =>
 						Error::<T>::AccountWouldGoBelowMinimumBalance,
 					_ => Error::<T>::InsufficientFunds,
 				})?;
-				frame_system::Pallet::<T>::inc_providers(&who);
 
 				<LocksPendingReleaseByUtxoId<T>>::try_mutate(|a| {
 					a.try_insert(

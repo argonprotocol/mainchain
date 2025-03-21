@@ -90,11 +90,14 @@ for i in {0..2} ; do
   mkdir -p /tmp/argon/$RUNID/${validators[$i]};
   "$BASEDIR/target/debug/argon-node" \
     --"${validators[$i]}" --detailed-log-output --chain local --name="${validators[$i]}" \
+    --bootnodes=/ip4/127.0.0.1/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn \
     --notebook-archive-hosts="$NOTEBOOK_ARCHIVE" \
     --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
-    --pruning=archive -lRUST_LOG=info,argon=trace,ismp=trace \
-    --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \
+    --pruning=archive -lRUST_LOG=info,argon=trace,pallet=trace,argon_notary_apis=info,argon_node_consensus::notary_client=info,argon_node_consensus::aux_client=info \
+    --unsafe-rpc-external --rpc-methods=unsafe \
+    --no-mdns \
+    $(if [ "$i" -eq 0 ]; then echo "--node-key=16ec4f460237d066d15d09a44959a7d49ea6405e98429826f1c28b9087bd60ea"; else echo "--unsafe-force-node-key-generation"; fi) \
     --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 2>&1 | \
     awk -v name="${validators[$i]}" '{printf "%-8s %s\n", name, $0; fflush()}' &
 done

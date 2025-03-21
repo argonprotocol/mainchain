@@ -313,6 +313,14 @@ pub fn run_compute_solver_threads<B, Proof, C>(
 					continue;
 				};
 
+				#[cfg(feature = "ci")]
+				{
+					// add some yielding to help CI tests with less cpus
+					if counter % 10 == 0 {
+						tokio::time::sleep(Duration::from_millis(10)).await;
+					}
+				}
+
 				counter += 1;
 				match solver.check_next() {
 					Ok(Some(nonce)) => worker.submit(nonce.nonce),

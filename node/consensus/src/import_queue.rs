@@ -19,7 +19,10 @@ use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_runtime::{
+	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	Justification,
+};
 use std::{marker::PhantomData, sync::Arc};
 
 /// A block importer for argon.
@@ -63,7 +66,19 @@ where
 		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
+		if block.state_action.skip_execution_checks() {
+			tracing::trace!(block_hash=?block.post_hash(), "Skipping import checks for warp/gap-filled block.");
+			block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+			return self.inner.import_block(block).await.map_err(Into::into);
+		}
+
 		let mut best_hash = *block.header.parent_hash();
+		tracing::trace!(
+			parent_hash=?best_hash,
+			block_hash=?block.post_hash,
+			has_state=block.with_state(),
+			"Begin import."
+		);
 		// if we're importing a block with state, the parent might not be available yet, so use best
 		// hash
 		if block.with_state() &&
@@ -123,6 +138,30 @@ where
 	}
 }
 
+#[async_trait::async_trait]
+impl<B, I, C, AC> sc_consensus::JustificationImport<B> for ArgonBlockImport<B, I, C, AC>
+where
+	B: BlockT,
+	I: sc_consensus::JustificationImport<B> + Send + Sync,
+	C: AuxStore + Send + Sync,
+	AC: Codec + Send + Sync,
+{
+	type Error = I::Error;
+
+	async fn on_start(&mut self) -> Vec<(B::Hash, NumberFor<B>)> {
+		self.inner.on_start().await
+	}
+
+	async fn import_justification(
+		&mut self,
+		hash: B::Hash,
+		number: NumberFor<B>,
+		justification: Justification,
+	) -> Result<(), Self::Error> {
+		self.inner.import_justification(hash, number, justification).await
+	}
+}
+
 #[allow(dead_code)]
 struct Verifier<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
@@ -154,6 +193,12 @@ where
 		// This is done for example when gap syncing and it is expected that the block after the gap
 		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
 		if block_params.state_action.skip_execution_checks() || block_params.with_state() {
+			tracing::trace!(
+				block_hash=?block_params.post_hash(),
+				has_state = block_params.with_state(),
+				skip_execution = block_params.state_action.skip_execution_checks(),
+				"Verify block skipping."
+			);
 			// When we are importing only the state of a block, it will be the best block.
 			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(block_params.with_state()));
 			return Ok(block_params)

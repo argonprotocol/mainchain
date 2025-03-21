@@ -70,9 +70,6 @@ pub mod pallet {
 			+ TypeInfo
 			+ MaxEncodedLen;
 
-		/// The minimum allowable balance for an account to hold
-		type ExistentialDeposit: Get<<Self as Config>::Balance>;
-
 		type NotebookProvider: NotebookProvider;
 		type NotebookTick: Get<Tick>;
 		type EventHandler: BurnEventHandler<<Self as Config>::Balance>;

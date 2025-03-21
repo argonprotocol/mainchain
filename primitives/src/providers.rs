@@ -208,9 +208,9 @@ pub trait BlockSealerProvider<AccountId: FullCodec> {
 }
 
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
-	fn get_rewards_account(author: &AccountId) -> Option<(AccountId, CohortId)>;
-	/// Returns all rewards accounts and the share they receive
-	fn get_all_rewards_accounts() -> Vec<AccountId>;
+	fn get_block_rewards_account(author: &AccountId) -> Option<(AccountId, CohortId)>;
+	/// Returns mint reward accounts
+	fn get_mint_rewards_accounts() -> Vec<(AccountId, CohortId)>;
 	/// Is a compute block still eligible for rewards?
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }

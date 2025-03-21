@@ -13,6 +13,7 @@ use argon_primitives::{
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	SlotEvents, TickProvider,
 };
+use codec::Codec;
 use frame_support::{
 	pallet_prelude::*,
 	traits::{
@@ -174,6 +175,7 @@ pub mod pallet {
 		type TickProvider: TickProvider<Self::Block>;
 
 		/// The increment that bids can be on (for instance, one cent increments)
+		#[pallet::constant]
 		type BidIncrements: Get<Self::Balance>;
 	}
 
@@ -194,16 +196,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
-	/// Authorities are the session keys that are actively participating in the network.
-	/// The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
+	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
+	/// the miner and the block hash at time of activation.
 	#[pallet::storage]
-	pub(super) type AuthorityHashByIndex<T: Config> =
+	pub(super) type MinerXorKeyByIndex<T: Config> =
 		StorageValue<_, BoundedBTreeMap<MinerIndex, U256, T::MaxMiners>, ValueQuery>;
-
-	/// Keys in use
-	#[pallet::storage]
-	pub(super) type AuthorityIdToMinerId<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::MiningAuthorityId, T::AccountId, OptionQuery>;
 
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
@@ -219,6 +216,14 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type NextSlotCohort<T: Config> =
 		StorageValue<_, BoundedVec<Registration<T>, T::MaxCohortSize>, ValueQuery>;
+
+	/// The miners released in the last block (only kept for a single block)
+	#[pallet::storage]
+	pub(super) type ReleasedMinersByAccountId<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<T::AccountId, Registration<T>, T::MaxCohortSize>,
+		ValueQuery,
+	>;
 
 	/// Is the next slot still open for bids
 	#[pallet::storage]
@@ -262,6 +267,7 @@ pub mod pallet {
 		NewMiners {
 			start_index: MinerIndex,
 			new_miners: BoundedVec<Registration<T>, T::MaxCohortSize>,
+			released_miners: u32,
 			cohort_id: CohortId,
 		},
 		SlotBidderAdded {
@@ -270,10 +276,6 @@ pub mod pallet {
 			index: u32,
 		},
 		SlotBidderDropped {
-			account_id: T::AccountId,
-			preserved_argonot_hold: bool,
-		},
-		ReleasedMinerSeat {
 			account_id: T::AccountId,
 			preserved_argonot_hold: bool,
 		},
@@ -329,16 +331,8 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
+		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let current_cohort_id = LastActivatedCohortId::<T>::get();
-			let next_cohort_id = Self::calculate_cohort_id();
-			if next_cohort_id > current_cohort_id {
-				log::trace!("Starting Slot {}", next_cohort_id);
-				Self::adjust_argonots_per_seat();
-				Self::start_new_slot(next_cohort_id);
-				return T::DbWeight::get().reads_writes(0, 2);
-			}
-
 			if current_cohort_id == 0 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
 				Self::is_slot_bidding_started()
@@ -350,24 +344,38 @@ pub mod pallet {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 
-			// rotate grandpas on off rotations
+			// clear out previous miners
+			ReleasedMinersByAccountId::<T>::take();
+
+			T::DbWeight::get().reads_writes(2, 2)
+		}
+
+		fn on_finalize(n: BlockNumberFor<T>) {
+			let current_cohort_id = LastActivatedCohortId::<T>::get();
+			let next_cohort_id = Self::calculate_cohort_id();
+			if next_cohort_id > current_cohort_id {
+				log::trace!("Starting Slot {}", next_cohort_id);
+				Self::adjust_argonots_per_seat();
+				Self::start_new_slot(next_cohort_id);
+				// new slot will rotate grandpas. Return so we don't do it again below
+				return;
+			}
+
 			let rotate_grandpa_blocks =
 				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
-			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(block_number);
+			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
+			// rotate grandpas on off rotations
 			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
 				T::SlotEvents::rotate_grandpas::<T::Keys>(current_cohort_id, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
-				return T::DbWeight::get().reads_writes(3, 2)
 			}
-
-			T::DbWeight::get().reads_writes(2, 0)
 		}
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
-		/// a slot can be supplanted by supplying a higher bid.
+		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
+		/// cohort, a bidder can be supplanted by supplying a higher bid.
 		///
 		/// Each slot has `MaxCohortSize` spots available.
 		///
@@ -375,8 +383,8 @@ pub mod pallet {
 		/// this account. The required amount is calculated as a percentage of the total ownership
 		/// tokens in the network. This percentage is adjusted before the beginning of each slot.
 		///
-		/// If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring
-		/// for this event, you will be able to ensure your bid is accepted.
+		/// If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
+		/// monitoring for this event, you will be able to ensure your bid is accepted.
 		///
 		/// NOTE: bidding for each slot will be closed at a random block within
 		/// `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
@@ -408,27 +416,21 @@ pub mod pallet {
 				Error::<T>::InvalidBidAmount
 			);
 
-			let miner_authority_id = keys
-				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				.ok_or(Error::<T>::InvalidKeyFormat)?;
-			if let Some(registrant) = AuthorityIdToMinerId::<T>::get(&miner_authority_id) {
-				ensure!(registrant == miner_account_id, Error::<T>::CannotRegisterDuplicateKeys);
-			}
-
-			if let Some(current_index) = <AccountIndexLookup<T>>::get(&miner_account_id) {
-				let cohort_start_index = Self::get_next_slot_starting_index();
-				let is_in_next_cohort = current_index >= cohort_start_index &&
-					current_index < (cohort_start_index + T::MaxCohortSize::get());
-
-				// current_index must be in the set of miners being replaced
-				ensure!(is_in_next_cohort, Error::<T>::CannotRegisterOverlappingSessions);
-			}
-
-			Self::send_argons_to_pool(&funding_account, bid)?;
-
+			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
 			let current_registration = Self::get_active_registration(&miner_account_id);
-			let ownership_tokens = Self::hold_argonots(&funding_account, current_registration)?;
 			let next_cohort_id = LastActivatedCohortId::<T>::get().saturating_add(1);
+			if let Some(ref registration) = current_registration {
+				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
+				// ensure we are not overlapping sessions
+				ensure!(
+					registration.cohort_id + cohorts as CohortId == next_cohort_id,
+					Error::<T>::CannotRegisterOverlappingSessions
+				);
+			}
+
+			Self::send_argons_to_pool(&funding_account, &existing_bid, bid)?;
+			let ownership_tokens =
+				Self::hold_argonots(&funding_account, &existing_bid, &current_registration)?;
 			<NextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
 				if let Some(existing_position) =
 					cohort.iter().position(|x| x.account_id == miner_account_id)
@@ -486,10 +488,7 @@ pub mod pallet {
 						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
 					}
 				});
-				AuthorityIdToMinerId::<T>::insert(
-					miner_authority_id.clone(),
-					miner_account_id.clone(),
-				);
+
 				Self::deposit_event(Event::<T>::SlotBidderAdded {
 					account_id: miner_account_id.clone(),
 					bid_amount: bid,
@@ -543,24 +542,24 @@ pub mod pallet {
 	}
 }
 impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
-	fn get_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, CohortId)> {
-		let registration = Self::get_active_registration(author)?;
+	fn get_block_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, CohortId)> {
+		let released_miners = ReleasedMinersByAccountId::<T>::get();
+		if let Some(x) = released_miners.get(author) {
+			return Some((x.rewards_account(), x.cohort_id))
+		}
 
-		let reward_account = match registration.reward_destination {
-			RewardDestination::Owner => registration.account_id,
-			RewardDestination::Account(reward_id) => reward_id,
-		};
-		Some((reward_account, registration.cohort_id))
+		let registration = Self::get_active_registration(author)?;
+		Some((registration.rewards_account(), registration.cohort_id))
 	}
 
-	fn get_all_rewards_accounts() -> Vec<T::AccountId> {
+	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, CohortId)> {
 		let mut result = vec![];
 		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
 			let account = match registration.reward_destination {
 				RewardDestination::Owner => registration.account_id,
 				RewardDestination::Account(reward_id) => reward_id,
 			};
-			result.push(account);
+			result.push((account, registration.cohort_id));
 		}
 		result
 	}
@@ -583,7 +582,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 	fn xor_closest_authority(
 		seal_proof: U256,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let closest = find_xor_closest(<AuthorityHashByIndex<T>>::get(), seal_proof)?;
+		let closest = find_xor_closest(<MinerXorKeyByIndex<T>>::get(), seal_proof)?;
 
 		Self::get_mining_authority_by_index(closest)
 	}
@@ -631,61 +630,64 @@ impl<T: Config> Pallet<T> {
 
 		let slot_cohort = NextSlotCohort::<T>::take();
 
-		// if we never vrf closed, we need to rotate the pool
-		let needs_vault_bid_pool_rotation = IsNextSlotBiddingOpen::<T>::get();
-
 		IsNextSlotBiddingOpen::<T>::put(true);
 
 		let mut active_miners = ActiveMinersCount::<T>::get();
-		let mut authority_hash_by_index = AuthorityHashByIndex::<T>::get();
+		let mut miner_xor_by_index = MinerXorKeyByIndex::<T>::get();
 		let mut added_miners = vec![];
 		let mut removed_miners = vec![];
+		let mut released_miners_by_account_id = BoundedBTreeMap::new();
+
+		let parent_hash: T::Hash = frame_system::Pallet::<T>::parent_hash();
 
 		for i in 0..cohort_size {
 			let index = i + start_index_to_replace_miners;
 
-			authority_hash_by_index.remove(&index);
+			miner_xor_by_index.remove(&index);
 			if let Some(entry) = ActiveMinersByIndex::<T>::take(index) {
 				let account_id = entry.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
 				active_miners -= 1;
 
 				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
+				let _ = released_miners_by_account_id.try_insert(account_id.clone(), entry.clone());
 				removed_miners.push((account_id, entry.authority_keys.clone()));
-				Self::release_mining_seat_obligations(entry, registered_for_next);
-			}
-
-			if let Some(entry) = slot_cohort.get(i as usize) {
-				AccountIndexLookup::<T>::insert(&entry.account_id, index);
-				active_miners += 1;
-				ActiveMinersByIndex::<T>::insert(index, entry.clone());
-				added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
-				if let Some(authority_id) =
-					entry.authority_keys.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-				{
-					let hash = blake2_256(&authority_id.to_raw_vec());
-					authority_hash_by_index
-						.try_insert(index, U256::from_big_endian(&hash))
-						.expect("only insert if we've removed first, ergo, should be impossible");
-				}
+				Self::release_mining_seat_obligations(&entry, registered_for_next);
 			}
 		}
 
-		<AuthorityHashByIndex<T>>::put(authority_hash_by_index);
-		ActiveMinersCount::<T>::put(active_miners);
+		// After all accounts are removed, we can add the new cohort members (otherwise, we can add
+		// and then remove after if sorted differently with same account)
+		for (i, entry) in slot_cohort.iter().enumerate() {
+			let index = i as u32 + start_index_to_replace_miners;
+			AccountIndexLookup::<T>::insert(&entry.account_id, index);
+			ActiveMinersByIndex::<T>::insert(index, entry.clone());
+			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
+			active_miners += 1;
 
+			let hash =
+				MinerXor::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
+					.using_encoded(blake2_256);
+			miner_xor_by_index
+				.try_insert(index, U256::from_big_endian(&hash))
+				.expect("safe because we removed in pass 1");
+		}
+
+		<MinerXorKeyByIndex<T>>::put(miner_xor_by_index);
+		ActiveMinersCount::<T>::put(active_miners);
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
+			released_miners: removed_miners.len() as u32,
 			cohort_id,
 		});
+
+		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
 		LastActivatedCohortId::<T>::put(cohort_id);
 		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
 		T::SlotEvents::on_new_cohort(cohort_id);
-		if needs_vault_bid_pool_rotation {
-			let end_tick = T::TickProvider::current_tick() + Self::mining_window_ticks();
-			T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
-		}
+		let end_tick = T::TickProvider::current_tick() + Self::mining_window_ticks();
+		T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
@@ -780,8 +782,6 @@ impl<T: Config> Pallet<T> {
 			info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
 			let cohort_id = LastActivatedCohortId::<T>::get() + 1;
 			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_id });
-			let end_tick = Self::get_next_slot_tick() + Self::mining_window_ticks();
-			T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
 			return true
 		}
 
@@ -840,13 +840,6 @@ impl<T: Config> Pallet<T> {
 		(cohort_id as u32 * cohort_size) % max_miners
 	}
 
-	pub(crate) fn get_next_slot_starting_index() -> u32 {
-		let current_cohort_id = LastActivatedCohortId::<T>::get();
-		let cohort_size = T::MaxCohortSize::get();
-
-		Self::get_slot_starting_index(current_cohort_id + 1, T::MaxMiners::get(), cohort_size)
-	}
-
 	pub fn get_mining_window_ticks() -> Tick {
 		let miners = T::MaxMiners::get() as u64;
 		let ticks_between_slots = Self::ticks_between_slots();
@@ -868,44 +861,15 @@ impl<T: Config> Pallet<T> {
 		NextSlotCohort::<T>::get().into_iter().find(|x| x.account_id == *account_id)
 	}
 
-	pub(crate) fn hold_argonots(
-		who: &T::AccountId,
-		current_registration: Option<Registration<T>>,
-	) -> Result<T::Balance, DispatchError> {
-		let argonots = ArgonotsPerMiningSeat::<T>::get();
-		let next_registration = Self::get_pending_cohort_registration(who);
-		let mut argonots_needed = argonots;
-
-		// if we've already held for next, reduce now
-		if let Some(next) = next_registration {
-			argonots_needed -= next.argonots;
-		} else if let Some(current_registration) = current_registration {
-			argonots_needed -= current_registration.argonots;
-		}
-
-		if argonots_needed == 0u32.into() {
-			return Ok(argonots);
-		}
-
-		let hold_reason = HoldReason::RegisterAsMiner;
-		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), who) == 0u32.into() {
-			frame_system::Pallet::<T>::inc_providers(who);
-		}
-
-		T::OwnershipCurrency::hold(&hold_reason.into(), who, argonots_needed)
-			.map_err(|_| Error::<T>::InsufficientOwnershipTokens)?;
-		Ok(argonots)
-	}
-
 	pub(crate) fn send_argons_to_pool(
 		miner_funding_account: &T::AccountId,
+		existing_bid: &Option<Registration<T>>,
 		bid_amount: T::Balance,
 	) -> Result<T::Balance, DispatchError> {
-		let bid_registration = Self::get_pending_cohort_registration(miner_funding_account);
 		let mut needed = bid_amount;
 
 		// if we've already held for next, reduce now
-		if let Some(existing) = bid_registration {
+		if let Some(existing) = existing_bid {
 			ensure!(bid_amount > existing.bid, Error::<T>::BidCannotBeReduced);
 			needed -= existing.bid;
 		}
@@ -914,7 +878,7 @@ impl<T: Config> Pallet<T> {
 			ensure!(
 				T::ArgonCurrency::reducible_balance(
 					miner_funding_account,
-					Preservation::Preserve,
+					Preservation::Protect,
 					Fortitude::Force
 				) >= needed,
 				Error::<T>::InsufficientFunds
@@ -923,10 +887,44 @@ impl<T: Config> Pallet<T> {
 				miner_funding_account,
 				&pool_account,
 				needed,
-				Preservation::Preserve,
+				Preservation::Expendable,
 			)?;
 		}
 		Ok(needed)
+	}
+
+	pub(crate) fn hold_argonots(
+		funding_account_id: &T::AccountId,
+		existing_bid: &Option<Registration<T>>,
+		current_registration: &Option<Registration<T>>,
+	) -> Result<T::Balance, DispatchError> {
+		// if we have an existing bid, we don't need to hold again
+		if let Some(existing) = existing_bid {
+			return Ok(existing.argonots);
+		}
+
+		let argonots = ArgonotsPerMiningSeat::<T>::get();
+		let mut argonots_needed = argonots;
+
+		// if we've already held for next, reduce now
+		if let Some(current_registration) = current_registration {
+			argonots_needed -= current_registration.argonots;
+		}
+
+		if argonots_needed == 0u32.into() {
+			return Ok(argonots);
+		}
+
+		let hold_reason = HoldReason::RegisterAsMiner;
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), funding_account_id) ==
+			0u32.into()
+		{
+			frame_system::Pallet::<T>::inc_providers(funding_account_id);
+		}
+
+		T::OwnershipCurrency::hold(&hold_reason.into(), funding_account_id, argonots_needed)
+			.map_err(|_| Error::<T>::InsufficientOwnershipTokens)?;
+		Ok(argonots)
 	}
 
 	fn release_argonots_hold(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
@@ -946,46 +944,32 @@ impl<T: Config> Pallet<T> {
 	/// Release the argonots from the mining seat. If the Argonots will be re-used in the next
 	/// era, we should not unlock it
 	pub(crate) fn release_mining_seat_obligations(
-		active_registration: Registration<T>,
+		active_registration: &Registration<T>,
 		is_registered_for_next: bool,
 	) {
-		let account_id = active_registration.account_id;
-
-		let funding_account =
-			active_registration.external_funding_account.unwrap_or(account_id.clone());
-
-		let mut preserved_argonot_hold = true;
-		if !is_registered_for_next {
-			preserved_argonot_hold = false;
-
-			if let Some(authority_id) = active_registration
-				.authority_keys
-				.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-			{
-				AuthorityIdToMinerId::<T>::remove(authority_id);
-			}
-
-			if let Err(e) =
-				Self::release_argonots_hold(&funding_account, active_registration.argonots)
-			{
-				log::error!(
-					"Failed to release argonots from funding account {:?} (account {:?}). {:?}",
-					funding_account,
-					account_id,
-					e,
-				);
-				Self::deposit_event(Event::<T>::ReleaseMinerSeatError {
-					account_id: account_id.clone(),
-					error: e,
-				});
-				return;
-			}
+		if is_registered_for_next {
+			return;
 		}
+		let account_id = &active_registration.account_id;
 
-		Self::deposit_event(Event::<T>::ReleasedMinerSeat {
-			account_id: account_id.clone(),
-			preserved_argonot_hold,
-		});
+		let funding_account = active_registration
+			.external_funding_account
+			.clone()
+			.unwrap_or(account_id.clone());
+
+		if let Err(e) = Self::release_argonots_hold(&funding_account, active_registration.argonots)
+		{
+			log::error!(
+				"Failed to release argonots from funding account {:?} (account {:?}). {:?}",
+				funding_account,
+				account_id,
+				e,
+			);
+			Self::deposit_event(Event::<T>::ReleaseMinerSeatError {
+				account_id: account_id.clone(),
+				error: e,
+			});
+		}
 	}
 
 	pub(crate) fn release_failed_bid(registration: &Registration<T>) -> DispatchResult {
@@ -1010,11 +994,6 @@ impl<T: Config> Pallet<T> {
 		if let Some(active) = Self::get_active_registration(&account_id) {
 			argonots_to_unhold -= active.argonots;
 			held_argonots = true;
-		} else if let Some(authority_id) = registration
-			.authority_keys
-			.get::<T::MiningAuthorityId>(T::MiningAuthorityId::ID)
-		{
-			AuthorityIdToMinerId::<T>::remove(authority_id);
 		}
 
 		Self::release_argonots_hold(&funding_account, argonots_to_unhold)?;
@@ -1030,6 +1009,17 @@ impl<T: Config> Pallet<T> {
 	fn ticks_between_slots() -> Tick {
 		MiningConfig::<T>::get().ticks_between_slots
 	}
+
+	pub fn bid_pool_balance() -> T::Balance {
+		let account_id = T::BidPoolProvider::get_bid_pool_account();
+		T::ArgonCurrency::balance(&account_id)
+	}
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+pub struct MinerXor<T: Config> {
+	pub account_id: T::AccountId,
+	pub block_hash: T::Hash,
 }
 
 impl<T: Config> MiningSlotProvider for Pallet<T> {
@@ -1085,7 +1075,8 @@ impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 
 sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
-	pub trait MiningSlotApi {
+	pub trait MiningSlotApi<Balance> where Balance: Codec {
 		fn next_slot_era() -> (Tick, Tick);
+		fn bid_pool() -> Balance;
 	}
 }

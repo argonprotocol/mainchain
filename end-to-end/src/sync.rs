@@ -2,7 +2,7 @@ use argon_testing::ArgonTestNode;
 use serde::{Deserialize, Serialize};
 use serial_test::serial;
 use std::env;
-use subxt::rpc_params;
+use subxt::ext::subxt_rpcs::rpc_params;
 use tokio::select;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -53,20 +53,27 @@ async fn test_can_prove_finality() {
 	}
 
 	// now can we warp sync forward?
-	let mut miner_3_args = grandpa_miner.get_fork_args("charlie", miner_threads);
+	let mut miner_3_args = grandpa_miner.get_fork_args("charlie", 0);
 	miner_3_args.is_archive_node = false;
+	miner_3_args.is_validator = false;
 	miner_3_args.extra_flags.push("--sync=warp".to_string());
-	// miner_3_args.rust_log += ",sync=trace";
-	let miner_2 = grandpa_miner.fork_node_with(miner_3_args).await.unwrap();
-	let mut blocks_sub = miner_2.client.live.blocks().subscribe_finalized().await.unwrap();
+	miner_3_args.rust_log += ",sync=trace,warp=trace";
+	let miner_3 = grandpa_miner.fork_node_with(miner_3_args).await.unwrap();
+	println!("Charlie started");
+	let mut blocks_sub = miner_3.client.live.blocks().subscribe_finalized().await.unwrap();
 
 	// wait for blocks sub, timeout after 30 seconds
-	let mut finalized_count = grandpa_miner.client.latest_finalized_block().await.unwrap();
+	let finalized_count = grandpa_miner.client.latest_finalized_block().await.unwrap();
+	let starting_finalized = miner_3.client.latest_finalized_block().await.unwrap();
+	let mut catchup_blocks = finalized_count.saturating_sub(starting_finalized);
 	loop {
+		if catchup_blocks == 0 {
+			break;
+		}
 		select! {
 			Some(_block) = blocks_sub.next() => {
-				finalized_count -= 1;
-				if finalized_count == 0 {
+				catchup_blocks -= 1;
+				if catchup_blocks == 0 {
 					break;
 				}
 			}
@@ -75,7 +82,7 @@ async fn test_can_prove_finality() {
 			}
 		}
 	}
-	assert_eq!(finalized_count, 0);
+	assert_eq!(catchup_blocks, 0);
 
 	drop(miner_1);
 	drop(grandpa_miner);

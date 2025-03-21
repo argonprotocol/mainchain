@@ -2,6 +2,7 @@ use env_logger::{Builder, Env};
 use frame_support::{derive_impl, parameter_types};
 use pallet_balances::AccountData;
 use sp_arithmetic::{FixedI128, FixedU128};
+use sp_core::ConstU32;
 use sp_runtime::BuildStorage;
 
 use crate as pallet_mint;
@@ -51,7 +52,7 @@ parameter_types! {
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
-	pub static MinerRewardsAccounts: Vec<u64> = vec![];
+	pub static MinerRewardsAccounts: Vec<(u64, CohortId)> = vec![];
 	pub static UniswapLiquidity: Balance = 100_000;
 }
 
@@ -73,11 +74,11 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_rewards_account(_author: &u64) -> Option<(u64, CohortId)> {
+	fn get_block_rewards_account(_author: &u64) -> Option<(u64, CohortId)> {
 		todo!("not used by mint")
 	}
 
-	fn get_all_rewards_accounts() -> Vec<u64> {
+	fn get_mint_rewards_accounts() -> Vec<(u64, CohortId)> {
 		MinerRewardsAccounts::get()
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {
@@ -93,6 +94,7 @@ impl pallet_mint::Config for Test {
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
 	type PriceProvider = StaticPriceProvider;
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
+	type MaxMintHistoryToMaintain = ConstU32<10>;
 }
 
 // Build genesis storage according to the mock runtime.

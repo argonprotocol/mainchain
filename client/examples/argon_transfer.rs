@@ -24,13 +24,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let alice_account = argon_client::types::AccountId32::from(Alice.to_account_id());
 	let transfer_query = api::tx().balances().transfer_allow_death(alice_account.into(), 1_000_000);
 
-	let latest_block = client.blocks().at_latest().await?;
-
 	// transaction to live for 32 blocks from the `latest_block` above.
-	let tx_params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
-		.tip(100)
-		.mortal(latest_block.header(), 32)
-		.build();
+	let tx_params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new().tip(100).mortal(32).build();
 
 	let mut sub = client
 		.tx()

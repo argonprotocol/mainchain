@@ -35,7 +35,6 @@ import type {
   ArgonPrimitivesBitcoinBitcoinXPub,
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesBitcoinUtxoValue,
-  ArgonPrimitivesBlockSealAppPublic,
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealMiningBidStats,
   ArgonPrimitivesBlockSealMiningRegistration,
@@ -797,25 +796,6 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<u128>,
         []
       >;
-      /**
-       * Authorities are the session keys that are actively participating in the network.
-       * The tuple is the authority, and the blake2 256 hash of the authority used for xor lookups
-       **/
-      authorityHashByIndex: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u32, U256>>,
-        []
-      >;
-      /**
-       * Keys in use
-       **/
-      authorityIdToMinerId: AugmentedQuery<
-        ApiType,
-        (
-          arg: ArgonPrimitivesBlockSealAppPublic | string | Uint8Array,
-        ) => Observable<Option<AccountId32>>,
-        [ArgonPrimitivesBlockSealAppPublic]
-      >;
       hasAddedGrandpaRotation: AugmentedQuery<
         ApiType,
         () => Observable<bool>,
@@ -842,6 +822,15 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       lastActivatedCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
+       * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
+       * the miner and the block hash at time of activation.
+       **/
+      minerXorKeyByIndex: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u32, U256>>,
+        []
+      >;
+      /**
        * The mining slot configuration set in genesis
        **/
       miningConfig: AugmentedQuery<
@@ -858,6 +847,16 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
+      /**
+       * The miners released in the last block (only kept for a single block)
+       **/
+      releasedMinersByAccountId: AugmentedQuery<
+        ApiType,
+        () => Observable<
+          BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>
+        >,
+        []
+      >;
     };
     mint: {
       blockMintAction: AugmentedQuery<
@@ -865,7 +864,21 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<ITuple<[u32, PalletMintMintAction]>>,
         []
       >;
+      /**
+       * The amount of argons minted per cohort for mining
+       **/
+      miningMintPerCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, u128>>,
+        []
+      >;
+      /**
+       * The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
+       **/
       mintedBitcoinArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
+      /**
+       * The total amount of argons minted for mining
+       **/
       mintedMiningArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
       /**
        * Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever

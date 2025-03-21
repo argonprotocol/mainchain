@@ -149,11 +149,11 @@ impl NotebookProvider for TestProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_rewards_account(author: &u64) -> Option<(u64, CohortId)> {
+	fn get_block_rewards_account(author: &u64) -> Option<(u64, CohortId)> {
 		AccountCohorts::get().iter().find(|(a, _)| a == author).cloned()
 	}
 
-	fn get_all_rewards_accounts() -> Vec<u64> {
+	fn get_mint_rewards_accounts() -> Vec<(u64, CohortId)> {
 		todo!("not used by rewards")
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {

@@ -2,8 +2,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
-		AuthorityHashByIndex, AuthorityIdToMinerId, HistoricalBidsPerSlot, IsNextSlotBiddingOpen,
-		LastActivatedCohortId, MiningConfig, NextSlotCohort,
+		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastActivatedCohortId, MinerXorKeyByIndex,
+		MiningConfig, NextSlotCohort,
 	},
 	Error, Event, HoldReason, Registration,
 };
@@ -13,12 +13,14 @@ use argon_primitives::{
 };
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
+	pallet_prelude::*,
 	traits::{
 		fungible::{InspectHold, Unbalanced},
-		Currency, OnInitialize,
+		Currency,
 	},
 };
-use pallet_balances::Event as OwnershipEvent;
+use frame_system::AccountInfo;
+use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use sp_core::{blake2_256, bounded_vec, H256, U256};
 use sp_runtime::{testing::UintAuthorityId, BoundedVec};
 use std::{collections::HashMap, env};
@@ -41,6 +43,7 @@ fn it_doesnt_add_cohorts_until_time() {
 		}]);
 
 		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
 
 		assert_eq!(NextSlotCohort::<Test>::get().len(), 1);
 		assert_eq!(NextSlotCohort::<Test>::get()[0].reward_destination, RewardDestination::Owner,);
@@ -86,18 +89,21 @@ fn calculate_cohort_id() {
 		ElapsedTicks::set(current_tick - genesis);
 		// bidding should open at 20k
 		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
 		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 		// now go to 20k
 		current_tick += 1;
 		CurrentTick::set(current_tick);
 		ElapsedTicks::set(current_tick - genesis);
 		MiningSlots::on_initialize(2);
+		MiningSlots::on_finalize(2);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 
 		current_tick += ticks_between_slots - 1;
 		CurrentTick::set(current_tick);
 		ElapsedTicks::set(current_tick - genesis);
 		MiningSlots::on_initialize(3);
+		MiningSlots::on_finalize(3);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1);
 		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1);
@@ -112,6 +118,7 @@ fn calculate_cohort_id() {
 		ElapsedTicks::mutate(|a| *a += 1u64);
 		CurrentTick::set(current_tick);
 		MiningSlots::on_initialize(4);
+		MiningSlots::on_finalize(4);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
@@ -154,6 +161,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		CurrentTick::set(current_tick);
 		ElapsedTicks::set(current_tick - genesis);
 		MiningSlots::on_initialize(2);
+		MiningSlots::on_finalize(2);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1440);
@@ -168,6 +176,7 @@ fn extends_bidding_if_mining_slot_extends() {
 			a.slot_bidding_start_after_ticks = 21_000;
 		});
 		MiningSlots::on_initialize(3);
+		MiningSlots::on_finalize(3);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
 			0,
@@ -180,6 +189,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		ElapsedTicks::set(current_tick - genesis);
 		CurrentTick::set(current_tick);
 		MiningSlots::on_initialize(4);
+		MiningSlots::on_finalize(4);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		// now it's bumped out
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1000);
@@ -191,6 +201,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		ElapsedTicks::set(current_tick - genesis);
 		CurrentTick::set(current_tick);
 		MiningSlots::on_initialize(5);
+		MiningSlots::on_finalize(5);
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
 		assert_eq!(LastActivatedCohortId::<Test>::get(), 1,);
 		assert_eq!(
@@ -244,7 +255,7 @@ fn it_adds_new_cohorts_on_block() {
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
-			AuthorityHashByIndex::<Test>::try_mutate(|index| {
+			MinerXorKeyByIndex::<Test>::try_mutate(|index| {
 				let hash = blake2_256(&account_id.to_le_bytes());
 				index.try_insert(i, U256::from_big_endian(&hash))
 			})
@@ -270,6 +281,7 @@ fn it_adds_new_cohorts_on_block() {
 		assert_eq!(MiningSlots::calculate_cohort_id(), 4);
 		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
 		MiningSlots::on_initialize(10);
+		MiningSlots::on_finalize(10);
 		assert_eq!(LastActivatedCohortId::<Test>::get(), 4);
 
 		// re-fetch
@@ -279,7 +291,7 @@ fn it_adds_new_cohorts_on_block() {
 			"Should have 3 validators still after insertion"
 		);
 		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
-		let authority_hashes = AuthorityHashByIndex::<Test>::get().into_inner();
+		let authority_hashes = MinerXorKeyByIndex::<Test>::get().into_inner();
 		assert_eq!(
 			NextSlotCohort::<Test>::get().len(),
 			0,
@@ -318,6 +330,7 @@ fn it_adds_new_cohorts_on_block() {
 			Event::NewMiners {
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(cohort.to_vec()),
+				released_miners: 2,
 				cohort_id: LastActivatedCohortId::<Test>::get(),
 			}
 			.into(),
@@ -348,7 +361,8 @@ fn it_releases_argonots_when_a_window_closes() {
 			set_argons(account_id, 10_000u32.into());
 
 			let bond_amount = (1000u32 + i).into();
-			let ownership_tokens = MiningSlots::hold_argonots(&account_id, None).ok().unwrap();
+			let ownership_tokens =
+				MiningSlots::hold_argonots(&account_id, &None, &None).ok().unwrap();
 
 			ActiveMinersByIndex::<Test>::insert(
 				i,
@@ -381,6 +395,7 @@ fn it_releases_argonots_when_a_window_closes() {
 		System::set_block_number(8);
 
 		MiningSlots::on_initialize(8);
+		MiningSlots::on_finalize(8);
 
 		System::assert_last_event(
 			Event::NewMiners {
@@ -395,6 +410,7 @@ fn it_releases_argonots_when_a_window_closes() {
 					cohort_id: 4,
 					external_funding_account: None,
 				}]),
+				released_miners: 2,
 			}
 			.into(),
 		);
@@ -407,10 +423,6 @@ fn it_releases_argonots_when_a_window_closes() {
 			.into(),
 		);
 
-		System::assert_has_event(
-			Event::<Test>::ReleasedMinerSeat { account_id: 3, preserved_argonot_hold: false }
-				.into(),
-		);
 		assert_eq!(Ownership::free_balance(2), 0);
 		assert_eq!(Ownership::total_balance(&2), 1000);
 
@@ -443,6 +455,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 		set_ownership(3, 5000u32.into());
 		let share_amount = 500;
 		MiningSlots::on_initialize(6);
+		MiningSlots::on_finalize(6);
 		ArgonotsPerMiningSeat::<Test>::set(share_amount);
 
 		assert_err!(
@@ -503,6 +516,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 			System::set_block_number(i);
 
 			MiningSlots::on_initialize(i);
+			MiningSlots::on_finalize(i);
 			assert_err!(
 				MiningSlots::bid(
 					RuntimeOrigin::signed(2),
@@ -519,6 +533,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		ElapsedTicks::set(12 + TicksBetweenSlots::get());
 		CurrentTick::set(12 + TicksBetweenSlots::get());
 		MiningSlots::on_initialize(12 + TicksBetweenSlots::get());
+		MiningSlots::on_finalize(12 + TicksBetweenSlots::get());
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
 		assert_ok!(MiningSlots::bid(
@@ -530,6 +545,14 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		));
 	});
 }
+
+fn get_next_slot_starting_index() -> u32 {
+	let current_cohort_id = LastActivatedCohortId::<Test>::get();
+	let cohort_size = MaxCohortSize::get();
+
+	MiningSlots::get_slot_starting_index(current_cohort_id + 1, MaxMiners::get(), cohort_size)
+}
+
 #[test]
 fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	TicksBetweenSlots::set(4);
@@ -546,10 +569,11 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		LastActivatedCohortId::<Test>::put(MiningSlots::calculate_cohort_id());
 
 		assert_eq!(MiningSlots::get_next_slot_era(), (16, 16 + (4 * 3)));
-		assert_eq!(MiningSlots::get_next_slot_starting_index(), 2);
+		assert_eq!(get_next_slot_starting_index(), 2);
 		set_ownership(2, 100u32.into());
 		set_ownership(1, 100u32.into());
 		MiningSlots::on_initialize(12);
+		MiningSlots::on_finalize(12);
 
 		let ownership = (200 / 6) as u128;
 		ArgonotsPerMiningSeat::<Test>::set(ownership);
@@ -564,6 +588,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		CurrentTick::set(16);
 		ElapsedTicks::set(16);
 		MiningSlots::on_initialize(16);
+		MiningSlots::on_finalize(16);
 
 		System::assert_last_event(
 			Event::NewMiners {
@@ -578,18 +603,20 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 					cohort_id: 4,
 					external_funding_account: None,
 				}]),
+				released_miners: 0,
 			}
 			.into(),
 		);
 		assert_eq!(MiningSlots::get_next_slot_era(), (20, 20 + (4 * 3)));
-		assert_eq!(MiningSlots::get_next_slot_starting_index(), 4);
+		assert_eq!(get_next_slot_starting_index(), 4);
 
 		CurrentTick::set(20);
 		ElapsedTicks::set(20);
 		System::set_block_number(20);
 		MiningSlots::on_initialize(20);
+		MiningSlots::on_finalize(20);
 		assert_eq!(MiningSlots::get_next_slot_era(), (24, 24 + (4 * 3)));
-		assert_eq!(MiningSlots::get_next_slot_starting_index(), 0);
+		assert_eq!(get_next_slot_starting_index(), 0);
 
 		assert_err!(
 			MiningSlots::bid(RuntimeOrigin::signed(1), 0, RewardDestination::Owner, 1.into(), None),
@@ -626,6 +653,7 @@ fn it_will_order_bids() {
 		set_ownership(3, 100_500u32.into());
 
 		MiningSlots::on_initialize(6);
+		MiningSlots::on_finalize(6);
 		let share_amount = 500;
 		ArgonotsPerMiningSeat::<Test>::set(share_amount);
 
@@ -762,10 +790,7 @@ fn it_will_order_bids() {
 		ElapsedTicks::set(9);
 		System::on_initialize(9);
 		MiningSlots::on_initialize(9);
-		assert_eq!(
-			AuthorityIdToMinerId::<Test>::iter_keys().collect::<Vec<_>>(),
-			vec![1u64.into(), 2u64.into()]
-		);
+		MiningSlots::on_finalize(9);
 		assert_eq!(Ownership::free_balance(3), 100_500);
 		assert_eq!(Ownership::total_balance(&3), 100_500);
 		assert_eq!(Balances::free_balance(3), 5_000_000);
@@ -798,6 +823,7 @@ fn it_will_order_bids() {
 						external_funding_account: None,
 					},
 				]),
+				released_miners: 0,
 			}
 			.into(),
 		);
@@ -814,6 +840,7 @@ fn handles_a_max_of_bids_per_block() {
 		System::set_block_number(4);
 		ElapsedTicks::set(4);
 		MiningSlots::on_initialize(4);
+		MiningSlots::on_finalize(4);
 		SlotBiddingStartAfterTicks::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
@@ -829,14 +856,9 @@ fn handles_a_max_of_bids_per_block() {
 			None
 		));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 1);
-		assert_eq!(AuthorityIdToMinerId::<Test>::get::<UintAuthorityId>(1.into()), Some(1));
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
-		);
-		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), 0, RewardDestination::Owner, 1.into(), None),
-			Error::<Test>::CannotRegisterDuplicateKeys
 		);
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
@@ -919,18 +941,6 @@ fn it_allows_bids_from_an_external_funding_account() {
 		);
 
 		// bid again as account 3
-
-		assert_err!(
-			MiningSlots::bid(
-				RuntimeOrigin::signed(1),
-				1_000_000,
-				RewardDestination::Owner,
-				1.into(),
-				Some(3)
-			),
-			Error::<Test>::CannotRegisterDuplicateKeys
-		);
-
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(1),
 			2_000_000,
@@ -986,6 +996,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 		CurrentTick::set(8);
 		System::set_block_number(8);
 		MiningSlots::on_initialize(8);
+		MiningSlots::on_finalize(8);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 4_000_000);
 		assert_eq!(Balances::free_balance(1), 1_100_000);
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 200_000);
@@ -1023,7 +1034,7 @@ fn it_can_get_closest_authority() {
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
 		}
-		AuthorityHashByIndex::<Test>::try_mutate(|a| {
+		MinerXorKeyByIndex::<Test>::try_mutate(|a| {
 			for i in 0..100u32 {
 				// these are normally hashed, but we'll simplify to ease the xor calculation
 				let hash = U256::from(i);
@@ -1081,9 +1092,6 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 
 		let cohort_id = LastActivatedCohortId::<Test>::get() + 1;
 		System::assert_last_event(Event::MiningBidsClosed { cohort_id }.into());
-		let era = MiningSlots::get_next_slot_era();
-
-		assert_eq!(LastBidPoolDistribution::get(), (cohort_id, era.1));
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
@@ -1183,18 +1191,22 @@ fn it_doesnt_accept_bids_until_first_slot() {
 	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
-		set_ownership(2, 1000u32.into());
-		ArgonotsPerMiningSeat::<Test>::set(1_000);
+		let argonots_per_seat = 1_000;
+		// use this test to ensure we can hold the entire ownership balance
+		set_ownership(2, argonots_per_seat + ExistentialDeposit::get());
+		ArgonotsPerMiningSeat::<Test>::set(argonots_per_seat);
 
 		System::set_block_number(1);
 		ElapsedTicks::set(12959);
 
 		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
 		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 
 		// bidding will start on the first (block % 1440 == 0)
 		ElapsedTicks::set(12960);
 		MiningSlots::on_initialize(12960);
+		MiningSlots::on_finalize(12960);
 		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_ok!(MiningSlots::bid(
@@ -1211,9 +1223,10 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		ElapsedTicks::set(next_divisible_period);
 		CurrentTick::set(next_divisible_period);
 		MiningSlots::on_initialize(next_divisible_period);
+		MiningSlots::on_finalize(next_divisible_period);
 		assert_eq!(LastActivatedCohortId::<Test>::get(), 1);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
-		assert_eq!(MiningSlots::get_next_slot_starting_index(), 20);
+		assert_eq!(get_next_slot_starting_index(), 20);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
 	});
 }
@@ -1226,6 +1239,7 @@ fn it_can_change_the_compute_mining_block() {
 		System::set_block_number(1);
 		ElapsedTicks::set(1);
 		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
 		let starting_config = MiningConfig::<Test>::get();
 		assert_ok!(MiningSlots::configure_mining_slot_delay(
 			RuntimeOrigin::root(),
@@ -1254,6 +1268,7 @@ fn it_should_rotate_grandpas() {
 		ElapsedTicks::set(1);
 		CurrentTick::set(1);
 		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
 		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
 		assert_eq!(GrandaRotations::get(), vec![0]);
 
@@ -1262,6 +1277,7 @@ fn it_should_rotate_grandpas() {
 		ElapsedTicks::set(4);
 		CurrentTick::set(4);
 		MiningSlots::on_initialize(4);
+		MiningSlots::on_finalize(4);
 		assert_eq!(GrandaRotations::get(), vec![0, 1]);
 
 		// should auto-increment and rotate
@@ -1269,6 +1285,65 @@ fn it_should_rotate_grandpas() {
 		ElapsedTicks::set(12_960);
 		CurrentTick::set(12_960);
 		MiningSlots::on_initialize(12_960);
+		MiningSlots::on_finalize(12_960);
 		assert_eq!(GrandaRotations::get(), vec![0, 1, 2]);
+	});
+}
+
+#[test]
+fn it_allows_a_bidder_to_use_their_full_balance() {
+	ExistentialDeposit::set(10_000);
+	new_test_ext().execute_with(|| {
+		set_argons(1, 1_000_000);
+		set_ownership(1, 1_000_000);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ArgonotsPerMiningSeat::<Test>::set(10_000);
+		// ### Use most of balance
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			900_000,
+			RewardDestination::Owner,
+			1.into(),
+			None
+		));
+
+		assert_eq!(Balances::free_balance(1), 100_000);
+		assert_eq!(System::providers(&1), 3);
+
+		// Can send the rest
+		assert_ok!(Balances::transfer_allow_death(RuntimeOrigin::signed(1), 2, 100_000));
+		assert!(System::account_exists(&1));
+
+		set_argons(2, 1_000_000);
+		set_ownership(2, 10_000);
+		System::inc_account_nonce(2);
+		// ### Use all of argonots and balance
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			1_000_000,
+			RewardDestination::Owner,
+			2.into(),
+			None
+		));
+		assert_eq!(Balances::free_balance(2), 0);
+		assert_eq!(System::providers(&2), 1);
+		assert!(System::account_exists(&2));
+		assert_eq!(System::account_nonce(2), 1);
+
+		// verify account is still here
+		assert_eq!(
+			System::account(2),
+			AccountInfo {
+				nonce: 1,
+				consumers: 1,
+				providers: 1,
+				sufficients: 0,
+				data: AccountData { free: 0, reserved: 0, flags: ExtraFlags::default(), frozen: 0 },
+			}
+		);
+		assert_eq!(Ownership::free_balance(2), 0);
+		assert_eq!(Ownership::total_balance(&2), 10_000);
+		assert_eq!(MiningSlots::bid_pool_balance(), 1_900_000);
 	});
 }

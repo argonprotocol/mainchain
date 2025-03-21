@@ -12,7 +12,7 @@ use std::env;
 #[serial]
 async fn test_import_of_block_with_notary_down() {
 	env::set_var("RUST_LOG", "info");
-	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", test_miner_count(), "").unwrap();
+	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
 	let archive_bucket = ArgonTestNotary::create_archive_bucket();
 	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
 	grandpa_miner.notebook_archive_urls.push(archive_host.clone());

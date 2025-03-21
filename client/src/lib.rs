@@ -12,7 +12,7 @@ use jsonrpsee::{
 use sp_core::{blake2_256, crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
 use subxt::{
-	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BlockRef},
+	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
 	config::{
 		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
 	},
@@ -28,7 +28,7 @@ use tokio::{
 	sync::{mpsc, Mutex, RwLock},
 	task::JoinHandle,
 };
-use tracing::{log::debug, warn};
+use tracing::{info, log::debug, warn};
 
 use argon_primitives::{
 	tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule,
@@ -87,7 +87,17 @@ pub struct MainchainClient {
 	pub ws_client: Arc<WsClient>,
 	pub methods: LegacyRpcMethods<ArgonConfig>,
 	pub url: String,
+	#[allow(dead_code)]
+	updater_handle: Option<Arc<JoinHandle<()>>>,
 	on_client_error: Option<mpsc::Sender<String>>,
+}
+
+impl Drop for MainchainClient {
+	fn drop(&mut self) {
+		if let Some(handle) = self.updater_handle.take() {
+			handle.abort();
+		}
+	}
 }
 
 impl MainchainClient {
@@ -114,8 +124,53 @@ impl MainchainClient {
 		let ws_client = Arc::new(ws_client);
 		let rpc = RpcClient::new(ws_client.clone());
 		let live = ArgonOnlineClient::from_rpc_client(rpc.clone()).await?;
+		let update_task = live.updater();
+		let block_hash = live.backend().latest_finalized_block_ref().await?;
+
+		let version = live.runtime_version();
+		let last_upgrade = live
+			.storage()
+			.at_latest()
+			.await?
+			.fetch(&storage().system().last_runtime_upgrade())
+			.await?;
+		if let Some(upgrade) = last_upgrade {
+			if upgrade.spec_version > version.spec_version {
+				info!(?upgrade, build_version = ?version, "ArgonFullClient: runtime version mismatch, updating..");
+				let updated_metadata =
+					live.backend().metadata_at_version(15, block_hash.hash()).await?;
+				live.set_metadata(updated_metadata);
+			}
+		}
+
+		let updater_handle = tokio::spawn(async move {
+			let mut update_stream = update_task
+				.runtime_updates()
+				.await
+				.expect("runtime_updater failed to initialize");
+			while let Some(Ok(update)) = update_stream.next().await {
+				let version = update.runtime_version().spec_version;
+
+				match update_task.apply_update(update) {
+					Ok(()) => {
+						info!("Upgrade to version: {} successful", version);
+					},
+					Err(_) => {
+						// the only failure is when it's the same version. just ignore
+					},
+				};
+			}
+		});
 		let methods = LegacyRpcMethods::new(rpc.clone());
-		Ok(Self { rpc, live, methods, ws_client, url, on_client_error: Default::default() })
+		Ok(Self {
+			rpc,
+			live,
+			methods,
+			ws_client,
+			url,
+			on_client_error: Default::default(),
+			updater_handle: Some(Arc::new(updater_handle)),
+		})
 	}
 
 	pub async fn from_url(url: &str) -> Result<Self, Error> {

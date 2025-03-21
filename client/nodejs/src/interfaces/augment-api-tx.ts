@@ -623,8 +623,8 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     miningSlot: {
       /**
-       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in a slot,
-       * a slot can be supplanted by supplying a higher bid.
+       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
+       * cohort, a bidder can be supplanted by supplying a higher bid.
        *
        * Each slot has `MaxCohortSize` spots available.
        *
@@ -632,8 +632,8 @@ declare module '@polkadot/api-base/types/submittable' {
        * this account. The required amount is calculated as a percentage of the total ownership
        * tokens in the network. This percentage is adjusted before the beginning of each slot.
        *
-       * If your bid is no longer winning, a `SlotBidderOut` event will be emitted. By monitoring
-       * for this event, you will be able to ensure your bid is accepted.
+       * If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
+       * monitoring for this event, you will be able to ensure your bid is accepted.
        *
        * NOTE: bidding for each slot will be closed at a random block within
        * `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
@@ -1202,6 +1202,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1267,6 +1270,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1308,6 +1314,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
@@ -1346,6 +1355,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1392,6 +1404,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1488,6 +1503,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'Any'
             | 'NonTransfer'
             | 'PriceIndex'
+            | 'MiningBid'
+            | 'BitcoinCosign'
+            | 'VaultAdmin'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,

@@ -1,5 +1,5 @@
 use crate::utils::{
-	bankroll_miners, create_active_notary, register_miner, register_miner_keys, transfer_mainchain,
+	create_active_notary, mining_slot_ownership_needed, register_miner_keys, register_miners,
 };
 use argon_client::{
 	api,
@@ -27,6 +27,7 @@ async fn test_end_to_end_default_vote_mining() {
 	let test_notary = create_active_notary(&grandpa_miner).await.expect("Notary registered");
 
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
+	let ownership_needed = mining_slot_ownership_needed(&grandpa_miner).await.unwrap();
 	let mut authors = HashSet::<AccountId>::new();
 	let mut counter = 0;
 	let mut rewards_counter = 0;
@@ -36,12 +37,12 @@ async fn test_end_to_end_default_vote_mining() {
 				block.header().runtime_digest().logs.iter().find_map(|a| a.as_author())
 			{
 				let keyring = AccountKeyring::from_account_id(&author).unwrap();
-				println!("Block Author {:?}", keyring);
+				println!("Block Author {:?} ({})", keyring, block.number());
 
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
 				{
-					if ownership.free >= 200_000 && !authors.contains(&author) {
+					if ownership.free >= (ownership_needed * 2) && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);
 						authors.insert(author);
 					}
@@ -59,7 +60,7 @@ async fn test_end_to_end_default_vote_mining() {
 			}
 			counter += 1;
 			if counter >= 50 {
-				panic!("Blocks not produced by both authors after 30 blocks -> {:?}", authors);
+				panic!("Blocks not produced by both authors after 50 blocks -> {:?}", authors);
 			}
 		}
 	}
@@ -74,23 +75,6 @@ async fn test_end_to_end_default_vote_mining() {
 		.0;
 	let miner_1_second_signer = Sr25519Signer::new(miner_1_second_account);
 	let miner_1_second_account = miner_1_second_signer.account_id();
-	bankroll_miners(
-		&miner_1,
-		&miner_1_keyring.pair().into(),
-		vec![miner_1_second_account.clone()],
-		true,
-	)
-	.await
-	.unwrap();
-	transfer_mainchain(
-		&miner_1,
-		&miner_1_keyring.pair().into(),
-		miner_1_second_account.clone(),
-		1_000_000,
-		true,
-	)
-	.await
-	.unwrap();
 
 	let miner_2_keyring = miner_2.keyring();
 
@@ -100,14 +84,24 @@ async fn test_end_to_end_default_vote_mining() {
 		register_miner_keys(&miner_2, miner_2_keyring, 1)
 	);
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
-	let (miner2_res, miner1_res, miner1_2_res) = join!(
-		register_miner(&miner_2, miner_2_keyring.pair(), keys2.unwrap()),
-		register_miner(&miner_1, miner_1_keyring.pair(), keys1.unwrap()),
-		register_miner(&miner_1, miner_1_second_signer.keypair, keys_1_2.unwrap())
+	let (miner2_res, miner1_res) = join!(
+		register_miners(
+			&miner_2,
+			miner_2_keyring.pair().into(),
+			vec![(miner_2.account_id.clone(), keys2.unwrap())]
+		),
+		register_miners(
+			&miner_1,
+			miner_1_keyring.pair().into(),
+			vec![
+				(miner_1.account_id.clone(), keys1.unwrap()),
+				(miner_1_second_account.clone(), keys_1_2.unwrap())
+			],
+		),
 	);
 	miner2_res.unwrap();
 	miner1_res.unwrap();
-	miner1_2_res.unwrap();
+
 	let mut miner_registrations = 0;
 	let mut block_loops = 0;
 	let mut vote_blocks = 0;

@@ -27,12 +27,11 @@ pub mod pallet {
 	use sp_core::U256;
 	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
-	use argon_primitives::{
-		bitcoin::UtxoId, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
-		UtxoLockEvents,
-	};
-
 	use super::*;
+	use argon_primitives::{
+		bitcoin::UtxoId, block_seal::CohortId, ArgonCPI, BlockRewardAccountsProvider,
+		BurnEventHandler, PriceProvider, UtxoLockEvents,
+	};
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -61,6 +60,10 @@ pub mod pallet {
 
 		/// The provider of reward account ids
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
+
+		/// The maximum number of mint histories to keep
+		#[pallet::constant]
+		type MaxMintHistoryToMaintain: Get<u32>;
 	}
 
 	/// Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
@@ -73,11 +76,21 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The total amount of argons minted for mining
 	#[pallet::storage]
 	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
+	/// The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
 	#[pallet::storage]
 	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+
+	/// The amount of argons minted per cohort for mining
+	#[pallet::storage]
+	pub(super) type MiningMintPerCohort<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<CohortId, T::Balance, T::MaxMintHistoryToMaintain>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	pub(super) type BlockMintAction<T> =
@@ -86,11 +99,15 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
-		ArgonsMinted {
-			mint_type: MintType,
+		BitcoinMint {
 			account_id: T::AccountId,
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
+		},
+		MiningMint {
+			amount: U256,
+			argon_cpi: ArgonCPI,
+			liquidity: T::Balance,
 		},
 		MintError {
 			mint_type: MintType,
@@ -128,7 +145,7 @@ pub mod pallet {
 			}
 
 			// if there are no miners registered, we can't mint
-			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
+			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
 
 			let argons_to_print_per_miner =
 				Self::get_argons_to_print_per_miner(reward_accounts.len() as u128);
@@ -137,18 +154,25 @@ pub mod pallet {
 			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			if argons_to_print_per_miner > T::Balance::zero() {
-				for miner in reward_accounts {
+				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
+				let mut amount_minted = U256::zero();
+				for (miner, cohort_id) in reward_accounts {
 					let amount = argons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());
+							amount_minted += U256::from(amount.into());
 							block_mint_action.argon_minted += amount;
-							Self::deposit_event(Event::<T>::ArgonsMinted {
-								mint_type: MintType::Mining,
-								account_id: miner.clone(),
-								utxo_id: None,
-								amount,
-							});
+							if !mining_mint_history.contains_key(&cohort_id) &&
+								mining_mint_history.len() >=
+									T::MaxMintHistoryToMaintain::get() as usize
+							{
+								mining_mint_history.pop_first();
+							}
+							mining_mint_history
+								.entry(cohort_id)
+								.or_default()
+								.saturating_accrue(amount);
 						},
 						Err(e) => {
 							warn!(
@@ -165,7 +189,19 @@ pub mod pallet {
 						},
 					};
 				}
+
+				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
+					MiningMintPerCohort::<T>::put(result);
+				}
 				MintedMiningArgons::<T>::put(mining_mint);
+
+				if !amount_minted.is_zero() {
+					Self::deposit_event(Event::<T>::MiningMint {
+						amount: amount_minted,
+						argon_cpi,
+						liquidity: T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default(),
+					});
+				}
 			}
 
 			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_mint);
@@ -192,8 +228,7 @@ pub mod pallet {
 								bitcoin_mint += U256::from(amount_to_mint.into());
 								block_mint_action.bitcoin_minted += amount_to_mint;
 
-								Self::deposit_event(Event::<T>::ArgonsMinted {
-									mint_type: MintType::Bitcoin,
+								Self::deposit_event(Event::<T>::BitcoinMint {
 									account_id: account_id.clone(),
 									utxo_id: Some(*utxo_id),
 									amount: amount_to_mint,

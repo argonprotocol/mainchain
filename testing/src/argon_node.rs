@@ -15,7 +15,7 @@ use std::{
 	thread,
 	time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use subxt::backend::rpc::RpcParams;
+use subxt::ext::subxt_rpcs::client::RpcParams;
 use url::Url;
 
 use crate::{get_target_dir, log_watcher::LogWatcher, start_bitcoind};
@@ -42,6 +42,7 @@ pub struct ArgonNodeStartArgs {
 	pub base_data_path: PathBuf,
 	pub rust_log: String,
 	pub authority: String,
+	pub is_validator: bool,
 	pub compute_miners: u16,
 	pub bitcoin_rpc: String,
 	pub notebook_archive_urls: Vec<String>,
@@ -94,6 +95,7 @@ impl ArgonNodeStartArgs {
 			compute_miners,
 			bitcoin_rpc: "".to_string(),
 			authority: authority.to_lowercase().to_string(),
+			is_validator: true,
 			rpc_port: 0,
 			notebook_archive_urls: vec![],
 			extra_flags: vec![],
@@ -181,6 +183,10 @@ impl ArgonTestNode {
 			more_args
 				.push(format!("--notebook-archive-hosts={}", args.notebook_archive_urls.join(",")))
 		};
+
+		if args.is_validator {
+			more_args.push("--validator".to_string());
+		}
 
 		if args.is_archive_node {
 			more_args.push("--state-pruning=archive".to_string());

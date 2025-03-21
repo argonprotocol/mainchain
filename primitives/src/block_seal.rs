@@ -87,6 +87,17 @@ pub struct MiningRegistration<
 	pub cohort_id: CohortId,
 }
 
+impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>
+	MiningRegistration<A, B, K>
+{
+	pub fn rewards_account(&self) -> A {
+		match &self.reward_destination {
+			RewardDestination::Owner => self.account_id.clone(),
+			RewardDestination::Account(reward_id) => reward_id.clone(),
+		}
+	}
+}
+
 #[derive(
 	Clone, Serialize, Deserialize, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo,
 )]

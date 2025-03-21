@@ -358,7 +358,6 @@ impl MainchainClient {
     TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>,
   )> {
     let current_nonce = self.get_account_nonce(address.clone()).await?;
-    let best_block = H256::from_slice(self.get_best_block_hash().await?.as_ref());
     let mortality = 50; // artibrary number of blocks to keep this tx alive
 
     let client = self.client().await?;
@@ -366,14 +365,12 @@ impl MainchainClient {
     let account_id = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let account_bytes: [u8; 32] = account_id.clone().into();
 
-    let latest_block = client.live.blocks().at(best_block).await?;
-
     let payload = {
       let params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
         .nonce(current_nonce as u64)
-        .mortal(latest_block.header(), mortality)
+        .mortal(mortality)
         .build();
-      let tx_tmp = client.live.tx().create_partial_signed_offline(
+      let tx_tmp = client.live.tx().create_partial_offline(
         &tx().chain_transfer().send_to_localchain(amount, notary_id),
         params,
       )?;
@@ -389,14 +386,14 @@ impl MainchainClient {
       client
         .live
         .tx()
-        .create_partial_signed_offline(
+        .create_partial_offline(
           &tx().chain_transfer().send_to_localchain(amount, notary_id),
           ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
             .nonce(current_nonce as u64)
-            .mortal(latest_block.header(), mortality)
+            .mortal(mortality)
             .build(),
         )?
-        .sign_with_address_and_signature(&account_id.into(), &multi_signature)
+        .sign_with_account_and_signature(&account_id, &multi_signature)
     };
 
     let tx_progress = submittable.submit_and_watch().await?;
