@@ -41,13 +41,13 @@ resolver = "2"
 
 
 [workspace.package]
-version = "1.0.17"
+version = "1.0.18"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
 homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.84.0"
+rust-version = "1.85.0"
 repository = "https://github.com/argonprotocol/mainchain"
 documentation = "https://argonprotocol.org/docs"
 

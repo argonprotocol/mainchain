@@ -1,8 +1,28 @@
 # Changelog
 
-## [v1.0.17](https://github.com/argonprotocol/mainchain/compare/v1.0.16...7f3733860a6e18b27660fa742b156fc2ec8dab67) (2025-03-13)
+## [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...f703193a95570d7c13e9a54c98713154c846ab42) (2025-03-21)
+
+### Features
+
+* **mint:** track per-cohort mint amounts
+([5350fdd](https://github.com/argonprotocol/mainchain/commit/5350fddf176ee9ddf184be6762a81277192b4342))
+* **proxy:** add a mining bid and vault proxy
+([42f69c4](https://github.com/argonprotocol/mainchain/commit/42f69c4b6b3f63af2a278ace434e7d6cf9e849b4))
+* **block_rewards:** scale with target price
+([23104e9](https://github.com/argonprotocol/mainchain/commit/23104e9e2f2cde69e4ea6421a0941aace93ce57c))
+* bid pools for mining
+([010b838](https://github.com/argonprotocol/mainchain/commit/010b838e836b5e09c2cdf3f860f0e8a9412032b1))
 
 ### Fixes
+
+* **mining_slot:** miners losing lookup index
+([c55e6b0](https://github.com/argonprotocol/mainchain/commit/c55e6b01fc4519e42bcc6f52d2d2beea2f9af601))
+* **mining_slot:** allow full balance bid
+([26e08ea](https://github.com/argonprotocol/mainchain/commit/26e08ea600ff6f39f7896adbea1322b264579059))
+
+### [v1.0.17](https://github.com/argonprotocol/mainchain/compare/v1.0.16...v1.0.17) (2025-03-14)
+
+#### Fixes
 
 * **mint:** use twal for liquidity in mint
 ([b997171](https://github.com/argonprotocol/mainchain/commit/b997171ae1bb4db99c1ebedfdbc331f4c372b4fc))
