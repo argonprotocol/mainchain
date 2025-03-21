@@ -37,7 +37,7 @@ async fn test_end_to_end_default_vote_mining() {
 				block.header().runtime_digest().logs.iter().find_map(|a| a.as_author())
 			{
 				let keyring = AccountKeyring::from_account_id(&author).unwrap();
-				println!("Block Author {:?}", keyring);
+				println!("Block Author {:?} ({})", keyring, block.number());
 
 				if let Ok(ownership) =
 					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
@@ -60,7 +60,7 @@ async fn test_end_to_end_default_vote_mining() {
 			}
 			counter += 1;
 			if counter >= 50 {
-				panic!("Blocks not produced by both authors after 30 blocks -> {:?}", authors);
+				panic!("Blocks not produced by both authors after 50 blocks -> {:?}", authors);
 			}
 		}
 	}

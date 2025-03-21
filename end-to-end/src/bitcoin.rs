@@ -106,7 +106,7 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+	let _last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
 
 	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
 
