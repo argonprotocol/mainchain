@@ -12,12 +12,7 @@ use jsonrpsee::{
 use sp_core::{blake2_256, crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
 use subxt::{
-	backend::{
-		chain_head::{ChainHeadBackend, ChainHeadBackendBuilder},
-		legacy::LegacyRpcMethods,
-		rpc::RpcClient,
-		BackendExt, BlockRef,
-	},
+	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
 	config::{
 		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
 	},
@@ -128,9 +123,7 @@ impl MainchainClient {
 	pub async fn new(ws_client: WsClient, url: String) -> Result<Self, Error> {
 		let ws_client = Arc::new(ws_client);
 		let rpc = RpcClient::new(ws_client.clone());
-		let backend: ChainHeadBackend<ArgonConfig> =
-			ChainHeadBackendBuilder::default().build_with_background_driver(rpc.clone());
-		let live = ArgonOnlineClient::from_backend(Arc::new(backend)).await?;
+		let live = ArgonOnlineClient::from_rpc_client(rpc.clone()).await?;
 		let update_task = live.updater();
 		let block_hash = live.backend().latest_finalized_block_ref().await?;
 
