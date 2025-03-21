@@ -847,6 +847,16 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
+      /**
+       * The miners released in the last block (only kept for a single block)
+       **/
+      releasedMinersByAccountId: AugmentedQuery<
+        ApiType,
+        () => Observable<
+          BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>
+        >,
+        []
+      >;
     };
     mint: {
       blockMintAction: AugmentedQuery<

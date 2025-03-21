@@ -31,13 +31,15 @@ as long as a Vault performs the following two functions:
 
 ## BondedBitcoins
 
-BondedBitcoins allow a vault to earn a share of the Bids submitted for mining slots. Every time a mining slot is closed,
-the vaults with BondedBitcoins from the previous day divide up the bid pool at their prorata rate. Any vaults with
-available BondedBitcoins will automatically have 10% of them locked for the next Mining slot (10 days). A Vault can
-submit up to an additional 2x the amount of LockedBitcoins in BondedBitcoins by adding `Added Securitization`. The
-Vault does not need to perform any actions to maintain their BondedBitcoins other than to allocate them upfront. As new
-bitcoins are locked, bonded bitcoins are automatically provisioned and locked for the next Mining Slot. BondedBitcoin
-funds are completely not at risk.
+BondedBitcoins allow a vault to earn a share of the Bids submitted for mining slots. Every time bidding for a mining
+slot cohort begins, 10% of each vault's available bonded bitcoins are automatically locked for the duration of the
+mining slot (eg, 10 days). At the end of bidding, the bid pool is distributed to those vaults based on their pro-rata
+amount of bitcoins locked.
+
+A Vault can submit up to an additional 2x the amount of LockedBitcoins in BondedBitcoins by adding
+`Added Securitization`. The Vault does not need to perform any actions to maintain their BondedBitcoins other than to
+allocate them upfront. As new bitcoins are locked, bonded bitcoins are automatically provisioned and locked for the next
+Mining Slot. BondedBitcoin funds are not at risk of being slashed or taken.
 
 ### Variables for BondedBitcoins
 
@@ -250,11 +252,13 @@ The following are a few rules around how and when you can add funding to a vault
 - Vault funding can be removed at any time down to the level of current obligations (Locked or Bonded Bitcoins)
 - Vaults must cosign any BitcoinLock release requests within 10 days of the request, or they will forfeit the market
   value of the Bitcoins
+- Vaults must cosign any BitcoinLock which has a mismatch making it unable to be locked into Argon, but which make it
+  stuck in bitcoin without further action.
 - Vaults must maintain or exceed the promised additional securitization percentage for the duration of any
   LockedBitcoins
 - Vault terms will take effect in the next Mining Slot (every day at noon EST). This also applies to new vaults. The
-  exception is that prior to bidding for Slot 1, there are no delays
+  exception is that prior to bidding for Slot 1, there are no delays.
 - Vaults must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon. If they do so, they
-  will forfeit funds
+  will forfeit funds.
 - Bitcoin base fees are a non-refundable fee charged to the LockedBitcoin creator. However, any APR charges
   will be refunded on "release" based on the duration of the funds being held in ticks.

@@ -73,11 +73,11 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_rewards_account(_author: &u64) -> Option<(u64, CohortId)> {
+	fn get_block_rewards_account(_author: &u64) -> Option<(u64, CohortId)> {
 		todo!("not used by mint")
 	}
 
-	fn get_all_rewards_accounts() -> Vec<u64> {
+	fn get_mint_rewards_accounts() -> Vec<u64> {
 		MinerRewardsAccounts::get()
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {

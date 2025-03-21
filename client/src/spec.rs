@@ -3857,9 +3857,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				187u8, 78u8, 71u8, 231u8, 195u8, 106u8, 64u8, 16u8, 156u8, 59u8, 245u8, 89u8,
-				186u8, 86u8, 139u8, 239u8, 66u8, 157u8, 208u8, 104u8, 247u8, 34u8, 230u8, 220u8,
-				251u8, 39u8, 8u8, 222u8, 138u8, 25u8, 126u8, 216u8,
+				168u8, 120u8, 200u8, 195u8, 189u8, 14u8, 73u8, 116u8, 248u8, 89u8, 95u8, 229u8,
+				82u8, 35u8, 111u8, 169u8, 230u8, 148u8, 64u8, 71u8, 187u8, 71u8, 55u8, 119u8, 56u8,
+				241u8, 135u8, 161u8, 88u8, 247u8, 37u8, 231u8,
 			]
 	}
 	pub mod system {
@@ -5010,9 +5010,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							248u8, 149u8, 171u8, 93u8, 108u8, 151u8, 136u8, 69u8, 237u8, 24u8,
-							144u8, 4u8, 78u8, 193u8, 32u8, 164u8, 75u8, 122u8, 184u8, 30u8, 249u8,
-							12u8, 246u8, 214u8, 195u8, 113u8, 204u8, 123u8, 254u8, 1u8, 82u8, 48u8,
+							110u8, 142u8, 234u8, 162u8, 4u8, 5u8, 123u8, 238u8, 135u8, 253u8, 21u8,
+							58u8, 126u8, 12u8, 141u8, 117u8, 170u8, 114u8, 246u8, 172u8, 226u8,
+							49u8, 179u8, 163u8, 240u8, 130u8, 235u8, 56u8, 149u8, 161u8, 126u8,
+							64u8,
 						],
 					)
 				}
@@ -7804,6 +7805,7 @@ pub mod api {
 			pub struct NewMiners {
 				pub start_index: new_miners::StartIndex,
 				pub new_miners: new_miners::NewMiners,
+				pub released_miners: new_miners::ReleasedMiners,
 				pub cohort_id: new_miners::CohortId,
 			}
 			pub mod new_miners {
@@ -7816,6 +7818,7 @@ pub mod api {
 						runtime_types::argon_runtime::SessionKeys,
 					>,
 				>;
+				pub type ReleasedMiners = ::core::primitive::u32;
 				pub type CohortId = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NewMiners {
@@ -7871,30 +7874,6 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for SlotBidderDropped {
 				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "SlotBidderDropped";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct ReleasedMinerSeat {
-				pub account_id: released_miner_seat::AccountId,
-				pub preserved_argonot_hold: released_miner_seat::PreservedArgonotHold,
-			}
-			pub mod released_miner_seat {
-				use super::runtime_types;
-				pub type AccountId = crate::types::AccountId32;
-				pub type PreservedArgonotHold = ::core::primitive::bool;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ReleasedMinerSeat {
-				const PALLET: &'static str = "MiningSlot";
-				const EVENT: &'static str = "ReleasedMinerSeat";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -8039,6 +8018,18 @@ pub mod api {
 					use super::runtime_types;
 					pub type NextSlotCohort =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::argon_primitives::block_seal::MiningRegistration<
+								crate::types::AccountId32,
+								::core::primitive::u128,
+								runtime_types::argon_runtime::SessionKeys,
+							>,
+						>;
+				}
+				pub mod released_miners_by_account_id {
+					use super::runtime_types;
+					pub type ReleasedMinersByAccountId =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+							crate::types::AccountId32,
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
 								crate::types::AccountId32,
 								::core::primitive::u128,
@@ -8269,6 +8260,28 @@ pub mod api {
 							223u8, 84u8, 166u8, 68u8, 129u8, 8u8, 10u8, 62u8, 52u8, 47u8, 13u8,
 							243u8, 29u8, 75u8, 63u8, 145u8, 198u8, 63u8, 232u8, 59u8, 36u8, 144u8,
 							76u8, 192u8, 162u8, 149u8, 47u8, 218u8, 255u8, 112u8, 30u8, 224u8,
+						],
+					)
+				}
+				#[doc = " The miners released in the last block (only kept for a single block)"]
+				pub fn released_miners_by_account_id(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::released_miners_by_account_id::ReleasedMinersByAccountId,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"ReleasedMinersByAccountId",
+						(),
+						[
+							176u8, 243u8, 25u8, 208u8, 121u8, 61u8, 100u8, 228u8, 255u8, 159u8,
+							240u8, 197u8, 200u8, 14u8, 28u8, 167u8, 73u8, 89u8, 102u8, 114u8,
+							143u8, 129u8, 172u8, 13u8, 4u8, 77u8, 160u8, 141u8, 21u8, 118u8, 236u8,
+							28u8,
 						],
 					)
 				}
@@ -15705,22 +15718,46 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct ArgonsMinted {
-				pub mint_type: argons_minted::MintType,
-				pub account_id: argons_minted::AccountId,
-				pub utxo_id: argons_minted::UtxoId,
-				pub amount: argons_minted::Amount,
+			pub struct BitcoinMint {
+				pub account_id: bitcoin_mint::AccountId,
+				pub utxo_id: bitcoin_mint::UtxoId,
+				pub amount: bitcoin_mint::Amount,
 			}
-			pub mod argons_minted {
+			pub mod bitcoin_mint {
 				use super::runtime_types;
-				pub type MintType = runtime_types::pallet_mint::pallet::MintType;
 				pub type AccountId = crate::types::AccountId32;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ArgonsMinted {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinMint {
 				const PALLET: &'static str = "Mint";
-				const EVENT: &'static str = "ArgonsMinted";
+				const EVENT: &'static str = "BitcoinMint";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct MiningMint {
+				pub amount: mining_mint::Amount,
+				pub argon_cpi: mining_mint::ArgonCpi,
+				pub liquidity: mining_mint::Liquidity,
+			}
+			pub mod mining_mint {
+				use super::runtime_types;
+				pub type Amount = runtime_types::primitive_types::U256;
+				pub type ArgonCpi = runtime_types::sp_arithmetic::fixed_point::FixedI128;
+				pub type Liquidity = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MiningMint {
+				const PALLET: &'static str = "Mint";
+				const EVENT: &'static str = "MiningMint";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -28673,6 +28710,7 @@ pub mod api {
 								runtime_types::argon_runtime::SessionKeys,
 							>,
 						>,
+						released_miners: ::core::primitive::u32,
 						cohort_id: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
@@ -28687,25 +28725,20 @@ pub mod api {
 						preserved_argonot_hold: ::core::primitive::bool,
 					},
 					#[codec(index = 3)]
-					ReleasedMinerSeat {
-						account_id: crate::types::AccountId32,
-						preserved_argonot_hold: ::core::primitive::bool,
-					},
-					#[codec(index = 4)]
 					ReleaseMinerSeatError {
 						account_id: crate::types::AccountId32,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 4)]
 					MiningConfigurationUpdated {
 						ticks_before_bid_end_for_vrf_close: ::core::primitive::u64,
 						ticks_between_slots: ::core::primitive::u64,
 						slot_bidding_start_after_ticks: ::core::primitive::u64,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 5)]
 					#[doc = "Bids are closed due to the VRF randomized function triggering"]
 					MiningBidsClosed { cohort_id: ::core::primitive::u64 },
-					#[codec(index = 7)]
+					#[codec(index = 6)]
 					ReleaseBidError {
 						account_id: crate::types::AccountId32,
 						error: runtime_types::sp_runtime::DispatchError,
@@ -28791,13 +28824,18 @@ pub mod api {
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
 					#[codec(index = 0)]
-					ArgonsMinted {
-						mint_type: runtime_types::pallet_mint::pallet::MintType,
+					BitcoinMint {
 						account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
+					MiningMint {
+						amount: runtime_types::primitive_types::U256,
+						argon_cpi: runtime_types::sp_arithmetic::fixed_point::FixedI128,
+						liquidity: ::core::primitive::u128,
+					},
+					#[codec(index = 2)]
 					MintError {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
 						account_id: crate::types::AccountId32,
@@ -31182,6 +31220,22 @@ pub mod api {
 			use super::runtime_types;
 			pub mod fixed_point {
 				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FixedI128(pub ::core::primitive::i128);
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: CompactAs,
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

@@ -1098,7 +1098,7 @@ fn it_can_distribute_a_bid_pool() {
 				bid_pool_distributed: 0,
 				bid_pool_burned: burn_amount,
 				bid_pool_entrants: 0,
-				cohort_id: 0,
+				cohort_id: 1,
 			}
 			.into(),
 		);
@@ -1171,7 +1171,7 @@ fn it_can_distribute_a_bid_pool() {
 				bid_pool_distributed: distributed,
 				bid_pool_burned: burn_amount,
 				bid_pool_entrants: 2,
-				cohort_id: 1,
+				cohort_id: 2,
 			}
 			.into(),
 		);

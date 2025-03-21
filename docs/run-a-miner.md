@@ -285,29 +285,31 @@ is determined from the block "seal" used to close a block. You can see if biddin
 
 ## Block Rewards
 
-Block rewards are given for each closed block as both Argons and Ownership Tokens. Rewards are scaled by the number of
-notebooks included in a block vs the active notaries. If no "current" notebooks are included, the block reward is only 1
-microgon (eg, you are mostly just earning fees). Current means the notebook tick is one prior to the block tick.
+Block rewards are given for each closed block as both Argons and Ownership Tokens (Argonots).
 
-Block rewards start at 0.5 Argons and 0.5 Ownership Tokens per block, and increase by 1 milligon (1/10th of an Argon)
-every 118 ticks. This will continue until the block reward reaches 5 Argons and 5 Ownership Tokens per block. After
-this point, the Ownership Tokens will become deflationary, with the block reward halving every 2.1 million blocks.
-Argons are currently slated to stay level, but we anticipate a future model where Argons are related to the total
-circulation to ensure sustainable economic security.
+Block rewards have a baseline of 0.5 Argons and 0.5 Argonots per block, and increase by 1 milligon (1/10th of an
+Argon) every 118 ticks until they reach 5 Argon(ot)s. NOTE: for Argons, this is the minimum baseline. See more
+below. Ownership Tokens will become deflationary after the 5 argonot peek, with the block reward halving every 2.1
+million blocks.
+
+The baseline amount of Argons per block are scaled based on the price of Argons on Uniswap. Increases will cause
+the reward to increase by the amount / 14,400 and likewise for decreases. This amount cannot go below the baseline block
+rewards described above (0.5 argons increasing 1 milligon every 118 blocks).
+
+The amount of eligible block rewards are also scaled by the number of notebooks included in a block vs the active
+notaries. If no "current" notebooks are included, the block reward is only 1 microgon (eg, you are mostly just earning
+fees). Current means the notebook tick is one prior to the block tick.
 
 NOTE: a miner earns 75% of the block rewards, and the vote creator earns 25% of the block rewards. If no vote creator is
 involved, the 25% are not issued.
-
-### Reward Maturation
-
-Block rewards are not immediately available. They are frozen and released after 5 blocks.
 
 ### Vote Creator
 
 When you are a bid-winning miner, you are processing "votes" for which block to follow that are produced by any Argon
 holder who has accumulated "tax" on their Argons. Tax is created when you send Argons via a Localchain or when you
-settle a payment channel via a Localchain. The miner with the mining authority key closest in XOR distance to the vote
-will be selected to create the block. This vote creator will be rewarded with 25% of the block rewards.
+settle a payment channel via a Localchain. The miner with the mining account id + slot block hash closest in XOR
+distance to the vote will be selected to create the block. This vote creator will be rewarded with 25% of the block
+rewards.
 
 ## Max Blocks Per Tick
 

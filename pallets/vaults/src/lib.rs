@@ -1349,10 +1349,8 @@ pub mod pallet {
 		}
 
 		fn distribute_and_rotate_bid_pool(cohort_id: CohortId, mining_window_end_tick: Tick) {
-			if cohort_id > 0 {
-				Self::distribute_open_bid_pool(cohort_id - 1);
-			}
-			Self::allocate_next_bid_pool(cohort_id, mining_window_end_tick);
+			Self::distribute_open_bid_pool(cohort_id);
+			Self::allocate_next_bid_pool(cohort_id + 1, mining_window_end_tick);
 		}
 	}
 

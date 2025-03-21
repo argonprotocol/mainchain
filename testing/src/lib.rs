@@ -31,6 +31,9 @@ pub async fn start_argon_test_node() -> ArgonTestNode {
 pub fn test_miner_count() -> u16 {
 	let cpus = num_cpus::get();
 	let mut threads = 2;
+	if env::var("CI").is_ok() {
+		threads = 1;
+	}
 	if cpus <= 2 {
 		threads = 1;
 	}

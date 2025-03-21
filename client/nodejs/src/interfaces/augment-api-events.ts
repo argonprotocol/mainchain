@@ -11,9 +11,11 @@ import type {
   Null,
   Option,
   Result,
+  U256,
   U8aFixed,
   Vec,
   bool,
+  i128,
   u128,
   u16,
   u32,
@@ -790,11 +792,13 @@ declare module '@polkadot/api-base/types/events' {
         [
           startIndex: u32,
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
+          releasedMiners: u32,
           cohortId: u64,
         ],
         {
           startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
+          releasedMiners: u32;
           cohortId: u64;
         }
       >;
@@ -802,11 +806,6 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [accountId: AccountId32, error: SpRuntimeDispatchError],
         { accountId: AccountId32; error: SpRuntimeDispatchError }
-      >;
-      ReleasedMinerSeat: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, preservedArgonotHold: bool],
-        { accountId: AccountId32; preservedArgonotHold: bool }
       >;
       ReleaseMinerSeatError: AugmentedEvent<
         ApiType,
@@ -825,20 +824,15 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     mint: {
-      ArgonsMinted: AugmentedEvent<
+      BitcoinMint: AugmentedEvent<
         ApiType,
-        [
-          mintType: PalletMintMintType,
-          accountId: AccountId32,
-          utxoId: Option<u64>,
-          amount: u128,
-        ],
-        {
-          mintType: PalletMintMintType;
-          accountId: AccountId32;
-          utxoId: Option<u64>;
-          amount: u128;
-        }
+        [accountId: AccountId32, utxoId: Option<u64>, amount: u128],
+        { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
+      >;
+      MiningMint: AugmentedEvent<
+        ApiType,
+        [amount: U256, argonCpi: i128, liquidity: u128],
+        { amount: U256; argonCpi: i128; liquidity: u128 }
       >;
       MintError: AugmentedEvent<
         ApiType,

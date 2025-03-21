@@ -28,7 +28,7 @@ pub mod pallet {
 	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
 	use argon_primitives::{
-		bitcoin::UtxoId, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
+		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
 		UtxoLockEvents,
 	};
 
@@ -86,11 +86,15 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
-		ArgonsMinted {
-			mint_type: MintType,
+		BitcoinMint {
 			account_id: T::AccountId,
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
+		},
+		MiningMint {
+			amount: U256,
+			argon_cpi: ArgonCPI,
+			liquidity: T::Balance,
 		},
 		MintError {
 			mint_type: MintType,
@@ -128,7 +132,7 @@ pub mod pallet {
 			}
 
 			// if there are no miners registered, we can't mint
-			let reward_accounts = T::BlockRewardAccountsProvider::get_all_rewards_accounts();
+			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
 
 			let argons_to_print_per_miner =
 				Self::get_argons_to_print_per_miner(reward_accounts.len() as u128);
@@ -137,18 +141,14 @@ pub mod pallet {
 			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			if argons_to_print_per_miner > T::Balance::zero() {
+				let mut amount_minted = U256::zero();
 				for miner in reward_accounts {
 					let amount = argons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());
+							amount_minted += U256::from(amount.into());
 							block_mint_action.argon_minted += amount;
-							Self::deposit_event(Event::<T>::ArgonsMinted {
-								mint_type: MintType::Mining,
-								account_id: miner.clone(),
-								utxo_id: None,
-								amount,
-							});
 						},
 						Err(e) => {
 							warn!(
@@ -166,6 +166,14 @@ pub mod pallet {
 					};
 				}
 				MintedMiningArgons::<T>::put(mining_mint);
+
+				if !amount_minted.is_zero() {
+					Self::deposit_event(Event::<T>::MiningMint {
+						amount: amount_minted,
+						argon_cpi,
+						liquidity: T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default(),
+					});
+				}
 			}
 
 			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_mint);
@@ -192,8 +200,7 @@ pub mod pallet {
 								bitcoin_mint += U256::from(amount_to_mint.into());
 								block_mint_action.bitcoin_minted += amount_to_mint;
 
-								Self::deposit_event(Event::<T>::ArgonsMinted {
-									mint_type: MintType::Bitcoin,
+								Self::deposit_event(Event::<T>::BitcoinMint {
 									account_id: account_id.clone(),
 									utxo_id: Some(*utxo_id),
 									amount: amount_to_mint,

@@ -124,11 +124,10 @@ fn it_can_mint() {
 		Mint::on_initialize(1);
 		let mint_amount = 25_000 / 60;
 		System::assert_last_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Mining,
-				account_id: 1,
-				utxo_id: None,
-				amount: mint_amount,
+			Event::MiningMint {
+				argon_cpi: FixedI128::from_float(-1.0),
+				liquidity: 25_000,
+				amount: U256::from(mint_amount),
 			}
 			.into(),
 		);
@@ -262,13 +261,7 @@ fn it_pays_bitcoin_mints() {
 			vec![(utxo_id, account_id, amount - 100), (2, 2, 500)]
 		);
 		System::assert_last_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Bitcoin,
-				account_id,
-				utxo_id: Some(utxo_id),
-				amount: 100,
-			}
-			.into(),
+			Event::BitcoinMint { account_id, utxo_id: Some(utxo_id), amount: 100 }.into(),
 		);
 		assert_eq!(MintedBitcoinArgons::<Test>::get(), U256::from(100));
 		assert_eq!(Balances::total_issuance(), 100u128);
@@ -286,23 +279,12 @@ fn it_pays_bitcoin_mints() {
 		let miner_amount = 10;
 		assert_eq!(Balances::free_balance(10), miner_amount);
 		System::assert_has_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Bitcoin,
-				account_id,
-				utxo_id: Some(utxo_id),
-				amount: amount - 100,
-			}
-			.into(),
+			Event::BitcoinMint { account_id, utxo_id: Some(utxo_id), amount: amount - 100 }.into(),
 		);
 		let bitcoin_amount_to_match = 100 + miner_amount;
 		System::assert_has_event(
-			Event::ArgonsMinted {
-				mint_type: MintType::Bitcoin,
-				account_id: 2,
-				utxo_id: Some(2),
-				amount: bitcoin_amount_to_match,
-			}
-			.into(),
+			Event::BitcoinMint { account_id: 2, utxo_id: Some(2), amount: bitcoin_amount_to_match }
+				.into(),
 		);
 		// should equal mined argons
 		assert_eq!(

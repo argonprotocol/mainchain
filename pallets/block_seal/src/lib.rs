@@ -232,13 +232,6 @@ pub mod pallet {
 		#[pallet::weight((0, DispatchClass::Mandatory))]
 		pub fn apply(origin: OriginFor<T>, seal: BlockSealInherent) -> DispatchResult {
 			ensure_none(origin)?;
-			info!(
-				"Block seal inherent submitted -> {}",
-				match seal {
-					BlockSealInherent::Compute => "Compute",
-					BlockSealInherent::Vote { .. } => "Vote",
-				}
-			);
 			Self::apply_seal(seal).inspect_err(|e| {
 				log::error!("Error applying block seal: {:?}", e);
 			})?;
@@ -257,6 +250,15 @@ pub mod pallet {
 
 			let digests = T::Digests::get()?;
 			let block_author = digests.author;
+
+			info!(
+				"Block seal submitted by {:?} -> {}",
+				block_author,
+				match seal {
+					BlockSealInherent::Compute => "Compute",
+					BlockSealInherent::Vote { .. } => "Vote",
+				}
+			);
 			let notebooks = T::NotebookProvider::notebooks_in_block().len() as u32;
 			let vote_digest = digests.block_vote;
 			let current_tick = T::TickProvider::current_tick();

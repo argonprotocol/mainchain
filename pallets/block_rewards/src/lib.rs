@@ -216,9 +216,10 @@ pub mod pallet {
 			}
 
 			let authors = T::BlockSealerProvider::get_sealer_info();
-			let assigned_rewards_account = T::BlockRewardAccountsProvider::get_rewards_account(
-				&authors.block_author_account_id,
-			);
+			let assigned_rewards_account =
+				T::BlockRewardAccountsProvider::get_block_rewards_account(
+					&authors.block_author_account_id,
+				);
 			let (miner_reward_account, cohort_id) =
 				assigned_rewards_account.unwrap_or((authors.block_author_account_id.clone(), 0));
 

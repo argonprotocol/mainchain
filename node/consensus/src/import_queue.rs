@@ -19,7 +19,10 @@ use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
-use sp_runtime::traits::{Block as BlockT, Header as HeaderT};
+use sp_runtime::{
+	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	Justification,
+};
 use std::{marker::PhantomData, sync::Arc};
 
 /// A block importer for argon.
@@ -132,6 +135,30 @@ where
 			},
 			Err(e) => Err(e.into()),
 		}
+	}
+}
+
+#[async_trait::async_trait]
+impl<B, I, C, AC> sc_consensus::JustificationImport<B> for ArgonBlockImport<B, I, C, AC>
+where
+	B: BlockT,
+	I: sc_consensus::JustificationImport<B> + Send + Sync,
+	C: AuxStore + Send + Sync,
+	AC: Codec + Send + Sync,
+{
+	type Error = I::Error;
+
+	async fn on_start(&mut self) -> Vec<(B::Hash, NumberFor<B>)> {
+		self.inner.on_start().await
+	}
+
+	async fn import_justification(
+		&mut self,
+		hash: B::Hash,
+		number: NumberFor<B>,
+		justification: Justification,
+	) -> Result<(), Self::Error> {
+		self.inner.import_justification(hash, number, justification).await
 	}
 }
 
