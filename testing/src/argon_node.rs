@@ -15,7 +15,7 @@ use std::{
 	thread,
 	time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use subxt::backend::rpc::RpcParams;
+use subxt::ext::subxt_rpcs::client::RpcParams;
 use url::Url;
 
 use crate::{get_target_dir, log_watcher::LogWatcher, start_bitcoind};

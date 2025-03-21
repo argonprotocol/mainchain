@@ -20,10 +20,6 @@ impl Signer<ArgonConfig> for Ed25519Signer {
 		<ArgonConfig as Config>::AccountId::from(self.keypair.public().0)
 	}
 
-	fn address(&self) -> <ArgonConfig as Config>::Address {
-		self.account_id().into()
-	}
-
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
 		self.keypair.sign(data).into()
 	}
@@ -45,10 +41,6 @@ impl Sr25519Signer {
 impl Signer<ArgonConfig> for Sr25519Signer {
 	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
 		<ArgonConfig as Config>::AccountId::from(self.keypair.public().0)
-	}
-
-	fn address(&self) -> <ArgonConfig as Config>::Address {
-		self.account_id().into()
 	}
 
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {
@@ -79,10 +71,6 @@ impl KeystoreSigner {
 impl Signer<ArgonConfig> for KeystoreSigner {
 	fn account_id(&self) -> <ArgonConfig as Config>::AccountId {
 		self.account_id.clone()
-	}
-
-	fn address(&self) -> <ArgonConfig as Config>::Address {
-		<ArgonConfig as Config>::Address::Id(self.account_id())
 	}
 
 	fn sign(&self, data: &[u8]) -> <ArgonConfig as Config>::Signature {

@@ -2,7 +2,7 @@ use argon_testing::ArgonTestNode;
 use serde::{Deserialize, Serialize};
 use serial_test::serial;
 use std::env;
-use subxt::rpc_params;
+use subxt::ext::subxt_rpcs::rpc_params;
 use tokio::select;
 
 #[derive(Clone, Serialize, Deserialize)]
