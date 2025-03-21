@@ -864,7 +864,21 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<ITuple<[u32, PalletMintMintAction]>>,
         []
       >;
+      /**
+       * The amount of argons minted per cohort for mining
+       **/
+      miningMintPerCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, u128>>,
+        []
+      >;
+      /**
+       * The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
+       **/
       mintedBitcoinArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
+      /**
+       * The total amount of argons minted for mining
+       **/
       mintedMiningArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
       /**
        * Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever

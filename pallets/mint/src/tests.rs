@@ -1,6 +1,9 @@
 use crate::{
 	mock::*,
-	pallet::{BlockMintAction, MintedBitcoinArgons, MintedMiningArgons, PendingMintUtxos},
+	pallet::{
+		BlockMintAction, MiningMintPerCohort, MintedBitcoinArgons, MintedMiningArgons,
+		PendingMintUtxos,
+	},
 	Event, MintType,
 };
 use argon_primitives::{
@@ -110,7 +113,7 @@ fn it_calculates_per_miner_mint() {
 fn it_can_mint() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
-	MinerRewardsAccounts::set(vec![1]);
+	MinerRewardsAccounts::set(vec![(1, 1)]);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -133,6 +136,7 @@ fn it_can_mint() {
 		);
 
 		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(mint_amount + 500));
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&mint_amount));
 		assert_eq!(Balances::total_issuance(), 25_000 + mint_amount);
 		assert_eq!(Balances::free_balance(1), mint_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, mint_amount);
@@ -143,7 +147,7 @@ fn it_can_mint() {
 fn it_records_failed_mints() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
 
-	MinerRewardsAccounts::set(vec![1]);
+	MinerRewardsAccounts::set(vec![(1, 1)]);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -167,10 +171,56 @@ fn it_records_failed_mints() {
 		);
 
 		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(0));
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), None);
 		assert_eq!(Balances::total_issuance(), amount);
 	});
 }
 
+#[test]
+fn it_cleans_old_cohorts() {
+	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
+
+	MinerRewardsAccounts::set(vec![(1, 1), (2, 2), (3, 3), (4, 3)]);
+
+	new_test_ext().execute_with(|| {
+		MiningMintPerCohort::<Test>::mutate(|a| {
+			for i in 1..=10 {
+				a.try_insert(i, 100u128).expect("should insert");
+			}
+		});
+		System::set_block_number(1);
+		Balances::set_total_issuance(60_000);
+		UniswapLiquidity::set(60_000);
+
+		// nothing to mint
+		MintedMiningArgons::<Test>::set(U256::from(500));
+		MintedBitcoinArgons::<Test>::set(U256::from(0));
+
+		Mint::on_initialize(1);
+		let mint_amount = 60_000 / 60;
+		System::assert_last_event(
+			Event::MiningMint {
+				argon_cpi: FixedI128::from_float(-1.0),
+				liquidity: 60_000,
+				amount: U256::from(mint_amount),
+			}
+			.into(),
+		);
+
+		assert_eq!(MintedMiningArgons::<Test>::get(), U256::from(mint_amount + 500));
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&350u128));
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&2), Some(&350u128));
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&3), Some(&600u128));
+
+		assert_eq!(MiningMintPerCohort::<Test>::get().keys().len(), 10);
+
+		MinerRewardsAccounts::set(vec![(2, 2), (3, 3), (4, 3), (5, 11)]);
+		Mint::on_initialize(2);
+		assert_eq!(MiningMintPerCohort::<Test>::get().keys().len(), 10);
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), None);
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&11), Some(&250u128));
+	});
+}
 #[test]
 fn it_doesnt_mint_before_active_miners() {
 	ArgonCPI::set(Some(FixedI128::from_float(-1.0)));
@@ -241,7 +291,7 @@ fn it_pays_bitcoin_mints() {
 		MintedMiningArgons::<Test>::set(U256::from(0));
 		MintedBitcoinArgons::<Test>::set(U256::from(0));
 		// must have miners to mint
-		MinerRewardsAccounts::set(vec![10]);
+		MinerRewardsAccounts::set(vec![(10, 1)]);
 
 		Mint::on_initialize(1);
 		assert_eq!(Balances::total_issuance(), 0u128);

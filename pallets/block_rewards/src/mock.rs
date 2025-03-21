@@ -153,7 +153,7 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 		AccountCohorts::get().iter().find(|(a, _)| a == author).cloned()
 	}
 
-	fn get_mint_rewards_accounts() -> Vec<u64> {
+	fn get_mint_rewards_accounts() -> Vec<(u64, CohortId)> {
 		todo!("not used by rewards")
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {

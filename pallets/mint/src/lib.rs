@@ -27,12 +27,11 @@ pub mod pallet {
 	use sp_core::U256;
 	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
 
-	use argon_primitives::{
-		bitcoin::UtxoId, ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider,
-		UtxoLockEvents,
-	};
-
 	use super::*;
+	use argon_primitives::{
+		bitcoin::UtxoId, block_seal::CohortId, ArgonCPI, BlockRewardAccountsProvider,
+		BurnEventHandler, PriceProvider, UtxoLockEvents,
+	};
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -61,6 +60,10 @@ pub mod pallet {
 
 		/// The provider of reward account ids
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
+
+		/// The maximum number of mint histories to keep
+		#[pallet::constant]
+		type MaxMintHistoryToMaintain: Get<u32>;
 	}
 
 	/// Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
@@ -73,11 +76,21 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The total amount of argons minted for mining
 	#[pallet::storage]
 	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
+	/// The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
 	#[pallet::storage]
 	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+
+	/// The amount of argons minted per cohort for mining
+	#[pallet::storage]
+	pub(super) type MiningMintPerCohort<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<CohortId, T::Balance, T::MaxMintHistoryToMaintain>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	pub(super) type BlockMintAction<T> =
@@ -141,14 +154,25 @@ pub mod pallet {
 			let mut mining_mint = MintedMiningArgons::<T>::get();
 
 			if argons_to_print_per_miner > T::Balance::zero() {
+				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
 				let mut amount_minted = U256::zero();
-				for miner in reward_accounts {
+				for (miner, cohort_id) in reward_accounts {
 					let amount = argons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());
 							amount_minted += U256::from(amount.into());
 							block_mint_action.argon_minted += amount;
+							if !mining_mint_history.contains_key(&cohort_id) &&
+								mining_mint_history.len() >=
+									T::MaxMintHistoryToMaintain::get() as usize
+							{
+								mining_mint_history.pop_first();
+							}
+							mining_mint_history
+								.entry(cohort_id)
+								.or_default()
+								.saturating_accrue(amount);
 						},
 						Err(e) => {
 							warn!(
@@ -164,6 +188,10 @@ pub mod pallet {
 							});
 						},
 					};
+				}
+
+				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
+					MiningMintPerCohort::<T>::put(result);
 				}
 				MintedMiningArgons::<T>::put(mining_mint);
 

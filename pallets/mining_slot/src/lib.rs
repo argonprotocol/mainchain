@@ -552,14 +552,14 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 		Some((registration.rewards_account(), registration.cohort_id))
 	}
 
-	fn get_mint_rewards_accounts() -> Vec<T::AccountId> {
+	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, CohortId)> {
 		let mut result = vec![];
 		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
 			let account = match registration.reward_destination {
 				RewardDestination::Owner => registration.account_id,
 				RewardDestination::Account(reward_id) => reward_id,
 			};
-			result.push(account);
+			result.push((account, registration.cohort_id));
 		}
 		result
 	}

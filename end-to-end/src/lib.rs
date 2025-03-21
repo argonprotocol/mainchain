@@ -153,9 +153,11 @@ pub(crate) mod utils {
 				})
 			})
 			.collect::<Vec<_>>();
+		let params = client.params_with_best_nonce(&funding.account_id()).await?.build();
 
-		let register =
-			client.submit_tx(&tx().utility().batch_all(bids), &funding, None, true).await?;
+		let register = client
+			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)
+			.await?;
 		println!(
 			"miner registered. ext hash: {:?}, block {:?}",
 			register.extrinsic_hash(),

@@ -3857,9 +3857,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				168u8, 120u8, 200u8, 195u8, 189u8, 14u8, 73u8, 116u8, 248u8, 89u8, 95u8, 229u8,
-				82u8, 35u8, 111u8, 169u8, 230u8, 148u8, 64u8, 71u8, 187u8, 71u8, 55u8, 119u8, 56u8,
-				241u8, 135u8, 161u8, 88u8, 247u8, 37u8, 231u8,
+				112u8, 242u8, 248u8, 235u8, 64u8, 232u8, 194u8, 62u8, 111u8, 80u8, 115u8, 16u8,
+				37u8, 45u8, 30u8, 243u8, 151u8, 165u8, 142u8, 56u8, 141u8, 144u8, 248u8, 200u8,
+				216u8, 199u8, 34u8, 148u8, 47u8, 93u8, 98u8, 67u8,
 			]
 	}
 	pub mod system {
@@ -15811,6 +15811,14 @@ pub mod api {
 					use super::runtime_types;
 					pub type MintedBitcoinArgons = runtime_types::primitive_types::U256;
 				}
+				pub mod mining_mint_per_cohort {
+					use super::runtime_types;
+					pub type MiningMintPerCohort =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+							::core::primitive::u64,
+							::core::primitive::u128,
+						>;
+				}
 				pub mod block_mint_action {
 					use super::runtime_types;
 					pub type BlockMintAction = (
@@ -15845,6 +15853,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The total amount of argons minted for mining"]
 				pub fn minted_mining_argons(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -15866,6 +15875,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`."]
 				pub fn minted_bitcoin_argons(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -15883,6 +15893,27 @@ pub mod api {
 							61u8, 61u8, 150u8, 84u8, 160u8, 9u8, 166u8, 80u8, 225u8, 163u8, 15u8,
 							39u8, 218u8, 183u8, 45u8, 230u8, 52u8, 8u8, 53u8, 147u8, 135u8, 79u8,
 							252u8, 128u8, 239u8, 228u8, 199u8, 31u8, 135u8, 58u8, 74u8, 114u8,
+						],
+					)
+				}
+				#[doc = " The amount of argons minted per cohort for mining"]
+				pub fn mining_mint_per_cohort(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::mining_mint_per_cohort::MiningMintPerCohort,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"MiningMintPerCohort",
+						(),
+						[
+							150u8, 205u8, 7u8, 199u8, 183u8, 159u8, 188u8, 118u8, 33u8, 135u8, 3u8,
+							69u8, 218u8, 111u8, 26u8, 234u8, 228u8, 229u8, 174u8, 177u8, 246u8,
+							48u8, 240u8, 167u8, 193u8, 59u8, 74u8, 126u8, 15u8, 87u8, 163u8, 137u8,
 						],
 					)
 				}
@@ -15922,6 +15953,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Mint",
 						"MaxPendingMintUtxos",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of mint histories to keep"]
+				pub fn max_mint_history_to_maintain(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Mint",
+						"MaxMintHistoryToMaintain",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,

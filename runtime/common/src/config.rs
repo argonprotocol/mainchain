@@ -156,6 +156,7 @@ parameter_types! {
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
+	pub const MaxMintHistoryToMaintain: u32 = 10; // keep all active sessions + the rollover
 
 	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices

@@ -19,7 +19,7 @@ use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
 	api,
 	api::{
-		price_index::calls::types::submit::Index,
+		constants, price_index::calls::types::submit::Index,
 		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
@@ -28,6 +28,7 @@ use argon_client::{
 use argon_primitives::{
 	argon_utils::format_argons,
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, Satoshis, UtxoId, SATOSHIS_PER_BITCOIN},
+	tick::{Tick, Ticker},
 	Balance, VaultId,
 };
 use argon_testing::{
@@ -105,27 +106,7 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let tick = ticker.current();
-	client
-		.live
-		.tx()
-		.sign_and_submit_then_watch_default(
-			&tx().price_index().submit(Index {
-				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
-				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
-				argon_time_weighted_average_liquidity: 500_000_000_000,
-				argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-				tick,
-			}),
-			&Sr25519Signer::new(price_index_operator.clone()),
-		)
-		.await
-		.unwrap()
-		.wait_for_finalized_success()
-		.await
-		.unwrap();
-	println!("bitcoin prices submitted at tick {tick}",);
+	let last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
 
 	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
 
@@ -221,6 +202,9 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 
+	println!("Submitting new bitcoin price");
+	submit_price(&ticker, &client, &price_index_operator).await;
+
 	// 5. Ask for the bitcoin to be unlocked
 	println!("\nOwner requests unlock");
 	owner_requests_unlock(
@@ -262,6 +246,35 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 	drop(test_node);
+}
+
+async fn submit_price(
+	ticker: &Ticker,
+	client: &MainchainClient,
+	price_index_operator: &sr25519::Pair,
+) -> Tick {
+	let tick = ticker.current();
+	client
+		.live
+		.tx()
+		.sign_and_submit_then_watch_default(
+			&tx().price_index().submit(Index {
+				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
+				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
+				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
+				argon_time_weighted_average_liquidity: 500_000_000_000,
+				argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
+				tick,
+			}),
+			&Sr25519Signer::new(price_index_operator.clone()),
+		)
+		.await
+		.unwrap()
+		.wait_for_finalized_success()
+		.await
+		.unwrap();
+	println!("bitcoin prices submitted at tick {tick}",);
+	tick
 }
 
 fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPath) -> Fingerprint {

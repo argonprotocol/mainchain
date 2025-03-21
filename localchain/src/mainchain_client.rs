@@ -393,7 +393,7 @@ impl MainchainClient {
             .mortal(mortality)
             .build(),
         )?
-        .sign_with_account_and_signature(&account_id.into(), &multi_signature)
+        .sign_with_account_and_signature(&account_id, &multi_signature)
     };
 
     let tx_progress = submittable.submit_and_watch().await?;

@@ -485,6 +485,7 @@ impl pallet_mint::Config for Runtime {
 	type Balance = Balance;
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
 	type BlockRewardAccountsProvider = MiningSlot;
+	type MaxMintHistoryToMaintain = MaxMintHistoryToMaintain;
 }
 
 pub(crate) type OwnershipToken = pallet_balances::Instance2;
