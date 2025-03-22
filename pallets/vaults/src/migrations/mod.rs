@@ -1,6 +1,6 @@
 use crate::{
 	pallet::{BondedBitcoinCompletions, ObligationsById, VaultsById},
-	Config, Pallet,
+	Config, HoldReason, Pallet,
 };
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
@@ -8,7 +8,10 @@ use argon_primitives::{
 	vault::{FundType, Obligation, ObligationExpiration, Vault, VaultArgons, VaultTerms},
 	TickProvider,
 };
-use frame_support::{fail, pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
+use frame_support::{
+	pallet_prelude::*,
+	traits::{fungible::MutateHold, tokens::Precision, UncheckedOnRuntimeUpgrade},
+};
 use log::{error, info, warn};
 
 mod old_storage {
@@ -22,6 +25,7 @@ mod old_storage {
 		storage_alias, BoundedVec, Parameter, Twox64Concat,
 	};
 	use scale_info::TypeInfo;
+	use sp_core::ConstU32;
 	use sp_runtime::{FixedU128, RuntimeDebug};
 
 	#[storage_alias]
@@ -58,6 +62,18 @@ mod old_storage {
 		ObligationId,
 		Obligation<<T as Config>::Balance, <T as frame_system::Config>::AccountId>,
 		OptionQuery,
+	>;
+
+	#[storage_alias]
+	pub(super) type PendingBaseFeeMaturationByTick<T: Config> = StorageMap<
+		Pallet<T>,
+		Twox64Concat,
+		Tick,
+		BoundedVec<
+			(<T as frame_system::Config>::AccountId, <T as Config>::Balance, VaultId, ObligationId),
+			ConstU32<1000>,
+		>,
+		ValueQuery,
 	>;
 
 	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -175,6 +191,22 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		);
 		count += pending_funding_count;
 
+		let base_fee_maturation = old_storage::PendingBaseFeeMaturationByTick::<T>::drain();
+		for (_tick, fee_holds) in base_fee_maturation {
+			count += 1;
+			for (who, amount, vault_id, obligation_id) in fee_holds {
+				count += 1;
+				if let Err(e) = T::Currency::release(
+					&HoldReason::ObligationFee.into(),
+					&who,
+					amount,
+					Precision::Exact,
+				) {
+					error!(target: "runtime", "Failed to release {:?} fee hold for obligation {} for vault {}: {:?}", amount, obligation_id, vault_id, e);
+				}
+			}
+		}
+
 		VaultsById::<T>::translate::<old_storage::Vault<T::Balance, T::AccountId>, _>(|id, vlt| {
 			count += 1;
 			info!("Migrating vault {id}");
@@ -219,6 +251,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			|_id, ob| {
 				count += 1;
 				let expiration = ob.expiration.clone();
+				let vault = VaultsById::<T>::get(ob.vault_id).expect("Vault must exist");
 				let converted = Obligation {
 					obligation_id: ob.obligation_id,
 					fund_type: match ob.fund_type {
@@ -232,6 +265,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					beneficiary: ob.beneficiary,
 					start_tick: ob.start_tick,
 					expiration: ob.expiration,
+					bitcoin_annual_percent_rate: match ob.fund_type {
+						old_storage::FundType::BondedArgons => None,
+						old_storage::FundType::Bitcoin =>
+							Some(vault.terms.bitcoin_annual_percent_rate),
+					},
 				};
 
 				if let ObligationExpiration::AtTick(expr_tick) = expiration {
@@ -267,7 +305,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
 		use argon_primitives::vault::ObligationExpiration;
 		use codec::Decode;
-		use frame_support::ensure;
+		use frame_support::{ensure, fail};
 
 		let old = <old_storage::Model<T>>::decode(&mut &state[..]).map_err(|_| {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")

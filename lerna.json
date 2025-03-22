@@ -2,9 +2,5 @@
   "version": "1.0.18",
   "npmClient": "yarn",
   "useWorkspaces": true,
-  "workspaces": [
-    "client/nodejs",
-    "localchain",
-    "localchain/npm/*"
-  ]
+  "workspaces": ["client/nodejs", "localchain", "localchain/npm/*"]
 }

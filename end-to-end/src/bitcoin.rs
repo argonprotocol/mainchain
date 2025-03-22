@@ -19,7 +19,7 @@ use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
 	api,
 	api::{
-		constants, price_index::calls::types::submit::Index,
+		price_index::calls::types::submit::Index,
 		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},

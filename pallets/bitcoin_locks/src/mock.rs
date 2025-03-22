@@ -224,6 +224,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			vault_id,
 			expiration: ObligationExpiration::BitcoinBlock(expiration),
 			start_tick: CurrentTick::get(),
+			bitcoin_annual_percent_rate: None,
 		};
 		Obligations::mutate(|a| a.insert(next_obligation_id, obligation.clone()));
 		Ok(obligation)
