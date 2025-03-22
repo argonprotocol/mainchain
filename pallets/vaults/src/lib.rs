@@ -872,7 +872,13 @@ pub mod pallet {
 			if amount == T::Balance::zero() {
 				return Ok(amount);
 			}
-			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)?;
+			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)
+				.inspect_err(|e| {
+					warn!(
+						"Error releasing {:?} hold for {:?}. Amount {:?}. {:?}",
+						reason, who, amount, e
+					);
+				})?;
 
 			if T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into() {
 				let _ = frame_system::Pallet::<T>::dec_providers(who);
@@ -948,7 +954,7 @@ pub mod pallet {
 			}
 		}
 
-		fn release_reserved_funds(
+		pub(crate) fn release_reserved_funds(
 			obligation: &Obligation<T::AccountId, T::Balance>,
 		) -> Result<ReleaseFundsResult<T::Balance>, ObligationError> {
 			let vault_id = obligation.vault_id;
@@ -983,8 +989,10 @@ pub mod pallet {
 
 			let current_tick = T::TickProvider::current_tick();
 			let ticks = current_tick.saturating_sub(obligation.start_tick);
+			let amount_on_hold = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
+
 			let remaining_fee = Self::calculate_tick_fees(apr, obligation.amount, ticks);
-			if remaining_fee > 0u128.into() {
+			if amount_on_hold > 0u128.into() && remaining_fee > 0u128.into() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::ObligationFee.into(),
 					&obligation.beneficiary,
@@ -994,11 +1002,19 @@ pub mod pallet {
 					Restriction::Free,
 					Fortitude::Force,
 				)
-				.map_err(|_| ObligationError::UnrecoverableHold)?;
+				.map_err(|e| {
+					log::error!(
+						"Error transferring obligation fee from {:?} to {:?}. Amount: {:?}. Error: {:?}",
+						obligation.beneficiary,
+						vault.operator_account_id,
+						remaining_fee,
+						e
+					);
+					ObligationError::UnrecoverableHold
+				})?;
 			}
-			let amount_on_hold = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
-			let to_return = amount_on_hold.saturating_sub(remaining_fee);
 
+			let to_return = amount_on_hold.saturating_sub(remaining_fee);
 			if to_return > 0u128.into() {
 				Self::release_hold(&obligation.beneficiary, to_return, HoldReason::ObligationFee)
 					.map_err(|_| ObligationError::UnrecoverableHold)?;
