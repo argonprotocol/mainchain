@@ -79,7 +79,7 @@ jobs:
         if: github.event_name != 'release'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.runtime }}-runtime
+          name: ${{ matrix.runtime }}-results
           path: |
             ${{ matrix.runtime }}-info.json
             ${{ matrix.runtime }}-info_compressed.json
@@ -88,10 +88,11 @@ jobs:
 
       # Release published: add artifacts to release
       - name: Add artifacts to release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/v')
         with:
           append_body: true
+          tag_name: ${{ github.ref_name }}
           body: |
             ## Runtime: `${{ matrix.runtime }}`
             ```

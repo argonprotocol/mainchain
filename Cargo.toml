@@ -47,7 +47,7 @@ authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
 homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.85.0"
+rust-version = "1.81.0"
 repository = "https://github.com/argonprotocol/mainchain"
 documentation = "https://argonprotocol.org/docs"
 
