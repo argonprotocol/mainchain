@@ -1,12 +1,18 @@
 use crate::{
 	pallet::{BondedBitcoinCompletions, ObligationsById, VaultsById},
-	Config,
+	Config, HoldReason, Pallet,
 };
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
-use argon_primitives::vault::{FundType, Obligation, Vault, VaultArgons, VaultTerms};
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use argon_primitives::{
+	vault::{FundType, Obligation, ObligationExpiration, Vault, VaultArgons, VaultTerms},
+	TickProvider,
+};
+use frame_support::{
+	pallet_prelude::*,
+	traits::{fungible::MutateHold, tokens::Precision, UncheckedOnRuntimeUpgrade},
+};
+use log::{error, info, warn};
 
 mod old_storage {
 	use crate::{Config, Pallet};
@@ -19,6 +25,7 @@ mod old_storage {
 		storage_alias, BoundedVec, Parameter, Twox64Concat,
 	};
 	use scale_info::TypeInfo;
+	use sp_core::ConstU32;
 	use sp_runtime::{FixedU128, RuntimeDebug};
 
 	#[storage_alias]
@@ -55,6 +62,18 @@ mod old_storage {
 		ObligationId,
 		Obligation<<T as Config>::Balance, <T as frame_system::Config>::AccountId>,
 		OptionQuery,
+	>;
+
+	#[storage_alias]
+	pub(super) type PendingBaseFeeMaturationByTick<T: Config> = StorageMap<
+		Pallet<T>,
+		Twox64Concat,
+		Tick,
+		BoundedVec<
+			(<T as frame_system::Config>::AccountId, <T as Config>::Balance, VaultId, ObligationId),
+			ConstU32<1000>,
+		>,
+		ValueQuery,
 	>;
 
 	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -159,40 +178,34 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		info!("Migrating vault storage");
 		let pending_funding = old_storage::PendingFundingModificationsByTick::<T>::drain();
 		let bonded_argon_completions = old_storage::BondedArgonCompletions::<T>::drain();
+		let mut obligation_count = 0;
 		for (tick, completions) in bonded_argon_completions {
 			count += 1;
+			obligation_count += completions.len();
 			BondedBitcoinCompletions::<T>::insert(tick, completions);
 		}
 		let pending_funding_count = pending_funding.count();
-		info!("Migrated bonded argon completions and {} pending fundings", pending_funding_count);
+		info!(
+			"Migrated {} bonded argon completions and {} pending fundings",
+			obligation_count, pending_funding_count
+		);
 		count += pending_funding_count;
 
-		ObligationsById::<T>::translate::<old_storage::Obligation<T::Balance, T::AccountId>, _>(
-			|_id, ob| {
+		let base_fee_maturation = old_storage::PendingBaseFeeMaturationByTick::<T>::drain();
+		for (_tick, fee_holds) in base_fee_maturation {
+			count += 1;
+			for (who, amount, vault_id, obligation_id) in fee_holds {
 				count += 1;
-
-				info!(
-					"Migrated {:?} obligation {} for {:?}",
-					ob.fund_type, ob.obligation_id, ob.amount
-				);
-				Some(Obligation {
-					obligation_id: ob.obligation_id,
-					fund_type: match ob.fund_type {
-						old_storage::FundType::BondedArgons => FundType::BondedBitcoin,
-						old_storage::FundType::Bitcoin => FundType::LockedBitcoin,
-					},
-					vault_id: ob.vault_id,
-					amount: ob.amount,
-					prepaid_fee: ob.prepaid_fee,
-					total_fee: ob.total_fee,
-					beneficiary: ob.beneficiary,
-					start_tick: ob.start_tick,
-					expiration: ob.expiration,
-				})
-			},
-		);
-
-		count += 1;
+				if let Err(e) = T::Currency::release(
+					&HoldReason::ObligationFee.into(),
+					&who,
+					amount,
+					Precision::Exact,
+				) {
+					error!(target: "runtime", "Failed to release {:?} fee hold for obligation {} for vault {}: {:?}", amount, obligation_id, vault_id, e);
+				}
+			}
+		}
 
 		VaultsById::<T>::translate::<old_storage::Vault<T::Balance, T::AccountId>, _>(|id, vlt| {
 			count += 1;
@@ -232,6 +245,59 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			})
 		});
 
+		let current_tick = T::TickProvider::current_tick();
+
+		ObligationsById::<T>::translate::<old_storage::Obligation<T::Balance, T::AccountId>, _>(
+			|_id, ob| {
+				count += 1;
+				let expiration = ob.expiration.clone();
+				let vault = VaultsById::<T>::get(ob.vault_id).expect("Vault must exist");
+				let converted = Obligation {
+					obligation_id: ob.obligation_id,
+					fund_type: match ob.fund_type {
+						old_storage::FundType::BondedArgons => FundType::BondedBitcoin,
+						old_storage::FundType::Bitcoin => FundType::LockedBitcoin,
+					},
+					vault_id: ob.vault_id,
+					amount: ob.amount,
+					prepaid_fee: ob.prepaid_fee,
+					total_fee: ob.total_fee,
+					beneficiary: ob.beneficiary,
+					start_tick: ob.start_tick,
+					expiration: ob.expiration,
+					bitcoin_annual_percent_rate: match ob.fund_type {
+						old_storage::FundType::BondedArgons => None,
+						old_storage::FundType::Bitcoin =>
+							Some(vault.terms.bitcoin_annual_percent_rate),
+					},
+				};
+
+				if let ObligationExpiration::AtTick(expr_tick) = expiration {
+					if expr_tick < current_tick {
+						if let Err(e) = Pallet::<T>::release_reserved_funds(&converted) {
+							error!(
+								"Failed to remove obligation {} for vault {}: {:?}",
+								ob.obligation_id, ob.vault_id, e
+							);
+						}
+						warn!(
+							"Removed faulty obligation {} for vault {}. Amount returned is {:?}",
+							ob.obligation_id, ob.vault_id, ob.amount
+						);
+						return None;
+					}
+				}
+
+				info!(
+					"Migrated {:?} obligation {} for {:?}",
+					ob.fund_type, ob.obligation_id, ob.amount
+				);
+				Some(converted)
+			},
+		);
+
+		count += 1;
+
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
 	}
 
@@ -239,7 +305,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
 		use argon_primitives::vault::ObligationExpiration;
 		use codec::Decode;
-		use frame_support::ensure;
+		use frame_support::{ensure, fail};
 
 		let old = <old_storage::Model<T>>::decode(&mut &state[..]).map_err(|_| {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
@@ -271,10 +337,14 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					"New pending bonded argons not set correctly"
 				);
 			} else {
-				ensure!(
-					vlt.bonded_argons.reserved == new_vlt.bonded_bitcoin_argons.reserved,
-					"New bonded bitcoin argons not set correctly"
-				);
+				if vlt.bonded_argons.reserved != new_vlt.bonded_bitcoin_argons.reserved {
+					warn!(
+						"New bonded bitcoin argons not set correctly. Vault {}. Old reserve: {:?}. New {:?}. Could it have been changed by a fauly obligation?",
+						id,
+						vlt.bonded_argons.reserved,
+						new_vlt.bonded_bitcoin_argons.reserved
+					);
+				}
 			}
 			ensure!(
 				vlt.bitcoin_argons.base_fee == new_vlt.terms.bitcoin_base_fee,
@@ -282,15 +352,26 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			);
 			ensure!(vlt.is_closed == new_vlt.is_closed, "New is closed not set correctly");
 		}
+		let current_tick = T::TickProvider::current_tick();
+
 		for (id, ob) in old.obligations_by_id {
+			// removed
+			if let ObligationExpiration::AtTick(expr_tick) = ob.expiration {
+				if expr_tick < current_tick {
+					continue;
+				}
+			}
 			let new = ObligationsById::<T>::get(&id).expect("Obligation not found");
 			ensure!(new.amount == ob.amount, "Obligation mismatch");
 			if new.fund_type == FundType::BondedBitcoin {
 				if let ObligationExpiration::AtTick(tick) = new.expiration {
-					ensure!(
-						BondedBitcoinCompletions::<T>::get(tick).contains(&new.obligation_id),
-						"New bonded argon completion not set correctly"
-					);
+					if !BondedBitcoinCompletions::<T>::get(tick).contains(&new.obligation_id) {
+						error!(
+							"obligation_id {} not found in BondedBitcoinCompletions for tick {}",
+							new.obligation_id, tick
+						);
+						fail!("Obligation not found in BondedBitcoinCompletions for tick");
+					}
 				} else {
 					ensure!(false, "Expiration not set correctly");
 				}

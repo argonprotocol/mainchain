@@ -270,7 +270,6 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
-	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
 	type MaxBidPoolEntrants = ConstU32<100>;
 	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;
 	type PalletId = VaultBidPoolsOwnerPalletId;

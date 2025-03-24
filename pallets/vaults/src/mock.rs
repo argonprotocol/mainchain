@@ -72,7 +72,6 @@ parameter_types! {
 
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 	pub static IsSlotBiddingStarted: bool = false;
-	pub static BaseFeeMaturationTicks: Tick = 1000;
 
 	pub static MaxBidPoolEntrants: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
@@ -132,7 +131,6 @@ impl pallet_vaults::Config for Test {
 	type TickProvider = StaticTickProvider;
 	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
 	type EventHandler = ();
-	type BaseFeeMaturationTicks = BaseFeeMaturationTicks;
 	type PalletId = VaultPalletId;
 	type MaxBidPoolEntrants = MaxBidPoolEntrants;
 	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;

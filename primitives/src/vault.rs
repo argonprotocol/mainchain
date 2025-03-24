@@ -290,6 +290,7 @@ pub struct Obligation<AccountId: Codec, Balance: Codec> {
 	#[codec(compact)]
 	pub start_tick: Tick,
 	pub expiration: ObligationExpiration,
+	pub bitcoin_annual_percent_rate: Option<FixedU128>,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]

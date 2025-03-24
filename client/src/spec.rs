@@ -3857,9 +3857,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				112u8, 242u8, 248u8, 235u8, 64u8, 232u8, 194u8, 62u8, 111u8, 80u8, 115u8, 16u8,
-				37u8, 45u8, 30u8, 243u8, 151u8, 165u8, 142u8, 56u8, 141u8, 144u8, 248u8, 200u8,
-				216u8, 199u8, 34u8, 148u8, 47u8, 93u8, 98u8, 67u8,
+				59u8, 18u8, 126u8, 46u8, 35u8, 112u8, 249u8, 49u8, 127u8, 46u8, 119u8, 175u8,
+				146u8, 247u8, 100u8, 173u8, 66u8, 143u8, 225u8, 140u8, 40u8, 146u8, 220u8, 92u8,
+				21u8, 77u8, 70u8, 78u8, 157u8, 167u8, 239u8, 90u8,
 			]
 	}
 	pub mod system {
@@ -10060,17 +10060,6 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod pending_base_fee_maturation_by_tick {
-					use super::runtime_types;
-					pub type PendingBaseFeeMaturationByTick =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							crate::types::AccountId32,
-							::core::primitive::u128,
-							::core::primitive::u32,
-							::core::primitive::u64,
-						)>;
-					pub type Param0 = ::core::primitive::u64;
-				}
 				pub mod next_obligation_id {
 					use super::runtime_types;
 					pub type NextObligationId = ::core::primitive::u64;
@@ -10277,55 +10266,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Pending base fee hold releases"]
-				pub fn pending_base_fee_maturation_by_tick_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::pending_base_fee_maturation_by_tick::PendingBaseFeeMaturationByTick,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"PendingBaseFeeMaturationByTick",
-						(),
-						[
-							142u8, 211u8, 128u8, 129u8, 177u8, 217u8, 114u8, 246u8, 29u8, 187u8,
-							194u8, 231u8, 62u8, 37u8, 225u8, 140u8, 243u8, 242u8, 217u8, 59u8,
-							66u8, 139u8, 87u8, 26u8, 30u8, 130u8, 119u8, 110u8, 114u8, 64u8, 64u8,
-							119u8,
-						],
-					)
-				}
-				#[doc = " Pending base fee hold releases"]
-				pub fn pending_base_fee_maturation_by_tick(
-					&self,
-					_0: impl ::core::borrow::Borrow<types::pending_base_fee_maturation_by_tick::Param0>,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::pending_base_fee_maturation_by_tick::Param0,
-					>,
-					types::pending_base_fee_maturation_by_tick::PendingBaseFeeMaturationByTick,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"PendingBaseFeeMaturationByTick",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
-							_0.borrow(),
-						),
-						[
-							142u8, 211u8, 128u8, 129u8, 177u8, 217u8, 114u8, 246u8, 29u8, 187u8,
-							194u8, 231u8, 62u8, 37u8, 225u8, 140u8, 243u8, 242u8, 217u8, 59u8,
-							66u8, 139u8, 87u8, 26u8, 30u8, 130u8, 119u8, 110u8, 114u8, 64u8, 64u8,
-							119u8,
-						],
-					)
-				}
 				pub fn next_obligation_id(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -10362,9 +10302,10 @@ pub mod api {
 						"ObligationsById",
 						(),
 						[
-							176u8, 68u8, 245u8, 133u8, 51u8, 255u8, 108u8, 203u8, 113u8, 145u8,
-							159u8, 77u8, 60u8, 216u8, 105u8, 94u8, 218u8, 239u8, 232u8, 75u8, 19u8,
-							28u8, 233u8, 2u8, 200u8, 94u8, 43u8, 216u8, 112u8, 202u8, 229u8, 112u8,
+							49u8, 151u8, 180u8, 227u8, 32u8, 195u8, 149u8, 163u8, 197u8, 201u8,
+							192u8, 94u8, 137u8, 189u8, 228u8, 113u8, 42u8, 8u8, 24u8, 94u8, 189u8,
+							1u8, 232u8, 145u8, 150u8, 180u8, 165u8, 211u8, 231u8, 212u8, 226u8,
+							16u8,
 						],
 					)
 				}
@@ -10388,9 +10329,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							176u8, 68u8, 245u8, 133u8, 51u8, 255u8, 108u8, 203u8, 113u8, 145u8,
-							159u8, 77u8, 60u8, 216u8, 105u8, 94u8, 218u8, 239u8, 232u8, 75u8, 19u8,
-							28u8, 233u8, 2u8, 200u8, 94u8, 43u8, 216u8, 112u8, 202u8, 229u8, 112u8,
+							49u8, 151u8, 180u8, 227u8, 32u8, 195u8, 149u8, 163u8, 197u8, 201u8,
+							192u8, 94u8, 137u8, 189u8, 228u8, 113u8, 42u8, 8u8, 24u8, 94u8, 189u8,
+							1u8, 232u8, 145u8, 150u8, 180u8, 165u8, 211u8, 231u8, 212u8, 226u8,
+							16u8,
 						],
 					)
 				}
@@ -24502,6 +24444,9 @@ pub mod api {
 					#[codec(compact)]
 					pub start_tick: ::core::primitive::u64,
 					pub expiration: runtime_types::argon_primitives::vault::ObligationExpiration,
+					pub bitcoin_annual_percent_rate: ::core::option::Option<
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

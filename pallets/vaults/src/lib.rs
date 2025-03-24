@@ -137,9 +137,6 @@ pub mod pallet {
 		/// Callbacks for various vault obligation events
 		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
 
-		/// Maturation period for base fees
-		type BaseFeeMaturationTicks: Get<Tick>;
-
 		/// A pallet id that is used to hold the bid pool
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -179,16 +176,6 @@ pub mod pallet {
 		Twox64Concat,
 		Tick,
 		BoundedVec<VaultId, T::MaxPendingTermModificationsPerTick>,
-		ValueQuery,
-	>;
-
-	/// Pending base fee hold releases
-	#[pallet::storage]
-	pub(super) type PendingBaseFeeMaturationByTick<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		Tick,
-		BoundedVec<(T::AccountId, T::Balance, VaultId, ObligationId), ConstU32<1000>>,
 		ValueQuery,
 	>;
 
@@ -471,33 +458,6 @@ pub mod pallet {
 					);
 					Self::deposit_event(Event::<T>::ObligationCompletionError {
 						obligation_id,
-						error: e,
-					});
-				}
-			}
-
-			let pending_base_hold_releases =
-				(previous_tick..=current_tick).flat_map(PendingBaseFeeMaturationByTick::<T>::take);
-			for (who, amount, vault_id, obligation_id) in pending_base_hold_releases {
-				let res = with_storage_layer(|| {
-					T::Currency::release(
-						&HoldReason::ObligationFee.into(),
-						&who,
-						amount,
-						Precision::Exact,
-					)
-				});
-				if let Err(e) = res {
-					log::error!(
-						"Base fee failed to release for vault {:?} {:?}, {:?}",
-						vault_id,
-						amount,
-						e
-					);
-					Self::deposit_event(Event::<T>::ObligationBaseFeeMaturationError {
-						obligation_id,
-						vault_id,
-						base_fee: amount,
 						error: e,
 					});
 				}
@@ -872,7 +832,13 @@ pub mod pallet {
 			if amount == T::Balance::zero() {
 				return Ok(amount);
 			}
-			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)?;
+			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)
+				.inspect_err(|e| {
+					warn!(
+						"Error releasing {:?} hold for {:?}. Amount {:?}. {:?}",
+						reason, who, amount, e
+					);
+				})?;
 
 			if T::Currency::balance_on_hold(&reason.into(), who) == 0u128.into() {
 				let _ = frame_system::Pallet::<T>::dec_providers(who);
@@ -948,7 +914,7 @@ pub mod pallet {
 			}
 		}
 
-		fn release_reserved_funds(
+		pub(crate) fn release_reserved_funds(
 			obligation: &Obligation<T::AccountId, T::Balance>,
 		) -> Result<ReleaseFundsResult<T::Balance>, ObligationError> {
 			let vault_id = obligation.vault_id;
@@ -979,11 +945,17 @@ pub mod pallet {
 				vault.mut_argons(&obligation.fund_type).reduce_allocated(obligation.amount);
 			}
 
-			let apr = vault.terms.bitcoin_annual_percent_rate;
-
-			let current_tick = T::TickProvider::current_tick();
-			let ticks = current_tick.saturating_sub(obligation.start_tick);
-			let remaining_fee = Self::calculate_tick_fees(apr, obligation.amount, ticks);
+			let mut remaining_fee = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
+			let mut to_return = 0u128.into();
+			if let Some(bitcoin_apr) = obligation.bitcoin_annual_percent_rate {
+				let current_tick = T::TickProvider::current_tick();
+				let ticks = current_tick.saturating_sub(obligation.start_tick);
+				let calculated = Self::calculate_tick_fees(bitcoin_apr, obligation.amount, ticks);
+				if calculated < remaining_fee {
+					to_return = remaining_fee.saturating_sub(calculated);
+					remaining_fee = calculated;
+				}
+			}
 			if remaining_fee > 0u128.into() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::ObligationFee.into(),
@@ -994,11 +966,17 @@ pub mod pallet {
 					Restriction::Free,
 					Fortitude::Force,
 				)
-				.map_err(|_| ObligationError::UnrecoverableHold)?;
+				.map_err(|e| {
+					log::error!(
+							"Error transferring obligation fee from {:?} to {:?}. Amount: {:?}. Error: {:?}",
+							obligation.beneficiary,
+							vault.operator_account_id,
+							remaining_fee,
+							e
+						);
+					ObligationError::UnrecoverableHold
+				})?;
 			}
-			let amount_on_hold = obligation.total_fee.saturating_sub(obligation.prepaid_fee);
-			let to_return = amount_on_hold.saturating_sub(remaining_fee);
-
 			if to_return > 0u128.into() {
 				Self::release_hold(&obligation.beneficiary, to_return, HoldReason::ObligationFee)
 					.map_err(|_| ObligationError::UnrecoverableHold)?;
@@ -1259,31 +1237,21 @@ pub mod pallet {
 				total_fee
 			);
 
-			T::Currency::transfer_and_hold(
-				&HoldReason::ObligationFee.into(),
+			if total_fee > base_fee {
+				Self::hold(account_id, total_fee - base_fee, HoldReason::ObligationFee)?;
+			}
+
+			// do this second so the 'provider' is already on the account
+			T::Currency::transfer(
 				account_id,
 				&vault.operator_account_id,
 				base_fee,
-				Precision::Exact,
-				Preservation::Preserve,
-				Fortitude::Force,
+				Preservation::Expendable,
 			)
 			.map_err(|e| match e {
 				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
 				_ => ObligationError::InsufficientFunds,
 			})?;
-
-			let base_fee_maturation =
-				T::TickProvider::current_tick().saturating_add(T::BaseFeeMaturationTicks::get());
-			PendingBaseFeeMaturationByTick::<T>::try_append(
-				base_fee_maturation,
-				(vault.operator_account_id.clone(), base_fee, vault_id, obligation_id),
-			)
-			.map_err(|_| ObligationError::BaseFeeOverflow)?;
-
-			if total_fee > base_fee {
-				Self::hold(account_id, total_fee - base_fee, HoldReason::ObligationFee)?;
-			}
 
 			vault_argons.reserved = vault_argons.reserved.saturating_add(amount);
 			VaultsById::<T>::set(vault_id, Some(vault));
@@ -1300,6 +1268,7 @@ pub mod pallet {
 				total_fee,
 				start_tick: T::TickProvider::current_tick(),
 				prepaid_fee: base_fee,
+				bitcoin_annual_percent_rate: Some(apr),
 			};
 			ObligationsById::<T>::set(obligation_id, Some(obligation.clone()));
 			BitcoinLockCompletions::<T>::try_mutate(expiration_block, |a| {
@@ -1515,6 +1484,7 @@ pub mod pallet {
 					total_fee: 0u128.into(),
 					start_tick: T::TickProvider::current_tick(),
 					prepaid_fee: 0u128.into(),
+					bitcoin_annual_percent_rate: None,
 				},
 			);
 			BondedBitcoinCompletions::<T>::try_mutate(mining_window_end_tick, |a| {

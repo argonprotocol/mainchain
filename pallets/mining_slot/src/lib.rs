@@ -21,7 +21,7 @@ use frame_support::{
 		tokens::{Fortitude, Precision, Preservation},
 	},
 };
-use log::info;
+use log::{info, warn};
 pub use pallet::*;
 use sp_core::{Get, U256};
 use sp_io::hashing::blake2_256;
@@ -933,7 +933,13 @@ impl<T: Config> Pallet<T> {
 			return Ok(());
 		}
 		T::OwnershipCurrency::release(&reason.into(), account_id, amount, Precision::Exact)
-			.map_err(|_| Error::<T>::UnrecoverableHold)?;
+			.map_err(|e| {
+				warn!(
+					"Error recovering mining slot hold for {account_id:?}. Amount {amount:?}. {:?}",
+					e
+				);
+				Error::<T>::UnrecoverableHold
+			})?;
 
 		if T::OwnershipCurrency::balance_on_hold(&reason.into(), account_id) == 0u32.into() {
 			let _ = frame_system::Pallet::<T>::dec_providers(account_id);
