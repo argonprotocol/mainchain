@@ -95,6 +95,9 @@ enum Commands {
 		/// If not given, you will be prompted for the URI.
 		#[arg(long, verbatim_doc_comment)]
 		suri: Option<String>,
+		/// Verify that the generated address matches this one
+		#[clap(long)]
+		verify_address: Option<String>,
 	},
 	/// Migrate a notary database
 	Migrate {
@@ -264,10 +267,23 @@ async fn main() -> anyhow::Result<()> {
 
 			tracing::info!("Notary server closed");
 		},
-		Commands::InsertKey { suri, keystore_params } => {
-			keystore_params
+		Commands::InsertKey { suri, keystore_params, verify_address } => {
+			let (_, address) = keystore_params
 				.open_with_account(suri.as_ref(), CryptoType::Ed25519, NOTARY_KEYID, false)
 				.map_err(|_| Error::KeystoreOperation)?;
+			if let Some(verify_address) = verify_address {
+				if *verify_address != address {
+					warn!(
+						?address,
+						?verify_address,
+						"The provided key does not match the `verify_address` param"
+					);
+					return Err(Error::Input(
+						"The provided key does not match the `verify_address` param".to_string(),
+					)
+					.into());
+				}
+			}
 		},
 		Commands::Migrate { db_url } => {
 			let pool = PgPoolOptions::new()
