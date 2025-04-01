@@ -416,6 +416,48 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
     };
+    miningBonds: {
+      /**
+       * The added amount would exceed the activated securitization
+       **/
+      ActivatedSecuritizationExceeded: AugmentedError<ApiType>;
+      /**
+       * This fund has already been renewed
+       **/
+      AlreadyRenewed: AugmentedError<ApiType>;
+      /**
+       * Below the minimum amount of argons per contributor
+       **/
+      BelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The contributed amount would not make this account a contributor
+       **/
+      ContributionTooLow: AugmentedError<ApiType>;
+      /**
+       * Unable to update the vault fund
+       **/
+      CouldNotFindBondFund: AugmentedError<ApiType>;
+      /**
+       * An internal error occurred (like an overflow)
+       **/
+      InternalError: AugmentedError<ApiType>;
+      /**
+       * Max contributors for a fund exceeded
+       **/
+      MaxContributorsExceeded: AugmentedError<ApiType>;
+      /**
+       * Max Vaults exceeded
+       **/
+      MaxVaultsExceeded: AugmentedError<ApiType>;
+      /**
+       * This account is not an active mining fund contributor
+       **/
+      NotAFundContributor: AugmentedError<ApiType>;
+      /**
+       * The given vault is not accepting mining bonds
+       **/
+      VaultNotAcceptingMiningBonds: AugmentedError<ApiType>;
+    };
     miningSlot: {
       AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
       /**
@@ -915,10 +957,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       VaultNotYetActive: AugmentedError<ApiType>;
       /**
-       * This reduction in obligation funds offered goes below the amount that is already
-       * committed to
+       * This reduction in vault securitization goes below the amount already committed
        **/
-      VaultReductionBelowAllocatedFunds: AugmentedError<ApiType>;
+      VaultReductionBelowSecuritization: AugmentedError<ApiType>;
       /**
        * Wrong Xpub Network
        **/

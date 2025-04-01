@@ -5,7 +5,7 @@ use env_logger::{Builder, Env};
 use frame_support::{
 	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
 };
-use sp_arithmetic::{FixedI128, FixedU128};
+use sp_arithmetic::{traits::Saturating, FixedI128, FixedU128, Permill};
 use sp_core::{ConstU32, ConstU64, H256};
 use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
 
@@ -21,7 +21,7 @@ use argon_primitives::{
 	tick::{Tick, Ticker},
 	vault::{
 		BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
-		ReleaseFundsResult, Vault, VaultArgons, VaultTerms,
+		ReleaseFundsResult, Vault, VaultTerms,
 	},
 	BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider, TickProvider,
 	UtxoLockEvents, VaultId, VotingSchedule,
@@ -48,7 +48,6 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-
 	pub static ExistentialDeposit: Balance = 10;
 	pub const BlocksPerYear:u32 = 1440*365;
 }
@@ -85,25 +84,19 @@ parameter_types! {
 	pub static BitcoinBlockHeight: BitcoinHeight = 0;
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
-		bonded_bitcoin_argons : VaultArgons {
-			allocated: 100_000_000_000,
-			reserved: 0,
-		},
-		locked_bitcoin_argons: VaultArgons {
-			allocated: 200_000_000_000,
-			reserved: 0,
-		},
+		securitization:  200_000_000_000,
+		bitcoin_locked: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(10.0),
 			bitcoin_base_fee: 0,
+			mining_bond_percent_take: Permill::from_float(0.0),
 		},
-		activation_tick: 1,
+		opened_tick: 1,
 		operator_account_id: 1,
-		added_securitization_percent: FixedU128::from_float(0.0),
-		added_securitization_argons: 0,
+		securitization_ratio: FixedU128::from_float(1.0),
 		is_closed: false,
 		pending_terms: None,
-		pending_bitcoins: 0,
+		bitcoin_pending: 0,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
@@ -189,7 +182,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 			let obligation = a.remove(&obligation_id).expect("should exist");
 			let _ = BitcoinLocks::on_canceled(&obligation);
 			DefaultVault::mutate(|v| {
-				v.mut_argons(&obligation.fund_type).reserved -= obligation.amount;
+				v.reduce_locked_bitcoin(obligation.amount);
 			});
 		});
 		Ok(ReleaseFundsResult { returned_to_beneficiary: 0u128, paid_to_vault: 0u128 })
@@ -204,10 +197,10 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
 		let fund_type = FundType::LockedBitcoin;
 		ensure!(
-			DefaultVault::get().mut_argons(&fund_type).allocated >= amount,
+			DefaultVault::get().free_balance() >= amount,
 			ObligationError::InsufficientVaultFunds
 		);
-		DefaultVault::mutate(|a| a.mut_argons(&fund_type).reserved += amount);
+		DefaultVault::mutate(|a| a.bitcoin_locked.saturating_accrue(amount));
 		let next_obligation_id = NextObligationId::mutate(|a| {
 			let id = *a;
 			*a += 1;
@@ -237,7 +230,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 	) -> Result<(Self::Balance, Self::Balance), ObligationError> {
 		let rate = release_amount_paid.min(market_rate);
 		DefaultVault::mutate(|a| {
-			a.locked_bitcoin_argons.destroy_funds(market_rate).expect("should not fail");
+			a.destroy_funds(market_rate).expect("should not fail");
 		});
 		Ok((0, rate))
 	}
@@ -246,9 +239,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		obligation_id: ObligationId,
 		amount_to_burn: Self::Balance,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
-		DefaultVault::mutate(|a| {
-			a.locked_bitcoin_argons.destroy_funds(amount_to_burn).expect("should not fail")
-		});
+		DefaultVault::mutate(|a| a.destroy_funds(amount_to_burn).expect("should not fail"));
 
 		let mut obligation = Obligations::get().get(&obligation_id).cloned().unwrap();
 		obligation.amount = amount_to_burn;

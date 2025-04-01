@@ -1,0 +1,135 @@
+use crate as pallet_mining_bonds;
+use argon_primitives::{
+	block_seal::CohortId, tick::Tick, vault::MiningBondFundVaultProvider, VaultId,
+};
+use env_logger::{Builder, Env};
+use frame_support::{
+	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight, PalletId,
+};
+use frame_system::pallet_prelude::BlockNumberFor;
+use sp_runtime::{BuildStorage, Percent, Permill};
+use std::collections::HashMap;
+
+type Block = frame_system::mocking::MockBlock<Test>;
+
+// Configure a mock runtime to test the pallet.
+frame_support::construct_runtime!(
+	pub enum Test
+	{
+		System: frame_system,
+		MiningBondFunds: pallet_mining_bonds,
+		Balances: pallet_balances,
+	}
+);
+
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
+impl frame_system::Config for Test {
+	type Block = Block;
+	type AccountData = pallet_balances::AccountData<Balance>;
+	type DbWeight = RocksDbWeight;
+}
+
+parameter_types! {
+	pub const BidIncrements: u128 = 10_000; // 1 cent
+
+	pub static ExistentialDeposit: Balance = 1;
+}
+
+pub type Balance = u128;
+
+impl pallet_balances::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = ();
+	type Balance = Balance;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type ReserveIdentifier = [u8; 8];
+	type FreezeIdentifier = ();
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type MaxFreezes = ();
+}
+
+pub fn set_argons(account_id: u64, amount: Balance) {
+	let _ = Balances::make_free_balance_be(&account_id, amount);
+	drop(Balances::issue(amount));
+}
+
+parameter_types! {
+	pub static NextSlot: BlockNumberFor<Test> = 100;
+	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
+
+	pub const BidPoolAccountId: u64 = 10000;
+
+	pub static LastBidPoolDistribution: (CohortId, Tick) = (0, 0);
+
+	pub static MaxBondFundContributors: u32 = 10;
+	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
+	pub static MaxBidPoolVaultParticipants: u32 = 100;
+	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
+
+	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+	pub static NextCohortId: CohortId = 1;
+
+	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
+}
+
+#[derive(Clone)]
+pub struct TestVault {
+	pub activated: Balance,
+	pub mining_bond_take: Permill,
+	pub account_id: u64,
+	pub is_closed: bool,
+}
+
+pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
+	VaultsById::mutate(|x| {
+		x.insert(vault_id, vault);
+	});
+}
+
+pub struct StaticBondFundVaultProvider;
+impl MiningBondFundVaultProvider for StaticBondFundVaultProvider {
+	type Balance = Balance;
+	type AccountId = u64;
+
+	fn get_activated_securitization(vault_id: VaultId) -> Self::Balance {
+		VaultsById::get().get(&vault_id).map(|a| a.activated).unwrap_or_default()
+	}
+
+	fn get_vault_payment_info(vault_id: VaultId) -> Option<(Self::AccountId, Permill)> {
+		VaultsById::get().get(&vault_id).map(|a| (a.account_id, a.mining_bond_take))
+	}
+
+	fn is_vault_accepting_mining_bonds(vault_id: VaultId) -> bool {
+		VaultsById::get().get(&vault_id).map(|a| !a.is_closed).unwrap_or_default()
+	}
+}
+
+impl pallet_mining_bonds::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type Balance = Balance;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MiningBondFundVaultProvider = StaticBondFundVaultProvider;
+	type MaxBondFundContributors = MaxBondFundContributors;
+	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
+	type PalletId = VaultPalletId;
+	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type NextCohortId = NextCohortId;
+}
+
+// Build genesis storage according to the mock runtime.
+pub fn new_test_ext() -> sp_io::TestExternalities {
+	let env = Env::new().default_filter_or("debug");
+	let _ = Builder::from_env(env).is_test(true).try_init();
+
+	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+	sp_io::TestExternalities::new(t)
+}

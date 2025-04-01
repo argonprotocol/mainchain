@@ -2,8 +2,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
-		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, LastActivatedCohortId, MinerXorKeyByIndex,
-		MiningConfig, NextSlotCohort,
+		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MinerXorKeyByIndex, MiningConfig,
+		NextCohortId, NextSlotCohort,
 	},
 	Error, Event, HoldReason, Registration,
 };
@@ -84,7 +84,6 @@ fn calculate_cohort_id() {
 	CurrentTick::set(current_tick);
 
 	new_test_ext().execute_with(|| {
-		LastActivatedCohortId::<Test>::set(0);
 		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 		ElapsedTicks::set(current_tick - genesis);
 		// bidding should open at 20k
@@ -123,11 +122,7 @@ fn calculate_cohort_id() {
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
 		assert_eq!(MiningSlots::calculate_cohort_id(), 1);
-		assert_eq!(
-			LastActivatedCohortId::<Test>::get(),
-			1,
-			"if not set, will show the current era"
-		);
+		assert_eq!(NextCohortId::<Test>::get(), 2, "if not set, will show the current era");
 		assert_eq!(
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
@@ -154,7 +149,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		set_ownership(1, 1000u32.into());
 		set_ownership(2, 1000u32.into());
 
-		LastActivatedCohortId::<Test>::set(0);
+		NextCohortId::<Test>::set(1);
 		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 		// now go to 20k
 		current_tick += 1;
@@ -195,7 +190,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1000);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
 		assert_eq!(MiningSlots::calculate_cohort_id(), 0);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
+		assert_eq!(NextCohortId::<Test>::get(), 1);
 
 		current_tick += 1000;
 		ElapsedTicks::set(current_tick - genesis);
@@ -203,7 +198,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		MiningSlots::on_initialize(5);
 		MiningSlots::on_finalize(5);
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 1,);
+		assert_eq!(NextCohortId::<Test>::get(), 2,);
 		assert_eq!(
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
@@ -238,7 +233,7 @@ fn it_adds_new_cohorts_on_block() {
 		CurrentTick::set(8);
 		assert_eq!(MiningSlots::slot_1_tick(), 4);
 		assert_eq!(MiningSlots::calculate_cohort_id(), 3);
-		LastActivatedCohortId::<Test>::put(3);
+		NextCohortId::<Test>::put(4);
 
 		for i in 0..4u32 {
 			let account_id: u64 = (i + 4).into();
@@ -282,7 +277,7 @@ fn it_adds_new_cohorts_on_block() {
 		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
 		MiningSlots::on_initialize(10);
 		MiningSlots::on_finalize(10);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 4);
+		assert_eq!(NextCohortId::<Test>::get(), 5);
 
 		// re-fetch
 		assert_eq!(
@@ -331,7 +326,7 @@ fn it_adds_new_cohorts_on_block() {
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(cohort.to_vec()),
 				released_miners: 2,
-				cohort_id: LastActivatedCohortId::<Test>::get(),
+				cohort_id: NextCohortId::<Test>::get() - 1,
 			}
 			.into(),
 		)
@@ -347,12 +342,12 @@ fn it_releases_argonots_when_a_window_closes() {
 
 	new_test_ext().execute_with(|| {
 		ArgonotsPerMiningSeat::<Test>::set(1000);
-		LastActivatedCohortId::<Test>::put(1);
+		NextCohortId::<Test>::put(2);
 		CurrentTick::set(7);
 		ElapsedTicks::set(7);
 		assert_eq!(MiningSlots::slot_1_tick(), 2);
 		assert_eq!(MiningSlots::calculate_cohort_id(), 3);
-		LastActivatedCohortId::<Test>::set(3);
+		NextCohortId::<Test>::set(4);
 		System::set_block_number(7);
 
 		for i in 0..4u32 {
@@ -399,7 +394,7 @@ fn it_releases_argonots_when_a_window_closes() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_id: LastActivatedCohortId::<Test>::get(),
+				cohort_id: NextCohortId::<Test>::get() - 1,
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 2,
@@ -547,10 +542,10 @@ fn it_wont_accept_bids_until_bidding_starts() {
 }
 
 fn get_next_slot_starting_index() -> u32 {
-	let current_cohort_id = LastActivatedCohortId::<Test>::get();
+	let next_cohort_id = NextCohortId::<Test>::get();
 	let cohort_size = MaxCohortSize::get();
 
-	MiningSlots::get_slot_starting_index(current_cohort_id + 1, MaxMiners::get(), cohort_size)
+	MiningSlots::get_slot_starting_index(next_cohort_id, MaxMiners::get(), cohort_size)
 }
 
 #[test]
@@ -566,7 +561,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		System::set_block_number(12);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
-		LastActivatedCohortId::<Test>::put(MiningSlots::calculate_cohort_id());
+		NextCohortId::<Test>::put(MiningSlots::calculate_cohort_id() + 1);
 
 		assert_eq!(MiningSlots::get_next_slot_era(), (16, 16 + (4 * 3)));
 		assert_eq!(get_next_slot_starting_index(), 2);
@@ -592,7 +587,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_id: LastActivatedCohortId::<Test>::get(),
+				cohort_id: NextCohortId::<Test>::get() - 1,
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
@@ -1090,7 +1085,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 		.unwrap();
 		assert!(!MiningSlots::check_for_bidding_close(invalid_strength));
 
-		let cohort_id = LastActivatedCohortId::<Test>::get() + 1;
+		let cohort_id = NextCohortId::<Test>::get();
 		System::assert_last_event(Event::MiningBidsClosed { cohort_id }.into());
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
@@ -1207,7 +1202,7 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		ElapsedTicks::set(12960);
 		MiningSlots::on_initialize(12960);
 		MiningSlots::on_finalize(12960);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
+		assert_eq!(NextCohortId::<Test>::get(), 1);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_ok!(MiningSlots::bid(
 			RuntimeOrigin::signed(2),
@@ -1224,7 +1219,7 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		CurrentTick::set(next_divisible_period);
 		MiningSlots::on_initialize(next_divisible_period);
 		MiningSlots::on_finalize(next_divisible_period);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 1);
+		assert_eq!(NextCohortId::<Test>::get(), 2);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(get_next_slot_starting_index(), 20);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
@@ -1260,25 +1255,26 @@ fn it_can_change_the_compute_mining_block() {
 
 #[test]
 fn it_should_rotate_grandpas() {
-	SlotBiddingStartAfterTicks::set(12_960 - 2);
+	SlotBiddingStartAfterTicks::set(12_960 - 1);
 	GrandpaRotationFrequency::set(4);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		ElapsedTicks::set(1);
 		CurrentTick::set(1);
+		NextCohortId::<Test>::set(1);
 		MiningSlots::on_initialize(1);
 		MiningSlots::on_finalize(1);
-		assert_eq!(LastActivatedCohortId::<Test>::get(), 0);
+		assert_eq!(NextCohortId::<Test>::get(), 1);
+		// genesis rotate
 		assert_eq!(GrandaRotations::get(), vec![0]);
 
-		LastActivatedCohortId::<Test>::put(1);
 		System::set_block_number(4);
 		ElapsedTicks::set(4);
 		CurrentTick::set(4);
 		MiningSlots::on_initialize(4);
 		MiningSlots::on_finalize(4);
-		assert_eq!(GrandaRotations::get(), vec![0, 1]);
+		assert_eq!(GrandaRotations::get(), vec![0, 0]);
 
 		// should auto-increment and rotate
 		System::set_block_number(12_960);
@@ -1286,7 +1282,7 @@ fn it_should_rotate_grandpas() {
 		CurrentTick::set(12_960);
 		MiningSlots::on_initialize(12_960);
 		MiningSlots::on_finalize(12_960);
-		assert_eq!(GrandaRotations::get(), vec![0, 1, 2]);
+		assert_eq!(GrandaRotations::get(), vec![0, 0, 1]);
 	});
 }
 

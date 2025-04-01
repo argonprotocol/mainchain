@@ -92,7 +92,7 @@ macro_rules! inject_runtime_vars {
 			spec_version: 116,
 			impl_version: 6,
 			apis: RUNTIME_API_VERSIONS,
-			transaction_version: 2,
+			transaction_version: 3,
 			state_version: 1,
 		};
 		parameter_types! {
@@ -128,7 +128,7 @@ macro_rules! inject_runtime_vars {
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
 			pallet_mining_slot::migrations::BiddingMigration<Runtime>,
-			pallet_vaults::migrations::BondedBitcoinBidPoolMigration<Runtime>,
+			pallet_vaults::migrations::MiningBondBidPoolMigration<Runtime>,
 			pallet_block_rewards::migrations::RewardFreezeMigration<Runtime>,
 		);
 

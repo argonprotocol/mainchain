@@ -3,7 +3,7 @@ use argon_primitives::{
 	block_seal::{CohortId, MiningSlotConfig},
 	providers::OnNewSlot,
 	tick::{Tick, Ticker},
-	vault::BondedBitcoinsBidPoolProvider,
+	vault::MiningBidPoolProvider,
 	BlockNumber, TickProvider, VotingSchedule,
 };
 use env_logger::{Builder, Env};
@@ -125,16 +125,12 @@ parameter_types! {
 }
 
 pub struct StaticBondProvider;
-impl BondedBitcoinsBidPoolProvider for StaticBondProvider {
+impl MiningBidPoolProvider for StaticBondProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
 	fn get_bid_pool_account() -> Self::AccountId {
 		BidPoolAccountId::get()
-	}
-
-	fn distribute_and_rotate_bid_pool(cohort_id: CohortId, cohort_window_end_tick: Tick) {
-		LastBidPoolDistribution::set((cohort_id, cohort_window_end_tick));
 	}
 }
 
@@ -149,6 +145,7 @@ impl OnNewSlot<u64> for StaticNewSlotEvent {
 		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		GrandaRotations::mutate(|a| a.push(current_cohort_id));
+		LastBidPoolDistribution::set((current_cohort_id, CurrentTick::get()));
 	}
 }
 

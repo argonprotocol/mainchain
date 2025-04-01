@@ -1,12 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
-
 extern crate alloc;
-#[cfg(feature = "std")]
-include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-pub use argon_runtime_common::prelude::*;
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmark;
 
 mod migrations;
 pub mod weights;
@@ -18,6 +16,10 @@ pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 
 pub use argon_runtime_common::config::NotaryRecordT;
+use argon_runtime_common::prelude::*;
+
+#[cfg(feature = "std")]
+include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_runtime::impl_opaque_keys;
 #[cfg(any(feature = "std", test))]
@@ -111,6 +113,9 @@ mod runtime {
 	pub type Hyperbridge = pallet_hyperbridge;
 	#[runtime::pallet_index(30)]
 	pub type TokenGateway = pallet_token_gateway;
+
+	#[runtime::pallet_index(31)]
+	pub type MiningBonds = pallet_mining_bonds;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -186,6 +191,7 @@ impl Get<Tick> for NotebookTickProvider {
 		schedule.notebook_tick()
 	}
 }
+
 impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
@@ -267,10 +273,6 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
-	type MaxBidPoolEntrants = ConstU32<100>;
-	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;
-	type PalletId = VaultBidPoolsOwnerPalletId;
-	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -334,6 +336,32 @@ impl Get<Tick> for TicksSinceGenesis {
 	}
 }
 
+pub struct NextCohortId;
+impl Get<CohortId> for NextCohortId {
+	fn get() -> CohortId {
+		MiningSlot::next_cohort_id()
+	}
+}
+
+parameter_types! {
+	pub const MinimumArgonsPerContributor: Balance = ARGON; // 1 argons minimum
+}
+
+impl pallet_mining_bonds::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_mining_bonds::weights::SubstrateWeight<Runtime>;
+	type Balance = Balance;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type MiningBondFundVaultProvider = Vaults;
+	type MaxBondFundContributors = MaxBondFundContributors;
+	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
+	type PalletId = MiningBondsInternalPalletId;
+	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type NextCohortId = NextCohortId;
+}
+
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
@@ -347,8 +375,8 @@ impl pallet_mining_slot::Config for Runtime {
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BidPoolProvider = Vaults;
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards);
+	type BidPoolProvider = MiningBonds;
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards, MiningBonds);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

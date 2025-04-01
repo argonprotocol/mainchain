@@ -9,7 +9,7 @@ use argon_primitives::{
 	},
 	inherents::BlockSealInherent,
 	tick::Tick,
-	vault::BondedBitcoinsBidPoolProvider,
+	vault::MiningBidPoolProvider,
 	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	SlotEvents, TickProvider,
 };
@@ -64,7 +64,7 @@ pub mod weights;
 /// To register for a Slot, you must submit a bid. At any given time, only the next Slot is being
 /// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
 /// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
-/// BondedBitcoins.
+/// MiningBonds.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use codec::FullCodec;
@@ -83,7 +83,7 @@ pub mod pallet {
 	use super::*;
 	use argon_primitives::{
 		block_seal::{MiningRegistration, RewardDestination},
-		vault::BondedBitcoinsBidPoolProvider,
+		vault::MiningBidPoolProvider,
 		SlotEvents, TickProvider,
 	};
 
@@ -155,7 +155,7 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BidPoolProvider: BondedBitcoinsBidPoolProvider<
+		type BidPoolProvider: MiningBidPoolProvider<
 			Balance = Self::Balance,
 			AccountId = Self::AccountId,
 		>;
@@ -238,9 +238,13 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
 
-	/// The last activated cohort id
+	/// The next cohort id
 	#[pallet::storage]
-	pub(super) type LastActivatedCohortId<T: Config> = StorageValue<_, CohortId, ValueQuery>;
+	pub(super) type NextCohortId<T: Config> = StorageValue<_, CohortId, ValueQuery>;
+
+	/// Did this block activate a new cohort
+	#[pallet::storage]
+	pub(super) type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -258,6 +262,7 @@ pub mod pallet {
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
 			ArgonotsPerMiningSeat::<T>::put(T::MinimumArgonotsPerSeat::get());
+			NextCohortId::<T>::put(1);
 		}
 	}
 
@@ -332,8 +337,9 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			let current_cohort_id = LastActivatedCohortId::<T>::get();
-			if current_cohort_id == 0 &&
+			DidStartNewCohort::<T>::take();
+			let current_cohort_id = NextCohortId::<T>::get();
+			if current_cohort_id == 1 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
 				Self::is_slot_bidding_started()
 			{
@@ -351,9 +357,9 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let current_cohort_id = LastActivatedCohortId::<T>::get();
+			let next_scheduled_cohort_id = NextCohortId::<T>::get();
 			let next_cohort_id = Self::calculate_cohort_id();
-			if next_cohort_id > current_cohort_id {
+			if next_cohort_id >= next_scheduled_cohort_id {
 				log::trace!("Starting Slot {}", next_cohort_id);
 				Self::adjust_argonots_per_seat();
 				Self::start_new_slot(next_cohort_id);
@@ -366,7 +372,7 @@ pub mod pallet {
 			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
 			// rotate grandpas on off rotations
 			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
-				T::SlotEvents::rotate_grandpas::<T::Keys>(current_cohort_id, vec![], vec![]);
+				T::SlotEvents::rotate_grandpas::<T::Keys>(next_cohort_id, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
 			}
 		}
@@ -418,7 +424,7 @@ pub mod pallet {
 
 			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
 			let current_registration = Self::get_active_registration(&miner_account_id);
-			let next_cohort_id = LastActivatedCohortId::<T>::get().saturating_add(1);
+			let next_cohort_id = NextCohortId::<T>::get();
 			if let Some(ref registration) = current_registration {
 				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
 				// ensure we are not overlapping sessions
@@ -450,9 +456,8 @@ pub mod pallet {
 					})
 					.unwrap_or_else(|pos| pos);
 
-				ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
-
 				if cohort.is_full() {
+					ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
 					// need to pop-off the lowest bid
 					let entry = cohort.pop().expect("should exist, just checked");
 					Self::release_failed_bid(&entry)?;
@@ -590,7 +595,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn is_registered_mining_active() -> bool {
-		LastActivatedCohortId::<T>::get() > 0 && ActiveMinersCount::<T>::get() > 0
+		NextCohortId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
 	}
 
 	pub fn get_mining_authority(
@@ -683,11 +688,11 @@ impl<T: Config> Pallet<T> {
 		});
 
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
-		LastActivatedCohortId::<T>::put(cohort_id);
+		DidStartNewCohort::<T>::put(true);
+		NextCohortId::<T>::put(cohort_id + 1);
+
 		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
 		T::SlotEvents::on_new_cohort(cohort_id);
-		let end_tick = T::TickProvider::current_tick() + Self::mining_window_ticks();
-		T::BidPoolProvider::distribute_and_rotate_bid_pool(cohort_id, end_tick);
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
@@ -780,7 +785,7 @@ impl<T: Config> Pallet<T> {
 
 		if vote_seal_proof < threshold {
 			info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
-			let cohort_id = LastActivatedCohortId::<T>::get() + 1;
+			let cohort_id = NextCohortId::<T>::get();
 			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_id });
 			return true
 		}
@@ -802,7 +807,11 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn get_next_slot_tick() -> Tick {
-		Self::tick_for_slot(LastActivatedCohortId::<T>::get() + 1)
+		Self::tick_for_slot(Self::next_cohort_id())
+	}
+
+	pub fn next_cohort_id() -> CohortId {
+		NextCohortId::<T>::get()
 	}
 
 	pub fn get_next_slot_era() -> (Tick, Tick) {

@@ -765,6 +765,93 @@ declare module '@polkadot/api-base/types/events' {
         { stateMachines: Vec<IsmpHostStateMachine> }
       >;
     };
+    miningBonds: {
+      /**
+       * Funds from the active bid pool have been distributed
+       **/
+      BidPoolDistributed: AugmentedEvent<
+        ApiType,
+        [
+          cohortId: u64,
+          bidPoolDistributed: u128,
+          bidPoolBurned: u128,
+          bidPoolShares: u32,
+        ],
+        {
+          cohortId: u64;
+          bidPoolDistributed: u128;
+          bidPoolBurned: u128;
+          bidPoolShares: u32;
+        }
+      >;
+      /**
+       * An error occurred burning from the bid pool
+       **/
+      CouldNotBurnBidPool: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { cohortId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
+       * An error occurred distributing a bid pool
+       **/
+      CouldNotDistributeBidPool: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          cohortId: u64,
+          vaultId: u32,
+          amount: u128,
+          dispatchError: SpRuntimeDispatchError,
+          isForVault: bool,
+        ],
+        {
+          accountId: AccountId32;
+          cohortId: u64;
+          vaultId: u32;
+          amount: u128;
+          dispatchError: SpRuntimeDispatchError;
+          isForVault: bool;
+        }
+      >;
+      /**
+       * An error occurred releasing a contributor hold
+       **/
+      ErrorRefundingBondFundCapital: AugmentedEvent<
+        ApiType,
+        [
+          cohortId: u64,
+          vaultId: u32,
+          amount: u128,
+          accountId: AccountId32,
+          dispatchError: SpRuntimeDispatchError,
+        ],
+        {
+          cohortId: u64;
+          vaultId: u32;
+          amount: u128;
+          accountId: AccountId32;
+          dispatchError: SpRuntimeDispatchError;
+        }
+      >;
+      /**
+       * The next bid pool has been locked in
+       **/
+      NextBidPoolCapitalLocked: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, totalActivatedCapital: u128, participatingVaults: u32],
+        { cohortId: u64; totalActivatedCapital: u128; participatingVaults: u32 }
+      >;
+      /**
+       * Some mining bond capital was refunded due to less activated vault funds than bond
+       * capital
+       **/
+      RefundedBondFundCapital: AugmentedEvent<
+        ApiType,
+        [cohortId: u64, vaultId: u32, amount: u128, accountId: AccountId32],
+        { cohortId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }
+      >;
+    };
     miningSlot: {
       /**
        * Bids are closed due to the VRF randomized function triggering
@@ -1483,66 +1570,6 @@ declare module '@polkadot/api-base/types/events' {
     };
     vaults: {
       /**
-       * Funds fro the active bid pool have been distributed
-       **/
-      BidPoolDistributed: AugmentedEvent<
-        ApiType,
-        [
-          cohortId: u64,
-          bidPoolDistributed: u128,
-          bidPoolBurned: u128,
-          bidPoolEntrants: u32,
-        ],
-        {
-          cohortId: u64;
-          bidPoolDistributed: u128;
-          bidPoolBurned: u128;
-          bidPoolEntrants: u32;
-        }
-      >;
-      /**
-       * An error occurred allocating the next bid pool
-       **/
-      CouldNotAllocateNextBidPool: AugmentedEvent<
-        ApiType,
-        [cohortId: u64, dispatchError: SpRuntimeDispatchError],
-        { cohortId: u64; dispatchError: SpRuntimeDispatchError }
-      >;
-      /**
-       * An error occurred burning from the bid pool
-       **/
-      CouldNotBurnBidPool: AugmentedEvent<
-        ApiType,
-        [cohortId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { cohortId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
-      >;
-      /**
-       * An error occurred distributing a bid pool
-       **/
-      CouldNotDistributeBidPool: AugmentedEvent<
-        ApiType,
-        [
-          cohortId: u64,
-          vaultId: u32,
-          amount: u128,
-          dispatchError: SpRuntimeDispatchError,
-        ],
-        {
-          cohortId: u64;
-          vaultId: u32;
-          amount: u128;
-          dispatchError: SpRuntimeDispatchError;
-        }
-      >;
-      /**
-       * The next bid pool has been allocated
-       **/
-      NextBidPoolAllocated: AugmentedEvent<
-        ApiType,
-        [bondedBitcoinPool: u128, bidPoolEntrants: u32],
-        { bondedBitcoinPool: u128; bidPoolEntrants: u32 }
-      >;
-      /**
        * An error occurred releasing a base fee hold
        **/
       ObligationBaseFeeMaturationError: AugmentedEvent<
@@ -1626,52 +1653,30 @@ declare module '@polkadot/api-base/types/events' {
       >;
       VaultClosed: AugmentedEvent<
         ApiType,
-        [
-          vaultId: u32,
-          lockedBitcoinAmountStillReserved: u128,
-          bondedBitcoinAmountStillReserved: u128,
-          securitizationStillReserved: u128,
-        ],
-        {
-          vaultId: u32;
-          lockedBitcoinAmountStillReserved: u128;
-          bondedBitcoinAmountStillReserved: u128;
-          securitizationStillReserved: u128;
-        }
+        [vaultId: u32, remainingSecuritization: u128, released: u128],
+        { vaultId: u32; remainingSecuritization: u128; released: u128 }
       >;
       VaultCreated: AugmentedEvent<
         ApiType,
         [
           vaultId: u32,
-          lockedBitcoinArgons: u128,
-          bondedBitcoinArgons: u128,
-          addedSecuritizationPercent: u128,
+          securitization: u128,
+          securitizationRatio: u128,
           operatorAccountId: AccountId32,
-          activationTick: u64,
+          openedTick: u64,
         ],
         {
           vaultId: u32;
-          lockedBitcoinArgons: u128;
-          bondedBitcoinArgons: u128;
-          addedSecuritizationPercent: u128;
+          securitization: u128;
+          securitizationRatio: u128;
           operatorAccountId: AccountId32;
-          activationTick: u64;
+          openedTick: u64;
         }
       >;
       VaultModified: AugmentedEvent<
         ApiType,
-        [
-          vaultId: u32,
-          lockedBitcoinArgons: u128,
-          bondedBitcoinArgons: u128,
-          addedSecuritizationPercent: u128,
-        ],
-        {
-          vaultId: u32;
-          lockedBitcoinArgons: u128;
-          bondedBitcoinArgons: u128;
-          addedSecuritizationPercent: u128;
-        }
+        [vaultId: u32, securitization: u128, securitizationRatio: u128],
+        { vaultId: u32; securitization: u128; securitizationRatio: u128 }
       >;
       VaultTermsChanged: AugmentedEvent<
         ApiType,

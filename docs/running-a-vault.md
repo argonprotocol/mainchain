@@ -1,8 +1,8 @@
 # Bitcoin Vaults
 
-Vaults are a core part of the Argon network. They lend Argons to both Bitcoin holders and "back" the mining cohorts with
-BondedBitcoins. For Bitcoin bonders, Vaults commit to lock up the market value of Bitcoin in Argons for a year. A Vault
-may choose the Annual Percentage Rate (APR) per Argon they charge for this service.
+Vaults are a core part of the Argon network. They lend Argons to both Bitcoin holders and can claim Mining Bid Pools by
+funding Mining Bonds. For Bitcoin lock-ers, Vaults commit to lock up the market value of Bitcoin in Argons for a year.
+A Vault may choose the Annual Percentage Rate (APR) per Argon they charge for this service.
 
 ## Locked Bitcoins
 
@@ -23,28 +23,29 @@ as long as a Vault performs the following two functions:
   value to determine the yearly fee. This fee is paid out at the end of the term.
 - `Base Fee`: A non-refundable flat fee charged for the service of locking up Bitcoin. This fee is held for a day before
   being spendable.
-- `Added Securitization Percent`: The added percentage (of offered _Bitcoin Argons_) the Vault is willing to put up to
-  cover the loss of Bitcoins in case of fraud. These funds are not eligible for LockedBitcoins themselves, but allow a
-  Vault to offer an equivalent amount of BondedBitcoins (up to 2x the Bitcoin Argons).
-- `Bitcoin Argons`: The number of argons a Vault will offer for LockedBitcoins. Once an argon is locked for the year, it
-  will not be returned to the Vault until the term is complete.
+- `Securitization Ratio`: The ratio of offered _Bitcoin Argons_ to securities used to cover the loss of Bitcoins in case
+  of fraud.
+- `Securitization`: The number of argons a Vault will lock as Securitization for Bitcoins. `1 / securitization ratio`
+  worth of these argons can be used to create LockedBitcoins.
 
-## BondedBitcoins
+## Mining Bonds
 
-BondedBitcoins allow a vault to earn a share of the Bids submitted for mining slots. Every time bidding for a mining
-slot cohort begins, 10% of each vault's available bonded bitcoins are automatically locked for the duration of the
-mining slot (eg, 10 days). At the end of bidding, the bid pool is distributed to those vaults based on their pro-rata
+Mining Bonds allow a vault to earn a share of the bids submitted for mining slots. Every time bidding for a mining
+slot cohort begins, each vault is entitled to issue mining bonds up to one-tenth of it's activated securitization.
+At the end of bidding, the bid pool is distributed to those mining-bonds based on their pro-rata
 amount of bitcoins locked.
 
-A Vault can submit up to an additional 2x the amount of LockedBitcoins in BondedBitcoins by adding
-`Added Securitization`. The Vault does not need to perform any actions to maintain their BondedBitcoins other than to
-allocate them upfront. As new bitcoins are locked, bonded bitcoins are automatically provisioned and locked for the next
-Mining Slot. BondedBitcoin funds are not at risk of being slashed or taken.
+`Activated securitization` is the amount of securitization currently locked into Bitcoin multiplied by the
+securitization ratio. In other words, it's the capital locked into use.
+
+To create `Mining Bonds`, any account can submit capital to a given cohort's bid pool using the `MiningBonds` pallet.
+The vault can control how much of the bid pool earnings are distributed to the contributed capital. More capital will
+earn a higher pro-rata share of the bid pool, so it's desirable to have an appealing offer.
 
 ### Variables for BondedBitcoins
 
-- `Bonded Bitcoin Argons`: The number of argons a Vault will offer for their prorata share of the Mining bid pool.
-  Once an argon is locked for the 10 days, it will not be returned to the Vault until the term is complete.
+- `Mining Bond Percent "take"`: The percent of the mining bond earnings that the vault owner will take for themselves (
+  vs distributing to the capital contributors).
 
 ## The Argon Bitcoin CLI
 
@@ -153,9 +154,9 @@ whatever you'd like to offer.
 
 ```bash
 $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
-  --bonded-bitcoin-argons=₳100 --locked-bitcoin-argons=₳100 \
+  --argons=₳100 --securitization-ratio=1x \
+  --mining-bond-percent-take=50% \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 \
-  --added-securitization-percent=100% \
   --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
 
@@ -177,7 +178,7 @@ Once your vault is created, you can look at the block it was included in to see 
 ### 4. Wait for your Vault to be Active
 
 Your vault will be active in the next Mining Slot (every day at noon EST). NOTE: this rule only applies once bidding has
-begun for Slot 1. The field to look at is `activation_tick`. The current tick is available under `Storage` -> `Ticks` ->
+begun for Slot 1. The field to look at is `opened_tick`. The current tick is available under `Storage` -> `Ticks` ->
 `CurrentTick` in the Polkadotjs UI.
 
 ## Monitoring Cosign Requests
