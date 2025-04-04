@@ -49,7 +49,7 @@ jobs:
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
