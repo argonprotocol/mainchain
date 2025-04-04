@@ -1,7 +1,7 @@
 use anyhow::Context;
 use clap::Subcommand;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
-use sp_runtime::{FixedPointNumber, FixedU128};
+use sp_runtime::{traits::One, FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
 use argon_client::{
@@ -82,26 +82,22 @@ impl VaultCommands {
 					.load_preset(UTF8_FULL)
 					.apply_modifier(UTF8_ROUND_CORNERS)
 					.set_content_arrangement(ContentArrangement::Dynamic)
-					.set_header(vec![
-						"Id",
-						"Available argons",
-						"Locked argons",
-						"Added Securitization",
-						"Fee",
-						"State",
-					]);
+					.set_header(vec!["Id", "Free Argons", "Securitization Ratio", "Fee", "State"]);
 
 				while let Some(Ok(kv)) = vaults.next().await {
 					let vault: VaultsById = kv.value.as_type()?;
 					let Some(vault_id) = kv.keys[0].as_u128().map(|a| a as VaultId) else {
 						continue;
 					};
-					let bitcoin_argons_available = vault.locked_bitcoin_argons.allocated -
-						vault.locked_bitcoin_argons.reserved -
-						vault.pending_bitcoins;
+
+					let securitization_ratio = from_api_fixed_u128(vault.securitization_ratio);
+					let available = FixedU128::one()
+						.div(securitization_ratio)
+						.saturating_mul_int(vault.securitization);
+					let bitcoin_argons_available = vault.securitization - available;
 					let state = if vault.is_closed {
 						"Closed"
-					} else if vault.activation_tick > current_tick {
+					} else if vault.opened_tick > current_tick {
 						"Pending"
 					} else {
 						"Active"
@@ -114,8 +110,7 @@ impl VaultCommands {
 						table.add_row(vec![
 							vault_id.to_string(),
 							ArgonFormatter(bitcoin_argons_available).to_string(),
-							ArgonFormatter(vault.locked_bitcoin_argons.reserved).to_string(),
-							ArgonFormatter(vault.added_securitization_argons).to_string(),
+							securitization_ratio.to_string(),
 							ArgonFormatter(fee).to_string(),
 							state.to_string(),
 						]);

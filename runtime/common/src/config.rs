@@ -86,6 +86,12 @@ parameter_types! {
 	pub const PayoutHistoryBlocks: u32 = 5;
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
+	// ### pallet_mining_bonds
+	pub const MaxBondFundContributors: u32 = 100;
+	pub const MaxBidPoolVaultParticipants: u32 = 100;
+	pub const MiningBondsInternalPalletId: PalletId = PalletId(*b"mngBonds");
+	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+
 	// ### pallet_mining_slot
 	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
 	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
@@ -111,9 +117,6 @@ parameter_types! {
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
-	pub const MinBidPoolProrataPercent: Perbill = Perbill::from_percent(1);
-	pub const VaultBidPoolsOwnerPalletId: PalletId = PalletId(*b"bidPools");
-	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 	// ### pallet chain transfer
 	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");

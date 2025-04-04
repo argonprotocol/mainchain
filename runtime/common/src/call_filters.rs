@@ -60,10 +60,21 @@ macro_rules! call_filters {
 						c,
 						RuntimeCall::Balances(..) |
 							RuntimeCall::Ownership(..) |
-							RuntimeCall::ChainTransfer(..)
+							RuntimeCall::ChainTransfer(..) |
+							RuntimeCall::TokenGateway(..)
 					),
-					ProxyType::MiningBid =>
-						matches!(c, RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })),
+					ProxyType::MiningBid => match c {
+						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. }) => true,
+						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+							calls.iter().all(|sc| {
+								matches!(
+									sc,
+									RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })
+								)
+							}),
+						_ => false,
+					},
 					ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
 					ProxyType::BitcoinCosign => matches!(
 						c,

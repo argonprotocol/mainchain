@@ -75,13 +75,14 @@ import type {
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletHyperbridgeVersionedHostParams,
+  PalletMiningBondsMiningBondFund,
+  PalletMiningBondsVaultBidPoolCapital,
   PalletMintMintAction,
   PalletMultisigMultisig,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
-  PalletVaultsBidPoolEntrant,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
 } from '@polkadot/types/lookup';
@@ -768,6 +769,36 @@ declare module '@polkadot/api-base/types/storage' {
         [IsmpHostStateMachine]
       >;
     };
+    miningBonds: {
+      /**
+       * The currently earning contributors for the current epoch's bond funds. Sorted by highest
+       * bids first
+       **/
+      miningBondFundsByCohort: AugmentedQuery<
+        ApiType,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<BTreeMap<u32, PalletMiningBondsMiningBondFund>>,
+        [u64]
+      >;
+      /**
+       * The bid pool capital for the next bid pool.
+       **/
+      nextVaultBidPoolCapital: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletMiningBondsVaultBidPoolCapital>>,
+        []
+      >;
+      /**
+       * The entrants in the mining bond pool that will be paid out for the active bid pool. They
+       * apply to the next closed mining slot cohort bid pool. Sorted with biggest share last.
+       **/
+      openVaultBidPoolCapital: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletMiningBondsVaultBidPoolCapital>>,
+        []
+      >;
+    };
     miningSlot: {
       /**
        * Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
@@ -796,6 +827,10 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<u128>,
         []
       >;
+      /**
+       * Did this block activate a new cohort
+       **/
+      didStartNewCohort: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       hasAddedGrandpaRotation: AugmentedQuery<
         ApiType,
         () => Observable<bool>,
@@ -818,10 +853,6 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The last activated cohort id
-       **/
-      lastActivatedCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
        * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
        * the miner and the block hash at time of activation.
        **/
@@ -838,6 +869,10 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>,
         []
       >;
+      /**
+       * The next cohort id
+       **/
+      nextCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The cohort set to go into effect in the next slot. The Vec has all
        * registrants with their bid amount
@@ -1426,29 +1461,20 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
       >;
-      /**
-       * Completion of bonded bitcoin obligation, upon which funds are returned to the vault
-       **/
-      bondedBitcoinCompletions: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
-        [u64]
-      >;
-      /**
-       * The entrants in the bonded bitcoin pool that will next be paid out. They apply to the next
-       * closed mining slot cohort bid pool.
-       **/
-      nextBondedBitcoinPoolEntrants: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletVaultsBidPoolEntrant>>,
-        []
-      >;
       nextObligationId: AugmentedQuery<
         ApiType,
         () => Observable<Option<u64>>,
         []
       >;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Completion of obligations by tick
+       **/
+      obligationCompletionByTick: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
+        [u64]
+      >;
       /**
        * Obligation  by id
        **/

@@ -1,26 +1,36 @@
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use scale_info::TypeInfo;
-use sp_arithmetic::{traits::UniqueSaturatedInto, FixedPointNumber, FixedU128};
+use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey},
-	block_seal::CohortId,
 	tick::Tick,
 	ObligationId, VaultId,
 };
 
-pub trait BondedBitcoinsBidPoolProvider {
+pub trait MiningBidPoolProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
 	/// Transfer funds to the bid pool and hold
 	fn get_bid_pool_account() -> Self::AccountId;
+}
 
-	/// Distribute the bid pool and allocate the next one
-	fn distribute_and_rotate_bid_pool(cohort_id: CohortId, cohort_window_end_tick: Tick);
+pub trait MiningBondFundVaultProvider {
+	type Balance: Codec;
+	type AccountId: Codec;
+
+	/// Get the total amount of securitization activated for the vault
+	fn get_activated_securitization(vault_id: VaultId) -> Self::Balance;
+
+	/// Gets the account id of the vault and the vault share of mining bonds
+	fn get_vault_payment_info(vault_id: VaultId) -> Option<(Self::AccountId, Permill)>;
+
+	/// Ensure a vault is accepting mining bonds
+	fn is_vault_accepting_mining_bonds(vault_id: VaultId) -> bool;
 }
 
 #[derive(RuntimeDebug, Clone, PartialEq, Eq)]
@@ -128,27 +138,27 @@ pub struct Vault<
 > {
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
-	/// The assignment and allocation of LockedBitcoins
-	pub locked_bitcoin_argons: VaultArgons<Balance>,
-	/// The terms for locked bitcoin
-	pub terms: VaultTerms<Balance>,
-	/// The additional securitization percent that has been added to the vault (recoverable by
-	/// beneficiary in case of fraud or theft)
+	/// The securitization in the vault
 	#[codec(compact)]
-	pub added_securitization_percent: FixedU128,
-	/// The amount of argons that have been securitized
+	pub securitization: Balance,
+	/// The amount of locked bitcoins
 	#[codec(compact)]
-	pub added_securitization_argons: Balance,
-	/// The bonded bitcoins that are currently in the vault
-	pub bonded_bitcoin_argons: VaultArgons<Balance>,
+	pub bitcoin_locked: Balance,
+	/// Bitcoins pending verification (this is "out of" the bitcoin_locked, not in addition to)
+	#[codec(compact)]
+	pub bitcoin_pending: Balance,
+	/// The securitization ratio of "total securitization" to "available for locked bitcoin"
+	#[codec(compact)]
+	pub securitization_ratio: FixedU128,
 	/// If the vault is closed, no new obligations can be issued
 	pub is_closed: bool,
-	/// The terms that are pending to be applied to this vault at the given block number
+	/// The terms for locked bitcoin
+	pub terms: VaultTerms<Balance>,
+	/// The terms that are pending to be applied to this vault at the given tick
 	pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
-	/// Bitcoins pending verification
-	pub pending_bitcoins: Balance,
 	/// A tick at which this vault is active
-	pub activation_tick: Tick,
+	#[codec(compact)]
+	pub opened_tick: Tick,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -159,6 +169,9 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	/// The base fee for a bitcoin lock
 	#[codec(compact)]
 	pub bitcoin_base_fee: Balance,
+	/// The percent of mining bonds taken by the vault
+	#[codec(compact)]
+	pub mining_bond_percent_take: Permill,
 }
 
 impl<
@@ -176,98 +189,52 @@ impl<
 			+ Eq,
 	> Vault<AccountId, Balance>
 {
-	pub fn bonded_bitcoins_for_pool(&self, slots: u32) -> Balance {
-		let mut locked_bitcoin_space =
-			self.locked_bitcoin_argons.reserved.saturating_sub(self.pending_bitcoins);
-
+	pub fn get_activated_securitization(&self) -> Balance {
+		let activated_securitization = self.bitcoin_locked.saturating_sub(self.bitcoin_pending);
 		// you can increase the max allocation up to an additional 2x over the locked bitcoins
-		if self.added_securitization_argons > Balance::zero() {
-			let allowed_securities = locked_bitcoin_space
-				.saturating_mul(2u32.into())
-				.min(self.added_securitization_argons);
-			locked_bitcoin_space = locked_bitcoin_space.saturating_add(allowed_securities);
-		}
-
-		let max_allocation = self.bonded_bitcoin_argons.allocated.min(locked_bitcoin_space);
-		let ideal_amount = max_allocation / slots.into();
-		let reserved = self.bonded_bitcoin_argons.reserved;
-		let remainder = max_allocation.saturating_sub(reserved);
-		if ideal_amount <= remainder {
-			ideal_amount
-		} else {
-			remainder
-		}
+		let ratio = self.securitization_ratio.min(FixedU128::from_u32(2));
+		ratio.saturating_mul_int(activated_securitization).min(self.securitization)
 	}
 
-	pub fn get_added_securitization_needed(&self) -> Balance {
-		let allocated = if self.is_closed {
-			self.locked_bitcoin_argons.reserved
-		} else {
-			self.locked_bitcoin_argons.allocated
-		};
-
-		let argons = self
-			.added_securitization_percent
-			.saturating_mul_int::<u128>(allocated.unique_saturated_into());
-
-		argons.unique_saturated_into()
-	}
-	pub fn mut_argons(&mut self, fund_type: &FundType) -> &mut VaultArgons<Balance> {
-		match *fund_type {
-			FundType::BondedBitcoin => &mut self.bonded_bitcoin_argons,
-			FundType::LockedBitcoin => &mut self.locked_bitcoin_argons,
-		}
+	pub fn get_minimum_securitization_needed(&self) -> Balance {
+		self.securitization_ratio.saturating_mul_int(self.bitcoin_locked)
 	}
 
-	pub fn argons(&self, fund_type: &FundType) -> &VaultArgons<Balance> {
-		match *fund_type {
-			FundType::BondedBitcoin => &self.bonded_bitcoin_argons,
-			FundType::LockedBitcoin => &self.locked_bitcoin_argons,
-		}
+	pub fn get_recovery_securitization(&self) -> Balance {
+		let reserved = FixedU128::from_u32(1).div(self.securitization_ratio);
+		self.securitization
+			.saturating_sub(reserved.saturating_mul_int(self.securitization))
 	}
-}
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
-pub struct VaultArgons<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> {
-	#[codec(compact)]
-	pub allocated: Balance,
-	#[codec(compact)]
-	pub reserved: Balance,
-}
-
-impl<Balance> VaultArgons<Balance>
-where
-	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned,
-{
 	pub fn destroy_funds(&mut self, amount: Balance) -> Result<(), ObligationError> {
-		if self.reserved < amount {
+		if self.bitcoin_locked < amount {
 			return Err(ObligationError::InsufficientFunds);
 		}
-		self.reduce_allocated(amount);
-		self.reduce_reserved(amount);
+		self.reduce_securitization(amount);
+		self.reduce_locked_bitcoin(amount);
 		Ok(())
 	}
 
 	pub fn destroy_allocated_funds(&mut self, amount: Balance) -> Result<(), ObligationError> {
-		if self.allocated < amount {
+		if self.securitization < amount {
 			return Err(ObligationError::InsufficientFunds);
 		}
-		self.reduce_allocated(amount);
+		self.reduce_securitization(amount);
 		Ok(())
 	}
 
-	pub fn reduce_allocated(&mut self, amount: Balance) {
-		self.allocated = self.allocated.saturating_sub(amount);
+	pub fn reduce_securitization(&mut self, amount: Balance) {
+		self.securitization.saturating_reduce(amount);
 	}
 
-	pub fn reduce_reserved(&mut self, amount: Balance) {
-		self.reserved = self.reserved.saturating_sub(amount);
+	pub fn reduce_locked_bitcoin(&mut self, amount: Balance) {
+		self.bitcoin_locked.saturating_reduce(amount);
 	}
-}
 
-impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned> VaultArgons<Balance> {
 	pub fn free_balance(&self) -> Balance {
-		self.allocated.saturating_sub(self.reserved)
+		self.securitization
+			.saturating_sub(self.get_recovery_securitization())
+			.saturating_sub(self.bitcoin_locked)
 	}
 }
 
@@ -304,5 +271,4 @@ pub enum ObligationExpiration {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum FundType {
 	LockedBitcoin,
-	BondedBitcoin,
 }

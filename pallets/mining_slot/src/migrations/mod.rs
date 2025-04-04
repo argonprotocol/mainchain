@@ -1,5 +1,6 @@
 use crate::{
 	pallet::{ActiveMinersByIndex, MinerXorKeyByIndex, NextSlotCohort},
+	runtime_decl_for_mining_slot_api::NextCohortId,
 	Config, Registration,
 };
 use alloc::vec::Vec;
@@ -85,6 +86,10 @@ mod old_storage {
 		BoundedBTreeMap<MinerIndex, U256, <T as Config>::MaxMiners>,
 		ValueQuery,
 	>;
+
+	#[storage_alias]
+	pub(super) type LastActivatedCohortId<T: Config> =
+		StorageValue<crate::Pallet<T>, CohortId, ValueQuery>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -135,6 +140,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			})
 		});
 		info!("{} mining registrations migrated", count);
+
+		let last_cohort_id = old_storage::LastActivatedCohortId::<T>::take();
+		NextCohortId::<T>::set(last_cohort_id);
+		count += 1;
 
 		let authority_hash = old_storage::AuthorityHashByIndex::<T>::take();
 		MinerXorKeyByIndex::<T>::set(authority_hash);

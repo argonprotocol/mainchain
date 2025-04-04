@@ -621,6 +621,38 @@ declare module '@polkadot/api-base/types/submittable' {
         [Vec<IsmpHostStateMachine>]
       >;
     };
+    miningBonds: {
+      /**
+       * Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount
+       * raised per vault cannot exceed the allocated securitization for the vault.
+       *
+       * The funds and profits will be automatically rolled over to the next fund up to the max
+       * securitization activated.
+       *
+       * - `origin`: The account that is joining the fund
+       * - `vault_id`: The vault id that the account would like to join a fund for
+       * - `amount`: The amount of argons to contribute to the fund. If you change this amount,
+       * it will just add the incremental amount
+       **/
+      addCapital: AugmentedSubmittable<
+        (
+          vaultId: u32 | AnyNumber | Uint8Array,
+          amount: u128 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u32, u128]
+      >;
+      /**
+       * Allows a user to remove their contribution from the fund after the hold is released
+       * (once cohort slot period is complete).
+       **/
+      endRenewal: AugmentedSubmittable<
+        (
+          vaultId: u32 | AnyNumber | Uint8Array,
+          cohortId: u64 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u32, u64]
+      >;
+    };
     miningSlot: {
       /**
        * Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
@@ -1995,10 +2027,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | PalletVaultsVaultConfig
             | {
                 terms?: any;
-                lockedBitcoinArgonsAllocated?: any;
+                securitization?: any;
                 bitcoinXpubkey?: any;
-                bondedBitcoinArgonsAllocated?: any;
-                addedSecuritizationPercent?: any;
+                securitizationRatio?: any;
               }
             | string
             | Uint8Array,
@@ -2006,23 +2037,22 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletVaultsVaultConfig]
       >;
       /**
-       * Modify funds offered by the vault. This will not affect issued obligations, but will
+       * Modify funds allocated by the vault. This will not affect issued obligations, but will
        * affect the amount of funds available for new ones.
        *
-       * The additional securitization percent must be maintained or increased.
+       * The securitization percent must be maintained or increased.
        *
-       * The amount offered may not go below the existing reserved amounts, but you can release
+       * The amount allocated may not go below the existing reserved amounts, but you can release
        * funds in this vault as obligations are released. To stop issuing any more obligations,
        * use the `close` api.
        **/
       modifyFunding: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
-          totalBondedBitcoinAmountOffered: u128 | AnyNumber | Uint8Array,
-          totalLockedBitcoinAmountOffered: u128 | AnyNumber | Uint8Array,
-          addedSecuritizationPercent: u128 | AnyNumber | Uint8Array,
+          securitization: u128 | AnyNumber | Uint8Array,
+          securitizationRatio: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128, u128, u128]
+        [u32, u128, u128]
       >;
       /**
        * Change the terms of this vault. The change will be applied at the next mining slot
@@ -2033,7 +2063,11 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           terms:
             | ArgonPrimitivesVaultVaultTerms
-            | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any }
+            | {
+                bitcoinAnnualPercentRate?: any;
+                bitcoinBaseFee?: any;
+                miningBondPercentTake?: any;
+              }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,

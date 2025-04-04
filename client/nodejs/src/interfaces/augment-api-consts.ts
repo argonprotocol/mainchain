@@ -161,6 +161,28 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxSetIdSessionEntries: u64 & AugmentedConst<ApiType>;
     };
+    miningBonds: {
+      /**
+       * Bid Pool burn percent
+       **/
+      bidPoolBurnPercent: Percent & AugmentedConst<ApiType>;
+      /**
+       * The number of vaults that can participate in the bid pools. This is a substrate limit.
+       **/
+      maxBidPoolVaultParticipants: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of contributors to a bond fund
+       **/
+      maxBondFundContributors: u32 & AugmentedConst<ApiType>;
+      /**
+       * The minimum argons per fund contributor
+       **/
+      minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
+      /**
+       * A pallet id that is used to hold the bid pool
+       **/
+      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
+    };
     miningSlot: {
       /**
        * The max percent swing for the argonots per slot (from the last percent
@@ -423,11 +445,6 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
-       * Max entrants allowed in the bid pool. This is only present because substrate prefers
-       * limits
-       **/
-      maxBidPoolEntrants: u32 & AugmentedConst<ApiType>;
-      /**
        * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
        * single block
        **/
@@ -444,10 +461,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The number of ticks that a funding change will be delayed before it takes effect
        **/
       miningArgonIncreaseTickDelay: u64 & AugmentedConst<ApiType>;
-      /**
-       * A pallet id that is used to hold the bid pool
-       **/
-      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
        * Argon blocks per day
        **/

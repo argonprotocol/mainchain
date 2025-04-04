@@ -1,6 +1,6 @@
 use crate::{api::runtime_types, BlakeTwo256};
 use argon_primitives::BlockNumber;
-use sp_arithmetic::FixedU128;
+use sp_arithmetic::{FixedU128, Permill};
 use subxt::config::substrate::{DigestItem, SubstrateHeader};
 
 impl<T, X: sp_core::Get<u32>> From<sp_core::bounded_vec::BoundedVec<T, X>>
@@ -190,8 +190,16 @@ pub fn to_api_fixed_u128(value: FixedU128) -> runtime_types::sp_arithmetic::fixe
 	runtime_types::sp_arithmetic::fixed_point::FixedU128(value.into_inner())
 }
 
+pub fn to_api_per_mill(value: Permill) -> runtime_types::sp_arithmetic::per_things::Permill {
+	runtime_types::sp_arithmetic::per_things::Permill(value.deconstruct())
+}
+
 pub fn from_api_fixed_u128(
 	value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 ) -> FixedU128 {
 	FixedU128::from_inner(value.0)
+}
+
+pub fn from_api_per_mill(value: runtime_types::sp_arithmetic::per_things::Permill) -> Permill {
+	Permill::from_parts(value.0)
 }

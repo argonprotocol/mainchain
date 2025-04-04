@@ -76,6 +76,7 @@ pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
+pallet-mining-bonds = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
 pallet-ticks = { workspace = true }
@@ -115,6 +116,7 @@ std = [
 	"pallet-hyperbridge/std",
 	"pallet-ismp-runtime-api/std",
 	"pallet-ismp/std",
+	"pallet-mining-bonds/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
 	"pallet-multisig/std",
@@ -167,6 +169,7 @@ runtime-benchmarks = [
 	"pallet-domains/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
 	"pallet-ismp/runtime-benchmarks",
+	"pallet-mining-bonds/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
 	"pallet-multisig/runtime-benchmarks",
@@ -203,6 +206,7 @@ try-runtime = [
 	"pallet-grandpa/try-runtime",
 	"pallet-hyperbridge/try-runtime",
 	"pallet-ismp/try-runtime",
+	"pallet-mining-bonds/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
 	"pallet-multisig/try-runtime",

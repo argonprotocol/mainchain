@@ -55,7 +55,6 @@ import type {
   ArgonPrimitivesVaultObligation,
   ArgonPrimitivesVaultObligationError,
   ArgonPrimitivesVaultObligationExpiration,
-  ArgonPrimitivesVaultVaultArgons,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
@@ -176,6 +175,12 @@ import type {
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsMessageCommitment,
   PalletIsmpUtilsUpdateConsensusState,
+  PalletMiningBondsCall,
+  PalletMiningBondsError,
+  PalletMiningBondsEvent,
+  PalletMiningBondsHoldReason,
+  PalletMiningBondsMiningBondFund,
+  PalletMiningBondsVaultBidPoolCapital,
   PalletMiningSlotCall,
   PalletMiningSlotError,
   PalletMiningSlotEvent,
@@ -226,7 +231,6 @@ import type {
   PalletUtilityCall,
   PalletUtilityError,
   PalletUtilityEvent,
-  PalletVaultsBidPoolEntrant,
   PalletVaultsCall,
   PalletVaultsError,
   PalletVaultsEvent,
@@ -303,7 +307,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesVaultObligation: ArgonPrimitivesVaultObligation;
     ArgonPrimitivesVaultObligationError: ArgonPrimitivesVaultObligationError;
     ArgonPrimitivesVaultObligationExpiration: ArgonPrimitivesVaultObligationExpiration;
-    ArgonPrimitivesVaultVaultArgons: ArgonPrimitivesVaultVaultArgons;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
     ArgonRuntimeProxyType: ArgonRuntimeProxyType;
@@ -424,6 +427,12 @@ declare module '@polkadot/types/types/registry' {
     PalletIsmpUtilsFundMessageParams: PalletIsmpUtilsFundMessageParams;
     PalletIsmpUtilsMessageCommitment: PalletIsmpUtilsMessageCommitment;
     PalletIsmpUtilsUpdateConsensusState: PalletIsmpUtilsUpdateConsensusState;
+    PalletMiningBondsCall: PalletMiningBondsCall;
+    PalletMiningBondsError: PalletMiningBondsError;
+    PalletMiningBondsEvent: PalletMiningBondsEvent;
+    PalletMiningBondsHoldReason: PalletMiningBondsHoldReason;
+    PalletMiningBondsMiningBondFund: PalletMiningBondsMiningBondFund;
+    PalletMiningBondsVaultBidPoolCapital: PalletMiningBondsVaultBidPoolCapital;
     PalletMiningSlotCall: PalletMiningSlotCall;
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;
@@ -474,7 +483,6 @@ declare module '@polkadot/types/types/registry' {
     PalletUtilityCall: PalletUtilityCall;
     PalletUtilityError: PalletUtilityError;
     PalletUtilityEvent: PalletUtilityEvent;
-    PalletVaultsBidPoolEntrant: PalletVaultsBidPoolEntrant;
     PalletVaultsCall: PalletVaultsCall;
     PalletVaultsError: PalletVaultsError;
     PalletVaultsEvent: PalletVaultsEvent;

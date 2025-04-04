@@ -6,11 +6,11 @@ use argon_primitives::{
 };
 use env_logger::{Builder, Env};
 use frame_support::{
-	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight, PalletId,
+	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use sp_core::{ConstU32, ConstU64, H256};
-use sp_runtime::{BuildStorage, Perbill, Percent};
+use sp_runtime::BuildStorage;
 
 pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -73,11 +73,6 @@ parameter_types! {
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 	pub static IsSlotBiddingStarted: bool = false;
 
-	pub static MaxBidPoolEntrants: u32 = 100;
-	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
-	pub static MinBidPoolProrataPercent: Perbill = Perbill::from_percent(1);
-
-	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(10);
 }
 pub struct StaticMiningSlotProvider;
 impl MiningSlotProvider for StaticMiningSlotProvider {
@@ -131,10 +126,6 @@ impl pallet_vaults::Config for Test {
 	type TickProvider = StaticTickProvider;
 	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
 	type EventHandler = ();
-	type PalletId = VaultPalletId;
-	type MaxBidPoolEntrants = MaxBidPoolEntrants;
-	type MinBidPoolProrataPercent = MinBidPoolProrataPercent;
-	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 }
 
 // Build genesis storage according to the mock runtime.

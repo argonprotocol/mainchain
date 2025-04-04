@@ -9,7 +9,7 @@ use sp_core::{
 };
 use sp_runtime::traits::IdentifyAccount;
 use std::env;
-use tracing::info;
+use tracing::{error, info};
 use url::Url;
 
 use crate::{bitcoin_tip::bitcoin_loop, price_index::price_index_loop};
@@ -77,6 +77,10 @@ pub enum Subcommand {
 		/// The crypto type
 		#[clap(short, long, env, default_value_t=CryptoType::Sr25519)]
 		crypto_type: CryptoType,
+
+		/// Expected address
+		#[clap(long)]
+		verify_address: Option<String>,
 	},
 }
 
@@ -118,13 +122,23 @@ async fn main() -> anyhow::Result<()> {
 	let Cli { trusted_rpc_url, keystore_params, dev, signer_address, signer_crypto, subcommand } =
 		Cli::parse();
 
-	if let Subcommand::InsertKey { suri, crypto_type } = &subcommand {
+	if let Subcommand::InsertKey { suri, crypto_type, verify_address } = &subcommand {
 		let (_keystore, address) = keystore_params.open_with_account(
 			suri.as_ref(),
 			crypto_type.clone(),
 			ACCOUNT,
 			false,
 		)?;
+		if let Some(verify_address) = verify_address {
+			if *verify_address != address {
+				error!(
+					?address,
+					?verify_address,
+					"The provided key does not match the `verify_address` param"
+				);
+				bail!("The provided key does not match the `verify_address` param");
+			}
+		}
 		info!(?address,
 			keystore_path = ?keystore_params.keystore_path,
 			"Inserted key to keystore");

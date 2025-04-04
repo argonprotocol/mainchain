@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 31usize] = [
+	pub static PALLETS: [&str; 32usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -38,6 +38,7 @@ pub mod api {
 		"IsmpGrandpa",
 		"Hyperbridge",
 		"TokenGateway",
+		"MiningBonds",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -1160,10 +1161,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							76u8, 207u8, 72u8, 175u8, 144u8, 166u8, 226u8, 163u8, 68u8, 87u8,
-							100u8, 64u8, 77u8, 37u8, 201u8, 72u8, 53u8, 3u8, 139u8, 98u8, 189u8,
-							178u8, 100u8, 167u8, 198u8, 166u8, 38u8, 221u8, 109u8, 210u8, 216u8,
-							68u8,
+							253u8, 125u8, 115u8, 38u8, 112u8, 54u8, 252u8, 149u8, 91u8, 114u8,
+							85u8, 119u8, 203u8, 190u8, 88u8, 255u8, 172u8, 201u8, 186u8, 90u8,
+							175u8, 107u8, 102u8, 247u8, 133u8, 239u8, 205u8, 87u8, 41u8, 239u8,
+							246u8, 188u8,
 						],
 					)
 				}
@@ -1181,9 +1182,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							81u8, 171u8, 139u8, 140u8, 119u8, 98u8, 135u8, 22u8, 70u8, 215u8, 29u8,
-							54u8, 12u8, 230u8, 152u8, 130u8, 44u8, 78u8, 34u8, 122u8, 208u8, 58u8,
-							228u8, 24u8, 208u8, 218u8, 58u8, 215u8, 18u8, 47u8, 148u8, 137u8,
+							185u8, 245u8, 116u8, 108u8, 244u8, 79u8, 153u8, 111u8, 225u8, 120u8,
+							231u8, 179u8, 48u8, 92u8, 186u8, 198u8, 195u8, 222u8, 249u8, 78u8,
+							19u8, 167u8, 108u8, 18u8, 13u8, 245u8, 120u8, 243u8, 151u8, 102u8,
+							64u8, 169u8,
 						],
 					)
 				}
@@ -3670,6 +3672,9 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::constants::ConstantsApi {
 			token_gateway::constants::ConstantsApi
 		}
+		pub fn mining_bonds(&self) -> mining_bonds::constants::ConstantsApi {
+			mining_bonds::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3763,6 +3768,9 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::storage::StorageApi {
 			token_gateway::storage::StorageApi
 		}
+		pub fn mining_bonds(&self) -> mining_bonds::storage::StorageApi {
+			mining_bonds::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3847,6 +3855,9 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::calls::TransactionApi {
 			token_gateway::calls::TransactionApi
 		}
+		pub fn mining_bonds(&self) -> mining_bonds::calls::TransactionApi {
+			mining_bonds::calls::TransactionApi
+		}
 	}
 	#[doc = r" check whether the metadata provided is aligned with this statically generated code."]
 	pub fn is_codegen_valid_for(metadata: &::subxt::ext::subxt_core::Metadata) -> bool {
@@ -3857,9 +3868,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				59u8, 18u8, 126u8, 46u8, 35u8, 112u8, 249u8, 49u8, 127u8, 46u8, 119u8, 175u8,
-				146u8, 247u8, 100u8, 173u8, 66u8, 143u8, 225u8, 140u8, 40u8, 146u8, 220u8, 92u8,
-				21u8, 77u8, 70u8, 78u8, 157u8, 167u8, 239u8, 90u8,
+				120u8, 127u8, 130u8, 185u8, 18u8, 56u8, 100u8, 179u8, 205u8, 53u8, 146u8, 212u8,
+				249u8, 19u8, 30u8, 181u8, 53u8, 142u8, 113u8, 88u8, 45u8, 108u8, 201u8, 70u8, 70u8,
+				239u8, 170u8, 58u8, 57u8, 81u8, 16u8, 107u8,
 			]
 	}
 	pub mod system {
@@ -5010,10 +5021,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							110u8, 142u8, 234u8, 162u8, 4u8, 5u8, 123u8, 238u8, 135u8, 253u8, 21u8,
-							58u8, 126u8, 12u8, 141u8, 117u8, 170u8, 114u8, 246u8, 172u8, 226u8,
-							49u8, 179u8, 163u8, 240u8, 130u8, 235u8, 56u8, 149u8, 161u8, 126u8,
-							64u8,
+							121u8, 32u8, 196u8, 196u8, 191u8, 253u8, 70u8, 102u8, 151u8, 231u8,
+							30u8, 38u8, 79u8, 232u8, 250u8, 169u8, 10u8, 111u8, 41u8, 116u8, 209u8,
+							70u8, 6u8, 96u8, 54u8, 136u8, 39u8, 216u8, 250u8, 237u8, 132u8, 35u8,
 						],
 					)
 				}
@@ -5835,10 +5845,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							227u8, 127u8, 76u8, 116u8, 162u8, 48u8, 209u8, 27u8, 48u8, 109u8, 39u8,
-							48u8, 204u8, 183u8, 207u8, 140u8, 38u8, 136u8, 88u8, 252u8, 66u8,
-							185u8, 154u8, 242u8, 235u8, 245u8, 105u8, 145u8, 195u8, 35u8, 89u8,
-							188u8,
+							218u8, 44u8, 84u8, 243u8, 33u8, 216u8, 107u8, 118u8, 131u8, 69u8,
+							204u8, 229u8, 26u8, 136u8, 64u8, 224u8, 127u8, 148u8, 45u8, 197u8,
+							117u8, 158u8, 73u8, 112u8, 83u8, 216u8, 109u8, 214u8, 74u8, 145u8,
+							31u8, 34u8,
 						],
 					)
 				}
@@ -5900,10 +5910,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							195u8, 216u8, 150u8, 35u8, 42u8, 201u8, 248u8, 169u8, 216u8, 201u8,
-							172u8, 224u8, 13u8, 45u8, 172u8, 207u8, 49u8, 14u8, 48u8, 131u8, 54u8,
-							29u8, 81u8, 112u8, 100u8, 96u8, 228u8, 89u8, 214u8, 210u8, 148u8,
-							169u8,
+							39u8, 133u8, 249u8, 94u8, 17u8, 90u8, 200u8, 102u8, 34u8, 39u8, 64u8,
+							158u8, 87u8, 205u8, 150u8, 94u8, 22u8, 172u8, 131u8, 255u8, 135u8,
+							231u8, 131u8, 155u8, 213u8, 3u8, 0u8, 236u8, 148u8, 158u8, 93u8, 89u8,
 						],
 					)
 				}
@@ -6766,9 +6775,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							31u8, 42u8, 97u8, 157u8, 3u8, 239u8, 34u8, 21u8, 188u8, 249u8, 198u8,
-							238u8, 159u8, 218u8, 102u8, 31u8, 136u8, 1u8, 248u8, 105u8, 183u8,
-							93u8, 1u8, 94u8, 232u8, 77u8, 139u8, 19u8, 174u8, 50u8, 27u8, 86u8,
+							231u8, 62u8, 205u8, 19u8, 247u8, 85u8, 104u8, 49u8, 90u8, 117u8, 6u8,
+							208u8, 47u8, 109u8, 131u8, 125u8, 2u8, 24u8, 169u8, 115u8, 92u8, 14u8,
+							151u8, 130u8, 80u8, 231u8, 101u8, 131u8, 23u8, 204u8, 172u8, 204u8,
 						],
 					)
 				}
@@ -7031,10 +7040,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							155u8, 236u8, 76u8, 234u8, 185u8, 26u8, 97u8, 130u8, 81u8, 68u8, 49u8,
-							222u8, 195u8, 164u8, 235u8, 77u8, 216u8, 27u8, 64u8, 118u8, 169u8,
-							165u8, 100u8, 198u8, 216u8, 134u8, 115u8, 121u8, 225u8, 172u8, 221u8,
-							18u8,
+							204u8, 252u8, 72u8, 151u8, 173u8, 84u8, 169u8, 95u8, 128u8, 26u8,
+							180u8, 225u8, 198u8, 146u8, 183u8, 154u8, 125u8, 170u8, 140u8, 232u8,
+							212u8, 233u8, 77u8, 13u8, 111u8, 35u8, 14u8, 146u8, 233u8, 88u8, 47u8,
+							83u8,
 						],
 					)
 				}
@@ -8053,9 +8062,13 @@ pub mod api {
 					pub type MiningConfig =
 						runtime_types::argon_primitives::block_seal::MiningSlotConfig;
 				}
-				pub mod last_activated_cohort_id {
+				pub mod next_cohort_id {
 					use super::runtime_types;
-					pub type LastActivatedCohortId = ::core::primitive::u64;
+					pub type NextCohortId = ::core::primitive::u64;
+				}
+				pub mod did_start_new_cohort {
+					use super::runtime_types;
+					pub type DidStartNewCohort = ::core::primitive::bool;
 				}
 			}
 			pub struct StorageApi;
@@ -8348,24 +8361,45 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The last activated cohort id"]
-				pub fn last_activated_cohort_id(
+				#[doc = " The next cohort id"]
+				pub fn next_cohort_id(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::last_activated_cohort_id::LastActivatedCohortId,
+					types::next_cohort_id::NextCohortId,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"LastActivatedCohortId",
+						"NextCohortId",
 						(),
 						[
-							66u8, 134u8, 40u8, 119u8, 180u8, 55u8, 113u8, 201u8, 173u8, 112u8,
-							220u8, 164u8, 58u8, 186u8, 248u8, 7u8, 60u8, 210u8, 54u8, 237u8, 26u8,
-							83u8, 79u8, 220u8, 25u8, 167u8, 96u8, 17u8, 184u8, 143u8, 43u8, 0u8,
+							102u8, 17u8, 180u8, 109u8, 242u8, 41u8, 123u8, 209u8, 254u8, 203u8,
+							190u8, 122u8, 43u8, 138u8, 206u8, 39u8, 247u8, 147u8, 3u8, 42u8, 194u8,
+							95u8, 30u8, 5u8, 132u8, 4u8, 184u8, 235u8, 119u8, 144u8, 221u8, 166u8,
+						],
+					)
+				}
+				#[doc = " Did this block activate a new cohort"]
+				pub fn did_start_new_cohort(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::did_start_new_cohort::DidStartNewCohort,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"DidStartNewCohort",
+						(),
+						[
+							199u8, 93u8, 132u8, 26u8, 111u8, 248u8, 239u8, 83u8, 227u8, 95u8,
+							127u8, 171u8, 87u8, 239u8, 51u8, 11u8, 98u8, 186u8, 212u8, 20u8, 249u8,
+							81u8, 74u8, 45u8, 66u8, 101u8, 137u8, 89u8, 198u8, 168u8, 165u8, 130u8,
 						],
 					)
 				}
@@ -9329,28 +9363,24 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Modify funds offered by the vault. This will not affect issued obligations, but will"]
+				#[doc = "Modify funds allocated by the vault. This will not affect issued obligations, but will"]
 				#[doc = "affect the amount of funds available for new ones."]
 				#[doc = ""]
-				#[doc = "The additional securitization percent must be maintained or increased."]
+				#[doc = "The securitization percent must be maintained or increased."]
 				#[doc = ""]
-				#[doc = "The amount offered may not go below the existing reserved amounts, but you can release"]
+				#[doc = "The amount allocated may not go below the existing reserved amounts, but you can release"]
 				#[doc = "funds in this vault as obligations are released. To stop issuing any more obligations,"]
 				#[doc = "use the `close` api."]
 				pub struct ModifyFunding {
 					pub vault_id: modify_funding::VaultId,
-					pub total_bonded_bitcoin_amount_offered:
-						modify_funding::TotalBondedBitcoinAmountOffered,
-					pub total_locked_bitcoin_amount_offered:
-						modify_funding::TotalLockedBitcoinAmountOffered,
-					pub added_securitization_percent: modify_funding::AddedSecuritizationPercent,
+					pub securitization: modify_funding::Securitization,
+					pub securitization_ratio: modify_funding::SecuritizationRatio,
 				}
 				pub mod modify_funding {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
-					pub type TotalBondedBitcoinAmountOffered = ::core::primitive::u128;
-					pub type TotalLockedBitcoinAmountOffered = ::core::primitive::u128;
-					pub type AddedSecuritizationPercent =
+					pub type Securitization = ::core::primitive::u128;
+					pub type SecuritizationRatio =
 						runtime_types::sp_arithmetic::fixed_point::FixedU128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ModifyFunding {
@@ -9460,43 +9490,36 @@ pub mod api {
 						"create",
 						types::Create { vault_config },
 						[
-							189u8, 246u8, 50u8, 148u8, 146u8, 200u8, 174u8, 97u8, 75u8, 89u8,
-							123u8, 102u8, 212u8, 95u8, 67u8, 181u8, 65u8, 184u8, 123u8, 111u8,
-							81u8, 166u8, 230u8, 70u8, 43u8, 210u8, 204u8, 242u8, 24u8, 201u8, 85u8,
-							0u8,
+							207u8, 13u8, 69u8, 87u8, 24u8, 165u8, 108u8, 218u8, 192u8, 248u8,
+							190u8, 120u8, 141u8, 0u8, 127u8, 41u8, 211u8, 178u8, 214u8, 179u8,
+							166u8, 112u8, 209u8, 233u8, 21u8, 58u8, 19u8, 255u8, 171u8, 117u8,
+							78u8, 241u8,
 						],
 					)
 				}
-				#[doc = "Modify funds offered by the vault. This will not affect issued obligations, but will"]
+				#[doc = "Modify funds allocated by the vault. This will not affect issued obligations, but will"]
 				#[doc = "affect the amount of funds available for new ones."]
 				#[doc = ""]
-				#[doc = "The additional securitization percent must be maintained or increased."]
+				#[doc = "The securitization percent must be maintained or increased."]
 				#[doc = ""]
-				#[doc = "The amount offered may not go below the existing reserved amounts, but you can release"]
+				#[doc = "The amount allocated may not go below the existing reserved amounts, but you can release"]
 				#[doc = "funds in this vault as obligations are released. To stop issuing any more obligations,"]
 				#[doc = "use the `close` api."]
 				pub fn modify_funding(
 					&self,
 					vault_id: types::modify_funding::VaultId,
-					total_bonded_bitcoin_amount_offered : types :: modify_funding :: TotalBondedBitcoinAmountOffered,
-					total_locked_bitcoin_amount_offered : types :: modify_funding :: TotalLockedBitcoinAmountOffered,
-					added_securitization_percent: types::modify_funding::AddedSecuritizationPercent,
+					securitization: types::modify_funding::Securitization,
+					securitization_ratio: types::modify_funding::SecuritizationRatio,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ModifyFunding>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"Vaults",
 						"modify_funding",
-						types::ModifyFunding {
-							vault_id,
-							total_bonded_bitcoin_amount_offered,
-							total_locked_bitcoin_amount_offered,
-							added_securitization_percent,
-						},
+						types::ModifyFunding { vault_id, securitization, securitization_ratio },
 						[
-							138u8, 215u8, 89u8, 16u8, 19u8, 84u8, 229u8, 201u8, 136u8, 132u8,
-							232u8, 101u8, 219u8, 98u8, 101u8, 251u8, 184u8, 134u8, 233u8, 241u8,
-							109u8, 111u8, 30u8, 38u8, 133u8, 137u8, 66u8, 218u8, 14u8, 186u8,
-							107u8, 247u8,
+							104u8, 132u8, 53u8, 37u8, 54u8, 24u8, 217u8, 80u8, 63u8, 102u8, 198u8,
+							170u8, 27u8, 79u8, 127u8, 181u8, 46u8, 178u8, 37u8, 202u8, 163u8,
+							187u8, 0u8, 163u8, 188u8, 53u8, 164u8, 214u8, 20u8, 224u8, 94u8, 7u8,
 						],
 					)
 				}
@@ -9512,10 +9535,9 @@ pub mod api {
 						"modify_terms",
 						types::ModifyTerms { vault_id, terms },
 						[
-							176u8, 55u8, 75u8, 191u8, 4u8, 153u8, 142u8, 215u8, 172u8, 68u8, 35u8,
-							32u8, 77u8, 89u8, 145u8, 122u8, 101u8, 223u8, 222u8, 67u8, 168u8,
-							236u8, 176u8, 50u8, 181u8, 151u8, 43u8, 250u8, 32u8, 51u8, 212u8,
-							101u8,
+							227u8, 86u8, 91u8, 176u8, 143u8, 88u8, 185u8, 122u8, 55u8, 247u8, 71u8,
+							246u8, 251u8, 166u8, 138u8, 96u8, 105u8, 134u8, 165u8, 51u8, 7u8, 67u8,
+							206u8, 102u8, 38u8, 78u8, 186u8, 142u8, 189u8, 109u8, 250u8, 114u8,
 						],
 					)
 				}
@@ -9575,21 +9597,18 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultCreated {
 				pub vault_id: vault_created::VaultId,
-				pub locked_bitcoin_argons: vault_created::LockedBitcoinArgons,
-				pub bonded_bitcoin_argons: vault_created::BondedBitcoinArgons,
-				pub added_securitization_percent: vault_created::AddedSecuritizationPercent,
+				pub securitization: vault_created::Securitization,
+				pub securitization_ratio: vault_created::SecuritizationRatio,
 				pub operator_account_id: vault_created::OperatorAccountId,
-				pub activation_tick: vault_created::ActivationTick,
+				pub opened_tick: vault_created::OpenedTick,
 			}
 			pub mod vault_created {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type LockedBitcoinArgons = ::core::primitive::u128;
-				pub type BondedBitcoinArgons = ::core::primitive::u128;
-				pub type AddedSecuritizationPercent =
-					runtime_types::sp_arithmetic::fixed_point::FixedU128;
+				pub type Securitization = ::core::primitive::u128;
+				pub type SecuritizationRatio = runtime_types::sp_arithmetic::fixed_point::FixedU128;
 				pub type OperatorAccountId = crate::types::AccountId32;
-				pub type ActivationTick = ::core::primitive::u64;
+				pub type OpenedTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultCreated {
 				const PALLET: &'static str = "Vaults";
@@ -9608,17 +9627,14 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultModified {
 				pub vault_id: vault_modified::VaultId,
-				pub locked_bitcoin_argons: vault_modified::LockedBitcoinArgons,
-				pub bonded_bitcoin_argons: vault_modified::BondedBitcoinArgons,
-				pub added_securitization_percent: vault_modified::AddedSecuritizationPercent,
+				pub securitization: vault_modified::Securitization,
+				pub securitization_ratio: vault_modified::SecuritizationRatio,
 			}
 			pub mod vault_modified {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type LockedBitcoinArgons = ::core::primitive::u128;
-				pub type BondedBitcoinArgons = ::core::primitive::u128;
-				pub type AddedSecuritizationPercent =
-					runtime_types::sp_arithmetic::fixed_point::FixedU128;
+				pub type Securitization = ::core::primitive::u128;
+				pub type SecuritizationRatio = runtime_types::sp_arithmetic::fixed_point::FixedU128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultModified {
 				const PALLET: &'static str = "Vaults";
@@ -9683,18 +9699,14 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct VaultClosed {
 				pub vault_id: vault_closed::VaultId,
-				pub locked_bitcoin_amount_still_reserved:
-					vault_closed::LockedBitcoinAmountStillReserved,
-				pub bonded_bitcoin_amount_still_reserved:
-					vault_closed::BondedBitcoinAmountStillReserved,
-				pub securitization_still_reserved: vault_closed::SecuritizationStillReserved,
+				pub remaining_securitization: vault_closed::RemainingSecuritization,
+				pub released: vault_closed::Released,
 			}
 			pub mod vault_closed {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type LockedBitcoinAmountStillReserved = ::core::primitive::u128;
-				pub type BondedBitcoinAmountStillReserved = ::core::primitive::u128;
-				pub type SecuritizationStillReserved = ::core::primitive::u128;
+				pub type RemainingSecuritization = ::core::primitive::u128;
+				pub type Released = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultClosed {
 				const PALLET: &'static str = "Vaults";
@@ -9892,141 +9904,6 @@ pub mod api {
 				const PALLET: &'static str = "Vaults";
 				const EVENT: &'static str = "ObligationBaseFeeMaturationError";
 			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An error occurred distributing a bid pool"]
-			pub struct CouldNotDistributeBidPool {
-				pub cohort_id: could_not_distribute_bid_pool::CohortId,
-				pub vault_id: could_not_distribute_bid_pool::VaultId,
-				pub amount: could_not_distribute_bid_pool::Amount,
-				pub dispatch_error: could_not_distribute_bid_pool::DispatchError,
-			}
-			pub mod could_not_distribute_bid_pool {
-				use super::runtime_types;
-				pub type CohortId = ::core::primitive::u64;
-				pub type VaultId = ::core::primitive::u32;
-				pub type Amount = ::core::primitive::u128;
-				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotDistributeBidPool {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "CouldNotDistributeBidPool";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An error occurred burning from the bid pool"]
-			pub struct CouldNotBurnBidPool {
-				pub cohort_id: could_not_burn_bid_pool::CohortId,
-				pub amount: could_not_burn_bid_pool::Amount,
-				pub dispatch_error: could_not_burn_bid_pool::DispatchError,
-			}
-			pub mod could_not_burn_bid_pool {
-				use super::runtime_types;
-				pub type CohortId = ::core::primitive::u64;
-				pub type Amount = ::core::primitive::u128;
-				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotBurnBidPool {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "CouldNotBurnBidPool";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An error occurred allocating the next bid pool"]
-			pub struct CouldNotAllocateNextBidPool {
-				pub cohort_id: could_not_allocate_next_bid_pool::CohortId,
-				pub dispatch_error: could_not_allocate_next_bid_pool::DispatchError,
-			}
-			pub mod could_not_allocate_next_bid_pool {
-				use super::runtime_types;
-				pub type CohortId = ::core::primitive::u64;
-				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotAllocateNextBidPool {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "CouldNotAllocateNextBidPool";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "Funds fro the active bid pool have been distributed"]
-			pub struct BidPoolDistributed {
-				pub cohort_id: bid_pool_distributed::CohortId,
-				pub bid_pool_distributed: bid_pool_distributed::BidPoolDistributed,
-				pub bid_pool_burned: bid_pool_distributed::BidPoolBurned,
-				pub bid_pool_entrants: bid_pool_distributed::BidPoolEntrants,
-			}
-			pub mod bid_pool_distributed {
-				use super::runtime_types;
-				pub type CohortId = ::core::primitive::u64;
-				pub type BidPoolDistributed = ::core::primitive::u128;
-				pub type BidPoolBurned = ::core::primitive::u128;
-				pub type BidPoolEntrants = ::core::primitive::u32;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for BidPoolDistributed {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "BidPoolDistributed";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "The next bid pool has been allocated"]
-			pub struct NextBidPoolAllocated {
-				pub bonded_bitcoin_pool: next_bid_pool_allocated::BondedBitcoinPool,
-				pub bid_pool_entrants: next_bid_pool_allocated::BidPoolEntrants,
-			}
-			pub mod next_bid_pool_allocated {
-				use super::runtime_types;
-				pub type BondedBitcoinPool = ::core::primitive::u128;
-				pub type BidPoolEntrants = ::core::primitive::u32;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for NextBidPoolAllocated {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "NextBidPoolAllocated";
-			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -10072,9 +9949,9 @@ pub mod api {
 					>;
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod bonded_bitcoin_completions {
+				pub mod obligation_completion_by_tick {
 					use super::runtime_types;
-					pub type BondedBitcoinCompletions =
+					pub type ObligationCompletionByTick =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u64,
 						>;
@@ -10087,13 +9964,6 @@ pub mod api {
 							::core::primitive::u64,
 						>;
 					pub type Param0 = ::core::primitive::u64;
-				}
-				pub mod next_bonded_bitcoin_pool_entrants {
-					use super::runtime_types;
-					pub type NextBondedBitcoinPoolEntrants =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_vaults::pallet::BidPoolEntrant,
-						>;
 				}
 			}
 			pub struct StorageApi;
@@ -10134,9 +10004,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							94u8, 71u8, 236u8, 227u8, 236u8, 25u8, 143u8, 188u8, 14u8, 156u8, 50u8,
-							207u8, 111u8, 71u8, 96u8, 43u8, 247u8, 8u8, 30u8, 182u8, 220u8, 216u8,
-							164u8, 153u8, 9u8, 32u8, 59u8, 244u8, 139u8, 89u8, 146u8, 46u8,
+							169u8, 150u8, 76u8, 191u8, 202u8, 47u8, 141u8, 146u8, 52u8, 253u8,
+							121u8, 170u8, 173u8, 19u8, 103u8, 33u8, 66u8, 177u8, 36u8, 195u8, 78u8,
+							20u8, 229u8, 152u8, 66u8, 132u8, 84u8, 118u8, 255u8, 161u8, 226u8,
+							64u8,
 						],
 					)
 				}
@@ -10160,9 +10031,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							94u8, 71u8, 236u8, 227u8, 236u8, 25u8, 143u8, 188u8, 14u8, 156u8, 50u8,
-							207u8, 111u8, 71u8, 96u8, 43u8, 247u8, 8u8, 30u8, 182u8, 220u8, 216u8,
-							164u8, 153u8, 9u8, 32u8, 59u8, 244u8, 139u8, 89u8, 146u8, 46u8,
+							169u8, 150u8, 76u8, 191u8, 202u8, 47u8, 141u8, 146u8, 52u8, 253u8,
+							121u8, 170u8, 173u8, 19u8, 103u8, 33u8, 66u8, 177u8, 36u8, 195u8, 78u8,
+							20u8, 229u8, 152u8, 66u8, 132u8, 84u8, 118u8, 255u8, 161u8, 226u8,
+							64u8,
 						],
 					)
 				}
@@ -10302,10 +10174,10 @@ pub mod api {
 						"ObligationsById",
 						(),
 						[
-							49u8, 151u8, 180u8, 227u8, 32u8, 195u8, 149u8, 163u8, 197u8, 201u8,
-							192u8, 94u8, 137u8, 189u8, 228u8, 113u8, 42u8, 8u8, 24u8, 94u8, 189u8,
-							1u8, 232u8, 145u8, 150u8, 180u8, 165u8, 211u8, 231u8, 212u8, 226u8,
-							16u8,
+							221u8, 123u8, 171u8, 163u8, 222u8, 189u8, 65u8, 145u8, 237u8, 29u8,
+							250u8, 17u8, 221u8, 61u8, 218u8, 67u8, 112u8, 79u8, 221u8, 216u8,
+							141u8, 26u8, 58u8, 196u8, 166u8, 136u8, 225u8, 200u8, 57u8, 227u8,
+							243u8, 141u8,
 						],
 					)
 				}
@@ -10329,57 +10201,59 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							49u8, 151u8, 180u8, 227u8, 32u8, 195u8, 149u8, 163u8, 197u8, 201u8,
-							192u8, 94u8, 137u8, 189u8, 228u8, 113u8, 42u8, 8u8, 24u8, 94u8, 189u8,
-							1u8, 232u8, 145u8, 150u8, 180u8, 165u8, 211u8, 231u8, 212u8, 226u8,
-							16u8,
+							221u8, 123u8, 171u8, 163u8, 222u8, 189u8, 65u8, 145u8, 237u8, 29u8,
+							250u8, 17u8, 221u8, 61u8, 218u8, 67u8, 112u8, 79u8, 221u8, 216u8,
+							141u8, 26u8, 58u8, 196u8, 166u8, 136u8, 225u8, 200u8, 57u8, 227u8,
+							243u8, 141u8,
 						],
 					)
 				}
-				#[doc = " Completion of bonded bitcoin obligation, upon which funds are returned to the vault"]
-				pub fn bonded_bitcoin_completions_iter(
+				#[doc = " Completion of obligations by tick"]
+				pub fn obligation_completion_by_tick_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::bonded_bitcoin_completions::BondedBitcoinCompletions,
+					types::obligation_completion_by_tick::ObligationCompletionByTick,
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"BondedBitcoinCompletions",
+						"ObligationCompletionByTick",
 						(),
 						[
-							209u8, 121u8, 113u8, 202u8, 181u8, 117u8, 127u8, 182u8, 167u8, 251u8,
-							177u8, 77u8, 38u8, 186u8, 250u8, 189u8, 131u8, 23u8, 100u8, 78u8, 68u8,
-							13u8, 67u8, 97u8, 58u8, 72u8, 128u8, 34u8, 111u8, 213u8, 218u8, 114u8,
+							218u8, 80u8, 226u8, 95u8, 104u8, 150u8, 129u8, 107u8, 252u8, 206u8,
+							14u8, 199u8, 72u8, 214u8, 173u8, 195u8, 209u8, 139u8, 25u8, 255u8,
+							239u8, 44u8, 65u8, 54u8, 153u8, 106u8, 165u8, 10u8, 168u8, 20u8, 146u8,
+							206u8,
 						],
 					)
 				}
-				#[doc = " Completion of bonded bitcoin obligation, upon which funds are returned to the vault"]
-				pub fn bonded_bitcoin_completions(
+				#[doc = " Completion of obligations by tick"]
+				pub fn obligation_completion_by_tick(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::bonded_bitcoin_completions::Param0>,
+					_0: impl ::core::borrow::Borrow<types::obligation_completion_by_tick::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::bonded_bitcoin_completions::Param0,
+						types::obligation_completion_by_tick::Param0,
 					>,
-					types::bonded_bitcoin_completions::BondedBitcoinCompletions,
+					types::obligation_completion_by_tick::ObligationCompletionByTick,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Vaults",
-						"BondedBitcoinCompletions",
+						"ObligationCompletionByTick",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							209u8, 121u8, 113u8, 202u8, 181u8, 117u8, 127u8, 182u8, 167u8, 251u8,
-							177u8, 77u8, 38u8, 186u8, 250u8, 189u8, 131u8, 23u8, 100u8, 78u8, 68u8,
-							13u8, 67u8, 97u8, 58u8, 72u8, 128u8, 34u8, 111u8, 213u8, 218u8, 114u8,
+							218u8, 80u8, 226u8, 95u8, 104u8, 150u8, 129u8, 107u8, 252u8, 206u8,
+							14u8, 199u8, 72u8, 214u8, 173u8, 195u8, 209u8, 139u8, 25u8, 255u8,
+							239u8, 44u8, 65u8, 54u8, 153u8, 106u8, 165u8, 10u8, 168u8, 20u8, 146u8,
+							206u8,
 						],
 					)
 				}
@@ -10431,29 +10305,6 @@ pub mod api {
 							214u8, 208u8, 193u8, 115u8, 154u8, 141u8, 95u8, 143u8, 153u8, 197u8,
 							113u8, 108u8, 250u8, 95u8, 251u8, 101u8, 149u8, 122u8, 6u8, 215u8,
 							109u8,
-						],
-					)
-				}
-				#[doc = " The entrants in the bonded bitcoin pool that will next be paid out. They apply to the next"]
-				#[doc = " closed mining slot cohort bid pool."]
-				pub fn next_bonded_bitcoin_pool_entrants(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::next_bonded_bitcoin_pool_entrants::NextBondedBitcoinPoolEntrants,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"NextBondedBitcoinPoolEntrants",
-						(),
-						[
-							120u8, 170u8, 146u8, 115u8, 17u8, 154u8, 242u8, 74u8, 218u8, 5u8,
-							213u8, 30u8, 142u8, 145u8, 146u8, 190u8, 8u8, 43u8, 250u8, 170u8,
-							225u8, 229u8, 154u8, 80u8, 229u8, 70u8, 130u8, 151u8, 255u8, 214u8,
-							161u8, 156u8,
 						],
 					)
 				}
@@ -10545,40 +10396,6 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
-						],
-					)
-				}
-				#[doc = " Max entrants allowed in the bid pool. This is only present because substrate prefers"]
-				#[doc = " limits"]
-				pub fn max_bid_pool_entrants(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"MaxBidPoolEntrants",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " A pallet id that is used to hold the bid pool"]
-				pub fn pallet_id(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					runtime_types::frame_support::PalletId,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"PalletId",
-						[
-							56u8, 243u8, 53u8, 83u8, 154u8, 179u8, 170u8, 80u8, 133u8, 173u8, 61u8,
-							161u8, 47u8, 225u8, 146u8, 21u8, 50u8, 229u8, 248u8, 27u8, 104u8, 58u8,
-							129u8, 197u8, 102u8, 160u8, 168u8, 205u8, 154u8, 42u8, 217u8, 53u8,
 						],
 					)
 				}
@@ -17360,9 +17177,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							210u8, 1u8, 26u8, 4u8, 42u8, 245u8, 167u8, 16u8, 171u8, 58u8, 236u8,
-							121u8, 175u8, 17u8, 237u8, 228u8, 148u8, 112u8, 227u8, 104u8, 126u8,
-							1u8, 72u8, 77u8, 90u8, 59u8, 193u8, 203u8, 204u8, 30u8, 216u8, 103u8,
+							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
+							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
+							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
 						],
 					)
 				}
@@ -17386,9 +17203,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							210u8, 1u8, 26u8, 4u8, 42u8, 245u8, 167u8, 16u8, 171u8, 58u8, 236u8,
-							121u8, 175u8, 17u8, 237u8, 228u8, 148u8, 112u8, 227u8, 104u8, 126u8,
-							1u8, 72u8, 77u8, 90u8, 59u8, 193u8, 203u8, 204u8, 30u8, 216u8, 103u8,
+							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
+							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
+							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
 						],
 					)
 				}
@@ -18966,9 +18783,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							210u8, 1u8, 26u8, 4u8, 42u8, 245u8, 167u8, 16u8, 171u8, 58u8, 236u8,
-							121u8, 175u8, 17u8, 237u8, 228u8, 148u8, 112u8, 227u8, 104u8, 126u8,
-							1u8, 72u8, 77u8, 90u8, 59u8, 193u8, 203u8, 204u8, 30u8, 216u8, 103u8,
+							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
+							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
+							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
 						],
 					)
 				}
@@ -18992,9 +18809,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							210u8, 1u8, 26u8, 4u8, 42u8, 245u8, 167u8, 16u8, 171u8, 58u8, 236u8,
-							121u8, 175u8, 17u8, 237u8, 228u8, 148u8, 112u8, 227u8, 104u8, 126u8,
-							1u8, 72u8, 77u8, 90u8, 59u8, 193u8, 203u8, 204u8, 30u8, 216u8, 103u8,
+							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
+							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
+							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
 						],
 					)
 				}
@@ -19876,10 +19693,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							61u8, 226u8, 70u8, 207u8, 186u8, 118u8, 215u8, 212u8, 36u8, 168u8,
-							19u8, 83u8, 96u8, 176u8, 204u8, 225u8, 197u8, 235u8, 240u8, 74u8,
-							126u8, 60u8, 209u8, 26u8, 60u8, 18u8, 89u8, 180u8, 103u8, 109u8, 226u8,
-							248u8,
+							203u8, 41u8, 6u8, 121u8, 222u8, 10u8, 157u8, 131u8, 160u8, 37u8, 69u8,
+							69u8, 7u8, 157u8, 12u8, 187u8, 167u8, 221u8, 213u8, 140u8, 186u8,
+							185u8, 15u8, 29u8, 82u8, 214u8, 1u8, 169u8, 108u8, 66u8, 37u8, 82u8,
 						],
 					)
 				}
@@ -19909,9 +19725,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							118u8, 168u8, 69u8, 33u8, 194u8, 52u8, 74u8, 81u8, 241u8, 184u8, 202u8,
-							5u8, 69u8, 177u8, 185u8, 217u8, 115u8, 185u8, 126u8, 119u8, 243u8,
-							100u8, 100u8, 93u8, 246u8, 12u8, 109u8, 3u8, 245u8, 194u8, 161u8, 92u8,
+							5u8, 138u8, 135u8, 57u8, 84u8, 224u8, 246u8, 89u8, 255u8, 207u8, 88u8,
+							194u8, 175u8, 49u8, 118u8, 123u8, 58u8, 9u8, 187u8, 102u8, 47u8, 117u8,
+							42u8, 187u8, 195u8, 60u8, 84u8, 23u8, 68u8, 187u8, 236u8, 217u8,
 						],
 					)
 				}
@@ -19937,9 +19753,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							68u8, 143u8, 11u8, 144u8, 44u8, 143u8, 248u8, 43u8, 170u8, 233u8, 92u8,
-							208u8, 0u8, 144u8, 108u8, 4u8, 199u8, 236u8, 5u8, 189u8, 154u8, 130u8,
-							212u8, 231u8, 72u8, 202u8, 18u8, 2u8, 26u8, 89u8, 12u8, 165u8,
+							125u8, 145u8, 6u8, 236u8, 34u8, 55u8, 64u8, 45u8, 169u8, 102u8, 102u8,
+							89u8, 253u8, 122u8, 223u8, 194u8, 14u8, 61u8, 8u8, 180u8, 255u8, 106u8,
+							151u8, 200u8, 191u8, 68u8, 154u8, 32u8, 9u8, 75u8, 62u8, 20u8,
 						],
 					)
 				}
@@ -19962,9 +19778,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							64u8, 243u8, 210u8, 254u8, 241u8, 9u8, 62u8, 168u8, 201u8, 183u8, 71u8,
-							85u8, 92u8, 214u8, 191u8, 121u8, 252u8, 42u8, 130u8, 236u8, 33u8, 62u8,
-							232u8, 121u8, 41u8, 96u8, 54u8, 137u8, 242u8, 24u8, 134u8, 188u8,
+							158u8, 1u8, 53u8, 156u8, 7u8, 104u8, 129u8, 100u8, 169u8, 214u8, 127u8,
+							44u8, 146u8, 158u8, 187u8, 134u8, 235u8, 141u8, 85u8, 164u8, 30u8,
+							162u8, 132u8, 139u8, 52u8, 98u8, 170u8, 153u8, 224u8, 85u8, 195u8, 8u8,
 						],
 					)
 				}
@@ -19990,9 +19806,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							52u8, 108u8, 4u8, 255u8, 124u8, 236u8, 159u8, 110u8, 14u8, 158u8,
-							203u8, 198u8, 188u8, 141u8, 9u8, 157u8, 51u8, 9u8, 38u8, 82u8, 114u8,
-							10u8, 255u8, 176u8, 0u8, 183u8, 9u8, 201u8, 164u8, 29u8, 125u8, 211u8,
+							102u8, 198u8, 188u8, 115u8, 140u8, 151u8, 38u8, 201u8, 93u8, 59u8,
+							147u8, 96u8, 113u8, 141u8, 40u8, 228u8, 108u8, 23u8, 251u8, 182u8,
+							63u8, 34u8, 174u8, 102u8, 151u8, 19u8, 151u8, 69u8, 46u8, 58u8, 14u8,
+							220u8,
 						],
 					)
 				}
@@ -20015,10 +19832,10 @@ pub mod api {
 							weight,
 						},
 						[
-							165u8, 157u8, 171u8, 165u8, 10u8, 174u8, 125u8, 43u8, 149u8, 222u8,
-							218u8, 84u8, 64u8, 149u8, 157u8, 111u8, 114u8, 96u8, 3u8, 94u8, 254u8,
-							182u8, 177u8, 122u8, 164u8, 53u8, 50u8, 37u8, 171u8, 230u8, 32u8,
-							225u8,
+							106u8, 41u8, 247u8, 237u8, 222u8, 69u8, 124u8, 148u8, 248u8, 19u8,
+							143u8, 240u8, 234u8, 153u8, 107u8, 215u8, 81u8, 152u8, 141u8, 105u8,
+							63u8, 176u8, 71u8, 42u8, 154u8, 81u8, 47u8, 51u8, 139u8, 43u8, 139u8,
+							193u8,
 						],
 					)
 				}
@@ -20353,9 +20170,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							218u8, 72u8, 1u8, 41u8, 202u8, 70u8, 62u8, 60u8, 147u8, 2u8, 158u8,
-							4u8, 182u8, 226u8, 154u8, 92u8, 205u8, 61u8, 143u8, 106u8, 62u8, 47u8,
-							142u8, 61u8, 200u8, 24u8, 156u8, 246u8, 80u8, 56u8, 215u8, 13u8,
+							245u8, 217u8, 45u8, 189u8, 185u8, 100u8, 67u8, 216u8, 33u8, 72u8,
+							109u8, 152u8, 173u8, 227u8, 162u8, 84u8, 167u8, 155u8, 148u8, 172u8,
+							163u8, 183u8, 177u8, 83u8, 228u8, 178u8, 129u8, 53u8, 105u8, 174u8,
+							99u8, 73u8,
 						],
 					)
 				}
@@ -20378,9 +20196,10 @@ pub mod api {
 							weight,
 						},
 						[
-							152u8, 58u8, 99u8, 86u8, 217u8, 38u8, 72u8, 181u8, 15u8, 198u8, 65u8,
-							84u8, 189u8, 150u8, 106u8, 236u8, 15u8, 176u8, 45u8, 253u8, 132u8,
-							31u8, 248u8, 182u8, 180u8, 62u8, 37u8, 91u8, 111u8, 7u8, 80u8, 188u8,
+							5u8, 227u8, 135u8, 64u8, 134u8, 101u8, 123u8, 162u8, 234u8, 114u8,
+							233u8, 209u8, 31u8, 71u8, 60u8, 101u8, 169u8, 1u8, 232u8, 35u8, 165u8,
+							131u8, 108u8, 199u8, 189u8, 234u8, 70u8, 8u8, 99u8, 219u8, 227u8,
+							241u8,
 						],
 					)
 				}
@@ -20418,10 +20237,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							80u8, 160u8, 191u8, 244u8, 39u8, 94u8, 214u8, 25u8, 147u8, 12u8, 188u8,
-							35u8, 217u8, 174u8, 2u8, 31u8, 179u8, 173u8, 232u8, 175u8, 123u8,
-							163u8, 176u8, 81u8, 231u8, 67u8, 27u8, 185u8, 228u8, 163u8, 200u8,
-							92u8,
+							50u8, 197u8, 205u8, 181u8, 60u8, 136u8, 188u8, 253u8, 119u8, 124u8,
+							163u8, 72u8, 14u8, 201u8, 90u8, 155u8, 190u8, 133u8, 163u8, 7u8, 69u8,
+							143u8, 255u8, 60u8, 224u8, 179u8, 177u8, 46u8, 48u8, 84u8, 217u8,
+							123u8,
 						],
 					)
 				}
@@ -22789,6 +22608,535 @@ pub mod api {
 			}
 		}
 	}
+	pub mod mining_bonds {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_mining_bonds::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_mining_bonds::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
+				#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+				#[doc = ""]
+				#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
+				#[doc = "securitization activated."]
+				#[doc = ""]
+				#[doc = "- `origin`: The account that is joining the fund"]
+				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
+				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+				#[doc = "  it will just add the incremental amount"]
+				pub struct AddCapital {
+					pub vault_id: add_capital::VaultId,
+					pub amount: add_capital::Amount,
+				}
+				pub mod add_capital {
+					use super::runtime_types;
+					pub type VaultId = ::core::primitive::u32;
+					pub type Amount = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AddCapital {
+					const PALLET: &'static str = "MiningBonds";
+					const CALL: &'static str = "add_capital";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+				#[doc = "(once cohort slot period is complete)."]
+				pub struct EndRenewal {
+					pub vault_id: end_renewal::VaultId,
+					pub cohort_id: end_renewal::CohortId,
+				}
+				pub mod end_renewal {
+					use super::runtime_types;
+					pub type VaultId = ::core::primitive::u32;
+					pub type CohortId = ::core::primitive::u64;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for EndRenewal {
+					const PALLET: &'static str = "MiningBonds";
+					const CALL: &'static str = "end_renewal";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
+				#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+				#[doc = ""]
+				#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
+				#[doc = "securitization activated."]
+				#[doc = ""]
+				#[doc = "- `origin`: The account that is joining the fund"]
+				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
+				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+				#[doc = "  it will just add the incremental amount"]
+				pub fn add_capital(
+					&self,
+					vault_id: types::add_capital::VaultId,
+					amount: types::add_capital::Amount,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::AddCapital> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"MiningBonds",
+						"add_capital",
+						types::AddCapital { vault_id, amount },
+						[
+							224u8, 80u8, 8u8, 241u8, 126u8, 235u8, 220u8, 75u8, 189u8, 186u8, 32u8,
+							82u8, 20u8, 223u8, 76u8, 31u8, 62u8, 144u8, 151u8, 87u8, 242u8, 217u8,
+							7u8, 6u8, 99u8, 84u8, 89u8, 210u8, 252u8, 228u8, 231u8, 12u8,
+						],
+					)
+				}
+				#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+				#[doc = "(once cohort slot period is complete)."]
+				pub fn end_renewal(
+					&self,
+					vault_id: types::end_renewal::VaultId,
+					cohort_id: types::end_renewal::CohortId,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::EndRenewal> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"MiningBonds",
+						"end_renewal",
+						types::EndRenewal { vault_id, cohort_id },
+						[
+							191u8, 184u8, 228u8, 199u8, 98u8, 13u8, 164u8, 129u8, 2u8, 194u8,
+							173u8, 121u8, 226u8, 115u8, 41u8, 177u8, 99u8, 167u8, 7u8, 157u8,
+							153u8, 222u8, 214u8, 25u8, 230u8, 222u8, 169u8, 169u8, 157u8, 48u8,
+							31u8, 201u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_mining_bonds::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An error occurred distributing a bid pool"]
+			pub struct CouldNotDistributeBidPool {
+				pub account_id: could_not_distribute_bid_pool::AccountId,
+				pub cohort_id: could_not_distribute_bid_pool::CohortId,
+				pub vault_id: could_not_distribute_bid_pool::VaultId,
+				pub amount: could_not_distribute_bid_pool::Amount,
+				pub dispatch_error: could_not_distribute_bid_pool::DispatchError,
+				pub is_for_vault: could_not_distribute_bid_pool::IsForVault,
+			}
+			pub mod could_not_distribute_bid_pool {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type CohortId = ::core::primitive::u64;
+				pub type VaultId = ::core::primitive::u32;
+				pub type Amount = ::core::primitive::u128;
+				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
+				pub type IsForVault = ::core::primitive::bool;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotDistributeBidPool {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "CouldNotDistributeBidPool";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An error occurred burning from the bid pool"]
+			pub struct CouldNotBurnBidPool {
+				pub cohort_id: could_not_burn_bid_pool::CohortId,
+				pub amount: could_not_burn_bid_pool::Amount,
+				pub dispatch_error: could_not_burn_bid_pool::DispatchError,
+			}
+			pub mod could_not_burn_bid_pool {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotBurnBidPool {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "CouldNotBurnBidPool";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Funds from the active bid pool have been distributed"]
+			pub struct BidPoolDistributed {
+				pub cohort_id: bid_pool_distributed::CohortId,
+				pub bid_pool_distributed: bid_pool_distributed::BidPoolDistributed,
+				pub bid_pool_burned: bid_pool_distributed::BidPoolBurned,
+				pub bid_pool_shares: bid_pool_distributed::BidPoolShares,
+			}
+			pub mod bid_pool_distributed {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+				pub type BidPoolDistributed = ::core::primitive::u128;
+				pub type BidPoolBurned = ::core::primitive::u128;
+				pub type BidPoolShares = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BidPoolDistributed {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "BidPoolDistributed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The next bid pool has been locked in"]
+			pub struct NextBidPoolCapitalLocked {
+				pub cohort_id: next_bid_pool_capital_locked::CohortId,
+				pub total_activated_capital: next_bid_pool_capital_locked::TotalActivatedCapital,
+				pub participating_vaults: next_bid_pool_capital_locked::ParticipatingVaults,
+			}
+			pub mod next_bid_pool_capital_locked {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+				pub type TotalActivatedCapital = ::core::primitive::u128;
+				pub type ParticipatingVaults = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for NextBidPoolCapitalLocked {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "NextBidPoolCapitalLocked";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An error occurred releasing a contributor hold"]
+			pub struct ErrorRefundingBondFundCapital {
+				pub cohort_id: error_refunding_bond_fund_capital::CohortId,
+				pub vault_id: error_refunding_bond_fund_capital::VaultId,
+				pub amount: error_refunding_bond_fund_capital::Amount,
+				pub account_id: error_refunding_bond_fund_capital::AccountId,
+				pub dispatch_error: error_refunding_bond_fund_capital::DispatchError,
+			}
+			pub mod error_refunding_bond_fund_capital {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+				pub type VaultId = ::core::primitive::u32;
+				pub type Amount = ::core::primitive::u128;
+				pub type AccountId = crate::types::AccountId32;
+				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ErrorRefundingBondFundCapital {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "ErrorRefundingBondFundCapital";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
+			#[doc = "capital"]
+			pub struct RefundedBondFundCapital {
+				pub cohort_id: refunded_bond_fund_capital::CohortId,
+				pub vault_id: refunded_bond_fund_capital::VaultId,
+				pub amount: refunded_bond_fund_capital::Amount,
+				pub account_id: refunded_bond_fund_capital::AccountId,
+			}
+			pub mod refunded_bond_fund_capital {
+				use super::runtime_types;
+				pub type CohortId = ::core::primitive::u64;
+				pub type VaultId = ::core::primitive::u32;
+				pub type Amount = ::core::primitive::u128;
+				pub type AccountId = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for RefundedBondFundCapital {
+				const PALLET: &'static str = "MiningBonds";
+				const EVENT: &'static str = "RefundedBondFundCapital";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod mining_bond_funds_by_cohort {
+					use super::runtime_types;
+					pub type MiningBondFundsByCohort =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+							::core::primitive::u32,
+							runtime_types::pallet_mining_bonds::pallet::MiningBondFund,
+						>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod open_vault_bid_pool_capital {
+					use super::runtime_types;
+					pub type OpenVaultBidPoolCapital =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_mining_bonds::pallet::VaultBidPoolCapital,
+						>;
+				}
+				pub mod next_vault_bid_pool_capital {
+					use super::runtime_types;
+					pub type NextVaultBidPoolCapital =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_mining_bonds::pallet::VaultBidPoolCapital,
+						>;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " The currently earning contributors for the current epoch's bond funds. Sorted by highest"]
+				#[doc = " bids first"]
+				pub fn mining_bond_funds_by_cohort_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::mining_bond_funds_by_cohort::MiningBondFundsByCohort,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningBonds",
+						"MiningBondFundsByCohort",
+						(),
+						[
+							80u8, 219u8, 224u8, 222u8, 174u8, 65u8, 155u8, 29u8, 214u8, 140u8,
+							35u8, 177u8, 110u8, 97u8, 130u8, 247u8, 95u8, 105u8, 1u8, 62u8, 206u8,
+							147u8, 254u8, 167u8, 144u8, 100u8, 161u8, 23u8, 130u8, 220u8, 115u8,
+							10u8,
+						],
+					)
+				}
+				#[doc = " The currently earning contributors for the current epoch's bond funds. Sorted by highest"]
+				#[doc = " bids first"]
+				pub fn mining_bond_funds_by_cohort(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::mining_bond_funds_by_cohort::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::mining_bond_funds_by_cohort::Param0,
+					>,
+					types::mining_bond_funds_by_cohort::MiningBondFundsByCohort,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningBonds",
+						"MiningBondFundsByCohort",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							80u8, 219u8, 224u8, 222u8, 174u8, 65u8, 155u8, 29u8, 214u8, 140u8,
+							35u8, 177u8, 110u8, 97u8, 130u8, 247u8, 95u8, 105u8, 1u8, 62u8, 206u8,
+							147u8, 254u8, 167u8, 144u8, 100u8, 161u8, 23u8, 130u8, 220u8, 115u8,
+							10u8,
+						],
+					)
+				}
+				#[doc = " The entrants in the mining bond pool that will be paid out for the active bid pool. They"]
+				#[doc = " apply to the next closed mining slot cohort bid pool. Sorted with biggest share last."]
+				pub fn open_vault_bid_pool_capital(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::open_vault_bid_pool_capital::OpenVaultBidPoolCapital,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningBonds",
+						"OpenVaultBidPoolCapital",
+						(),
+						[
+							66u8, 199u8, 141u8, 139u8, 183u8, 250u8, 101u8, 127u8, 239u8, 118u8,
+							162u8, 123u8, 192u8, 224u8, 198u8, 208u8, 29u8, 230u8, 1u8, 232u8,
+							202u8, 26u8, 196u8, 72u8, 225u8, 213u8, 72u8, 135u8, 99u8, 161u8,
+							151u8, 80u8,
+						],
+					)
+				}
+				#[doc = " The bid pool capital for the next bid pool."]
+				pub fn next_vault_bid_pool_capital(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_vault_bid_pool_capital::NextVaultBidPoolCapital,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningBonds",
+						"NextVaultBidPoolCapital",
+						(),
+						[
+							179u8, 200u8, 193u8, 102u8, 213u8, 87u8, 1u8, 192u8, 130u8, 203u8,
+							145u8, 232u8, 234u8, 48u8, 185u8, 138u8, 139u8, 251u8, 82u8, 235u8,
+							231u8, 153u8, 106u8, 152u8, 236u8, 42u8, 161u8, 215u8, 45u8, 194u8,
+							188u8, 104u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " The maximum number of contributors to a bond fund"]
+				pub fn max_bond_fund_contributors(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningBonds",
+						"MaxBondFundContributors",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The minimum argons per fund contributor"]
+				pub fn minimum_argons_per_contributor(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningBonds",
+						"MinimumArgonsPerContributor",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " A pallet id that is used to hold the bid pool"]
+				pub fn pallet_id(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::frame_support::PalletId,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningBonds",
+						"PalletId",
+						[
+							56u8, 243u8, 53u8, 83u8, 154u8, 179u8, 170u8, 80u8, 133u8, 173u8, 61u8,
+							161u8, 47u8, 225u8, 146u8, 21u8, 50u8, 229u8, 248u8, 27u8, 104u8, 58u8,
+							129u8, 197u8, 102u8, 160u8, 168u8, 205u8, 154u8, 42u8, 217u8, 53u8,
+						],
+					)
+				}
+				#[doc = " Bid Pool burn percent"]
+				pub fn bid_pool_burn_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningBonds",
+						"BidPoolBurnPercent",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
+						],
+					)
+				}
+				#[doc = " The number of vaults that can participate in the bid pools. This is a substrate limit."]
+				pub fn max_bid_pool_vault_participants(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningBonds",
+						"MaxBidPoolVaultParticipants",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -24410,8 +24758,6 @@ pub mod api {
 				pub enum FundType {
 					#[codec(index = 0)]
 					LockedBitcoin,
-					#[codec(index = 1)]
-					BondedBitcoin,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24539,44 +24885,22 @@ pub mod api {
 				)]
 				pub struct Vault<_0, _1> {
 					pub operator_account_id: _0,
-					pub locked_bitcoin_argons:
-						runtime_types::argon_primitives::vault::VaultArgons<_1>,
-					pub terms: runtime_types::argon_primitives::vault::VaultTerms<_1>,
 					#[codec(compact)]
-					pub added_securitization_percent:
-						runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub securitization: _1,
 					#[codec(compact)]
-					pub added_securitization_argons: _1,
-					pub bonded_bitcoin_argons:
-						runtime_types::argon_primitives::vault::VaultArgons<_1>,
+					pub bitcoin_locked: _1,
+					#[codec(compact)]
+					pub bitcoin_pending: _1,
+					#[codec(compact)]
+					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					pub is_closed: ::core::primitive::bool,
+					pub terms: runtime_types::argon_primitives::vault::VaultTerms<_1>,
 					pub pending_terms: ::core::option::Option<(
 						::core::primitive::u64,
 						runtime_types::argon_primitives::vault::VaultTerms<_1>,
 					)>,
-					pub pending_bitcoins: _1,
-					pub activation_tick: ::core::primitive::u64,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct VaultArgons<_0> {
 					#[codec(compact)]
-					pub allocated: _0,
-					#[codec(compact)]
-					pub reserved: _0,
+					pub opened_tick: ::core::primitive::u64,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24599,6 +24923,8 @@ pub mod api {
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					#[codec(compact)]
 					pub bitcoin_base_fee: _0,
+					#[codec(compact)]
+					pub mining_bond_percent_take: runtime_types::sp_arithmetic::per_things::Permill,
 				}
 			}
 		}
@@ -24726,6 +25052,8 @@ pub mod api {
 				IsmpGrandpa(runtime_types::ismp_grandpa::pallet::Call),
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Call),
+				#[codec(index = 31)]
+				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24793,6 +25121,8 @@ pub mod api {
 				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Error),
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Error),
+				#[codec(index = 31)]
+				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24860,6 +25190,8 @@ pub mod api {
 				Hyperbridge(runtime_types::pallet_hyperbridge::pallet::Event),
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Event),
+				#[codec(index = 31)]
+				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -24896,6 +25228,8 @@ pub mod api {
 				BitcoinLocks(runtime_types::pallet_bitcoin_locks::pallet::HoldReason),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
+				#[codec(index = 31)]
+				MiningBonds(runtime_types::pallet_mining_bonds::pallet::HoldReason),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -28548,6 +28882,239 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_mining_bonds {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
+					#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+					#[doc = ""]
+					#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
+					#[doc = "securitization activated."]
+					#[doc = ""]
+					#[doc = "- `origin`: The account that is joining the fund"]
+					#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
+					#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+					#[doc = "  it will just add the incremental amount"]
+					add_capital {
+						vault_id: ::core::primitive::u32,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 2)]
+					#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+					#[doc = "(once cohort slot period is complete)."]
+					end_renewal {
+						vault_id: ::core::primitive::u32,
+						cohort_id: ::core::primitive::u64,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The contributed amount would not make this account a contributor"]
+					ContributionTooLow,
+					#[codec(index = 1)]
+					#[doc = "The given vault is not accepting mining bonds"]
+					VaultNotAcceptingMiningBonds,
+					#[codec(index = 2)]
+					#[doc = "Below the minimum amount of argons per contributor"]
+					BelowMinimum,
+					#[codec(index = 3)]
+					#[doc = "This account is not an active mining fund contributor"]
+					NotAFundContributor,
+					#[codec(index = 4)]
+					#[doc = "An internal error occurred (like an overflow)"]
+					InternalError,
+					#[codec(index = 5)]
+					#[doc = "Unable to update the vault fund"]
+					CouldNotFindBondFund,
+					#[codec(index = 6)]
+					#[doc = "Max contributors for a fund exceeded"]
+					MaxContributorsExceeded,
+					#[codec(index = 7)]
+					#[doc = "The added amount would exceed the activated securitization"]
+					ActivatedSecuritizationExceeded,
+					#[codec(index = 8)]
+					#[doc = "Max Vaults exceeded"]
+					MaxVaultsExceeded,
+					#[codec(index = 9)]
+					#[doc = "This fund has already been renewed"]
+					AlreadyRenewed,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "An error occurred distributing a bid pool"]
+					CouldNotDistributeBidPool {
+						account_id: crate::types::AccountId32,
+						cohort_id: ::core::primitive::u64,
+						vault_id: ::core::primitive::u32,
+						amount: ::core::primitive::u128,
+						dispatch_error: runtime_types::sp_runtime::DispatchError,
+						is_for_vault: ::core::primitive::bool,
+					},
+					#[codec(index = 1)]
+					#[doc = "An error occurred burning from the bid pool"]
+					CouldNotBurnBidPool {
+						cohort_id: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+						dispatch_error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 2)]
+					#[doc = "Funds from the active bid pool have been distributed"]
+					BidPoolDistributed {
+						cohort_id: ::core::primitive::u64,
+						bid_pool_distributed: ::core::primitive::u128,
+						bid_pool_burned: ::core::primitive::u128,
+						bid_pool_shares: ::core::primitive::u32,
+					},
+					#[codec(index = 3)]
+					#[doc = "The next bid pool has been locked in"]
+					NextBidPoolCapitalLocked {
+						cohort_id: ::core::primitive::u64,
+						total_activated_capital: ::core::primitive::u128,
+						participating_vaults: ::core::primitive::u32,
+					},
+					#[codec(index = 4)]
+					#[doc = "An error occurred releasing a contributor hold"]
+					ErrorRefundingBondFundCapital {
+						cohort_id: ::core::primitive::u64,
+						vault_id: ::core::primitive::u32,
+						amount: ::core::primitive::u128,
+						account_id: crate::types::AccountId32,
+						dispatch_error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 5)]
+					#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
+					#[doc = "capital"]
+					RefundedBondFundCapital {
+						cohort_id: ::core::primitive::u64,
+						vault_id: ::core::primitive::u32,
+						amount: ::core::primitive::u128,
+						account_id: crate::types::AccountId32,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum HoldReason {
+					#[codec(index = 0)]
+					ContributedToBondFund,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MiningBondFund {
+					pub contributor_balances:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+							crate::types::AccountId32,
+							::core::primitive::u128,
+						)>,
+					pub do_not_renew: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						crate::types::AccountId32,
+					>,
+					pub is_rolled_over: ::core::primitive::bool,
+					pub distributed_earnings: ::core::option::Option<::core::primitive::u128>,
+					#[codec(compact)]
+					pub vault_percent_take: runtime_types::sp_arithmetic::per_things::Permill,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct VaultBidPoolCapital {
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub activated_capital: ::core::primitive::u128,
+					#[codec(compact)]
+					pub cohort_id: ::core::primitive::u64,
+				}
+			}
+		}
 		pub mod pallet_mining_slot {
 			use super::runtime_types;
 			pub mod pallet {
@@ -30839,29 +31406,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BidPoolEntrant {
-					pub operator_account_id: crate::types::AccountId32,
-					#[codec(compact)]
-					pub vault_id: ::core::primitive::u32,
-					#[codec(compact)]
-					pub bonded_bitcoins: ::core::primitive::u128,
-					pub prorata: runtime_types::sp_arithmetic::per_things::Perbill,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
@@ -30871,20 +31415,18 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 1)]
-					#[doc = "Modify funds offered by the vault. This will not affect issued obligations, but will"]
+					#[doc = "Modify funds allocated by the vault. This will not affect issued obligations, but will"]
 					#[doc = "affect the amount of funds available for new ones."]
 					#[doc = ""]
-					#[doc = "The additional securitization percent must be maintained or increased."]
+					#[doc = "The securitization percent must be maintained or increased."]
 					#[doc = ""]
-					#[doc = "The amount offered may not go below the existing reserved amounts, but you can release"]
+					#[doc = "The amount allocated may not go below the existing reserved amounts, but you can release"]
 					#[doc = "funds in this vault as obligations are released. To stop issuing any more obligations,"]
 					#[doc = "use the `close` api."]
 					modify_funding {
 						vault_id: ::core::primitive::u32,
-						total_bonded_bitcoin_amount_offered: ::core::primitive::u128,
-						total_locked_bitcoin_amount_offered: ::core::primitive::u128,
-						added_securitization_percent:
-							runtime_types::sp_arithmetic::fixed_point::FixedU128,
+						securitization: ::core::primitive::u128,
+						securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
 					#[doc = "Change the terms of this vault. The change will be applied at the next mining slot"]
@@ -30949,9 +31491,8 @@ pub mod api {
 					#[doc = "Funding would result in an overflow of the balance type"]
 					InvalidVaultAmount,
 					#[codec(index = 10)]
-					#[doc = "This reduction in obligation funds offered goes below the amount that is already"]
-					#[doc = "committed to"]
-					VaultReductionBelowAllocatedFunds,
+					#[doc = "This reduction in vault securitization goes below the amount already committed"]
+					VaultReductionBelowSecuritization,
 					#[codec(index = 11)]
 					#[doc = "An invalid securitization percent was provided for the vault. NOTE: it cannot be"]
 					#[doc = "decreased (or negative)"]
@@ -31033,20 +31574,16 @@ pub mod api {
 					#[codec(index = 0)]
 					VaultCreated {
 						vault_id: ::core::primitive::u32,
-						locked_bitcoin_argons: ::core::primitive::u128,
-						bonded_bitcoin_argons: ::core::primitive::u128,
-						added_securitization_percent:
-							runtime_types::sp_arithmetic::fixed_point::FixedU128,
+						securitization: ::core::primitive::u128,
+						securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 						operator_account_id: crate::types::AccountId32,
-						activation_tick: ::core::primitive::u64,
+						opened_tick: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
 					VaultModified {
 						vault_id: ::core::primitive::u32,
-						locked_bitcoin_argons: ::core::primitive::u128,
-						bonded_bitcoin_argons: ::core::primitive::u128,
-						added_securitization_percent:
-							runtime_types::sp_arithmetic::fixed_point::FixedU128,
+						securitization: ::core::primitive::u128,
+						securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
 					VaultTermsChangeScheduled {
@@ -31058,9 +31595,8 @@ pub mod api {
 					#[codec(index = 4)]
 					VaultClosed {
 						vault_id: ::core::primitive::u32,
-						locked_bitcoin_amount_still_reserved: ::core::primitive::u128,
-						bonded_bitcoin_amount_still_reserved: ::core::primitive::u128,
-						securitization_still_reserved: ::core::primitive::u128,
+						remaining_securitization: ::core::primitive::u128,
+						released: ::core::primitive::u128,
 					},
 					#[codec(index = 5)]
 					VaultBitcoinXpubChange { vault_id: ::core::primitive::u32 },
@@ -31108,41 +31644,6 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 12)]
-					#[doc = "An error occurred distributing a bid pool"]
-					CouldNotDistributeBidPool {
-						cohort_id: ::core::primitive::u64,
-						vault_id: ::core::primitive::u32,
-						amount: ::core::primitive::u128,
-						dispatch_error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 13)]
-					#[doc = "An error occurred burning from the bid pool"]
-					CouldNotBurnBidPool {
-						cohort_id: ::core::primitive::u64,
-						amount: ::core::primitive::u128,
-						dispatch_error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 14)]
-					#[doc = "An error occurred allocating the next bid pool"]
-					CouldNotAllocateNextBidPool {
-						cohort_id: ::core::primitive::u64,
-						dispatch_error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 15)]
-					#[doc = "Funds fro the active bid pool have been distributed"]
-					BidPoolDistributed {
-						cohort_id: ::core::primitive::u64,
-						bid_pool_distributed: ::core::primitive::u128,
-						bid_pool_burned: ::core::primitive::u128,
-						bid_pool_entrants: ::core::primitive::u32,
-					},
-					#[codec(index = 16)]
-					#[doc = "The next bid pool has been allocated"]
-					NextBidPoolAllocated {
-						bonded_bitcoin_pool: ::core::primitive::u128,
-						bid_pool_entrants: ::core::primitive::u32,
-					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -31183,14 +31684,11 @@ pub mod api {
 				pub struct VaultConfig<_0> {
 					pub terms: runtime_types::argon_primitives::vault::VaultTerms<_0>,
 					#[codec(compact)]
-					pub locked_bitcoin_argons_allocated: _0,
+					pub securitization: _0,
 					pub bitcoin_xpubkey:
 						runtime_types::argon_primitives::bitcoin::OpaqueBitcoinXpub,
 					#[codec(compact)]
-					pub bonded_bitcoin_argons_allocated: _0,
-					#[codec(compact)]
-					pub added_securitization_percent:
-						runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				}
 			}
 		}
@@ -31265,7 +31763,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct Perbill(pub ::core::primitive::u32);
+				pub struct Percent(pub ::core::primitive::u8);
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: CompactAs,
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -31282,7 +31780,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct Percent(pub ::core::primitive::u8);
+				pub struct Permill(pub ::core::primitive::u32);
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,

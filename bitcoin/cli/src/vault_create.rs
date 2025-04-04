@@ -5,7 +5,11 @@ use crate::{
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 };
 use argon_bitcoin_cli_macros::ReadDocs;
-use argon_client::{api, api::runtime_types, conversion::to_api_fixed_u128};
+use argon_client::{
+	api,
+	api::runtime_types,
+	conversion::{to_api_fixed_u128, to_api_per_mill},
+};
 use argon_primitives::bitcoin::BitcoinXPub;
 use clap::Args;
 use inquire::{
@@ -13,12 +17,18 @@ use inquire::{
 	validator::{StringValidator, Validation},
 	CustomUserError, InquireError, Select, Text,
 };
+use sp_runtime::{FixedU128, Permill};
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
-	/// Argons to move to the vault to be available for bitcoin locks.
+	/// Argons to allocated ot the vault for bitcoin locks and securitization
 	#[clap(long, value_parser=parse_number)]
-	locked_bitcoin_argons: Option<f32>,
+	argons: Option<f32>,
+
+	/// The securitization ratio for bitcoin argons in your vault
+	#[clap(long, value_parser=parse_number)]
+	securitization_ratio: Option<f32>,
+
 	/// A serialized xpub string to be uploaded to the vault. Child pubkeys will have a single
 	/// incrementing index used for each bitcoin lock.
 	#[clap(long)]
@@ -32,26 +42,19 @@ pub struct VaultConfig {
 	/// amount of argons borrowed times this rate.
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_apr: Option<f32>,
-	/// Number of argons to move into the vault for the bonded bitcoin bid pool. NOTE: mining can
-	/// only be done at a 1-1 ratio with the amount of bonded bitcoin argons (or securitization up
-	/// to 2x bitcoin locks).
-	#[clap(long, value_parser=parse_number)]
-	bonded_bitcoin_argons: Option<f32>,
 
-	/// A percentage of additional argons to add to a securitization pool. These argons are a
-	/// guarantee for bitcoin lockers in the case of loss or fraud if the price is above the
-	/// original lock price. They may be up to 2x the amount of bitcoin argons.
+	/// The vault percent to keep for mining bonds funded by contributors to the vault.
 	#[clap(long, value_parser=parse_number)]
-	added_securitization_percent: Option<f32>,
+	mining_bond_percent_take: Option<f32>,
 }
 
 const FIELD_TO_LABEL: [(&str, &str); 6] = [
-	("locked_bitcoin_argons", "LockedBitcoin Argons"),
+	("argons", "Vault Argons"),
+	("securitization_ratio", "Securitization Ratio"),
 	("bitcoin_xpub", "Bitcoin XPub"),
 	("bitcoin_base_fee", "Bitcoin Base Fee Argons"),
 	("bitcoin_apr", "Bitcoin APR"),
-	("bonded_bitcoin_argons", "BondedBitcoin Argons"),
-	("added_securitization_percent", "Added Securitization %"),
+	("mining_bond_percent_take", "MiningBond % Take"),
 ];
 
 fn label(field: &str) -> &str {
@@ -86,22 +89,19 @@ impl VaultConfig {
 				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.bitcoin_apr.unwrap_or(0.0),
 				)),
+				mining_bond_percent_take: to_api_per_mill(Permill::from_float(
+					(self.mining_bond_percent_take.unwrap_or(0.0) / 100.0) as f64,
+				)),
 			},
-			added_securitization_percent: to_api_fixed_u128(read_percent_to_fixed_128(
-				self.added_securitization_percent.unwrap_or(0.0),
+			securitization_ratio: to_api_fixed_u128(FixedU128::from_float(
+				self.securitization_ratio.unwrap_or(1.0) as f64,
 			)),
-			locked_bitcoin_argons_allocated: (self.locked_bitcoin_argons.unwrap_or(0.0) *
-				1_000_000.0) as u128,
-			bonded_bitcoin_argons_allocated: (self.bonded_bitcoin_argons.unwrap_or(0.0) *
-				1_000_000.0) as u128,
+			securitization: (self.argons.unwrap_or(0.0) * 1_000_000.0) as u128,
 		}
 	}
 
 	pub fn argons_needed(&self) -> String {
-		let mut argons_needed = self.locked_bitcoin_argons.unwrap_or(0.0);
-		argons_needed += (self.added_securitization_percent.unwrap_or(0.0) / 100.0) * argons_needed;
-		argons_needed += self.bonded_bitcoin_argons.unwrap_or(0.0);
-		Argons(argons_needed).to_string()
+		Argons(self.argons.unwrap_or_default()).to_string()
 	}
 
 	fn update_state(&mut self, has_keypair: bool) -> Result<bool, String> {
@@ -146,12 +146,12 @@ impl VaultConfig {
 
 			println!("\n\n");
 			match field {
-				"locked_bitcoin_argons" => self.prompt_locked_bitcoin_argons()?,
+				"argons" => self.prompt_argons()?,
 				"bitcoin_xpub" => self.prompt_bitcoin_xpub()?,
 				"bitcoin_base_fee" => self.prompt_bitcoin_base_fee()?,
 				"bitcoin_apr" => self.prompt_bitcoin_apr()?,
-				"bonded_bitcoin_argons" => self.prompt_bonded_bitcoin_argons()?,
-				"added_securitization_percent" => self.prompt_securitization()?,
+				"mining_bond_percent_take" => self.prompt_mining_bond_percent_take()?,
+				"securitization_ratio" => self.prompt_securitization()?,
 				_ => unreachable!(),
 			}
 
@@ -195,36 +195,29 @@ impl VaultConfig {
 	}
 
 	fn prompt_bitcoin_base_fee(&mut self) -> Result<(), String> {
-		self.bitcoin_base_fee = Some(
-			self.text_field("bitcoin_base_fee", "0.0")
-				.with_positive_f32()
-				.prompt_with_f32()?,
-		);
+		self.bitcoin_base_fee =
+			Some(self.text_field("bitcoin_base_fee", "0.0").with_min_f32(0.0).prompt_with_f32()?);
 		Ok(())
 	}
 
-	fn prompt_locked_bitcoin_argons(&mut self) -> Result<(), String> {
-		self.locked_bitcoin_argons = Some(
-			self.text_field("locked_bitcoin_argons", "0.00")
-				.with_positive_f32()
-				.prompt_with_f32()?,
-		);
+	fn prompt_argons(&mut self) -> Result<(), String> {
+		self.argons = Some(self.text_field("argons", "0.00").with_min_f32(0.0).prompt_with_f32()?);
 		Ok(())
 	}
 
-	fn prompt_bonded_bitcoin_argons(&mut self) -> Result<(), String> {
-		self.bonded_bitcoin_argons = Some(
-			self.text_field("bonded_bitcoin_argons", "0.00")
-				.with_positive_f32()
+	fn prompt_mining_bond_percent_take(&mut self) -> Result<(), String> {
+		self.mining_bond_percent_take = Some(
+			self.text_field("mining_bond_percent_take", "0.00")
+				.with_min_f32(0.0)
 				.prompt_with_f32()?,
 		);
 		Ok(())
 	}
 
 	fn prompt_securitization(&mut self) -> Result<(), String> {
-		self.added_securitization_percent = Some(
-			self.text_field("added_securitization_percent", "100.0")
-				.with_positive_f32()
+		self.securitization_ratio = Some(
+			self.text_field("securitization_ratio", "1.0")
+				.with_min_f32(1.0)
 				.prompt_with_f32()?,
 		);
 		Ok(())
@@ -232,24 +225,24 @@ impl VaultConfig {
 
 	fn prompt_bitcoin_apr(&mut self) -> Result<(), String> {
 		self.bitcoin_apr =
-			Some(self.text_field("bitcoin_apr", "0.0").with_positive_f32().prompt_with_f32()?);
+			Some(self.text_field("bitcoin_apr", "0.0").with_min_f32(0.0).prompt_with_f32()?);
 		Ok(())
 	}
 
 	fn sanitize_bad_values(&mut self) {
-		if let Some(val) = self.locked_bitcoin_argons {
+		if let Some(val) = self.argons {
 			if val < 0.0 {
-				self.locked_bitcoin_argons = None;
+				self.argons = None;
 			}
 		}
-		if let Some(val) = self.bonded_bitcoin_argons {
+		if let Some(val) = self.mining_bond_percent_take {
 			if val < 0.0 {
-				self.bonded_bitcoin_argons = None;
+				self.mining_bond_percent_take = None;
 			}
 		}
-		if let Some(val) = self.added_securitization_percent {
-			if val < 0.0 {
-				self.added_securitization_percent = None;
+		if let Some(val) = self.securitization_ratio {
+			if val < 1.0 {
+				self.securitization_ratio = None;
 			}
 		}
 
@@ -279,13 +272,12 @@ impl VaultConfig {
 
 	fn formatted_value(&self, field: &str) -> Option<String> {
 		match field {
-			"locked_bitcoin_argons" => self.format_type(field, &self.locked_bitcoin_argons),
+			"argons" => self.format_type(field, &self.argons),
 			"bitcoin_xpub" => self.bitcoin_xpub.clone(),
 			"bitcoin_base_fee" => self.format_type(field, &self.bitcoin_base_fee),
 			"bitcoin_apr" => self.format_type(field, &self.bitcoin_apr),
-			"bonded_bitcoin_argons" => self.format_type(field, &self.bonded_bitcoin_argons),
-			"added_securitization_percent" =>
-				self.format_type(field, &self.added_securitization_percent),
+			"mining_bond_percent_take" => self.format_type(field, &self.mining_bond_percent_take),
+			"securitization_ratio" => self.format_type(field, &self.securitization_ratio),
 			_ => None,
 		}
 	}
@@ -298,13 +290,17 @@ impl VaultConfig {
 		}
 
 		match field {
-			"locked_bitcoin_argons" | "bonded_bitcoin_argons" | "bitcoin_base_fee" => {
+			"argons" | "bitcoin_base_fee" => {
 				let argons = parse_number(&value).unwrap();
 				Some(Argons(argons).to_string())
 			},
-			"bitcoin_apr" | "added_securitization_percent" => {
+			"bitcoin_apr" | "mining_bond_percent_take" => {
 				let pct = parse_number(&value).unwrap();
 				Some(Pct(pct).to_string())
+			},
+			"securitization_ratio" => {
+				let ratio = parse_number(&value).unwrap();
+				Some(format!("{:.2}x", ratio))
 			},
 			_ => None,
 		}
@@ -333,8 +329,8 @@ impl<'a> TextField<'a> {
 		Self { existing_value: existing_value.clone(), default, text: text_field }
 	}
 
-	fn with_positive_f32(mut self) -> Self {
-		self.text = self.text.with_validator(F32Validator(true));
+	fn with_min_f32(mut self, min_value: f32) -> Self {
+		self.text = self.text.with_validator(F32Validator { min_value });
 		self
 	}
 
@@ -367,15 +363,19 @@ impl<'a> TextField<'a> {
 
 /// Validates that a string can be converted to an f32 and is non-negative (if the .0 is true)
 #[derive(Clone)]
-struct F32Validator(bool);
+struct F32Validator {
+	min_value: f32,
+}
 impl StringValidator for F32Validator {
 	fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
 		match parse_number(input) {
 			Ok(x) =>
-				if x >= 0.0 || !self.0 {
+				if x >= self.min_value {
 					Ok(Validation::Valid)
 				} else {
-					Ok(Validation::Invalid("Must not be negative".into()))
+					Ok(Validation::Invalid(
+						format!("Must be greater than {}", self.min_value).into(),
+					))
 				},
 			Err(_) => Ok(Validation::Invalid("Invalid number".into())),
 		}
