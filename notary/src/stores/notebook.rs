@@ -218,7 +218,7 @@ impl NotebookStore {
 					match note.note_type {
 						NoteType::Tax | NoteType::LeaseDomain => tax += note.microgons,
 						NoteType::ChannelHold { .. } => change_note = Some(note.clone()),
-						NoteType::ChannelHoldSettle { .. } => change_note = None,
+						NoteType::ChannelHoldSettle => change_note = None,
 						NoteType::ClaimFromMainchain { transfer_id } =>
 							transfers.push(ChainTransfer::ToLocalchain { transfer_id }),
 						NoteType::SendToMainchain => transfers.push(ChainTransfer::ToMainchain {

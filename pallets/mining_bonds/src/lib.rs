@@ -598,9 +598,11 @@ pub mod pallet {
 						}
 						fund.is_rolled_over = true;
 						if !participants.is_empty() {
-							let mut new_fund = MiningBondFund::default();
-							new_fund.vault_percent_take = vault_take;
-							new_fund.contributor_balances = BoundedVec::truncate_from(participants);
+							let new_fund = MiningBondFund {
+								contributor_balances: BoundedVec::truncate_from(participants),
+								vault_percent_take: vault_take,
+								..Default::default()
+							};
 							next.try_insert(vault_id, new_fund).ok();
 						}
 						if total > T::Balance::zero() {
