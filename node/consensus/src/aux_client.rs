@@ -13,12 +13,12 @@ use argon_primitives::{
 };
 use argon_runtime::NotebookVerifyError;
 use codec::{Codec, Decode, Encode};
+use frame_support::{Deserialize, Serialize};
 use log::{trace, warn};
 use parking_lot::RwLock;
 use sc_client_api::{self, backend::AuxStore};
-use sc_consensus::BlockImportParams;
 use schnellru::{ByLength, LruMap};
-use sp_core::H256;
+use sp_core::{RuntimeDebug, H256};
 use sp_runtime::traits::Block as BlockT;
 use std::{
 	any::Any,
@@ -26,18 +26,21 @@ use std::{
 	fmt::Debug,
 	sync::Arc,
 };
+use tracing::info;
+
 pub enum AuxState<C: AuxStore> {
 	NotaryStateAtTick(Arc<AuxData<NotaryNotebookTickState, C>>),
 	AuthorsAtTick(Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>),
 	NotaryNotebooks(
-		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditResult<NotebookVerifyError>>, C>>,
+		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditAndRawHeader<NotebookVerifyError>>, C>>,
 	),
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
-	NotaryMissingNotebooks(Arc<AuxData<BTreeSet<NotebookNumber>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
 	MaxForkPower(Arc<AuxData<ForkPower, C>>),
 	BlockMetrics(Arc<AuxData<BlockMetrics, C>>),
+	Version(Arc<AuxData<u32, C>>),
 }
+
 trait AuxStateData {
 	fn as_any(&self) -> &dyn Any;
 }
@@ -48,11 +51,11 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 			AuxState::NotaryStateAtTick(a) => a,
 			AuxState::AuthorsAtTick(a) => a,
 			AuxState::NotaryNotebooks(a) => a,
-			AuxState::NotaryMissingNotebooks(a) => a,
 			AuxState::VotesAtTick(a) => a,
 			AuxState::NotaryAuditSummaries(a) => a,
 			AuxState::MaxForkPower(a) => a,
 			AuxState::BlockMetrics(a) => a,
+			AuxState::Version(a) => a,
 		}
 	}
 }
@@ -65,6 +68,7 @@ pub enum AuxKey {
 	NotaryAuditSummaries(NotaryId),
 	MaxForkPower,
 	BlockMetrics,
+	Version,
 }
 
 impl AuxKey {
@@ -84,6 +88,7 @@ impl AuxKey {
 				AuxState::MaxForkPower(AuxData::new(client, self.clone()).into()),
 			AuxKey::BlockMetrics =>
 				AuxState::BlockMetrics(AuxData::new(client, self.clone()).into()),
+			AuxKey::Version => AuxState::Version(AuxData::new(client, self.clone()).into()),
 		}
 	}
 }
@@ -118,7 +123,7 @@ impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 }
 
 pub const OLDEST_TICK_STATE: Tick = 256;
-const MAX_AUDIT_HISTORY: usize = 2000;
+const MAX_FINALIZED_AUDIT_HISTORY: usize = 100;
 const MAX_EXTRA_SUMMARY_HISTORY: usize = 100;
 
 ///
@@ -131,9 +136,50 @@ const MAX_EXTRA_SUMMARY_HISTORY: usize = 100;
 /// - `AuthorsAtHeight` - the authors at a given height for every voting key. A block will only be
 ///   accepted once per author per key
 impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
+	pub fn migrate(&self, runtime_tick: Tick) -> Result<(), Error> {
+		let _lock = self.lock.write();
+		let version = self.get_or_insert_state::<u32>(AuxKey::Version)?;
+
+		const VERSION: u32 = 1;
+		if version.get() == VERSION {
+			return Ok(());
+		}
+
+		info!("Migrating argon aux data from version {} to {}", version.get(), VERSION);
+
+		let mut to_delete = vec![];
+		// check a year of ticks
+		let oldest_tick = runtime_tick.saturating_sub(1440 * 365);
+
+		// Force a resync of headers
+		for i in oldest_tick..runtime_tick.saturating_sub(OLDEST_TICK_STATE) {
+			let key = AuxKey::NotaryStateAtTick(i).encode();
+			if i % 1440 == 0 {
+				info!("Migrating tick state progress {} of {}", i, runtime_tick);
+			}
+			if self.client.get_aux(&key)?.is_some() {
+				to_delete.push(key);
+			};
+		}
+
+		for i in 0..5 {
+			let key = AuxKey::NotaryNotebooks(i).encode();
+			if self.client.get_aux(&key)?.is_some() {
+				to_delete.push(key);
+			}
+		}
+
+		self.client
+			.insert_aux(vec![], &to_delete.iter().map(|a| a.as_slice()).collect::<Vec<_>>())?;
+
+		version.mutate(|a| *a = VERSION)?;
+
+		Ok(())
+	}
+
 	pub fn record_block<AC: Codec>(
 		&self,
-		block: &mut BlockImportParams<B>,
+		auxiliary_changes: &mut Vec<(Vec<u8>, Option<Vec<u8>>)>,
 		author: AC,
 		voting_key: Option<H256>,
 		tick: Tick,
@@ -161,16 +207,19 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		// cleanup old votes (None deletes)
 		if tick >= 10 {
 			let cleanup_height = tick - 10;
-			block.auxiliary.push((AuxKey::VotesAtTick(cleanup_height).encode(), None));
-			block.auxiliary.push((AuxKey::AuthorsAtTick(cleanup_height).encode(), None));
+			auxiliary_changes.push((AuxKey::VotesAtTick(cleanup_height).encode(), None));
+			auxiliary_changes.push((AuxKey::AuthorsAtTick(cleanup_height).encode(), None));
+			self.state.write().remove(&AuxKey::VotesAtTick(cleanup_height));
+			self.state.write().remove(&AuxKey::AuthorsAtTick(cleanup_height));
 		}
 		// Cleanup old notary state. We keep this longer because we might need to catchup on
 		// notebooks
 		if tick >= OLDEST_TICK_STATE {
 			let oldest = tick.saturating_sub(OLDEST_TICK_STATE);
 			// cleanup 10 ticks at a time, just in case
-			for tick in (oldest + 10)..=oldest {
-				block.auxiliary.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
+			for tick in oldest.saturating_sub(10)..=oldest {
+				auxiliary_changes.push((AuxKey::NotaryStateAtTick(tick).encode(), None));
+				self.state.write().remove(&AuxKey::NotaryStateAtTick(tick));
 			}
 		}
 		Ok(max_fork_power)
@@ -225,24 +274,22 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				break;
 			}
 			let tick = notebook.tick;
-
-			let state = self.get_notebook_tick_state(tick)?.get();
 			if tick == notebook_tick {
+				let state = self.get_notebook_tick_state(tick)?.get();
 				tick_notebook = state.notebook_key_details_by_notary.get(&notary_id).cloned();
 			}
-			if let Some(raw_data) = state.raw_headers_by_notary.get(&notary_id) {
-				notebook_count += 1;
-				headers.signed_headers.push(raw_data.clone());
-				headers.notebook_digest.notebooks.push(NotebookAuditResult {
-					notary_id,
-					notebook_number: notebook.notebook_number,
-					tick,
-					audit_first_failure: notebook.audit_first_failure.clone(),
-				});
-				// make of 10 notebooks per notary
-				if headers.signed_headers.len() >= max_notebooks as usize {
-					break;
-				}
+
+			notebook_count += 1;
+			headers.signed_headers.push(notebook.raw_signed_header.clone());
+			headers.notebook_digest.notebooks.push(NotebookAuditResult {
+				notary_id,
+				notebook_number: notebook.notebook_number,
+				tick,
+				audit_first_failure: notebook.audit_first_failure.clone(),
+			});
+
+			if headers.signed_headers.len() >= max_notebooks as usize {
+				break;
 			}
 		}
 
@@ -284,7 +331,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		&self,
 		notary_id: NotaryId,
 	) -> Result<
-		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditResult<NotebookVerifyError>>, C>>,
+		Arc<AuxData<BTreeMap<NotebookNumber, NotebookAuditAndRawHeader<NotebookVerifyError>>, C>>,
 		Error,
 	> {
 		let key = AuxKey::NotaryNotebooks(notary_id);
@@ -353,7 +400,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		self.get_notebook_tick_state(tick)?.mutate(|state| {
 			state.notebook_key_details_by_notary.remove(&notary_id);
-			state.raw_headers_by_notary.remove(&notary_id);
 		})?;
 
 		Ok(())
@@ -367,6 +413,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		raw_signed_header: SignedHeaderBytes,
 		notebook_details: NotaryNotebookDetails<B::Hash>,
 		finalized_notebook_number: NotebookNumber,
+		runtime_tick: Tick,
 	) -> Result<VotingPowerInfo, Error> {
 		let tick = notebook_details.tick;
 		let notary_id = notebook_details.notary_id;
@@ -381,17 +428,24 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		let mut voting_power = 0u128;
 		let mut notebooks = 0u32;
-		let (summary, vote_details) = notebook_details.into();
-		self.get_notebook_tick_state(tick)?.mutate(|state| {
-			if state.notebook_key_details_by_notary.insert(notary_id, vote_details).is_none() {
-				state.raw_headers_by_notary.insert(notary_id, raw_signed_header);
-			}
 
+		let (summary, vote_details) = notebook_details.into();
+		// only update tick state if this is in the last OLDEST_TICK_STATE ticks
+		if tick > runtime_tick || runtime_tick.saturating_sub(tick) < OLDEST_TICK_STATE {
+			self.get_notebook_tick_state(tick)?.mutate(|state| {
+				state.notebook_key_details_by_notary.insert(notary_id, vote_details);
+				for digest in state.notebook_key_details_by_notary.values() {
+					voting_power += digest.block_voting_power;
+					notebooks += 1;
+				}
+			})?;
+		} else {
+			let state = self.get_notebook_tick_state(tick)?.get();
 			for digest in state.notebook_key_details_by_notary.values() {
 				voting_power += digest.block_voting_power;
 				notebooks += 1;
 			}
-		})?;
+		}
 
 		self.get_audit_summaries(notary_id)?.mutate(|summaries| {
 			let mut insert_index = 0;
@@ -412,10 +466,11 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		})?;
 
 		// keep history for a little while
-		let oldest_to_retain = finalized_notebook_number.saturating_sub(MAX_AUDIT_HISTORY as u32);
+		let oldest_to_retain =
+			finalized_notebook_number.saturating_sub(MAX_FINALIZED_AUDIT_HISTORY as u32);
 		self.get_notary_audit_history(notary_id)?.mutate(|notebooks| {
-			notebooks.insert(notebook_number, audit_result.clone());
-			if notebooks.len() > MAX_AUDIT_HISTORY {
+			notebooks.insert(notebook_number, (raw_signed_header, audit_result).into());
+			if notebooks.len() > MAX_FINALIZED_AUDIT_HISTORY {
 				// remove oldest notebooks
 				notebooks.retain(|n, _| *n > oldest_to_retain);
 			}
@@ -443,6 +498,40 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			Ok(data.clone())
 		} else {
 			Err(format!("Could not downcast AuxState for {key:?}").into())
+		}
+	}
+}
+
+#[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, Serialize, Deserialize, Default)]
+pub struct NotebookAuditAndRawHeader<E: Codec> {
+	#[codec(compact)]
+	pub notary_id: NotaryId,
+	#[codec(compact)]
+	pub notebook_number: NotebookNumber,
+	#[codec(compact)]
+	pub tick: Tick,
+	pub audit_first_failure: Option<E>,
+	pub raw_signed_header: SignedHeaderBytes,
+}
+
+impl<E: Codec> From<(SignedHeaderBytes, NotebookAuditResult<E>)> for NotebookAuditAndRawHeader<E> {
+	fn from(value: (SignedHeaderBytes, NotebookAuditResult<E>)) -> Self {
+		NotebookAuditAndRawHeader {
+			notary_id: value.1.notary_id,
+			notebook_number: value.1.notebook_number,
+			tick: value.1.tick,
+			audit_first_failure: value.1.audit_first_failure,
+			raw_signed_header: value.0,
+		}
+	}
+}
+impl<E: Codec> From<NotebookAuditAndRawHeader<E>> for NotebookAuditResult<E> {
+	fn from(value: NotebookAuditAndRawHeader<E>) -> Self {
+		NotebookAuditResult {
+			notary_id: value.notary_id,
+			notebook_number: value.notebook_number,
+			tick: value.tick,
+			audit_first_failure: value.audit_first_failure,
 		}
 	}
 }
@@ -491,6 +580,7 @@ mod test {
 	fn it_should_store_notebook_results() {
 		let aux = Arc::new(MockAux::default());
 		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
+		let empty_header: SignedHeaderBytes = Default::default();
 		let audit_10 = NotebookAuditResult {
 			notebook_number: 10,
 			tick: 1,
@@ -511,13 +601,11 @@ mod test {
 		let (summary_10, _vote_details_10) = details_10.clone().into();
 
 		let result = argon_aux
-			.store_notebook_result(audit_10.clone(), Default::default(), details_10.clone(), 3)
+			.store_notebook_result(audit_10.clone(), empty_header.clone(), details_10.clone(), 3, 1)
 			.expect("store notebook result");
 		assert_eq!(result, (1, 0u128, 1));
-		assert_eq!(
-			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			BTreeMap::from([(10, audit_10.clone())])
-		);
+		let stored = argon_aux.get_notary_audit_history(1).expect("get notary audit history").get();
+		assert_eq!(stored, BTreeMap::from([(10, (empty_header.clone(), audit_10.clone()).into())]));
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
 			vec![summary_10.clone()]
@@ -551,12 +639,15 @@ mod test {
 		};
 		let (summary_9, _vote_details_9) = details_9.clone().into();
 		let result = argon_aux
-			.store_notebook_result(audit_9.clone(), Default::default(), details_9.clone(), 3)
+			.store_notebook_result(audit_9.clone(), empty_header.clone(), details_9.clone(), 3, 1)
 			.expect("store notebook result");
 		assert_eq!(result, (1, 0u128, 1));
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			BTreeMap::from([(9, audit_9.clone()), (10, audit_10.clone())])
+			BTreeMap::from([
+				(9, (empty_header.clone(), audit_9.clone()).into()),
+				(10, (empty_header.clone(), audit_10.clone()).into())
+			])
 		);
 
 		assert_eq!(
@@ -583,11 +674,15 @@ mod test {
 		};
 		let (summary_11, _vote_details_11) = details_11.clone().into();
 		argon_aux
-			.store_notebook_result(audit_11.clone(), Default::default(), details_11.clone(), 9)
+			.store_notebook_result(audit_11.clone(), Default::default(), details_11.clone(), 9, 1)
 			.expect("store notebook result");
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
-			BTreeMap::from([(9, audit_9.clone()), (10, audit_10.clone()), (11, audit_11.clone()),])
+			BTreeMap::from([
+				(9, (empty_header.clone(), audit_9.clone()).into()),
+				(10, (empty_header.clone(), audit_10.clone()).into()),
+				(11, (empty_header.clone(), audit_11.clone()).into()),
+			])
 		);
 		assert_eq!(
 			argon_aux.get_audit_summaries(1).expect("get audit summaries").get(),
@@ -599,15 +694,15 @@ mod test {
 		let mut details_10_mod = details_10.clone();
 		details_10_mod.tick = 2;
 		argon_aux
-			.store_notebook_result(audit_10_mod.clone(), Default::default(), details_10, 9)
+			.store_notebook_result(audit_10_mod.clone(), Default::default(), details_10, 9, 1)
 			.expect("store notebook result");
 
 		assert_eq!(
 			argon_aux.get_notary_audit_history(1).expect("get notary audit history").get(),
 			BTreeMap::from([
-				(9, audit_9.clone()),
-				(10, audit_10_mod.clone()),
-				(11, audit_11.clone()),
+				(9, (empty_header.clone(), audit_9.clone()).into()),
+				(10, (empty_header.clone(), audit_10_mod.clone()).into()),
+				(11, (empty_header.clone(), audit_11.clone()).into()),
 			]),
 			"should not add duplicate notebook"
 		);
@@ -616,6 +711,84 @@ mod test {
 			vec![summary_9.clone(), summary_10.clone(), summary_11.clone(),],
 			"should not add duplicate notebook"
 		);
+	}
+
+	#[test]
+	fn it_should_not_add_tick_state_for_old_ticks() {
+		let aux = Arc::new(MockAux::default());
+		let argon_aux = ArgonAux::<Block, _>::new(aux.clone());
+		for i in 1..OLDEST_TICK_STATE + 10 {
+			let notebook_number = i as NotebookNumber;
+			let tick = i as Tick;
+			argon_aux
+				.get_audit_summaries(1)
+				.unwrap()
+				.mutate(|a| {
+					a.push(NotaryNotebookAuditSummary {
+						notary_id: 1,
+						notebook_number,
+						tick,
+						version: 0,
+						raw_data: vec![],
+					});
+				})
+				.unwrap();
+			let audit = NotebookAuditResult {
+				notebook_number,
+				tick,
+				notary_id: 1,
+				audit_first_failure: None,
+			};
+			let details = NotaryNotebookDetails {
+				notary_id: 1,
+				block_voting_power: 0,
+				tick,
+				notebook_number,
+				raw_audit_summary: vec![],
+				version: 1,
+				block_votes_count: 0,
+				blocks_with_votes: vec![],
+				header_hash: H256::zero(),
+			};
+
+			let mut changes = vec![];
+			argon_aux.record_block(&mut changes, 1, None, i as Tick, false).unwrap();
+			argon_aux
+				.store_notebook_result(
+					audit,
+					Default::default(),
+					details,
+					notebook_number.saturating_sub(1),
+					tick.saturating_sub(1),
+				)
+				.expect("store notebook result");
+
+			for (key, value) in &changes {
+				if value.is_some() {
+					aux.insert_aux(vec![&(&key[..], &value.clone().unwrap()[..])], &[]).unwrap();
+				} else {
+					aux.insert_aux(vec![], &[&key[..]]).unwrap();
+				}
+			}
+
+			let state =
+				argon_aux.get_notebook_tick_state(tick).expect("get notebook tick state").get();
+			assert_eq!(state.notebook_key_details_by_notary.len(), 1);
+
+			if i > OLDEST_TICK_STATE {
+				let cleaned_tick = tick.saturating_sub(OLDEST_TICK_STATE);
+				let oldest_state = argon_aux.get_notebook_tick_state(cleaned_tick).unwrap();
+				assert!(changes
+					.iter()
+					.any(|a| a.0 == AuxKey::NotaryStateAtTick(cleaned_tick).encode() &&
+						a.1.is_none()));
+				assert_eq!(oldest_state.get().notebook_key_details_by_notary.len(), 0);
+				assert_eq!(
+					aux.get_aux(&AuxKey::NotaryStateAtTick(cleaned_tick).encode()[..]).unwrap(),
+					None
+				);
+			}
+		}
 	}
 
 	#[test]
@@ -664,6 +837,7 @@ mod test {
 				Default::default(),
 				details_10.clone(),
 				finalized_notebook_number,
+				1,
 			)
 			.expect("store notebook result");
 		assert_eq!(
@@ -705,7 +879,7 @@ mod test {
 		};
 
 		argon_aux
-			.store_notebook_result(audit_10.clone(), Default::default(), details_10.clone(), 3)
+			.store_notebook_result(audit_10.clone(), Default::default(), details_10.clone(), 3, 1)
 			.expect("store notebook result");
 		assert!(argon_aux.has_successful_audit(1, 10));
 		assert!(!argon_aux.has_successful_audit(1, 9));
@@ -745,7 +919,7 @@ mod test {
 				header_hash: H256::zero(),
 			};
 			argon_aux
-				.store_notebook_result(audit, Default::default(), details, 0)
+				.store_notebook_result(audit, Default::default(), details, 0, 0)
 				.expect("store notebook result");
 		}
 		assert_eq!(
@@ -808,6 +982,7 @@ mod test {
 					blocks_with_votes: vec![],
 					header_hash: H256::zero(),
 				},
+				0,
 				0,
 			)
 			.expect("store notebook result");

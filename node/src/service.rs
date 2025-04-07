@@ -11,7 +11,7 @@ use argon_node_consensus::{
 	aux_client::ArgonAux, create_import_queue, run_block_builder_task, run_notary_sync,
 	BlockBuilderParams, NotaryClient, NotebookDownloader,
 };
-use argon_primitives::{AccountId, Chain, TickApis};
+use argon_primitives::{tick::Ticker, AccountId, Chain, TickApis};
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
@@ -131,7 +131,17 @@ where
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
 	let ticker = {
 		let best_hash = client.info().best_hash;
-		client.runtime_api().ticker(best_hash).expect("Ticker not available")
+		let ticker: Ticker = client.runtime_api().ticker(best_hash).map_err(|e| {
+			ServiceError::Other(format!("Failed to establish runtime ticker: {:?}", e))
+		})?;
+		let latest_tick = client
+			.runtime_api()
+			.current_tick(best_hash)
+			.map_err(|e| ServiceError::Other(format!("Failed to get runtime tick: {:?}", e)))?;
+		aux_client
+			.migrate(latest_tick)
+			.map_err(|e| ServiceError::Other(format!("Failed to migrate aux data: {:?}", e)))?;
+		ticker
 	};
 	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 	let notebook_downloader = NotebookDownloader::new(mining_config.notebook_archive_hosts.clone())

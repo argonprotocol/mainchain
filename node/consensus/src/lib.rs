@@ -20,7 +20,7 @@ use sc_service::TaskManager;
 use sc_utils::mpsc::tracing_unbounded;
 use schnellru::{ByLength, LruMap};
 use sp_api::ProvideRuntimeApi;
-use sp_blockchain::HeaderBackend;
+use sp_blockchain::{BlockStatus, HeaderBackend};
 use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
 use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
@@ -231,6 +231,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	let consensus_metrics_finder = consensus_metrics.clone();
 
 	let block_finder_task = async move {
+		*notary_client.pause_queue_processing.write().await = true;
 		let mut import_stream = client.every_import_notification_stream();
 		let mut finalized_stream = client.finality_notification_stream();
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
@@ -309,7 +310,21 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 
 			// don't try to check for blocks during a sync
 			if sync_oracle.is_major_syncing() {
+				*notary_client.pause_queue_processing.write().await = true;
 				continue;
+			}
+
+			// make sure best hash is synched (there's a delay in some sync modes between the block
+			// being imported and state synched)
+			let best_hash = client.info().best_hash;
+			if client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown {
+				*notary_client.pause_queue_processing.write().await = true;
+				warn!(?best_hash, "Best block state not available (yet?). Not starting compute.");
+				continue;
+			}
+
+			if *notary_client.pause_queue_processing.read().await {
+				*notary_client.pause_queue_processing.write().await = false;
 			}
 
 			if let Some((notebook_tick, voting_power, notebooks)) = check_for_better_blocks {

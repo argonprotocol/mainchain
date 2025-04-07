@@ -1,6 +1,7 @@
 use crate::{aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error, NotaryClient};
 use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
+	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
 	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
@@ -8,10 +9,10 @@ use argon_primitives::{
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use sc_client_api::{self, backend::AuxStore, blockchain::BlockStatus};
+use sc_client_api::{self, backend::AuxStore};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
-	ForkChoiceStrategy, ImportResult, Verifier as VerifierT,
+	ForkChoiceStrategy, ImportResult, StateAction, StorageChanges, Verifier as VerifierT,
 };
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
@@ -52,8 +53,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + Send + Sync + AuxStore + 'static,
-	C::Api: BlockCreatorApis<B, AC, NotebookVerifyError>,
+	C: HeaderBackend<B> + AuxStore + Send + Sync + 'static,
 	AC: Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
@@ -66,70 +66,78 @@ where
 		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
-		if block.state_action.skip_execution_checks() {
-			tracing::trace!(block_hash=?block.post_hash(), "Skipping import checks for warp/gap-filled block.");
-			block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-			return self.inner.import_block(block).await.map_err(Into::into);
-		}
+		let hash = block.post_hash();
+		let number = *block.header.number();
 
-		let mut best_hash = *block.header.parent_hash();
+		let parent = *block.header.parent_hash();
+
+		let info = self.client.info();
+		let is_block_gap = info.block_gap.is_some_and(|(s, e)| s <= number && number <= e);
+		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
+		// imported. Various sync strategies will access this path without state set yet
 		tracing::trace!(
-			parent_hash=?best_hash,
-			block_hash=?block.post_hash,
-			has_state=block.with_state(),
+			number=?number,
+			hash=?hash,
+			parent=?parent,
+			is_block_gap,
+			action=match block.state_action {
+				StateAction::ApplyChanges(StorageChanges::Changes(_)) => "state_apply",
+				StateAction::ApplyChanges(StorageChanges::Import(_)) => "state_import",
+				StateAction::Execute => "execute",
+				StateAction::ExecuteIfPossible => "execute_if_possible",
+				StateAction::Skip => "skip",
+			},
+			is_ours=block.origin == BlockOrigin::Own,
 			"Begin import."
 		);
-		// if we're importing a block with state, the parent might not be available yet, so use best
-		// hash
-		if block.with_state() &&
-			self.client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown
-		{
-			best_hash = self.client.info().best_hash;
-		}
+		let digest = block.header.digest();
+		let block_author: AC = digest
+			.convert_first(|a| a.as_author())
+			.ok_or(Error::UnableToDecodeDigest("author".to_string()))?;
 
-		// decode at best hash since we might be just importing state, in which case the parent
-		// state is not stored yet
-		let (block_author, tick, voting_key) = self
-			.client
-			.runtime_api()
-			.decode_voting_author(best_hash, block.header.digest())
-			.map_err(Error::Api)?
-			.map_err(|e| {
-				Error::MissingRuntimeData(format!("Failed to get voting author power: {:?}", e))
-			})?;
+		let tick = digest
+			.convert_first(|a| a.as_tick())
+			.ok_or(Error::UnableToDecodeDigest("tick".to_string()))?
+			.0;
 
-		let fork_power = ForkPower::try_from(block.header.digest())
+		let voting_key = digest
+			.convert_first(|a| a.as_parent_voting_key())
+			.ok_or(Error::UnableToDecodeDigest("voting key".to_string()))?
+			.parent_voting_key;
+
+		let fork_power = ForkPower::try_from(digest)
 			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
 
 		// hold for rest of block import
 		let _lock = self.import_lock.lock().await;
-		let max_fork_power = self.aux_client.record_block(
-			&mut block,
-			block_author,
-			voting_key,
-			tick,
-			fork_power.is_latest_vote,
-		)?;
 
-		// NOTE: only import as best block if it beats the best stored block. There are cases where
-		// importing a tie will yield too many blocks at a height and break substrate
-		let is_best_fork = fork_power > max_fork_power;
-
-		if is_best_fork {
-			tracing::info!(
-				block_hash = ?block.post_hash,
-				?fork_power,
-				"New best fork imported"
-			);
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+		// We only want to set a best block if the state is imported. When
+		// syncing, we will sometimes import state, but be grabbing a gap block, in which case we
+		// don't want to set interim blocks as best block
+		if !block.state_action.skip_execution_checks() && !is_block_gap {
+			let max_fork_power = self.aux_client.record_block(
+				&mut block.auxiliary,
+				block_author,
+				voting_key,
+				tick,
+				fork_power.is_latest_vote,
+			)?;
+			// NOTE: only import as best block if it beats the best stored block. There are cases
+			// where importing a tie will yield too many blocks at a height and break substrate
+			if fork_power > max_fork_power {
+				tracing::info!(
+					block_hash = ?hash,
+					?fork_power,
+					"New best fork imported"
+				);
+				block.fork_choice = Some(ForkChoiceStrategy::Custom(true));
+			}
 		}
-
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(is_best_fork));
-
-		let block_hash = block.post_hash();
 		match self.inner.import_block(block).await {
 			Ok(result) => {
 				self.aux_client.block_accepted(fork_power).inspect_err(|e| {
-					log::error!("Failed to record block accepted for {:?}: {:?}", block_hash, e)
+					log::error!("Failed to record block accepted for {:?}: {:?}", hash, e)
 				})?;
 				Ok(result)
 			},
@@ -193,14 +201,6 @@ where
 		// This is done for example when gap syncing and it is expected that the block after the gap
 		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
 		if block_params.state_action.skip_execution_checks() || block_params.with_state() {
-			tracing::trace!(
-				block_hash=?block_params.post_hash(),
-				has_state = block_params.with_state(),
-				skip_execution = block_params.state_action.skip_execution_checks(),
-				"Verify block skipping."
-			);
-			// When we are importing only the state of a block, it will be the best block.
-			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(block_params.with_state()));
 			return Ok(block_params)
 		}
 
