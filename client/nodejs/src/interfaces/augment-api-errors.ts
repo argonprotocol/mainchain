@@ -416,7 +416,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
     };
-    miningBonds: {
+    liquidityPools: {
       /**
        * The added amount would exceed the activated securitization
        **/
@@ -436,7 +436,7 @@ declare module '@polkadot/api-base/types/errors' {
       /**
        * Unable to update the vault fund
        **/
-      CouldNotFindBondFund: AugmentedError<ApiType>;
+      CouldNotFindLiquidityPool: AugmentedError<ApiType>;
       /**
        * An internal error occurred (like an overflow)
        **/

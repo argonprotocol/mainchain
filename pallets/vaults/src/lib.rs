@@ -16,15 +16,14 @@ pub mod weights;
 
 /// The vaults pallet allows a user to offer argons for lease to other users. There are two types of
 /// obligations allocated in the system, Bitcoin and Mining obligations. Vaults can define the
-/// amount of argons available bitcoins locks and the terms of both bitcoin locks and mining bonds.
-/// However, Mining Bonds may only issued up to the amount of bitcoins that are locked.
+/// amount of argons available bitcoins locks and the terms of both bitcoin locks and liquidity
+/// pools. However, bonded argons for LiquidityPool may only issued up to the amount of locked
+/// bitcoin.
 ///
-/// ** Additional Bitcoin Securitization **
-///
-/// A vault may apply added bitcoin securitization to their account up to 2x the locked value of
-/// their bitcoin argons. This allows a vault to issue more mining obligations, but the funds are
-/// locked up for the duration of the bitcoin locks, and will be taken in the case of bitcoins not
-/// being cosigned on unlock.
+/// ** Activated Securitization **
+/// A vault create liquidity pools up to 2x the locked securitization used for Bitcoin. This added
+/// securitization is locked up for the duration of the bitcoin locks, and will be taken in the case
+/// of bitcoins not being cosigned on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use alloc::vec;
@@ -39,7 +38,7 @@ pub mod pallet {
 		},
 		tick::Tick,
 		vault::{
-			BitcoinObligationProvider, FundType, MiningBondFundVaultProvider, Obligation,
+			BitcoinObligationProvider, FundType, LiquidityPoolVaultProvider, Obligation,
 			ObligationError, ObligationExpiration, ReleaseFundsResult, Vault, VaultTerms,
 		},
 		MiningSlotProvider, ObligationEvents, ObligationId, TickProvider, VaultId,
@@ -869,7 +868,7 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> MiningBondFundVaultProvider for Pallet<T> {
+	impl<T: Config> LiquidityPoolVaultProvider for Pallet<T> {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
@@ -879,12 +878,15 @@ pub mod pallet {
 				.unwrap_or_default()
 		}
 
-		fn get_vault_payment_info(vault_id: VaultId) -> Option<(Self::AccountId, Permill)> {
-			VaultsById::<T>::get(vault_id)
-				.map(|a| (a.operator_account_id, a.terms.mining_bond_percent_take))
+		fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+			VaultsById::<T>::get(vault_id).map(|a| a.operator_account_id)
 		}
 
-		fn is_vault_accepting_mining_bonds(vault_id: VaultId) -> bool {
+		fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
+			VaultsById::<T>::get(vault_id).map(|a| a.terms.liquidity_pool_profit_sharing)
+		}
+
+		fn is_vault_open(vault_id: VaultId) -> bool {
 			VaultsById::<T>::get(vault_id).map(|a| !a.is_closed).unwrap_or_default()
 		}
 	}

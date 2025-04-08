@@ -621,20 +621,21 @@ declare module '@polkadot/api-base/types/submittable' {
         [Vec<IsmpHostStateMachine>]
       >;
     };
-    miningBonds: {
+    liquidityPools: {
       /**
-       * Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount
-       * raised per vault cannot exceed the allocated securitization for the vault.
+       * Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,
+       * tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the
+       * activated securitization for the vault.
        *
-       * The funds and profits will be automatically rolled over to the next fund up to the max
-       * securitization activated.
+       * The bonded argons and profits will be automatically rolled over to the next fund up to
+       * the max securitization activated.
        *
        * - `origin`: The account that is joining the fund
        * - `vault_id`: The vault id that the account would like to join a fund for
        * - `amount`: The amount of argons to contribute to the fund. If you change this amount,
        * it will just add the incremental amount
        **/
-      addCapital: AugmentedSubmittable<
+      bondArgons: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           amount: u128 | AnyNumber | Uint8Array,
@@ -642,10 +643,10 @@ declare module '@polkadot/api-base/types/submittable' {
         [u32, u128]
       >;
       /**
-       * Allows a user to remove their contribution from the fund after the hold is released
+       * Allows a user to remove their bonded argons from the fund after the hold is released
        * (once cohort slot period is complete).
        **/
-      endRenewal: AugmentedSubmittable<
+      unbondArgons: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           cohortId: u64 | AnyNumber | Uint8Array,
@@ -2066,7 +2067,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | {
                 bitcoinAnnualPercentRate?: any;
                 bitcoinBaseFee?: any;
-                miningBondPercentTake?: any;
+                liquidityPoolProfitSharing?: any;
               }
             | string
             | Uint8Array,

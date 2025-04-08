@@ -1585,8 +1585,8 @@ declare module '@polkadot/types/lookup' {
       | 'Erc6160AssetRegistrationDispatched';
   }
 
-  /** @name PalletMiningBondsEvent (131) */
-  interface PalletMiningBondsEvent extends Enum {
+  /** @name PalletLiquidityPoolsEvent (131) */
+  interface PalletLiquidityPoolsEvent extends Enum {
     readonly isCouldNotDistributeBidPool: boolean;
     readonly asCouldNotDistributeBidPool: {
       readonly accountId: AccountId32;
@@ -1615,16 +1615,16 @@ declare module '@polkadot/types/lookup' {
       readonly totalActivatedCapital: u128;
       readonly participatingVaults: u32;
     } & Struct;
-    readonly isErrorRefundingBondFundCapital: boolean;
-    readonly asErrorRefundingBondFundCapital: {
+    readonly isErrorRefundingLiquidityPoolCapital: boolean;
+    readonly asErrorRefundingLiquidityPoolCapital: {
       readonly cohortId: u64;
       readonly vaultId: u32;
       readonly amount: u128;
       readonly accountId: AccountId32;
       readonly dispatchError: SpRuntimeDispatchError;
     } & Struct;
-    readonly isRefundedBondFundCapital: boolean;
-    readonly asRefundedBondFundCapital: {
+    readonly isRefundedLiquidityPoolCapital: boolean;
+    readonly asRefundedLiquidityPoolCapital: {
       readonly cohortId: u64;
       readonly vaultId: u32;
       readonly amount: u128;
@@ -1635,8 +1635,8 @@ declare module '@polkadot/types/lookup' {
       | 'CouldNotBurnBidPool'
       | 'BidPoolDistributed'
       | 'NextBidPoolCapitalLocked'
-      | 'ErrorRefundingBondFundCapital'
-      | 'RefundedBondFundCapital';
+      | 'ErrorRefundingLiquidityPoolCapital'
+      | 'RefundedLiquidityPoolCapital';
   }
 
   /** @name FrameSystemPhase (132) */
@@ -2094,7 +2094,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesVaultVaultTerms extends Struct {
     readonly bitcoinAnnualPercentRate: Compact<u128>;
     readonly bitcoinBaseFee: Compact<u128>;
-    readonly miningBondPercentTake: Compact<Permill>;
+    readonly liquidityPoolProfitSharing: Compact<Permill>;
   }
 
   /** @name ArgonPrimitivesBitcoinOpaqueBitcoinXpub (200) */
@@ -2876,19 +2876,19 @@ declare module '@polkadot/types/lookup' {
     readonly precisions: BTreeMap<IsmpHostStateMachine, u8>;
   }
 
-  /** @name PalletMiningBondsCall (313) */
-  interface PalletMiningBondsCall extends Enum {
-    readonly isAddCapital: boolean;
-    readonly asAddCapital: {
+  /** @name PalletLiquidityPoolsCall (313) */
+  interface PalletLiquidityPoolsCall extends Enum {
+    readonly isBondArgons: boolean;
+    readonly asBondArgons: {
       readonly vaultId: u32;
       readonly amount: u128;
     } & Struct;
-    readonly isEndRenewal: boolean;
-    readonly asEndRenewal: {
+    readonly isUnbondArgons: boolean;
+    readonly asUnbondArgons: {
       readonly vaultId: u32;
       readonly cohortId: u64;
     } & Struct;
-    readonly type: 'AddCapital' | 'EndRenewal';
+    readonly type: 'BondArgons' | 'UnbondArgons';
   }
 
   /** @name PalletMultisigError (315) */
@@ -3620,14 +3620,14 @@ declare module '@polkadot/types/lookup' {
     readonly asBitcoinLocks: PalletBitcoinLocksHoldReason;
     readonly isBlockRewards: boolean;
     readonly asBlockRewards: PalletBlockRewardsHoldReason;
-    readonly isMiningBonds: boolean;
-    readonly asMiningBonds: PalletMiningBondsHoldReason;
+    readonly isLiquidityPools: boolean;
+    readonly asLiquidityPools: PalletLiquidityPoolsHoldReason;
     readonly type:
       | 'MiningSlot'
       | 'Vaults'
       | 'BitcoinLocks'
       | 'BlockRewards'
-      | 'MiningBonds';
+      | 'LiquidityPools';
   }
 
   /** @name PalletMiningSlotHoldReason (450) */
@@ -3655,10 +3655,10 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'MaturationPeriod';
   }
 
-  /** @name PalletMiningBondsHoldReason (454) */
-  interface PalletMiningBondsHoldReason extends Enum {
-    readonly isContributedToBondFund: boolean;
-    readonly type: 'ContributedToBondFund';
+  /** @name PalletLiquidityPoolsHoldReason (454) */
+  interface PalletLiquidityPoolsHoldReason extends Enum {
+    readonly isContributedToLiquidityPool: boolean;
+    readonly type: 'ContributedToLiquidityPool';
   }
 
   /** @name FrameSupportTokensMiscIdAmountRuntimeFreezeReason (457) */
@@ -3778,30 +3778,30 @@ declare module '@polkadot/types/lookup' {
       | 'NotAssetOwner';
   }
 
-  /** @name PalletMiningBondsMiningBondFund (472) */
-  interface PalletMiningBondsMiningBondFund extends Struct {
+  /** @name PalletLiquidityPoolsLiquidityPool (472) */
+  interface PalletLiquidityPoolsLiquidityPool extends Struct {
     readonly contributorBalances: Vec<ITuple<[AccountId32, u128]>>;
     readonly doNotRenew: Vec<AccountId32>;
     readonly isRolledOver: bool;
-    readonly distributedEarnings: Option<u128>;
-    readonly vaultPercentTake: Compact<Permill>;
+    readonly distributedProfits: Option<u128>;
+    readonly vaultSharingPercent: Compact<Permill>;
   }
 
-  /** @name PalletMiningBondsVaultBidPoolCapital (481) */
-  interface PalletMiningBondsVaultBidPoolCapital extends Struct {
+  /** @name PalletLiquidityPoolsLiquidityPoolCapital (481) */
+  interface PalletLiquidityPoolsLiquidityPoolCapital extends Struct {
     readonly vaultId: Compact<u32>;
     readonly activatedCapital: Compact<u128>;
     readonly cohortId: Compact<u64>;
   }
 
-  /** @name PalletMiningBondsError (483) */
-  interface PalletMiningBondsError extends Enum {
+  /** @name PalletLiquidityPoolsError (483) */
+  interface PalletLiquidityPoolsError extends Enum {
     readonly isContributionTooLow: boolean;
     readonly isVaultNotAcceptingMiningBonds: boolean;
     readonly isBelowMinimum: boolean;
     readonly isNotAFundContributor: boolean;
     readonly isInternalError: boolean;
-    readonly isCouldNotFindBondFund: boolean;
+    readonly isCouldNotFindLiquidityPool: boolean;
     readonly isMaxContributorsExceeded: boolean;
     readonly isActivatedSecuritizationExceeded: boolean;
     readonly isMaxVaultsExceeded: boolean;
@@ -3812,7 +3812,7 @@ declare module '@polkadot/types/lookup' {
       | 'BelowMinimum'
       | 'NotAFundContributor'
       | 'InternalError'
-      | 'CouldNotFindBondFund'
+      | 'CouldNotFindLiquidityPool'
       | 'MaxContributorsExceeded'
       | 'ActivatedSecuritizationExceeded'
       | 'MaxVaultsExceeded'

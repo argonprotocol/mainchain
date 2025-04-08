@@ -765,7 +765,7 @@ declare module '@polkadot/api-base/types/events' {
         { stateMachines: Vec<IsmpHostStateMachine> }
       >;
     };
-    miningBonds: {
+    liquidityPools: {
       /**
        * Funds from the active bid pool have been distributed
        **/
@@ -817,7 +817,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * An error occurred releasing a contributor hold
        **/
-      ErrorRefundingBondFundCapital: AugmentedEvent<
+      ErrorRefundingLiquidityPoolCapital: AugmentedEvent<
         ApiType,
         [
           cohortId: u64,
@@ -846,7 +846,7 @@ declare module '@polkadot/api-base/types/events' {
        * Some mining bond capital was refunded due to less activated vault funds than bond
        * capital
        **/
-      RefundedBondFundCapital: AugmentedEvent<
+      RefundedLiquidityPoolCapital: AugmentedEvent<
         ApiType,
         [cohortId: u64, vaultId: u32, amount: u128, accountId: AccountId32],
         { cohortId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }

@@ -1271,9 +1271,9 @@ export default {
     },
   },
   /**
-   * Lookup131: pallet_mining_bonds::pallet::Event<T>
+   * Lookup131: pallet_liquidity_pools::pallet::Event<T>
    **/
-  PalletMiningBondsEvent: {
+  PalletLiquidityPoolsEvent: {
     _enum: {
       CouldNotDistributeBidPool: {
         accountId: 'AccountId32',
@@ -1299,14 +1299,14 @@ export default {
         totalActivatedCapital: 'u128',
         participatingVaults: 'u32',
       },
-      ErrorRefundingBondFundCapital: {
+      ErrorRefundingLiquidityPoolCapital: {
         cohortId: 'u64',
         vaultId: 'u32',
         amount: 'u128',
         accountId: 'AccountId32',
         dispatchError: 'SpRuntimeDispatchError',
       },
-      RefundedBondFundCapital: {
+      RefundedLiquidityPoolCapital: {
         cohortId: 'u64',
         vaultId: 'u32',
         amount: 'u128',
@@ -1728,7 +1728,7 @@ export default {
   ArgonPrimitivesVaultVaultTerms: {
     bitcoinAnnualPercentRate: 'Compact<u128>',
     bitcoinBaseFee: 'Compact<u128>',
-    miningBondPercentTake: 'Compact<Permill>',
+    liquidityPoolProfitSharing: 'Compact<Permill>',
   },
   /**
    * Lookup200: argon_primitives::bitcoin::OpaqueBitcoinXpub
@@ -2486,16 +2486,16 @@ export default {
     precisions: 'BTreeMap<IsmpHostStateMachine, u8>',
   },
   /**
-   * Lookup313: pallet_mining_bonds::pallet::Call<T>
+   * Lookup313: pallet_liquidity_pools::pallet::Call<T>
    **/
-  PalletMiningBondsCall: {
+  PalletLiquidityPoolsCall: {
     _enum: {
-      add_capital: {
+      bond_argons: {
         vaultId: 'u32',
         amount: 'u128',
       },
       __Unused1: 'Null',
-      end_renewal: {
+      unbond_argons: {
         vaultId: 'u32',
         cohortId: 'u64',
       },
@@ -3100,7 +3100,7 @@ export default {
       __Unused28: 'Null',
       __Unused29: 'Null',
       __Unused30: 'Null',
-      MiningBonds: 'PalletMiningBondsHoldReason',
+      LiquidityPools: 'PalletLiquidityPoolsHoldReason',
     },
   },
   /**
@@ -3128,10 +3128,10 @@ export default {
     _enum: ['MaturationPeriod'],
   },
   /**
-   * Lookup454: pallet_mining_bonds::pallet::HoldReason
+   * Lookup454: pallet_liquidity_pools::pallet::HoldReason
    **/
-  PalletMiningBondsHoldReason: {
-    _enum: ['ContributedToBondFund'],
+  PalletLiquidityPoolsHoldReason: {
+    _enum: ['ContributedToLiquidityPool'],
   },
   /**
    * Lookup457: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
@@ -3249,34 +3249,34 @@ export default {
     ],
   },
   /**
-   * Lookup472: pallet_mining_bonds::pallet::MiningBondFund<T>
+   * Lookup472: pallet_liquidity_pools::pallet::LiquidityPool<T>
    **/
-  PalletMiningBondsMiningBondFund: {
+  PalletLiquidityPoolsLiquidityPool: {
     contributorBalances: 'Vec<(AccountId32,u128)>',
     doNotRenew: 'Vec<AccountId32>',
     isRolledOver: 'bool',
-    distributedEarnings: 'Option<u128>',
-    vaultPercentTake: 'Compact<Permill>',
+    distributedProfits: 'Option<u128>',
+    vaultSharingPercent: 'Compact<Permill>',
   },
   /**
-   * Lookup481: pallet_mining_bonds::pallet::VaultBidPoolCapital<T>
+   * Lookup481: pallet_liquidity_pools::pallet::LiquidityPoolCapital<T>
    **/
-  PalletMiningBondsVaultBidPoolCapital: {
+  PalletLiquidityPoolsLiquidityPoolCapital: {
     vaultId: 'Compact<u32>',
     activatedCapital: 'Compact<u128>',
     cohortId: 'Compact<u64>',
   },
   /**
-   * Lookup483: pallet_mining_bonds::pallet::Error<T>
+   * Lookup483: pallet_liquidity_pools::pallet::Error<T>
    **/
-  PalletMiningBondsError: {
+  PalletLiquidityPoolsError: {
     _enum: [
       'ContributionTooLow',
       'VaultNotAcceptingMiningBonds',
       'BelowMinimum',
       'NotAFundContributor',
       'InternalError',
-      'CouldNotFindBondFund',
+      'CouldNotFindLiquidityPool',
       'MaxContributorsExceeded',
       'ActivatedSecuritizationExceeded',
       'MaxVaultsExceeded',

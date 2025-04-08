@@ -221,7 +221,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				terms: VaultTerms {
 					bitcoin_annual_percent_rate: vlt.bitcoin_argons.annual_percent_rate,
 					bitcoin_base_fee: vlt.bitcoin_argons.base_fee,
-					mining_bond_percent_take: Permill::zero(),
+					liquidity_pool_profit_sharing: Permill::zero(),
 				},
 				pending_terms: vlt.pending_terms.map(|(tick, terms)| {
 					(
@@ -229,7 +229,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 						VaultTerms {
 							bitcoin_base_fee: terms.bitcoin_base_fee,
 							bitcoin_annual_percent_rate: terms.bitcoin_annual_percent_rate,
-							mining_bond_percent_take: Permill::zero(),
+							liquidity_pool_profit_sharing: Permill::zero(),
 						},
 					)
 				}),

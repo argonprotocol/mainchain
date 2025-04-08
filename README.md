@@ -16,7 +16,7 @@ mint new Argons when the price is above target. The second is through a "Liquid 
 Bitcoins are able to mint liquidity equal to their Bitcoin's market value by committing to locking their Bitcoins and an
 equivalent amount of Argons for a year.
 
-The Bitcoin bonds transform into "options" that allow a holder to profit from the volatility of both the Bitcoin price
+The Bitcoin "locks" transform into "options" that allow a holder to profit from the volatility of both the Bitcoin price
 and the Argon price. To call an option, a Bitcoin holder must issue a "system burn" of argons equivalent to the current
 market price of Bitcoin. This creates a dynamically adjusting "burn rate" to forcefully remove unwanted currency from
 the system (unwanted, meaning, the market price of the Argon is below target, ergo less desirable).
@@ -29,8 +29,8 @@ Localchains are the person-to-person Layer 2 of the Argon network. They are a pe
 cryptographic proof of the "current balance" of each user, which can be signed and sent to another user for exchanging
 funds. Localchains are expected to be used for high-frequency transactions, such as micropayments for queries in
 [Ulixee Datastores](https://ulixee.org/docs/datastore). Localchains submit balance changes in "notarizations" to the
-Argon mainchain via Notaries,
-which are network approved entities that audit the balance changes and batch them to the mainchain.
+Argon mainchain via Notaries, which are network approved entities that audit the balance changes and batch them to the
+mainchain.
 
 ## Consensus
 
@@ -41,13 +41,10 @@ Monero blockchain to create a proof of work that does not favor GPUs, allowing r
 has no funds minted in the genesis block, so this period can be viewed as the bootstrapping period for the network.
 
 The second form of consensus is a registered mining phase, where miners bid for slots to mine blocks. They must bid for
-a slot. Vaults can win a prorata of this bid pool by creating BondedBitcoins, which are issued equal to the amount of
-LockedBitcoin they have confirmed. Because it is expected that mining auctions will be near the expected earnings,
-Vaults are incented to bring new bitcoin liquidity into the system to compete on their prorata share. Miners are given
-priority to register blocks in the system over proof of compute blocks, so once this phase activates, the network will
-be secured by the miners and only use proof of compute when no miners are registered or active. Miners are matched to
-votes provided by Localchain users using an XOR closest
-algorithm (more details to come in the whitepaper).
+a slot. Miners are given priority to register blocks in the system over proof of compute blocks, so after this phase
+activates, the network is secured by the miners and only uses proof of compute when no miners are registered or
+active. Miners are matched to votes provided by Localchain users using an XOR closest algorithm (more details to come in
+the whitepaper).
 
 ## Technology Brief
 
@@ -95,15 +92,17 @@ PostgresSQL database to keep track of its history and users' balance tips.
 - `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
 - `pallets`: The pallets are the various "tables" that make up the blockchain. They define the storage, dispatchables,
   events, and errors of the blockchain.
+  - `bitcoin_locks`: Main interaction point to lock and release bitcoins into a vault.
   - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
   - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
     spent).
   - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
   - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-  - `bitcoin_locks`: Allows users to lock and unlock bitcoins.
   - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
   - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
     akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
+  - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity pools offer early
+    liquidity to locked bitcoins and earn participants a share of the mining bid pool.
   - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
     mine blocks created by the notebook commit reveal scheme.
   - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
@@ -113,8 +112,7 @@ PostgresSQL database to keep track of its history and users' balance tips.
   - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
     inflation since the starting time.
   - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-  - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and use BondedBitcoins to earn a
-    pro rata of the Mining Slot bid pool.
+  - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create LiquidityPools.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets
@@ -140,6 +138,9 @@ Argon makes use of a few runtime pallets that are useful to know about as a user
   a proxy account that can submit transactions on behalf of another account. This is useful for creating a cold wallet
   that can still submit transactions. The cold wallet will pay for the transaction fees but doesn't have to have keys
   loaded into memory.
+- `Utility`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_utility/index.html) allows you to
+  batch multiple api calls into a single transaction. This is useful for creating a single transaction that performs
+  multiple actions you want to all succeed or fail as one.
 - `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`, `token_gateway`) here to
   activate the Argon ability to move tokens cross-chain. Learn more about
   hyperbridge [here](https://hyperbridge.network).

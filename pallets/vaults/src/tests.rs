@@ -53,7 +53,7 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 	VaultTerms {
 		bitcoin_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
-		mining_bond_percent_take: Permill::zero(),
+		liquidity_pool_profit_sharing: Permill::zero(),
 	}
 }
 
@@ -472,7 +472,7 @@ fn it_accounts_for_pending_bitcoins() {
 				terms: VaultTerms {
 					bitcoin_annual_percent_rate: FixedU128::from_float(0.0),
 					bitcoin_base_fee: 0,
-					mining_bond_percent_take: Permill::zero(),
+					liquidity_pool_profit_sharing: Permill::zero(),
 				},
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -506,7 +506,7 @@ fn it_can_charge_prorated_obligation_fees() {
 		let terms = VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 123,
-			mining_bond_percent_take: Permill::zero(),
+			liquidity_pool_profit_sharing: Permill::zero(),
 		};
 
 		assert_ok!(Vaults::create(

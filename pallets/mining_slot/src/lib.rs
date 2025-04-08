@@ -64,7 +64,7 @@ pub mod weights;
 /// To register for a Slot, you must submit a bid. At any given time, only the next Slot is being
 /// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
 /// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
-/// MiningBonds.
+/// LiquidityPools.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use codec::FullCodec;
