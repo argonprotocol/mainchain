@@ -37,7 +37,7 @@ runs:
         images: ${{ inputs.image }}
         labels: |
           org.opencontainers.image.licenses=MIT
-          org.opencontainers.image.vendor=argon
+          org.opencontainers.image.vendor=Argon Foundation
         flavor: ${{ inputs.flavor }}
         tags: ${{ inputs.tags }}
 
@@ -56,6 +56,7 @@ runs:
 
     - name: Build and push image to container registry
       uses: docker/build-push-action@v5
+      id: push
       with:
         platforms: linux/amd64,linux/arm64
         context: .
@@ -66,3 +67,10 @@ runs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=registry,ref=${{ inputs.image }}:buildcache
         cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max
+
+    - name: Generate artifact attestation
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: true
