@@ -1,8 +1,26 @@
 # Changelog
 
-## [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...f703193a95570d7c13e9a54c98713154c846ab42) (2025-03-21)
+## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...4a0576922ed637bc20f280a62d991585f1e2deef) (2025-04-09)
 
 ### Features
+
+* **mining-bonds:** Mining Bonds
+([ab75e7f](https://github.com/argonprotocol/mainchain/commit/ab75e7fa8e5804d2e9df31ee5a880f7caed0f5e7))
+* **notary/oracle:** verify key during insert
+([ce966d5](https://github.com/argonprotocol/mainchain/commit/ce966d5cbcb27199300465726159358ca1b386c7))
+
+### Fixes
+
+* crash if unable to allocate randomx for hash
+([7fa84fb](https://github.com/argonprotocol/mainchain/commit/7fa84fbd8ae502aae36c79d563ca9b2ec112f43b))
+* **node:** fast sync issues accessing state
+([2453ba4](https://github.com/argonprotocol/mainchain/commit/2453ba4590d72aeb8f2337fe502ef39e66b0cee5))
+* **srtool:** try updating rust version
+([b39a781](https://github.com/argonprotocol/mainchain/commit/b39a781382d384848ba0f0d532c0856c70e2a430))
+
+### [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...v1.0.18) (2025-03-22)
+
+#### Features
 
 * **mint:** track per-cohort mint amounts
 ([5350fdd](https://github.com/argonprotocol/mainchain/commit/5350fddf176ee9ddf184be6762a81277192b4342))
@@ -15,8 +33,12 @@
 * bid pools for mining
 ([010b838](https://github.com/argonprotocol/mainchain/commit/010b838e836b5e09c2cdf3f860f0e8a9412032b1))
 
-### Fixes
+#### Fixes
 
+* **vaults:** store apr for calculating prorata
+([1bbcaa1](https://github.com/argonprotocol/mainchain/commit/1bbcaa1842e0e25dcef7722d34a41bd19fba6c13))
+* **vaults:** migration broken due to stalled oblg
+([d70eb4a](https://github.com/argonprotocol/mainchain/commit/d70eb4a6cb948af8a4d7a0de0d6c1ad5abaef2cf))
 * **ci:** attempt to fix ci tests
 ([7130054](https://github.com/argonprotocol/mainchain/commit/7130054cde93709196bfa1b767ed89c9781c24cf))
 * **mining_slot:** miners losing lookup index

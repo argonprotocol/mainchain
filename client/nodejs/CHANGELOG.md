@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...f703193a95570d7c13e9a54c98713154c846ab42) (2025-03-21)
+## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...4a0576922ed637bc20f280a62d991585f1e2deef) (2025-04-09)
 
 ### Features
+
+* **mining-bonds:** Mining Bonds
+([ab75e7f](https://github.com/argonprotocol/mainchain/commit/ab75e7fa8e5804d2e9df31ee5a880f7caed0f5e7))
+
+### [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...v1.0.18) (2025-03-22)
+
+#### Features
 
 * **mint:** track per-cohort mint amounts
 ([5350fdd](https://github.com/argonprotocol/mainchain/commit/5350fddf176ee9ddf184be6762a81277192b4342))
@@ -13,8 +20,10 @@
 * bid pools for mining
 ([010b838](https://github.com/argonprotocol/mainchain/commit/010b838e836b5e09c2cdf3f860f0e8a9412032b1))
 
-### Fixes
+#### Fixes
 
+* **vaults:** store apr for calculating prorata
+([1bbcaa1](https://github.com/argonprotocol/mainchain/commit/1bbcaa1842e0e25dcef7722d34a41bd19fba6c13))
 * **mining_slot:** miners losing lookup index
 ([c55e6b0](https://github.com/argonprotocol/mainchain/commit/c55e6b01fc4519e42bcc6f52d2d2beea2f9af601))
 * **mining_slot:** allow full balance bid

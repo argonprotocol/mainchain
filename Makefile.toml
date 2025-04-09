@@ -142,7 +142,7 @@ dependencies = ["testnet-spec", "release"]
 description = "Complete release process: install dependencies, version bump, changelogs, commit, and push"
 script = [
     "brew install convco",
-    "export RELEASE_TYPE=${1:---bump}",
+    "if [ $# -eq 0 ]; then export RELEASE_TYPE=--bump; else export RELEASE_TYPE=\"$@\"; fi",
     "export VERSION=$(convco version $RELEASE_TYPE)",
     "export COMMIT_MSG=\"chore(release): update changelogs and bump versions to v${VERSION}\"",
     "echo $COMMIT_MSG",
