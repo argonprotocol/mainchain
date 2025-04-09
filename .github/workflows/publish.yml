@@ -24,6 +24,8 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write
+      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4

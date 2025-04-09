@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...f703193a95570d7c13e9a54c98713154c846ab42) (2025-03-21)
+## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...4a0576922ed637bc20f280a62d991585f1e2deef) (2025-04-09)
 
-### Features
+### [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...v1.0.18) (2025-03-22)
+
+#### Features
 
 * **mint:** track per-cohort mint amounts
 ([5350fdd](https://github.com/argonprotocol/mainchain/commit/5350fddf176ee9ddf184be6762a81277192b4342))

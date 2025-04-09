@@ -123,6 +123,11 @@ jobs:
     name: Docker
     needs:
       - build-and-test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
