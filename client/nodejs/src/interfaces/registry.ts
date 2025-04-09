@@ -175,12 +175,12 @@ import type {
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsMessageCommitment,
   PalletIsmpUtilsUpdateConsensusState,
-  PalletMiningBondsCall,
-  PalletMiningBondsError,
-  PalletMiningBondsEvent,
-  PalletMiningBondsHoldReason,
-  PalletMiningBondsMiningBondFund,
-  PalletMiningBondsVaultBidPoolCapital,
+  PalletLiquidityPoolsCall,
+  PalletLiquidityPoolsError,
+  PalletLiquidityPoolsEvent,
+  PalletLiquidityPoolsHoldReason,
+  PalletLiquidityPoolsLiquidityPool,
+  PalletLiquidityPoolsLiquidityPoolCapital,
   PalletMiningSlotCall,
   PalletMiningSlotError,
   PalletMiningSlotEvent,
@@ -427,12 +427,12 @@ declare module '@polkadot/types/types/registry' {
     PalletIsmpUtilsFundMessageParams: PalletIsmpUtilsFundMessageParams;
     PalletIsmpUtilsMessageCommitment: PalletIsmpUtilsMessageCommitment;
     PalletIsmpUtilsUpdateConsensusState: PalletIsmpUtilsUpdateConsensusState;
-    PalletMiningBondsCall: PalletMiningBondsCall;
-    PalletMiningBondsError: PalletMiningBondsError;
-    PalletMiningBondsEvent: PalletMiningBondsEvent;
-    PalletMiningBondsHoldReason: PalletMiningBondsHoldReason;
-    PalletMiningBondsMiningBondFund: PalletMiningBondsMiningBondFund;
-    PalletMiningBondsVaultBidPoolCapital: PalletMiningBondsVaultBidPoolCapital;
+    PalletLiquidityPoolsCall: PalletLiquidityPoolsCall;
+    PalletLiquidityPoolsError: PalletLiquidityPoolsError;
+    PalletLiquidityPoolsEvent: PalletLiquidityPoolsEvent;
+    PalletLiquidityPoolsHoldReason: PalletLiquidityPoolsHoldReason;
+    PalletLiquidityPoolsLiquidityPool: PalletLiquidityPoolsLiquidityPool;
+    PalletLiquidityPoolsLiquidityPoolCapital: PalletLiquidityPoolsLiquidityPoolCapital;
     PalletMiningSlotCall: PalletMiningSlotCall;
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;

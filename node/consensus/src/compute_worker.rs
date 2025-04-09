@@ -225,8 +225,13 @@ impl BlockComputeNonce {
 	) -> bool {
 		let hash =
 			Self { nonce: *nonce, pre_hash }.using_encoded(|x| calculate_hash(key_block_hash, x));
-		let Ok(hash) = hash else {
-			return false;
+		let hash = match hash {
+			Ok(hash) => hash,
+			Err(e) => {
+				// If this fails, it means system resources aren't available. To avoid setting the
+				// wrong return value, we should crash
+				panic!("Error calculating hash: {:?}", e);
+			},
 		};
 		let threshold = Self::threshold(compute_difficulty);
 		Self::meets_threshold(hash.as_fixed_bytes(), threshold)

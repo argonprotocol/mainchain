@@ -268,7 +268,7 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(6, 6));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(7, 7));
 
 			// Check the new value
 			let new = NextSlotCohort::<Test>::get();

@@ -28,24 +28,28 @@ as long as a Vault performs the following two functions:
 - `Securitization`: The number of argons a Vault will lock as Securitization for Bitcoins. `1 / securitization ratio`
   worth of these argons can be used to create LockedBitcoins.
 
-## Mining Bonds
+## Liquidity Pools
 
-Mining Bonds allow a vault to earn a share of the bids submitted for mining slots. Every time bidding for a mining
-slot cohort begins, each vault is entitled to issue mining bonds up to one-tenth of it's activated securitization.
-At the end of bidding, the bid pool is distributed to those mining-bonds based on their pro-rata
-amount of bitcoins locked.
+Liquidity Pools offer LockedBitcoins upfront liquidity in the case where they will not be minted due to a below-target
+argon price. A liquidity pool for a slot accumulates all mining bid capital on top of Bonded Argons provided by argon
+holders in the network. The pool is distributed first to any pending Bitcoins, and then to each vault based
+on the size of its contributed liquidity pool. The per-slot liquidity pool is capped at one-tenth of a vault's activated
+securitization.
+
+If a liquidity pool is used to fund Bitcoins, it will be the first to be paid out once the argon price is back at (or
+above) target.
 
 `Activated securitization` is the amount of securitization currently locked into Bitcoin multiplied by the
 securitization ratio. In other words, it's the capital locked into use.
 
-To create `Mining Bonds`, any account can submit capital to a given cohort's bid pool using the `MiningBonds` pallet.
-The vault can control how much of the bid pool earnings are distributed to the contributed capital. More capital will
-earn a higher pro-rata share of the bid pool, so it's desirable to have an appealing offer.
+To bond argons to a `Liquidity Pool`, any account can submit argons to a given cohort's bid pool using the
+`LiquidityPools` pallet. The vault can control how much of the liquidity pool earnings are shared with those
+contributing capital.
 
-### Variables for BondedBitcoins
+### Variables for Liquidity Pools
 
-- `Mining Bond Percent "take"`: The percent of the mining bond earnings that the vault owner will take for themselves (
-  vs distributing to the capital contributors).
+- `Liquidity Pool Profit Sharing`: The percent of the profit sharing a vault is offering for liquidity pool
+  participants.
 
 ## The Argon Bitcoin CLI
 
@@ -155,7 +159,7 @@ whatever you'd like to offer.
 ```bash
 $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
   --argons=₳100 --securitization-ratio=1x \
-  --mining-bond-percent-take=50% \
+  --liquidity-pool-profit-sharing=50% \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 \
   --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```
@@ -166,7 +170,7 @@ URL, you can click over to `Submission` to submit the transaction.
 ```bash
 Vault funds needed: ₳300
 Link to create transaction:
-https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x07000f0080e03779c311d1070f0000c16ff28623a10f00821a0600045f1cf601459bf4948000000025df6a795c9c2f021f1b826157957c53ec219754d7bc19d4875f26ec3d8cdad8030a1c14c2ab00f5fd06dc8fbf41ab7b5323290203a78444d4f20e5ecc5b98f25d821a060013000064a7b3b6e00d
+https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x08000f0080e03779c31182841e0082841e000284d717043587cf015436d724800000008f5e2b22b8e08d61a920bc2006ccd532b6e1304ce07b3a28d86c3595db6fed2303ca6a577de236ac2477e0fc7b6e93ba5df2e4556845952446645114d002c4add213000064a7b3b6e00d
 ```
 
 ![Polkadot.js Vault Submission](images/pjs-vaultcreate.png)
@@ -227,7 +231,7 @@ LockedBitcoin.
 ## Reclaiming Bitcoin
 
 If you get to the end of the year and the Bitcoin owner has not requested a LockedBitcoin Release in Argon, you will
-lose possession of the BondedBitcoins. As compensation, you can claim the Bitcoin.
+lose possession of the vault securitization at the ratio you set. As compensation, you can claim the Bitcoin.
 
 ### 1. Sign the "Claim Bitcoin" Partially Signed Bitcoin Transaction
 
@@ -250,7 +254,7 @@ of where you can import (and broadcast) into Electrum:
 The following are a few rules around how and when you can add funding to a vault:
 
 - Vault funding can be added at any time
-- Vault funding can be removed at any time down to the level of current obligations (Locked or Bonded Bitcoins)
+- Vault funding can be removed at any time down to the level of activated securitization
 - Vaults must cosign any BitcoinLock release requests within 10 days of the request, or they will forfeit the market
   value of the Bitcoins
 - Vaults must cosign any BitcoinLock which has a mismatch making it unable to be locked into Argon, but which make it

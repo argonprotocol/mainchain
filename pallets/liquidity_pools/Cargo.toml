@@ -1,5 +1,5 @@
 [package]
-name = "pallet-mining-bonds"
+name = "pallet-liquidity-pools"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

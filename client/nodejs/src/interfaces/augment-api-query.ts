@@ -75,8 +75,8 @@ import type {
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletHyperbridgeVersionedHostParams,
-  PalletMiningBondsMiningBondFund,
-  PalletMiningBondsVaultBidPoolCapital,
+  PalletLiquidityPoolsLiquidityPool,
+  PalletLiquidityPoolsLiquidityPoolCapital,
   PalletMintMintAction,
   PalletMultisigMultisig,
   PalletPriceIndexPriceIndex,
@@ -769,33 +769,33 @@ declare module '@polkadot/api-base/types/storage' {
         [IsmpHostStateMachine]
       >;
     };
-    miningBonds: {
+    liquidityPools: {
       /**
        * The currently earning contributors for the current epoch's bond funds. Sorted by highest
        * bids first
        **/
-      miningBondFundsByCohort: AugmentedQuery<
+      liquidityPoolsByCohort: AugmentedQuery<
         ApiType,
         (
           arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<BTreeMap<u32, PalletMiningBondsMiningBondFund>>,
+        ) => Observable<BTreeMap<u32, PalletLiquidityPoolsLiquidityPool>>,
         [u64]
       >;
       /**
-       * The bid pool capital for the next bid pool.
+       * The liquidity pool capital for the next mining slot cohort.
        **/
-      nextVaultBidPoolCapital: AugmentedQuery<
+      nextLiquidityPoolCapital: AugmentedQuery<
         ApiType,
-        () => Observable<Vec<PalletMiningBondsVaultBidPoolCapital>>,
+        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
         []
       >;
       /**
-       * The entrants in the mining bond pool that will be paid out for the active bid pool. They
-       * apply to the next closed mining slot cohort bid pool. Sorted with biggest share last.
+       * The entrants in the liquidity pool for the mining slot cohort being bid on. Sorted with
+       * biggest share last.
        **/
-      openVaultBidPoolCapital: AugmentedQuery<
+      openLiquidityPoolCapital: AugmentedQuery<
         ApiType,
-        () => Observable<Vec<PalletMiningBondsVaultBidPoolCapital>>,
+        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
         []
       >;
     };

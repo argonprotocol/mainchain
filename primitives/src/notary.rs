@@ -189,7 +189,6 @@ pub struct NotaryNotebookTickState {
 	#[codec(compact)]
 	pub notaries: u16,
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
-	pub raw_headers_by_notary: BTreeMap<NotaryId, SignedHeaderBytes>,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]

@@ -391,7 +391,7 @@ async fn create_vault(
 			"1.0",
 			"--bitcoin-base-fee",
 			"0",
-			"--mining-bond-percent-take",
+			"--liquidity-pool-profit-sharing",
 			"50",
 		],
 	)

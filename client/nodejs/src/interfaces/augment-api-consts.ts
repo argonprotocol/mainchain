@@ -161,7 +161,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxSetIdSessionEntries: u64 & AugmentedConst<ApiType>;
     };
-    miningBonds: {
+    liquidityPools: {
       /**
        * Bid Pool burn percent
        **/
@@ -173,7 +173,7 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * The maximum number of contributors to a bond fund
        **/
-      maxBondFundContributors: u32 & AugmentedConst<ApiType>;
+      maxLiquidityPoolContributors: u32 & AugmentedConst<ApiType>;
       /**
        * The minimum argons per fund contributor
        **/

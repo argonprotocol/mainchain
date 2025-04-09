@@ -86,10 +86,10 @@ parameter_types! {
 	pub const PayoutHistoryBlocks: u32 = 5;
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
-	// ### pallet_mining_bonds
-	pub const MaxBondFundContributors: u32 = 100;
+	// ### pallet_liquidity_pools
+	pub const MaxLiquidityPoolContributors: u32 = 100;
 	pub const MaxBidPoolVaultParticipants: u32 = 100;
-	pub const MiningBondsInternalPalletId: PalletId = PalletId(*b"mngBonds");
+	pub const LiquidityPoolsInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 	// ### pallet_mining_slot

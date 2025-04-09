@@ -1012,7 +1012,7 @@ dependencies = [
  "pallet-hyperbridge",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
- "pallet-mining-bonds",
+ "pallet-liquidity-pools",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-multisig",
@@ -1493,7 +1493,7 @@ dependencies = [
  "pallet-hyperbridge",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
- "pallet-mining-bonds",
+ "pallet-liquidity-pools",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-multisig",
@@ -1563,7 +1563,7 @@ dependencies = [
  "pallet-hyperbridge",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
- "pallet-mining-bonds",
+ "pallet-liquidity-pools",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-multisig",
@@ -11948,6 +11948,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-liquidity-pools"
+version = "1.0.18"
+dependencies = [
+ "argon-primitives",
+ "env_logger 0.11.6",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "impl-trait-for-tuples",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "tracing",
+]
+
+[[package]]
 name = "pallet-lottery"
 version = "38.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12014,27 +12035,6 @@ dependencies = [
  "scale-info",
  "sp-core",
  "sp-runtime",
-]
-
-[[package]]
-name = "pallet-mining-bonds"
-version = "1.0.18"
-dependencies = [
- "argon-primitives",
- "env_logger 0.11.6",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "impl-trait-for-tuples",
- "log",
- "pallet-balances",
- "parity-scale-codec",
- "scale-info",
- "sp-api",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "tracing",
 ]
 
 [[package]]

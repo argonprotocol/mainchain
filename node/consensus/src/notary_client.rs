@@ -35,6 +35,7 @@ use std::{
 	collections::{BTreeMap, BTreeSet},
 	default::Default,
 	marker::PhantomData,
+	ops::Range,
 	pin::Pin,
 	sync::Arc,
 	task::{Context, Poll},
@@ -294,6 +295,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	aux_client: ArgonAux<B, C>,
 	notebook_downloader: NotebookDownloader,
 	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
+	pub pause_queue_processing: Arc<RwLock<bool>>,
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
@@ -326,6 +328,7 @@ where
 			notebook_queue_by_id: Default::default(),
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
+			pause_queue_processing: Default::default(),
 			aux_client,
 			notebook_downloader,
 			metrics,
@@ -495,6 +498,9 @@ where
 	}
 
 	pub async fn process_queues(self: &Arc<Self>) -> Result<bool, Error> {
+		if *self.pause_queue_processing.read().await {
+			return Ok(true);
+		}
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
@@ -504,10 +510,13 @@ where
 			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
 
 		let handles = queued_notaries.into_iter().map(|notary_id| {
+			let finalized_notebook_number =
+				self.latest_notebook_in_runtime(finalized_hash, notary_id);
+
 			let self_clone: Arc<Self> = Arc::clone(self);
 			tokio::spawn(async move {
 				let Some((notebook_number, raw_header, time)) =
-					self_clone.get_next(notary_id).await
+					self_clone.get_next(notary_id, finalized_notebook_number).await
 				else {
 					return Ok::<_, Error>(false);
 				};
@@ -515,7 +524,7 @@ where
 					.process_notebook(
 						notary_id,
 						notebook_number,
-						&finalized_hash,
+						finalized_notebook_number,
 						&best_hash,
 						raw_header.clone(),
 						time,
@@ -594,23 +603,37 @@ where
 	async fn get_next(
 		&self,
 		notary_id: NotaryId,
+		finalized_notebook_number: NotebookNumber,
 	) -> Option<(NotebookNumber, SignedHeaderBytes, Instant)> {
 		let (notebook_number, mut bytes, queue_time) = {
 			let mut queues = self.notebook_queue_by_id.write().await;
-			let queue = queues.get_mut(&notary_id)?;
-			if queue.is_empty() {
-				return None;
+			let mut next = None;
+			let mut finalized_notebooks_trimmed = 0u32;
+			let mut queue_range: Range<NotebookNumber> = 0..0;
+			while let Some(queue) = queues.get_mut(&notary_id) {
+				if queue.is_empty() {
+					return None
+				}
+				queue_range = Range { start: queue[0].0, end: queue[queue.len() - 1].0 };
+
+				let (notebook_number, bytes, queue_time) = queue.remove(0);
+				if notebook_number > finalized_notebook_number {
+					next = Some((notebook_number, bytes, queue_time));
+					break;
+				} else {
+					finalized_notebooks_trimmed += 1;
+				}
 			}
 
 			if tracing::enabled!(tracing::Level::TRACE) {
-				trace!(
-					"Dequeuing notebook for notary {}. Queue: {:?}..{:?}",
+				tracing::trace!(
+					?finalized_notebooks_trimmed,
 					notary_id,
-					queue.first().map(|(n, _, _)| *n),
-					queue.last().map(|(n, _, _)| *n)
+					"Dequeuing notebook for notary. Queue: {:?}",
+					queue_range,
 				);
 			}
-			queue.remove(0)
+			next?
 		};
 
 		if bytes.is_none() {
@@ -771,13 +794,12 @@ where
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
-		finalized_hash: &B::Hash,
+		finalized_notebook_number: NotebookNumber,
 		best_hash: &B::Hash,
 		raw_header: SignedHeaderBytes,
 		enqueue_time: Instant,
 	) -> Result<(), Error> {
 		let mut best_hash = *best_hash;
-		let finalized_notebook_number = self.latest_notebook_in_runtime(*finalized_hash, notary_id);
 		if notebook_number <= finalized_notebook_number {
 			tracing::info!(
 				notary_id,
@@ -843,12 +865,13 @@ where
 		);
 
 		let audit_result = self.audit_notebook(&best_hash, &notebook_details).await?;
-
+		let runtime_tick = self.client.current_tick(best_hash)?;
 		let voting_power = self.aux_client.store_notebook_result(
 			audit_result,
 			raw_header,
 			notebook_details,
 			finalized_notebook_number,
+			runtime_tick,
 		)?;
 
 		if let Some(metrics) = self.metrics.as_ref() {
@@ -869,7 +892,7 @@ where
 		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
 	) -> Result<(), Error> {
 		for _ in 0..2 {
-			let mut missing_audits_by_notary = BTreeSet::new();
+			let mut missing_audits_by_notary = BTreeMap::new();
 			let notary_ids = self.get_notary_ids().await;
 			let mut needs_notary_updates = false;
 			for digest_record in &notebook_audit_results {
@@ -899,7 +922,9 @@ where
 					)
 					.await?;
 					missing_audits_by_notary
-						.insert((digest_record.notary_id, digest_record.notebook_number));
+						.entry(digest_record.notary_id)
+						.or_insert_with(Vec::new)
+						.push(digest_record.notebook_number);
 				}
 			}
 			if missing_audits_by_notary.is_empty() {
@@ -918,30 +943,32 @@ where
 			// drain queues
 			// NOTE: only do this for 10 seconds
 			let start = Instant::now();
-			let notaries_needing_update =
-				missing_audits_by_notary.iter().map(|(n, _)| *n).collect::<BTreeSet<_>>();
 			// wait a max of 5 seconds per notebook.
-			let wait_time = (missing_audits_by_notary.len() * 5).max(10);
+			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
+
+			// if we're importing a specific block, then network syncing should be off
+			*self.pause_queue_processing.write().await = false;
 			while self.process_queues().await? {
 				tokio::time::sleep(Duration::from_millis(30)).await;
-				for notary_id in &notaries_needing_update {
+				let mut has_more_work = false;
+				for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
 					let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
-					missing_audits_by_notary.retain(|(n, notebook_number)| {
-						if n != notary_id {
-							return true;
-						}
-						!notary_audits.contains_key(notebook_number)
-					});
+					audits.retain(|notebook_number| !notary_audits.contains_key(notebook_number));
+					if !audits.is_empty() {
+						has_more_work = true;
+					}
 				}
-				if missing_audits_by_notary.is_empty() {
+				if !has_more_work {
 					break;
 				}
 				if start.elapsed() > Duration::from_secs(wait_time as u64) {
+					warn!("Timed out waiting for missing audits. {:#?}", missing_audits_by_notary);
 					return Err(Error::UnableToSyncNotary(format!(
 						"Could not process all missing audits in {} seconds",
 						wait_time
 					)));
 				}
+				*self.pause_queue_processing.write().await = false;
 			}
 		}
 		Err(Error::InvalidNotebookDigest(
@@ -978,10 +1005,12 @@ where
 			for missing in &missing_notebooks {
 				self.enqueue_notebook(notary_id, *missing, None, None).await?;
 			}
-			info!("Missing notebooks for notary {}. Enqueued: {:?}", notary_id, missing_notebooks);
+			let notebook_range =
+				missing_notebooks[0]..missing_notebooks[missing_notebooks.len() - 1];
+			info!("Missing notebooks for notary {}. Enqueued: {:?}", notary_id, notebook_range);
 			return Err(Error::MissingNotebooksError(format!(
 				"Missing notebooks #{:?} to audit {} for notary {}",
-				missing_notebooks, notebook_number, notary_id
+				notebook_range, notebook_number, notary_id
 			)));
 		}
 		Ok(notebook_dependencies)
@@ -997,14 +1026,21 @@ where
 		let notebook_number = notebook_details.notebook_number;
 		let notebook_dependencies =
 			self.get_notebook_dependencies(notary_id, notebook_number, best_hash).await?;
-		trace!(
-			"Attempting to audit notebook. Notary {notary_id}, #{notebook_number}, tick {tick}.",
+		tracing::trace!(
+			notary_id,
+			notebook_number,
+			best_hash = ?best_hash,
+			tick,
+			notebook_dependencies = notebook_dependencies.len(),
+			"Attempting to audit notebook",
 		);
 
 		let full_notebook = self.download_notebook(notary_id, notebook_number).await?;
-		trace!(
-			"Notebook downloaded. Notary {notary_id}, #{notebook_number}, tick {tick}. {} bytes.",
-			full_notebook.0.len()
+		tracing::trace!(
+			notary_id,
+			notebook_number,
+			bytes = full_notebook.0.len(),
+			"Notebook downloaded.",
 		);
 
 		// audit on the best block since we're adding dependencies
@@ -1023,8 +1059,11 @@ where
 				let vote_count = votes.raw_votes.len();
 				self.aux_client.store_votes(tick, votes)?;
 
-				info!(
-					"Notebook audit successful. Notary {notary_id}, #{notebook_number}, tick {tick}. {vote_count} block vote(s).",
+				tracing::info!(
+					notary_id,
+					notebook_number,
+					tick,
+					"Notebook audit successful. {vote_count} block vote(s).",
 				);
 				None
 			},
@@ -1053,8 +1092,11 @@ where
 					)));
 				}
 
-				warn!(
-					"Notebook audit failed ({}). Notary {notary_id}, #{notebook_number}, tick {tick}.",
+				tracing::warn!(
+					notary_id,
+					notebook_number,
+					tick,
+					"Notebook audit failed ({})",
 					error
 				);
 				Some(error)
@@ -1570,7 +1612,7 @@ mod test {
 				.collect::<Vec<_>>(),
 			vec![(1, false), (2, false), (3, false)]
 		);
-		let next = notary_client.get_next(1).await;
+		let next = notary_client.get_next(1, 0).await;
 		assert!(next.is_none());
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&1).unwrap().len(), 3);
 
@@ -1612,7 +1654,7 @@ mod test {
 				.collect::<Vec<_>>(),
 			vec![(1, true), (2, true), (3, false)]
 		);
-		let next = notary_client.get_next(1).await;
+		let next = notary_client.get_next(1, 0).await;
 		assert!(next.is_some());
 	}
 
@@ -1693,7 +1735,8 @@ mod test {
 
 		// still missing number 9
 		assert!(matches!(result, Error::MissingNotebooksError(_)),);
-		assert!(result.to_string().contains("[9]"));
+		println!("result: {}", result);
+		assert!(result.to_string().contains("#9..9"));
 
 		for _ in 0..9 {
 			notary_client.process_queues().await.expect("Could not process queues");
@@ -1708,17 +1751,7 @@ mod test {
 				.iter()
 				.map(|(n, a, _)| { (*n, a.is_some()) })
 				.collect::<Vec<_>>(),
-			vec![
-				(1, false),
-				(2, false),
-				(3, false),
-				(4, false),
-				(5, false),
-				(6, false),
-				(7, false),
-				(8, false),
-				(9, false)
-			]
+			vec![(9, false)]
 		);
 		for _ in 0..10 {
 			test_notary.create_notebook_header(vec![]).await;
@@ -1874,7 +1907,7 @@ mod test {
 			.process_notebook(
 				1,
 				3,
-				&H256::from_slice(&[1; 32]),
+				2,
 				&H256::from_slice(&[4; 32]),
 				SignedHeaderBytes(vec![]),
 				Instant::now(),

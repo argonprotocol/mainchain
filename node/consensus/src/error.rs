@@ -31,6 +31,9 @@ pub enum Error {
 
 	#[error("Missing block seal digest")]
 	MissingBlockSealDigest,
+	#[error("Unable to decode digest {0}")]
+	UnableToDecodeDigest(String),
+
 	#[error("Invalid vote seal signature")]
 	InvalidVoteSealSignature,
 

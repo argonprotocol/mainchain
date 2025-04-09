@@ -216,7 +216,7 @@ impl NotarizationBuilder {
 
       for note in change.notes {
         match note.note_type {
-          NoteType::Claim { .. } | NoteType::ChannelHoldClaim => balance -= note.microgons as i128,
+          NoteType::Claim | NoteType::ChannelHoldClaim => balance -= note.microgons as i128,
           NoteType::Send { .. } | NoteType::ChannelHoldSettle => balance += note.microgons as i128,
           _ => {}
         };
@@ -723,7 +723,7 @@ impl NotarizationBuilder {
     {
       for (key, balance_change_tx) in &*(self.balance_changes_by_account.read().await) {
         let balance_change = balance_change_tx.inner().await;
-        if balance_change.notes.len() == 0 {
+        if balance_change.notes.is_empty() {
           to_delete.push(*key);
           accounts_to_delete.push((
             balance_change_tx.address.clone(),

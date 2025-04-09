@@ -1,6 +1,6 @@
-use crate as pallet_mining_bonds;
+use crate as pallet_liquidity_pools;
 use argon_primitives::{
-	block_seal::CohortId, tick::Tick, vault::MiningBondFundVaultProvider, VaultId,
+	block_seal::CohortId, tick::Tick, vault::LiquidityPoolVaultProvider, VaultId,
 };
 use env_logger::{Builder, Env};
 use frame_support::{
@@ -17,7 +17,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		MiningBondFunds: pallet_mining_bonds,
+		LiquidityPools: pallet_liquidity_pools,
 		Balances: pallet_balances,
 	}
 );
@@ -66,7 +66,7 @@ parameter_types! {
 
 	pub static LastBidPoolDistribution: (CohortId, Tick) = (0, 0);
 
-	pub static MaxBondFundContributors: u32 = 10;
+	pub static MaxLiquidityPoolContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxBidPoolVaultParticipants: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
@@ -80,7 +80,7 @@ parameter_types! {
 #[derive(Clone)]
 pub struct TestVault {
 	pub activated: Balance,
-	pub mining_bond_take: Permill,
+	pub sharing_percent: Permill,
 	pub account_id: u64,
 	pub is_closed: bool,
 }
@@ -91,8 +91,8 @@ pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	});
 }
 
-pub struct StaticBondFundVaultProvider;
-impl MiningBondFundVaultProvider for StaticBondFundVaultProvider {
+pub struct StaticLiquidityPoolVaultProvider;
+impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
@@ -100,23 +100,27 @@ impl MiningBondFundVaultProvider for StaticBondFundVaultProvider {
 		VaultsById::get().get(&vault_id).map(|a| a.activated).unwrap_or_default()
 	}
 
-	fn get_vault_payment_info(vault_id: VaultId) -> Option<(Self::AccountId, Permill)> {
-		VaultsById::get().get(&vault_id).map(|a| (a.account_id, a.mining_bond_take))
+	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
+		VaultsById::get().get(&vault_id).map(|a| a.sharing_percent)
 	}
 
-	fn is_vault_accepting_mining_bonds(vault_id: VaultId) -> bool {
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+		VaultsById::get().get(&vault_id).map(|a| a.account_id)
+	}
+
+	fn is_vault_open(vault_id: VaultId) -> bool {
 		VaultsById::get().get(&vault_id).map(|a| !a.is_closed).unwrap_or_default()
 	}
 }
 
-impl pallet_mining_bonds::Config for Test {
+impl pallet_liquidity_pools::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MiningBondFundVaultProvider = StaticBondFundVaultProvider;
-	type MaxBondFundContributors = MaxBondFundContributors;
+	type LiquidityPoolVaultProvider = StaticLiquidityPoolVaultProvider;
+	type MaxLiquidityPoolContributors = MaxLiquidityPoolContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;

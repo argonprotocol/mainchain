@@ -19,18 +19,19 @@ pub trait MiningBidPoolProvider {
 	fn get_bid_pool_account() -> Self::AccountId;
 }
 
-pub trait MiningBondFundVaultProvider {
+pub trait LiquidityPoolVaultProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
 	/// Get the total amount of securitization activated for the vault
 	fn get_activated_securitization(vault_id: VaultId) -> Self::Balance;
 
-	/// Gets the account id of the vault and the vault share of mining bonds
-	fn get_vault_payment_info(vault_id: VaultId) -> Option<(Self::AccountId, Permill)>;
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
+	/// Gets the percent of profit sharing
+	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill>;
 
-	/// Ensure a vault is accepting mining bonds
-	fn is_vault_accepting_mining_bonds(vault_id: VaultId) -> bool;
+	/// Ensure a vault is open
+	fn is_vault_open(vault_id: VaultId) -> bool;
 }
 
 #[derive(RuntimeDebug, Clone, PartialEq, Eq)]
@@ -171,7 +172,7 @@ pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + Partia
 	pub bitcoin_base_fee: Balance,
 	/// The percent of mining bonds taken by the vault
 	#[codec(compact)]
-	pub mining_bond_percent_take: Permill,
+	pub liquidity_pool_profit_sharing: Permill,
 }
 
 impl<

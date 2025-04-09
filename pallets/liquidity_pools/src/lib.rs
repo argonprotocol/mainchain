@@ -16,25 +16,51 @@ pub mod migrations;
 pub mod weights;
 pub use pallet::*;
 
-/// This pallet allows users to contribute to a mining bond fund. Mining bond funds are the only way
-/// to collect the bid pools accumulated from the mining slot auctions. Bonds are created at a level
-/// that cannot exceed the activated securitization of each vault.
+/// This pallet allows users to bond argons to a Vault's Liquidity Pool. Liquidity pools serve as
+/// instant liquidity for LockedBitcoins. "Bonding argons" to a liquidity pool means that the argons
+/// will be inserted into the Liquidity Pool for a slot and will continue to roll-over to follow-on
+/// cohorts until they are unbonded. Any profits are automatically bonded and combined with existing
+/// funds.
 ///
-/// Each day, capital for tomorrow's mining bond fund is allocated. The prorata for the bid pool,
-/// and within each mining bond fund is locked in at the beginning of the slot, and then distributed
-/// once that cohort is activated.
 ///
-/// The only limitations to bond funds are:
-/// - The maximum number of contributors to a fund (`MaxBondFundContributors`)
-/// - The minimum amount of argons per contributor (`MinimumArgonsPerContributor`)
-/// - The amount of prorata share each vault can have of the overall bid pool
+/// TODO: ## Bitcoin Minting
+/// The system will only mint argons for BitcoinLocks when the CPI is negative. Liquidity pools
+/// allow Bitcoins to still be granted liquidity by adding the following funds to the pool:
+/// 1. The mint rights garnered over the current day (slot period)
+/// 2. 80% of the mining bid pool for the next slot cohort (20% is burned)
+/// 3. The liquidity pool for each vault
+///
+/// Funds are then distributed in this order:
+/// 1. Bitcoins locked in this slot
+/// 2. Liquidity pool contributors based on pro-rata
+///
+/// Liquidity pool imbalances are added to the front of the "Mint" queue. Before minting occurs
+/// for bitcoins in the list, any pending Liquidity Pools are paid out (oldest first). Within the
+/// pool, contributors are paid out at a floored pro-rata. Excess is burned.
+///
+/// Bitcoins with remaining mint-able argons are added to the end of the mint-queue. Only bitcoins
+/// locked the same day as a slot are eligible for instant-liquidity.
+///
+/// ## Liquidity Pool Allocation
+/// Each slot's liquidity pool can bond argons up to 1/10th of a vault's `activated securitization`.
+/// `Activated securitization` is 2x the amount of LockedBitcoins.
+///
+/// ## Profits from Bid Pool
+/// Once each bid pool is closed, 20% of the pool is burned. Then the remaining funds are
+/// distributed pro-rata to each vault's slot liquidity pool. Vault's automatically disperse funds
+/// to contributors based on the vault's sharing percent, and each individual contributor's
+/// pro-rata.
+///
+/// The limitations to bonding argons are:
+/// - The maximum number of contributors to a fund (`MaxLiquidityPoolContributors`)
+/// - The minimum amount of bonded argons per contributor (`MinimumArgonsPerContributor`)
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
 	use alloc::{collections::BTreeMap, vec};
 	use argon_primitives::{
 		block_seal::CohortId,
-		vault::{MiningBidPoolProvider, MiningBondFundVaultProvider},
+		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
 		BlockSealAuthorityId, OnNewSlot, VaultId,
 	};
 	use frame_support::{
@@ -88,14 +114,14 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type MiningBondFundVaultProvider: MiningBondFundVaultProvider<
+		type LiquidityPoolVaultProvider: LiquidityPoolVaultProvider<
 			Balance = Self::Balance,
 			AccountId = Self::AccountId,
 		>;
 
 		/// The maximum number of contributors to a bond fund
 		#[pallet::constant]
-		type MaxBondFundContributors: Get<u32>;
+		type MaxLiquidityPoolContributors: Get<u32>;
 		/// The minimum argons per fund contributor
 		#[pallet::constant]
 		type MinimumArgonsPerContributor: Get<Self::Balance>;
@@ -118,34 +144,34 @@ pub mod pallet {
 	/// A reason for the pallet placing a hold on funds.
 	#[pallet::composite_enum]
 	pub enum HoldReason {
-		ContributedToBondFund,
+		ContributedToLiquidityPool,
 	}
 
 	/// The currently earning contributors for the current epoch's bond funds. Sorted by highest
 	/// bids first
 	#[pallet::storage]
-	pub(super) type MiningBondFundsByCohort<T: Config> = StorageMap<
+	pub(super) type LiquidityPoolsByCohort<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		CohortId,
-		BoundedBTreeMap<VaultId, MiningBondFund<T>, T::MaxBidPoolVaultParticipants>,
+		BoundedBTreeMap<VaultId, LiquidityPool<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
 	>;
 
-	/// The entrants in the mining bond pool that will be paid out for the active bid pool. They
-	/// apply to the next closed mining slot cohort bid pool. Sorted with biggest share last.
+	/// The entrants in the liquidity pool for the mining slot cohort being bid on. Sorted with
+	/// biggest share last.
 	#[pallet::storage]
-	pub(super) type OpenVaultBidPoolCapital<T: Config> = StorageValue<
+	pub(super) type OpenLiquidityPoolCapital<T: Config> = StorageValue<
 		_,
-		BoundedVec<VaultBidPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
+		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
 	>;
 
-	/// The bid pool capital for the next bid pool.
+	/// The liquidity pool capital for the next mining slot cohort.
 	#[pallet::storage]
-	pub(super) type NextVaultBidPoolCapital<T: Config> = StorageValue<
+	pub(super) type NextLiquidityPoolCapital<T: Config> = StorageValue<
 		_,
-		BoundedVec<VaultBidPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
+		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
 	>;
 
@@ -181,7 +207,7 @@ pub mod pallet {
 			participating_vaults: u32,
 		},
 		/// An error occurred releasing a contributor hold
-		ErrorRefundingBondFundCapital {
+		ErrorRefundingLiquidityPoolCapital {
 			cohort_id: CohortId,
 			vault_id: VaultId,
 			amount: T::Balance,
@@ -190,7 +216,7 @@ pub mod pallet {
 		},
 		/// Some mining bond capital was refunded due to less activated vault funds than bond
 		/// capital
-		RefundedBondFundCapital {
+		RefundedLiquidityPoolCapital {
 			cohort_id: CohortId,
 			vault_id: VaultId,
 			amount: T::Balance,
@@ -211,7 +237,7 @@ pub mod pallet {
 		/// An internal error occurred (like an overflow)
 		InternalError,
 		/// Unable to update the vault fund
-		CouldNotFindBondFund,
+		CouldNotFindLiquidityPool,
 		/// Max contributors for a fund exceeded
 		MaxContributorsExceeded,
 		/// The added amount would exceed the activated securitization
@@ -236,11 +262,12 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount
-		/// raised per vault cannot exceed the allocated securitization for the vault.
+		/// Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,
+		/// tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the
+		/// activated securitization for the vault.
 		///
-		/// The funds and profits will be automatically rolled over to the next fund up to the max
-		/// securitization activated.
+		/// The bonded argons and profits will be automatically rolled over to the next fund up to
+		/// the max securitization activated.
 		///
 		/// - `origin`: The account that is joining the fund
 		/// - `vault_id`: The vault id that the account would like to join a fund for
@@ -248,7 +275,7 @@ pub mod pallet {
 		///   it will just add the incremental amount
 		#[pallet::call_index(0)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
-		pub fn add_capital(
+		pub fn bond_argons(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			amount: T::Balance,
@@ -256,16 +283,16 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let mut hold_amount = amount;
 			ensure!(
-				T::MiningBondFundVaultProvider::is_vault_accepting_mining_bonds(vault_id),
+				T::LiquidityPoolVaultProvider::is_vault_open(vault_id),
 				Error::<T>::VaultNotAcceptingMiningBonds
 			);
 			ensure!(amount >= T::MinimumArgonsPerContributor::get(), Error::<T>::BelowMinimum);
 
 			let next_cohort = T::NextCohortId::get() + 1;
-			MiningBondFundsByCohort::<T>::try_mutate(next_cohort, |a| -> DispatchResult {
+			LiquidityPoolsByCohort::<T>::try_mutate(next_cohort, |a| -> DispatchResult {
 				let activated_securitization = Self::get_vault_activated_funds_per_slot(vault_id);
 
-				NextVaultBidPoolCapital::<T>::try_mutate(|list| {
+				NextLiquidityPoolCapital::<T>::try_mutate(|list| {
 					if let Some(entry) = list.iter_mut().find(|x| x.vault_id == vault_id) {
 						ensure!(
 							entry.activated_capital.saturating_add(amount) <=
@@ -278,7 +305,7 @@ pub mod pallet {
 							amount <= activated_securitization,
 							Error::<T>::ActivatedSecuritizationExceeded
 						);
-						let entry = VaultBidPoolCapital {
+						let entry = LiquidityPoolCapital {
 							vault_id,
 							activated_capital: amount,
 							cohort_id: next_cohort,
@@ -291,14 +318,14 @@ pub mod pallet {
 
 				let mut mining_fund = a.remove(&vault_id);
 				if mining_fund.is_none() {
-					let mut fund = MiningBondFund::default();
-					let (_, vault_take) =
-						T::MiningBondFundVaultProvider::get_vault_payment_info(vault_id)
-							.ok_or(Error::<T>::CouldNotFindBondFund)?;
-					fund.vault_percent_take = vault_take;
+					let mut fund = LiquidityPool::default();
+					let sharing_percent =
+						T::LiquidityPoolVaultProvider::get_vault_profit_sharing_percent(vault_id)
+							.ok_or(Error::<T>::CouldNotFindLiquidityPool)?;
+					fund.vault_sharing_percent = sharing_percent;
 					mining_fund = Some(fund);
 				}
-				let mut mining_fund = mining_fund.ok_or(Error::<T>::CouldNotFindBondFund)?;
+				let mut mining_fund = mining_fund.ok_or(Error::<T>::CouldNotFindLiquidityPool)?;
 
 				let existing_pos =
 					mining_fund.contributor_balances.iter().position(|(a, _)| *a == who);
@@ -337,18 +364,18 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Allows a user to remove their contribution from the fund after the hold is released
+		/// Allows a user to remove their bonded argons from the fund after the hold is released
 		/// (once cohort slot period is complete).
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
-		pub fn end_renewal(
+		pub fn unbond_argons(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			cohort_id: CohortId,
 		) -> DispatchResult {
 			let account = ensure_signed(origin)?;
-			MiningBondFundsByCohort::<T>::try_mutate(cohort_id, |a| -> DispatchResult {
-				let fund = a.get_mut(&vault_id).ok_or(Error::<T>::CouldNotFindBondFund)?;
+			LiquidityPoolsByCohort::<T>::try_mutate(cohort_id, |a| -> DispatchResult {
+				let fund = a.get_mut(&vault_id).ok_or(Error::<T>::CouldNotFindLiquidityPool)?;
 
 				ensure!(
 					fund.contributor_balances.iter().any(|(a, _)| *a == account),
@@ -370,7 +397,7 @@ pub mod pallet {
 			if amount == Zero::zero() {
 				return Ok(());
 			}
-			let hold_reason = HoldReason::ContributedToBondFund;
+			let hold_reason = HoldReason::ContributedToLiquidityPool;
 			if T::Currency::balance_on_hold(&hold_reason.into(), account_id).is_zero() {
 				frame_system::Pallet::<T>::inc_providers(account_id);
 			}
@@ -383,7 +410,7 @@ pub mod pallet {
 			if amount == T::Balance::zero() {
 				return Ok(());
 			}
-			let reason = HoldReason::ContributedToBondFund;
+			let reason = HoldReason::ContributedToLiquidityPool;
 
 			T::Currency::release(&reason.into(), who, amount, Precision::Exact)?;
 
@@ -414,20 +441,20 @@ pub mod pallet {
 
 			total_bid_pool_amount.saturating_reduce(burn_amount);
 			let mut remaining_bid_pool = total_bid_pool_amount;
-			let bid_pool_capital = OpenVaultBidPoolCapital::<T>::take();
+			let bid_pool_capital = OpenLiquidityPoolCapital::<T>::take();
 			let bid_pool_entrants = bid_pool_capital.len();
 			let total_bid_pool_capital = bid_pool_capital
 				.iter()
 				.fold(T::Balance::zero(), |acc, x| acc.saturating_add(x.activated_capital));
 
-			let mut cohort_mining_bonds = MiningBondFundsByCohort::<T>::get(cohort_id);
+			let mut liquidity_pools_by_vault = LiquidityPoolsByCohort::<T>::get(cohort_id);
 
 			for (i, entrant) in bid_pool_capital.iter().rev().enumerate() {
-				let Some(vault_fund) = cohort_mining_bonds.get_mut(&entrant.vault_id) else {
+				let Some(vault_fund) = liquidity_pools_by_vault.get_mut(&entrant.vault_id) else {
 					continue;
 				};
-				let Some((vault_account_id, _)) =
-					T::MiningBondFundVaultProvider::get_vault_payment_info(entrant.vault_id)
+				let Some(vault_account_id) =
+					T::LiquidityPoolVaultProvider::get_vault_operator(entrant.vault_id)
 				else {
 					continue;
 				};
@@ -439,9 +466,11 @@ pub mod pallet {
 					bond_fund_share.saturating_accrue(remaining_bid_pool);
 					remaining_bid_pool = T::Balance::zero();
 				}
-				vault_fund.distributed_earnings = Some(bond_fund_share);
+				vault_fund.distributed_profits = Some(bond_fund_share);
 
-				let vault_share = vault_fund.vault_percent_take.mul_floor(bond_fund_share);
+				let vault_share = Permill::one()
+					.saturating_sub(vault_fund.vault_sharing_percent)
+					.mul_floor(bond_fund_share);
 
 				// pay vault
 				{
@@ -487,7 +516,7 @@ pub mod pallet {
 						continue;
 					}
 					if let Err(e) = T::Currency::transfer_and_hold(
-						&HoldReason::ContributedToBondFund.into(),
+						&HoldReason::ContributedToLiquidityPool.into(),
 						&bid_pool_account,
 						&account,
 						amount,
@@ -506,7 +535,7 @@ pub mod pallet {
 					}
 				}
 			}
-			MiningBondFundsByCohort::<T>::insert(cohort_id, cohort_mining_bonds);
+			LiquidityPoolsByCohort::<T>::insert(cohort_id, liquidity_pools_by_vault);
 
 			Self::deposit_event(Event::<T>::BidPoolDistributed {
 				cohort_id,
@@ -517,8 +546,8 @@ pub mod pallet {
 		}
 
 		pub(crate) fn lock_next_bid_pool_capital(cohort_id: CohortId) {
-			let mut next_bid_pool_capital = NextVaultBidPoolCapital::<T>::take();
-			let mut cohort_funds = MiningBondFundsByCohort::<T>::get(cohort_id);
+			let mut next_bid_pool_capital = NextLiquidityPoolCapital::<T>::take();
+			let mut cohort_funds = LiquidityPoolsByCohort::<T>::get(cohort_id);
 
 			for bid_pool_capital in next_bid_pool_capital.iter_mut() {
 				let vault_id = bid_pool_capital.vault_id;
@@ -559,8 +588,8 @@ pub mod pallet {
 				total_activated_capital,
 				participating_vaults,
 			});
-			OpenVaultBidPoolCapital::<T>::set(next_bid_pool_capital);
-			MiningBondFundsByCohort::<T>::insert(cohort_id, cohort_funds);
+			OpenLiquidityPoolCapital::<T>::set(next_bid_pool_capital);
+			LiquidityPoolsByCohort::<T>::insert(cohort_id, cohort_funds);
 		}
 
 		/// Release the held fund for all vaults and move the active fund contributors to the held
@@ -569,16 +598,17 @@ pub mod pallet {
 			if next_cohort_id < 10 {
 				return;
 			}
-			MiningBondFundsByCohort::<T>::mutate(next_cohort_id, |next| {
-				MiningBondFundsByCohort::<T>::mutate(next_cohort_id - 10, |tree| {
+			LiquidityPoolsByCohort::<T>::mutate(next_cohort_id, |next| {
+				LiquidityPoolsByCohort::<T>::mutate(next_cohort_id - 10, |tree| {
 					let mut entrants = BoundedVec::new();
 					for (vault_id, fund) in tree {
 						let vault_id = *vault_id;
 						let mut total = T::Balance::zero();
-						let vault_take =
-							T::MiningBondFundVaultProvider::get_vault_payment_info(vault_id)
-								.map(|(_, t)| t)
-								.unwrap_or(Permill::from_percent(100));
+						let vault_sharing =
+							T::LiquidityPoolVaultProvider::get_vault_profit_sharing_percent(
+								vault_id,
+							)
+							.unwrap_or_default();
 
 						let mut participants = vec![];
 						for (account, amount) in &fund.contributor_balances {
@@ -589,7 +619,7 @@ pub mod pallet {
 								fund.do_not_renew.try_push(account.clone()).ok();
 								continue;
 							}
-							if vault_take > fund.vault_percent_take {
+							if vault_sharing < fund.vault_sharing_percent {
 								fund.do_not_renew.try_push(account.clone()).ok();
 								continue;
 							}
@@ -598,14 +628,16 @@ pub mod pallet {
 						}
 						fund.is_rolled_over = true;
 						if !participants.is_empty() {
-							let mut new_fund = MiningBondFund::default();
-							new_fund.vault_percent_take = vault_take;
-							new_fund.contributor_balances = BoundedVec::truncate_from(participants);
+							let new_fund = LiquidityPool {
+								contributor_balances: BoundedVec::truncate_from(participants),
+								vault_sharing_percent: vault_sharing,
+								..Default::default()
+							};
 							next.try_insert(vault_id, new_fund).ok();
 						}
 						if total > T::Balance::zero() {
 							entrants
-								.try_push(VaultBidPoolCapital {
+								.try_push(LiquidityPoolCapital {
 									vault_id,
 									activated_capital: total,
 									cohort_id: next_cohort_id,
@@ -613,7 +645,7 @@ pub mod pallet {
 								.ok();
 						}
 					}
-					NextVaultBidPoolCapital::<T>::set(entrants);
+					NextLiquidityPoolCapital::<T>::set(entrants);
 				});
 			});
 		}
@@ -623,7 +655,7 @@ pub mod pallet {
 				return;
 			}
 			let release_cohort_id = activated_cohort_id - 10;
-			for (vault_id, fund) in MiningBondFundsByCohort::<T>::take(release_cohort_id) {
+			for (vault_id, fund) in LiquidityPoolsByCohort::<T>::take(release_cohort_id) {
 				for (account, amount) in fund.contributor_balances {
 					if fund.do_not_renew.contains(&account) {
 						Self::refund_fund_capital(release_cohort_id, vault_id, &account, amount);
@@ -646,7 +678,7 @@ pub mod pallet {
 					"Error releasing vault hold for fund. {:?}",
 					e
 				);
-				Self::deposit_event(Event::<T>::ErrorRefundingBondFundCapital {
+				Self::deposit_event(Event::<T>::ErrorRefundingLiquidityPoolCapital {
 					cohort_id,
 					vault_id,
 					amount: refund_amount,
@@ -654,7 +686,7 @@ pub mod pallet {
 					dispatch_error: e,
 				})
 			} else {
-				Self::deposit_event(Event::<T>::RefundedBondFundCapital {
+				Self::deposit_event(Event::<T>::RefundedLiquidityPoolCapital {
 					cohort_id,
 					vault_id,
 					amount: refund_amount,
@@ -665,7 +697,7 @@ pub mod pallet {
 
 		fn get_vault_activated_funds_per_slot(vault_id: VaultId) -> T::Balance {
 			let activated_securitization =
-				T::MiningBondFundVaultProvider::get_activated_securitization(vault_id);
+				T::LiquidityPoolVaultProvider::get_activated_securitization(vault_id);
 			activated_securitization / 10u128.into()
 		}
 	}
@@ -681,7 +713,7 @@ pub mod pallet {
 
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound, TypeInfo)]
 	#[scale_info(skip_type_params(T))]
-	pub struct VaultBidPoolCapital<T: Config> {
+	pub struct LiquidityPoolCapital<T: Config> {
 		#[codec(compact)]
 		pub vault_id: VaultId,
 		#[codec(compact)]
@@ -694,23 +726,23 @@ pub mod pallet {
 		Encode, Decode, Clone, PartialEqNoBound, Eq, RuntimeDebugNoBound, TypeInfo, DefaultNoBound,
 	)]
 	#[scale_info(skip_type_params(T))]
-	pub struct MiningBondFund<T: Config> {
+	pub struct LiquidityPool<T: Config> {
 		/// The amount of argons per account. Sorted with largest first. After bid pool is
-		/// distributed, earnings are added to this balance
+		/// distributed, profits are added to this balance
 		pub contributor_balances:
-			BoundedVec<(T::AccountId, T::Balance), T::MaxBondFundContributors>,
+			BoundedVec<(T::AccountId, T::Balance), T::MaxLiquidityPoolContributors>,
 
 		/// Accounts not wishing to be re-upped
-		pub do_not_renew: BoundedVec<T::AccountId, T::MaxBondFundContributors>,
+		pub do_not_renew: BoundedVec<T::AccountId, T::MaxLiquidityPoolContributors>,
 
 		/// Did this fund already roll over?
 		pub is_rolled_over: bool,
 
 		/// The amount of argons that have been distributed to the fund (vault + contributors)
-		pub distributed_earnings: Option<T::Balance>,
+		pub distributed_profits: Option<T::Balance>,
 
-		/// The vault percent take
+		/// The vault percent of profits shared
 		#[codec(compact)]
-		pub vault_percent_take: Permill,
+		pub vault_sharing_percent: Permill,
 	}
 }

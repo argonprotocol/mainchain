@@ -38,7 +38,7 @@ pub mod api {
 		"IsmpGrandpa",
 		"Hyperbridge",
 		"TokenGateway",
-		"MiningBonds",
+		"LiquidityPools",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -1161,10 +1161,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							253u8, 125u8, 115u8, 38u8, 112u8, 54u8, 252u8, 149u8, 91u8, 114u8,
-							85u8, 119u8, 203u8, 190u8, 88u8, 255u8, 172u8, 201u8, 186u8, 90u8,
-							175u8, 107u8, 102u8, 247u8, 133u8, 239u8, 205u8, 87u8, 41u8, 239u8,
-							246u8, 188u8,
+							85u8, 145u8, 30u8, 117u8, 246u8, 1u8, 231u8, 165u8, 26u8, 40u8, 220u8,
+							255u8, 33u8, 157u8, 50u8, 144u8, 155u8, 74u8, 152u8, 126u8, 171u8,
+							156u8, 91u8, 227u8, 138u8, 53u8, 59u8, 50u8, 219u8, 12u8, 224u8, 75u8,
 						],
 					)
 				}
@@ -1182,10 +1181,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							185u8, 245u8, 116u8, 108u8, 244u8, 79u8, 153u8, 111u8, 225u8, 120u8,
-							231u8, 179u8, 48u8, 92u8, 186u8, 198u8, 195u8, 222u8, 249u8, 78u8,
-							19u8, 167u8, 108u8, 18u8, 13u8, 245u8, 120u8, 243u8, 151u8, 102u8,
-							64u8, 169u8,
+							94u8, 248u8, 102u8, 71u8, 50u8, 205u8, 37u8, 17u8, 32u8, 127u8, 173u8,
+							47u8, 166u8, 30u8, 7u8, 11u8, 86u8, 3u8, 64u8, 129u8, 187u8, 186u8,
+							67u8, 189u8, 170u8, 197u8, 15u8, 178u8, 95u8, 170u8, 54u8, 236u8,
 						],
 					)
 				}
@@ -3672,8 +3670,8 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::constants::ConstantsApi {
 			token_gateway::constants::ConstantsApi
 		}
-		pub fn mining_bonds(&self) -> mining_bonds::constants::ConstantsApi {
-			mining_bonds::constants::ConstantsApi
+		pub fn liquidity_pools(&self) -> liquidity_pools::constants::ConstantsApi {
+			liquidity_pools::constants::ConstantsApi
 		}
 	}
 	pub struct StorageApi;
@@ -3768,8 +3766,8 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::storage::StorageApi {
 			token_gateway::storage::StorageApi
 		}
-		pub fn mining_bonds(&self) -> mining_bonds::storage::StorageApi {
-			mining_bonds::storage::StorageApi
+		pub fn liquidity_pools(&self) -> liquidity_pools::storage::StorageApi {
+			liquidity_pools::storage::StorageApi
 		}
 	}
 	pub struct TransactionApi;
@@ -3855,8 +3853,8 @@ pub mod api {
 		pub fn token_gateway(&self) -> token_gateway::calls::TransactionApi {
 			token_gateway::calls::TransactionApi
 		}
-		pub fn mining_bonds(&self) -> mining_bonds::calls::TransactionApi {
-			mining_bonds::calls::TransactionApi
+		pub fn liquidity_pools(&self) -> liquidity_pools::calls::TransactionApi {
+			liquidity_pools::calls::TransactionApi
 		}
 	}
 	#[doc = r" check whether the metadata provided is aligned with this statically generated code."]
@@ -3868,9 +3866,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				120u8, 127u8, 130u8, 185u8, 18u8, 56u8, 100u8, 179u8, 205u8, 53u8, 146u8, 212u8,
-				249u8, 19u8, 30u8, 181u8, 53u8, 142u8, 113u8, 88u8, 45u8, 108u8, 201u8, 70u8, 70u8,
-				239u8, 170u8, 58u8, 57u8, 81u8, 16u8, 107u8,
+				224u8, 175u8, 227u8, 254u8, 223u8, 124u8, 255u8, 180u8, 235u8, 93u8, 63u8, 159u8,
+				139u8, 88u8, 154u8, 200u8, 232u8, 2u8, 110u8, 205u8, 65u8, 65u8, 103u8, 34u8,
+				226u8, 109u8, 99u8, 238u8, 194u8, 162u8, 167u8, 229u8,
 			]
 	}
 	pub mod system {
@@ -5021,9 +5019,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							121u8, 32u8, 196u8, 196u8, 191u8, 253u8, 70u8, 102u8, 151u8, 231u8,
-							30u8, 38u8, 79u8, 232u8, 250u8, 169u8, 10u8, 111u8, 41u8, 116u8, 209u8,
-							70u8, 6u8, 96u8, 54u8, 136u8, 39u8, 216u8, 250u8, 237u8, 132u8, 35u8,
+							98u8, 66u8, 249u8, 244u8, 47u8, 148u8, 248u8, 102u8, 30u8, 72u8, 184u8,
+							187u8, 144u8, 26u8, 42u8, 232u8, 32u8, 110u8, 216u8, 205u8, 223u8,
+							104u8, 174u8, 14u8, 184u8, 243u8, 122u8, 14u8, 46u8, 119u8, 200u8,
+							231u8,
 						],
 					)
 				}
@@ -5845,10 +5844,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							218u8, 44u8, 84u8, 243u8, 33u8, 216u8, 107u8, 118u8, 131u8, 69u8,
-							204u8, 229u8, 26u8, 136u8, 64u8, 224u8, 127u8, 148u8, 45u8, 197u8,
-							117u8, 158u8, 73u8, 112u8, 83u8, 216u8, 109u8, 214u8, 74u8, 145u8,
-							31u8, 34u8,
+							223u8, 47u8, 43u8, 36u8, 142u8, 181u8, 64u8, 17u8, 42u8, 60u8, 213u8,
+							141u8, 7u8, 7u8, 76u8, 225u8, 19u8, 147u8, 96u8, 142u8, 6u8, 220u8,
+							124u8, 95u8, 210u8, 88u8, 76u8, 130u8, 141u8, 177u8, 205u8, 54u8,
 						],
 					)
 				}
@@ -5910,9 +5908,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							39u8, 133u8, 249u8, 94u8, 17u8, 90u8, 200u8, 102u8, 34u8, 39u8, 64u8,
-							158u8, 87u8, 205u8, 150u8, 94u8, 22u8, 172u8, 131u8, 255u8, 135u8,
-							231u8, 131u8, 155u8, 213u8, 3u8, 0u8, 236u8, 148u8, 158u8, 93u8, 89u8,
+							231u8, 224u8, 40u8, 224u8, 41u8, 241u8, 1u8, 192u8, 89u8, 85u8, 134u8,
+							25u8, 174u8, 94u8, 248u8, 87u8, 199u8, 122u8, 92u8, 243u8, 87u8, 20u8,
+							12u8, 0u8, 87u8, 234u8, 134u8, 92u8, 190u8, 74u8, 228u8, 241u8,
 						],
 					)
 				}
@@ -6775,9 +6773,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							231u8, 62u8, 205u8, 19u8, 247u8, 85u8, 104u8, 49u8, 90u8, 117u8, 6u8,
-							208u8, 47u8, 109u8, 131u8, 125u8, 2u8, 24u8, 169u8, 115u8, 92u8, 14u8,
-							151u8, 130u8, 80u8, 231u8, 101u8, 131u8, 23u8, 204u8, 172u8, 204u8,
+							169u8, 225u8, 230u8, 93u8, 245u8, 88u8, 81u8, 86u8, 155u8, 70u8, 76u8,
+							178u8, 219u8, 120u8, 115u8, 226u8, 116u8, 181u8, 171u8, 69u8, 117u8,
+							128u8, 142u8, 76u8, 31u8, 38u8, 85u8, 154u8, 133u8, 197u8, 19u8, 141u8,
 						],
 					)
 				}
@@ -7040,10 +7038,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							204u8, 252u8, 72u8, 151u8, 173u8, 84u8, 169u8, 95u8, 128u8, 26u8,
-							180u8, 225u8, 198u8, 146u8, 183u8, 154u8, 125u8, 170u8, 140u8, 232u8,
-							212u8, 233u8, 77u8, 13u8, 111u8, 35u8, 14u8, 146u8, 233u8, 88u8, 47u8,
-							83u8,
+							49u8, 65u8, 5u8, 168u8, 131u8, 12u8, 95u8, 93u8, 236u8, 152u8, 180u8,
+							235u8, 28u8, 88u8, 111u8, 64u8, 204u8, 141u8, 147u8, 253u8, 38u8,
+							114u8, 32u8, 50u8, 37u8, 103u8, 225u8, 144u8, 212u8, 184u8, 155u8,
+							125u8,
 						],
 					)
 				}
@@ -9490,10 +9488,9 @@ pub mod api {
 						"create",
 						types::Create { vault_config },
 						[
-							207u8, 13u8, 69u8, 87u8, 24u8, 165u8, 108u8, 218u8, 192u8, 248u8,
-							190u8, 120u8, 141u8, 0u8, 127u8, 41u8, 211u8, 178u8, 214u8, 179u8,
-							166u8, 112u8, 209u8, 233u8, 21u8, 58u8, 19u8, 255u8, 171u8, 117u8,
-							78u8, 241u8,
+							241u8, 45u8, 105u8, 234u8, 55u8, 154u8, 65u8, 21u8, 7u8, 252u8, 223u8,
+							14u8, 250u8, 44u8, 20u8, 221u8, 251u8, 94u8, 144u8, 93u8, 37u8, 189u8,
+							223u8, 43u8, 86u8, 169u8, 74u8, 106u8, 248u8, 132u8, 0u8, 160u8,
 						],
 					)
 				}
@@ -9535,9 +9532,10 @@ pub mod api {
 						"modify_terms",
 						types::ModifyTerms { vault_id, terms },
 						[
-							227u8, 86u8, 91u8, 176u8, 143u8, 88u8, 185u8, 122u8, 55u8, 247u8, 71u8,
-							246u8, 251u8, 166u8, 138u8, 96u8, 105u8, 134u8, 165u8, 51u8, 7u8, 67u8,
-							206u8, 102u8, 38u8, 78u8, 186u8, 142u8, 189u8, 109u8, 250u8, 114u8,
+							41u8, 191u8, 228u8, 92u8, 217u8, 65u8, 229u8, 152u8, 239u8, 160u8,
+							171u8, 221u8, 228u8, 12u8, 204u8, 146u8, 116u8, 253u8, 46u8, 122u8,
+							197u8, 38u8, 233u8, 224u8, 128u8, 162u8, 92u8, 56u8, 82u8, 110u8, 38u8,
+							158u8,
 						],
 					)
 				}
@@ -10004,10 +10002,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							169u8, 150u8, 76u8, 191u8, 202u8, 47u8, 141u8, 146u8, 52u8, 253u8,
-							121u8, 170u8, 173u8, 19u8, 103u8, 33u8, 66u8, 177u8, 36u8, 195u8, 78u8,
-							20u8, 229u8, 152u8, 66u8, 132u8, 84u8, 118u8, 255u8, 161u8, 226u8,
-							64u8,
+							212u8, 4u8, 12u8, 107u8, 193u8, 66u8, 80u8, 160u8, 170u8, 122u8, 13u8,
+							134u8, 217u8, 133u8, 226u8, 49u8, 117u8, 162u8, 113u8, 241u8, 196u8,
+							65u8, 97u8, 188u8, 228u8, 23u8, 213u8, 186u8, 254u8, 128u8, 97u8, 20u8,
 						],
 					)
 				}
@@ -10031,10 +10028,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							169u8, 150u8, 76u8, 191u8, 202u8, 47u8, 141u8, 146u8, 52u8, 253u8,
-							121u8, 170u8, 173u8, 19u8, 103u8, 33u8, 66u8, 177u8, 36u8, 195u8, 78u8,
-							20u8, 229u8, 152u8, 66u8, 132u8, 84u8, 118u8, 255u8, 161u8, 226u8,
-							64u8,
+							212u8, 4u8, 12u8, 107u8, 193u8, 66u8, 80u8, 160u8, 170u8, 122u8, 13u8,
+							134u8, 217u8, 133u8, 226u8, 49u8, 117u8, 162u8, 113u8, 241u8, 196u8,
+							65u8, 97u8, 188u8, 228u8, 23u8, 213u8, 186u8, 254u8, 128u8, 97u8, 20u8,
 						],
 					)
 				}
@@ -17177,9 +17173,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
-							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
-							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
+							26u8, 234u8, 84u8, 215u8, 13u8, 93u8, 172u8, 88u8, 17u8, 252u8, 224u8,
+							77u8, 6u8, 254u8, 93u8, 86u8, 21u8, 176u8, 35u8, 129u8, 126u8, 12u8,
+							77u8, 229u8, 180u8, 96u8, 190u8, 11u8, 175u8, 197u8, 179u8, 15u8,
 						],
 					)
 				}
@@ -17203,9 +17199,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
-							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
-							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
+							26u8, 234u8, 84u8, 215u8, 13u8, 93u8, 172u8, 88u8, 17u8, 252u8, 224u8,
+							77u8, 6u8, 254u8, 93u8, 86u8, 21u8, 176u8, 35u8, 129u8, 126u8, 12u8,
+							77u8, 229u8, 180u8, 96u8, 190u8, 11u8, 175u8, 197u8, 179u8, 15u8,
 						],
 					)
 				}
@@ -18783,9 +18779,9 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
-							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
-							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
+							26u8, 234u8, 84u8, 215u8, 13u8, 93u8, 172u8, 88u8, 17u8, 252u8, 224u8,
+							77u8, 6u8, 254u8, 93u8, 86u8, 21u8, 176u8, 35u8, 129u8, 126u8, 12u8,
+							77u8, 229u8, 180u8, 96u8, 190u8, 11u8, 175u8, 197u8, 179u8, 15u8,
 						],
 					)
 				}
@@ -18809,9 +18805,9 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							40u8, 29u8, 158u8, 130u8, 222u8, 219u8, 250u8, 106u8, 55u8, 69u8, 62u8,
-							105u8, 77u8, 5u8, 195u8, 7u8, 62u8, 212u8, 86u8, 194u8, 231u8, 159u8,
-							9u8, 227u8, 116u8, 188u8, 136u8, 204u8, 18u8, 43u8, 43u8, 149u8,
+							26u8, 234u8, 84u8, 215u8, 13u8, 93u8, 172u8, 88u8, 17u8, 252u8, 224u8,
+							77u8, 6u8, 254u8, 93u8, 86u8, 21u8, 176u8, 35u8, 129u8, 126u8, 12u8,
+							77u8, 229u8, 180u8, 96u8, 190u8, 11u8, 175u8, 197u8, 179u8, 15u8,
 						],
 					)
 				}
@@ -19693,9 +19689,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							203u8, 41u8, 6u8, 121u8, 222u8, 10u8, 157u8, 131u8, 160u8, 37u8, 69u8,
-							69u8, 7u8, 157u8, 12u8, 187u8, 167u8, 221u8, 213u8, 140u8, 186u8,
-							185u8, 15u8, 29u8, 82u8, 214u8, 1u8, 169u8, 108u8, 66u8, 37u8, 82u8,
+							248u8, 38u8, 242u8, 57u8, 145u8, 113u8, 106u8, 250u8, 131u8, 104u8,
+							145u8, 228u8, 6u8, 50u8, 89u8, 183u8, 138u8, 73u8, 17u8, 13u8, 139u8,
+							128u8, 42u8, 240u8, 194u8, 87u8, 43u8, 190u8, 72u8, 80u8, 91u8, 237u8,
 						],
 					)
 				}
@@ -19725,9 +19721,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							5u8, 138u8, 135u8, 57u8, 84u8, 224u8, 246u8, 89u8, 255u8, 207u8, 88u8,
-							194u8, 175u8, 49u8, 118u8, 123u8, 58u8, 9u8, 187u8, 102u8, 47u8, 117u8,
-							42u8, 187u8, 195u8, 60u8, 84u8, 23u8, 68u8, 187u8, 236u8, 217u8,
+							98u8, 223u8, 78u8, 138u8, 76u8, 118u8, 215u8, 252u8, 48u8, 45u8, 229u8,
+							193u8, 114u8, 242u8, 72u8, 171u8, 4u8, 213u8, 129u8, 1u8, 238u8, 138u8,
+							203u8, 121u8, 139u8, 2u8, 105u8, 100u8, 36u8, 238u8, 50u8, 151u8,
 						],
 					)
 				}
@@ -19753,9 +19749,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							125u8, 145u8, 6u8, 236u8, 34u8, 55u8, 64u8, 45u8, 169u8, 102u8, 102u8,
-							89u8, 253u8, 122u8, 223u8, 194u8, 14u8, 61u8, 8u8, 180u8, 255u8, 106u8,
-							151u8, 200u8, 191u8, 68u8, 154u8, 32u8, 9u8, 75u8, 62u8, 20u8,
+							50u8, 111u8, 50u8, 7u8, 86u8, 226u8, 206u8, 113u8, 85u8, 24u8, 68u8,
+							107u8, 103u8, 23u8, 162u8, 178u8, 66u8, 237u8, 75u8, 95u8, 55u8, 150u8,
+							49u8, 9u8, 167u8, 118u8, 15u8, 197u8, 229u8, 69u8, 227u8, 55u8,
 						],
 					)
 				}
@@ -19778,9 +19774,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							158u8, 1u8, 53u8, 156u8, 7u8, 104u8, 129u8, 100u8, 169u8, 214u8, 127u8,
-							44u8, 146u8, 158u8, 187u8, 134u8, 235u8, 141u8, 85u8, 164u8, 30u8,
-							162u8, 132u8, 139u8, 52u8, 98u8, 170u8, 153u8, 224u8, 85u8, 195u8, 8u8,
+							193u8, 67u8, 173u8, 190u8, 121u8, 23u8, 50u8, 15u8, 214u8, 176u8, 97u8,
+							138u8, 143u8, 90u8, 9u8, 9u8, 73u8, 92u8, 24u8, 192u8, 55u8, 162u8,
+							200u8, 124u8, 227u8, 3u8, 210u8, 242u8, 93u8, 199u8, 117u8, 155u8,
 						],
 					)
 				}
@@ -19806,10 +19802,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							102u8, 198u8, 188u8, 115u8, 140u8, 151u8, 38u8, 201u8, 93u8, 59u8,
-							147u8, 96u8, 113u8, 141u8, 40u8, 228u8, 108u8, 23u8, 251u8, 182u8,
-							63u8, 34u8, 174u8, 102u8, 151u8, 19u8, 151u8, 69u8, 46u8, 58u8, 14u8,
-							220u8,
+							121u8, 129u8, 53u8, 52u8, 220u8, 237u8, 114u8, 123u8, 50u8, 27u8, 48u8,
+							177u8, 129u8, 132u8, 140u8, 155u8, 144u8, 8u8, 105u8, 103u8, 29u8,
+							141u8, 194u8, 164u8, 184u8, 158u8, 18u8, 226u8, 107u8, 224u8, 83u8,
+							145u8,
 						],
 					)
 				}
@@ -19832,10 +19828,9 @@ pub mod api {
 							weight,
 						},
 						[
-							106u8, 41u8, 247u8, 237u8, 222u8, 69u8, 124u8, 148u8, 248u8, 19u8,
-							143u8, 240u8, 234u8, 153u8, 107u8, 215u8, 81u8, 152u8, 141u8, 105u8,
-							63u8, 176u8, 71u8, 42u8, 154u8, 81u8, 47u8, 51u8, 139u8, 43u8, 139u8,
-							193u8,
+							217u8, 59u8, 86u8, 52u8, 148u8, 203u8, 51u8, 201u8, 33u8, 26u8, 33u8,
+							113u8, 151u8, 104u8, 71u8, 230u8, 157u8, 26u8, 92u8, 219u8, 232u8,
+							157u8, 83u8, 120u8, 248u8, 31u8, 139u8, 229u8, 86u8, 71u8, 180u8, 60u8,
 						],
 					)
 				}
@@ -20170,10 +20165,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							245u8, 217u8, 45u8, 189u8, 185u8, 100u8, 67u8, 216u8, 33u8, 72u8,
-							109u8, 152u8, 173u8, 227u8, 162u8, 84u8, 167u8, 155u8, 148u8, 172u8,
-							163u8, 183u8, 177u8, 83u8, 228u8, 178u8, 129u8, 53u8, 105u8, 174u8,
-							99u8, 73u8,
+							37u8, 229u8, 129u8, 57u8, 127u8, 91u8, 35u8, 144u8, 44u8, 252u8, 54u8,
+							225u8, 201u8, 37u8, 26u8, 110u8, 238u8, 230u8, 192u8, 0u8, 100u8, 30u8,
+							164u8, 151u8, 249u8, 217u8, 101u8, 182u8, 24u8, 52u8, 86u8, 28u8,
 						],
 					)
 				}
@@ -20196,10 +20190,10 @@ pub mod api {
 							weight,
 						},
 						[
-							5u8, 227u8, 135u8, 64u8, 134u8, 101u8, 123u8, 162u8, 234u8, 114u8,
-							233u8, 209u8, 31u8, 71u8, 60u8, 101u8, 169u8, 1u8, 232u8, 35u8, 165u8,
-							131u8, 108u8, 199u8, 189u8, 234u8, 70u8, 8u8, 99u8, 219u8, 227u8,
-							241u8,
+							24u8, 203u8, 134u8, 20u8, 184u8, 22u8, 68u8, 55u8, 3u8, 101u8, 235u8,
+							254u8, 65u8, 107u8, 175u8, 110u8, 223u8, 183u8, 53u8, 65u8, 177u8,
+							40u8, 245u8, 168u8, 172u8, 80u8, 162u8, 24u8, 108u8, 24u8, 113u8,
+							119u8,
 						],
 					)
 				}
@@ -20237,10 +20231,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							50u8, 197u8, 205u8, 181u8, 60u8, 136u8, 188u8, 253u8, 119u8, 124u8,
-							163u8, 72u8, 14u8, 201u8, 90u8, 155u8, 190u8, 133u8, 163u8, 7u8, 69u8,
-							143u8, 255u8, 60u8, 224u8, 179u8, 177u8, 46u8, 48u8, 84u8, 217u8,
-							123u8,
+							192u8, 95u8, 186u8, 90u8, 222u8, 103u8, 92u8, 28u8, 222u8, 157u8,
+							139u8, 145u8, 65u8, 62u8, 135u8, 139u8, 34u8, 156u8, 226u8, 203u8,
+							242u8, 88u8, 182u8, 11u8, 84u8, 254u8, 50u8, 220u8, 41u8, 54u8, 165u8,
+							224u8,
 						],
 					)
 				}
@@ -22608,12 +22602,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod mining_bonds {
+	pub mod liquidity_pools {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_mining_bonds::pallet::Error;
+		pub type Error = runtime_types::pallet_liquidity_pools::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_mining_bonds::pallet::Call;
+		pub type Call = runtime_types::pallet_liquidity_pools::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -22634,28 +22628,29 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
-				#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+				#[doc = "Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,"]
+				#[doc = "tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the"]
+				#[doc = "activated securitization for the vault."]
 				#[doc = ""]
-				#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
-				#[doc = "securitization activated."]
+				#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
+				#[doc = "the max securitization activated."]
 				#[doc = ""]
 				#[doc = "- `origin`: The account that is joining the fund"]
 				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
 				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
 				#[doc = "  it will just add the incremental amount"]
-				pub struct AddCapital {
-					pub vault_id: add_capital::VaultId,
-					pub amount: add_capital::Amount,
+				pub struct BondArgons {
+					pub vault_id: bond_argons::VaultId,
+					pub amount: bond_argons::Amount,
 				}
-				pub mod add_capital {
+				pub mod bond_argons {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
 					pub type Amount = ::core::primitive::u128;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for AddCapital {
-					const PALLET: &'static str = "MiningBonds";
-					const CALL: &'static str = "add_capital";
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BondArgons {
+					const PALLET: &'static str = "LiquidityPools";
+					const CALL: &'static str = "bond_argons";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -22672,73 +22667,75 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+				#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
 				#[doc = "(once cohort slot period is complete)."]
-				pub struct EndRenewal {
-					pub vault_id: end_renewal::VaultId,
-					pub cohort_id: end_renewal::CohortId,
+				pub struct UnbondArgons {
+					pub vault_id: unbond_argons::VaultId,
+					pub cohort_id: unbond_argons::CohortId,
 				}
-				pub mod end_renewal {
+				pub mod unbond_argons {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
 					pub type CohortId = ::core::primitive::u64;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for EndRenewal {
-					const PALLET: &'static str = "MiningBonds";
-					const CALL: &'static str = "end_renewal";
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UnbondArgons {
+					const PALLET: &'static str = "LiquidityPools";
+					const CALL: &'static str = "unbond_argons";
 				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
-				#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+				#[doc = "Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,"]
+				#[doc = "tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the"]
+				#[doc = "activated securitization for the vault."]
 				#[doc = ""]
-				#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
-				#[doc = "securitization activated."]
+				#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
+				#[doc = "the max securitization activated."]
 				#[doc = ""]
 				#[doc = "- `origin`: The account that is joining the fund"]
 				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
 				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
 				#[doc = "  it will just add the incremental amount"]
-				pub fn add_capital(
+				pub fn bond_argons(
 					&self,
-					vault_id: types::add_capital::VaultId,
-					amount: types::add_capital::Amount,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::AddCapital> {
+					vault_id: types::bond_argons::VaultId,
+					amount: types::bond_argons::Amount,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::BondArgons> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"MiningBonds",
-						"add_capital",
-						types::AddCapital { vault_id, amount },
+						"LiquidityPools",
+						"bond_argons",
+						types::BondArgons { vault_id, amount },
 						[
-							224u8, 80u8, 8u8, 241u8, 126u8, 235u8, 220u8, 75u8, 189u8, 186u8, 32u8,
-							82u8, 20u8, 223u8, 76u8, 31u8, 62u8, 144u8, 151u8, 87u8, 242u8, 217u8,
-							7u8, 6u8, 99u8, 84u8, 89u8, 210u8, 252u8, 228u8, 231u8, 12u8,
+							9u8, 113u8, 229u8, 204u8, 94u8, 125u8, 69u8, 9u8, 123u8, 63u8, 199u8,
+							74u8, 209u8, 138u8, 208u8, 162u8, 82u8, 27u8, 79u8, 189u8, 132u8,
+							195u8, 7u8, 161u8, 62u8, 207u8, 143u8, 178u8, 151u8, 83u8, 173u8,
+							198u8,
 						],
 					)
 				}
-				#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+				#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
 				#[doc = "(once cohort slot period is complete)."]
-				pub fn end_renewal(
+				pub fn unbond_argons(
 					&self,
-					vault_id: types::end_renewal::VaultId,
-					cohort_id: types::end_renewal::CohortId,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::EndRenewal> {
+					vault_id: types::unbond_argons::VaultId,
+					cohort_id: types::unbond_argons::CohortId,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UnbondArgons> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"MiningBonds",
-						"end_renewal",
-						types::EndRenewal { vault_id, cohort_id },
+						"LiquidityPools",
+						"unbond_argons",
+						types::UnbondArgons { vault_id, cohort_id },
 						[
-							191u8, 184u8, 228u8, 199u8, 98u8, 13u8, 164u8, 129u8, 2u8, 194u8,
-							173u8, 121u8, 226u8, 115u8, 41u8, 177u8, 99u8, 167u8, 7u8, 157u8,
-							153u8, 222u8, 214u8, 25u8, 230u8, 222u8, 169u8, 169u8, 157u8, 48u8,
-							31u8, 201u8,
+							89u8, 169u8, 173u8, 104u8, 150u8, 121u8, 57u8, 85u8, 239u8, 228u8,
+							32u8, 32u8, 150u8, 160u8, 16u8, 10u8, 170u8, 38u8, 115u8, 104u8, 23u8,
+							149u8, 122u8, 81u8, 71u8, 83u8, 207u8, 225u8, 117u8, 151u8, 191u8,
+							171u8,
 						],
 					)
 				}
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_mining_bonds::pallet::Event;
+		pub type Event = runtime_types::pallet_liquidity_pools::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -22771,7 +22768,7 @@ pub mod api {
 				pub type IsForVault = ::core::primitive::bool;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotDistributeBidPool {
-				const PALLET: &'static str = "MiningBonds";
+				const PALLET: &'static str = "LiquidityPools";
 				const EVENT: &'static str = "CouldNotDistributeBidPool";
 			}
 			#[derive(
@@ -22798,7 +22795,7 @@ pub mod api {
 				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotBurnBidPool {
-				const PALLET: &'static str = "MiningBonds";
+				const PALLET: &'static str = "LiquidityPools";
 				const EVENT: &'static str = "CouldNotBurnBidPool";
 			}
 			#[derive(
@@ -22827,7 +22824,7 @@ pub mod api {
 				pub type BidPoolShares = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BidPoolDistributed {
-				const PALLET: &'static str = "MiningBonds";
+				const PALLET: &'static str = "LiquidityPools";
 				const EVENT: &'static str = "BidPoolDistributed";
 			}
 			#[derive(
@@ -22854,7 +22851,7 @@ pub mod api {
 				pub type ParticipatingVaults = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NextBidPoolCapitalLocked {
-				const PALLET: &'static str = "MiningBonds";
+				const PALLET: &'static str = "LiquidityPools";
 				const EVENT: &'static str = "NextBidPoolCapitalLocked";
 			}
 			#[derive(
@@ -22869,14 +22866,14 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "An error occurred releasing a contributor hold"]
-			pub struct ErrorRefundingBondFundCapital {
-				pub cohort_id: error_refunding_bond_fund_capital::CohortId,
-				pub vault_id: error_refunding_bond_fund_capital::VaultId,
-				pub amount: error_refunding_bond_fund_capital::Amount,
-				pub account_id: error_refunding_bond_fund_capital::AccountId,
-				pub dispatch_error: error_refunding_bond_fund_capital::DispatchError,
+			pub struct ErrorRefundingLiquidityPoolCapital {
+				pub cohort_id: error_refunding_liquidity_pool_capital::CohortId,
+				pub vault_id: error_refunding_liquidity_pool_capital::VaultId,
+				pub amount: error_refunding_liquidity_pool_capital::Amount,
+				pub account_id: error_refunding_liquidity_pool_capital::AccountId,
+				pub dispatch_error: error_refunding_liquidity_pool_capital::DispatchError,
 			}
-			pub mod error_refunding_bond_fund_capital {
+			pub mod error_refunding_liquidity_pool_capital {
 				use super::runtime_types;
 				pub type CohortId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
@@ -22884,9 +22881,9 @@ pub mod api {
 				pub type AccountId = crate::types::AccountId32;
 				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ErrorRefundingBondFundCapital {
-				const PALLET: &'static str = "MiningBonds";
-				const EVENT: &'static str = "ErrorRefundingBondFundCapital";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ErrorRefundingLiquidityPoolCapital {
+				const PALLET: &'static str = "LiquidityPools";
+				const EVENT: &'static str = "ErrorRefundingLiquidityPoolCapital";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -22901,49 +22898,49 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
 			#[doc = "capital"]
-			pub struct RefundedBondFundCapital {
-				pub cohort_id: refunded_bond_fund_capital::CohortId,
-				pub vault_id: refunded_bond_fund_capital::VaultId,
-				pub amount: refunded_bond_fund_capital::Amount,
-				pub account_id: refunded_bond_fund_capital::AccountId,
+			pub struct RefundedLiquidityPoolCapital {
+				pub cohort_id: refunded_liquidity_pool_capital::CohortId,
+				pub vault_id: refunded_liquidity_pool_capital::VaultId,
+				pub amount: refunded_liquidity_pool_capital::Amount,
+				pub account_id: refunded_liquidity_pool_capital::AccountId,
 			}
-			pub mod refunded_bond_fund_capital {
+			pub mod refunded_liquidity_pool_capital {
 				use super::runtime_types;
 				pub type CohortId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
 				pub type Amount = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for RefundedBondFundCapital {
-				const PALLET: &'static str = "MiningBonds";
-				const EVENT: &'static str = "RefundedBondFundCapital";
+			impl ::subxt::ext::subxt_core::events::StaticEvent for RefundedLiquidityPoolCapital {
+				const PALLET: &'static str = "LiquidityPools";
+				const EVENT: &'static str = "RefundedLiquidityPoolCapital";
 			}
 		}
 		pub mod storage {
 			use super::runtime_types;
 			pub mod types {
 				use super::runtime_types;
-				pub mod mining_bond_funds_by_cohort {
+				pub mod liquidity_pools_by_cohort {
 					use super::runtime_types;
-					pub type MiningBondFundsByCohort =
+					pub type LiquidityPoolsByCohort =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
 							::core::primitive::u32,
-							runtime_types::pallet_mining_bonds::pallet::MiningBondFund,
+							runtime_types::pallet_liquidity_pools::pallet::LiquidityPool,
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod open_vault_bid_pool_capital {
+				pub mod open_liquidity_pool_capital {
 					use super::runtime_types;
-					pub type OpenVaultBidPoolCapital =
+					pub type OpenLiquidityPoolCapital =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_mining_bonds::pallet::VaultBidPoolCapital,
+							runtime_types::pallet_liquidity_pools::pallet::LiquidityPoolCapital,
 						>;
 				}
-				pub mod next_vault_bid_pool_capital {
+				pub mod next_liquidity_pool_capital {
 					use super::runtime_types;
-					pub type NextVaultBidPoolCapital =
+					pub type NextLiquidityPoolCapital =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_mining_bonds::pallet::VaultBidPoolCapital,
+							runtime_types::pallet_liquidity_pools::pallet::LiquidityPoolCapital,
 						>;
 				}
 			}
@@ -22951,97 +22948,94 @@ pub mod api {
 			impl StorageApi {
 				#[doc = " The currently earning contributors for the current epoch's bond funds. Sorted by highest"]
 				#[doc = " bids first"]
-				pub fn mining_bond_funds_by_cohort_iter(
+				pub fn liquidity_pools_by_cohort_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::mining_bond_funds_by_cohort::MiningBondFundsByCohort,
+					types::liquidity_pools_by_cohort::LiquidityPoolsByCohort,
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"MiningBonds",
-						"MiningBondFundsByCohort",
+						"LiquidityPools",
+						"LiquidityPoolsByCohort",
 						(),
 						[
-							80u8, 219u8, 224u8, 222u8, 174u8, 65u8, 155u8, 29u8, 214u8, 140u8,
-							35u8, 177u8, 110u8, 97u8, 130u8, 247u8, 95u8, 105u8, 1u8, 62u8, 206u8,
-							147u8, 254u8, 167u8, 144u8, 100u8, 161u8, 23u8, 130u8, 220u8, 115u8,
-							10u8,
+							174u8, 107u8, 92u8, 82u8, 138u8, 90u8, 83u8, 53u8, 250u8, 230u8, 21u8,
+							205u8, 179u8, 226u8, 175u8, 58u8, 194u8, 20u8, 65u8, 35u8, 227u8, 17u8,
+							24u8, 229u8, 208u8, 217u8, 178u8, 45u8, 53u8, 40u8, 254u8, 112u8,
 						],
 					)
 				}
 				#[doc = " The currently earning contributors for the current epoch's bond funds. Sorted by highest"]
 				#[doc = " bids first"]
-				pub fn mining_bond_funds_by_cohort(
+				pub fn liquidity_pools_by_cohort(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::mining_bond_funds_by_cohort::Param0>,
+					_0: impl ::core::borrow::Borrow<types::liquidity_pools_by_cohort::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::mining_bond_funds_by_cohort::Param0,
+						types::liquidity_pools_by_cohort::Param0,
 					>,
-					types::mining_bond_funds_by_cohort::MiningBondFundsByCohort,
+					types::liquidity_pools_by_cohort::LiquidityPoolsByCohort,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"MiningBonds",
-						"MiningBondFundsByCohort",
+						"LiquidityPools",
+						"LiquidityPoolsByCohort",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							80u8, 219u8, 224u8, 222u8, 174u8, 65u8, 155u8, 29u8, 214u8, 140u8,
-							35u8, 177u8, 110u8, 97u8, 130u8, 247u8, 95u8, 105u8, 1u8, 62u8, 206u8,
-							147u8, 254u8, 167u8, 144u8, 100u8, 161u8, 23u8, 130u8, 220u8, 115u8,
-							10u8,
+							174u8, 107u8, 92u8, 82u8, 138u8, 90u8, 83u8, 53u8, 250u8, 230u8, 21u8,
+							205u8, 179u8, 226u8, 175u8, 58u8, 194u8, 20u8, 65u8, 35u8, 227u8, 17u8,
+							24u8, 229u8, 208u8, 217u8, 178u8, 45u8, 53u8, 40u8, 254u8, 112u8,
 						],
 					)
 				}
-				#[doc = " The entrants in the mining bond pool that will be paid out for the active bid pool. They"]
-				#[doc = " apply to the next closed mining slot cohort bid pool. Sorted with biggest share last."]
-				pub fn open_vault_bid_pool_capital(
+				#[doc = " The entrants in the liquidity pool for the mining slot cohort being bid on. Sorted with"]
+				#[doc = " biggest share last."]
+				pub fn open_liquidity_pool_capital(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::open_vault_bid_pool_capital::OpenVaultBidPoolCapital,
+					types::open_liquidity_pool_capital::OpenLiquidityPoolCapital,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"MiningBonds",
-						"OpenVaultBidPoolCapital",
+						"LiquidityPools",
+						"OpenLiquidityPoolCapital",
 						(),
 						[
-							66u8, 199u8, 141u8, 139u8, 183u8, 250u8, 101u8, 127u8, 239u8, 118u8,
-							162u8, 123u8, 192u8, 224u8, 198u8, 208u8, 29u8, 230u8, 1u8, 232u8,
-							202u8, 26u8, 196u8, 72u8, 225u8, 213u8, 72u8, 135u8, 99u8, 161u8,
-							151u8, 80u8,
+							73u8, 92u8, 8u8, 86u8, 249u8, 53u8, 77u8, 108u8, 175u8, 174u8, 174u8,
+							167u8, 62u8, 239u8, 254u8, 239u8, 104u8, 205u8, 19u8, 119u8, 32u8,
+							42u8, 101u8, 5u8, 68u8, 142u8, 153u8, 171u8, 111u8, 191u8, 55u8, 88u8,
 						],
 					)
 				}
-				#[doc = " The bid pool capital for the next bid pool."]
-				pub fn next_vault_bid_pool_capital(
+				#[doc = " The liquidity pool capital for the next mining slot cohort."]
+				pub fn next_liquidity_pool_capital(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::next_vault_bid_pool_capital::NextVaultBidPoolCapital,
+					types::next_liquidity_pool_capital::NextLiquidityPoolCapital,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"MiningBonds",
-						"NextVaultBidPoolCapital",
+						"LiquidityPools",
+						"NextLiquidityPoolCapital",
 						(),
 						[
-							179u8, 200u8, 193u8, 102u8, 213u8, 87u8, 1u8, 192u8, 130u8, 203u8,
-							145u8, 232u8, 234u8, 48u8, 185u8, 138u8, 139u8, 251u8, 82u8, 235u8,
-							231u8, 153u8, 106u8, 152u8, 236u8, 42u8, 161u8, 215u8, 45u8, 194u8,
-							188u8, 104u8,
+							185u8, 109u8, 53u8, 230u8, 197u8, 226u8, 195u8, 10u8, 188u8, 96u8,
+							104u8, 76u8, 185u8, 93u8, 201u8, 194u8, 73u8, 53u8, 163u8, 125u8,
+							155u8, 100u8, 55u8, 21u8, 162u8, 183u8, 67u8, 222u8, 46u8, 27u8, 255u8,
+							245u8,
 						],
 					)
 				}
@@ -23052,14 +23046,14 @@ pub mod api {
 			pub struct ConstantsApi;
 			impl ConstantsApi {
 				#[doc = " The maximum number of contributors to a bond fund"]
-				pub fn max_bond_fund_contributors(
+				pub fn max_liquidity_pool_contributors(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningBonds",
-						"MaxBondFundContributors",
+						"LiquidityPools",
+						"MaxLiquidityPoolContributors",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -23075,7 +23069,7 @@ pub mod api {
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningBonds",
+						"LiquidityPools",
 						"MinimumArgonsPerContributor",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
@@ -23091,7 +23085,7 @@ pub mod api {
 					runtime_types::frame_support::PalletId,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningBonds",
+						"LiquidityPools",
 						"PalletId",
 						[
 							56u8, 243u8, 53u8, 83u8, 154u8, 179u8, 170u8, 80u8, 133u8, 173u8, 61u8,
@@ -23107,7 +23101,7 @@ pub mod api {
 					runtime_types::sp_arithmetic::per_things::Percent,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningBonds",
+						"LiquidityPools",
 						"BidPoolBurnPercent",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
@@ -23124,7 +23118,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningBonds",
+						"LiquidityPools",
 						"MaxBidPoolVaultParticipants",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -24924,7 +24918,8 @@ pub mod api {
 					#[codec(compact)]
 					pub bitcoin_base_fee: _0,
 					#[codec(compact)]
-					pub mining_bond_percent_take: runtime_types::sp_arithmetic::per_things::Permill,
+					pub liquidity_pool_profit_sharing:
+						runtime_types::sp_arithmetic::per_things::Permill,
 				}
 			}
 		}
@@ -25053,7 +25048,7 @@ pub mod api {
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Call),
 				#[codec(index = 31)]
-				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Call),
+				LiquidityPools(runtime_types::pallet_liquidity_pools::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -25122,7 +25117,7 @@ pub mod api {
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Error),
 				#[codec(index = 31)]
-				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Error),
+				LiquidityPools(runtime_types::pallet_liquidity_pools::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -25191,7 +25186,7 @@ pub mod api {
 				#[codec(index = 30)]
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Event),
 				#[codec(index = 31)]
-				MiningBonds(runtime_types::pallet_mining_bonds::pallet::Event),
+				LiquidityPools(runtime_types::pallet_liquidity_pools::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -25229,7 +25224,7 @@ pub mod api {
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
 				#[codec(index = 31)]
-				MiningBonds(runtime_types::pallet_mining_bonds::pallet::HoldReason),
+				LiquidityPools(runtime_types::pallet_liquidity_pools::pallet::HoldReason),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -28882,7 +28877,7 @@ pub mod api {
 				}
 			}
 		}
-		pub mod pallet_mining_bonds {
+		pub mod pallet_liquidity_pools {
 			use super::runtime_types;
 			pub mod pallet {
 				use super::runtime_types;
@@ -28904,24 +28899,25 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "Add capital to the next cohort's mining bids (aka, tomorrow after noon EST). The amount"]
-					#[doc = "raised per vault cannot exceed the allocated securitization for the vault."]
+					#[doc = "Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,"]
+					#[doc = "tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the"]
+					#[doc = "activated securitization for the vault."]
 					#[doc = ""]
-					#[doc = "The funds and profits will be automatically rolled over to the next fund up to the max"]
-					#[doc = "securitization activated."]
+					#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
+					#[doc = "the max securitization activated."]
 					#[doc = ""]
 					#[doc = "- `origin`: The account that is joining the fund"]
 					#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
 					#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
 					#[doc = "  it will just add the incremental amount"]
-					add_capital {
+					bond_argons {
 						vault_id: ::core::primitive::u32,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 2)]
-					#[doc = "Allows a user to remove their contribution from the fund after the hold is released"]
+					#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
 					#[doc = "(once cohort slot period is complete)."]
-					end_renewal {
+					unbond_argons {
 						vault_id: ::core::primitive::u32,
 						cohort_id: ::core::primitive::u64,
 					},
@@ -28960,7 +28956,7 @@ pub mod api {
 					InternalError,
 					#[codec(index = 5)]
 					#[doc = "Unable to update the vault fund"]
-					CouldNotFindBondFund,
+					CouldNotFindLiquidityPool,
 					#[codec(index = 6)]
 					#[doc = "Max contributors for a fund exceeded"]
 					MaxContributorsExceeded,
@@ -29025,7 +29021,7 @@ pub mod api {
 					},
 					#[codec(index = 4)]
 					#[doc = "An error occurred releasing a contributor hold"]
-					ErrorRefundingBondFundCapital {
+					ErrorRefundingLiquidityPoolCapital {
 						cohort_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						amount: ::core::primitive::u128,
@@ -29035,7 +29031,7 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
 					#[doc = "capital"]
-					RefundedBondFundCapital {
+					RefundedLiquidityPoolCapital {
 						cohort_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						amount: ::core::primitive::u128,
@@ -29059,7 +29055,7 @@ pub mod api {
 				)]
 				pub enum HoldReason {
 					#[codec(index = 0)]
-					ContributedToBondFund,
+					ContributedToLiquidityPool,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -29076,7 +29072,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct MiningBondFund {
+				pub struct LiquidityPool {
 					pub contributor_balances:
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							crate::types::AccountId32,
@@ -29086,9 +29082,9 @@ pub mod api {
 						crate::types::AccountId32,
 					>,
 					pub is_rolled_over: ::core::primitive::bool,
-					pub distributed_earnings: ::core::option::Option<::core::primitive::u128>,
+					pub distributed_profits: ::core::option::Option<::core::primitive::u128>,
 					#[codec(compact)]
-					pub vault_percent_take: runtime_types::sp_arithmetic::per_things::Permill,
+					pub vault_sharing_percent: runtime_types::sp_arithmetic::per_things::Permill,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -29105,7 +29101,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct VaultBidPoolCapital {
+				pub struct LiquidityPoolCapital {
 					#[codec(compact)]
 					pub vault_id: ::core::primitive::u32,
 					#[codec(compact)]

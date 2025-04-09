@@ -191,7 +191,7 @@ pub mod pallet {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			let current_tick = T::TickProvider::current_tick();
 			let meta_changes = QueuedNotaryMetaChanges::<T>::take(current_tick);
-			if meta_changes.len() > 0 {
+			if !meta_changes.is_empty() {
 				let old_block_to_preserve =
 					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get() as Tick);
 				<ActiveNotaries<T>>::mutate(|active| {
@@ -379,7 +379,7 @@ pub mod pallet {
 			// find the first key that is valid at the given block height
 			let mut public =
 				key_history.iter().find(|(tick, _)| *tick >= at_tick).map(|(_, public)| public);
-			if public.is_none() && key_history.len() > 0 && key_history[0].0 < at_tick {
+			if public.is_none() && !key_history.is_empty() && key_history[0].0 < at_tick {
 				public = key_history.first().map(|(_, public)| public);
 			}
 

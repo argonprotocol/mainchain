@@ -827,7 +827,7 @@ pub fn verify_notarization_allocation(
 					state.allocated_to_domains =
 						state.allocated_to_domains.saturating_add(note.microgons);
 				},
-				NoteType::SendToVote { .. } => {
+				NoteType::SendToVote => {
 					ensure!(localchain_account_id.is_tax(), VerifyError::InvalidTaxOperation);
 					state.record_tax_sent_to_vote(note.microgons, &localchain_account_id)?;
 				},
@@ -837,7 +837,7 @@ pub fn verify_notarization_allocation(
 			// track the balances moved in this note
 			match note.note_type {
 				NoteType::ClaimFromMainchain { .. } |
-				NoteType::Claim { .. } |
+				NoteType::Claim |
 				NoteType::ChannelHoldClaim => {
 					if let Some(new_balance) = balance.checked_add(note.microgons as i128) {
 						balance = new_balance;

@@ -171,8 +171,9 @@ At any given time, a mining slot requires you to own and lock 1/100th (or curren
 Tokens in circulation. And you can (optionally) put yourself ahead of someone else on the list by bidding more Argons
 than they have. You will be refunded if you lose out on a slot.
 
-Your bids will go into a bid "pool" for your slot and paid to Vaults who have committed to backing the MiningSlot with
-"Bonded" Bitcoins.
+Your bids will go into a bid "pool" for your slot and into the Slot Liquidity Pool. This pool helps grant liquidity to
+Bitcoin holders when minting is delayed. Vaults are able to crowd-source funds to this liquidity pool and earn profits
+via its distribution.
 
 You need to set up an account and acquire Argons to bid for a mining slot.
 
