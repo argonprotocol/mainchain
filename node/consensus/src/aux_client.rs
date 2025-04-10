@@ -173,6 +173,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			.insert_aux(vec![], &to_delete.iter().map(|a| a.as_slice()).collect::<Vec<_>>())?;
 
 		version.mutate(|a| *a = VERSION)?;
+		info!("Migration of aux data complete {}", version.get());
 
 		Ok(())
 	}
