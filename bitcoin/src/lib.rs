@@ -11,6 +11,8 @@ pub use utxo_spend_filter::{BlockFilter, UtxoSpendFilter};
 mod cosign_releaser;
 mod cosign_script;
 
+#[cfg(feature = "std")]
+pub mod client;
 mod errors;
 #[cfg(feature = "std")]
 mod utxo_spend_filter;

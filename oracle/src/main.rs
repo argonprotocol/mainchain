@@ -206,17 +206,19 @@ async fn main() -> anyhow::Result<()> {
 			}
 		},
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {
-			let bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
+			let mut bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
 				anyhow!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e)
 			})?;
 			let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
-
 			let bitcoin_auth = if !user.is_empty() {
 				Some((user.to_string(), password.unwrap_or_default().to_string()))
 			} else {
 				None
 			};
-			bitcoin_loop(bitcoin_rpc_url, bitcoin_auth, trusted_rpc_url, signer).await?
+			bitcoin_url.set_username("").ok();
+			bitcoin_url.set_password(None).ok();
+
+			bitcoin_loop(bitcoin_url.to_string(), bitcoin_auth, trusted_rpc_url, signer).await?
 		},
 		_ => bail!("Handled above, qed, not possible"),
 	};

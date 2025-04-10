@@ -308,7 +308,7 @@ impl MiningConfig {
 			));
 		};
 
-		let bitcoin_url = Url::parse(bitcoin_rpc_url).map_err(|e| {
+		let mut bitcoin_url = Url::parse(bitcoin_rpc_url).map_err(|e| {
 			Error::Input(format!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e))
 		})?;
 		let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
@@ -318,6 +318,8 @@ impl MiningConfig {
 		} else {
 			None
 		};
+		bitcoin_url.set_username("").ok();
+		bitcoin_url.set_password(None).ok();
 		Ok((bitcoin_url, bitcoin_auth))
 	}
 }

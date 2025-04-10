@@ -2,13 +2,8 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
+use crate::client::Client;
 use anyhow::bail;
-use bitcoin::{bip158, hashes::Hash};
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use codec::{Decode, Encode};
-use parking_lot::Mutex;
-use sp_runtime::RuntimeDebug;
-
 use argon_primitives::{
 	bitcoin::{
 		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinRejectedReason, BitcoinSyncStatus,
@@ -16,6 +11,11 @@ use argon_primitives::{
 	},
 	inherents::BitcoinUtxoSync,
 };
+use bitcoin::{bip158, hashes::Hash};
+use bitcoincore_rpc::{Auth, RpcApi};
+use codec::{Decode, Encode};
+use parking_lot::Mutex;
+use sp_runtime::RuntimeDebug;
 
 #[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
 pub struct BlockFilter {
