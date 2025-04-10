@@ -29,6 +29,8 @@ hwi = { workspace = true, optional = true }
 
 argon-primitives = { workspace = true, default-features = false, features = ["bitcoin"] }
 log = { workspace = true }
+minreq = { workspace = true, optional = true, features = ["https", "json-using-serde"] }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 frame-support = { workspace = true }
@@ -39,7 +41,7 @@ env_logger = { workspace = true }
 rand = { workspace = true }
 base64 = { workspace = true }
 bitcoin = { workspace = true, features = ["base64"] }
-serde_json = { workspace = true }
+
 
 [features]
 default = [ "std" ]
@@ -53,7 +55,9 @@ std = [
 	"k256/std",
 	"log/std",
 	"miniscript/std",
+	"minreq",
 	"parking_lot/default",
+	"serde_json/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",

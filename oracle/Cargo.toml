@@ -28,6 +28,7 @@ clap = { workspace = true }
 chrono = { workspace = true }
 rand = { workspace = true }
 directories = { workspace = true }
+argon-bitcoin = { workspace = true, features = ["default"] }
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 url = { workspace = true }

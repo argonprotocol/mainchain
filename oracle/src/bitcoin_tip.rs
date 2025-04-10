@@ -1,14 +1,14 @@
 use anyhow::bail;
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use std::time::Duration;
-use tokio::time::sleep;
-
+use argon_bitcoin::client::Client;
 use argon_client::{
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
 	ArgonConfig, ReconnectingClient,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
+use bitcoincore_rpc::{Auth, RpcApi};
+use std::time::Duration;
+use tokio::time::sleep;
 
 const CONFIRMATIONS: u64 = 6;
 

@@ -303,7 +303,7 @@ impl ArgonTestNode {
 	}
 
 	pub fn get_bitcoin_url(&self) -> (String, Auth) {
-		let rpc_url = self.start_args.bitcoin_rpc_url().unwrap();
+		let mut rpc_url = self.start_args.bitcoin_rpc_url().unwrap();
 
 		let auth = if !rpc_url.username().is_empty() {
 			Auth::UserPass(
@@ -313,6 +313,8 @@ impl ArgonTestNode {
 		} else {
 			Auth::None
 		};
+		rpc_url.set_password(None).unwrap();
+		rpc_url.set_username("").unwrap();
 		(rpc_url.to_string(), auth)
 	}
 }
