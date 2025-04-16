@@ -7,8 +7,6 @@ import {
   NotarizationBuilder,
 } from '../index';
 import { format } from 'node:util';
-import TestMainchain from './TestMainchain';
-import TestNotary from './TestNotary';
 import {
   checkForExtrinsicSuccess,
   getClient,
@@ -23,6 +21,8 @@ import {
   describeIntegration,
   disconnectOnTeardown,
   KeyringSigner,
+  TestNotary,
+  TestMainchain,
   teardown,
   transferToLocalchain,
 } from './testHelpers';

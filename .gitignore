@@ -25,3 +25,4 @@ node_modules
 /oracle/.env
 /scripts/hyperbridge/**/*-messaging-relayer.toml
 /docs/.obsidian
+**/*.tsbuildinfo

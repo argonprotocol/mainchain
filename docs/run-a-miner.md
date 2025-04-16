@@ -91,7 +91,7 @@ rpcport=18332
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1/0
 signetchallenge=0014df6edb04cb5d8de5b15a63bdf5883f2eb6678b88
-signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333
+addnode=bitcoin-node0.testnet.argonprotocol.org:38333
 ```
 
 ### Node Setup 3. The Argon software

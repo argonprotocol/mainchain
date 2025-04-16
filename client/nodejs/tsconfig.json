@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
     "paths": {
-      "@argonprotocol/mainchain/*": ["src/*"],
       "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
       "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
       "@polkadot/types/augment": ["src/interfaces/augment-types.ts"]
     },
-    "target": "es2022",
+    "target": "esnext",
     "module": "es2022",
     "declaration": true,
     "composite": true,
@@ -18,22 +17,20 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitOverride": true,
-    "types": ["node", "jest"],
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
+    "baseUrl": "./",
     "rootDir": "./src",
     "sourceMap": true,
     "importHelpers": true,
     "skipDefaultLibCheck": true,
-    "outDir": "./lib/esm"
+    "outDir": "./lib"
   },
   "include": [
-    "./src/index.ts",
-    "./src/WageProtector.ts",
-    "./src/interfaces/*",
-    "./src/examples/*",
-    "./src/__test__/*"
+    "src",
+    "src/interfaces/**/*.ts",
+    // if you have augment-api.ts etc.
+    "node_modules/@polkadot/**/*.d.ts"
   ],
   "exclude": ["**/localchain", "build/**/*", "node_modules", "target"]
 }

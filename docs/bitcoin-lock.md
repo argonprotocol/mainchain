@@ -57,7 +57,7 @@ To launch in Signet:
 - [Electrum](https://electrum.org/#home): Open with --signet. Eg, in Mac
   OS: `open -a Electrum.app --args --oneserver --signet --server=electrs.testnet.argonprotocol.org:50002:s`
 - [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
-  and `signetseednode=bitcoin-node0.testnet.argonprotocol.org:38333`
+  and `addnode=bitcoin-node0.testnet.argonprotocol.org:38333`
 
 Ensure you did in fact use Signet (the message will say Testnet):
 ![Electrum signet.png](images/electrum-testnet.png)

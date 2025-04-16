@@ -1,4 +1,5 @@
 import { WageProtector, waitForLoad } from '../index';
+import { expect, it } from 'vitest';
 
 it('adjusts the price of a wage for inflation', async () => {
   await waitForLoad();

@@ -1,12 +1,7 @@
 import { customAlphabet } from 'nanoid';
 import { Client } from 'pg';
 import * as child_process from 'node:child_process';
-import {
-  ArgonClient,
-  checkForExtrinsicSuccess,
-  Keyring,
-  KeyringPair,
-} from '@argonprotocol/mainchain';
+import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '../index';
 import fs from 'node:fs';
 import * as readline from 'node:readline';
 import {
@@ -15,8 +10,11 @@ import {
   getDockerPortMapping,
   getProxy,
   ITeardownable,
-} from './testHelpers';
+  projectRoot,
+} from './index';
 import * as process from 'node:process';
+import { Readable } from 'node:stream';
+import Path from 'node:path';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -25,16 +23,16 @@ export function createUid(): string {
 }
 
 export default class TestNotary implements ITeardownable {
-  public operator: KeyringPair;
+  public operator?: KeyringPair;
   public ip = '127.0.0.1';
-  public registeredPublicKey: Uint8Array;
-  public port: string;
+  public registeredPublicKey?: Uint8Array;
+  public port?: string;
   public containerName?: string;
   public proxy?: string;
-  #dbName: string;
+  #dbName?: string;
   #dbConnectionString: string;
-  #childProcess: child_process.ChildProcessWithoutNullStreams;
-  #stdioInterface: readline.Interface;
+  #childProcess?: child_process.ChildProcessByStdio<null, Readable, Readable>;
+  #stdioInterface?: readline.Interface;
 
   public get address(): string {
     if (this.proxy) {
@@ -68,7 +66,7 @@ export default class TestNotary implements ITeardownable {
     ).publicKey;
 
     let notaryPath =
-      pathToNotaryBin ?? `${__dirname}/../../target/debug/argon-notary`;
+      pathToNotaryBin ?? Path.join(projectRoot(), 'target/debug/argon-notary');
     if (process.env.ARGON_USE_DOCKER_BINS) {
       this.containerName = 'notary_' + uuid;
       const addHost = process.env.ADD_DOCKER_HOST
@@ -149,20 +147,20 @@ export default class TestNotary implements ITeardownable {
         console.warn('Error running notary', err);
         reject(err);
       };
-      this.#childProcess.once('error', onProcessError);
-      this.#childProcess.stderr.on('data', data => {
+      this.#childProcess!.once('error', onProcessError);
+      this.#childProcess!.stderr.on('data', data => {
         console.warn('Notary >> %s', data);
         if (data.startsWith('WARNING')) return;
-        this.#childProcess.off('error', onProcessError);
+        this.#childProcess!.off('error', onProcessError);
         reject(data);
       });
       this.#stdioInterface = readline
-        .createInterface({ input: this.#childProcess.stdout })
+        .createInterface({ input: this.#childProcess!.stdout })
         .on('line', line => {
           console.log('Notary >> %s', line);
           let match = line.match(/Listening on ([ws:/\d.]+)/);
-          if (match) {
-            resolve(match[1].split(':').pop());
+          if (match?.length ?? 0 > 0) {
+            resolve(match![1].split(':').pop()!);
           }
         });
     });
@@ -179,32 +177,15 @@ export default class TestNotary implements ITeardownable {
 
   public async register(client: ArgonClient): Promise<void> {
     let address = new URL(this.address);
-
-    await new Promise<void>(async (resolve, reject) => {
-      await client.tx.notaries
-        .propose({
-          public: this.registeredPublicKey,
-          hosts: [address.href],
-          name: 'Test Notary',
-        })
-        .signAndSend(this.operator, ({ events, status }) => {
-          if (status.isInBlock) {
-            void checkForExtrinsicSuccess(events, client).then((): null => {
-              console.log(
-                `Successful proposal of notary in block ${status.asInBlock.toHex()}`,
-                status.type,
-              );
-              resolve();
-              return null;
-            }, reject);
-          } else {
-            console.log(
-              'Status of notary proposal: %s',
-              JSON.stringify(status, null, 2),
-            );
-          }
-        });
-    });
+    await new TxSubmitter(
+      client,
+      client.tx.notaries.propose({
+        public: this.registeredPublicKey,
+        hosts: [address.href],
+        name: 'Test Notary',
+      }),
+      this.operator!,
+    ).submit({ waitForBlock: true });
   }
 
   public async teardown(): Promise<void> {
