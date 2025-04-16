@@ -7,6 +7,8 @@ import {
   TestNotary,
 } from './testHelpers';
 
+import { afterAll, afterEach, expect, it } from 'vitest';
+
 afterEach(teardown);
 afterAll(teardown);
 

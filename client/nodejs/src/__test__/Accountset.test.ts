@@ -83,24 +83,7 @@ describeIntegration('Accountset tests', () => {
 
   it('can will handle a subset of failed bids', async () => {
     const alice = sudo();
-    const res = await new Accountset({
-      client,
-      seedAccount: alice,
-      subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
-    }).createMiningBids({
-      bidAmount: 2_000_000n,
-      subaccountRange: [0, 1, 2, 3, 4, 5, 6],
-    });
-    expect(res.successfulBids).toBe(7);
-
     const secondAccount = await createKeyringPair({});
-    const accountset = new Accountset({
-      client,
-      seedAccount: secondAccount,
-      subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
-    });
 
     const api = await client;
     const txSubmitter = new TxSubmitter(
@@ -113,14 +96,30 @@ describeIntegration('Accountset tests', () => {
     );
     await txSubmitter.submit({ waitForBlock: true });
 
-    const result = await accountset.createMiningBids({
+    const alice_result = await new Accountset({
+      client,
+      seedAccount: alice,
+      subaccountRange: parseSubaccountRange('0-49'),
+      sessionKeyMnemonic: mnemonicGenerate(),
+    }).createMiningBids({
+      bidAmount: 2_000_000n,
+      subaccountRange: [0, 1, 2, 3, 4, 5, 6],
+    });
+    expect(alice_result.successfulBids).toBe(7);
+
+    const second_bids = await new Accountset({
+      client,
+      seedAccount: secondAccount,
+      subaccountRange: parseSubaccountRange('0-49'),
+      sessionKeyMnemonic: mnemonicGenerate(),
+    }).createMiningBids({
       bidAmount: 500_000n,
       subaccountRange: [0, 1, 2, 3, 4],
       tip: 100n,
     });
-    expect(result).toBeTruthy();
-    expect(result.finalFee).toBeGreaterThan(22_300n);
-    expect(result.successfulBids).toBe(3);
-    expect(result.bidError?.stack).toMatch('BidTooLow');
+    expect(second_bids).toBeTruthy();
+    expect(second_bids.finalFee).toBeGreaterThan(22_300n);
+    expect(second_bids.successfulBids).toBe(3);
+    expect(second_bids.bidError?.stack).toMatch('BidTooLow');
   });
 });

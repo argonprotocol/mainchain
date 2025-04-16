@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -122,7 +122,7 @@ jobs:
   docker:
     name: Docker
     needs:
-      - build-and-test
+      - build
     permissions:
       contents: read
       packages: write
@@ -330,7 +330,8 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --forceExit --verbose --runInBand --target=${{ matrix.target }}
+        run: yarn test:ci --target=${{ matrix.target }}
+        working-directory: localchain
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
@@ -425,14 +426,31 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:js-only --forceExit --verbose --runInBand
+        run: yarn test:ci
+        working-directory: ./localchain
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
           ADD_DOCKER_HOST: true
+          ARGON_USE_DOCKER_BINS: 1
           RUST_LOG: debug,sqlx=info
           AWS_S3_ENDPOINT: http://host.docker.internal:9000
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bins-x86_64-unknown-linux-gnu
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./amd64
+
+      - name: Test client
+        run: yarn test:ci
+        working-directory: ./client/nodejs
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_S3_ENDPOINT: http://localhost:9000
 
       - name: Cleanup minio
         if: always()

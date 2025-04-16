@@ -1,6 +1,7 @@
 import { CryptoScheme, Localchain } from '../index';
 import { closeOnTeardown, KeyringSigner, teardown } from './testHelpers';
 import { Keyring } from '@argonprotocol/mainchain';
+import { afterAll, expect, it } from 'vitest';
 
 afterAll(teardown);
 

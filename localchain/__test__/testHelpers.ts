@@ -13,7 +13,6 @@ export {
   activateNotary,
   describeIntegration,
   disconnectOnTeardown,
-  getMainchainBalance,
   TestNotary,
   closeOnTeardown,
   TestMainchain,
@@ -62,6 +61,14 @@ export async function createLocalchain(
   });
   closeOnTeardown(localchain);
   return localchain;
+}
+
+export async function getMainchainBalance(
+  client: ArgonClient,
+  address: string,
+): Promise<bigint> {
+  const { data } = await client.query.system.account(address);
+  return data.free.toBigInt();
 }
 
 export async function transferToLocalchain(

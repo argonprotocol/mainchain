@@ -30,7 +30,7 @@ export {
   keyringFromSuri,
   keyringFromFile,
 } from './keyringUtils';
-export { IGlobalOptions } from './cli/setup';
+export { IGlobalOptions } from './clis';
 
 export {
   Keyring,

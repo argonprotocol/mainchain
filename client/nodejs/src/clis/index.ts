@@ -8,6 +8,8 @@ import liquidityCli from './liquidityCli';
 import bitcoinCli from './bitcoinCli';
 import { parseSubaccountRange } from '../Accountset';
 
+export { accountCli, vaultCli, miningCli, liquidityCli, bitcoinCli };
+
 export function globalOptions(program: Command) {
   return program.optsWithGlobals() as IGlobalOptions;
 }
@@ -57,9 +59,13 @@ export type IGlobalOptions = ReturnType<ReturnType<typeof buildCli>['opts']>;
 
 export function addGlobalArgs(program: ReturnType<typeof buildCli>) {
   for (const command of program.commands) {
-    command.configureHelp({ showGlobalOptions: true });
+    command.configureHelp({
+      showGlobalOptions: true,
+    });
     for (const nested of command.commands) {
-      nested.configureHelp({ showGlobalOptions: true });
+      nested.configureHelp({
+        showGlobalOptions: true,
+      });
     }
   }
 }

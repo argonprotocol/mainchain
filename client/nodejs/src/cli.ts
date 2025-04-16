@@ -1,5 +1,5 @@
 #!/bin/env node
-import { addGlobalArgs, applyEnv, buildCli } from './setup';
+import { addGlobalArgs, applyEnv, buildCli } from './clis';
 
 const program = buildCli();
 addGlobalArgs(program);

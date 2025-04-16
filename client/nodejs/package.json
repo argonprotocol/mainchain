@@ -11,38 +11,47 @@
   "bugs": {
     "url": "https://github.com/argonprotocol/mainchain/issues"
   },
-  "bin": "./lib/cli/index.cjs",
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn build:tsc",
+    "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn tsc",
     "generate:defs": "tsx node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
-    "build:tsc": "tsup && tsc -p tsconfig-types.json",
+    "tsc": "tsup",
     "watch": "tsup --watch",
-    "test": "vitest --typecheck --disableConsoleIntercept",
-    "test:ci": "vitest --typecheck --disableConsoleIntercept --retry=1"
+    "test": "vitest --run --typecheck --disableConsoleIntercept",
+    "test:ci": "vitest --run --typecheck --disableConsoleIntercept --retry=1"
   },
-  "type": "module",
-  "types": "./lib/index.d.ts",
   "files": [
     "lib/"
   ],
-  "main": "./lib/index.cjs",
+  "type": "module",
+  "bin": "./lib/cli.js",
   "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "exports": {
     ".": {
+      "types": "./lib/index.d.ts",
       "import": "./lib/index.js",
-      "require": "./lib/index.cjs"
+      "require": {
+        "types": "./lib/index.d.cts",
+        "default": "./lib/index.cjs"
+      }
     },
-    "./cli/*": {
-      "types": "./lib/cli/*.d.ts",
-      "import": "./lib/cli/*.js",
-      "require": "./lib/cli/*.cjs"
+    "./clis": {
+      "types": "./lib/clis/index.d.ts",
+      "import": "./lib/clis/index.js",
+      "require": {
+        "types": "./lib/clis/index.d.cts",
+        "default": "./lib/clis/index.cjs"
+      }
     },
-    "./test-utils/*": {
-      "types": "./lib/test-utils/*.d.ts",
-      "import": "./lib/test-utils/*.js",
-      "require": "./lib/test-utils/*.cjs"
+    "./test-utils": {
+      "types": "./lib/test-utils/index.d.ts",
+      "import": "./lib/test-utils/index.js",
+      "require": {
+        "types": "./lib/test-utils/index.d.cts",
+        "default": "./lib/test-utils/index.cjs"
+      }
     }
   },
   "dependencies": {
@@ -53,7 +62,8 @@
     "bignumber.js": "^9.1.2",
     "commander": "^13.1.0",
     "console-table-printer": "^2.12.1",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "typed-emitter": "^2.1.0"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.52.3",
@@ -71,7 +81,6 @@
     "shx": "^0.4.0",
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
-    "typed-emitter": "^2.1.0",
     "typescript": "^5.8.3",
     "vitest": "^3.1.1"
   },

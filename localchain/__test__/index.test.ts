@@ -1,6 +1,8 @@
 import { CryptoScheme, Localchain } from '../index';
 import { closeOnTeardown, teardown } from './testHelpers';
 
+import { afterAll, expect, it } from 'vitest';
+
 afterAll(teardown);
 
 it('can create and reload a localchain', async () => {

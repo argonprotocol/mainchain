@@ -12,6 +12,7 @@ import {
   teardown,
   transferToLocalchain,
 } from './testHelpers';
+import { afterAll, afterEach, expect, it } from 'vitest';
 
 afterEach(teardown);
 afterAll(teardown);

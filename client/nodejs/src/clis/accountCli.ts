@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs';
 import { Accountset, parseSubaccountRange } from '../Accountset';
 import Env from '../env';
 import * as process from 'node:process';
-import { globalOptions } from './setup';
+import { globalOptions } from './index';
 
 export default function accountCli() {
   const program = new Command('accounts').description(

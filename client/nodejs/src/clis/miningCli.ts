@@ -5,7 +5,7 @@ import { Accountset } from '../Accountset';
 import { MiningBids } from '../MiningBids';
 import { formatArgons } from '../utils';
 import { TxSubmitter } from '../TxSubmitter';
-import { globalOptions } from './setup';
+import { globalOptions } from './index';
 import { CohortBidder } from '../CohortBidder';
 
 export default function miningCli() {
