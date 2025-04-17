@@ -1,6 +1,4 @@
 import { AccountType, CryptoScheme, NotarizationTracker } from '../index';
-import TestMainchain from './TestMainchain';
-import TestNotary from './TestNotary';
 import { getClient, Keyring } from '@argonprotocol/mainchain';
 import {
   activateNotary,
@@ -8,10 +6,13 @@ import {
   describeIntegration,
   disconnectOnTeardown,
   getMainchainBalance,
+  TestMainchain,
+  TestNotary,
   KeyringSigner,
   teardown,
   transferToLocalchain,
 } from './testHelpers';
+import { afterAll, afterEach, expect, it } from 'vitest';
 
 afterEach(teardown);
 afterAll(teardown);

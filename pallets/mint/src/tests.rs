@@ -131,6 +131,7 @@ fn it_can_mint() {
 				argon_cpi: FixedI128::from_float(-1.0),
 				liquidity: 25_000,
 				amount: U256::from(mint_amount),
+				per_miner: mint_amount,
 			}
 			.into(),
 		);
@@ -203,6 +204,7 @@ fn it_cleans_old_cohorts() {
 				argon_cpi: FixedI128::from_float(-1.0),
 				liquidity: 60_000,
 				amount: U256::from(mint_amount),
+				per_miner: mint_amount / 4,
 			}
 			.into(),
 		);

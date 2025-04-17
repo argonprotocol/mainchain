@@ -914,6 +914,7 @@ export default {
       },
       MiningMint: {
         amount: 'U256',
+        perMiner: 'u128',
         argonCpi: 'i128',
         liquidity: 'u128',
       },

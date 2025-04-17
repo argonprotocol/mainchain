@@ -1,18 +1,42 @@
-import './interfaces/augment-api.js';
-import './interfaces/augment-types.js';
-import './interfaces/types-lookup.js';
-import { KeyringPair, KeyringPair$Json } from '@polkadot/keyring/types';
-import { ApiPromise, Keyring, WsProvider } from '@polkadot/api';
+import './interfaces/augment-api';
+import './interfaces/augment-types';
+import './interfaces/types-lookup';
+import type { KeyringPair, KeyringPair$Json } from '@polkadot/keyring/types';
+import { ApiPromise, HttpProvider, Keyring, WsProvider } from '@polkadot/api';
 import {
   cryptoWaitReady,
   decodeAddress,
   mnemonicGenerate,
 } from '@polkadot/util-crypto';
-import { EventRecord } from '@polkadot/types/interfaces/system';
-import { InterfaceTypes } from '@polkadot/types/types/registry';
-import { KeypairType } from '@polkadot/util-crypto/types';
+import type { InterfaceTypes } from '@polkadot/types/types/registry';
+import type { KeypairType } from '@polkadot/util-crypto/types';
+import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 
 export { WageProtector } from './WageProtector';
+export { TxSubmitter } from './TxSubmitter';
+export { Accountset } from './Accountset';
+export { MiningBids } from './MiningBids';
+export { AccountMiners } from './AccountMiners';
+export { MiningRotations } from './MiningRotations';
+export {
+  BlockWatch,
+  getAuthorFromHeader,
+  getTickFromHeader,
+} from './BlockWatch';
+export * from './utils';
+export { AccountRegistry } from './AccountRegistry';
+export { Vault } from './Vault';
+export { VaultMonitor } from './VaultMonitor';
+export { CohortBidder } from './CohortBidder';
+export { BidPool } from './BidPool';
+export { BitcoinLocks } from './BitcoinLocks';
+export {
+  createKeyringPair,
+  keyringFromCli,
+  keyringFromSuri,
+  keyringFromFile,
+} from './keyringUtils';
+export { IGlobalOptions } from './clis';
 
 export {
   Keyring,
@@ -25,6 +49,7 @@ export {
 
 export * from '@polkadot/types';
 export * from '@polkadot/types/lookup';
+export * from '@polkadot/types/interfaces';
 export { InterfaceTypes as interfaces };
 
 export type ArgonClient = ApiPromise;
@@ -42,40 +67,11 @@ export async function waitForLoad(): Promise<void> {
  * @returns The client
  */
 export async function getClient(host: string): Promise<ArgonClient> {
-  const provider = new WsProvider(host);
+  let provider: ProviderInterface;
+  if (host.startsWith('http:')) {
+    provider = new HttpProvider(host);
+  } else {
+    provider = new WsProvider(host);
+  }
   return await ApiPromise.create({ provider, noInitWarn: true });
-}
-
-/**
- * Check for an extrinsic success event in the given events. Helpful to validate the result of an extrinsic inclusion in a block (it will be included even if it fails)
- * @param events The events to check
- * @param client The client to use
- * @returns A promise that resolves if the extrinsic was successful, and rejects if it failed
- */
-export function checkForExtrinsicSuccess(
-  events: EventRecord[],
-  client: ArgonClient,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    for (const { event } of events) {
-      if (client.events.system.ExtrinsicSuccess.is(event)) {
-        resolve();
-      } else if (client.events.system.ExtrinsicFailed.is(event)) {
-        // extract the data for this event
-        const [dispatchError] = event.data;
-        let errorInfo = dispatchError.toString();
-
-        if (dispatchError.isModule) {
-          const decoded = client.registry.findMetaError(dispatchError.asModule);
-          errorInfo = `${decoded.section}.${decoded.name}`;
-        }
-
-        reject(
-          new Error(
-            `${event.section}.${event.method}:: ExtrinsicFailed:: ${errorInfo}`,
-          ),
-        );
-      }
-    }
-  });
 }

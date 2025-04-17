@@ -1,8 +1,13 @@
 import { AccountType, MainchainClient, NotaryClient } from '../index';
-import TestMainchain from './TestMainchain';
-import TestNotary from './TestNotary';
 import { Keyring } from '@argonprotocol/mainchain';
-import { describeIntegration, teardown } from './testHelpers';
+import {
+  describeIntegration,
+  teardown,
+  TestMainchain,
+  TestNotary,
+} from './testHelpers';
+
+import { afterAll, afterEach, expect, it } from 'vitest';
 
 afterEach(teardown);
 afterAll(teardown);

@@ -6,16 +6,13 @@ import {
   Localchain,
   NotarizationBuilder,
 } from '../index';
-import { format } from 'node:util';
-import TestMainchain from './TestMainchain';
-import TestNotary from './TestNotary';
 import {
+  ArgonClient,
+  ArgonPrimitivesDomainVersionHost,
   checkForExtrinsicSuccess,
   getClient,
   Keyring,
   KeyringPair,
-  ArgonClient,
-  ArgonPrimitivesDomainVersionHost,
 } from '@argonprotocol/mainchain';
 import {
   activateNotary,
@@ -24,23 +21,15 @@ import {
   disconnectOnTeardown,
   KeyringSigner,
   teardown,
+  TestMainchain,
+  TestNotary,
   transferToLocalchain,
 } from './testHelpers';
 import * as Crypto from 'node:crypto';
-import { beforeAll } from 'jest-circus';
-import retryTimes = jest.retryTimes;
+import { afterAll, afterEach, expect, it } from 'vitest';
 
-if (process.env.RUST_LOG !== undefined) {
-  // this stops jest from killing the logs
-  global.console.log = (...args) => process.stdout.write(format(...args));
-}
 afterEach(teardown);
 afterAll(teardown);
-beforeAll(() => {
-  retryTimes(3, {
-    logErrorsBeforeRetry: true,
-  });
-});
 
 describeIntegration('ChannelHold integration', () => {
   it('can create a zone record type', async () => {
