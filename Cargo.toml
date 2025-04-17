@@ -42,7 +42,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "1.1.0-rc.1"
+version = "1.1.0-rc.2"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
