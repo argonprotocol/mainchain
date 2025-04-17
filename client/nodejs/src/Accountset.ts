@@ -13,6 +13,7 @@ import { AccountRegistry } from './AccountRegistry';
 import type { Command } from '@commander-js/extra-typings';
 import * as process from 'node:process';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
+import { AccountMiners } from './AccountMiners';
 
 export type SubaccountRange = readonly number[];
 
@@ -124,7 +125,7 @@ export class Accountset {
     });
   }
 
-  public async getNextMiningSeats(
+  public async getAvailableMinerAccounts(
     maxSeats: number,
   ): Promise<{ index: number; isRebid: boolean; address: string }[]> {
     const miningSeats = await this.miningSeats();
@@ -503,10 +504,11 @@ export class Accountset {
       .map(([address, { pair, index }]) => ({ pair, index, address }));
   }
 
-  public async watchBlocks(shouldLog?: boolean): Promise<BlockWatch> {
-    const blockWatch = new BlockWatch(this.client, this, shouldLog);
-    await blockWatch.start();
-    return blockWatch;
+  public async watchBlocks(shouldLog: boolean = false): Promise<AccountMiners> {
+    const accountMiners = new AccountMiners(this, { shouldLog });
+    await accountMiners.loadAt();
+    await accountMiners.watch();
+    return accountMiners;
   }
 
   public static async fromCli(program: Command, proxyForAddress?: string) {

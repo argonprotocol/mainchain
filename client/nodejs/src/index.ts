@@ -16,7 +16,13 @@ export { WageProtector } from './WageProtector';
 export { TxSubmitter } from './TxSubmitter';
 export { Accountset } from './Accountset';
 export { MiningBids } from './MiningBids';
-export { BlockWatch } from './BlockWatch';
+export { AccountMiners } from './AccountMiners';
+export { MiningRotations } from './MiningRotations';
+export {
+  BlockWatch,
+  getAuthorFromHeader,
+  getTickFromHeader,
+} from './BlockWatch';
 export * from './utils';
 export { AccountRegistry } from './AccountRegistry';
 export { Vault } from './Vault';
@@ -43,6 +49,7 @@ export {
 
 export * from '@polkadot/types';
 export * from '@polkadot/types/lookup';
+export * from '@polkadot/types/interfaces';
 export { InterfaceTypes as interfaces };
 
 export type ArgonClient = ApiPromise;

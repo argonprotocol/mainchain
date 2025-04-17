@@ -132,3 +132,25 @@ export function checkForExtrinsicSuccess(
     }
   });
 }
+
+/**
+ * JSON with support for BigInt in JSON.stringify and JSON.parse
+ */
+export class JsonExt {
+  public static stringify(obj: any, space?: number): string {
+    return JSON.stringify(
+      obj,
+      (_, v) => (typeof v === 'bigint' ? `${v}n` : v),
+      space,
+    );
+  }
+
+  public static parse<T = any>(str: string): T {
+    return JSON.parse(str, (_, v) => {
+      if (typeof v === 'string' && v.endsWith('n')) {
+        return BigInt(v.slice(0, -1));
+      }
+      return v;
+    });
+  }
+}

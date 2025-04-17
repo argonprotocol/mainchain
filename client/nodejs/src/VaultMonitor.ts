@@ -44,18 +44,19 @@ export class VaultMonitor {
       this.shouldLog = options.shouldLog;
     }
     this.miningBids = new MiningBids(this.mainchain, this.shouldLog);
-    this.blockWatch = new BlockWatch(this.mainchain, undefined, this.shouldLog);
-    this.blockWatch.events.on(
-      'vaults-updated',
-      this.onVaultsUpdated.bind(this),
-    );
-    this.blockWatch.events.on('mining-bid', async (blockHash, _bid) => {
-      await this.miningBids.loadAt(this.accountset.namedAccounts, blockHash);
-      this.printBids(blockHash);
+    this.blockWatch = new BlockWatch(this.mainchain, {
+      shouldLog: this.shouldLog,
     });
-    this.blockWatch.events.on('mining-bid-ousted', async blockHash => {
-      await this.miningBids.loadAt(this.accountset.namedAccounts, blockHash);
-      this.printBids(blockHash);
+    this.blockWatch.events.on('vaults-updated', (header, vaultIds) =>
+      this.onVaultsUpdated(header.hash, vaultIds),
+    );
+    this.blockWatch.events.on('mining-bid', async (header, _bid) => {
+      await this.miningBids.loadAt(this.accountset.namedAccounts, header.hash);
+      this.printBids(header.hash);
+    });
+    this.blockWatch.events.on('mining-bid-ousted', async header => {
+      await this.miningBids.loadAt(this.accountset.namedAccounts, header.hash);
+      this.printBids(header.hash);
     });
   }
 

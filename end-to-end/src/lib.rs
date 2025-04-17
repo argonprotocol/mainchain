@@ -163,6 +163,20 @@ pub(crate) mod utils {
 			register.extrinsic_hash(),
 			register.block_hash()
 		);
+		// wait for next cohort to start
+		let cohort = client
+			.fetch_storage(&storage().mining_slot().next_cohort_id(), None)
+			.await?
+			.unwrap_or_default();
+		while cohort ==
+			client
+				.fetch_storage(&storage().mining_slot().next_cohort_id(), None)
+				.await?
+				.unwrap_or_default()
+		{
+			println!("Waiting for cohort {cohort} to start");
+			tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+		}
 		Ok(())
 	}
 }

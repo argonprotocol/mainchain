@@ -1,45 +1,63 @@
-import { Accountset, type ArgonClient, type GenericEvent } from './index';
+import { type ArgonClient, type GenericEvent } from './index';
 import type TypedEventEmitter from 'typed-emitter';
 import EventEmitter from 'node:events';
 import type { Header, SignedBlock } from '@polkadot/types/interfaces';
 import { eventDataToJson, formatArgons } from './utils';
 
 export type BlockWatchEvents = {
-  'vaults-updated': (blockHash: Uint8Array, vaultIds: Set<number>) => void;
+  block: (
+    header: Header,
+    digests: { tick: number; author: string },
+    events: GenericEvent[],
+  ) => void;
+  'vaults-updated': (header: Header, vaultIds: Set<number>) => void;
   'bitcoin-verified': (
-    blockHash: Uint8Array,
+    header: Header,
     lockedBitcoin: { utxoId: number; vaultId: number; amount: bigint },
   ) => void;
   'mining-bid': (
-    blockHash: Uint8Array,
+    header: Header,
     bid: { amount: bigint; accountId: string },
   ) => void;
   'mining-bid-ousted': (
-    blockHash: Uint8Array,
+    header: Header,
     bid: {
       preservedArgonotHold: boolean;
       accountId: string;
     },
   ) => void;
-  'accountset-authored': (
-    blockHash: Uint8Array,
-    earnings: {
-      author: string;
-      argons: bigint;
-      argonots: bigint;
-      cohortId: number;
-    },
-  ) => void;
-  'accountset-minted': (
-    blockHash: Uint8Array,
-    minted: {
-      accountId: string;
-      argons: bigint;
-      cohortId: number;
-    },
-  ) => void;
-  event: (blockHash: Uint8Array, event: GenericEvent) => void;
+  event: (header: Header, event: GenericEvent) => void;
 };
+
+export function getTickFromHeader(
+  client: ArgonClient,
+  header: Header,
+): number | undefined {
+  for (const x of header.digest.logs) {
+    if (x.isPreRuntime) {
+      const [engineId, data] = x.asPreRuntime;
+      if (engineId.toString() === 'aura') {
+        return client.createType('u64', data).toNumber();
+      }
+    }
+  }
+  return undefined;
+}
+
+export function getAuthorFromHeader(
+  client: ArgonClient,
+  header: Header,
+): string | undefined {
+  for (const x of header.digest.logs) {
+    if (x.isPreRuntime) {
+      const [engineId, data] = x.asPreRuntime;
+      if (engineId.toString() === 'pow_') {
+        return client.createType('AccountId32', data).toHuman();
+      }
+    }
+  }
+  return undefined;
+}
 
 export class BlockWatch {
   public readonly events =
@@ -56,15 +74,16 @@ export class BlockWatch {
   } = {};
   private unsubscribe?: () => void;
 
-  private trackedAccountsByAddress: {
-    [address: string]: { cohortId: number; subaccountIndex: number };
-  } = {};
-
   constructor(
     private readonly mainchain: Promise<ArgonClient>,
-    private monitorAccounts?: Accountset,
-    private shouldLog = true,
-  ) {}
+    private options: {
+      finalizedBlocks?: boolean;
+      shouldLog?: boolean;
+    } = {},
+  ) {
+    this.options.shouldLog ??= true;
+    this.options.finalizedBlocks ??= false;
+  }
 
   public stop() {
     if (this.unsubscribe) {
@@ -74,58 +93,30 @@ export class BlockWatch {
   }
 
   public async start() {
-    if (this.monitorAccounts) {
-      const seats = await this.monitorAccounts.miningSeats();
-      for (const seat of seats) {
-        if (seat.cohortId === undefined) continue;
-        this.trackedAccountsByAddress[seat.address] = {
-          cohortId: seat.cohortId,
-          subaccountIndex: seat.subaccountIndex,
-        };
-      }
-    }
     await this.watchBlocks();
-  }
-
-  private newCohortMiners(cohortId: number, addresses: string[]) {
-    if (!this.monitorAccounts) return;
-
-    for (const [address, info] of Object.entries(
-      this.trackedAccountsByAddress,
-    )) {
-      if (info.cohortId === cohortId - 10) {
-        delete this.trackedAccountsByAddress[address];
-      }
-    }
-    for (const address of addresses) {
-      const entry = this.monitorAccounts.subAccountsByAddress[address];
-      if (entry) {
-        console.log('new miners has subaccount', address);
-        this.trackedAccountsByAddress[address] = {
-          cohortId,
-          subaccountIndex: entry.index,
-        };
-      }
-    }
   }
 
   private async watchBlocks() {
     const client = await this.mainchain;
-    this.unsubscribe = await client.rpc.chain.subscribeNewHeads(
-      async header => {
-        try {
-          await this.processBlock(header);
-        } catch (e) {
-          console.error('Error processing block', e);
-        }
-      },
-    );
+    const onBlock = async (header: Header) => {
+      try {
+        await this.processBlock(header);
+      } catch (e) {
+        console.error('Error processing block', e);
+      }
+    };
+    if (this.options.finalizedBlocks) {
+      this.unsubscribe =
+        await client.rpc.chain.subscribeFinalizedHeads(onBlock);
+    } else {
+      this.unsubscribe = await client.rpc.chain.subscribeNewHeads(onBlock);
+    }
   }
 
   private async processBlock(header: Header) {
     const client = await this.mainchain;
 
-    if (this.shouldLog) {
+    if (this.options.shouldLog) {
       console.log(`-------------------------------------
 BLOCK #${header.number}, ${header.hash.toHuman()}`);
     }
@@ -138,27 +129,6 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
     const events = await api.query.system.events();
     const reloadVaults = new Set<number>();
     let block: SignedBlock | undefined = undefined;
-
-    const author =
-      header.digest.logs
-        .map(x => {
-          if (x.isPreRuntime) {
-            const [engineId, data] = x.asPreRuntime;
-            if (engineId.toString() === 'pow_') {
-              return client.createType('AccountId32', data).toHuman();
-            }
-          }
-          return undefined;
-        })
-        .find(Boolean) ?? '';
-
-    const voteAuthor = this.trackedAccountsByAddress[author];
-    if (voteAuthor && this.shouldLog) {
-      console.log(
-        '> Our vote author',
-        this.monitorAccounts!.accountRegistry.getName(author),
-      );
-    }
 
     for (const { event, phase } of events) {
       const data = eventDataToJson(event);
@@ -201,44 +171,20 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
         if (client.events.mint.MiningMint.is(event)) {
           const { amount } = event.data;
           data.amount = formatArgons(amount.toBigInt());
-          if (this.monitorAccounts) {
-            const activeMiners = await client.query.miningSlot
-              .activeMinersCount()
-              .then(x => x.toBigInt());
-            const amountPerMiner = amount.toBigInt() / activeMiners;
-            if (amountPerMiner > 0n) {
-              for (const [address, info] of Object.entries(
-                this.trackedAccountsByAddress,
-              )) {
-                const { cohortId } = info;
-                this.events.emit('accountset-minted', blockHash, {
-                  accountId: address,
-                  argons: amountPerMiner,
-                  cohortId,
-                });
-              }
-            }
-          }
         }
       } else if (event.section === 'miningSlot') {
         logEvent = true;
         if (client.events.miningSlot.SlotBidderAdded.is(event)) {
           data.amount = formatArgons(event.data.bidAmount.toBigInt());
-          this.events.emit('mining-bid', blockHash, {
+          this.events.emit('mining-bid', header, {
             amount: event.data.bidAmount.toBigInt(),
             accountId: event.data.accountId.toString(),
           });
         } else if (client.events.miningSlot.SlotBidderDropped.is(event)) {
-          this.events.emit('mining-bid-ousted', blockHash, {
+          this.events.emit('mining-bid-ousted', header, {
             accountId: event.data.accountId.toString(),
             preservedArgonotHold: event.data.preservedArgonotHold.toPrimitive(),
           });
-        }
-        if (client.events.miningSlot.NewMiners.is(event)) {
-          this.newCohortMiners(
-            event.data.cohortId.toNumber(),
-            event.data.newMiners.map(x => x.accountId.toHuman()),
-          );
         }
       } else if (event.section === 'bitcoinUtxos') {
         logEvent = true;
@@ -248,7 +194,7 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
             utxoId.toNumber(),
             blockHash,
           );
-          this.events.emit('bitcoin-verified', blockHash, {
+          this.events.emit('bitcoin-verified', header, {
             utxoId: utxoId.toNumber(),
             vaultId: details.vaultId,
             amount: details.amount,
@@ -256,23 +202,6 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
 
           data.amount = formatArgons(details.amount);
           reloadVaults.add(details.vaultId);
-        }
-      } else if (event.section === 'blockRewards') {
-        if (client.events.blockRewards.RewardCreated.is(event)) {
-          const { rewards } = event.data;
-          for (const reward of rewards) {
-            const { argons, ownership } = reward;
-
-            const entry = this.trackedAccountsByAddress[author];
-            if (entry) {
-              this.events.emit('accountset-authored', blockHash, {
-                author,
-                argons: argons.toBigInt(),
-                argonots: ownership.toBigInt(),
-                cohortId: entry.cohortId,
-              });
-            }
-          }
         }
       } else if (event.section === 'system') {
         if (client.events.system.ExtrinsicFailed.is(event)) {
@@ -284,7 +213,7 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
             const extrinsicIndex = phase.asApplyExtrinsic.toNumber();
             const ext = block!.block.extrinsics[extrinsicIndex];
             // translate dispatchInfo into readable tx
-            if (this.shouldLog) {
+            if (this.options.shouldLog) {
               console.log(
                 `> [Failed Tx] ${section}.${name} -> ${ext.method.section}.${ext.method.method} (nonce=${ext.nonce})`,
                 (ext.toHuman() as any)?.method?.args,
@@ -292,19 +221,29 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
             }
           } else {
             // Other, CannotLookup, BadOrigin, no extra info
-            if (this.shouldLog) {
+            if (this.options.shouldLog) {
               console.log(`x [Failed Tx] ${dispatchError.toJSON()}`);
             }
           }
         }
       }
-      if (this.shouldLog && logEvent) {
+      if (this.options.shouldLog && logEvent) {
         console.log(`> ${event.section}.${event.method}`, data);
       }
-      this.events.emit('event', blockHash, event);
+      this.events.emit('event', header, event);
     }
     if (reloadVaults.size)
-      this.events.emit('vaults-updated', blockHash, reloadVaults);
+      this.events.emit('vaults-updated', header, reloadVaults);
+
+    const tick = getTickFromHeader(client, header)!;
+    const author = getAuthorFromHeader(client, header)!;
+
+    this.events.emit(
+      'block',
+      header,
+      { tick, author },
+      events.map(x => x.event),
+    );
   }
 
   private async getBitcoinLockDetails(

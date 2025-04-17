@@ -3866,9 +3866,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				224u8, 175u8, 227u8, 254u8, 223u8, 124u8, 255u8, 180u8, 235u8, 93u8, 63u8, 159u8,
-				139u8, 88u8, 154u8, 200u8, 232u8, 2u8, 110u8, 205u8, 65u8, 65u8, 103u8, 34u8,
-				226u8, 109u8, 99u8, 238u8, 194u8, 162u8, 167u8, 229u8,
+				29u8, 228u8, 224u8, 30u8, 5u8, 226u8, 45u8, 142u8, 251u8, 170u8, 94u8, 183u8, 43u8,
+				129u8, 91u8, 116u8, 184u8, 249u8, 120u8, 168u8, 165u8, 132u8, 183u8, 244u8, 199u8,
+				112u8, 82u8, 137u8, 111u8, 50u8, 255u8, 253u8,
 			]
 	}
 	pub mod system {
@@ -5019,10 +5019,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							98u8, 66u8, 249u8, 244u8, 47u8, 148u8, 248u8, 102u8, 30u8, 72u8, 184u8,
-							187u8, 144u8, 26u8, 42u8, 232u8, 32u8, 110u8, 216u8, 205u8, 223u8,
-							104u8, 174u8, 14u8, 184u8, 243u8, 122u8, 14u8, 46u8, 119u8, 200u8,
-							231u8,
+							253u8, 170u8, 218u8, 8u8, 102u8, 141u8, 223u8, 251u8, 40u8, 246u8,
+							207u8, 250u8, 21u8, 140u8, 66u8, 73u8, 163u8, 15u8, 2u8, 211u8, 83u8,
+							109u8, 184u8, 42u8, 42u8, 74u8, 249u8, 2u8, 153u8, 159u8, 83u8, 144u8,
 						],
 					)
 				}
@@ -15473,6 +15472,7 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Any bitcoins minted"]
 			pub struct BitcoinMint {
 				pub account_id: bitcoin_mint::AccountId,
 				pub utxo_id: bitcoin_mint::UtxoId,
@@ -15499,14 +15499,18 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The amount of argons minted for mining. NOTE: accounts below Existential Deposit will"]
+			#[doc = "not be able to mint"]
 			pub struct MiningMint {
 				pub amount: mining_mint::Amount,
+				pub per_miner: mining_mint::PerMiner,
 				pub argon_cpi: mining_mint::ArgonCpi,
 				pub liquidity: mining_mint::Liquidity,
 			}
 			pub mod mining_mint {
 				use super::runtime_types;
 				pub type Amount = runtime_types::primitive_types::U256;
+				pub type PerMiner = ::core::primitive::u128;
 				pub type ArgonCpi = runtime_types::sp_arithmetic::fixed_point::FixedI128;
 				pub type Liquidity = ::core::primitive::u128;
 			}
@@ -15525,6 +15529,8 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Errors encountered while minting. Most often due to mint amount still below Existential"]
+			#[doc = "Deposit"]
 			pub struct MintError {
 				pub mint_type: mint_error::MintType,
 				pub account_id: mint_error::AccountId,
@@ -29380,18 +29386,24 @@ pub mod api {
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
 					#[codec(index = 0)]
+					#[doc = "Any bitcoins minted"]
 					BitcoinMint {
 						account_id: crate::types::AccountId32,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
+					#[doc = "The amount of argons minted for mining. NOTE: accounts below Existential Deposit will"]
+					#[doc = "not be able to mint"]
 					MiningMint {
 						amount: runtime_types::primitive_types::U256,
+						per_miner: ::core::primitive::u128,
 						argon_cpi: runtime_types::sp_arithmetic::fixed_point::FixedI128,
 						liquidity: ::core::primitive::u128,
 					},
 					#[codec(index = 2)]
+					#[doc = "Errors encountered while minting. Most often due to mint amount still below Existential"]
+					#[doc = "Deposit"]
 					MintError {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
 						account_id: crate::types::AccountId32,

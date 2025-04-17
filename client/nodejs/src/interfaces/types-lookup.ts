@@ -1155,6 +1155,7 @@ declare module '@polkadot/types/lookup' {
     readonly isMiningMint: boolean;
     readonly asMiningMint: {
       readonly amount: U256;
+      readonly perMiner: u128;
       readonly argonCpi: i128;
       readonly liquidity: u128;
     } & Struct;

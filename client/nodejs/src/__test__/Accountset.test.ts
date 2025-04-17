@@ -53,7 +53,7 @@ describeIntegration('Accountset tests', () => {
       sessionKeyMnemonic: mnemonicGenerate(),
     });
 
-    const nextSeats = await accountset.getNextMiningSeats(5);
+    const nextSeats = await accountset.getAvailableMinerAccounts(5);
     expect(nextSeats).toHaveLength(5);
     const existingBids = await accountset.bids();
     expect(existingBids.filter(x => x.bidPlace !== undefined)).toHaveLength(0);

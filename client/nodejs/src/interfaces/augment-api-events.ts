@@ -911,16 +911,27 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     mint: {
+      /**
+       * Any bitcoins minted
+       **/
       BitcoinMint: AugmentedEvent<
         ApiType,
         [accountId: AccountId32, utxoId: Option<u64>, amount: u128],
         { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
       >;
+      /**
+       * The amount of argons minted for mining. NOTE: accounts below Existential Deposit will
+       * not be able to mint
+       **/
       MiningMint: AugmentedEvent<
         ApiType,
-        [amount: U256, argonCpi: i128, liquidity: u128],
-        { amount: U256; argonCpi: i128; liquidity: u128 }
+        [amount: U256, perMiner: u128, argonCpi: i128, liquidity: u128],
+        { amount: U256; perMiner: u128; argonCpi: i128; liquidity: u128 }
       >;
+      /**
+       * Errors encountered while minting. Most often due to mint amount still below Existential
+       * Deposit
+       **/
       MintError: AugmentedEvent<
         ApiType,
         [

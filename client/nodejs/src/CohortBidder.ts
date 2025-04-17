@@ -13,7 +13,7 @@ export class CohortBidder {
     return this.accountset.client;
   }
 
-  public readonly stats = {
+  public stats = {
     // number of seats won
     seats: 0,
     // sum of argons bid in successful bids
@@ -92,6 +92,8 @@ export class CohortBidder {
         },
       );
     });
+    // wait for any pending request to finish updating stats
+    void (await this.pendingRequest);
 
     if (nextCohortId.toNumber() === this.cohortId) {
       console.log('Bidder updating stats with bid queue');

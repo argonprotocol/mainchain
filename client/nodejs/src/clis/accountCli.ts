@@ -18,11 +18,12 @@ export default function accountCli() {
     .description('Watch for blocks closed by subaccounts')
     .action(async () => {
       const accountset = await Accountset.fromCli(program);
-      const blockWatch = await accountset.watchBlocks(false);
-      blockWatch.events.on('accountset-authored', (_block, mined) => {
+      const accountMiners = await accountset.watchBlocks();
+
+      accountMiners.events.on('mined', (_block, mined) => {
         console.log('Your accounts authored a block', mined);
       });
-      blockWatch.events.on('accountset-minted', (_block, minted) => {
+      accountMiners.events.on('minted', (_block, minted) => {
         console.log('Your accounts minted argons', minted);
       });
     });

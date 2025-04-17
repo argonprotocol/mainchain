@@ -197,7 +197,7 @@ export default function miningCli() {
               process.exit(1);
             }
             const subaccountRange =
-              await accountset.getNextMiningSeats(seatsToWin);
+              await accountset.getAvailableMinerAccounts(seatsToWin);
 
             if (cohortBidder && cohortBidder?.cohortId !== cohortId) {
               await stopBidder(unsubscribe);

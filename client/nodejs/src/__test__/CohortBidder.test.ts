@@ -91,7 +91,7 @@ describeIntegration('Cohort Bidder tests', () => {
         bobBidder = new CohortBidder(
           bob,
           cohortId,
-          await bob.getNextMiningSeats(10),
+          await bob.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
             maxBid: 5_000_000n,
@@ -103,7 +103,7 @@ describeIntegration('Cohort Bidder tests', () => {
         aliceBidder = new CohortBidder(
           alice,
           cohortId,
-          await alice.getNextMiningSeats(10),
+          await alice.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
             maxBid: 4_000_000n,
@@ -130,14 +130,14 @@ describeIntegration('Cohort Bidder tests', () => {
 
     const bobWatch = await bob.watchBlocks(true);
     const bobMinePromise = new Promise<{ argons: bigint }>(resolve => {
-      bobWatch.events.on('accountset-authored', (_blockHash, minted) => {
-        resolve(minted);
+      bobWatch.events.on('mined', (_blockHash, mined) => {
+        resolve(mined);
       });
     });
     const aliceWatch = await alice.watchBlocks(true);
     const aliceMinePromise = new Promise<{ argons: bigint }>(resolve => {
-      aliceWatch.events.on('accountset-authored', (_blockHash, minted) => {
-        resolve(minted);
+      aliceWatch.events.on('mined', (_blockHash, mined) => {
+        resolve(mined);
       });
     });
     // wait for the slot to fully complete

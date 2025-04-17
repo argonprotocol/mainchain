@@ -71,7 +71,7 @@ export class BidPool {
     readonly keypair: KeyringPair,
     readonly accountRegistry: AccountRegistry = AccountRegistry.factory(),
   ) {
-    this.blockWatch = new BlockWatch(client, undefined, false);
+    this.blockWatch = new BlockWatch(client, { shouldLog: false });
   }
 
   private async onVaultsUpdated(
@@ -159,9 +159,8 @@ export class BidPool {
   public async watch(): Promise<{ unsubscribe: () => void }> {
     await this.loadAt();
     await this.blockWatch.start();
-    this.blockWatch.events.on(
-      'vaults-updated',
-      this.onVaultsUpdated.bind(this),
+    this.blockWatch.events.on('vaults-updated', (b, v) =>
+      this.onVaultsUpdated(b.hash, v),
     );
     const api = await this.client;
     this.blockWatch.events.on('event', async (_, event) => {

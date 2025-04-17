@@ -99,16 +99,18 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
-		BitcoinMint {
-			account_id: T::AccountId,
-			utxo_id: Option<UtxoId>,
-			amount: T::Balance,
-		},
+		/// Any bitcoins minted
+		BitcoinMint { account_id: T::AccountId, utxo_id: Option<UtxoId>, amount: T::Balance },
+		/// The amount of argons minted for mining. NOTE: accounts below Existential Deposit will
+		/// not be able to mint
 		MiningMint {
 			amount: U256,
+			per_miner: T::Balance,
 			argon_cpi: ArgonCPI,
 			liquidity: T::Balance,
 		},
+		/// Errors encountered while minting. Most often due to mint amount still below Existential
+		/// Deposit
 		MintError {
 			mint_type: MintType,
 			account_id: T::AccountId,
@@ -198,6 +200,7 @@ pub mod pallet {
 				if !amount_minted.is_zero() {
 					Self::deposit_event(Event::<T>::MiningMint {
 						amount: amount_minted,
+						per_miner: argons_to_print_per_miner,
 						argon_cpi,
 						liquidity: T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default(),
 					});
