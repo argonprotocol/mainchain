@@ -20,7 +20,7 @@
     "watch": "tsup --watch",
     "typecheck": "tsc -w --noEmit",
     "test": "vitest --run --typecheck --disableConsoleIntercept",
-    "test:ci": "vitest --run --typecheck --disableConsoleIntercept --retry=1"
+    "test:ci": "vitest --run --retry=1"
   },
   "files": [
     "lib/"

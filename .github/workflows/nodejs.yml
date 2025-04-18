@@ -447,6 +447,15 @@ jobs:
       - name: Make binary executable
         run: chmod +x ./target/debug/argon-*
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install bitcoind
+        run: cargo build -p argon-testing-bitcoin
+
       - name: Test client
         run: yarn test:ci
         working-directory: ./client/nodejs
