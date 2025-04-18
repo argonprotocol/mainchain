@@ -1,10 +1,12 @@
 import { createKeyringPair, keyringFromFile } from '../keyringUtils';
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import { expect, it } from 'vitest';
+import * as Path from 'node:path';
 
 it('can import and export a keyring', async () => {
+  const tmpFile = Path.resolve(fs.mkdtempSync('key'), 'keyring.json');
   const keyring = await createKeyringPair({
-    filePath: '/tmp/keyring.json',
+    filePath: tmpFile,
     passphrase: 'test',
     cryptoType: 'sr25519',
   });
@@ -15,10 +17,10 @@ it('can import and export a keyring', async () => {
   keyring.unlock('test');
   expect(keyring.isLocked).toBe(false);
 
-  expect(fs.existsSync('/tmp/keyring.json')).toBe(true);
+  expect(fs.existsSync(tmpFile)).toBe(true);
 
   const decoded = await keyringFromFile({
-    filePath: '/tmp/keyring.json',
+    filePath: tmpFile,
     passphrase: 'test',
   });
   expect(decoded.address).toBe(address);

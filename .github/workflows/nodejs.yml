@@ -321,7 +321,7 @@ jobs:
         shell: bash
         working-directory: ./client/nodejs
 
-      - name: Download artifacts
+      - name: Download localchain artifacts
         uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.target }}
@@ -330,8 +330,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:ci --target=${{ matrix.target }}
-        working-directory: localchain
+        run: yarn test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
@@ -417,7 +416,7 @@ jobs:
       - name: Pull Miner
         run: docker pull ghcr.io/argonprotocol/argon-miner:dev && docker pull ghcr.io/argonprotocol/argon-notary:dev
 
-      - name: Download artifacts
+      - name: Download localchain bindings
         uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.target }}
@@ -426,7 +425,7 @@ jobs:
       #          run-id: 8755170162
 
       - name: Test bindings
-        run: yarn test:ci
+        run: yarn test
         working-directory: ./localchain
         continue-on-error: true
         env:
@@ -435,14 +434,18 @@ jobs:
           ADD_DOCKER_HOST: true
           ARGON_USE_DOCKER_BINS: 1
           RUST_LOG: debug,sqlx=info
+          SQLX_OFFLINE: true
           AWS_S3_ENDPOINT: http://host.docker.internal:9000
 
-      - name: Download artifacts
+      - name: Download binary artifacts
         uses: actions/download-artifact@v4
         with:
           name: bins-x86_64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: ./amd64
+          path: target/debug/
+
+      - name: Make binary executable
+        run: chmod +x ./target/debug/argon-*
 
       - name: Test client
         run: yarn test:ci
