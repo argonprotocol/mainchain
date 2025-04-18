@@ -1,6 +1,22 @@
 # Changelog
 
-## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...4a0576922ed637bc20f280a62d991585f1e2deef) (2025-04-09)
+## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.1...da1d9f6a1470a23eeba09a8fc7ad4e12e0923a77) (2025-04-17)
+
+### Features
+
+* **client:** add nodejs cli + bidding
+([babcfb6](https://github.com/argonprotocol/mainchain/commit/babcfb6070d7d430ba13b39a0bbbbd7d9ffb2bcd))
+
+### Fixes
+
+* **client:** update nodejs testing
+([1e0908c](https://github.com/argonprotocol/mainchain/commit/1e0908cbeeefadf71255657c7c286d5205f0ee3a))
+* **node:** properly retieve aux data
+([8f1eef5](https://github.com/argonprotocol/mainchain/commit/8f1eef59728f0bf981f0ae13a0cbe753c4a51e0e))
+* **bitcoin:** allow https servers
+([cadca32](https://github.com/argonprotocol/mainchain/commit/cadca327b4475fa7864a7f573fdb9963b831dc9d))
+
+## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.1) (2025-04-09)
 
 ### Features
 

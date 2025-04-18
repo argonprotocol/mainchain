@@ -117,6 +117,9 @@ export default class TestMainchain implements ITeardownable {
       `--compute-miners=${miningThreads}`,
       `--port=${port}`,
       `--rpc-port=${rpcPort}`,
+      '--rpc-external',
+      '--unsafe-rpc-external',
+      '--rpc-methods=unsafe',
       `--bitcoin-rpc-url=${bitcoinRpcUrl}`,
       `--notebook-archive-hosts=http://127.0.0.1:9000/${this.uuid}`,
     );

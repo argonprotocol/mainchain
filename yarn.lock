@@ -49,7 +49,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/localchain@workspace:localchain"
   dependencies:
-    "@argonprotocol/mainchain": "npm:1.1.0-rc.1"
+    "@argonprotocol/mainchain": "npm:1.1.0-rc.2"
     "@napi-rs/cli": "npm:3.0.0-alpha.55"
     shx: "npm:^0.3.4"
     typescript: "npm:^5.8.3"
@@ -68,7 +68,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/mainchain@npm:1.1.0-rc.1, @argonprotocol/mainchain@workspace:client/nodejs":
+"@argonprotocol/mainchain@npm:1.1.0-rc.2, @argonprotocol/mainchain@workspace:client/nodejs":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/mainchain@workspace:client/nodejs"
   dependencies:
