@@ -1,10 +1,17 @@
 import { createKeyringPair, keyringFromFile } from '../keyringUtils';
 import * as fs from 'node:fs';
-import { expect, it } from 'vitest';
+import { afterAll, expect, it } from 'vitest';
 import * as Path from 'node:path';
+import { closeOnTeardown, teardown } from '@argonprotocol/testing';
 
+afterAll(teardown);
 it('can import and export a keyring', async () => {
   const tmpFile = Path.resolve(fs.mkdtempSync('key'), 'keyring.json');
+  closeOnTeardown({
+    async close() {
+      await fs.promises.rm(tmpFile, { force: true });
+    },
+  });
   const keyring = await createKeyringPair({
     filePath: tmpFile,
     passphrase: 'test',

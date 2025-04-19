@@ -4,7 +4,8 @@ import {
   teardown,
   TestBitcoinCli,
   TestMainchain,
-} from '../test-utils/index';
+  TestOracle,
+} from '@argonprotocol/testing';
 import {
   Accountset,
   ArgonClient,
@@ -15,8 +16,7 @@ import {
 import { parseSubaccountRange } from '../Accountset';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { mnemonicGenerate } from '@polkadot/util-crypto';
-import fs from 'node:fs';
-import TestOracle from '../test-utils/TestOracle';
+import * as fs from 'node:fs';
 import { Keyring } from '@polkadot/api';
 
 afterAll(teardown);

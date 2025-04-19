@@ -6,7 +6,7 @@ import {
   teardown,
   TestMainchain,
   TestNotary,
-} from '../test-utils/index';
+} from '@argonprotocol/testing';
 import { parseSubaccountRange } from '../Accountset';
 import { Keyring } from '@polkadot/api';
 import { mnemonicGenerate } from '@polkadot/util-crypto';

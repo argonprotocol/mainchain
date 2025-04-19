@@ -31,6 +31,7 @@ export class MiningRotations {
   }
 
   async getForHeader(client: ArgonClient, header: Header) {
+    if (header.number.toNumber() === 0) return 0;
     const tick = getTickFromHeader(client, header);
     if (tick === undefined) return undefined;
     return this.getForTick(client, tick);

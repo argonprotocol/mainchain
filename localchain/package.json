@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@argonprotocol/mainchain": "1.1.0-rc.2",
+    "@argonprotocol/testing": "1.1.0-rc.2",
     "@napi-rs/cli": "3.0.0-alpha.55",
     "shx": "^0.3.4",
     "typescript": "^5.8.3",

@@ -1,6 +1,5 @@
 import { Command } from '@commander-js/extra-typings';
 import { VaultMonitor } from '../VaultMonitor';
-import BigNumber from 'bignumber.js';
 import { Accountset } from '../Accountset';
 import { TxSubmitter } from '../TxSubmitter';
 import { Vault } from '../Vault';

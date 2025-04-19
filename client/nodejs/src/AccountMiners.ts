@@ -171,7 +171,6 @@ export class AccountMiners {
     for (const address of addresses) {
       const entry = this.accountset.subAccountsByAddress[address];
       if (entry) {
-        console.log('new miners has subaccount', address);
         this.trackedAccountsByAddress[address] = {
           cohortId,
           subaccountIndex: entry.index,

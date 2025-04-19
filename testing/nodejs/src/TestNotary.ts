@@ -1,8 +1,14 @@
 import { customAlphabet } from 'nanoid';
-import { Client } from 'pg';
+import pg from 'pg';
+import type { Client } from 'pg';
 import * as child_process from 'node:child_process';
-import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '../index';
-import fs from 'node:fs';
+import {
+  ArgonClient,
+  Keyring,
+  KeyringPair,
+  TxSubmitter,
+} from '@argonprotocol/mainchain';
+import * as fs from 'node:fs';
 import * as readline from 'node:readline';
 import {
   addTeardown,
@@ -14,7 +20,9 @@ import {
 } from './index';
 import * as process from 'node:process';
 import { Readable } from 'node:stream';
-import Path from 'node:path';
+import * as Path from 'node:path';
+
+const { Client: PgClient } = pg;
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -205,7 +213,7 @@ export default class TestNotary implements ITeardownable {
   }
 
   async connect(): Promise<Client> {
-    const client = new Client({ connectionString: this.#dbConnectionString });
+    const client = new PgClient({ connectionString: this.#dbConnectionString });
     try {
       await client.connect();
     } catch (err) {

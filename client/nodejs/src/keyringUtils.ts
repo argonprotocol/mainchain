@@ -5,7 +5,7 @@ import {
   IGlobalOptions,
 } from './index';
 import { promises } from 'node:fs';
-import os from 'node:os';
+import * as os from 'node:os';
 
 const { readFile, writeFile } = promises;
 

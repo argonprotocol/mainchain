@@ -1,11 +1,6 @@
 import * as fs from 'node:fs';
-import child_process, {
-  ChildProcess,
-  execSync,
-  spawn,
-} from 'node:child_process';
-import * as path from 'node:path';
-import Path from 'node:path';
+import { ChildProcess, execSync, spawn } from 'node:child_process';
+import * as Path from 'node:path';
 import * as readline from 'node:readline';
 import {
   addTeardown,
@@ -20,7 +15,7 @@ import { detectPort } from 'detect-port';
 import { customAlphabet } from 'nanoid';
 import Client from 'bitcoin-core';
 import { createUid } from './TestNotary';
-import { type ArgonClient, getClient } from '../index';
+import { type ArgonClient, getClient } from '@argonprotocol/mainchain';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
 
@@ -49,7 +44,7 @@ export default class TestMainchain implements ITeardownable {
   constructor(binPath?: string) {
     this.#binPath =
       binPath ?? Path.join(projectRoot(), `target/debug/argon-node`);
-    this.#binPath = path.resolve(this.#binPath);
+    this.#binPath = Path.resolve(this.#binPath);
     if (!process.env.ARGON_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
       throw new Error(`Mainchain binary not found at ${this.#binPath}`);
     }
@@ -218,14 +213,12 @@ export default class TestMainchain implements ITeardownable {
     let rpcPort = 14338;
     if (launchBitcoin) {
       rpcPort = await detectPort();
-      const path = child_process
-        .execSync(
-          Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`),
-          {
-            encoding: 'utf8',
-          },
-        )
-        .trim();
+      const path = execSync(
+        Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`),
+        {
+          encoding: 'utf8',
+        },
+      ).trim();
 
       const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-' + this.uuid);
 

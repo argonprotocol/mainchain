@@ -316,10 +316,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install client
+      - name: Build typescript
         run: yarn tsc
-        shell: bash
-        working-directory: ./client/nodejs
 
       - name: Download localchain artifacts
         uses: actions/download-artifact@v4
@@ -382,10 +380,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install client
+      - name: Build typescript
         run: yarn tsc
-        shell: bash
-        working-directory: ./client/nodejs
 
       - name: Docker Internal Host
         run: |
@@ -495,7 +491,6 @@ jobs:
 
       - name: Build client
         run: yarn tsc
-        working-directory: ./client/nodejs
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
