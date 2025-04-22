@@ -5,8 +5,9 @@ import {
   convertFixedU128ToBigNumber,
 } from './index';
 import { formatArgons } from './utils';
-import { Bool, Compact, u128, u64, Vec } from '@polkadot/types-codec';
+import { Bool, Compact, u128, u32, u64, Vec } from '@polkadot/types-codec';
 import { AccountId } from '@polkadot/types/interfaces/runtime';
+import { ApiDecoration } from '@polkadot/api/types';
 
 export class CohortBidder {
   public get client(): Promise<ArgonClient> {
@@ -30,6 +31,8 @@ export class CohortBidder {
     argonotUsdPrice: 0.0,
     // The cohort expected argons per block
     cohortArgonsPerBlock: 0n,
+    // The last block that bids are synced to
+    lastBlock: 0,
   };
 
   private unsubscribe?: () => void;
@@ -69,25 +72,26 @@ export class CohortBidder {
       this.unsubscribe();
     }
     const client = await this.client;
-    const [nextCohort, nextCohortId] = await new Promise<
-      [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64]
+    const [nextCohort, nextCohortId, blockNumber] = await new Promise<
+      [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, u32]
     >(async resolve => {
       // wait for bidding to be complete
       const unsub = await client.queryMulti<
-        [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, Bool]
+        [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, Bool, u32]
       >(
         [
           client.query.miningSlot.nextSlotCohort as any,
           client.query.miningSlot.nextCohortId as any,
           client.query.miningSlot.isNextSlotBiddingOpen as any,
+          client.query.system.number as any,
         ],
-        ([nextCohort, nextCohortId, isBiddingStillOpen]) => {
+        ([nextCohort, nextCohortId, isBiddingStillOpen, blockNumber]) => {
           if (
             nextCohortId.toNumber() !== this.cohortId ||
             isBiddingStillOpen.isFalse
           ) {
             unsub();
-            resolve([nextCohort, nextCohortId]);
+            resolve([nextCohort, nextCohortId, blockNumber]);
           }
         },
       );
@@ -118,7 +122,36 @@ export class CohortBidder {
 
       this.updateStats(wonSeats);
     }
+    this.stats.lastBlock = Math.max(
+      blockNumber.toNumber(),
+      this.stats.lastBlock,
+    );
     return this.stats;
+  }
+
+  public static async getStartingData(
+    api: ApiDecoration<'promise'>,
+  ): Promise<
+    Pick<
+      CohortBidder['stats'],
+      'argonotUsdPrice' | 'argonotsPerSeat' | 'cohortArgonsPerBlock'
+    >
+  > {
+    const argonotPrice = await api.query.priceIndex.current();
+    let argonotUsdPrice = 0;
+    if (argonotPrice.isSome) {
+      argonotUsdPrice = convertFixedU128ToBigNumber(
+        argonotPrice.unwrap().argonotUsdPrice.toBigInt(),
+      ).toNumber();
+    }
+
+    const argonotsPerSeat = await api.query.miningSlot
+      .argonotsPerMiningSeat()
+      .then(x => x.toBigInt());
+    const cohortArgonsPerBlock = await api.query.blockRewards
+      .argonsPerBlock()
+      .then(x => x.toBigInt());
+    return { argonotsPerSeat, argonotUsdPrice, cohortArgonsPerBlock };
   }
 
   public async start() {
@@ -132,22 +165,14 @@ export class CohortBidder {
     });
 
     const client = await this.client;
-    const argonotPrice = await client.query.priceIndex.current();
-    if (argonotPrice.isSome) {
-      this.stats.argonotUsdPrice = convertFixedU128ToBigNumber(
-        argonotPrice.unwrap().argonotUsdPrice.toBigInt(),
-      ).toNumber();
+    if (!this.stats.argonotsPerSeat) {
+      const startingStats = await CohortBidder.getStartingData(client);
+      Object.assign(this.stats, startingStats);
     }
 
     this.millisPerTick ??= await client.query.ticks
       .genesisTicker()
       .then(x => x.tickDurationMillis.toNumber());
-    this.stats.argonotsPerSeat = await client.query.miningSlot
-      .argonotsPerMiningSeat()
-      .then(x => x.toBigInt());
-    this.stats.cohortArgonsPerBlock = await client.query.blockRewards
-      .argonsPerBlock()
-      .then(x => x.toBigInt());
 
     this.unsubscribe = await client.queryMulti<
       [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64]
@@ -189,7 +214,7 @@ export class CohortBidder {
       return;
     }
     console.log(
-      'Checking seats for cohort',
+      'Checking bids for cohort',
       this.cohortId,
       this.subaccounts.map(x => x.index),
     );
@@ -287,6 +312,13 @@ export class CohortBidder {
         bidAmount: bidPerSeat,
         sendRewardsToSeed: true,
       });
+      if (result.blockHash) {
+        const client = await this.client;
+        const api = await client.at(result.blockHash);
+        this.stats.lastBlock = await api.query.system
+          .number()
+          .then(x => x.toNumber());
+      }
       this.stats.fees += result.finalFee ?? 0n;
       this.stats.bids += subaccountRange.length;
       if (bidPerSeat > this.stats.maxBidPerSeat) {

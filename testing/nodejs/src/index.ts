@@ -130,6 +130,10 @@ export function addTeardown(teardownable: ITeardownable) {
   toTeardown.push(teardownable);
 }
 
+export function runOnTeardown(teardown: () => Promise<void>) {
+  addTeardown({ teardown });
+}
+
 export function closeOnTeardown<T extends { close(): Promise<void> }>(
   closeable: T,
 ): T {

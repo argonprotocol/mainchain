@@ -1,6 +1,5 @@
 import {
   type ArgonClient,
-  BlockWatch,
   getClient,
   type IGlobalOptions,
   Keyring,
@@ -14,10 +13,20 @@ import type { Command } from '@commander-js/extra-typings';
 import * as process from 'node:process';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import { AccountMiners } from './AccountMiners';
+import { ApiDecoration } from '@polkadot/api/types';
 
 export type SubaccountRange = readonly number[];
 
 export type IAddressNames = Map<string, string>;
+
+export interface ISubaccountMiner {
+  address: string;
+  seat?: number;
+  bidAmount?: bigint;
+  subaccountIndex: number;
+  cohortId?: number;
+  isLastDay: boolean;
+}
 
 export class Accountset {
   public txSubmitterPair: KeyringPair;
@@ -148,29 +157,19 @@ export class Accountset {
     return subaccountRange;
   }
 
-  public async miningSeats(blockHash?: Uint8Array): Promise<
-    {
-      address: string;
-      seat?: number;
-      subaccountIndex: number;
-      cohortId?: number;
-      hasWinningBid: boolean;
-      bidAmount?: bigint;
-      isLastDay: boolean;
-    }[]
-  > {
-    const client = await this.client;
-    const api = blockHash ? await client.at(blockHash) : client;
+  public async loadRegisteredMiners(
+    api: ApiDecoration<'promise'>,
+  ): Promise<ISubaccountMiner[]> {
     const addresses = Object.keys(this.subAccountsByAddress);
     const rawIndices =
       await api.query.miningSlot.accountIndexLookup.multi(addresses);
-    const addressToIndex: { [address: string]: number } = {};
+    const addressToMiningIndex: { [address: string]: number } = {};
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
       if (rawIndices[i].isNone) continue;
-      addressToIndex[address] = rawIndices[i].value.toNumber();
+      addressToMiningIndex[address] = rawIndices[i].value.toNumber();
     }
-    const indices = Object.values(addressToIndex).filter(
+    const indices = Object.values(addressToMiningIndex).filter(
       x => x !== undefined,
     ) as number[];
 
@@ -178,7 +177,7 @@ export class Accountset {
       ? await api.query.miningSlot.activeMinersByIndex.multi(indices)
       : [];
     const registrationBySeatIndex: {
-      [seatIndex: string]: { cohortId: number; bid: bigint };
+      [seatIndex: string]: { cohortId: number; bidAmount: bigint };
     } = {};
 
     for (let i = 0; i < indices.length; i++) {
@@ -187,30 +186,47 @@ export class Accountset {
       if (registration?.isSome) {
         registrationBySeatIndex[seatIndex] = {
           cohortId: registration.value.cohortId.toNumber(),
-          bid: registration.value.bid.toBigInt(),
+          bidAmount: registration.value.bid.toBigInt(),
         };
       }
     }
-
     const nextCohortId = await api.query.miningSlot.nextCohortId();
-    const nextCohort = await api.query.miningSlot.nextSlotCohort();
 
     return addresses.map(address => {
-      const seat = addressToIndex[address];
+      const seat = addressToMiningIndex[address];
       const registration = registrationBySeatIndex[seat];
       let isLastDay = false;
-      if (registration) {
-        isLastDay = nextCohortId.toNumber() - registration.cohortId === 10;
+      if (registration?.cohortId) {
+        isLastDay = nextCohortId.toNumber() - registration?.cohortId === 10;
       }
       return {
+        ...registration,
         address,
         seat,
+        isLastDay,
         subaccountIndex:
           this.subAccountsByAddress[address]?.index ?? Number.NaN,
-        hasWinningBid: nextCohort.some(x => x.accountId.toHuman() === address),
-        cohortId: registration?.cohortId,
-        bidAmount: registration?.bid,
-        isLastDay,
+      };
+    });
+  }
+
+  public async miningSeats(blockHash?: Uint8Array): Promise<
+    (ISubaccountMiner & {
+      hasWinningBid: boolean;
+    })[]
+  > {
+    const client = await this.client;
+    const api = blockHash ? await client.at(blockHash) : client;
+    const miners = await this.loadRegisteredMiners(api);
+
+    const nextCohort = await api.query.miningSlot.nextSlotCohort();
+
+    return miners.map(miner => {
+      const bid = nextCohort.find(x => x.accountId.toHuman() === miner.address);
+      return {
+        ...miner,
+        hasWinningBid: !!bid,
+        bidAmount: bid?.bid.toBigInt() ?? miner.bidAmount,
       };
     });
   }
@@ -505,8 +521,7 @@ export class Accountset {
   }
 
   public async watchBlocks(shouldLog: boolean = false): Promise<AccountMiners> {
-    const accountMiners = new AccountMiners(this, { shouldLog });
-    await accountMiners.loadAt();
+    const accountMiners = await AccountMiners.loadAt(this, { shouldLog });
     await accountMiners.watch();
     return accountMiners;
   }
