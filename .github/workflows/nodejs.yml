@@ -334,6 +334,21 @@ jobs:
           SKIP_E2E: true
           SQLX_OFFLINE: true
 
+      - name: Publish client test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: client/nodejs/vitest-results.xml
+          reporter: jest-junit
+
+      - name: Publish localchain test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: localchain/vitest-results.xml
+          reporter: jest-junit
   test-linux:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
     needs: [ localchain, docker ]
@@ -459,6 +474,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_S3_ENDPOINT: http://localhost:9000
+
+      - name: Publish client test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: client/nodejs/vitest-results.xml
+          reporter: jest-junit
+
+      - name: Publish localchain test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: localchain/vitest-results.xml
+          reporter: jest-junit
 
       - name: Cleanup minio
         if: always()
