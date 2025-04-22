@@ -554,7 +554,7 @@ export function getDefaultSubaccountRange(): number[] {
   } catch (e) {
     console.error(
       'Failed to parse SUBACCOUNT_RANGE environment variable. Defaulting to 0-9',
-      e,
+      e.message,
     );
     return Array.from({ length: 10 }, (_, i) => i);
   }
