@@ -553,8 +553,7 @@ export function getDefaultSubaccountRange(): number[] {
     return parseSubaccountRange(process.env.SUBACCOUNT_RANGE ?? '0-9')!;
   } catch (e) {
     console.error(
-      'Failed to parse SUBACCOUNT_RANGE environment variable. Defaulting to 0-9',
-      e.message,
+      'Failed to parse SUBACCOUNT_RANGE environment variable. Defaulting to 0-9. Please check the format of the SUBACCOUNT_RANGE variable.',
     );
     return Array.from({ length: 10 }, (_, i) => i);
   }
