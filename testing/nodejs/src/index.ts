@@ -1,18 +1,23 @@
-import { ArgonClient, KeyringPair, TxSubmitter } from '../index';
+import {
+  ArgonClient,
+  Keyring,
+  KeyringPair,
+  TxSubmitter,
+} from '@argonprotocol/mainchain';
 import { describe, SuiteAPI } from 'vitest';
-import TestNotary from './TestNotary';
-import process from 'node:process';
+import * as process from 'node:process';
 import HttpProxy from 'http-proxy';
-import child_process from 'node:child_process';
+import * as child_process from 'node:child_process';
 import * as http from 'node:http';
 import * as url from 'node:url';
 import * as net from 'node:net';
+import * as Path from 'node:path';
+import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
 import TestBitcoinCli from './TestBitcoinCli';
-import { Keyring } from '@polkadot/api';
-import Path from 'node:path';
+import TestOracle from './TestOracle';
 
-export { TestNotary, TestMainchain, TestBitcoinCli };
+export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle };
 
 export interface ITeardownable {
   teardown(): Promise<void>;
@@ -73,7 +78,10 @@ export async function getProxy() {
 }
 
 export function projectRoot() {
-  return Path.join(__dirname, `../../../..`);
+  if (process.env.ARGON_PROJECT_ROOT) {
+    return Path.join(process.env.ARGON_PROJECT_ROOT);
+  }
+  return Path.join(__dirname, `../../..`);
 }
 
 /**
@@ -120,6 +128,10 @@ export function cleanHostForDocker(
 
 export function addTeardown(teardownable: ITeardownable) {
   toTeardown.push(teardownable);
+}
+
+export function runOnTeardown(teardown: () => Promise<void>) {
+  addTeardown({ teardown });
 }
 
 export function closeOnTeardown<T extends { close(): Promise<void> }>(

@@ -7,7 +7,7 @@ import {
   waitForLoad,
 } from '@argonprotocol/mainchain';
 import { Localchain } from '../index';
-import { closeOnTeardown } from '@argonprotocol/mainchain/test-utils';
+import { closeOnTeardown } from '@argonprotocol/testing';
 
 export {
   activateNotary,
@@ -17,7 +17,7 @@ export {
   closeOnTeardown,
   TestMainchain,
   teardown,
-} from '@argonprotocol/mainchain/test-utils';
+} from '@argonprotocol/testing';
 
 export class KeyringSigner {
   readonly keyring: Keyring;

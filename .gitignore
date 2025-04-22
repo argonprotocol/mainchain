@@ -26,3 +26,4 @@ node_modules
 /scripts/hyperbridge/**/*-messaging-relayer.toml
 /docs/.obsidian
 **/*.tsbuildinfo
+/testing/nodejs/lib

@@ -11,7 +11,7 @@ import {
   sudo,
   teardown,
   TestMainchain,
-} from '../test-utils/index';
+} from '@argonprotocol/testing';
 import { parseSubaccountRange } from '../Accountset';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 

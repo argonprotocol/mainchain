@@ -1,6 +1,6 @@
 import * as child_process from 'node:child_process';
 import { projectRoot } from './index';
-import Path from 'node:path';
+import * as Path from 'node:path';
 
 export default class TestBitcoinCli {
   /**

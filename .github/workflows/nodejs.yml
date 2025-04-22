@@ -316,10 +316,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install client
+      - name: Build typescript
         run: yarn tsc
-        shell: bash
-        working-directory: ./client/nodejs
 
       - name: Download localchain artifacts
         uses: actions/download-artifact@v4
@@ -336,6 +334,21 @@ jobs:
           SKIP_E2E: true
           SQLX_OFFLINE: true
 
+      - name: Publish client test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: client/nodejs/vitest-results.xml
+          reporter: jest-junit
+
+      - name: Publish localchain test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: localchain/vitest-results.xml
+          reporter: jest-junit
   test-linux:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
     needs: [ localchain, docker ]
@@ -382,10 +395,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install client
+      - name: Build typescript
         run: yarn tsc
-        shell: bash
-        working-directory: ./client/nodejs
 
       - name: Docker Internal Host
         run: |
@@ -447,6 +458,15 @@ jobs:
       - name: Make binary executable
         run: chmod +x ./target/debug/argon-*
 
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install bitcoind
+        run: cargo build -p argon-testing-bitcoin
+
       - name: Test client
         run: yarn test:ci
         working-directory: ./client/nodejs
@@ -454,6 +474,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_S3_ENDPOINT: http://localhost:9000
+
+      - name: Publish client test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: client/nodejs/vitest-results.xml
+          reporter: jest-junit
+
+      - name: Publish localchain test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: localchain/vitest-results.xml
+          reporter: jest-junit
 
       - name: Cleanup minio
         if: always()
@@ -486,7 +522,6 @@ jobs:
 
       - name: Build client
         run: yarn tsc
-        working-directory: ./client/nodejs
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

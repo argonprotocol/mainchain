@@ -9,7 +9,7 @@ import {
   formatArgons,
   formatPercent,
 } from './index';
-import EventEmitter from 'node:events';
+import { EventEmitter } from 'node:events';
 import type TypedEventEmitter from 'typed-emitter';
 import { printTable } from 'console-table-printer';
 

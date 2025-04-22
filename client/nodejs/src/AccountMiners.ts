@@ -37,9 +37,20 @@ export class AccountMiners {
 
   constructor(
     private accountset: Accountset,
+    registeredMiners: {
+      cohortId: number;
+      address: string;
+      subaccountIndex: number;
+    }[],
     private options: { shouldLog: boolean } = { shouldLog: false },
   ) {
     this.miningRotations = new MiningRotations();
+    for (const seat of registeredMiners) {
+      this.trackedAccountsByAddress[seat.address] = {
+        cohortId: seat.cohortId,
+        subaccountIndex: seat.subaccountIndex,
+      };
+    }
   }
 
   public async watch(): Promise<BlockWatch> {
@@ -49,26 +60,6 @@ export class AccountMiners {
     blockWatch.events.on('block', this.onBlock.bind(this));
     await blockWatch.start();
     return blockWatch;
-  }
-
-  public loadCurrentState(
-    seats: {
-      cohortId: number;
-      address: string;
-      subaccountIndex: number;
-    }[],
-  ) {
-    for (const seat of seats) {
-      this.trackedAccountsByAddress[seat.address] = {
-        cohortId: seat.cohortId,
-        subaccountIndex: seat.subaccountIndex,
-      };
-    }
-  }
-
-  public async loadAt(blockHash?: Uint8Array) {
-    const seats = await this.accountset.miningSeats(blockHash);
-    this.loadCurrentState(seats.filter(x => x.cohortId !== undefined) as any);
   }
 
   public async onBlock(
@@ -171,12 +162,25 @@ export class AccountMiners {
     for (const address of addresses) {
       const entry = this.accountset.subAccountsByAddress[address];
       if (entry) {
-        console.log('new miners has subaccount', address);
         this.trackedAccountsByAddress[address] = {
           cohortId,
           subaccountIndex: entry.index,
         };
       }
     }
+  }
+
+  public static async loadAt(
+    accountset: Accountset,
+    options: {
+      blockHash?: Uint8Array;
+      shouldLog?: boolean;
+    } = {},
+  ) {
+    const seats = await accountset.miningSeats(options.blockHash);
+    const registered = seats.filter(x => x.cohortId !== undefined);
+    return new AccountMiners(accountset, registered as any, {
+      shouldLog: options.shouldLog ?? false,
+    });
   }
 }

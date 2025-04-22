@@ -12,6 +12,7 @@ import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 
+export * from '@polkadot/types-codec/types';
 export { WageProtector } from './WageProtector';
 export { TxSubmitter } from './TxSubmitter';
 export { Accountset } from './Accountset';

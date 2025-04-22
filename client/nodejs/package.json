@@ -20,7 +20,7 @@
     "watch": "tsup --watch",
     "typecheck": "tsc -w --noEmit",
     "test": "vitest --run --typecheck --disableConsoleIntercept",
-    "test:ci": "vitest --run --typecheck --disableConsoleIntercept --retry=1"
+    "test:ci": "vitest --run --retry=1"
   },
   "files": [
     "lib/"
@@ -45,14 +45,6 @@
         "types": "./lib/clis/index.d.cts",
         "default": "./lib/clis/index.cjs"
       }
-    },
-    "./test-utils": {
-      "types": "./lib/test-utils/index.d.ts",
-      "import": "./lib/test-utils/index.js",
-      "require": {
-        "types": "./lib/test-utils/index.d.cts",
-        "default": "./lib/test-utils/index.cjs"
-      }
     }
   },
   "dependencies": {
@@ -67,18 +59,12 @@
     "typed-emitter": "^2.1.0"
   },
   "devDependencies": {
+    "@argonprotocol/testing": "1.1.0-rc.2",
     "@microsoft/api-extractor": "^7.52.3",
     "@polkadot/typegen": "^15.8.1",
     "@substrate/ss58-registry": "^1.49.0",
-    "@types/http-proxy": "^1.17.16",
     "@types/node": "^18.19.6",
-    "@types/pg": "^8.11.12",
     "@vitest/coverage-v8": "3.1.1",
-    "bitcoin-core": "^5.0.0",
-    "detect-port": "^2.1.0",
-    "http-proxy": "^1.18.1",
-    "nanoid": "^3.3.7",
-    "pg": "^8.11.3",
     "shx": "^0.4.0",
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
