@@ -1,23 +1,27 @@
 # Changelog
 
-## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.1...da1d9f6a1470a23eeba09a8fc7ad4e12e0923a77) (2025-04-17)
+## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.2...205be2744795262f738a7962d892c381f42a5125) (2025-04-22)
+
+### Fixes
+
+* **nodejs:** change rotation calculation
+([476035c](https://github.com/argonprotocol/mainchain/commit/476035c2befa0baf17670c0f000a7b3307757bee))
+
+## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.2) (2025-04-18)
 
 ### Features
 
 * **client:** add nodejs cli + bidding
 ([babcfb6](https://github.com/argonprotocol/mainchain/commit/babcfb6070d7d430ba13b39a0bbbbd7d9ffb2bcd))
+* **mining-bonds:** Mining Bonds
+([ab75e7f](https://github.com/argonprotocol/mainchain/commit/ab75e7fa8e5804d2e9df31ee5a880f7caed0f5e7))
 
 ### Fixes
 
+* bump spec version
+([ea2887b](https://github.com/argonprotocol/mainchain/commit/ea2887ba1fe2f95e007e093c9bda9c8e566d62f5))
 * **client:** update nodejs testing
 ([1e0908c](https://github.com/argonprotocol/mainchain/commit/1e0908cbeeefadf71255657c7c286d5205f0ee3a))
-
-## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.1) (2025-04-09)
-
-### Features
-
-* **mining-bonds:** Mining Bonds
-([ab75e7f](https://github.com/argonprotocol/mainchain/commit/ab75e7fa8e5804d2e9df31ee5a880f7caed0f5e7))
 
 ### [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...v1.0.18) (2025-03-22)
 
