@@ -1,25 +1,18 @@
 # Changelog
 
-## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.1...da1d9f6a1470a23eeba09a8fc7ad4e12e0923a77) (2025-04-17)
+## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.2...205be2744795262f738a7962d892c381f42a5125) (2025-04-22)
+
+### Fixes
+
+* **nodejs:** change rotation calculation
+([476035c](https://github.com/argonprotocol/mainchain/commit/476035c2befa0baf17670c0f000a7b3307757bee))
+
+## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.2) (2025-04-18)
 
 ### Features
 
 * **client:** add nodejs cli + bidding
 ([babcfb6](https://github.com/argonprotocol/mainchain/commit/babcfb6070d7d430ba13b39a0bbbbd7d9ffb2bcd))
-
-### Fixes
-
-* **client:** update nodejs testing
-([1e0908c](https://github.com/argonprotocol/mainchain/commit/1e0908cbeeefadf71255657c7c286d5205f0ee3a))
-* **node:** properly retieve aux data
-([8f1eef5](https://github.com/argonprotocol/mainchain/commit/8f1eef59728f0bf981f0ae13a0cbe753c4a51e0e))
-* **bitcoin:** allow https servers
-([cadca32](https://github.com/argonprotocol/mainchain/commit/cadca327b4475fa7864a7f573fdb9963b831dc9d))
-
-## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.1) (2025-04-09)
-
-### Features
-
 * **mining-bonds:** Mining Bonds
 ([ab75e7f](https://github.com/argonprotocol/mainchain/commit/ab75e7fa8e5804d2e9df31ee5a880f7caed0f5e7))
 * **notary/oracle:** verify key during insert
@@ -27,6 +20,14 @@
 
 ### Fixes
 
+* bump spec version
+([ea2887b](https://github.com/argonprotocol/mainchain/commit/ea2887ba1fe2f95e007e093c9bda9c8e566d62f5))
+* **client:** update nodejs testing
+([1e0908c](https://github.com/argonprotocol/mainchain/commit/1e0908cbeeefadf71255657c7c286d5205f0ee3a))
+* **node:** properly retieve aux data
+([8f1eef5](https://github.com/argonprotocol/mainchain/commit/8f1eef59728f0bf981f0ae13a0cbe753c4a51e0e))
+* **bitcoin:** allow https servers
+([cadca32](https://github.com/argonprotocol/mainchain/commit/cadca327b4475fa7864a7f573fdb9963b831dc9d))
 * crash if unable to allocate randomx for hash
 ([7fa84fb](https://github.com/argonprotocol/mainchain/commit/7fa84fbd8ae502aae36c79d563ca9b2ec112f43b))
 * **node:** fast sync issues accessing state

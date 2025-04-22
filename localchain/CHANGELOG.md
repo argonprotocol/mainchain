@@ -1,6 +1,8 @@
 # Changelog
 
-## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.1...da1d9f6a1470a23eeba09a8fc7ad4e12e0923a77) (2025-04-17)
+## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.2...205be2744795262f738a7962d892c381f42a5125) (2025-04-22)
+
+## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.2) (2025-04-18)
 
 ### Features
 
@@ -11,8 +13,6 @@
 
 * **client:** update nodejs testing
 ([1e0908c](https://github.com/argonprotocol/mainchain/commit/1e0908cbeeefadf71255657c7c286d5205f0ee3a))
-
-## [v1.1.0-rc.1](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.1) (2025-04-09)
 
 ### [v1.0.18](https://github.com/argonprotocol/mainchain/compare/v1.0.17...v1.0.18) (2025-03-22)
 

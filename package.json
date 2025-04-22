@@ -2,7 +2,7 @@
   "name": "@argonprotocol/mainchain-monorepo",
   "version": "0.0.3",
   "scripts": {
-    "tsc": "yarn workspaces foreach --all run tsc",
+    "tsc": "yarn workspaces foreach --all run tsup",
     "build": "yarn workspaces foreach --all run build && yarn lint",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "lint": "yarn prettier --write \"**/*.{ts,js,json,md}\"",
@@ -20,7 +20,7 @@
     "testing/nodejs"
   ],
   "devDependencies": {
-    "@lerna-lite/version": "^3.9.1",
+    "@lerna-lite/version": "^3.12.3",
     "prettier": "^3.5.1"
   },
   "packageManager": "yarn@4.1.1"
