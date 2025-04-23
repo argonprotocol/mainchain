@@ -551,7 +551,7 @@ export class Accountset {
 export function getDefaultSubaccountRange(): number[] {
   try {
     return parseSubaccountRange(process.env.SUBACCOUNT_RANGE ?? '0-9')!;
-  } catch (e) {
+  } catch {
     console.error(
       'Failed to parse SUBACCOUNT_RANGE environment variable. Defaulting to 0-9. Please check the format of the SUBACCOUNT_RANGE variable.',
     );
