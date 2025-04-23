@@ -183,6 +183,7 @@ Here are some tutorials to get you started:
 - [How to lock Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-lock)
 - [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault.md)
 - [How to run a miner](./docs/run-a-miner.md)
+- [How to transfer Argon between chains](./docs/chain-transfers.md)
 
 ## Running Locally
 
