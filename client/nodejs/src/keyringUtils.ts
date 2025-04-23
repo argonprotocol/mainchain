@@ -26,8 +26,11 @@ export async function keyringFromCli(
   );
 }
 
-export function keyringFromSuri(suri: string): KeyringPair {
-  return new Keyring({ type: 'sr25519' }).createFromUri(suri);
+export function keyringFromSuri(
+  suri: string,
+  cryptoType: 'sr25519' | 'ed25519' = 'sr25519',
+): KeyringPair {
+  return new Keyring({ type: cryptoType }).createFromUri(suri);
 }
 
 export async function keyringFromFile(opts: {
@@ -52,9 +55,8 @@ export async function createKeyringPair(opts: {
   cryptoType?: 'sr25519' | 'ed25519';
 }): Promise<KeyringPair> {
   const { filePath, passphrase, cryptoType } = opts;
-  const type = cryptoType ?? 'sr25519';
   const seed = mnemonicGenerate();
-  const keyring = new Keyring().createFromUri(seed, { type });
+  const keyring = keyringFromSuri(seed, cryptoType);
   if (filePath) {
     const json = keyring.toJson(passphrase);
     await writeFile(filePath, JSON.stringify(json, null, 2));
