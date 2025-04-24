@@ -9,7 +9,7 @@ use argon_primitives::{
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use sc_client_api::{self, backend::AuxStore};
+use sc_client_api::{self, backend::AuxStore, BlockBackend};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
 	ForkChoiceStrategy, ImportResult, StateAction, StorageChanges, Verifier as VerifierT,
@@ -17,7 +17,7 @@ use sc_consensus::{
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
-use sp_blockchain::HeaderBackend;
+use sp_blockchain::{BlockStatus, HeaderBackend};
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
@@ -25,6 +25,7 @@ use sp_runtime::{
 	Justification,
 };
 use std::{marker::PhantomData, sync::Arc};
+use tracing::warn;
 
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
@@ -59,7 +60,7 @@ where
 	type Error = ConsensusError;
 
 	async fn check_block(&self, block: BlockCheckParams<B>) -> Result<ImportResult, Self::Error> {
-		self.inner.check_block(block).await.map_err(Into::into)
+		self.inner.check_block(block.clone()).await.map_err(Into::into)
 	}
 
 	async fn import_block(
@@ -115,7 +116,14 @@ where
 		// We only want to set a best block if the state is imported. When
 		// syncing, we will sometimes import state, but be grabbing a gap block, in which case we
 		// don't want to set interim blocks as best block
-		if !block.state_action.skip_execution_checks() && !is_block_gap {
+		let has_state = match block.state_action {
+			StateAction::ApplyChanges(_) | StateAction::Execute => true,
+			StateAction::ExecuteIfPossible =>
+				self.client.status(parent).unwrap_or(BlockStatus::Unknown) == BlockStatus::InChain,
+			StateAction::Skip => false,
+		};
+
+		if has_state && !is_block_gap {
 			let max_fork_power = self.aux_client.record_block(
 				&mut block.auxiliary,
 				block_author,
@@ -182,7 +190,7 @@ struct Verifier<B: BlockT, C: AuxStore, AC> {
 #[async_trait::async_trait]
 impl<B: BlockT, C, AC> VerifierT<B> for Verifier<B, C, AC>
 where
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + Send + Sync + AuxStore + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B> + Send + Sync + AuxStore + 'static,
 	C::Api: BlockBuilderApi<B>
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
@@ -196,16 +204,46 @@ where
 		&self,
 		mut block_params: BlockImportParams<B>,
 	) -> Result<BlockImportParams<B>, String> {
+		let number = *block_params.header.number();
+		let is_gap_sync =
+			self.client.info().block_gap.is_some_and(|(s, e)| s <= number && number <= e);
 		// Skip checks that include execution, if being told so, or when importing only state.
 		//
 		// This is done for example when gap syncing and it is expected that the block after the gap
 		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
-		if block_params.state_action.skip_execution_checks() || block_params.with_state() {
+		if is_gap_sync ||
+			block_params.state_action.skip_execution_checks() ||
+			block_params.with_state()
+		{
 			return Ok(block_params)
 		}
 
-		let parent_hash = *block_params.header.parent_hash();
 		let post_hash = block_params.header.hash();
+		if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
+			// ensure we have parent state
+			if self
+				.client
+				.block_status(*block_params.header.parent_hash())
+				.unwrap_or(sp_consensus::BlockStatus::Unknown) !=
+				sp_consensus::BlockStatus::InChainWithState
+			{
+				warn!(
+					block_hash = ?post_hash,
+					origin = ?block_params.origin,
+					fork_choice = ?block_params.fork_choice,
+					import_existing = ?block_params.import_existing,
+					finalized = ?block_params.finalized,
+					"Unable to verify block due with ExecuteIfPossible to missing state for parent block."
+				);
+				if block_params.origin == BlockOrigin::NetworkInitialSync {
+					return Ok(block_params)
+				}
+
+				return Err("Parent state not available".into())
+			}
+		}
+
+		let parent_hash = *block_params.header.parent_hash();
 
 		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
@@ -331,7 +369,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Clone + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B> + Send + Sync + AuxStore + 'static,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B> + Send + Sync + AuxStore + 'static,
 	C::Api: BlockBuilderApi<B>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
 		+ BitcoinApis<B, Balance>
