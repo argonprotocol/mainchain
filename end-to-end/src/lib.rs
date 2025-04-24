@@ -25,13 +25,12 @@ pub(crate) mod utils {
 			tx,
 		},
 		signer::{Signer, Sr25519Signer},
-		ArgonConfig, ArgonOnlineClient,
+		FetchAt, TxInBlockWithEvents,
 	};
 	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
 	use sp_core::{crypto::key_types::GRANDPA, Pair};
 	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring};
-	use subxt::tx::TxInBlock;
 
 	#[allow(dead_code)]
 	pub(crate) async fn transfer_mainchain(
@@ -40,7 +39,7 @@ pub(crate) mod utils {
 		to: AccountId,
 		amount: Balance,
 		wait_for_finalized: bool,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, ArgonOnlineClient>> {
+	) -> anyhow::Result<TxInBlockWithEvents> {
 		let to_account_id = test_node.client.api_account(&to);
 		let params = test_node.client.params_with_best_nonce(&from.account_id()).await?.build();
 		test_node
@@ -98,7 +97,7 @@ pub(crate) mod utils {
 	pub(crate) async fn sudo(
 		test_node: &ArgonTestNode,
 		call: types::sudo::Call,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, ArgonOnlineClient>> {
+	) -> anyhow::Result<TxInBlockWithEvents> {
 		let from = Sr25519Signer::new(Alice.pair());
 		let client = test_node.client.clone();
 		let params = client.params_with_best_nonce(&from.account_id()).await?.build();
@@ -113,7 +112,7 @@ pub(crate) mod utils {
 	) -> anyhow::Result<Balance> {
 		Ok(test_node
 			.client
-			.fetch_storage(&storage().mining_slot().argonots_per_mining_seat(), None)
+			.fetch_storage(&storage().mining_slot().argonots_per_mining_seat(), FetchAt::Finalized)
 			.await?
 			.unwrap_or_default())
 	}
@@ -161,20 +160,19 @@ pub(crate) mod utils {
 		let register = client
 			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)
 			.await?;
-		println!(
-			"miner registered. ext hash: {:?}, block {:?}",
-			register.extrinsic_hash(),
-			register.block_hash()
-		);
+		println!("miner registered. {:?}", register);
 
 		let wait_til_past_cohort_id = client
-			.fetch_best_storage(&storage().mining_slot().next_cohort_id())
+			.fetch_storage(&storage().mining_slot().next_cohort_id(), FetchAt::Best)
 			.await?
 			.unwrap_or_default();
 		// wait for next cohort to start
 		loop {
 			let account_index = client
-				.fetch_best_storage(&storage().mining_slot().account_index_lookup(&first_account))
+				.fetch_storage(
+					&storage().mining_slot().account_index_lookup(&first_account),
+					FetchAt::Best,
+				)
 				.await?
 				.unwrap_or_default();
 			if account_index > 0 {
@@ -182,15 +180,15 @@ pub(crate) mod utils {
 				break;
 			}
 			let registered_miners = client
-				.fetch_best_storage(&storage().mining_slot().active_miners_count())
+				.fetch_storage(&storage().mining_slot().active_miners_count(), FetchAt::Best)
 				.await?
 				.unwrap_or_default();
 			let next_cohort = client
-				.fetch_best_storage(&storage().mining_slot().next_slot_cohort())
+				.fetch_storage(&storage().mining_slot().next_slot_cohort(), FetchAt::Best)
 				.await?
 				.unwrap_or(BoundedVec(vec![]));
 			let next_cohort_id = client
-				.fetch_best_storage(&storage().mining_slot().next_cohort_id())
+				.fetch_storage(&storage().mining_slot().next_cohort_id(), FetchAt::Best)
 				.await?
 				.unwrap_or_default();
 			println!("Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}", next_cohort.0.iter().map(|a|  a.account_id.to_address()).collect::<Vec<_>>()	);
@@ -204,7 +202,7 @@ pub(crate) mod utils {
 			tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 		}
 		let registered_miners = client
-			.fetch_best_storage(&storage().mining_slot().active_miners_count())
+			.fetch_storage(&storage().mining_slot().active_miners_count(), FetchAt::Best)
 			.await?
 			.unwrap_or_default();
 		println!("Registered miners: {miner_count} of {registered_miners}");

@@ -4,6 +4,7 @@ use crate::utils::{
 use argon_client::{
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
+	FetchAt,
 };
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
 use argon_testing::{test_miner_count, ArgonTestNode};
@@ -39,7 +40,7 @@ async fn test_end_to_end_default_vote_mining() {
 				println!("Block Author {:?} ({})", keyring, block.number());
 
 				if let Ok(ownership) =
-					grandpa_miner.client.get_ownership(&author, Some(block.hash())).await
+					grandpa_miner.client.get_ownership(&author, FetchAt::Block(block.hash())).await
 				{
 					if ownership.free >= (ownership_needed * 2) && !authors.contains(&author) {
 						println!("Block Author is ready {:?}", keyring);

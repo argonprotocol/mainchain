@@ -268,11 +268,7 @@ mod tests {
 		task::{Context, Poll},
 		time::Duration,
 	};
-	use subxt::{
-		blocks::Block,
-		tx::{TxInBlock, TxProgress},
-		OnlineClient,
-	};
+	use subxt::{blocks::Block, tx::TxProgress, OnlineClient};
 	use tokio::sync::Mutex;
 
 	use argon_client::{
@@ -287,7 +283,8 @@ mod tests {
 		},
 		conversion::SubxtRuntime,
 		signer::Sr25519Signer,
-		ArgonConfig, ArgonOnlineClient, MainchainClient, ReconnectingClient,
+		ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, ReconnectingClient,
+		TxInBlockWithEvents,
 	};
 	use argon_notary_apis::localchain::BalanceChangeResult;
 	use argon_notary_audit::VerifyError;
@@ -415,7 +412,7 @@ mod tests {
 					&storage()
 						.domains()
 						.zone_records_by_domain(argon_client::types::H256::from(domain_hash)),
-					Some(zone_block)
+					FetchAt::Block(zone_block)
 				)
 				.await?
 				.unwrap()
@@ -581,7 +578,7 @@ mod tests {
 						.client
 						.fetch_storage(
 							&storage().block_seal().parent_voting_key(),
-							Some(block_hash),
+							FetchAt::Block(block_hash),
 						)
 						.await?
 					{
@@ -1070,7 +1067,7 @@ mod tests {
 
 	async fn wait_for_in_block(
 		tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
+	) -> anyhow::Result<TxInBlockWithEvents, Error> {
 		let res = MainchainClient::wait_for_ext_in_block(tx_progress, false).await?;
 		Ok(res)
 	}

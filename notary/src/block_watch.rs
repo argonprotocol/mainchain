@@ -9,7 +9,7 @@ use subxt::{
 use tracing::{error, info, trace, warn};
 
 pub use argon_client;
-use argon_client::{api, ArgonConfig, ArgonOnlineClient, MainchainClient};
+use argon_client::{api, ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient};
 use argon_primitives::{
 	prelude::*,
 	tick::{TickDigest, Ticker},
@@ -69,8 +69,10 @@ async fn get_notary_activation(
 	}
 	let notaries_query = api::storage().notaries().active_notaries();
 
-	let active_notaries =
-		client.fetch_storage(&notaries_query, None).await?.unwrap_or(vec![].into());
+	let active_notaries = client
+		.fetch_storage(&notaries_query, FetchAt::Finalized)
+		.await?
+		.unwrap_or(vec![].into());
 
 	let Some(notary) = active_notaries.0.iter().find(|notary| notary.notary_id == notary_id) else {
 		info!("NOTE: Notary {} is not active", notary_id);
