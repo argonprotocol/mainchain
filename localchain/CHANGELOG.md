@@ -1,8 +1,18 @@
 # Changelog
 
-## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.2...205be2744795262f738a7962d892c381f42a5125) (2025-04-22)
+## [v1.1.0-rc.4](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.3...076393d437cea0c7459b5de61e62169bb3da49b0) (2025-04-24)
 
-## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.2) (2025-04-18)
+### Features
+
+* **client:** clarify storage height
+([2007632](https://github.com/argonprotocol/mainchain/commit/200763227b16edb1acb6ec9d269511acfc520059))
+
+### Fixes
+
+* **bitcoin_locks:** add error decode
+([59771b5](https://github.com/argonprotocol/mainchain/commit/59771b5e5fc91e57843ca582634f1a70fd275201))
+
+## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.3) (2025-04-22)
 
 ### Features
 

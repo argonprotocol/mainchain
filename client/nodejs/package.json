@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/mainchain",
-  "version": "1.1.0-rc.3",
+  "version": "1.1.0-rc.4",
   "description": "A client for accessing the Argon mainchain apis.",
   "repository": {
     "type": "git",
@@ -59,7 +59,7 @@
     "typed-emitter": "^2.1.0"
   },
   "devDependencies": {
-    "@argonprotocol/testing": "1.1.0-rc.3",
+    "@argonprotocol/testing": "1.1.0-rc.4",
     "@microsoft/api-extractor": "^7.52.3",
     "@polkadot/typegen": "^15.8.1",
     "@substrate/ss58-registry": "^1.49.0",
