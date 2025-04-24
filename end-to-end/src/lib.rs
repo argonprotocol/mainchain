@@ -17,6 +17,7 @@ pub(crate) mod utils {
 			runtime_types::{
 				argon_primitives::{block_seal, block_seal::RewardDestination},
 				argon_runtime::{RuntimeCall, SessionKeys},
+				bounded_collections::bounded_vec::BoundedVec,
 				sp_consensus_grandpa as grandpa,
 			},
 			storage,
@@ -140,7 +141,9 @@ pub(crate) mod utils {
 	) -> anyhow::Result<()> {
 		let client = node.client.clone();
 
-		println!("Registering miners");
+		let first_account = client.api_account(&miner_accounts[0].0);
+		let miner_count = miner_accounts.len() as u16;
+		println!("Registering {miner_count} miners");
 		let bids = miner_accounts
 			.into_iter()
 			.map(|(a, keys)| {
@@ -163,20 +166,49 @@ pub(crate) mod utils {
 			register.extrinsic_hash(),
 			register.block_hash()
 		);
-		// wait for next cohort to start
-		let cohort = client
-			.fetch_storage(&storage().mining_slot().next_cohort_id(), None)
+
+		let wait_til_past_cohort_id = client
+			.fetch_best_storage(&storage().mining_slot().next_cohort_id())
 			.await?
 			.unwrap_or_default();
-		while cohort ==
-			client
-				.fetch_storage(&storage().mining_slot().next_cohort_id(), None)
+		// wait for next cohort to start
+		loop {
+			let account_index = client
+				.fetch_best_storage(&storage().mining_slot().account_index_lookup(&first_account))
 				.await?
-				.unwrap_or_default()
-		{
-			println!("Waiting for cohort {cohort} to start");
-			tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+				.unwrap_or_default();
+			if account_index > 0 {
+				println!("Miner 1 registered at index {account_index}");
+				break;
+			}
+			let registered_miners = client
+				.fetch_best_storage(&storage().mining_slot().active_miners_count())
+				.await?
+				.unwrap_or_default();
+			let next_cohort = client
+				.fetch_best_storage(&storage().mining_slot().next_slot_cohort())
+				.await?
+				.unwrap_or(BoundedVec(vec![]));
+			let next_cohort_id = client
+				.fetch_best_storage(&storage().mining_slot().next_cohort_id())
+				.await?
+				.unwrap_or_default();
+			println!("Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}", next_cohort.0.iter().map(|a|  a.account_id.to_address()).collect::<Vec<_>>()	);
+			let block_confirm = client.block_number(register.block_hash()).await;
+			if block_confirm.is_err() {
+				println!("Block no longer finalized! {:?}", block_confirm);
+			}
+			if next_cohort_id > wait_til_past_cohort_id {
+				panic!("Cohort id changed while waiting for registration");
+			}
+			tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 		}
+		let registered_miners = client
+			.fetch_best_storage(&storage().mining_slot().active_miners_count())
+			.await?
+			.unwrap_or_default();
+		println!("Registered miners: {miner_count} of {registered_miners}");
+		assert!(registered_miners >= miner_count);
 		Ok(())
 	}
 }

@@ -130,6 +130,10 @@ declare module '@polkadot/api-base/types/errors' {
       UnrecoverableHold: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
+      /**
+       * This vault is not yet active
+       **/
+      VaultNotYetActive: AugmentedError<ApiType>;
     };
     bitcoinUtxos: {
       /**

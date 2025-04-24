@@ -385,14 +385,32 @@ impl MainchainClient {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
 				TxStatus::InBestBlock(tx_in_block) => {
-					tx_in_block.wait_for_success().await?;
+					let events = tx_in_block.wait_for_success().await?;
 					if !wait_for_finalized {
+						println!(
+							"Transaction {:?} in block. Events: {:?}",
+							tx_in_block.block_hash(),
+							events
+								.iter()
+								.flatten()
+								.map(|a| format!("{}.{}", a.pallet_name(), a.variant_name()))
+								.collect::<Vec<_>>()
+						);
 						return Ok(tx_in_block);
 					}
 				},
 				TxStatus::InFinalizedBlock(tx_in_block) => {
-					tx_in_block.wait_for_success().await?;
+					let events = tx_in_block.wait_for_success().await?;
 					if wait_for_finalized {
+						println!(
+							"Transaction {:?} finalized. Events: {:?}",
+							tx_in_block.block_hash(),
+							events
+								.iter()
+								.flatten()
+								.map(|a| format!("{}.{}", a.pallet_name(), a.variant_name()))
+								.collect::<Vec<_>>()
+						);
 						return Ok(tx_in_block);
 					}
 				},
@@ -444,6 +462,17 @@ impl MainchainClient {
 				Err(e)
 			},
 		}
+	}
+	pub async fn fetch_best_storage<Address>(
+		&self,
+		address: &Address,
+	) -> Result<Option<Address::Target>, Error>
+	where
+		Address: StorageAddress<IsFetchable = Yes>,
+	{
+		let best_block = self.best_block_hash().await.map_err(|e| e.to_string())?;
+
+		self.fetch_storage(address, Some(best_block)).await
 	}
 
 	pub async fn fetch_storage<Address>(

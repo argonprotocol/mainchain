@@ -417,6 +417,28 @@ async fn request_bitcoin_lock(
 	owner_compressed_pubkey: &bitcoin::PublicKey,
 	bitcoin_owner: &sr25519::Pair,
 ) -> anyhow::Result<UtxoId> {
+	// wait for the vault to be open
+
+	loop {
+		println!("Waiting for vault to be open");
+		let tick = test_node
+			.client
+			.fetch_best_storage(&storage().ticks().current_tick())
+			.await?
+			.ok_or(anyhow!("No tick found"))?;
+		let vault = test_node
+			.client
+			.fetch_best_storage(&storage().vaults().vaults_by_id(vault_id))
+			.await?
+			.ok_or(anyhow!("No vault found"))?;
+		if vault.opened_tick <= tick {
+			println!("Vault is open");
+			break;
+		}
+		// wait for 1 second
+		tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+	}
+
 	let lock_cli_result = run_bitcoin_cli(
 		test_node,
 		vec![

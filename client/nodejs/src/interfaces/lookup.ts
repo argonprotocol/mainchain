@@ -2805,6 +2805,7 @@ export default {
       LockNotFound: 'Null',
       NoVaultBitcoinPubkeysAvailable: 'Null',
       UnableToGenerateVaultBitcoinPubkey: 'Null',
+      VaultNotYetActive: 'Null',
     },
   },
   /**

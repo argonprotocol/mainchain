@@ -3866,9 +3866,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				29u8, 228u8, 224u8, 30u8, 5u8, 226u8, 45u8, 142u8, 251u8, 170u8, 94u8, 183u8, 43u8,
-				129u8, 91u8, 116u8, 184u8, 249u8, 120u8, 168u8, 165u8, 132u8, 183u8, 244u8, 199u8,
-				112u8, 82u8, 137u8, 111u8, 50u8, 255u8, 253u8,
+				76u8, 60u8, 101u8, 219u8, 189u8, 136u8, 127u8, 233u8, 77u8, 135u8, 189u8, 47u8,
+				155u8, 204u8, 170u8, 80u8, 223u8, 168u8, 113u8, 57u8, 56u8, 167u8, 227u8, 63u8,
+				194u8, 25u8, 200u8, 159u8, 63u8, 63u8, 14u8, 126u8,
 			]
 	}
 	pub mod system {
@@ -27347,6 +27347,9 @@ pub mod api {
 					#[codec(index = 27)]
 					#[doc = "Unable to generate a new vault public key"]
 					UnableToGenerateVaultBitcoinPubkey,
+					#[codec(index = 28)]
+					#[doc = "This vault is not yet active"]
+					VaultNotYetActive,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
