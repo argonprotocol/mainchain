@@ -1,7 +1,5 @@
 extern crate core;
 
-use std::{io::Write, sync::Arc};
-
 use anyhow::anyhow;
 use codec::Encode;
 use jsonrpsee::{
@@ -11,12 +9,15 @@ use jsonrpsee::{
 };
 use sp_core::{blake2_256, crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
+use std::{fmt::Debug, io::Write, sync::Arc};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
+	blocks::ExtrinsicEvents,
 	config::{
 		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
 	},
 	error::{Error, RpcError},
+	events::EventDetails,
 	ext::subxt_core::tx::payload::ValidationDetails,
 	runtime_api::Payload as RuntimeApiPayload,
 	storage::Address as StorageAddress,
@@ -258,7 +259,7 @@ impl MainchainClient {
 	) -> anyhow::Result<system::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let info = self
-			.fetch_storage(&storage().system().account(&account_id), None)
+			.fetch_storage(&storage().system().account(&account_id), FetchAt::Finalized)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(info)
@@ -275,7 +276,7 @@ impl MainchainClient {
 	pub async fn get_ownership(
 		&self,
 		account_id: &AccountId32,
-		at_block: Option<<ArgonConfig as Config>::Hash>,
+		at_block: FetchAt,
 	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let balance = self
@@ -293,7 +294,7 @@ impl MainchainClient {
 	pub async fn block_at_height(&self, height: BlockNumber) -> anyhow::Result<Option<H256>> {
 		let best_block = self.best_block_hash().await?;
 		let block_hash = self
-			.fetch_storage(&storage().system().block_hash(height), Some(best_block))
+			.fetch_storage(&storage().system().block_hash(height), FetchAt::Block(best_block))
 			.await?;
 		Ok(block_hash.map(|a| a.into()))
 	}
@@ -320,7 +321,7 @@ impl MainchainClient {
 		let votable_blocks = self
 			.fetch_storage(
 				&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
-				Some(best_hash),
+				FetchAt::Block(best_hash),
 			)
 			.await?
 			.ok_or_else(|| anyhow!("No vote blocks found"))?
@@ -334,7 +335,7 @@ impl MainchainClient {
 		let minimum = self
 			.fetch_storage(
 				&api::block_seal_spec::storage::StorageApi.current_vote_minimum(),
-				Some(best_hash),
+				FetchAt::Block(best_hash),
 			)
 			.await?
 			.ok_or_else(|| anyhow!("No minimum vote requirement found"))?;
@@ -357,7 +358,7 @@ impl MainchainClient {
 
 	pub async fn latest_finalized_block(&self) -> anyhow::Result<u32> {
 		let block_number = self
-			.fetch_storage(&storage().system().number(), None)
+			.fetch_storage(&storage().system().number(), FetchAt::Finalized)
 			.await?
 			.unwrap_or_default();
 		Ok(block_number)
@@ -369,7 +370,7 @@ impl MainchainClient {
 		signer: &impl Signer<ArgonConfig>,
 		params: Option<<ArgonExtrinsicParams<ArgonConfig> as ExtrinsicParams<ArgonConfig>>::Params>,
 		wait_for_finalized: bool,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, ArgonOnlineClient>> {
+	) -> anyhow::Result<TxInBlockWithEvents> {
 		let result = self
 			.live
 			.tx()
@@ -381,20 +382,18 @@ impl MainchainClient {
 	pub async fn wait_for_ext_in_block(
 		mut tx_progress: ArgonTxProgress,
 		wait_for_finalized: bool,
-	) -> anyhow::Result<TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>, Error> {
+	) -> anyhow::Result<TxInBlockWithEvents, Error> {
 		while let Some(status) = tx_progress.next().await {
 			match status? {
 				TxStatus::InBestBlock(tx_in_block) => {
-					tx_in_block.wait_for_success().await?;
+					let events = tx_in_block.wait_for_success().await?;
 					if !wait_for_finalized {
-						return Ok(tx_in_block);
+						return Ok(TxInBlockWithEvents::new(tx_in_block, events, false));
 					}
 				},
 				TxStatus::InFinalizedBlock(tx_in_block) => {
-					tx_in_block.wait_for_success().await?;
-					if wait_for_finalized {
-						return Ok(tx_in_block);
-					}
+					let events = tx_in_block.wait_for_success().await?;
+					return Ok(TxInBlockWithEvents::new(tx_in_block, events, true));
 				},
 				TxStatus::Error { message } |
 				TxStatus::Invalid { message } |
@@ -449,14 +448,18 @@ impl MainchainClient {
 	pub async fn fetch_storage<Address>(
 		&self,
 		address: &Address,
-		at: Option<H256>,
+		at: FetchAt,
 	) -> Result<Option<Address::Target>, Error>
 	where
 		Address: StorageAddress<IsFetchable = Yes>,
 	{
 		let storage = match at {
-			Some(at) => self.live.storage().at(at),
-			None => self.live.storage().at_latest().await?,
+			FetchAt::Block(at) => self.live.storage().at(at),
+			FetchAt::Finalized => self.live.storage().at_latest().await?,
+			FetchAt::Best => {
+				let best_block = self.best_block_hash().await.map_err(|a| a.to_string())?;
+				self.live.storage().at(best_block)
+			},
 		};
 
 		match storage.fetch(address).await {
@@ -484,6 +487,59 @@ impl MainchainClient {
 			.enable_ws_ping(PingConfig::default())
 			.build_with_tokio(sender, receiver);
 		Ok(client)
+	}
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub enum FetchAt {
+	Best,
+	#[default]
+	Finalized,
+	Block(H256),
+}
+
+impl From<H256> for FetchAt {
+	fn from(block_hash: H256) -> Self {
+		Self::Block(block_hash)
+	}
+}
+
+pub struct TxInBlockWithEvents {
+	pub tx_in_block: TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>,
+	pub events: Vec<EventDetails<ArgonConfig>>,
+	pub is_finalized: bool,
+}
+
+impl TxInBlockWithEvents {
+	pub fn block_hash(&self) -> H256 {
+		self.tx_in_block.block_hash()
+	}
+	pub fn extrinsic_hash(&self) -> H256 {
+		self.tx_in_block.extrinsic_hash()
+	}
+	pub fn new(
+		tx_in_block: TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>,
+		events: ExtrinsicEvents<ArgonConfig>,
+		is_finalized: bool,
+	) -> Self {
+		Self { tx_in_block, events: events.iter().flatten().collect::<Vec<_>>(), is_finalized }
+	}
+}
+
+impl Debug for TxInBlockWithEvents {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		println!();
+		write!(
+			f,
+			"TxInBlock. {{ is_finalized={}, tx_hash={:?}, block_hash={:?}. Events: {:?} }}",
+			self.is_finalized,
+			self.tx_in_block.extrinsic_hash(),
+			self.tx_in_block.block_hash(),
+			self.events
+				.iter()
+				.map(|a| format!("{}.{}", a.pallet_name(), a.variant_name()))
+				.collect::<Vec<_>>()
+		)
 	}
 }
 

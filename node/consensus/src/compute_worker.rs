@@ -346,7 +346,6 @@ pub fn run_compute_solver_threads<B, Proof, C>(
 
 pub trait ComputeApisExt<B: BlockT, AC> {
 	fn current_tick(&self, block_hash: B::Hash) -> Result<Tick, Error>;
-	fn best_hash(&self) -> B::Hash;
 	fn genesis_hash(&self) -> B::Hash;
 	fn has_eligible_votes(&self, block_hash: B::Hash) -> Result<bool, Error>;
 	fn is_bootstrap_mining(&self, block_hash: B::Hash) -> Result<bool, Error>;
@@ -365,10 +364,6 @@ where
 {
 	fn current_tick(&self, block_hash: B::Hash) -> Result<Tick, Error> {
 		self.runtime_api().current_tick(block_hash).map_err(Into::into)
-	}
-
-	fn best_hash(&self) -> B::Hash {
-		self.info().best_hash
 	}
 
 	fn genesis_hash(&self) -> B::Hash {
@@ -423,15 +418,18 @@ where
 		}
 	}
 
+	/// This is called when a new notebook is found at the same tick as the best block.
+	///
+	/// NOTE: ensure this block hash has state before calling this.
 	pub fn on_new_notebook_tick(
 		&self,
+		best_hash: B::Hash,
 		updated_notebooks_at_tick: Option<VotingPowerInfo>,
 		consensus_metrics: &Arc<Option<ConsensusMetrics<C>>>,
 		submitting_tick: Tick,
 	) -> Option<B::Hash> {
 		// see if we have more notebooks at the same tick. if so, we should restart compute to
 		// include them
-		let best_hash = self.client.best_hash();
 		let latest_block_tick = self.client.current_tick(best_hash).unwrap_or_default();
 		let mut solve_notebook_tick = latest_block_tick;
 		let mut notebooks = 0;
@@ -561,10 +559,6 @@ mod tests {
 			Ok(self.state.lock().ticker.current())
 		}
 
-		fn best_hash(&self) -> HashOutput {
-			self.state.lock().best_hash
-		}
-
 		fn genesis_hash(&self) -> HashOutput {
 			self.state.lock().genesis_hash
 		}
@@ -637,9 +631,10 @@ mod tests {
 		let (tx, _) = tracing_unbounded("node::consensus::compute_block_stream", 10);
 		let compute_handle = ComputeHandle::<Block, bool>::new(tx);
 
+		let state_best_hash = H256::from_slice(&[1u8; 32]);
 		let state = Arc::new(Mutex::new(ApiState {
 			ticker,
-			best_hash: H256::from_slice(&[1u8; 32]),
+			best_hash: state_best_hash,
 			genesis_hash: H256::from_slice(&[0u8; 32]),
 			is_bootstrap_mining: false,
 			has_eligible_votes: false,
@@ -654,13 +649,15 @@ mod tests {
 			ComputeState::new(compute_handle.clone(), Arc::new(api.clone()), ticker);
 
 		let latest_tick = api.state.lock().ticker.current();
-		let best_hash = compute_state.on_new_notebook_tick(None, &Arc::new(None), latest_tick);
+		let best_hash =
+			compute_state.on_new_notebook_tick(state_best_hash, None, &Arc::new(None), latest_tick);
 
 		assert_eq!(best_hash, Some(api.state.lock().best_hash));
 		assert_eq!(compute_handle.best_hash().clone(), Some(api.state.lock().best_hash));
 
 		// if we already have notebooks at the tick, we should try to solve with them
 		let best_hash = compute_state.on_new_notebook_tick(
+			state_best_hash,
 			Some((latest_tick, 1, 2)),
 			&Arc::new(None),
 			latest_tick,
@@ -677,6 +674,7 @@ mod tests {
 
 		// we should not replace for an older tick
 		let _best_hash = compute_state.on_new_notebook_tick(
+			state_best_hash,
 			Some((latest_tick - 1, 1, 1)),
 			&Arc::new(None),
 			latest_tick,

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use argon_client::{
 	api::{notaries::storage::types, storage},
-	MainchainClient,
+	FetchAt, MainchainClient,
 };
 use argon_notary::{
 	block_watch::spawn_block_sync,
@@ -308,7 +308,7 @@ async fn check_notary(
 	let client = MainchainClient::try_until_connected(&mainchain_url, 2500, 10000).await?;
 	let ticker: Ticker = client.lookup_ticker().await?;
 	let active_notaries = client
-		.fetch_storage(&storage().notaries().active_notaries(), None)
+		.fetch_storage(&storage().notaries().active_notaries(), FetchAt::Finalized)
 		.await?
 		.unwrap_or(types::active_notaries::ActiveNotaries::from(Vec::new()));
 

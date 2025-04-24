@@ -14,7 +14,7 @@ use argon_primitives::{
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::prelude::*;
-use sc_client_api::{AuxStore, BlockchainEvents};
+use sc_client_api::{AuxStore, BlockBackend, BlockchainEvents};
 use sc_consensus::BlockImport;
 use sc_service::TaskManager;
 use sc_utils::mpsc::tracing_unbounded;
@@ -97,6 +97,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	C: ProvideRuntimeApi<Block>
 		+ BlockchainEvents<Block>
 		+ HeaderBackend<Block>
+		+ BlockBackend<Block>
 		+ AuxStore
 		+ 'static,
 	C::Api: NotebookApis<Block, NotebookVerifyError>
@@ -260,7 +261,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						if block_number < client.info().finalized_number {
 							continue;
 						}
-						if stale_branches.get(&block.hash).is_some() {
+						if stale_branches.get(&block.hash).is_some() || stale_branches.get(block.header.parent_hash()).is_some() {
 							continue;
 						}
 						// If this block can still be finalized, see if we can beat it. This could be the best block
@@ -317,7 +318,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			// make sure best hash is synched (there's a delay in some sync modes between the block
 			// being imported and state synched)
 			let best_hash = client.info().best_hash;
-			if client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown {
+			if client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown ||
+				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown) !=
+					sp_consensus::BlockStatus::InChainWithState
+			{
 				*notary_client.pause_queue_processing.write().await = true;
 				warn!(?best_hash, "Best block state not available (yet?). Not starting compute.");
 				continue;
@@ -348,6 +352,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			let time = ticker.now_adjusted_to_ntp();
 			let tick = ticker.tick_for_time(time);
 			let Some(best_hash) = compute_state.on_new_notebook_tick(
+				best_hash,
 				next_notebooks_at_tick,
 				&consensus_metrics_finder,
 				tick,

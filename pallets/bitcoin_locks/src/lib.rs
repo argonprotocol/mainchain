@@ -343,6 +343,8 @@ pub mod pallet {
 		NoVaultBitcoinPubkeysAvailable,
 		/// Unable to generate a new vault public key
 		UnableToGenerateVaultBitcoinPubkey,
+		/// This vault is not yet active
+		VaultNotYetActive,
 	}
 
 	impl<T> From<ObligationError> for Error<T> {
@@ -366,6 +368,7 @@ pub mod pallet {
 					Error::<T>::NoVaultBitcoinPubkeysAvailable,
 				ObligationError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
+				ObligationError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
 
 				e => Error::<T>::GenericObligationError(e),
 			}

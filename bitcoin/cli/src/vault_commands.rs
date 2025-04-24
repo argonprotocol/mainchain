@@ -7,7 +7,7 @@ use subxt::dynamic::Value;
 use argon_client::{
 	api::{apis, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
 	conversion::from_api_fixed_u128,
-	MainchainClient,
+	FetchAt, MainchainClient,
 };
 use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams, VaultId};
 
@@ -143,7 +143,7 @@ impl VaultCommands {
 					.await
 					.context("Failed to connect to argon node")?;
 				let call = storage().bitcoin_locks().locks_pending_release_by_utxo_id();
-				let Some(pending) = client.fetch_storage(&call, None).await? else {
+				let Some(pending) = client.fetch_storage(&call, FetchAt::Finalized).await? else {
 					println!("No pending cosign requests found");
 					return Ok(());
 				};

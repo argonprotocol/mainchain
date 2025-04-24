@@ -100,7 +100,7 @@ impl RpcApi for Client {
 
 		let resp = self
 			.send_request(req)
-			.map_err(|e| Error::JsonRpc(jsonrpc::Error::Transport(Box::new(e)).into()));
+			.map_err(|e| Error::JsonRpc(jsonrpc::Error::Transport(Box::new(e))));
 		log_response(cmd, &resp);
 		Ok(resp?.result()?)
 	}

@@ -23,7 +23,7 @@ use argon_client::{
 		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
-	ArgonConfig, MainchainClient,
+	ArgonConfig, FetchAt, MainchainClient,
 };
 use argon_primitives::{
 	argon_utils::format_argons,
@@ -56,7 +56,7 @@ async fn test_bitcoin_minting_e2e() {
 	// 1. Owner creates a new pubkey and submits to blockchain
 	let network: BitcoinNetwork = test_node
 		.client
-		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
 		.await
 		.unwrap()
 		.ok_or(anyhow!("No bitcoin network found"))
@@ -362,7 +362,10 @@ async fn create_vault(
 	while let Some(block) = finalized_sub.next().await {
 		println!("Waiting for Alice to have enough argons");
 		if let Some(alice_balance) = client
-			.fetch_storage(&storage().system().account(&vault_account), Some(block.unwrap().hash()))
+			.fetch_storage(
+				&storage().system().account(&vault_account),
+				FetchAt::Block(block.unwrap().hash()),
+			)
 			.await?
 		{
 			println!("Alice argon balance {:#?}", alice_balance.data.free);
@@ -417,6 +420,28 @@ async fn request_bitcoin_lock(
 	owner_compressed_pubkey: &bitcoin::PublicKey,
 	bitcoin_owner: &sr25519::Pair,
 ) -> anyhow::Result<UtxoId> {
+	// wait for the vault to be open
+
+	loop {
+		println!("Waiting for vault to be open");
+		let tick = test_node
+			.client
+			.fetch_storage(&storage().ticks().current_tick(), FetchAt::Best)
+			.await?
+			.ok_or(anyhow!("No tick found"))?;
+		let vault = test_node
+			.client
+			.fetch_storage(&storage().vaults().vaults_by_id(vault_id), FetchAt::Best)
+			.await?
+			.ok_or(anyhow!("No vault found"))?;
+		if vault.opened_tick <= tick {
+			println!("Vault is open");
+			break;
+		}
+		// wait for 1 second
+		tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+	}
+
 	let lock_cli_result = run_bitcoin_cli(
 		test_node,
 		vec![
@@ -469,7 +494,7 @@ async fn confirm_bond(
 	let xpubkey = Xpub::from_str(xpubkey).expect("valid xpub");
 
 	let lock_api = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), None)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("should be able to retrieve");
 	assert_eq!(lock_api.vault_id, vault_id);
@@ -525,7 +550,7 @@ async fn wait_for_mint(
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let pending_utxos = client
-		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), None)
+		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), FetchAt::Finalized)
 		.await?
 		.unwrap()
 		.0;
@@ -553,14 +578,14 @@ async fn wait_for_mint(
 		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), None)
+		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("utxo");
 	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());
 	assert_eq!(utxo_ref.output_index, vout);
 
 	let pending_mint = client
-		.fetch_storage(&storage().mint().pending_mint_utxos(), None)
+		.fetch_storage(&storage().mint().pending_mint_utxos(), FetchAt::Finalized)
 		.await?
 		.expect("pending mint");
 
@@ -583,7 +608,7 @@ async fn wait_for_mint(
 		let mut counter = 0;
 		while let Some(_block) = finalized_sub.next().await {
 			let pending_mint = client
-				.fetch_storage(&storage().mint().pending_mint_utxos(), None)
+				.fetch_storage(&storage().mint().pending_mint_utxos(), FetchAt::Finalized)
 				.await?
 				.expect("pending mint");
 			println!("Pending mint {:?}", pending_mint.0.first().map(|a| a.2));

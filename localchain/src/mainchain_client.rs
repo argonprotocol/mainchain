@@ -9,9 +9,7 @@ use sp_core::{ByteArray, H256};
 use sp_runtime::MultiSignature;
 use subxt::runtime_api::Payload as RuntimeApiPayload;
 use subxt::storage::Address as StorageAddress;
-use subxt::tx::TxInBlock;
 use subxt::utils::Yes;
-use subxt::OnlineClient;
 use tokio::sync::{Mutex, RwLock};
 use tracing::warn;
 
@@ -20,7 +18,8 @@ use argon_client::api::{runtime_types, tx};
 
 use argon_client::api::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use argon_client::{
-  api, ArgonConfig, ArgonExtrinsicParamsBuilder, MainchainClient as InnerMainchainClient,
+  api, ArgonConfig, ArgonExtrinsicParamsBuilder, FetchAt, MainchainClient as InnerMainchainClient,
+  TxInBlockWithEvents,
 };
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
@@ -140,7 +139,13 @@ impl MainchainClient {
   where
     Address: StorageAddress<IsFetchable = Yes>,
   {
-    Ok(self.client().await?.fetch_storage(address, at).await?)
+    Ok(
+      self
+        .client()
+        .await?
+        .fetch_storage(address, at.map(Into::into).unwrap_or_default())
+        .await?,
+    )
   }
 
   pub async fn get_ticker(&self) -> Result<Ticker> {
@@ -309,7 +314,7 @@ impl MainchainClient {
     let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let client = self.client().await?;
     let balance = client
-      .get_ownership(&account_id32, None)
+      .get_ownership(&account_id32, FetchAt::Finalized)
       .await
       .map_err(|_| anyhow!("No account found for address {address}"))?;
     Ok(BalancesAccountData {
@@ -353,10 +358,7 @@ impl MainchainClient {
     amount: u128,
     notary_id: u32,
     keystore: &Keystore,
-  ) -> Result<(
-    LocalchainTransfer,
-    TxInBlock<ArgonConfig, OnlineClient<ArgonConfig>>,
-  )> {
+  ) -> Result<(LocalchainTransfer, TxInBlockWithEvents)> {
     let current_nonce = self.get_account_nonce(address.clone()).await?;
     let mortality = 50; // artibrary number of blocks to keep this tx alive
 
@@ -402,15 +404,13 @@ impl MainchainClient {
       .await
       .map_err(|e| anyhow!("Error submitting notebook to block: {:?}", e))?;
 
-    let transfer = in_block.fetch_events().await?.iter().find_map(|event| {
-      if let Ok(event) = event {
-        if let Some(Ok(transfer)) = event
-          .as_event::<api::chain_transfer::events::TransferToLocalchain>()
-          .transpose()
-        {
-          if transfer.account_id.0 == account_bytes {
-            return Some(transfer);
-          }
+    let transfer = in_block.events.iter().find_map(|event| {
+      if let Some(Ok(transfer)) = event
+        .as_event::<api::chain_transfer::events::TransferToLocalchain>()
+        .transpose()
+      {
+        if transfer.account_id.0 == account_bytes {
+          return Some(transfer);
         }
       }
       None

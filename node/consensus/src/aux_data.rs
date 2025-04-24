@@ -24,7 +24,7 @@ where
 	}
 
 	fn get_static(encoded_key: &[u8], client: &Arc<C>) -> T {
-		if let Ok(Some(bytes)) = client.get_aux(&encoded_key) {
+		if let Ok(Some(bytes)) = client.get_aux(encoded_key) {
 			T::decode(&mut &bytes[..]).ok().unwrap_or_default()
 		} else {
 			Default::default()

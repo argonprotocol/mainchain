@@ -16,7 +16,7 @@ use argon_client::{
 	api,
 	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::LockReleaseRequest, storage, tx},
 	conversion::from_api_fixed_u128,
-	MainchainClient,
+	FetchAt, MainchainClient,
 };
 use argon_primitives::{
 	bitcoin::{
@@ -173,9 +173,9 @@ impl LockCommands {
 
 				let owner_pubkey: CompressedBitcoinPubkey =
 					CompressedPublicKey::from_str(&owner_pubkey)?.into();
-				let best_block = client.best_block_hash().await?;
+
 				let vault = client
-					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), Some(best_block))
+					.fetch_storage(&storage().vaults().vaults_by_id(vault_id), FetchAt::Best)
 					.await?
 					.ok_or(anyhow!("Vault not found"))?;
 				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
@@ -201,8 +201,8 @@ impl LockCommands {
 					.context("Failed to connect to argon node")?;
 
 				let (_utxo_id, lock) =
-					get_bitcoin_lock_from_utxo_id(&client, utxo_id, None).await?;
-				let network = get_bitcoin_network(&client, None).await?;
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, FetchAt::Finalized).await?;
+				let network = get_bitcoin_network(&client, FetchAt::Finalized).await?;
 
 				let cosign_script = get_cosign_script(&lock, network)?;
 				let compressed_pubkey: CompressedBitcoinPubkey = lock.owner_pubkey.into();
@@ -223,24 +223,21 @@ impl LockCommands {
 					.await
 					.context("Failed to connect to argon node")?;
 				let at_block = if let Some(at_block) = at_block {
-					let block_hash = client
-						.fetch_storage(&storage().system().block_hash(at_block), None)
-						.await?
-						.unwrap();
-					Some(block_hash.into())
+					client.block_at_height(at_block).await?.unwrap()
 				} else {
 					let latest_block = client.latest_finalized_block_hash().await?;
-					Some(latest_block.hash())
+					latest_block.hash()
 				};
 
+				let fetch_at = FetchAt::Block(at_block);
 				let (utxo_id, lock) =
-					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, fetch_at).await?;
 
 				let utxo_ref = client
-					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
+					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), fetch_at)
 					.await?;
 
-				let release_request = find_release_request(&client, at_block, utxo_id).await?;
+				let release_request = find_release_request(&client, fetch_at, utxo_id).await?;
 
 				let status = match lock.is_verified {
 					true =>
@@ -253,7 +250,7 @@ impl LockCommands {
 				};
 				let pending_mint_query = storage().mint().pending_mint_utxos();
 				let pending_mint = client
-					.fetch_storage(&pending_mint_query, at_block)
+					.fetch_storage(&pending_mint_query, fetch_at)
 					.await?
 					.map(|a| a.0)
 					.unwrap_or_default();
@@ -272,7 +269,7 @@ impl LockCommands {
 				} else {
 					let redemption_price_query =
 						apis().bitcoin_apis().redemption_rate(lock.satoshis);
-					client.call(redemption_price_query, at_block).await?.unwrap_or_default()
+					client.call(redemption_price_query, Some(at_block)).await?.unwrap_or_default()
 				};
 
 				let minted = if lock.is_verified { lock.lock_price - remaining } else { 0 };
@@ -344,13 +341,13 @@ impl LockCommands {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let latest_block = client.latest_finalized_block_hash().await?;
-				let at_block = Some(latest_block.hash());
-				let network = get_bitcoin_network(&client, at_block).await?;
+				let network = get_bitcoin_network(&client, FetchAt::Finalized).await?;
 
-				let (_, lock) = get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
+				let (_, lock) =
+					get_bitcoin_lock_from_utxo_id(&client, utxo_id, FetchAt::Finalized).await?;
 				let redemption_price_query = apis().bitcoin_apis().redemption_rate(lock.satoshis);
 
+				let latest_block = client.latest_finalized_block_hash().await?;
 				let redemption_price = client
 					.live
 					.runtime_api()
@@ -390,8 +387,7 @@ impl LockCommands {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let latest_block = client.latest_finalized_block_hash().await?;
-				let at_block = Some(latest_block.hash());
+				let at_block = FetchAt::Finalized;
 				let child_xpriv = xpriv_file.read()?.derive_priv(
 					&Secp256k1::new(),
 					&DerivationPath::from_str(&master_xpub_hd_path)?,
@@ -453,8 +449,7 @@ impl LockCommands {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let latest_block = client.latest_finalized_block_hash().await?;
-				let at_block = Some(latest_block.hash());
+				let at_block = FetchAt::Finalized;
 
 				let mut signature: Option<BitcoinSignature> = None;
 				let mut active_height: Option<H256> = None;
@@ -529,16 +524,14 @@ impl LockCommands {
 					_ => bail!("No signature found"),
 				};
 
+				let fetch_at: FetchAt = active_height.map(Into::into).unwrap_or_default();
+
 				let utxo = client
-					.fetch_storage(
-						&storage().bitcoin_locks().locks_by_utxo_id(utxo_id),
-						active_height,
-					)
+					.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), fetch_at)
 					.await?
 					.ok_or(anyhow::anyhow!("No utxo found for lock"))?;
 
-				let mut releaser =
-					load_cosign_releaser(&client, utxo_id, &utxo, active_height).await?;
+				let mut releaser = load_cosign_releaser(&client, utxo_id, &utxo, fetch_at).await?;
 				releaser.add_signature(
 					releaser
 						.cosign_script
@@ -600,11 +593,11 @@ impl LockCommands {
 					.await
 					.context("Failed to connect to argon node")?;
 				let block_hash = client
-					.fetch_storage(&storage().system().block_hash(block_number), None)
+					.fetch_storage(&storage().system().block_hash(block_number), Default::default())
 					.await?
 					.ok_or(anyhow::anyhow!("No block found for the given block number"))?;
 
-				let at_block = Some(block_hash.into());
+				let at_block = FetchAt::Block(block_hash.into());
 				let (utxo_id, lock) =
 					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
 
@@ -688,7 +681,7 @@ async fn load_cosign_releaser(
 	client: &MainchainClient,
 	utxo_id: UtxoId,
 	lock: &api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin,
-	at_block: Option<H256>,
+	at_block: FetchAt,
 ) -> anyhow::Result<CosignReleaser> {
 	let utxo_ref = client
 		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
@@ -718,7 +711,7 @@ async fn load_cosign_releaser(
 
 async fn find_release_request(
 	client: &MainchainClient,
-	at_block: Option<H256>,
+	at_block: FetchAt,
 	utxo_id: UtxoId,
 ) -> anyhow::Result<Option<LockReleaseRequest<u128>>> {
 	let release_request = client
@@ -738,7 +731,7 @@ async fn find_release_request(
 async fn get_bitcoin_lock_from_utxo_id(
 	client: &MainchainClient,
 	utxo_id: ObligationId,
-	at_block: Option<H256>,
+	at_block: FetchAt,
 ) -> anyhow::Result<(UtxoId, api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin)> {
 	let query = storage().bitcoin_locks().locks_by_utxo_id(utxo_id);
 	let lock = client

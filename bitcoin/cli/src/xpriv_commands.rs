@@ -1,6 +1,6 @@
 use crate::{helpers::get_bitcoin_network, xpriv_file::XprivFile};
 use anyhow::anyhow;
-use argon_client::MainchainClient;
+use argon_client::{FetchAt, MainchainClient};
 use bip39::Mnemonic;
 use bitcoin::{
 	bip32,
@@ -44,7 +44,7 @@ impl XPrivCommands {
 		match self {
 			XPrivCommands::Master { xpriv_file, mnemonic } => {
 				let client = MainchainClient::from_url(&rpc_url).await?;
-				let network = get_bitcoin_network(&client, None).await?;
+				let network = get_bitcoin_network(&client, FetchAt::Finalized).await?;
 				println!(
 					"Based on connected Argon chain, this will create an xpriv for Bitcoin {:?}",
 					match network {

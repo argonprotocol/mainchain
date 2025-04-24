@@ -3,7 +3,7 @@ use argon_bitcoin::client::Client;
 use argon_client::{
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
-	ArgonConfig, ReconnectingClient,
+	ArgonConfig, FetchAt, ReconnectingClient,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 use bitcoincore_rpc::{Auth, RpcApi};
@@ -30,7 +30,7 @@ pub async fn bitcoin_loop(
 	let required_bitcoin_network: BitcoinNetwork = mainchain_client
 		.get()
 		.await?
-		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
 		.await?
 		.expect("Expected network")
 		.into();
@@ -109,7 +109,7 @@ mod tests {
 		let bitcoind = argon_node.bitcoind.as_ref().expect("Bitcoind not started");
 		let network: BitcoinNetwork = argon_node
 			.client
-			.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), None)
+			.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
 			.await
 			.unwrap()
 			.expect("Expected network")
@@ -159,12 +159,8 @@ mod tests {
 	}
 
 	async fn get_confirmed_block(client: &MainchainClient) -> Option<ConfirmedBitcoinBlockTip> {
-		let best_block = client.best_block_hash().await.unwrap();
 		client
-			.fetch_storage(
-				&storage().bitcoin_utxos().confirmed_bitcoin_block_tip(),
-				Some(best_block),
-			)
+			.fetch_storage(&storage().bitcoin_utxos().confirmed_bitcoin_block_tip(), FetchAt::Best)
 			.await
 			.expect("Expected tip")
 	}

@@ -16,7 +16,7 @@ use argon_client::{
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
-	MainchainClient, ReconnectingClient,
+	FetchAt, MainchainClient, ReconnectingClient,
 };
 
 pub async fn price_index_loop(
@@ -47,9 +47,8 @@ pub async fn price_index_loop(
 		}
 	}
 
-	let best_block = mainchain_client.best_block_hash().await?;
 	let last_price = mainchain_client
-		.fetch_storage(&storage().price_index().current(), Some(best_block))
+		.fetch_storage(&storage().price_index().current(), FetchAt::Best)
 		.await?;
 
 	let constants_client = mainchain_client.live.constants();

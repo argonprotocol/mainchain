@@ -3263,6 +3263,7 @@ declare module '@polkadot/types/lookup' {
     readonly isLockNotFound: boolean;
     readonly isNoVaultBitcoinPubkeysAvailable: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
+    readonly isVaultNotYetActive: boolean;
     readonly type:
       | 'ObligationNotFound'
       | 'NoMoreObligationIds'
@@ -3291,7 +3292,8 @@ declare module '@polkadot/types/lookup' {
       | 'GenericObligationError'
       | 'LockNotFound'
       | 'NoVaultBitcoinPubkeysAvailable'
-      | 'UnableToGenerateVaultBitcoinPubkey';
+      | 'UnableToGenerateVaultBitcoinPubkey'
+      | 'VaultNotYetActive';
   }
 
   /** @name ArgonPrimitivesVaultObligationError (375) */
