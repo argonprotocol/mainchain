@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/testing",
-  "version": "1.1.0-rc.4",
+  "version": "1.1.0-rc.5",
   "description": "A testing library to launch locally built binaries/dockers for Argon.",
   "repository": {
     "type": "git",
@@ -35,7 +35,7 @@
     }
   },
   "dependencies": {
-    "@argonprotocol/mainchain": "1.1.0-rc.4",
+    "@argonprotocol/mainchain": "1.1.0-rc.5",
     "bitcoin-core": "^5.0.0",
     "detect-port": "^2.1.0",
     "http-proxy": "^1.18.1",
