@@ -3,10 +3,10 @@ import { mnemonicGenerate } from '../index';
 import { printTable } from 'console-table-printer';
 import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { writeFileSync } from 'node:fs';
-import { Accountset, parseSubaccountRange } from '../Accountset';
+import { parseSubaccountRange } from '../Accountset';
 import Env from '../env';
 import * as process from 'node:process';
-import { globalOptions } from './index';
+import { accountsetFromCli, globalOptions } from './index';
 
 export default function accountCli() {
   const program = new Command('accounts').description(
@@ -17,7 +17,7 @@ export default function accountCli() {
     .command('watch')
     .description('Watch for blocks closed by subaccounts')
     .action(async () => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const accountMiners = await accountset.watchBlocks();
 
       accountMiners.events.on('mined', (_block, mined) => {
@@ -34,7 +34,7 @@ export default function accountCli() {
     .option('--addresses', 'Just show a list of ids')
     .action(async ({ addresses }) => {
       const { subaccounts } = globalOptions(program);
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
 
       if (addresses) {
         const addresses = accountset.addresses;
@@ -75,7 +75,7 @@ export default function accountCli() {
     .action(async ({ registerKeysTo, path }) => {
       const { accountPassphrase, accountSuri, accountFilePath } =
         globalOptions(program);
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       process.env.KEYS_MNEMONIC ||= mnemonicGenerate();
       if (registerKeysTo) {
         await accountset.registerKeys(registerKeysTo);
@@ -126,7 +126,7 @@ export default function accountCli() {
       'Output as curl commands instead of direct registration',
     )
     .action(async (nodeRpcUrl, { printOnly }) => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       if (printOnly) {
         const { gran, seal } = accountset.keys();
         const commands: string[] = [];
@@ -166,7 +166,7 @@ export default function accountCli() {
       parseSubaccountRange,
     )
     .action(async ({ subaccounts }) => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const result = await accountset.consolidate(subaccounts);
       printTable(result);
       process.exit(0);

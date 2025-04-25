@@ -1,13 +1,12 @@
 import { Accountset } from './Accountset';
 import { Header } from '@polkadot/types/interfaces/runtime';
-import TypedEventEmitter from 'typed-emitter';
-import EventEmitter from 'node:events';
 import { GenericEvent } from '@polkadot/types';
 import { BlockWatch } from './BlockWatch';
 import { MiningRotations } from './MiningRotations';
+import { createNanoEvents } from 'nanoevents';
 
 export class AccountMiners {
-  public events = new EventEmitter() as TypedEventEmitter<{
+  public events = createNanoEvents<{
     mined: (
       header: Header,
       earnings: {
@@ -27,7 +26,7 @@ export class AccountMiners {
         rotation: number;
       },
     ) => void;
-  }>;
+  }>();
 
   public miningRotations: MiningRotations;
 

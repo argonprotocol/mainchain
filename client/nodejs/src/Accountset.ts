@@ -1,15 +1,12 @@
 import {
   type ArgonClient,
   getClient,
-  type IGlobalOptions,
   Keyring,
-  keyringFromCli,
   type KeyringPair,
 } from './index';
 import { dispatchErrorToString, formatArgons } from './utils';
 import { logExtrinsicResult, TxSubmitter } from './TxSubmitter';
 import { AccountRegistry } from './AccountRegistry';
-import type { Command } from '@commander-js/extra-typings';
 import * as process from 'node:process';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import { AccountMiners } from './AccountMiners';
@@ -524,27 +521,6 @@ export class Accountset {
     const accountMiners = await AccountMiners.loadAt(this, { shouldLog });
     await accountMiners.watch();
     return accountMiners;
-  }
-
-  public static async fromCli(program: Command, proxyForAddress?: string) {
-    const parentOptions =
-      program.parent?.optsWithGlobals() as unknown as IGlobalOptions;
-    const keypair = await keyringFromCli(parentOptions);
-
-    const client = getClient(parentOptions.mainchainUrl);
-    if (proxyForAddress) {
-      return new Accountset({
-        client,
-        isProxy: true,
-        seedAddress: proxyForAddress,
-        txSubmitter: keypair,
-      });
-    } else {
-      return new Accountset({
-        seedAccount: keypair,
-        client,
-      });
-    }
   }
 }
 

@@ -3,6 +3,7 @@ import { VaultMonitor } from '../VaultMonitor';
 import { BitcoinLocks } from '../BitcoinLocks';
 import { Accountset } from '../Accountset';
 import { formatArgons } from '../utils';
+import { accountsetFromCli } from './index';
 
 export default function bitcoinCli() {
   const program = new Command('bitcoin').description('Wait for bitcoin space');
@@ -16,7 +17,7 @@ export default function bitcoinCli() {
     )
     .description('Watch for bitcoin space available')
     .action(async ({ argons }) => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const bot = new VaultMonitor(accountset, {
         bitcoinSpaceAvailable: argons ? BigInt(argons * 1e6) : 1n,
       });
@@ -57,7 +58,7 @@ export default function bitcoinCli() {
     .action(async ({ argons, bitcoinXpub, maxLockFee, tip }) => {
       const amountToLock = BigInt(argons * 1e6);
 
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       await BitcoinLocks.waitForSpace(accountset, {
         argonAmount: amountToLock,
         bitcoinXpub,

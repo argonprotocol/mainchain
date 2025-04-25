@@ -6,9 +6,19 @@ import vaultCli from './vaultCli';
 import miningCli from './miningCli';
 import liquidityCli from './liquidityCli';
 import bitcoinCli from './bitcoinCli';
-import { parseSubaccountRange } from '../Accountset';
+import { Accountset, parseSubaccountRange } from '../Accountset';
+import { getClient, keyringFromSuri, KeyringPair } from '../index';
+import { keyringFromFile, saveKeyringPair } from './keyringStore';
 
-export { accountCli, vaultCli, miningCli, liquidityCli, bitcoinCli };
+export {
+  accountCli,
+  vaultCli,
+  miningCli,
+  liquidityCli,
+  bitcoinCli,
+  keyringFromFile,
+  saveKeyringPair,
+};
 
 export function globalOptions(program: Command) {
   return program.optsWithGlobals() as IGlobalOptions;
@@ -53,6 +63,44 @@ export function buildCli() {
     .addCommand(miningCli())
     .addCommand(liquidityCli())
     .addCommand(bitcoinCli());
+}
+
+export async function accountsetFromCli(
+  program: Command,
+  proxyForAddress?: string,
+): Promise<Accountset> {
+  const opts = program.parent?.optsWithGlobals() as unknown as IGlobalOptions;
+
+  let keypair: KeyringPair | undefined;
+  if (opts.accountSuri) {
+    keypair = keyringFromSuri(opts.accountSuri!);
+  }
+  if (opts.accountFilePath) {
+    keypair = await keyringFromFile({
+      filePath: opts.accountFilePath,
+      passphrase: opts.accountPassphrase,
+    });
+  }
+  if (!keypair) {
+    throw new Error(
+      'No ACCOUNT account loaded (either ACCOUNT_SURI or ACCOUNT_JSON_PATH required)',
+    );
+  }
+
+  const client = getClient(opts.mainchainUrl);
+  if (proxyForAddress) {
+    return new Accountset({
+      client,
+      isProxy: true,
+      seedAddress: proxyForAddress,
+      txSubmitter: keypair,
+    });
+  } else {
+    return new Accountset({
+      seedAccount: keypair,
+      client,
+    });
+  }
 }
 
 export type IGlobalOptions = ReturnType<ReturnType<typeof buildCli>['opts']>;

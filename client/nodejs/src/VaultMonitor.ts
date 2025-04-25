@@ -9,15 +9,14 @@ import {
   formatArgons,
   formatPercent,
 } from './index';
-import { EventEmitter } from 'node:events';
-import type TypedEventEmitter from 'typed-emitter';
 import { printTable } from 'console-table-printer';
+import { createNanoEvents } from 'nanoevents';
 
 export class VaultMonitor {
-  public events = new EventEmitter() as TypedEventEmitter<{
+  public events = createNanoEvents<{
     'bitcoin-space-above': (vaultId: number, amount: bigint) => void;
     'liquidity-pool-space-above': (vaultId: number, amount: bigint) => void;
-  }>;
+  }>();
   public readonly vaultsById: { [id: number]: Vault } = {};
   public readonly blockWatch: BlockWatch;
   public readonly mainchain: Promise<ArgonClient>;

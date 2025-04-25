@@ -1,8 +1,7 @@
 import { type ArgonClient, type GenericEvent } from './index';
-import type TypedEventEmitter from 'typed-emitter';
-import EventEmitter from 'node:events';
 import type { Header, SignedBlock } from '@polkadot/types/interfaces';
 import { eventDataToJson, formatArgons } from './utils';
+import { createNanoEvents } from 'nanoevents';
 
 export type BlockWatchEvents = {
   block: (
@@ -60,8 +59,7 @@ export function getAuthorFromHeader(
 }
 
 export class BlockWatch {
-  public readonly events =
-    new EventEmitter() as TypedEventEmitter<BlockWatchEvents>;
+  public readonly events = createNanoEvents<BlockWatchEvents>();
   public readonly obligationsById: {
     [obligationId: number]: {
       vaultId: number;

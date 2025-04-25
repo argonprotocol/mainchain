@@ -1,8 +1,8 @@
 import { Command } from '@commander-js/extra-typings';
-import { Accountset } from '../Accountset';
 import { BidPool } from '../BidPool';
 import { VaultMonitor } from '../VaultMonitor';
 import { formatArgons } from '../utils';
+import { accountsetFromCli } from './index';
 
 export default function liquidityCli() {
   const program = new Command('liquidity-pools').description(
@@ -12,7 +12,7 @@ export default function liquidityCli() {
     .command('list', { isDefault: true })
     .description('Show or watch the vault bid pool rewards')
     .action(async () => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const bidPool = new BidPool(
         accountset.client,
         accountset.txSubmitterPair,
@@ -35,7 +35,7 @@ export default function liquidityCli() {
       parseFloat,
     )
     .action(async ({ tip, argons, vaultId }) => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
 
       const microgons = BigInt(argons * 1e6);
@@ -72,7 +72,7 @@ export default function liquidityCli() {
     .action(async ({ maxArgons, minPctSharing, tip }) => {
       const maxAmountPerSlot = BigInt(maxArgons * 1e6);
 
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const vaults = new VaultMonitor(
         accountset,
         {
