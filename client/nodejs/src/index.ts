@@ -31,14 +31,7 @@ export { VaultMonitor } from './VaultMonitor';
 export { CohortBidder } from './CohortBidder';
 export { BidPool } from './BidPool';
 export { BitcoinLocks } from './BitcoinLocks';
-export {
-  createKeyringPair,
-  keyringFromCli,
-  keyringFromSuri,
-  keyringFromFile,
-} from './keyringUtils';
-export { IGlobalOptions } from './clis';
-
+export { keyringFromSuri, createKeyringPair } from './keyringUtils';
 export {
   Keyring,
   KeyringPair,

@@ -1,9 +1,9 @@
 import { Command } from '@commander-js/extra-typings';
 import { VaultMonitor } from '../VaultMonitor';
-import { Accountset } from '../Accountset';
 import { TxSubmitter } from '../TxSubmitter';
 import { Vault } from '../Vault';
 import { BitcoinLocks } from '../BitcoinLocks';
+import { accountsetFromCli } from './index';
 
 export default function vaultCli() {
   const program = new Command('vaults').description(
@@ -14,7 +14,7 @@ export default function vaultCli() {
     .command('list', { isDefault: true })
     .description('Show current state of vaults')
     .action(async () => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const vaults = new VaultMonitor(accountset, undefined, {
         vaultOnlyWatchMode: true,
       });
@@ -38,7 +38,7 @@ export default function vaultCli() {
       parseFloat,
     )
     .action(async ({ tip, argons, vaultId, ratio }) => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
       const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
       const microgons = BigInt(argons * 1e6);
@@ -111,7 +111,7 @@ export default function vaultCli() {
           'Bitcoin pubkey must be 66 characters (add 0x in front optionally)',
         );
       }
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
       const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
       const microgons = BigInt(argons * 1e6);

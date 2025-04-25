@@ -1,4 +1,4 @@
-import { createKeyringPair, keyringFromFile } from '../keyringUtils';
+import { keyringFromFile, saveKeyringPair } from '../clis';
 import * as fs from 'node:fs';
 import { afterAll, expect, it } from 'vitest';
 import * as Path from 'node:path';
@@ -12,7 +12,7 @@ it('can import and export a keyring', async () => {
       await fs.promises.rm(tmpFile, { force: true });
     },
   });
-  const keyring = await createKeyringPair({
+  const keyring = await saveKeyringPair({
     filePath: tmpFile,
     passphrase: 'test',
     cryptoType: 'sr25519',

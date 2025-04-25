@@ -1,30 +1,4 @@
-import {
-  Keyring,
-  KeyringPair,
-  mnemonicGenerate,
-  IGlobalOptions,
-} from './index';
-import { promises } from 'node:fs';
-import * as os from 'node:os';
-
-const { readFile, writeFile } = promises;
-
-export async function keyringFromCli(
-  opts: IGlobalOptions,
-): Promise<KeyringPair> {
-  if (opts.accountSuri) {
-    return keyringFromSuri(opts.accountSuri!);
-  }
-  if (opts.accountFilePath) {
-    return keyringFromFile({
-      filePath: opts.accountFilePath,
-      passphrase: opts.accountPassphrase,
-    });
-  }
-  throw new Error(
-    'No ACCOUNT account loaded (either ACCOUNT_SURI or ACCOUNT_JSON_PATH required)',
-  );
-}
+import { Keyring, KeyringPair, mnemonicGenerate } from './index';
 
 export function keyringFromSuri(
   suri: string,
@@ -33,33 +7,10 @@ export function keyringFromSuri(
   return new Keyring({ type: cryptoType }).createFromUri(suri);
 }
 
-export async function keyringFromFile(opts: {
-  filePath: string;
-  passphrase?: string;
-}): Promise<KeyringPair> {
-  if (!opts.filePath) {
-    throw new Error(
-      'No ACCOUNT account loaded (either ACCOUNT_SURI or ACCOUNT_JSON_PATH required)',
-    );
-  }
-  const path = opts.filePath.replace('~', os.homedir());
-  const json = JSON.parse(await readFile(path, 'utf-8'));
-  const mainAccount = new Keyring().createFromJson(json);
-  mainAccount.decodePkcs8(opts.passphrase);
-  return mainAccount;
-}
-
-export async function createKeyringPair(opts: {
-  filePath?: string;
-  passphrase?: string;
+export function createKeyringPair(opts: {
   cryptoType?: 'sr25519' | 'ed25519';
-}): Promise<KeyringPair> {
-  const { filePath, passphrase, cryptoType } = opts;
+}): KeyringPair {
+  const { cryptoType } = opts;
   const seed = mnemonicGenerate();
-  const keyring = keyringFromSuri(seed, cryptoType);
-  if (filePath) {
-    const json = keyring.toJson(passphrase);
-    await writeFile(filePath, JSON.stringify(json, null, 2));
-  }
-  return keyring;
+  return keyringFromSuri(seed, cryptoType);
 }

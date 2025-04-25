@@ -5,7 +5,7 @@ import { Accountset } from '../Accountset';
 import { MiningBids } from '../MiningBids';
 import { formatArgons } from '../utils';
 import { TxSubmitter } from '../TxSubmitter';
-import { globalOptions } from './index';
+import { accountsetFromCli, globalOptions, saveKeyringPair } from './index';
 import { CohortBidder } from '../CohortBidder';
 
 export default function miningCli() {
@@ -17,7 +17,7 @@ export default function miningCli() {
     .command('list', { isDefault: true })
     .description('Monitor all miners')
     .action(async () => {
-      const accountset = await Accountset.fromCli(program);
+      const accountset = await accountsetFromCli(program);
       const bids = new MiningBids(accountset.client);
       const api = await accountset.client;
       let lastMiners: {
@@ -139,7 +139,7 @@ export default function miningCli() {
         bidIncrement,
         proxyForAddress,
       }) => {
-        const accountset = await Accountset.fromCli(program, proxyForAddress);
+        const accountset = await accountsetFromCli(program, proxyForAddress);
 
         let cohortBidder: CohortBidder | undefined;
         const miningBids = new MiningBids(accountset.client, false);
@@ -240,7 +240,7 @@ export default function miningCli() {
       const { mainchainUrl } = globalOptions(program);
       const client = await getClient(mainchainUrl);
 
-      const keyringPair = await createKeyringPair({
+      const keyringPair = await saveKeyringPair({
         filePath: outfile,
         passphrase: proxyPassphrase,
       });
@@ -254,7 +254,7 @@ export default function miningCli() {
       ]);
       let keypair: KeyringPair;
       try {
-        const accountset = await Accountset.fromCli(program);
+        const accountset = await accountsetFromCli(program);
         keypair = accountset.txSubmitterPair;
       } catch (e) {
         const polkadotLink = `https://polkadot.js.org/apps/?rpc=${mainchainUrl}#/extrinsics/decode/${tx.toHex()}`;
