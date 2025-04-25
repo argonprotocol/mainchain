@@ -17,8 +17,8 @@ use sc_consensus::{
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
-use sp_blockchain::{BlockStatus, HeaderBackend};
-use sp_consensus::{BlockOrigin, Error as ConsensusError};
+use sp_blockchain::HeaderBackend;
+use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
@@ -54,7 +54,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: HeaderBackend<B> + AuxStore + Send + Sync + 'static,
+	C: HeaderBackend<B> + BlockBackend<B> + AuxStore + Send + Sync + 'static,
 	AC: Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
@@ -119,7 +119,8 @@ where
 		let has_state = match block.state_action {
 			StateAction::ApplyChanges(_) | StateAction::Execute => true,
 			StateAction::ExecuteIfPossible =>
-				self.client.status(parent).unwrap_or(BlockStatus::Unknown) == BlockStatus::InChain,
+				self.client.block_status(parent).unwrap_or(BlockStatus::Unknown) ==
+					BlockStatus::InChainWithState,
 			StateAction::Skip => false,
 		};
 
@@ -224,8 +225,8 @@ where
 			if self
 				.client
 				.block_status(*block_params.header.parent_hash())
-				.unwrap_or(sp_consensus::BlockStatus::Unknown) !=
-				sp_consensus::BlockStatus::InChainWithState
+				.unwrap_or(BlockStatus::Unknown) !=
+				BlockStatus::InChainWithState
 			{
 				warn!(
 					block_hash = ?post_hash,

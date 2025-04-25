@@ -1,13 +1,20 @@
 # Changelog
 
-## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.2...205be2744795262f738a7962d892c381f42a5125) (2025-04-22)
+## [v1.1.0-rc.4](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.3...076393d437cea0c7459b5de61e62169bb3da49b0) (2025-04-24)
+
+### Features
+
+* hyperbridge doc
+([fd8a425](https://github.com/argonprotocol/mainchain/commit/fd8a425e82dfb7adc923805dafbb34818f12a108))
 
 ### Fixes
 
-* **nodejs:** change rotation calculation
-([476035c](https://github.com/argonprotocol/mainchain/commit/476035c2befa0baf17670c0f000a7b3307757bee))
+* **bitcoin_locks:** add error decode
+([59771b5](https://github.com/argonprotocol/mainchain/commit/59771b5e5fc91e57843ca582634f1a70fd275201))
+* **client:** codeql issue
+([edb2c7d](https://github.com/argonprotocol/mainchain/commit/edb2c7dd5a3cd1bb2da8e06bc7e3b3b5b0dc73a1))
 
-## [v1.1.0-rc.2](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.2) (2025-04-18)
+## [v1.1.0-rc.3](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.3) (2025-04-22)
 
 ### Features
 
@@ -18,6 +25,8 @@
 
 ### Fixes
 
+* **nodejs:** change rotation calculation
+([476035c](https://github.com/argonprotocol/mainchain/commit/476035c2befa0baf17670c0f000a7b3307757bee))
 * bump spec version
 ([ea2887b](https://github.com/argonprotocol/mainchain/commit/ea2887ba1fe2f95e007e093c9bda9c8e566d62f5))
 * **client:** update nodejs testing
