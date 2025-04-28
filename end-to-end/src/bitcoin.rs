@@ -617,7 +617,7 @@ async fn wait_for_mint(
 			}
 			counter += 1;
 			if counter >= 30 {
-				panic!("Timed out waiting for remaining mint")
+				panic!("Timed out waiting for remaining mint. Last mint was {:?}", pending_mint.0);
 			}
 		}
 		println!("Owner minted full bitcoin")
