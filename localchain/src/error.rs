@@ -1,4 +1,5 @@
 use jsonrpsee::core::client::error::Error as JsonrpseeError;
+use polkadot_sdk::*;
 use sp_core::crypto::{DeriveError, SecretStringError};
 
 use argon_notary_audit::VerifyError;

@@ -1,20 +1,12 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
-	block_seal::{CohortId, MiningSlotConfig},
-	providers::OnNewSlot,
-	tick::{Tick, Ticker},
-	vault::MiningBidPoolProvider,
+	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, vault::MiningBidPoolProvider,
 	BlockNumber, TickProvider, VotingSchedule,
 };
-use env_logger::{Builder, Env};
-use frame_support::{
-	derive_impl, parameter_types,
-	traits::{Currency, StorageMapShim},
-	weights::constants::RocksDbWeight,
-};
-use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{Get, H256};
-use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId, BuildStorage, FixedU128, Percent};
+
+use frame_support::traits::{Currency, StorageMapShim};
+use pallet_prelude::*;
+use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -52,8 +44,6 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 1;
 }
 
-pub type Balance = u128;
-
 type ArgonToken = pallet_balances::Instance1;
 impl pallet_balances::Config<ArgonToken> for Test {
 	type MaxLocks = ();
@@ -69,6 +59,7 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
 }
 
 pub fn set_ownership(account_id: u64, amount: Balance) {
@@ -100,6 +91,7 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -217,21 +209,16 @@ impl pallet_mining_slot::Config for Test {
 	type BidIncrements = BidIncrements;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		let mining_config = MiningSlotConfig {
+			slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),
+			ticks_between_slots: TicksBetweenSlots::get(),
+			ticks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
+		};
 
-	let mining_config = MiningSlotConfig {
-		slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),
-		ticks_between_slots: TicksBetweenSlots::get(),
-		ticks_before_bid_end_for_vrf_close: BlocksBeforeBidEndForVrfClose::get(),
-	};
-
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
-		.assimilate_storage(&mut t)
-		.unwrap();
-
-	sp_io::TestExternalities::new(t)
+		pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
+			.assimilate_storage(t)
+			.unwrap();
+	})
 }

@@ -1,11 +1,11 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 #[cfg(feature = "std")]
 use core::time::Duration;
+use polkadot_sdk::sp_core::RuntimeDebug;
 #[cfg(feature = "std")]
 use rsntp::SntpClient;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::RuntimeDebug;
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 

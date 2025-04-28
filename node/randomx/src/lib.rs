@@ -1,6 +1,6 @@
+use polkadot_sdk::sp_core::H256;
 pub use randomx_rs::RandomXError;
 use randomx_rs::{RandomXCache, RandomXFlag, RandomXVM};
-use sp_core::H256;
 
 pub fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
 	let flags = RandomXFlag::get_recommended_flags();
@@ -27,9 +27,9 @@ pub mod full_vm {
 	use lazy_static::lazy_static;
 	use lru_cache::LruCache;
 	use parking_lot::Mutex;
+	use polkadot_sdk::sp_core::H256;
 	pub use randomx_rs::RandomXError;
 	use randomx_rs::{RandomXCache, RandomXDataset, RandomXFlag, RandomXVM};
-	use sp_core::H256;
 
 	use log::info;
 	use std::{

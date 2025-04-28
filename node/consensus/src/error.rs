@@ -1,10 +1,10 @@
 use argon_primitives::AccountId;
+use polkadot_sdk::*;
 use sc_consensus::ImportResult;
 use sp_api::ApiError;
 use sp_blockchain::Error as BlockchainError;
 use sp_consensus::Error as ConsensusError;
 use sp_inherents::Error as InherentsError;
-use sp_runtime::RuntimeString;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -46,7 +46,7 @@ pub enum Error {
 	#[error("{0}")]
 	Environment(String),
 	#[error("{0}")]
-	Runtime(RuntimeString),
+	Runtime(String),
 	#[error("Missing runtime data {0}")]
 	MissingRuntimeData(String),
 	#[error("Block import error {0:?}")]

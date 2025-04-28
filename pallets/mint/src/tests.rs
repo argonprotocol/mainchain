@@ -10,13 +10,8 @@ use argon_primitives::{
 	block_seal::{BlockPayout, BlockRewardType},
 	BlockRewardsEventHandler, UtxoLockEvents,
 };
-use frame_support::{
-	assert_ok,
-	traits::{fungible::Unbalanced, OnInitialize},
-};
-use sp_arithmetic::FixedI128;
-use sp_core::U256;
-use sp_runtime::{DispatchError, TokenError};
+use frame_support::traits::fungible::Unbalanced;
+use pallet_prelude::*;
 
 #[test]
 fn it_records_burnt_argons_by_prorata() {

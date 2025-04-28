@@ -2,22 +2,18 @@ use crate as pallet_notebook;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
 	block_vote::VoteMinimum,
-	notary::{NotaryId, NotaryProvider, NotarySignature},
-	tick::{Tick, TickDigest, Ticker},
-	AccountId, BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty,
-	Digestset, NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider,
-	TransferToLocalchainId, VotingSchedule,
+	notary::{NotaryProvider, NotarySignature},
+	tick::{TickDigest, Ticker},
+	BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty, Digestset,
+	NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider, TransferToLocalchainId,
+	VotingSchedule,
 };
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency};
-use sp_core::{crypto::AccountId32, ConstU32, Get, H256};
-use sp_keyring::{ed25519::Keyring, Ed25519Keyring};
-use sp_runtime::{
-	traits::{Block as BlockT, IdentityLookup},
-	BuildStorage, DispatchError,
-};
+use pallet_prelude::*;
 
-pub type Balance = u128;
+use ed25519::Keyring;
+use frame_support::traits::Currency;
+use sp_core::crypto::AccountId32;
+
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -117,6 +113,7 @@ impl pallet_balances::Config for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
 }
 
 pub fn set_argons(account_id: &AccountId32, amount: Balance) {
@@ -179,9 +176,6 @@ impl pallet_notebook::Config for Test {
 	type Digests = DigestGetter;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

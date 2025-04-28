@@ -2,8 +2,8 @@
 extern crate alloc;
 
 use argon_primitives::DecodeDigestError;
-use codec::Decode;
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -18,19 +18,18 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use argon_primitives::{digests::*, tick::Tick, VotingKey};
-	use codec::{Codec, EncodeLike};
-	use frame_support::{pallet_prelude::*, traits::FindAuthor};
-	use frame_system::pallet_prelude::*;
-	use log::warn;
-	use sp_runtime::{ConsensusEngineId, Digest};
+	use argon_primitives::{digests::*, VotingKey};
+	use codec::EncodeLike;
+	use frame_support::traits::FindAuthor;
+	use sp_runtime::ConsensusEngineId;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 		type NotebookVerifyError: Codec + EncodeLike + Clone + TypeInfo;
 	}
@@ -102,7 +101,7 @@ pub mod pallet {
 			}
 			let digest = frame_system::Pallet::<T>::digest();
 			let digests = Self::decode(&digest).inspect_err(|e| {
-				warn!("Could not decode digests: {:?}", e);
+				log::warn!("Could not decode digests: {:?}", e);
 			})?;
 			Ok(digests)
 		}

@@ -1,9 +1,4 @@
-use frame_support::{
-	assert_err, assert_ok,
-	pallet_prelude::*,
-	traits::fungible::{Inspect, InspectHold, Mutate},
-};
-use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber, FixedU128};
+use pallet_prelude::*;
 
 use crate::{
 	mock::*,
@@ -101,7 +96,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		let who = 1;
 		set_argons(who, 2_000_000);
 		let secp = bitcoin::secp256k1::Secp256k1::new();
-		let rng = &mut rand::thread_rng();
+		let rng = &mut bitcoin::secp256k1::rand::thread_rng();
 		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
 		let pubkey = keypair.public_key(&secp).serialize();
 		CurrentTick::set(1);
@@ -472,7 +467,7 @@ fn clears_released_bitcoins() {
 		System::set_block_number(1);
 
 		let secp = bitcoin::secp256k1::Secp256k1::new();
-		let rng = &mut rand::thread_rng();
+		let rng = &mut bitcoin::secp256k1::rand::thread_rng();
 		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
 		let pubkey = keypair.public_key(&secp).serialize();
 		let who = 2;

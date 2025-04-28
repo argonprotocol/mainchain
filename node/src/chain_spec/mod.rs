@@ -11,6 +11,7 @@ use argon_runtime::{
 	ChainTransferConfig, GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig,
 	PriceIndexConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
+use polkadot_sdk::*;
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityWeight};
 use sp_core::{Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};

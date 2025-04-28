@@ -7,6 +7,7 @@ use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use core::fmt::Debug;
 use frame_support::pallet_prelude::ConstU32;
 use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
+use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ed25519, Get, RuntimeDebug, H256};

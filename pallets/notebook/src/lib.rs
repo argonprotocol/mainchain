@@ -2,8 +2,8 @@
 extern crate alloc;
 
 pub use argon_notary_audit::VerifyError as NotebookVerifyError;
-use argon_primitives::{notary::NotaryProvider, notebook::NotebookNumber};
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -16,16 +16,8 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::{
-		collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-		vec,
-		vec::Vec,
-	};
-	use codec::alloc::string::ToString;
-	use frame_support::{pallet_prelude::*, DefaultNoBound};
-	use frame_system::pallet_prelude::*;
-	use sp_core::{crypto::AccountId32, H256};
-	use sp_runtime::traits::Block as BlockT;
+	use alloc::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
+	use sp_core::crypto::AccountId32;
 	use tracing::{info, trace, warn};
 
 	use super::*;
@@ -33,15 +25,14 @@ pub mod pallet {
 	use argon_primitives::{
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{
-			NotaryId, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
+			NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
 			NotaryNotebookAuditSummaryDetails, NotaryNotebookDetails, NotaryNotebookKeyDetails,
-			NotaryNotebookRawVotes, NotaryState,
+			NotaryNotebookRawVotes, NotaryProvider, NotaryState,
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
-		tick::Tick,
-		AccountId, AccountOriginUid, Balance, BlockSealSpecProvider, BlockVote, ChainTransfer,
-		ChainTransferLookup, Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler,
-		NotebookProvider, NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
+		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
+		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
+		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
 		TransferToLocalchainId,
 	};
 
@@ -55,9 +46,12 @@ pub mod pallet {
 	/// to confirm the inherent submitted accurately reflects the digest of notebooks, along with
 	/// tracking for any notaries that failed audits and need to be locked.
 	#[pallet::config]
-	pub trait Config: frame_system::Config<AccountId = AccountId32, Hash = H256> {
+	pub trait Config:
+		polkadot_sdk::frame_system::Config<AccountId = AccountId32, Hash = H256>
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 

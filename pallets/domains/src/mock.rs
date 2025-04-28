@@ -1,14 +1,9 @@
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
-use sp_core::crypto::AccountId32;
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
-
-use argon_primitives::tick::Tick;
+use pallet_prelude::*;
 
 use crate as pallet_domains;
 
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
-
+use sp_runtime::AccountId32;
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test
@@ -41,9 +36,6 @@ impl pallet_domains::Config for Test {
 	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

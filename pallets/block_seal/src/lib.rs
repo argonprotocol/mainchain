@@ -3,6 +3,7 @@
 
 extern crate alloc;
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -18,7 +19,7 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use alloc::{collections::btree_map::BTreeMap, vec, vec::Vec};
+	use alloc::collections::btree_map::BTreeMap;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
 		digests::Digestset,
@@ -26,19 +27,16 @@ pub mod pallet {
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notary::NotaryNotebookRawVotes,
-		prelude::*,
 		AuthorityProvider, BlockSealAuthorityId, BlockSealDigest, BlockSealEventHandler,
 		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingKey, MerkleProof,
 		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
 		FORK_POWER_DIGEST, PARENT_VOTING_KEY_DIGEST,
 	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
-	use frame_support::{pallet_prelude::*, traits::FindAuthor};
-	use frame_system::pallet_prelude::*;
-	use log::info;
-	use sp_core::{ByteArray, H256, U256};
+	use frame_support::traits::FindAuthor;
+	use sp_core::ByteArray;
 	use sp_runtime::{
-		traits::{BlakeTwo256, Block as BlockT, Verify},
+		traits::{Block as BlockT, Verify},
 		Digest, DigestItem, RuntimeAppPublic,
 	};
 
@@ -47,7 +45,9 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config<Hash: From<[u8; 32]>, AccountId = AccountId> {
+	pub trait Config:
+		polkadot_sdk::frame_system::Config<Hash: From<[u8; 32]>, AccountId = AccountId>
+	{
 		/// The identifier type for an authority.
 		type AuthorityId: Member
 			+ Parameter
@@ -251,7 +251,7 @@ pub mod pallet {
 			let digests = T::Digests::get()?;
 			let block_author = digests.author;
 
-			info!(
+			log::info!(
 				"Block seal submitted by {:?} -> {}",
 				block_author,
 				match seal {
@@ -359,8 +359,8 @@ pub mod pallet {
 				verify_proof::<'_, BlakeTwo256, _, _>(
 					&notebook_votes_root,
 					source_notebook_proof.proof.clone(),
-					source_notebook_proof.number_of_leaves as usize,
-					source_notebook_proof.leaf_index as usize,
+					source_notebook_proof.number_of_leaves,
+					source_notebook_proof.leaf_index,
 					&block_vote.encode(),
 				),
 				Error::<T>::InvalidBlockVoteProof
@@ -500,16 +500,18 @@ pub mod pallet {
 			let grandparent_tick_blocks = T::TickProvider::blocks_at_tick(voted_for_block_at_tick);
 
 			if grandparent_tick_blocks.is_empty() {
-				info!(
+				log::info!(
 					"No eligible blocks to vote on in grandparent tick {:?}",
 					voted_for_block_at_tick
 				);
 				return Ok(BoundedVec::new());
 			};
 
-			info!(
+			log::info!(
 				"Finding votes for block at tick {} - (grandparents={:?}, notebook tick={})",
-				voted_for_block_at_tick, grandparent_tick_blocks, expected_notebook_tick
+				voted_for_block_at_tick,
+				grandparent_tick_blocks,
+				expected_notebook_tick
 			);
 
 			let mut best_votes = vec![];
@@ -550,7 +552,7 @@ pub mod pallet {
 			{
 				let leafs = leafs_by_notary.get(&notary_id).expect("just created");
 
-				let proof = merkle_proof::<BlakeTwo256, _, _>(leafs, index);
+				let proof = merkle_proof::<BlakeTwo256, _, _>(leafs, index as u32);
 
 				let vote =
 					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
@@ -558,9 +560,10 @@ pub mod pallet {
 
 				// proxy votes can use any block
 				if !vote.is_proxy_vote() && !grandparent_tick_blocks.contains(&vote.block_hash) {
-					info!(
+					log::info!(
 						"Cant use vote for grandparent tick {:?} - voted for {:?}",
-						grandparent_tick_blocks, vote.block_hash
+						grandparent_tick_blocks,
+						vote.block_hash
 					);
 					continue;
 				}

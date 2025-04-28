@@ -2,33 +2,18 @@
 extern crate alloc;
 extern crate core;
 
-use alloc::{vec, vec::Vec};
 use argon_primitives::{
 	block_seal::{
-		CohortId, MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
+		MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig, RewardDestination,
 	},
 	inherents::BlockSealInherent,
-	tick::Tick,
+	providers::*,
 	vault::MiningBidPoolProvider,
-	AuthorityProvider, BlockRewardAccountsProvider, BlockSealEventHandler, MiningSlotProvider,
 	SlotEvents, TickProvider,
 };
-use codec::Codec;
-use frame_support::{
-	pallet_prelude::*,
-	traits::{
-		fungible::{Inspect, InspectHold, Mutate, MutateHold},
-		tokens::{Fortitude, Precision, Preservation},
-	},
-};
-use log::{info, warn};
 pub use pallet::*;
-use sp_core::{Get, U256};
-use sp_io::hashing::blake2_256;
-use sp_runtime::{
-	traits::{One, OpaqueKeys, UniqueSaturatedInto, Zero},
-	FixedPointNumber, FixedU128, RuntimeAppPublic, SaturatedConversion, Saturating,
-};
+use pallet_prelude::*;
+use sp_runtime::{traits::OpaqueKeys, RuntimeAppPublic};
 pub use weights::*;
 
 #[cfg(test)]
@@ -69,16 +54,7 @@ pub mod weights;
 pub mod pallet {
 	use codec::FullCodec;
 	use core::cmp::Ordering;
-	use frame_support::{
-		pallet_prelude::*,
-		traits::fungible::{Inspect, Mutate, MutateHold},
-		BoundedVec,
-	};
-	use frame_system::pallet_prelude::*;
-	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, Member, OpaqueKeys, UniqueSaturatedInto},
-		BoundedBTreeMap, Percent,
-	};
+	use sp_runtime::{BoundedBTreeMap, Percent};
 
 	use super::*;
 	use argon_primitives::{
@@ -101,12 +77,13 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config
+	pub trait Config: polkadot_sdk::frame_system::Config
 	where
 		<Self as Config>::Balance: Into<u128>,
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 		/// The maximum number of Miners that the pallet can hold.
@@ -784,7 +761,7 @@ impl<T: Config> Pallet<T> {
 		let threshold = U256::MAX / U256::from(ticks_before_close);
 
 		if vote_seal_proof < threshold {
-			info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
+			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
 			let cohort_id = NextCohortId::<T>::get();
 			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_id });
 			return true
@@ -943,7 +920,7 @@ impl<T: Config> Pallet<T> {
 		}
 		T::OwnershipCurrency::release(&reason.into(), account_id, amount, Precision::Exact)
 			.map_err(|e| {
-				warn!(
+				log::warn!(
 					"Error recovering mining slot hold for {account_id:?}. Amount {amount:?}. {:?}",
 					e
 				);

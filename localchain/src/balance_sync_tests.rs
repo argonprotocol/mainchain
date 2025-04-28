@@ -2,8 +2,9 @@ use crate::test_utils::*;
 use crate::CryptoScheme::Sr25519;
 use crate::*;
 use argon_primitives::{BalanceChange, LocalchainAccountId};
-use sp_keyring::AccountKeyring::{Alice, Bob};
+use polkadot_sdk::*;
 use sp_keyring::Ed25519Keyring::Ferdie;
+use sp_keyring::Sr25519Keyring::{Alice, Bob};
 
 #[allow(dead_code)]
 struct TestNetwork {

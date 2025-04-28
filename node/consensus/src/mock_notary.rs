@@ -6,6 +6,7 @@ use jsonrpsee::{
 	types::error::ErrorObjectOwned,
 	RpcModule,
 };
+use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519::Signature, Blake2Hasher, H256};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
@@ -87,10 +88,13 @@ impl MockNotary {
 		let archive_server = Router::new()
 			// `GET /` goes to `root`
 			.route(
-				&format!("/notary/{notary_id}/notebook/:notebook_number"),
+				&format!("/notary/{notary_id}/notebook/{{notebook_number}}"),
 				get(Self::get_notebook),
 			)
-			.route(&format!("/notary/{notary_id}/header/:notebook_number"), get(Self::get_header))
+			.route(
+				&format!("/notary/{notary_id}/header/{{notebook_number}}"),
+				get(Self::get_header),
+			)
 			.with_state(Arc::new(self.clone()));
 
 		let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;

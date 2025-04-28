@@ -35,8 +35,8 @@ import type {
   ArgonPrimitivesVaultFundType,
   ArgonPrimitivesVaultObligationExpiration,
   ArgonRuntimeProxyType,
-  FrameSupportDispatchDispatchInfo,
   FrameSupportTokensMiscBalanceStatus,
+  FrameSystemDispatchEventInfo,
   IsmpConsensusStateMachineHeight,
   IsmpConsensusStateMachineId,
   IsmpEventsRequestResponseHandled,
@@ -1417,11 +1417,11 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           dispatchError: SpRuntimeDispatchError,
-          dispatchInfo: FrameSupportDispatchDispatchInfo,
+          dispatchInfo: FrameSystemDispatchEventInfo,
         ],
         {
           dispatchError: SpRuntimeDispatchError;
-          dispatchInfo: FrameSupportDispatchDispatchInfo;
+          dispatchInfo: FrameSystemDispatchEventInfo;
         }
       >;
       /**
@@ -1429,8 +1429,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       ExtrinsicSuccess: AugmentedEvent<
         ApiType,
-        [dispatchInfo: FrameSupportDispatchDispatchInfo],
-        { dispatchInfo: FrameSupportDispatchDispatchInfo }
+        [dispatchInfo: FrameSystemDispatchEventInfo],
+        { dispatchInfo: FrameSystemDispatchEventInfo }
       >;
       /**
        * An account was reaped.

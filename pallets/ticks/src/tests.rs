@@ -3,7 +3,8 @@ use crate::{
 	pallet::RecentBlocksAtTicks,
 };
 use argon_primitives::{tick::MAX_BLOCKS_PER_TICK, NotebookAuditResult, TickProvider};
-use frame_support::{pallet_prelude::*, traits::OnTimestampSet};
+use frame_support::traits::OnTimestampSet;
+use pallet_prelude::*;
 use std::panic::catch_unwind;
 
 #[test]

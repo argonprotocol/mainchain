@@ -13,7 +13,7 @@ documentation.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 codec = { workspace = true, features = ["default"] }
-sp-runtime = { workspace = true, features = ["default"] }
+polkadot-sdk = { workspace = true, features = ["sp-runtime"] }
 
 subxt = { workspace = true }
 tokio = { workspace = true }

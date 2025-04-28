@@ -11,14 +11,15 @@ use jsonrpsee::{
 	types::{ErrorObject, Id, Request},
 	MethodResponse,
 };
+use polkadot_sdk::*;
 use prometheus::Registry;
-use prometheus_endpoint::init_prometheus;
 use std::{
 	net::{Ipv4Addr, SocketAddr},
 	num::NonZeroU32,
 	sync::Arc,
 	time::{Duration, Instant},
 };
+use substrate_prometheus_endpoint::init_prometheus;
 
 const MAX_JITTER: Duration = Duration::from_millis(50);
 const MAX_RETRIES: usize = 10;

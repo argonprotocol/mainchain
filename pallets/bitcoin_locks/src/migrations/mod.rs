@@ -1,8 +1,6 @@
 use crate::{pallet::LocksByUtxoId, Config, LockedBitcoin, OwedUtxoAggrieved};
-use alloc::vec::Vec;
-use argon_primitives::VaultId;
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use pallet_prelude::*;
 
 mod old_storage {
 	use super::*;
@@ -87,7 +85,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating Bitcoin locks");
+		log::info!("Migrating Bitcoin locks");
 		LocksByUtxoId::<T>::translate_values::<old_storage::LockedBitcoin<T>, _>(|a| {
 			count += 1;
 			Some(LockedBitcoin {

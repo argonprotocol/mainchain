@@ -9,6 +9,7 @@ use bitcoind::{
 	bitcoincore_rpc::{bitcoincore_rpc_json::AddressType, jsonrpc::serde_json, RpcApi},
 	BitcoinD,
 };
+use polkadot_sdk::*;
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 use std::{env, str::FromStr, sync::Arc};
@@ -36,10 +37,7 @@ use argon_testing::{
 	ArgonTestNode, ArgonTestOracle,
 };
 use serial_test::serial;
-use sp_keyring::{
-	AccountKeyring::{Bob, Eve},
-	Sr25519Keyring::Alice,
-};
+use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
 use tokio::fs;
 
 #[tokio::test(flavor = "multi_thread")]

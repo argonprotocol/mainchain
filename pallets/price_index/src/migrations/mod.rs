@@ -1,8 +1,6 @@
 use crate::Config;
-#[cfg(feature = "try-runtime")]
-use alloc::{vec, vec::Vec};
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use pallet_prelude::*;
 
 mod old_storage {
 	use super::*;
@@ -52,7 +50,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating price index (removing)");
+		log::info!("Migrating price index (removing)");
 		old_storage::Current::<T>::take();
 		count += 1;
 

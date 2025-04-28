@@ -1,18 +1,12 @@
 use alloc::collections::btree_map::BTreeMap;
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::Currency, PalletId};
-use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{crypto::AccountId32, ConstU32, ConstU64, H256};
-use sp_keyring::AccountKeyring::Alice;
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
+
+use pallet_prelude::*;
+use Sr25519Keyring::Alice;
 
 use crate as pallet_chain_transfer;
-use argon_primitives::{
-	notary::NotaryId, tick::Tick, BlockSealAuthorityId, NotebookNumber, NotebookProvider,
-	NotebookSecret,
-};
-
-pub type Balance = u128;
+use argon_primitives::{NotebookProvider, NotebookSecret};
+use frame_support::traits::Currency;
+use sp_runtime::AccountId32;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 pub(crate) type BlockNumber = BlockNumberFor<Test>;
 
@@ -72,6 +66,7 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type MaxFreezes = ConstU32<1>;
+	type DoneSlashHandler = ();
 }
 
 pub fn set_argons(account_id: &AccountId32, amount: Balance) {
@@ -119,17 +114,13 @@ impl pallet_chain_transfer::Config for Test {
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	pallet_chain_transfer::GenesisConfig::<Test> {
-		hyperbridge_token_admin: Some(Alice.to_account_id()),
-		..Default::default()
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_chain_transfer::GenesisConfig::<Test> {
+			hyperbridge_token_admin: Some(Alice.to_account_id()),
+			..Default::default()
+		}
+		.assimilate_storage(t)
+		.unwrap();
+	})
 }

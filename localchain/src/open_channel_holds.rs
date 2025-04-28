@@ -15,6 +15,7 @@ use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
 use codec::Encode;
 use lazy_static::lazy_static;
+use polkadot_sdk::*;
 use sp_core::ed25519::Signature;
 use sp_core::Decode;
 use sp_runtime::MultiSignature;
@@ -754,9 +755,9 @@ mod tests {
   use argon_primitives::{AccountId, LocalchainAccountId, Notarization};
   use serde_json::json;
   use sp_core::Pair;
-  use sp_keyring::AccountKeyring::{Alice, Charlie};
   use sp_keyring::Ed25519Keyring::Bob;
   use sp_keyring::Ed25519Keyring::Ferdie;
+  use sp_keyring::Sr25519Keyring::{Alice, Charlie};
 
   async fn register_account(
     db: &mut SqliteConnection,
@@ -989,7 +990,7 @@ mod tests {
       );
       balance_change.notes[0].microgons += 100_000;
       let encoded = balance_change.hash().0;
-      let charlie_pair = sp_core::sr25519::Pair::from_string(&Charlie.to_seed(), None)?;
+      let charlie_pair = sp_core::sr25519::Pair::from_string(&Charlie.to_seed(), None).unwrap();
       let signature = charlie_pair.sign(&encoded);
       balance_change.signature = signature.into();
       (balance_change.signature, balance_change.notes[0].microgons)

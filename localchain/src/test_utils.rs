@@ -1,9 +1,3 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_support::BoundedVec;
@@ -13,12 +7,18 @@ use jsonrpsee::{
   types::error::ErrorObjectOwned,
   RpcModule,
 };
+use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
 use sp_core::ed25519::Signature;
 use sp_core::{Blake2Hasher, LogLevelFilter, Pair, H256};
 use sp_keyring::Ed25519Keyring;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 use crate::notarization_builder::NotarizationBuilder;
@@ -173,7 +173,7 @@ impl MockNotary {
     // build our application with a route
     let archive_server = Router::new()
       // `GET /` goes to `root`
-      .route("/notary/1/header/:notebook_number", get(Self::get_header))
+      .route("/notary/1/header/{notebook_number}", get(Self::get_header))
       .with_state(Arc::new(self.clone()));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -384,7 +384,7 @@ impl MockNotary {
 
     let tick = self.ticker.lock().await.current();
     for (leaf_index, balance_tip) in balance_tips.iter().enumerate() {
-      let proof = merkle_proof::<Blake2Hasher, _, _>(merkle_leafs.clone(), leaf_index);
+      let proof = merkle_proof::<Blake2Hasher, _, _>(merkle_leafs.clone(), leaf_index as u32);
 
       notary_state.balance_proofs.insert(
         (notebook_number, balance_tip.tip().into()),

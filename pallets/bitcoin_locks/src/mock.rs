@@ -1,13 +1,7 @@
 use std::collections::BTreeMap;
 
 use bitcoin::PublicKey;
-use env_logger::{Builder, Env};
-use frame_support::{
-	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
-};
-use sp_arithmetic::{traits::Saturating, FixedI128, FixedU128, Permill};
-use sp_core::{ConstU32, ConstU64, H256};
-use sp_runtime::{BuildStorage, DispatchError, DispatchResult};
+use pallet_prelude::*;
 
 use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
@@ -18,16 +12,15 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	ensure,
-	tick::{Tick, Ticker},
+	tick::Ticker,
 	vault::{
 		BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
 		ReleaseFundsResult, Vault, VaultTerms,
 	},
-	BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider, TickProvider,
-	UtxoLockEvents, VaultId, VotingSchedule,
+	BitcoinUtxoTracker, ObligationEvents, PriceProvider, TickProvider, UtxoLockEvents,
+	VotingSchedule,
 };
-
-pub type Balance = u128;
+use frame_support::traits::Currency;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -66,6 +59,7 @@ impl pallet_balances::Config for Test {
 	type MaxFreezes = ();
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {
@@ -364,18 +358,13 @@ impl pallet_bitcoin_locks::Config for Test {
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	pallet_bitcoin_locks::GenesisConfig::<Test> {
-		minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),
-		_phantom: Default::default(),
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_bitcoin_locks::GenesisConfig::<Test> {
+			minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),
+			_phantom: Default::default(),
+		}
+		.assimilate_storage(t)
+		.unwrap();
+	})
 }

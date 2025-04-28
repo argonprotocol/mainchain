@@ -1,25 +1,15 @@
 use binary_merkle_tree::{merkle_proof, merkle_root};
-use codec::Encode;
-use frame_support::{
-	assert_err, assert_ok,
-	inherent::{InherentData, ProvideInherent},
-	pallet_prelude::*,
-};
-use sp_core::{
-	ed25519::{Public, Signature},
-	H256, U256,
-};
+use frame_support::inherent::{InherentData, ProvideInherent};
+use pallet_prelude::*;
+use sp_core::ed25519::{Public, Signature};
 use sp_inherents::InherentDataProvider;
 use sp_keyring::{
 	ed25519::Keyring,
-	AccountKeyring::{Bob, Ferdie},
 	Ed25519Keyring,
 	Ed25519Keyring::Alice,
+	Sr25519Keyring::{Bob, Ferdie},
 };
-use sp_runtime::{
-	traits::{BlakeTwo256, Header},
-	BoundedVec, Digest, DigestItem, MultiSignature,
-};
+use sp_runtime::MultiSignature;
 use std::panic::catch_unwind;
 
 use crate::{
@@ -37,9 +27,8 @@ use argon_primitives::{
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	notary::NotaryNotebookRawVotes,
-	tick::Tick,
-	BlockSealAuthorityId, BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey,
-	Domain, DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule, FORK_POWER_DIGEST,
+	BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey, Domain,
+	DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule, FORK_POWER_DIGEST,
 	PARENT_VOTING_KEY_DIGEST,
 };
 

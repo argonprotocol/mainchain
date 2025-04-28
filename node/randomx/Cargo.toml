@@ -11,7 +11,8 @@ homepage.workspace = true
 publish = false
 
 [dependencies]
-sp-core = { workspace = true }
+thiserror = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-core"] }
 lazy_static = { workspace = true }
 lru-cache = { workspace = true }
 parking_lot = { workspace = true }

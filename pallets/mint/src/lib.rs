@@ -2,12 +2,8 @@
 extern crate alloc;
 extern crate core;
 
-use codec::{Codec, Decode, Encode};
-use scale_info::TypeInfo;
-use sp_runtime::{traits::Zero, Saturating};
-
-use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -20,12 +16,10 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use core::fmt::Debug;
-	use frame_support::{pallet_prelude::*, traits::fungible::Mutate};
-	use frame_system::pallet_prelude::*;
-	use log::{trace, warn};
-	use sp_core::U256;
-	use sp_runtime::{traits::AtLeast32BitUnsigned, FixedPointNumber};
+	use pallet_prelude::*;
+
+	use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
+	use sp_runtime::FixedPointNumber;
 
 	use super::*;
 	use argon_primitives::{
@@ -37,8 +31,9 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>;
 		type PriceProvider: PriceProvider<Self::Balance>;
@@ -142,7 +137,7 @@ pub mod pallet {
 			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
 			// only mint when cpi is negative or 0
 			if argon_cpi.is_positive() {
-				trace!("Argon cpi is positive. Nothing to mint.");
+				log::trace!("Argon cpi is positive. Nothing to mint.");
 				return T::DbWeight::get().reads(2);
 			}
 
@@ -177,9 +172,11 @@ pub mod pallet {
 								.saturating_accrue(amount);
 						},
 						Err(e) => {
-							warn!(
+							log::warn!(
 								"Failed to mint {:?} argons for miner {:?}: {:?}",
-								amount, &miner, e
+								amount,
+								&miner,
+								e
 							);
 							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Mining,
@@ -238,9 +235,11 @@ pub mod pallet {
 								});
 							},
 							Err(e) => {
-								warn!(
+								log::warn!(
 									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}",
-									amount_to_mint, &utxo_id, e
+									amount_to_mint,
+									&utxo_id,
+									e
 								);
 								Self::deposit_event(Event::<T>::MintError {
 									mint_type: MintType::Bitcoin,
@@ -286,7 +285,7 @@ pub mod pallet {
 			let argons_to_print = argons_to_print as u128;
 
 			let per_miner = argons_to_print.saturating_div(active_miners);
-			trace!(
+			log::trace!(
 				"Minting {} microgons. CPI={:?}, Liquidity = {}. Per miner {}",
 				argons_to_print,
 				T::PriceProvider::get_argon_cpi().unwrap_or_default(),
@@ -388,26 +387,25 @@ pub mod pallet {
 		Bitcoin,
 		Mining,
 	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Default, Decode, TypeInfo)]
-pub struct MintAction<Balance: Codec> {
-	pub argon_burned: Balance,
-	pub argon_minted: Balance,
-	pub bitcoin_minted: Balance,
-}
-impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T>
-where
-	<T as Config>::Balance: Into<u128>,
-	<T as Config>::Balance: From<u128>,
-{
-	fn rewards_created(payout: &[BlockPayout<T::AccountId, T::Balance>]) {
-		let mut argons = T::Balance::zero();
-		for reward in payout {
-			argons = argons.saturating_add(reward.argons);
-		}
-		if argons != T::Balance::zero() {
-			Self::track_block_mint(argons);
+	#[derive(Debug, Clone, PartialEq, Eq, Encode, Default, Decode, TypeInfo)]
+	pub struct MintAction<Balance: Codec> {
+		pub argon_burned: Balance,
+		pub argon_minted: Balance,
+		pub bitcoin_minted: Balance,
+	}
+	impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T>
+	where
+		<T as Config>::Balance: Into<u128>,
+		<T as Config>::Balance: From<u128>,
+	{
+		fn rewards_created(payout: &[BlockPayout<T::AccountId, T::Balance>]) {
+			let mut argons = T::Balance::zero();
+			for reward in payout {
+				argons = argons.saturating_add(reward.argons);
+			}
+			if argons != T::Balance::zero() {
+				Self::track_block_mint(argons);
+			}
 		}
 	}
 }

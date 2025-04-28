@@ -2,6 +2,7 @@
 extern crate alloc;
 
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -15,18 +16,12 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::vec::Vec;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_core::H256;
 	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
 
 	use argon_primitives::{
 		notary::{
-			GenesisNotary, NotaryId, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord,
-			NotarySignature,
+			GenesisNotary, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord, NotarySignature,
 		},
-		tick::Tick,
 		TickProvider,
 	};
 
@@ -43,8 +38,9 @@ pub mod pallet {
 	type NotaryMetaOf<T> = NotaryMeta<<T as Config>::MaxNotaryHosts>;
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 
 		/// The maximum active notaries allowed

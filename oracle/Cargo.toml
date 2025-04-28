@@ -20,9 +20,8 @@ serde_json = { workspace = true, features = ["default"] }
 reqwest = { workspace = true, features = ["default"] }
 scraper = { workspace = true }
 hex = { workspace = true }
-sp-runtime = { workspace = true, features = ["default"] }
-sp-core = { workspace = true, features = ["default"] }
 tracing = { workspace = true, features = ["default"] }
+polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "binary-merkle-tree"] }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 chrono = { workspace = true }
@@ -49,8 +48,7 @@ alloy-provider = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
-sp-keyring = { workspace = true }
-sp-keystore = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-keyring", "sp-keystore"], default-features = true }
 argon-testing = { workspace = true }
 
 [build-dependencies]

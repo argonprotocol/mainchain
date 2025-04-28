@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::{bail, Result};
 use anyhow::anyhow;
 use clap::ValueEnum;
+use polkadot_sdk::*;
 use sp_core::crypto::{
   ExposeSecret, Pair as CorePair, SecretString, SecretUri, Ss58Codec, Zeroize,
 };

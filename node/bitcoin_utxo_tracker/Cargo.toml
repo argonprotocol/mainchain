@@ -24,11 +24,7 @@ bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
 argon-primitives = { workspace = true, features = ["std", "bitcoin"] }
 argon-bitcoin = { workspace = true, features = ["std"] }
-sc-service = { workspace = true }
-sp-api = { workspace = true, features = ["std"] }
-sp-runtime = { workspace = true, features = ["std"] }
-sc-client-api = { workspace = true }
-prometheus-endpoint = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sc-service", "sp-api", "sp-runtime", "sc-client-api"] }
 
 [dev-dependencies]
 bitcoind = { workspace = true }

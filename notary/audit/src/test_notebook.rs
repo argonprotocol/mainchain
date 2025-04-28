@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_support::{assert_err, assert_ok, parameter_types};
+use polkadot_sdk::*;
 use sp_core::{
 	bounded::BoundedVec, bounded_vec, crypto::AccountId32, ed25519, sr25519::Signature,
 	Blake2Hasher, Pair, H256,
@@ -1138,7 +1139,7 @@ fn test_votes_must_add_up() {
 
 fn proof(leaves: Vec<BalanceTip>, index: usize) -> MerkleProof {
 	let leaves = leaves.iter().map(|v| v.encode()).collect::<Vec<_>>();
-	let proof = merkle_proof::<Blake2Hasher, _, _>(leaves, index);
+	let proof = merkle_proof::<Blake2Hasher, _, _>(leaves, index as u32);
 	MerkleProof {
 		proof: BoundedVec::truncate_from(proof.proof),
 		leaf_index: proof.leaf_index as u32,

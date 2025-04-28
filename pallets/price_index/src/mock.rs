@@ -1,10 +1,6 @@
 use crate as pallet_price_index;
-use argon_primitives::tick::Tick;
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, weights::constants::RocksDbWeight};
-use sp_arithmetic::FixedU128;
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
 
+use pallet_prelude::*;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -44,13 +40,10 @@ impl pallet_price_index::Config for Test {
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
 
-pub fn new_test_ext(operator: Option<u64>) -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	pallet_price_index::GenesisConfig::<Test> { operator }
-		.assimilate_storage(&mut t)
-		.unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext(operator: Option<u64>) -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_price_index::GenesisConfig::<Test> { operator }
+			.assimilate_storage(t)
+			.unwrap();
+	})
 }

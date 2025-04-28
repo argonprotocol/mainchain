@@ -3,7 +3,7 @@
 extern crate alloc;
 extern crate core;
 
-use sp_runtime::DispatchError;
+use pallet_prelude::*;
 
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
@@ -59,26 +59,6 @@ pub mod weights;
 ///    ownership tokens and the market value of underlying Bitcoin locks.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::vec;
-
-	use codec::Codec;
-	use frame_support::{
-		pallet_prelude::*,
-		storage::with_storage_layer,
-		traits::{
-			fungible::{Inspect, Mutate, MutateHold},
-			tokens::{Fortitude, Precision},
-		},
-	};
-	use frame_system::pallet_prelude::*;
-	use log::warn;
-	use sp_arithmetic::FixedU128;
-	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, UniqueSaturatedInto},
-		DispatchError::Token,
-		FixedPointNumber, Saturating, TokenError,
-	};
-
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
@@ -87,10 +67,9 @@ pub mod pallet {
 			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
 			XPubFingerprint,
 		},
-		tick::Tick,
 		vault::{BitcoinObligationProvider, Obligation, ObligationError},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, ObligationEvents, ObligationId, PriceProvider,
-		TickProvider, UtxoLockEvents, VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, ObligationEvents, PriceProvider, TickProvider,
+		UtxoLockEvents, VaultId,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -101,9 +80,10 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: polkadot_sdk::frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 
@@ -746,7 +726,7 @@ pub mod pallet {
 					)
 					.map_err(Error::<T>::from)?;
 				} else {
-					warn!("Verified utxo_id {:?} not found", utxo_id);
+					log::warn!("Verified utxo_id {:?} not found", utxo_id);
 				}
 				Ok::<(), DispatchError>(())
 			})

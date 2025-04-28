@@ -458,6 +458,7 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
 	type MaxReserves = ();
 	type MaxFreezes = ConstU32<2>;
+	type DoneSlashHandler = ();
 }
 
 impl pallet_multisig::Config for Runtime {
@@ -536,6 +537,7 @@ impl pallet_balances::Config<OwnershipToken> for Runtime {
 	type MaxLocks = ConstU32<50>;
 	type MaxReserves = ();
 	type MaxFreezes = ConstU32<2>;
+	type DoneSlashHandler = ();
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -558,6 +560,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type WeightToFee = WeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+	type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_token_gateway::Config for Runtime {
@@ -601,11 +604,10 @@ impl pallet_ismp::Config for Runtime {
 		// Add the grandpa or beefy consensus client here
 		ismp_grandpa::consensus::GrandpaConsensusClient<Runtime>,
 	);
-	// Weight provider for local modules
-	type WeightProvider = ();
 	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
 	// You most likely don't need it, just use the `NoOpMmrTree`
 	type OffchainDB = ();
+	type FeeHandler = pallet_ismp::fee_handler::WeightFeeHandler<()>;
 }
 
 impl ismp_grandpa::Config for Runtime {

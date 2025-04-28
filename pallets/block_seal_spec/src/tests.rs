@@ -1,10 +1,6 @@
-use codec::Encode;
-use frame_support::{
-	assert_ok,
-	traits::{Len, OnFinalize, OnInitialize, OnTimestampSet},
-};
-use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{Digest, DigestItem, Percent};
+use frame_support::traits::OnTimestampSet;
+use pallet_prelude::*;
+use sp_core::crypto::AccountId32;
 
 use argon_primitives::{
 	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
@@ -12,7 +8,6 @@ use argon_primitives::{
 	localchain::BlockVote,
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
-	tick::Tick,
 	MerkleProof, NotaryId, NotebookEventHandler,
 };
 

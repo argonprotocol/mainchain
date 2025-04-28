@@ -1,13 +1,7 @@
 use crate as pallet_liquidity_pools;
-use argon_primitives::{
-	block_seal::CohortId, tick::Tick, vault::LiquidityPoolVaultProvider, VaultId,
-};
-use env_logger::{Builder, Env};
-use frame_support::{
-	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight, PalletId,
-};
-use frame_system::pallet_prelude::BlockNumberFor;
-use sp_runtime::{BuildStorage, Percent, Permill};
+use argon_primitives::vault::LiquidityPoolVaultProvider;
+use frame_support::traits::Currency;
+use pallet_prelude::*;
 use std::collections::HashMap;
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -35,8 +29,6 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 1;
 }
 
-pub type Balance = u128;
-
 impl pallet_balances::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -51,6 +43,7 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type MaxFreezes = ();
+	type DoneSlashHandler = ();
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {
@@ -128,12 +121,6 @@ impl pallet_liquidity_pools::Config for Test {
 	type NextCohortId = NextCohortId;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-
-	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

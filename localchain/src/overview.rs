@@ -1,3 +1,4 @@
+use polkadot_sdk::*;
 use sp_core::H256;
 use sqlx::SqlitePool;
 use std::collections::{BTreeMap, HashSet};
@@ -665,8 +666,9 @@ fn is_pending(status: &BalanceChangeStatus) -> bool {
 
 #[cfg(test)]
 mod tests {
-  use sp_keyring::AccountKeyring::{Alice, Bob};
+  use polkadot_sdk::*;
   use sp_keyring::Ed25519Keyring::Ferdie;
+  use sp_keyring::Sr25519Keyring::{Alice, Bob};
 
   use crate::overview::OverviewStore;
   use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};

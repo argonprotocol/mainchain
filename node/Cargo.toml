@@ -23,62 +23,60 @@ async-trait = { workspace = true }
 futures-timer = { workspace = true }
 thiserror = { workspace = true, features = ["default"] }
 serde = { workspace = true }
-prometheus-endpoint = { workspace = true }
 log = { workspace = true }
-sc-tracing = { workspace = true }
-sc-cli = { workspace = true }
-sp-core = { workspace = true, features = ["default"] }
-sc-executor = { workspace = true, features = ["default"] }
-sc-network = { workspace = true, features = ["default"] }
-sc-consensus-grandpa = { workspace = true }
-sp-consensus-grandpa = { workspace = true, features = ["default"] }
-sc-service = { workspace = true }
-sc-telemetry = { workspace = true }
-sc-transaction-pool = { workspace = true }
-sc-transaction-pool-api = { workspace = true }
-sc-offchain = { workspace = true }
-sc-consensus = { workspace = true }
-sp-consensus = { workspace = true }
-sc-client-api = { workspace = true }
-sc-chain-spec = { workspace = true }
-sc-rpc-spec-v2 = { workspace = true }
-sp-runtime = { workspace = true, features = ["default"] }
-sp-arithmetic = { workspace = true, features = ["default"] }
-sp-session = { workspace = true, features = ["default"] }
-sp-statement-store = { workspace = true, features = ["default"] }
-sp-io = { workspace = true, features = ["default"] }
-sp-timestamp = { workspace = true, features = ["default"] }
-sp-inherents = { workspace = true, features = ["default"] }
-sp-transaction-pool = { workspace = true, features = ["default"] }
 hex = { workspace = true }
 hex-literal = { workspace = true }
-sp-keystore = { workspace = true, features = ["default"] }
-sp-keyring = { workspace = true, features = ["default"] }
-frame-system = { workspace = true, features = ["default"] }
-pallet-transaction-payment = { workspace = true, features = ["default"] }
-frame-metadata-hash-extension = { workspace = true, features = ["default"] }
+
+polkadot-sdk.workspace = true
+
+polkadot-sdk.default-features = true
+
+polkadot-sdk.features = [
+    "substrate-prometheus-endpoint",
+    "sc-cli",
+    "sp-core",
+    "sc-executor",
+    "sc-network",
+    "sc-consensus-grandpa",
+    "sp-consensus-grandpa",
+    "sc-service",
+    "sc-telemetry",
+    "sc-transaction-pool",
+    "sc-transaction-pool-api",
+    "sc-offchain",
+    "sc-consensus",
+    "sp-consensus",
+    "sc-client-api",
+    "sc-chain-spec",
+    "sc-rpc-spec-v2",
+    "sp-runtime",
+    "sp-arithmetic",
+    "sp-statement-store",
+    "sp-io",
+    "sp-timestamp",
+    "sp-inherents",
+    "sp-keystore",
+    "sp-keyring",
+    "frame-system",
+    "frame-benchmarking-cli",
+    "pallet-transaction-payment",
+    "sp-api",
+    "sc-rpc",
+    "sc-rpc-api",
+    "sp-blockchain",
+    "sc-consensus-grandpa-rpc",
+    "sp-block-builder",
+    "sc-basic-authorship",
+    "substrate-frame-rpc-system",
+    "pallet-transaction-payment-rpc",
+]
+
 jsonrpsee = { workspace = true, features = ["server"] }
-sp-api = { workspace = true, features = ["default"] }
-sc-rpc = { workspace = true }
-sc-rpc-api = { workspace = true }
-sp-blockchain = { workspace = true }
-sc-consensus-grandpa-rpc = { workspace = true }
-sp-block-builder = { workspace = true, features = ["default"] }
-sc-basic-authorship = { workspace = true }
-substrate-frame-rpc-system = { workspace = true }
-pallet-transaction-payment-rpc = { workspace = true }
 serde_json = { workspace = true }
 color-backtrace = { workspace = true }
-# These dependencies are used for runtime benchmarking
-frame-benchmarking = { workspace = true }
-frame-benchmarking-cli = { workspace = true }
 
 pallet-ismp-runtime-api = { workspace = true, features = ["default"] }
 pallet-ismp-rpc = { workspace = true }
-
-sp-mmr-primitives = { workspace = true }
-
-rand = { workspace = true }
 
 # Local Dependencies
 argon-node-consensus = { workspace = true }
@@ -92,7 +90,7 @@ argon-randomx = { workspace = true }
 url = { workspace = true }
 
 [build-dependencies]
-substrate-build-script-utils = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["substrate-build-script-utils"] }
 
 [features]
 default = []
@@ -100,18 +98,12 @@ default = []
 runtime-benchmarks = [
 	"argon-canary-runtime/runtime-benchmarks",
 	"argon-runtime/runtime-benchmarks",
-	"frame-benchmarking-cli/runtime-benchmarks",
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"sc-service/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
+	"polkadot-sdk/runtime-benchmarks",
 ]
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
 try-runtime = [
 	"argon-canary-runtime/try-runtime",
 	"argon-runtime/try-runtime",
-	"frame-system/try-runtime",
-	"pallet-transaction-payment/try-runtime",
-	"sp-runtime/try-runtime",
+	"polkadot-sdk/try-runtime",
 ]

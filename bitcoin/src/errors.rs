@@ -2,6 +2,7 @@ use bitcoin::{
 	bip32, psbt,
 	psbt::{ExtractTxError, SignError, SigningErrors},
 };
+use polkadot_sdk::*;
 use sp_runtime::RuntimeDebug;
 
 use argon_primitives::bitcoin::BitcoinError;

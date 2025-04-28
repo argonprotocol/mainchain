@@ -1,8 +1,10 @@
+use alloc::borrow::Cow;
 use argon_primitives::{tick::Tick, AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT};
 use codec::{Decode, Encode};
+use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
-use sp_runtime::{scale_info::TypeInfo, RuntimeString};
+use sp_runtime::scale_info::TypeInfo;
 use thiserror::Error;
 
 use crate::AccountHistoryLookupError;
@@ -46,7 +48,7 @@ pub enum VerifyError {
 	InvalidNoteRecipients,
 
 	#[error("An invalid balance change was submitted (#{change_index}.{note_index}): {message:?}")]
-	BalanceChangeError { change_index: u16, note_index: u16, message: RuntimeString },
+	BalanceChangeError { change_index: u16, note_index: u16, message: Cow<'static, str> },
 
 	#[error("Invalid net balance changeset. Must account for all funds.")]
 	InvalidNetBalanceChangeset,

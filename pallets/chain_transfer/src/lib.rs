@@ -2,12 +2,8 @@
 extern crate alloc;
 
 pub use argon_notary_audit::VerifyError as NotebookVerifyError;
-use argon_primitives::{notary::NotaryId, tick::Tick, TransferToLocalchainId};
-use codec::{Decode, Encode};
-use core::fmt::Debug;
 pub use pallet::*;
-use scale_info::TypeInfo;
-use sp_runtime::RuntimeDebug;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -23,22 +19,12 @@ pub mod pallet {
 	use super::*;
 	use argon_primitives::{
 		notebook::{ChainTransfer, NotebookHeader},
-		tick::Tick,
-		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookNumber,
-		NotebookProvider,
+		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
+		TransferToLocalchainId,
 	};
-	use frame_support::{
-		pallet_prelude::*,
-		traits::{
-			fungible::{Inspect, Mutate},
-			tokens::{Fortitude, Precision, Preservation},
-			Incrementable,
-		},
-		PalletId,
-	};
-	use frame_system::pallet_prelude::*;
-	use sp_core::{crypto::AccountId32, H256};
-	use sp_runtime::traits::{AccountIdConversion, AtLeast32BitUnsigned};
+
+	use sp_core::crypto::AccountId32;
+	use sp_runtime::traits::AccountIdConversion;
 
 	use sp_core::Get;
 
@@ -47,9 +33,12 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config<AccountId = AccountId32, Hash = H256> {
+	pub trait Config:
+		polkadot_sdk::frame_system::Config<AccountId = AccountId32, Hash = H256>
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 

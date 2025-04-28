@@ -1,11 +1,7 @@
-use argon_primitives::{
-	tick::{Tick, Ticker},
-	TickProvider, VotingSchedule,
-};
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::ConstU16};
-use sp_core::{ConstU64, H256};
-use sp_runtime::{traits::IdentityLookup, BuildStorage};
+use argon_primitives::{tick::Ticker, TickProvider, VotingSchedule};
+use pallet_prelude::*;
+
+use frame_support::traits::ConstU16;
 
 use crate as pallet_notaries;
 
@@ -72,9 +68,6 @@ impl pallet_notaries::Config for Test {
 	type TickProvider = StaticTickProvider;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

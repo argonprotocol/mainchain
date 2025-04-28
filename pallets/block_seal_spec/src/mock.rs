@@ -1,18 +1,11 @@
 use std::collections::BTreeMap;
 
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, weights::constants::RocksDbWeight};
-use sp_core::{ConstU32, ConstU64, H256, U256};
-use sp_runtime::{BuildStorage, Percent};
+use pallet_prelude::*;
 
 use crate as pallet_block_seal_spec;
 use argon_primitives::{
-	block_seal::MiningAuthority,
-	inherents::BlockSealInherent,
-	notebook::NotebookNumber,
-	tick::{Tick, Ticker},
-	AuthorityProvider, BlockSealAuthorityId, NotaryId, NotebookProvider, NotebookSecret,
-	TickProvider, VotingSchedule,
+	block_seal::MiningAuthority, inherents::BlockSealInherent, notebook::NotebookNumber,
+	providers::*, tick::Ticker, NotebookSecret, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -134,21 +127,14 @@ impl pallet_block_seal_spec::Config for Test {
 }
 
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext(
-	initial_vote_minimum: u128,
-	initial_compute_difficulty: u128,
-) -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	pallet_block_seal_spec::GenesisConfig::<Test> {
-		initial_vote_minimum,
-		initial_compute_difficulty,
-		_phantom: Default::default(),
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext(initial_vote_minimum: u128, initial_compute_difficulty: u128) -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_block_seal_spec::GenesisConfig::<Test> {
+			initial_vote_minimum,
+			initial_compute_difficulty,
+			_phantom: Default::default(),
+		}
+		.assimilate_storage(t)
+		.unwrap();
+	})
 }

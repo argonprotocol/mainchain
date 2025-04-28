@@ -30,7 +30,7 @@ pub(crate) mod utils {
 	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
 	use sp_core::{crypto::key_types::GRANDPA, Pair};
-	use sp_keyring::{AccountKeyring::Alice, Sr25519Keyring};
+	use sp_keyring::{Sr25519Keyring, Sr25519Keyring::Alice};
 
 	#[allow(dead_code)]
 	pub(crate) async fn transfer_mainchain(

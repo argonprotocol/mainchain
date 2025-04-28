@@ -9,8 +9,9 @@ use argon_primitives::{
 	NotebookEventHandler,
 };
 use frame_support::{assert_noop, assert_ok};
+use pallet_prelude::*;
 use sp_core::bounded_vec;
-use sp_keyring::AccountKeyring::Bob;
+use sp_keyring::Sr25519Keyring::Bob;
 use sp_runtime::testing::H256;
 
 #[test]

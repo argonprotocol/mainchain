@@ -1,11 +1,9 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, MinerXorKeyByIndex, NextSlotCohort},
-	runtime_decl_for_mining_slot_api::NextCohortId,
+	pallet::{ActiveMinersByIndex, MinerXorKeyByIndex, NextCohortId, NextSlotCohort},
 	Config, Registration,
 };
-use alloc::vec::Vec;
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use pallet_prelude::*;
 
 mod old_storage {
 	use crate::Config;
@@ -13,12 +11,9 @@ mod old_storage {
 		block_seal::{CohortId, MinerIndex, RewardDestination},
 		ObligationId,
 	};
-
-	use crate::runtime_decl_for_mining_slot_api::U256;
-	#[cfg(feature = "try-runtime")]
-	use alloc::vec::Vec;
-	use frame_support::{pallet_prelude::*, storage_alias, BoundedVec};
-	use sp_runtime::{traits::OpaqueKeys, FixedU128};
+	use frame_support_procedural::storage_alias;
+	use pallet_prelude::*;
+	use sp_runtime::traits::OpaqueKeys;
 
 	pub type Registration<T> = MiningRegistration<
 		<T as frame_system::Config>::AccountId,
@@ -111,7 +106,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating mining slot pallet storage");
+		log::info!("Migrating mining slot pallet storage");
 		let old = old_storage::NextSlotCohort::<T>::take();
 		let new = old
 			.into_iter()
@@ -139,7 +134,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				cohort_id: reg.cohort_id,
 			})
 		});
-		info!("{} mining registrations migrated", count);
+		log::info!("{} mining registrations migrated", count);
 
 		let last_cohort_id = old_storage::LastActivatedCohortId::<T>::take();
 		NextCohortId::<T>::set(last_cohort_id);

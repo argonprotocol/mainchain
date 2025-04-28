@@ -1,12 +1,13 @@
-use alloc::collections::btree_map::BTreeMap;
+use alloc::{borrow::Cow, collections::btree_map::BTreeMap};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use core::{cmp::Ordering, str};
+use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::{BoundedBTreeMap, BoundedVec, RuntimeString};
+use sp_runtime::{BoundedBTreeMap, BoundedVec};
 
 use crate::{domain_top_level::DomainTopLevel, host::Host, Balance, NotaryId};
 
@@ -21,7 +22,7 @@ pub type DomainHash = H256;
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Domain {
-	pub name: RuntimeString,
+	pub name: Cow<'static, str>,
 	pub top_level: DomainTopLevel,
 }
 
@@ -49,12 +50,12 @@ impl Ord for Domain {
 
 impl Domain {
 	pub fn new(name: &'static str, top_level: DomainTopLevel) -> Self {
-		Self { name: RuntimeString::Borrowed(name), top_level }
+		Self { name: Cow::Borrowed(name), top_level }
 	}
 
 	#[cfg(feature = "std")]
 	pub fn from_string(name: String, top_level: DomainTopLevel) -> Self {
-		Self { name: RuntimeString::Owned(name.to_lowercase()), top_level }
+		Self { name: Cow::Owned(name.to_lowercase()), top_level }
 	}
 
 	#[cfg(feature = "std")]

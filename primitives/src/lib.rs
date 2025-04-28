@@ -3,6 +3,7 @@ extern crate alloc;
 extern crate core;
 
 use core::fmt::Display;
+use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
 use sp_runtime::{
@@ -94,9 +95,13 @@ pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
 pub mod prelude {
 	pub use super::{
-		localchain::*, tick::Tick, AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment,
-		Nonce, NotaryId, NotebookNumber, ObligationId, VaultId,
+		block_seal::{BlockSealAuthorityId, CohortId},
+		localchain::*,
+		tick::Tick,
+		AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment, Nonce, NotaryId,
+		NotebookNumber, ObligationId, VaultId,
 	};
+	pub use polkadot_sdk::*;
 }
 pub mod localchain {
 	pub use crate::{

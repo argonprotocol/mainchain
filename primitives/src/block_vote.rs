@@ -1,5 +1,6 @@
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
+use polkadot_sdk::*;
 
 use crate::{tick::Tick, AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
 use alloc::vec::Vec;

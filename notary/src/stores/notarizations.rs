@@ -21,6 +21,7 @@ use argon_primitives::{
 	Notarization, NotaryId, NoteType, NotebookNumber,
 };
 use codec::Encode;
+use polkadot_sdk::*;
 use serde_json::{from_value, json};
 use sp_runtime::BoundedVec;
 use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
@@ -468,8 +469,9 @@ impl NotarizationsStore {
 
 #[cfg(test)]
 mod tests {
+	use polkadot_sdk::*;
 	use sp_core::{bounded_vec, ed25519::Signature};
-	use sp_keyring::{AccountKeyring::Ferdie, Sr25519Keyring::Bob};
+	use sp_keyring::Sr25519Keyring::{Bob, Ferdie};
 	use sqlx::PgPool;
 
 	use argon_primitives::{

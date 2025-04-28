@@ -1,24 +1,18 @@
-use env_logger::{Builder, Env};
-use frame_support::{
-	derive_impl, parameter_types, traits::StorageMapShim, weights::constants::RocksDbWeight,
-};
-use sp_arithmetic::FixedI128;
-use sp_core::{ConstU32, ConstU64, H256};
-use sp_runtime::{traits::IdentityLookup, BuildStorage, FixedU128};
+use frame_support::traits::StorageMapShim;
+use pallet_prelude::*;
 
 use crate as pallet_block_rewards;
 use crate::GrowthPath;
 use argon_primitives::{
-	block_seal::{BlockPayout, CohortId},
+	block_seal::BlockPayout,
 	notary::{NotaryProvider, NotarySignature},
-	tick::{Tick, Ticker},
+	tick::Ticker,
 	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
-	NotaryId, NotebookNumber, NotebookProvider, NotebookSecret, PriceProvider, TickProvider,
-	VotingSchedule,
+	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
-pub(crate) type AccountId = u64;
+pub(crate) type TestAccountId = u64;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -32,14 +26,13 @@ frame_support::construct_runtime!(
 );
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
-	type AccountId = AccountId;
+	type AccountId = TestAccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
 	type AccountData = pallet_balances::AccountData<Balance>;
 	type DbWeight = RocksDbWeight;
 }
 
-pub type Balance = u128;
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
@@ -60,6 +53,7 @@ impl pallet_balances::Config<ArgonToken> for Test {
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
 }
 
 type OwnershipToken = pallet_balances::Instance2;
@@ -73,7 +67,7 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = StorageMapShim<
 		pallet_balances::Account<Test, OwnershipToken>,
-		AccountId,
+		TestAccountId,
 		pallet_balances::AccountData<Balance>,
 	>;
 	type WeightInfo = ();
@@ -81,6 +75,7 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type MaxFreezes = ConstU32<1>;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type DoneSlashHandler = ();
 }
 
 parameter_types! {
@@ -103,8 +98,8 @@ parameter_types! {
 	};
 	pub static IsMiningSlotsActive: bool = false;
 	pub static IsBlockVoteSeal: bool = false;
-	pub static LastRewards: Vec<BlockPayout<AccountId, Balance>> = vec![];
-	pub static AccountCohorts: Vec<(AccountId, CohortId)> = vec![];
+	pub static LastRewards: Vec<BlockPayout<TestAccountId, Balance>> = vec![];
+	pub static AccountCohorts: Vec<(TestAccountId, CohortId)> = vec![];
 }
 
 pub struct StaticBlockSealerProvider;
@@ -118,14 +113,14 @@ impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
 }
 
 pub struct TestProvider;
-impl NotaryProvider<Block, AccountId> for TestProvider {
+impl NotaryProvider<Block, TestAccountId> for TestProvider {
 	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
 	fn active_notaries() -> Vec<NotaryId> {
 		ActiveNotaries::get()
 	}
-	fn notary_operator_account_id(_notary_id: NotaryId) -> Option<AccountId> {
+	fn notary_operator_account_id(_notary_id: NotaryId) -> Option<TestAccountId> {
 		todo!()
 	}
 }
@@ -184,8 +179,8 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 pub struct RewardEvents;
-impl BlockRewardsEventHandler<AccountId, Balance> for RewardEvents {
-	fn rewards_created(payout: &[BlockPayout<AccountId, Balance>]) {
+impl BlockRewardsEventHandler<TestAccountId, Balance> for RewardEvents {
+	fn rewards_created(payout: &[BlockPayout<TestAccountId, Balance>]) {
 		LastRewards::set(payout.to_vec());
 	}
 }
@@ -240,9 +235,6 @@ impl pallet_block_rewards::Config for Test {
 	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

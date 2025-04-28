@@ -1,10 +1,6 @@
-use frame_support::{
-	assert_noop, assert_ok,
-	traits::{Len, OnFinalize, OnInitialize},
-};
-use sp_core::H256;
+use frame_support::traits::Len;
+use pallet_prelude::*;
 use sp_keyring::Ed25519Keyring;
-use sp_runtime::BoundedVec;
 
 use crate::{
 	mock::*,

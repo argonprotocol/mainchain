@@ -1,4 +1,4 @@
-use sp_core::blake2_256;
+use polkadot_sdk::sp_core::blake2_256;
 use std::time::Instant;
 
 fn main() {

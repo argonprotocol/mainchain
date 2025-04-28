@@ -34,9 +34,7 @@ thiserror = { workspace = true, features = ["default"] }
 subxt = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 hex = { workspace = true, features = ["default"] }
-sp-runtime = { workspace = true, features = ["default"] }
-sp-core = { workspace = true, features = ["default", "serde"] }
-binary-merkle-tree = { workspace = true, features = ["default"] }
+polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "binary-merkle-tree"] }
 tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
@@ -56,10 +54,8 @@ uniffi = { workspace = true, optional = true }
 jsonrpsee = { workspace = true }
 
 [dev-dependencies]
-frame-support = { workspace = true }
-sp-keyring = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-keyring", "sc-utils", "frame-support"], default-features = true }
 argon-testing = { workspace = true }
-sc-utils = { workspace = true }
 argon-notary = { workspace = true }
 axum = { workspace = true }
 
@@ -69,6 +65,6 @@ dotenv = { workspace = true }
 uniffi = { workspace = true, features = ["build"] }
 
 [features]
-default = []
+default = [ "polkadot-sdk/std" ]
 napi = [ "argon-primitives/napi", "dep:napi", "napi-derive" ]
 uniffi = [ "argon-primitives/uniffi", "dep:uniffi" ]

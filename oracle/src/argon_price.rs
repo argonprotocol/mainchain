@@ -5,6 +5,7 @@ use argon_primitives::{
 	tick::{Tick, Ticker},
 	ARGON_TOKEN_SYMBOL,
 };
+use polkadot_sdk::*;
 use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128, Saturating};
 use std::env;
 use uniswap_sdk_core::{prelude::*, token};
@@ -127,6 +128,7 @@ mod dev {
 	use crate::argon_price::ArgonPriceLookup;
 	use argon_primitives::tick::Tick;
 	use chrono::{TimeZone, Timelike};
+	use polkadot_sdk::*;
 	use rand::Rng;
 	use sp_runtime::{FixedU128, Saturating};
 
@@ -187,8 +189,8 @@ mod dev {
 					},
 					14..=15 => {
 						// Randomize price swing for one hour
-						let mut rng = rand::thread_rng();
-						let direction = rng.gen_range(-1..=1);
+						let mut rng = rand::rng();
+						let direction = rng.random_range(-1..=1);
 						match direction {
 							-1 => {
 								last_price =
@@ -224,7 +226,7 @@ mod dev {
 mod test {
 	use super::*;
 	use crate::uniswap_oracle::use_mock_uniswap_prices;
-	use std::time::Duration;
+	use std::{str::FromStr, time::Duration};
 
 	const DAI_ADDRESS_SEPOLIA: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 

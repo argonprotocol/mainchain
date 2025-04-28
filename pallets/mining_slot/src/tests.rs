@@ -11,18 +11,12 @@ use argon_primitives::{
 	block_seal::{MiningAuthority, MiningBidStats, MiningRegistration, RewardDestination},
 	AuthorityProvider,
 };
-use frame_support::{
-	assert_err, assert_noop, assert_ok,
-	pallet_prelude::*,
-	traits::{
-		fungible::{InspectHold, Unbalanced},
-		Currency,
-	},
-};
+use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
-use sp_core::{blake2_256, bounded_vec, H256, U256};
-use sp_runtime::{testing::UintAuthorityId, BoundedVec};
+use pallet_prelude::*;
+use sp_core::bounded_vec;
+use sp_runtime::testing::UintAuthorityId;
 use std::{collections::HashMap, env};
 
 #[test]

@@ -4,9 +4,8 @@ use argon_primitives::{
 	tick::{TickDigest, Ticker},
 	BlockVoteDigest, Digestset, NotebookDigest,
 };
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types, traits::ConstU64};
-use sp_runtime::{traits::Get, BuildStorage, DispatchError};
+
+use pallet_prelude::*;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -58,18 +57,13 @@ impl pallet_ticks::Config for Test {
 	type Digests = DigestGetter;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext(tick_duration_millis: u64) -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	pallet_ticks::GenesisConfig::<Test> {
-		ticker: Ticker::new(tick_duration_millis, 2),
-		_phantom: Default::default(),
-	}
-	.assimilate_storage(&mut t)
-	.unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext(tick_duration_millis: u64) -> TestState {
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_ticks::GenesisConfig::<Test> {
+			ticker: Ticker::new(tick_duration_millis, 2),
+			_phantom: Default::default(),
+		}
+		.assimilate_storage(t)
+		.unwrap();
+	})
 }

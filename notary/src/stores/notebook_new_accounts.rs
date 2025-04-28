@@ -1,8 +1,8 @@
 use codec::{Decode, Encode};
+use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ByteArray, RuntimeDebug};
-use sp_runtime::RuntimeString;
 use sqlx::FromRow;
 
 use argon_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber};
@@ -40,10 +40,7 @@ impl TryInto<NotebookNewAccount> for NotebookOriginsRow {
 					self.account_id
 				))
 			})?,
-			account_type: self
-				.account_type
-				.try_into()
-				.map_err(|e: RuntimeString| Error::InternalError(e.to_string()))?,
+			account_type: self.account_type.try_into().map_err(Error::InternalError)?,
 		})
 	}
 }
@@ -108,7 +105,8 @@ impl NotebookNewAccountsStore {
 
 #[cfg(test)]
 mod tests {
-	use sp_keyring::AccountKeyring::{Alice, Bob, Dave};
+	use polkadot_sdk::*;
+	use sp_keyring::Sr25519Keyring::{Alice, Bob, Dave};
 	use sqlx::PgPool;
 
 	use argon_primitives::AccountType::Deposit;

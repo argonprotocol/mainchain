@@ -4,13 +4,14 @@ use argon_primitives::{
 	Balance, NotaryId,
 };
 use codec::{Decode, Encode};
-use prometheus_endpoint::{
-	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
-	Registry, U64,
-};
+use polkadot_sdk::*;
 use sc_client_api::AuxStore;
 use sp_arithmetic::traits::UniqueSaturatedInto;
 use std::{sync::Arc, time::Instant};
+use substrate_prometheus_endpoint::{
+	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
+	Registry, U64,
+};
 
 #[derive(Debug, Clone, Decode, Encode, Default)]
 pub struct BlockMetrics {

@@ -27,8 +27,8 @@
 #![allow(missing_docs)]
 
 use frame_support::{traits::Get, weights::Weight};
+use polkadot_sdk::*;
 use core::marker::PhantomData;
-
 /// Weight functions for `ismp_grandpa`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> ismp_grandpa::WeightInfo for WeightInfo<T> {

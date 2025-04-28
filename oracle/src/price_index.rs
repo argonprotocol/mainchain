@@ -1,6 +1,7 @@
 use std::{env, time::Duration};
 
 use anyhow::{anyhow, ensure};
+use polkadot_sdk::*;
 use sp_runtime::{
 	traits::{One, Zero},
 	FixedU128, Saturating,
@@ -189,6 +190,7 @@ pub async fn price_index_loop(
 #[cfg(test)]
 mod tests {
 	use alloy_primitives::Address;
+	use polkadot_sdk::*;
 	use sp_core::{
 		crypto::{key_types::ACCOUNT, AccountId32},
 		sr25519, Pair,

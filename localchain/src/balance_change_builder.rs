@@ -3,6 +3,7 @@ use argon_primitives::{
   DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use lazy_static::lazy_static;
+use polkadot_sdk::*;
 use sp_core::bounded_vec::BoundedVec;
 use sp_core::{ed25519::Signature as EdSignature, ByteArray};
 use std::sync::Arc;
@@ -465,8 +466,8 @@ impl ClaimResult {
 
 #[cfg(test)]
 mod test {
-  use sp_keyring::AccountKeyring::Bob;
   use sp_keyring::Ed25519Keyring::Alice;
+  use sp_keyring::Sr25519Keyring::Bob;
 
   use super::*;
 

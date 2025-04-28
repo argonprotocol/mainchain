@@ -5,6 +5,7 @@ use argon_primitives::{
 use binary_merkle_tree::{verify_proof, Leaf};
 use chrono::NaiveDateTime;
 use codec::Encode;
+use polkadot_sdk::*;
 use serde_json::{from_value, json};
 use sp_core::{bounded_vec, ed25519, H256};
 use sp_runtime::traits::BlakeTwo256;
@@ -76,8 +77,8 @@ impl BalanceChangeRow {
     let result = verify_proof::<'_, BlakeTwo256, _, _>(
       &H256::from_slice(&account_change_root[..]),
       notebook_proof.proof.clone().into_inner(),
-      notebook_proof.number_of_leaves as usize,
-      notebook_proof.leaf_index as usize,
+      notebook_proof.number_of_leaves,
+      notebook_proof.leaf_index,
       Leaf::Value(&tip.encode()),
     );
     if !result {
@@ -545,7 +546,7 @@ pub mod napi_ext {
 #[cfg(test)]
 mod test {
   use argon_primitives::{AccountOrigin, AccountType, Note, NoteType};
-  use sp_keyring::AccountKeyring::Ferdie;
+  use sp_keyring::Sr25519Keyring::Ferdie;
   use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
   use crate::test_utils::connect_with_logs;

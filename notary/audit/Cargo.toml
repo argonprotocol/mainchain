@@ -15,16 +15,13 @@ anyhow = { workspace = true }
 codec = { workspace = true }
 serde = { workspace = true }
 scale-info = { workspace = true }
-sp-core = { workspace = true }
-sp-runtime = { workspace = true }
 thiserror = { workspace = true, default-features = false }
-binary-merkle-tree = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["binary-merkle-tree", "sp-core", "sp-runtime"] }
 
 argon-primitives = { workspace = true }
 
 [dev-dependencies]
-frame-support = { workspace = true }
-sp-keyring = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "sp-keyring"], default-features = true }
 chrono = { workspace = true }
 
 [features]
@@ -32,12 +29,10 @@ default = [ "std" ]
 std = [
 	"anyhow/std",
 	"argon-primitives/std",
-	"binary-merkle-tree/std",
 	"codec/std",
 	"log/std",
+	"polkadot-sdk/std",
 	"scale-info/std",
 	"serde/std",
-	"sp-core/std",
-	"sp-runtime/std",
 	"thiserror/std",
 ]

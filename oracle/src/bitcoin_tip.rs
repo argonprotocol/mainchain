@@ -94,6 +94,7 @@ mod tests {
 	use argon_primitives::bitcoin::BitcoinNetwork;
 	use argon_testing::start_argon_test_node;
 	use bitcoin::{hashes::Hash, Network};
+	use polkadot_sdk::*;
 	use sp_core::{sr25519, Pair};
 
 	use super::*;

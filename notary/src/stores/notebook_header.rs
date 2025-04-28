@@ -1,17 +1,5 @@
 use std::collections::BTreeSet;
 
-use chrono::{DateTime, TimeZone, Utc};
-use codec::Encode;
-use serde_json::{from_value, json};
-use sp_core::{bounded::BoundedVec, H256};
-use sqlx::{query, types::JsonValue, FromRow, PgConnection};
-
-use argon_primitives::{
-	ensure, notary::NotarySignature, tick::Tick, AccountId, AccountOrigin, BlockVotingPower,
-	ChainTransfer, DomainHash, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
-	SignedNotebookHeader, NOTEBOOK_VERSION,
-};
-
 use crate::{
 	stores::{
 		notarizations::NotarizationsStore, notebook_constraints::NotebookConstraintsStore,
@@ -20,6 +8,16 @@ use crate::{
 	},
 	Error,
 };
+use argon_primitives::{
+	ensure, notary::NotarySignature, prelude::*, AccountOrigin, BlockVotingPower, ChainTransfer,
+	DomainHash, NotebookHeader, NotebookMeta, SignedNotebookHeader, NOTEBOOK_VERSION,
+};
+use chrono::{DateTime, TimeZone, Utc};
+use codec::Encode;
+use rand::RngCore;
+use serde_json::{from_value, json};
+use sp_core::{bounded::BoundedVec, H256};
+use sqlx::{query, types::JsonValue, FromRow, PgConnection};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -314,7 +312,7 @@ impl NotebookHeaderStore {
 		let notebook_number = header.notebook_number;
 		// set the secret
 		let mut secret = [0u8; 32];
-		getrandom::getrandom(&mut secret).map_err(|e| Error::InternalError(e.to_string()))?;
+		rand::rng().fill_bytes(&mut secret);
 		header.secret_hash = header.hash_secret(secret.into());
 
 		Self::save_secret(db, notebook_number, H256::from_slice(&secret)).await?;
@@ -428,11 +426,12 @@ impl NotebookHeaderStore {
 
 #[cfg(test)]
 mod tests {
+	use polkadot_sdk::*;
 	use std::ops::Add;
 
 	use chrono::{Duration, Utc};
 	use sp_core::H256;
-	use sp_keyring::AccountKeyring::Alice;
+	use sp_keyring::Sr25519Keyring::Alice;
 	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;

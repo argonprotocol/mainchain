@@ -9,6 +9,7 @@ use argon_primitives::{
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
+use polkadot_sdk::*;
 use sc_client_api::{self, backend::AuxStore, BlockBackend};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
@@ -73,7 +74,7 @@ where
 		let parent = *block.header.parent_hash();
 
 		let info = self.client.info();
-		let is_block_gap = info.block_gap.is_some_and(|(s, e)| s <= number && number <= e);
+		let is_block_gap = info.block_gap.is_some_and(|a| a.start <= number && number <= a.end);
 		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
 		// imported. Various sync strategies will access this path without state set yet
 		tracing::trace!(
@@ -206,8 +207,11 @@ where
 		mut block_params: BlockImportParams<B>,
 	) -> Result<BlockImportParams<B>, String> {
 		let number = *block_params.header.number();
-		let is_gap_sync =
-			self.client.info().block_gap.is_some_and(|(s, e)| s <= number && number <= e);
+		let is_gap_sync = self
+			.client
+			.info()
+			.block_gap
+			.is_some_and(|gap| gap.start <= number && number <= gap.end);
 		// Skip checks that include execution, if being told so, or when importing only state.
 		//
 		// This is done for example when gap syncing and it is expected that the block after the gap
@@ -230,6 +234,8 @@ where
 			{
 				warn!(
 					block_hash = ?post_hash,
+					block_number = ?number,
+					parent_hash = ?block_params.header.parent_hash(),
 					origin = ?block_params.origin,
 					fork_choice = ?block_params.fork_choice,
 					import_existing = ?block_params.import_existing,
@@ -362,7 +368,7 @@ pub fn create_import_queue<C, B, I, AC>(
 	justification_import: Option<BoxJustificationImport<B>>,
 	block_import: I,
 	spawner: &impl sp_core::traits::SpawnEssentialNamed,
-	registry: Option<&prometheus_endpoint::Registry>,
+	registry: Option<&substrate_prometheus_endpoint::Registry>,
 	telemetry: Option<TelemetryHandle>,
 	utxo_tracker: Arc<UtxoTracker>,
 ) -> (BasicQueue<B>, ArgonBlockImport<B, I, C, AC>)

@@ -16,50 +16,31 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 codec = { workspace = true }
-log = { workspace = true }
 scale-info = { workspace = true }
-frame-benchmarking = { workspace = true, optional = true }
-frame-support = { workspace = true }
-frame-system = { workspace = true }
-sp-runtime = { workspace = true }
-sp-core = { workspace = true }
-argon-primitives = { workspace = true, features = ["bitcoin"] }
 argon-bitcoin = { workspace = true, default-features = false }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+pallet-prelude = { workspace = true }
 
 [dev-dependencies]
-pallet-balances = { workspace = true }
-sp-io = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 bitcoin = { workspace = true }
 k256 = { workspace = true }
-env_logger = { workspace = true }
 bip32 = { workspace = true, features = ["secp256k1"] }
 
 [features]
 default = [ "std" ]
 std = [
 	"argon-bitcoin/std",
-	"argon-primitives/std",
 	"bip32/std",
 	"codec/std",
-	"frame-benchmarking?/std",
-	"frame-support/std",
-	"frame-system/std",
 	"k256/std",
-	"log/std",
-	"pallet-balances/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
 	"scale-info/std",
-	"sp-core/std",
-	"sp-io/std",
-	"sp-runtime/std",
 ]
 runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [
-	"frame-support/try-runtime",
-	"frame-system/try-runtime",
-	"sp-runtime/try-runtime",
-]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

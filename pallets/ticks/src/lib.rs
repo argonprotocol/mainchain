@@ -5,7 +5,7 @@ extern crate core;
 use argon_primitives::TickProvider;
 use frame_support::traits::OnTimestampSet;
 pub use pallet::*;
-use sp_runtime::traits::UniqueSaturatedInto;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -24,22 +24,18 @@ const MAX_RECENT_BLOCKS: u64 = 10;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use alloc::vec::Vec;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
-		tick::{Tick, Ticker, MAX_BLOCKS_PER_TICK},
+		tick::{Ticker, MAX_BLOCKS_PER_TICK},
 		Digestset, TickProvider, VotingSchedule,
 	};
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::Block as BlockT;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: pallet_timestamp::Config + frame_system::Config {
+	pub trait Config: pallet_timestamp::Config + polkadot_sdk::frame_system::Config {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 

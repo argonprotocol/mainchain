@@ -14,6 +14,7 @@ use argon_primitives::{
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::prelude::*;
+use polkadot_sdk::*;
 use sc_client_api::{AuxStore, BlockBackend, BlockchainEvents};
 use sc_consensus::BlockImport;
 use sc_service::TaskManager;
@@ -26,7 +27,7 @@ use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time};
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 #[cfg(test)]
 pub(crate) mod mock_notary;
@@ -318,16 +319,18 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			// make sure best hash is synched (there's a delay in some sync modes between the block
 			// being imported and state synched)
 			let best_hash = client.info().best_hash;
+			let best_number = client.info().best_number;
 			if client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown ||
 				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown) !=
 					sp_consensus::BlockStatus::InChainWithState
 			{
 				*notary_client.pause_queue_processing.write().await = true;
-				warn!(?best_hash, "Best block state not available (yet?). Not starting compute.");
+				info!(?best_hash, "Best block state not available (yet?). Not starting compute.");
 				continue;
 			}
 
 			if *notary_client.pause_queue_processing.read().await {
+				info!(?best_hash, ?best_number, "Activating sync.");
 				*notary_client.pause_queue_processing.write().await = false;
 			}
 
@@ -394,6 +397,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 mod test {
 	use argon_runtime::{Block, Header};
 	use codec::{Decode, Encode};
+	use polkadot_sdk::*;
 	use sc_consensus_grandpa::{FinalityProof, GrandpaJustification};
 	use sp_runtime::RuntimeAppPublic;
 	#[test]

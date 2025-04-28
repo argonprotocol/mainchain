@@ -3,6 +3,7 @@
 use bitcoin::hex::DisplayHex;
 use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
+use polkadot_sdk::*;
 use sp_core::{crypto::KeyTypeId, ed25519, Pair};
 use sp_keyring::Sr25519Keyring;
 use std::{

@@ -19,7 +19,7 @@ use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use futures::{future::join_all, task::noop_waker_ref, Stream, StreamExt};
 use log::{info, trace, warn};
-use prometheus_endpoint::Registry;
+use polkadot_sdk::*;
 use rand::prelude::SliceRandom;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
@@ -41,6 +41,7 @@ use std::{
 	task::{Context, Poll},
 	time::{Duration, Instant},
 };
+use substrate_prometheus_endpoint::Registry;
 use tokio::{
 	sync::{Mutex, RwLock},
 	time,
@@ -456,7 +457,7 @@ where
 		}
 
 		// Shuffle the subscriptions to randomize the polling order
-		subscription_ids.shuffle(&mut rand::thread_rng());
+		subscription_ids.shuffle(&mut rand::rng());
 
 		// Poll each subscription in the randomized order
 		for notary_id in subscription_ids {

@@ -1,8 +1,8 @@
 use crate::{BlockSealDigest, BlockVotingPower, ComputeDifficulty};
 use codec::{Decode, Encode, MaxEncodedLen};
 use core::cmp::Ordering;
+use polkadot_sdk::sp_core::U256;
 use scale_info::TypeInfo;
-use sp_core::U256;
 
 #[derive(Clone, Encode, Decode, Debug, Eq, PartialEq, MaxEncodedLen, TypeInfo)]
 pub struct ForkPower {

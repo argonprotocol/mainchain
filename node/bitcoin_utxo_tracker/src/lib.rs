@@ -13,11 +13,12 @@ use codec::{Decode, Encode};
 use log::info;
 pub use metrics::BitcoinMetrics;
 use parking_lot::Mutex;
-use prometheus_endpoint::Registry;
+use polkadot_sdk::*;
 use sc_client_api::{backend::AuxStore, HeaderBackend};
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 use std::{sync::Arc, time::Instant};
+use substrate_prometheus_endpoint::Registry;
 
 pub fn get_bitcoin_inherent<C, B>(
 	tracker: &Arc<UtxoTracker>,

@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-use argon_primitives::tick::Tick;
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -21,24 +21,14 @@ pub type GrowthPath<Balance> = (Balance, Tick, Balance);
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::{vec, vec::Vec};
 	use core::any::TypeId;
-	use frame_support::{
-		pallet_prelude::*,
-		traits::fungible::{InspectFreeze, Mutate, MutateFreeze},
-	};
-	use frame_system::pallet_prelude::*;
-	use log::{info, trace};
-	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, One, UniqueSaturatedInto, Zero},
-		FixedPointNumber, FixedU128, Saturating,
-	};
+	use frame_support::traits::fungible::{InspectFreeze, Mutate, MutateFreeze};
+	use sp_runtime::FixedPointNumber;
 
 	use super::*;
 	use argon_primitives::{
 		block_seal::{BlockPayout, BlockRewardType, CohortId},
 		notary::NotaryProvider,
-		tick::Tick,
 		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
 		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 	};
@@ -57,9 +47,10 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: polkadot_sdk::frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 
@@ -211,7 +202,7 @@ pub mod pallet {
 			if !T::BlockSealerProvider::is_block_vote_seal() &&
 				!T::BlockRewardAccountsProvider::is_compute_block_eligible_for_rewards()
 			{
-				info!("Compute block is not eligible for rewards");
+				log::info!("Compute block is not eligible for rewards");
 				return;
 			}
 
@@ -374,7 +365,7 @@ pub mod pallet {
 			}
 
 			if !rewards_change.is_zero() {
-				trace!(
+				log::trace!(
 					"Argons per block adjusted to {:?} (change: {:?})",
 					block_argons,
 					rewards_change

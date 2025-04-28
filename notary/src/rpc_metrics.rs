@@ -21,7 +21,7 @@
 use std::time::Instant;
 
 use jsonrpsee::{types::Request, MethodResponse};
-use prometheus_endpoint::{
+use polkadot_sdk::substrate_prometheus_endpoint::{
 	register, Counter, CounterVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry,
 	U64,
 };

@@ -2,6 +2,7 @@
 extern crate alloc;
 extern crate core;
 
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -57,25 +58,12 @@ pub use pallet::*;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use alloc::{collections::BTreeMap, vec};
+	use alloc::collections::BTreeMap;
 	use argon_primitives::{
-		block_seal::CohortId,
 		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
-		BlockSealAuthorityId, OnNewSlot, VaultId,
+		OnNewSlot,
 	};
-	use frame_support::{
-		pallet_prelude::*,
-		traits::{
-			fungible::{Inspect, InspectHold, Mutate, MutateHold},
-			tokens::{Fortitude, Precision, Preservation},
-		},
-		BoundedVec, DefaultNoBound, PalletId,
-	};
-	use frame_system::pallet_prelude::*;
-	use sp_runtime::{
-		traits::{AccountIdConversion, AtLeast32BitUnsigned, Zero},
-		BoundedBTreeMap, Perbill, Percent, Permill, Saturating,
-	};
+	use sp_runtime::{traits::AccountIdConversion, BoundedBTreeMap};
 	use tracing::warn;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
@@ -86,12 +74,13 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config
+	pub trait Config: polkadot_sdk::frame_system::Config
 	where
 		<Self as Config>::Balance: Into<u128>,
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 

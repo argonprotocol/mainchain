@@ -15,6 +15,7 @@ use bitcoin::{bip158, hashes::Hash};
 use bitcoincore_rpc::{Auth, RpcApi};
 use codec::{Decode, Encode};
 use parking_lot::Mutex;
+use polkadot_sdk::*;
 use sp_runtime::RuntimeDebug;
 
 #[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
