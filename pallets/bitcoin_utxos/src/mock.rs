@@ -1,6 +1,4 @@
-use env_logger::{Builder, Env};
-use frame_support::{derive_impl, parameter_types};
-use sp_runtime::{BuildStorage, DispatchResult};
+use pallet_prelude::*;
 
 use argon_primitives::{
 	bitcoin::{BitcoinRejectedReason, UtxoId},
@@ -64,8 +62,6 @@ impl pallet_bitcoin_utxos::Config for Test {
 	type EventHandler = StaticEventHandler;
 }
 
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

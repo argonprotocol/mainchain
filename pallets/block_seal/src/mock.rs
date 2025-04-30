@@ -12,14 +12,11 @@ use argon_primitives::{
 	DomainHash, HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
 	NotebookSecret, TickProvider, VotingSchedule,
 };
-use env_logger::{Builder, Env};
-use frame_support::{__private::Get, derive_impl, parameter_types, traits::FindAuthor};
-use sp_core::{crypto::AccountId32, H256, U256};
+use frame_support::traits::FindAuthor;
+use pallet_prelude::*;
+use sp_core::crypto::AccountId32;
 use sp_keyring::Ed25519Keyring::Alice;
-use sp_runtime::{
-	traits::{Block as BlockT, IdentityLookup},
-	BuildStorage, ConsensusEngineId, DispatchError,
-};
+use sp_runtime::{ConsensusEngineId, DispatchError};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -175,12 +172,6 @@ impl pallet_block_seal::Config for Test {
 	type FindAuthor = StaticFindAuthor;
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-
-	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-
-	sp_io::TestExternalities::new(t)
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

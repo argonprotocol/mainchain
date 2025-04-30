@@ -1,10 +1,6 @@
 use crate::{pallet::PayoutsByBlock, Config, FreezeReason};
-use frame_support::{
-	pallet_prelude::*,
-	traits::{fungible::MutateFreeze, UncheckedOnRuntimeUpgrade},
-};
-use log::info;
-use sp_runtime::traits::Zero;
+use frame_support::traits::{fungible::MutateFreeze, UncheckedOnRuntimeUpgrade};
+use pallet_prelude::*;
 
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
@@ -19,7 +15,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating block rewards to remove maturation period");
+		log::info!("Migrating block rewards to remove maturation period");
 		let freeze_id = FreezeReason::MaturationPeriod.into();
 		let zero = T::Balance::zero();
 		for (_block, unlocks) in PayoutsByBlock::<T>::iter() {
@@ -48,7 +44,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				}
 			}
 		}
-		info!("{} rewards unfrozen", count);
+		log::info!("{} rewards unfrozen", count);
 
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
 	}

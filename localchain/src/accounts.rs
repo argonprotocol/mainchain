@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
+use polkadot_sdk::*;
 use sp_core::crypto::{AccountId32, PublicError, Ss58AddressFormat, Ss58Codec};
 use sp_core::ByteArray;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
@@ -520,8 +521,8 @@ pub mod napi_ext {
 
 #[cfg(test)]
 mod test {
-  use sp_keyring::AccountKeyring::Bob;
   use sp_keyring::Ed25519Keyring::Alice;
+  use sp_keyring::Sr25519Keyring::Bob;
 
   use crate::*;
 

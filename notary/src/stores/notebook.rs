@@ -1,3 +1,4 @@
+use polkadot_sdk::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
@@ -56,7 +57,7 @@ impl NotebookStore {
 				.position(|x| *x == record)
 				.ok_or(Error::InvalidBalanceProofRequested)?;
 
-			let proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leafs, index);
+			let proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leafs, index as u32);
 
 			Ok(MerkleProof {
 				proof: BoundedVec::truncate_from(proof.proof.into_iter().collect()),
@@ -131,8 +132,8 @@ impl NotebookStore {
 		let is_valid = verify_proof::<Blake2Hasher, _, _>(
 			&root,
 			notebook_proof.proof.clone().into_inner(),
-			notebook_proof.number_of_leaves as usize,
-			notebook_proof.leaf_index as usize,
+			notebook_proof.number_of_leaves,
+			notebook_proof.leaf_index,
 			Leaf::Value(&balance_tip.encode()),
 		);
 
@@ -371,16 +372,13 @@ struct AccountIdAndOrigin {
 }
 #[cfg(test)]
 mod tests {
-	use std::ops::Add;
-
 	use chrono::{Duration, Utc};
+	use polkadot_sdk::*;
 	use sp_core::{bounded_vec, ed25519::Signature};
-	use sp_keyring::{
-		AccountKeyring::{Alice, Dave, Ferdie},
-		Sr25519Keyring::Bob,
-	};
+	use sp_keyring::Sr25519Keyring::{Alice, Bob, Dave, Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sqlx::PgPool;
+	use std::ops::Add;
 
 	use argon_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, NewAccountOrigin,

@@ -1,6 +1,7 @@
 use crate::{tick::Tick, Balance};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
+use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
@@ -16,9 +17,9 @@ pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 // sr25519 signatures are non-deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
 pub mod app {
-	use sp_application_crypto::{app_crypto, ed25519};
+	use sp_application_crypto::{app_crypto, ed25519, KeyTypeId};
 
-	app_crypto!(ed25519, sp_core::crypto::KeyTypeId(*b"seal"));
+	app_crypto!(ed25519, KeyTypeId(*b"seal"));
 }
 
 sp_application_crypto::with_pair! {
@@ -58,10 +59,17 @@ impl<B: Block> ComputePuzzle<B> {
 pub type CohortId = u64;
 
 #[derive(
-	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
+	PartialEqNoBound,
+	EqNoBound,
+	CloneNoBound,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
 )]
-#[scale_info(skip_type_params(MaxHosts))]
-#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MiningRegistration<
 	AccountId: Parameter,
@@ -85,6 +93,9 @@ pub struct MiningRegistration<
 	/// Which cohort the miner is in
 	#[codec(compact)]
 	pub cohort_id: CohortId,
+	/// When the bid was placed
+	#[codec(compact)]
+	pub bid_at_tick: Tick,
 }
 
 impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>

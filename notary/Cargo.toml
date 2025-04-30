@@ -16,8 +16,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 anyhow = { workspace = true, features = ["default"] }
 futures = { workspace = true }
-getrandom = { workspace = true }
-parking_lot = { workspace = true }
+rand = { workspace = true }
 async-trait = { workspace = true }
 codec = { workspace = true, features = ["default"] }
 serde = { workspace = true, features = ["default"] }
@@ -26,14 +25,9 @@ scale-info = { workspace = true, features = ["default"] }
 thiserror = { workspace = true, features = ["default"] }
 subxt = { workspace = true }
 tokio = { workspace = true }
-hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server"] }
-sp-runtime = { workspace = true, features = ["default"] }
-sp-core = { workspace = true, features = ["default"] }
-sc-utils = { workspace = true }
-sp-keystore = { workspace = true, features = ["default"] }
-binary-merkle-tree = { workspace = true, features = ["default"] }
 tracing = { workspace = true, features = ["default"] }
+polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "sc-utils", "sp-keystore", "binary-merkle-tree", "substrate-prometheus-endpoint"] }
 tracing-subscriber = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio-native-tls", "postgres", "macros", "chrono"] }
 chrono = { workspace = true }
@@ -44,14 +38,9 @@ argon-client = { workspace = true }
 argon-notary-audit = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-notary-apis = { workspace = true }
-url = { workspace = true }
 
-prometheus-endpoint = { workspace = true }
 prometheus = { workspace = true }
 governor = { workspace = true }
-http-body-util = { workspace = true }
-hyper = { workspace = true }
-hyper-util = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true, features = ["cors"] }
 
@@ -63,8 +52,7 @@ base64 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-frame-support = { workspace = true }
-sp-keyring = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "sp-keyring"], default-features = true }
 argon-testing = { workspace = true }
 
 [build-dependencies]

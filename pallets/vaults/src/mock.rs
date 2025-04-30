@@ -1,18 +1,12 @@
 use crate as pallet_vaults;
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
-	tick::{Tick, Ticker},
+	tick::Ticker,
 	MiningSlotProvider, TickProvider, VotingSchedule,
 };
-use env_logger::{Builder, Env};
-use frame_support::{
-	derive_impl, parameter_types, traits::Currency, weights::constants::RocksDbWeight,
-};
-use frame_system::pallet_prelude::BlockNumberFor;
-use sp_core::{ConstU32, ConstU64, H256};
-use sp_runtime::BuildStorage;
+use frame_support::traits::Currency;
+use pallet_prelude::*;
 
-pub type Balance = u128;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -54,6 +48,7 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ConstU32<0>;
 	type MaxReserves = ConstU32<0>;
 	type MaxFreezes = ();
+	type DoneSlashHandler = ();
 }
 
 pub fn set_argons(account_id: u64, amount: Balance) {
@@ -128,9 +123,6 @@ impl pallet_vaults::Config for Test {
 	type EventHandler = ();
 }
 
-// Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	let env = Env::new().default_filter_or("debug");
-	let _ = Builder::from_env(env).is_test(true).try_init();
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+pub fn new_test_ext() -> TestState {
+	new_test_with_genesis::<Test>(|_t| {})
 }

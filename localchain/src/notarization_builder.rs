@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use argon_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
 use argon_primitives::{
-  AccountType, Balance, BalanceChange, BlockVote, Domain, Notarization, NotaryId, Note, NoteType,
+  prelude::*, AccountType, BalanceChange, BlockVote, Domain, Notarization, Note, NoteType,
   DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTARIZATION,
   MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE, TRANSFER_TAX_CAP,
 };

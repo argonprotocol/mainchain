@@ -17,20 +17,8 @@ use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
-use frame_support::{
-	assert_err, assert_noop, assert_ok,
-	pallet_prelude::Hooks,
-	traits::{
-		fungible::{Inspect, InspectHold, Mutate},
-		tokens::Preservation,
-	},
-	BoundedVec,
-};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
-use sp_runtime::{
-	traits::{One, Zero},
-	FixedPointNumber, FixedU128, Permill,
-};
+use pallet_prelude::*;
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(110, 100);
 

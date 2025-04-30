@@ -1,27 +1,13 @@
 use crate::{Config, HoldReason, ObligationsById, VaultsById};
-#[cfg(feature = "try-runtime")]
-use alloc::vec::Vec;
 use argon_primitives::vault::{FundType, Obligation, Vault, VaultTerms};
-use frame_support::{
-	pallet_prelude::*,
-	traits::{fungible::MutateHold, tokens::Precision, UncheckedOnRuntimeUpgrade},
-};
-use log::{error, info};
-use sp_runtime::{traits::Zero, FixedU128, Permill};
+use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use pallet_prelude::*;
 
 mod old_storage {
 	use crate::{Config, Pallet};
-	#[cfg(feature = "try-runtime")]
-	use alloc::vec::Vec;
-	use argon_primitives::{prelude::Tick, vault::ObligationExpiration, ObligationId, VaultId};
-	use codec::{Decode, Encode, MaxEncodedLen};
-	use frame_support::{
-		pallet_prelude::{OptionQuery, ValueQuery},
-		storage_alias, BoundedVec, Parameter, Twox64Concat,
-	};
-	use scale_info::TypeInfo;
-	use sp_core::ConstU32;
-	use sp_runtime::{FixedU128, RuntimeDebug};
+	use argon_primitives::vault::ObligationExpiration;
+	use frame_support::{storage_alias, Parameter, Twox64Concat};
+	use pallet_prelude::*;
 
 	#[storage_alias]
 	pub(super) type PendingFundingModificationsByTick<T: Config> = StorageMap<
@@ -170,7 +156,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating vault storage");
+		log::info!("Migrating vault storage");
 		let pending_funding = old_storage::PendingFundingModificationsByTick::<T>::drain();
 		let bonded_argon_completions = old_storage::BondedArgonCompletions::<T>::drain();
 
@@ -187,9 +173,12 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					amount,
 					Precision::Exact,
 				) {
-					error!(
+					log::error!(
 						"Failed to release {:?} fee hold for obligation {} for vault {}: {:?}",
-						amount, obligation_id, vault_id, e
+						amount,
+						obligation_id,
+						vault_id,
+						e
 					);
 				}
 			}
@@ -197,7 +186,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		VaultsById::<T>::translate::<old_storage::Vault<T::Balance, T::AccountId>, _>(|id, vlt| {
 			count += 1;
-			info!("Migrating vault {id}");
+			log::info!("Migrating vault {id}");
 			let mut to_return = vlt.bonded_argons.allocated;
 			if let Some((_, argons)) = vlt.pending_bonded_argons {
 				to_return = argons;
@@ -210,7 +199,12 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					to_return,
 					Precision::Exact,
 				) {
-					error!("Failed to release {:?} funds for vault {}: {:?}", to_return, id, e);
+					log::error!(
+						"Failed to release {:?} funds for vault {}: {:?}",
+						to_return,
+						id,
+						e
+					);
 				}
 			}
 			Some(Vault {
@@ -260,9 +254,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					bitcoin_annual_percent_rate: Some(vault.terms.bitcoin_annual_percent_rate),
 				};
 
-				info!(
+				log::info!(
 					"Migrated {:?} obligation {} for {:?}",
-					ob.fund_type, ob.obligation_id, ob.amount
+					ob.fund_type,
+					ob.obligation_id,
+					ob.amount
 				);
 				Some(converted)
 			},
@@ -286,7 +282,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		for (id, vlt) in old.vaults_by_id {
 			let new_vlt = VaultsById::<T>::get(&id).expect("Vault not found");
-			info!("Checking vault {id} post migrate");
+			log::info!("Checking vault {id} post migrate");
 			ensure!(
 				vlt.pending_bitcoins == new_vlt.bitcoin_pending,
 				"New pending bitcoins value not set correctly"
@@ -316,7 +312,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			// removed
 			if let ObligationExpiration::AtTick(tick) = ob.expiration {
 				if ObligationCompletionByTick::<T>::get(tick).contains(&id) {
-					error!(
+					log::error!(
 							"obligation_id {} should not exist in ObligationCompletionByTick for tick {}",
 							id, tick
 						);

@@ -33,8 +33,8 @@
 #![allow(unused_imports)]
 
 use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
+use pallet_prelude::*;
 use core::marker::PhantomData;
-
 /// Weight functions needed for oracle.
 pub trait WeightInfo {
 	fn on_initialize(u: u32, ) -> Weight;

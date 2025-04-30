@@ -7,6 +7,7 @@ use jsonrpsee::{
 	core::client::ClientBuilder,
 	ws_client::{PingConfig, WsClient},
 };
+pub(crate) use polkadot_sdk::*;
 use sp_core::{blake2_256, crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
 use std::{fmt::Debug, io::Write, sync::Arc};
@@ -528,7 +529,6 @@ impl TxInBlockWithEvents {
 
 impl Debug for TxInBlockWithEvents {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		println!();
 		write!(
 			f,
 			"TxInBlock. {{ is_finalized={}, tx_hash={:?}, block_hash={:?}. Events: {:?} }}",

@@ -2,7 +2,7 @@
 extern crate alloc;
 
 pub use pallet::*;
-use sp_runtime::BoundedVec;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -26,9 +26,6 @@ pub mod weights;
 /// of bitcoins not being cosigned on unlock.
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::vec;
-	use core::fmt::Debug;
-
 	use super::*;
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
@@ -36,31 +33,13 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub,
 		},
-		tick::Tick,
 		vault::{
 			BitcoinObligationProvider, FundType, LiquidityPoolVaultProvider, Obligation,
 			ObligationError, ObligationExpiration, ReleaseFundsResult, Vault, VaultTerms,
 		},
-		MiningSlotProvider, ObligationEvents, ObligationId, TickProvider, VaultId,
+		MiningSlotProvider, ObligationEvents, TickProvider,
 	};
-	use codec::Codec;
-	use frame_support::{
-		pallet_prelude::*,
-		storage::with_storage_layer,
-		traits::{
-			fungible::{Inspect, InspectHold, Mutate, MutateHold},
-			tokens::{Fortitude, Precision, Preservation, Restriction},
-			Incrementable,
-		},
-	};
-	use frame_system::pallet_prelude::*;
-	use log::warn;
-	use sp_runtime::{
-		traits::{AtLeast32BitUnsigned, CheckedDiv, CheckedSub, One, UniqueSaturatedInto, Zero},
-		DispatchError::Token,
-		FixedPointNumber, FixedU128, Permill, Saturating, TokenError,
-	};
-
+	use frame_support::traits::Incrementable;
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 
 	#[pallet::pallet]
@@ -69,8 +48,9 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
@@ -709,9 +689,12 @@ pub mod pallet {
 			}
 			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)
 				.inspect_err(|e| {
-					warn!(
+					log::warn!(
 						"Error releasing {:?} hold for {:?}. Amount {:?}. {:?}",
-						reason, who, amount, e
+						reason,
+						who,
+						amount,
+						e
 					);
 				})?;
 

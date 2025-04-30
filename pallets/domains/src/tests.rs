@@ -8,7 +8,8 @@ use argon_primitives::{
 	NotebookEventHandler, Semver, VersionHost, ZoneRecord,
 };
 use frame_support::{assert_err, assert_ok, traits::Hooks};
-use sp_keyring::AccountKeyring::{Alice, Bob};
+use pallet_prelude::*;
+use sp_keyring::Sr25519Keyring::{Alice, Bob};
 use sp_runtime::{testing::H256, BoundedVec};
 use std::collections::BTreeMap;
 

@@ -1963,7 +1963,6 @@ declare module '@polkadot/api-base/types/submittable' {
           asOrigin:
             | ArgonRuntimeOriginCaller
             | { system: any }
-            | { Void: any }
             | string
             | Uint8Array,
           call: Call | IMethod | string | Uint8Array,

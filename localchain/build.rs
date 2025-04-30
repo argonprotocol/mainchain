@@ -40,7 +40,14 @@ fn main() {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let output = Command::new("cargo")
-      .args(["sqlx", "database", "reset", "--database-url", &database_url])
+      .args([
+        "sqlx",
+        "database",
+        "reset",
+        "-y",
+        "--database-url",
+        &database_url,
+      ])
       .current_dir(&project_dir) // Set the current directory for the command
       .output()
       .unwrap_or_else(|_| panic!("failed to build database at {}", database_url.clone()));

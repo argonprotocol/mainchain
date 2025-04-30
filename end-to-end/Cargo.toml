@@ -26,9 +26,7 @@ argon-bitcoin-utxo-tracker = { workspace = true }
 argon-bitcoin = { workspace = true }
 hex = { workspace = true }
 base64 = { workspace = true }
-sp-keyring = { workspace = true }
-sp-arithmetic = { workspace = true }
-sp-core = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-arithmetic", "sp-core", "sp-keyring"], default-features = true }
 subxt = { workspace = true }
 serial_test = { workspace = true }
 regex = { workspace = true }

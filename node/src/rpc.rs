@@ -4,7 +4,7 @@
 //! capabilities that are specific to this project's runtime configuration.
 
 #![warn(missing_docs)]
-
+use polkadot_sdk::*;
 use std::sync::Arc;
 
 use crate::runtime_api::opaque::{Block, Hash};

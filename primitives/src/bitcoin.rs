@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::convert::{TryFrom, TryInto};
+use polkadot_sdk::*;
 
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::TypeInfo;
@@ -210,6 +211,7 @@ impl BitcoinXPub {
 #[cfg(feature = "bitcoin")]
 mod bitcoin_compat {
 	use alloc::vec::Vec;
+	use polkadot_sdk::*;
 
 	use crate::bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,

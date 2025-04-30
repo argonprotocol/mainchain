@@ -5,6 +5,7 @@ extern crate core;
 use argon_primitives::ABSOLUTE_TAX_VOTE_MINIMUM;
 use frame_support::traits::OnTimestampSet;
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -38,24 +39,16 @@ pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use alloc::{vec, vec::Vec};
 	use argon_primitives::{
 		block_vote::VoteMinimum,
 		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::BlockSealInherent,
 		notary::NotaryNotebookVoteDigestDetails,
 		notebook::{BlockVotingPower, NotebookHeader},
-		tick::Tick,
 		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
 		NotebookEventHandler, NotebookProvider, TickProvider,
 	};
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_core::U256;
-	use sp_runtime::{
-		traits::{Block, UniqueSaturatedInto},
-		DigestItem, FixedPointNumber, FixedU128,
-	};
+	use sp_runtime::DigestItem;
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
@@ -64,9 +57,10 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: pallet_timestamp::Config + frame_system::Config {
+	pub trait Config: pallet_timestamp::Config + polkadot_sdk::frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 
 		/// The desired percent of the default block time to use for compute
 		type TargetComputeBlockPercent: Get<FixedU128>;
@@ -120,7 +114,7 @@ pub mod pallet {
 	/// change every day
 	#[pallet::storage]
 	pub(super) type CurrentComputeKeyBlock<T: Config> =
-		StorageValue<_, <T::Block as Block>::Hash, OptionQuery>;
+		StorageValue<_, <T::Block as BlockT>::Hash, OptionQuery>;
 
 	#[pallet::storage]
 	pub(super) type PastComputeBlockTimes<T: Config> =
@@ -485,7 +479,7 @@ pub mod pallet {
 			<CurrentComputeDifficulty<T>>::get()
 		}
 
-		fn compute_key_block_hash() -> Option<<T::Block as Block>::Hash> {
+		fn compute_key_block_hash() -> Option<<T::Block as BlockT>::Hash> {
 			<CurrentComputeKeyBlock<T>>::get()
 		}
 	}

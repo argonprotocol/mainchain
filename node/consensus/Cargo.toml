@@ -24,33 +24,33 @@ parking_lot = { workspace = true }
 thiserror = { workspace = true, features = ["default"] }
 rand = { workspace = true }
 lazy_static = { workspace = true }
-prometheus-endpoint = { workspace = true }
-frame-support = { workspace = true, features = ["default"] }
-sp-consensus = { workspace = true }
-sc-consensus = { workspace = true }
-sc-tracing = { workspace = true }
-sp-api = { workspace = true, features = ["default"] }
-sp-blockchain = { workspace = true }
-sp-block-builder = { workspace = true, features = ["default"] }
-sc-client-api = { workspace = true }
-sp-runtime = { workspace = true, features = ["default"] }
-sp-core = { workspace = true, features = ["default"] }
-sp-inherents = { workspace = true, features = ["default"] }
-sp-arithmetic = { workspace = true, features = ["default"] }
-sc-transaction-pool = { workspace = true }
-sc-transaction-pool-api = { workspace = true }
-sp-keystore = { workspace = true, features = ["default"] }
-sp-application-crypto = { workspace = true, features = ["default"] }
-sc-service = { workspace = true }
-sc-telemetry = { workspace = true }
-sp-timestamp = { workspace = true, features = ["default"] }
+polkadot-sdk.workspace = true
+polkadot-sdk.features = [
+    "substrate-prometheus-endpoint",
+    "sp-consensus",
+    "sc-consensus",
+    "sp-api",
+    "sp-blockchain",
+    "sp-block-builder",
+    "sc-client-api",
+    "sp-runtime",
+    "sp-inherents",
+    'sp-arithmetic',
+    "sc-transaction-pool",
+    "sc-transaction-pool-api",
+    "sc-utils",
+    "sc-executor",
+    "sp-io",
+    "sp-keystore",
+    "sc-service",
+    "sc-telemetry",
+    "sp-timestamp",
+]
 tokio = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server"] }
 serde = { workspace = true, features = ["default"] }
-sc-utils = { workspace = true }
-sc-executor = { workspace = true, features = ["default"] }
-sp-io = { workspace = true, features = ["default"] }
 schnellru = { workspace = true }
+sp-application-crypto = { workspace = true }
 humantime = { workspace = true }
 
 # Local Dependencies
@@ -62,23 +62,27 @@ argon-randomx = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
-sc-block-builder = { workspace = true }
-frame-support = { workspace = true, features = ["default"] }
-sp-tracing = { workspace = true }
-sc-client-db = { workspace = true }
-sc-keystore = { workspace = true }
-sc-network-types = { workspace = true }
-sc-utils = { workspace = true }
-sp-keyring = { workspace = true }
-sc-network = { workspace = true }
 pallet-mining-slot = { workspace = true, features = ["default"] }
+polkadot-sdk.workspace = true
+polkadot-sdk.default-features = true
+polkadot-sdk.features = [
+    "binary-merkle-tree",
+    "sc-consensus-grandpa",
+    "sc-block-builder",
+    "frame-support",
+    "sp-tracing",
+    "sc-client-db",
+    "sc-keystore",
+    "sc-network",
+    "sc-network-types",
+    "sc-utils",
+    "sp-keyring",
+]
+finality-grandpa = { workspace = true }
 argon-notary = { workspace = true }
 anyhow = { workspace = true }
-binary-merkle-tree = { workspace = true }
 axum = { workspace = true }
-sc-consensus-grandpa = { workspace = true }
 hex = { workspace = true }
-finality-grandpa = { workspace = true, default-features = false }
 
 [features]
 default = []

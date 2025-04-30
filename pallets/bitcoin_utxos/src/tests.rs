@@ -9,6 +9,7 @@ use argon_primitives::{
 	BitcoinUtxoTracker,
 };
 use frame_support::{assert_err, assert_noop, assert_ok, pallet_prelude::Hooks};
+use pallet_prelude::*;
 use sp_core::H256;
 use sp_runtime::DispatchError;
 

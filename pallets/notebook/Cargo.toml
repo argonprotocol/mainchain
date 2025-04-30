@@ -18,48 +18,26 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { workspace = true }
 tracing = { workspace = true }
 scale-info = { workspace = true }
-frame-benchmarking = { workspace = true, optional = true }
-frame-support = { workspace = true }
-frame-system = { workspace = true }
-sp-runtime = { workspace = true }
-sp-core = { workspace = true }
-sp-api = { workspace = true }
-
-argon-primitives = { workspace = true }
 argon-notary-audit = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+pallet-prelude = { workspace = true }
 
 [dev-dependencies]
-pallet-balances = { workspace = true }
-sp-io = { workspace = true }
-env_logger = { workspace = true }
-sp-keyring = { workspace = true }
-binary-merkle-tree = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-keyring", "pallet-balances", "binary-merkle-tree"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 
 [features]
 default = [ "std" ]
 std = [
 	"argon-notary-audit/std",
-	"argon-primitives/std",
 	"codec/std",
-	"frame-benchmarking?/std",
-	"frame-support/std",
-	"frame-system/std",
-	"pallet-balances/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
 	"scale-info/std",
-	"sp-api/std",
-	"sp-core/std",
-	"sp-io/std",
-	"sp-runtime/std",
 	"tracing/std",
 ]
 runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [
-	"frame-support/try-runtime",
-	"frame-system/try-runtime",
-	"sp-runtime/try-runtime",
-]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

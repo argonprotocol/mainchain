@@ -1,5 +1,5 @@
 use argon_primitives::inherents::BitcoinUtxoSync;
-use prometheus_endpoint::{
+use polkadot_sdk::substrate_prometheus_endpoint::{
 	prometheus, register, CounterVec, Gauge, HistogramOpts, HistogramVec, Opts, PrometheusError,
 	Registry, U64,
 };

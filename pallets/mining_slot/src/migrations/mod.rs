@@ -1,11 +1,13 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, MinerXorKeyByIndex, NextSlotCohort},
-	runtime_decl_for_mining_slot_api::NextCohortId,
-	Config, Registration,
+	pallet::{MinerXorKeyByIndex, NextCohortId},
+	Config,
 };
-use alloc::vec::Vec;
-use frame_support::{pallet_prelude::*, traits::UncheckedOnRuntimeUpgrade};
-use log::info;
+use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use pallet_prelude::*;
+
+mod v6;
+
+pub use v6::BiddingTickMigration;
 
 mod old_storage {
 	use crate::Config;
@@ -13,12 +15,9 @@ mod old_storage {
 		block_seal::{CohortId, MinerIndex, RewardDestination},
 		ObligationId,
 	};
-
-	use crate::runtime_decl_for_mining_slot_api::U256;
-	#[cfg(feature = "try-runtime")]
-	use alloc::vec::Vec;
-	use frame_support::{pallet_prelude::*, storage_alias, BoundedVec};
-	use sp_runtime::{traits::OpaqueKeys, FixedU128};
+	use frame_support_procedural::storage_alias;
+	use pallet_prelude::*;
+	use sp_runtime::traits::OpaqueKeys;
 
 	pub type Registration<T> = MiningRegistration<
 		<T as frame_system::Config>::AccountId,
@@ -92,6 +91,64 @@ mod old_storage {
 		StorageValue<crate::Pallet<T>, CohortId, ValueQuery>;
 }
 
+pub mod v5 {
+	use crate::Config;
+	use argon_primitives::block_seal::{CohortId, MinerIndex, RewardDestination};
+	use frame_support_procedural::storage_alias;
+	use pallet_prelude::*;
+	use sp_runtime::traits::OpaqueKeys;
+
+	#[derive(
+		PartialEqNoBound,
+		EqNoBound,
+		CloneNoBound,
+		Encode,
+		Decode,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct MiningRegistration<
+		AccountId: Parameter,
+		Balance: Parameter + MaxEncodedLen,
+		Keys: OpaqueKeys + Parameter,
+	> {
+		/// The account id the miner will operate as
+		pub account_id: AccountId,
+		/// The account that bids and argonots come from
+		pub external_funding_account: Option<AccountId>,
+		/// The account that rewards are paid to
+		pub reward_destination: RewardDestination<AccountId>,
+		/// How much was bid for the mining slot
+		#[codec(compact)]
+		pub bid: Balance,
+		/// The argonots put on hold to run a mining seat
+		#[codec(compact)]
+		pub argonots: Balance,
+		/// The signing keys for the miner
+		pub authority_keys: Keys,
+		/// Which cohort the miner is in
+		#[codec(compact)]
+		pub cohort_id: CohortId,
+	}
+
+	pub type Registration<T> = MiningRegistration<
+		<T as frame_system::Config>::AccountId,
+		<T as Config>::Balance,
+		<T as Config>::Keys,
+	>;
+
+	#[storage_alias]
+	pub(super) type NextSlotCohort<T: Config> = StorageValue<
+		crate::Pallet<T>,
+		BoundedVec<Registration<T>, <T as Config>::MaxMiners>,
+		ValueQuery,
+	>;
+	#[storage_alias]
+	pub(super) type ActiveMinersByIndex<T: Config> =
+		StorageMap<crate::Pallet<T>, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
+}
+
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
 
 impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
@@ -111,11 +168,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
-		info!("Migrating mining slot pallet storage");
+		log::info!("Migrating mining slot pallet storage");
 		let old = old_storage::NextSlotCohort::<T>::take();
 		let new = old
 			.into_iter()
-			.map(|x| Registration::<T> {
+			.map(|x| v5::Registration::<T> {
 				account_id: x.account_id,
 				external_funding_account: None,
 				reward_destination: x.reward_destination,
@@ -125,11 +182,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				cohort_id: x.cohort_id,
 			})
 			.collect::<Vec<_>>();
-		NextSlotCohort::<T>::put(BoundedVec::truncate_from(new));
+		v5::NextSlotCohort::<T>::put(BoundedVec::truncate_from(new));
 		count += 1;
-		ActiveMinersByIndex::<T>::translate::<old_storage::Registration<T>, _>(|_id, reg| {
+		v5::ActiveMinersByIndex::<T>::translate::<old_storage::Registration<T>, _>(|_id, reg| {
 			count += 1;
-			Some(Registration::<T> {
+			Some(v5::Registration::<T> {
 				account_id: reg.account_id,
 				external_funding_account: None,
 				reward_destination: reg.reward_destination,
@@ -139,7 +196,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				cohort_id: reg.cohort_id,
 			})
 		});
-		info!("{} mining registrations migrated", count);
+		log::info!("{} mining registrations migrated", count);
 
 		let last_cohort_id = old_storage::LastActivatedCohortId::<T>::take();
 		NextCohortId::<T>::set(last_cohort_id);
@@ -164,11 +221,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
 
-		let new = NextSlotCohort::<T>::get();
+		let new = v5::NextSlotCohort::<T>::get();
 		ensure!(old.next_cohort.len() == new.len(), "New next cohort not set correctly");
 
 		let old_active_miners_by_index = old.active_miners_by_index;
-		let new_active_miners_by_index = ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
+		let new_active_miners_by_index = v5::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 		ensure!(
 			old_active_miners_by_index.len() == new_active_miners_by_index.len(),
 			"New active miners value not set correctly"
@@ -271,13 +328,13 @@ mod test {
 			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(7, 7));
 
 			// Check the new value
-			let new = NextSlotCohort::<Test>::get();
+			let new = v5::NextSlotCohort::<Test>::get();
 			assert_eq!(new.len(), 2);
 			assert_eq!(new[0].account_id, 1);
 			assert_eq!(new[1].account_id, 2);
 
 			let new_active_miners_by_index =
-				ActiveMinersByIndex::<Test>::iter().collect::<Vec<_>>();
+				v5::ActiveMinersByIndex::<Test>::iter().collect::<Vec<_>>();
 			assert_eq!(new_active_miners_by_index.len(), 2);
 			assert_eq!(new_active_miners_by_index[0].0, 0);
 			assert_eq!(new_active_miners_by_index[1].0, 1);

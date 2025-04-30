@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use clap::{crate_version, Parser, Subcommand};
+use polkadot_sdk::*;
 use sp_runtime::FixedU128;
 use std::{env, process::exit, str::FromStr};
 

@@ -34,6 +34,7 @@ use jsonrpsee::{
 	types::ErrorObjectOwned,
 	RpcModule, TrySendError,
 };
+use polkadot_sdk::*;
 use prometheus::Registry;
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
@@ -502,9 +503,10 @@ mod tests {
 	use codec::Encode;
 	use futures::{StreamExt, TryStreamExt};
 	use jsonrpsee::ws_client::WsClientBuilder;
+	use polkadot_sdk::*;
 	use prometheus::Registry;
 	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
-	use sp_keyring::{AccountKeyring::Ferdie, Ed25519Keyring::Bob};
+	use sp_keyring::{Ed25519Keyring::Bob, Sr25519Keyring::Ferdie};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 
@@ -648,8 +650,8 @@ mod tests {
 		assert!(verify_proof::<Blake2Hasher, _, _>(
 			&header.changed_accounts_root,
 			notebook_proof.proof,
-			notebook_proof.number_of_leaves as usize,
-			notebook_proof.leaf_index as usize,
+			notebook_proof.number_of_leaves,
+			notebook_proof.leaf_index,
 			&tip.encode(),
 		));
 

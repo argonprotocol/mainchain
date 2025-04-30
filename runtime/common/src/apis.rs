@@ -344,7 +344,7 @@ macro_rules! inject_common_apis {
 
             fn dispatch_benchmark(
                 config: frame_benchmarking::BenchmarkConfig
-            ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
+            ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, alloc::string::String> {
                 use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch};
                 use frame_support::traits::TrackedStorageKey;
 

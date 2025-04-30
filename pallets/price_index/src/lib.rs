@@ -2,19 +2,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-use codec::{Decode, Encode, MaxEncodedLen};
 use core::convert::TryInto;
-use scale_info::TypeInfo;
-use sp_arithmetic::{FixedI128, FixedU128};
-use sp_core::RuntimeDebug;
-use sp_runtime::traits::{CheckedDiv, One};
+use pallet_prelude::*;
 
-use argon_primitives::{tick::Tick, ArgonCPI, Balance};
+use argon_primitives::ArgonCPI;
 pub use pallet::*;
 pub use weights::WeightInfo;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 
 pub mod migrations;
 #[cfg(test)]
@@ -66,11 +59,7 @@ impl PriceIndex {
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use alloc::vec;
-	use core::fmt::Debug;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
-	use sp_arithmetic::{traits::AtLeast32BitUnsigned, FixedPointNumber};
+	use sp_arithmetic::FixedPointNumber;
 
 	use argon_primitives::PriceProvider;
 
@@ -85,9 +74,10 @@ pub mod pallet {
 	/// ## Configuration
 	/// The pallet's configuration trait.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: polkadot_sdk::frame_system::Config {
 		/// The overarching event type.
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 
 		/// Weight information for the extrinsics in this module.
 		type WeightInfo: WeightInfo;

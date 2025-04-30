@@ -7,6 +7,7 @@ use alloc::{
 };
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, Encode};
+use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::H256;
 use sp_runtime::{
@@ -426,8 +427,8 @@ fn verify_previous_balance_proof<T: NotebookHistoryLookup>(
 			verify_proof::<'_, BlakeTwo256, _, _>(
 				&root,
 				notebook_proof.proof.clone().into_inner(),
-				notebook_proof.number_of_leaves as usize,
-				notebook_proof.leaf_index as usize,
+				notebook_proof.number_of_leaves,
+				notebook_proof.leaf_index,
 				Leaf::Value(&leaf.encode()),
 			),
 			VerifyError::InvalidPreviousBalanceProof

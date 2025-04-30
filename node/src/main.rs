@@ -7,10 +7,10 @@ mod service;
 
 mod cli;
 mod command;
-mod grandpa_set_id_patch;
+// mod grandpa_set_id_patch;
 mod rpc;
 pub(crate) mod runtime_api;
 
-fn main() -> sc_cli::Result<()> {
+fn main() -> polkadot_sdk::sc_cli::Result<()> {
 	command::run()
 }

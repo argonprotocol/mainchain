@@ -201,14 +201,14 @@ impl NotebookStatusStore {
 
 #[cfg(test)]
 mod tests {
-	use std::ops::Add;
-
 	use crate::stores::notebook_status::{NotebookFinalizationStep, NotebookStatusStore};
 	use argon_notary_apis::error::Error;
 	use chrono::{Duration, Utc};
 	use frame_support::assert_ok;
 	use futures::future::try_join;
+	use polkadot_sdk::*;
 	use sqlx::PgPool;
+	use std::ops::Add;
 
 	#[sqlx::test]
 	async fn test_locks(pool: PgPool) -> anyhow::Result<()> {

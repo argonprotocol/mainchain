@@ -6,6 +6,7 @@ use core::{
 	hash,
 	hash::Hash,
 };
+use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use sp_core::crypto::{AccountId32 as CoreAccountId32, PublicError, Ss58Codec};
 use subxt::ext::{scale_decode::DecodeAsType, scale_encode::EncodeAsType};

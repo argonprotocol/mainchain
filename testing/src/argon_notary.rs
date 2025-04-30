@@ -11,7 +11,8 @@ use argon_client::{
 	signer::Sr25519Signer,
 	MainchainClient,
 };
-use rand::seq::SliceRandom;
+use polkadot_sdk::*;
+use rand::prelude::IndexedRandom;
 use sp_core::{
 	crypto::{Pair, Ss58Codec},
 	ed25519, sr25519,
@@ -225,7 +226,7 @@ impl ArgonTestNotary {
 fn generate_random_db_name() -> String {
 	const DB_NAME_LENGTH: usize = 12;
 	const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
-	let mut rng = rand::thread_rng();
+	let mut rng = rand::rng();
 
 	// Ensure the first character is a letter or underscore
 	let first_char = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"

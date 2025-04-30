@@ -6,6 +6,7 @@ use argon_primitives::{
 };
 use codec::Encode;
 use frame_support::pallet_prelude::Hooks;
+use pallet_prelude::*;
 use sp_runtime::DigestItem;
 use std::panic::catch_unwind;
 

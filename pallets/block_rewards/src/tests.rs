@@ -7,17 +7,8 @@ use argon_primitives::{
 	block_seal::{BlockPayout, BlockRewardType},
 	BlockSealAuthorityId, BlockSealerInfo, OnNewSlot,
 };
-use frame_support::{
-	assert_ok,
-	traits::{
-		fungible::{Inspect, Mutate},
-		tokens::{Fortitude, Preservation},
-		OnFinalize, OnInitialize,
-	},
-};
-use sp_arithmetic::{traits::UniqueSaturatedInto, FixedI128, FixedU128};
+use pallet_prelude::*;
 use sp_core::ByteArray;
-use sp_runtime::{traits::One, DispatchError, TokenError};
 
 pub(crate) fn test_authority(id: [u8; 32]) -> BlockSealAuthorityId {
 	BlockSealAuthorityId::from_slice(&id).unwrap()
@@ -80,7 +71,7 @@ fn it_mints_immediately_available_funds() {
 
 		// test that we can transfer regular funds still
 		let _ = Balances::mint_into(&1, 3000);
-		assert_ok!(<Balances as Mutate<AccountId>>::transfer(
+		assert_ok!(<Balances as Mutate<TestAccountId>>::transfer(
 			&1,
 			&2,
 			3000,

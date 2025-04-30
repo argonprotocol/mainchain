@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use bitcoind::{downloaded_exe_path, BitcoinD, Conf};
 use fs2::FileExt;
 use lazy_static::lazy_static;
-use rand::{rngs::OsRng, RngCore};
+use rand::RngCore;
 
 use argon_primitives::bitcoin::Satoshis;
 use bitcoin::{
@@ -84,7 +84,7 @@ pub fn wait_for_txid(
 pub fn create_xpriv(network: Network) -> (Xpriv, Fingerprint) {
 	let secp = Secp256k1::new();
 	let mut seed = [0u8; 32];
-	OsRng.fill_bytes(&mut seed);
+	rand::rng().fill_bytes(&mut seed);
 	let master_xpriv = Xpriv::new_master(network, &seed).unwrap();
 	let master_xpub = Xpub::from_priv(&secp, &master_xpriv);
 	let fingerprint = master_xpub.fingerprint();

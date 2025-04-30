@@ -14,9 +14,7 @@ documentation.workspace = true
 thiserror = { workspace = true }
 codec = { workspace = true, default-features = false }
 
-sp-runtime = { workspace = true, default-features = false }
-sp-core = { workspace = true, default-features = false }
-sp-io = { workspace = true, default-features = false }
+polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "sp-io"] }
 bitcoin = { workspace = true, default-features = false }
 miniscript = { workspace = true, default-features = false, features = ["compiler", "no-std"] }
 k256 = { workspace = true, features = ["alloc", "ecdsa"], default-features = false }
@@ -33,12 +31,9 @@ minreq = { workspace = true, optional = true, features = ["https", "json-using-s
 serde_json = { workspace = true }
 
 [dev-dependencies]
-frame-support = { workspace = true }
-sp-keyring = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "sp-keyring"], default-features = true }
 argon-testing = { workspace = true }
 bitcoind = { workspace = true }
-env_logger = { workspace = true }
-rand = { workspace = true }
 base64 = { workspace = true }
 bitcoin = { workspace = true, features = ["base64"] }
 
@@ -57,10 +52,8 @@ std = [
 	"miniscript/std",
 	"minreq",
 	"parking_lot/default",
+	"polkadot-sdk/std",
 	"serde_json/std",
-	"sp-core/std",
-	"sp-io/std",
-	"sp-runtime/std",
 	"thiserror/std",
 ]
 hwi = [ "dep:hwi" ]

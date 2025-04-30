@@ -1,0 +1,24 @@
+[package]
+name = "pallet-prelude"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+codec = { workspace = true, features = ["derive", "max-encoded-len", ] }
+log = { workspace = true }
+argon-primitives = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "sp-api", "sp-io"] }
+env_logger = { workspace = true, optional = true }
+
+
+[features]
+default = [ "std" ]
+test = [ "dep:env_logger", "polkadot-sdk/sp-keyring", "std" ]
+std = [ "argon-primitives/std", "codec/std", "log/std", "polkadot-sdk/std" ]

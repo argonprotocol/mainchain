@@ -22,13 +22,15 @@ export class MiningRotations {
       .then(x => x.toNumber());
 
     const ticksBetweenSlots = this.miningConfig!.ticksBetweenSlots;
-    const slot1BiddingStartTick =
-      this.genesisTick! + this.miningConfig!.slotBiddingStartAfterTicks;
-    if (tick < slot1BiddingStartTick) return 0;
+    const slot1StartTick =
+      this.genesisTick! +
+      this.miningConfig!.slotBiddingStartAfterTicks +
+      ticksBetweenSlots;
+    if (tick < slot1StartTick) return 0;
     // Calculate the number of ticks since the start of bidding. Once bidding started, it was rotation 1
-    const ticksSinceBiddingStart = tick - slot1BiddingStartTick;
+    const ticksSinceSlot1 = tick - slot1StartTick;
 
-    return Math.floor(ticksSinceBiddingStart / ticksBetweenSlots) + 1;
+    return Math.floor(ticksSinceSlot1 / ticksBetweenSlots);
   }
 
   async getForHeader(client: ArgonClient, header: Header) {

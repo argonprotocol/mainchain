@@ -6,11 +6,12 @@ use crate::{
 	service::new_partial,
 };
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
+use polkadot_sdk::*;
 use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
 use sc_network::{config::NetworkBackendType, Litep2pNetworkBackend, NetworkWorker};
 use sp_core::crypto::AccountId32;
-use sp_keyring::AccountKeyring::Alice;
+use sp_keyring::Sr25519Keyring::Alice;
 use std::cmp::max;
 use url::Url;
 
@@ -195,9 +196,9 @@ pub fn run() -> sc_cli::Result<()> {
 			// this is required for hyperbridge
 			cli.run.base.offchain_worker_params.indexing_enabled = true;
 			// Set max rpc request and response size to 150mb
-			cli.run.base.rpc_max_request_size = 150;
-			cli.run.base.rpc_max_response_size = 150;
-			for x in cli.run.base.experimental_rpc_endpoint.iter_mut() {
+			cli.run.base.rpc_params.rpc_max_request_size = 150;
+			cli.run.base.rpc_params.rpc_max_response_size = 150;
+			for x in cli.run.base.rpc_params.experimental_rpc_endpoint.iter_mut() {
 				x.max_payload_in_mb = 150;
 				x.max_payload_out_mb = 150;
 			}
@@ -216,8 +217,10 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.run_node_until_exit(|config| async move {
 				let mining_config = MiningConfig::new(&cli);
 
-				let is_lipb2p =
-					matches!(config.network.network_backend, NetworkBackendType::Libp2p);
+				let is_lipb2p = matches!(
+					config.network.network_backend.unwrap_or_default(),
+					NetworkBackendType::Libp2p
+				);
 				if is_lipb2p {
 					if config.chain_spec.is_canary() {
 						service::new_full::<CanaryRuntimeApi, NetworkWorker<Block, BlockHashT>>(

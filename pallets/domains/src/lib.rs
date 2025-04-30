@@ -1,12 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-use codec::{Decode, Encode};
-use scale_info::TypeInfo;
-use sp_runtime::RuntimeDebug;
-
-use argon_primitives::tick::Tick;
 pub use pallet::*;
+use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
@@ -30,8 +26,6 @@ pub mod pallet {
 		notebook::NotebookHeader, DomainHash, NotebookEventHandler, ZoneRecord,
 		MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
 	};
-	use frame_support::{pallet_prelude::*, traits::Len};
-	use frame_system::pallet_prelude::*;
 	use sp_core::crypto::AccountId32;
 
 	use super::*;
@@ -42,8 +36,9 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
+		type RuntimeEvent: From<Event<Self>>
+			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 
 		/// The number of blocks after which a domain will expire if not renewed.

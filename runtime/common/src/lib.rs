@@ -11,7 +11,7 @@ pub mod token_asset;
 
 pub mod prelude {
 	pub use crate::config::*;
-	pub use alloc::{boxed::Box, collections::BTreeMap, vec, vec::Vec};
+	pub use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
 		apis::*,
 		bitcoin::*,
@@ -62,6 +62,7 @@ pub mod prelude {
 	pub use pallet_block_rewards::GrowthPath;
 	pub use pallet_notebook::NotebookVerifyError;
 	pub use pallet_tx_pause::RuntimeCallNameOf;
+
 	pub use sp_api::{decl_runtime_apis, impl_runtime_apis};
 	pub use sp_arithmetic::{FixedU128, Perbill, Percent};
 	pub use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList, AuthorityWeight};
@@ -71,7 +72,7 @@ pub mod prelude {
 		traits::{BlakeTwo256, Block as BlockT, Header as HeaderT, NumberFor},
 		ApplyExtrinsicResult, Digest, DigestItem, KeyTypeId,
 	};
-	pub use sp_version::{create_runtime_str, RuntimeVersion};
+	pub use sp_version::RuntimeVersion;
 }
 
 #[macro_export]
@@ -81,19 +82,19 @@ macro_rules! inject_runtime_vars {
 		// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 		#[sp_version::runtime_version]
 		pub const VERSION: RuntimeVersion = RuntimeVersion {
-			spec_name: create_runtime_str!("argon"),
-			impl_name: create_runtime_str!("argon"),
+			spec_name: Cow::Borrowed("argon"),
+			impl_name: Cow::Borrowed("argon"),
 			authoring_version: 1,
 			// The version of the runtime specification. A full node will not attempt to use its
 			// native   runtime in substitute for the on-chain Wasm runtime unless all of
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 119,
+			spec_version: 120,
 			impl_version: 6,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 3,
-			state_version: 1,
+			system_version: 1,
 		};
 		parameter_types! {
 			pub const Version: RuntimeVersion = VERSION;
@@ -130,6 +131,7 @@ macro_rules! inject_runtime_vars {
 			pallet_mining_slot::migrations::BiddingMigration<Runtime>,
 			pallet_vaults::migrations::MiningBondBidPoolMigration<Runtime>,
 			pallet_block_rewards::migrations::RewardFreezeMigration<Runtime>,
+			pallet_mining_slot::migrations::BiddingTickMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

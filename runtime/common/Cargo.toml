@@ -20,37 +20,40 @@ smallvec = { workspace = true }
 log = { workspace = true }
 serde_json = { workspace = true }
 
-pallet-authorship = { workspace = true }
-pallet-balances = { workspace = true }
-pallet-multisig = { workspace = true }
-pallet-sudo = { workspace = true }
-pallet-timestamp = { workspace = true }
-pallet-grandpa = { workspace = true }
-pallet-offences = { workspace = true }
-pallet-proxy = { workspace = true }
-pallet-tx-pause = { workspace = true }
-pallet-transaction-payment = { workspace = true }
-pallet-utility = { workspace = true }
-frame-support = { workspace = true }
-frame-system = { workspace = true }
-frame-try-runtime = { workspace = true, optional = true }
-frame-executive = { workspace = true }
-sp-api = { workspace = true }
-sp-arithmetic = { workspace = true }
-sp-block-builder = { workspace = true }
+polkadot-sdk.workspace = true
+
+polkadot-sdk.features = [
+    "frame-support",
+    "frame-system",
+    "frame-executive",
+    "sp-api",
+    "sp-core",
+    "sp-runtime",
+    "sp-block-builder",
+    "sp-arithmetic",
+    "sp-inherents",
+    "sp-offchain",
+    "sp-session",
+    "sp-transaction-pool",
+    "sp-version",
+    "sp-genesis-builder",
+    "sp-consensus-grandpa",
+    "frame-system-rpc-runtime-api",
+    "frame-metadata-hash-extension",
+    "pallet-authorship",
+    "pallet-balances",
+    "pallet-sudo",
+    "pallet-offences",
+    "pallet-grandpa",
+    "pallet-multisig",
+    "pallet-timestamp",
+    "pallet-proxy",
+    "pallet-tx-pause",
+    "pallet-utility",
+    "pallet-transaction-payment",
+    "pallet-transaction-payment-rpc-runtime-api",
+]
 sp-debug-derive = { workspace = true, features = ["force-debug"] }
-sp-core = { workspace = true }
-sp-inherents = { workspace = true }
-sp-offchain = { workspace = true }
-sp-runtime = { workspace = true }
-sp-session = { workspace = true }
-sp-transaction-pool = { workspace = true }
-sp-version = { workspace = true }
-sp-genesis-builder = { workspace = true }
-sp-consensus-grandpa = { workspace = true }
-frame-system-rpc-runtime-api = { workspace = true }
-pallet-transaction-payment-rpc-runtime-api = { workspace = true }
-frame-metadata-hash-extension = { workspace = true }
 
 pallet-token-gateway = { workspace = true }
 pallet-ismp = { workspace = true, features = ["unsigned"] }
@@ -59,11 +62,6 @@ pallet-hyperbridge = { workspace = true }
 ismp-grandpa = { workspace = true }
 ismp = { workspace = true }
 anyhow = { workspace = true, default-features = false }
-sp-mmr-primitives = { workspace = true }
-
-# Used for runtime benchmarking
-frame-benchmarking = { workspace = true, optional = true }
-frame-system-benchmarking = { workspace = true, optional = true }
 
 # Local Dependencies
 pallet-bitcoin-utxos = { workspace = true }
@@ -91,19 +89,9 @@ std = [
 	"anyhow/std",
 	"argon-primitives/std",
 	"codec/std",
-	"frame-benchmarking?/std",
-	"frame-executive/std",
-	"frame-metadata-hash-extension/std",
-	"frame-support/std",
-	"frame-system-benchmarking?/std",
-	"frame-system-rpc-runtime-api/std",
-	"frame-system/std",
-	"frame-try-runtime?/std",
 	"ismp-grandpa/std",
 	"ismp/std",
 	"log/std",
-	"pallet-authorship/std",
-	"pallet-balances/std",
 	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
 	"pallet-block-rewards/std",
@@ -112,53 +100,25 @@ std = [
 	"pallet-chain-transfer/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
-	"pallet-grandpa/std",
 	"pallet-hyperbridge/std",
 	"pallet-ismp-runtime-api/std",
 	"pallet-ismp/std",
 	"pallet-liquidity-pools/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
-	"pallet-multisig/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
-	"pallet-offences/std",
 	"pallet-price-index/std",
-	"pallet-proxy/std",
-	"pallet-sudo/std",
 	"pallet-ticks/std",
-	"pallet-timestamp/std",
 	"pallet-token-gateway/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-transaction-payment/std",
-	"pallet-tx-pause/std",
-	"pallet-utility/std",
 	"pallet-vaults/std",
+	"polkadot-sdk/std",
 	"scale-info/std",
 	"serde_json/std",
-	"sp-api/std",
-	"sp-arithmetic/std",
-	"sp-block-builder/std",
-	"sp-consensus-grandpa/std",
-	"sp-core/std",
-	"sp-debug-derive/force-debug",
 	"sp-debug-derive/std",
-	"sp-genesis-builder/std",
-	"sp-inherents/std",
-	"sp-mmr-primitives/std",
-	"sp-offchain/std",
-	"sp-runtime/std",
-	"sp-session/std",
-	"sp-transaction-pool/std",
-	"sp-version/std",
 ]
 runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system-benchmarking/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
 	"ismp-grandpa/runtime-benchmarks",
-	"pallet-balances/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
 	"pallet-block-rewards/runtime-benchmarks",
@@ -167,34 +127,20 @@ runtime-benchmarks = [
 	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
-	"pallet-grandpa/runtime-benchmarks",
 	"pallet-ismp/runtime-benchmarks",
 	"pallet-liquidity-pools/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
-	"pallet-multisig/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
-	"pallet-offences/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
-	"pallet-proxy/runtime-benchmarks",
-	"pallet-sudo/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
-	"pallet-timestamp/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",
-	"pallet-tx-pause/runtime-benchmarks",
-	"pallet-utility/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
+	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [
-	"frame-executive/try-runtime",
-	"frame-support/try-runtime",
-	"frame-system/try-runtime",
-	"frame-try-runtime/try-runtime",
 	"ismp-grandpa/try-runtime",
-	"pallet-authorship/try-runtime",
-	"pallet-balances/try-runtime",
 	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",
 	"pallet-block-rewards/try-runtime",
@@ -203,25 +149,16 @@ try-runtime = [
 	"pallet-chain-transfer/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
-	"pallet-grandpa/try-runtime",
 	"pallet-hyperbridge/try-runtime",
 	"pallet-ismp/try-runtime",
 	"pallet-liquidity-pools/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
-	"pallet-multisig/try-runtime",
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
-	"pallet-offences/try-runtime",
 	"pallet-price-index/try-runtime",
-	"pallet-proxy/try-runtime",
-	"pallet-sudo/try-runtime",
 	"pallet-ticks/try-runtime",
-	"pallet-timestamp/try-runtime",
 	"pallet-token-gateway/try-runtime",
-	"pallet-transaction-payment/try-runtime",
-	"pallet-tx-pause/try-runtime",
-	"pallet-utility/try-runtime",
 	"pallet-vaults/try-runtime",
-	"sp-runtime/try-runtime",
+	"polkadot-sdk/try-runtime",
 ]

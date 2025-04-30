@@ -126,6 +126,7 @@ mod tests {
 	use crate::stores::notebook_header::NotebookHeaderStore;
 	use argon_notary_apis::error::Error;
 	use frame_support::assert_ok;
+	use polkadot_sdk::frame_support;
 	use sqlx::PgPool;
 
 	use super::*;

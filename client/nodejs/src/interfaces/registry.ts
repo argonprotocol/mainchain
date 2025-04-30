@@ -69,7 +69,6 @@ import type {
   FrameMetadataHashExtensionCheckMetadataHash,
   FrameMetadataHashExtensionMode,
   FrameSupportDispatchDispatchClass,
-  FrameSupportDispatchDispatchInfo,
   FrameSupportDispatchPays,
   FrameSupportDispatchPerDispatchClassU32,
   FrameSupportDispatchPerDispatchClassWeight,
@@ -82,6 +81,7 @@ import type {
   FrameSystemAccountInfo,
   FrameSystemCall,
   FrameSystemCodeUpgradeAuthorization,
+  FrameSystemDispatchEventInfo,
   FrameSystemError,
   FrameSystemEvent,
   FrameSystemEventRecord,
@@ -247,6 +247,7 @@ import type {
   SpRuntimeDispatchError,
   SpRuntimeModuleError,
   SpRuntimeMultiSignature,
+  SpRuntimeProvingTrieTrieError,
   SpRuntimeTokenError,
   SpRuntimeTransactionalError,
   SpVersionRuntimeVersion,
@@ -321,7 +322,6 @@ declare module '@polkadot/types/types/registry' {
     FrameMetadataHashExtensionCheckMetadataHash: FrameMetadataHashExtensionCheckMetadataHash;
     FrameMetadataHashExtensionMode: FrameMetadataHashExtensionMode;
     FrameSupportDispatchDispatchClass: FrameSupportDispatchDispatchClass;
-    FrameSupportDispatchDispatchInfo: FrameSupportDispatchDispatchInfo;
     FrameSupportDispatchPays: FrameSupportDispatchPays;
     FrameSupportDispatchPerDispatchClassU32: FrameSupportDispatchPerDispatchClassU32;
     FrameSupportDispatchPerDispatchClassWeight: FrameSupportDispatchPerDispatchClassWeight;
@@ -334,6 +334,7 @@ declare module '@polkadot/types/types/registry' {
     FrameSystemAccountInfo: FrameSystemAccountInfo;
     FrameSystemCall: FrameSystemCall;
     FrameSystemCodeUpgradeAuthorization: FrameSystemCodeUpgradeAuthorization;
+    FrameSystemDispatchEventInfo: FrameSystemDispatchEventInfo;
     FrameSystemError: FrameSystemError;
     FrameSystemEvent: FrameSystemEvent;
     FrameSystemEventRecord: FrameSystemEventRecord;
@@ -499,6 +500,7 @@ declare module '@polkadot/types/types/registry' {
     SpRuntimeDispatchError: SpRuntimeDispatchError;
     SpRuntimeModuleError: SpRuntimeModuleError;
     SpRuntimeMultiSignature: SpRuntimeMultiSignature;
+    SpRuntimeProvingTrieTrieError: SpRuntimeProvingTrieTrieError;
     SpRuntimeTokenError: SpRuntimeTokenError;
     SpRuntimeTransactionalError: SpRuntimeTransactionalError;
     SpVersionRuntimeVersion: SpVersionRuntimeVersion;

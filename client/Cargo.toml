@@ -25,15 +25,11 @@ hex = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "ws-client", "macros", "client-ws-transport-tls"] } # needs to be in sync with subxt
 tracing = { workspace = true, features = ["default"] }
 tracing-subscriber = { workspace = true }
-sp-core = { workspace = true, features = ["default"] }
-sp-arithmetic = { workspace = true, features = ["default"] }
-sp-keystore = { workspace = true, features = ["default"] }
-sp-runtime = { workspace = true, features = ["default"] }
+polkadot-sdk = { workspace = true }
 argon-primitives = { workspace = true, features = ["default"] }
 anyhow = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 
 [dev-dependencies]
-sp-keyring = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 argon-testing = { workspace = true }

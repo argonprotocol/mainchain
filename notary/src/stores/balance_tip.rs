@@ -6,7 +6,7 @@ use sqlx::PgConnection;
 
 use argon_notary_apis::localchain::BalanceTipResult;
 use argon_primitives::{
-	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
+	ensure, prelude::*, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
 };
 
 use crate::{stores::BoxFutureResult, Error};
@@ -156,6 +156,7 @@ impl BalanceTipStore {
 #[cfg(test)]
 mod tests {
 	use frame_support::assert_ok;
+	use polkadot_sdk::*;
 	use sp_keyring::Sr25519Keyring::Bob;
 	use sqlx::PgPool;
 

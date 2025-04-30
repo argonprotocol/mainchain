@@ -1,7 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 use crate::{
 	command::MiningConfig,
-	grandpa_set_id_patch::GrandpaStateOverrider,
 	rpc,
 	rpc::GrandpaDeps,
 	runtime_api::{opaque::Block, BaseHostRuntimeApis},
@@ -11,7 +10,8 @@ use argon_node_consensus::{
 	aux_client::ArgonAux, create_import_queue, run_block_builder_task, run_notary_sync,
 	BlockBuilderParams, NotaryClient, NotebookDownloader,
 };
-use argon_primitives::{tick::Ticker, AccountId, Chain, TickApis};
+use argon_primitives::{tick::Ticker, AccountId, TickApis};
+use polkadot_sdk::*;
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
@@ -26,7 +26,7 @@ use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
 use sp_blockchain::HeaderBackend;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 pub(crate) type FullClient<Runtime> = sc_service::TFullClient<
 	Block,
@@ -51,7 +51,7 @@ pub type Service<Runtime> = sc_service::PartialComponents<
 	FullBackend,
 	FullSelectChain,
 	BasicQueue<Block>,
-	sc_transaction_pool::FullPool<Block, FullClient<Runtime>>,
+	sc_transaction_pool::TransactionPoolHandle<Block, FullClient<Runtime>>,
 	(
 		ArgonBlockImport<Runtime>,
 		Arc<NotaryClient<Block, FullClient<Runtime>, AccountId>>,
@@ -83,15 +83,15 @@ where
 
 	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
 
-	let (mut client, backend, keystore_container, task_manager) =
+	let (client, backend, keystore_container, task_manager) =
 		sc_service::new_full_parts::<Block, Runtime, _>(
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
 		)?;
-	let runtime_overrides =
-		GrandpaStateOverrider::for_chain(Chain::from_str(config.chain_spec.name())?);
-	client.set_state_overrider(Box::new(runtime_overrides));
+	// let runtime_overrides =
+	// 	GrandpaStateOverrider::for_chain(Chain::from_str(config.chain_spec.name())?);
+	// client.set_state_overrider(Box::new(runtime_overrides));
 
 	let client = Arc::new(client);
 
@@ -101,12 +101,15 @@ where
 	});
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
-	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
-		config.transaction_pool.clone(),
-		config.role.is_authority().into(),
-		config.prometheus_registry(),
-		task_manager.spawn_essential_handle(),
-		client.clone(),
+	let transaction_pool = Arc::from(
+		sc_transaction_pool::Builder::new(
+			task_manager.spawn_essential_handle(),
+			client.clone(),
+			config.role.is_authority().into(),
+		)
+		.with_options(config.transaction_pool.clone())
+		.with_prometheus(config.prometheus_registry())
+		.build(),
 	);
 	let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
 		client.clone(),

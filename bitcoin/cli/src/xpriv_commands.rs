@@ -59,7 +59,7 @@ impl XPrivCommands {
 				let mnemonic = if let Some(x) = mnemonic {
 					Mnemonic::from_str(&x).map_err(|e| anyhow!(e))?
 				} else {
-					let mut rng = rand::thread_rng();
+					let mut rng = rand::rng();
 					let mut bytes = [0u8; 32];
 					rng.fill(&mut bytes);
 					Mnemonic::from_entropy(&bytes[..]).map_err(|e| anyhow!(e))?

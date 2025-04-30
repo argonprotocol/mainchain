@@ -8,9 +8,10 @@ use argon_client::{
 };
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
 use argon_testing::{test_miner_count, ArgonTestNode};
+use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
-use sp_keyring::AccountKeyring;
+use sp_keyring::Sr25519Keyring;
 use std::{collections::HashSet, env};
 use tokio::join;
 
@@ -36,7 +37,7 @@ async fn test_end_to_end_default_vote_mining() {
 			if let Some(author) =
 				block.header().runtime_digest().logs.iter().find_map(|a| a.as_author())
 			{
-				let keyring = AccountKeyring::from_account_id(&author).unwrap();
+				let keyring = Sr25519Keyring::from_account_id(&author).unwrap();
 				println!("Block Author {:?} ({})", keyring, block.number());
 
 				if let Ok(ownership) =

@@ -340,9 +340,10 @@ pub mod uniffi_ext {
 
 #[cfg(test)]
 mod tests {
-  use sp_keyring::AccountKeyring::{Alice, Bob};
+  use polkadot_sdk::*;
   use sp_keyring::Ed25519Keyring;
   use sp_keyring::Ed25519Keyring::Ferdie;
+  use sp_keyring::Sr25519Keyring::{Alice, Bob};
 
   use argon_primitives::AccountType;
 

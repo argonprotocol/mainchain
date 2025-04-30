@@ -30,8 +30,8 @@
 #![allow(unused_imports)]
 
 use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
+use pallet_prelude::*;
 use core::marker::PhantomData;
-
 /// Weight functions needed for pallet_template.
 pub trait WeightInfo {
 	fn do_something() -> Weight;

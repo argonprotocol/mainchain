@@ -1,9 +1,8 @@
-use alloc::format;
+use alloc::{format, string::String};
 use codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::RuntimeString;
 
 use crate::AccountId;
 
@@ -81,23 +80,13 @@ impl AccountType {
 }
 
 impl TryFrom<i32> for AccountType {
-	type Error = RuntimeString;
+	type Error = String;
 
 	fn try_from(value: i32) -> Result<Self, Self::Error> {
 		match value {
 			0 => Ok(AccountType::Tax),
 			1 => Ok(AccountType::Deposit),
-			_ => {
-				let str = format!("Invalid account_type value {}", value);
-				#[cfg(feature = "std")]
-				{
-					Err(RuntimeString::Owned(str))
-				}
-				#[cfg(not(feature = "std"))]
-				{
-					Err(RuntimeString::Owned(str.as_bytes().to_vec()))
-				}
-			},
+			_ => Err(format!("Invalid account_type value {}", value)),
 		}
 	}
 }

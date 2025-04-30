@@ -1,5 +1,5 @@
 use crate::ArgonConfig;
-use argon_primitives::{AccountId, CryptoType};
+use argon_primitives::{prelude::*, AccountId, CryptoType};
 use sp_core::{crypto::key_types::ACCOUNT, ed25519, sr25519, Pair};
 use sp_keystore::Keystore;
 pub use subxt::tx::Signer;

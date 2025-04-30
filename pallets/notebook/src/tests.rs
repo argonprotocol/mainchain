@@ -17,19 +17,16 @@ use argon_primitives::{
 		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
 		NotebookNumber,
 	},
-	tick::Tick,
-	BalanceProof, BlockVote, MerkleProof, NotaryId, NotebookAuditResult, NotebookDigest,
-	NotebookProvider, SignedNotebookHeader,
+	BalanceProof, BlockVote, MerkleProof, NotebookAuditResult, NotebookDigest, NotebookProvider,
+	SignedNotebookHeader,
 };
 use binary_merkle_tree::{merkle_proof, merkle_root};
-use codec::Encode;
-use frame_support::{assert_err, assert_noop, assert_ok, traits::OnInitialize};
-use sp_core::{bounded_vec, ed25519, Blake2Hasher, Pair};
+use pallet_prelude::*;
+use sp_core::{bounded_vec, ed25519, Pair};
 use sp_keyring::{
-	AccountKeyring::{Alice, Bob},
 	Ed25519Keyring,
+	Sr25519Keyring::{Alice, Bob},
 };
-use sp_runtime::{testing::H256, BoundedVec};
 use std::collections::BTreeMap;
 
 fn notebook_digest(

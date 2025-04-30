@@ -255,7 +255,7 @@ impl ComputeSolver {
 		key_block_hash: H256,
 		compute_difficulty: ComputeDifficulty,
 	) -> Self {
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 		let mut bytes = [0u8; 32];
 		rng.fill(&mut bytes);
 		let mut solver = ComputeSolver {

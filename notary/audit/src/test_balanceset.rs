@@ -1,9 +1,9 @@
 use frame_support::{assert_err, assert_ok};
+use polkadot_sdk::*;
 use sp_core::{bounded_vec, sr25519::Signature, H256};
 use sp_keyring::{
-	AccountKeyring::Charlie,
 	Ed25519Keyring::{Dave, Ferdie},
-	Sr25519Keyring::{Alice, Bob},
+	Sr25519Keyring::{Alice, Bob, Charlie},
 };
 
 use argon_primitives::{

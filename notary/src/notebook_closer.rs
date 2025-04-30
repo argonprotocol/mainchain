@@ -14,6 +14,7 @@ use crate::{
 use argon_notary_apis::error::Error;
 use argon_primitives::{tick::Ticker, AccountId, NotaryId, SignedNotebookHeader};
 use futures::FutureExt;
+use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
 use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
@@ -255,7 +256,7 @@ mod tests {
 	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::{
 		sr25519::Keyring,
-		AccountKeyring,
+		Sr25519Keyring,
 		Sr25519Keyring::{Alice, Bob, Ferdie},
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
@@ -809,7 +810,7 @@ mod tests {
 	async fn set_zone_record(
 		client: &ArgonOnlineClient,
 		domain_hash: DomainHash,
-		account: AccountKeyring,
+		account: Sr25519Keyring,
 	) -> anyhow::Result<H256> {
 		let signer = Sr25519Signer::new(account.pair());
 		let tx_progress = client

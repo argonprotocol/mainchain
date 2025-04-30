@@ -5,6 +5,7 @@ use crate::{
 };
 use argon_primitives::{vault::MiningBidPoolProvider, OnNewSlot};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
+use pallet_prelude::*;
 use sp_core::bounded_vec;
 use sp_runtime::Permill;
 
