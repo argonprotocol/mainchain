@@ -12,6 +12,53 @@ permissions:
   actions: write
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        uses: ./.github/templates/clear-space
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Start sccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          variant: sccache
+          key: sccache-build-and-lint
+          max-size: 10G
+          append-timestamp: false
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli@0.8.5
+
+      - name: Migrate Notary Db
+        working-directory: notary
+        run: cargo sqlx database setup
+
+      - name: Create and Set Database URL
+        working-directory: localchain
+        run: |
+          touch ${{ runner.temp }}/temp.db
+          chmod 777 ${{ runner.temp }}/temp.db
+          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+          cat .env
+
+      - name: Migrate Localchain Db
+        working-directory: localchain
+        run: cargo sqlx database setup
+
+      - name: Clippy
+        run: cargo clippy --workspace
+        env:
+          RUSTC_WRAPPER: "sccache"
+          SKIP_WASM_BUILD: 1
   test:
     strategy:
       fail-fast: false
@@ -83,13 +130,6 @@ jobs:
       - name: Migrate Localchain Db
         working-directory: localchain
         run: cargo sqlx database setup
-
-      - name: Clippy
-        if: ${{startsWith(matrix.os, 'ubuntu')}}
-        run: cargo clippy --workspace
-        env:
-          RUSTC_WRAPPER: "sccache"
-          SKIP_WASM_BUILD: 1
 
       - name: Build
         run: cargo build --features=simulated-prices
