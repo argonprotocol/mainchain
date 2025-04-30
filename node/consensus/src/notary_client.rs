@@ -11,6 +11,7 @@ use argon_primitives::{
 		NotebookBytes, SignedHeaderBytes,
 	},
 	notebook::NotebookNumber,
+	prelude::sc_client_api::BlockBackend,
 	tick::{Tick, Ticker},
 	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
 	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
@@ -51,6 +52,7 @@ use tracing::error;
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
 
 pub trait NotaryApisExt<B: BlockT, AC> {
+	fn has_block_state(&self, block_hash: B::Hash) -> bool;
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error>;
 	fn latest_notebook_by_notary(
 		&self,
@@ -84,13 +86,18 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 impl<B, C, AC> NotaryApisExt<B, AC> for C
 where
 	B: BlockT,
-	C: ProvideRuntimeApi<B> + HeaderBackend<B>,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B>,
 	C::Api: NotaryApis<B, NotaryRecordT>
 		+ NotebookApis<B, NotebookVerifyError>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ TickApis<B>,
 	AC: Clone + Codec,
 {
+	fn has_block_state(&self, block_hash: B::Hash) -> bool {
+		self.block_status(block_hash).unwrap_or(sp_consensus::BlockStatus::Unknown) ==
+			sp_consensus::BlockStatus::InChainWithState
+	}
+
 	fn notaries(&self, block_hash: B::Hash) -> Result<Vec<NotaryRecordT>, Error> {
 		self.runtime_api().notaries(block_hash).map_err(Into::into)
 	}
@@ -195,6 +202,7 @@ where
 	B: BlockT,
 	C: ProvideRuntimeApi<B>
 		+ BlockchainEvents<B>
+		+ BlockBackend<B>
 		+ HeaderBackend<B>
 		+ AuxStore
 		+ Send
@@ -507,6 +515,9 @@ where
 		};
 		let finalized_hash = self.client.finalized_hash();
 		let best_hash = self.client.best_hash();
+		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
+			return Ok(true);
+		}
 		let queued_notaries =
 			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
 
@@ -545,7 +556,9 @@ where
 					Err(e) => {
 						if matches!(
 							e,
-							Error::MissingNotebooksError(_) | Error::NotebookAuditBeforeTick(_)
+							Error::MissingNotebooksError(_) |
+								Error::NotebookAuditBeforeTick(_) |
+								Error::StateUnavailableError
 						) {
 							trace!(
 								"In queue, re-queuing notebook for notary {} - {:?}",
@@ -833,6 +846,9 @@ where
 					"Checking if we can audit at parent block",
 				);
 				best_hash = self.client.parent_hash(&best_hash)?;
+				if !self.client.has_block_state(best_hash) {
+					return Err(Error::StateUnavailableError);
+				}
 				latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
 			}
 			tracing::info!(
@@ -1393,6 +1409,9 @@ mod test {
 	}
 
 	impl NotaryApisExt<Block, AccountId> for TestNode {
+		fn has_block_state(&self, _block_hash: <Block as BlockT>::Hash) -> bool {
+			true
+		}
 		fn notaries(&self, _block_hash: H256) -> Result<Vec<NotaryRecordT>, Error> {
 			Ok(self.notaries.lock().clone())
 		}

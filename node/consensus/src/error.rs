@@ -79,6 +79,9 @@ pub enum Error {
 
 	#[error("A duplicate block was created by this author {0} for the given voting key")]
 	DuplicateAuthoredBlock(AccountId),
+
+	#[error("The block state is not available")]
+	StateUnavailableError,
 }
 
 impl From<String> for Error {

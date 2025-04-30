@@ -142,11 +142,16 @@ yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
 
 [patch."https://github.com/paritytech/polkadot-sdk"]
-polkadot-sdk = { path = "../polkadot-clone/umbrella" }
-sp-application-crypto = { path = "../polkadot-clone/substrate/primitives/application-crypto" }
-sp-debug-derive = { path = "../polkadot-clone/substrate/primitives/debug-derive" }
-sp-io = { path = "../polkadot-clone/substrate/primitives/io" }
-substrate-wasm-builder = { path = "../polkadot-clone/substrate/utils/wasm-builder" }
+polkadot-sdk = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+sp-debug-derive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+sp-io = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+substrate-wasm-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+
+[patch.crates-io]
+sp-core = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
+sp-runtime = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
 
 [workspace.dependencies]
 futures = { version = "0.3" }
@@ -202,7 +207,6 @@ sqlx = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 polkadot-sdk = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
-
 # substrate crates needing extra features
 substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
 sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }

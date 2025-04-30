@@ -26,7 +26,7 @@ use sp_runtime::{
 	Justification,
 };
 use std::{marker::PhantomData, sync::Arc};
-use tracing::warn;
+use tracing::{error, warn};
 
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
@@ -206,12 +206,12 @@ where
 		&self,
 		mut block_params: BlockImportParams<B>,
 	) -> Result<BlockImportParams<B>, String> {
-		let number = *block_params.header.number();
+		let block_number = *block_params.header.number();
 		let is_gap_sync = self
 			.client
 			.info()
 			.block_gap
-			.is_some_and(|gap| gap.start <= number && number <= gap.end);
+			.is_some_and(|gap| gap.start <= block_number && block_number <= gap.end);
 		// Skip checks that include execution, if being told so, or when importing only state.
 		//
 		// This is done for example when gap syncing and it is expected that the block after the gap
@@ -224,6 +224,8 @@ where
 		}
 
 		let post_hash = block_params.header.hash();
+		let parent_hash = *block_params.header.parent_hash();
+
 		if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
 			// ensure we have parent state
 			if self
@@ -234,8 +236,8 @@ where
 			{
 				warn!(
 					block_hash = ?post_hash,
-					block_number = ?number,
-					parent_hash = ?block_params.header.parent_hash(),
+					?block_number,
+					?parent_hash,
 					origin = ?block_params.origin,
 					fork_choice = ?block_params.fork_choice,
 					import_existing = ?block_params.import_existing,
@@ -249,8 +251,6 @@ where
 				return Err("Parent state not available".into())
 			}
 		}
-
-		let parent_hash = *block_params.header.parent_hash();
 
 		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
@@ -278,8 +278,8 @@ where
 		// if we're importing a non-finalized block from someone else, verify the notebook
 		// audits
 		let latest_verified_finalized = self.client.info().finalized_number;
-		if block_params.origin != BlockOrigin::Own &&
-			block_params.header.number() > &latest_verified_finalized &&
+		if !matches!(block_params.origin, BlockOrigin::Own | BlockOrigin::NetworkInitialSync) &&
+			block_number > latest_verified_finalized &&
 			!block_params.finalized
 		{
 			let digest_notebooks = self
@@ -290,7 +290,18 @@ where
 				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
 			self.notary_client
 				.verify_notebook_audits(&parent_hash, digest_notebooks)
-				.await?;
+				.await
+				.inspect_err(|e| {
+					error!(
+						?block_number,
+						block_hash=?post_hash,
+						?parent_hash,
+						origin = ?block_params.origin,
+						import_existing = block_params.import_existing,
+						finalized = block_params.finalized,
+						has_justification = block_params.justifications.is_some(),
+						"Failed to verify notebook audits {}", e.to_string())
+				})?;
 		}
 
 		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which

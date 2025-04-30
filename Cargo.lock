@@ -91,7 +91,7 @@ dependencies = [
  "rand 0.8.5",
  "rust-embed",
  "scrypt 0.11.0",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "subtle 2.6.1",
  "x25519-dalek",
  "zeroize",
@@ -111,7 +111,7 @@ dependencies = [
  "nom",
  "rand 0.8.5",
  "secrecy",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -292,7 +292,7 @@ dependencies = [
  "derive_more 1.0.0",
  "once_cell",
  "serde",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -1851,13 +1851,15 @@ checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
 
 [[package]]
 name = "asset-test-utils"
-version = "21.0.1"
+version = "21.0.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "cumulus-pallet-xcmp-queue",
  "cumulus-primitives-core",
  "frame-support",
  "frame-system",
+ "pallet-asset-conversion",
  "pallet-assets",
  "pallet-balances",
  "pallet-collator-selection",
@@ -1875,11 +1877,13 @@ dependencies = [
  "staging-xcm-builder",
  "staging-xcm-executor",
  "substrate-wasm-builder",
+ "xcm-runtime-apis",
 ]
 
 [[package]]
 name = "assets-common"
-version = "0.19.0"
+version = "0.19.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -1951,14 +1955,15 @@ dependencies = [
 
 [[package]]
 name = "async-executor"
-version = "1.13.1"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30ca9a001c1e8ba5149f91a74362376cc6bc5b919d92d988668657bd570bdcec"
+checksum = "bb812ffb58524bdd10860d7d974e2f01cc0950c2438a74ee5ec2e2280c6c4ffa"
 dependencies = [
  "async-task",
  "concurrent-queue",
  "fastrand 2.3.0",
  "futures-lite 2.6.0",
+ "pin-project-lite",
  "slab",
 ]
 
@@ -2234,9 +2239,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "axum"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de45108900e1f9b9242f7f2e254aa3e2c029c921c258fe9e6b4217eeebd54288"
+checksum = "021e862c184ae977658b36c4500f7feac3221ca5da43e3f25bd04ab6c79a29b5"
 dependencies = [
  "axum-core",
  "bytes",
@@ -2399,6 +2404,7 @@ dependencies = [
 [[package]]
 name = "binary-merkle-tree"
 version = "16.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hash-db",
  "log",
@@ -2467,7 +2473,7 @@ dependencies = [
  "rand_core 0.6.4",
  "ripemd",
  "secp256k1 0.27.0",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "subtle 2.6.1",
  "zeroize",
 ]
@@ -2787,6 +2793,7 @@ dependencies = [
 [[package]]
 name = "bp-header-chain"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-runtime",
  "finality-grandpa",
@@ -2803,6 +2810,7 @@ dependencies = [
 [[package]]
 name = "bp-messages"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-runtime",
@@ -2818,6 +2826,7 @@ dependencies = [
 [[package]]
 name = "bp-parachains"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-polkadot-core",
@@ -2834,6 +2843,7 @@ dependencies = [
 [[package]]
 name = "bp-polkadot"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-polkadot-core",
@@ -2846,6 +2856,7 @@ dependencies = [
 [[package]]
 name = "bp-polkadot-core"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-messages",
  "bp-runtime",
@@ -2862,6 +2873,7 @@ dependencies = [
 [[package]]
 name = "bp-relayers"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-messages",
@@ -2878,7 +2890,8 @@ dependencies = [
 
 [[package]]
 name = "bp-runtime"
-version = "0.19.0"
+version = "0.19.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -2901,6 +2914,7 @@ dependencies = [
 [[package]]
 name = "bp-test-utils"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-parachains",
@@ -2920,6 +2934,7 @@ dependencies = [
 [[package]]
 name = "bp-xcm-bridge-hub"
 version = "0.5.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-messages",
  "bp-runtime",
@@ -2936,6 +2951,7 @@ dependencies = [
 [[package]]
 name = "bp-xcm-bridge-hub-router"
 version = "0.15.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -2947,6 +2963,7 @@ dependencies = [
 [[package]]
 name = "bridge-hub-common"
 version = "0.12.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -2963,6 +2980,7 @@ dependencies = [
 [[package]]
 name = "bridge-hub-test-utils"
 version = "0.21.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "asset-test-utils",
  "bp-header-chain",
@@ -3004,6 +3022,7 @@ dependencies = [
 [[package]]
 name = "bridge-runtime-common"
 version = "0.19.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-messages",
@@ -3058,7 +3077,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
 dependencies = [
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "tinyvec",
 ]
 
@@ -3091,9 +3110,9 @@ checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
 name = "bytemuck"
-version = "1.22.0"
+version = "1.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b1fc10dbac614ebc03540c9dbd60e83887fda27794998c6528f1782047d540"
+checksum = "9134a6ef01ce4b366b50689c94f82c14bc72bc5d0386829828a2e2752ef7958c"
 
 [[package]]
 name = "byteorder"
@@ -3290,9 +3309,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.40"
+version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
+checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -3453,7 +3472,7 @@ dependencies = [
  "hmac 0.12.1",
  "k256",
  "serde",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
 ]
 
@@ -3469,7 +3488,7 @@ dependencies = [
  "once_cell",
  "pbkdf2 0.12.2",
  "rand 0.8.5",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
 ]
 
@@ -3488,7 +3507,7 @@ dependencies = [
  "ripemd",
  "serde",
  "serde_derive",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "thiserror 1.0.69",
 ]
@@ -4035,6 +4054,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-cli"
 version = "0.21.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "clap",
  "parity-scale-codec",
@@ -4051,6 +4071,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-collator"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-client-consensus-common",
  "cumulus-client-network",
@@ -4073,6 +4094,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-aura"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-client-collator",
@@ -4118,6 +4140,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-common"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-client-pov-recovery",
@@ -4147,6 +4170,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-proposer"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4161,6 +4185,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-relay-chain"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-client-consensus-common",
@@ -4183,6 +4208,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-network"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-relay-chain-interface",
@@ -4208,6 +4234,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-parachain-inherent"
 version = "0.15.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4217,7 +4244,7 @@ dependencies = [
  "parity-scale-codec",
  "sc-client-api",
  "sp-api",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-inherents",
  "sp-runtime",
  "sp-state-machine",
@@ -4229,6 +4256,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-pov-recovery"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4254,6 +4282,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-service"
 version = "0.22.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-client-cli",
  "cumulus-client-collator",
@@ -4290,6 +4319,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-aura-ext"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "frame-support",
@@ -4306,6 +4336,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-dmp-queue"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-benchmarking",
@@ -4322,6 +4353,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-parachain-system"
 version = "0.18.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bytes",
  "cumulus-pallet-parachain-system-proc-macro",
@@ -4357,6 +4389,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-parachain-system-proc-macro"
 version = "0.6.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
@@ -4367,6 +4400,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-session-benchmarking"
 version = "20.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4379,6 +4413,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-solo-to-para"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "frame-support",
@@ -4393,6 +4428,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-xcm"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -4407,6 +4443,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-xcmp-queue"
 version = "0.18.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bounded-collections",
  "bp-xcm-bridge-hub-router",
@@ -4431,6 +4468,7 @@ dependencies = [
 [[package]]
 name = "cumulus-ping"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-xcm",
  "cumulus-primitives-core",
@@ -4445,6 +4483,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-aura"
 version = "0.16.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-api",
  "sp-consensus-aura",
@@ -4453,6 +4492,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-core"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "polkadot-core-primitives",
@@ -4468,6 +4508,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-parachain-inherent"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4481,6 +4522,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-proof-size-hostfunction"
 version = "0.11.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-externalities",
  "sp-runtime-interface",
@@ -4490,6 +4532,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-storage-weight-reclaim"
 version = "9.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-proof-size-hostfunction",
@@ -4506,6 +4549,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-timestamp"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "sp-inherents",
@@ -4515,6 +4559,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-utility"
 version = "0.18.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -4531,6 +4576,7 @@ dependencies = [
 [[package]]
 name = "cumulus-relay-chain-inprocess-interface"
 version = "0.22.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4554,6 +4600,7 @@ dependencies = [
 [[package]]
 name = "cumulus-relay-chain-interface"
 version = "0.21.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4572,6 +4619,7 @@ dependencies = [
 [[package]]
 name = "cumulus-relay-chain-minimal-node"
 version = "0.22.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "async-trait",
@@ -4606,6 +4654,7 @@ dependencies = [
 [[package]]
 name = "cumulus-relay-chain-rpc-interface"
 version = "0.21.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -4646,6 +4695,7 @@ dependencies = [
 [[package]]
 name = "cumulus-test-relay-sproof-builder"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "parity-scale-codec",
@@ -5150,7 +5200,7 @@ dependencies = [
  "regex",
  "syn 2.0.101",
  "termcolor",
- "toml 0.8.21",
+ "toml 0.8.22",
  "walkdir",
 ]
 
@@ -5261,7 +5311,7 @@ dependencies = [
  "ed25519",
  "rand_core 0.6.4",
  "serde",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "subtle 2.6.1",
  "zeroize",
 ]
@@ -5277,7 +5327,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "hex",
  "rand_core 0.6.4",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "zeroize",
 ]
 
@@ -5523,7 +5573,7 @@ dependencies = [
  "scrypt 0.10.0",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "thiserror 1.0.69",
  "uuid 0.8.2",
@@ -5685,7 +5735,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.101",
- "toml 0.8.21",
+ "toml 0.8.22",
  "walkdir",
 ]
 
@@ -5829,7 +5879,7 @@ dependencies = [
  "eth-keystore",
  "ethers-core",
  "rand 0.8.5",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -6242,6 +6292,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "fork-tree"
 version = "13.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
 ]
@@ -6285,6 +6336,7 @@ checksum = "28dd6caf6059519a65843af8fe2a3ae298b14b80179855aeb4adc2c1934ee619"
 [[package]]
 name = "frame-benchmarking"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-support-procedural",
@@ -6308,6 +6360,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking-cli"
 version = "46.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "Inflector",
  "array-bytes",
@@ -6345,7 +6398,7 @@ dependencies = [
  "sp-block-builder",
  "sp-blockchain",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-database",
  "sp-externalities",
  "sp-genesis-builder",
@@ -6369,6 +6422,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking-pallet-pov"
 version = "29.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -6396,6 +6450,7 @@ dependencies = [
 [[package]]
 name = "frame-election-provider-solution-type"
 version = "14.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
@@ -6406,6 +6461,7 @@ dependencies = [
 [[package]]
 name = "frame-election-provider-support"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-election-provider-solution-type",
  "frame-support",
@@ -6421,6 +6477,7 @@ dependencies = [
 [[package]]
 name = "frame-executive"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "aquamarine",
  "frame-support",
@@ -6496,6 +6553,7 @@ dependencies = [
 [[package]]
 name = "frame-metadata-hash-extension"
 version = "0.7.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "const-hex",
@@ -6511,6 +6569,7 @@ dependencies = [
 [[package]]
 name = "frame-support"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "aquamarine",
  "array-bytes",
@@ -6553,6 +6612,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural"
 version = "31.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "Inflector",
  "cfg-expr",
@@ -6565,13 +6625,14 @@ dependencies = [
  "proc-macro-warning 1.84.1",
  "proc-macro2",
  "quote",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "syn 2.0.101",
 ]
 
 [[package]]
 name = "frame-support-procedural-tools"
 version = "13.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support-procedural-tools-derive",
  "proc-macro-crate 3.3.0",
@@ -6583,6 +6644,7 @@ dependencies = [
 [[package]]
 name = "frame-support-procedural-tools-derive"
 version = "12.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6592,6 +6654,7 @@ dependencies = [
 [[package]]
 name = "frame-system"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cfg-if",
  "docify",
@@ -6611,6 +6674,7 @@ dependencies = [
 [[package]]
 name = "frame-system-benchmarking"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -6624,6 +6688,7 @@ dependencies = [
 [[package]]
 name = "frame-system-rpc-runtime-api"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "parity-scale-codec",
@@ -6633,6 +6698,7 @@ dependencies = [
 [[package]]
 name = "frame-try-runtime"
 version = "0.45.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -7590,7 +7656,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.2",
  "tower-service",
- "webpki-roots 0.26.9",
+ "webpki-roots 0.26.10",
 ]
 
 [[package]]
@@ -8291,6 +8357,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8740,7 +8815,7 @@ dependencies = [
  "elliptic-curve",
  "once_cell",
  "serdect",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "signature",
 ]
 
@@ -9030,9 +9105,9 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identity"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "257b5621d159b32282eac446bed6670c39c7dc68a200a992d8f056afa0066f6d"
+checksum = "fbb68ea10844211a59ce46230909fd0ea040e8a192454d4cc2ee0d53e12280eb"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -9040,8 +9115,8 @@ dependencies = [
  "multihash 0.19.3",
  "quick-protobuf",
  "rand 0.8.5",
- "sha2 0.10.8",
- "thiserror 1.0.69",
+ "sha2 0.10.9",
+ "thiserror 2.0.12",
  "tracing",
  "zeroize",
 ]
@@ -9067,7 +9142,7 @@ dependencies = [
  "quick-protobuf",
  "quick-protobuf-codec",
  "rand 0.8.5",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "smallvec",
  "thiserror 1.0.69",
  "uint 0.9.5",
@@ -9130,7 +9205,7 @@ dependencies = [
  "once_cell",
  "quick-protobuf",
  "rand 0.8.5",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "snow",
  "static_assertions",
  "thiserror 1.0.69",
@@ -9535,7 +9610,7 @@ dependencies = [
  "ring 0.16.20",
  "rustls 0.20.9",
  "serde",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "simple-dns",
  "smallvec",
  "snow",
@@ -9876,9 +9951,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniscript"
-version = "12.3.1"
+version = "12.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82911d2fb527bb9aacd2446d2f517aff3f8e3846ace1b3c24258b61ea3cce2bc"
+checksum = "0760e92feaf4ee26bd2e616f557de64712bf1e75f3b1b218dfb475c0a84c7943"
 dependencies = [
  "bech32 0.11.0",
  "bitcoin",
@@ -9958,6 +10033,7 @@ dependencies = [
 [[package]]
 name = "mmr-gadget"
 version = "43.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "log",
@@ -9976,6 +10052,7 @@ dependencies = [
 [[package]]
 name = "mmr-rpc"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "parity-scale-codec",
@@ -10107,7 +10184,7 @@ dependencies = [
  "core2",
  "digest 0.10.7",
  "multihash-derive",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "unsigned-varint 0.7.2",
 ]
@@ -10124,7 +10201,7 @@ dependencies = [
  "core2",
  "digest 0.10.7",
  "multihash-derive",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "unsigned-varint 0.7.2",
 ]
@@ -10775,6 +10852,7 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "pallet-alliance"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "frame-benchmarking",
@@ -10786,7 +10864,7 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-io",
  "sp-runtime",
 ]
@@ -10794,6 +10872,7 @@ dependencies = [
 [[package]]
 name = "pallet-asset-conversion"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10811,6 +10890,7 @@ dependencies = [
 [[package]]
 name = "pallet-asset-conversion-ops"
 version = "0.7.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10828,6 +10908,7 @@ dependencies = [
 [[package]]
 name = "pallet-asset-conversion-tx-payment"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10842,6 +10923,7 @@ dependencies = [
 [[package]]
 name = "pallet-asset-rate"
 version = "18.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10855,6 +10937,7 @@ dependencies = [
 [[package]]
 name = "pallet-asset-tx-payment"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10871,6 +10954,7 @@ dependencies = [
 [[package]]
 name = "pallet-assets"
 version = "41.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10886,6 +10970,7 @@ dependencies = [
 [[package]]
 name = "pallet-assets-freezer"
 version = "0.6.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10900,6 +10985,7 @@ dependencies = [
 [[package]]
 name = "pallet-atomic-swap"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -10913,6 +10999,7 @@ dependencies = [
 [[package]]
 name = "pallet-aura"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -10928,6 +11015,7 @@ dependencies = [
 [[package]]
 name = "pallet-authority-discovery"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -10942,6 +11030,7 @@ dependencies = [
 [[package]]
 name = "pallet-authorship"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -10954,6 +11043,7 @@ dependencies = [
 [[package]]
 name = "pallet-babe"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -10976,6 +11066,7 @@ dependencies = [
 [[package]]
 name = "pallet-bags-list"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "aquamarine",
  "docify",
@@ -10996,6 +11087,7 @@ dependencies = [
 [[package]]
 name = "pallet-balances"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -11010,6 +11102,7 @@ dependencies = [
 [[package]]
 name = "pallet-beefy"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11028,6 +11121,7 @@ dependencies = [
 [[package]]
 name = "pallet-beefy-mmr"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "binary-merkle-tree",
@@ -11107,6 +11201,7 @@ dependencies = [
 [[package]]
 name = "pallet-bounties"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11123,6 +11218,7 @@ dependencies = [
 [[package]]
 name = "pallet-bridge-grandpa"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-runtime",
@@ -11141,6 +11237,7 @@ dependencies = [
 [[package]]
 name = "pallet-bridge-messages"
 version = "0.19.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-messages",
@@ -11159,6 +11256,7 @@ dependencies = [
 [[package]]
 name = "pallet-bridge-parachains"
 version = "0.19.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-parachains",
@@ -11178,6 +11276,7 @@ dependencies = [
 [[package]]
 name = "pallet-bridge-relayers"
 version = "0.19.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-header-chain",
  "bp-messages",
@@ -11201,6 +11300,7 @@ dependencies = [
 [[package]]
 name = "pallet-broker"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "frame-benchmarking",
@@ -11229,6 +11329,7 @@ dependencies = [
 [[package]]
 name = "pallet-child-bounties"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11246,6 +11347,7 @@ dependencies = [
 [[package]]
 name = "pallet-collator-selection"
 version = "20.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11264,6 +11366,7 @@ dependencies = [
 [[package]]
 name = "pallet-collective"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -11280,6 +11383,7 @@ dependencies = [
 [[package]]
 name = "pallet-collective-content"
 version = "0.17.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11293,6 +11397,7 @@ dependencies = [
 [[package]]
 name = "pallet-contracts"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitflags 1.3.2",
  "environmental",
@@ -11325,6 +11430,7 @@ dependencies = [
 [[package]]
 name = "pallet-contracts-mock-network"
 version = "15.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11359,6 +11465,7 @@ dependencies = [
 [[package]]
 name = "pallet-contracts-proc-macro"
 version = "23.0.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11368,6 +11475,7 @@ dependencies = [
 [[package]]
 name = "pallet-contracts-uapi"
 version = "12.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitflags 1.3.2",
  "parity-scale-codec",
@@ -11378,6 +11486,7 @@ dependencies = [
 [[package]]
 name = "pallet-conviction-voting"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "assert_matches",
  "frame-benchmarking",
@@ -11393,6 +11502,7 @@ dependencies = [
 [[package]]
 name = "pallet-core-fellowship"
 version = "23.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11410,6 +11520,7 @@ dependencies = [
 [[package]]
 name = "pallet-delegated-staking"
 version = "6.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11424,6 +11535,7 @@ dependencies = [
 [[package]]
 name = "pallet-democracy"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11440,6 +11552,7 @@ dependencies = [
 [[package]]
 name = "pallet-dev-mode"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11476,6 +11589,7 @@ dependencies = [
 [[package]]
 name = "pallet-election-provider-multi-phase"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
@@ -11497,6 +11611,7 @@ dependencies = [
 [[package]]
 name = "pallet-election-provider-support-benchmarking"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
@@ -11509,6 +11624,7 @@ dependencies = [
 [[package]]
 name = "pallet-elections-phragmen"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11526,6 +11642,7 @@ dependencies = [
 [[package]]
 name = "pallet-fast-unstake"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -11543,6 +11660,7 @@ dependencies = [
 [[package]]
 name = "pallet-glutton"
 version = "25.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "blake2 0.10.6",
  "frame-benchmarking",
@@ -11560,6 +11678,7 @@ dependencies = [
 [[package]]
 name = "pallet-grandpa"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11595,6 +11714,7 @@ dependencies = [
 [[package]]
 name = "pallet-identity"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -11610,6 +11730,7 @@ dependencies = [
 [[package]]
 name = "pallet-im-online"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11628,6 +11749,7 @@ dependencies = [
 [[package]]
 name = "pallet-indices"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11643,6 +11765,7 @@ dependencies = [
 [[package]]
 name = "pallet-insecure-randomness-collective-flip"
 version = "27.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11717,6 +11840,7 @@ dependencies = [
 [[package]]
 name = "pallet-lottery"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11729,6 +11853,7 @@ dependencies = [
 [[package]]
 name = "pallet-membership"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11744,6 +11869,7 @@ dependencies = [
 [[package]]
 name = "pallet-message-queue"
 version = "42.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "environmental",
  "frame-benchmarking",
@@ -11762,6 +11888,7 @@ dependencies = [
 [[package]]
 name = "pallet-migrations"
 version = "9.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cfg-if",
  "docify",
@@ -11800,6 +11927,7 @@ dependencies = [
 [[package]]
 name = "pallet-mixnet"
 version = "0.15.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11818,6 +11946,7 @@ dependencies = [
 [[package]]
 name = "pallet-mmr"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11833,7 +11962,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-multisig"
-version = "39.1.0"
+version = "39.1.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -11844,6 +11974,7 @@ dependencies = [
 [[package]]
 name = "pallet-nft-fractionalization"
 version = "22.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11859,6 +11990,7 @@ dependencies = [
 [[package]]
 name = "pallet-nfts"
 version = "33.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -11875,6 +12007,7 @@ dependencies = [
 [[package]]
 name = "pallet-nfts-runtime-api"
 version = "25.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "pallet-nfts",
  "parity-scale-codec",
@@ -11884,6 +12017,7 @@ dependencies = [
 [[package]]
 name = "pallet-nis"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11898,6 +12032,7 @@ dependencies = [
 [[package]]
 name = "pallet-node-authorization"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11911,7 +12046,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-nomination-pools"
-version = "37.0.1"
+version = "37.0.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11929,6 +12065,7 @@ dependencies = [
 [[package]]
 name = "pallet-nomination-pools-benchmarking"
 version = "37.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
@@ -11947,7 +12084,8 @@ dependencies = [
 
 [[package]]
 name = "pallet-nomination-pools-runtime-api"
-version = "35.0.0"
+version = "35.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "pallet-nomination-pools",
  "parity-scale-codec",
@@ -11980,6 +12118,7 @@ dependencies = [
 [[package]]
 name = "pallet-offences"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -11995,6 +12134,7 @@ dependencies = [
 [[package]]
 name = "pallet-offences-benchmarking"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
@@ -12017,6 +12157,7 @@ dependencies = [
 [[package]]
 name = "pallet-paged-list"
 version = "0.17.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12033,6 +12174,7 @@ dependencies = [
 [[package]]
 name = "pallet-parameters"
 version = "0.10.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12049,6 +12191,7 @@ dependencies = [
 [[package]]
 name = "pallet-preimage"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12085,6 +12228,7 @@ dependencies = [
 [[package]]
 name = "pallet-proxy"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "polkadot-sdk-frame",
@@ -12094,6 +12238,7 @@ dependencies = [
 [[package]]
 name = "pallet-ranked-collective"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12111,6 +12256,7 @@ dependencies = [
 [[package]]
 name = "pallet-recovery"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12124,6 +12270,7 @@ dependencies = [
 [[package]]
 name = "pallet-referenda"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "assert_matches",
  "frame-benchmarking",
@@ -12141,6 +12288,7 @@ dependencies = [
 [[package]]
 name = "pallet-remark"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12156,6 +12304,7 @@ dependencies = [
 [[package]]
 name = "pallet-root-offences"
 version = "36.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12170,6 +12319,7 @@ dependencies = [
 [[package]]
 name = "pallet-root-testing"
 version = "15.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12183,6 +12333,7 @@ dependencies = [
 [[package]]
 name = "pallet-safe-mode"
 version = "20.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12200,6 +12351,7 @@ dependencies = [
 [[package]]
 name = "pallet-salary"
 version = "24.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12217,6 +12369,7 @@ dependencies = [
 [[package]]
 name = "pallet-scheduler"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12233,6 +12386,7 @@ dependencies = [
 [[package]]
 name = "pallet-scored-pool"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12245,6 +12399,7 @@ dependencies = [
 [[package]]
 name = "pallet-session"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12265,6 +12420,7 @@ dependencies = [
 [[package]]
 name = "pallet-session-benchmarking"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12280,6 +12436,7 @@ dependencies = [
 [[package]]
 name = "pallet-skip-feeless-payment"
 version = "14.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12291,6 +12448,7 @@ dependencies = [
 [[package]]
 name = "pallet-society"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12307,6 +12465,7 @@ dependencies = [
 [[package]]
 name = "pallet-staking"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
@@ -12328,6 +12487,7 @@ dependencies = [
 [[package]]
 name = "pallet-staking-reward-fn"
 version = "22.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "sp-arithmetic",
@@ -12336,6 +12496,7 @@ dependencies = [
 [[package]]
 name = "pallet-staking-runtime-api"
 version = "25.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -12345,6 +12506,7 @@ dependencies = [
 [[package]]
 name = "pallet-state-trie-migration"
 version = "43.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12360,6 +12522,7 @@ dependencies = [
 [[package]]
 name = "pallet-statement"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -12376,6 +12539,7 @@ dependencies = [
 [[package]]
 name = "pallet-sudo"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12401,6 +12565,7 @@ dependencies = [
 [[package]]
 name = "pallet-timestamp"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12419,6 +12584,7 @@ dependencies = [
 [[package]]
 name = "pallet-tips"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12456,6 +12622,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12471,6 +12638,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc"
 version = "42.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "pallet-transaction-payment-rpc-runtime-api",
@@ -12486,6 +12654,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-payment-rpc-runtime-api"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "pallet-transaction-payment",
  "parity-scale-codec",
@@ -12497,6 +12666,7 @@ dependencies = [
 [[package]]
 name = "pallet-transaction-storage"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "frame-benchmarking",
@@ -12516,6 +12686,7 @@ dependencies = [
 [[package]]
 name = "pallet-treasury"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12534,6 +12705,7 @@ dependencies = [
 [[package]]
 name = "pallet-tx-pause"
 version = "20.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -12550,6 +12722,7 @@ dependencies = [
 [[package]]
 name = "pallet-uniques"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12563,6 +12736,7 @@ dependencies = [
 [[package]]
 name = "pallet-utility"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12591,6 +12765,7 @@ dependencies = [
 [[package]]
 name = "pallet-verify-signature"
 version = "0.2.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12606,6 +12781,7 @@ dependencies = [
 [[package]]
 name = "pallet-vesting"
 version = "39.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12619,6 +12795,7 @@ dependencies = [
 [[package]]
 name = "pallet-whitelist"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -12632,6 +12809,7 @@ dependencies = [
 [[package]]
 name = "pallet-xcm"
 version = "18.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bounded-collections",
  "frame-benchmarking",
@@ -12653,12 +12831,12 @@ dependencies = [
 
 [[package]]
 name = "pallet-xcm-benchmarks"
-version = "18.1.0"
+version = "18.1.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
- "log",
  "parity-scale-codec",
  "scale-info",
  "sp-io",
@@ -12671,6 +12849,7 @@ dependencies = [
 [[package]]
 name = "pallet-xcm-bridge-hub"
 version = "0.14.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-messages",
  "bp-runtime",
@@ -12692,6 +12871,7 @@ dependencies = [
 [[package]]
 name = "pallet-xcm-bridge-hub-router"
 version = "0.16.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bp-xcm-bridge-hub-router",
  "frame-benchmarking",
@@ -12710,6 +12890,7 @@ dependencies = [
 [[package]]
 name = "parachains-common"
 version = "19.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-utility",
@@ -12738,7 +12919,8 @@ dependencies = [
 
 [[package]]
 name = "parachains-runtimes-test-utils"
-version = "20.0.1"
+version = "20.0.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "cumulus-pallet-xcmp-queue",
@@ -12752,6 +12934,7 @@ dependencies = [
  "pallet-session",
  "pallet-timestamp",
  "pallet-xcm",
+ "parachains-common",
  "parity-scale-codec",
  "polkadot-parachain-primitives",
  "sp-consensus-aura",
@@ -12763,6 +12946,7 @@ dependencies = [
  "staging-xcm",
  "staging-xcm-executor",
  "substrate-wasm-builder",
+ "xcm-runtime-apis",
 ]
 
 [[package]]
@@ -12943,7 +13127,7 @@ dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
  "password-hash 0.4.2",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -13029,7 +13213,7 @@ checksum = "7f9f832470494906d1fca5329f8ab5791cc60beb230c74815dff541cbd2b5ca0"
 dependencies = [
  "once_cell",
  "pest",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -13193,6 +13377,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 [[package]]
 name = "polkadot-approval-distribution"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "futures",
@@ -13211,6 +13396,7 @@ dependencies = [
 [[package]]
 name = "polkadot-availability-bitfield-distribution"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "always-assert",
  "futures",
@@ -13226,6 +13412,7 @@ dependencies = [
 [[package]]
 name = "polkadot-availability-distribution"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "derive_more 0.99.20",
  "fatality",
@@ -13249,6 +13436,7 @@ dependencies = [
 [[package]]
 name = "polkadot-availability-recovery"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "fatality",
@@ -13281,6 +13469,7 @@ dependencies = [
 [[package]]
 name = "polkadot-cli"
 version = "22.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cfg-if",
  "clap",
@@ -13308,6 +13497,7 @@ dependencies = [
 [[package]]
 name = "polkadot-collator-protocol"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "fatality",
@@ -13330,6 +13520,7 @@ dependencies = [
 [[package]]
 name = "polkadot-core-primitives"
 version = "16.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -13340,6 +13531,7 @@ dependencies = [
 [[package]]
 name = "polkadot-dispute-distribution"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "derive_more 0.99.20",
  "fatality",
@@ -13364,6 +13556,7 @@ dependencies = [
 [[package]]
 name = "polkadot-erasure-coding"
 version = "17.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "polkadot-node-primitives",
@@ -13377,6 +13570,7 @@ dependencies = [
 [[package]]
 name = "polkadot-gossip-support"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "futures-timer",
@@ -13390,7 +13584,7 @@ dependencies = [
  "sc-network-common",
  "sp-application-crypto",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-keystore",
  "tracing-gum",
 ]
@@ -13398,6 +13592,7 @@ dependencies = [
 [[package]]
 name = "polkadot-network-bridge"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "always-assert",
  "async-trait",
@@ -13420,6 +13615,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-collation-generation"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "parity-scale-codec",
@@ -13438,6 +13634,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-approval-voting"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "bitvec",
@@ -13470,6 +13667,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-approval-voting-parallel"
 version = "0.4.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -13499,6 +13697,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-av-store"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "futures",
@@ -13519,6 +13718,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-backing"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "fatality",
@@ -13539,6 +13739,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-bitfield-signing"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "polkadot-node-subsystem",
@@ -13553,6 +13754,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-candidate-validation"
 version = "21.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -13574,6 +13776,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-chain-api"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "polkadot-node-metrics",
@@ -13587,6 +13790,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-chain-selection"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "futures-timer",
@@ -13603,6 +13807,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-dispute-coordinator"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "fatality",
  "futures",
@@ -13621,6 +13826,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-parachains-inherent"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -13637,6 +13843,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-prospective-parachains"
 version = "20.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "fatality",
  "futures",
@@ -13650,6 +13857,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-provisioner"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "fatality",
@@ -13667,6 +13875,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-pvf"
 version = "21.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "always-assert",
  "array-bytes",
@@ -13696,6 +13905,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-pvf-checker"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "polkadot-node-primitives",
@@ -13711,6 +13921,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-pvf-common"
 version = "17.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cpu-time",
  "futures",
@@ -13725,7 +13936,7 @@ dependencies = [
  "sc-executor-wasmtime",
  "seccompiler",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-externalities",
  "sp-io",
  "sp-tracing",
@@ -13736,6 +13947,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-core-runtime-api"
 version = "21.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "polkadot-node-metrics",
@@ -13750,6 +13962,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-metrics"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bs58",
  "futures",
@@ -13768,6 +13981,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-network-protocol"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-channel 1.9.0",
  "async-trait",
@@ -13792,6 +14006,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-primitives"
 version = "17.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "bounded-vec",
@@ -13817,6 +14032,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-subsystem"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "polkadot-node-subsystem-types",
  "polkadot-overseer",
@@ -13825,6 +14041,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-subsystem-types"
 version = "21.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "bitvec",
@@ -13853,6 +14070,7 @@ dependencies = [
 [[package]]
 name = "polkadot-node-subsystem-util"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "derive_more 0.99.20",
@@ -13887,6 +14105,7 @@ dependencies = [
 [[package]]
 name = "polkadot-omni-node-lib"
 version = "0.4.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "clap",
@@ -13957,6 +14176,7 @@ dependencies = [
 [[package]]
 name = "polkadot-overseer"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -13978,6 +14198,7 @@ dependencies = [
 [[package]]
 name = "polkadot-parachain-primitives"
 version = "15.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bounded-collections",
  "derive_more 0.99.20",
@@ -13993,6 +14214,7 @@ dependencies = [
 [[package]]
 name = "polkadot-primitives"
 version = "17.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "hex-literal",
@@ -14020,6 +14242,7 @@ dependencies = [
 [[package]]
 name = "polkadot-rpc"
 version = "22.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "mmr-rpc",
@@ -14054,6 +14277,7 @@ dependencies = [
 [[package]]
 name = "polkadot-runtime-common"
 version = "18.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitvec",
  "frame-benchmarking",
@@ -14104,6 +14328,7 @@ dependencies = [
 [[package]]
 name = "polkadot-runtime-metrics"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bs58",
  "frame-benchmarking",
@@ -14115,6 +14340,7 @@ dependencies = [
 [[package]]
 name = "polkadot-runtime-parachains"
 version = "18.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bitflags 1.3.2",
  "bitvec",
@@ -14163,6 +14389,7 @@ dependencies = [
 [[package]]
 name = "polkadot-sdk"
 version = "0.12.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "asset-test-utils",
  "assets-common",
@@ -14379,7 +14606,7 @@ dependencies = [
  "sp-core",
  "sp-core-hashing",
  "sp-crypto-ec-utils",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-debug-derive",
  "sp-externalities",
  "sp-genesis-builder",
@@ -14424,6 +14651,7 @@ dependencies = [
 [[package]]
 name = "polkadot-sdk-frame"
 version = "0.8.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-benchmarking",
@@ -14457,6 +14685,7 @@ dependencies = [
 [[package]]
 name = "polkadot-service"
 version = "22.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "frame-benchmarking",
@@ -14564,6 +14793,7 @@ dependencies = [
 [[package]]
 name = "polkadot-statement-distribution"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "arrayvec 0.7.6",
  "bitvec",
@@ -14586,6 +14816,7 @@ dependencies = [
 [[package]]
 name = "polkadot-statement-table"
 version = "17.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "polkadot-primitives",
@@ -15041,7 +15272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -15074,7 +15305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.101",
@@ -15706,7 +15937,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots 0.26.9",
+ "webpki-roots 0.26.10",
  "windows-registry",
 ]
 
@@ -15851,6 +16082,7 @@ dependencies = [
 [[package]]
 name = "rococo-runtime"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "binary-merkle-tree",
  "bitvec",
@@ -15952,6 +16184,7 @@ dependencies = [
 [[package]]
 name = "rococo-runtime-constants"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "polkadot-primitives",
@@ -16184,7 +16417,7 @@ version = "8.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d55b95147fe01265d06b3955db798bdaed52e60e2211c41137701b3aba8e21"
 dependencies = [
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "walkdir",
 ]
 
@@ -16435,7 +16668,7 @@ dependencies = [
  "rustls-webpki 0.102.8",
  "security-framework 2.11.1",
  "security-framework-sys",
- "webpki-roots 0.26.9",
+ "webpki-roots 0.26.10",
  "winapi",
 ]
 
@@ -16604,6 +16837,7 @@ dependencies = [
 [[package]]
 name = "sc-allocator"
 version = "30.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "sp-core",
@@ -16614,6 +16848,7 @@ dependencies = [
 [[package]]
 name = "sc-authority-discovery"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -16643,6 +16878,7 @@ dependencies = [
 [[package]]
 name = "sc-basic-authorship"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "futures-timer",
@@ -16664,6 +16900,7 @@ dependencies = [
 [[package]]
 name = "sc-block-builder"
 version = "0.43.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -16678,6 +16915,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec"
 version = "41.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "docify",
@@ -16693,7 +16931,7 @@ dependencies = [
  "serde_json",
  "sp-blockchain",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-genesis-builder",
  "sp-io",
  "sp-runtime",
@@ -16704,6 +16942,7 @@ dependencies = [
 [[package]]
 name = "sc-chain-spec-derive"
 version = "12.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
@@ -16714,6 +16953,7 @@ dependencies = [
 [[package]]
 name = "sc-cli"
 version = "0.50.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "chrono",
@@ -16755,6 +16995,7 @@ dependencies = [
 [[package]]
 name = "sc-client-api"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "fnv",
  "futures",
@@ -16781,6 +17022,7 @@ dependencies = [
 [[package]]
 name = "sc-client-db"
 version = "0.45.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hash-db",
  "kvdb",
@@ -16806,6 +17048,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -16829,6 +17072,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-aura"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -16857,6 +17101,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "fork-tree",
@@ -16881,7 +17126,7 @@ dependencies = [
  "sp-consensus-babe",
  "sp-consensus-slots",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-inherents",
  "sp-keystore",
  "sp-runtime",
@@ -16892,6 +17137,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-babe-rpc"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "jsonrpsee 0.24.9",
@@ -16913,6 +17159,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-beefy"
 version = "27.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "async-channel 1.9.0",
@@ -16936,7 +17183,7 @@ dependencies = [
  "sp-consensus",
  "sp-consensus-beefy",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-keystore",
  "sp-runtime",
  "substrate-prometheus-endpoint",
@@ -16948,6 +17195,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-beefy-rpc"
 version = "27.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "jsonrpsee 0.24.9",
@@ -16967,6 +17215,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-epochs"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "fork-tree",
  "parity-scale-codec",
@@ -16979,6 +17228,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-grandpa"
 version = "0.33.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ahash",
  "array-bytes",
@@ -17012,7 +17262,7 @@ dependencies = [
  "sp-consensus",
  "sp-consensus-grandpa",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-keystore",
  "sp-runtime",
  "substrate-prometheus-endpoint",
@@ -17022,6 +17272,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-grandpa-rpc"
 version = "0.33.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "finality-grandpa",
  "futures",
@@ -17041,6 +17292,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-manual-seal"
 version = "0.49.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "assert_matches",
  "async-trait",
@@ -17075,6 +17327,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-slots"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -17097,6 +17350,7 @@ dependencies = [
 [[package]]
 name = "sc-executor"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "parking_lot 0.12.3",
@@ -17119,6 +17373,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-common"
 version = "0.36.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "polkavm",
  "sc-allocator",
@@ -17131,6 +17386,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-polkavm"
 version = "0.33.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "polkavm",
@@ -17141,6 +17397,7 @@ dependencies = [
 [[package]]
 name = "sc-executor-wasmtime"
 version = "0.36.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -17158,6 +17415,7 @@ dependencies = [
 [[package]]
 name = "sc-informant"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "console",
  "futures",
@@ -17174,6 +17432,7 @@ dependencies = [
 [[package]]
 name = "sc-keystore"
 version = "34.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "parking_lot 0.12.3",
@@ -17187,6 +17446,7 @@ dependencies = [
 [[package]]
 name = "sc-mixnet"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "arrayvec 0.7.6",
@@ -17215,6 +17475,7 @@ dependencies = [
 [[package]]
 name = "sc-network"
 version = "0.48.3"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "async-channel 1.9.0",
@@ -17265,6 +17526,7 @@ dependencies = [
 [[package]]
 name = "sc-network-common"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "bitflags 1.3.2",
@@ -17282,6 +17544,7 @@ dependencies = [
 [[package]]
 name = "sc-network-gossip"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ahash",
  "futures",
@@ -17300,6 +17563,7 @@ dependencies = [
 [[package]]
 name = "sc-network-light"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "async-channel 1.9.0",
@@ -17320,6 +17584,7 @@ dependencies = [
 [[package]]
 name = "sc-network-sync"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "async-channel 1.9.0",
@@ -17355,6 +17620,7 @@ dependencies = [
 [[package]]
 name = "sc-network-transactions"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "futures",
@@ -17373,6 +17639,7 @@ dependencies = [
 [[package]]
 name = "sc-network-types"
 version = "0.15.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bs58",
  "ed25519-dalek",
@@ -17389,6 +17656,7 @@ dependencies = [
 [[package]]
 name = "sc-offchain"
 version = "43.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "bytes",
@@ -17425,6 +17693,7 @@ dependencies = [
 [[package]]
 name = "sc-proposer-metrics"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "substrate-prometheus-endpoint",
@@ -17433,6 +17702,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc"
 version = "43.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "jsonrpsee 0.24.9",
@@ -17464,6 +17734,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-api"
 version = "0.47.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "parity-scale-codec",
@@ -17483,6 +17754,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-server"
 version = "20.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "dyn-clone",
  "forwarded-header-value",
@@ -17506,6 +17778,7 @@ dependencies = [
 [[package]]
 name = "sc-rpc-spec-v2"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "futures",
@@ -17537,6 +17810,7 @@ dependencies = [
 [[package]]
 name = "sc-service"
 version = "0.49.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "directories",
@@ -17600,6 +17874,7 @@ dependencies = [
 [[package]]
 name = "sc-state-db"
 version = "0.37.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -17610,6 +17885,7 @@ dependencies = [
 [[package]]
 name = "sc-storage-monitor"
 version = "0.23.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "clap",
  "fs4",
@@ -17622,6 +17898,7 @@ dependencies = [
 [[package]]
 name = "sc-sync-state-rpc"
 version = "0.48.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "parity-scale-codec",
@@ -17640,6 +17917,7 @@ dependencies = [
 [[package]]
 name = "sc-sysinfo"
 version = "41.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "derive_more 0.99.20",
  "futures",
@@ -17652,7 +17930,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-io",
  "sp-std",
 ]
@@ -17660,6 +17938,7 @@ dependencies = [
 [[package]]
 name = "sc-telemetry"
 version = "28.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "chrono",
  "futures",
@@ -17679,6 +17958,7 @@ dependencies = [
 [[package]]
 name = "sc-tracing"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "chrono",
  "console",
@@ -17706,6 +17986,7 @@ dependencies = [
 [[package]]
 name = "sc-tracing-proc-macro"
 version = "11.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
@@ -17716,6 +17997,7 @@ dependencies = [
 [[package]]
 name = "sc-transaction-pool"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -17733,7 +18015,7 @@ dependencies = [
  "sp-api",
  "sp-blockchain",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-runtime",
  "sp-tracing",
  "sp-transaction-pool",
@@ -17746,6 +18028,7 @@ dependencies = [
 [[package]]
 name = "sc-transaction-pool-api"
 version = "38.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -17761,6 +18044,7 @@ dependencies = [
 [[package]]
 name = "sc-utils"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-channel 1.9.0",
  "futures",
@@ -18066,7 +18350,7 @@ dependencies = [
  "merlin",
  "rand_core 0.6.4",
  "serde_bytes",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "subtle 2.6.1",
  "zeroize",
 ]
@@ -18127,7 +18411,7 @@ dependencies = [
  "hmac 0.12.1",
  "pbkdf2 0.11.0",
  "salsa20",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -18138,7 +18422,7 @@ checksum = "0516a385866c09368f0b5bcd1caff3366aace790fcd46e2bb032697bb172fd1f"
 dependencies = [
  "pbkdf2 0.12.2",
  "salsa20",
- "sha2 0.10.8",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -18555,9 +18839,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -18709,6 +18993,7 @@ checksum = "826167069c09b99d56f31e9ae5c99049e932a98c9dc2dac47645b08dbbf76ba7"
 [[package]]
 name = "slot-range-helper"
 version = "16.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "enumn",
  "parity-scale-codec",
@@ -18816,7 +19101,7 @@ dependencies = [
  "schnorrkel 0.10.2",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "siphasher 0.3.11",
  "slab",
@@ -18871,7 +19156,7 @@ dependencies = [
  "schnorrkel 0.11.4",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "siphasher 1.0.1",
  "slab",
@@ -18925,7 +19210,7 @@ dependencies = [
  "schnorrkel 0.11.4",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "siphasher 1.0.1",
  "slab",
@@ -19064,7 +19349,7 @@ dependencies = [
  "rand_core 0.6.4",
  "ring 0.17.14",
  "rustc_version 0.4.1",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "subtle 2.6.1",
 ]
 
@@ -19081,6 +19366,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-beacon-primitives"
 version = "0.12.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "byte-slice-cast",
  "frame-support",
@@ -19101,7 +19387,8 @@ dependencies = [
 
 [[package]]
 name = "snowbridge-core"
-version = "0.12.1"
+version = "0.12.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ethabi-decode",
  "frame-support",
@@ -19124,6 +19411,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-ethereum"
 version = "0.11.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ethabi-decode",
  "ethbloom 0.14.1",
@@ -19158,6 +19446,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-outbound-queue-merkle-tree"
 version = "0.10.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19168,6 +19457,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-outbound-queue-runtime-api"
 version = "0.12.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -19180,6 +19470,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-pallet-ethereum-client"
 version = "0.12.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -19204,6 +19495,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-pallet-ethereum-client-fixtures"
 version = "0.20.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hex-literal",
  "snowbridge-beacon-primitives",
@@ -19215,6 +19507,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-pallet-inbound-queue"
 version = "0.12.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "alloy-primitives 0.4.2",
  "alloy-sol-types 0.4.2",
@@ -19242,6 +19535,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-pallet-inbound-queue-fixtures"
 version = "0.20.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hex-literal",
  "snowbridge-beacon-primitives",
@@ -19253,6 +19547,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-pallet-outbound-queue"
 version = "0.12.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bridge-hub-common",
  "ethabi-decode",
@@ -19273,7 +19568,8 @@ dependencies = [
 
 [[package]]
 name = "snowbridge-pallet-system"
-version = "0.12.1"
+version = "0.12.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -19293,6 +19589,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-router-primitives"
 version = "0.18.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "hex-literal",
@@ -19311,6 +19608,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-runtime-common"
 version = "0.12.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "log",
@@ -19326,6 +19624,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-runtime-test-common"
 version = "0.14.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "frame-support",
@@ -19356,6 +19655,7 @@ dependencies = [
 [[package]]
 name = "snowbridge-system-runtime-api"
 version = "0.12.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "snowbridge-core",
@@ -19432,6 +19732,7 @@ dependencies = [
 [[package]]
 name = "sp-api"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "hash-db",
@@ -19453,6 +19754,7 @@ dependencies = [
 [[package]]
 name = "sp-api-proc-macro"
 version = "21.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "Inflector",
  "blake2 0.10.6",
@@ -19466,6 +19768,7 @@ dependencies = [
 [[package]]
 name = "sp-application-crypto"
 version = "39.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19477,6 +19780,7 @@ dependencies = [
 [[package]]
 name = "sp-arithmetic"
 version = "26.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "integer-sqrt",
@@ -19490,6 +19794,7 @@ dependencies = [
 [[package]]
 name = "sp-authority-discovery"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19501,6 +19806,7 @@ dependencies = [
 [[package]]
 name = "sp-block-builder"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-api",
  "sp-inherents",
@@ -19510,6 +19816,7 @@ dependencies = [
 [[package]]
 name = "sp-blockchain"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "futures",
  "parity-scale-codec",
@@ -19528,6 +19835,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "futures",
@@ -19542,6 +19850,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-aura"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "parity-scale-codec",
@@ -19557,6 +19866,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-babe"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "parity-scale-codec",
@@ -19574,6 +19884,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-beefy"
 version = "23.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19581,7 +19892,7 @@ dependencies = [
  "sp-api",
  "sp-application-crypto",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-io",
  "sp-keystore",
  "sp-mmr-primitives",
@@ -19593,6 +19904,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-grandpa"
 version = "22.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "finality-grandpa",
  "log",
@@ -19609,6 +19921,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-pow"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -19619,6 +19932,7 @@ dependencies = [
 [[package]]
 name = "sp-consensus-slots"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19629,6 +19943,7 @@ dependencies = [
 [[package]]
 name = "sp-core"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "bitflags 1.3.2",
@@ -19657,7 +19972,7 @@ dependencies = [
  "secp256k1 0.28.2",
  "secrecy",
  "serde",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-debug-derive",
  "sp-externalities",
  "sp-runtime-interface",
@@ -19674,13 +19989,15 @@ dependencies = [
 [[package]]
 name = "sp-core-hashing"
 version = "16.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
 ]
 
 [[package]]
 name = "sp-crypto-ec-utils"
 version = "0.15.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ark-bls12-377",
  "ark-bls12-377-ext",
@@ -19700,11 +20017,13 @@ dependencies = [
 [[package]]
 name = "sp-crypto-hashing"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc9927a7f81334ed5b8a98a4a978c81324d12bd9713ec76b5c68fd410174c5eb"
 dependencies = [
  "blake2b_simd",
  "byteorder",
  "digest 0.10.7",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "twox-hash",
 ]
@@ -19712,13 +20031,12 @@ dependencies = [
 [[package]]
 name = "sp-crypto-hashing"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc9927a7f81334ed5b8a98a4a978c81324d12bd9713ec76b5c68fd410174c5eb"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "blake2b_simd",
  "byteorder",
  "digest 0.10.7",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "twox-hash",
 ]
@@ -19726,15 +20044,17 @@ dependencies = [
 [[package]]
 name = "sp-crypto-hashing-proc-macro"
 version = "0.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "quote",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "syn 2.0.101",
 ]
 
 [[package]]
 name = "sp-database"
 version = "10.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "kvdb",
  "parking_lot 0.12.3",
@@ -19743,6 +20063,7 @@ dependencies = [
 [[package]]
 name = "sp-debug-derive"
 version = "14.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -19752,6 +20073,7 @@ dependencies = [
 [[package]]
 name = "sp-externalities"
 version = "0.30.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "environmental",
  "parity-scale-codec",
@@ -19761,6 +20083,7 @@ dependencies = [
 [[package]]
 name = "sp-genesis-builder"
 version = "0.16.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19772,6 +20095,7 @@ dependencies = [
 [[package]]
 name = "sp-inherents"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "impl-trait-for-tuples",
@@ -19783,7 +20107,8 @@ dependencies = [
 
 [[package]]
 name = "sp-io"
-version = "39.0.0"
+version = "39.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bytes",
  "docify",
@@ -19795,7 +20120,7 @@ dependencies = [
  "rustversion",
  "secp256k1 0.28.2",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-externalities",
  "sp-keystore",
  "sp-runtime-interface",
@@ -19809,6 +20134,7 @@ dependencies = [
 [[package]]
 name = "sp-keyring"
 version = "40.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-core",
  "sp-runtime",
@@ -19818,6 +20144,7 @@ dependencies = [
 [[package]]
 name = "sp-keystore"
 version = "0.41.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "parking_lot 0.12.3",
@@ -19828,6 +20155,7 @@ dependencies = [
 [[package]]
 name = "sp-maybe-compressed-blob"
 version = "11.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "thiserror 1.0.69",
  "zstd 0.12.4",
@@ -19836,6 +20164,7 @@ dependencies = [
 [[package]]
 name = "sp-metadata-ir"
 version = "0.8.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-metadata 18.0.0",
  "parity-scale-codec",
@@ -19845,6 +20174,7 @@ dependencies = [
 [[package]]
 name = "sp-mixnet"
 version = "0.13.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19855,6 +20185,7 @@ dependencies = [
 [[package]]
 name = "sp-mmr-primitives"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "log",
  "parity-scale-codec",
@@ -19871,6 +20202,7 @@ dependencies = [
 [[package]]
 name = "sp-npos-elections"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19883,6 +20215,7 @@ dependencies = [
 [[package]]
 name = "sp-offchain"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-api",
  "sp-core",
@@ -19892,6 +20225,7 @@ dependencies = [
 [[package]]
 name = "sp-panic-handler"
 version = "13.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "backtrace",
  "regex",
@@ -19900,6 +20234,7 @@ dependencies = [
 [[package]]
 name = "sp-rpc"
 version = "33.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "rustc-hash 1.1.0",
  "serde",
@@ -19909,6 +20244,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime"
 version = "40.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "binary-merkle-tree",
  "docify",
@@ -19937,6 +20273,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface"
 version = "29.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bytes",
  "impl-trait-for-tuples",
@@ -19955,6 +20292,7 @@ dependencies = [
 [[package]]
 name = "sp-runtime-interface-proc-macro"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "Inflector",
  "expander",
@@ -19967,6 +20305,7 @@ dependencies = [
 [[package]]
 name = "sp-session"
 version = "37.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -19980,6 +20319,7 @@ dependencies = [
 [[package]]
 name = "sp-staking"
 version = "37.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "impl-trait-for-tuples",
  "parity-scale-codec",
@@ -19992,6 +20332,7 @@ dependencies = [
 [[package]]
 name = "sp-state-machine"
 version = "0.44.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hash-db",
  "log",
@@ -20011,6 +20352,7 @@ dependencies = [
 [[package]]
 name = "sp-statement-store"
 version = "19.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "aes-gcm",
  "curve25519-dalek",
@@ -20019,11 +20361,11 @@ dependencies = [
  "parity-scale-codec",
  "rand 0.8.5",
  "scale-info",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sp-api",
  "sp-application-crypto",
  "sp-core",
- "sp-crypto-hashing 0.1.0",
+ "sp-crypto-hashing 0.1.0 (git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix)",
  "sp-externalities",
  "sp-runtime",
  "sp-runtime-interface",
@@ -20034,10 +20376,12 @@ dependencies = [
 [[package]]
 name = "sp-std"
 version = "14.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 
 [[package]]
 name = "sp-storage"
 version = "22.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "impl-serde 0.5.0",
  "parity-scale-codec",
@@ -20049,6 +20393,7 @@ dependencies = [
 [[package]]
 name = "sp-timestamp"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "parity-scale-codec",
@@ -20060,6 +20405,7 @@ dependencies = [
 [[package]]
 name = "sp-tracing"
 version = "17.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "tracing",
@@ -20070,6 +20416,7 @@ dependencies = [
 [[package]]
 name = "sp-transaction-pool"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "sp-api",
  "sp-runtime",
@@ -20078,6 +20425,7 @@ dependencies = [
 [[package]]
 name = "sp-transaction-storage-proof"
 version = "35.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "async-trait",
  "parity-scale-codec",
@@ -20091,6 +20439,7 @@ dependencies = [
 [[package]]
 name = "sp-trie"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "ahash",
  "hash-db",
@@ -20112,6 +20461,7 @@ dependencies = [
 [[package]]
 name = "sp-version"
 version = "38.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "impl-serde 0.5.0",
  "parity-scale-codec",
@@ -20128,6 +20478,7 @@ dependencies = [
 [[package]]
 name = "sp-version-proc-macro"
 version = "15.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "parity-scale-codec",
  "proc-macro-warning 1.84.1",
@@ -20139,6 +20490,7 @@ dependencies = [
 [[package]]
 name = "sp-wasm-interface"
 version = "21.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "anyhow",
  "impl-trait-for-tuples",
@@ -20150,6 +20502,7 @@ dependencies = [
 [[package]]
 name = "sp-weights"
 version = "31.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "bounded-collections",
  "parity-scale-codec",
@@ -20234,7 +20587,7 @@ dependencies = [
  "percent-encoding",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "smallvec",
  "thiserror 2.0.12",
  "tokio",
@@ -20271,7 +20624,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sqlx-core",
  "sqlx-mysql",
  "sqlx-postgres",
@@ -20316,7 +20669,7 @@ dependencies = [
  "rsa",
  "serde",
  "sha1",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "smallvec",
  "sqlx-core",
  "stringprep",
@@ -20354,7 +20707,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "smallvec",
  "sqlx-core",
  "stringprep",
@@ -20435,6 +20788,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "staging-node-inspect"
 version = "0.26.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "clap",
  "parity-scale-codec",
@@ -20452,6 +20806,7 @@ dependencies = [
 [[package]]
 name = "staging-parachain-info"
 version = "0.18.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -20463,7 +20818,8 @@ dependencies = [
 
 [[package]]
 name = "staging-xcm"
-version = "15.0.2"
+version = "15.0.3"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "bounded-collections",
@@ -20483,7 +20839,8 @@ dependencies = [
 
 [[package]]
 name = "staging-xcm-builder"
-version = "18.1.0"
+version = "18.2.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -20505,6 +20862,7 @@ dependencies = [
 [[package]]
 name = "staging-xcm-executor"
 version = "18.0.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "environmental",
  "frame-benchmarking",
@@ -20689,21 +21047,24 @@ dependencies = [
 [[package]]
 name = "substrate-bip39"
 version = "0.6.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2 0.12.2",
  "schnorrkel 0.11.4",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "zeroize",
 ]
 
 [[package]]
 name = "substrate-build-script-utils"
 version = "11.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 
 [[package]]
 name = "substrate-frame-rpc-system"
 version = "42.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "docify",
  "frame-system-rpc-runtime-api",
@@ -20723,6 +21084,7 @@ dependencies = [
 [[package]]
 name = "substrate-prometheus-endpoint"
 version = "0.17.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "http-body-util",
  "hyper 1.6.0",
@@ -20751,6 +21113,7 @@ dependencies = [
 [[package]]
 name = "substrate-state-trie-migration-rpc"
 version = "41.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "jsonrpsee 0.24.9",
  "parity-scale-codec",
@@ -20766,7 +21129,8 @@ dependencies = [
 
 [[package]]
 name = "substrate-wasm-builder"
-version = "25.0.0"
+version = "25.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "array-bytes",
  "build-helper",
@@ -20788,7 +21152,7 @@ dependencies = [
  "sp-version",
  "strum 0.26.3",
  "tempfile",
- "toml 0.8.21",
+ "toml 0.8.22",
  "walkdir",
  "wasm-opt",
 ]
@@ -21114,7 +21478,7 @@ dependencies = [
  "schnorrkel 0.11.4",
  "secp256k1 0.28.2",
  "secrecy",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sp-crypto-hashing 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "subxt-core 0.37.1",
  "zeroize",
@@ -21145,7 +21509,7 @@ dependencies = [
  "semver 1.0.26",
  "serde",
  "serde_json",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
  "url",
  "zip",
@@ -21375,6 +21739,7 @@ checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 [[package]]
 name = "testnet-parachains-constants"
 version = "11.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -21722,9 +22087,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900f6c86a685850b1bc9f6223b20125115ee3f31e01207d81655bbcc0aea9231"
+checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -21743,9 +22108,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.22.25"
+version = "0.22.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10558ed0bd2a1562e630926a2d1f0b98c827da99fabd3fe20920a59642504485"
+checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap 2.9.0",
  "serde",
@@ -21757,9 +22122,9 @@ dependencies = [
 
 [[package]]
 name = "toml_write"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28391a4201ba7eb1984cfeb6862c0b3ea2cfe23332298967c749dddc0d6cd976"
+checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
 
 [[package]]
 name = "tower"
@@ -21880,6 +22245,7 @@ dependencies = [
 [[package]]
 name = "tracing-gum"
 version = "17.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "coarsetime",
  "polkadot-primitives",
@@ -21890,6 +22256,7 @@ dependencies = [
 [[package]]
 name = "tracing-gum-proc-macro"
 version = "5.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "expander",
  "proc-macro-crate 3.3.0",
@@ -22546,7 +22913,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "sha3",
  "zeroize",
 ]
@@ -22891,7 +23258,7 @@ dependencies = [
  "log",
  "rustix 0.36.17",
  "serde",
- "sha2 0.10.8",
+ "sha2 0.10.9",
  "toml 0.5.11",
  "windows-sys 0.45.0",
  "zstd 0.11.2+zstd.1.5.2",
@@ -23081,9 +23448,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-root-certs"
-version = "0.26.9"
+version = "0.26.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "180d2741b6115c3d906577e6533ad89472d48d96df00270fccb78233073d77f7"
+checksum = "c99403924bc5f23afefc319b8ac67ed0e50669f6e52a413314cccb1fdbc93ba0"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -23096,9 +23463,9 @@ checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.9"
+version = "0.26.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29aad86cec885cafd03e8305fd727c418e970a521322c91688414d5b8efba16b"
+checksum = "37493cadf42a2a939ed404698ded7fb378bf301b5011f973361779a3a74f8c93"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -23115,6 +23482,7 @@ dependencies = [
 [[package]]
 name = "westend-runtime"
 version = "21.1.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "binary-merkle-tree",
  "bitvec",
@@ -23224,6 +23592,7 @@ dependencies = [
 [[package]]
 name = "westend-runtime-constants"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "polkadot-primitives",
@@ -23818,6 +24187,7 @@ dependencies = [
 [[package]]
 name = "xcm-procedural"
 version = "11.0.1"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -23827,7 +24197,8 @@ dependencies = [
 
 [[package]]
 name = "xcm-runtime-apis"
-version = "0.5.1"
+version = "0.5.2"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -23841,6 +24212,7 @@ dependencies = [
 [[package]]
 name = "xcm-simulator"
 version = "18.0.0"
+source = "git+https://github.com/argonprotocol/polkadot-sdk?branch=stable2412-grandpa-fix#b0702d48993a222d62b999a56fa979071263b7f8"
 dependencies = [
  "frame-support",
  "frame-system",

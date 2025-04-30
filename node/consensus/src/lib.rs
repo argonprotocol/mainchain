@@ -320,12 +320,19 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			// being imported and state synched)
 			let best_hash = client.info().best_hash;
 			let best_number = client.info().best_number;
-			if client.status(best_hash).unwrap_or(BlockStatus::Unknown) == BlockStatus::Unknown ||
-				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown) !=
-					sp_consensus::BlockStatus::InChainWithState
+			let header_status = client.status(best_hash).unwrap_or(BlockStatus::Unknown);
+			let state_status =
+				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown);
+			if header_status == BlockStatus::Unknown ||
+				state_status != sp_consensus::BlockStatus::InChainWithState
 			{
 				*notary_client.pause_queue_processing.write().await = true;
-				info!(?best_hash, "Best block state not available (yet?). Not starting compute.");
+				info!(
+					?best_hash,
+					?header_status,
+					?state_status,
+					"Best block state not available (yet?). Not starting compute."
+				);
 				continue;
 			}
 
@@ -414,6 +421,7 @@ mod test {
 
 		for signed in justification.justification.commit.precommits.iter() {
 			let message = finality_grandpa::Message::Precommit(signed.precommit.clone());
+			println!("Message: {:#?}", signed);
 
 			for i in 0..10u64 {
 				let buf = (message.clone(), justification.justification.round, i).encode();
