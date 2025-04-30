@@ -443,6 +443,7 @@ declare module '@polkadot/types/lookup' {
     readonly argonots: Compact<u128>;
     readonly authorityKeys: ArgonRuntimeSessionKeys;
     readonly cohortId: Compact<u64>;
+    readonly bidAtTick: Compact<u64>;
   }
 
   /** @name ArgonRuntimeSessionKeys (43) */

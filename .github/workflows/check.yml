@@ -66,7 +66,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: sqlx-cli@0.8.0
+          tool: sqlx-cli@0.8.5
 
       - name: Migrate Notary Db
         working-directory: notary

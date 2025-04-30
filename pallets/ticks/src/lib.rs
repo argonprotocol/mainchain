@@ -14,8 +14,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
 pub mod weights;
 
 const MAX_RECENT_BLOCKS: u64 = 10;

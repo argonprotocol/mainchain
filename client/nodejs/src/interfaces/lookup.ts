@@ -336,6 +336,7 @@ export default {
     argonots: 'Compact<u128>',
     authorityKeys: 'ArgonRuntimeSessionKeys',
     cohortId: 'Compact<u64>',
+    bidAtTick: 'Compact<u64>',
   },
   /**
    * Lookup43: argon_runtime::SessionKeys

@@ -203,7 +203,7 @@ humantime = { version = "2.1" }
 color-backtrace = { version = "0.7" }
 uuid = { version = "1.11.0" }
 
-sqlx = { version = "0.8", features = ["macros"] }
+sqlx = { version = "0.8.5", features = ["macros"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 polkadot-sdk = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }

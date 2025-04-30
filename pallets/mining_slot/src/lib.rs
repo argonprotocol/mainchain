@@ -63,7 +63,7 @@ pub mod pallet {
 		SlotEvents, TickProvider,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -455,6 +455,7 @@ pub mod pallet {
 							argonots: ownership_tokens,
 							authority_keys: keys,
 							cohort_id: next_cohort_id,
+							bid_at_tick: T::TickProvider::current_tick(),
 						},
 					)
 					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;

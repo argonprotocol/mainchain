@@ -33,7 +33,8 @@ fn it_doesnt_add_cohorts_until_time() {
 			reward_destination: RewardDestination::Owner,
 			authority_keys: 1.into(),
 			cohort_id: 1,
-			external_funding_account: None
+			external_funding_account: None,
+			bid_at_tick: 1
 		}]);
 
 		MiningSlots::on_initialize(1);
@@ -241,6 +242,7 @@ fn it_adds_new_cohorts_on_block() {
 					authority_keys: account_id.into(),
 					cohort_id: i as u64 + 1,
 					external_funding_account: None,
+					bid_at_tick: 1,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -261,6 +263,7 @@ fn it_adds_new_cohorts_on_block() {
 			authority_keys: 1.into(),
 			cohort_id: 5,
 			external_funding_account: None,
+			bid_at_tick: 1,
 		}]);
 
 		NextSlotCohort::<Test>::set(cohort.clone());
@@ -363,6 +366,7 @@ fn it_releases_argonots_when_a_window_closes() {
 					authority_keys: 1.into(),
 					cohort_id: 1,
 					external_funding_account: None,
+					bid_at_tick: 7,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);
@@ -398,6 +402,7 @@ fn it_releases_argonots_when_a_window_closes() {
 					authority_keys: 1.into(),
 					cohort_id: 4,
 					external_funding_account: None,
+					bid_at_tick: 7,
 				}]),
 				released_miners: 2,
 			}
@@ -591,6 +596,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 					authority_keys: 1.into(),
 					cohort_id: 4,
 					external_funding_account: None,
+					bid_at_tick: 12,
 				}]),
 				released_miners: 0,
 			}
@@ -801,6 +807,7 @@ fn it_will_order_bids() {
 						authority_keys: 1.into(),
 						cohort_id: 2,
 						external_funding_account: None,
+						bid_at_tick: 6,
 					},
 					MiningRegistration {
 						account_id: 2,
@@ -810,6 +817,7 @@ fn it_will_order_bids() {
 						authority_keys: 2.into(),
 						cohort_id: 2,
 						external_funding_account: None,
+						bid_at_tick: 6,
 					},
 				]),
 				released_miners: 0,
@@ -926,6 +934,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 				authority_keys: 1.into(),
 				cohort_id: 1,
 				external_funding_account: Some(1),
+				bid_at_tick: 6,
 			}]
 		);
 
@@ -954,6 +963,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					authority_keys: 3.into(),
 					cohort_id: 1,
 					external_funding_account: Some(1),
+					bid_at_tick: 6,
 				},
 				Registration::<Test> {
 					account_id: 2,
@@ -963,6 +973,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					authority_keys: 1.into(),
 					cohort_id: 1,
 					external_funding_account: Some(1),
+					bid_at_tick: 6,
 				}
 			]
 		);
@@ -1019,6 +1030,7 @@ fn it_can_get_closest_authority() {
 					authority_keys: account_id.into(),
 					cohort_id: 1,
 					external_funding_account: None,
+					bid_at_tick: 1,
 				},
 			);
 			AccountIndexLookup::<Test>::insert(account_id, i);

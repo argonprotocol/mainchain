@@ -59,10 +59,17 @@ impl<B: Block> ComputePuzzle<B> {
 pub type CohortId = u64;
 
 #[derive(
-	PartialEqNoBound, EqNoBound, CloneNoBound, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
+	PartialEqNoBound,
+	EqNoBound,
+	CloneNoBound,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+	Deserialize,
+	Serialize,
 )]
-#[scale_info(skip_type_params(MaxHosts))]
-#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MiningRegistration<
 	AccountId: Parameter,
@@ -86,6 +93,9 @@ pub struct MiningRegistration<
 	/// Which cohort the miner is in
 	#[codec(compact)]
 	pub cohort_id: CohortId,
+	/// When the bid was placed
+	#[codec(compact)]
+	pub bid_at_tick: Tick,
 }
 
 impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>

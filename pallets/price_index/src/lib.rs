@@ -9,9 +9,6 @@ use argon_primitives::ArgonCPI;
 pub use pallet::*;
 pub use weights::WeightInfo;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-
 pub mod migrations;
 #[cfg(test)]
 mod tests;
