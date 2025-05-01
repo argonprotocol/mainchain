@@ -22,7 +22,7 @@ use sp_runtime::{FixedU128, Permill};
 
 #[derive(Debug, Args, ReadDocs)]
 pub struct VaultConfig {
-	/// Argons to allocated ot the vault for bitcoin locks and securitization
+	/// Argons to allocate to the vault for bitcoin locks and securitization
 	#[clap(long, value_parser=parse_number)]
 	argons: Option<f32>,
 

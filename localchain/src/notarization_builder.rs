@@ -972,8 +972,7 @@ pub mod napi_ext {
   use crate::ChannelHold;
   use crate::LocalAccount;
   use crate::{notarization_tracker::NotarizationTracker, AccountStore};
-  use argon_primitives::tick::Tick;
-  use argon_primitives::{AccountType, BlockVote};
+  use argon_primitives::{prelude::*, AccountType, BlockVote};
   use codec::Decode;
   use napi::bindgen_prelude::BigInt;
   use sp_core::H256;
