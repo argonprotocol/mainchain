@@ -21,6 +21,9 @@ jobs:
       - name: Free Disk Space
         uses: ./.github/templates/clear-space
 
+      - name: Install linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -34,31 +37,13 @@ jobs:
           max-size: 10G
           append-timestamp: false
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: sqlx-cli@0.8.5
-
-      - name: Migrate Notary Db
-        working-directory: notary
-        run: cargo sqlx database setup
-
-      - name: Create and Set Database URL
-        working-directory: localchain
-        run: |
-          touch ${{ runner.temp }}/temp.db
-          chmod 777 ${{ runner.temp }}/temp.db
-          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
-          cat .env
-
-      - name: Migrate Localchain Db
-        working-directory: localchain
-        run: cargo sqlx database setup
-
       - name: Clippy
         run: cargo clippy --workspace
         env:
           RUSTC_WRAPPER: "sccache"
           SKIP_WASM_BUILD: 1
+          SQLX_OFFLINE: true
+          CARGO_INCREMENTAL: 0
   test:
     strategy:
       fail-fast: false
@@ -141,7 +126,7 @@ jobs:
 
       - name: Run tests
         run: cargo test --features=ci --no-fail-fast --lib --bins -- --nocapture
-        timeout-minutes: 60
+        timeout-minutes: 90
         env:
           RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0

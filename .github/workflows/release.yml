@@ -78,6 +78,7 @@ jobs:
         include:
           - target: aarch64-unknown-linux-gnu
             bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
+            os: ubuntu-22.04-arm
           - target: x86_64-unknown-linux-gnu
             bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: aarch64-apple-darwin

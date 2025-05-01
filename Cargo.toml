@@ -44,7 +44,7 @@ resolver = "2"
 
 
 [workspace.package]
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 edition = "2021"
 authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
@@ -57,89 +57,18 @@ documentation = "https://argonprotocol.org/docs"
 [profile.release]
 lto = true
 opt-level = 3
-panic = "unwind"
 
 [profile.production]
 inherits = "release"
 
-[profile.testnet]
-inherits = "release"
-lto = false
-debug = 1               # debug symbols are useful for profilers
-debug-assertions = true
-overflow-checks = true
-
 [profile.dev]
 debug = 1
-debug-assertions = true
-incremental = true
-codegen-units = 256
-opt-level = 0
-split-debuginfo = "unpacked"
 
 # make sure dev builds with backtrace do not slow us down
 [profile.dev.package.backtrace]
 inherits = "release"
 
 [workspace.lints.clippy]
-
-# COPIED FROM SUBSTRATE REPO
-#
-# The list of dependencies below (which can be both direct and indirect dependencies) are crates
-# that are suspected to be CPU-intensive, and that are unlikely to require debugging (as some of
-# their debug info might be missing) or to require to be frequently recompiled. We compile these
-# dependencies with `opt-level=3` even in "dev" mode in order to make "dev" mode more usable.
-# The majority of these crates are cryptographic libraries.
-#
-# If you see an error mentioning "profile package spec ... did not match any packages", it
-# probably concerns this list.
-#
-# This list is ordered alphabetically.
-[profile.dev.package]
-blake2 = { opt-level = 3 }
-blake2b_simd = { opt-level = 3 }
-chacha20poly1305 = { opt-level = 3 }
-cranelift-codegen = { opt-level = 3 }
-cranelift-wasm = { opt-level = 3 }
-crc32fast = { opt-level = 3 }
-crossbeam-deque = { opt-level = 3 }
-crypto-mac = { opt-level = 3 }
-curve25519-dalek = { opt-level = 3 }
-ed25519-dalek = { opt-level = 3 }
-flate2 = { opt-level = 3 }
-futures-channel = { opt-level = 3 }
-hash-db = { opt-level = 3 }
-hashbrown = { opt-level = 3 }
-hmac = { opt-level = 3 }
-httparse = { opt-level = 3 }
-integer-sqrt = { opt-level = 3 }
-keccak = { opt-level = 3 }
-libm = { opt-level = 3 }
-librocksdb-sys = { opt-level = 3 }
-libsecp256k1 = { opt-level = 3 }
-libz-sys = { opt-level = 3 }
-mio = { opt-level = 3 }
-nalgebra = { opt-level = 3 }
-num-bigint = { opt-level = 3 }
-parking_lot = { opt-level = 3 }
-parking_lot_core = { opt-level = 3 }
-percent-encoding = { opt-level = 3 }
-polkavm-linker = { opt-level = 3 }
-primitive-types = { opt-level = 3 }
-ring = { opt-level = 3 }
-rustls = { opt-level = 3 }
-sha2 = { opt-level = 3 }
-sha3 = { opt-level = 3 }
-smallvec = { opt-level = 3 }
-snow = { opt-level = 3 }
-substrate-bip39 = { opt-level = 3 }
-twox-hash = { opt-level = 3 }
-uint = { opt-level = 3 }
-wasmi = { opt-level = 3 }
-sqlx-macros = { opt-level = 3 }
-x25519-dalek = { opt-level = 3 }
-yamux = { opt-level = 3 }
-zeroize = { opt-level = 3 }
 
 [patch."https://github.com/paritytech/polkadot-sdk"]
 polkadot-sdk = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
@@ -184,11 +113,6 @@ jsonrpsee = { version = "0.24", features = ["http-client", "ws-client", "macros"
 tower = { version = "0.4" }
 tower-http = { version = "0.6" }
 prometheus = { version = "0.13", default-features = false }
-hyper = { version = "1", default-features = false }
-hyper-util = { version = "0.1", default-features = false, features = [
-    "server",
-] }
-http-body-util = { version = "0.1", default-features = false }
 governor = { version = "0.10.0" }
 rusoto_core = { version = "0.48" }
 rusoto_s3 = { version = "0.48" }
@@ -203,14 +127,14 @@ humantime = { version = "2.1" }
 color-backtrace = { version = "0.7" }
 uuid = { version = "1.11.0" }
 
-sqlx = { version = "0.8.5", features = ["macros"] }
+sqlx = { version = "0.8.5" }
 chrono = { version = "0.4", features = ["serde"] }
 
-polkadot-sdk = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
+polkadot-sdk = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
 # substrate crates needing extra features
-substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
-sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
-sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2412", default-features = false }
+substrate-wasm-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
+sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
+sp-debug-derive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
 
 
 finality-grandpa = { version = "0.16", default-features = false }
@@ -255,7 +179,6 @@ bech32 = { version = "0.11.0" }
 array-bytes = { version = "6.2" }
 directories = { version = "5.0" }
 syn = { version = "2.0" }
-proc-macro2 = { version = "1.0" }
 
 bindgen = { version = "0.71" }
 cmake = { version = "0.1" }

@@ -1,8 +1,24 @@
 # Changelog
 
-## [v1.1.0-rc.5](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.4...c3068321c7a8b125912a41474f73b8b904aa9b43) (2025-04-25)
+## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.5...ec6fa88cb1761c645617f0cacbf185eba4a0d7cb) (2025-04-30)
 
-## [v1.1.0-rc.4](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.4) (2025-04-24)
+### Features
+
+* clear more space
+([138a836](https://github.com/argonprotocol/mainchain/commit/138a836946658347963a795868c163ff348352e6))
+* **mining_slot:** add tick to bids + mining reg
+([4e8e475](https://github.com/argonprotocol/mainchain/commit/4e8e4755af2367e42e042be76e79b880c31141e4))
+* upgrade to polkadot-sdk umbrella
+([06f0e09](https://github.com/argonprotocol/mainchain/commit/06f0e098f65e19204d1da64e22e6dcf096a859ad))
+
+### Fixes
+
+* **node:** handle state unavailable in sync
+([34e0223](https://github.com/argonprotocol/mainchain/commit/34e0223b35db18508f144e71647b15391e268a91))
+* mining rotations calculation
+([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
+
+## [v1.1.0-rc.5](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.5) (2025-04-25)
 
 ### Features
 

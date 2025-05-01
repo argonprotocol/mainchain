@@ -422,7 +422,7 @@ dependencies = [
  "const-hex",
  "derive_more 2.0.1",
  "foldhash",
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "indexmap 2.9.0",
  "itoa",
  "k256",
@@ -879,7 +879,7 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "argon-bitcoin"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -902,7 +902,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "age",
  "anyhow",
@@ -931,16 +931,15 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli-macros"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn 2.0.101",
 ]
 
 [[package]]
 name = "argon-bitcoin-utxo-tracker"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -963,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "argon-canary-runtime"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1002,7 +1001,7 @@ dependencies = [
 
 [[package]]
 name = "argon-client"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1025,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "argon-localchain"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1070,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
@@ -1100,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node-consensus"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-bitcoin-utxo-tracker",
@@ -1135,7 +1134,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1176,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-apis"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-notary-audit",
@@ -1197,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-audit"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1212,7 +1211,7 @@ dependencies = [
 
 [[package]]
 name = "argon-oracle"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "alloy-eips",
  "alloy-primitives 0.8.25",
@@ -1254,7 +1253,7 @@ dependencies = [
 
 [[package]]
 name = "argon-primitives"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1283,7 +1282,7 @@ dependencies = [
 
 [[package]]
 name = "argon-randomx"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "bindgen 0.71.1",
  "cmake",
@@ -1301,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1340,7 +1339,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime-common"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1377,7 +1376,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1405,7 +1404,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing-bitcoin"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "bitcoind",
 ]
@@ -1818,7 +1817,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
- "synstructure 0.13.1",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
@@ -5392,7 +5391,7 @@ dependencies = [
 
 [[package]]
 name = "end-to-end"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -7118,7 +7117,7 @@ dependencies = [
  "futures-timer",
  "futures-util",
  "getrandom 0.3.2",
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "nonzero_ext",
  "parking_lot 0.12.3",
  "portable-atomic",
@@ -7263,9 +7262,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -7297,7 +7296,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
 ]
 
 [[package]]
@@ -8138,7 +8137,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "serde",
 ]
 
@@ -9659,7 +9658,7 @@ version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
 dependencies = [
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
 ]
 
 [[package]]
@@ -11145,7 +11144,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-locks"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -11158,7 +11157,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-utxos"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11168,7 +11167,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-rewards"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11178,7 +11177,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-notary-audit",
  "futures",
@@ -11190,7 +11189,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11317,7 +11316,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-chain-transfer"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -11566,7 +11565,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-digests"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-notary-audit",
  "impl-trait-for-tuples",
@@ -11578,7 +11577,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-domains"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11827,7 +11826,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-liquidity-pools"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-prelude",
@@ -11905,7 +11904,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mining-slot"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-prelude",
@@ -11916,7 +11915,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mint"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12094,7 +12093,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notaries"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12105,7 +12104,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notebook"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12206,7 +12205,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prelude"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.8",
@@ -12217,7 +12216,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-price-index"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12553,7 +12552,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ticks"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12750,7 +12749,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-vaults"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "argon-bitcoin",
  "bip32",
@@ -15463,7 +15462,7 @@ dependencies = [
  "cfg_aliases 0.2.1",
  "pin-project-lite",
  "quinn-proto 0.11.11",
- "quinn-udp 0.5.11",
+ "quinn-udp 0.5.12",
  "rustc-hash 2.1.1",
  "rustls 0.23.26",
  "socket2 0.5.9",
@@ -15525,9 +15524,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-udp"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "541d0f57c6ec747a90738a52741d3221f7960e8ac2f0ff4b1a63680e033b4ab5"
+checksum = "ee4e529991f949c5e25755532370b8af5d114acae52326361d68d47af64aa842"
 dependencies = [
  "cfg_aliases 0.2.1",
  "libc",
@@ -16524,9 +16523,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d97817398dd4bb2e6da002002db259209759911da105da92bec29ccb12cf58bf"
+checksum = "91b73dab8b4bf63c9dbf81b3d2d4ae6e54033e397c3051a3baac27f7e4e5607e"
 dependencies = [
  "bitflags 2.9.0",
  "errno",
@@ -20577,7 +20576,7 @@ dependencies = [
  "futures-intrusive",
  "futures-io",
  "futures-util",
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "hashlink 0.10.0",
  "indexmap 2.9.0",
  "log",
@@ -21602,9 +21601,9 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
+checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -21685,7 +21684,7 @@ dependencies = [
  "fastrand 2.3.0",
  "getrandom 0.3.2",
  "once_cell",
- "rustix 1.0.5",
+ "rustix 1.0.6",
  "windows-sys 0.59.0",
 ]
 
@@ -21726,7 +21725,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "45c6481c4829e4cc63825e62c49186a34538b7b2750b73b266581ffb612fb5ed"
 dependencies = [
- "rustix 1.0.5",
+ "rustix 1.0.6",
  "windows-sys 0.59.0",
 ]
 
@@ -22604,7 +22603,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-cli"
-version = "1.1.0-rc.5"
+version = "1.1.0-rc.6"
 dependencies = [
  "uniffi",
 ]
@@ -24181,7 +24180,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d65cbf2f12c15564212d48f4e3dfb87923d25d611f2aed18f4cb23f0413d89e"
 dependencies = [
  "libc",
- "rustix 1.0.5",
+ "rustix 1.0.6",
 ]
 
 [[package]]
@@ -24325,7 +24324,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
- "synstructure 0.13.1",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
@@ -24386,7 +24385,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
- "synstructure 0.13.1",
+ "synstructure 0.13.2",
 ]
 
 [[package]]
