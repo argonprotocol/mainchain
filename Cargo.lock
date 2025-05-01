@@ -945,7 +945,6 @@ dependencies = [
  "argon-bitcoin",
  "argon-primitives",
  "argon-testing",
- "async-trait",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoind",
@@ -955,9 +954,6 @@ dependencies = [
  "parity-scale-codec",
  "parking_lot 0.12.3",
  "polkadot-sdk",
- "rand 0.9.1",
- "thiserror 2.0.12",
- "tokio",
 ]
 
 [[package]]

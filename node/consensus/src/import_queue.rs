@@ -125,14 +125,22 @@ where
 			StateAction::Skip => false,
 		};
 
+		let is_block_already_imported =
+			self.client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown) ==
+				sp_blockchain::BlockStatus::InChain;
+
 		if has_state && !is_block_gap {
-			let max_fork_power = self.aux_client.record_block(
-				&mut block.auxiliary,
-				block_author,
-				voting_key,
-				tick,
-				fork_power.is_latest_vote,
-			)?;
+			let max_fork_power = if is_block_already_imported {
+				self.aux_client.strongest_fork_power()?.get()
+			} else {
+				self.aux_client.record_block(
+					&mut block.auxiliary,
+					block_author,
+					voting_key,
+					tick,
+					fork_power.is_latest_vote,
+				)?
+			};
 			// NOTE: only import as best block if it beats the best stored block. There are cases
 			// where importing a tie will yield too many blocks at a height and break substrate
 			if fork_power > max_fork_power {
@@ -220,18 +228,30 @@ where
 			block_params.state_action.skip_execution_checks() ||
 			block_params.with_state()
 		{
+			// When we are importing only the state of a block or its from network sync, it will be
+			// the best block.
+			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(
+				block_params.with_state() || block_params.origin == BlockOrigin::NetworkInitialSync,
+			));
 			return Ok(block_params)
 		}
 
 		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
+		let mut header = block_params.header;
+		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
+		let seal_digest = BlockSealDigest::try_from(&raw_seal_digest)
+			.ok_or(Error::UnableToDecodeDigest("Seal Digest".into()))?;
 
-		if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
-			// ensure we have parent state
-			if self
-				.client
-				.block_status(*block_params.header.parent_hash())
-				.unwrap_or(BlockStatus::Unknown) !=
+		block_params.header = header;
+		block_params.post_digests.push(raw_seal_digest);
+		block_params.post_hash = Some(post_hash);
+
+		// The import queue can import headers and also blocks. Sometimes these blocks come in and
+		// the parent state isn't yet available
+		if let Some(inner_body) = block_params.body.clone() {
+			// sanity check to log if we somehow DON'T have state
+			if self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
 				BlockStatus::InChainWithState
 			{
 				warn!(
@@ -242,57 +262,70 @@ where
 					fork_choice = ?block_params.fork_choice,
 					import_existing = ?block_params.import_existing,
 					finalized = ?block_params.finalized,
-					"Unable to verify block due with ExecuteIfPossible to missing state for parent block."
+					"Unable to verify block with `ExecuteIfPossible` due to missing state for parent block."
 				);
 				if block_params.origin == BlockOrigin::NetworkInitialSync {
 					return Ok(block_params)
 				}
 
-				return Err("Parent state not available".into())
+				if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
+					return Err("Parent state not available".into())
+				}
 			}
-		}
 
-		let mut header = block_params.header;
-		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
-		let seal_digest =
-			BlockSealDigest::try_from(&raw_seal_digest).ok_or(Error::MissingBlockSealDigest)?;
+			let runtime_api = self.client.runtime_api();
 
-		block_params.header = header;
-		block_params.post_digests.push(raw_seal_digest);
-		block_params.post_hash = Some(post_hash);
+			let digest = block_params.header.digest();
+			let pre_hash = block_params.header.hash();
 
-		let digest = block_params.header.digest();
-		let pre_hash = block_params.header.hash();
-
-		if seal_digest.is_vote() {
-			let is_valid = self
-				.client
-				.runtime_api()
-				.is_valid_signature(parent_hash, pre_hash, &seal_digest, digest)
-				.map_err(|e| format!("Error verifying miner signature {:?}", e))?;
-			if !is_valid {
-				return Err(Error::InvalidVoteSealSignature.into());
+			// TODO: should we move all of this to the runtime? Main holdup is building randomx for
+			// wasm
+			if seal_digest.is_vote() {
+				let is_valid = runtime_api
+					.is_valid_signature(parent_hash, pre_hash, &seal_digest, digest)
+					.map_err(|e| format!("Error verifying miner signature {:?}", e))?;
+				if !is_valid {
+					return Err(Error::InvalidVoteSealSignature.into());
+				}
 			}
-		}
 
-		// if we're importing a non-finalized block from someone else, verify the notebook
-		// audits
-		let latest_verified_finalized = self.client.info().finalized_number;
-		if !matches!(block_params.origin, BlockOrigin::Own | BlockOrigin::NetworkInitialSync) &&
-			block_number > latest_verified_finalized &&
-			!block_params.finalized
-		{
-			let digest_notebooks = self
-				.client
-				.runtime_api()
-				.digest_notebooks(parent_hash, digest)
-				.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
-				.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
-			self.notary_client
-				.verify_notebook_audits(&parent_hash, digest_notebooks)
-				.await
-				.inspect_err(|e| {
-					error!(
+			// NOTE: we verify compute nonce in import queue because we use the pre-hash, which
+			// we'd have to inject into the runtime
+			if let BlockSealDigest::Compute { nonce } = &seal_digest {
+				let compute_puzzle = runtime_api
+					.compute_puzzle(parent_hash)
+					.map_err(|e| format!("Error calling compute difficulty api {e:?}"))?;
+
+				let key_block_hash = compute_puzzle.get_key_block(self.client.info().genesis_hash);
+				let compute_difficulty = compute_puzzle.difficulty;
+
+				tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, block_hash=?post_hash, "Verifying compute nonce");
+				if !BlockComputeNonce::is_valid(
+					nonce,
+					pre_hash.as_ref().to_vec(),
+					&key_block_hash,
+					compute_difficulty,
+				) {
+					return Err(Error::InvalidComputeNonce.into());
+				}
+			}
+
+			// if we're importing a non-finalized block from someone else, verify the notebook
+			// audits
+			let latest_verified_finalized = self.client.info().finalized_number;
+			if !matches!(block_params.origin, BlockOrigin::Own | BlockOrigin::NetworkInitialSync) &&
+				block_number > latest_verified_finalized &&
+				!block_params.finalized
+			{
+				let digest_notebooks = runtime_api
+					.digest_notebooks(parent_hash, digest)
+					.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
+					.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
+				self.notary_client
+					.verify_notebook_audits(&parent_hash, digest_notebooks)
+					.await
+					.inspect_err(|e| {
+						error!(
 						?block_number,
 						block_hash=?post_hash,
 						?parent_hash,
@@ -301,33 +334,9 @@ where
 						finalized = block_params.finalized,
 						has_justification = block_params.justifications.is_some(),
 						"Failed to verify notebook audits {}", e.to_string())
-				})?;
-		}
-
-		// NOTE: we verify compute nonce in import queue because we use the pre-hash, which
-		// we'd have to inject into the runtime
-		if let BlockSealDigest::Compute { nonce } = &seal_digest {
-			let compute_puzzle = self
-				.client
-				.runtime_api()
-				.compute_puzzle(parent_hash)
-				.map_err(|e| format!("Error calling compute difficulty api {e:?}"))?;
-
-			let key_block_hash = compute_puzzle.get_key_block(self.client.info().genesis_hash);
-			let compute_difficulty = compute_puzzle.difficulty;
-
-			tracing::info!(?key_block_hash, ?compute_difficulty, ?nonce, block_hash=?post_hash, "Verifying compute nonce");
-			if !BlockComputeNonce::is_valid(
-				nonce,
-				pre_hash.as_ref().to_vec(),
-				&key_block_hash,
-				compute_difficulty,
-			) {
-				return Err(Error::InvalidComputeNonce.into());
+					})?;
 			}
-		}
 
-		if let Some(inner_body) = block_params.body.clone() {
 			let check_block = B::new(block_params.header.clone(), inner_body);
 
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
@@ -350,9 +359,7 @@ where
 			}
 
 			// inherent data passed in is what we would have generated...
-			let inherent_res = self
-				.client
-				.runtime_api()
+			let inherent_res = runtime_api
 				.check_inherents(parent_hash, check_block.clone(), inherent_data)
 				.map_err(|e| Error::Client(e.into()))?;
 

@@ -29,18 +29,15 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Start sccache
-        uses: hendrikmuhs/ccache-action@v1.2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
-          variant: sccache
-          key: sccache-build-and-lint
-          max-size: 10G
-          append-timestamp: false
+          shared-key: cargo-x86_64-unknown-linux-gnu
+          save-if: false
 
       - name: Clippy
         run: cargo clippy --workspace
         env:
-          RUSTC_WRAPPER: "sccache"
           SKIP_WASM_BUILD: 1
           SQLX_OFFLINE: true
           CARGO_INCREMENTAL: 0
@@ -80,15 +77,10 @@ jobs:
           echo "CC=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
           echo "CXX=/opt/homebrew/opt/llvm@18/bin/clang++" >> $GITHUB_ENV
 
-      - name: Start sccache
-        uses: hendrikmuhs/ccache-action@v1.2
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
         with:
-          variant: sccache
-          key: sccache-build-and-test-${{ runner.target }}
-          max-size: 10G
-          append-timestamp: false
-
-      - uses: rui314/setup-mold@v1
+          shared-key: cargo-${{ matrix.target }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -119,7 +111,6 @@ jobs:
       - name: Build
         run: cargo build --features=simulated-prices
         env:
-          RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
@@ -128,7 +119,6 @@ jobs:
         run: cargo test --features=ci --no-fail-fast --lib --bins -- --nocapture
         timeout-minutes: 90
         env:
-          RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info

@@ -21,13 +21,13 @@ use sc_service::TaskManager;
 use sc_utils::mpsc::tracing_unbounded;
 use schnellru::{ByLength, LruMap};
 use sp_api::ProvideRuntimeApi;
-use sp_blockchain::{BlockStatus, HeaderBackend};
+use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
 use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time};
-use tracing::{info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 #[cfg(test)]
 pub(crate) mod mock_notary;
@@ -320,16 +320,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			// being imported and state synched)
 			let best_hash = client.info().best_hash;
 			let best_number = client.info().best_number;
-			let header_status = client.status(best_hash).unwrap_or(BlockStatus::Unknown);
 			let state_status =
 				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown);
-			if header_status == BlockStatus::Unknown ||
-				state_status != sp_consensus::BlockStatus::InChainWithState
-			{
+			if state_status != sp_consensus::BlockStatus::InChainWithState {
 				*notary_client.pause_queue_processing.write().await = true;
-				info!(
+				debug!(
 					?best_hash,
-					?header_status,
 					?state_status,
 					"Best block state not available (yet?). Not starting compute."
 				);

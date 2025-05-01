@@ -73,7 +73,7 @@ export default class TestMainchain implements ITeardownable {
     launchBitcoin?: boolean;
   }): Promise<string> {
     const {
-      miningThreads = 2,
+      miningThreads = 1,
       bootnodes,
       author = 'alice',
       launchBitcoin = false,
@@ -236,7 +236,7 @@ export default class TestMainchain implements ITeardownable {
           '-rpcpassword=bitcoin',
         ],
         {
-          stdio: ['ignore', 'inherit', 'inherit', 'ignore'],
+          stdio: ['ignore'],
         },
       );
       addTeardown({

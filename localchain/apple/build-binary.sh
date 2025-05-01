@@ -71,7 +71,6 @@ for arch in $ARCHS; do
       fi
   esac
 
-  export RUSTC_WRAPPER=sccache
   $HOME/.cargo/bin/cargo build -p argon-localchain --features=$FEATURES --lib $RELFLAG --target "${OS_TARGET}"
 done
 

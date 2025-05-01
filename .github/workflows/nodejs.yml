@@ -60,17 +60,11 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
-      - name: Start sccache
+      - name: Rust cache
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        uses: hendrikmuhs/ccache-action@v1.2
+        uses: swatinem/rust-cache@v2
         with:
-          variant: sccache
-          key: sccache-${{ github.job }}-${{ matrix.target }}
-          restore-keys: ${{ runner.os }}
-          max-size: 10G
-          append-timestamp: false
-
-      - uses: rui314/setup-mold@v1
+          shared-key: cargo-${{ matrix.target }}
 
       - name: Install
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -111,7 +105,6 @@ jobs:
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: cargo build
         env:
-          RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info

@@ -128,8 +128,6 @@ jobs:
           echo "OPENSSL_STATIC=1" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - uses: rui314/setup-mold@v1
-
       - name: Install
         uses: dtolnay/rust-toolchain@stable
         with:
