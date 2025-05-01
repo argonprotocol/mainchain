@@ -60,11 +60,11 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
-      - name: Rust cache
+      - uses: ./.github/templates/rust-cache
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        uses: swatinem/rust-cache@v2
         with:
-          shared-key: cargo-${{ matrix.target }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-${{ matrix.target }}
 
       - name: Install
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -234,18 +234,10 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: ./.github/templates/rust-cache
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            .cargo-cache
-            target/
-          key: localchain-${{ matrix.target }}-cargo
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: localchain-${{ matrix.target }}-cargo
 
       - name: Install dependencies
         run: yarn install

@@ -29,18 +29,18 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: ./.github/templates/rust-cache
         with:
-          shared-key: cargo-x86_64-unknown-linux-gnu
-          save-if: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-x86_64-unknown-linux-gnu
+          save: false
 
       - name: Clippy
         run: cargo clippy --workspace
         env:
+          CARGO_INCREMENTAL: 0
           SKIP_WASM_BUILD: 1
           SQLX_OFFLINE: true
-          CARGO_INCREMENTAL: 0
   test:
     strategy:
       fail-fast: false
@@ -77,10 +77,10 @@ jobs:
           echo "CC=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
           echo "CXX=/opt/homebrew/opt/llvm@18/bin/clang++" >> $GITHUB_ENV
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: ./.github/templates/rust-cache
         with:
-          shared-key: cargo-${{ matrix.target }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-${{ matrix.target }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -114,6 +114,9 @@ jobs:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
+
+      - name: Show space before tests
+        run: df -h
 
       - name: Run tests
         run: cargo test --features=ci --no-fail-fast --lib --bins -- --nocapture
