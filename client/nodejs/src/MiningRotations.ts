@@ -30,7 +30,7 @@ export class MiningRotations {
     // Calculate the number of ticks since the start of bidding. Once bidding started, it was rotation 1
     const ticksSinceSlot1 = tick - slot1StartTick;
 
-    return Math.floor(ticksSinceSlot1 / ticksBetweenSlots);
+    return Math.floor(ticksSinceSlot1 / ticksBetweenSlots) + 1;
   }
 
   async getForHeader(client: ArgonClient, header: Header) {
