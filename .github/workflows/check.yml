@@ -32,7 +32,7 @@ jobs:
       - uses: ./.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: cargo-x86_64-unknown-linux-gnu
+          name: check-x86_64-unknown-linux-gnu
           save: false
 
       - name: Clippy

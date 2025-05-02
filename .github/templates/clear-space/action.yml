@@ -24,6 +24,9 @@ runs:
         sudo rm -rf /opt/hostedtoolcache/Swift
         sudo rm -rf /opt/hostedtoolcache/Scala
 
+        echo "Top 10 largest remaining folders in /opt/hostedtoolcache:"
+        sudo du -sh /opt/hostedtoolcache/* 2>/dev/null | sort -rh | head -n 10
+
         docker system prune --all --force
         sudo apt-get clean
         sudo rm -rf /usr/share/dotnet
@@ -36,8 +39,9 @@ runs:
         sudo rm -rf /opt/microsoft          # Microsoft tools
         sudo rm -rf /opt/ghc                # Haskell GHC (~3GB)
 
-        # Node/npm cache (safe if you're not using node/yarn)
-        rm -rf ~/.npm ~/.cache/yarn ~/.cargo/registry
+        echo "Top 10 largest remaining folders in /opt"
+        sudo du -sh /opt/* 2>/dev/null | sort -rh | head -n 10
+
         df -h
     - name: Clear space
       if: ${{ runner.os == 'macOS' }}
