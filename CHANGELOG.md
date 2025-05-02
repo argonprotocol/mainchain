@@ -1,6 +1,21 @@
 # Changelog
 
-## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.5...ec6fa88cb1761c645617f0cacbf185eba4a0d7cb) (2025-04-30)
+## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.6...105a99c28607180efc3a67b573d7842eb5845519) (2025-05-02)
+
+### Fixes
+
+* **gh:** glibc incapatability
+([48a81d2](https://github.com/argonprotocol/mainchain/commit/48a81d24b6121199e932db2855af49288f9e3ab8))
+* **testing:** bitcoin unavailable in docker
+([6d8cc4e](https://github.com/argonprotocol/mainchain/commit/6d8cc4e4814fcbfa672df2a7abfe2d1ea59beb8a))
+* **client:** rotation id still one off
+([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
+* **ga:** caching of files
+([079232f](https://github.com/argonprotocol/mainchain/commit/079232f69f54b2b712a050685c490be48cda30c7))
+* **node:** additional fast sync fixes
+([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
+
+## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.6) (2025-05-01)
 
 ### Features
 
@@ -10,18 +25,6 @@
 ([4e8e475](https://github.com/argonprotocol/mainchain/commit/4e8e4755af2367e42e042be76e79b880c31141e4))
 * upgrade to polkadot-sdk umbrella
 ([06f0e09](https://github.com/argonprotocol/mainchain/commit/06f0e098f65e19204d1da64e22e6dcf096a859ad))
-
-### Fixes
-
-* **node:** handle state unavailable in sync
-([34e0223](https://github.com/argonprotocol/mainchain/commit/34e0223b35db18508f144e71647b15391e268a91))
-* mining rotations calculation
-([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
-
-## [v1.1.0-rc.5](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.5) (2025-04-25)
-
-### Features
-
 * **client:** clarify storage height
 ([2007632](https://github.com/argonprotocol/mainchain/commit/200763227b16edb1acb6ec9d269511acfc520059))
 * hyperbridge doc
@@ -35,6 +38,14 @@
 
 ### Fixes
 
+* aarch64 can’t find openssl
+([2ae1a4f](https://github.com/argonprotocol/mainchain/commit/2ae1a4fbb79633c49a0e6d6e41bd193f819d409e))
+* check space
+([b4f5107](https://github.com/argonprotocol/mainchain/commit/b4f51072e7e21cd81b2dc8cc231d91882ce8ebd7))
+* **node:** handle state unavailable in sync
+([34e0223](https://github.com/argonprotocol/mainchain/commit/34e0223b35db18508f144e71647b15391e268a91))
+* mining rotations calculation
+([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
 * **node:** fast sync bugs with state
 ([690ba42](https://github.com/argonprotocol/mainchain/commit/690ba42d141b4779c5074f37155968ce3517fc33))
 * **bitcoin_locks:** add error decode
