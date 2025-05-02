@@ -14,22 +14,18 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-async-trait = { workspace = true }
 codec = { workspace = true }
 log = { workspace = true }
 anyhow = { workspace = true }
 parking_lot = { workspace = true }
-thiserror = { workspace = true, features = ["default"] }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
 argon-primitives = { workspace = true, features = ["std", "bitcoin"] }
 argon-bitcoin = { workspace = true, features = ["std"] }
-polkadot-sdk = { workspace = true, features = ["sc-service", "sp-api", "sp-runtime", "sc-client-api"] }
+polkadot-sdk = { workspace = true, features = ["sc-service", "sp-api", "sp-runtime", "sc-client-api", "substrate-prometheus-endpoint"] }
 
 [dev-dependencies]
 bitcoind = { workspace = true }
 env_logger = { workspace = true }
-tokio = { workspace = true }
-rand = { workspace = true }
 lazy_static = { workspace = true }
 argon-testing = { workspace = true }

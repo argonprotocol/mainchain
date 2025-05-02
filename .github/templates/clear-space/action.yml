@@ -12,12 +12,36 @@ runs:
         df -h
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /opt/hostedtoolcache/Go
+        sudo rm -rf /opt/hostedtoolcache/Java
+        sudo rm -rf /opt/hostedtoolcache/R
+        sudo rm -rf /opt/hostedtoolcache/Node
+        sudo rm -rf /opt/hostedtoolcache/PowerShell
+        sudo rm -rf /opt/hostedtoolcache/Python
+        sudo rm -rf /opt/hostedtoolcache/Php
+        sudo rm -rf /opt/hostedtoolcache/Perl
+        sudo rm -rf /opt/hostedtoolcache/Ruby
+        sudo rm -rf /opt/hostedtoolcache/Swift
+        sudo rm -rf /opt/hostedtoolcache/Scala
+
+        echo "Top 10 largest remaining folders in /opt/hostedtoolcache:"
+        sudo du -sh /opt/hostedtoolcache/* 2>/dev/null | sort -rh | head -n 10
+
         docker system prune --all --force
         sudo apt-get clean
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /usr/local/lib/android/sdk
         sudo rm -rf /usr/share/swift
         sudo rm -rf /usr/share/miniconda
+        # Additional heavy caches
+        sudo rm -rf /opt/az                 # Azure CLI tools (~500MB+)
+        sudo rm -rf /opt/google             # Google Cloud SDK (~500MB+)
+        sudo rm -rf /opt/microsoft          # Microsoft tools
+        sudo rm -rf /opt/ghc                # Haskell GHC (~3GB)
+
+        echo "Top 10 largest remaining folders in /opt"
+        sudo du -sh /opt/* 2>/dev/null | sort -rh | head -n 10
+
         df -h
     - name: Clear space
       if: ${{ runner.os == 'macOS' }}

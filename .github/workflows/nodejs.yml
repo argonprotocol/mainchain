@@ -60,17 +60,11 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
-      - name: Start sccache
+      - uses: ./.github/templates/rust-cache
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          variant: sccache
-          key: sccache-${{ github.job }}-${{ matrix.target }}
-          restore-keys: ${{ runner.os }}
-          max-size: 10G
-          append-timestamp: false
-
-      - uses: rui314/setup-mold@v1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-${{ matrix.target }}
 
       - name: Install
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -111,7 +105,6 @@ jobs:
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         run: cargo build
         env:
-          RUSTC_WRAPPER: "sccache"
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info
@@ -241,18 +234,10 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: ./.github/templates/rust-cache
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            .cargo-cache
-            target/
-          key: localchain-${{ matrix.target }}-cargo
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: localchain-${{ matrix.target }}-cargo
 
       - name: Install dependencies
         run: yarn install

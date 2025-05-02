@@ -246,6 +246,10 @@ where
 				Some(ref block) = best_block.next() => {
 					if block.is_new_best {
 						let best_hash = block.hash;
+						if !client.has_block_state(best_hash) {
+							// We don't have the block state yet, so we can't update notaries
+							continue;
+						}
 						if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
 							warn!(
 

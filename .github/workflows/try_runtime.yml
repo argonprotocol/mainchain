@@ -28,10 +28,10 @@ jobs:
           targets: wasm32-unknown-unknown
           components: rust-src
 
-      - name: Fetch cache
-        uses: Swatinem/rust-cache@v2.7.0
+      - uses: ./.github/templates/rust-cache
         with:
-          shared-key: try-runtime
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: try-runtime
 
       - name: Build Runtimes
         run: |

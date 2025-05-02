@@ -73,7 +73,7 @@ export default class TestMainchain implements ITeardownable {
     launchBitcoin?: boolean;
   }): Promise<string> {
     const {
-      miningThreads = 2,
+      miningThreads = 1,
       bootnodes,
       author = 'alice',
       launchBitcoin = false,
@@ -222,23 +222,20 @@ export default class TestMainchain implements ITeardownable {
 
       const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-' + this.uuid);
 
-      this.#bitcoind = spawn(
-        path,
-        [
-          '-regtest',
-          '-fallbackfee=0.0001',
-          '-listen=0',
-          `-datadir=${tmpDir}`,
-          '-blockfilterindex',
-          '-txindex',
-          `-rpcport=${rpcPort}`,
-          '-rpcuser=bitcoin',
-          '-rpcpassword=bitcoin',
-        ],
-        {
-          stdio: ['ignore', 'inherit', 'inherit', 'ignore'],
-        },
-      );
+      console.log('Starting bitcoin node at %s', tmpDir);
+      this.#bitcoind = spawn(path, [
+        '-regtest',
+        '-fallbackfee=0.0001',
+        '-listen=0',
+        `-datadir=${tmpDir}`,
+        '-blockfilterindex',
+        '-txindex',
+        `-rpcport=${rpcPort}`,
+        '-rpcbind=0.0.0.0',
+        '-rpcallowip=0.0.0.0/0',
+        '-rpcuser=bitcoin',
+        '-rpcpassword=bitcoin',
+      ]);
       addTeardown({
         async teardown() {
           await fs.promises.rm(tmpDir, {

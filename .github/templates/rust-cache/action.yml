@@ -1,0 +1,49 @@
+name: Cache rust dependencies
+description: |
+  Shared config to cache rust dependencies
+
+inputs:
+  github-token:
+    description: 'The github token'
+    required: true
+  name:
+    description: 'The name of the cache'
+    required: true
+  save:
+    description: 'Whether to save the cache'
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get rustc version
+      id: rust-version
+      run: echo "version=$(rustc --version --verbose | grep 'release:' | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - name: Get OS version string
+      id: os_version
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          echo "version=$(source /etc/os-release && echo $ID-$VERSION_ID)" >> $GITHUB_OUTPUT
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          echo "version=macos-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          ver_str=$(cmd /c ver)
+          echo "version=windows-$(echo $ver_str | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> $GITHUB_OUTPUT
+        fi
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          .cargo-cache
+          target/
+        key: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('./Cargo.lock') }}
+        restore-keys: |
+          ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
