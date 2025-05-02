@@ -31,6 +31,7 @@ export default class TestMainchain implements ITeardownable {
   proxy?: string;
   #bitcoind?: ChildProcess;
   bitcoinPort?: number;
+  #bitcoinDir?: string;
 
   public get address(): string {
     if (this.proxy) {
@@ -204,6 +205,12 @@ export default class TestMainchain implements ITeardownable {
     this.#process?.unref();
     this.#bitcoind?.kill();
     this.#bitcoind?.unref();
+    if (this.#bitcoinDir) {
+      await fs.promises.rm(this.#bitcoinDir, {
+        recursive: true,
+        force: true,
+      });
+    }
     for (const i of this.#interfaces) {
       i.close();
     }
@@ -236,14 +243,7 @@ export default class TestMainchain implements ITeardownable {
         '-rpcuser=bitcoin',
         '-rpcpassword=bitcoin',
       ]);
-      addTeardown({
-        async teardown() {
-          await fs.promises.rm(tmpDir, {
-            recursive: true,
-            force: true,
-          });
-        },
-      });
+      this.#bitcoinDir = tmpDir;
     }
     this.bitcoinPort = rpcPort;
     return cleanHostForDocker(`http://bitcoin:bitcoin@localhost:${rpcPort}`);

@@ -12,7 +12,7 @@ runs:
         df -h
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/hostedtoolcache/CodeQL
-        sudo rm -rf /opt/hostedtoolcache/Go
+        sudo rm -rf /opt/hostedtoolcache/go
         sudo rm -rf /opt/hostedtoolcache/Java
         sudo rm -rf /opt/hostedtoolcache/R
         sudo rm -rf /opt/hostedtoolcache/Node
