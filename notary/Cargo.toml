@@ -54,6 +54,7 @@ uuid = { workspace = true, features = ["v4"] }
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["frame-support", "sp-keyring"], default-features = true }
 argon-testing = { workspace = true }
+serial_test = { workspace = true }
 
 [build-dependencies]
 argon-primitives = { workspace = true, features = ["std"] }

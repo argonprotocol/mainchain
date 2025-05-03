@@ -214,6 +214,7 @@ mod test {
 		BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey, Satoshis, UtxoRef, UtxoValue,
 	};
 	use argon_testing::*;
+	use serial_test::serial;
 
 	use crate::{CosignReleaser, ReleaseStep, UtxoSpendFilter};
 
@@ -241,6 +242,7 @@ mod test {
 	}
 
 	#[test]
+	#[serial]
 	fn vault_can_claim_the_timelock_script() {
 		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 
@@ -413,6 +415,7 @@ mod test {
 	}
 
 	#[test]
+	#[serial]
 	fn owner_can_reclaim_the_timelock_script() {
 		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 
@@ -527,6 +530,7 @@ mod test {
 	}
 
 	#[test]
+	#[serial]
 	fn owner_can_reclaim_the_timelock_script_with_bitcoin_core() {
 		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 
@@ -654,6 +658,7 @@ mod test {
 	}
 
 	#[test]
+	#[serial]
 	fn vault_and_owner_can_cosign() {
 		let (bitcoind, tracker, block_address, network) = start_bitcoind();
 		// 1. Owner creates a new pubkey and submits to blockchain
