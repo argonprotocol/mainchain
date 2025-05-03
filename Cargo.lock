@@ -879,7 +879,7 @@ checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "argon-bitcoin"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -897,12 +897,13 @@ dependencies = [
  "parking_lot 0.12.3",
  "polkadot-sdk",
  "serde_json",
+ "serial_test",
  "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "argon-bitcoin-cli"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "age",
  "anyhow",
@@ -931,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-cli-macros"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "quote",
  "syn 2.0.101",
@@ -939,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-utxo-tracker"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -958,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "argon-canary-runtime"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -997,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "argon-client"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1020,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "argon-localchain"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1065,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
@@ -1095,7 +1096,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node-consensus"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-bitcoin-utxo-tracker",
@@ -1130,7 +1131,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1158,6 +1159,7 @@ dependencies = [
  "scale-info",
  "serde",
  "serde_json",
+ "serial_test",
  "sqlx",
  "subxt 0.41.0",
  "thiserror 2.0.12",
@@ -1171,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-apis"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-notary-audit",
@@ -1192,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-audit"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1207,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "argon-oracle"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "alloy-eips",
  "alloy-primitives 0.8.25",
@@ -1249,7 +1251,7 @@ dependencies = [
 
 [[package]]
 name = "argon-primitives"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1278,7 +1280,7 @@ dependencies = [
 
 [[package]]
 name = "argon-randomx"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "bindgen 0.71.1",
  "cmake",
@@ -1296,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1335,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime-common"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1372,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1400,7 +1402,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing-bitcoin"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "bitcoind",
 ]
@@ -5387,7 +5389,7 @@ dependencies = [
 
 [[package]]
 name = "end-to-end"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -11140,7 +11142,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-locks"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -11153,7 +11155,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-utxos"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11163,7 +11165,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-rewards"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11173,7 +11175,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-notary-audit",
  "futures",
@@ -11185,7 +11187,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11312,7 +11314,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-chain-transfer"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -11561,7 +11563,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-digests"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-notary-audit",
  "impl-trait-for-tuples",
@@ -11573,7 +11575,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-domains"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11822,7 +11824,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-liquidity-pools"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-prelude",
@@ -11900,7 +11902,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mining-slot"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-prelude",
@@ -11911,7 +11913,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mint"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12089,7 +12091,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notaries"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12100,7 +12102,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notebook"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12201,7 +12203,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prelude"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-primitives",
  "env_logger 0.11.8",
@@ -12212,7 +12214,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-price-index"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12548,7 +12550,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ticks"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12745,7 +12747,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-vaults"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "argon-bitcoin",
  "bip32",
@@ -22599,7 +22601,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-cli"
-version = "1.1.0-rc.6"
+version = "1.1.0-rc.7"
 dependencies = [
  "uniffi",
 ]

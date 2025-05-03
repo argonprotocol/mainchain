@@ -114,6 +114,19 @@ where
 		let _lock = self.import_lock.lock().await;
 
 		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+		let finalized_hash = self.client.info().finalized_hash;
+		let is_finalized_descendent = is_on_finalized_chain(
+			&(*self.client),
+			&block,
+			&finalized_hash,
+			self.client.info().finalized_number,
+		)
+		.unwrap_or_default();
+
+		let can_finalize = is_finalized_descendent ||
+			block.origin == BlockOrigin::NetworkInitialSync ||
+			block.finalized;
+
 		// We only want to set a best block if the state is imported. When
 		// syncing, we will sometimes import state, but be grabbing a gap block, in which case we
 		// don't want to set interim blocks as best block
@@ -128,7 +141,14 @@ where
 		let is_block_already_imported =
 			self.client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown) ==
 				sp_blockchain::BlockStatus::InChain;
-
+		if is_block_already_imported && !can_finalize {
+			tracing::debug!(
+				?hash,
+				?number,
+				"Skipping reimport of known block not in finalized chain"
+			);
+			return Ok(ImportResult::AlreadyInChain);
+		}
 		if has_state && !is_block_gap {
 			let max_fork_power = if is_block_already_imported {
 				self.aux_client.strongest_fork_power()?.get()
@@ -143,7 +163,7 @@ where
 			};
 			// NOTE: only import as best block if it beats the best stored block. There are cases
 			// where importing a tie will yield too many blocks at a height and break substrate
-			if fork_power > max_fork_power {
+			if can_finalize && fork_power > max_fork_power {
 				tracing::info!(
 					block_hash = ?hash,
 					?fork_power,
@@ -154,14 +174,43 @@ where
 		}
 		match self.inner.import_block(block).await {
 			Ok(result) => {
-				self.aux_client.block_accepted(fork_power).inspect_err(|e| {
-					log::error!("Failed to record block accepted for {:?}: {:?}", hash, e)
-				})?;
+				if can_finalize {
+					self.aux_client.block_accepted(fork_power).inspect_err(|e| {
+						log::error!("Failed to record block accepted for {:?}: {:?}", hash, e)
+					})?;
+				}
 				Ok(result)
 			},
 			Err(e) => Err(e.into()),
 		}
 	}
+}
+
+fn is_on_finalized_chain<C, B>(
+	client: &C,
+	block: &BlockImportParams<B>,
+	finalized: &B::Hash,
+	finalized_number: NumberFor<B>,
+) -> Result<bool, Error>
+where
+	C: HeaderBackend<B>,
+	B: BlockT,
+{
+	let mut number = *block.header.number();
+	let mut parent_hash = *block.header.parent_hash();
+	let mut block_hash = block.post_hash();
+	while number >= finalized_number {
+		if number == finalized_number {
+			return Ok(block_hash == *finalized)
+		}
+		let header = client
+			.header(parent_hash)?
+			.ok_or(Error::BlockNotFound(format!("{:?}", parent_hash)))?;
+		number = *header.number();
+		parent_hash = *header.parent_hash();
+		block_hash = header.hash();
+	}
+	Ok(false)
 }
 
 #[async_trait::async_trait]

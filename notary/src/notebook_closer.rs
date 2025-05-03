@@ -302,6 +302,7 @@ mod tests {
 		DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
+	use serial_test::serial;
 
 	use super::*;
 	use crate::{
@@ -312,6 +313,7 @@ mod tests {
 	};
 
 	#[sqlx::test]
+	#[serial]
 	async fn test_submitting_votes(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let ctx = start_argon_test_node().await;

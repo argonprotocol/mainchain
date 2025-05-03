@@ -398,10 +398,12 @@ async fn subscribe_to_blocks(
 mod tests {
 	use super::*;
 	use argon_testing::start_argon_test_node;
+	use serial_test::serial;
 	use sqlx::PgPool;
 	use subxt::config::Header;
 
 	#[sqlx::test]
+	#[serial]
 	async fn test_handles_duplicate_blocks(pool: PgPool) -> anyhow::Result<()> {
 		let node = start_argon_test_node().await;
 		let _ = tracing_subscriber::fmt::try_init();
@@ -443,6 +445,7 @@ mod tests {
 	}
 
 	#[sqlx::test]
+	#[serial]
 	async fn can_survive_a_reboot(pool: PgPool) -> anyhow::Result<()> {
 		let mut node = start_argon_test_node().await;
 		let _ = tracing_subscriber::fmt::try_init();

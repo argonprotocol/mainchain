@@ -1,6 +1,15 @@
 # Changelog
 
-## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.5...ec6fa88cb1761c645617f0cacbf185eba4a0d7cb) (2025-04-30)
+## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.6...105a99c28607180efc3a67b573d7842eb5845519) (2025-05-02)
+
+### Fixes
+
+* **client:** rotation id still one off
+([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
+* **node:** additional fast sync fixes
+([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
+
+## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.6) (2025-05-01)
 
 ### Features
 
@@ -8,16 +17,6 @@
 ([4e8e475](https://github.com/argonprotocol/mainchain/commit/4e8e4755af2367e42e042be76e79b880c31141e4))
 * upgrade to polkadot-sdk umbrella
 ([06f0e09](https://github.com/argonprotocol/mainchain/commit/06f0e098f65e19204d1da64e22e6dcf096a859ad))
-
-### Fixes
-
-* mining rotations calculation
-([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
-
-## [v1.1.0-rc.5](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.5) (2025-04-25)
-
-### Features
-
 * hyperbridge doc
 ([fd8a425](https://github.com/argonprotocol/mainchain/commit/fd8a425e82dfb7adc923805dafbb34818f12a108))
 * **client:** add nodejs cli + bidding
@@ -27,6 +26,8 @@
 
 ### Fixes
 
+* mining rotations calculation
+([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
 * **bitcoin_locks:** add error decode
 ([59771b5](https://github.com/argonprotocol/mainchain/commit/59771b5e5fc91e57843ca582634f1a70fd275201))
 * **client:** codeql issue
