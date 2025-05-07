@@ -79,6 +79,7 @@ pallet-liquidity-pools = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
 pallet-ticks = { workspace = true }
+pallet-restricted-account = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
 argon-primitives = { workspace = true }
@@ -110,6 +111,7 @@ std = [
 	"pallet-notaries/std",
 	"pallet-notebook/std",
 	"pallet-price-index/std",
+	"pallet-restricted-account/std",
 	"pallet-ticks/std",
 	"pallet-token-gateway/std",
 	"pallet-vaults/std",
@@ -135,6 +137,7 @@ runtime-benchmarks = [
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
+	"pallet-restricted-account/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
@@ -158,6 +161,7 @@ try-runtime = [
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
 	"pallet-price-index/try-runtime",
+	"pallet-restricted-account/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-token-gateway/try-runtime",
 	"pallet-vaults/try-runtime",

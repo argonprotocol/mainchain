@@ -53,6 +53,7 @@ import type {
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultObligation,
+  ArgonRuntimeProxyType,
   FrameSupportDispatchPerDispatchClassWeight,
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
   FrameSupportTokensMiscIdAmountRuntimeHoldReason,
@@ -1177,6 +1178,29 @@ declare module '@polkadot/api-base/types/storage' {
         (
           arg: AccountId32 | string | Uint8Array,
         ) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>,
+        [AccountId32]
+      >;
+    };
+    restrictedAccount: {
+      /**
+       * The restricted access types for an account.
+       **/
+      accountAccessList: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<Vec<ArgonRuntimeProxyType>>>,
+        [AccountId32]
+      >;
+      /**
+       * The owner of the account. This account is the only account that can remove the restriction.
+       * It also has an ability to dispatch calls as the restricted account.
+       **/
+      accountOwner: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<AccountId32>>,
         [AccountId32]
       >;
     };

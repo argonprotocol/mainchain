@@ -1386,6 +1386,7 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
     };
+    restrictedAccount: {};
     sudo: {
       /**
        * The sudo key has been updated.
