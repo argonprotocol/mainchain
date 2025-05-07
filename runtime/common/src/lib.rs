@@ -121,6 +121,7 @@ macro_rules! inject_runtime_vars {
 			frame_system::CheckMortality<Runtime>,
 			frame_system::CheckNonce<Runtime>,
 			frame_system::CheckWeight<Runtime>,
+			pallet_restricted_account::CheckRestrictedAccess<Runtime>,
 			pallet_skip_feeless_payment::SkipCheckIfFeeless<
 				Runtime,
 				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,

@@ -1532,6 +1532,72 @@ declare module '@polkadot/api-base/types/submittable' {
         [MultiAddress, ArgonRuntimeProxyType, u32]
       >;
     };
+    restrictedAccount: {
+      /**
+       * Remove account access restriction. Must be called by the owner account
+       **/
+      deregister: AugmentedSubmittable<
+        (
+          restrictedAccount: AccountId32 | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32]
+      >;
+      /**
+       * Modify account access. Must be called by the owner account
+       **/
+      modifyAccess: AugmentedSubmittable<
+        (
+          restrictedAccount: AccountId32 | string | Uint8Array,
+          accessTypes:
+            | Vec<ArgonRuntimeProxyType>
+            | (
+                | ArgonRuntimeProxyType
+                | 'Any'
+                | 'NonTransfer'
+                | 'PriceIndex'
+                | 'MiningBid'
+                | 'BitcoinCosign'
+                | 'VaultAdmin'
+                | number
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, Vec<ArgonRuntimeProxyType>]
+      >;
+      /**
+       * Dispatch a restricted call as the restricted account. This api opens permissions to apis
+       * otherwise unavailable to the account
+       **/
+      ownerDispatch: AugmentedSubmittable<
+        (
+          restrictedAccount: AccountId32 | string | Uint8Array,
+          call: Call | IMethod | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, Call]
+      >;
+      /**
+       * Restrict account access
+       **/
+      register: AugmentedSubmittable<
+        (
+          ownerAccount: AccountId32 | string | Uint8Array,
+          accessTypes:
+            | Vec<ArgonRuntimeProxyType>
+            | (
+                | ArgonRuntimeProxyType
+                | 'Any'
+                | 'NonTransfer'
+                | 'PriceIndex'
+                | 'MiningBid'
+                | 'BitcoinCosign'
+                | 'VaultAdmin'
+                | number
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, Vec<ArgonRuntimeProxyType>]
+      >;
+    };
     sudo: {
       /**
        * Permanently removes the sudo key.

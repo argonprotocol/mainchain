@@ -984,6 +984,7 @@ dependencies = [
  "pallet-notaries",
  "pallet-notebook",
  "pallet-price-index",
+ "pallet-restricted-account",
  "pallet-ticks",
  "pallet-token-gateway",
  "pallet-vaults",
@@ -1323,6 +1324,7 @@ dependencies = [
  "pallet-notaries",
  "pallet-notebook",
  "pallet-price-index",
+ "pallet-restricted-account",
  "pallet-ticks",
  "pallet-token-gateway",
  "pallet-vaults",
@@ -1361,6 +1363,7 @@ dependencies = [
  "pallet-notaries",
  "pallet-notebook",
  "pallet-price-index",
+ "pallet-restricted-account",
  "pallet-ticks",
  "pallet-token-gateway",
  "pallet-vaults",
@@ -12296,6 +12299,16 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-restricted-account"
+version = "1.1.0"
+dependencies = [
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
 ]
 
 [[package]]

@@ -18,6 +18,7 @@ members = [
     "pallets/notebook",
     "pallets/price_index",
     "pallets/pallet_prelude",
+    "pallets/restricted_account",
     "pallets/ticks",
     "pallets/mint",
     "pallets/vaults",
@@ -292,6 +293,7 @@ pallet-liquidity-pools = { path = "pallets/liquidity_pools", default-features = 
 pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }
 pallet-notaries = { path = "pallets/notaries", default-features = false }
+pallet-restricted-account = { path = "pallets/restricted_account", default-features = false }
 pallet-ticks = { path = "pallets/ticks", default-features = false }
 pallet-mint = { path = "pallets/mint", default-features = false }
 pallet-price-index = { path = "pallets/price_index", default-features = false }

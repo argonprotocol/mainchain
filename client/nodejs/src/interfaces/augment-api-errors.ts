@@ -763,6 +763,16 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       Unproxyable: AugmentedError<ApiType>;
     };
+    restrictedAccount: {
+      /**
+       * The account is already restricted.
+       **/
+      AccountAlreadyRestricted: AugmentedError<ApiType>;
+      /**
+       * This account is not the owner of the restriction
+       **/
+      AccountNotOwner: AugmentedError<ApiType>;
+    };
     sudo: {
       /**
        * Sender must be the Sudo account.
