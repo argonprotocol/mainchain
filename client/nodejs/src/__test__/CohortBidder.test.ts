@@ -95,7 +95,7 @@ describeIntegration('Cohort Bidder tests', () => {
           {
             minBid: 10_000n,
             maxBid: 5_000_000n,
-            maxBalance: 25_000_000n,
+            maxBudget: 25_000_000n,
             bidIncrement: 1_000_000n,
             bidDelay: 0,
           },
@@ -107,7 +107,7 @@ describeIntegration('Cohort Bidder tests', () => {
           {
             minBid: 10_000n,
             maxBid: 4_000_000n,
-            maxBalance: 40_000_000n,
+            maxBudget: 40_000_000n,
             bidIncrement: 1_000_000n,
             bidDelay: 0,
           },

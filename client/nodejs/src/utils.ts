@@ -6,6 +6,7 @@ import { EventRecord } from '@polkadot/types/interfaces/system';
 const { ROUND_FLOOR } = BN;
 
 export function formatArgons(x: bigint | number): string {
+  if (x === undefined || x === null) return 'na';
   const isNegative = x < 0;
   let format = BigNumber(x.toString()).abs().div(1e6).toFormat(2, ROUND_FLOOR);
   if (format.endsWith('.00')) {

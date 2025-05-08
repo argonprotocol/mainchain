@@ -113,8 +113,8 @@ import { CohortBidder } from '@argonprotocol/mainchain';
 const subaccounts = await accountset.getAvailableMinerAccounts(5);
 const cohortBidder = new CohortBidder(accountset, cohortId, subaccounts, {
   maxSeats: 5,
-  // spend a max of 100 argons
-  maxBalance: 100_000_000,
+  // a budget not to exceed
+  maxBudget: 100_000_000,
   // only spend max 1 argon per seat
   maxBid: 1_000_000,
   // start bidding at 0.5 argons

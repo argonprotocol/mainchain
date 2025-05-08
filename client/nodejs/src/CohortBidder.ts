@@ -53,7 +53,7 @@ export class CohortBidder {
     public options: {
       minBid: bigint;
       maxBid: bigint;
-      maxBalance: bigint;
+      maxBudget: bigint;
       bidIncrement: bigint;
       bidDelay: number;
     },
@@ -159,7 +159,7 @@ export class CohortBidder {
       maxBid: formatArgons(this.options.maxBid),
       minBid: formatArgons(this.options.minBid),
       bidIncrement: formatArgons(this.options.bidIncrement),
-      maxBalance: formatArgons(this.options.maxBalance),
+      maxBudget: formatArgons(this.options.maxBudget),
       bidDelay: this.options.bidDelay,
       subaccounts: this.subaccounts,
     });
@@ -255,14 +255,19 @@ export class CohortBidder {
       return;
     }
 
-    // 2. how many seats fit into this budget?
+    let budget = this.options.maxBudget;
+    const balance = await this.accountset.balance();
+    const feeWiggleRoom = BigInt(25e3);
+
+    if (budget > balance - feeWiggleRoom) {
+      budget = balance - feeWiggleRoom;
+    }
+
     const seatsInBudget =
-      nextBid === 0n
-        ? this.subaccounts.length
-        : Number(this.options.maxBalance / nextBid);
+      nextBid === 0n ? this.subaccounts.length : Number(budget / nextBid);
     if (seatsInBudget <= 0) {
       console.log(
-        `Can't afford any seats at ${formatArgons(nextBid)}. Would exceed our max balance of ${formatArgons(this.options.maxBalance)}.`,
+        `Can't afford any seats at ${formatArgons(nextBid)}. Would exceed our available budget of ${formatArgons(budget)}.`,
       );
       return;
     }
@@ -292,7 +297,7 @@ export class CohortBidder {
       console.log('Had to remove some subaccounts to fit in budget:', {
         removedIndices,
         seatsInBudget,
-        budget: formatArgons(this.options.maxBalance),
+        budget: formatArgons(budget),
       });
     }
     this.pendingRequest = this.bid(
