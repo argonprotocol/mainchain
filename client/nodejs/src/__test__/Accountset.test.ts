@@ -83,7 +83,7 @@ describeIntegration('Accountset tests', () => {
 
   it('can will handle a subset of failed bids', async () => {
     const alice = sudo();
-    const secondAccount = await createKeyringPair({});
+    const secondAccount = createKeyringPair({});
 
     const api = await client;
     const txSubmitter = new TxSubmitter(
@@ -95,16 +95,29 @@ describeIntegration('Accountset tests', () => {
       alice,
     );
     await txSubmitter.submit({ waitForBlock: true });
+    let startingCohortId = await api.query.miningSlot
+      .nextCohortId()
+      .then(x => x.toNumber());
+    await new Promise(resolve =>
+      api.query.miningSlot.nextCohortId(x => {
+        if (x.toNumber() > startingCohortId) {
+          resolve(true);
+        }
+      }),
+    );
 
-    const alice_result = await new Accountset({
+    const account = new Accountset({
       client,
       seedAccount: alice,
       subaccountRange: parseSubaccountRange('0-49'),
       sessionKeyMnemonic: mnemonicGenerate(),
-    }).createMiningBids({
-      bidAmount: 2_000_000n,
-      subaccountRange: [0, 1, 2, 3, 4, 5, 6],
     });
+    const subaccounts = await account.getAvailableMinerAccounts(7);
+    const alice_result = await account.createMiningBids({
+      bidAmount: 2_000_000n,
+      subaccountRange: subaccounts.map(x => x.index),
+    });
+    expect(alice_result.bidError).toBeFalsy();
     expect(alice_result.successfulBids).toBe(7);
 
     const second_bids = await new Accountset({

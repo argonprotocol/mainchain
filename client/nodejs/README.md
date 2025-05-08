@@ -57,6 +57,93 @@ interface IArgonCpiSnapshot {
 }
 ```
 
+## Library Classes
+
+The library has a few classes that are used to interact with the Argon Protocol.
+
+`clis` - this is a collection of cli commands and helpers. Included here are two helpers to read and store encrypted
+wallets from Polkadot.js or a wallet like [Talisman](https://talisman.xyz/).
+
+`Accountset.ts` - manage subaccounts from a single keypair
+
+```typescript
+import {
+  Accountset,
+  getClient,
+  type KeyringPair,
+  mnemonicGenerate,
+} from '@argonprotocol/mainchain';
+import { keyringFromFile } from '@argonprotocol/mainchain/clis';
+import { existsSync, promises as fs } from 'node:fs';
+
+const mnemonicFile = './sessionKeyMnemonic.key';
+// generate keys that are used to sign blocks.
+if (!existsSync(mnemonicFile)) {
+  const sessionKeyMnemonic = mnemonicGenerate();
+  await fs.writeFile(sessionKeyMnemonic, 'utf8');
+}
+const sessionKeyMnemonic = await fs.readFile(mnemonicFile, 'utf8');
+const seedAccount = await keyringFromFile({
+  filePath: '<path to file>',
+  passphrase: 'my password',
+});
+const mainchainUrl = 'wss://rpc.argon.network';
+const client = getClient(mainchainUrl);
+this.accountset = new Accountset({
+  client,
+  seedAccount,
+  sessionKeyMnemonic,
+  subaccountRange: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+});
+
+// register your keys on your miner
+await this.accountset.registerKeys(localRpcUrl);
+```
+
+`BidPool.ts` - monitor mining bid pools
+
+`BitcoinLocks.ts` - wait for bitcoin space, create bitcoin transactions and look up market pricing
+
+`CohortBidder.ts` - create a bidding bot
+
+```typescript
+import { CohortBidder } from '@argonprotocol/mainchain';
+
+// on new bidding
+const subaccounts = await accountset.getAvailableMinerAccounts(5);
+const cohortBidder = new CohortBidder(accountset, cohortId, subaccounts, {
+  maxSeats: 5,
+  // a budget not to exceed
+  maxBudget: 100_000_000,
+  // only spend max 1 argon per seat
+  maxBid: 1_000_000,
+  // start bidding at 0.5 argons
+  minBid: 500_000,
+  // increment by 0.01 argons each bid
+  bidIncrement: 10_000,
+  // wait 10 minutes between bids
+  bidDelay: 10,
+});
+```
+
+`MiningBids.ts` - subscribe to the next bidding cohorts
+
+```typescript
+import { MiningBids } from '@argonprotocol/mainchain';
+
+const miningBids = new MiningBids(client);
+const { unsubscribe } = await miningBids.onCohortChange({
+  async onBiddingStart(cohortId) {
+    // ...
+  },
+  async onBiddingEnd(cohortId) {
+    // ...
+  },
+});
+```
+
+`Vault.ts + VaultMonitor.ts` - watch vaults for available funds/opportunities and calculate fees
+
 ## Cli
 
 To use this CLI, the easiest way is to define an .env file with the following variables (you can also provide these to
@@ -128,6 +215,7 @@ Options:
   --account-file-path <jsonPath>   The path to your json seed file from polkadotjs (env: ACCOUNT_JSON_PATH)
   --account-suri <secretUri>       A secret uri (suri) to use for the account (env: ACCOUNT_SURI)
   --account-passphrase <password>  The password for your seed file (env: ACCOUNT_PASSPHRASE)
+  --account-passphrase-file <path> A password for your seed file contained in a file
   -s, --subaccounts <range>        Restrict this operation to a subset of the subaccounts (eg, 0-10) (env: SUBACCOUNT_RANGE)
   -h, --help                       display help for command
 
@@ -146,7 +234,7 @@ Create a dynamic bid for a mining seat, maxed at 10 argons per seat. Without a b
 eg, 10 seats).
 
 ```bash
-npx @argonprotocol/mainchain --env=accounts/.env.bob mining bid --min-argons=1 --max-argons=10 --bid-increment=0.1
+npx @argonprotocol/mainchain --env=accounts/.env.bob mining bid --min-bid=1 --max-bid=10 --bid-increment=0.1
 ```
 
 ### Subaccounts

@@ -210,7 +210,7 @@ export default function miningCli() {
                 maxBid: maxBidAmount,
                 minBid: BigInt((minBid ?? 0) * 1e6),
                 bidIncrement: BigInt(Math.floor(bidIncrement * 1e6)),
-                maxBalance: maxBalanceToUse,
+                maxBudget: maxBalanceToUse,
                 bidDelay,
               },
             );

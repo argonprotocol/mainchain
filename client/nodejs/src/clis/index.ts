@@ -52,6 +52,12 @@ export function buildCli() {
     )
     .addOption(
       new Option(
+        '--account-passphrase-file <path>',
+        'The path to a password for your seed file',
+      ),
+    )
+    .addOption(
+      new Option(
         '-s, --subaccounts <range>',
         'Restrict this operation to a subset of the subaccounts (eg, 0-10)',
       )
@@ -79,6 +85,7 @@ export async function accountsetFromCli(
     keypair = await keyringFromFile({
       filePath: opts.accountFilePath,
       passphrase: opts.accountPassphrase,
+      passphraseFile: opts.accountPassphraseFile,
     });
   }
   if (!keypair) {

@@ -7,6 +7,7 @@ const { readFile, writeFile } = promises;
 export async function keyringFromFile(opts: {
   filePath: string;
   passphrase?: string;
+  passphraseFile?: string;
 }): Promise<KeyringPair> {
   if (!opts.filePath) {
     throw new Error(
@@ -15,8 +16,13 @@ export async function keyringFromFile(opts: {
   }
   const path = opts.filePath.replace('~', os.homedir());
   const json = JSON.parse(await readFile(path, 'utf-8'));
+  let passphrase = opts.passphrase;
+  if (opts.passphraseFile) {
+    const passphrasePath = opts.passphraseFile.replace('~', os.homedir());
+    passphrase = await readFile(passphrasePath, 'utf-8');
+  }
   const mainAccount = new Keyring().createFromJson(json);
-  mainAccount.decodePkcs8(opts.passphrase);
+  mainAccount.decodePkcs8(passphrase);
   return mainAccount;
 }
 
