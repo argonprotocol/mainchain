@@ -50,6 +50,7 @@ polkadot-sdk.features = [
     "pallet-proxy",
     "pallet-tx-pause",
     "pallet-utility",
+    "pallet-skip-feeless-payment",
     "pallet-transaction-payment",
     "pallet-transaction-payment-rpc-runtime-api",
 ]

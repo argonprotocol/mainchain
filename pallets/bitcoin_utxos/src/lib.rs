@@ -287,24 +287,29 @@ pub mod pallet {
 		/// * `bitcoin_height` - the latest bitcoin block height to be confirmed
 		#[pallet::call_index(1)]
 		#[pallet::weight((0, DispatchClass::Operational))]
-		#[allow(clippy::useless_conversion)]
+		#[pallet::feeless_if(|origin: &OriginFor<T>, _height: &BitcoinHeight, _hash: &BitcoinBlockHash, | -> bool {
+			let Ok(who) = ensure_signed(origin.clone()) else {
+				return false;
+			};
+			Some(who) == <OracleOperatorAccount<T>>::get()
+		})]
 		pub fn set_confirmed_block(
 			origin: OriginFor<T>,
 			bitcoin_height: BitcoinHeight,
 			bitcoin_block_hash: BitcoinBlockHash,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Some(who) == <OracleOperatorAccount<T>>::get(), Error::<T>::NoPermissions);
 			if let Some(current) = <ConfirmedBitcoinBlockTip<T>>::get() {
 				if bitcoin_height < current.block_height {
-					return Ok(Pays::No.into());
+					return Ok(());
 				}
 			}
 			<ConfirmedBitcoinBlockTip<T>>::put(BitcoinBlock {
 				block_height: bitcoin_height,
 				block_hash: bitcoin_block_hash,
 			});
-			Ok(Pays::No.into())
+			Ok(())
 		}
 
 		/// Sets the oracle operator account id (only executable by the Root account)

@@ -210,6 +210,7 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
+  PalletSkipFeelessPaymentEvent,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -463,6 +464,7 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
+    PalletSkipFeelessPaymentEvent: PalletSkipFeelessPaymentEvent;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

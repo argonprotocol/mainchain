@@ -620,12 +620,21 @@ pub mod pallet {
 		/// wallets.
 		#[pallet::call_index(2)]
 		#[pallet::weight((0, DispatchClass::Operational))]
+		#[pallet::feeless_if(|origin: &OriginFor<T>, utxo_id: &UtxoId, _signature: &BitcoinSignature| -> bool {
+			let Ok(who) = ensure_signed(origin.clone()) else {
+				return false;
+			};
+			if let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) {
+				return T::BitcoinObligationProvider::is_owner(lock.vault_id, &who)
+			}
+			false
+		})]
 		#[allow(clippy::useless_conversion)]
 		pub fn cosign_release(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,
 			signature: BitcoinSignature,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::ObligationNotFound)?;
 
@@ -698,7 +707,7 @@ pub mod pallet {
 			});
 
 			// no fee for cosigning
-			Ok(Pays::No.into())
+			Ok(())
 		}
 
 		#[pallet::call_index(3)]

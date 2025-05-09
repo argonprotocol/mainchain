@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 32usize] = [
+	pub static PALLETS: [&str; 33usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -39,6 +39,7 @@ pub mod api {
 		"Hyperbridge",
 		"TokenGateway",
 		"LiquidityPools",
+		"FeelessTransaction",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -3871,9 +3872,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				101u8, 160u8, 119u8, 105u8, 80u8, 130u8, 93u8, 187u8, 244u8, 118u8, 7u8, 142u8,
-				104u8, 254u8, 138u8, 126u8, 144u8, 228u8, 196u8, 223u8, 215u8, 198u8, 208u8, 184u8,
-				251u8, 203u8, 165u8, 91u8, 58u8, 191u8, 230u8, 162u8,
+				214u8, 55u8, 250u8, 139u8, 233u8, 233u8, 248u8, 223u8, 33u8, 115u8, 110u8, 77u8,
+				34u8, 120u8, 85u8, 157u8, 143u8, 19u8, 206u8, 44u8, 188u8, 220u8, 39u8, 225u8,
+				180u8, 68u8, 223u8, 230u8, 160u8, 0u8, 226u8, 201u8,
 			]
 	}
 	pub mod system {
@@ -5024,9 +5025,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							38u8, 29u8, 73u8, 59u8, 237u8, 196u8, 111u8, 150u8, 22u8, 207u8, 85u8,
-							225u8, 80u8, 87u8, 208u8, 92u8, 49u8, 26u8, 114u8, 160u8, 117u8, 55u8,
-							79u8, 254u8, 253u8, 53u8, 20u8, 229u8, 78u8, 101u8, 231u8, 198u8,
+							130u8, 177u8, 215u8, 58u8, 219u8, 174u8, 148u8, 251u8, 30u8, 60u8,
+							19u8, 127u8, 132u8, 68u8, 141u8, 90u8, 115u8, 199u8, 21u8, 157u8,
+							177u8, 0u8, 64u8, 148u8, 217u8, 168u8, 246u8, 209u8, 154u8, 227u8,
+							174u8, 97u8,
 						],
 					)
 				}
@@ -23146,6 +23148,37 @@ pub mod api {
 			}
 		}
 	}
+	pub mod feeless_transaction {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_skip_feeless_payment::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transaction fee was skipped."]
+			pub struct FeeSkipped {
+				pub origin: fee_skipped::Origin,
+			}
+			pub mod fee_skipped {
+				use super::runtime_types;
+				pub type Origin = runtime_types::argon_runtime::OriginCaller;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FeeSkipped {
+				const PALLET: &'static str = "FeelessTransaction";
+				const EVENT: &'static str = "FeeSkipped";
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -25202,6 +25235,8 @@ pub mod api {
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Event),
 				#[codec(index = 31)]
 				LiquidityPools(runtime_types::pallet_liquidity_pools::pallet::Event),
+				#[codec(index = 32)]
+				FeelessTransaction(runtime_types::pallet_skip_feeless_payment::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -30505,6 +30540,33 @@ pub mod api {
 				pub delegate: _0,
 				pub proxy_type: _1,
 				pub delay: _2,
+			}
+		}
+		pub mod pallet_skip_feeless_payment {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "A transaction fee was skipped."]
+					FeeSkipped { origin: runtime_types::argon_runtime::OriginCaller },
+				}
 			}
 		}
 		pub mod pallet_sudo {

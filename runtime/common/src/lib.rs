@@ -90,10 +90,10 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 121,
+			spec_version: 122,
 			impl_version: 6,
 			apis: RUNTIME_API_VERSIONS,
-			transaction_version: 3,
+			transaction_version: 4,
 			system_version: 1,
 		};
 		parameter_types! {
@@ -112,8 +112,8 @@ macro_rules! inject_runtime_vars {
 		pub type Header = generic::Header<BlockNumber, BlockHash>;
 		/// Block type as expected by this runtime.
 		pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-		/// The SignedExtension to the basic transaction logic.
-		pub type SignedExtra = (
+		/// The `TransactionExtension` to the basic transaction logic.
+		pub type TxExtension = (
 			frame_system::CheckNonZeroSender<Runtime>,
 			frame_system::CheckSpecVersion<Runtime>,
 			frame_system::CheckTxVersion<Runtime>,
@@ -121,7 +121,10 @@ macro_rules! inject_runtime_vars {
 			frame_system::CheckMortality<Runtime>,
 			frame_system::CheckNonce<Runtime>,
 			frame_system::CheckWeight<Runtime>,
-			pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+			pallet_skip_feeless_payment::SkipCheckIfFeeless<
+				Runtime,
+				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+			>,
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 		);
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
@@ -136,9 +139,9 @@ macro_rules! inject_runtime_vars {
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =
-			generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+			generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 		/// The payload being signed in transactions.
-		pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
+		pub type SignedPayload = generic::SignedPayload<RuntimeCall, TxExtension>;
 		/// Executive: handles dispatch to the various modules.
 		pub type Executive = frame_executive::Executive<
 			Runtime,

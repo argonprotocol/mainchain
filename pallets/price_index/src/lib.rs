@@ -180,8 +180,13 @@ pub mod pallet {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
 		#[pallet::weight((0, DispatchClass::Operational))]
-		#[allow(clippy::useless_conversion)]
-		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResultWithPostInfo {
+		#[pallet::feeless_if(|origin: &OriginFor<T>, _index: &PriceIndex| -> bool {
+			let Ok(who) = ensure_signed(origin.clone()) else {
+				return false;
+			};
+			Some(who) == <Operator<T>>::get()
+		})]
+		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let operator = <Operator<T>>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
@@ -190,13 +195,13 @@ pub mod pallet {
 			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
 
 			if index.tick < oldest_age {
-				return Ok(Pays::No.into());
+				return Ok(());
 			}
 
 			let mut index = index;
 			if let Some(current) = <Current<T>>::get() {
 				if index.tick <= current.tick {
-					return Ok(Pays::No.into());
+					return Ok(());
 				}
 				Self::clamp_argon_prices(&current, &mut index);
 			}
@@ -204,7 +209,7 @@ pub mod pallet {
 			<Current<T>>::put(index);
 			Self::deposit_event(Event::<T>::NewIndex);
 
-			Ok(Pays::No.into())
+			Ok(())
 		}
 
 		/// Sets the operator account id (only executable by the Root account)

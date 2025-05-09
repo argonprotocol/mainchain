@@ -116,6 +116,9 @@ mod runtime {
 
 	#[runtime::pallet_index(31)]
 	pub type LiquidityPools = pallet_liquidity_pools;
+
+	#[runtime::pallet_index(32)]
+	pub type FeelessTransaction = pallet_skip_feeless_payment;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -619,6 +622,10 @@ impl ismp_grandpa::Config for Runtime {
 impl pallet_hyperbridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type IsmpHost = Ismp;
+}
+
+impl pallet_skip_feeless_payment::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
 }
 
 // Add the token gateway pallet to your ISMP router
