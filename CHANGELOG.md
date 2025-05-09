@@ -1,21 +1,20 @@
 # Changelog
 
-## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.6...105a99c28607180efc3a67b573d7842eb5845519) (2025-05-02)
+## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.7...2dcb2f6cb59bde2e33025d21b2a8d370531156a1) (2025-05-09)
+
+### Features
+
+* **client:** add bidding history to cohortbidder
+([8a69d17](https://github.com/argonprotocol/mainchain/commit/8a69d17184682baa34d70262488eb6813c6ce865))
+* **client:** ability to use a password file
+([b08cfdd](https://github.com/argonprotocol/mainchain/commit/b08cfdd9f9a6065a525968d6b7d540a918c82dce))
 
 ### Fixes
 
-* **gh:** glibc incapatability
-([48a81d2](https://github.com/argonprotocol/mainchain/commit/48a81d24b6121199e932db2855af49288f9e3ab8))
-* **testing:** bitcoin unavailable in docker
-([6d8cc4e](https://github.com/argonprotocol/mainchain/commit/6d8cc4e4814fcbfa672df2a7abfe2d1ea59beb8a))
-* **client:** rotation id still one off
-([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
-* **ga:** caching of files
-([079232f](https://github.com/argonprotocol/mainchain/commit/079232f69f54b2b712a050685c490be48cda30c7))
-* **node:** additional fast sync fixes
-([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
+* **client:** cap budget by balance
+([4286a17](https://github.com/argonprotocol/mainchain/commit/4286a172c15741fd3ba618ece025cdf959bc8456))
 
-## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.6) (2025-05-01)
+## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.7) (2025-05-02)
 
 ### Features
 
@@ -38,6 +37,18 @@
 
 ### Fixes
 
+* **node:** check finalization before marking best
+([f5dba60](https://github.com/argonprotocol/mainchain/commit/f5dba60efa43f226920537db005d09bde6f9608b))
+* **gh:** glibc incapatability
+([48a81d2](https://github.com/argonprotocol/mainchain/commit/48a81d24b6121199e932db2855af49288f9e3ab8))
+* **testing:** bitcoin unavailable in docker
+([6d8cc4e](https://github.com/argonprotocol/mainchain/commit/6d8cc4e4814fcbfa672df2a7abfe2d1ea59beb8a))
+* **client:** rotation id still one off
+([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
+* **ga:** caching of files
+([079232f](https://github.com/argonprotocol/mainchain/commit/079232f69f54b2b712a050685c490be48cda30c7))
+* **node:** additional fast sync fixes
+([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
 * aarch64 can’t find openssl
 ([2ae1a4f](https://github.com/argonprotocol/mainchain/commit/2ae1a4fbb79633c49a0e6d6e41bd193f819d409e))
 * check space

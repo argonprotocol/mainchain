@@ -1,13 +1,8 @@
 # Changelog
 
-## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.6...105a99c28607180efc3a67b573d7842eb5845519) (2025-05-02)
+## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.7...2dcb2f6cb59bde2e33025d21b2a8d370531156a1) (2025-05-09)
 
-### Fixes
-
-* **node:** additional fast sync fixes
-([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
-
-## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.6) (2025-05-01)
+## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.7) (2025-05-02)
 
 ### Features
 
@@ -22,6 +17,8 @@
 
 ### Fixes
 
+* **node:** additional fast sync fixes
+([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
 * check space
 ([b4f5107](https://github.com/argonprotocol/mainchain/commit/b4f51072e7e21cd81b2dc8cc231d91882ce8ebd7))
 * **bitcoin_locks:** add error decode

@@ -1,15 +1,20 @@
 # Changelog
 
-## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.6...105a99c28607180efc3a67b573d7842eb5845519) (2025-05-02)
+## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.7...2dcb2f6cb59bde2e33025d21b2a8d370531156a1) (2025-05-09)
+
+### Features
+
+* **client:** add bidding history to cohortbidder
+([8a69d17](https://github.com/argonprotocol/mainchain/commit/8a69d17184682baa34d70262488eb6813c6ce865))
+* **client:** ability to use a password file
+([b08cfdd](https://github.com/argonprotocol/mainchain/commit/b08cfdd9f9a6065a525968d6b7d540a918c82dce))
 
 ### Fixes
 
-* **client:** rotation id still one off
-([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
-* **node:** additional fast sync fixes
-([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
+* **client:** cap budget by balance
+([4286a17](https://github.com/argonprotocol/mainchain/commit/4286a172c15741fd3ba618ece025cdf959bc8456))
 
-## [v1.1.0-rc.6](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.6) (2025-05-01)
+## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.7) (2025-05-02)
 
 ### Features
 
@@ -26,6 +31,10 @@
 
 ### Fixes
 
+* **client:** rotation id still one off
+([fe3d1d6](https://github.com/argonprotocol/mainchain/commit/fe3d1d6c7571b84374a85b698246179ea89ba4f7))
+* **node:** additional fast sync fixes
+([45adbc5](https://github.com/argonprotocol/mainchain/commit/45adbc5c5c4c581311c66206f50ac453cd59db22))
 * mining rotations calculation
 ([58e39df](https://github.com/argonprotocol/mainchain/commit/58e39df794b965585a6ef38274a8d79054f2f9d4))
 * **bitcoin_locks:** add error decode

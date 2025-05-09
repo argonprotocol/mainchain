@@ -242,6 +242,19 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
+      - name: Set HOME_DIR for Linux builds
+        if: startsWith(matrix.os, 'ubuntu')
+        run: echo "TARGET_BASEDIR=/mnt" >> "$GITHUB_ENV"
+
+      - name: Set HOME_DIR for Mac builds
+        if: ${{ !startsWith(matrix.os, 'ubuntu') }}
+        run: echo "TARGET_BASEDIR=${{ github.workspace }}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Set HOME_DIR
+        run: echo "HOME_DIR=$HOME" >> $GITHUB_ENV
+        shell: bash
+
       - name: Build in docker
         uses: addnab/docker-run-action@v3
         if: ${{ matrix.docker }}
@@ -253,10 +266,11 @@ jobs:
             -e SKIP_WASM_BUILD=1
             -e RUST_BACKTRACE=1
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db
-            -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache
-            -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index
+            -v ${{ env.HOME_DIR }}/.cargo/git/db:/usr/local/cargo/git/db
+            -v ${{ env.HOME_DIR }}/.cargo/registry/cache:/usr/local/cargo/registry/cache
+            -v ${{ env.HOME_DIR }}/.cargo/registry/index:/usr/local/cargo/registry/index
             -v ${{ github.workspace }}:/build
+            -v ${{ env.TARGET_BASEDIR }}/target:/build/target
             -w /build
           run: ${{ matrix.build }}
 
