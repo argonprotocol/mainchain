@@ -1,5 +1,10 @@
 import { Command } from '@commander-js/extra-typings';
-import { createKeyringPair, getClient, type KeyringPair } from '../index';
+import {
+  createKeyringPair,
+  getClient,
+  type KeyringPair,
+  MICROGONS_PER_ARGON,
+} from '../index';
 import { printTable } from 'console-table-printer';
 import { Accountset } from '../Accountset';
 import { MiningBids } from '../MiningBids';
@@ -170,7 +175,9 @@ export default function miningCli() {
             const balance = await accountset.balance();
             const feeWiggleRoom = BigInt(25e3);
             const amountAvailable = balance - feeWiggleRoom;
-            let maxBidAmount = maxBid ? BigInt(maxBid * 1e6) : undefined;
+            let maxBidAmount = maxBid
+              ? BigInt(maxBid * MICROGONS_PER_ARGON)
+              : undefined;
             let maxBalanceToUse = amountAvailable;
             if (maxBalance !== undefined) {
               if (maxBalance!.endsWith('%')) {
@@ -183,7 +190,7 @@ export default function miningCli() {
                 maxBalanceToUse = amountToBid;
               } else {
                 maxBalanceToUse = BigInt(
-                  Math.floor(parseFloat(maxBalance) * 1e6),
+                  Math.floor(parseFloat(maxBalance) * MICROGONS_PER_ARGON),
                 );
               }
 
@@ -208,8 +215,10 @@ export default function miningCli() {
               subaccountRange,
               {
                 maxBid: maxBidAmount,
-                minBid: BigInt((minBid ?? 0) * 1e6),
-                bidIncrement: BigInt(Math.floor(bidIncrement * 1e6)),
+                minBid: BigInt((minBid ?? 0) * MICROGONS_PER_ARGON),
+                bidIncrement: BigInt(
+                  Math.floor(bidIncrement * MICROGONS_PER_ARGON),
+                ),
                 maxBudget: maxBalanceToUse,
                 bidDelay,
               },
@@ -250,7 +259,10 @@ export default function miningCli() {
       );
       const tx = client.tx.utility.batchAll([
         client.tx.proxy.addProxy(address, 'MiningBid', 0),
-        client.tx.balances.transferAllowDeath(address, BigInt(feeArgons * 1e6)),
+        client.tx.balances.transferAllowDeath(
+          address,
+          BigInt(feeArgons * MICROGONS_PER_ARGON),
+        ),
       ]);
       let keypair: KeyringPair;
       try {

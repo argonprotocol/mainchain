@@ -2,7 +2,7 @@ import { Command } from '@commander-js/extra-typings';
 import { VaultMonitor } from '../VaultMonitor';
 import { BitcoinLocks } from '../BitcoinLocks';
 import { Accountset } from '../Accountset';
-import { formatArgons } from '../utils';
+import { MICROGONS_PER_ARGON, formatArgons } from '../utils';
 import { accountsetFromCli } from './index';
 
 export default function bitcoinCli() {
@@ -19,7 +19,9 @@ export default function bitcoinCli() {
     .action(async ({ argons }) => {
       const accountset = await accountsetFromCli(program);
       const bot = new VaultMonitor(accountset, {
-        bitcoinSpaceAvailable: argons ? BigInt(argons * 1e6) : 1n,
+        bitcoinSpaceAvailable: argons
+          ? BigInt(argons * MICROGONS_PER_ARGON)
+          : 1n,
       });
       bot.events.on('bitcoin-space-above', async (vaultId, amount) => {
         const vault = bot.vaultsById[vaultId];
@@ -56,15 +58,17 @@ export default function bitcoinCli() {
       0.0,
     )
     .action(async ({ argons, bitcoinXpub, maxLockFee, tip }) => {
-      const amountToLock = BigInt(argons * 1e6);
+      const amountToLock = BigInt(argons * MICROGONS_PER_ARGON);
 
       const accountset = await accountsetFromCli(program);
       await BitcoinLocks.waitForSpace(accountset, {
         argonAmount: amountToLock,
         bitcoinXpub,
         maxLockFee:
-          maxLockFee !== undefined ? BigInt(maxLockFee * 1e6) : undefined,
-        tip: BigInt(tip * 1e6),
+          maxLockFee !== undefined
+            ? BigInt(maxLockFee * MICROGONS_PER_ARGON)
+            : undefined,
+        tip: BigInt(tip * MICROGONS_PER_ARGON),
       }).then(({ vaultId, satoshis, txFee, btcFee }) => {
         console.log(
           `Locked ${satoshis} satoshis in vault ${vaultId}. Tx fee=${formatArgons(

@@ -207,6 +207,7 @@ impl ArgonTestNode {
 			.arg("--unsafe-force-node-key-generation")
 			.arg("--allow-private-ipv4")
 			.arg("--no-telemetry")
+			.arg("--no-prometheus")
 			.arg("--chain=dev")
 			.arg(format!("--{}", &args.authority.to_lowercase()))
 			.arg(format!("--name={}", &args.authority.to_lowercase()))

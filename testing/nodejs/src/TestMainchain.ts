@@ -114,6 +114,8 @@ export default class TestMainchain implements ITeardownable {
       `--port=${port}`,
       `--rpc-port=${rpcPort}`,
       '--rpc-external',
+      '--no-telemetry',
+      '--no-prometheus',
       '--unsafe-rpc-external',
       '--rpc-methods=unsafe',
       `--bitcoin-rpc-url=${bitcoinRpcUrl}`,

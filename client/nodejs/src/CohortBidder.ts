@@ -2,38 +2,27 @@ import type { Accountset } from './Accountset';
 import {
   ArgonClient,
   ArgonPrimitivesBlockSealMiningRegistration,
-  convertFixedU128ToBigNumber,
+  ExtrinsicError,
 } from './index';
 import { formatArgons } from './utils';
-import { Bool, Compact, u128, u32, u64, Vec } from '@polkadot/types-codec';
-import { AccountId } from '@polkadot/types/interfaces/runtime';
-import { ApiDecoration } from '@polkadot/api/types';
+import { Bool, u64, Vec } from '@polkadot/types-codec';
+import CohortBidderHistory, {
+  IBidHistoryEntry,
+  SeatReductionReason,
+} from './CohortBidderHistory';
 
 export class CohortBidder {
   public get client(): Promise<ArgonClient> {
     return this.accountset.client;
   }
 
-  public stats = {
-    // number of seats won
-    seats: 0,
-    // sum of argons bid in successful bids
-    totalArgonsBid: 0n,
-    // total number of bids placed (includes 1 per seat)
-    bids: 0,
-    // fees including the tip
-    fees: 0n,
-    // Max bid per seat
-    maxBidPerSeat: 0n,
-    // The cost in argonots of each seat
-    argonotsPerSeat: 0n,
-    // The argonot price in USD for cost basis
-    argonotUsdPrice: 0.0,
-    // The cohort expected argons per block
-    cohortArgonsPerBlock: 0n,
-    // The last block that bids are synced to
-    lastBlock: 0,
-  };
+  public get stats(): CohortBidderHistory['stats'] {
+    return this.history.stats;
+  }
+
+  public get bidHistory(): CohortBidderHistory['bidHistory'] {
+    return this.history.bidHistory;
+  }
 
   private unsubscribe?: () => void;
   private pendingRequest: Promise<any> | undefined;
@@ -41,10 +30,11 @@ export class CohortBidder {
   private isStopped = false;
   private needsRebid = false;
   private lastBidTime = 0;
+  private history: CohortBidderHistory;
 
   private millisPerTick?: number;
 
-  private readonly allAddresses = new Set<string>();
+  private readonly myAddresses = new Set<string>();
 
   constructor(
     public accountset: Accountset,
@@ -56,10 +46,12 @@ export class CohortBidder {
       maxBudget: bigint;
       bidIncrement: bigint;
       bidDelay: number;
+      tipPerTransaction?: bigint;
     },
   ) {
+    this.history = new CohortBidderHistory(cohortId, subaccounts);
     this.subaccounts.forEach(x => {
-      this.allAddresses.add(x.address);
+      this.myAddresses.add(x.address);
     });
   }
 
@@ -72,86 +64,52 @@ export class CohortBidder {
       this.unsubscribe();
     }
     const client = await this.client;
-    const [nextCohort, nextCohortId, blockNumber] = await new Promise<
-      [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, u32]
-    >(async resolve => {
-      // wait for bidding to be complete
-      const unsub = await client.queryMulti<
-        [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, Bool, u32]
-      >(
-        [
-          client.query.miningSlot.nextSlotCohort as any,
-          client.query.miningSlot.nextCohortId as any,
-          client.query.miningSlot.isNextSlotBiddingOpen as any,
-          client.query.system.number as any,
-        ],
-        ([nextCohort, nextCohortId, isBiddingStillOpen, blockNumber]) => {
-          if (
-            nextCohortId.toNumber() !== this.cohortId ||
-            isBiddingStillOpen.isFalse
-          ) {
-            unsub();
-            resolve([nextCohort, nextCohortId, blockNumber]);
-          }
-        },
-      );
-    });
+    const [nextCohortId, isBiddingOpen] = await client.queryMulti<[u64, Bool]>([
+      client.query.miningSlot.nextCohortId as any,
+      client.query.miningSlot.isNextSlotBiddingOpen,
+    ]);
+    if (nextCohortId.toNumber() === this.cohortId && isBiddingOpen.isTrue) {
+      console.log('Bidding is still open, waiting for it to close');
+      await new Promise<void>(async resolve => {
+        const unsub = await client.query.miningSlot.isNextSlotBiddingOpen(
+          isOpen => {
+            if (isOpen.isFalse) {
+              unsub();
+              resolve();
+            }
+          },
+        );
+      });
+    }
     // wait for any pending request to finish updating stats
     void (await this.pendingRequest);
 
-    if (nextCohortId.toNumber() === this.cohortId) {
-      console.log('Bidder updating stats with bid queue');
-      this.updateStats(nextCohort);
-    } else {
-      const bestBlock = await client.rpc.chain.getBlockHash();
-      const api = await client.at(bestBlock);
-      const wonIndices = await api.query.miningSlot.accountIndexLookup
-        .multi([...this.allAddresses])
-        .then(x => x.filter(x => x.isSome).map(x => x.value));
-      const wonSeats = await api.query.miningSlot.activeMinersByIndex
-        .multi(wonIndices)
-        .then(x =>
-          x
-            .filter(
-              x => x.isSome && x.value.cohortId.toNumber() === this.cohortId,
-            )
-            .map(x => x.value),
-        );
-
-      console.log('Bidder updating stats with finalized cohort');
-
-      this.updateStats(wonSeats);
+    // go back to last block with this cohort
+    let header = await client.rpc.chain.getHeader();
+    while (true) {
+      const api = await client.at(header.hash);
+      const cohortId = await api.query.miningSlot.nextCohortId();
+      if (cohortId.toNumber() === this.cohortId) {
+        break;
+      }
+      header = await client.rpc.chain.getHeader(header.parentHash);
     }
-    this.stats.lastBlock = Math.max(
-      blockNumber.toNumber(),
-      this.stats.lastBlock,
-    );
+    const api = await client.at(header.hash);
+    const tick = await api.query.ticks.currentTick().then(x => x.toNumber());
+    const cohort = await api.query.miningSlot.nextSlotCohort();
+
+    this.history.trackChange(cohort, header.number.toNumber(), tick, true);
+    console.log('Bidder stopped', {
+      cohortId: this.cohortId,
+      blockNumber: header.number.toNumber(),
+      tick,
+      cohort: cohort.map(x => ({
+        address: x.accountId.toHuman(),
+        bid: x.bid.toBigInt(),
+      })),
+    });
+
     return this.stats;
-  }
-
-  public static async getStartingData(
-    api: ApiDecoration<'promise'>,
-  ): Promise<
-    Pick<
-      CohortBidder['stats'],
-      'argonotUsdPrice' | 'argonotsPerSeat' | 'cohortArgonsPerBlock'
-    >
-  > {
-    const argonotPrice = await api.query.priceIndex.current();
-    let argonotUsdPrice = 0;
-    if (argonotPrice.isSome) {
-      argonotUsdPrice = convertFixedU128ToBigNumber(
-        argonotPrice.unwrap().argonotUsdPrice.toBigInt(),
-      ).toNumber();
-    }
-
-    const argonotsPerSeat = await api.query.miningSlot
-      .argonotsPerMiningSeat()
-      .then(x => x.toBigInt());
-    const cohortArgonsPerBlock = await api.query.blockRewards
-      .argonsPerBlock()
-      .then(x => x.toBigInt());
-    return { argonotsPerSeat, argonotUsdPrice, cohortArgonsPerBlock };
   }
 
   public async start() {
@@ -165,11 +123,7 @@ export class CohortBidder {
     });
 
     const client = await this.client;
-    if (!this.stats.argonotsPerSeat) {
-      const startingStats = await CohortBidder.getStartingData(client);
-      Object.assign(this.stats, startingStats);
-    }
-
+    await this.history.init(client);
     this.millisPerTick ??= await client.query.ticks
       .genesisTicker()
       .then(x => x.tickDurationMillis.toNumber());
@@ -189,28 +143,30 @@ export class CohortBidder {
     );
   }
 
-  private updateStats(
-    next: Iterable<{ accountId: AccountId; bid: u128 | Compact<u128> }>,
-  ) {
-    let seats = 0;
-    let totalArgonsBid = 0n;
-    for (const x of next) {
-      if (this.allAddresses.has(x.accountId.toHuman())) {
-        seats++;
-        totalArgonsBid += x.bid.toBigInt();
-      }
-    }
-    this.stats.seats = seats;
-    this.stats.totalArgonsBid = totalArgonsBid;
-  }
-
   private async checkSeats(next: ArgonPrimitivesBlockSealMiningRegistration[]) {
-    if (this.isStopped || this.pendingRequest) return;
+    if (this.isStopped) return;
+    clearTimeout(this.retryTimeout);
+
+    const client = await this.client;
+    const bestBlock = await client.rpc.chain.getBlockHash();
+    const api = await client.at(bestBlock);
+    const blockNumber = await api.query.system.number().then(x => x.toNumber());
+    if (this.bidHistory[0]?.blockNumber >= blockNumber) {
+      return;
+    }
+    const tick = await api.query.ticks.currentTick().then(x => x.toNumber());
+    const historyEntry = this.history.trackChange(next, blockNumber, tick);
+
+    if (this.pendingRequest) return;
 
     const ticksSinceLastBid = Math.floor(
       (Date.now() - this.lastBidTime) / this.millisPerTick!,
     );
     if (ticksSinceLastBid < this.options.bidDelay) {
+      this.retryTimeout = setTimeout(
+        () => void this.checkCurrentSeats(),
+        this.millisPerTick!,
+      );
       return;
     }
     console.log(
@@ -218,15 +174,24 @@ export class CohortBidder {
       this.cohortId,
       this.subaccounts.map(x => x.index),
     );
-    this.updateStats(next);
 
-    this.needsRebid = this.subaccounts.some(
-      x => !next.some(y => y.accountId.toHuman() === x.address),
-    );
+    const winningBids = historyEntry.winningSeats;
+    this.needsRebid = winningBids < this.subaccounts.length;
     if (!this.needsRebid) return;
 
-    const lowestBid = next.at(-1)?.bid.toBigInt() ?? -this.options.bidIncrement;
+    const winningAddresses = new Set(next.map(x => x.accountId.toHuman()));
+    let lowestBid = -this.options.bidIncrement;
+    if (next.length) {
+      for (let i = next.length - 1; i >= 0; i--) {
+        // find the lowest bid that is not us
+        if (!this.myAddresses.has(next[i].accountId.toHuman())) {
+          lowestBid = next.at(i)!.bid.toBigInt();
+          break;
+        }
+      }
+    }
     const MIN_INCREMENT = 10_000n;
+
     // 1. determine next bid based on current bids and settings
     let nextBid = lowestBid + this.options.bidIncrement;
     if (nextBid < this.options.minBid) {
@@ -234,17 +199,30 @@ export class CohortBidder {
     }
     if (nextBid > this.options.maxBid) {
       nextBid = this.options.maxBid;
-      if (nextBid - lowestBid < MIN_INCREMENT) {
-        console.log(
-          `Can't make any more bids for ${this.cohortId} with given constraints.`,
-          {
-            lowestCurrentBid: formatArgons(lowestBid),
-            nextAttemptedBid: formatArgons(nextBid),
-            maxBid: formatArgons(this.options.maxBid),
-          },
-        );
-        return;
+    }
+
+    const fakeTx = await this.accountset.createMiningBidTx({
+      subaccounts: this.subaccounts,
+      bidAmount: nextBid,
+      sendRewardsToSeed: true,
+    });
+    let availableBalanceForBids = await api.query.system
+      .account(this.accountset.txSubmitterPair.address)
+      .then(x => x.data.free.toBigInt());
+
+    // add our current balance used to the budget
+    for (const bid of next) {
+      if (this.myAddresses.has(bid.accountId.toHuman())) {
+        availableBalanceForBids += bid.bid.toBigInt();
       }
+    }
+    const tip = this.options.tipPerTransaction ?? 0n;
+    const feeEstimate = await fakeTx.feeEstimate(tip);
+    const feePlusTip = feeEstimate + tip;
+
+    let budgetForSeats = this.options.maxBudget - feePlusTip;
+    if (budgetForSeats > availableBalanceForBids) {
+      budgetForSeats = availableBalanceForBids - feePlusTip;
     }
     if (nextBid < lowestBid) {
       console.log(
@@ -252,86 +230,118 @@ export class CohortBidder {
           lowestBid,
         )}.`,
       );
-      return;
-    }
-
-    let budget = this.options.maxBudget;
-    const balance = await this.accountset.balance();
-    const feeWiggleRoom = BigInt(25e3);
-
-    if (budget > balance - feeWiggleRoom) {
-      budget = balance - feeWiggleRoom;
-    }
-
-    const seatsInBudget =
-      nextBid === 0n ? this.subaccounts.length : Number(budget / nextBid);
-    if (seatsInBudget <= 0) {
-      console.log(
-        `Can't afford any seats at ${formatArgons(nextBid)}. Would exceed our available budget of ${formatArgons(budget)}.`,
+      this.history.maybeReducingSeats(
+        winningBids,
+        SeatReductionReason.MaxBidTooLow,
+        historyEntry,
       );
       return;
     }
-    // 3. if we have more seats than we can afford, we need to remove some
-    if (this.subaccounts.length > seatsInBudget) {
-      const toKeep: CohortBidder['subaccounts'] = [];
 
-      // first add rebids
-      for (const account of this.subaccounts) {
-        if (toKeep.length >= seatsInBudget) break;
-        if (account.isRebid) {
-          toKeep.push(account);
-        }
-      }
-      // if we still have space, add non-rebids
-      for (const account of this.subaccounts) {
-        if (toKeep.length >= seatsInBudget) break;
-        if (!account.isRebid) {
-          toKeep.push(account);
-        }
-      }
-
-      const removedIndices = this.subaccounts
-        .filter(x => !toKeep.some(y => y.index === x.index))
-        .map(x => x.index);
-      this.subaccounts = toKeep;
-      console.log('Had to remove some subaccounts to fit in budget:', {
-        removedIndices,
-        seatsInBudget,
-        budget: formatArgons(budget),
-      });
+    if (nextBid - lowestBid < MIN_INCREMENT) {
+      console.log(
+        `Can't make any more bids for ${this.cohortId} with given constraints.`,
+        {
+          lowestCurrentBid: formatArgons(lowestBid),
+          nextAttemptedBid: formatArgons(nextBid),
+          maxBid: formatArgons(this.options.maxBid),
+        },
+      );
+      this.history.maybeReducingSeats(
+        winningBids,
+        SeatReductionReason.MaxBidTooLow,
+        historyEntry,
+      );
+      return;
     }
-    this.pendingRequest = this.bid(
-      nextBid,
-      this.subaccounts.map(x => x.index),
-    );
+
+    const seatsInBudget =
+      nextBid === 0n
+        ? this.subaccounts.length
+        : Number(budgetForSeats / nextBid);
+
+    let accountsToUse = [...this.subaccounts];
+    // 3. if we have more seats than we can afford, we need to remove some
+    if (accountsToUse.length > seatsInBudget) {
+      const reason =
+        availableBalanceForBids - feePlusTip < nextBid * BigInt(seatsInBudget)
+          ? SeatReductionReason.InsufficientFunds
+          : SeatReductionReason.MaxBudgetTooLow;
+      this.history.maybeReducingSeats(seatsInBudget, reason, historyEntry);
+      // Sort accounts by winning bids first, then rebids, then by index
+      accountsToUse.sort((a, b) => {
+        const isWinningA = winningAddresses.has(a.address);
+        const isWinningB = winningAddresses.has(b.address);
+        if (isWinningA && !isWinningB) return -1;
+        if (!isWinningA && isWinningB) return 1;
+
+        if (a.isRebid && !b.isRebid) return -1;
+        if (!a.isRebid && b.isRebid) return 1;
+        return a.index - b.index;
+      });
+      // only keep the number of accounts we can afford
+      accountsToUse.length = seatsInBudget;
+    }
+    if (accountsToUse.length > winningBids) {
+      historyEntry.myBidsPlaced = {
+        bids: accountsToUse.length,
+        bidPerSeat: nextBid,
+        txFeePlusTip: feePlusTip,
+        successfulBids: 0,
+      };
+      this.pendingRequest = this.bid(nextBid, accountsToUse, historyEntry);
+    } else if (historyEntry.bidChanges.length === 0) {
+      this.history.bidHistory.shift();
+    }
     this.needsRebid = false;
   }
 
-  private async bid(bidPerSeat: bigint, subaccountRange: number[]) {
-    if (!subaccountRange.length) return;
+  private async bid(
+    bidPerSeat: bigint,
+    subaccounts: { address: string }[],
+    historyEntry: IBidHistoryEntry,
+  ) {
     const prevLastBidTime = this.lastBidTime;
     try {
       this.lastBidTime = Date.now();
-      const result = await this.accountset.createMiningBids({
-        subaccountRange,
+      const submitter = await this.accountset.createMiningBidTx({
+        subaccounts,
         bidAmount: bidPerSeat,
         sendRewardsToSeed: true,
       });
-      if (result.blockHash) {
+      const tip = this.options.tipPerTransaction ?? 0n;
+      const txResult = await submitter.submit({
+        tip,
+        useLatestNonce: true,
+      });
+
+      const bidError = await txResult.inBlockPromise
+        .then(() => undefined)
+        .catch((x: ExtrinsicError) => x);
+      let blockNumber: number | undefined;
+      if (txResult.includedInBlock) {
         const client = await this.client;
-        const api = await client.at(result.blockHash);
-        this.stats.lastBlock = await api.query.system
-          .number()
-          .then(x => x.toNumber());
-      }
-      this.stats.fees += result.finalFee ?? 0n;
-      this.stats.bids += subaccountRange.length;
-      if (bidPerSeat > this.stats.maxBidPerSeat) {
-        this.stats.maxBidPerSeat = bidPerSeat;
+        const api = await client.at(txResult.includedInBlock);
+        blockNumber = await api.query.system.number().then(x => x.toNumber());
       }
 
-      console.log('Done creating bids for cohort', this.cohortId);
-      if (result.bidError) throw result.bidError;
+      const successfulBids =
+        txResult.batchInterruptedIndex ?? subaccounts.length;
+      this.history.onBidResult(historyEntry, {
+        blockNumber,
+        successfulBids,
+        bidPerSeat,
+        txFeePlusTip: txResult.finalFee ?? 0n,
+        bidsAttempted: subaccounts.length,
+        bidError,
+      });
+
+      console.log('Done creating bids for cohort', {
+        successfulBids,
+        bidPerSeat,
+        blockNumber,
+      });
+      if (bidError) throw bidError;
     } catch (err) {
       this.lastBidTime = prevLastBidTime;
       console.error(`Error bidding for cohort ${this.cohortId}:`, err);

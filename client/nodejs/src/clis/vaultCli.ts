@@ -4,6 +4,7 @@ import { TxSubmitter } from '../TxSubmitter';
 import { Vault } from '../Vault';
 import { BitcoinLocks } from '../BitcoinLocks';
 import { accountsetFromCli } from './index';
+import { MICROGONS_PER_ARGON } from '../utils';
 
 export default function vaultCli() {
   const program = new Command('vaults').description(
@@ -40,8 +41,8 @@ export default function vaultCli() {
     .action(async ({ tip, argons, vaultId, ratio }) => {
       const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
-      const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
-      const microgons = BigInt(argons * 1e6);
+      const resolvedTip = tip ? BigInt(tip * MICROGONS_PER_ARGON) : 0n;
+      const microgons = BigInt(argons * MICROGONS_PER_ARGON);
 
       const rawVault = (await client.query.vaults.vaultsById(vaultId)).unwrap();
       if (rawVault.operatorAccountId.toHuman() !== accountset.seedAddress) {
@@ -113,8 +114,8 @@ export default function vaultCli() {
       }
       const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
-      const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
-      const microgons = BigInt(argons * 1e6);
+      const resolvedTip = tip ? BigInt(tip * MICROGONS_PER_ARGON) : 0n;
+      const microgons = BigInt(argons * MICROGONS_PER_ARGON);
       const bitcoinLocks = new BitcoinLocks(Promise.resolve(client));
       const existentialDeposit =
         client.consts.balances.existentialDeposit.toBigInt();
