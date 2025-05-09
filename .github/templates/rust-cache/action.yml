@@ -17,6 +17,9 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Print space before restore
+      run: df -h
+      shell: bash
     - name: Get rustc version
       id: rust-version
       run: echo "version=$(rustc --version --verbose | grep 'release:' | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -27,6 +30,11 @@ runs:
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
           echo "version=$(source /etc/os-release && echo $ID-$VERSION_ID)" >> $GITHUB_OUTPUT
+          sudo mkdir -p /mnt/target
+          sudo chown -R $USER:$USER /mnt/target
+          sudo rm -rf target
+          sudo ln -s /mnt/target target
+          echo "CARGO_TARGET_DIR=/mnt/target" >> $GITHUB_ENV
         elif [ "$RUNNER_OS" == "macOS" ]; then
           echo "version=macos-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
         elif [ "$RUNNER_OS" == "Windows" ]; then
@@ -47,3 +55,14 @@ runs:
           ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+    - name: Print space after restore
+      run: |
+        echo "Disk space after restore:"
+        df -h
+        echo "Cargo cache size:"
+        du -sh ~/.cargo/registry/index/ 2>/dev/null || true
+        du -sh ~/.cargo/registry/cache/ 2>/dev/null || true
+        du -sh ~/.cargo/git/db/ 2>/dev/null || true
+        du -sh .cargo-cache 2>/dev/null || true
+        du -sh target/ 2>/dev/null || true
+      shell: bash

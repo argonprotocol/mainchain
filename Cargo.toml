@@ -63,6 +63,7 @@ inherits = "release"
 [profile.dev]
 debug = 1
 opt-level = 1
+split-debuginfo = "packed"
 
 # COPIED FROM SUBSTRATE REPO
 #
@@ -96,9 +97,9 @@ httparse = { opt-level = 3 }
 integer-sqrt = { opt-level = 3 }
 keccak = { opt-level = 3 }
 libm = { opt-level = 3 }
-librocksdb-sys = { opt-level = 3 }
-libsecp256k1 = { opt-level = 3 }
-libz-sys = { opt-level = 3 }
+librocksdb-sys = { opt-level = 3, debug = false }
+libsecp256k1 = { opt-level = 3, debug = false }
+libz-sys = { opt-level = 3, debug = false }
 mio = { opt-level = 3 }
 nalgebra = { opt-level = 3 }
 num-bigint = { opt-level = 3 }
@@ -108,7 +109,7 @@ percent-encoding = { opt-level = 3 }
 polkavm-linker = { opt-level = 3 }
 primitive-types = { opt-level = 3 }
 reed-solomon-novelpoly = { opt-level = 3 }
-ring = { opt-level = 3 }
+ring = { opt-level = 3, debug = false }
 rustls = { opt-level = 3 }
 sha2 = { opt-level = 3 }
 sha3 = { opt-level = 3 }
@@ -117,11 +118,11 @@ snow = { opt-level = 3 }
 substrate-bip39 = { opt-level = 3 }
 twox-hash = { opt-level = 3 }
 uint = { opt-level = 3 }
-wasmi = { opt-level = 3 }
+wasmi = { opt-level = 3, debug = false }
 x25519-dalek = { opt-level = 3 }
 yamux = { opt-level = 3 }
 zeroize = { opt-level = 3 }
-sqlx-macros = { opt-level = 3 }
+sqlx-macros = { opt-level = 3, debug = false }
 
 [workspace.lints.clippy]
 

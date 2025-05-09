@@ -108,8 +108,11 @@ jobs:
         working-directory: localchain
         run: cargo sqlx database setup
 
+      - name: Show space before build
+        run: df -h
+
       - name: Build
-        run: cargo build --features=simulated-prices
+        run: cargo build --features=simulated-prices --bins
         env:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
