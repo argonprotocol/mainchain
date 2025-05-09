@@ -20,7 +20,7 @@ pub use pallet::*;
 /// This pallet allows users to bond argons to a Vault's Liquidity Pool. Liquidity pools serve as
 /// instant liquidity for LockedBitcoins. "Bonding argons" to a liquidity pool means that the argons
 /// will be inserted into the Liquidity Pool for a slot and will continue to roll-over to follow-on
-/// cohorts until they are unbonded. Any profits are automatically bonded and combined with existing
+/// funds until they are unbonded. Any profits are automatically bonded and combined with existing
 /// funds.
 ///
 ///

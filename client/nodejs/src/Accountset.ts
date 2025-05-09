@@ -89,6 +89,16 @@ export class Accountset {
     }
   }
 
+  public async submitterBalance(blockHash?: Uint8Array): Promise<bigint> {
+    const client = await this.client;
+    const api = blockHash ? await client.at(blockHash) : client;
+    const accountData = await api.query.system.account(
+      this.txSubmitterPair.address,
+    );
+
+    return accountData.data.free.toBigInt();
+  }
+
   public async balance(blockHash?: Uint8Array): Promise<bigint> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
@@ -412,6 +422,43 @@ export class Accountset {
   }
 
   /**
+   * Create but don't submit a mining bid transaction.
+   * @param options
+   */
+  public async createMiningBidTx(options: {
+    subaccounts: { address: string }[];
+    bidAmount: bigint;
+    sendRewardsToSeed?: boolean;
+  }) {
+    const client = await this.client;
+    const { bidAmount, subaccounts, sendRewardsToSeed } = options;
+
+    const batch = client.tx.utility.batch(
+      subaccounts.map(x => {
+        const keys = this.keys();
+        const rewards = sendRewardsToSeed
+          ? { Account: this.seedAddress }
+          : { Owner: null };
+        return client.tx.miningSlot.bid(
+          bidAmount,
+          rewards,
+          {
+            grandpa: keys.gran.rawPublicKey,
+            blockSealAuthority: keys.seal.rawPublicKey,
+          },
+          x.address,
+        );
+      }),
+    );
+
+    let tx = batch;
+    if (this.isProxy) {
+      tx = client.tx.proxy.proxy(this.seedAddress, 'MiningBid', batch);
+    }
+    return new TxSubmitter(client, tx, this.txSubmitterPair);
+  }
+
+  /**
    * Create a mining bid. This will create a bid for each account in the given range from the seed account as funding.
    */
   public async createMiningBids(options: {
@@ -427,32 +474,11 @@ export class Accountset {
   }> {
     const accounts = this.getAccountsInRange(options.subaccountRange);
     const client = await this.client;
-
-    let tip = options.tip ?? 0n;
-
-    const batch = client.tx.utility.batch(
-      accounts.map(x => {
-        const keys = this.keys();
-        const rewards = options.sendRewardsToSeed
-          ? { Account: this.seedAddress }
-          : { Owner: null };
-        return client.tx.miningSlot.bid(
-          options.bidAmount,
-          rewards,
-          {
-            grandpa: keys.gran.rawPublicKey,
-            blockSealAuthority: keys.seal.rawPublicKey,
-          },
-          x.address,
-        );
-      }),
-    );
-
-    let tx = batch;
-    if (this.isProxy) {
-      tx = client.tx.proxy.proxy(this.seedAddress, 'MiningBid', batch);
-    }
-    const submitter = new TxSubmitter(client, tx, this.txSubmitterPair);
+    const submitter = await this.createMiningBidTx({
+      ...options,
+      subaccounts: accounts,
+    });
+    const { tip = 0n } = options;
     const txFee = await submitter.feeEstimate(tip);
 
     let minBalance = options.bidAmount * BigInt(accounts.length);

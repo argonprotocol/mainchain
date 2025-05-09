@@ -5,10 +5,15 @@ import { EventRecord } from '@polkadot/types/interfaces/system';
 
 const { ROUND_FLOOR } = BN;
 
+export const MICROGONS_PER_ARGON = 1_000_000;
+
 export function formatArgons(x: bigint | number): string {
   if (x === undefined || x === null) return 'na';
   const isNegative = x < 0;
-  let format = BigNumber(x.toString()).abs().div(1e6).toFormat(2, ROUND_FLOOR);
+  let format = BigNumber(x.toString())
+    .abs()
+    .div(MICROGONS_PER_ARGON)
+    .toFormat(2, ROUND_FLOOR);
   if (format.endsWith('.00')) {
     format = format.slice(0, -3);
   }
@@ -98,6 +103,41 @@ export function dispatchErrorToString(
     message = `${section}.${name}: ${docs.join(' ')}`;
   }
   return message;
+}
+
+// ExtrinsicError
+export class ExtrinsicError extends Error {
+  constructor(
+    public readonly errorCode: string,
+    public readonly details?: string,
+    public readonly batchInterruptedIndex?: number,
+  ) {
+    super(errorCode);
+  }
+
+  public override toString() {
+    if (this.batchInterruptedIndex !== undefined) {
+      return `${this.errorCode} ${this.details ?? ''} (Batch interrupted at index ${this.batchInterruptedIndex})`;
+    }
+    return `${this.errorCode} ${this.details ?? ''}`;
+  }
+}
+
+export function dispatchErrorToExtrinsicError(
+  client: ArgonClient,
+  error: DispatchError,
+  batchInterruptedIndex?: number,
+) {
+  if (error.isModule) {
+    const decoded = client.registry.findMetaError(error.asModule);
+    const { docs, name, section } = decoded;
+    return new ExtrinsicError(
+      `${section}.${name}`,
+      docs.join(' '),
+      batchInterruptedIndex,
+    );
+  }
+  return new ExtrinsicError(error.toString(), undefined, batchInterruptedIndex);
 }
 
 /**

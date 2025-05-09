@@ -11,7 +11,10 @@ import { parseSubaccountRange } from '../Accountset';
 import { Keyring } from '@polkadot/api';
 import { mnemonicGenerate } from '@polkadot/util-crypto';
 import { afterAll, afterEach, it, expect } from 'vitest';
+import { inspect } from 'util';
 
+// set the default log depth to 10
+inspect.defaultOptions.depth = 10;
 afterEach(teardown);
 afterAll(teardown);
 
@@ -156,20 +159,22 @@ describeIntegration('Cohort Bidder tests', () => {
     const bobStats = bobBidder!.stats;
 
     console.log({ cohortId, bobStats, aliceStats });
+    console.log('bob', bobBidder!.bidHistory);
+    console.log('alice', aliceBidder!.bidHistory);
 
     const bobActive = bobMiners.filter(x => x.seat !== undefined);
     const aliceActive = aliceMiners.filter(x => x.seat !== undefined);
 
-    expect(bobActive.length).toBe(bobStats.seats);
-    expect(bobStats.bids).toBeGreaterThanOrEqual(20);
+    expect(bobActive.length).toBe(bobStats.seatsWon);
+    expect(bobStats.bidsAttempted).toBeGreaterThanOrEqual(20);
     expect(bobActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(
       bobStats.totalArgonsBid,
     );
     // expect 5 rounds of bidding
     expect(bobStats.fees).toBeGreaterThanOrEqual(22_000n * 4n);
 
-    expect(aliceStats.bids).toBeGreaterThanOrEqual(20);
-    expect(aliceActive.length).toBe(aliceStats.seats);
+    expect(aliceStats.bidsAttempted).toBeGreaterThanOrEqual(20);
+    expect(aliceActive.length).toBe(aliceStats.seatsWon);
     expect(aliceActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(
       aliceStats.totalArgonsBid,
     );

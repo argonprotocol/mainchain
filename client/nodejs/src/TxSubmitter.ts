@@ -1,7 +1,12 @@
 import type { ISubmittableResult } from '@polkadot/types/types/extrinsic';
-import type { ArgonClient, GenericEvent, KeyringPair } from './index';
+import {
+  ArgonClient,
+  dispatchErrorToExtrinsicError,
+  ExtrinsicError,
+  GenericEvent,
+  KeyringPair,
+} from './index';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
-import { dispatchErrorToString } from './utils';
 import type { SignerOptions } from '@polkadot/api/types';
 
 export function logExtrinsicResult(result: ISubmittableResult) {
@@ -112,9 +117,9 @@ export class TxResult {
   public finalFeeTip?: bigint;
 
   private inBlockResolve!: (blockHash: Uint8Array) => void;
-  private inBlockReject!: (error: Error) => void;
+  private inBlockReject!: (error: ExtrinsicError) => void;
   private finalizedResolve!: (blockHash: Uint8Array) => void;
-  private finalizedReject!: (error: Error) => void;
+  private finalizedReject!: (error: ExtrinsicError) => void;
 
   constructor(
     private readonly client: ArgonClient,
@@ -162,13 +167,12 @@ export class TxResult {
       }
 
       if (encounteredError) {
-        const error = dispatchErrorToString(this.client, encounteredError);
-        if (batchErrorIndex) {
-          this.reject(
-            new Error(`Error in batch#${batchErrorIndex}: ${error.toString()}`),
-          );
-        }
-        this.reject(new Error(`Transaction failed: ${error}`));
+        const error = dispatchErrorToExtrinsicError(
+          this.client,
+          encounteredError,
+          batchErrorIndex,
+        );
+        this.reject(error);
       } else {
         this.inBlockResolve(status.asInBlock.toU8a());
       }
@@ -178,7 +182,7 @@ export class TxResult {
     }
   }
 
-  private reject(error: Error) {
+  private reject(error: ExtrinsicError) {
     this.inBlockReject(error);
     this.finalizedReject(error);
   }

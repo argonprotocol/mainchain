@@ -1,7 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import { BidPool } from '../BidPool';
 import { VaultMonitor } from '../VaultMonitor';
-import { formatArgons } from '../utils';
+import { formatArgons, MICROGONS_PER_ARGON } from '../utils';
 import { accountsetFromCli } from './index';
 
 export default function liquidityCli() {
@@ -36,9 +36,9 @@ export default function liquidityCli() {
     )
     .action(async ({ tip, argons, vaultId }) => {
       const accountset = await accountsetFromCli(program);
-      const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
+      const resolvedTip = tip ? BigInt(tip * MICROGONS_PER_ARGON) : 0n;
 
-      const microgons = BigInt(argons * 1e6);
+      const microgons = BigInt(argons * MICROGONS_PER_ARGON);
       const bidPool = new BidPool(
         accountset.client,
         accountset.txSubmitterPair,
@@ -70,7 +70,7 @@ export default function liquidityCli() {
       parseFloat,
     )
     .action(async ({ maxArgons, minPctSharing, tip }) => {
-      const maxAmountPerSlot = BigInt(maxArgons * 1e6);
+      const maxAmountPerSlot = BigInt(maxArgons * MICROGONS_PER_ARGON);
 
       const accountset = await accountsetFromCli(program);
       const vaults = new VaultMonitor(
@@ -84,7 +84,7 @@ export default function liquidityCli() {
         accountset.client,
         accountset.txSubmitterPair,
       );
-      const resolvedTip = tip ? BigInt(tip * 1e6) : 0n;
+      const resolvedTip = tip ? BigInt(tip * MICROGONS_PER_ARGON) : 0n;
       console.log('Waiting for liquidity pool space...');
 
       vaults.events.on(
