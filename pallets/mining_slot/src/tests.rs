@@ -2,8 +2,8 @@ use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
-		HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MinerXorKeyByIndex, MiningConfig,
-		NextCohortId, NextSlotCohort,
+		FrameStartBlockNumbers, HistoricalBidsPerSlot, IsNextSlotBiddingOpen, MinerXorKeyByIndex,
+		MiningConfig, NextCohortId, NextSlotCohort,
 	},
 	Error, Event, HoldReason, Registration,
 };
@@ -602,6 +602,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 			}
 			.into(),
 		);
+		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![16]);
 		assert_eq!(MiningSlots::get_next_slot_era(), (20, 20 + (4 * 3)));
 		assert_eq!(get_next_slot_starting_index(), 4);
 
@@ -1226,6 +1227,7 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		MiningSlots::on_initialize(next_divisible_period);
 		MiningSlots::on_finalize(next_divisible_period);
 		assert_eq!(NextCohortId::<Test>::get(), 2);
+		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![next_divisible_period]);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(get_next_slot_starting_index(), 20);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);

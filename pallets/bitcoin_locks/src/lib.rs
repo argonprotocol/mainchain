@@ -438,8 +438,6 @@ pub mod pallet {
 				&account_id,
 				lock_price,
 				vault_claim_height,
-				// charge in 1 year of ticks (even though we'll expire off bitcoin time)
-				T::ArgonTicksPerDay::get() * 365u64,
 			)
 			.map_err(Error::<T>::from)?;
 

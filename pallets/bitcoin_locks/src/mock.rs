@@ -15,7 +15,7 @@ use argon_primitives::{
 	tick::Ticker,
 	vault::{
 		BitcoinObligationProvider, FundType, Obligation, ObligationError, ObligationExpiration,
-		ReleaseFundsResult, Vault, VaultTerms,
+		Vault, VaultTerms,
 	},
 	BitcoinUtxoTracker, ObligationEvents, PriceProvider, TickProvider, UtxoLockEvents,
 	VotingSchedule,
@@ -168,9 +168,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		false
 	}
 
-	fn cancel_obligation(
-		obligation_id: ObligationId,
-	) -> Result<ReleaseFundsResult<Self::Balance>, ObligationError> {
+	fn cancel_obligation(obligation_id: ObligationId) -> Result<(), ObligationError> {
 		CanceledObligations::mutate(|a| a.push(obligation_id));
 		Obligations::mutate(|a| {
 			let obligation = a.remove(&obligation_id).expect("should exist");
@@ -179,7 +177,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 				v.reduce_locked_bitcoin(obligation.amount);
 			});
 		});
-		Ok(ReleaseFundsResult { returned_to_beneficiary: 0u128, paid_to_vault: 0u128 })
+		Ok(())
 	}
 
 	fn create_obligation(
@@ -187,7 +185,6 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
 		expiration: BitcoinHeight,
-		_ticks: Tick,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
 		let fund_type = FundType::LockedBitcoin;
 		ensure!(

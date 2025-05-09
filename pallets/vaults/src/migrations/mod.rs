@@ -2,6 +2,7 @@ use crate::{Config, HoldReason, ObligationsById, VaultsById};
 use argon_primitives::vault::{FundType, Obligation, Vault, VaultTerms};
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
+pub mod v5;
 
 mod old_storage {
 	use crate::{Config, Pallet};
@@ -141,6 +142,22 @@ mod old_storage {
 	}
 }
 
+mod v4 {
+	use crate::{Config, Pallet};
+	use frame_support::{storage_alias, Twox64Concat};
+	use pallet_prelude::*;
+
+	/// Completion of obligations by tick
+	#[storage_alias]
+	pub(super) type ObligationCompletionByTick<T: Config> = StorageMap<
+		Pallet<T>,
+		Twox64Concat,
+		Tick,
+		BoundedVec<ObligationId, <T as Config>::MaxConcurrentlyExpiringObligations>,
+		ValueQuery,
+	>;
+}
+
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
 
 impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
@@ -168,6 +185,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			for (who, amount, vault_id, obligation_id) in fee_holds {
 				count += 1;
 				if let Err(e) = T::Currency::release(
+					#[allow(deprecated)]
 					&HoldReason::ObligationFee.into(),
 					&who,
 					amount,
@@ -271,10 +289,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-		use crate::ObligationCompletionByTick;
 		use argon_primitives::vault::ObligationExpiration;
 		use codec::Decode;
 		use frame_support::{ensure, fail};
+		use v4::ObligationCompletionByTick;
 
 		let old = <old_storage::Model<T>>::decode(&mut &state[..]).map_err(|_| {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
@@ -310,6 +328,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		for (id, ob) in old.obligations_by_id {
 			// removed
+			#[allow(deprecated)]
 			if let ObligationExpiration::AtTick(tick) = ob.expiration {
 				if ObligationCompletionByTick::<T>::get(tick).contains(&id) {
 					log::error!(
@@ -434,6 +453,7 @@ mod test {
 					prepaid_fee: 1,
 					amount: 1,
 					start_tick: 1,
+					#[allow(deprecated)]
 					expiration: ObligationExpiration::AtTick(10),
 				},
 			);

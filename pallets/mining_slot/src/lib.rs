@@ -223,6 +223,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+	/// The previous 10 frame start block numbers
+	#[pallet::storage]
+	pub(super) type FrameStartBlockNumbers<T: Config> =
+		StorageValue<_, BoundedVec<BlockNumberFor<T>, ConstU32<10>>, ValueQuery>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -572,6 +577,10 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 }
 
 impl<T: Config> Pallet<T> {
+	pub fn current_frame_id() -> FrameId {
+		NextCohortId::<T>::get().saturating_sub(1)
+	}
+
 	pub fn is_registered_mining_active() -> bool {
 		NextCohortId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
 	}
@@ -668,6 +677,12 @@ impl<T: Config> Pallet<T> {
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
 		DidStartNewCohort::<T>::put(true);
 		NextCohortId::<T>::put(cohort_id + 1);
+		FrameStartBlockNumbers::<T>::mutate(|a| {
+			if a.is_full() {
+				a.pop();
+			}
+			let _ = a.try_insert(0, frame_system::Pallet::<T>::block_number());
+		});
 
 		T::SlotEvents::rotate_grandpas(cohort_id, removed_miners, added_miners);
 		T::SlotEvents::on_new_cohort(cohort_id);
