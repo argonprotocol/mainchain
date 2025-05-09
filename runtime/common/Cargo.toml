@@ -51,6 +51,7 @@ polkadot-sdk.features = [
     "pallet-tx-pause",
     "pallet-utility",
     "pallet-transaction-payment",
+    "pallet-skip-feeless-payment",
     "pallet-transaction-payment-rpc-runtime-api",
 ]
 sp-debug-derive = { workspace = true, features = ["force-debug"] }

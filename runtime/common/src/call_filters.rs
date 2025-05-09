@@ -76,19 +76,24 @@ macro_rules! call_filters {
 						_ => false,
 					},
 					ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
-					ProxyType::BitcoinCosign => matches!(
-						c,
-						RuntimeCall::BitcoinLocks(
-							pallet_bitcoin_locks::Call::cosign_release { .. }
-						)
-					),
-					ProxyType::VaultAdmin => matches!(
-						c,
-						RuntimeCall::Vaults(..) |
-							RuntimeCall::BitcoinLocks(
-								pallet_bitcoin_locks::Call::cosign_release { .. }
-							)
-					),
+					ProxyType::BitcoinCosign => match c {
+						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::cosign_release {
+							..
+						}) => true,
+						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+							calls.iter().all(|sc| {
+								matches!(
+									sc,
+									RuntimeCall::BitcoinLocks(
+										pallet_bitcoin_locks::Call::cosign_release { .. }
+									)
+								)
+							}),
+						_ => false,
+					},
+					ProxyType::VaultAdmin =>
+						matches!(c, RuntimeCall::Vaults(..)) || ProxyType::BitcoinCosign.filter(c),
 				}
 			}
 			fn is_superset(&self, o: &Self) -> bool {
@@ -96,6 +101,7 @@ macro_rules! call_filters {
 					(x, y) if x == y => true,
 					(ProxyType::Any, _) => true,
 					(_, ProxyType::Any) => false,
+					(ProxyType::VaultAdmin, ProxyType::BitcoinCosign) => true,
 					(ProxyType::NonTransfer, _) => true,
 					_ => false,
 				}

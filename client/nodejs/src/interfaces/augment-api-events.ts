@@ -34,6 +34,7 @@ import type {
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesVaultFundType,
   ArgonPrimitivesVaultObligationExpiration,
+  ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
@@ -573,6 +574,16 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord],
         { domainHash: H256; zoneRecord: ArgonPrimitivesDomainZoneRecord }
+      >;
+    };
+    feelessTransaction: {
+      /**
+       * A transaction fee was skipped.
+       **/
+      FeeSkipped: AugmentedEvent<
+        ApiType,
+        [origin: ArgonRuntimeOriginCaller],
+        { origin: ArgonRuntimeOriginCaller }
       >;
     };
     grandpa: {
