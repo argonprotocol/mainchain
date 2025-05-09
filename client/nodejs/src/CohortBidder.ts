@@ -6,7 +6,8 @@ import {
 } from './index';
 import { formatArgons } from './utils';
 import { Bool, u64, Vec } from '@polkadot/types-codec';
-import CohortBidderHistory, {
+import {
+  CohortBidderHistory,
   IBidHistoryEntry,
   SeatReductionReason,
 } from './CohortBidderHistory';

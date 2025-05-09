@@ -29,6 +29,7 @@ export { AccountRegistry } from './AccountRegistry';
 export { Vault } from './Vault';
 export { VaultMonitor } from './VaultMonitor';
 export { CohortBidder } from './CohortBidder';
+export { CohortBidderHistory } from './CohortBidderHistory';
 export { BidPool } from './BidPool';
 export { BitcoinLocks } from './BitcoinLocks';
 export { keyringFromSuri, createKeyringPair } from './keyringUtils';
