@@ -64,6 +64,7 @@ parameter_types! {
 	pub static CurrentTick: Tick = 1;
 	pub static PreviousTick: Tick = 1;
 	pub static ElapsedTicks: Tick = 4;
+	pub static CurrentFrameId: FrameId = 1;
 
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 	pub static IsSlotBiddingStarted: bool = false;
@@ -112,9 +113,8 @@ impl pallet_vaults::Config for Test {
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumObligationAmount = MinimumObligationAmount;
-	type TicksPerDay = ConstU64<1440>;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
-	type MiningArgonIncreaseTickDelay = FundingChangeBlockDelay;
+	type CurrentFrameId = CurrentFrameId;
 	type MiningSlotProvider = StaticMiningSlotProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;

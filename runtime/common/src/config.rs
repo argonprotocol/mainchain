@@ -116,7 +116,6 @@ parameter_types! {
 
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
-	pub const VaultFundingModificationDelay: Tick = 60; // 1 hour
 
 	// ### pallet chain transfer
 	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");

@@ -7,7 +7,9 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
+	},
 	tick::Tick,
 	ObligationId, VaultId,
 };
@@ -35,22 +37,21 @@ pub trait LiquidityPoolVaultProvider {
 	fn is_vault_open(vault_id: VaultId) -> bool;
 }
 
-#[derive(RuntimeDebug, Clone, PartialEq, Eq)]
-pub struct ReleaseFundsResult<Balance> {
-	pub returned_to_beneficiary: Balance,
-	pub paid_to_vault: Balance,
-}
-
 pub trait BitcoinObligationProvider {
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 
-	/// Return the obligation to the beneficiary with a prorated refund
-	fn cancel_obligation(
+	/// When bitcoin is released from the vault, notate the number of bitcoins that were released
+	fn did_release_bitcoin(
+		vault_id: VaultId,
 		obligation_id: ObligationId,
-	) -> Result<ReleaseFundsResult<Self::Balance>, ObligationError>;
+		satoshis: Satoshis,
+	) -> Result<(), ObligationError>;
+
+	/// Return the obligation to the beneficiary with a prorated refund
+	fn cancel_obligation(obligation_id: ObligationId) -> Result<(), ObligationError>;
 
 	/// Holds the given amount of funds for the given vault. The fee is calculated based on the
 	/// amount and the duration of the hold.
@@ -58,8 +59,8 @@ pub trait BitcoinObligationProvider {
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
+		satoshis: Satoshis,
 		expiration_block: BitcoinHeight,
-		ticks: Tick,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError>;
 
 	/// Recoup funds from the vault. This will be called if a vault does not move cosigned UTXOs in
@@ -67,9 +68,8 @@ pub trait BitcoinObligationProvider {
 	///
 	/// This will make the beneficiary whole via funds from the vault in the following order:
 	/// 1. From the obligation funds
-	/// 2. From the allocated funds
-	/// 3. From the securitized funds
-	/// 4. TODO: From the ownership tokens
+	/// 2. From the securitization (up to the ratio * lock price) of the vault
+	/// 3. TODO: From the ownership tokens
 	///
 	/// The funds will be returned to the `beneficiary`
 	///
@@ -129,8 +129,6 @@ pub enum ObligationError {
 	ObligationCompletionError,
 	/// This vault is not yet active
 	VaultNotYetActive,
-	/// Too many base fee maturations were inserted per tick
-	BaseFeeOverflow,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -265,6 +263,7 @@ pub struct Obligation<AccountId: Codec, Balance: Codec> {
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum ObligationExpiration {
 	/// The obligation will expire at the given tick
+	#[deprecated = "No longer in use"]
 	AtTick(#[codec(compact)] Tick),
 	/// The obligation will expire at a bitcoin block height
 	BitcoinBlock(#[codec(compact)] BitcoinHeight),

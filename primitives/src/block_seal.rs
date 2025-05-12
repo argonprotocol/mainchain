@@ -56,6 +56,7 @@ impl<B: Block> ComputePuzzle<B> {
 	}
 }
 
+pub type FrameId = u64;
 pub type CohortId = u64;
 
 #[derive(

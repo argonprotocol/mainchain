@@ -95,7 +95,7 @@ pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
 pub mod prelude {
 	pub use super::{
-		block_seal::{BlockSealAuthorityId, CohortId},
+		block_seal::{BlockSealAuthorityId, CohortId, FrameId},
 		localchain::*,
 		tick::Tick,
 		AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment, Nonce, NotaryId,

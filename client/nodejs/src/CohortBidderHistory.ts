@@ -3,7 +3,6 @@ import { AccountId } from '@polkadot/types/interfaces/runtime';
 import { Compact, u128 } from '@polkadot/types-codec';
 import { ArgonClient } from './index';
 import { ApiDecoration } from '@polkadot/api/types';
-import { an } from 'vitest/dist/chunks/reporters.d.CfRkRKN2';
 
 export enum SeatReductionReason {
   InsufficientFunds = 'InsufficientFunds',
@@ -42,7 +41,7 @@ export interface IBidHistoryEntry {
   maxSeatsReductionReason?: SeatReductionReason;
 }
 
-export default class CohortBidderHistory {
+export class CohortBidderHistory {
   public bidHistory: IBidHistoryEntry[] = [];
 
   public stats = {

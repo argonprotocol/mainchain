@@ -877,10 +877,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountBelowMinimumBalance: AugmentedError<ApiType>;
       /**
-       * Too many base fee maturations were inserted per tick
-       **/
-      BaseFeeOverflow: AugmentedError<ApiType>;
-      /**
        * Bitcoin conversion to compressed pubkey failed
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;

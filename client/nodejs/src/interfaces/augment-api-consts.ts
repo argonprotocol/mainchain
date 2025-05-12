@@ -457,14 +457,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum amount for an obligation
        **/
       minimumObligationAmount: u128 & AugmentedConst<ApiType>;
-      /**
-       * The number of ticks that a funding change will be delayed before it takes effect
-       **/
-      miningArgonIncreaseTickDelay: u64 & AugmentedConst<ApiType>;
-      /**
-       * Argon blocks per day
-       **/
-      ticksPerDay: u64 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module
