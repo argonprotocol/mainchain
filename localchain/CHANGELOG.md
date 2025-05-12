@@ -1,8 +1,8 @@
 # Changelog
 
-## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.7...2dcb2f6cb59bde2e33025d21b2a8d370531156a1) (2025-05-09)
+## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.8...508ae441cd6f8d46fe0661978bab1362f45d29b2) (2025-05-12)
 
-## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.7) (2025-05-02)
+## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.8) (2025-05-09)
 
 ### Features
 

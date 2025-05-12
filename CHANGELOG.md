@@ -1,6 +1,18 @@
 # Changelog
 
-## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.7...2dcb2f6cb59bde2e33025d21b2a8d370531156a1) (2025-05-09)
+## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.8...508ae441cd6f8d46fe0661978bab1362f45d29b2) (2025-05-12)
+
+### Features
+
+* **vaults:** track revenue per frame
+([0147fce](https://github.com/argonprotocol/mainchain/commit/0147fce4098aa9a59d03e135d145a0fc826dddf2))
+
+### Fixes
+
+* **vaults:** make all fees paid upfront
+([c898195](https://github.com/argonprotocol/mainchain/commit/c89819521d782f415b01b4aad2068e67137894e2))
+
+## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.8) (2025-05-09)
 
 ### Features
 
@@ -8,16 +20,6 @@
 ([8a69d17](https://github.com/argonprotocol/mainchain/commit/8a69d17184682baa34d70262488eb6813c6ce865))
 * **client:** ability to use a password file
 ([b08cfdd](https://github.com/argonprotocol/mainchain/commit/b08cfdd9f9a6065a525968d6b7d540a918c82dce))
-
-### Fixes
-
-* **client:** cap budget by balance
-([4286a17](https://github.com/argonprotocol/mainchain/commit/4286a172c15741fd3ba618ece025cdf959bc8456))
-
-## [v1.1.0-rc.7](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.7) (2025-05-02)
-
-### Features
-
 * clear more space
 ([138a836](https://github.com/argonprotocol/mainchain/commit/138a836946658347963a795868c163ff348352e6))
 * **mining_slot:** add tick to bids + mining reg
@@ -37,6 +39,8 @@
 
 ### Fixes
 
+* **client:** cap budget by balance
+([4286a17](https://github.com/argonprotocol/mainchain/commit/4286a172c15741fd3ba618ece025cdf959bc8456))
 * **node:** check finalization before marking best
 ([f5dba60](https://github.com/argonprotocol/mainchain/commit/f5dba60efa43f226920537db005d09bde6f9608b))
 * **gh:** glibc incapatability
