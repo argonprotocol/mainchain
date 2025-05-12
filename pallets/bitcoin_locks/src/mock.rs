@@ -184,6 +184,7 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
+		_satoshis: Satoshis,
 		expiration: BitcoinHeight,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError> {
 		let fund_type = FundType::LockedBitcoin;
@@ -212,6 +213,14 @@ impl BitcoinObligationProvider for StaticVaultProvider {
 		};
 		Obligations::mutate(|a| a.insert(next_obligation_id, obligation.clone()));
 		Ok(obligation)
+	}
+
+	fn did_release_bitcoin(
+		_vault_id: VaultId,
+		_obligation_id: ObligationId,
+		_satoshis: Satoshis,
+	) -> Result<(), ObligationError> {
+		Ok(())
 	}
 
 	fn compensate_lost_bitcoin(

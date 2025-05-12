@@ -437,6 +437,7 @@ pub mod pallet {
 				vault_id,
 				&account_id,
 				lock_price,
+				satoshis,
 				vault_claim_height,
 			)
 			.map_err(Error::<T>::from)?;
@@ -686,6 +687,12 @@ pub mod pallet {
 				)?;
 				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
 				T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+				T::BitcoinObligationProvider::did_release_bitcoin(
+					vault_id,
+					lock.obligation_id,
+					lock.satoshis,
+				)
+				.map_err(Error::<T>::from)?;
 			}
 
 			LocksByUtxoId::<T>::take(utxo_id);

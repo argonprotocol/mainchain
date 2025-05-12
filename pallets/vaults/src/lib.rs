@@ -40,6 +40,8 @@ pub mod pallet {
 		MiningSlotProvider, ObligationEvents, TickProvider,
 	};
 	use frame_support::traits::Incrementable;
+	use pallet_prelude::argon_primitives::bitcoin::Satoshis;
+
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
 
 	#[pallet::pallet]
@@ -74,17 +76,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumObligationAmount: Get<Self::Balance>;
 
-		/// Argon blocks per day
-		#[pallet::constant]
-		type TicksPerDay: Get<Tick>;
-
 		/// The max pending vault term changes per block
 		#[pallet::constant]
 		type MaxPendingTermModificationsPerTick: Get<u32>;
-
-		/// The number of ticks that a funding change will be delayed before it takes effect
-		#[pallet::constant]
-		type MiningArgonIncreaseTickDelay: Get<Tick>;
 
 		/// A provider of mining slot information
 		type MiningSlotProvider: MiningSlotProvider;
@@ -102,6 +96,8 @@ pub mod pallet {
 
 		/// Callbacks for various vault obligation events
 		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
+
+		type CurrentFrameId: Get<CohortId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -157,6 +153,18 @@ pub mod pallet {
 		Twox64Concat,
 		BitcoinHeight,
 		BoundedVec<ObligationId, T::MaxConcurrentlyExpiringObligations>,
+		ValueQuery,
+	>;
+
+	/// Tracks fee revenue from Bitcoin Locks for the last 10 Frames for each vault (a frame is a
+	/// "mining day" in Argon). The total revenue for a vault includes Liquidity Pools, of which the
+	/// associated data can be found in that pallet.
+	#[pallet::storage]
+	pub(super) type PerFrameFeeRevenueByVault<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		BoundedVec<VaultFrameFeeRevenue<T>, ConstU32<10>>,
 		ValueQuery,
 	>;
 
@@ -729,6 +737,55 @@ pub mod pallet {
 			NextObligationId::<T>::set(Some(next_obligation_id));
 			Ok(obligation_id)
 		}
+
+		pub(crate) fn update_vault_metrics(
+			vault_id: VaultId,
+			obligations_added: u32,
+			total_fee: T::Balance,
+			lock_price: T::Balance,
+			satoshis_locked: Satoshis,
+			satoshis_released: Satoshis,
+		) -> Result<(), ObligationError> {
+			let current_frame_id = T::CurrentFrameId::get();
+			PerFrameFeeRevenueByVault::<T>::mutate(vault_id, |x| {
+				let mut needs_insert = false;
+				if let Some(existing) = x.get(0) {
+					if existing.frame_id != current_frame_id {
+						if x.is_full() {
+							x.pop();
+						}
+						needs_insert = true;
+					}
+				} else {
+					needs_insert = true;
+				}
+				if needs_insert {
+					x.try_insert(
+						0,
+						VaultFrameFeeRevenue {
+							frame_id: current_frame_id,
+							fee_revenue: Zero::zero(),
+							bitcoin_locks_created: 0,
+							bitcoin_locks_total_satoshis: 0,
+							bitcoin_locks_market_value: 0u32.into(),
+							satoshis_released: 0,
+						},
+					)
+					.map_err(|_| {
+						tracing::error!("Unable to push new vault revenue");
+						ObligationError::InternalError
+					})?;
+				}
+				if let Some(existing) = x.get_mut(0) {
+					existing.fee_revenue.saturating_accrue(total_fee);
+					existing.bitcoin_locks_created += obligations_added;
+					existing.bitcoin_locks_total_satoshis.saturating_accrue(satoshis_locked);
+					existing.bitcoin_locks_market_value.saturating_accrue(lock_price);
+					existing.satoshis_released.saturating_accrue(satoshis_released);
+				}
+				Ok(())
+			})
+		}
 	}
 
 	impl<T: Config> LiquidityPoolVaultProvider for Pallet<T> {
@@ -790,6 +847,14 @@ pub mod pallet {
 			ObligationsById::<T>::insert(obligation_id, obligation.clone());
 
 			Ok(obligation)
+		}
+
+		fn did_release_bitcoin(
+			vault_id: VaultId,
+			_obligation_id: ObligationId,
+			satoshis: Satoshis,
+		) -> Result<(), ObligationError> {
+			Self::update_vault_metrics(vault_id, 0, 0u32.into(), 0u32.into(), 0, satoshis)
 		}
 
 		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
@@ -950,13 +1015,14 @@ pub mod pallet {
 		fn create_obligation(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			amount: T::Balance,
+			lock_price: T::Balance,
+			satoshis: Satoshis,
 			expiration_block: BitcoinHeight,
 		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
 			let obligation_id = Self::get_obligation_id_and_increment()?;
 
 			ensure!(
-				amount >= T::MinimumObligationAmount::get(),
+				lock_price >= T::MinimumObligationAmount::get(),
 				ObligationError::MinimumObligationAmountNotMet
 			);
 			let mut vault = VaultsById::<T>::get(vault_id)
@@ -969,17 +1035,19 @@ pub mod pallet {
 
 			ensure!(!vault.is_closed, ObligationError::VaultClosed);
 
-			ensure!(vault.free_balance() >= amount, ObligationError::InsufficientVaultFunds);
+			ensure!(vault.free_balance() >= lock_price, ObligationError::InsufficientVaultFunds);
 
 			let apr = vault.terms.bitcoin_annual_percent_rate;
 			let base_fee = vault.terms.bitcoin_base_fee;
 
-			let total_fee = apr.saturating_mul_int(amount).saturating_add(base_fee);
+			let total_fee = apr.saturating_mul_int(lock_price).saturating_add(base_fee);
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
-				amount,
+				lock_price,
 				total_fee
 			);
+
+			Self::update_vault_metrics(vault_id, 1, total_fee, lock_price, satoshis, 0)?;
 
 			// do this second so the 'provider' is already on the account
 			T::Currency::transfer(
@@ -993,7 +1061,7 @@ pub mod pallet {
 				_ => ObligationError::InsufficientFunds,
 			})?;
 
-			vault.bitcoin_locked.saturating_accrue(amount);
+			vault.bitcoin_locked.saturating_accrue(lock_price);
 			VaultsById::<T>::set(vault_id, Some(vault));
 
 			let expiration = ObligationExpiration::BitcoinBlock(expiration_block);
@@ -1003,7 +1071,7 @@ pub mod pallet {
 				vault_id,
 				fund_type: FundType::LockedBitcoin,
 				beneficiary: account_id.clone(),
-				amount,
+				amount: lock_price,
 				expiration: expiration.clone(),
 				total_fee,
 				start_tick: T::TickProvider::current_tick(),
@@ -1020,7 +1088,7 @@ pub mod pallet {
 				vault_id,
 				obligation_id,
 				beneficiary: account_id.clone(),
-				amount,
+				amount: lock_price,
 				expiration,
 				fund_type: FundType::LockedBitcoin,
 			});
@@ -1034,5 +1102,39 @@ pub mod pallet {
 
 	fn balance_to_i128<T: Config>(balance: T::Balance) -> i128 {
 		UniqueSaturatedInto::<u128>::unique_saturated_into(balance) as i128
+	}
+
+	/// Tracks the fee revenue for a Vault for a single Frame (mining day). Includes the associated
+	/// amount of bitcoin locked up in Satoshi and Argon values.
+	#[derive(
+		Encode,
+		Decode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct VaultFrameFeeRevenue<T: Config> {
+		/// The frame id in question
+		#[codec(compact)]
+		pub frame_id: CohortId,
+		/// The fee revenue for the value
+		#[codec(compact)]
+		pub fee_revenue: T::Balance,
+		/// The number of bitcoin locks created
+		#[codec(compact)]
+		pub bitcoin_locks_created: u32,
+		/// The argon market value of the locked satoshis
+		#[codec(compact)]
+		pub bitcoin_locks_market_value: T::Balance,
+		/// The number of satoshis locked into the vault
+		#[codec(compact)]
+		pub bitcoin_locks_total_satoshis: Satoshis,
+		/// The number of satoshis released during this period
+		#[codec(compact)]
+		pub satoshis_released: Satoshis,
 	}
 }

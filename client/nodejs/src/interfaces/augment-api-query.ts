@@ -83,6 +83,7 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
+  PalletVaultsVaultRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
 } from '@polkadot/types/lookup';
@@ -831,6 +832,14 @@ declare module '@polkadot/api-base/types/storage' {
        * Did this block activate a new cohort
        **/
       didStartNewCohort: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * The previous 10 frame start block numbers
+       **/
+      frameStartBlockNumbers: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<u32>>,
+        []
+      >;
       hasAddedGrandpaRotation: AugmentedQuery<
         ApiType,
         () => Observable<bool>,
@@ -1468,15 +1477,7 @@ declare module '@polkadot/api-base/types/storage' {
       >;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
-       * Completion of obligations by tick
-       **/
-      obligationCompletionByTick: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
-        [u64]
-      >;
-      /**
-       * Obligation  by id
+       * Obligation by id
        **/
       obligationsById: AugmentedQuery<
         ApiType,
@@ -1493,6 +1494,16 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>,
         [u64]
+      >;
+      /**
+       * Tracks revenue for the last 10 cohort frames for each vault
+       **/
+      trailingRevenueByVault: AugmentedQuery<
+        ApiType,
+        (
+          arg: u32 | AnyNumber | Uint8Array,
+        ) => Observable<Vec<PalletVaultsVaultRevenue>>,
+        [u32]
       >;
       /**
        * Vaults by id

@@ -3872,9 +3872,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				214u8, 55u8, 250u8, 139u8, 233u8, 233u8, 248u8, 223u8, 33u8, 115u8, 110u8, 77u8,
-				34u8, 120u8, 85u8, 157u8, 143u8, 19u8, 206u8, 44u8, 188u8, 220u8, 39u8, 225u8,
-				180u8, 68u8, 223u8, 230u8, 160u8, 0u8, 226u8, 201u8,
+				181u8, 154u8, 255u8, 43u8, 191u8, 87u8, 146u8, 67u8, 0u8, 211u8, 130u8, 208u8, 2u8,
+				167u8, 254u8, 62u8, 112u8, 57u8, 120u8, 149u8, 75u8, 30u8, 92u8, 157u8, 204u8,
+				158u8, 179u8, 85u8, 85u8, 184u8, 36u8, 19u8,
 			]
 	}
 	pub mod system {
@@ -5025,10 +5025,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							130u8, 177u8, 215u8, 58u8, 219u8, 174u8, 148u8, 251u8, 30u8, 60u8,
-							19u8, 127u8, 132u8, 68u8, 141u8, 90u8, 115u8, 199u8, 21u8, 157u8,
-							177u8, 0u8, 64u8, 148u8, 217u8, 168u8, 246u8, 209u8, 154u8, 227u8,
-							174u8, 97u8,
+							94u8, 220u8, 129u8, 123u8, 243u8, 169u8, 18u8, 172u8, 194u8, 42u8,
+							104u8, 155u8, 200u8, 131u8, 239u8, 109u8, 19u8, 150u8, 82u8, 232u8,
+							0u8, 57u8, 151u8, 82u8, 210u8, 217u8, 143u8, 191u8, 141u8, 213u8,
+							248u8, 30u8,
 						],
 					)
 				}
@@ -8074,6 +8074,13 @@ pub mod api {
 					use super::runtime_types;
 					pub type DidStartNewCohort = ::core::primitive::bool;
 				}
+				pub mod frame_start_block_numbers {
+					use super::runtime_types;
+					pub type FrameStartBlockNumbers =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u32,
+						>;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -8406,6 +8413,27 @@ pub mod api {
 							199u8, 93u8, 132u8, 26u8, 111u8, 248u8, 239u8, 83u8, 227u8, 95u8,
 							127u8, 171u8, 87u8, 239u8, 51u8, 11u8, 98u8, 186u8, 212u8, 20u8, 249u8,
 							81u8, 74u8, 45u8, 66u8, 101u8, 137u8, 89u8, 198u8, 168u8, 165u8, 130u8,
+						],
+					)
+				}
+				#[doc = " The previous 10 frame start block numbers"]
+				pub fn frame_start_block_numbers(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::frame_start_block_numbers::FrameStartBlockNumbers,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"FrameStartBlockNumbers",
+						(),
+						[
+							162u8, 160u8, 254u8, 222u8, 59u8, 160u8, 91u8, 216u8, 180u8, 149u8,
+							167u8, 144u8, 15u8, 39u8, 239u8, 76u8, 231u8, 29u8, 40u8, 111u8, 66u8,
+							114u8, 16u8, 234u8, 97u8, 116u8, 82u8, 16u8, 186u8, 7u8, 102u8, 232u8,
 						],
 					)
 				}
@@ -9786,15 +9814,13 @@ pub mod api {
 			pub struct ObligationCompleted {
 				pub vault_id: obligation_completed::VaultId,
 				pub obligation_id: obligation_completed::ObligationId,
-				pub returned_fee: obligation_completed::ReturnedFee,
-				pub released_fee: obligation_completed::ReleasedFee,
+				pub was_canceled: obligation_completed::WasCanceled,
 			}
 			pub mod obligation_completed {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type ObligationId = ::core::primitive::u64;
-				pub type ReturnedFee = ::core::primitive::u128;
-				pub type ReleasedFee = ::core::primitive::u128;
+				pub type WasCanceled = ::core::primitive::bool;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ObligationCompleted {
 				const PALLET: &'static str = "Vaults";
@@ -9837,36 +9863,6 @@ pub mod api {
 			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct ObligationCanceled {
-				pub vault_id: obligation_canceled::VaultId,
-				pub obligation_id: obligation_canceled::ObligationId,
-				pub beneficiary: obligation_canceled::Beneficiary,
-				pub fund_type: obligation_canceled::FundType,
-				pub returned_fee: obligation_canceled::ReturnedFee,
-			}
-			pub mod obligation_canceled {
-				use super::runtime_types;
-				pub type VaultId = ::core::primitive::u32;
-				pub type ObligationId = ::core::primitive::u64;
-				pub type Beneficiary = crate::types::AccountId32;
-				pub type FundType = runtime_types::argon_primitives::vault::FundType;
-				pub type ReturnedFee = ::core::primitive::u128;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ObligationCanceled {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "ObligationCanceled";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "An error occurred while completing an obligation"]
 			pub struct ObligationCompletionError {
 				pub obligation_id: obligation_completion_error::ObligationId,
@@ -9880,35 +9876,6 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ObligationCompletionError {
 				const PALLET: &'static str = "Vaults";
 				const EVENT: &'static str = "ObligationCompletionError";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
-				:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An error occurred releasing a base fee hold"]
-			pub struct ObligationBaseFeeMaturationError {
-				pub obligation_id: obligation_base_fee_maturation_error::ObligationId,
-				pub base_fee: obligation_base_fee_maturation_error::BaseFee,
-				pub vault_id: obligation_base_fee_maturation_error::VaultId,
-				pub error: obligation_base_fee_maturation_error::Error,
-			}
-			pub mod obligation_base_fee_maturation_error {
-				use super::runtime_types;
-				pub type ObligationId = ::core::primitive::u64;
-				pub type BaseFee = ::core::primitive::u128;
-				pub type VaultId = ::core::primitive::u32;
-				pub type Error = runtime_types::sp_runtime::DispatchError;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for ObligationBaseFeeMaturationError {
-				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "ObligationBaseFeeMaturationError";
 			}
 		}
 		pub mod storage {
@@ -9955,14 +9922,6 @@ pub mod api {
 					>;
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod obligation_completion_by_tick {
-					use super::runtime_types;
-					pub type ObligationCompletionByTick =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u64,
-						>;
-					pub type Param0 = ::core::primitive::u64;
-				}
 				pub mod bitcoin_lock_completions {
 					use super::runtime_types;
 					pub type BitcoinLockCompletions =
@@ -9970,6 +9929,14 @@ pub mod api {
 							::core::primitive::u64,
 						>;
 					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod trailing_revenue_by_vault {
+					use super::runtime_types;
+					pub type TrailingRevenueByVault =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_vaults::pallet::VaultRevenue,
+						>;
+					pub type Param0 = ::core::primitive::u32;
 				}
 			}
 			pub struct StorageApi;
@@ -10163,7 +10130,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Obligation  by id"]
+				#[doc = " Obligation by id"]
 				pub fn obligations_by_id_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -10185,7 +10152,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Obligation  by id"]
+				#[doc = " Obligation by id"]
 				pub fn obligations_by_id(
 					&self,
 					_0: impl ::core::borrow::Borrow<types::obligations_by_id::Param0>,
@@ -10209,55 +10176,6 @@ pub mod api {
 							250u8, 17u8, 221u8, 61u8, 218u8, 67u8, 112u8, 79u8, 221u8, 216u8,
 							141u8, 26u8, 58u8, 196u8, 166u8, 136u8, 225u8, 200u8, 57u8, 227u8,
 							243u8, 141u8,
-						],
-					)
-				}
-				#[doc = " Completion of obligations by tick"]
-				pub fn obligation_completion_by_tick_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::obligation_completion_by_tick::ObligationCompletionByTick,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"ObligationCompletionByTick",
-						(),
-						[
-							218u8, 80u8, 226u8, 95u8, 104u8, 150u8, 129u8, 107u8, 252u8, 206u8,
-							14u8, 199u8, 72u8, 214u8, 173u8, 195u8, 209u8, 139u8, 25u8, 255u8,
-							239u8, 44u8, 65u8, 54u8, 153u8, 106u8, 165u8, 10u8, 168u8, 20u8, 146u8,
-							206u8,
-						],
-					)
-				}
-				#[doc = " Completion of obligations by tick"]
-				pub fn obligation_completion_by_tick(
-					&self,
-					_0: impl ::core::borrow::Borrow<types::obligation_completion_by_tick::Param0>,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::obligation_completion_by_tick::Param0,
-					>,
-					types::obligation_completion_by_tick::ObligationCompletionByTick,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"ObligationCompletionByTick",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
-							_0.borrow(),
-						),
-						[
-							218u8, 80u8, 226u8, 95u8, 104u8, 150u8, 129u8, 107u8, 252u8, 206u8,
-							14u8, 199u8, 72u8, 214u8, 173u8, 195u8, 209u8, 139u8, 25u8, 255u8,
-							239u8, 44u8, 65u8, 54u8, 153u8, 106u8, 165u8, 10u8, 168u8, 20u8, 146u8,
-							206u8,
 						],
 					)
 				}
@@ -10312,6 +10230,55 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Tracks revenue for the last 10 cohort frames for each vault"]
+				pub fn trailing_revenue_by_vault_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::trailing_revenue_by_vault::TrailingRevenueByVault,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"TrailingRevenueByVault",
+						(),
+						[
+							61u8, 208u8, 107u8, 170u8, 89u8, 215u8, 4u8, 176u8, 29u8, 45u8, 138u8,
+							178u8, 192u8, 191u8, 218u8, 5u8, 83u8, 226u8, 111u8, 133u8, 201u8,
+							127u8, 25u8, 62u8, 199u8, 60u8, 46u8, 232u8, 156u8, 254u8, 221u8,
+							103u8,
+						],
+					)
+				}
+				#[doc = " Tracks revenue for the last 10 cohort frames for each vault"]
+				pub fn trailing_revenue_by_vault(
+					&self,
+					_0: impl ::core::borrow::Borrow<types::trailing_revenue_by_vault::Param0>,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::trailing_revenue_by_vault::Param0,
+					>,
+					types::trailing_revenue_by_vault::TrailingRevenueByVault,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"TrailingRevenueByVault",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
+							_0.borrow(),
+						),
+						[
+							61u8, 208u8, 107u8, 170u8, 89u8, 215u8, 4u8, 176u8, 29u8, 45u8, 138u8,
+							178u8, 192u8, 191u8, 218u8, 5u8, 83u8, 226u8, 111u8, 133u8, 201u8,
+							127u8, 25u8, 62u8, 199u8, 60u8, 46u8, 232u8, 156u8, 254u8, 221u8,
+							103u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -10334,23 +10301,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Argon blocks per day"]
-				pub fn ticks_per_day(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"TicksPerDay",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
-						],
-					)
-				}
 				#[doc = " The max pending vault term changes per block"]
 				pub fn max_pending_term_modifications_per_tick(
 					&self,
@@ -10365,23 +10315,6 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
-						],
-					)
-				}
-				#[doc = " The number of ticks that a funding change will be delayed before it takes effect"]
-				pub fn mining_argon_increase_tick_delay(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"MiningArgonIncreaseTickDelay",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
 						],
 					)
 				}
@@ -24888,8 +24821,6 @@ pub mod api {
 					ObligationCompletionError,
 					#[codec(index = 16)]
 					VaultNotYetActive,
-					#[codec(index = 17)]
-					BaseFeeOverflow,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -31633,9 +31564,6 @@ pub mod api {
 					#[codec(index = 30)]
 					#[doc = "An error occurred processing an obligation completion"]
 					ObligationCompletionError,
-					#[codec(index = 31)]
-					#[doc = "Too many base fee maturations were inserted per tick"]
-					BaseFeeOverflow,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
@@ -31696,8 +31624,7 @@ pub mod api {
 					ObligationCompleted {
 						vault_id: ::core::primitive::u32,
 						obligation_id: ::core::primitive::u64,
-						returned_fee: ::core::primitive::u128,
-						released_fee: ::core::primitive::u128,
+						was_canceled: ::core::primitive::bool,
 					},
 					#[codec(index = 8)]
 					ObligationModified {
@@ -31706,25 +31633,9 @@ pub mod api {
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 9)]
-					ObligationCanceled {
-						vault_id: ::core::primitive::u32,
-						obligation_id: ::core::primitive::u64,
-						beneficiary: crate::types::AccountId32,
-						fund_type: runtime_types::argon_primitives::vault::FundType,
-						returned_fee: ::core::primitive::u128,
-					},
-					#[codec(index = 10)]
 					#[doc = "An error occurred while completing an obligation"]
 					ObligationCompletionError {
 						obligation_id: ::core::primitive::u64,
-						error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 11)]
-					#[doc = "An error occurred releasing a base fee hold"]
-					ObligationBaseFeeMaturationError {
-						obligation_id: ::core::primitive::u64,
-						base_fee: ::core::primitive::u128,
-						vault_id: ::core::primitive::u32,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
 				}
@@ -31772,6 +31683,35 @@ pub mod api {
 						runtime_types::argon_primitives::bitcoin::OpaqueBitcoinXpub,
 					#[codec(compact)]
 					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Decode,
+					:: subxt :: ext :: subxt_core :: ext :: codec :: Encode,
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				# [codec (crate = :: subxt :: ext :: subxt_core :: ext :: codec)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct VaultRevenue {
+					#[codec(compact)]
+					pub cohort_frame_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub fee_revenue: ::core::primitive::u128,
+					#[codec(compact)]
+					pub bitcoin_locks_created: ::core::primitive::u32,
+					#[codec(compact)]
+					pub bitcoin_locks_market_value: ::core::primitive::u128,
+					#[codec(compact)]
+					pub bitcoin_locks_total_satoshis: ::core::primitive::u64,
+					#[codec(compact)]
+					pub satoshis_released: ::core::primitive::u64,
 				}
 			}
 		}

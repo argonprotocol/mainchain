@@ -2,7 +2,7 @@ use crate::{
 	mock::{Vaults, *},
 	pallet::{
 		BitcoinLockCompletions, NextVaultId, ObligationsById, PendingTermsModificationsByTick,
-		VaultXPubById, VaultsById,
+		PerFrameFeeRevenueByVault, VaultXPubById, VaultsById,
 	},
 	Error, Event, HoldReason, VaultConfig,
 };
@@ -148,7 +148,7 @@ fn it_delays_vault_activation_after_bidding() {
 		);
 
 		assert_err!(
-			Vaults::create_obligation(1, &2, 50_000, 100,),
+			Vaults::create_obligation(1, &2, 50_000, 500, 100,),
 			ObligationError::VaultNotYetActive
 		);
 	});
@@ -369,7 +369,7 @@ fn it_can_close_a_vault() {
 
 		let amount = 40_000;
 		let obligation =
-			Vaults::create_obligation(1, &2, amount, 1440 * 365).expect("bonding failed");
+			Vaults::create_obligation(1, &2, amount, 500, 1440 * 365).expect("bonding failed");
 		let fee = obligation.total_fee;
 		assert_eq!(obligation.total_fee, 401);
 		assert_eq!(obligation.prepaid_fee, 401);
@@ -397,7 +397,7 @@ fn it_can_close_a_vault() {
 		assert_eq!(Balances::free_balance(1), vault_owner_balance + fee);
 		assert_eq!(Balances::free_balance(2), 100_000 - fee);
 		assert_err!(
-			Vaults::create_obligation(1, &2, 1000, 1440 * 365),
+			Vaults::create_obligation(1, &2, 1000, 500, 1440 * 365),
 			ObligationError::VaultClosed
 		);
 	});
@@ -424,7 +424,8 @@ fn it_can_create_obligation() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 6_000);
-		let obligation = Vaults::create_obligation(1, &2, 500_000, 2440).expect("bonding failed");
+		let obligation =
+			Vaults::create_obligation(1, &2, 500_000, 500, 2440).expect("bonding failed");
 
 		let total_fee = obligation.total_fee;
 		let apr_fee = (0.01f64 * 500_000f64) as u128;
@@ -435,7 +436,44 @@ fn it_can_create_obligation() {
 		assert_ok!(Vaults::cancel_obligation(1));
 		assert_eq!(Balances::free_balance(1), 500_000 + total_fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - total_fee);
+
+		let current_frame_id = CurrentFrameId::get();
+		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
+		assert_eq!(vault_revenue[0].fee_revenue, total_fee);
+		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
 	});
+}
+
+#[test]
+fn it_handles_overflowing_metrics() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+		for frame_id in 1..50 {
+			CurrentFrameId::set(frame_id);
+			for vault_id in 0..10 {
+				for _ in 0..100 {
+					Vaults::update_vault_metrics(vault_id, 1, 1000, 10_000, 1000, 0).unwrap();
+				}
+			}
+		}
+		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 10);
+		assert_eq!(vault_revenue[0].frame_id, 49);
+		assert_eq!(vault_revenue[0].fee_revenue, 1000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 10_000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 1000 * 100);
+
+		assert_eq!(vault_revenue[9].frame_id, 40);
+		assert_eq!(vault_revenue[9].fee_revenue, 1000 * 100);
+		assert_eq!(vault_revenue[9].bitcoin_locks_market_value, 10_000 * 100);
+
+		assert_eq!(PerFrameFeeRevenueByVault::<Test>::get(9).len(), 10);
+	})
 }
 
 #[test]
@@ -460,7 +498,7 @@ fn it_accounts_for_pending_bitcoins() {
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 900_000);
-		let _ = Vaults::create_obligation(1, &2, 100_000, 14_400).expect("bonding failed");
+		let _ = Vaults::create_obligation(1, &2, 100_000, 500, 14_400).expect("bonding failed");
 
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().get_activated_securitization(),
@@ -496,7 +534,8 @@ fn it_can_burn_an_obligation() {
 		assert_eq!(Balances::free_balance(1), 900_000);
 
 		set_argons(2, 2_000);
-		let obligation = Vaults::create_obligation(1, &2, 100_000, 2440).expect("bonding failed");
+		let obligation =
+			Vaults::create_obligation(1, &2, 100_000, 500, 2440).expect("bonding failed");
 		let total_fee = obligation.total_fee;
 		let paid = obligation.prepaid_fee;
 
@@ -541,7 +580,7 @@ fn it_can_recoup_reduced_value_bitcoins_from_create_obligation() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 200_000);
 
 		let obligation =
-			Vaults::create_obligation(1, &2, 100_000, 1440 * 365).expect("bonding failed");
+			Vaults::create_obligation(1, &2, 100_000, 500, 1440 * 365).expect("bonding failed");
 		let total_fee = obligation.total_fee;
 		let paid = obligation.prepaid_fee;
 
@@ -592,7 +631,7 @@ fn it_can_recoup_increased_value_bitcoins_from_securitizations() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 350_000);
 
 		let obligation =
-			Vaults::create_obligation(1, &2, 50_000, 1440 * 365).expect("bonding failed");
+			Vaults::create_obligation(1, &2, 50_000, 500, 1440 * 365).expect("bonding failed");
 		let total_fee = obligation.total_fee;
 		let paid = obligation.prepaid_fee;
 		assert_eq!(total_fee, 50);
@@ -791,7 +830,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		let amount = 1_000_000;
 
 		CurrentTick::set(1);
-		assert_ok!(Vaults::create_obligation(1, &2, amount, 365));
+		assert_ok!(Vaults::create_obligation(1, &2, amount, 500, 365));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_locked, 1_000_000);
 		assert_eq!(
 			ObligationsById::<Test>::get(1).unwrap(),

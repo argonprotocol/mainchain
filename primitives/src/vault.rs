@@ -7,7 +7,9 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
+	},
 	tick::Tick,
 	ObligationId, VaultId,
 };
@@ -41,6 +43,13 @@ pub trait BitcoinObligationProvider {
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 
+	/// When bitcoin is released from the vault, notate the number of bitcoins that were released
+	fn did_release_bitcoin(
+		vault_id: VaultId,
+		obligation_id: ObligationId,
+		satoshis: Satoshis,
+	) -> Result<(), ObligationError>;
+
 	/// Return the obligation to the beneficiary with a prorated refund
 	fn cancel_obligation(obligation_id: ObligationId) -> Result<(), ObligationError>;
 
@@ -50,6 +59,7 @@ pub trait BitcoinObligationProvider {
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
 		amount: Self::Balance,
+		satoshis: Satoshis,
 		expiration_block: BitcoinHeight,
 	) -> Result<Obligation<Self::AccountId, Self::Balance>, ObligationError>;
 

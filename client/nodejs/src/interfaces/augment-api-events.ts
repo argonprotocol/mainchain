@@ -1591,50 +1591,10 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     vaults: {
-      /**
-       * An error occurred releasing a base fee hold
-       **/
-      ObligationBaseFeeMaturationError: AugmentedEvent<
-        ApiType,
-        [
-          obligationId: u64,
-          baseFee: u128,
-          vaultId: u32,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          obligationId: u64;
-          baseFee: u128;
-          vaultId: u32;
-          error: SpRuntimeDispatchError;
-        }
-      >;
-      ObligationCanceled: AugmentedEvent<
-        ApiType,
-        [
-          vaultId: u32,
-          obligationId: u64,
-          beneficiary: AccountId32,
-          fundType: ArgonPrimitivesVaultFundType,
-          returnedFee: u128,
-        ],
-        {
-          vaultId: u32;
-          obligationId: u64;
-          beneficiary: AccountId32;
-          fundType: ArgonPrimitivesVaultFundType;
-          returnedFee: u128;
-        }
-      >;
       ObligationCompleted: AugmentedEvent<
         ApiType,
-        [vaultId: u32, obligationId: u64, returnedFee: u128, releasedFee: u128],
-        {
-          vaultId: u32;
-          obligationId: u64;
-          returnedFee: u128;
-          releasedFee: u128;
-        }
+        [vaultId: u32, obligationId: u64, wasCanceled: bool],
+        { vaultId: u32; obligationId: u64; wasCanceled: bool }
       >;
       /**
        * An error occurred while completing an obligation

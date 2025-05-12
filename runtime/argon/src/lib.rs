@@ -260,6 +260,13 @@ impl pallet_ticks::Config for Runtime {
 	type Digests = Digests;
 }
 
+pub struct GetCurrentFrameId;
+impl Get<FrameId> for GetCurrentFrameId {
+	fn get() -> FrameId {
+		MiningSlot::current_frame_id()
+	}
+}
+
 impl pallet_vaults::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
@@ -267,15 +274,14 @@ impl pallet_vaults::Config for Runtime {
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MinimumObligationAmount = MinimumObligationAmount;
-	type TicksPerDay = TicksPerDay;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
-	type MiningArgonIncreaseTickDelay = VaultFundingModificationDelay;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type TickProvider = Ticks;
 	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
 	type EventHandler = (BitcoinLocks,);
+	type CurrentFrameId = GetCurrentFrameId;
 }
 
 pub struct BitcoinSignatureVerifier;

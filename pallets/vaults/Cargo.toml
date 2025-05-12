@@ -20,6 +20,7 @@ scale-info = { workspace = true }
 argon-bitcoin = { workspace = true, default-features = false }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
@@ -38,6 +39,7 @@ std = [
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
+	"tracing/std",
 ]
 runtime-benchmarks = [
 	"polkadot-sdk/frame-benchmarking",
