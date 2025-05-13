@@ -135,8 +135,8 @@ export function applyEnv(
     const res = configDotenv({ path: envPath });
     if (res.parsed?.ACCOUNT_JSON_PATH) {
       // ensure path is relative to the env file if provided that way
-      process.env.ACCOUNT_JSON_PATH = Path.relative(
-        envPath,
+      process.env.ACCOUNT_JSON_PATH = Path.resolve(
+        Path.dirname(envPath),
         process.env.ACCOUNT_JSON_PATH!,
       );
     }
