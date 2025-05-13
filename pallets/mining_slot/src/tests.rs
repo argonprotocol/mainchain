@@ -65,7 +65,7 @@ fn get_validation_window_blocks() {
 }
 
 #[test]
-fn calculate_cohort_id() {
+fn calculate_frame_id() {
 	MaxCohortSize::set(10);
 	MaxMiners::set(100);
 	let ticks_between_slots = 1440;
@@ -102,7 +102,7 @@ fn calculate_cohort_id() {
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1);
 		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 0);
+		assert_eq!(MiningSlots::calculated_frame_id(), 0);
 		assert_eq!(
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1, current_tick + 1 + mining_window)
@@ -116,13 +116,42 @@ fn calculate_cohort_id() {
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 1);
+		assert_eq!(MiningSlots::calculated_frame_id(), 1);
 		assert_eq!(NextCohortId::<Test>::get(), 2, "if not set, will show the current era");
 		assert_eq!(
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
 		);
 		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1440);
+	});
+}
+
+#[test]
+fn it_updates_cohort_id_at_right_time() {
+	MaxCohortSize::set(10);
+	MaxMiners::set(100);
+	let ticks_between_slots = 1440;
+	TicksBetweenSlots::set(ticks_between_slots);
+
+	SlotBiddingStartAfterTicks::set(55_661);
+
+	let genesis = 28_949_839;
+	let _bidding_start_tick = 29_005_500;
+	let current_tick = 29_118_062;
+	CurrentTick::set(current_tick);
+
+	let _frame_78_tick = 29_117_820; // bidding_start_tick + (1440 * 78);
+
+	new_test_ext().execute_with(|| {
+		NextCohortId::<Test>::set(79);
+		ElapsedTicks::mutate(|a| *a = current_tick - genesis);
+		CurrentTick::set(current_tick);
+		assert_eq!(MiningSlots::calculated_frame_id(), 78);
+		MiningSlots::on_initialize(4);
+		MiningSlots::on_finalize(4);
+		assert_eq!(NextCohortId::<Test>::get(), 79);
+
+		ElapsedTicks::mutate(|a| *a = genesis + SlotBiddingStartAfterTicks::get() - 1440 * 79);
 	});
 }
 
@@ -184,7 +213,7 @@ fn extends_bidding_if_mining_slot_extends() {
 		// now it's bumped out
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1000);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 0);
+		assert_eq!(MiningSlots::calculated_frame_id(), 0);
 		assert_eq!(NextCohortId::<Test>::get(), 1);
 
 		current_tick += 1000;
@@ -227,7 +256,7 @@ fn it_adds_new_cohorts_on_block() {
 		ElapsedTicks::set(8);
 		CurrentTick::set(8);
 		assert_eq!(MiningSlots::slot_1_tick(), 4);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 3);
+		assert_eq!(MiningSlots::calculated_frame_id(), 3);
 		NextCohortId::<Test>::put(4);
 
 		for i in 0..4u32 {
@@ -270,7 +299,7 @@ fn it_adds_new_cohorts_on_block() {
 
 		CurrentTick::set(10);
 		ElapsedTicks::set(10);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 4);
+		assert_eq!(MiningSlots::calculated_frame_id(), 4);
 		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
 		MiningSlots::on_initialize(10);
 		MiningSlots::on_finalize(10);
@@ -343,7 +372,7 @@ fn it_releases_argonots_when_a_window_closes() {
 		CurrentTick::set(7);
 		ElapsedTicks::set(7);
 		assert_eq!(MiningSlots::slot_1_tick(), 2);
-		assert_eq!(MiningSlots::calculate_cohort_id(), 3);
+		assert_eq!(MiningSlots::calculated_frame_id(), 3);
 		NextCohortId::<Test>::set(4);
 		System::set_block_number(7);
 
@@ -560,7 +589,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		System::set_block_number(12);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
-		NextCohortId::<Test>::put(MiningSlots::calculate_cohort_id() + 1);
+		NextCohortId::<Test>::put(MiningSlots::calculated_frame_id() + 1);
 
 		assert_eq!(MiningSlots::get_next_slot_era(), (16, 16 + (4 * 3)));
 		assert_eq!(get_next_slot_starting_index(), 2);
@@ -837,6 +866,7 @@ fn handles_a_max_of_bids_per_block() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(4);
 		ElapsedTicks::set(4);
+		CurrentTick::set(4);
 		MiningSlots::on_initialize(4);
 		MiningSlots::on_finalize(4);
 		SlotBiddingStartAfterTicks::set(0);

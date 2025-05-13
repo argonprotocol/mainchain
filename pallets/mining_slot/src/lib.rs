@@ -339,12 +339,13 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let next_scheduled_cohort_id = NextCohortId::<T>::get();
-			let next_cohort_id = Self::calculate_cohort_id();
-			if next_cohort_id >= next_scheduled_cohort_id {
-				log::trace!("Starting Slot {}", next_cohort_id);
+			let next_cohort_frame_id = NextCohortId::<T>::get();
+			let calculated_frame_id = Self::calculated_frame_id();
+			// if it's time for the cohort to start, do it
+			if calculated_frame_id >= next_cohort_frame_id {
+				log::trace!("Starting Slot {}", next_cohort_frame_id);
 				Self::adjust_argonots_per_seat();
-				Self::start_new_slot(next_cohort_id);
+				Self::start_new_slot(calculated_frame_id);
 				// new slot will rotate grandpas. Return so we don't do it again below
 				return;
 			}
@@ -354,7 +355,7 @@ pub mod pallet {
 			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
 			// rotate grandpas on off rotations
 			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
-				T::SlotEvents::rotate_grandpas::<T::Keys>(next_cohort_id, vec![], vec![]);
+				T::SlotEvents::rotate_grandpas::<T::Keys>(calculated_frame_id, vec![], vec![]);
 				HasAddedGrandpaRotation::<T>::put(true);
 			}
 		}
@@ -812,16 +813,15 @@ impl<T: Config> Pallet<T> {
 		(start_tick, start_tick + Self::get_mining_window_ticks())
 	}
 
-	pub(crate) fn calculate_cohort_id() -> CohortId {
+	pub(crate) fn calculated_frame_id() -> FrameId {
 		let mining_config = MiningConfig::<T>::get();
-		let slot_1_tick_start =
-			mining_config.slot_bidding_start_after_ticks + mining_config.ticks_between_slots;
-		if T::TickProvider::elapsed_ticks() < slot_1_tick_start {
-			return 0
-		}
-		let ticks_since_mining_start = Self::ticks_since_mining_start();
-		let cohort_id = ticks_since_mining_start / mining_config.ticks_between_slots;
-		cohort_id as CohortId + 1
+		let current_tick = T::TickProvider::current_tick();
+		let genesis_tick = current_tick.saturating_sub(T::TickProvider::elapsed_ticks());
+		let bidding_start_tick =
+			genesis_tick.saturating_add(mining_config.slot_bidding_start_after_ticks);
+
+		let ticks_since_mining_start = current_tick.saturating_sub(bidding_start_tick);
+		ticks_since_mining_start / mining_config.ticks_between_slots
 	}
 
 	pub fn tick_for_slot(cohort_id: CohortId) -> Tick {
