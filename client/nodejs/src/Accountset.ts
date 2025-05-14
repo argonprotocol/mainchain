@@ -197,15 +197,14 @@ export class Accountset {
         };
       }
     }
-    const nextCohortFrameId = await api.query.miningSlot.nextCohortFrameId();
+    const nextFrameId = await api.query.miningSlot.nextFrameId();
 
     return addresses.map(address => {
       const seat = addressToMiningIndex[address];
       const registration = registrationBySeatIndex[seat];
       let isLastDay = false;
       if (registration?.cohortFrameId) {
-        isLastDay =
-          nextCohortFrameId.toNumber() - registration?.cohortFrameId === 10;
+        isLastDay = nextFrameId.toNumber() - registration?.cohortFrameId === 10;
       }
       return {
         ...registration,

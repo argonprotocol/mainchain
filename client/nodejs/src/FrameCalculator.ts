@@ -1,10 +1,12 @@
 import { type ArgonClient, getTickFromHeader, type Header } from './index';
 
 /**
- * A rotation is the period from noon EDT to the next noon EDT that a cohort of
- * miners rotates. The first rotation was the period between bidding start and Cohort 1 beginning.
+ * A frame starts with the bidding start time (noon EDT), and ends the next day at noon EDT. Frame 0 was the first day of
+ * bidding, and frame 1 began once the first miners were selected. This occurred on February 24th, 2025 at 12pm EDT.
+ *
+ * This class calculates fromeId from ticks.
  */
-export class MiningRotations {
+export class FrameCalculator {
   private miningConfig:
     | { ticksBetweenSlots: number; slotBiddingStartAfterTicks: number }
     | undefined;
@@ -22,15 +24,12 @@ export class MiningRotations {
       .then(x => x.toNumber());
 
     const ticksBetweenSlots = this.miningConfig!.ticksBetweenSlots;
-    const slot1StartTick =
-      this.genesisTick! +
-      this.miningConfig!.slotBiddingStartAfterTicks +
-      ticksBetweenSlots;
-    if (tick < slot1StartTick) return 0;
-    // Calculate the number of ticks since the start of bidding. Once bidding started, it was rotation 1
-    const ticksSinceSlot1 = tick - slot1StartTick;
+    const biddingStartTick =
+      this.genesisTick! + this.miningConfig!.slotBiddingStartAfterTicks;
 
-    return Math.floor(ticksSinceSlot1 / ticksBetweenSlots) + 1;
+    const ticksSinceMiningStart = tick - biddingStartTick;
+
+    return Math.floor(ticksSinceMiningStart / ticksBetweenSlots);
   }
 
   async getForHeader(client: ArgonClient, header: Header) {

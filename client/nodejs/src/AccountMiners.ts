@@ -2,7 +2,7 @@ import { Accountset } from './Accountset';
 import { Header } from '@polkadot/types/interfaces/runtime';
 import { GenericEvent } from '@polkadot/types';
 import { BlockWatch } from './BlockWatch';
-import { MiningRotations } from './MiningRotations';
+import { FrameCalculator } from './FrameCalculator';
 import { createNanoEvents } from 'nanoevents';
 
 export class AccountMiners {
@@ -14,7 +14,7 @@ export class AccountMiners {
         argons: bigint;
         argonots: bigint;
         cohortFrameId: number;
-        rotation: number;
+        duringFrameId: number;
       },
     ) => void;
     minted: (
@@ -23,12 +23,12 @@ export class AccountMiners {
         accountId: string;
         argons: bigint;
         cohortFrameId: number;
-        rotation: number;
+        duringFrameId: number;
       },
     ) => void;
   }>();
 
-  public miningRotations: MiningRotations;
+  public frameCalculator: FrameCalculator;
 
   private trackedAccountsByAddress: {
     [address: string]: { cohortFrameId: number; subaccountIndex: number };
@@ -43,7 +43,7 @@ export class AccountMiners {
     }[],
     private options: { shouldLog: boolean } = { shouldLog: false },
   ) {
-    this.miningRotations = new MiningRotations();
+    this.frameCalculator = new FrameCalculator();
     for (const seat of registeredMiners) {
       this.trackedAccountsByAddress[seat.address] = {
         cohortFrameId: seat.cohortFrameId,
@@ -79,16 +79,16 @@ export class AccountMiners {
       console.warn('> No vote author found');
     }
     const client = await this.accountset.client;
-    const rotation = await this.miningRotations.getForTick(client, tick);
+    const currentFrameId = await this.frameCalculator.getForTick(client, tick);
     let newMiners: { cohortFrameId: number; addresses: string[] } | undefined;
     const dataByCohort: {
-      rotation: number;
+      currentFrameId: number;
       [cohortFrameId: number]: {
         argonsMinted: bigint;
         argonsMined: bigint;
         argonotsMined: bigint;
       };
-    } = { rotation };
+    } = { currentFrameId };
     for (const event of events) {
       if (client.events.miningSlot.NewMiners.is(event)) {
         newMiners = {
@@ -116,7 +116,7 @@ export class AccountMiners {
               argons: argons.toBigInt(),
               argonots: ownership.toBigInt(),
               cohortFrameId: entry.cohortFrameId,
-              rotation,
+              duringFrameId: currentFrameId,
             });
           }
         }
@@ -139,7 +139,7 @@ export class AccountMiners {
               accountId: address,
               argons: amountPerMiner,
               cohortFrameId,
-              rotation,
+              duringFrameId: currentFrameId,
             });
           }
         }

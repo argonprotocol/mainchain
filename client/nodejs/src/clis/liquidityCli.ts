@@ -62,7 +62,7 @@ export default function liquidityCli() {
       '--min-pct-sharing <percent>',
       'The minimum profit sharing percent to allow',
       parseInt,
-      100,
+      30,
     )
     .option(
       '--tip <amount>',

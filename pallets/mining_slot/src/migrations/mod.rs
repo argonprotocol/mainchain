@@ -1,5 +1,5 @@
 use crate::{
-	pallet::{ActiveMinersByIndex, BidsForNextSlotCohort, NextCohortFrameId},
+	pallet::{ActiveMinersByIndex, BidsForNextSlotCohort, NextFrameId},
 	Config, Registration,
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
@@ -85,8 +85,7 @@ mod old_storage {
 		StorageMap<crate::Pallet<T>, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
 
 	#[storage_alias]
-	pub(super) type NextCohortFrameId<T: Config> =
-		StorageValue<crate::Pallet<T>, FrameId, ValueQuery>;
+	pub(super) type NextFrameId<T: Config> = StorageValue<crate::Pallet<T>, FrameId, ValueQuery>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -136,8 +135,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		});
 		log::info!("{} mining registrations migrated", count);
 
-		let frame_id = old_storage::NextCohortFrameId::<T>::take();
-		NextCohortFrameId::<T>::set(frame_id);
+		let frame_id = old_storage::NextFrameId::<T>::take();
+		NextFrameId::<T>::set(frame_id);
 		count += 1;
 
 		T::DbWeight::get().reads_writes(count as u64, count as u64)

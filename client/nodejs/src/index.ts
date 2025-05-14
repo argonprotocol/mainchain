@@ -18,7 +18,7 @@ export { TxSubmitter } from './TxSubmitter';
 export { Accountset } from './Accountset';
 export { MiningBids } from './MiningBids';
 export { AccountMiners } from './AccountMiners';
-export { MiningRotations } from './MiningRotations';
+export { FrameCalculator } from './FrameCalculator';
 export {
   BlockWatch,
   getAuthorFromHeader,

@@ -25,12 +25,18 @@ export function formatPercent(x: BigNumber | undefined): string {
   return `${x.times(100).decimalPlaces(3)}%`;
 }
 
-export function filterUndefined(obj: Record<string, any>): Record<string, any> {
+type NonNullableProps<T> = {
+  [K in keyof T]-?: Exclude<T[K], undefined | null>;
+};
+
+export function filterUndefined<T extends Record<string, any>>(
+  obj: Partial<T>,
+): NonNullableProps<T> {
   return Object.fromEntries(
     Object.entries(obj).filter(
       ([_, value]) => value !== undefined && value !== null,
     ),
-  );
+  ) as NonNullableProps<T>;
 }
 
 export async function gettersToObject<T>(obj: T): Promise<T> {

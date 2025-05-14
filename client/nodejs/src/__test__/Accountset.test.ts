@@ -96,10 +96,10 @@ describeIntegration('Accountset tests', () => {
     );
     await txSubmitter.submit({ waitForBlock: true });
     let startingCohortFrameId = await api.query.miningSlot
-      .nextCohortFrameId()
+      .nextFrameId()
       .then(x => x.toNumber());
     await new Promise(resolve =>
-      api.query.miningSlot.nextCohortFrameId(x => {
+      api.query.miningSlot.nextFrameId(x => {
         if (x.toNumber() > startingCohortFrameId) {
           resolve(true);
         }

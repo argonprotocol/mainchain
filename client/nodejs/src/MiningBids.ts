@@ -35,19 +35,19 @@ export class MiningBids {
     const unsubscribe = await client.queryMulti<[Bool, u64]>(
       [
         client.query.miningSlot.isNextSlotBiddingOpen as any,
-        client.query.miningSlot.nextCohortFrameId as any,
+        client.query.miningSlot.nextFrameId as any,
       ],
       async ([isBiddingOpen, rawNextCohortFrameId]) => {
-        const nextCohortFrameId = rawNextCohortFrameId.toNumber();
+        const nextFrameId = rawNextCohortFrameId.toNumber();
 
         if (isBiddingOpen.isTrue) {
           if (openCohortFrameId !== 0) {
             await onBiddingEnd?.(openCohortFrameId);
           }
-          openCohortFrameId = nextCohortFrameId;
-          await onBiddingStart?.(nextCohortFrameId);
+          openCohortFrameId = nextFrameId;
+          await onBiddingStart?.(nextFrameId);
         } else {
-          await onBiddingEnd?.(nextCohortFrameId);
+          await onBiddingEnd?.(nextFrameId);
           openCohortFrameId = 0;
         }
       },

@@ -134,9 +134,7 @@ export class BidPool {
     const rawVaultIds = await api.query.vaults.vaultsById.keys();
     const vaultIds = rawVaultIds.map(x => x.args[0].toNumber());
     this.bidPoolAmount = await this.getBidPool();
-    this.nextFrameId = (
-      await api.query.miningSlot.nextCohortFrameId()
-    ).toNumber();
+    this.nextFrameId = (await api.query.miningSlot.nextFrameId()).toNumber();
 
     const contributors =
       await api.query.liquidityPools.vaultPoolsByFrame.entries();
@@ -214,7 +212,7 @@ export class BidPool {
     >(
       [
         api.query.miningSlot.bidsForNextSlotCohort as any,
-        api.query.miningSlot.nextCohortFrameId as any,
+        api.query.miningSlot.nextFrameId as any,
         api.query.liquidityPools.capitalActive as any,
         api.query.liquidityPools.capitalRaising as any,
       ],
@@ -362,11 +360,12 @@ export class BidPool {
       }).printTable();
     }
 
-    const nextPool = this.poolVaultCapitalByFrame[this.nextFrameId + 1] ?? [];
+    const raisingFunds =
+      this.poolVaultCapitalByFrame[this.nextFrameId + 1] ?? [];
     let maxWidth = 0;
     const nextCapital = [];
     for (const x of this.vaultSecuritization) {
-      const entry = nextPool[x.vaultId] ?? {};
+      const entry = raisingFunds[x.vaultId] ?? {};
       const { table, width } = this.createBondCapitalTable(
         x.activatedSecuritization,
         entry.contributors ?? [],
@@ -383,7 +382,7 @@ export class BidPool {
       });
     }
     if (nextCapital.length) {
-      console.log(`\n\nNext (Frame ${this.nextFrameId + 1}):`);
+      console.log(`\n\nRaising Funds (Frame ${this.nextFrameId + 1}):`);
       new Table({
         columns: [
           { name: 'Vault', alignment: 'left' },

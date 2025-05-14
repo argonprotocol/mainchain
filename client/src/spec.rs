@@ -3872,9 +3872,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				104u8, 3u8, 121u8, 242u8, 213u8, 122u8, 209u8, 5u8, 214u8, 197u8, 88u8, 120u8,
-				206u8, 227u8, 188u8, 109u8, 186u8, 173u8, 196u8, 124u8, 104u8, 83u8, 205u8, 50u8,
-				76u8, 52u8, 161u8, 66u8, 98u8, 49u8, 146u8, 122u8,
+				119u8, 152u8, 66u8, 47u8, 122u8, 222u8, 87u8, 36u8, 202u8, 144u8, 102u8, 127u8,
+				105u8, 42u8, 97u8, 241u8, 0u8, 233u8, 99u8, 142u8, 64u8, 255u8, 17u8, 102u8, 65u8,
+				210u8, 38u8, 252u8, 39u8, 123u8, 100u8, 140u8,
 			]
 	}
 	pub mod system {
@@ -8056,9 +8056,9 @@ pub mod api {
 					pub type MiningConfig =
 						runtime_types::argon_primitives::block_seal::MiningSlotConfig;
 				}
-				pub mod next_cohort_frame_id {
+				pub mod next_frame_id {
 					use super::runtime_types;
-					pub type NextCohortFrameId = ::core::primitive::u64;
+					pub type NextFrameId = ::core::primitive::u64;
 				}
 				pub mod did_start_new_cohort {
 					use super::runtime_types;
@@ -8363,24 +8363,25 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The next cohort frameId"]
-				pub fn next_cohort_frame_id(
+				#[doc = " The next frameId. A frame in argon is the 24 hours between the start of two different mining"]
+				#[doc = " cohorts."]
+				pub fn next_frame_id(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::next_cohort_frame_id::NextCohortFrameId,
+					types::next_frame_id::NextFrameId,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"NextCohortFrameId",
+						"NextFrameId",
 						(),
 						[
-							7u8, 194u8, 20u8, 69u8, 194u8, 135u8, 69u8, 113u8, 86u8, 8u8, 210u8,
-							123u8, 109u8, 230u8, 145u8, 216u8, 201u8, 94u8, 227u8, 86u8, 27u8,
-							67u8, 47u8, 203u8, 6u8, 247u8, 53u8, 195u8, 218u8, 108u8, 176u8, 184u8,
+							204u8, 139u8, 40u8, 5u8, 151u8, 145u8, 33u8, 38u8, 204u8, 140u8, 164u8,
+							200u8, 212u8, 170u8, 144u8, 68u8, 92u8, 165u8, 46u8, 76u8, 80u8, 5u8,
+							246u8, 140u8, 245u8, 10u8, 115u8, 251u8, 115u8, 49u8, 163u8, 106u8,
 						],
 					)
 				}

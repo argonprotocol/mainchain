@@ -211,11 +211,12 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
 
-	/// The next cohort frameId
+	/// The next frameId. A frame in argon is the 24 hours between the start of two different mining
+	/// cohorts.
 	#[pallet::storage]
-	pub(super) type NextCohortFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
+	pub(super) type NextFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
 
-	/// Did this block activate a new cohort
+	/// Did this block activate a new frame
 	#[pallet::storage]
 	pub(super) type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
 
@@ -240,7 +241,7 @@ pub mod pallet {
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
 			ArgonotsPerMiningSeat::<T>::put(T::MinimumArgonotsPerSeat::get());
-			NextCohortFrameId::<T>::put(1);
+			NextFrameId::<T>::put(1);
 		}
 	}
 
@@ -316,7 +317,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			DidStartNewCohort::<T>::take();
-			let next_cohort_frame_id = NextCohortFrameId::<T>::get();
+			let next_cohort_frame_id = NextFrameId::<T>::get();
 			if next_cohort_frame_id == 1 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
 				Self::is_slot_bidding_started()
@@ -335,7 +336,7 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let next_cohort_frame_id = NextCohortFrameId::<T>::get();
+			let next_cohort_frame_id = NextFrameId::<T>::get();
 			let calculated_frame_id = Self::calculated_frame_id();
 			// if it's time for the cohort to start, do it
 			if calculated_frame_id >= next_cohort_frame_id {
@@ -400,7 +401,7 @@ pub mod pallet {
 
 			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
 			let current_registration = Self::get_active_registration(&miner_account_id);
-			let next_cohort_frame_id = NextCohortFrameId::<T>::get();
+			let next_cohort_frame_id = NextFrameId::<T>::get();
 			if let Some(ref registration) = current_registration {
 				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
 				// ensure we are not overlapping sessions
@@ -568,11 +569,11 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 
 impl<T: Config> Pallet<T> {
 	pub fn current_frame_id() -> FrameId {
-		NextCohortFrameId::<T>::get().saturating_sub(1)
+		NextFrameId::<T>::get().saturating_sub(1)
 	}
 
 	pub fn is_registered_mining_active() -> bool {
-		NextCohortFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
+		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
 	}
 
 	pub fn get_mining_authority(
@@ -666,7 +667,7 @@ impl<T: Config> Pallet<T> {
 
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
 		DidStartNewCohort::<T>::put(true);
-		NextCohortFrameId::<T>::put(frame_id + 1);
+		NextFrameId::<T>::put(frame_id + 1);
 		FrameStartBlockNumbers::<T>::mutate(|a| {
 			if a.is_full() {
 				a.pop();
@@ -768,7 +769,7 @@ impl<T: Config> Pallet<T> {
 
 		if vote_seal_proof < threshold {
 			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
-			let cohort_frame_id = NextCohortFrameId::<T>::get();
+			let cohort_frame_id = NextFrameId::<T>::get();
 			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_frame_id });
 			return true
 		}
@@ -794,7 +795,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn next_cohort_frame_id() -> FrameId {
-		NextCohortFrameId::<T>::get()
+		NextFrameId::<T>::get()
 	}
 
 	pub fn get_next_slot_era() -> (Tick, Tick) {

@@ -65,16 +65,11 @@ export class CohortBidder {
       this.unsubscribe();
     }
     const client = await this.client;
-    const [nextCohortFrameId, isBiddingOpen] = await client.queryMulti<
-      [u64, Bool]
-    >([
-      client.query.miningSlot.nextCohortFrameId as any,
+    const [nextFrameId, isBiddingOpen] = await client.queryMulti<[u64, Bool]>([
+      client.query.miningSlot.nextFrameId as any,
       client.query.miningSlot.isNextSlotBiddingOpen,
     ]);
-    if (
-      nextCohortFrameId.toNumber() === this.cohortFrameId &&
-      isBiddingOpen.isTrue
-    ) {
+    if (nextFrameId.toNumber() === this.cohortFrameId && isBiddingOpen.isTrue) {
       console.log('Bidding is still open, waiting for it to close');
       await new Promise<void>(async resolve => {
         const unsub = await client.query.miningSlot.isNextSlotBiddingOpen(
@@ -94,7 +89,7 @@ export class CohortBidder {
     let header = await client.rpc.chain.getHeader();
     while (true) {
       const api = await client.at(header.hash);
-      const cohortFrameId = await api.query.miningSlot.nextCohortFrameId();
+      const cohortFrameId = await api.query.miningSlot.nextFrameId();
       if (cohortFrameId.toNumber() === this.cohortFrameId) {
         break;
       }
@@ -139,10 +134,10 @@ export class CohortBidder {
     >(
       [
         client.query.miningSlot.bidsForNextSlotCohort as any,
-        client.query.miningSlot.nextCohortFrameId as any,
+        client.query.miningSlot.nextFrameId as any,
       ],
-      async ([bids, nextCohortFrameId]) => {
-        if (nextCohortFrameId.toNumber() === this.cohortFrameId) {
+      async ([bids, nextFrameId]) => {
+        if (nextFrameId.toNumber() === this.cohortFrameId) {
           await this.checkWinningBids(bids);
         }
       },

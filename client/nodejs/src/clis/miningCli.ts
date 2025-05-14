@@ -72,8 +72,8 @@ export default function miningCli() {
       const seatIndices = new Array(maxMiners).fill(0).map((_, i) => i);
       console.log('Watching miners...');
 
-      const unsub = await api.query.miningSlot.nextCohortFrameId(
-        async nextCohortFrameId => {
+      const unsub = await api.query.miningSlot.nextFrameId(
+        async nextFrameId => {
           const entries =
             await api.query.miningSlot.activeMinersByIndex.entries();
           const block = await api.query.system.number();
@@ -94,7 +94,7 @@ export default function miningCli() {
               miner: accountset.namedAccounts.get(address) ?? address,
               bid: miner.bid.toBigInt(),
               cohort: cohortFrameId,
-              isLastDay: nextCohortFrameId.toNumber() - cohortFrameId === 10,
+              isLastDay: nextFrameId.toNumber() - cohortFrameId === 10,
             };
           }
           for (const index of seatsWithMiner) {

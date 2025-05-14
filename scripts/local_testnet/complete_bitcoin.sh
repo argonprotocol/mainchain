@@ -20,7 +20,7 @@ then
 fi
 
 # get new address from bitcoin cli
-BTC_CLI="bitcoin-cli -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
+BTC_CLI="bitcoin-cli -conf=/dev/null -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
 
 # try to create wallet, but if it already exists, ignore error
 $BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default" || true
