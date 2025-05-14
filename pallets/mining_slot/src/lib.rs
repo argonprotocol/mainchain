@@ -317,8 +317,8 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			DidStartNewCohort::<T>::take();
-			let next_cohort_frame_id = NextFrameId::<T>::get();
-			if next_cohort_frame_id == 1 &&
+			let next_frame_id = NextFrameId::<T>::get();
+			if next_frame_id == 1 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
 				Self::is_slot_bidding_started()
 			{
@@ -336,11 +336,11 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let next_cohort_frame_id = NextFrameId::<T>::get();
+			let next_frame_id = NextFrameId::<T>::get();
 			let calculated_frame_id = Self::calculated_frame_id();
 			// if it's time for the cohort to start, do it
-			if calculated_frame_id >= next_cohort_frame_id {
-				log::trace!("Starting Slot {}", next_cohort_frame_id);
+			if calculated_frame_id >= next_frame_id {
+				log::trace!("Starting Slot {}", next_frame_id);
 				Self::adjust_argonots_per_seat();
 				Self::start_new_frame(calculated_frame_id);
 				// new slot will rotate grandpas. Return so we don't do it again below
@@ -401,12 +401,12 @@ pub mod pallet {
 
 			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
 			let current_registration = Self::get_active_registration(&miner_account_id);
-			let next_cohort_frame_id = NextFrameId::<T>::get();
+			let next_frame_id = NextFrameId::<T>::get();
 			if let Some(ref registration) = current_registration {
 				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
 				// ensure we are not overlapping sessions
 				ensure!(
-					registration.cohort_frame_id + cohorts as FrameId == next_cohort_frame_id,
+					registration.cohort_frame_id + cohorts as FrameId == next_frame_id,
 					Error::<T>::CannotRegisterOverlappingSessions
 				);
 			}
@@ -453,7 +453,7 @@ pub mod pallet {
 							bid,
 							argonots: ownership_tokens,
 							authority_keys: keys,
-							cohort_frame_id: next_cohort_frame_id,
+							cohort_frame_id: next_frame_id,
 							bid_at_tick: T::TickProvider::current_tick(),
 						},
 					)
