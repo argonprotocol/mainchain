@@ -13,6 +13,36 @@ export class FrameCalculator {
   private genesisTick: number | undefined;
 
   async getForTick(client: ArgonClient, tick: number) {
+    const { ticksBetweenFrames, biddingStartTick } =
+      await this.getConfig(client);
+
+    const ticksSinceMiningStart = tick - biddingStartTick;
+
+    return Math.floor(ticksSinceMiningStart / ticksBetweenFrames);
+  }
+
+  async getTickRangeForFrame(
+    client: ArgonClient,
+    frameId: number,
+  ): Promise<[number, number]> {
+    const { ticksBetweenFrames, biddingStartTick } =
+      await this.getConfig(client);
+
+    const startingTick =
+      biddingStartTick + Math.floor(frameId * ticksBetweenFrames);
+    const endingTick = startingTick + ticksBetweenFrames - 1;
+
+    return [startingTick, endingTick];
+  }
+
+  async getForHeader(client: ArgonClient, header: Header) {
+    if (header.number.toNumber() === 0) return 0;
+    const tick = getTickFromHeader(client, header);
+    if (tick === undefined) return undefined;
+    return this.getForTick(client, tick);
+  }
+
+  private async getConfig(client: ArgonClient) {
     this.miningConfig ??= await client.query.miningSlot
       .miningConfig()
       .then(x => ({
@@ -21,21 +51,14 @@ export class FrameCalculator {
       }));
     this.genesisTick ??= await client.query.ticks
       .genesisTick()
-      .then(x => x.toNumber());
-
-    const ticksBetweenSlots = this.miningConfig!.ticksBetweenSlots;
-    const biddingStartTick =
-      this.genesisTick! + this.miningConfig!.slotBiddingStartAfterTicks;
-
-    const ticksSinceMiningStart = tick - biddingStartTick;
-
-    return Math.floor(ticksSinceMiningStart / ticksBetweenSlots);
-  }
-
-  async getForHeader(client: ArgonClient, header: Header) {
-    if (header.number.toNumber() === 0) return 0;
-    const tick = getTickFromHeader(client, header);
-    if (tick === undefined) return undefined;
-    return this.getForTick(client, tick);
+      .then((x: { toNumber: () => number }) => x.toNumber());
+    const config = this.miningConfig!;
+    const genesisTick = this.genesisTick!;
+    return {
+      ticksBetweenFrames: config.ticksBetweenSlots,
+      slotBiddingStartAfterTicks: config.slotBiddingStartAfterTicks,
+      genesisTick,
+      biddingStartTick: genesisTick + config.slotBiddingStartAfterTicks,
+    };
   }
 }
