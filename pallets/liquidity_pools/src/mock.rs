@@ -57,7 +57,7 @@ parameter_types! {
 
 	pub const BidPoolAccountId: u64 = 10000;
 
-	pub static LastBidPoolDistribution: (CohortId, Tick) = (0, 0);
+	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxLiquidityPoolContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
@@ -65,7 +65,7 @@ parameter_types! {
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
-	pub static NextCohortId: CohortId = 1;
+	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
 }
@@ -118,7 +118,7 @@ impl pallet_liquidity_pools::Config for Test {
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
-	type NextCohortId = NextCohortId;
+	type GetCurrentFrameId = CurrentFrameId;
 }
 
 pub fn new_test_ext() -> TestState {

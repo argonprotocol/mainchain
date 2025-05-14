@@ -73,9 +73,10 @@ describeIntegration('Cohort Bidder tests', () => {
     let bobBidder: CohortBidder;
     let aliceBidder: CohortBidder;
     // wait for the cohort to change so we have enough time
-    const startingCohort = await aliceClient.query.miningSlot.nextCohortId();
+    const startingCohort =
+      await aliceClient.query.miningSlot.nextCohortFrameId();
     await new Promise(resolve => {
-      const unsub = aliceClient.query.miningSlot.nextCohortId(x => {
+      const unsub = aliceClient.query.miningSlot.nextCohortFrameId(x => {
         if (x.toNumber() > startingCohort.toNumber()) {
           resolve(true);
           unsub.then();
@@ -88,12 +89,12 @@ describeIntegration('Cohort Bidder tests', () => {
       waitForStopPromise = resolve;
     });
     const { unsubscribe } = await miningBids.onCohortChange({
-      async onBiddingStart(cohortId) {
+      async onBiddingStart(cohortFrameId) {
         if (bobBidder) return;
-        console.log(`Cohort ${cohortId} started bidding`);
+        console.log(`Cohort ${cohortFrameId} started bidding`);
         bobBidder = new CohortBidder(
           bob,
-          cohortId,
+          cohortFrameId,
           await bob.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
@@ -105,7 +106,7 @@ describeIntegration('Cohort Bidder tests', () => {
         );
         aliceBidder = new CohortBidder(
           alice,
-          cohortId,
+          cohortFrameId,
           await alice.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
@@ -118,8 +119,8 @@ describeIntegration('Cohort Bidder tests', () => {
         await bobBidder.start();
         await aliceBidder.start();
       },
-      async onBiddingEnd(cohortId) {
-        console.log(`Cohort ${cohortId} ended bidding`);
+      async onBiddingEnd(cohortFrameId) {
+        console.log(`Cohort ${cohortFrameId} ended bidding`);
         await aliceBidder.stop();
         await bobBidder.stop();
         waitForStopPromise();
@@ -145,8 +146,8 @@ describeIntegration('Cohort Bidder tests', () => {
     });
     // wait for the slot to fully complete
     await new Promise(resolve =>
-      aliceClient.query.miningSlot.nextCohortId(y => {
-        if (y.toNumber() >= bobBidder!.cohortId) {
+      aliceClient.query.miningSlot.nextCohortFrameId(y => {
+        if (y.toNumber() >= bobBidder!.cohortFrameId) {
           resolve(true);
         }
       }),
@@ -154,11 +155,11 @@ describeIntegration('Cohort Bidder tests', () => {
 
     const aliceMiners = await alice.miningSeats();
     const aliceStats = aliceBidder!.stats;
-    const cohortId = aliceBidder!.cohortId;
+    const cohortFrameId = aliceBidder!.cohortFrameId;
     const bobMiners = await bob.miningSeats();
     const bobStats = bobBidder!.stats;
 
-    console.log({ cohortId, bobStats, aliceStats });
+    console.log({ cohortFrameId, bobStats, aliceStats });
     console.log('bob', bobBidder!.bidHistory);
     console.log('alice', aliceBidder!.bidHistory);
 

@@ -14,10 +14,13 @@ import {
 import { detectPort } from 'detect-port';
 import { customAlphabet } from 'nanoid';
 import Client from 'bitcoin-core';
+import * as lockfile from 'proper-lockfile';
 import { createUid } from './TestNotary';
 import { type ArgonClient, getClient } from '@argonprotocol/mainchain';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 4);
+
+const lockPath = Path.join(process.cwd(), '.port-lock');
 
 export default class TestMainchain implements ITeardownable {
   public ip = '127.0.0.1';
@@ -221,31 +224,53 @@ export default class TestMainchain implements ITeardownable {
   private async startBitcoin(launchBitcoin: boolean): Promise<string> {
     let rpcPort = 14338;
     if (launchBitcoin) {
-      rpcPort = await detectPort();
-      const path = execSync(
-        Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`),
-        {
-          encoding: 'utf8',
-        },
-      ).trim();
+      // Ensure lock file exists
+      fs.closeSync(fs.openSync(lockPath, 'w'));
+      const release = await lockfile.lock(lockPath, { retries: 10 });
+      try {
+        rpcPort = await detectPort();
+        const path = execSync(
+          Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`),
+          {
+            encoding: 'utf8',
+          },
+        ).trim();
 
-      const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-' + this.uuid);
+        const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-' + this.uuid);
 
-      console.log('Starting bitcoin node at %s', tmpDir);
-      this.#bitcoind = spawn(path, [
-        '-regtest',
-        '-fallbackfee=0.0001',
-        '-listen=0',
-        `-datadir=${tmpDir}`,
-        '-blockfilterindex',
-        '-txindex',
-        `-rpcport=${rpcPort}`,
-        '-rpcbind=0.0.0.0',
-        '-rpcallowip=0.0.0.0/0',
-        '-rpcuser=bitcoin',
-        '-rpcpassword=bitcoin',
-      ]);
-      this.#bitcoinDir = tmpDir;
+        console.log('Starting bitcoin node at %s. Data %s', path, tmpDir);
+        this.#bitcoind = spawn(
+          path,
+          [
+            '-regtest',
+            '-fallbackfee=0.0001',
+            '-listen=0',
+            `-datadir=${tmpDir}`,
+            '-blockfilterindex',
+            '-txindex',
+            `-rpcport=${rpcPort}`,
+            '-rpcbind=0.0.0.0',
+            '-rpcallowip=0.0.0.0/0',
+            '-rpcuser=bitcoin',
+            '-rpcpassword=bitcoin',
+          ],
+          {
+            stdio: ['ignore', 'pipe', 'pipe'],
+          },
+        );
+        this.#bitcoind.stderr!.setEncoding('utf8');
+        this.#bitcoind.stdout!.setEncoding('utf8');
+        this.#bitcoind.stdout!.on('data', data => {
+          console.log('Bitcoin >> %s', data);
+        });
+        this.#bitcoind.stderr!.on('data', data => {
+          console.error('Bitcoin >> %s', data);
+        });
+        this.#bitcoinDir = tmpDir;
+      } finally {
+        // Release the lock file
+        await release();
+      }
     }
     this.bitcoinPort = rpcPort;
     return cleanHostForDocker(`http://bitcoin:bitcoin@localhost:${rpcPort}`);

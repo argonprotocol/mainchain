@@ -21,7 +21,7 @@ export interface ISubaccountMiner {
   seat?: number;
   bidAmount?: bigint;
   subaccountIndex: number;
-  cohortId?: number;
+  cohortFrameId?: number;
   isLastDay: boolean;
 }
 
@@ -184,7 +184,7 @@ export class Accountset {
       ? await api.query.miningSlot.activeMinersByIndex.multi(indices)
       : [];
     const registrationBySeatIndex: {
-      [seatIndex: string]: { cohortId: number; bidAmount: bigint };
+      [seatIndex: string]: { cohortFrameId: number; bidAmount: bigint };
     } = {};
 
     for (let i = 0; i < indices.length; i++) {
@@ -192,19 +192,20 @@ export class Accountset {
       const registration = indexRegistrations[i];
       if (registration?.isSome) {
         registrationBySeatIndex[seatIndex] = {
-          cohortId: registration.value.cohortId.toNumber(),
+          cohortFrameId: registration.value.cohortFrameId.toNumber(),
           bidAmount: registration.value.bid.toBigInt(),
         };
       }
     }
-    const nextCohortId = await api.query.miningSlot.nextCohortId();
+    const nextCohortFrameId = await api.query.miningSlot.nextCohortFrameId();
 
     return addresses.map(address => {
       const seat = addressToMiningIndex[address];
       const registration = registrationBySeatIndex[seat];
       let isLastDay = false;
-      if (registration?.cohortId) {
-        isLastDay = nextCohortId.toNumber() - registration?.cohortId === 10;
+      if (registration?.cohortFrameId) {
+        isLastDay =
+          nextCohortFrameId.toNumber() - registration?.cohortFrameId === 10;
       }
       return {
         ...registration,
@@ -226,7 +227,7 @@ export class Accountset {
     const api = blockHash ? await client.at(blockHash) : client;
     const miners = await this.loadRegisteredMiners(api);
 
-    const nextCohort = await api.query.miningSlot.nextSlotCohort();
+    const nextCohort = await api.query.miningSlot.bidsForNextSlotCohort();
 
     return miners.map(miner => {
       const bid = nextCohort.find(x => x.accountId.toHuman() === miner.address);
@@ -246,7 +247,7 @@ export class Accountset {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
     const addresses = Object.keys(this.subAccountsByAddress);
-    const nextCohort = await api.query.miningSlot.nextSlotCohort();
+    const nextCohort = await api.query.miningSlot.bidsForNextSlotCohort();
 
     const registrationsByAddress = Object.fromEntries(
       nextCohort.map((x, i) => [x.accountId.toHuman(), { ...x, index: i }]),
@@ -428,20 +429,15 @@ export class Accountset {
   public async createMiningBidTx(options: {
     subaccounts: { address: string }[];
     bidAmount: bigint;
-    sendRewardsToSeed?: boolean;
   }) {
     const client = await this.client;
-    const { bidAmount, subaccounts, sendRewardsToSeed } = options;
+    const { bidAmount, subaccounts } = options;
 
     const batch = client.tx.utility.batch(
       subaccounts.map(x => {
         const keys = this.keys();
-        const rewards = sendRewardsToSeed
-          ? { Account: this.seedAddress }
-          : { Owner: null };
         return client.tx.miningSlot.bid(
           bidAmount,
-          rewards,
           {
             grandpa: keys.gran.rawPublicKey,
             blockSealAuthority: keys.seal.rawPublicKey,
@@ -465,7 +461,6 @@ export class Accountset {
     subaccountRange?: SubaccountRange;
     bidAmount: bigint;
     tip?: bigint;
-    sendRewardsToSeed?: boolean;
   }): Promise<{
     finalFee?: bigint;
     blockHash?: Uint8Array;

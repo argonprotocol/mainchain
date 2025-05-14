@@ -82,7 +82,7 @@ export class VaultMonitor {
       this.updateVault(vaultId, rawVault);
     }
 
-    await client.query.liquidityPools.nextLiquidityPoolCapital(x => {
+    await client.query.liquidityPools.capitalRaising(x => {
       this.activatedCapitalByVault = {};
       for (const entry of x) {
         const vaultId = entry.vaultId.toNumber();

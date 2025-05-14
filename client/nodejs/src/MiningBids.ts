@@ -26,29 +26,29 @@ export class MiningBids {
   }
 
   public async onCohortChange(options: {
-    onBiddingStart?: (cohortId: number) => Promise<void>;
-    onBiddingEnd?: (cohortId: number) => Promise<void>;
+    onBiddingStart?: (cohortFrameId: number) => Promise<void>;
+    onBiddingEnd?: (cohortFrameId: number) => Promise<void>;
   }): Promise<{ unsubscribe: () => void }> {
     const { onBiddingStart, onBiddingEnd } = options;
     const client = await this.client;
-    let openCohortId = 0;
+    let openCohortFrameId = 0;
     const unsubscribe = await client.queryMulti<[Bool, u64]>(
       [
         client.query.miningSlot.isNextSlotBiddingOpen as any,
-        client.query.miningSlot.nextCohortId as any,
+        client.query.miningSlot.nextCohortFrameId as any,
       ],
-      async ([isBiddingOpen, rawNextCohortId]) => {
-        const nextCohortId = rawNextCohortId.toNumber();
+      async ([isBiddingOpen, rawNextCohortFrameId]) => {
+        const nextCohortFrameId = rawNextCohortFrameId.toNumber();
 
         if (isBiddingOpen.isTrue) {
-          if (openCohortId !== 0) {
-            await onBiddingEnd?.(openCohortId);
+          if (openCohortFrameId !== 0) {
+            await onBiddingEnd?.(openCohortFrameId);
           }
-          openCohortId = nextCohortId;
-          await onBiddingStart?.(nextCohortId);
+          openCohortFrameId = nextCohortFrameId;
+          await onBiddingStart?.(nextCohortFrameId);
         } else {
-          await onBiddingEnd?.(nextCohortId);
-          openCohortId = 0;
+          await onBiddingEnd?.(nextCohortFrameId);
+          openCohortFrameId = 0;
         }
       },
     );
@@ -62,7 +62,7 @@ export class MiningBids {
   ): Promise<{ unsubscribe: () => void }> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
-    const unsubscribe = await api.query.miningSlot.nextSlotCohort(
+    const unsubscribe = await api.query.miningSlot.bidsForNextSlotCohort(
       async next => {
         this.nextCohort = await Promise.all(
           next.map(x => this.toBid(accountNames, x)),
@@ -87,7 +87,7 @@ export class MiningBids {
   ): Promise<void> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
-    const nextCohort = await api.query.miningSlot.nextSlotCohort();
+    const nextCohort = await api.query.miningSlot.bidsForNextSlotCohort();
     this.nextCohort = await Promise.all(
       nextCohort.map(x => this.toBid(accountNames, x)),
     );

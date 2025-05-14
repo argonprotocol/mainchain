@@ -111,7 +111,7 @@ import { CohortBidder } from '@argonprotocol/mainchain';
 
 // on new bidding
 const subaccounts = await accountset.getAvailableMinerAccounts(5);
-const cohortBidder = new CohortBidder(accountset, cohortId, subaccounts, {
+const cohortBidder = new CohortBidder(accountset, cohortFrameId, subaccounts, {
   maxSeats: 5,
   // a budget not to exceed
   maxBudget: 100_000_000,
@@ -133,10 +133,10 @@ import { MiningBids } from '@argonprotocol/mainchain';
 
 const miningBids = new MiningBids(client);
 const { unsubscribe } = await miningBids.onCohortChange({
-  async onBiddingStart(cohortId) {
+  async onBiddingStart(cohortFrameId) {
     // ...
   },
-  async onBiddingEnd(cohortId) {
+  async onBiddingEnd(cohortFrameId) {
     // ...
   },
 });

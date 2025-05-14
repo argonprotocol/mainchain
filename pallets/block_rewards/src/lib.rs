@@ -13,7 +13,6 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-pub mod migrations;
 pub mod weights;
 
 /// (Incremental increase per block, blocks between increments, max value)
@@ -27,7 +26,7 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		block_seal::{BlockPayout, BlockRewardType, CohortId},
+		block_seal::{BlockPayout, BlockRewardType, FrameId},
 		notary::NotaryProvider,
 		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
 		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
@@ -109,7 +108,7 @@ pub mod pallet {
 		type RuntimeFreezeReason: From<FreezeReason>;
 		type EventHandler: BlockRewardsEventHandler<Self::AccountId, Self::Balance>;
 
-		/// The number of argons to cohort id entries to keep in history
+		/// The number of "argons by cohort" entries to keep in history
 		type CohortBlockRewardsToKeep: Get<u32>;
 
 		/// The number of blocks to keep payouts in history
@@ -138,11 +137,8 @@ pub mod pallet {
 
 	/// The cohort block rewards
 	#[pallet::storage]
-	pub(super) type BlockRewardsByCohort<T: Config> = StorageValue<
-		_,
-		BoundedVec<(CohortId, T::Balance), T::CohortBlockRewardsToKeep>,
-		ValueQuery,
-	>;
+	pub(super) type BlockRewardsByCohort<T: Config> =
+		StorageValue<_, BoundedVec<(FrameId, T::Balance), T::CohortBlockRewardsToKeep>, ValueQuery>;
 
 	/// The current scaled block rewards. It will adjust based on the argon movement away from price
 	/// target
@@ -211,13 +207,13 @@ pub mod pallet {
 				T::BlockRewardAccountsProvider::get_block_rewards_account(
 					&authors.block_author_account_id,
 				);
-			let (miner_reward_account, cohort_id) =
+			let (miner_reward_account, cohort_frame_id) =
 				assigned_rewards_account.unwrap_or((authors.block_author_account_id.clone(), 0));
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
 			let RewardAmounts { argons: block_argons, ownership: block_ownership } =
-				Self::calculate_reward_amounts(cohort_id, minimums);
+				Self::calculate_reward_amounts(cohort_frame_id, minimums);
 
 			let miner_ownership = miner_percent.saturating_mul_int(block_ownership);
 			let miner_argons = miner_percent.saturating_mul_int(block_argons);
@@ -376,13 +372,13 @@ pub mod pallet {
 		}
 
 		pub(crate) fn calculate_reward_amounts(
-			cohort_id: CohortId,
+			cohort_frame_id: FrameId,
 			minimums: RewardAmounts<T>,
 		) -> RewardAmounts<T> {
 			let mut block_ownership = minimums.ownership;
 			let mut block_argons = BlockRewardsByCohort::<T>::get()
 				.iter()
-				.find(|x| x.0 == cohort_id)
+				.find(|x| x.0 == cohort_frame_id)
 				.map(|x| x.1)
 				.unwrap_or(minimums.argons);
 
@@ -416,12 +412,12 @@ pub mod pallet {
 
 	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
 		type Key = BlockSealAuthorityId;
-		fn on_new_cohort(cohort_id: CohortId) {
+		fn on_frame_start(frame_id: FrameId) {
 			let _ = BlockRewardsByCohort::<T>::mutate(|rewards| {
 				if rewards.is_full() {
 					rewards.remove(0);
 				}
-				rewards.try_push((cohort_id + 1, ArgonsPerBlock::<T>::get()))
+				rewards.try_push((frame_id + 1, ArgonsPerBlock::<T>::get()))
 			});
 		}
 	}

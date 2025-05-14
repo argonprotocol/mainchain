@@ -6,7 +6,7 @@ export default defineConfig({
   external: ['@polkadot/types/lookup', '@commander-js/extra-typings'],
   format: ['esm', 'cjs'],
   clean: true,
-  splitting: false,
+  splitting: true,
   outDir: 'lib',
   platform: 'node',
   target: 'node20',

@@ -97,7 +97,7 @@ impl pallet_balances::Config<OwnershipToken> for Test {
 parameter_types! {
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
-	pub static GrandaRotations: Vec<CohortId> = vec![];
+	pub static GrandaRotations: Vec<FrameId> = vec![];
 
 	// set slot bidding active by default
 	pub static ElapsedTicks: u64 = 3;
@@ -113,7 +113,7 @@ parameter_types! {
 
 	pub const BidPoolAccountId: u64 = 10000;
 
-	pub static LastBidPoolDistribution: (CohortId, Tick) = (0, 0);
+	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 }
 
 pub struct StaticBondProvider;
@@ -130,14 +130,14 @@ pub struct StaticNewSlotEvent;
 impl OnNewSlot<u64> for StaticNewSlotEvent {
 	type Key = UintAuthorityId;
 	fn rotate_grandpas(
-		current_cohort_id: CohortId,
+		current_frame_id: FrameId,
 		removed_authorities: Vec<(&u64, Self::Key)>,
 		added_authorities: Vec<(&u64, Self::Key)>,
 	) {
 		LastSlotRemoved::set(removed_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
-		GrandaRotations::mutate(|a| a.push(current_cohort_id));
-		LastBidPoolDistribution::set((current_cohort_id, CurrentTick::get()));
+		GrandaRotations::mutate(|a| a.push(current_frame_id));
+		LastBidPoolDistribution::set((current_frame_id, CurrentTick::get()));
 	}
 }
 

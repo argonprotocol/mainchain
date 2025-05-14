@@ -57,7 +57,6 @@ impl<B: Block> ComputePuzzle<B> {
 }
 
 pub type FrameId = u64;
-pub type CohortId = u64;
 
 #[derive(
 	PartialEqNoBound,
@@ -81,8 +80,6 @@ pub struct MiningRegistration<
 	pub account_id: AccountId,
 	/// The account that bids and argonots come from
 	pub external_funding_account: Option<AccountId>,
-	/// The account that rewards are paid to
-	pub reward_destination: RewardDestination<AccountId>,
 	/// How much was bid for the mining slot
 	#[codec(compact)]
 	pub bid: Balance,
@@ -93,7 +90,7 @@ pub struct MiningRegistration<
 	pub authority_keys: Keys,
 	/// Which cohort the miner is in
 	#[codec(compact)]
-	pub cohort_id: CohortId,
+	pub cohort_frame_id: FrameId,
 	/// When the bid was placed
 	#[codec(compact)]
 	pub bid_at_tick: Tick,
@@ -103,10 +100,7 @@ impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>
 	MiningRegistration<A, B, K>
 {
 	pub fn rewards_account(&self) -> A {
-		match &self.reward_destination {
-			RewardDestination::Owner => self.account_id.clone(),
-			RewardDestination::Account(reward_id) => reward_id.clone(),
-		}
+		self.external_funding_account.clone().unwrap_or(self.account_id.clone())
 	}
 }
 
@@ -124,28 +118,6 @@ pub struct MiningSlotConfig {
 	/// The tick when bidding will start (eg, Slot "1")
 	#[codec(compact)]
 	pub slot_bidding_start_after_ticks: Tick,
-}
-
-/// A destination account for validator rewards
-#[derive(
-	PartialEq,
-	Eq,
-	Copy,
-	Clone,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
-	Deserialize,
-	Serialize,
-	Default,
-)]
-pub enum RewardDestination<AccountId> {
-	#[default]
-	Owner,
-	/// Pay into a specified account.
-	Account(AccountId),
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]

@@ -41,12 +41,14 @@
     "http-proxy": "^1.18.1",
     "nanoid": "^3.3.7",
     "pg": "^8.11.3",
+    "proper-lockfile": "^4.1.2",
     "vitest": "^3.1.1"
   },
   "devDependencies": {
     "@types/http-proxy": "^1.17.16",
     "@types/node": "^18.19.6",
     "@types/pg": "^8.11.3",
+    "@types/proper-lockfile": "^4.1.4",
     "tsup": "^8.4.0",
     "typescript": "^5.8.3"
   },

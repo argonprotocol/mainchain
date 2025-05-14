@@ -399,7 +399,7 @@ fn it_should_modify_block_rewards() {
 		let minus_pct = 10_901;
 		assert_eq!(ArgonsPerBlock::<Test>::get(), minus_pct);
 
-		BlockRewards::on_new_cohort(2);
+		BlockRewards::on_frame_start(2);
 		// it sets rewards for the next cohort
 		assert_eq!(
 			BlockRewardsByCohort::<Test>::get().into_iter().collect::<Vec<_>>(),

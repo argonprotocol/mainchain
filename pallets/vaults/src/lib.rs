@@ -11,7 +11,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-pub mod migrations;
 pub mod weights;
 
 /// The Vaults pallet allows a user to offer argons for lease to other users. There are two types of
@@ -97,7 +96,7 @@ pub mod pallet {
 		/// Callbacks for various vault obligation events
 		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
 
-		type CurrentFrameId: Get<CohortId>;
+		type CurrentFrameId: Get<FrameId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -1120,7 +1119,7 @@ pub mod pallet {
 	pub struct VaultFrameFeeRevenue<T: Config> {
 		/// The frame id in question
 		#[codec(compact)]
-		pub frame_id: CohortId,
+		pub frame_id: FrameId,
 		/// The fee revenue for the value
 		#[codec(compact)]
 		pub fee_revenue: T::Balance,

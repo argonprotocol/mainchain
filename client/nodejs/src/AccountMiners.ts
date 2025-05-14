@@ -13,7 +13,7 @@ export class AccountMiners {
         author: string;
         argons: bigint;
         argonots: bigint;
-        cohortId: number;
+        cohortFrameId: number;
         rotation: number;
       },
     ) => void;
@@ -22,7 +22,7 @@ export class AccountMiners {
       minted: {
         accountId: string;
         argons: bigint;
-        cohortId: number;
+        cohortFrameId: number;
         rotation: number;
       },
     ) => void;
@@ -31,13 +31,13 @@ export class AccountMiners {
   public miningRotations: MiningRotations;
 
   private trackedAccountsByAddress: {
-    [address: string]: { cohortId: number; subaccountIndex: number };
+    [address: string]: { cohortFrameId: number; subaccountIndex: number };
   } = {};
 
   constructor(
     private accountset: Accountset,
     registeredMiners: {
-      cohortId: number;
+      cohortFrameId: number;
       address: string;
       subaccountIndex: number;
     }[],
@@ -46,7 +46,7 @@ export class AccountMiners {
     this.miningRotations = new MiningRotations();
     for (const seat of registeredMiners) {
       this.trackedAccountsByAddress[seat.address] = {
-        cohortId: seat.cohortId,
+        cohortFrameId: seat.cohortFrameId,
         subaccountIndex: seat.subaccountIndex,
       };
     }
@@ -80,10 +80,10 @@ export class AccountMiners {
     }
     const client = await this.accountset.client;
     const rotation = await this.miningRotations.getForTick(client, tick);
-    let newMiners: { cohortId: number; addresses: string[] } | undefined;
+    let newMiners: { cohortFrameId: number; addresses: string[] } | undefined;
     const dataByCohort: {
       rotation: number;
-      [cohortId: number]: {
+      [cohortFrameId: number]: {
         argonsMinted: bigint;
         argonsMined: bigint;
         argonotsMined: bigint;
@@ -92,7 +92,7 @@ export class AccountMiners {
     for (const event of events) {
       if (client.events.miningSlot.NewMiners.is(event)) {
         newMiners = {
-          cohortId: event.data.cohortId.toNumber(),
+          cohortFrameId: event.data.cohortFrameId.toNumber(),
           addresses: event.data.newMiners.map(x => x.accountId.toHuman()),
         };
       }
@@ -103,18 +103,19 @@ export class AccountMiners {
 
           const entry = this.trackedAccountsByAddress[author];
           if (entry) {
-            dataByCohort[entry.cohortId] ??= {
+            dataByCohort[entry.cohortFrameId] ??= {
               argonsMinted: 0n,
               argonsMined: 0n,
               argonotsMined: 0n,
             };
-            dataByCohort[entry.cohortId].argonotsMined += ownership.toBigInt();
-            dataByCohort[entry.cohortId].argonsMined += argons.toBigInt();
+            dataByCohort[entry.cohortFrameId].argonotsMined +=
+              ownership.toBigInt();
+            dataByCohort[entry.cohortFrameId].argonsMined += argons.toBigInt();
             this.events.emit('mined', header, {
               author,
               argons: argons.toBigInt(),
               argonots: ownership.toBigInt(),
-              cohortId: entry.cohortId,
+              cohortFrameId: entry.cohortFrameId,
               rotation,
             });
           }
@@ -127,17 +128,17 @@ export class AccountMiners {
           for (const [address, info] of Object.entries(
             this.trackedAccountsByAddress,
           )) {
-            const { cohortId } = info;
-            dataByCohort[cohortId] ??= {
+            const { cohortFrameId } = info;
+            dataByCohort[cohortFrameId] ??= {
               argonsMinted: 0n,
               argonsMined: 0n,
               argonotsMined: 0n,
             };
-            dataByCohort[cohortId].argonsMinted += amountPerMiner;
+            dataByCohort[cohortFrameId].argonsMinted += amountPerMiner;
             this.events.emit('minted', header, {
               accountId: address,
               argons: amountPerMiner,
-              cohortId,
+              cohortFrameId,
               rotation,
             });
           }
@@ -145,16 +146,16 @@ export class AccountMiners {
       }
     }
     if (newMiners) {
-      this.newCohortMiners(newMiners.cohortId, newMiners.addresses);
+      this.newCohortMiners(newMiners.cohortFrameId, newMiners.addresses);
     }
     return dataByCohort;
   }
 
-  private newCohortMiners(cohortId: number, addresses: string[]) {
+  private newCohortMiners(cohortFrameId: number, addresses: string[]) {
     for (const [address, info] of Object.entries(
       this.trackedAccountsByAddress,
     )) {
-      if (info.cohortId === cohortId - 10) {
+      if (info.cohortFrameId === cohortFrameId - 10) {
         delete this.trackedAccountsByAddress[address];
       }
     }
@@ -162,7 +163,7 @@ export class AccountMiners {
       const entry = this.accountset.subAccountsByAddress[address];
       if (entry) {
         this.trackedAccountsByAddress[address] = {
-          cohortId,
+          cohortFrameId,
           subaccountIndex: entry.index,
         };
       }
@@ -177,7 +178,7 @@ export class AccountMiners {
     } = {},
   ) {
     const seats = await accountset.miningSeats(options.blockHash);
-    const registered = seats.filter(x => x.cohortId !== undefined);
+    const registered = seats.filter(x => x.cohortFrameId !== undefined);
     return new AccountMiners(accountset, registered as any, {
       shouldLog: options.shouldLog ?? false,
     });

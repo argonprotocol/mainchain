@@ -45,9 +45,9 @@ interface IVaultMiningBondFund {
 
 export class BidPool {
   public bidPoolAmount: bigint = 0n;
-  public nextCohortId: number = 1;
-  public poolVaultCapitalByCohort: {
-    [cohortId: number]: {
+  public nextFrameId: number = 1;
+  public poolVaultCapitalByFrame: {
+    [frameId: number]: {
       [vaultId: number]: IVaultMiningBondFund;
     };
   } = {};
@@ -62,9 +62,9 @@ export class BidPool {
   private blockWatch: BlockWatch;
   private vaultsById: { [id: number]: Vault } = {};
   private tickDuration?: number;
-  private lastDistributedCohortId?: number;
+  private lastDistributedFrameId?: number;
 
-  private cohortSubscriptions: { [cohortId: number]: () => void } = {};
+  private FrameSubscriptions: { [frameId: number]: () => void } = {};
 
   constructor(
     readonly client: Promise<ArgonClient>,
@@ -134,23 +134,33 @@ export class BidPool {
     const rawVaultIds = await api.query.vaults.vaultsById.keys();
     const vaultIds = rawVaultIds.map(x => x.args[0].toNumber());
     this.bidPoolAmount = await this.getBidPool();
-    this.nextCohortId = (await api.query.miningSlot.nextCohortId()).toNumber();
+    this.nextFrameId = (
+      await api.query.miningSlot.nextCohortFrameId()
+    ).toNumber();
 
     const contributors =
-      await api.query.liquidityPools.liquidityPoolsByCohort.entries();
-    for (const [cohortId, funds] of contributors) {
-      const cohortIdNumber = cohortId.args[0].toNumber();
-      this.loadCohortData(cohortIdNumber, funds);
+      await api.query.liquidityPools.vaultPoolsByFrame.entries();
+    for (const [frameId, funds] of contributors) {
+      const FrameIdNumber = frameId.args[0].toNumber();
+      this.loadFrameData(FrameIdNumber, funds);
     }
-    for (const entrant of await api.query.liquidityPools.openLiquidityPoolCapital()) {
-      this.setVaultCohortData(this.nextCohortId, entrant.vaultId.toNumber(), {
-        activatedCapital: entrant.activatedCapital.toBigInt(),
-      });
+    for (const entrant of await api.query.liquidityPools.capitalActive()) {
+      this.setVaultFrameData(
+        entrant.frameId.toNumber(),
+        entrant.vaultId.toNumber(),
+        {
+          activatedCapital: entrant.activatedCapital.toBigInt(),
+        },
+      );
     }
-    for (const entrant of await api.query.liquidityPools.nextLiquidityPoolCapital()) {
-      this.setVaultCohortData(this.nextCohortId, entrant.vaultId.toNumber(), {
-        activatedCapital: entrant.activatedCapital.toBigInt(),
-      });
+    for (const entrant of await api.query.liquidityPools.capitalRaising()) {
+      this.setVaultFrameData(
+        entrant.frameId.toNumber(),
+        entrant.vaultId.toNumber(),
+        {
+          activatedCapital: entrant.activatedCapital.toBigInt(),
+        },
+      );
     }
     await this.onVaultsUpdated(blockHash, new Set(vaultIds));
     this.print();
@@ -165,27 +175,27 @@ export class BidPool {
     const api = await this.client;
     this.blockWatch.events.on('event', async (_, event) => {
       if (api.events.liquidityPools.BidPoolDistributed.is(event)) {
-        const { cohortId: rawCohortId } = event.data;
-        this.lastDistributedCohortId = rawCohortId.toNumber();
+        const { frameId: rawFrameId } = event.data;
+        this.lastDistributedFrameId = rawFrameId.toNumber();
         this.bidPoolAmount = await this.getBidPool();
 
-        this.cohortSubscriptions[rawCohortId.toNumber()]?.();
+        this.FrameSubscriptions[rawFrameId.toNumber()]?.();
         const entrant =
-          await api.query.liquidityPools.liquidityPoolsByCohort(rawCohortId);
-        this.loadCohortData(rawCohortId.toNumber(), entrant);
+          await api.query.liquidityPools.vaultPoolsByFrame(rawFrameId);
+        this.loadFrameData(rawFrameId.toNumber(), entrant);
         this.printDebounce();
       }
       if (api.events.liquidityPools.NextBidPoolCapitalLocked.is(event)) {
-        const { cohortId } = event.data;
+        const { frameId } = event.data;
 
         for (let inc = 0; inc < 2; inc++) {
-          const id = cohortId.toNumber() + inc;
-          if (!this.cohortSubscriptions[id]) {
-            this.cohortSubscriptions[id] =
-              await api.query.liquidityPools.liquidityPoolsByCohort(
+          const id = frameId.toNumber() + inc;
+          if (!this.FrameSubscriptions[id]) {
+            this.FrameSubscriptions[id] =
+              await api.query.liquidityPools.vaultPoolsByFrame(
                 id,
                 async entrant => {
-                  this.loadCohortData(id, entrant);
+                  this.loadFrameData(id, entrant);
                   this.printDebounce();
                 },
               );
@@ -203,25 +213,25 @@ export class BidPool {
       ]
     >(
       [
-        api.query.miningSlot.nextSlotCohort as any,
-        api.query.miningSlot.nextCohortId as any,
-        api.query.liquidityPools.openLiquidityPoolCapital as any,
-        api.query.liquidityPools.nextLiquidityPoolCapital as any,
+        api.query.miningSlot.bidsForNextSlotCohort as any,
+        api.query.miningSlot.nextCohortFrameId as any,
+        api.query.liquidityPools.capitalActive as any,
+        api.query.liquidityPools.capitalRaising as any,
       ],
       async ([
-        _nextSlotCohort,
-        nextCohortId,
+        _bids,
+        nextFrameId,
         openVaultBidPoolCapital,
         nextPoolCapital,
       ]) => {
         this.bidPoolAmount = await this.getBidPool();
-        this.nextCohortId = nextCohortId.toNumber();
+        this.nextFrameId = nextFrameId.toNumber();
         for (const entrant of [
           ...openVaultBidPoolCapital,
           ...nextPoolCapital,
         ]) {
-          this.setVaultCohortData(
-            entrant.cohortId.toNumber(),
+          this.setVaultFrameData(
+            entrant.frameId.toNumber(),
             entrant.vaultId.toNumber(),
             {
               activatedCapital: entrant.activatedCapital.toBigInt(),
@@ -284,15 +294,15 @@ export class BidPool {
 
   public print() {
     console.clear();
-    const lastDistributedCohortId = this.lastDistributedCohortId;
-    const distributedCohort =
-      this.poolVaultCapitalByCohort[this.lastDistributedCohortId ?? -1] ?? {};
-    if (Object.keys(distributedCohort).length > 0) {
-      console.log(`\n\nDistributed (cohort ${lastDistributedCohortId})`);
+    const lastDistributedFrameId = this.lastDistributedFrameId;
+    const distributedFrame =
+      this.poolVaultCapitalByFrame[this.lastDistributedFrameId ?? -1] ?? {};
+    if (Object.keys(distributedFrame).length > 0) {
+      console.log(`\n\nDistributed (Frame ${lastDistributedFrameId})`);
 
       const rows = [];
       let maxWidth = 0;
-      for (const [key, entry] of Object.entries(distributedCohort)) {
+      for (const [key, entry] of Object.entries(distributedFrame)) {
         const { table, width } = this.createBondCapitalTable(
           entry.earnings ?? 0n,
           entry.contributors ?? [],
@@ -322,13 +332,13 @@ export class BidPool {
       }).printTable();
     }
     console.log(
-      `\n\nActive Bid Pool: ${formatArgons(this.bidPoolAmount)} (cohort ${this.nextCohortId})`,
+      `\n\nActive Bid Pool: ${formatArgons(this.bidPoolAmount)} (Frame ${this.nextFrameId})`,
     );
-    const cohort = this.poolVaultCapitalByCohort[this.nextCohortId];
-    if (Object.keys(cohort ?? {}).length > 0) {
+    const Frame = this.poolVaultCapitalByFrame[this.nextFrameId];
+    if (Object.keys(Frame ?? {}).length > 0) {
       const rows = [];
       let maxWidth = 0;
-      for (const [key, entry] of Object.entries(cohort)) {
+      for (const [key, entry] of Object.entries(Frame)) {
         const { table, width } = this.createBondCapitalTable(
           entry.activatedCapital,
           entry.contributors ?? [],
@@ -352,7 +362,7 @@ export class BidPool {
       }).printTable();
     }
 
-    const nextPool = this.poolVaultCapitalByCohort[this.nextCohortId + 1] ?? [];
+    const nextPool = this.poolVaultCapitalByFrame[this.nextFrameId + 1] ?? [];
     let maxWidth = 0;
     const nextCapital = [];
     for (const x of this.vaultSecuritization) {
@@ -373,7 +383,7 @@ export class BidPool {
       });
     }
     if (nextCapital.length) {
-      console.log(`\n\nNext (cohort ${this.nextCohortId + 1}):`);
+      console.log(`\n\nNext (Frame ${this.nextFrameId + 1}):`);
       new Table({
         columns: [
           { name: 'Vault', alignment: 'left' },
@@ -387,14 +397,14 @@ export class BidPool {
     }
   }
 
-  private setVaultCohortData(
-    cohortId: number,
+  private setVaultFrameData(
+    frameId: number,
     vaultId: number,
     data: Partial<IVaultMiningBondFund>,
   ) {
-    this.poolVaultCapitalByCohort ??= {};
-    this.poolVaultCapitalByCohort[cohortId] ??= {};
-    this.poolVaultCapitalByCohort[cohortId][vaultId] ??= {
+    this.poolVaultCapitalByFrame ??= {};
+    this.poolVaultCapitalByFrame[frameId] ??= {};
+    this.poolVaultCapitalByFrame[frameId][vaultId] ??= {
       activatedCapital:
         data.activatedCapital ??
         data.contributors?.reduce((a, b) => a + b.amount, 0n) ??
@@ -402,7 +412,7 @@ export class BidPool {
     };
 
     Object.assign(
-      this.poolVaultCapitalByCohort[cohortId][vaultId],
+      this.poolVaultCapitalByFrame[frameId][vaultId],
       filterUndefined(data),
     );
   }
@@ -435,8 +445,8 @@ export class BidPool {
     return { table: str, width };
   }
 
-  private loadCohortData(
-    cohortId: number,
+  private loadFrameData(
+    frameId: number,
     vaultFunds: Iterable<[u32, PalletLiquidityPoolsLiquidityPool]>,
   ): void {
     for (const [vaultId, fund] of vaultFunds) {
@@ -446,11 +456,11 @@ export class BidPool {
         amount: b.toBigInt(),
       }));
       if (fund.distributedProfits.isSome) {
-        if (cohortId > (this.lastDistributedCohortId ?? 0)) {
-          this.lastDistributedCohortId = cohortId;
+        if (frameId > (this.lastDistributedFrameId ?? 0)) {
+          this.lastDistributedFrameId = frameId;
         }
       }
-      this.setVaultCohortData(cohortId, vaultIdNumber, {
+      this.setVaultFrameData(frameId, vaultIdNumber, {
         earnings: fund.distributedProfits.isSome
           ? fund.distributedProfits.unwrap().toBigInt()
           : undefined,
