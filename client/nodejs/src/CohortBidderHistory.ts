@@ -11,7 +11,7 @@ export enum SeatReductionReason {
 }
 
 export interface IBidHistoryEntry {
-  cohortId: number;
+  cohortFrameId: number;
   blockNumber: number;
   tick: number;
   // changes to the bid list
@@ -69,7 +69,7 @@ export class CohortBidderHistory {
   private maxSeatsInPlay: number = 0;
 
   constructor(
-    readonly cohortId: number,
+    readonly cohortFrameId: number,
     readonly subaccounts: {
       index: number;
       isRebid: boolean;
@@ -127,7 +127,7 @@ export class CohortBidderHistory {
     );
 
     const historyEntry: IBidHistoryEntry = {
-      cohortId: this.cohortId,
+      cohortFrameId: this.cohortFrameId,
       blockNumber,
       tick,
       bidChanges: [],

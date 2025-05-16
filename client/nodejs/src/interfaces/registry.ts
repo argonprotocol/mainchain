@@ -28,7 +28,6 @@ import type {
   ArgonPrimitivesBlockSealMiningBidStats,
   ArgonPrimitivesBlockSealMiningRegistration,
   ArgonPrimitivesBlockSealMiningSlotConfig,
-  ArgonPrimitivesBlockSealRewardDestination,
   ArgonPrimitivesBlockVoteBlockVoteT,
   ArgonPrimitivesDigestsBlockVoteDigest,
   ArgonPrimitivesDigestsDigestset,
@@ -237,7 +236,7 @@ import type {
   PalletVaultsEvent,
   PalletVaultsHoldReason,
   PalletVaultsVaultConfig,
-  PalletVaultsVaultRevenue,
+  PalletVaultsVaultFrameFeeRevenue,
   SpArithmeticArithmeticError,
   SpConsensusGrandpaAppPublic,
   SpConsensusGrandpaAppSignature,
@@ -283,7 +282,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesBlockSealMiningBidStats: ArgonPrimitivesBlockSealMiningBidStats;
     ArgonPrimitivesBlockSealMiningRegistration: ArgonPrimitivesBlockSealMiningRegistration;
     ArgonPrimitivesBlockSealMiningSlotConfig: ArgonPrimitivesBlockSealMiningSlotConfig;
-    ArgonPrimitivesBlockSealRewardDestination: ArgonPrimitivesBlockSealRewardDestination;
     ArgonPrimitivesBlockVoteBlockVoteT: ArgonPrimitivesBlockVoteBlockVoteT;
     ArgonPrimitivesDigestsBlockVoteDigest: ArgonPrimitivesDigestsBlockVoteDigest;
     ArgonPrimitivesDigestsDigestset: ArgonPrimitivesDigestsDigestset;
@@ -492,7 +490,7 @@ declare module '@polkadot/types/types/registry' {
     PalletVaultsEvent: PalletVaultsEvent;
     PalletVaultsHoldReason: PalletVaultsHoldReason;
     PalletVaultsVaultConfig: PalletVaultsVaultConfig;
-    PalletVaultsVaultRevenue: PalletVaultsVaultRevenue;
+    PalletVaultsVaultFrameFeeRevenue: PalletVaultsVaultFrameFeeRevenue;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;
     SpConsensusGrandpaAppPublic: SpConsensusGrandpaAppPublic;
     SpConsensusGrandpaAppSignature: SpConsensusGrandpaAppSignature;

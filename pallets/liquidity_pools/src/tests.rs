@@ -1,6 +1,6 @@
 use crate::{
 	mock::{LiquidityPools, *},
-	pallet::{LiquidityPoolsByCohort, NextLiquidityPoolCapital, OpenLiquidityPoolCapital},
+	pallet::{CapitalActive, CapitalRaising, VaultPoolsByFrame},
 	Error, Event, HoldReason, LiquidityPool, LiquidityPoolCapital,
 };
 use argon_primitives::{vault::MiningBidPoolProvider, OnNewSlot};
@@ -13,6 +13,7 @@ use sp_runtime::Permill;
 fn it_can_add_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrameId::set(1);
 		let hold_reason = HoldReason::ContributedToLiquidityPool;
 
 		set_argons(2, 500_000_000);
@@ -34,7 +35,7 @@ fn it_can_add_pool_capital() {
 
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 200_000_000));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&1)
 				.unwrap()
 				.contributor_balances
@@ -48,7 +49,7 @@ fn it_can_add_pool_capital() {
 		set_argons(3, 300_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(3), 1, 300_000_000));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&1)
 				.unwrap()
 				.contributor_balances
@@ -62,7 +63,7 @@ fn it_can_add_pool_capital() {
 		set_argons(4, 250_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(4), 1, 250_000_000));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&1)
 				.unwrap()
 				.contributor_balances
@@ -75,7 +76,7 @@ fn it_can_add_pool_capital() {
 		// now move the first bid
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 251_000_000));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&1)
 				.unwrap()
 				.contributor_balances
@@ -122,6 +123,7 @@ fn it_refunds_a_bounced_out_contributor() {
 fn it_can_lock_next_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrameId::set(1);
 		insert_vault(
 			1,
 			TestVault {
@@ -153,19 +155,19 @@ fn it_can_lock_next_pool_capital() {
 		set_argons(5, 500_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(5), 2, 200_000_000));
 
-		LiquidityPools::lock_next_bid_pool_capital(2);
+		LiquidityPools::end_pool_capital_raise(2);
 		assert_eq!(
-			OpenLiquidityPoolCapital::<Test>::get().into_inner(),
+			CapitalActive::<Test>::get().into_inner(),
 			vec![
 				LiquidityPoolCapital {
 					vault_id: 1,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 				LiquidityPoolCapital {
 					vault_id: 2,
 					activated_capital: 450_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 			],
 			"sorted with biggest share last"
@@ -173,7 +175,7 @@ fn it_can_lock_next_pool_capital() {
 
 		System::assert_last_event(
 			Event::<Test>::NextBidPoolCapitalLocked {
-				cohort_id: 2,
+				frame_id: 2,
 				participating_vaults: 2,
 				total_activated_capital: 950_000_000,
 			}
@@ -186,6 +188,7 @@ fn it_can_lock_next_pool_capital() {
 fn it_refunds_non_activated_funds_on_lock() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrameId::set(1);
 		insert_vault(
 			1,
 			TestVault {
@@ -218,23 +221,23 @@ fn it_refunds_non_activated_funds_on_lock() {
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(5), 2, 200_000_000));
 
 		assert_eq!(
-			NextLiquidityPoolCapital::<Test>::get().into_inner(),
+			CapitalRaising::<Test>::get().into_inner(),
 			vec![
 				LiquidityPoolCapital {
 					vault_id: 1,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 				LiquidityPoolCapital {
 					vault_id: 2,
 					activated_capital: 450_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 			],
 			"sorted with biggest share last"
 		);
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&1)
 				.unwrap()
 				.contributor_balances
@@ -243,7 +246,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 			vec![(3, 280_000_000), (2, 220_000_000)]
 		);
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
+			VaultPoolsByFrame::<Test>::get(3)
 				.get(&2)
 				.unwrap()
 				.contributor_balances
@@ -257,31 +260,31 @@ fn it_refunds_non_activated_funds_on_lock() {
 			a.get_mut(&2).unwrap().activated = 4_000_000_000;
 		});
 
-		LiquidityPools::lock_next_bid_pool_capital(2);
+		LiquidityPools::end_pool_capital_raise(3);
 		assert_eq!(
-			OpenLiquidityPoolCapital::<Test>::get().into_inner(),
+			CapitalActive::<Test>::get().into_inner(),
 			vec![
 				LiquidityPoolCapital {
 					vault_id: 2,
 					activated_capital: 400_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 				LiquidityPoolCapital {
 					vault_id: 1,
 					activated_capital: 300_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 			],
 			"sorted with biggest share last"
 		);
 
-		let cohort_capital = LiquidityPoolsByCohort::<Test>::get(2);
+		let fund_capital = VaultPoolsByFrame::<Test>::get(3);
 		assert_eq!(
-			cohort_capital.get(&1).unwrap().contributor_balances.clone().into_inner(),
+			fund_capital.get(&1).unwrap().contributor_balances.clone().into_inner(),
 			vec![(3, 280_000_000), (2, 20_000_000)]
 		);
 		assert_eq!(
-			cohort_capital.get(&2).unwrap().contributor_balances.clone().into_inner(),
+			fund_capital.get(&2).unwrap().contributor_balances.clone().into_inner(),
 			vec![(4, 250_000_000), (5, 150_000_000),]
 		);
 
@@ -310,7 +313,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 				vault_id: 1,
 				amount: 200_000_000,
 				account_id: 2,
-				cohort_id: 2,
+				frame_id: 3,
 			}
 			.into(),
 		);
@@ -319,13 +322,13 @@ fn it_refunds_non_activated_funds_on_lock() {
 				vault_id: 2,
 				amount: 50_000_000,
 				account_id: 5,
-				cohort_id: 2,
+				frame_id: 3,
 			}
 			.into(),
 		);
 		System::assert_last_event(
 			Event::<Test>::NextBidPoolCapitalLocked {
-				cohort_id: 2,
+				frame_id: 3,
 				participating_vaults: 2,
 				total_activated_capital: 700_000_000,
 			}
@@ -338,6 +341,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 fn it_can_distribute_bid_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrameId::set(1);
 		insert_vault(
 			1,
 			TestVault {
@@ -385,7 +389,7 @@ fn it_can_distribute_bid_pool_capital() {
 			250_000_000
 		);
 
-		let bond_funds = LiquidityPoolsByCohort::<Test>::get(2);
+		let bond_funds = VaultPoolsByFrame::<Test>::get(3);
 		assert_eq!(
 			bond_funds.get(&1).unwrap().contributor_balances.clone().into_inner(),
 			vec![(3, 280_000_000), (2, 220_000_000),]
@@ -395,42 +399,43 @@ fn it_can_distribute_bid_pool_capital() {
 			vec![(5, 250_000_000), (4, 250_000_000),]
 		);
 		assert_eq!(
-			NextLiquidityPoolCapital::<Test>::get().into_inner(),
+			CapitalRaising::<Test>::get().into_inner(),
 			vec![
 				LiquidityPoolCapital {
 					vault_id: 1,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 				LiquidityPoolCapital {
 					vault_id: 2,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 			]
 		);
-		LiquidityPools::lock_next_bid_pool_capital(2);
+		LiquidityPools::end_pool_capital_raise(3);
 		assert_eq!(
-			OpenLiquidityPoolCapital::<Test>::get().into_inner(),
+			CapitalActive::<Test>::get().into_inner(),
 			vec![
 				LiquidityPoolCapital {
 					vault_id: 1,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 				LiquidityPoolCapital {
 					vault_id: 2,
 					activated_capital: 500_000_000u128,
-					cohort_id: 2
+					frame_id: 3
 				},
 			],
 			"sorted with biggest share last"
 		);
-		LiquidityPools::distribute_bid_pool(2);
-		let bond_funds = LiquidityPoolsByCohort::<Test>::get(2);
+		// Pretend we skipped forward and will now distribute the bid pool for 3
+		LiquidityPools::distribute_bid_pool(3);
+		let bond_funds = VaultPoolsByFrame::<Test>::get(3);
 		System::assert_has_event(
 			Event::<Test>::BidPoolDistributed {
-				cohort_id: 2,
+				frame_id: 3,
 				bid_pool_distributed: 800_000_001,
 				bid_pool_shares: 2,
 				bid_pool_burned: 200_000_001,
@@ -504,6 +509,7 @@ fn it_can_distribute_bid_pool_capital() {
 fn it_can_exit_auto_renew() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrameId::set(0);
 		insert_vault(
 			1,
 			TestVault {
@@ -514,35 +520,31 @@ fn it_can_exit_auto_renew() {
 			},
 		);
 
-		// last cohort is 1
+		// last fund is 1
 		set_argons(2, 200_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 200_000_000));
 		set_argons(3, 220_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(3), 1, 220_000_000));
 
-		LiquidityPools::on_new_cohort(1);
-		assert!(LiquidityPoolsByCohort::<Test>::contains_key(2));
+		LiquidityPools::on_frame_start(1);
+		assert!(VaultPoolsByFrame::<Test>::contains_key(2));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2)
-				.get(&1)
-				.unwrap()
-				.contributor_balances
-				.to_vec(),
+			VaultPoolsByFrame::<Test>::get(2).get(&1).unwrap().contributor_balances.to_vec(),
 			vec![(3, 220_000_000), (2, 200_000_000)]
 		);
-		// funds now wait on hold for 1 slot on_new_cohort(2)
+		// funds now wait on hold for 1 slot on_frame_start(2)
 		// 3, 4. 5. 6, 7, 8, 9, 10, 11
 
 		assert_ok!(LiquidityPools::unbond_argons(RuntimeOrigin::signed(2), 1, 2));
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2).get(&1).unwrap().do_not_renew.to_vec(),
+			VaultPoolsByFrame::<Test>::get(2).get(&1).unwrap().do_not_renew.to_vec(),
 			vec![2]
 		);
 
 		// trigger rollover (will bump #2 to 2 forward)
-		LiquidityPools::on_new_cohort(10);
+		LiquidityPools::on_frame_start(10);
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(12).get(&1).unwrap(),
+			VaultPoolsByFrame::<Test>::get(12).get(&1).unwrap(),
 			&LiquidityPool {
 				contributor_balances: bounded_vec![(3, 220_000_000)],
 				do_not_renew: Default::default(),
@@ -552,7 +554,7 @@ fn it_can_exit_auto_renew() {
 			}
 		);
 		assert_eq!(
-			LiquidityPoolsByCohort::<Test>::get(2).get(&1).unwrap(),
+			VaultPoolsByFrame::<Test>::get(2).get(&1).unwrap(),
 			&LiquidityPool {
 				contributor_balances: bounded_vec![(3, 220_000_000), (2, 200_000_000)],
 				do_not_renew: bounded_vec![2],
@@ -566,16 +568,16 @@ fn it_can_exit_auto_renew() {
 			Error::<Test>::AlreadyRenewed
 		);
 		assert_eq!(
-			NextLiquidityPoolCapital::<Test>::get().to_vec(),
+			CapitalRaising::<Test>::get().to_vec(),
 			vec![LiquidityPoolCapital {
 				vault_id: 1,
 				activated_capital: 220_000_000,
-				cohort_id: 12,
+				frame_id: 12,
 			}]
 		);
 
 		// now trigger refund
-		LiquidityPools::on_new_cohort(12);
+		LiquidityPools::on_frame_start(12);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &2),
 			0

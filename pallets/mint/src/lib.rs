@@ -23,7 +23,7 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		bitcoin::UtxoId, block_seal::CohortId, ArgonCPI, BlockRewardAccountsProvider,
+		bitcoin::UtxoId, block_seal::FrameId, ArgonCPI, BlockRewardAccountsProvider,
 		BurnEventHandler, PriceProvider, UtxoLockEvents,
 	};
 
@@ -83,7 +83,7 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type MiningMintPerCohort<T: Config> = StorageValue<
 		_,
-		BoundedBTreeMap<CohortId, T::Balance, T::MaxMintHistoryToMaintain>,
+		BoundedBTreeMap<FrameId, T::Balance, T::MaxMintHistoryToMaintain>,
 		ValueQuery,
 	>;
 
@@ -153,21 +153,21 @@ pub mod pallet {
 			if argons_to_print_per_miner > T::Balance::zero() {
 				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
 				let mut amount_minted = U256::zero();
-				for (miner, cohort_id) in reward_accounts {
+				for (miner, cohort_frame_id) in reward_accounts {
 					let amount = argons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
 							mining_mint += U256::from(amount.into());
 							amount_minted += U256::from(amount.into());
 							block_mint_action.argon_minted += amount;
-							if !mining_mint_history.contains_key(&cohort_id) &&
+							if !mining_mint_history.contains_key(&cohort_frame_id) &&
 								mining_mint_history.len() >=
 									T::MaxMintHistoryToMaintain::get() as usize
 							{
 								mining_mint_history.pop_first();
 							}
 							mining_mint_history
-								.entry(cohort_id)
+								.entry(cohort_frame_id)
 								.or_default()
 								.saturating_accrue(amount);
 						},

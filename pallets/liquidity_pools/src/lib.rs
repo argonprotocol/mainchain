@@ -66,7 +66,7 @@ pub mod pallet {
 	use sp_runtime::{traits::AccountIdConversion, BoundedBTreeMap};
 	use tracing::warn;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -127,7 +127,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxBidPoolVaultParticipants: Get<u32>;
 
-		type NextCohortId: Get<CohortId>;
+		type GetCurrentFrameId: Get<FrameId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -139,26 +139,26 @@ pub mod pallet {
 	/// The currently earning contributors for the current epoch's bond funds. Sorted by highest
 	/// bids first
 	#[pallet::storage]
-	pub(super) type LiquidityPoolsByCohort<T: Config> = StorageMap<
+	pub(super) type VaultPoolsByFrame<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		CohortId,
+		FrameId,
 		BoundedBTreeMap<VaultId, LiquidityPool<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
 	>;
 
-	/// The entrants in the liquidity pool for the mining slot cohort being bid on. Sorted with
-	/// biggest share last.
+	/// The liquidity pool for the current frame. This correlates with the bids coming in for the
+	/// current frame. Sorted with the biggest share last. (current frame + 1)
 	#[pallet::storage]
-	pub(super) type OpenLiquidityPoolCapital<T: Config> = StorageValue<
+	pub(super) type CapitalActive<T: Config> = StorageValue<
 		_,
 		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
 	>;
 
-	/// The liquidity pool capital for the next mining slot cohort.
+	/// The liquidity pool still raising capital. (current frame + 2)
 	#[pallet::storage]
-	pub(super) type NextLiquidityPoolCapital<T: Config> = StorageValue<
+	pub(super) type CapitalRaising<T: Config> = StorageValue<
 		_,
 		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
@@ -170,34 +170,30 @@ pub mod pallet {
 		/// An error occurred distributing a bid pool
 		CouldNotDistributeBidPool {
 			account_id: T::AccountId,
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			vault_id: VaultId,
 			amount: T::Balance,
 			dispatch_error: DispatchError,
 			is_for_vault: bool,
 		},
 		/// An error occurred burning from the bid pool
-		CouldNotBurnBidPool {
-			cohort_id: CohortId,
-			amount: T::Balance,
-			dispatch_error: DispatchError,
-		},
+		CouldNotBurnBidPool { frame_id: FrameId, amount: T::Balance, dispatch_error: DispatchError },
 		/// Funds from the active bid pool have been distributed
 		BidPoolDistributed {
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			bid_pool_distributed: T::Balance,
 			bid_pool_burned: T::Balance,
 			bid_pool_shares: u32,
 		},
 		/// The next bid pool has been locked in
 		NextBidPoolCapitalLocked {
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			total_activated_capital: T::Balance,
 			participating_vaults: u32,
 		},
 		/// An error occurred releasing a contributor hold
 		ErrorRefundingLiquidityPoolCapital {
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			vault_id: VaultId,
 			amount: T::Balance,
 			account_id: T::AccountId,
@@ -206,7 +202,7 @@ pub mod pallet {
 		/// Some mining bond capital was refunded due to less activated vault funds than bond
 		/// capital
 		RefundedLiquidityPoolCapital {
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			vault_id: VaultId,
 			amount: T::Balance,
 			account_id: T::AccountId,
@@ -239,21 +235,20 @@ pub mod pallet {
 
 	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
 		type Key = BlockSealAuthorityId;
-		fn on_new_cohort(cohort_id: CohortId) {
-			Self::release_rolling_contributors(cohort_id);
-			Self::distribute_bid_pool(cohort_id);
-			let open_cohort_id = cohort_id + 1;
-			Self::lock_next_bid_pool_capital(open_cohort_id);
+		fn on_frame_start(frame_id: FrameId) {
+			Self::release_rolling_contributors(frame_id);
+			Self::distribute_bid_pool(frame_id);
+			Self::end_pool_capital_raise(frame_id + 1);
 
-			Self::rollover_contributors(cohort_id);
+			Self::rollover_contributors(frame_id);
 		}
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,
-		/// tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the
-		/// activated securitization for the vault.
+		/// Bond argons to a Vault's next liquidity pool, tied to the next frame (aka,
+		/// tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot
+		/// exceed 1/10th of the activated securitization for the vault.
 		///
 		/// The bonded argons and profits will be automatically rolled over to the next fund up to
 		/// the max securitization activated.
@@ -277,11 +272,12 @@ pub mod pallet {
 			);
 			ensure!(amount >= T::MinimumArgonsPerContributor::get(), Error::<T>::BelowMinimum);
 
-			let next_cohort = T::NextCohortId::get() + 1;
-			LiquidityPoolsByCohort::<T>::try_mutate(next_cohort, |a| -> DispatchResult {
+			// the "next next" frame is the one we are adding capital to
+			let raising_frame_id = T::GetCurrentFrameId::get() + 2;
+			VaultPoolsByFrame::<T>::try_mutate(raising_frame_id, |a| -> DispatchResult {
 				let activated_securitization = Self::get_vault_activated_funds_per_slot(vault_id);
 
-				NextLiquidityPoolCapital::<T>::try_mutate(|list| {
+				CapitalRaising::<T>::try_mutate(|list| {
 					if let Some(entry) = list.iter_mut().find(|x| x.vault_id == vault_id) {
 						ensure!(
 							entry.activated_capital.saturating_add(amount) <=
@@ -297,7 +293,7 @@ pub mod pallet {
 						let entry = LiquidityPoolCapital {
 							vault_id,
 							activated_capital: amount,
-							cohort_id: next_cohort,
+							frame_id: raising_frame_id,
 						};
 						list.try_push(entry).map_err(|_| Error::<T>::MaxVaultsExceeded)?;
 					}
@@ -354,16 +350,16 @@ pub mod pallet {
 		}
 
 		/// Allows a user to remove their bonded argons from the fund after the hold is released
-		/// (once cohort slot period is complete).
+		/// (once epoch starting at bonded frame is complete).
 		#[pallet::call_index(2)]
 		#[pallet::weight(0)] //T::WeightInfo::hold())]
 		pub fn unbond_argons(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
-			cohort_id: CohortId,
+			frame_id: FrameId,
 		) -> DispatchResult {
 			let account = ensure_signed(origin)?;
-			LiquidityPoolsByCohort::<T>::try_mutate(cohort_id, |a| -> DispatchResult {
+			VaultPoolsByFrame::<T>::try_mutate(frame_id, |a| -> DispatchResult {
 				let fund = a.get_mut(&vault_id).ok_or(Error::<T>::CouldNotFindLiquidityPool)?;
 
 				ensure!(
@@ -409,7 +405,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub(crate) fn distribute_bid_pool(cohort_id: CohortId) {
+		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
 			let bid_pool_account = Self::get_bid_pool_account();
 			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
 
@@ -422,7 +418,7 @@ pub mod pallet {
 				Fortitude::Force,
 			) {
 				Self::deposit_event(Event::<T>::CouldNotBurnBidPool {
-					cohort_id,
+					frame_id,
 					amount: burn_amount,
 					dispatch_error: e,
 				});
@@ -430,13 +426,13 @@ pub mod pallet {
 
 			total_bid_pool_amount.saturating_reduce(burn_amount);
 			let mut remaining_bid_pool = total_bid_pool_amount;
-			let bid_pool_capital = OpenLiquidityPoolCapital::<T>::take();
+			let bid_pool_capital = CapitalActive::<T>::take();
 			let bid_pool_entrants = bid_pool_capital.len();
 			let total_bid_pool_capital = bid_pool_capital
 				.iter()
 				.fold(T::Balance::zero(), |acc, x| acc.saturating_add(x.activated_capital));
 
-			let mut liquidity_pools_by_vault = LiquidityPoolsByCohort::<T>::get(cohort_id);
+			let mut liquidity_pools_by_vault = VaultPoolsByFrame::<T>::get(frame_id);
 
 			for (i, entrant) in bid_pool_capital.iter().rev().enumerate() {
 				let Some(vault_fund) = liquidity_pools_by_vault.get_mut(&entrant.vault_id) else {
@@ -471,7 +467,7 @@ pub mod pallet {
 					) {
 						Self::deposit_event(Event::<T>::CouldNotDistributeBidPool {
 							account_id: vault_account_id.clone(),
-							cohort_id,
+							frame_id,
 							vault_id: entrant.vault_id,
 							amount: vault_share,
 							dispatch_error: e,
@@ -515,7 +511,7 @@ pub mod pallet {
 					) {
 						Self::deposit_event(Event::<T>::CouldNotDistributeBidPool {
 							account_id: account.clone(),
-							cohort_id,
+							frame_id,
 							vault_id: entrant.vault_id,
 							amount,
 							dispatch_error: e,
@@ -524,19 +520,19 @@ pub mod pallet {
 					}
 				}
 			}
-			LiquidityPoolsByCohort::<T>::insert(cohort_id, liquidity_pools_by_vault);
+			VaultPoolsByFrame::<T>::insert(frame_id, liquidity_pools_by_vault);
 
 			Self::deposit_event(Event::<T>::BidPoolDistributed {
-				cohort_id,
+				frame_id,
 				bid_pool_distributed: total_bid_pool_amount - remaining_bid_pool,
 				bid_pool_burned: burn_amount,
 				bid_pool_shares: bid_pool_entrants as u32,
 			});
 		}
 
-		pub(crate) fn lock_next_bid_pool_capital(cohort_id: CohortId) {
-			let mut next_bid_pool_capital = NextLiquidityPoolCapital::<T>::take();
-			let mut cohort_funds = LiquidityPoolsByCohort::<T>::get(cohort_id);
+		pub(crate) fn end_pool_capital_raise(frame_id: FrameId) {
+			let mut next_bid_pool_capital = CapitalRaising::<T>::take();
+			let mut frame_funds = VaultPoolsByFrame::<T>::get(frame_id);
 
 			for bid_pool_capital in next_bid_pool_capital.iter_mut() {
 				let vault_id = bid_pool_capital.vault_id;
@@ -547,7 +543,7 @@ pub mod pallet {
 						bid_pool_capital.activated_capital.saturating_sub(activated_securitization);
 					bid_pool_capital.activated_capital = activated_securitization;
 
-					let Some(vault_fund) = cohort_funds.get_mut(&vault_id) else {
+					let Some(vault_fund) = frame_funds.get_mut(&vault_id) else {
 						continue;
 					};
 
@@ -557,7 +553,7 @@ pub mod pallet {
 							continue;
 						};
 						let to_refund = total_to_refund.min(amount);
-						Self::refund_fund_capital(cohort_id, vault_id, &account, to_refund);
+						Self::refund_fund_capital(frame_id, vault_id, &account, to_refund);
 						total_to_refund.saturating_reduce(to_refund);
 						let final_amount = amount.saturating_sub(to_refund);
 						if final_amount > T::Balance::zero() {
@@ -573,22 +569,22 @@ pub mod pallet {
 				.iter()
 				.fold(T::Balance::zero(), |acc, x| acc.saturating_add(x.activated_capital));
 			Self::deposit_event(Event::<T>::NextBidPoolCapitalLocked {
-				cohort_id,
+				frame_id,
 				total_activated_capital,
 				participating_vaults,
 			});
-			OpenLiquidityPoolCapital::<T>::set(next_bid_pool_capital);
-			LiquidityPoolsByCohort::<T>::insert(cohort_id, cohort_funds);
+			CapitalActive::<T>::set(next_bid_pool_capital);
+			VaultPoolsByFrame::<T>::insert(frame_id, frame_funds);
 		}
 
 		/// Release the held fund for all vaults and move the active fund contributors to the held
-		pub(crate) fn rollover_contributors(activated_cohort_id: CohortId) {
-			let next_cohort_id = activated_cohort_id + 2;
-			if next_cohort_id < 10 {
+		pub(crate) fn rollover_contributors(current_frame_id: FrameId) {
+			let raising_frame_id = current_frame_id + 2;
+			if raising_frame_id < 10 {
 				return;
 			}
-			LiquidityPoolsByCohort::<T>::mutate(next_cohort_id, |next| {
-				LiquidityPoolsByCohort::<T>::mutate(next_cohort_id - 10, |tree| {
+			VaultPoolsByFrame::<T>::mutate(raising_frame_id, |next| {
+				VaultPoolsByFrame::<T>::mutate(raising_frame_id - 10, |tree| {
 					let mut entrants = BoundedVec::new();
 					for (vault_id, fund) in tree {
 						let vault_id = *vault_id;
@@ -629,32 +625,32 @@ pub mod pallet {
 								.try_push(LiquidityPoolCapital {
 									vault_id,
 									activated_capital: total,
-									cohort_id: next_cohort_id,
+									frame_id: raising_frame_id,
 								})
 								.ok();
 						}
 					}
-					NextLiquidityPoolCapital::<T>::set(entrants);
+					CapitalRaising::<T>::set(entrants);
 				});
 			});
 		}
 
-		pub(crate) fn release_rolling_contributors(activated_cohort_id: CohortId) {
-			if activated_cohort_id < 10 {
+		pub(crate) fn release_rolling_contributors(current_frame_id: FrameId) {
+			if current_frame_id < 10 {
 				return;
 			}
-			let release_cohort_id = activated_cohort_id - 10;
-			for (vault_id, fund) in LiquidityPoolsByCohort::<T>::take(release_cohort_id) {
+			let release_frame_id = current_frame_id - 10;
+			for (vault_id, fund) in VaultPoolsByFrame::<T>::take(release_frame_id) {
 				for (account, amount) in fund.contributor_balances {
 					if fund.do_not_renew.contains(&account) {
-						Self::refund_fund_capital(release_cohort_id, vault_id, &account, amount);
+						Self::refund_fund_capital(release_frame_id, vault_id, &account, amount);
 					}
 				}
 			}
 		}
 
 		fn refund_fund_capital(
-			cohort_id: CohortId,
+			frame_id: FrameId,
 			vault_id: VaultId,
 			account: &T::AccountId,
 			refund_amount: T::Balance,
@@ -668,7 +664,7 @@ pub mod pallet {
 					e
 				);
 				Self::deposit_event(Event::<T>::ErrorRefundingLiquidityPoolCapital {
-					cohort_id,
+					frame_id,
 					vault_id,
 					amount: refund_amount,
 					account_id: account.clone(),
@@ -676,7 +672,7 @@ pub mod pallet {
 				})
 			} else {
 				Self::deposit_event(Event::<T>::RefundedLiquidityPoolCapital {
-					cohort_id,
+					frame_id,
 					vault_id,
 					amount: refund_amount,
 					account_id: account.clone(),
@@ -707,8 +703,9 @@ pub mod pallet {
 		pub vault_id: VaultId,
 		#[codec(compact)]
 		pub activated_capital: T::Balance,
+		/// The frame id this liquidity pool is for
 		#[codec(compact)]
-		pub cohort_id: CohortId,
+		pub frame_id: FrameId,
 	}
 
 	#[derive(

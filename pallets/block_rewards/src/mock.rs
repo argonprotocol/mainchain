@@ -99,7 +99,7 @@ parameter_types! {
 	pub static IsMiningSlotsActive: bool = false;
 	pub static IsBlockVoteSeal: bool = false;
 	pub static LastRewards: Vec<BlockPayout<TestAccountId, Balance>> = vec![];
-	pub static AccountCohorts: Vec<(TestAccountId, CohortId)> = vec![];
+	pub static AccountCohorts: Vec<(TestAccountId, FrameId)> = vec![];
 }
 
 pub struct StaticBlockSealerProvider;
@@ -144,11 +144,11 @@ impl NotebookProvider for TestProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
-	fn get_block_rewards_account(author: &u64) -> Option<(u64, CohortId)> {
+	fn get_block_rewards_account(author: &u64) -> Option<(u64, FrameId)> {
 		AccountCohorts::get().iter().find(|(a, _)| a == author).cloned()
 	}
 
-	fn get_mint_rewards_accounts() -> Vec<(u64, CohortId)> {
+	fn get_mint_rewards_accounts() -> Vec<(u64, FrameId)> {
 		todo!("not used by rewards")
 	}
 	fn is_compute_block_eligible_for_rewards() -> bool {

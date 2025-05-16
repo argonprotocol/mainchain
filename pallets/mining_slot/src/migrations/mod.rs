@@ -1,20 +1,13 @@
 use crate::{
-	pallet::{MinerXorKeyByIndex, NextCohortId},
-	Config,
+	pallet::{ActiveMinersByIndex, BidsForNextSlotCohort, NextFrameId},
+	Config, Registration,
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
 
-mod v6;
-
-pub use v6::BiddingTickMigration;
-
 mod old_storage {
 	use crate::Config;
-	use argon_primitives::{
-		block_seal::{CohortId, MinerIndex, RewardDestination},
-		ObligationId,
-	};
+	use argon_primitives::block_seal::{FrameId, MinerIndex};
 	use frame_support_procedural::storage_alias;
 	use pallet_prelude::*;
 	use sp_runtime::traits::OpaqueKeys;
@@ -25,19 +18,22 @@ mod old_storage {
 		<T as Config>::Keys,
 	>;
 
+	/// A destination account for validator rewards
+	#[derive(
+		PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
+	)]
+	pub enum RewardDestination<AccountId> {
+		#[default]
+		Owner,
+		/// Pay into a specified account.
+		Account(AccountId),
+	}
+
 	#[cfg(feature = "try-runtime")]
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
 		pub next_cohort: BoundedVec<Registration<T>, <T as Config>::MaxMiners>,
 		pub active_miners_by_index: Vec<(u32, Registration<T>)>,
-		pub old_hash_count: u32,
-	}
-
-	#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-	pub struct RewardSharing<AccountId> {
-		pub account_id: AccountId,
-		#[codec(compact)]
-		pub percent_take: FixedU128,
 	}
 
 	#[derive(
@@ -51,63 +47,6 @@ mod old_storage {
 		MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(MaxHosts))]
-	pub struct MiningRegistration<
-		AccountId: Parameter,
-		Balance: Parameter + MaxEncodedLen,
-		Keys: OpaqueKeys + Parameter,
-	> {
-		pub account_id: AccountId,
-		pub reward_destination: RewardDestination<AccountId>,
-		pub obligation_id: Option<ObligationId>,
-		#[codec(compact)]
-		pub bonded_argons: Balance,
-		#[codec(compact)]
-		pub argonots: Balance,
-		pub reward_sharing: Option<RewardSharing<AccountId>>,
-		pub authority_keys: Keys,
-		#[codec(compact)]
-		pub cohort_id: CohortId,
-	}
-
-	#[storage_alias]
-	pub(super) type NextSlotCohort<T: Config> = StorageValue<
-		crate::Pallet<T>,
-		BoundedVec<Registration<T>, <T as Config>::MaxMiners>,
-		ValueQuery,
-	>;
-	#[storage_alias]
-	pub(super) type ActiveMinersByIndex<T: Config> =
-		StorageMap<crate::Pallet<T>, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
-
-	#[storage_alias]
-	pub(super) type AuthorityHashByIndex<T: Config> = StorageValue<
-		crate::Pallet<T>,
-		BoundedBTreeMap<MinerIndex, U256, <T as Config>::MaxMiners>,
-		ValueQuery,
-	>;
-
-	#[storage_alias]
-	pub(super) type LastActivatedCohortId<T: Config> =
-		StorageValue<crate::Pallet<T>, CohortId, ValueQuery>;
-}
-
-pub mod v5 {
-	use crate::Config;
-	use argon_primitives::block_seal::{CohortId, MinerIndex, RewardDestination};
-	use frame_support_procedural::storage_alias;
-	use pallet_prelude::*;
-	use sp_runtime::traits::OpaqueKeys;
-
-	#[derive(
-		PartialEqNoBound,
-		EqNoBound,
-		CloneNoBound,
-		Encode,
-		Decode,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
-	)]
 	pub struct MiningRegistration<
 		AccountId: Parameter,
 		Balance: Parameter + MaxEncodedLen,
@@ -129,14 +68,11 @@ pub mod v5 {
 		pub authority_keys: Keys,
 		/// Which cohort the miner is in
 		#[codec(compact)]
-		pub cohort_id: CohortId,
+		pub cohort_id: FrameId,
+		/// When the bid was placed
+		#[codec(compact)]
+		pub bid_at_tick: Tick,
 	}
-
-	pub type Registration<T> = MiningRegistration<
-		<T as frame_system::Config>::AccountId,
-		<T as Config>::Balance,
-		<T as Config>::Keys,
-	>;
 
 	#[storage_alias]
 	pub(super) type NextSlotCohort<T: Config> = StorageValue<
@@ -147,6 +83,9 @@ pub mod v5 {
 	#[storage_alias]
 	pub(super) type ActiveMinersByIndex<T: Config> =
 		StorageMap<crate::Pallet<T>, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
+
+	#[storage_alias]
+	pub(super) type NextFrameId<T: Config> = StorageValue<crate::Pallet<T>, FrameId, ValueQuery>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -161,9 +100,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let active_miners_by_index =
 			old_storage::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 
-		let old_hash_count = old_storage::AuthorityHashByIndex::<T>::get().len() as u32;
-
-		Ok(old_storage::Model::<T> { next_cohort, active_miners_by_index, old_hash_count }.encode())
+		Ok(old_storage::Model::<T> { next_cohort, active_miners_by_index }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
@@ -172,41 +109,34 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let old = old_storage::NextSlotCohort::<T>::take();
 		let new = old
 			.into_iter()
-			.map(|x| v5::Registration::<T> {
+			.map(|x| Registration::<T> {
 				account_id: x.account_id,
 				external_funding_account: None,
-				reward_destination: x.reward_destination,
-				bid: x.bonded_argons,
+				bid: x.bid,
 				argonots: x.argonots,
 				authority_keys: x.authority_keys,
-				cohort_id: x.cohort_id,
+				cohort_frame_id: x.cohort_id,
+				bid_at_tick: x.bid_at_tick,
 			})
 			.collect::<Vec<_>>();
-		v5::NextSlotCohort::<T>::put(BoundedVec::truncate_from(new));
+		BidsForNextSlotCohort::<T>::put(BoundedVec::truncate_from(new));
 		count += 1;
-		v5::ActiveMinersByIndex::<T>::translate::<old_storage::Registration<T>, _>(|_id, reg| {
+		ActiveMinersByIndex::<T>::translate::<old_storage::Registration<T>, _>(|_id, reg| {
 			count += 1;
-			Some(v5::Registration::<T> {
+			Some(Registration::<T> {
 				account_id: reg.account_id,
 				external_funding_account: None,
-				reward_destination: reg.reward_destination,
-				bid: reg.bonded_argons,
+				bid: reg.bid,
 				argonots: reg.argonots,
 				authority_keys: reg.authority_keys,
-				cohort_id: reg.cohort_id,
+				cohort_frame_id: reg.cohort_id,
+				bid_at_tick: reg.bid_at_tick,
 			})
 		});
 		log::info!("{} mining registrations migrated", count);
 
-		let last_cohort_id = old_storage::LastActivatedCohortId::<T>::take();
-		NextCohortId::<T>::set(last_cohort_id);
-		count += 1;
-
-		let authority_hash = old_storage::AuthorityHashByIndex::<T>::take();
-		MinerXorKeyByIndex::<T>::set(authority_hash);
-		count += 2;
-
-		old_storage::AuthorityHashByIndex::<T>::take();
+		let frame_id = old_storage::NextFrameId::<T>::take();
+		NextFrameId::<T>::set(frame_id);
 		count += 1;
 
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
@@ -221,27 +151,23 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
 
-		let new = v5::NextSlotCohort::<T>::get();
+		let new = BidsForNextSlotCohort::<T>::get();
 		ensure!(old.next_cohort.len() == new.len(), "New next cohort not set correctly");
 
 		let old_active_miners_by_index = old.active_miners_by_index;
-		let new_active_miners_by_index = v5::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
+		let new_active_miners_by_index = ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 		ensure!(
 			old_active_miners_by_index.len() == new_active_miners_by_index.len(),
 			"New active miners value not set correctly"
 		);
 
-		let old_hash_count = old.old_hash_count;
-		let new_hash_count = MinerXorKeyByIndex::<T>::get().len() as u32;
-		ensure!(old_hash_count == new_hash_count, "New hash count not set correctly");
-
 		Ok(())
 	}
 }
 
-pub type BiddingMigration<T> = frame_support::migrations::VersionedMigration<
-	4, // The migration will only execute when the on-chain storage version is 1
-	5, // The on-chain storage version will be set to 2 after the migration is complete
+pub type FrameMigration<T> = frame_support::migrations::VersionedMigration<
+	6,
+	7,
 	InnerMigrate<T>,
 	crate::pallet::Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
@@ -251,9 +177,8 @@ mod test {
 	use self::InnerMigrate;
 	use super::*;
 	use crate::mock::{new_test_ext, Test};
-	use argon_primitives::block_seal::RewardDestination::Owner;
 	use frame_support::assert_ok;
-	use sp_core::bounded_btree_map;
+	use old_storage::RewardDestination::Owner;
 
 	#[test]
 	fn handles_existing_value() {
@@ -261,55 +186,51 @@ mod test {
 			old_storage::NextSlotCohort::<Test>::mutate(|v| {
 				let _ = v.try_push(old_storage::Registration::<Test> {
 					account_id: 1,
-					obligation_id: Some(1),
+					external_funding_account: None,
 					argonots: 1,
-					bonded_argons: 100u128,
+					bid: 100u128,
+					bid_at_tick: 1,
 					authority_keys: 1u64.into(),
 					reward_destination: Owner,
-					reward_sharing: None,
-					cohort_id: 1,
+					cohort_id: 3,
 				});
 				let _ = v.try_push(old_storage::Registration::<Test> {
 					account_id: 2,
-					obligation_id: Some(2),
+					external_funding_account: Some(3),
 					argonots: 2,
-					bonded_argons: 100u128,
+					bid: 101u128,
+					bid_at_tick: 2,
 					authority_keys: 2u64.into(),
 					reward_destination: Owner,
-					reward_sharing: None,
-					cohort_id: 2,
+					cohort_id: 3,
 				});
 			});
 
 			old_storage::ActiveMinersByIndex::<Test>::insert(
 				0,
 				old_storage::Registration::<Test> {
-					account_id: 1,
-					obligation_id: Some(1),
+					account_id: 5,
+					external_funding_account: None,
 					argonots: 1,
-					bonded_argons: 100u128,
+					bid: 102u128,
+					bid_at_tick: 1,
 					authority_keys: 1u64.into(),
 					reward_destination: Owner,
-					reward_sharing: None,
-					cohort_id: 1,
+					cohort_id: 2,
 				},
 			);
 			old_storage::ActiveMinersByIndex::<Test>::insert(
 				1,
 				old_storage::Registration::<Test> {
-					account_id: 2,
-					obligation_id: Some(2),
-					argonots: 1000,
-					bonded_argons: 123u128,
-					authority_keys: 2u64.into(),
+					account_id: 6,
+					external_funding_account: None,
+					argonots: 1,
+					bid: 123u128,
+					bid_at_tick: 2,
+					authority_keys: 1u64.into(),
 					reward_destination: Owner,
-					reward_sharing: None,
 					cohort_id: 1,
 				},
-			);
-
-			old_storage::AuthorityHashByIndex::<Test>::set(
-				bounded_btree_map!(0 => 100u128.into(), 1 => 123u128.into()),
 			);
 
 			// Get the pre_upgrade bytes
@@ -325,20 +246,20 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(7, 7));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(4, 4));
 
 			// Check the new value
-			let new = v5::NextSlotCohort::<Test>::get();
+			let new = BidsForNextSlotCohort::<Test>::get();
 			assert_eq!(new.len(), 2);
 			assert_eq!(new[0].account_id, 1);
 			assert_eq!(new[1].account_id, 2);
 
 			let new_active_miners_by_index =
-				v5::ActiveMinersByIndex::<Test>::iter().collect::<Vec<_>>();
+				ActiveMinersByIndex::<Test>::iter().collect::<Vec<_>>();
 			assert_eq!(new_active_miners_by_index.len(), 2);
 			assert_eq!(new_active_miners_by_index[0].0, 0);
 			assert_eq!(new_active_miners_by_index[1].0, 1);
-			assert_eq!(new_active_miners_by_index[0].1.bid, 100u128);
+			assert_eq!(new_active_miners_by_index[0].1.bid, 102u128);
 			assert_eq!(new_active_miners_by_index[1].1.bid, 123u128);
 		});
 	}

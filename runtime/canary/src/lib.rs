@@ -312,7 +312,7 @@ pub struct GrandpaSlotRotation;
 impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 	type Key = GrandpaId;
 	fn rotate_grandpas(
-		_current_cohort_id: CohortId,
+		_current_frame_id: FrameId,
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
 		_added_authorities: Vec<(&AccountId, Self::Key)>,
 	) {
@@ -345,13 +345,6 @@ impl Get<Tick> for TicksSinceGenesis {
 	}
 }
 
-pub struct NextCohortId;
-impl Get<CohortId> for NextCohortId {
-	fn get() -> CohortId {
-		MiningSlot::next_cohort_id()
-	}
-}
-
 parameter_types! {
 	pub const MinimumArgonsPerContributor: Balance = ARGON; // 1 argons minimum
 }
@@ -368,7 +361,7 @@ impl pallet_liquidity_pools::Config for Runtime {
 	type PalletId = LiquidityPoolsInternalPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
-	type NextCohortId = NextCohortId;
+	type GetCurrentFrameId = GetCurrentFrameId;
 }
 
 impl pallet_mining_slot::Config for Runtime {

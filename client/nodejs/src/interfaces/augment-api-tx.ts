@@ -35,7 +35,6 @@ import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
   ArgonPrimitivesBitcoinH256Le,
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub,
-  ArgonPrimitivesBlockSealRewardDestination,
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
@@ -623,9 +622,9 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     liquidityPools: {
       /**
-       * Bond argons to a Vault's next liquidity pool, tied to the next MiningSlot cohort (aka,
-       * tomorrow after noon EST). The amount bonded to the pool cannot exceed 1/10th of the
-       * activated securitization for the vault.
+       * Bond argons to a Vault's next liquidity pool, tied to the next frame (aka,
+       * tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot
+       * exceed 1/10th of the activated securitization for the vault.
        *
        * The bonded argons and profits will be automatically rolled over to the next fund up to
        * the max securitization activated.
@@ -644,12 +643,12 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * Allows a user to remove their bonded argons from the fund after the hold is released
-       * (once cohort slot period is complete).
+       * (once epoch starting at bonded frame is complete).
        **/
       unbondArgons: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
-          cohortId: u64 | AnyNumber | Uint8Array,
+          frameId: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, u64]
       >;
@@ -675,8 +674,6 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * Parameters:
        * - `bid`: The amount of argons to bid
-       * - `reward_destination`: The account_id for the mining rewards, or `Owner` for the
-       * submitting user.
        * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
        * - `mining_account_id`: This account_id allows you to operate as this miner account id,
        * but use funding (argonots and bid) from the submitting account
@@ -684,12 +681,6 @@ declare module '@polkadot/api-base/types/submittable' {
       bid: AugmentedSubmittable<
         (
           bid: u128 | AnyNumber | Uint8Array,
-          rewardDestination:
-            | ArgonPrimitivesBlockSealRewardDestination
-            | { Owner: any }
-            | { Account: any }
-            | string
-            | Uint8Array,
           keys:
             | ArgonRuntimeSessionKeys
             | { grandpa?: any; blockSealAuthority?: any }
@@ -702,12 +693,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | AccountId32
             | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [
-          u128,
-          ArgonPrimitivesBlockSealRewardDestination,
-          ArgonRuntimeSessionKeys,
-          Option<AccountId32>,
-        ]
+        [u128, ArgonRuntimeSessionKeys, Option<AccountId32>]
       >;
       /**
        * Admin function to update the mining slot delay.

@@ -83,7 +83,7 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
-  PalletVaultsVaultRevenue,
+  PalletVaultsVaultFrameFeeRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
 } from '@polkadot/types/lookup';
@@ -772,32 +772,32 @@ declare module '@polkadot/api-base/types/storage' {
     };
     liquidityPools: {
       /**
+       * The liquidity pool for the current frame. This correlates with the bids coming in for the
+       * current frame. Sorted with the biggest share last. (current frame + 1)
+       **/
+      capitalActive: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
+        []
+      >;
+      /**
+       * The liquidity pool still raising capital. (current frame + 2)
+       **/
+      capitalRaising: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
+        []
+      >;
+      /**
        * The currently earning contributors for the current epoch's bond funds. Sorted by highest
        * bids first
        **/
-      liquidityPoolsByCohort: AugmentedQuery<
+      vaultPoolsByFrame: AugmentedQuery<
         ApiType,
         (
           arg: u64 | AnyNumber | Uint8Array,
         ) => Observable<BTreeMap<u32, PalletLiquidityPoolsLiquidityPool>>,
         [u64]
-      >;
-      /**
-       * The liquidity pool capital for the next mining slot cohort.
-       **/
-      nextLiquidityPoolCapital: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
-        []
-      >;
-      /**
-       * The entrants in the liquidity pool for the mining slot cohort being bid on. Sorted with
-       * biggest share last.
-       **/
-      openLiquidityPoolCapital: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
-        []
       >;
     };
     miningSlot: {
@@ -826,6 +826,15 @@ declare module '@polkadot/api-base/types/storage' {
       argonotsPerMiningSeat: AugmentedQuery<
         ApiType,
         () => Observable<u128>,
+        []
+      >;
+      /**
+       * The cohort set to go into effect in the next slot. The Vec has all
+       * registrants with their bid amount
+       **/
+      bidsForNextSlotCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
       /**
@@ -879,18 +888,10 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The next cohort id
+       * The next frameId. A frame in argon is the 24 hours between the start of two different mining
+       * cohorts.
        **/
-      nextCohortId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
-       * The cohort set to go into effect in the next slot. The Vec has all
-       * registrants with their bid amount
-       **/
-      nextSlotCohort: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
-        []
-      >;
+      nextFrameId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The miners released in the last block (only kept for a single block)
        **/
@@ -1496,13 +1497,15 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * Tracks revenue for the last 10 cohort frames for each vault
+       * Tracks fee revenue from Bitcoin Locks for the last 10 Frames for each vault (a frame is a
+       * "mining day" in Argon). The total revenue for a vault includes Liquidity Pools, of which the
+       * associated data can be found in that pallet.
        **/
-      trailingRevenueByVault: AugmentedQuery<
+      perFrameFeeRevenueByVault: AugmentedQuery<
         ApiType,
         (
           arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Vec<PalletVaultsVaultRevenue>>,
+        ) => Observable<Vec<PalletVaultsVaultFrameFeeRevenue>>,
         [u32]
       >;
       /**

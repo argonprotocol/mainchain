@@ -212,7 +212,7 @@ rotate in. Over time, the number of miners will increase to 10,000.
 You are bidding for a slot, and can be outbid at any time by someone who bids more Argons than you. You can monitor
 if you currently have a winning slot by looking at
 the [Chain State](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/chainstate) under
-**miningSlot** -> **nextSlotCohort**. If you are in the `nextSlotCohort`, you have a winning bid. You can
+**miningSlot** -> **bidsForNextSlotCohort**. If you are in the `bidsForNextSlotCohort`, you have a winning bid. You can
 also monitor for events in each block matching `SlotBidderDropped` to see if you have been outbid. (Events can be
 monitored programmatically using the `@argonprotocol/mainchain` node.js library, or using the `argon-client` rust
 library, which is a [`subxt`](https://github.com/paritytech/subxt) based rust library).
@@ -264,8 +264,8 @@ and looking up `Ownership -> Accounts (your account)`.
 
 ### Slot Zero
 
-The first phase of mining is a compute phase. Compute mining uses Randomx to solve a hash that is less than the current
-difficulty target. This phase will last 10 days to bootstrap the network.
+The first phase of mining was a compute phase. Argon compute mining uses `Randomx` to solve a hash that is less than the
+current difficulty target. This phase lasted from January 15th until February 24th, 2025.
 
 ### Slot Bidding
 
@@ -276,7 +276,13 @@ based on a target number of miners applying for the slots). These variables can 
 - `TargetBidsPerSlot`: the current number of bids per slot that are targeted (20% more than slots available)
 - `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
 - `ArgonotsPerMiningSeat`: the total number of Ownership Tokens (argonots) needed to bid for a slot
-- `NextSlotCohort`: the currently slotted miners for the slot ending tomorrow
+- `BidsForNextSlotCohort`: the current winning bids for miners for the slot starting in the next frame
+
+#### Frame
+
+A frame in argon is the 24 hours between the start of two different mining cohorts. Each miner operates for 10 frames.
+A frame starts with the bidding start time (noon EDT), and ends the next day at noon EDT. Frame 0 was the first day of
+bidding, and frame 1 began once the first miners were selected. This occurred on February 24th, 2025 at 12pm EDT.
 
 #### Slot Bid End-time
 
@@ -315,7 +321,7 @@ rewards.
 ## Max Blocks Per Tick
 
 Up to 60 blocks can be created per tick (this is only relevant to the compute phase). Only a single block can be created
-per tick with a mining slot. The 60th block per tick must have notebooks included to be accepted.
+per tick with vote blocks. The 60th block per tick must have notebooks included to be accepted.
 
 ## Block Priority
 

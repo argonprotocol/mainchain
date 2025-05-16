@@ -783,13 +783,13 @@ declare module '@polkadot/api-base/types/events' {
       BidPoolDistributed: AugmentedEvent<
         ApiType,
         [
-          cohortId: u64,
+          frameId: u64,
           bidPoolDistributed: u128,
           bidPoolBurned: u128,
           bidPoolShares: u32,
         ],
         {
-          cohortId: u64;
+          frameId: u64;
           bidPoolDistributed: u128;
           bidPoolBurned: u128;
           bidPoolShares: u32;
@@ -800,8 +800,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       CouldNotBurnBidPool: AugmentedEvent<
         ApiType,
-        [cohortId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { cohortId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
        * An error occurred distributing a bid pool
@@ -810,7 +810,7 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           accountId: AccountId32,
-          cohortId: u64,
+          frameId: u64,
           vaultId: u32,
           amount: u128,
           dispatchError: SpRuntimeDispatchError,
@@ -818,7 +818,7 @@ declare module '@polkadot/api-base/types/events' {
         ],
         {
           accountId: AccountId32;
-          cohortId: u64;
+          frameId: u64;
           vaultId: u32;
           amount: u128;
           dispatchError: SpRuntimeDispatchError;
@@ -831,14 +831,14 @@ declare module '@polkadot/api-base/types/events' {
       ErrorRefundingLiquidityPoolCapital: AugmentedEvent<
         ApiType,
         [
-          cohortId: u64,
+          frameId: u64,
           vaultId: u32,
           amount: u128,
           accountId: AccountId32,
           dispatchError: SpRuntimeDispatchError,
         ],
         {
-          cohortId: u64;
+          frameId: u64;
           vaultId: u32;
           amount: u128;
           accountId: AccountId32;
@@ -850,8 +850,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       NextBidPoolCapitalLocked: AugmentedEvent<
         ApiType,
-        [cohortId: u64, totalActivatedCapital: u128, participatingVaults: u32],
-        { cohortId: u64; totalActivatedCapital: u128; participatingVaults: u32 }
+        [frameId: u64, totalActivatedCapital: u128, participatingVaults: u32],
+        { frameId: u64; totalActivatedCapital: u128; participatingVaults: u32 }
       >;
       /**
        * Some mining bond capital was refunded due to less activated vault funds than bond
@@ -859,8 +859,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       RefundedLiquidityPoolCapital: AugmentedEvent<
         ApiType,
-        [cohortId: u64, vaultId: u32, amount: u128, accountId: AccountId32],
-        { cohortId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }
+        [frameId: u64, vaultId: u32, amount: u128, accountId: AccountId32],
+        { frameId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }
       >;
     };
     miningSlot: {
@@ -869,8 +869,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MiningBidsClosed: AugmentedEvent<
         ApiType,
-        [cohortId: u64],
-        { cohortId: u64 }
+        [cohortFrameId: u64],
+        { cohortFrameId: u64 }
       >;
       MiningConfigurationUpdated: AugmentedEvent<
         ApiType,
@@ -891,13 +891,13 @@ declare module '@polkadot/api-base/types/events' {
           startIndex: u32,
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
           releasedMiners: u32,
-          cohortId: u64,
+          cohortFrameId: u64,
         ],
         {
           startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
           releasedMiners: u32;
-          cohortId: u64;
+          cohortFrameId: u64;
         }
       >;
       ReleaseBidError: AugmentedEvent<

@@ -6,7 +6,7 @@ use crate::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
-	block_seal::{BlockPayout, CohortId, MiningAuthority},
+	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	vault::Obligation,
@@ -209,9 +209,9 @@ pub trait BlockSealerProvider<AccountId: FullCodec> {
 }
 
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
-	fn get_block_rewards_account(author: &AccountId) -> Option<(AccountId, CohortId)>;
+	fn get_block_rewards_account(author: &AccountId) -> Option<(AccountId, FrameId)>;
 	/// Returns mint reward accounts
-	fn get_mint_rewards_accounts() -> Vec<(AccountId, CohortId)>;
+	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)>;
 	/// Is a compute block still eligible for rewards?
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
@@ -295,10 +295,10 @@ impl<AccountId: Codec, Balance: Codec + MaxEncodedLen> BlockRewardsEventHandler<
 
 pub trait OnNewSlot<AccountId> {
 	type Key: Decode + RuntimeAppPublic;
-	fn on_new_cohort(_cohort_id: CohortId) {}
+	fn on_frame_start(_frame_id: FrameId) {}
 
 	fn rotate_grandpas(
-		_current_cohort_id: CohortId,
+		_current_frame_id: FrameId,
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
 		_added_authorities: Vec<(&AccountId, Self::Key)>,
 	) {
@@ -306,9 +306,9 @@ pub trait OnNewSlot<AccountId> {
 }
 
 pub trait SlotEvents<AccountId> {
-	fn on_new_cohort(_cohort_id: CohortId) {}
+	fn on_frame_start(_frame_id: FrameId) {}
 	fn rotate_grandpas<Ks: OpaqueKeys>(
-		_current_cohort_id: CohortId,
+		_current_frame_id: FrameId,
 		_removed_authorities: Vec<(AccountId, Ks)>,
 		_added_authorities: Vec<(AccountId, Ks)>,
 	) {
@@ -318,12 +318,12 @@ pub trait SlotEvents<AccountId> {
 #[impl_trait_for_tuples::impl_for_tuples(0, 5)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
-	fn on_new_cohort(cohort_id: CohortId) {
-		for_tuples!( #( Tuple::on_new_cohort(cohort_id); )* );
+	fn on_frame_start(frame_id: FrameId) {
+		for_tuples!( #( Tuple::on_frame_start(frame_id); )* );
 	}
 
 	fn rotate_grandpas<Ks: OpaqueKeys>(
-		current_cohort_id: CohortId,
+		current_frame_id: FrameId,
 		removed_authorities: Vec<(AId, Ks)>,
 		added_authorities: Vec<(AId, Ks)>,
 	) {
@@ -337,7 +337,7 @@ impl<AId> SlotEvents<AId> for Tuple {
 				added_authorities.iter().filter_map(|k| {
 					k.1.get::<Tuple::Key>(<Tuple::Key as RuntimeAppPublic>::ID).map(|k1| (&k.0, k1))
 				}).collect::<Vec<_>>();
-			Tuple::rotate_grandpas(current_cohort_id, removed_keys, added_keys);
+			Tuple::rotate_grandpas(current_frame_id, removed_keys, added_keys);
 		)*
 		)
 	}

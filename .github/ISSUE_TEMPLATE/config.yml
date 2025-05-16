@@ -2,6 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Support & Troubleshooting with the Substrate Stack Exchange Community
     url: https://substrate.stackexchange.com
-    about: |
-      For general problems with Substrate or related technologies, please search here first
-      for solutions, by keyword and tags. If you discover no solution, please then ask and questions in our community! We highly encourage everyone also share their understanding by answering questions for others.
+    about: Use for general Substrate-related questions and issues outside this repo.
+  - name: Community Chat
+    url: https://discord.gg/xDwwDgCYr9
+    about: For real-time help or discussion about Argon

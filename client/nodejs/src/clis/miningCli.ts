@@ -72,8 +72,8 @@ export default function miningCli() {
       const seatIndices = new Array(maxMiners).fill(0).map((_, i) => i);
       console.log('Watching miners...');
 
-      const unsub = await api.query.miningSlot.nextCohortId(
-        async nextCohortId => {
+      const unsub = await api.query.miningSlot.nextFrameId(
+        async nextFrameId => {
           const entries =
             await api.query.miningSlot.activeMinersByIndex.entries();
           const block = await api.query.system.number();
@@ -89,12 +89,12 @@ export default function miningCli() {
 
             const miner = maybeMiner.unwrap();
             const address = miner.accountId.toHuman();
-            const cohortId = miner.cohortId.toNumber();
+            const cohortFrameId = miner.cohortFrameId.toNumber();
             lastMiners[index] = {
               miner: accountset.namedAccounts.get(address) ?? address,
               bid: miner.bid.toBigInt(),
-              cohort: cohortId,
-              isLastDay: nextCohortId.toNumber() - cohortId === 10,
+              cohort: cohortFrameId,
+              isLastDay: nextFrameId.toNumber() - cohortFrameId === 10,
             };
           }
           for (const index of seatsWithMiner) {
@@ -154,7 +154,7 @@ export default function miningCli() {
           if (cohortBidder) {
             const stats = await cohortBidder.stop();
             console.log('Final bidding result', {
-              cohortId: cohortBidder.cohortId,
+              cohortFrameId: cohortBidder.cohortFrameId,
               ...stats,
             });
             cohortBidder = undefined;
@@ -165,12 +165,12 @@ export default function miningCli() {
           }
         };
         const { unsubscribe } = await miningBids.onCohortChange({
-          async onBiddingEnd(cohortId) {
-            if (cohortBidder?.cohortId === cohortId) {
+          async onBiddingEnd(cohortFrameId) {
+            if (cohortBidder?.cohortFrameId === cohortFrameId) {
               await stopBidder(unsubscribe);
             }
           },
-          async onBiddingStart(cohortId) {
+          async onBiddingStart(cohortFrameId) {
             const seatsToWin = maxSeats ?? maxCohortSize;
             const balance = await accountset.balance();
             const feeWiggleRoom = BigInt(25e3);
@@ -206,12 +206,12 @@ export default function miningCli() {
             const subaccountRange =
               await accountset.getAvailableMinerAccounts(seatsToWin);
 
-            if (cohortBidder && cohortBidder?.cohortId !== cohortId) {
+            if (cohortBidder && cohortBidder?.cohortFrameId !== cohortFrameId) {
               await stopBidder(unsubscribe);
             }
             cohortBidder = new CohortBidder(
               accountset,
-              cohortId,
+              cohortFrameId,
               subaccountRange,
               {
                 maxBid: maxBidAmount,

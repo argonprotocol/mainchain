@@ -2,7 +2,7 @@
 # This script is meant to be run on Unix/Linux based systems
 set -e
 
-BASEDIR=$(dirname "$0")/..
+BASEDIR=$(dirname "$0")/../..
 # create array of validators
 validators=(alice bob dave)
 
@@ -31,7 +31,7 @@ mkdir -p /tmp/argon/$RUNID/bitcoin;
 # listen for sighup and kill all child processes
 trap 'kill $(jobs -p)' SIGHUP SIGINT SIGTERM
 
-$("$BASEDIR/target/debug/argon-testing-bitcoin") -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin \
+$("$BASEDIR/target/debug/argon-testing-bitcoin") -conf=/dev/null -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin \
   -fallbackfee=0.0001 -listen=0 -datadir=/tmp/argon/$RUNID/bitcoin \
   -blockfilterindex -txindex -wallet=1  2>&1 | \
   awk -v name="bitcoin" '{printf "%-8s %s\n", name, $0; fflush()}' &
@@ -53,7 +53,7 @@ until is_node_ready; do
 done
 
 
-BTC_CLI="bitcoin-cli -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
+BTC_CLI="bitcoin-cli -conf=/dev/null -chain=regtest -rpcport=18444 -rpcuser=bitcoin -rpcpassword=bitcoin"
 # try to create wallet, but if it already exists, ignore error
 $BTC_CLI createwallet "default" || $BTC_CLI loadwallet "default" || true
 
