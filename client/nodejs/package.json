@@ -48,17 +48,15 @@
     }
   },
   "dependencies": {
+    "@commander-js/extra-typings  ": "^13.1.0",
     "@polkadot/api": "^15.8.1",
     "@polkadot/keyring": "^13.4.3",
     "@polkadot/util-crypto": "^13.4.3",
     "bignumber.js": "^9.1.2",
-    "console-table-printer": "^2.12.1",
-    "nanoevents": "^9.1.0"
-  },
-  "optionalDependencies": {
-    "@commander-js/extra-typings": "^13.1.0",
     "commander": "^13.1.0",
-    "dotenv": "^16.4.7"
+    "console-table-printer": "^2.12.1",
+    "dotenv": "^16.4.7",
+    "nanoevents": "^9.1.0"
   },
   "devDependencies": {
     "@argonprotocol/testing": "1.1.0",
