@@ -119,6 +119,9 @@ mod runtime {
 
 	#[runtime::pallet_index(32)]
 	pub type FeelessTransaction = pallet_skip_feeless_payment;
+
+	#[runtime::pallet_index(33)]
+	pub type RestrictedAccount = pallet_restricted_account;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -625,6 +628,13 @@ impl pallet_hyperbridge::Config for Runtime {
 
 impl pallet_skip_feeless_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+}
+
+impl pallet_restricted_account::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AccessTypes = ProxyType;
+	type WeightInfo = pallet_restricted_account::weights::SubstrateWeight<Runtime>;
+	type MaxAccessTypes = ConstU32<10>;
 }
 
 // Add the token gateway pallet to your ISMP router
