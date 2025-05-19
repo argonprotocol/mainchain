@@ -351,7 +351,7 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       argonsPerBlock: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
-       * The cohort block rewards
+       * The cohort block rewards by mining cohort (ie, with the same starting frame id)
        **/
       blockRewardsByCohort: AugmentedQuery<
         ApiType,
@@ -838,7 +838,7 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Did this block activate a new cohort
+       * Did this block activate a new frame
        **/
       didStartNewCohort: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
@@ -910,7 +910,7 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The amount of argons minted per cohort for mining
+       * The amount of argons minted per mining cohort (ie, grouped by starting frame id)
        **/
       miningMintPerCohort: AugmentedQuery<
         ApiType,

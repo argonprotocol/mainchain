@@ -161,7 +161,7 @@ pub(crate) mod utils {
 			.await?;
 		println!("miner registered. {:?}", register);
 
-		let wait_til_past_cohort_frame_id = client
+		let wait_til_past_frame_id = client
 			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
 			.await?
 			.unwrap_or_default();
@@ -195,8 +195,8 @@ pub(crate) mod utils {
 			if block_confirm.is_err() {
 				println!("Block no longer finalized! {:?}", block_confirm);
 			}
-			if next_frame_id > wait_til_past_cohort_frame_id {
-				panic!("cohort frameId changed while waiting for registration");
+			if next_frame_id > wait_til_past_frame_id {
+				panic!("next frameId changed while waiting for registration");
 			}
 			tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 		}

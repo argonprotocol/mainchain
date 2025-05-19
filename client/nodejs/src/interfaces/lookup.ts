@@ -296,7 +296,7 @@ export default {
         startIndex: 'u32',
         newMiners: 'Vec<ArgonPrimitivesBlockSealMiningRegistration>',
         releasedMiners: 'u32',
-        cohortFrameId: 'u64',
+        frameId: 'u64',
       },
       SlotBidderAdded: {
         accountId: 'AccountId32',
@@ -317,7 +317,7 @@ export default {
         slotBiddingStartAfterTicks: 'u64',
       },
       MiningBidsClosed: {
-        cohortFrameId: 'u64',
+        frameId: 'u64',
       },
       ReleaseBidError: {
         accountId: 'AccountId32',
@@ -334,7 +334,7 @@ export default {
     bid: 'Compact<u128>',
     argonots: 'Compact<u128>',
     authorityKeys: 'ArgonRuntimeSessionKeys',
-    cohortFrameId: 'Compact<u64>',
+    startingFrameId: 'Compact<u64>',
     bidAtTick: 'Compact<u64>',
   },
   /**

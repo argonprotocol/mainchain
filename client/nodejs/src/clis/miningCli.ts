@@ -29,7 +29,7 @@ export default function miningCli() {
         [seat: number]: {
           miner: string;
           bid?: bigint;
-          cohort?: number;
+          startingFrameId?: number;
           isLastDay?: boolean;
         };
       } = {};
@@ -48,7 +48,7 @@ export default function miningCli() {
             toPrint.map(x => ({
               ...x,
               bid: x.bid ? formatArgons(x.bid) : '-',
-              cohort: x.cohort,
+              startingFrameId: x.startingFrameId,
               isLastDay: x.isLastDay ? 'Y' : '',
               miner: x.miner,
             })),
@@ -89,12 +89,12 @@ export default function miningCli() {
 
             const miner = maybeMiner.unwrap();
             const address = miner.accountId.toHuman();
-            const cohortFrameId = miner.cohortFrameId.toNumber();
+            const startingFrameId = miner.startingFrameId.toNumber();
             lastMiners[index] = {
               miner: accountset.namedAccounts.get(address) ?? address,
               bid: miner.bid.toBigInt(),
-              cohort: cohortFrameId,
-              isLastDay: nextFrameId.toNumber() - cohortFrameId === 10,
+              startingFrameId,
+              isLastDay: nextFrameId.toNumber() - startingFrameId === 10,
             };
           }
           for (const index of seatsWithMiner) {
@@ -154,7 +154,7 @@ export default function miningCli() {
           if (cohortBidder) {
             const stats = await cohortBidder.stop();
             console.log('Final bidding result', {
-              cohortFrameId: cohortBidder.cohortFrameId,
+              cohortFrameId: cohortBidder.cohortStartingFrameId,
               ...stats,
             });
             cohortBidder = undefined;
@@ -166,7 +166,7 @@ export default function miningCli() {
         };
         const { unsubscribe } = await miningBids.onCohortChange({
           async onBiddingEnd(cohortFrameId) {
-            if (cohortBidder?.cohortFrameId === cohortFrameId) {
+            if (cohortBidder?.cohortStartingFrameId === cohortFrameId) {
               await stopBidder(unsubscribe);
             }
           },
@@ -206,7 +206,10 @@ export default function miningCli() {
             const subaccountRange =
               await accountset.getAvailableMinerAccounts(seatsToWin);
 
-            if (cohortBidder && cohortBidder?.cohortFrameId !== cohortFrameId) {
+            if (
+              cohortBidder &&
+              cohortBidder?.cohortStartingFrameId !== cohortFrameId
+            ) {
               await stopBidder(unsubscribe);
             }
             cohortBidder = new CohortBidder(

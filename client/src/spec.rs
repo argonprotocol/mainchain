@@ -3872,9 +3872,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				119u8, 152u8, 66u8, 47u8, 122u8, 222u8, 87u8, 36u8, 202u8, 144u8, 102u8, 127u8,
-				105u8, 42u8, 97u8, 241u8, 0u8, 233u8, 99u8, 142u8, 64u8, 255u8, 17u8, 102u8, 65u8,
-				210u8, 38u8, 252u8, 39u8, 123u8, 100u8, 140u8,
+				90u8, 145u8, 218u8, 156u8, 51u8, 70u8, 8u8, 14u8, 118u8, 37u8, 169u8, 173u8, 50u8,
+				18u8, 1u8, 235u8, 155u8, 52u8, 251u8, 44u8, 141u8, 161u8, 228u8, 57u8, 215u8,
+				112u8, 142u8, 66u8, 29u8, 116u8, 98u8, 226u8,
 			]
 	}
 	pub mod system {
@@ -5025,9 +5025,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							112u8, 233u8, 128u8, 157u8, 239u8, 134u8, 82u8, 242u8, 172u8, 52u8,
-							182u8, 164u8, 175u8, 119u8, 252u8, 8u8, 15u8, 51u8, 215u8, 131u8, 30u8,
-							37u8, 88u8, 133u8, 221u8, 209u8, 65u8, 140u8, 246u8, 98u8, 0u8, 193u8,
+							214u8, 126u8, 170u8, 217u8, 224u8, 130u8, 214u8, 158u8, 35u8, 186u8,
+							12u8, 248u8, 230u8, 152u8, 134u8, 177u8, 27u8, 10u8, 32u8, 177u8, 25u8,
+							79u8, 22u8, 201u8, 16u8, 243u8, 186u8, 33u8, 227u8, 69u8, 17u8, 139u8,
 						],
 					)
 				}
@@ -7809,7 +7809,7 @@ pub mod api {
 				pub start_index: new_miners::StartIndex,
 				pub new_miners: new_miners::NewMiners,
 				pub released_miners: new_miners::ReleasedMiners,
-				pub cohort_frame_id: new_miners::CohortFrameId,
+				pub frame_id: new_miners::FrameId,
 			}
 			pub mod new_miners {
 				use super::runtime_types;
@@ -7822,7 +7822,7 @@ pub mod api {
 					>,
 				>;
 				pub type ReleasedMiners = ::core::primitive::u32;
-				pub type CohortFrameId = ::core::primitive::u64;
+				pub type FrameId = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for NewMiners {
 				const PALLET: &'static str = "MiningSlot";
@@ -7943,11 +7943,11 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "Bids are closed due to the VRF randomized function triggering"]
 			pub struct MiningBidsClosed {
-				pub cohort_frame_id: mining_bids_closed::CohortFrameId,
+				pub frame_id: mining_bids_closed::FrameId,
 			}
 			pub mod mining_bids_closed {
 				use super::runtime_types;
-				pub type CohortFrameId = ::core::primitive::u64;
+				pub type FrameId = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MiningBidsClosed {
 				const PALLET: &'static str = "MiningSlot";
@@ -8110,10 +8110,10 @@ pub mod api {
 						"ActiveMinersByIndex",
 						(),
 						[
-							122u8, 41u8, 141u8, 131u8, 172u8, 80u8, 162u8, 84u8, 60u8, 251u8,
-							173u8, 71u8, 153u8, 253u8, 137u8, 144u8, 38u8, 63u8, 32u8, 240u8,
-							210u8, 7u8, 13u8, 177u8, 50u8, 109u8, 55u8, 191u8, 14u8, 227u8, 96u8,
-							185u8,
+							95u8, 172u8, 157u8, 135u8, 62u8, 201u8, 219u8, 116u8, 115u8, 162u8,
+							136u8, 148u8, 175u8, 229u8, 183u8, 15u8, 25u8, 148u8, 251u8, 17u8,
+							80u8, 199u8, 86u8, 2u8, 212u8, 75u8, 251u8, 38u8, 59u8, 219u8, 153u8,
+							214u8,
 						],
 					)
 				}
@@ -8137,10 +8137,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							122u8, 41u8, 141u8, 131u8, 172u8, 80u8, 162u8, 84u8, 60u8, 251u8,
-							173u8, 71u8, 153u8, 253u8, 137u8, 144u8, 38u8, 63u8, 32u8, 240u8,
-							210u8, 7u8, 13u8, 177u8, 50u8, 109u8, 55u8, 191u8, 14u8, 227u8, 96u8,
-							185u8,
+							95u8, 172u8, 157u8, 135u8, 62u8, 201u8, 219u8, 116u8, 115u8, 162u8,
+							136u8, 148u8, 175u8, 229u8, 183u8, 15u8, 25u8, 148u8, 251u8, 17u8,
+							80u8, 199u8, 86u8, 2u8, 212u8, 75u8, 251u8, 38u8, 59u8, 219u8, 153u8,
+							214u8,
 						],
 					)
 				}
@@ -8273,9 +8273,9 @@ pub mod api {
 						"BidsForNextSlotCohort",
 						(),
 						[
-							140u8, 1u8, 208u8, 224u8, 242u8, 4u8, 113u8, 167u8, 28u8, 38u8, 62u8,
-							31u8, 57u8, 213u8, 29u8, 28u8, 18u8, 138u8, 70u8, 15u8, 138u8, 53u8,
-							41u8, 188u8, 73u8, 111u8, 195u8, 163u8, 55u8, 160u8, 123u8, 247u8,
+							54u8, 101u8, 112u8, 80u8, 132u8, 200u8, 117u8, 34u8, 219u8, 50u8, 83u8,
+							226u8, 250u8, 103u8, 135u8, 39u8, 45u8, 235u8, 171u8, 202u8, 126u8,
+							226u8, 159u8, 135u8, 124u8, 7u8, 54u8, 94u8, 94u8, 10u8, 116u8, 54u8,
 						],
 					)
 				}
@@ -8294,9 +8294,9 @@ pub mod api {
 						"ReleasedMinersByAccountId",
 						(),
 						[
-							208u8, 7u8, 245u8, 136u8, 135u8, 106u8, 190u8, 116u8, 83u8, 218u8,
-							163u8, 51u8, 148u8, 24u8, 83u8, 57u8, 169u8, 44u8, 0u8, 18u8, 208u8,
-							128u8, 9u8, 81u8, 94u8, 86u8, 116u8, 50u8, 34u8, 87u8, 220u8, 10u8,
+							9u8, 158u8, 53u8, 32u8, 171u8, 44u8, 4u8, 135u8, 218u8, 236u8, 21u8,
+							40u8, 149u8, 195u8, 43u8, 43u8, 199u8, 0u8, 208u8, 198u8, 152u8, 229u8,
+							194u8, 127u8, 70u8, 17u8, 118u8, 2u8, 189u8, 203u8, 143u8, 10u8,
 						],
 					)
 				}
@@ -8385,7 +8385,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Did this block activate a new cohort"]
+				#[doc = " Did this block activate a new frame"]
 				pub fn did_start_new_cohort(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -15223,7 +15223,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The cohort block rewards"]
+				#[doc = " The cohort block rewards by mining cohort (ie, with the same starting frame id)"]
 				pub fn block_rewards_by_cohort(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -15591,7 +15591,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The amount of argons minted per cohort for mining"]
+				#[doc = " The amount of argons minted per mining cohort (ie, grouped by starting frame id)"]
 				pub fn mining_mint_per_cohort(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -23849,7 +23849,7 @@ pub mod api {
 					pub argonots: _1,
 					pub authority_keys: _2,
 					#[codec(compact)]
-					pub cohort_frame_id: ::core::primitive::u64,
+					pub starting_frame_id: ::core::primitive::u64,
 					#[codec(compact)]
 					pub bid_at_tick: ::core::primitive::u64,
 				}
@@ -29210,7 +29210,7 @@ pub mod api {
 							>,
 						>,
 						released_miners: ::core::primitive::u32,
-						cohort_frame_id: ::core::primitive::u64,
+						frame_id: ::core::primitive::u64,
 					},
 					#[codec(index = 1)]
 					SlotBidderAdded {
@@ -29236,7 +29236,7 @@ pub mod api {
 					},
 					#[codec(index = 5)]
 					#[doc = "Bids are closed due to the VRF randomized function triggering"]
-					MiningBidsClosed { cohort_frame_id: ::core::primitive::u64 },
+					MiningBidsClosed { frame_id: ::core::primitive::u64 },
 					#[codec(index = 6)]
 					ReleaseBidError {
 						account_id: crate::types::AccountId32,

@@ -31,7 +31,7 @@ fn it_doesnt_add_cohorts_until_time() {
 			argonots: 0,
 			bid: 0,
 			authority_keys: 1.into(),
-			cohort_frame_id: 1,
+			starting_frame_id: 1,
 			external_funding_account: None,
 			bid_at_tick: 1
 		}]);
@@ -126,7 +126,7 @@ fn calculate_frame_id() {
 }
 
 #[test]
-fn it_updates_cohort_frame_id_at_right_time() {
+fn it_updates_frame_id_at_right_time() {
 	MaxCohortSize::set(10);
 	MaxMiners::set(100);
 	let ticks_between_slots = 1440;
@@ -255,7 +255,7 @@ fn it_adds_new_cohorts_on_block() {
 					argonots: 0,
 					bid: 0,
 					authority_keys: account_id.into(),
-					cohort_frame_id: i as u64 + 1,
+					starting_frame_id: i as u64 + 1,
 					external_funding_account: None,
 					bid_at_tick: 1,
 				},
@@ -275,7 +275,7 @@ fn it_adds_new_cohorts_on_block() {
 			argonots: 0,
 			bid: 0,
 			authority_keys: 1.into(),
-			cohort_frame_id: 5,
+			starting_frame_id: 5,
 			external_funding_account: None,
 			bid_at_tick: 1,
 		}]);
@@ -337,7 +337,7 @@ fn it_adds_new_cohorts_on_block() {
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(cohort.to_vec()),
 				released_miners: 2,
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
+				frame_id: NextFrameId::<Test>::get() - 1,
 			}
 			.into(),
 		)
@@ -377,7 +377,7 @@ fn it_releases_argonots_when_a_window_closes() {
 					argonots: ownership_tokens,
 					bid: bond_amount,
 					authority_keys: 1.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: None,
 					bid_at_tick: 7,
 				},
@@ -399,14 +399,14 @@ fn it_releases_argonots_when_a_window_closes() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
+				frame_id: NextFrameId::<Test>::get() - 1,
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 2,
 					argonots: 1000u32.into(),
 					bid: 0,
 					authority_keys: 1.into(),
-					cohort_frame_id: 4,
+					starting_frame_id: 4,
 					external_funding_account: None,
 					bid_at_tick: 7,
 				}]),
@@ -526,10 +526,10 @@ fn it_wont_accept_bids_until_bidding_starts() {
 }
 
 fn get_next_slot_starting_index() -> u32 {
-	let next_cohort_frame_id = NextFrameId::<Test>::get();
+	let next_frame_id = NextFrameId::<Test>::get();
 	let cohort_size = MaxCohortSize::get();
 
-	MiningSlots::get_slot_starting_index(next_cohort_frame_id, MaxMiners::get(), cohort_size)
+	MiningSlots::get_slot_starting_index(next_frame_id, MaxMiners::get(), cohort_size)
 }
 
 #[test]
@@ -565,14 +565,14 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
+				frame_id: NextFrameId::<Test>::get() - 1,
 				start_index: 2,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
 					argonots: ownership,
 					bid: 0,
 					authority_keys: 1.into(),
-					cohort_frame_id: 4,
+					starting_frame_id: 4,
 					external_funding_account: None,
 					bid_at_tick: 12,
 				}]),
@@ -754,7 +754,7 @@ fn it_will_order_bids() {
 		);
 		System::assert_has_event(
 			Event::NewMiners {
-				cohort_frame_id: 2,
+				frame_id: 2,
 				start_index: 4,
 				new_miners: BoundedVec::truncate_from(vec![
 					MiningRegistration {
@@ -762,7 +762,7 @@ fn it_will_order_bids() {
 						argonots: 500u32.into(),
 						bid: 2_010_000,
 						authority_keys: 1.into(),
-						cohort_frame_id: 2,
+						starting_frame_id: 2,
 						external_funding_account: None,
 						bid_at_tick: 6,
 					},
@@ -771,7 +771,7 @@ fn it_will_order_bids() {
 						argonots: 500u32.into(),
 						bid: 2_000_000,
 						authority_keys: 2.into(),
-						cohort_frame_id: 2,
+						starting_frame_id: 2,
 						external_funding_account: None,
 						bid_at_tick: 6,
 					},
@@ -870,7 +870,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 				argonots: 100_000u32.into(),
 				bid: 1_000_000u32.into(),
 				authority_keys: 1.into(),
-				cohort_frame_id: 1,
+				starting_frame_id: 1,
 				external_funding_account: Some(1),
 				bid_at_tick: 6,
 			}]
@@ -892,7 +892,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					argonots: 100_000u32.into(),
 					bid: 2_000_000u32.into(),
 					authority_keys: 3.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: Some(1),
 					bid_at_tick: 6,
 				},
@@ -901,7 +901,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					argonots: 100_000u32.into(),
 					bid: 1_000_000u32.into(),
 					authority_keys: 1.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: Some(1),
 					bid_at_tick: 6,
 				}
@@ -951,7 +951,7 @@ fn it_can_get_closest_authority() {
 					argonots: 0,
 					bid: 0,
 					authority_keys: account_id.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: None,
 					bid_at_tick: 1,
 				},
@@ -1014,8 +1014,8 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 		.unwrap();
 		assert!(!MiningSlots::check_for_bidding_close(invalid_strength));
 
-		let cohort_frame_id = NextFrameId::<Test>::get();
-		System::assert_last_event(Event::MiningBidsClosed { cohort_frame_id }.into());
+		let frame_id = NextFrameId::<Test>::get();
+		System::assert_last_event(Event::MiningBidsClosed { frame_id }.into());
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];

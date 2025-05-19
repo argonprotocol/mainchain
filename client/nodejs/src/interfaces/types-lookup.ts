@@ -391,7 +391,7 @@ declare module '@polkadot/types/lookup' {
       readonly startIndex: u32;
       readonly newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
       readonly releasedMiners: u32;
-      readonly cohortFrameId: u64;
+      readonly frameId: u64;
     } & Struct;
     readonly isSlotBidderAdded: boolean;
     readonly asSlotBidderAdded: {
@@ -417,7 +417,7 @@ declare module '@polkadot/types/lookup' {
     } & Struct;
     readonly isMiningBidsClosed: boolean;
     readonly asMiningBidsClosed: {
-      readonly cohortFrameId: u64;
+      readonly frameId: u64;
     } & Struct;
     readonly isReleaseBidError: boolean;
     readonly asReleaseBidError: {
@@ -441,7 +441,7 @@ declare module '@polkadot/types/lookup' {
     readonly bid: Compact<u128>;
     readonly argonots: Compact<u128>;
     readonly authorityKeys: ArgonRuntimeSessionKeys;
-    readonly cohortFrameId: Compact<u64>;
+    readonly startingFrameId: Compact<u64>;
     readonly bidAtTick: Compact<u64>;
   }
 

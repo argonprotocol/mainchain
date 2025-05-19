@@ -146,7 +146,7 @@ describeIntegration('Cohort Bidder tests', () => {
     // wait for the slot to fully complete
     await new Promise(resolve =>
       aliceClient.query.miningSlot.nextFrameId(y => {
-        if (y.toNumber() >= bobBidder!.cohortFrameId) {
+        if (y.toNumber() >= bobBidder!.cohortStartingFrameId) {
           resolve(true);
         }
       }),
@@ -154,7 +154,7 @@ describeIntegration('Cohort Bidder tests', () => {
 
     const aliceMiners = await alice.miningSeats();
     const aliceStats = aliceBidder!.stats;
-    const cohortFrameId = aliceBidder!.cohortFrameId;
+    const cohortFrameId = aliceBidder!.cohortStartingFrameId;
     const bobMiners = await bob.miningSeats();
     const bobStats = bobBidder!.stats;
 

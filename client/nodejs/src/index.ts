@@ -12,7 +12,6 @@ import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 
-export * from '@polkadot/types-codec/types';
 export { WageProtector } from './WageProtector';
 export { TxSubmitter } from './TxSubmitter';
 export { Accountset } from './Accountset';
@@ -45,6 +44,7 @@ export {
 export * from '@polkadot/types';
 export * from '@polkadot/types/lookup';
 export * from '@polkadot/types/interfaces';
+export * from '@polkadot/types-codec/types';
 export { InterfaceTypes as interfaces };
 
 export type ArgonClient = ApiPromise;

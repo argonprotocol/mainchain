@@ -35,8 +35,8 @@ pub mod weights;
 /// the new cohort members (or emptied out). A Slot Index is similar to a Mining "Seat", but
 /// 0-based.
 ///
-/// To be eligible for mining, you must reserve a percent of the total supply of argonots (ownership
-/// tokens). The percent is configured to aim for `TargetBidsPerSlot`, with a
+/// To be eligible for mining, you must reserve a percentage of the argonot issuance (ownership
+/// tokens). The percentage is configured to aim for `TargetBidsPerSlot`, with a
 /// maximum change in ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper`
 /// (NOTE: this percent is the max increase or reduction in the amount of ownership issued).
 ///
@@ -252,7 +252,7 @@ pub mod pallet {
 			start_index: MinerIndex,
 			new_miners: BoundedVec<Registration<T>, T::MaxCohortSize>,
 			released_miners: u32,
-			cohort_frame_id: FrameId,
+			frame_id: FrameId,
 		},
 		SlotBidderAdded {
 			account_id: T::AccountId,
@@ -274,7 +274,7 @@ pub mod pallet {
 		},
 		/// Bids are closed due to the VRF randomized function triggering
 		MiningBidsClosed {
-			cohort_frame_id: FrameId,
+			frame_id: FrameId,
 		},
 		ReleaseBidError {
 			account_id: T::AccountId,
@@ -406,7 +406,7 @@ pub mod pallet {
 				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
 				// ensure we are not overlapping sessions
 				ensure!(
-					registration.cohort_frame_id + cohorts as FrameId == next_frame_id,
+					registration.starting_frame_id + cohorts as FrameId == next_frame_id,
 					Error::<T>::CannotRegisterOverlappingSessions
 				);
 			}
@@ -453,7 +453,7 @@ pub mod pallet {
 							bid,
 							argonots: ownership_tokens,
 							authority_keys: keys,
-							cohort_frame_id: next_frame_id,
+							starting_frame_id: next_frame_id,
 							bid_at_tick: T::TickProvider::current_tick(),
 						},
 					)
@@ -527,18 +527,18 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	fn get_block_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, FrameId)> {
 		let released_miners = ReleasedMinersByAccountId::<T>::get();
 		if let Some(x) = released_miners.get(author) {
-			return Some((x.rewards_account(), x.cohort_frame_id))
+			return Some((x.rewards_account(), x.starting_frame_id))
 		}
 
 		let registration = Self::get_active_registration(author)?;
-		Some((registration.rewards_account(), registration.cohort_frame_id))
+		Some((registration.rewards_account(), registration.starting_frame_id))
 	}
 
 	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, FrameId)> {
 		let mut result = vec![];
 		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
 			let account = registration.rewards_account();
-			result.push((account, registration.cohort_frame_id));
+			result.push((account, registration.starting_frame_id));
 		}
 		result
 	}
@@ -662,7 +662,7 @@ impl<T: Config> Pallet<T> {
 			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 			released_miners: removed_miners.len() as u32,
-			cohort_frame_id: frame_id,
+			frame_id,
 		});
 
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
@@ -769,8 +769,8 @@ impl<T: Config> Pallet<T> {
 
 		if vote_seal_proof < threshold {
 			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
-			let cohort_frame_id = NextFrameId::<T>::get();
-			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_frame_id });
+			let frame_id = NextFrameId::<T>::get();
+			Self::deposit_event(Event::<T>::MiningBidsClosed { frame_id });
 			return true
 		}
 
@@ -791,10 +791,10 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn get_next_slot_tick() -> Tick {
-		Self::tick_for_slot(Self::next_cohort_frame_id())
+		Self::tick_for_frame(Self::next_frame_id())
 	}
 
-	pub fn next_cohort_frame_id() -> FrameId {
+	pub fn next_frame_id() -> FrameId {
 		NextFrameId::<T>::get()
 	}
 
@@ -814,22 +814,22 @@ impl<T: Config> Pallet<T> {
 		ticks_since_mining_start / mining_config.ticks_between_slots
 	}
 
-	pub fn tick_for_slot(cohort_frame_id: FrameId) -> Tick {
-		if cohort_frame_id == 0 {
+	pub fn tick_for_frame(frame_id: FrameId) -> Tick {
+		if frame_id == 0 {
 			// return genesis tick for slot 0
 			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks())
 		}
 		let slot_1_tick = Self::slot_1_tick();
-		let added_ticks = (cohort_frame_id - 1) * Self::ticks_between_slots();
+		let added_ticks = (frame_id - 1) * Self::ticks_between_slots();
 		slot_1_tick.saturating_add(added_ticks)
 	}
 
 	pub(crate) fn get_slot_starting_index(
-		cohort_frame_id: FrameId,
+		frame_id: FrameId,
 		max_miners: u32,
 		cohort_size: u32,
 	) -> u32 {
-		(cohort_frame_id as u32 * cohort_size) % max_miners
+		(frame_id as u32 * cohort_size) % max_miners
 	}
 
 	pub fn get_mining_window_ticks() -> Tick {

@@ -115,7 +115,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				bid: x.bid,
 				argonots: x.argonots,
 				authority_keys: x.authority_keys,
-				cohort_frame_id: x.cohort_id,
+				starting_frame_id: x.cohort_id,
 				bid_at_tick: x.bid_at_tick,
 			})
 			.collect::<Vec<_>>();
@@ -129,7 +129,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				bid: reg.bid,
 				argonots: reg.argonots,
 				authority_keys: reg.authority_keys,
-				cohort_frame_id: reg.cohort_id,
+				starting_frame_id: reg.cohort_id,
 				bid_at_tick: reg.bid_at_tick,
 			})
 		});

@@ -869,8 +869,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MiningBidsClosed: AugmentedEvent<
         ApiType,
-        [cohortFrameId: u64],
-        { cohortFrameId: u64 }
+        [frameId: u64],
+        { frameId: u64 }
       >;
       MiningConfigurationUpdated: AugmentedEvent<
         ApiType,
@@ -891,13 +891,13 @@ declare module '@polkadot/api-base/types/events' {
           startIndex: u32,
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
           releasedMiners: u32,
-          cohortFrameId: u64,
+          frameId: u64,
         ],
         {
           startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
           releasedMiners: u32;
-          cohortFrameId: u64;
+          frameId: u64;
         }
       >;
       ReleaseBidError: AugmentedEvent<

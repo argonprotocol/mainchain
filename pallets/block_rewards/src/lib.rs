@@ -135,7 +135,7 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	/// The cohort block rewards
+	/// The cohort block rewards by mining cohort (ie, with the same starting frame id)
 	#[pallet::storage]
 	pub(super) type BlockRewardsByCohort<T: Config> =
 		StorageValue<_, BoundedVec<(FrameId, T::Balance), T::CohortBlockRewardsToKeep>, ValueQuery>;
@@ -207,13 +207,13 @@ pub mod pallet {
 				T::BlockRewardAccountsProvider::get_block_rewards_account(
 					&authors.block_author_account_id,
 				);
-			let (miner_reward_account, cohort_frame_id) =
+			let (miner_reward_account, starting_frame_id) =
 				assigned_rewards_account.unwrap_or((authors.block_author_account_id.clone(), 0));
 
 			let miner_percent = T::MinerPayoutPercent::get();
 
 			let RewardAmounts { argons: block_argons, ownership: block_ownership } =
-				Self::calculate_reward_amounts(cohort_frame_id, minimums);
+				Self::calculate_reward_amounts(starting_frame_id, minimums);
 
 			let miner_ownership = miner_percent.saturating_mul_int(block_ownership);
 			let miner_argons = miner_percent.saturating_mul_int(block_argons);
@@ -372,13 +372,13 @@ pub mod pallet {
 		}
 
 		pub(crate) fn calculate_reward_amounts(
-			cohort_frame_id: FrameId,
+			starting_frame_id: FrameId,
 			minimums: RewardAmounts<T>,
 		) -> RewardAmounts<T> {
 			let mut block_ownership = minimums.ownership;
 			let mut block_argons = BlockRewardsByCohort::<T>::get()
 				.iter()
-				.find(|x| x.0 == cohort_frame_id)
+				.find(|x| x.0 == starting_frame_id)
 				.map(|x| x.1)
 				.unwrap_or(minimums.argons);
 

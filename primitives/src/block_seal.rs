@@ -88,9 +88,9 @@ pub struct MiningRegistration<
 	pub argonots: Balance,
 	/// The signing keys for the miner
 	pub authority_keys: Keys,
-	/// Which cohort the miner is in
+	/// Which frame the miner started in
 	#[codec(compact)]
-	pub cohort_frame_id: FrameId,
+	pub starting_frame_id: FrameId,
 	/// When the bid was placed
 	#[codec(compact)]
 	pub bid_at_tick: Tick,

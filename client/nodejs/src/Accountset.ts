@@ -192,7 +192,7 @@ export class Accountset {
       const registration = indexRegistrations[i];
       if (registration?.isSome) {
         registrationBySeatIndex[seatIndex] = {
-          cohortFrameId: registration.value.cohortFrameId.toNumber(),
+          cohortFrameId: registration.value.startingFrameId.toNumber(),
           bidAmount: registration.value.bid.toBigInt(),
         };
       }

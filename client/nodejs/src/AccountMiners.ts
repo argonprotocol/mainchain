@@ -13,7 +13,7 @@ export class AccountMiners {
         author: string;
         argons: bigint;
         argonots: bigint;
-        cohortFrameId: number;
+        forCohortWithStartingFrameId: number;
         duringFrameId: number;
       },
     ) => void;
@@ -22,7 +22,7 @@ export class AccountMiners {
       minted: {
         accountId: string;
         argons: bigint;
-        cohortFrameId: number;
+        forCohortWithStartingFrameId: number;
         duringFrameId: number;
       },
     ) => void;
@@ -31,13 +31,16 @@ export class AccountMiners {
   public frameCalculator: FrameCalculator;
 
   private trackedAccountsByAddress: {
-    [address: string]: { cohortFrameId: number; subaccountIndex: number };
+    [address: string]: {
+      startingFrameId: number;
+      subaccountIndex: number;
+    };
   } = {};
 
   constructor(
     private accountset: Accountset,
     registeredMiners: {
-      cohortFrameId: number;
+      startingFrameId: number;
       address: string;
       subaccountIndex: number;
     }[],
@@ -46,7 +49,7 @@ export class AccountMiners {
     this.frameCalculator = new FrameCalculator();
     for (const seat of registeredMiners) {
       this.trackedAccountsByAddress[seat.address] = {
-        cohortFrameId: seat.cohortFrameId,
+        startingFrameId: seat.startingFrameId,
         subaccountIndex: seat.subaccountIndex,
       };
     }
@@ -80,19 +83,19 @@ export class AccountMiners {
     }
     const client = await this.accountset.client;
     const currentFrameId = await this.frameCalculator.getForTick(client, tick);
-    let newMiners: { cohortFrameId: number; addresses: string[] } | undefined;
+    let newMiners: { frameId: number; addresses: string[] } | undefined;
     const dataByCohort: {
-      currentFrameId: number;
-      [cohortFrameId: number]: {
+      duringFrameId: number;
+      [cohortStartingFrameId: number]: {
         argonsMinted: bigint;
         argonsMined: bigint;
         argonotsMined: bigint;
       };
-    } = { currentFrameId };
+    } = { duringFrameId: currentFrameId };
     for (const event of events) {
       if (client.events.miningSlot.NewMiners.is(event)) {
         newMiners = {
-          cohortFrameId: event.data.cohortFrameId.toNumber(),
+          frameId: event.data.frameId.toNumber(),
           addresses: event.data.newMiners.map(x => x.accountId.toHuman()),
         };
       }
@@ -103,19 +106,20 @@ export class AccountMiners {
 
           const entry = this.trackedAccountsByAddress[author];
           if (entry) {
-            dataByCohort[entry.cohortFrameId] ??= {
+            dataByCohort[entry.startingFrameId] ??= {
               argonsMinted: 0n,
               argonsMined: 0n,
               argonotsMined: 0n,
             };
-            dataByCohort[entry.cohortFrameId].argonotsMined +=
+            dataByCohort[entry.startingFrameId].argonotsMined +=
               ownership.toBigInt();
-            dataByCohort[entry.cohortFrameId].argonsMined += argons.toBigInt();
+            dataByCohort[entry.startingFrameId].argonsMined +=
+              argons.toBigInt();
             this.events.emit('mined', header, {
               author,
               argons: argons.toBigInt(),
               argonots: ownership.toBigInt(),
-              cohortFrameId: entry.cohortFrameId,
+              forCohortWithStartingFrameId: entry.startingFrameId,
               duringFrameId: currentFrameId,
             });
           }
@@ -128,17 +132,17 @@ export class AccountMiners {
           for (const [address, info] of Object.entries(
             this.trackedAccountsByAddress,
           )) {
-            const { cohortFrameId } = info;
-            dataByCohort[cohortFrameId] ??= {
+            const { startingFrameId } = info;
+            dataByCohort[startingFrameId] ??= {
               argonsMinted: 0n,
               argonsMined: 0n,
               argonotsMined: 0n,
             };
-            dataByCohort[cohortFrameId].argonsMinted += amountPerMiner;
+            dataByCohort[startingFrameId].argonsMinted += amountPerMiner;
             this.events.emit('minted', header, {
               accountId: address,
               argons: amountPerMiner,
-              cohortFrameId,
+              forCohortWithStartingFrameId: startingFrameId,
               duringFrameId: currentFrameId,
             });
           }
@@ -146,16 +150,16 @@ export class AccountMiners {
       }
     }
     if (newMiners) {
-      this.newCohortMiners(newMiners.cohortFrameId, newMiners.addresses);
+      this.newCohortMiners(newMiners.frameId, newMiners.addresses);
     }
     return dataByCohort;
   }
 
-  private newCohortMiners(cohortFrameId: number, addresses: string[]) {
+  private newCohortMiners(frameId: number, addresses: string[]) {
     for (const [address, info] of Object.entries(
       this.trackedAccountsByAddress,
     )) {
-      if (info.cohortFrameId === cohortFrameId - 10) {
+      if (info.startingFrameId === frameId - 10) {
         delete this.trackedAccountsByAddress[address];
       }
     }
@@ -163,7 +167,7 @@ export class AccountMiners {
       const entry = this.accountset.subAccountsByAddress[address];
       if (entry) {
         this.trackedAccountsByAddress[address] = {
-          cohortFrameId,
+          startingFrameId: frameId,
           subaccountIndex: entry.index,
         };
       }
