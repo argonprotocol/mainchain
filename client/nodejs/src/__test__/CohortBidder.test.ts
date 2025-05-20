@@ -88,12 +88,12 @@ describeIntegration('Cohort Bidder tests', () => {
       waitForStopPromise = resolve;
     });
     const { unsubscribe } = await miningBids.onCohortChange({
-      async onBiddingStart(cohortFrameId) {
+      async onBiddingStart(cohortStartingFrameId) {
         if (bobBidder) return;
-        console.log(`Cohort ${cohortFrameId} started bidding`);
+        console.log(`Cohort ${cohortStartingFrameId} started bidding`);
         bobBidder = new CohortBidder(
           bob,
-          cohortFrameId,
+          cohortStartingFrameId,
           await bob.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
@@ -105,7 +105,7 @@ describeIntegration('Cohort Bidder tests', () => {
         );
         aliceBidder = new CohortBidder(
           alice,
-          cohortFrameId,
+          cohortStartingFrameId,
           await alice.getAvailableMinerAccounts(10),
           {
             minBid: 10_000n,
@@ -118,8 +118,8 @@ describeIntegration('Cohort Bidder tests', () => {
         await bobBidder.start();
         await aliceBidder.start();
       },
-      async onBiddingEnd(cohortFrameId) {
-        console.log(`Cohort ${cohortFrameId} ended bidding`);
+      async onBiddingEnd(cohortStartingFrameId) {
+        console.log(`Cohort ${cohortStartingFrameId} ended bidding`);
         await aliceBidder.stop();
         await bobBidder.stop();
         waitForStopPromise();
@@ -154,11 +154,11 @@ describeIntegration('Cohort Bidder tests', () => {
 
     const aliceMiners = await alice.miningSeats();
     const aliceStats = aliceBidder!.stats;
-    const cohortFrameId = aliceBidder!.cohortStartingFrameId;
+    const cohortStartingFrameId = aliceBidder!.cohortStartingFrameId;
     const bobMiners = await bob.miningSeats();
     const bobStats = bobBidder!.stats;
 
-    console.log({ cohortFrameId, bobStats, aliceStats });
+    console.log({ cohortStartingFrameId, bobStats, aliceStats });
     console.log('bob', bobBidder!.bidHistory);
     console.log('alice', aliceBidder!.bidHistory);
 

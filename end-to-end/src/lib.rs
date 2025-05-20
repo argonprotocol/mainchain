@@ -172,10 +172,9 @@ pub(crate) mod utils {
 					&storage().mining_slot().account_index_lookup(&first_account),
 					FetchAt::Best,
 				)
-				.await?
-				.unwrap_or_default();
-			if account_index > 0 {
-				println!("Miner 1 registered at index {account_index}");
+				.await?;
+			if let Some((frame_id, index)) = account_index {
+				println!("Miner 1 registered at frame {}, index {}", frame_id, index);
 				break;
 			}
 			let registered_miners = client

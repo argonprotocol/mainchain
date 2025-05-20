@@ -30,14 +30,17 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static TicksBetweenSlots: u64 = 1;
+	pub static MinCohortSize: u32 = 5;
 	pub static MaxCohortSize: u32 = 5;
-	pub static MaxMiners: u32 = 10;
+	pub static FramesPerMiningTerm: u32 = 2;
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
 	pub static SlotBiddingStartAfterTicks: u64 = 3;
 	pub static TargetBidsPerSlot: u32 = 5;
 	pub static MinOwnershipBondAmount: Balance = 1;
 	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub static TargetPricePerSeat: Balance = 10 * 1_000_000; // 10 Argons
 
 	pub const BidIncrements: u128 = 10_000; // 1 cent
 
@@ -190,8 +193,11 @@ impl TickProvider<Block> for StaticTickProvider {
 impl pallet_mining_slot::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type MaxMiners = MaxMiners;
+	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
+	type FramesPerMiningTerm = FramesPerMiningTerm;
+	type TargetPricePerSeat = TargetPricePerSeat;
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
 	type MinimumArgonotsPerSeat = MinOwnershipBondAmount;
 	type MaximumArgonotProrataPercent = MaxOwnershipPercent;

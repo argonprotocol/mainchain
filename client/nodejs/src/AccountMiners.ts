@@ -182,7 +182,7 @@ export class AccountMiners {
     } = {},
   ) {
     const seats = await accountset.miningSeats(options.blockHash);
-    const registered = seats.filter(x => x.cohortFrameId !== undefined);
+    const registered = seats.filter(x => x.seat !== undefined);
     return new AccountMiners(accountset, registered as any, {
       shouldLog: options.shouldLog ?? false,
     });

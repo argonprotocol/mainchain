@@ -92,8 +92,8 @@ export class CohortBidder {
     let header = await client.rpc.chain.getHeader();
     while (true) {
       const api = await client.at(header.hash);
-      const cohortFrameId = await api.query.miningSlot.nextFrameId();
-      if (cohortFrameId.toNumber() === this.cohortStartingFrameId) {
+      const cohortStartingFrameId = await api.query.miningSlot.nextFrameId();
+      if (cohortStartingFrameId.toNumber() === this.cohortStartingFrameId) {
         break;
       }
       header = await client.rpc.chain.getHeader(header.parentHash);
@@ -104,7 +104,7 @@ export class CohortBidder {
 
     this.history.trackChange(bids, header.number.toNumber(), tick, true);
     console.log('Bidder stopped', {
-      cohortFrameId: this.cohortStartingFrameId,
+      cohortStartingFrameId: this.cohortStartingFrameId,
       blockNumber: header.number.toNumber(),
       tick,
       bids: bids.map(x => ({

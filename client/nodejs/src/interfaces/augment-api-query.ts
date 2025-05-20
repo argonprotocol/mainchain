@@ -802,22 +802,14 @@ declare module '@polkadot/api-base/types/storage' {
     };
     miningSlot: {
       /**
-       * Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
+       * Lookup by account id to the corresponding index in MinersByCohort and Authorities
        **/
       accountIndexLookup: AugmentedQuery<
         ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Option<u32>>,
-        [AccountId32]
-      >;
-      /**
-       * Miners that are active in the current block (post initialize)
-       **/
-      activeMinersByIndex: AugmentedQuery<
-        ApiType,
         (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<ArgonPrimitivesBlockSealMiningRegistration>>,
-        [u32]
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<ITuple<[u64, u32]>>>,
+        [AccountId32]
       >;
       activeMinersCount: AugmentedQuery<ApiType, () => Observable<u16>, []>;
       /**
@@ -826,6 +818,14 @@ declare module '@polkadot/api-base/types/storage' {
       argonotsPerMiningSeat: AugmentedQuery<
         ApiType,
         () => Observable<u128>,
+        []
+      >;
+      /**
+       * The average price per seat for the last 10 frames (newest first)
+       **/
+      averagePricePerSeat: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<u128>>,
         []
       >;
       /**
@@ -871,12 +871,22 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
-       * the miner and the block hash at time of activation.
+       * Miners that are active in the current block (post initialize) by their starting frame
        **/
-      minerXorKeyByIndex: AugmentedQuery<
+      minersByCohort: AugmentedQuery<
         ApiType,
-        () => Observable<BTreeMap<u32, U256>>,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
+        [u64]
+      >;
+      /**
+       * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
+       * id and the block hash at time of activation.
+       **/
+      minerXorKeysByCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, Vec<U256>>>,
         []
       >;
       /**
@@ -887,6 +897,10 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>,
         []
       >;
+      /**
+       * The number of allow miners to bid for the next mining cohort
+       **/
+      nextCohortSize: AugmentedQuery<ApiType, () => Observable<u32>, []>;
       /**
        * The next frameId. A frame in argon is the 24 hours between the start of two different mining
        * cohorts.

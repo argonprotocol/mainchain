@@ -1364,10 +1364,10 @@ pub mod api {
 						"get_authority_id",
 						types::GetAuthorityId { account_id },
 						[
-							77u8, 76u8, 252u8, 255u8, 70u8, 110u8, 251u8, 108u8, 92u8, 141u8, 6u8,
-							122u8, 191u8, 248u8, 214u8, 19u8, 136u8, 46u8, 207u8, 152u8, 27u8,
-							241u8, 131u8, 117u8, 28u8, 251u8, 178u8, 207u8, 247u8, 136u8, 204u8,
-							164u8,
+							189u8, 50u8, 2u8, 246u8, 8u8, 119u8, 203u8, 134u8, 51u8, 10u8, 130u8,
+							16u8, 161u8, 179u8, 77u8, 46u8, 125u8, 73u8, 253u8, 228u8, 114u8,
+							223u8, 157u8, 38u8, 183u8, 140u8, 222u8, 186u8, 235u8, 34u8, 147u8,
+							171u8,
 						],
 					)
 				}
@@ -3872,9 +3872,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				90u8, 145u8, 218u8, 156u8, 51u8, 70u8, 8u8, 14u8, 118u8, 37u8, 169u8, 173u8, 50u8,
-				18u8, 1u8, 235u8, 155u8, 52u8, 251u8, 44u8, 141u8, 161u8, 228u8, 57u8, 215u8,
-				112u8, 142u8, 66u8, 29u8, 116u8, 98u8, 226u8,
+				141u8, 74u8, 45u8, 148u8, 248u8, 58u8, 98u8, 159u8, 34u8, 243u8, 146u8, 24u8, 51u8,
+				230u8, 94u8, 158u8, 177u8, 236u8, 58u8, 149u8, 13u8, 158u8, 31u8, 238u8, 218u8,
+				255u8, 178u8, 7u8, 196u8, 175u8, 96u8, 254u8,
 			]
 	}
 	pub mod system {
@@ -5025,9 +5025,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							214u8, 126u8, 170u8, 217u8, 224u8, 130u8, 214u8, 158u8, 35u8, 186u8,
-							12u8, 248u8, 230u8, 152u8, 134u8, 177u8, 27u8, 10u8, 32u8, 177u8, 25u8,
-							79u8, 22u8, 201u8, 16u8, 243u8, 186u8, 33u8, 227u8, 69u8, 17u8, 139u8,
+							69u8, 184u8, 196u8, 29u8, 177u8, 247u8, 51u8, 156u8, 207u8, 217u8,
+							174u8, 125u8, 147u8, 226u8, 44u8, 9u8, 125u8, 192u8, 254u8, 68u8,
+							135u8, 148u8, 20u8, 117u8, 62u8, 159u8, 75u8, 18u8, 121u8, 39u8, 69u8,
+							203u8,
 						],
 					)
 				}
@@ -7806,14 +7807,12 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct NewMiners {
-				pub start_index: new_miners::StartIndex,
 				pub new_miners: new_miners::NewMiners,
 				pub released_miners: new_miners::ReleasedMiners,
 				pub frame_id: new_miners::FrameId,
 			}
 			pub mod new_miners {
 				use super::runtime_types;
-				pub type StartIndex = ::core::primitive::u32;
 				pub type NewMiners = runtime_types::bounded_collections::bounded_vec::BoundedVec<
 					runtime_types::argon_primitives::block_seal::MiningRegistration<
 						crate::types::AccountId32,
@@ -7986,26 +7985,30 @@ pub mod api {
 					use super::runtime_types;
 					pub type HasAddedGrandpaRotation = ::core::primitive::bool;
 				}
-				pub mod active_miners_by_index {
+				pub mod miners_by_cohort {
 					use super::runtime_types;
-					pub type ActiveMinersByIndex =
-						runtime_types::argon_primitives::block_seal::MiningRegistration<
-							crate::types::AccountId32,
-							::core::primitive::u128,
-							runtime_types::argon_runtime::SessionKeys,
+					pub type MinersByCohort =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::argon_primitives::block_seal::MiningRegistration<
+								crate::types::AccountId32,
+								::core::primitive::u128,
+								runtime_types::argon_runtime::SessionKeys,
+							>,
 						>;
-					pub type Param0 = ::core::primitive::u32;
+					pub type Param0 = ::core::primitive::u64;
 				}
 				pub mod active_miners_count {
 					use super::runtime_types;
 					pub type ActiveMinersCount = ::core::primitive::u16;
 				}
-				pub mod miner_xor_key_by_index {
+				pub mod miner_xor_keys_by_cohort {
 					use super::runtime_types;
-					pub type MinerXorKeyByIndex =
+					pub type MinerXorKeysByCohort =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
-							::core::primitive::u32,
-							runtime_types::primitive_types::U256,
+							::core::primitive::u64,
+							runtime_types::bounded_collections::bounded_vec::BoundedVec<
+								runtime_types::primitive_types::U256,
+							>,
 						>;
 				}
 				pub mod argonots_per_mining_seat {
@@ -8014,7 +8017,7 @@ pub mod api {
 				}
 				pub mod account_index_lookup {
 					use super::runtime_types;
-					pub type AccountIndexLookup = ::core::primitive::u32;
+					pub type AccountIndexLookup = (::core::primitive::u64, ::core::primitive::u32);
 					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod bids_for_next_slot_cohort {
@@ -8051,6 +8054,13 @@ pub mod api {
 							runtime_types::argon_primitives::block_seal::MiningBidStats,
 						>;
 				}
+				pub mod average_price_per_seat {
+					use super::runtime_types;
+					pub type AveragePricePerSeat =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u128,
+						>;
+				}
 				pub mod mining_config {
 					use super::runtime_types;
 					pub type MiningConfig =
@@ -8059,6 +8069,10 @@ pub mod api {
 				pub mod next_frame_id {
 					use super::runtime_types;
 					pub type NextFrameId = ::core::primitive::u64;
+				}
+				pub mod next_cohort_size {
+					use super::runtime_types;
+					pub type NextCohortSize = ::core::primitive::u32;
 				}
 				pub mod did_start_new_cohort {
 					use super::runtime_types;
@@ -8095,52 +8109,52 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Miners that are active in the current block (post initialize)"]
-				pub fn active_miners_by_index_iter(
+				#[doc = " Miners that are active in the current block (post initialize) by their starting frame"]
+				pub fn miners_by_cohort_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::active_miners_by_index::ActiveMinersByIndex,
+					types::miners_by_cohort::MinersByCohort,
 					(),
-					(),
+					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"ActiveMinersByIndex",
+						"MinersByCohort",
 						(),
 						[
-							95u8, 172u8, 157u8, 135u8, 62u8, 201u8, 219u8, 116u8, 115u8, 162u8,
-							136u8, 148u8, 175u8, 229u8, 183u8, 15u8, 25u8, 148u8, 251u8, 17u8,
-							80u8, 199u8, 86u8, 2u8, 212u8, 75u8, 251u8, 38u8, 59u8, 219u8, 153u8,
-							214u8,
+							208u8, 231u8, 84u8, 224u8, 126u8, 231u8, 164u8, 44u8, 144u8, 46u8,
+							160u8, 242u8, 237u8, 72u8, 212u8, 137u8, 20u8, 201u8, 145u8, 143u8,
+							54u8, 231u8, 71u8, 10u8, 224u8, 78u8, 140u8, 143u8, 209u8, 231u8, 70u8,
+							167u8,
 						],
 					)
 				}
-				#[doc = " Miners that are active in the current block (post initialize)"]
-				pub fn active_miners_by_index(
+				#[doc = " Miners that are active in the current block (post initialize) by their starting frame"]
+				pub fn miners_by_cohort(
 					&self,
-					_0: impl ::core::borrow::Borrow<types::active_miners_by_index::Param0>,
+					_0: impl ::core::borrow::Borrow<types::miners_by_cohort::Param0>,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::active_miners_by_index::Param0,
+						types::miners_by_cohort::Param0,
 					>,
-					types::active_miners_by_index::ActiveMinersByIndex,
+					types::miners_by_cohort::MinersByCohort,
 					::subxt::ext::subxt_core::utils::Yes,
-					(),
+					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"ActiveMinersByIndex",
+						"MinersByCohort",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(
 							_0.borrow(),
 						),
 						[
-							95u8, 172u8, 157u8, 135u8, 62u8, 201u8, 219u8, 116u8, 115u8, 162u8,
-							136u8, 148u8, 175u8, 229u8, 183u8, 15u8, 25u8, 148u8, 251u8, 17u8,
-							80u8, 199u8, 86u8, 2u8, 212u8, 75u8, 251u8, 38u8, 59u8, 219u8, 153u8,
-							214u8,
+							208u8, 231u8, 84u8, 224u8, 126u8, 231u8, 164u8, 44u8, 144u8, 46u8,
+							160u8, 242u8, 237u8, 72u8, 212u8, 137u8, 20u8, 201u8, 145u8, 143u8,
+							54u8, 231u8, 71u8, 10u8, 224u8, 78u8, 140u8, 143u8, 209u8, 231u8, 70u8,
+							167u8,
 						],
 					)
 				}
@@ -8164,25 +8178,25 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of"]
-				#[doc = " the miner and the block hash at time of activation."]
-				pub fn miner_xor_key_by_index(
+				#[doc = " This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account"]
+				#[doc = " id and the block hash at time of activation."]
+				pub fn miner_xor_keys_by_cohort(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::miner_xor_key_by_index::MinerXorKeyByIndex,
+					types::miner_xor_keys_by_cohort::MinerXorKeysByCohort,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MinerXorKeyByIndex",
+						"MinerXorKeysByCohort",
 						(),
 						[
-							10u8, 27u8, 38u8, 201u8, 106u8, 161u8, 185u8, 204u8, 210u8, 71u8, 63u8,
-							188u8, 30u8, 7u8, 107u8, 201u8, 82u8, 43u8, 100u8, 90u8, 217u8, 152u8,
-							161u8, 253u8, 236u8, 131u8, 16u8, 128u8, 129u8, 153u8, 8u8, 125u8,
+							127u8, 228u8, 113u8, 145u8, 59u8, 26u8, 118u8, 230u8, 78u8, 93u8,
+							163u8, 148u8, 88u8, 78u8, 34u8, 9u8, 245u8, 209u8, 41u8, 193u8, 133u8,
+							54u8, 254u8, 11u8, 62u8, 31u8, 66u8, 247u8, 112u8, 128u8, 237u8, 168u8,
 						],
 					)
 				}
@@ -8208,7 +8222,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities"]
+				#[doc = " Lookup by account id to the corresponding index in MinersByCohort and Authorities"]
 				pub fn account_index_lookup_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -8223,14 +8237,14 @@ pub mod api {
 						"AccountIndexLookup",
 						(),
 						[
-							203u8, 195u8, 115u8, 185u8, 125u8, 36u8, 9u8, 40u8, 68u8, 9u8, 52u8,
-							60u8, 181u8, 139u8, 145u8, 41u8, 100u8, 62u8, 237u8, 172u8, 108u8,
-							227u8, 106u8, 161u8, 59u8, 110u8, 244u8, 142u8, 80u8, 147u8, 188u8,
-							190u8,
+							41u8, 54u8, 141u8, 143u8, 18u8, 93u8, 134u8, 22u8, 24u8, 123u8, 210u8,
+							108u8, 201u8, 193u8, 220u8, 66u8, 119u8, 155u8, 218u8, 127u8, 130u8,
+							248u8, 160u8, 49u8, 250u8, 167u8, 253u8, 43u8, 146u8, 210u8, 167u8,
+							130u8,
 						],
 					)
 				}
-				#[doc = " Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities"]
+				#[doc = " Lookup by account id to the corresponding index in MinersByCohort and Authorities"]
 				pub fn account_index_lookup(
 					&self,
 					_0: impl ::core::borrow::Borrow<types::account_index_lookup::Param0>,
@@ -8250,10 +8264,10 @@ pub mod api {
 							_0.borrow(),
 						),
 						[
-							203u8, 195u8, 115u8, 185u8, 125u8, 36u8, 9u8, 40u8, 68u8, 9u8, 52u8,
-							60u8, 181u8, 139u8, 145u8, 41u8, 100u8, 62u8, 237u8, 172u8, 108u8,
-							227u8, 106u8, 161u8, 59u8, 110u8, 244u8, 142u8, 80u8, 147u8, 188u8,
-							190u8,
+							41u8, 54u8, 141u8, 143u8, 18u8, 93u8, 134u8, 22u8, 24u8, 123u8, 210u8,
+							108u8, 201u8, 193u8, 220u8, 66u8, 119u8, 155u8, 218u8, 127u8, 130u8,
+							248u8, 160u8, 49u8, 250u8, 167u8, 253u8, 43u8, 146u8, 210u8, 167u8,
+							130u8,
 						],
 					)
 				}
@@ -8342,6 +8356,28 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The average price per seat for the last 10 frames (newest first)"]
+				pub fn average_price_per_seat(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::average_price_per_seat::AveragePricePerSeat,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"AveragePricePerSeat",
+						(),
+						[
+							77u8, 221u8, 232u8, 161u8, 85u8, 229u8, 11u8, 172u8, 59u8, 220u8,
+							206u8, 69u8, 211u8, 116u8, 85u8, 171u8, 232u8, 20u8, 234u8, 102u8,
+							193u8, 11u8, 53u8, 56u8, 211u8, 1u8, 149u8, 243u8, 186u8, 145u8, 134u8,
+							145u8,
+						],
+					)
+				}
 				#[doc = " The mining slot configuration set in genesis"]
 				pub fn mining_config(
 					&self,
@@ -8382,6 +8418,28 @@ pub mod api {
 							204u8, 139u8, 40u8, 5u8, 151u8, 145u8, 33u8, 38u8, 204u8, 140u8, 164u8,
 							200u8, 212u8, 170u8, 144u8, 68u8, 92u8, 165u8, 46u8, 76u8, 80u8, 5u8,
 							246u8, 140u8, 245u8, 10u8, 115u8, 251u8, 115u8, 49u8, 163u8, 106u8,
+						],
+					)
+				}
+				#[doc = " The number of allow miners to bid for the next mining cohort"]
+				pub fn next_cohort_size(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_cohort_size::NextCohortSize,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"NextCohortSize",
+						(),
+						[
+							251u8, 123u8, 253u8, 211u8, 14u8, 73u8, 99u8, 145u8, 150u8, 120u8,
+							62u8, 42u8, 200u8, 212u8, 209u8, 190u8, 54u8, 46u8, 243u8, 177u8,
+							158u8, 110u8, 109u8, 200u8, 237u8, 218u8, 163u8, 64u8, 163u8, 210u8,
+							102u8, 114u8,
 						],
 					)
 				}
@@ -8433,15 +8491,15 @@ pub mod api {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " The maximum number of Miners that the pallet can hold."]
-				pub fn max_miners(
+				#[doc = " The number of frames a miner operates for"]
+				pub fn frames_per_mining_term(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MaxMiners",
+						"FramesPerMiningTerm",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -8450,7 +8508,25 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " How many new miners can be in the cohort for each slot"]
+				#[doc = " The minimum number of miners per cohort"]
+				pub fn min_cohort_size(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningSlot",
+						"MinCohortSize",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " How many new miners can be in the cohort for each slot. The actual maximum will adjust"]
+				#[doc = " dynamically"]
 				pub fn max_cohort_size(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -8467,7 +8543,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The max percent swing for the argonots per slot (from the last percent"]
+				#[doc = " The max percent swing for the argonots per slot (from the last percent)"]
 				pub fn argonots_percent_adjustment_damper(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -8533,6 +8609,39 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " The target price per seat."]
+				pub fn target_price_per_seat(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningSlot",
+						"TargetPricePerSeat",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The damper on the price per seat adjustment (from the last price)"]
+				pub fn price_per_seat_adjustment_damper(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::fixed_point::FixedU128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"MiningSlot",
+						"PricePerSeatAdjustmentDamper",
+						[
+							62u8, 145u8, 102u8, 227u8, 159u8, 92u8, 27u8, 54u8, 159u8, 228u8,
+							193u8, 99u8, 75u8, 196u8, 26u8, 250u8, 229u8, 230u8, 88u8, 109u8,
+							246u8, 100u8, 152u8, 158u8, 14u8, 25u8, 224u8, 173u8, 224u8, 41u8,
+							105u8, 231u8,
 						],
 					)
 				}
@@ -23799,8 +23908,7 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct MiningAuthority<_0, _1> {
-					#[codec(compact)]
-					pub authority_index: ::core::primitive::u32,
+					pub authority_index: (::core::primitive::u64, ::core::primitive::u32),
 					pub authority_id: _0,
 					pub account_id: _1,
 				}
@@ -29201,7 +29309,6 @@ pub mod api {
 				pub enum Event {
 					#[codec(index = 0)]
 					NewMiners {
-						start_index: ::core::primitive::u32,
 						new_miners: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
 								crate::types::AccountId32,

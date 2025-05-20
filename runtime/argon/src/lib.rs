@@ -367,12 +367,15 @@ impl pallet_liquidity_pools::Config for Runtime {
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
-	type MaxMiners = MaxMiners;
+	type FramesPerMiningTerm = FramesPerMiningTerm;
+	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
 	type MinimumArgonotsPerSeat = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
 	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type TargetPricePerSeat = TargetPricePerSeat;
+	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
@@ -401,7 +404,7 @@ impl pallet_block_seal::Config for Runtime {
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type MaxAuthorities = MaxMiners;
+	type MaxAuthorities = MaxGrandpas;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
 	type KeyOwnerProof = sp_core::Void;

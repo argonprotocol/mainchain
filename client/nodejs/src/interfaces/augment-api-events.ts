@@ -888,13 +888,11 @@ declare module '@polkadot/api-base/types/events' {
       NewMiners: AugmentedEvent<
         ApiType,
         [
-          startIndex: u32,
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
           releasedMiners: u32,
           frameId: u64,
         ],
         {
-          startIndex: u32;
           newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
           releasedMiners: u32;
           frameId: u64;
