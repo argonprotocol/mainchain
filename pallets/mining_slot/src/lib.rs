@@ -26,17 +26,18 @@ pub mod migrations;
 pub mod weights;
 
 /// To register as a Slot 1+ miner, operators must `Bid` on a `Slot`. Each `Slot` allows a
-/// `Cohort` of miners to operate for a given number of ticks (the `MiningWindow`).
+/// `Cohort` of miners to operate for a given number of `Frames` (the period between bidding start,
+/// and the start of mining). The frames that a miner operates in are determined by
+/// `config.FramesPerMiningTerm`.
 ///
 /// New miner slots are rotated in every `mining_config.ticks_between_slots` ticks. Each cohort
-/// will have `MaxCohortSize` members. A maximum of `MaxMiners` will be active at any given time.
+/// will have `NextCohortSize` members, a number that can be a min of `config.MinCohortSize` and a
+/// max of `config.MaxCohortSize`. A maximum of `MaxMiners` will be active at any given time.
 ///
-/// When a new Slot begins, the Miners with the corresponding Slot Indices will be replaced with
-/// the new cohort members (or emptied out). A Slot Index is similar to a Mining "Seat", but
-/// 0-based.
+/// When a new Slot begins, the Miners from `config.FramesPerMiningTerm` will be retired.
 ///
-/// To be eligible for mining, you must reserve a percent of the total supply of argonots (ownership
-/// tokens). The percent is configured to aim for `TargetBidsPerSlot`, with a
+/// To be eligible for mining, you must reserve a percentage of the argonot issuance (ownership
+/// tokens). The percentage is configured to aim for `TargetBidsPerSlot`, with a
 /// maximum change in ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper`
 /// (NOTE: this percent is the max increase or reduction in the amount of ownership issued).
 ///
@@ -82,16 +83,21 @@ pub mod pallet {
 			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
-		/// The maximum number of Miners that the pallet can hold.
+		/// The number of frames a miner operates for
 		#[pallet::constant]
-		type MaxMiners: Get<u32>;
-		/// How many new miners can be in the cohort for each slot
+		type FramesPerMiningTerm: Get<u32>;
+		/// The minimum number of miners per cohort
+		#[pallet::constant]
+		type MinCohortSize: Get<u32>;
+		/// How many new miners can be in the cohort for each slot. The actual maximum will adjust
+		/// dynamically
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
 
-		/// The max percent swing for the argonots per slot (from the last percent
+		/// The max percent swing for the argonots per slot (from the last percent)
 		#[pallet::constant]
 		type ArgonotsPercentAdjustmentDamper: Get<FixedU128>;
+
 		/// The minimum argonots needed per seat
 		#[pallet::constant]
 		type MinimumArgonotsPerSeat: Get<Self::Balance>;
@@ -105,6 +111,14 @@ pub mod pallet {
 		/// down to ensure mining slots are filled.
 		#[pallet::constant]
 		type TargetBidsPerSlot: Get<u32>;
+
+		/// The target price per seat.
+		#[pallet::constant]
+		type TargetPricePerSeat: Get<Self::Balance>;
+
+		/// The damper on the price per seat adjustment (from the last price)
+		#[pallet::constant]
+		type PricePerSeatAdjustmentDamper: Get<FixedU128>;
 
 		/// The balance type
 		type Balance: AtLeast32BitUnsigned
@@ -162,24 +176,33 @@ pub mod pallet {
 	#[pallet::storage]
 	pub(super) type HasAddedGrandpaRotation<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	/// Miners that are active in the current block (post initialize)
+	/// Miners that are active in the current block (post initialize) by their starting frame
 	#[pallet::storage]
-	pub(super) type ActiveMinersByIndex<T: Config> =
-		StorageMap<_, Blake2_128Concat, MinerIndex, Registration<T>, OptionQuery>;
+	pub(super) type MinersByCohort<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		FrameId,
+		BoundedVec<Registration<T>, T::MaxCohortSize>,
+		ValueQuery,
+	>;
+
 	#[pallet::storage]
 	pub(super) type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
-	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the account id of
-	/// the miner and the block hash at time of activation.
+	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
+	/// id and the block hash at time of activation.
 	#[pallet::storage]
-	pub(super) type MinerXorKeyByIndex<T: Config> =
-		StorageValue<_, BoundedBTreeMap<MinerIndex, U256, T::MaxMiners>, ValueQuery>;
+	pub(super) type MinerXorKeysByCohort<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<FrameId, BoundedVec<U256, T::MaxCohortSize>, T::FramesPerMiningTerm>,
+		ValueQuery,
+	>;
 
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
 	pub(super) type ArgonotsPerMiningSeat<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
-	/// Lookup by account id to the corresponding index in ActiveMinersByIndex and Authorities
+	/// Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
 	#[pallet::storage]
 	pub(super) type AccountIndexLookup<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, MinerIndex, OptionQuery>;
@@ -207,6 +230,11 @@ pub mod pallet {
 	pub(super) type HistoricalBidsPerSlot<T: Config> =
 		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
 
+	/// The average price per seat for the last 10 frames (newest first)
+	#[pallet::storage]
+	pub(super) type AveragePricePerSeat<T: Config> =
+		StorageValue<_, BoundedVec<T::Balance, ConstU32<10>>, ValueQuery>;
+
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
 	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
@@ -215,6 +243,10 @@ pub mod pallet {
 	/// cohorts.
 	#[pallet::storage]
 	pub(super) type NextFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
+
+	/// The number of allow miners to bid for the next mining cohort
+	#[pallet::storage]
+	pub(super) type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	/// Did this block activate a new frame
 	#[pallet::storage]
@@ -242,6 +274,7 @@ pub mod pallet {
 			MiningConfig::<T>::put(self.mining_config.clone());
 			ArgonotsPerMiningSeat::<T>::put(T::MinimumArgonotsPerSeat::get());
 			NextFrameId::<T>::put(1);
+			NextCohortSize::<T>::put(T::MinCohortSize::get());
 		}
 	}
 
@@ -249,10 +282,9 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		NewMiners {
-			start_index: MinerIndex,
 			new_miners: BoundedVec<Registration<T>, T::MaxCohortSize>,
 			released_miners: u32,
-			cohort_frame_id: FrameId,
+			frame_id: FrameId,
 		},
 		SlotBidderAdded {
 			account_id: T::AccountId,
@@ -274,7 +306,7 @@ pub mod pallet {
 		},
 		/// Bids are closed due to the VRF randomized function triggering
 		MiningBidsClosed {
-			cohort_frame_id: FrameId,
+			frame_id: FrameId,
 		},
 		ReleaseBidError {
 			account_id: T::AccountId,
@@ -343,6 +375,8 @@ pub mod pallet {
 				log::trace!("Starting Slot {}", next_frame_id);
 				Self::adjust_argonots_per_seat();
 				Self::start_new_frame(calculated_frame_id);
+				// we use the current price as part of calculations
+				Self::adjust_number_of_seats();
 				// new slot will rotate grandpas. Return so we don't do it again below
 				return;
 			}
@@ -403,10 +437,10 @@ pub mod pallet {
 			let current_registration = Self::get_active_registration(&miner_account_id);
 			let next_frame_id = NextFrameId::<T>::get();
 			if let Some(ref registration) = current_registration {
-				let cohorts = T::MaxMiners::get() / T::MaxCohortSize::get();
+				let frames = T::FramesPerMiningTerm::get() as FrameId;
 				// ensure we are not overlapping sessions
 				ensure!(
-					registration.cohort_frame_id + cohorts as FrameId == next_frame_id,
+					registration.starting_frame_id + frames == next_frame_id,
 					Error::<T>::CannotRegisterOverlappingSessions
 				);
 			}
@@ -433,8 +467,9 @@ pub mod pallet {
 					})
 					.unwrap_or_else(|pos| pos);
 
-				if cohort.is_full() {
-					ensure!(pos < T::MaxCohortSize::get() as usize, Error::<T>::BidTooLow);
+				let next_cohort_size = NextCohortSize::<T>::get() as usize;
+				if cohort.len() >= next_cohort_size {
+					ensure!(pos < next_cohort_size, Error::<T>::BidTooLow);
 					// need to pop-off the lowest bid
 					let entry = cohort.pop().expect("should exist, just checked");
 					Self::release_failed_bid(&entry)?;
@@ -453,7 +488,7 @@ pub mod pallet {
 							bid,
 							argonots: ownership_tokens,
 							authority_keys: keys,
-							cohort_frame_id: next_frame_id,
+							starting_frame_id: next_frame_id,
 							bid_at_tick: T::TickProvider::current_tick(),
 						},
 					)
@@ -527,18 +562,20 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	fn get_block_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, FrameId)> {
 		let released_miners = ReleasedMinersByAccountId::<T>::get();
 		if let Some(x) = released_miners.get(author) {
-			return Some((x.rewards_account(), x.cohort_frame_id))
+			return Some((x.rewards_account(), x.starting_frame_id))
 		}
 
 		let registration = Self::get_active_registration(author)?;
-		Some((registration.rewards_account(), registration.cohort_frame_id))
+		Some((registration.rewards_account(), registration.starting_frame_id))
 	}
 
 	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, FrameId)> {
 		let mut result = vec![];
-		for (_, registration) in <ActiveMinersByIndex<T>>::iter() {
-			let account = registration.rewards_account();
-			result.push((account, registration.cohort_frame_id));
+		for (_, cohort) in <MinersByCohort<T>>::iter() {
+			for registration in cohort {
+				let account = registration.rewards_account();
+				result.push((account, registration.starting_frame_id));
+			}
 		}
 		result
 	}
@@ -561,9 +598,20 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 	fn xor_closest_authority(
 		seal_proof: U256,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let closest = find_xor_closest(<MinerXorKeyByIndex<T>>::get(), seal_proof)?;
+		let xor_keys = <MinerXorKeysByCohort<T>>::get();
+		let mut closest_distance: U256 = U256::MAX;
+		let mut closest = None;
+		for (frame_id, cohort) in xor_keys {
+			for (i, peer_hash) in cohort.into_iter().enumerate() {
+				let distance = seal_proof ^ peer_hash;
+				if distance < closest_distance {
+					closest_distance = distance;
+					closest = Some((frame_id, i as u32));
+				}
+			}
+		}
 
-		Self::get_mining_authority_by_index(closest)
+		Self::get_mining_authority_by_index(closest?)
 	}
 }
 
@@ -586,7 +634,7 @@ impl<T: Config> Pallet<T> {
 	pub fn get_mining_authority_by_index(
 		index: MinerIndex,
 	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let miner = ActiveMinersByIndex::<T>::get(index)?;
+		let miner = Self::get_miner_by_index(index)?;
 		miner
 			.authority_keys
 			.get(T::MiningAuthorityId::ID)
@@ -597,10 +645,19 @@ impl<T: Config> Pallet<T> {
 			})
 	}
 
-	pub(crate) fn start_new_frame(frame_id: FrameId) {
-		let max_miners = T::MaxMiners::get();
-		let cohort_size = T::MaxCohortSize::get();
+	pub fn get_miner_by_index(index: MinerIndex) -> Option<Registration<T>> {
+		let cohort = MinersByCohort::<T>::get(index.0);
+		cohort.get(index.1 as usize).cloned()
+	}
 
+	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
+		if let Some(index) = AccountIndexLookup::<T>::get(account_id) {
+			return Self::get_miner_by_index(index);
+		}
+		None
+	}
+
+	pub(crate) fn start_new_frame(frame_id: FrameId) {
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
 			if bids.is_full() {
 				bids.pop();
@@ -608,61 +665,71 @@ impl<T: Config> Pallet<T> {
 			let _ = bids.try_insert(0, MiningBidStats::default());
 		});
 
-		let start_index_to_replace_miners =
-			Self::get_slot_starting_index(frame_id, max_miners, cohort_size);
-
 		let slot_cohort = BidsForNextSlotCohort::<T>::take();
 
 		IsNextSlotBiddingOpen::<T>::put(true);
 
 		let mut active_miners = ActiveMinersCount::<T>::get();
-		let mut miner_xor_by_index = MinerXorKeyByIndex::<T>::get();
 		let mut added_miners = vec![];
 		let mut removed_miners = vec![];
 		let mut released_miners_by_account_id = BoundedBTreeMap::new();
 
 		let parent_hash: T::Hash = frame_system::Pallet::<T>::parent_hash();
 
-		for i in 0..cohort_size {
-			let index = i + start_index_to_replace_miners;
+		let frames_per_term = T::FramesPerMiningTerm::get() as FrameId;
 
-			miner_xor_by_index.remove(&index);
-			if let Some(entry) = ActiveMinersByIndex::<T>::take(index) {
-				let account_id = entry.account_id.clone();
+		if frame_id >= frames_per_term {
+			let retiring_frame_id = frame_id - frames_per_term;
+			let rotating_out = MinersByCohort::<T>::take(retiring_frame_id);
+			MinerXorKeysByCohort::<T>::mutate(|a| a.remove(&retiring_frame_id));
+			for miner in rotating_out {
+				let account_id = miner.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
 				active_miners -= 1;
-
-				let registered_for_next = slot_cohort.iter().any(|x| x.account_id == account_id);
-				let _ = released_miners_by_account_id.try_insert(account_id.clone(), entry.clone());
-				removed_miners.push((account_id, entry.authority_keys.clone()));
-				Self::release_mining_seat_obligations(&entry, registered_for_next);
+				let _ = released_miners_by_account_id.try_insert(account_id.clone(), miner.clone());
+				removed_miners.push((account_id, miner.authority_keys.clone()));
+				Self::release_mining_seat_obligations(&miner, false);
 			}
 		}
 
 		// After all accounts are removed, we can add the new cohort members (otherwise, we can add
 		// and then remove after if sorted differently with same account)
+		MinersByCohort::<T>::insert(frame_id, slot_cohort.clone());
+
+		let mut total_price_per_seat = T::Balance::zero();
 		for (i, entry) in slot_cohort.iter().enumerate() {
-			let index = i as u32 + start_index_to_replace_miners;
-			AccountIndexLookup::<T>::insert(&entry.account_id, index);
-			ActiveMinersByIndex::<T>::insert(index, entry.clone());
+			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
-
+			total_price_per_seat += entry.bid;
 			let hash =
 				MinerXor::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
 					.using_encoded(blake2_256);
-			miner_xor_by_index
-				.try_insert(index, U256::from_big_endian(&hash))
-				.expect("safe because we removed in pass 1");
-		}
 
-		<MinerXorKeyByIndex<T>>::put(miner_xor_by_index);
+			MinerXorKeysByCohort::<T>::mutate(|a| {
+				if !a.contains_key(&frame_id) {
+					let _ = a.try_insert(frame_id, BoundedVec::default());
+				}
+				let a = a.get_mut(&frame_id).expect("should exist, just checked");
+				a.try_push(U256::from_big_endian(&hash))
+					.expect("should not fail, just checked size")
+			});
+		}
+		let average_price_per_seat = total_price_per_seat
+			.checked_div(&T::Balance::from(slot_cohort.len() as u32))
+			.unwrap_or_default();
+		AveragePricePerSeat::<T>::mutate(|a| {
+			if a.is_full() {
+				a.pop();
+			}
+			let _ = a.try_insert(0, average_price_per_seat);
+		});
+
 		ActiveMinersCount::<T>::put(active_miners);
 		Pallet::<T>::deposit_event(Event::<T>::NewMiners {
-			start_index: start_index_to_replace_miners,
 			new_miners: slot_cohort,
 			released_miners: removed_miners.len() as u32,
-			cohort_frame_id: frame_id,
+			frame_id,
 		});
 
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
@@ -679,11 +746,11 @@ impl<T: Config> Pallet<T> {
 		T::SlotEvents::on_frame_start(frame_id);
 	}
 
-	/// Adjust the argonots per seat amount based on a rolling 10 slot average of bids.
+	/// Adjust the argonots per seat amount based on a rolling 10-frame average of bids.
 	///
 	/// This should be called before starting a new slot. It will adjust the argonots per seat
-	/// amount based on the number of bids in the last 10 slots to reach the target number of bids
-	/// per slot. The amount must also be adjusted based on the total ownership tokens in the
+	/// amount based on the number of bids in the last 10 frames to reach the target number of bids
+	/// per cohort. The amount must also be adjusted based on the total ownership tokens in the
 	/// network, which will increase in every block.
 	///
 	/// The max percent swing is 20% over the previous adjustment to the argonots per seat amount.
@@ -702,9 +769,9 @@ impl<T: Config> Pallet<T> {
 			return;
 		}
 
-		let base_ownership_tokens: u128 = ownership_circulation
-			.checked_div(T::MaxMiners::get().into())
-			.unwrap_or_default();
+		let current_max_miners = NextCohortSize::<T>::get() * T::FramesPerMiningTerm::get();
+		let base_ownership_tokens: u128 =
+			ownership_circulation.checked_div(current_max_miners.into()).unwrap_or_default();
 
 		let damper = T::ArgonotsPercentAdjustmentDamper::get();
 		let one = FixedU128::one();
@@ -718,7 +785,7 @@ impl<T: Config> Pallet<T> {
 		let current = ArgonotsPerMiningSeat::<T>::get();
 
 		let min_value = T::MinimumArgonotsPerSeat::get();
-		// don't let this go below the minimum (it is in beginning)
+		// don't let this go below the minimum (it is in the beginning)
 		let max_value: T::Balance = T::MaximumArgonotProrataPercent::get()
 			.mul_ceil(base_ownership_tokens)
 			.unique_saturated_into();
@@ -728,8 +795,39 @@ impl<T: Config> Pallet<T> {
 		} else if argonots_needed > max_value {
 			argonots_needed = max_value;
 		}
-
 		ArgonotsPerMiningSeat::<T>::put(argonots_needed.saturated_into::<T::Balance>());
+	}
+
+	/// Adjust the number of seats in the next cohort based on the average price per seat vs the
+	/// target price per seat.
+	///
+	/// Swings are dampened by the `PricePerSeatAdjustmentDamper` constant and in the range of
+	/// `MinCohortSize` => value <= `MaxCohortSize`.
+	pub(crate) fn adjust_number_of_seats() {
+		let price_target: u128 = T::TargetPricePerSeat::get().into();
+		let trailing_average_price = AveragePricePerSeat::<T>::get();
+		let prices = trailing_average_price.len() as u128;
+		let price_sum: u128 = trailing_average_price.into_iter().map(Into::into).sum();
+		let average_price = price_sum.checked_div(prices).unwrap_or_default();
+		let max_cohort_size = T::MaxCohortSize::get();
+		let min_cohort_size = T::MinCohortSize::get();
+		let damper = T::PricePerSeatAdjustmentDamper::get();
+		let one = FixedU128::one();
+		let adjustment_percent = FixedU128::from_rational(average_price, price_target)
+			.clamp(one.saturating_sub(damper), one.saturating_add(damper));
+
+		if adjustment_percent == FixedU128::one() {
+			return;
+		}
+		let mut next_cohort_size =
+			adjustment_percent.saturating_mul_int(NextCohortSize::<T>::get());
+		if next_cohort_size < min_cohort_size {
+			next_cohort_size = min_cohort_size;
+		} else if next_cohort_size > max_cohort_size {
+			next_cohort_size = max_cohort_size;
+		}
+
+		NextCohortSize::<T>::put(next_cohort_size);
 	}
 
 	/// Check if the current block is in the closing window for the next slot
@@ -739,7 +837,7 @@ impl<T: Config> Pallet<T> {
 	/// If VRF < threshold, then the auction will be ended
 	///
 	/// The random seal strength is used to ensure that the VRF is unique for each block:
-	///  - the block votes was submitted in a previous notebook
+	///  - the block vote was submitted in a previous notebook
 	///  - seal proof is the combination of the vote and the "voting key" (a hash of commit/reveal
 	///    nonces supplied by each notary for a given tick).
 	///  - this seal proof must be cryptographically secure and unique for each block for the
@@ -769,8 +867,8 @@ impl<T: Config> Pallet<T> {
 
 		if vote_seal_proof < threshold {
 			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
-			let cohort_frame_id = NextFrameId::<T>::get();
-			Self::deposit_event(Event::<T>::MiningBidsClosed { cohort_frame_id });
+			let frame_id = NextFrameId::<T>::get();
+			Self::deposit_event(Event::<T>::MiningBidsClosed { frame_id });
 			return true
 		}
 
@@ -791,10 +889,10 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn get_next_slot_tick() -> Tick {
-		Self::tick_for_slot(Self::next_cohort_frame_id())
+		Self::tick_for_frame(Self::next_frame_id())
 	}
 
-	pub fn next_cohort_frame_id() -> FrameId {
+	pub fn next_frame_id() -> FrameId {
 		NextFrameId::<T>::get()
 	}
 
@@ -814,37 +912,21 @@ impl<T: Config> Pallet<T> {
 		ticks_since_mining_start / mining_config.ticks_between_slots
 	}
 
-	pub fn tick_for_slot(cohort_frame_id: FrameId) -> Tick {
-		if cohort_frame_id == 0 {
+	pub fn tick_for_frame(frame_id: FrameId) -> Tick {
+		if frame_id == 0 {
 			// return genesis tick for slot 0
 			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks())
 		}
 		let slot_1_tick = Self::slot_1_tick();
-		let added_ticks = (cohort_frame_id - 1) * Self::ticks_between_slots();
+		let added_ticks = (frame_id - 1) * Self::ticks_between_slots();
 		slot_1_tick.saturating_add(added_ticks)
 	}
 
-	pub(crate) fn get_slot_starting_index(
-		cohort_frame_id: FrameId,
-		max_miners: u32,
-		cohort_size: u32,
-	) -> u32 {
-		(cohort_frame_id as u32 * cohort_size) % max_miners
-	}
-
 	pub fn get_mining_window_ticks() -> Tick {
-		let miners = T::MaxMiners::get() as u64;
 		let ticks_between_slots = Self::ticks_between_slots();
-		let cohort_size = T::MaxCohortSize::get() as u64;
+		let term_frames = T::FramesPerMiningTerm::get() as Tick;
 
-		miners.saturating_mul(ticks_between_slots) / cohort_size
-	}
-
-	pub(crate) fn get_active_registration(account_id: &T::AccountId) -> Option<Registration<T>> {
-		if let Some(index) = AccountIndexLookup::<T>::get(account_id) {
-			return ActiveMinersByIndex::<T>::get(index);
-		}
-		None
+		term_frames.saturating_mul(ticks_between_slots)
 	}
 
 	pub(crate) fn get_pending_cohort_registration(
@@ -1051,22 +1133,6 @@ impl<T: Config> BlockSealEventHandler for Pallet<T> {
 			}
 		}
 	}
-}
-
-pub fn find_xor_closest<I>(authorities: I, hash: U256) -> Option<MinerIndex>
-where
-	I: IntoIterator<Item = (MinerIndex, U256)>,
-{
-	let mut closest_distance: U256 = U256::MAX;
-	let mut closest = None;
-	for (index, peer_hash) in authorities.into_iter() {
-		let distance = hash ^ peer_hash;
-		if distance < closest_distance {
-			closest_distance = distance;
-			closest = Some(index);
-		}
-	}
-	closest
 }
 
 impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {

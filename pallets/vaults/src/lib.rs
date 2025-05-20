@@ -748,7 +748,7 @@ pub mod pallet {
 			let current_frame_id = T::CurrentFrameId::get();
 			PerFrameFeeRevenueByVault::<T>::mutate(vault_id, |x| {
 				let mut needs_insert = false;
-				if let Some(existing) = x.get(0) {
+				if let Some(existing) = x.first() {
 					if existing.frame_id != current_frame_id {
 						if x.is_full() {
 							x.pop();

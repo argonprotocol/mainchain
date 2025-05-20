@@ -185,7 +185,7 @@ declare module '@polkadot/api-base/types/consts' {
     };
     miningSlot: {
       /**
-       * The max percent swing for the argonots per slot (from the last percent
+       * The max percent swing for the argonots per slot (from the last percent)
        **/
       argonotsPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
@@ -193,7 +193,12 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       bidIncrements: u128 & AugmentedConst<ApiType>;
       /**
-       * How many new miners can be in the cohort for each slot
+       * The number of frames a miner operates for
+       **/
+      framesPerMiningTerm: u32 & AugmentedConst<ApiType>;
+      /**
+       * How many new miners can be in the cohort for each slot. The actual maximum will adjust
+       * dynamically
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
       /**
@@ -202,18 +207,26 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maximumArgonotProrataPercent: Percent & AugmentedConst<ApiType>;
       /**
-       * The maximum number of Miners that the pallet can hold.
+       * The minimum number of miners per cohort
        **/
-      maxMiners: u32 & AugmentedConst<ApiType>;
+      minCohortSize: u32 & AugmentedConst<ApiType>;
       /**
        * The minimum argonots needed per seat
        **/
       minimumArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
       /**
+       * The damper on the price per seat adjustment (from the last price)
+       **/
+      pricePerSeatAdjustmentDamper: u128 & AugmentedConst<ApiType>;
+      /**
        * The target number of bids per slot. This will adjust the argonots per seat up or
        * down to ensure mining slots are filled.
        **/
       targetBidsPerSlot: u32 & AugmentedConst<ApiType>;
+      /**
+       * The target price per seat.
+       **/
+      targetPricePerSeat: u128 & AugmentedConst<ApiType>;
     };
     mint: {
       /**

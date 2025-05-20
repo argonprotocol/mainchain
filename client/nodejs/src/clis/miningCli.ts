@@ -1,12 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
-import {
-  createKeyringPair,
-  getClient,
-  type KeyringPair,
-  MICROGONS_PER_ARGON,
-} from '../index';
+import { getClient, type KeyringPair, MICROGONS_PER_ARGON } from '../index';
 import { printTable } from 'console-table-printer';
-import { Accountset } from '../Accountset';
 import { MiningBids } from '../MiningBids';
 import { formatArgons } from '../utils';
 import { TxSubmitter } from '../TxSubmitter';
@@ -26,10 +20,9 @@ export default function miningCli() {
       const bids = new MiningBids(accountset.client);
       const api = await accountset.client;
       let lastMiners: {
-        [seat: number]: {
+        [frameId: string]: {
           miner: string;
           bid?: bigint;
-          cohort?: number;
           isLastDay?: boolean;
         };
       } = {};
@@ -48,7 +41,6 @@ export default function miningCli() {
             toPrint.map(x => ({
               ...x,
               bid: x.bid ? formatArgons(x.bid) : '-',
-              cohort: x.cohort,
               isLastDay: x.isLastDay ? 'Y' : '',
               miner: x.miner,
             })),
@@ -68,39 +60,52 @@ export default function miningCli() {
         undefined,
         print,
       );
-      const maxMiners = api.consts.miningSlot.maxMiners.toNumber();
-      const seatIndices = new Array(maxMiners).fill(0).map((_, i) => i);
       console.log('Watching miners...');
+      const minMiners = api.consts.miningSlot.minCohortSize.toNumber();
 
       const unsub = await api.query.miningSlot.nextFrameId(
         async nextFrameId => {
-          const entries =
-            await api.query.miningSlot.activeMinersByIndex.entries();
+          const frames = new Array(nextFrameId.toNumber())
+            .fill(0)
+            .map((_, i) => nextFrameId.toNumber() - i)
+            .sort();
+          const unseenFrames = new Set(frames);
+          const entries = await api.query.miningSlot.minersByCohort.entries();
           const block = await api.query.system.number();
 
-          const seatsWithMiner = new Set(seatIndices);
+          const sortedEntries = entries.sort((a, b) => {
+            const aIndex = a[0].args[0].toNumber();
+            const bIndex = b[0].args[0].toNumber();
+            return aIndex - bIndex;
+          });
 
-          for (const [rawIndex, maybeMiner] of entries) {
-            const index = rawIndex.args[0].toNumber();
-            if (!maybeMiner.isSome) {
-              continue;
+          for (const [rawFrameId, miners] of sortedEntries) {
+            const frameId = rawFrameId.args[0].toNumber();
+            unseenFrames.delete(frameId);
+            let i = 0;
+            for (const miner of miners) {
+              const address = miner.accountId.toHuman();
+              const startingFrameId = miner.startingFrameId.toNumber();
+              lastMiners[`${frameId}-${i}`] = {
+                miner: accountset.namedAccounts.get(address) ?? address,
+                bid: miner.bid.toBigInt(),
+                isLastDay: nextFrameId.toNumber() - startingFrameId === 10,
+              };
+              i++;
             }
-            seatsWithMiner.delete(index);
-
-            const miner = maybeMiner.unwrap();
-            const address = miner.accountId.toHuman();
-            const cohortFrameId = miner.cohortFrameId.toNumber();
-            lastMiners[index] = {
-              miner: accountset.namedAccounts.get(address) ?? address,
-              bid: miner.bid.toBigInt(),
-              cohort: cohortFrameId,
-              isLastDay: nextFrameId.toNumber() - cohortFrameId === 10,
-            };
+            while (i < minMiners) {
+              lastMiners[`${frameId}-${i}`] = {
+                miner: 'none',
+              };
+              i++;
+            }
           }
-          for (const index of seatsWithMiner) {
-            lastMiners[index] = {
-              miner: 'none',
-            };
+          for (const frameId of unseenFrames) {
+            for (let i = 0; i < minMiners; i++) {
+              lastMiners[`${frameId}-${i}`] = {
+                miner: 'none',
+              };
+            }
           }
           print(block.toNumber());
         },
@@ -154,7 +159,7 @@ export default function miningCli() {
           if (cohortBidder) {
             const stats = await cohortBidder.stop();
             console.log('Final bidding result', {
-              cohortFrameId: cohortBidder.cohortFrameId,
+              cohortStartingFrameId: cohortBidder.cohortStartingFrameId,
               ...stats,
             });
             cohortBidder = undefined;
@@ -165,12 +170,12 @@ export default function miningCli() {
           }
         };
         const { unsubscribe } = await miningBids.onCohortChange({
-          async onBiddingEnd(cohortFrameId) {
-            if (cohortBidder?.cohortFrameId === cohortFrameId) {
+          async onBiddingEnd(cohortStartingFrameId) {
+            if (cohortBidder?.cohortStartingFrameId === cohortStartingFrameId) {
               await stopBidder(unsubscribe);
             }
           },
-          async onBiddingStart(cohortFrameId) {
+          async onBiddingStart(cohortStartingFrameId) {
             const seatsToWin = maxSeats ?? maxCohortSize;
             const balance = await accountset.balance();
             const feeWiggleRoom = BigInt(25e3);
@@ -206,12 +211,15 @@ export default function miningCli() {
             const subaccountRange =
               await accountset.getAvailableMinerAccounts(seatsToWin);
 
-            if (cohortBidder && cohortBidder?.cohortFrameId !== cohortFrameId) {
+            if (
+              cohortBidder &&
+              cohortBidder?.cohortStartingFrameId !== cohortStartingFrameId
+            ) {
               await stopBidder(unsubscribe);
             }
             cohortBidder = new CohortBidder(
               accountset,
-              cohortFrameId,
+              cohortStartingFrameId,
               subaccountRange,
               {
                 maxBid: maxBidAmount,
