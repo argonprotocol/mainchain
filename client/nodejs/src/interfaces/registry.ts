@@ -50,10 +50,7 @@ import type {
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
-  ArgonPrimitivesVaultFundType,
-  ArgonPrimitivesVaultObligation,
-  ArgonPrimitivesVaultObligationError,
-  ArgonPrimitivesVaultObligationExpiration,
+  ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
@@ -304,10 +301,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
-    ArgonPrimitivesVaultFundType: ArgonPrimitivesVaultFundType;
-    ArgonPrimitivesVaultObligation: ArgonPrimitivesVaultObligation;
-    ArgonPrimitivesVaultObligationError: ArgonPrimitivesVaultObligationError;
-    ArgonPrimitivesVaultObligationExpiration: ArgonPrimitivesVaultObligationExpiration;
+    ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
     ArgonRuntimeProxyType: ArgonRuntimeProxyType;

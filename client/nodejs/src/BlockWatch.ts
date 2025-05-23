@@ -12,7 +12,7 @@ export type BlockWatchEvents = {
   'vaults-updated': (header: Header, vaultIds: Set<number>) => void;
   'bitcoin-verified': (
     header: Header,
-    lockedBitcoin: { utxoId: number; vaultId: number; amount: bigint },
+    lockedBitcoin: { utxoId: number; vaultId: number; lockPrice: bigint },
   ) => void;
   'mining-bid': (
     header: Header,
@@ -60,15 +60,11 @@ export function getAuthorFromHeader(
 
 export class BlockWatch {
   public readonly events = createNanoEvents<BlockWatchEvents>();
-  public readonly obligationsById: {
-    [obligationId: number]: {
+  public readonly locksById: {
+    [utxoId: number]: {
       vaultId: number;
-      amount: bigint;
-      utxoId?: number;
+      lockPrice: bigint;
     };
-  } = {};
-  public readonly obligationIdByUtxoId: {
-    [utxoId: number]: number;
   } = {};
   private unsubscribe?: () => void;
 
@@ -155,9 +151,9 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
       } else if (event.section === 'bitcoinLocks') {
         if (client.events.bitcoinLocks.BitcoinLockCreated.is(event)) {
           const { lockPrice, utxoId, accountId, vaultId } = event.data;
-          this.obligationsById[utxoId.toNumber()] = {
+          this.locksById[utxoId.toNumber()] = {
             vaultId: vaultId.toNumber(),
-            amount: lockPrice.toBigInt(),
+            lockPrice: lockPrice.toBigInt(),
           };
           data.lockPrice = formatArgons(lockPrice.toBigInt());
           data.accountId = accountId.toHuman();
@@ -195,10 +191,10 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
           this.events.emit('bitcoin-verified', header, {
             utxoId: utxoId.toNumber(),
             vaultId: details.vaultId,
-            amount: details.amount,
+            lockPrice: details.lockPrice,
           });
 
-          data.amount = formatArgons(details.amount);
+          data.lockPrice = formatArgons(details.lockPrice);
           reloadVaults.add(details.vaultId);
         }
       } else if (event.section === 'system') {
@@ -247,19 +243,16 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
   private async getBitcoinLockDetails(
     utxoId: number,
     blockHash: Uint8Array,
-  ): Promise<{ vaultId: number; amount: bigint; utxoId?: number }> {
+  ): Promise<{ vaultId: number; lockPrice: bigint }> {
     const client = await this.mainchain;
     const api = await client.at(blockHash);
-    let obligationId = this.obligationIdByUtxoId[utxoId];
-    if (!obligationId) {
+    if (!this.locksById[utxoId]) {
       const lock = await api.query.bitcoinLocks.locksByUtxoId(utxoId);
-      obligationId = lock.value.obligationId.toNumber();
-      this.obligationIdByUtxoId[utxoId] = obligationId;
-      this.obligationsById[obligationId] = {
+      this.locksById[utxoId] = {
         vaultId: lock.value.vaultId.toNumber(),
-        amount: lock.value.lockPrice.toBigInt(),
+        lockPrice: lock.value.lockPrice.toBigInt(),
       };
     }
-    return this.obligationsById[obligationId];
+    return this.locksById[utxoId];
   }
 }

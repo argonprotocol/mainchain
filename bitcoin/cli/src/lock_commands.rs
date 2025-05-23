@@ -23,7 +23,7 @@ use argon_primitives::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoId,
 		SATOSHIS_PER_BITCOIN,
 	},
-	BlockNumber, KeystoreParams, ObligationId, VaultId,
+	BlockNumber, KeystoreParams, VaultId,
 };
 
 use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
@@ -730,7 +730,7 @@ async fn find_release_request(
 }
 async fn get_bitcoin_lock_from_utxo_id(
 	client: &MainchainClient,
-	utxo_id: ObligationId,
+	utxo_id: UtxoId,
 	at_block: FetchAt,
 ) -> anyhow::Result<(UtxoId, api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin)> {
 	let query = storage().bitcoin_locks().locks_by_utxo_id(utxo_id);

@@ -11,13 +11,13 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod migrations;
 pub mod weights;
 
-/// The Vaults pallet allows a user to offer argons for lease to other users. There are two types of
-/// obligations allocated in the system, Bitcoin and Mining obligations. Vaults can define the
-/// amount of Argons available for bitcoin locks and the terms of both bitcoin locks and liquidity
-/// pools. However, bonded argons for LiquidityPool may only be issued up to the amount of locked
-/// bitcoin.
+/// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
+/// participate in liquidity pools. Vaults can define the number of Argons available for bitcoin
+/// locks and the terms of both bitcoin locks and liquidity pools. However, bonded argons for
+/// LiquidityPool may only be issued up to the amount of locked bitcoin.
 ///
 /// ** Activated Securitization **
 /// A vault can create liquidity pools up to 2x the locked securitization used for Bitcoin. This
@@ -26,22 +26,20 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
+	use alloc::collections::BTreeSet;
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
-			CompressedBitcoinPubkey, OpaqueBitcoinXpub,
+			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
-		vault::{
-			BitcoinObligationProvider, FundType, LiquidityPoolVaultProvider, Obligation,
-			ObligationError, ObligationExpiration, Vault, VaultTerms,
-		},
-		MiningSlotProvider, ObligationEvents, TickProvider,
+		vault::{BitcoinVaultProvider, LiquidityPoolVaultProvider, Vault, VaultError, VaultTerms},
+		MiningSlotProvider, TickProvider,
 	};
 	use frame_support::traits::Incrementable;
-	use pallet_prelude::argon_primitives::bitcoin::Satoshis;
+	use pallet_prelude::argon_primitives::vault::LockExtension;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -71,10 +69,6 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		/// Minimum amount for an obligation
-		#[pallet::constant]
-		type MinimumObligationAmount: Get<Self::Balance>;
-
 		/// The max pending vault term changes per block
 		#[pallet::constant]
 		type MaxPendingTermModificationsPerTick: Get<u32>;
@@ -88,15 +82,12 @@ pub mod pallet {
 		type BitcoinBlockHeightChange: Get<(BitcoinHeight, BitcoinHeight)>;
 
 		type TickProvider: TickProvider<Self::Block>;
-		/// Pallet storage requires bounds, so we have to set a maximum number that can expire in a
-		/// single block
-		#[pallet::constant]
-		type MaxConcurrentlyExpiringObligations: Get<u32>;
-
-		/// Callbacks for various vault obligation events
-		type EventHandler: ObligationEvents<Self::AccountId, Self::Balance>;
 
 		type CurrentFrameId: Get<FrameId>;
+
+		/// The max number of vaults that can be created
+		#[pallet::constant]
+		type MaxVaults: Get<u32>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -131,27 +122,13 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The vaults that have funds releasing at a given bitcoin height
 	#[pallet::storage]
-	pub(super) type NextObligationId<T: Config> = StorageValue<_, ObligationId, OptionQuery>;
-
-	/// Obligation by id
-	#[pallet::storage]
-	pub(super) type ObligationsById<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		ObligationId,
-		Obligation<T::AccountId, T::Balance>,
-		OptionQuery,
-	>;
-
-	/// Completion of bitcoin locks by bitcoin height. Funds are returned to the vault if
-	/// unlocked or used as the price of the bitcoin
-	#[pallet::storage]
-	pub(super) type BitcoinLockCompletions<T: Config> = StorageMap<
+	pub(super) type VaultFundsReleasingByHeight<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BitcoinHeight,
-		BoundedVec<ObligationId, T::MaxConcurrentlyExpiringObligations>,
+		BoundedBTreeSet<VaultId, T::MaxVaults>,
 		ValueQuery,
 	>;
 
@@ -191,49 +168,54 @@ pub mod pallet {
 		},
 		VaultClosed {
 			vault_id: VaultId,
-			remaining_securitization: T::Balance,
-			released: T::Balance,
+			securitization_remaining: T::Balance,
+			securitization_released: T::Balance,
 		},
 		VaultBitcoinXpubChange {
 			vault_id: VaultId,
 		},
-		ObligationCreated {
+		FundsLocked {
 			vault_id: VaultId,
-			obligation_id: ObligationId,
-			fund_type: FundType,
+			locker: T::AccountId,
+			amount: T::Balance,
+			is_ratchet: bool,
+		},
+		FundLockCanceled {
+			vault_id: VaultId,
+			amount: T::Balance,
+		},
+		FundsScheduledForRelease {
+			vault_id: VaultId,
+			amount: T::Balance,
+			release_height: BitcoinHeight,
+		},
+		LostBitcoinCompensated {
+			vault_id: VaultId,
 			beneficiary: T::AccountId,
-			amount: T::Balance,
-			expiration: ObligationExpiration,
+			to_beneficiary: T::Balance,
+			burned: T::Balance,
 		},
-		ObligationCompleted {
+		FundsReleased {
 			vault_id: VaultId,
-			obligation_id: ObligationId,
-			was_canceled: bool,
-		},
-		ObligationModified {
-			vault_id: VaultId,
-			obligation_id: ObligationId,
 			amount: T::Balance,
 		},
-		/// An error occurred while completing an obligation
-		ObligationCompletionError {
-			obligation_id: ObligationId,
+		FundsReleasedError {
+			vault_id: VaultId,
 			error: DispatchError,
 		},
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		ObligationNotFound,
+		/// Internally, the vault ids are maxed out
 		NoMoreVaultIds,
-		NoMoreObligationIds,
-		MinimumObligationAmountNotMet,
-		/// There are too many obligations expiring in the given expiration block
-		ExpirationAtBlockOverflow,
+		/// The user doesn't have enough funds to complete this request
 		InsufficientFunds,
+		/// There aren't enough funds in the vault to cover the requested bitcoin lock
 		InsufficientVaultFunds,
 		/// The proposed transaction would take the account below the minimum (existential) balance
 		AccountBelowMinimumBalance,
+		/// This vault is closed
 		VaultClosed,
 		/// Funding would result in an overflow of the balance type
 		InvalidVaultAmount,
@@ -274,34 +256,25 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
-		/// An error occurred processing an obligation completion
-		ObligationCompletionError,
 	}
 
-	impl<T> From<ObligationError> for Error<T> {
-		fn from(e: ObligationError) -> Error<T> {
+	impl<T> From<VaultError> for Error<T> {
+		fn from(e: VaultError) -> Error<T> {
 			match e {
-				ObligationError::ObligationNotFound => Error::<T>::ObligationNotFound,
-				ObligationError::NoMoreObligationIds => Error::<T>::NoMoreObligationIds,
-				ObligationError::MinimumObligationAmountNotMet =>
-					Error::<T>::MinimumObligationAmountNotMet,
-				ObligationError::ExpirationAtBlockOverflow => Error::<T>::ExpirationAtBlockOverflow,
-				ObligationError::InsufficientFunds => Error::<T>::InsufficientFunds,
-				ObligationError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
-				ObligationError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
-				ObligationError::VaultNotFound => Error::<T>::VaultNotFound,
-				ObligationError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
-				ObligationError::VaultClosed => Error::<T>::VaultClosed,
-				ObligationError::AccountWouldBeBelowMinimum =>
-					Error::<T>::AccountBelowMinimumBalance,
-				ObligationError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
-				ObligationError::NoVaultBitcoinPubkeysAvailable =>
+				VaultError::InsufficientFunds => Error::<T>::InsufficientFunds,
+				VaultError::HoldUnexpectedlyModified => Error::<T>::HoldUnexpectedlyModified,
+				VaultError::UnrecoverableHold => Error::<T>::UnrecoverableHold,
+				VaultError::VaultNotFound => Error::<T>::VaultNotFound,
+				VaultError::InsufficientVaultFunds => Error::<T>::InsufficientVaultFunds,
+				VaultError::VaultClosed => Error::<T>::VaultClosed,
+				VaultError::AccountWouldBeBelowMinimum => Error::<T>::AccountBelowMinimumBalance,
+				VaultError::InvalidBitcoinScript => Error::<T>::InvalidBitcoinScript,
+				VaultError::NoVaultBitcoinPubkeysAvailable =>
 					Error::<T>::NoVaultBitcoinPubkeysAvailable,
-				ObligationError::InternalError => Error::<T>::InternalError,
-				ObligationError::UnableToGenerateVaultBitcoinPubkey =>
+				VaultError::InternalError => Error::<T>::InternalError,
+				VaultError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
-				ObligationError::ObligationCompletionError => Error::<T>::ObligationCompletionError,
-				ObligationError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
+				VaultError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
 			}
 		}
 	}
@@ -336,23 +309,16 @@ pub mod pallet {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let bitcoin_completions = (start_bitcoin_height..=bitcoin_block_height)
-				.flat_map(BitcoinLockCompletions::<T>::take);
-			for obligation_id in bitcoin_completions {
+				.flat_map(VaultFundsReleasingByHeight::<T>::take);
+			for vault_id in bitcoin_completions {
 				let res = with_storage_layer(|| {
-					Self::obligation_completed(obligation_id, false)
+					Self::release_funds(vault_id, bitcoin_block_height)
 						.map_err(Error::<T>::from)
 						.map_err(DispatchError::from)
 				});
 				if let Err(e) = res {
-					log::error!(
-						"Bitcoin obligation id {:?} failed to `complete` {:?}",
-						obligation_id,
-						e
-					);
-					Self::deposit_event(Event::<T>::ObligationCompletionError {
-						obligation_id,
-						error: e,
-					});
+					log::error!("Vault `{}` unable to recoupd released funds {:?}", vault_id, e);
+					Self::deposit_event(Event::<T>::FundsReleasedError { vault_id, error: e });
 				}
 			}
 
@@ -416,13 +382,14 @@ pub mod pallet {
 			let vault = Vault {
 				operator_account_id: who.clone(),
 				securitization,
-				bitcoin_locked: 0u32.into(),
+				argons_locked: 0u32.into(),
 				terms,
 				securitization_ratio,
 				opened_tick,
+				argons_scheduled_for_release: Default::default(),
 				is_closed: false,
 				pending_terms: None,
-				bitcoin_pending: 0u32.into(),
+				argons_pending_activation: 0u32.into(),
 			};
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
@@ -440,14 +407,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Modify funds allocated by the vault. This will not affect issued obligations, but will
+		/// Modify funds allocated by the vault. This will not affect issued bitcoin locks, but will
 		/// affect the amount of funds available for new ones.
 		///
 		/// The securitization percent must be maintained or increased.
 		///
 		/// The amount allocated may not go below the existing reserved amounts, but you can release
-		/// funds in this vault as obligations are released. To stop issuing any more obligations,
-		/// use the `close` api.
+		/// funds in this vault as bitcoin locks are released. To stop issuing any more bitcoin
+		/// locks, use the `close` api.
 		#[pallet::call_index(1)]
 		#[pallet::weight(0)]
 		pub fn modify_funding(
@@ -534,8 +501,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Stop offering additional obligations from this vault. Will not affect existing
-		/// obligations. As funds are returned, they will be released to the vault owner.
+		/// Stop offering additional bitcoin locks from this vault. Will not affect existing
+		/// locks. As funds are returned, they will be released to the vault owner.
 		#[pallet::call_index(3)]
 		#[pallet::weight(0)]
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
@@ -549,20 +516,21 @@ pub mod pallet {
 			vault.is_closed = true;
 			let start_securitization = vault.securitization;
 			Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
-			let remaining_securitization = vault.securitization;
+			let securitization_remaining = vault.securitization;
 
 			Self::deposit_event(Event::VaultClosed {
 				vault_id,
-				remaining_securitization,
-				released: start_securitization.saturating_sub(remaining_securitization),
+				securitization_remaining,
+				securitization_released: start_securitization
+					.saturating_sub(securitization_remaining),
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 
 			Ok(())
 		}
 
-		/// Replace the bitcoin xpubkey for this vault. This will not affect existing obligations,
-		/// but will be used for any obligations after this point. Will be rejected if already
+		/// Replace the bitcoin xpubkey for this vault. This will not affect existing bitcoin locks,
+		/// but will be used for any locks after this point. Will be rejected if already
 		/// used.
 		#[pallet::call_index(4)]
 		#[pallet::weight(0)]
@@ -609,7 +577,7 @@ pub mod pallet {
 			who: &T::AccountId,
 			amount: T::Balance,
 			reason: HoldReason,
-		) -> Result<(), ObligationError> {
+		) -> Result<(), VaultError> {
 			if amount == T::Balance::zero() {
 				return Ok(());
 			}
@@ -619,16 +587,16 @@ pub mod pallet {
 			}
 
 			T::Currency::hold(&reason.into(), who, amount).map_err(|e| match e {
-				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
+				Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
 				_ => {
 					let balance = T::Currency::balance(who);
 					if balance.checked_sub(&amount).is_some() &&
 						balance.saturating_sub(amount) < T::Currency::minimum_balance()
 					{
-						return ObligationError::AccountWouldBeBelowMinimum;
+						return VaultError::AccountWouldBeBelowMinimum;
 					}
 
-					ObligationError::InsufficientFunds
+					VaultError::InsufficientFunds
 				},
 			})?;
 			Ok(())
@@ -659,54 +627,21 @@ pub mod pallet {
 			Ok(balance)
 		}
 
-		/// Return bonded funds to the vault and complete the obligation
-		fn obligation_completed(
-			obligation_id: ObligationId,
-			is_canceled: bool,
-		) -> Result<(), ObligationError> {
-			let obligation = ObligationsById::<T>::get(obligation_id)
-				.ok_or(ObligationError::ObligationNotFound)?;
+		fn release_funds(vault_id: VaultId, block_height: BitcoinHeight) -> Result<(), VaultError> {
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			if is_canceled {
-				T::EventHandler::on_canceled(&obligation)
-			} else {
-				T::EventHandler::on_completed(&obligation)
+			let swept = vault.sweep_released(block_height);
+			Self::deposit_event(Event::FundsReleased { vault_id, amount: swept });
+			if vault.is_closed {
+				Self::shrink_vault_securitization(&mut vault)?;
 			}
-			.map_err(|_| ObligationError::ObligationCompletionError)?;
-
-			// reload obligation since on_completed might have modified
-			if let Some(obligation) = ObligationsById::<T>::take(obligation_id) {
-				if let ObligationExpiration::BitcoinBlock(b) = obligation.expiration {
-					BitcoinLockCompletions::<T>::mutate_extant(b, |obligations| {
-						if let Some(index) = obligations.iter().position(|b| *b == obligation_id) {
-							obligations.remove(index);
-						}
-					});
-				}
-				VaultsById::<T>::mutate(obligation.vault_id, |vault| {
-					let Some(vault) = vault else {
-						return Err(ObligationError::VaultNotFound);
-					};
-					vault.reduce_locked_bitcoin(obligation.amount);
-
-					// after reducing the bonded, we can check the minimum securitization needed
-					if vault.is_closed {
-						Self::shrink_vault_securitization(vault)?;
-					}
-					Ok::<(), ObligationError>(())
-				})?;
-				Self::deposit_event(Event::ObligationCompleted {
-					vault_id: obligation.vault_id,
-					obligation_id,
-					was_canceled: is_canceled,
-				});
-			}
+			VaultsById::<T>::insert(vault_id, vault);
 			Ok(())
 		}
 
 		fn shrink_vault_securitization(
 			vault: &mut Vault<T::AccountId, T::Balance>,
-		) -> Result<(), ObligationError> {
+		) -> Result<(), VaultError> {
 			let minimum_securitization = vault.get_minimum_securitization_needed();
 			let free_securitization = vault.securitization.saturating_sub(minimum_securitization);
 
@@ -717,7 +652,7 @@ pub mod pallet {
 					&HoldReason::EnterVault.into(),
 					&vault.operator_account_id
 				) >= free_securitization,
-				ObligationError::HoldUnexpectedlyModified
+				VaultError::HoldUnexpectedlyModified
 			);
 
 			Self::release_hold(
@@ -725,26 +660,22 @@ pub mod pallet {
 				free_securitization,
 				HoldReason::EnterVault,
 			)
-			.map_err(|_| ObligationError::UnrecoverableHold)?;
+			.map_err(|_| VaultError::UnrecoverableHold)?;
 			Ok(())
 		}
 
-		fn get_obligation_id_and_increment() -> Result<ObligationId, ObligationError> {
-			let obligation_id = NextObligationId::<T>::get().unwrap_or(1);
-			let next_obligation_id =
-				obligation_id.increment().ok_or(ObligationError::NoMoreObligationIds)?;
-			NextObligationId::<T>::set(Some(next_obligation_id));
-			Ok(obligation_id)
-		}
-
 		pub(crate) fn update_vault_metrics(
-			vault_id: VaultId,
-			obligations_added: u32,
-			total_fee: T::Balance,
-			lock_price: T::Balance,
-			satoshis_locked: Satoshis,
-			satoshis_released: Satoshis,
-		) -> Result<(), ObligationError> {
+			metrics: VaultMetricUpdate<T>,
+		) -> Result<(), VaultError> {
+			let VaultMetricUpdate {
+				vault_id,
+				locks_created,
+				total_fee,
+				securitization_locked,
+				satoshis_locked,
+				satoshis_released,
+				..
+			} = metrics;
 			let current_frame_id = T::CurrentFrameId::get();
 			PerFrameFeeRevenueByVault::<T>::mutate(vault_id, |x| {
 				let mut needs_insert = false;
@@ -772,19 +703,50 @@ pub mod pallet {
 					)
 					.map_err(|_| {
 						tracing::error!("Unable to push new vault revenue");
-						ObligationError::InternalError
+						VaultError::InternalError
 					})?;
 				}
 				if let Some(existing) = x.get_mut(0) {
 					existing.fee_revenue.saturating_accrue(total_fee);
-					existing.bitcoin_locks_created += obligations_added;
+					existing.bitcoin_locks_created += locks_created;
 					existing.bitcoin_locks_total_satoshis.saturating_accrue(satoshis_locked);
-					existing.bitcoin_locks_market_value.saturating_accrue(lock_price);
+					existing.bitcoin_locks_market_value.saturating_accrue(securitization_locked);
 					existing.satoshis_released.saturating_accrue(satoshis_released);
 				}
 				Ok(())
 			})
 		}
+
+		fn track_vault_release_schedule(
+			vault_id: VaultId,
+			vault: &mut Vault<T::AccountId, T::Balance>,
+			release_heights: BTreeSet<BitcoinHeight>,
+		) -> Result<(), VaultError> {
+			let current_height = T::BitcoinBlockHeightChange::get().1;
+			for height in release_heights {
+				if height <= current_height {
+					continue;
+				}
+				VaultFundsReleasingByHeight::<T>::mutate(height, |x| x.try_insert(vault_id))
+					.map_err(|_| VaultError::InternalError)?;
+			}
+			let swept = vault.sweep_released(current_height);
+			if !swept.is_zero() {
+				Self::deposit_event(Event::FundsReleased { vault_id, amount: swept });
+			}
+			Ok(())
+		}
+	}
+
+	#[allow(dead_code)]
+	pub(crate) struct VaultMetricUpdate<T: Config> {
+		pub vault_id: VaultId,
+		pub locks_created: u32,
+		pub total_fee: T::Balance,
+		pub securitization_locked: T::Balance,
+		pub securitization_released: T::Balance,
+		pub satoshis_locked: Satoshis,
+		pub satoshis_released: Satoshis,
 	}
 
 	impl<T: Config> LiquidityPoolVaultProvider for Pallet<T> {
@@ -810,7 +772,7 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> BitcoinObligationProvider for Pallet<T> {
+	impl<T: Config> BitcoinVaultProvider for Pallet<T> {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
@@ -821,125 +783,191 @@ pub mod pallet {
 			false
 		}
 
-		fn burn_vault_bitcoin_obligation(
-			obligation_id: ObligationId,
-			amount_to_burn: T::Balance,
-		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
-			let mut obligation = ObligationsById::<T>::get(obligation_id)
-				.ok_or(ObligationError::ObligationNotFound)?;
-			let vault_id = obligation.vault_id;
-			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
+		fn lock(
+			vault_id: VaultId,
+			account_id: &T::AccountId,
+			lock_price: T::Balance,
+			satoshis: Satoshis,
+			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
+		) -> Result<T::Balance, VaultError> {
+			let mut vault =
+				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
 
-			vault.destroy_funds(amount_to_burn)?;
-			obligation.amount.saturating_reduce(amount_to_burn);
+			ensure!(
+				vault.opened_tick <= T::TickProvider::current_tick(),
+				VaultError::VaultNotYetActive
+			);
 
-			T::Currency::burn_held(
-				&HoldReason::EnterVault.into(),
+			ensure!(!vault.is_closed, VaultError::VaultClosed);
+
+			ensure!(vault.available_for_lock() >= lock_price, VaultError::InsufficientVaultFunds);
+
+			let apr = vault.terms.bitcoin_annual_percent_rate;
+			let base_fee = vault.terms.bitcoin_base_fee;
+			let is_ratchet = extension.is_some();
+			let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
+
+			let total_fee =
+				apr.saturating_mul(term).saturating_mul_int(lock_price).saturating_add(base_fee);
+			log::trace!(
+				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
+				lock_price,
+				total_fee
+			);
+
+			Self::update_vault_metrics(VaultMetricUpdate {
+				vault_id,
+				locks_created: if is_ratchet { 0 } else { 1 },
+				total_fee,
+				securitization_locked: lock_price,
+				securitization_released: 0u32.into(),
+				satoshis_locked: satoshis,
+				satoshis_released: 0,
+			})?;
+
+			// do this second so the 'provider' is already on the account
+			T::Currency::transfer(
+				account_id,
 				&vault.operator_account_id,
-				amount_to_burn,
-				Precision::Exact,
-				Fortitude::Force,
+				total_fee,
+				Preservation::Expendable,
 			)
-			.map_err(|_| ObligationError::UnrecoverableHold)?;
+			.map_err(|e| match e {
+				Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
+				_ => VaultError::InsufficientFunds,
+			})?;
 
+			if let Some((_, extension)) = extension {
+				// locks must be held for a minimum of a year, so when we are looking to re-use
+				// locked funds, they must be getting a new expiration of > 1 year from their
+				// original date
+				vault.extend_lock(lock_price, extension)?;
+			} else {
+				vault.lock(lock_price)?;
+			}
+
+			Self::deposit_event(Event::FundsLocked {
+				vault_id,
+				locker: account_id.clone(),
+				amount: lock_price,
+				is_ratchet,
+			});
 			VaultsById::<T>::insert(vault_id, vault);
-			ObligationsById::<T>::insert(obligation_id, obligation.clone());
-
-			Ok(obligation)
+			Ok(total_fee)
 		}
 
-		fn did_release_bitcoin(
+		fn schedule_for_release(
 			vault_id: VaultId,
-			_obligation_id: ObligationId,
+			locked_argons: T::Balance,
 			satoshis: Satoshis,
-		) -> Result<(), ObligationError> {
-			Self::update_vault_metrics(vault_id, 0, 0u32.into(), 0u32.into(), 0, satoshis)
+			lock_extension: &LockExtension<T::Balance>,
+		) -> Result<(), VaultError> {
+			Self::update_vault_metrics(VaultMetricUpdate {
+				vault_id,
+				locks_created: 0,
+				total_fee: 0u32.into(),
+				securitization_locked: 0u32.into(),
+				securitization_released: locked_argons,
+				satoshis_locked: 0,
+				satoshis_released: satoshis,
+			})?;
+
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let release_heights = vault.schedule_for_release(locked_argons, lock_extension)?;
+			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
+			VaultsById::<T>::insert(vault_id, vault);
+			Self::deposit_event(Event::FundsScheduledForRelease {
+				vault_id,
+				amount: locked_argons,
+				release_height: lock_extension.lock_expiration,
+			});
+
+			Ok(())
 		}
 
 		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
 		/// activity, like not moving cosigned UTXOs in the appropriate timeframe.
 		///
-		/// The recouped funds are market rate capped at securitization rate of the vault.
+		/// The compensation is up to the market rate but capped at the securitization rate of the
+		/// vault.
 		///
-		/// This will take funds from the vault in the following order:
-		/// 1. From the bonded funds
-		/// 2. From the allocated funds
-		/// 3. From the securitized funds
-		/// 4. TODO: From the ownership tokens
-		///
-		/// The funds will be returned to the owed_to_account_id
-		///
-		/// Returns the amount (still owed, repaid)
+		/// Returns the amount sent to the beneficiary.
 		fn compensate_lost_bitcoin(
-			obligation_id: ObligationId,
+			vault_id: VaultId,
+			beneficiary: &T::AccountId,
+			original_lock_amount: Self::Balance,
 			market_rate: Self::Balance,
-			redemption_rate: Self::Balance,
-		) -> Result<(Self::Balance, Self::Balance), ObligationError> {
-			let zero = T::Balance::zero();
-			let obligation = ObligationsById::<T>::get(obligation_id)
-				.ok_or(ObligationError::ObligationNotFound)?;
+			lock_extension: &LockExtension<T::Balance>,
+		) -> Result<Self::Balance, VaultError> {
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let vault_id = obligation.vault_id;
-			let beneficiary = &obligation.beneficiary;
-			let original_lock_amount = obligation.amount;
+			let burn_result = vault.burn(original_lock_amount, market_rate, lock_extension)?;
 
-			// 1. burn redemption rate from the vault (or min of market rate)
-			let burn_amount = redemption_rate.min(market_rate);
-			Self::burn_vault_bitcoin_obligation(obligation.obligation_id, burn_amount)?;
+			let securitized_amount = burn_result.burned_amount;
+			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
-			// don't load until we've already burned
-			let mut vault = VaultsById::<T>::get(vault_id).ok_or(ObligationError::VaultNotFound)?;
-			let vault_operator = vault.operator_account_id.clone();
-
-			// the max amount to recoup, which is the market rate capped by securitization
-			let securitized_lock_amount = vault
-				.securitization_ratio
-				.saturating_mul_int(original_lock_amount)
-				.min(market_rate);
-
-			// Still owed is diff of securitized obligation amount and bonded amount
-			let amount_owed = securitized_lock_amount.saturating_sub(original_lock_amount);
-			let mut still_owed = amount_owed;
-
-			// 2: use bitcoin argons
-			if still_owed > zero && vault.free_balance() >= zero {
-				let amount_to_pull = still_owed.min(vault.free_balance());
-				vault.destroy_allocated_funds(amount_to_pull)?;
-				still_owed = still_owed
-					.checked_sub(&amount_to_pull)
-					.ok_or(ObligationError::InternalError)?;
+			let to_beneficiary = securitized_amount.saturating_sub(original_lock_amount);
+			if !to_beneficiary.is_zero() {
+				T::Currency::transfer_on_hold(
+					&HoldReason::EnterVault.into(),
+					&vault.operator_account_id,
+					beneficiary,
+					to_beneficiary,
+					Precision::Exact,
+					Restriction::Free,
+					Fortitude::Force,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+			}
+			let to_burn = securitized_amount.saturating_sub(to_beneficiary);
+			if !to_burn.is_zero() {
+				T::Currency::burn_held(
+					&HoldReason::EnterVault.into(),
+					&vault.operator_account_id,
+					to_burn,
+					Precision::Exact,
+					Fortitude::Force,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
 			}
 
-			// 3. Use securitized argons
-			let extra_securitization = vault.get_recovery_securitization();
-			if still_owed > zero && extra_securitization >= zero {
-				let amount_to_pull = still_owed.min(extra_securitization);
-				vault.securitization = vault
-					.securitization
-					.checked_sub(&amount_to_pull)
-					.ok_or(ObligationError::InternalError)?;
-				still_owed = still_owed
-					.checked_sub(&amount_to_pull)
-					.ok_or(ObligationError::InternalError)?;
-			}
+			Self::deposit_event(Event::LostBitcoinCompensated {
+				vault_id,
+				beneficiary: beneficiary.clone(),
+				to_beneficiary,
+				burned: to_burn,
+			});
+			VaultsById::<T>::insert(vault_id, vault);
 
-			// TODO: 4. Use ownership tokens at current value
+			Ok(to_beneficiary)
+		}
 
-			let recouped = amount_owed.saturating_sub(still_owed);
-			T::Currency::transfer_on_hold(
+		/// Burn the funds from the vault.
+		fn burn(
+			vault_id: VaultId,
+			lock_amount: T::Balance,
+			market_rate: T::Balance,
+			lock_extension: &LockExtension<T::Balance>,
+		) -> Result<T::Balance, VaultError> {
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+
+			let burn_result = vault.burn(lock_amount, market_rate, lock_extension)?;
+
+			let burn_amount = burn_result.burned_amount;
+			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
+
+			T::Currency::burn_held(
 				&HoldReason::EnterVault.into(),
-				&vault_operator,
-				beneficiary,
-				recouped,
+				&vault.operator_account_id,
+				burn_amount,
 				Precision::Exact,
-				Restriction::Free,
 				Fortitude::Force,
 			)
-			.map_err(|_| ObligationError::UnrecoverableHold)?;
+			.map_err(|_| VaultError::UnrecoverableHold)?;
 
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok((still_owed, recouped))
+			Ok(burn_amount)
 		}
 
 		fn create_utxo_script_pubkey(
@@ -948,24 +976,21 @@ pub mod pallet {
 			vault_claim_height: BitcoinHeight,
 			open_claim_height: BitcoinHeight,
 			current_height: BitcoinHeight,
-		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), ObligationError> {
+		) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError> {
 			let (vault_xpubkey, vault_claim_pubkey) = VaultXPubById::<T>::mutate(vault_id, |a| {
 				let (xpub, counter) =
-					a.as_mut().ok_or(ObligationError::NoVaultBitcoinPubkeysAvailable)?;
+					a.as_mut().ok_or(VaultError::NoVaultBitcoinPubkeysAvailable)?;
 
-				let mut next = counter
-					.checked_add(1)
-					.ok_or(ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
+				let mut next =
+					counter.checked_add(1).ok_or(VaultError::UnableToGenerateVaultBitcoinPubkey)?;
 				let pubkey = xpub
 					.derive_pubkey(next)
-					.map_err(|_| ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
+					.map_err(|_| VaultError::UnableToGenerateVaultBitcoinPubkey)?;
 
-				next = next
-					.checked_add(1)
-					.ok_or(ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
+				next = next.checked_add(1).ok_or(VaultError::UnableToGenerateVaultBitcoinPubkey)?;
 				let pubkey2 = xpub
 					.derive_pubkey(next)
-					.map_err(|_| ObligationError::UnableToGenerateVaultBitcoinPubkey)?;
+					.map_err(|_| VaultError::UnableToGenerateVaultBitcoinPubkey)?;
 
 				*a = Some((xpub.clone(), next));
 				Ok((pubkey, pubkey2))
@@ -982,7 +1007,7 @@ pub mod pallet {
 
 			let network = T::GetBitcoinNetwork::get();
 			let script_pubkey = CosignScript::new(script_args, network.into())
-				.map_err(|_| ObligationError::InvalidBitcoinScript)?;
+				.map_err(|_| VaultError::InvalidBitcoinScript)?;
 
 			Ok((
 				vault_xpubkey,
@@ -991,111 +1016,32 @@ pub mod pallet {
 					.script
 					.to_p2wsh()
 					.try_into()
-					.map_err(|_| ObligationError::InvalidBitcoinScript)?,
+					.map_err(|_| VaultError::InvalidBitcoinScript)?,
 			))
 		}
 
-		fn modify_pending_bitcoin_funds(
-			vault_id: VaultId,
-			amount: Self::Balance,
-			remove_pending: bool,
-		) -> Result<(), ObligationError> {
+		fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
-				let vault = vault.as_mut().ok_or(ObligationError::VaultNotFound)?;
-				vault.bitcoin_pending = if remove_pending {
-					vault.bitcoin_pending.saturating_sub(amount)
-				} else {
-					vault.bitcoin_pending.saturating_add(amount)
-				};
+				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				vault.argons_pending_activation.saturating_reduce(amount);
 				Ok(())
 			})
 		}
 
-		fn create_obligation(
-			vault_id: VaultId,
-			account_id: &T::AccountId,
-			lock_price: T::Balance,
-			satoshis: Satoshis,
-			expiration_block: BitcoinHeight,
-		) -> Result<Obligation<T::AccountId, T::Balance>, ObligationError> {
-			let obligation_id = Self::get_obligation_id_and_increment()?;
+		fn cancel(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
+			VaultsById::<T>::mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				vault.release_locked_funds(amount);
 
-			ensure!(
-				lock_price >= T::MinimumObligationAmount::get(),
-				ObligationError::MinimumObligationAmountNotMet
-			);
-			let mut vault = VaultsById::<T>::get(vault_id)
-				.ok_or::<ObligationError>(ObligationError::VaultNotFound)?;
-
-			ensure!(
-				vault.opened_tick <= T::TickProvider::current_tick(),
-				ObligationError::VaultNotYetActive
-			);
-
-			ensure!(!vault.is_closed, ObligationError::VaultClosed);
-
-			ensure!(vault.free_balance() >= lock_price, ObligationError::InsufficientVaultFunds);
-
-			let apr = vault.terms.bitcoin_annual_percent_rate;
-			let base_fee = vault.terms.bitcoin_base_fee;
-
-			let total_fee = apr.saturating_mul_int(lock_price).saturating_add(base_fee);
-			log::trace!(
-				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
-				lock_price,
-				total_fee
-			);
-
-			Self::update_vault_metrics(vault_id, 1, total_fee, lock_price, satoshis, 0)?;
-
-			// do this second so the 'provider' is already on the account
-			T::Currency::transfer(
-				account_id,
-				&vault.operator_account_id,
-				total_fee,
-				Preservation::Expendable,
-			)
-			.map_err(|e| match e {
-				Token(TokenError::BelowMinimum) => ObligationError::AccountWouldBeBelowMinimum,
-				_ => ObligationError::InsufficientFunds,
+				// after reducing the bonded, we can check the minimum securitization needed
+				if vault.is_closed {
+					Self::shrink_vault_securitization(vault)?;
+				}
+				Ok::<(), VaultError>(())
 			})?;
+			Self::deposit_event(Event::FundLockCanceled { vault_id, amount });
 
-			vault.bitcoin_locked.saturating_accrue(lock_price);
-			VaultsById::<T>::set(vault_id, Some(vault));
-
-			let expiration = ObligationExpiration::BitcoinBlock(expiration_block);
-
-			let obligation = Obligation {
-				obligation_id,
-				vault_id,
-				fund_type: FundType::LockedBitcoin,
-				beneficiary: account_id.clone(),
-				amount: lock_price,
-				expiration: expiration.clone(),
-				total_fee,
-				start_tick: T::TickProvider::current_tick(),
-				prepaid_fee: total_fee,
-				bitcoin_annual_percent_rate: Some(apr),
-			};
-			ObligationsById::<T>::set(obligation_id, Some(obligation.clone()));
-			BitcoinLockCompletions::<T>::try_mutate(expiration_block, |a| {
-				a.try_push(obligation_id)
-					.map_err(|_| ObligationError::ExpirationAtBlockOverflow)
-			})?;
-
-			Self::deposit_event(Event::ObligationCreated {
-				vault_id,
-				obligation_id,
-				beneficiary: account_id.clone(),
-				amount: lock_price,
-				expiration,
-				fund_type: FundType::LockedBitcoin,
-			});
-			Ok(obligation)
-		}
-
-		fn cancel_obligation(obligation_id: ObligationId) -> Result<(), ObligationError> {
-			Self::obligation_completed(obligation_id, true)
+			Ok(())
 		}
 	}
 

@@ -47,7 +47,7 @@ pub mod pallet {
 	}
 
 	/// Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
-	/// the expiration block, the obligation is burned and the UTXO is unlocked.
+	/// the expiration block, the funds are burned and the UTXO is unlocked.
 	#[pallet::storage]
 	pub(super) type LockedUtxos<T: Config> =
 		StorageMap<_, Blake2_128Concat, UtxoRef, UtxoValue, OptionQuery>;

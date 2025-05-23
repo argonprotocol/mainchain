@@ -81,7 +81,6 @@ pub type Nonce = u32;
 /// A timestamp: milliseconds since the unix epoch.
 pub type Moment = u64;
 
-pub type ObligationId = u64;
 pub type VaultId = u32;
 
 /// A hash of some data used by the chain.
@@ -89,7 +88,7 @@ pub type HashOutput = H256;
 pub type BlockHash = BlakeTwo256;
 
 pub const TOKEN_DECIMALS: u8 = 6;
-
+pub const MICROGONS_PER_ARGON: u128 = 1_000_000;
 pub const ARGON_TOKEN_SYMBOL: &str = "ARGN";
 pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
@@ -99,7 +98,7 @@ pub mod prelude {
 		localchain::*,
 		tick::Tick,
 		AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment, Nonce, NotaryId,
-		NotebookNumber, ObligationId, VaultId,
+		NotebookNumber, VaultId,
 	};
 	pub use polkadot_sdk::*;
 }

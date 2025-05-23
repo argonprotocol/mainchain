@@ -106,10 +106,9 @@ parameter_types! {
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
 	// ### pallet_vaults
-	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
-	pub const MinimumObligationAmount: u128 = 100_000;
 	pub const TicksPerDay: Tick = 1440;
 	pub const TicksPerYear: Tick = 1440 * 365;
+	pub const MaxVaults: u32 = 10_000;
 
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
@@ -118,7 +117,6 @@ parameter_types! {
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
-	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 
 	// ### pallet chain transfer
@@ -158,6 +156,10 @@ parameter_types! {
 	pub const MaxSignatories: u32 = 100;
 
 	// ### pallet_bitcoin_locks
+	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
+	/// Max locks that can expire in a single bitcoin block - effectively the max throughput of locks per bitcoin block (10 minutes)
+	pub const MaxConcurrentlyExpiringLocks: u32 = 10_000;
+
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;

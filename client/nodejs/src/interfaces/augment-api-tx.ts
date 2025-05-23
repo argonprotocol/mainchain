@@ -280,8 +280,7 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
-       * release fee will be burned, and the obligation will be allowed to expire without
-       * penalty.
+       * release fee will be burned, and the lock will be allowed to expire without a penalty.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
@@ -300,7 +299,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * The pubkey submitted here will be used to create a script pubkey that will be used in a
        * timelock multisig script to lock the bitcoin.
        *
-       * NOTE: A "lock-er" must sends btc to the cosign UTXO address in order to "complete" the
+       * NOTE: A "lock-er" must send btc to the cosigner UTXO address to "complete" the
        * LockedBitcoin and be added to the Bitcoin Mint line.
        **/
       initialize: AugmentedSubmittable<
@@ -313,6 +312,26 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]
+      >;
+      /**
+       * Ratcheting allows a user to change the lock price of their bitcoin lock. This is
+       * functionally the same as releasing and re-initializing, but it allows a user to skip
+       * sending transactions through bitcoin and any associated fees. It also allows you to stay
+       * on your original lock expiration without having to pay the full year of fees again.
+       *
+       * Ratcheting "down" - when the price of bitcoin is lower than your lock price, you pay the
+       * full release price and get added back to the mint queue at the current market rate. You
+       * pocket the difference between the already minted "lock price" and the new market value
+       * (which you just had burned). Your new lock price is set to the market low, so you can
+       * take advantage of ratchets "up" in the future.
+       *
+       * Ratcheting "up" - when the price of bitcoin is higher than your lock price, you pay a
+       * prorated fee for the remainder of your existing lock duration. You are added to the mint
+       * queue for the difference in your new lock price vs the previous lock price.
+       **/
+      ratchet: AugmentedSubmittable<
+        (utxoId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [u64]
       >;
       /**
        * Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
@@ -1998,8 +2017,8 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     vaults: {
       /**
-       * Stop offering additional obligations from this vault. Will not affect existing
-       * obligations. As funds are returned, they will be released to the vault owner.
+       * Stop offering additional bitcoin locks from this vault. Will not affect existing
+       * locks. As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<
         (
@@ -2023,14 +2042,14 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletVaultsVaultConfig]
       >;
       /**
-       * Modify funds allocated by the vault. This will not affect issued obligations, but will
+       * Modify funds allocated by the vault. This will not affect issued bitcoin locks, but will
        * affect the amount of funds available for new ones.
        *
        * The securitization percent must be maintained or increased.
        *
        * The amount allocated may not go below the existing reserved amounts, but you can release
-       * funds in this vault as obligations are released. To stop issuing any more obligations,
-       * use the `close` api.
+       * funds in this vault as bitcoin locks are released. To stop issuing any more bitcoin
+       * locks, use the `close` api.
        **/
       modifyFunding: AugmentedSubmittable<
         (
@@ -2060,8 +2079,8 @@ declare module '@polkadot/api-base/types/submittable' {
         [u32, ArgonPrimitivesVaultVaultTerms]
       >;
       /**
-       * Replace the bitcoin xpubkey for this vault. This will not affect existing obligations,
-       * but will be used for any obligations after this point. Will be rejected if already
+       * Replace the bitcoin xpubkey for this vault. This will not affect existing bitcoin locks,
+       * but will be used for any locks after this point. Will be rejected if already
        * used.
        **/
       replaceBitcoinXpub: AugmentedSubmittable<

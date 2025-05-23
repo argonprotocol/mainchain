@@ -29,7 +29,6 @@ impl frame_system::Config for Test {
 parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 10;
-	pub static MinimumObligationAmount:u128 = 1_000;
 	pub const BlocksPerYear:u32 = 1440*365;
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 }
@@ -112,15 +111,13 @@ impl pallet_vaults::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumObligationAmount = MinimumObligationAmount;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
 	type CurrentFrameId = CurrentFrameId;
 	type MiningSlotProvider = StaticMiningSlotProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
 	type TickProvider = StaticTickProvider;
-	type MaxConcurrentlyExpiringObligations = ConstU32<100>;
-	type EventHandler = ();
+	type MaxVaults = ConstU32<100>;
 }
 
 pub fn new_test_ext() -> TestState {
