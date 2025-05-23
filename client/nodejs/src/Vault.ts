@@ -10,8 +10,9 @@ const { ROUND_FLOOR } = BN;
 export class Vault {
   public securitization: bigint;
   public securitizationRatio: BigNumber;
-  public bitcoinLocked: bigint;
-  public bitcoinPending: bigint;
+  public argonsLocked: bigint;
+  public argonsPendingActivation: bigint;
+  public argonsScheduledForRelease: Map<number, bigint> = new Map();
   public terms: ITerms;
   public operatorAccountId: string;
   public isClosed: boolean;
@@ -25,8 +26,14 @@ export class Vault {
     this.securitizationRatio = convertFixedU128ToBigNumber(
       vault.securitizationRatio.toBigInt(),
     );
-    this.bitcoinLocked = vault.bitcoinLocked.toBigInt();
-    this.bitcoinPending = vault.bitcoinPending.toBigInt();
+    this.argonsLocked = vault.argonsLocked.toBigInt();
+    this.argonsPendingActivation = vault.argonsPendingActivation.toBigInt();
+    if (vault.argonsScheduledForRelease.size > 0) {
+      this.argonsScheduledForRelease.clear();
+      for (const [tick, amount] of vault.argonsScheduledForRelease.entries()) {
+        this.argonsScheduledForRelease.set(tick.toNumber(), amount.toBigInt());
+      }
+    }
     this.terms = {
       bitcoinAnnualPercentRate: convertFixedU128ToBigNumber(
         vault.terms.bitcoinAnnualPercentRate.toBigInt(),
@@ -60,7 +67,20 @@ export class Vault {
 
   public availableBitcoinSpace(): bigint {
     const recoverySecuritization = this.recoverySecuritization();
-    return this.securitization - recoverySecuritization - this.bitcoinLocked;
+    const reLockable = this.getRelockCapacity();
+    return (
+      this.securitization -
+      recoverySecuritization -
+      this.argonsLocked +
+      reLockable
+    );
+  }
+
+  public getRelockCapacity(): bigint {
+    return [...this.argonsScheduledForRelease.values()].reduce(
+      (acc, val) => acc + val,
+      0n,
+    );
   }
 
   public recoverySecuritization(): bigint {
@@ -78,14 +98,14 @@ export class Vault {
   public minimumSecuritization(): bigint {
     return BigInt(
       this.securitizationRatio
-        .multipliedBy(this.bitcoinLocked.toString())
+        .multipliedBy(this.argonsLocked.toString())
         .decimalPlaces(0, BigNumber.ROUND_CEIL)
         .toString(),
     );
   }
 
   public activatedSecuritization(): bigint {
-    const activated = this.bitcoinLocked - this.bitcoinPending;
+    const activated = this.argonsLocked - this.argonsPendingActivation;
     let maxRatio = this.securitizationRatio;
     if (this.securitizationRatio.toNumber() > 2) {
       maxRatio = BigNumber(2);

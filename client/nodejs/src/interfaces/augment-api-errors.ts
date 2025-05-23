@@ -93,10 +93,10 @@ declare module '@polkadot/api-base/types/errors' {
       BitcoinUnableToBeDecodedForRelease: AugmentedError<ApiType>;
       BitcoinUtxoNotFound: AugmentedError<ApiType>;
       /**
-       * There are too many obligations expiring in the given expiration block
+       * An overflow occurred recording a lock expiration
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      GenericObligationError: AugmentedError<ApiType>;
+      GenericVaultError: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       InsufficientSatoshisLocked: AugmentedError<ApiType>;
@@ -109,16 +109,21 @@ declare module '@polkadot/api-base/types/errors' {
        * Funding would result in an overflow of the balance type
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
+      /**
+       * A lock in process of release cannot be ratcheted
+       **/
+      LockInProcessOfRelease: AugmentedError<ApiType>;
       LockNotFound: AugmentedError<ApiType>;
-      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
       NoBitcoinPricesAvailable: AugmentedError<ApiType>;
-      NoMoreObligationIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
+      /**
+       * Nothing to ratchet
+       **/
+      NoRatchetingAvailable: AugmentedError<ApiType>;
       /**
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
-      ObligationNotFound: AugmentedError<ApiType>;
       /**
        * This bitcoin redemption has not been locked in
        **/
@@ -128,6 +133,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
       UnrecoverableHold: AugmentedError<ApiType>;
+      /**
+       * The lock is not verified
+       **/
+      UnverifiedLock: AugmentedError<ApiType>;
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
       /**
@@ -463,42 +472,42 @@ declare module '@polkadot/api-base/types/errors' {
       VaultNotAcceptingMiningBonds: AugmentedError<ApiType>;
     };
     miningSlot: {
-      AccountWouldBeBelowMinimum: AugmentedError<ApiType>;
       /**
        * The mining bid cannot be reduced
        **/
       BidCannotBeReduced: AugmentedError<ApiType>;
+      /**
+       * The given bid isn't high enough to be in the cohort
+       **/
       BidTooLow: AugmentedError<ApiType>;
       /**
-       * Keys cannot be registered by multiple accounts
+       * An account can only have one active registration
        **/
-      CannotRegisterDuplicateKeys: AugmentedError<ApiType>;
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
       /**
-       * There are too many obligations expiring in the given expiration block
+       * The funding account does not have enough funds to cover the bid
        **/
-      ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      HoldUnexpectedlyModified: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * This funding account does not hold the minimum argonots needed
+       **/
       InsufficientOwnershipTokens: AugmentedError<ApiType>;
-      InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
        * Bids must be in allowed increments
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
       /**
-       * Unable to decode the key format
+       * Bidding for the next cohort has closed
        **/
-      InvalidKeyFormat: AugmentedError<ApiType>;
-      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
-      NoMoreObligationIds: AugmentedError<ApiType>;
-      NoPermissions: AugmentedError<ApiType>;
-      ObligationNotFound: AugmentedError<ApiType>;
       SlotNotTakingBids: AugmentedError<ApiType>;
+      /**
+       * The cohort registration overflowed
+       **/
       TooManyBlockRegistrants: AugmentedError<ApiType>;
+      /**
+       * The argonots on hold cannot be released
+       **/
       UnrecoverableHold: AugmentedError<ApiType>;
-      VaultClosed: AugmentedError<ApiType>;
-      VaultNotFound: AugmentedError<ApiType>;
     };
     mint: {
       TooManyPendingMints: AugmentedError<ApiType>;
@@ -881,15 +890,17 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;
       /**
-       * There are too many obligations expiring in the given expiration block
-       **/
-      ExpirationAtBlockOverflow: AugmentedError<ApiType>;
-      /**
        * A funding change is already scheduled
        **/
       FundingChangeAlreadyScheduled: AugmentedError<ApiType>;
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
+      /**
+       * The user doesn't have enough funds to complete this request
+       **/
       InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * There aren't enough funds in the vault to cover the requested bitcoin lock
+       **/
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
        * An internal processing error occurred
@@ -912,19 +923,15 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to decode xpubkey
        **/
       InvalidXpubkey: AugmentedError<ApiType>;
-      MinimumObligationAmountNotMet: AugmentedError<ApiType>;
-      NoMoreObligationIds: AugmentedError<ApiType>;
+      /**
+       * Internally, the vault ids are maxed out
+       **/
       NoMoreVaultIds: AugmentedError<ApiType>;
       NoPermissions: AugmentedError<ApiType>;
       /**
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
-      /**
-       * An error occurred processing an obligation completion
-       **/
-      ObligationCompletionError: AugmentedError<ApiType>;
-      ObligationNotFound: AugmentedError<ApiType>;
       /**
        * The vault bitcoin xpubkey has already been used
        **/
@@ -950,6 +957,9 @@ declare module '@polkadot/api-base/types/errors' {
        * The XPub is unsafe to use in a public blockchain (aka, unhardened)
        **/
       UnsafeXpubkey: AugmentedError<ApiType>;
+      /**
+       * This vault is closed
+       **/
       VaultClosed: AugmentedError<ApiType>;
       VaultNotFound: AugmentedError<ApiType>;
       /**

@@ -9,9 +9,8 @@ use crate::{
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	vault::Obligation,
 	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
-	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
+	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule, MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
@@ -43,7 +42,7 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
 		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
-		let microgons_per_argon = FixedU128::saturating_from_integer(1_000_000);
+		let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);
 
 		let btc_usd_price = Self::get_latest_btc_price_in_us_cents()?;
 		let argon_usd_price = Self::get_latest_argon_price_in_us_cents()?;
@@ -155,23 +154,6 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 		burned_argons: Balance,
 	) -> DispatchResult {
 		for_tuples!( #( Tuple::utxo_released(utxo_id, remove_pending_mints, burned_argons)?; )* );
-		Ok(())
-	}
-}
-
-pub trait ObligationEvents<AccountId: Codec, Balance: Codec + Copy> {
-	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
-	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult;
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(5)]
-impl<AccountId: Codec, Balance: Codec + Copy> ObligationEvents<AccountId, Balance> for Tuple {
-	fn on_canceled(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
-		for_tuples!( #( Tuple::on_canceled(obligation)?; )* );
-		Ok(())
-	}
-	fn on_completed(obligation: &Obligation<AccountId, Balance>) -> DispatchResult {
-		for_tuples!( #( Tuple::on_completed(obligation)?; )* );
 		Ok(())
 	}
 }

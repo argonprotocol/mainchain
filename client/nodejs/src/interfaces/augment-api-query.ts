@@ -12,6 +12,7 @@ import type {
 } from '@polkadot/api-base/types';
 import type {
   BTreeMap,
+  BTreeSet,
   Bytes,
   Null,
   Option,
@@ -52,7 +53,6 @@ import type {
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
-  ArgonPrimitivesVaultObligation,
   FrameSupportDispatchPerDispatchClassWeight,
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
   FrameSupportTokensMiscIdAmountRuntimeHoldReason,
@@ -198,6 +198,15 @@ declare module '@polkadot/api-base/types/storage' {
     };
     bitcoinLocks: {
       /**
+       * Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
+       * unlock it
+       **/
+      lockExpirationsByBitcoinHeight: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
+        [u64]
+      >;
+      /**
        * Stores the block number where the lock was released
        **/
       lockReleaseCosignHeightById: AugmentedQuery<
@@ -228,30 +237,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
-      /**
-       * Mapping of obligation id to lock id
-       **/
-      obligationIdToUtxoId: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u64>>,
-        [u64]
-      >;
-      /**
-       * Stores Utxos that were not paid back in full
-       *
-       * Tuple stores Account, Vault, Still Owed, State
-       **/
-      owedUtxoAggrieved: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<
-          Option<
-            ITuple<[AccountId32, u32, u128, PalletBitcoinLocksLockedBitcoin]>
-          >
-        >,
-        [u64]
-      >;
     };
     bitcoinUtxos: {
       /**
@@ -286,7 +271,7 @@ declare module '@polkadot/api-base/types/storage' {
       >;
       /**
        * Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
-       * the expiration block, the obligation is burned and the UTXO is unlocked.
+       * the expiration block, the funds are burned and the UTXO is unlocked.
        **/
       lockedUtxos: AugmentedQuery<
         ApiType,
@@ -802,7 +787,7 @@ declare module '@polkadot/api-base/types/storage' {
     };
     miningSlot: {
       /**
-       * Lookup by account id to the corresponding index in MinersByCohort and Authorities
+       * Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
        **/
       accountIndexLookup: AugmentedQuery<
         ApiType,
@@ -1476,31 +1461,7 @@ declare module '@polkadot/api-base/types/storage' {
       >;
     };
     vaults: {
-      /**
-       * Completion of bitcoin locks by bitcoin height. Funds are returned to the vault if
-       * unlocked or used as the price of the bitcoin
-       **/
-      bitcoinLockCompletions: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
-        [u64]
-      >;
-      nextObligationId: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<u64>>,
-        []
-      >;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      /**
-       * Obligation by id
-       **/
-      obligationsById: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Option<ArgonPrimitivesVaultObligation>>,
-        [u64]
-      >;
       /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)
@@ -1521,6 +1482,14 @@ declare module '@polkadot/api-base/types/storage' {
           arg: u32 | AnyNumber | Uint8Array,
         ) => Observable<Vec<PalletVaultsVaultFrameFeeRevenue>>,
         [u32]
+      >;
+      /**
+       * The vaults that have funds releasing at a given bitcoin height
+       **/
+      vaultFundsReleasingByHeight: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u32>>,
+        [u64]
       >;
       /**
        * Vaults by id

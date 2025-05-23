@@ -62,7 +62,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       lockDurationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * The bitcoin blocks after an obligation expires which the vault will be allowed to claim
+       * The bitcoin blocks after a BitcoinLock expires which the vault will be allowed to claim
        * a bitcoin
        **/
       lockReclamationBlocks: u64 & AugmentedConst<ApiType>;
@@ -70,6 +70,11 @@ declare module '@polkadot/api-base/types/consts' {
        * Number of bitcoin blocks a vault has to counter-sign a bitcoin release
        **/
       lockReleaseCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
+       * single block
+       **/
+      maxConcurrentlyExpiringLocks: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum releasing utxos at a time
        **/
@@ -458,18 +463,13 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
-       * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
-       * single block
-       **/
-      maxConcurrentlyExpiringObligations: u32 & AugmentedConst<ApiType>;
-      /**
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerTick: u32 & AugmentedConst<ApiType>;
       /**
-       * Minimum amount for an obligation
+       * The max number of vaults that can be created
        **/
-      minimumObligationAmount: u128 & AugmentedConst<ApiType>;
+      maxVaults: u32 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

@@ -501,6 +501,15 @@ mod bitcoin_compat {
 		}
 	}
 }
+
+/// Returns the block height of the next Bitcoin day (eg, next iteration of 144 blocks)
+pub(crate) fn get_rounded_up_bitcoin_day_height(block_height: BitcoinHeight) -> BitcoinHeight {
+	if block_height % 144 == 0 {
+		return block_height;
+	}
+	block_height - (block_height % 144) + 144
+}
+
 pub type BitcoinHeight = u64;
 pub type Satoshis = u64;
 
