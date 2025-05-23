@@ -200,7 +200,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: Alice.into(),
 			authority_id: default_authority(),
-			authority_index: 0,
+			authority_index: (1, 0),
 		}));
 
 		let parent_voting_key = H256::random();
@@ -567,7 +567,7 @@ fn it_can_find_best_vote_seals() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: Alice.into(),
 			authority_id: default_authority(),
-			authority_index: 0,
+			authority_index: (1, 0),
 		}));
 		AuthorityList::set(vec![(Alice.into(), default_authority())]);
 
@@ -690,7 +690,7 @@ fn it_allows_any_block_with_default_votes() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: Alice.into(),
 			authority_id: default_authority(),
-			authority_index: 0,
+			authority_index: (1, 0),
 		}));
 		AuthorityList::set(vec![(Alice.into(), default_authority())]);
 
@@ -782,7 +782,7 @@ fn it_checks_tax_votes() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: Alice.into(),
 			authority_id: default_authority.clone(),
-			authority_index: 0,
+			authority_index: (1, 0),
 		}));
 
 		assert_ok!(BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),);
@@ -818,7 +818,7 @@ fn it_checks_default_votes() {
 		XorClosest::set(Some(MiningAuthority {
 			account_id: Alice.into(),
 			authority_id: default_authority.clone(),
-			authority_index: 0,
+			authority_index: (1, 0),
 		}));
 
 		assert_ok!(BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule,),);

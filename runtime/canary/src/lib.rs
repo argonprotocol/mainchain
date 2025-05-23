@@ -273,15 +273,13 @@ impl pallet_vaults::Config for Runtime {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumObligationAmount = MinimumObligationAmount;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type TickProvider = Ticks;
-	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
-	type EventHandler = (BitcoinLocks,);
 	type CurrentFrameId = GetCurrentFrameId;
+	type MaxVaults = MaxVaults;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -296,15 +294,16 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type PriceProvider = PriceIndex;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
-	type BitcoinBlockHeight = BitcoinUtxos;
+	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type BitcoinObligationProvider = Vaults;
+	type VaultProvider = Vaults;
 	type ArgonTicksPerDay = TicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
 	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
 	type TickProvider = Ticks;
+	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
 }
 
 pub struct GrandpaSlotRotation;
@@ -367,12 +366,15 @@ impl pallet_liquidity_pools::Config for Runtime {
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
-	type MaxMiners = MaxMiners;
+	type FramesPerMiningTerm = FramesPerMiningTerm;
+	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
 	type MinimumArgonotsPerSeat = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
 	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
 	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type TargetPricePerSeat = TargetPricePerSeat;
+	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
@@ -401,7 +403,7 @@ impl pallet_block_seal::Config for Runtime {
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
-	type MaxAuthorities = MaxMiners;
+	type MaxAuthorities = MaxGrandpas;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
 	type KeyOwnerProof = sp_core::Void;

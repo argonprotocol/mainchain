@@ -154,20 +154,13 @@ impl VaultCommands {
 					.load_preset(UTF8_FULL)
 					.apply_modifier(UTF8_ROUND_CORNERS)
 					.set_content_arrangement(ContentArrangement::Dynamic)
-					.set_header(vec![
-						"Utxo Id",
-						"Obligation Id",
-						"Cosign Due Block",
-						"Type",
-						"Redemption Price",
-					]);
+					.set_header(vec!["Utxo Id", "Cosign Due Block", "Type", "Redemption Price"]);
 				for (utxo_id, pending) in pending.0.iter() {
 					if pending.vault_id != vault_id {
 						continue;
 					}
 					table.add_row(vec![
 						utxo_id.to_string(),
-						pending.obligation_id.to_string(),
 						pending.cosign_due_block.to_string(),
 						"Cosign Request".to_string(),
 						ArgonFormatter(pending.redemption_price).to_string(),

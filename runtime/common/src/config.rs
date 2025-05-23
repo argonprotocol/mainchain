@@ -81,7 +81,7 @@ parameter_types! {
 	pub const HalvingTicks: Tick = 2_100_000; // based on bitcoin, but 10x since we're 1 block per minute
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
-	pub const BlockRewardsCohortHistoryToKeep: u32 = (MaxMiners::get() / MaxCohortSize::get()) + 1;
+	pub const BlockRewardsCohortHistoryToKeep: u32 = FramesPerMiningTerm::get() + 1;
 	pub const SlotWindowTicks: Tick = 10 * 1440; // 10 days
 	pub const PayoutHistoryBlocks: u32 = 5;
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
@@ -93,8 +93,12 @@ parameter_types! {
 	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 	// ### pallet_mining_slot
-	pub const MaxMiners: u32 = 100; // must multiply cleanly by MaxCohortSize
-	pub const MaxCohortSize: u32 = MaxMiners::get() / 10; // this means mining_slots last 10 days
+	pub const FramesPerMiningTerm: u32 = 10;
+	pub const MinCohortSize: u32 = 10;
+	pub const MaxCohortSize: u32 = 1000;
+	pub const MaxGrandpas: u32 = 1000;
+	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub const TargetPricePerSeat: Balance = 1000 * ARGON;
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
 	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
@@ -102,10 +106,9 @@ parameter_types! {
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
 	// ### pallet_vaults
-	pub const MaxConcurrentlyExpiringObligations: u32 = 1_000;
-	pub const MinimumObligationAmount: u128 = 100_000;
 	pub const TicksPerDay: Tick = 1440;
 	pub const TicksPerYear: Tick = 1440 * 365;
+	pub const MaxVaults: u32 = 10_000;
 
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
@@ -114,7 +117,6 @@ parameter_types! {
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 
-	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 
 	// ### pallet chain transfer
@@ -154,6 +156,10 @@ parameter_types! {
 	pub const MaxSignatories: u32 = 100;
 
 	// ### pallet_bitcoin_locks
+	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
+	/// Max locks that can expire in a single bitcoin block - effectively the max throughput of locks per bitcoin block (10 minutes)
+	pub const MaxConcurrentlyExpiringLocks: u32 = 10_000;
+
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;

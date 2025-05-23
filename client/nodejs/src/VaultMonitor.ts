@@ -109,7 +109,7 @@ export class VaultMonitor {
     for (const [vaultId, vault] of Object.entries(this.vaultsById)) {
       vaults.push({
         id: vaultId,
-        btcSpace: `${formatArgons(vault.availableBitcoinSpace())} (${formatArgons(vault.bitcoinPending)} pending)`,
+        btcSpace: `${formatArgons(vault.availableBitcoinSpace())} (${formatArgons(vault.argonsPendingActivation)} pending)`,
         btcDeal: `${formatArgons(vault.terms.bitcoinBaseFee)} + ${formatPercent(vault.terms.bitcoinAnnualPercentRate)}`,
         securitization: `${formatArgons(vault.securitization)} at ${vault.securitizationRatio.toFormat(1)}x`,
         securActivated: `${formatArgons(vault.activatedSecuritizationPerSlot())}/slot`,

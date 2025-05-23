@@ -18,11 +18,17 @@ export type IAddressNames = Map<string, string>;
 
 export interface ISubaccountMiner {
   address: string;
-  seat?: number;
-  bidAmount?: bigint;
   subaccountIndex: number;
-  cohortFrameId?: number;
+  seat?: {
+    frameId: number;
+    index: number;
+  };
   isLastDay: boolean;
+}
+
+export interface IMiningIndex {
+  frameId: number;
+  index: number;
 }
 
 export class Accountset {
@@ -170,46 +176,27 @@ export class Accountset {
     const addresses = Object.keys(this.subAccountsByAddress);
     const rawIndices =
       await api.query.miningSlot.accountIndexLookup.multi(addresses);
-    const addressToMiningIndex: { [address: string]: number } = {};
+    const addressToMiningIndex: { [address: string]: IMiningIndex } = {};
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
       if (rawIndices[i].isNone) continue;
-      addressToMiningIndex[address] = rawIndices[i].value.toNumber();
-    }
-    const indices = Object.values(addressToMiningIndex).filter(
-      x => x !== undefined,
-    ) as number[];
-
-    const indexRegistrations = indices.length
-      ? await api.query.miningSlot.activeMinersByIndex.multi(indices)
-      : [];
-    const registrationBySeatIndex: {
-      [seatIndex: string]: { cohortFrameId: number; bidAmount: bigint };
-    } = {};
-
-    for (let i = 0; i < indices.length; i++) {
-      const seatIndex = indices[i];
-      const registration = indexRegistrations[i];
-      if (registration?.isSome) {
-        registrationBySeatIndex[seatIndex] = {
-          cohortFrameId: registration.value.cohortFrameId.toNumber(),
-          bidAmount: registration.value.bid.toBigInt(),
-        };
-      }
+      const [frameId, index] = rawIndices[i].value;
+      addressToMiningIndex[address] = {
+        frameId: frameId.toNumber(),
+        index: index.toNumber(),
+      };
     }
     const nextFrameId = await api.query.miningSlot.nextFrameId();
 
     return addresses.map(address => {
-      const seat = addressToMiningIndex[address];
-      const registration = registrationBySeatIndex[seat];
+      const cohort = addressToMiningIndex[address];
       let isLastDay = false;
-      if (registration?.cohortFrameId) {
-        isLastDay = nextFrameId.toNumber() - registration?.cohortFrameId === 10;
+      if (cohort !== undefined) {
+        isLastDay = nextFrameId.toNumber() - cohort.frameId === 10;
       }
       return {
-        ...registration,
         address,
-        seat,
+        seat: cohort,
         isLastDay,
         subaccountIndex:
           this.subAccountsByAddress[address]?.index ?? Number.NaN,
@@ -220,6 +207,7 @@ export class Accountset {
   public async miningSeats(blockHash?: Uint8Array): Promise<
     (ISubaccountMiner & {
       hasWinningBid: boolean;
+      bidAmount?: bigint;
     })[]
   > {
     const client = await this.client;
@@ -233,7 +221,7 @@ export class Accountset {
       return {
         ...miner,
         hasWinningBid: !!bid,
-        bidAmount: bid?.bid.toBigInt() ?? miner.bidAmount,
+        bidAmount: bid?.bid.toBigInt(),
       };
     });
   }
@@ -591,7 +579,10 @@ interface IAccountStatus {
   address: string;
   argons: string;
   argonots: string;
-  seat?: number;
+  seat?: {
+    frameId: number;
+    index: number;
+  };
   bidPlace?: number;
   bidAmount?: bigint;
   isWorkingOn?: boolean;
