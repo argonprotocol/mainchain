@@ -1,9 +1,10 @@
 use crate::{
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
-		AccountIndexLookup, ActiveMinersByIndex, ActiveMinersCount, ArgonotsPerMiningSeat,
+		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
 		BidsForNextSlotCohort, FrameStartBlockNumbers, HistoricalBidsPerSlot,
-		IsNextSlotBiddingOpen, MinerXorKeyByIndex, MiningConfig, NextFrameId,
+		IsNextSlotBiddingOpen, MinerXorKeysByCohort, MinersByCohort, MiningConfig, NextCohortSize,
+		NextFrameId,
 	},
 	Error, Event, HoldReason, Registration,
 };
@@ -31,7 +32,7 @@ fn it_doesnt_add_cohorts_until_time() {
 			argonots: 0,
 			bid: 0,
 			authority_keys: 1.into(),
-			cohort_frame_id: 1,
+			starting_frame_id: 1,
 			external_funding_account: None,
 			bid_at_tick: 1
 		}]);
@@ -46,16 +47,16 @@ fn it_doesnt_add_cohorts_until_time() {
 
 #[test]
 fn get_validation_window_blocks() {
-	MaxCohortSize::set(2);
-	MaxMiners::set(10);
+	MinCohortSize::set(2);
+	FramesPerMiningTerm::set(5);
 	TicksBetweenSlots::set(1);
 
 	new_test_ext().execute_with(|| {
 		assert_eq!(MiningSlots::get_mining_window_ticks(), 5);
 	});
 
-	MaxCohortSize::set(5);
-	MaxMiners::set(10);
+	MinCohortSize::set(5);
+	FramesPerMiningTerm::set(2);
 	TicksBetweenSlots::set(10);
 
 	new_test_ext().execute_with(|| {
@@ -65,8 +66,9 @@ fn get_validation_window_blocks() {
 
 #[test]
 fn calculate_frame_id() {
+	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
-	MaxMiners::set(100);
+	FramesPerMiningTerm::set(10);
 	let ticks_between_slots = 1440;
 	TicksBetweenSlots::set(ticks_between_slots);
 
@@ -126,9 +128,10 @@ fn calculate_frame_id() {
 }
 
 #[test]
-fn it_updates_cohort_frame_id_at_right_time() {
+fn it_updates_frame_id_at_right_time() {
+	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
-	MaxMiners::set(100);
+	FramesPerMiningTerm::set(10);
 	let ticks_between_slots = 1440;
 	TicksBetweenSlots::set(ticks_between_slots);
 
@@ -156,8 +159,9 @@ fn it_updates_cohort_frame_id_at_right_time() {
 
 #[test]
 fn extends_bidding_if_mining_slot_extends() {
+	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
-	MaxMiners::set(100);
+	FramesPerMiningTerm::set(10);
 	let ticks_between_slots = 1440;
 	TicksBetweenSlots::set(ticks_between_slots);
 
@@ -219,23 +223,10 @@ fn extends_bidding_if_mining_slot_extends() {
 }
 
 #[test]
-fn starting_cohort_index() {
-	let max_cohort_size = 3;
-	let max_validators = 12;
-
-	assert_eq!(MiningSlots::get_slot_starting_index(0, max_validators, max_cohort_size), 0);
-	assert_eq!(MiningSlots::get_slot_starting_index(1, max_validators, max_cohort_size), 3);
-	assert_eq!(MiningSlots::get_slot_starting_index(2, max_validators, max_cohort_size), 6);
-	assert_eq!(MiningSlots::get_slot_starting_index(3, max_validators, max_cohort_size), 9);
-
-	assert_eq!(MiningSlots::get_slot_starting_index(4, max_validators, max_cohort_size), 0);
-}
-
-#[test]
 fn it_adds_new_cohorts_on_block() {
 	TicksBetweenSlots::set(2);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	SlotBiddingStartAfterTicks::set(2);
 
 	new_test_ext().execute_with(|| {
@@ -246,36 +237,45 @@ fn it_adds_new_cohorts_on_block() {
 		assert_eq!(MiningSlots::calculated_frame_id(), 3);
 		NextFrameId::<Test>::put(4);
 
-		for i in 0..4u32 {
-			let account_id: u64 = (i + 4).into();
-			ActiveMinersByIndex::<Test>::insert(
-				i,
-				MiningRegistration {
-					account_id,
-					argonots: 0,
-					bid: 0,
-					authority_keys: account_id.into(),
-					cohort_frame_id: i as u64 + 1,
-					external_funding_account: None,
-					bid_at_tick: 1,
-				},
-			);
-			AccountIndexLookup::<Test>::insert(account_id, i);
-			MinerXorKeyByIndex::<Test>::try_mutate(|index| {
-				let hash = blake2_256(&account_id.to_le_bytes());
-				index.try_insert(i, U256::from_big_endian(&hash))
-			})
-			.unwrap();
+		for frame_id in [1, 3] {
+			for i in [1, 2] {
+				let frame_account_offset = (frame_id - 1) * 3;
+				let account_id: u64 = (i + 4 + frame_account_offset as u32).into();
+				let mut index = 0;
+				MinersByCohort::<Test>::mutate(frame_id, |cohort| {
+					index = cohort.len();
+					cohort
+						.try_push(MiningRegistration {
+							account_id,
+							argonots: 0,
+							bid: 0,
+							authority_keys: account_id.into(),
+							starting_frame_id: frame_id,
+							external_funding_account: None,
+							bid_at_tick: 1,
+						})
+						.ok();
+				});
+				AccountIndexLookup::<Test>::insert(account_id, (frame_id, index as u32));
+				MinerXorKeysByCohort::<Test>::try_mutate(|x| {
+					let hash = blake2_256(&account_id.to_le_bytes());
+					if !x.contains_key(&frame_id) {
+						x.try_insert(frame_id, BoundedVec::default()).unwrap();
+					}
+					x.get_mut(&frame_id).unwrap().try_insert(index, U256::from_big_endian(&hash))
+				})
+				.unwrap();
+			}
 		}
 		ActiveMinersCount::<Test>::put(4);
-		// filled indexes are [0, 1, 2, 3, _, _]
+		println!("MinersByCohort: {:#?}", MinersByCohort::<Test>::iter().collect::<Vec<_>>());
 
 		let cohort = BoundedVec::truncate_from(vec![MiningRegistration {
 			account_id: 1,
 			argonots: 0,
 			bid: 0,
 			authority_keys: 1.into(),
-			cohort_frame_id: 5,
+			starting_frame_id: 5,
 			external_funding_account: None,
 			bid_at_tick: 1,
 		}]);
@@ -296,22 +296,35 @@ fn it_adds_new_cohorts_on_block() {
 			3,
 			"Should have 3 validators still after insertion"
 		);
-		let validators = ActiveMinersByIndex::<Test>::iter().collect::<HashMap<_, _>>();
-		let authority_hashes = MinerXorKeyByIndex::<Test>::get().into_inner();
+		let miners = MinersByCohort::<Test>::iter().collect::<HashMap<_, _>>();
+		let authority_hash_frames = MinerXorKeysByCohort::<Test>::get().into_inner();
 		assert_eq!(
 			BidsForNextSlotCohort::<Test>::get().len(),
 			0,
 			"Queued mining_slot for block 8 should be removed"
 		);
-		assert_eq!(authority_hashes.len(), 3, "Should have 3 authority hashes after insertion");
-		assert_eq!(validators.len(), 3, "Should have 3 validators still after insertion");
+		assert_eq!(
+			authority_hash_frames.len(),
+			2,
+			"Should have only 2 authority hash frames after insertion"
+		);
 
-		assert!(validators.contains_key(&2), "Should insert validator at index 2");
-		assert!(!validators.contains_key(&3), "Should no longer have a validator at index 3");
+		let authority_hashes = authority_hash_frames
+			.iter()
+			.flat_map(|(frame_id, hashes)| {
+				hashes.iter().enumerate().map(move |(i, hash)| ((frame_id, i), *hash))
+			})
+			.collect::<Vec<_>>();
+		assert_eq!(authority_hashes.len(), 3, "Should have 3 authority hashes after insertion");
+
+		assert_eq!(miners.len(), 2, "Should have 3 mining frames still after insertion");
+		assert!(miners.contains_key(&3), "Should have miner for frame 3, 4");
+		assert!(miners.contains_key(&4), "Should have miner for frame 3, 4");
+		assert!(!miners.contains_key(&1), "Should no longer have miners at 1");
 
 		assert_eq!(
 			AccountIndexLookup::<Test>::get(1),
-			Some(2),
+			Some((4, 0)),
 			"Should add an index lookup for account 1 at index 2"
 		);
 		assert!(
@@ -322,7 +335,10 @@ fn it_adds_new_cohorts_on_block() {
 			!AccountIndexLookup::<Test>::contains_key(7),
 			"Should no longer have account 7 registered"
 		);
-		assert!(!authority_hashes.contains_key(&3), "Should no longer have hash index 3");
+		assert!(
+			!authority_hashes.iter().any(|(index, _hash)| index.0 == &1),
+			"Should no longer have frame 1"
+		);
 
 		// check what was called from the events
 		assert_eq!(
@@ -334,10 +350,9 @@ fn it_adds_new_cohorts_on_block() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				start_index: 2,
 				new_miners: BoundedVec::truncate_from(cohort.to_vec()),
 				released_miners: 2,
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
+				frame_id: NextFrameId::<Test>::get() - 1,
 			}
 			.into(),
 		)
@@ -347,7 +362,8 @@ fn it_adds_new_cohorts_on_block() {
 #[test]
 fn it_releases_argonots_when_a_window_closes() {
 	TicksBetweenSlots::set(2);
-	MaxMiners::set(6);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	MaxCohortSize::set(2);
 	SlotBiddingStartAfterTicks::set(0);
 
@@ -361,28 +377,26 @@ fn it_releases_argonots_when_a_window_closes() {
 		NextFrameId::<Test>::set(4);
 		System::set_block_number(7);
 
-		for i in 0..4u32 {
-			let account_id: u64 = i.into();
-			set_ownership(account_id, 1000u32.into());
-			set_argons(account_id, 10_000u32.into());
-
-			let bond_amount = (1000u32 + i).into();
-			let ownership_tokens =
-				MiningSlots::hold_argonots(&account_id, &None, &None).ok().unwrap();
-
-			ActiveMinersByIndex::<Test>::insert(
-				i,
-				MiningRegistration {
-					account_id,
-					argonots: ownership_tokens,
-					bid: bond_amount,
-					authority_keys: 1.into(),
-					cohort_frame_id: 1,
-					external_funding_account: None,
-					bid_at_tick: 7,
-				},
-			);
-			AccountIndexLookup::<Test>::insert(account_id, i);
+		for frame_id in 1..2 {
+			for i in 0..4u32 {
+				let account_id: u64 = i.into();
+				set_ownership(account_id, 1000u32.into());
+				set_argons(account_id, 10_000u32.into());
+				MinersByCohort::<Test>::mutate(frame_id, |cohort| {
+					cohort
+						.try_push(MiningRegistration {
+							account_id,
+							argonots: 0,
+							bid: 0,
+							authority_keys: account_id.into(),
+							starting_frame_id: frame_id,
+							external_funding_account: None,
+							bid_at_tick: 1,
+						})
+						.ok();
+				});
+				AccountIndexLookup::<Test>::insert(account_id, (frame_id, i));
+			}
 		}
 		ActiveMinersCount::<Test>::put(4);
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -399,14 +413,13 @@ fn it_releases_argonots_when_a_window_closes() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
-				start_index: 2,
+				frame_id: NextFrameId::<Test>::get() - 1,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 2,
 					argonots: 1000u32.into(),
 					bid: 0,
 					authority_keys: 1.into(),
-					cohort_frame_id: 4,
+					starting_frame_id: 4,
 					external_funding_account: None,
 					bid_at_tick: 7,
 				}]),
@@ -438,8 +451,8 @@ fn it_releases_argonots_when_a_window_closes() {
 #[test]
 fn it_holds_ownership_tokens_for_a_slot() {
 	TicksBetweenSlots::set(3);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(6);
@@ -496,8 +509,8 @@ fn it_holds_ownership_tokens_for_a_slot() {
 #[test]
 fn it_wont_accept_bids_until_bidding_starts() {
 	TicksBetweenSlots::set(4);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	SlotBiddingStartAfterTicks::set(12);
 	ElapsedTicks::set(11);
 
@@ -525,18 +538,11 @@ fn it_wont_accept_bids_until_bidding_starts() {
 	});
 }
 
-fn get_next_slot_starting_index() -> u32 {
-	let next_cohort_frame_id = NextFrameId::<Test>::get();
-	let cohort_size = MaxCohortSize::get();
-
-	MiningSlots::get_slot_starting_index(next_cohort_frame_id, MaxMiners::get(), cohort_size)
-}
-
 #[test]
 fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	TicksBetweenSlots::set(4);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	SlotBiddingStartAfterTicks::set(0);
 
 	new_test_ext().execute_with(|| {
@@ -548,7 +554,6 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		NextFrameId::<Test>::put(MiningSlots::calculated_frame_id() + 1);
 
 		assert_eq!(MiningSlots::get_next_slot_era(), (16, 16 + (4 * 3)));
-		assert_eq!(get_next_slot_starting_index(), 2);
 		set_ownership(2, 100u32.into());
 		set_ownership(1, 100u32.into());
 		MiningSlots::on_initialize(12);
@@ -565,14 +570,13 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 
 		System::assert_last_event(
 			Event::NewMiners {
-				cohort_frame_id: NextFrameId::<Test>::get() - 1,
-				start_index: 2,
+				frame_id: NextFrameId::<Test>::get() - 1,
 				new_miners: BoundedVec::truncate_from(vec![MiningRegistration {
 					account_id: 1,
 					argonots: ownership,
 					bid: 0,
 					authority_keys: 1.into(),
-					cohort_frame_id: 4,
+					starting_frame_id: 4,
 					external_funding_account: None,
 					bid_at_tick: 12,
 				}]),
@@ -582,7 +586,6 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		);
 		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![16]);
 		assert_eq!(MiningSlots::get_next_slot_era(), (20, 20 + (4 * 3)));
-		assert_eq!(get_next_slot_starting_index(), 4);
 
 		CurrentTick::set(20);
 		ElapsedTicks::set(20);
@@ -590,7 +593,6 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		MiningSlots::on_initialize(20);
 		MiningSlots::on_finalize(20);
 		assert_eq!(MiningSlots::get_next_slot_era(), (24, 24 + (4 * 3)));
-		assert_eq!(get_next_slot_starting_index(), 0);
 
 		assert_err!(
 			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
@@ -604,8 +606,8 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 #[test]
 fn it_will_order_bids() {
 	TicksBetweenSlots::set(3);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(2);
+	MinCohortSize::set(2);
 	ExistentialDeposit::set(100_000);
 	let bid_pool_account_id = BidPoolAccountId::get();
 
@@ -754,15 +756,14 @@ fn it_will_order_bids() {
 		);
 		System::assert_has_event(
 			Event::NewMiners {
-				cohort_frame_id: 2,
-				start_index: 4,
+				frame_id: 2,
 				new_miners: BoundedVec::truncate_from(vec![
 					MiningRegistration {
 						account_id: 1,
 						argonots: 500u32.into(),
 						bid: 2_010_000,
 						authority_keys: 1.into(),
-						cohort_frame_id: 2,
+						starting_frame_id: 2,
 						external_funding_account: None,
 						bid_at_tick: 6,
 					},
@@ -771,7 +772,7 @@ fn it_will_order_bids() {
 						argonots: 500u32.into(),
 						bid: 2_000_000,
 						authority_keys: 2.into(),
-						cohort_frame_id: 2,
+						starting_frame_id: 2,
 						external_funding_account: None,
 						bid_at_tick: 6,
 					},
@@ -786,8 +787,8 @@ fn it_will_order_bids() {
 #[test]
 fn handles_a_max_of_bids_per_block() {
 	TicksBetweenSlots::set(1);
-	MaxMiners::set(4);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(2);
+	MinCohortSize::set(2);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(4);
@@ -830,8 +831,8 @@ fn handles_a_max_of_bids_per_block() {
 #[test]
 fn it_allows_bids_from_an_external_funding_account() {
 	TicksBetweenSlots::set(3);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	ExistentialDeposit::set(100_000);
 	let bid_pool_account_id = BidPoolAccountId::get();
 
@@ -870,7 +871,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 				argonots: 100_000u32.into(),
 				bid: 1_000_000u32.into(),
 				authority_keys: 1.into(),
-				cohort_frame_id: 1,
+				starting_frame_id: 1,
 				external_funding_account: Some(1),
 				bid_at_tick: 6,
 			}]
@@ -892,7 +893,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					argonots: 100_000u32.into(),
 					bid: 2_000_000u32.into(),
 					authority_keys: 3.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: Some(1),
 					bid_at_tick: 6,
 				},
@@ -901,7 +902,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 					argonots: 100_000u32.into(),
 					bid: 1_000_000u32.into(),
 					authority_keys: 1.into(),
-					cohort_frame_id: 1,
+					starting_frame_id: 1,
 					external_funding_account: Some(1),
 					bid_at_tick: 6,
 				}
@@ -937,43 +938,49 @@ fn it_handles_null_authority() {
 
 #[test]
 fn it_can_get_closest_authority() {
-	MaxMiners::set(100);
+	MinCohortSize::set(100);
+	MaxCohortSize::set(100);
+	FramesPerMiningTerm::set(10);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
 		ElapsedTicks::set(8);
 
-		for i in 0..100u32 {
-			let account_id: u64 = i.into();
-			ActiveMinersByIndex::<Test>::insert(
-				i,
-				MiningRegistration {
-					account_id,
-					argonots: 0,
-					bid: 0,
-					authority_keys: account_id.into(),
-					cohort_frame_id: 1,
-					external_funding_account: None,
-					bid_at_tick: 1,
-				},
-			);
-			AccountIndexLookup::<Test>::insert(account_id, i);
-		}
-		MinerXorKeyByIndex::<Test>::try_mutate(|a| {
-			for i in 0..100u32 {
-				// these are normally hashed, but we'll simplify to ease the xor calculation
-				let hash = U256::from(i);
-				let _ = a.try_insert(i, hash);
+		for frame_id in 1..=10u64 {
+			for i in 0..10u32 {
+				let account_id: u64 = (((frame_id - 1) * 10) as u32 + i).into();
+				MinersByCohort::<Test>::mutate(frame_id, |x| {
+					x.try_insert(
+						i as usize,
+						MiningRegistration {
+							account_id,
+							argonots: 0,
+							bid: 0,
+							authority_keys: account_id.into(),
+							starting_frame_id: frame_id,
+							external_funding_account: None,
+							bid_at_tick: 1,
+						},
+					)
+					.unwrap();
+				});
+				AccountIndexLookup::<Test>::insert(account_id, (frame_id, i));
+				MinerXorKeysByCohort::<Test>::try_mutate(|a| {
+					if !a.contains_key(&frame_id) {
+						a.try_insert(frame_id, Default::default()).ok();
+					}
+					let hash = U256::from(account_id);
+					a.get_mut(&frame_id).unwrap().try_insert(i as usize, hash)
+				})
+				.expect("Didn't insert authorities");
 			}
-			Ok::<(), Error<Test>>(())
-		})
-		.expect("Didn't insert authorities");
+		}
 
 		assert_eq!(
 			MiningSlots::xor_closest_authority(U256::from(100)),
 			Some(MiningAuthority {
 				account_id: 96,
 				authority_id: UintAuthorityId(96),
-				authority_index: 96,
+				authority_index: (10, 6),
 			})
 		);
 	});
@@ -982,8 +989,8 @@ fn it_can_get_closest_authority() {
 #[test]
 fn it_will_end_auctions_if_a_seal_qualifies() {
 	TicksBetweenSlots::set(100);
-	MaxMiners::set(6);
-	MaxCohortSize::set(2);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
 	BlocksBeforeBidEndForVrfClose::set(10);
 	SlotBiddingStartAfterTicks::set(0);
 
@@ -1014,8 +1021,8 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 		.unwrap();
 		assert!(!MiningSlots::check_for_bidding_close(invalid_strength));
 
-		let cohort_frame_id = NextFrameId::<Test>::get();
-		System::assert_last_event(Event::MiningBidsClosed { cohort_frame_id }.into());
+		let frame_id = NextFrameId::<Test>::get();
+		System::assert_last_event(Event::MiningBidsClosed { frame_id }.into());
 
 		if env::var("TEST_DISTRO").unwrap_or("false".to_string()) == "true" {
 			let mut valid_seals = vec![];
@@ -1044,7 +1051,8 @@ fn bid_stats(count: u32, amount: Balance) -> MiningBidStats {
 #[test]
 fn it_adjusts_locked_argonots() {
 	TicksBetweenSlots::set(10);
-	MaxMiners::set(100);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(10);
 	TargetBidsPerSlot::set(12);
@@ -1106,9 +1114,61 @@ fn it_adjusts_locked_argonots() {
 }
 
 #[test]
+fn it_adjusts_mining_seats() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(1000);
+	SlotBiddingStartAfterTicks::set(10);
+	TargetPricePerSeat::set(100 * 1_000_000);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(10);
+		ArgonotsPerMiningSeat::<Test>::set(100_000);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		// submit 10 bids
+		for i in 0..10 {
+			set_ownership(i, 100_000);
+			set_argons(i, 111_000_000);
+			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 110 * 1_000_000, 1.into(), None));
+		}
+
+		ElapsedTicks::set(20);
+		CurrentTick::set(20);
+		MiningSlots::on_initialize(11);
+		MiningSlots::on_finalize(11);
+		assert_eq!(NextFrameId::<Test>::get(), 2);
+		assert_eq!(AveragePricePerSeat::<Test>::get().to_vec(), vec![110 * 1_000_000]);
+		assert_eq!(NextCohortSize::<Test>::get(), 11);
+
+		for frame in 1..=11 {
+			for i in 0..10 {
+				let account = (((frame) * 10) as u32 + i).into();
+				set_ownership(account, 100_000);
+				set_argons(account, 111_000_000);
+				assert_ok!(MiningSlots::bid(
+					RuntimeOrigin::signed(account),
+					110 * 1_000_000,
+					1.into(),
+					None
+				));
+			}
+			ElapsedTicks::set(20 + frame * 10);
+			CurrentTick::set(20 + frame * 10);
+			MiningSlots::on_initialize(20 + frame * 10);
+			MiningSlots::on_finalize(20 + frame * 10);
+			assert_eq!(NextFrameId::<Test>::get(), frame + 2);
+		}
+		assert_eq!(NextCohortSize::<Test>::get(), 11 + 13);
+		assert_eq!(AveragePricePerSeat::<Test>::get().len(), 10);
+	});
+}
+
+#[test]
 fn it_doesnt_accept_bids_until_first_slot() {
 	TicksBetweenSlots::set(1440);
-	MaxMiners::set(100);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(12_960);
 	TargetBidsPerSlot::set(12);
@@ -1145,7 +1205,6 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		assert_eq!(NextFrameId::<Test>::get(), 2);
 		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![next_divisible_period]);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
-		assert_eq!(get_next_slot_starting_index(), 20);
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
 	});
 }

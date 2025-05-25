@@ -26,29 +26,29 @@ export class MiningBids {
   }
 
   public async onCohortChange(options: {
-    onBiddingStart?: (cohortFrameId: number) => Promise<void>;
-    onBiddingEnd?: (cohortFrameId: number) => Promise<void>;
+    onBiddingStart?: (cohortStartingFrameId: number) => Promise<void>;
+    onBiddingEnd?: (cohortStartingFrameId: number) => Promise<void>;
   }): Promise<{ unsubscribe: () => void }> {
     const { onBiddingStart, onBiddingEnd } = options;
     const client = await this.client;
-    let openCohortFrameId = 0;
+    let openCohortStartingFrameId = 0;
     const unsubscribe = await client.queryMulti<[Bool, u64]>(
       [
         client.query.miningSlot.isNextSlotBiddingOpen as any,
         client.query.miningSlot.nextFrameId as any,
       ],
-      async ([isBiddingOpen, rawNextCohortFrameId]) => {
-        const nextFrameId = rawNextCohortFrameId.toNumber();
+      async ([isBiddingOpen, rawNextCohortStartingFrameId]) => {
+        const nextFrameId = rawNextCohortStartingFrameId.toNumber();
 
         if (isBiddingOpen.isTrue) {
-          if (openCohortFrameId !== 0) {
-            await onBiddingEnd?.(openCohortFrameId);
+          if (openCohortStartingFrameId !== 0) {
+            await onBiddingEnd?.(openCohortStartingFrameId);
           }
-          openCohortFrameId = nextFrameId;
+          openCohortStartingFrameId = nextFrameId;
           await onBiddingStart?.(nextFrameId);
         } else {
           await onBiddingEnd?.(nextFrameId);
-          openCohortFrameId = 0;
+          openCohortStartingFrameId = 0;
         }
       },
     );

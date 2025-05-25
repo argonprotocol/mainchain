@@ -39,7 +39,7 @@ export class CohortBidder {
 
   constructor(
     public accountset: Accountset,
-    public cohortFrameId: number,
+    public cohortStartingFrameId: number,
     public subaccounts: { index: number; isRebid: boolean; address: string }[],
     public options: {
       minBid: bigint;
@@ -50,7 +50,7 @@ export class CohortBidder {
       tipPerTransaction?: bigint;
     },
   ) {
-    this.history = new CohortBidderHistory(cohortFrameId, subaccounts);
+    this.history = new CohortBidderHistory(cohortStartingFrameId, subaccounts);
     this.subaccounts.forEach(x => {
       this.myAddresses.add(x.address);
     });
@@ -59,7 +59,7 @@ export class CohortBidder {
   public async stop(): Promise<CohortBidder['stats']> {
     if (this.isStopped) return this.stats;
     this.isStopped = true;
-    console.log('Stopping bidder for cohort', this.cohortFrameId);
+    console.log('Stopping bidder for cohort', this.cohortStartingFrameId);
     clearTimeout(this.retryTimeout);
     if (this.unsubscribe) {
       this.unsubscribe();
@@ -69,7 +69,10 @@ export class CohortBidder {
       client.query.miningSlot.nextFrameId as any,
       client.query.miningSlot.isNextSlotBiddingOpen,
     ]);
-    if (nextFrameId.toNumber() === this.cohortFrameId && isBiddingOpen.isTrue) {
+    if (
+      nextFrameId.toNumber() === this.cohortStartingFrameId &&
+      isBiddingOpen.isTrue
+    ) {
       console.log('Bidding is still open, waiting for it to close');
       await new Promise<void>(async resolve => {
         const unsub = await client.query.miningSlot.isNextSlotBiddingOpen(
@@ -89,8 +92,8 @@ export class CohortBidder {
     let header = await client.rpc.chain.getHeader();
     while (true) {
       const api = await client.at(header.hash);
-      const cohortFrameId = await api.query.miningSlot.nextFrameId();
-      if (cohortFrameId.toNumber() === this.cohortFrameId) {
+      const cohortStartingFrameId = await api.query.miningSlot.nextFrameId();
+      if (cohortStartingFrameId.toNumber() === this.cohortStartingFrameId) {
         break;
       }
       header = await client.rpc.chain.getHeader(header.parentHash);
@@ -101,7 +104,7 @@ export class CohortBidder {
 
     this.history.trackChange(bids, header.number.toNumber(), tick, true);
     console.log('Bidder stopped', {
-      cohortFrameId: this.cohortFrameId,
+      cohortStartingFrameId: this.cohortStartingFrameId,
       blockNumber: header.number.toNumber(),
       tick,
       bids: bids.map(x => ({
@@ -114,7 +117,7 @@ export class CohortBidder {
   }
 
   public async start() {
-    console.log(`Starting cohort ${this.cohortFrameId} bidder`, {
+    console.log(`Starting cohort ${this.cohortStartingFrameId} bidder`, {
       maxBid: formatArgons(this.options.maxBid),
       minBid: formatArgons(this.options.minBid),
       bidIncrement: formatArgons(this.options.bidIncrement),
@@ -137,7 +140,7 @@ export class CohortBidder {
         client.query.miningSlot.nextFrameId as any,
       ],
       async ([bids, nextFrameId]) => {
-        if (nextFrameId.toNumber() === this.cohortFrameId) {
+        if (nextFrameId.toNumber() === this.cohortStartingFrameId) {
           await this.checkWinningBids(bids);
         }
       },
@@ -174,7 +177,7 @@ export class CohortBidder {
     }
     console.log(
       'Checking bids for cohort',
-      this.cohortFrameId,
+      this.cohortStartingFrameId,
       this.subaccounts.map(x => x.index),
     );
 
@@ -242,7 +245,7 @@ export class CohortBidder {
 
     if (nextBid - lowestBid < MIN_INCREMENT) {
       console.log(
-        `Can't make any more bids for ${this.cohortFrameId} with given constraints.`,
+        `Can't make any more bids for ${this.cohortStartingFrameId} with given constraints.`,
         {
           lowestCurrentBid: formatArgons(lowestBid),
           nextAttemptedBid: formatArgons(nextBid),
@@ -345,7 +348,10 @@ export class CohortBidder {
       if (bidError) throw bidError;
     } catch (err) {
       this.lastBidTime = prevLastBidTime;
-      console.error(`Error bidding for cohort ${this.cohortFrameId}:`, err);
+      console.error(
+        `Error bidding for cohort ${this.cohortStartingFrameId}:`,
+        err,
+      );
       clearTimeout(this.retryTimeout);
       this.retryTimeout = setTimeout(() => void this.checkCurrentSeats(), 1000);
     } finally {

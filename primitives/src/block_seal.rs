@@ -88,9 +88,9 @@ pub struct MiningRegistration<
 	pub argonots: Balance,
 	/// The signing keys for the miner
 	pub authority_keys: Keys,
-	/// Which cohort the miner is in
+	/// Which frame the miner started in
 	#[codec(compact)]
-	pub cohort_frame_id: FrameId,
+	pub starting_frame_id: FrameId,
 	/// When the bid was placed
 	#[codec(compact)]
 	pub bid_at_tick: Tick,
@@ -129,11 +129,11 @@ impl MaxEncodedLen for PeerId {
 	}
 }
 
-pub type MinerIndex = u32;
+/// The starting frame id for a miner and the index of the miner in that frame
+pub type MinerIndex = (FrameId, u32);
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct MiningAuthority<AuthorityId, AccountId> {
-	#[codec(compact)]
 	pub authority_index: MinerIndex,
 	pub authority_id: AuthorityId,
 	pub account_id: AccountId,
