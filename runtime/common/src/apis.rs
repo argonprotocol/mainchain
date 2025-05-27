@@ -283,7 +283,7 @@ macro_rules! inject_common_apis {
             }
 
             fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
-                BitcoinLocks::get_redemption_price(&satoshis).ok()
+                BitcoinLocks::get_redemption_price(&satoshis, None).ok()
             }
 
             fn market_rate(satoshis: Satoshis) -> Option<Balance> {
