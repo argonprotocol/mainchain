@@ -339,6 +339,8 @@ pub mod pallet {
 		LockInProcessOfRelease,
 		/// The lock is not verified
 		UnverifiedLock,
+		/// An overflow or underflow occurred while calculating the redemption price
+		OverflowError,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -558,7 +560,8 @@ pub mod pallet {
 			// If this is a confirmed utxo, we require the release price to be paid
 			if lock.is_verified {
 				ensure!(bitcoin_network_fee < lock.satoshis, Error::<T>::BitcoinFeeTooHigh);
-				redemption_price = Self::get_redemption_price(&lock.satoshis)?.min(lock.lock_price);
+				redemption_price =
+					Self::get_redemption_price(&lock.satoshis, Some(lock.lock_price))?;
 				// hold funds until the utxo is seen in the chain
 				let balance = T::Currency::balance(&who);
 				ensure!(
@@ -756,9 +759,9 @@ pub mod pallet {
 				duration_for_new_funds =
 					FixedU128::from_rational(elapsed_blocks as u128, full_term as u128);
 			} else {
-				let redemption_price = Self::get_redemption_price(&lock.satoshis)
-					.map_err(|_| Error::<T>::NoBitcoinPricesAvailable)?
-					.min(original_lock_price);
+				let redemption_price =
+					Self::get_redemption_price(&lock.satoshis, Some(original_lock_price))
+						.map_err(|_| Error::<T>::NoBitcoinPricesAvailable)?;
 				// first we'll burn the redemption price (just like a release)
 				amount_burned = redemption_price;
 
@@ -883,7 +886,8 @@ pub mod pallet {
 			}
 
 			// burn the current redemption price from the vault
-			let redemption_rate = Self::get_redemption_price(&lock.satoshis)?;
+			let redemption_rate =
+				Self::get_redemption_price(&lock.satoshis, Some(lock.lock_price))?;
 
 			T::VaultProvider::burn(
 				lock.vault_id,
@@ -958,32 +962,61 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn get_redemption_price(satoshis: &Satoshis) -> Result<T::Balance, Error<T>> {
-			const REDEMPTION_MULTIPLIER: FixedU128 = FixedU128::from_rational(713, 1000);
-			const REDEMPTION_ADDON: FixedU128 = FixedU128::from_rational(274, 1000);
-			let mut price: u128 = T::PriceProvider::get_bitcoin_argon_price(*satoshis)
+		pub fn get_redemption_price(
+			satoshis: &Satoshis,
+			lock_price: Option<T::Balance>,
+		) -> Result<T::Balance, Error<T>> {
+			let satoshis: u128 = (*satoshis).into();
+			let mut price: u128 = T::PriceProvider::get_latest_btc_price_in_us_cents()
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-				.unique_saturated_into();
-			let cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
+				.saturating_mul_int(satoshis)
+				// has 2 decimal places, but argons are in 6, so we need to scale it
+				.saturating_div(10_000u128);
 
-			if cpi.is_positive() {
-				let argon_price =
-					T::PriceProvider::get_latest_argon_price_in_us_cents().unwrap_or_default();
+			if let Some(lock_price) = lock_price {
+				price = price.min(lock_price.into());
+			}
 
-				let multiplier = REDEMPTION_MULTIPLIER
-					.saturating_mul(argon_price)
-					.saturating_add(REDEMPTION_ADDON);
+			let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
 
-				// Apply the formula: R = (Pb / Pa) * (0.713 * Pa + 0.274)
-				// Pa should be in a float value (1.01)
-				// `price` is already (Pb / Pa)
-				// The redemption price of the argon allocates fluctuating incentives based on how
-				// fast the dip should be incentivized to be capitalized on.
+			// Case 1: If argon is at or above target price, no penalty — unlock cost is just b.
+			let price: T::Balance = if r >= FixedU128::one() {
+				price
+			}
+			// Case 2: Mild deviation (0.90 ≤ r < 1) — apply quadratic curve to scale unlock cost.
+			else if r >= FixedU128::from_rational(0_9, 1_0) {
+				const FX_20: FixedU128 = FixedU128::from_u32(20);
+				const FX_38: FixedU128 = FixedU128::from_u32(38);
+				const FX_19: FixedU128 = FixedU128::from_u32(19);
 
-				price = multiplier.saturating_mul_int(price);
-			};
-
-			Ok(price.into())
+				// Formula: b * (20r² - 38r + 19)
+				((FX_20 * r.saturating_pow(2)) + FX_19)
+					.ensure_sub(FX_38 * r)
+					.map_err(|_| Error::<T>::OverflowError)?
+					.saturating_mul_int(price)
+			}
+			// Case 3: Moderate deviation (0.01 ≤ r < 0.90) — apply rational linear formula.
+			else if r >= FixedU128::from_rational(0_01, 1_00) {
+				const FX_0_5618: FixedU128 = FixedU128::from_rational(0_5618, 1_0000);
+				const FX_0_3944: FixedU128 = FixedU128::from_rational(0_3944, 1_0000);
+				// Formula: b * ((0.5618r + 0.3944) / r)
+				((FX_0_5618 * r) + FX_0_3944)
+					.ensure_div(r)
+					.map_err(|_| Error::<T>::OverflowError)?
+					.saturating_mul_int(price)
+			}
+			// Case 4: Extreme deviation (r < 0.01) — maximize burn using an aggressive slope.
+			else {
+				const FX_0_576: FixedU128 = FixedU128::from_rational(0_576, 1_000);
+				const FX_0_4: FixedU128 = FixedU128::from_rational(0_4, 1_0);
+				// Formula: (b / r) * (0.576r + 0.4)
+				FixedU128::from_u32(1)
+					.div(r)
+					.saturating_mul((FX_0_576 * r) + FX_0_4)
+					.saturating_mul_int(price)
+			}
+			.into();
+			Ok(price)
 		}
 
 		fn cancel_lock(utxo_id: UtxoId) -> Result<(), Error<T>> {

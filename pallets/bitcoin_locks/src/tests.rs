@@ -184,30 +184,63 @@ fn marks_a_verified_bitcoin() {
 #[test]
 fn calculates_redemption_prices() {
 	new_test_ext().execute_with(|| {
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
-		ArgonPricePerUsd::set(Some(FixedU128::saturating_from_integer(1)));
-		ArgonCPI::set(Some(FixedI128::zero()));
-		{
-			let new_price =
-				BitcoinLocks::get_redemption_price(&100_000_000).expect("should have price");
-			assert_eq!(new_price, 50_000_000_000);
+		struct Scenario {
+			argon_price: &'static str,
+			btc_price: &'static str,
+			expected_redemption: &'static str,
 		}
-		ArgonPricePerUsd::set(Some(FixedU128::from_float(1.01)));
-		{
-			let new_price =
-				BitcoinLocks::get_redemption_price(&100_000_000).expect("should have price");
-			assert_eq!(new_price, (50_000_000_000f64 / 1.01f64) as u128);
+		fn parse_price_in_cents(price: &str) -> FixedU128 {
+			let decimal_places = if price.contains(".") {
+				price.chars().rev().take_while(|&c| c != '.').count()
+			} else {
+				2
+			};
+			let u32: u32 =
+				price.replace(".", "").replace(",", "").parse().expect("should parse price");
+
+			FixedU128::from_u32(u32)
+				.div(FixedU128::from_u32(10u32).saturating_pow(decimal_places - 2))
 		}
-		ArgonCPI::set(Some(FixedI128::from_float(0.1)));
-		{
-			let new_price =
-				BitcoinLocks::get_redemption_price(&100_000_000).expect("should have price");
-			// round to 3 digit precision for multiplier
-			let multiplier = 0.713 * 1.01 + 0.274;
-			// NOTE: floating point yields different rounding - might need to modify if you change
-			// values
-			assert_eq!(new_price, (multiplier * (50_000_000_000.0 / 1.01)) as u128);
+		fn test_scenario(name: &str, scenario: Scenario) {
+			ArgonPriceInUsdCents::set(Some(parse_price_in_cents(scenario.argon_price)));
+			ArgonTargetPriceInUsdCents::set(Some(FixedU128::from_u32(100)));
+			BitcoinPriceInUsdCents::set(Some(parse_price_in_cents(scenario.btc_price)));
+			let new_price = BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN, None)
+				.expect("should have price");
+			let expected_price = parse_price_in_cents(scenario.expected_redemption);
+			assert_eq!(
+				new_price,
+				expected_price.saturating_mul_int((MICROGONS_PER_ARGON / 100).into()),
+				"{}: redemption price",
+				name
+			);
 		}
+		test_scenario(
+			">= 1.0 tier",
+			Scenario { argon_price: "1.00", btc_price: "1.00", expected_redemption: "1.00" },
+		);
+		test_scenario(
+			">= 0.9 tier",
+			Scenario { argon_price: "0.95", btc_price: "1.00", expected_redemption: "0.95" },
+		);
+		test_scenario(
+			"0.01 >= r < 0.9 tier (0.8)",
+			Scenario { argon_price: "0.80", btc_price: "1.00", expected_redemption: "1.0548" },
+		);
+		test_scenario(
+			"0.01 >= r < 0.9 tier (0.2)",
+			Scenario { argon_price: "0.20", btc_price: "1.00", expected_redemption: "2.5338" },
+		);
+
+		test_scenario(
+			"r < 0.01 tier (0.001)",
+			Scenario { argon_price: "0.001", btc_price: "1.00", expected_redemption: "400.576" },
+		);
+
+		test_scenario(
+			"r < 0.01 tier (0.0001)",
+			Scenario { argon_price: "0.0001", btc_price: "1.00", expected_redemption: "4,000.576" },
+		);
 	});
 }
 
@@ -221,7 +254,7 @@ fn burns_a_spent_bitcoin() {
 		set_argons(who, 2_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().securitization;
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(62000)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(62000_00)));
 		CurrentTick::set(1);
 
 		assert_ok!(BitcoinLocks::initialize(
@@ -238,13 +271,11 @@ fn burns_a_spent_bitcoin() {
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(50000)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(50000_00)));
 
-		let new_price =
-			BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
-		// 50_000_000_000 microgons for a bitcoin
-		// 50m * 0.987 = 49,350,000
-		assert_eq!(new_price, 49_350_000_000);
+		let new_price = BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN, None)
+			.expect("should have price");
+		assert_eq!(new_price, 50_000_000_000);
 
 		assert_ok!(BitcoinLocks::utxo_spent(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
@@ -314,7 +345,7 @@ fn can_release_a_bitcoin() {
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.lock_price));
 
-		BitcoinPricePerUsd::set(Some(FixedU128::from_float(65_000.00)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::from_u32(65_000_00)));
 		// now the user goes to release
 		// 1. We would create a psbt and output address
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -347,8 +378,8 @@ fn can_release_a_bitcoin() {
 			1000
 		));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
-		let redemption_price =
-			BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
+		let redemption_price = BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN, None)
+			.expect("should have price");
 		assert!(redemption_price > lock.lock_price);
 		// redemption price should be the lock price since current redemption price is above
 		assert_eq!(
@@ -405,7 +436,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
 		let redemption_price =
-			BitcoinLocks::get_redemption_price(&satoshis).expect("should have price");
+			BitcoinLocks::get_redemption_price(&satoshis, None).expect("should have price");
 		let cosign_due = BitcoinBlockHeightChange::get().1 + LockReleaseCosignDeadlineBlocks::get();
 		assert_eq!(
 			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
@@ -480,7 +511,7 @@ fn clears_released_bitcoins() {
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
 		let redemption_price =
-			BitcoinLocks::get_redemption_price(&satoshis).expect("should have price");
+			BitcoinLocks::get_redemption_price(&satoshis, None).expect("should have price");
 		let cosign_due_block =
 			BitcoinBlockHeightChange::get().1 + LockReleaseCosignDeadlineBlocks::get();
 		assert_eq!(
@@ -557,7 +588,7 @@ fn it_should_aggregate_holds_for_a_second_release() {
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.lock_price * 2));
 		let redemption_price =
-			BitcoinLocks::get_redemption_price(&satoshis).expect("should have price");
+			BitcoinLocks::get_redemption_price(&satoshis, None).expect("should have price");
 
 		assert_ok!(BitcoinLocks::request_release(
 			RuntimeOrigin::signed(who),
@@ -590,7 +621,7 @@ fn it_should_allow_a_ratchet_up() {
 		let who = 1;
 		let satoshis = SATOSHIS_PER_BITCOIN;
 		let current_block = BitcoinBlockHeightChange::get().1;
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(62_000_00)));
 		let apr = FixedU128::from_float(0.00000001);
 		DefaultVault::mutate(|a| {
 			a.securitization = 70_000_000_000;
@@ -611,7 +642,7 @@ fn it_should_allow_a_ratchet_up() {
 		let middle_block = (current_block + (expiration_block - current_block) / 2) + 1;
 		BitcoinBlockHeightChange::set((middle_block, middle_block));
 
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(65000)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(65000_00)));
 		assert_err!(
 			BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1,),
 			Error::<Test>::InsufficientVaultFunds,
@@ -662,7 +693,7 @@ fn it_should_allow_a_ratchet_down() {
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let who = 1;
 		let satoshis = SATOSHIS_PER_BITCOIN;
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(62_000_00)));
 		let apr = FixedU128::from_float(0.00000001);
 		DefaultVault::mutate(|a| {
 			a.securitization = 62_000_000_000;
@@ -686,9 +717,9 @@ fn it_should_allow_a_ratchet_down() {
 		assert_eq!(Balances::free_balance(who), balance);
 
 		// now set price to 52k and down ratchet
-		BitcoinPricePerUsd::set(Some(FixedU128::saturating_from_integer(52_000)));
-		let redemption_price =
-			BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN).expect("should have price");
+		BitcoinPriceInUsdCents::set(Some(FixedU128::saturating_from_integer(52_000_00)));
+		let redemption_price = BitcoinLocks::get_redemption_price(&SATOSHIS_PER_BITCOIN, None)
+			.expect("should have price");
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1,));
 		assert_eq!(
 			LastReleaseEvent::get(),

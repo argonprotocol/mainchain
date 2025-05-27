@@ -207,6 +207,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_pool_liquidity() -> Option<Balance> {
 		Some(UniswapLiquidity::get())
 	}
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		None
+	}
 }
 
 impl pallet_block_rewards::Config for Test {
