@@ -316,33 +316,24 @@ pub mod pallet {
 
 	#[pallet::error]
 	pub enum Error<T> {
+		/// Bidding for the next cohort has closed
 		SlotNotTakingBids,
+		/// The cohort registration overflowed
 		TooManyBlockRegistrants,
+		/// This funding account does not hold the minimum argonots needed
 		InsufficientOwnershipTokens,
+		/// The given bid isn't high enough to be in the cohort
 		BidTooLow,
+		/// An account can only have one active registration
 		CannotRegisterOverlappingSessions,
-		// copied from vault
-		ObligationNotFound,
-		NoMoreObligationIds,
-		VaultClosed,
-		MinimumObligationAmountNotMet,
-		/// There are too many obligations expiring in the given expiration block
-		ExpirationAtBlockOverflow,
+		/// The funding account does not have enough funds to cover the bid
 		InsufficientFunds,
-		InsufficientVaultFunds,
-		NoPermissions,
-		HoldUnexpectedlyModified,
-		UnrecoverableHold,
-		VaultNotFound,
-		AccountWouldBeBelowMinimum,
-		/// Keys cannot be registered by multiple accounts
-		CannotRegisterDuplicateKeys,
-		/// Unable to decode the key format
-		InvalidKeyFormat,
 		/// The mining bid cannot be reduced
 		BidCannotBeReduced,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
+		/// The argonots on hold cannot be released
+		UnrecoverableHold,
 	}
 
 	#[pallet::hooks]
@@ -688,7 +679,7 @@ impl<T: Config> Pallet<T> {
 				active_miners -= 1;
 				let _ = released_miners_by_account_id.try_insert(account_id.clone(), miner.clone());
 				removed_miners.push((account_id, miner.authority_keys.clone()));
-				Self::release_mining_seat_obligations(&miner, false);
+				Self::release_mining_seat_argonots(&miner, false);
 			}
 		}
 
@@ -1025,7 +1016,7 @@ impl<T: Config> Pallet<T> {
 
 	/// Release the argonots from the mining seat. If the Argonots will be re-used in the next
 	/// era, we should not unlock it
-	pub(crate) fn release_mining_seat_obligations(
+	pub(crate) fn release_mining_seat_argonots(
 		active_registration: &Registration<T>,
 		is_registered_for_next: bool,
 	) {

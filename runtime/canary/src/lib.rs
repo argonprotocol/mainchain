@@ -273,15 +273,13 @@ impl pallet_vaults::Config for Runtime {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type MinimumObligationAmount = MinimumObligationAmount;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
 	type MiningSlotProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type TickProvider = Ticks;
-	type MaxConcurrentlyExpiringObligations = MaxConcurrentlyExpiringObligations;
-	type EventHandler = (BitcoinLocks,);
 	type CurrentFrameId = GetCurrentFrameId;
+	type MaxVaults = MaxVaults;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -296,15 +294,16 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type PriceProvider = PriceIndex;
 	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
-	type BitcoinBlockHeight = BitcoinUtxos;
+	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type GetBitcoinNetwork = BitcoinUtxos;
-	type BitcoinObligationProvider = Vaults;
+	type VaultProvider = Vaults;
 	type ArgonTicksPerDay = TicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
 	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
 	type TickProvider = Ticks;
+	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
 }
 
 pub struct GrandpaSlotRotation;

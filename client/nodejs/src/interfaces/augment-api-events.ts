@@ -32,8 +32,6 @@ import type {
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotaryNotaryRecord,
-  ArgonPrimitivesVaultFundType,
-  ArgonPrimitivesVaultObligationExpiration,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   FrameSupportTokensMiscBalanceStatus,
@@ -244,71 +242,68 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           utxoId: u64,
-          obligationId: u64,
           vaultId: u32,
           compensationAmount: u128,
-          compensationStillOwed: u128,
           compensatedAccountId: AccountId32,
         ],
         {
           utxoId: u64;
-          obligationId: u64;
           vaultId: u32;
           compensationAmount: u128;
-          compensationStillOwed: u128;
           compensatedAccountId: AccountId32;
         }
       >;
       BitcoinLockBurned: AugmentedEvent<
         ApiType,
-        [
-          utxoId: u64,
-          vaultId: u32,
-          obligationId: u64,
-          amountBurned: u128,
-          amountHeld: u128,
-          wasUtxoSpent: bool,
-        ],
-        {
-          utxoId: u64;
-          vaultId: u32;
-          obligationId: u64;
-          amountBurned: u128;
-          amountHeld: u128;
-          wasUtxoSpent: bool;
-        }
+        [utxoId: u64, vaultId: u32, wasUtxoSpent: bool],
+        { utxoId: u64; vaultId: u32; wasUtxoSpent: bool }
       >;
       BitcoinLockCreated: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, vaultId: u32, lockPrice: u128, accountId: AccountId32],
+        { utxoId: u64; vaultId: u32; lockPrice: u128; accountId: AccountId32 }
+      >;
+      BitcoinLockRatcheted: AugmentedEvent<
         ApiType,
         [
           utxoId: u64,
           vaultId: u32,
-          obligationId: u64,
-          lockPrice: u128,
+          originalLockPrice: u128,
+          newLockPrice: u128,
+          amountBurned: u128,
           accountId: AccountId32,
         ],
         {
           utxoId: u64;
           vaultId: u32;
-          obligationId: u64;
-          lockPrice: u128;
+          originalLockPrice: u128;
+          newLockPrice: u128;
+          amountBurned: u128;
           accountId: AccountId32;
         }
       >;
       BitcoinUtxoCosigned: AugmentedEvent<
         ApiType,
-        [utxoId: u64, obligationId: u64, vaultId: u32, signature: Bytes],
-        { utxoId: u64; obligationId: u64; vaultId: u32; signature: Bytes }
+        [utxoId: u64, vaultId: u32, signature: Bytes],
+        { utxoId: u64; vaultId: u32; signature: Bytes }
       >;
       BitcoinUtxoCosignRequested: AugmentedEvent<
         ApiType,
-        [utxoId: u64, obligationId: u64, vaultId: u32],
-        { utxoId: u64; obligationId: u64; vaultId: u32 }
+        [utxoId: u64, vaultId: u32],
+        { utxoId: u64; vaultId: u32 }
       >;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin lock
        **/
       CosignOverdueError: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, error: SpRuntimeDispatchError],
+        { utxoId: u64; error: SpRuntimeDispatchError }
+      >;
+      /**
+       * An error occurred while completing a lock
+       **/
+      LockExpirationError: AugmentedEvent<
         ApiType,
         [utxoId: u64, error: SpRuntimeDispatchError],
         { utxoId: u64; error: SpRuntimeDispatchError }
@@ -1589,42 +1584,45 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     vaults: {
-      ObligationCompleted: AugmentedEvent<
+      FundLockCanceled: AugmentedEvent<
         ApiType,
-        [vaultId: u32, obligationId: u64, wasCanceled: bool],
-        { vaultId: u32; obligationId: u64; wasCanceled: bool }
+        [vaultId: u32, amount: u128],
+        { vaultId: u32; amount: u128 }
       >;
-      /**
-       * An error occurred while completing an obligation
-       **/
-      ObligationCompletionError: AugmentedEvent<
+      FundsLocked: AugmentedEvent<
         ApiType,
-        [obligationId: u64, error: SpRuntimeDispatchError],
-        { obligationId: u64; error: SpRuntimeDispatchError }
+        [vaultId: u32, locker: AccountId32, amount: u128, isRatchet: bool],
+        { vaultId: u32; locker: AccountId32; amount: u128; isRatchet: bool }
       >;
-      ObligationCreated: AugmentedEvent<
+      FundsReleased: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128],
+        { vaultId: u32; amount: u128 }
+      >;
+      FundsReleasedError: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, error: SpRuntimeDispatchError],
+        { vaultId: u32; error: SpRuntimeDispatchError }
+      >;
+      FundsScheduledForRelease: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128, releaseHeight: u64],
+        { vaultId: u32; amount: u128; releaseHeight: u64 }
+      >;
+      LostBitcoinCompensated: AugmentedEvent<
         ApiType,
         [
           vaultId: u32,
-          obligationId: u64,
-          fundType: ArgonPrimitivesVaultFundType,
           beneficiary: AccountId32,
-          amount: u128,
-          expiration: ArgonPrimitivesVaultObligationExpiration,
+          toBeneficiary: u128,
+          burned: u128,
         ],
         {
           vaultId: u32;
-          obligationId: u64;
-          fundType: ArgonPrimitivesVaultFundType;
           beneficiary: AccountId32;
-          amount: u128;
-          expiration: ArgonPrimitivesVaultObligationExpiration;
+          toBeneficiary: u128;
+          burned: u128;
         }
-      >;
-      ObligationModified: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, obligationId: u64, amount: u128],
-        { vaultId: u32; obligationId: u64; amount: u128 }
       >;
       VaultBitcoinXpubChange: AugmentedEvent<
         ApiType,
@@ -1633,8 +1631,16 @@ declare module '@polkadot/api-base/types/events' {
       >;
       VaultClosed: AugmentedEvent<
         ApiType,
-        [vaultId: u32, remainingSecuritization: u128, released: u128],
-        { vaultId: u32; remainingSecuritization: u128; released: u128 }
+        [
+          vaultId: u32,
+          securitizationRemaining: u128,
+          securitizationReleased: u128,
+        ],
+        {
+          vaultId: u32;
+          securitizationRemaining: u128;
+          securitizationReleased: u128;
+        }
       >;
       VaultCreated: AugmentedEvent<
         ApiType,
