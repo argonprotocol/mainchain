@@ -19,8 +19,8 @@ pub struct XprivFile {
 	pub xpriv_path: Option<PathBuf>,
 
 	/// Use interactive shell for entering the encryption password used by the xpriv.
-	#[arg(global = true, long, conflicts_with_all = & ["password", "password_filename", "password_ledger", "password_yubikey"])]
-	pub password_interactive: bool,
+	#[arg(global = true, long, conflicts_with_all = & ["xpriv_password", "xpriv_password_filename", "xpriv_password_ledger", "xpriv_password_yubikey"])]
+	pub xpriv_password_interactive: bool,
 
 	/// Encryption password used by the xpriv file.
 	///
@@ -29,41 +29,41 @@ pub struct XprivFile {
 		global = true,
 		long,
         value_parser = secret_string_from_str,
-        conflicts_with_all = & ["password_interactive", "password_filename", "password_ledger", "password_yubikey"]
+        conflicts_with_all = & ["xpriv_password_interactive", "xpriv_password_filename", "xpriv_password_ledger", "xpriv_password_yubikey"]
     )]
-	pub password: Option<SecretString>,
+	pub xpriv_password: Option<SecretString>,
 
 	/// File that contains the encryption password used by the xpriv file.
 	#[arg(
 		global = true,
 		long,
         value_name = "PATH",
-        conflicts_with_all = & ["password_interactive", "password", "password_ledger", "password_yubikey"]
+        conflicts_with_all = & ["xpriv_password_interactive", "xpriv_password", "xpriv_password_ledger", "xpriv_password_yubikey"]
     )]
-	pub password_filename: Option<PathBuf>,
+	pub xpriv_password_filename: Option<PathBuf>,
 
 	/// Use a ledger to protect your XPriv password (UNDER DEVELOPMENT)
-	#[arg(global = true, long, conflicts_with_all = & ["password", "password_filename", "password_interactive", "password_yubikey"])]
-	pub password_ledger: Option<bool>,
+	#[arg(global = true, long, conflicts_with_all = & ["xpriv_password", "xpriv_password_filename", "xpriv_password_interactive", "xpriv_password_yubikey"])]
+	pub xpriv_password_ledger: Option<bool>,
 
 	/// Use a yubikey to protect your XPriv password (UNDER DEVELOPMENT)
-	#[arg(global = true, long, conflicts_with_all = & ["password", "password_filename", "password_interactive", "password_ledger"])]
-	pub password_yubikey: Option<bool>,
+	#[arg(global = true, long, conflicts_with_all = & ["xpriv_password", "xpriv_password_filename", "xpriv_password_interactive", "xpriv_password_ledger"])]
+	pub xpriv_password_yubikey: Option<bool>,
 }
 
 impl XprivFile {
 	fn read_password(&self) -> anyhow::Result<Option<SecretString>> {
 		let xpriv_params = KeystoreParams {
 			keystore_path: self.xpriv_path.clone(),
-			password_interactive: self.password_interactive,
-			password: self.password.clone(),
-			password_filename: self.password_filename.clone(),
+			password_interactive: self.xpriv_password_interactive,
+			password: self.xpriv_password.clone(),
+			password_filename: self.xpriv_password_filename.clone(),
 		};
 
-		if self.password_ledger.is_some() {
+		if self.xpriv_password_ledger.is_some() {
 			unimplemented!("Ledger password protection is not yet implemented");
 		}
-		if self.password_yubikey.is_some() {
+		if self.xpriv_password_yubikey.is_some() {
 			unimplemented!("Yubikey password protection is not yet implemented");
 		}
 		xpriv_params.read_password()

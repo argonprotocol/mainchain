@@ -70,8 +70,8 @@ async fn main() -> anyhow::Result<()> {
 	match cli.command {
 		Commands::Vault { subcommand } => subcommand.process(rpc_url).await,
 		Commands::Lock { subcommand } => subcommand.process(rpc_url).await,
-		Commands::Utils { subcommand } => subcommand.process(rpc_url).await,
-		Commands::XPriv { subcommand } => subcommand.process(rpc_url).await,
+		Commands::Utils { subcommand } => subcommand.process().await,
+		Commands::XPriv { subcommand } => subcommand.process().await,
 	}
 	.map_err(|e| {
 		tracing::info!("{:?}", e);
@@ -96,7 +96,7 @@ struct OneArg {
 	arg: String,
 }
 impl UtilCommands {
-	pub async fn process(self, _rpc_url: String) -> anyhow::Result<()> {
+	pub async fn process(self) -> anyhow::Result<()> {
 		match self {
 			UtilCommands::ToFixed(OneArg { arg }) => {
 				let fixed = parse_number(&arg).map_err(|e| anyhow!(e))?;

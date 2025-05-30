@@ -198,7 +198,7 @@ rsntp = { version = "4.0" }
 bitcoincore-rpc = { version = "0.19" }
 minreq = { version = "2.7.0", features = ["https", "json-using-serde"] }
 bitcoin = { version = "0.32.0", default-features = false }
-bip39 = { version = "2.0.0" }
+bip39 = { version = "2.0.0", default-features = false }
 miniscript = { version = "12.0.0", default-features = false }
 hwi = { version = "0.10", default-features = false }
 bitcoind = { version = "0.36.1", features = ["26_0"] }

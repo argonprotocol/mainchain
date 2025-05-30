@@ -1,17 +1,9 @@
-use anyhow::{Context, anyhow, bail};
-use base64::{Engine, engine::general_purpose};
-use bitcoin::{
-	Address, CompressedPublicKey, FeeRate, Network, Txid,
-	bip32::{ChildNumber, DerivationPath, Fingerprint},
-	key::Secp256k1,
-	secp256k1,
+use crate::{
+	formatters::ArgonFormatter,
+	helpers::get_bitcoin_network,
+	xpriv_file::{XprivFile, secret_string_from_str},
 };
-use clap::{Subcommand, ValueEnum};
-use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
-use polkadot_sdk::*;
-use sp_runtime::{FixedPointNumber, FixedU128, testing::H256};
-use std::str::FromStr;
-
+use anyhow::{Context, anyhow, bail};
 use argon_bitcoin::{Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep};
 use argon_client::{
 	FetchAt, MainchainClient, api,
@@ -24,9 +16,24 @@ use argon_primitives::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
 		SATOSHIS_PER_BITCOIN, UtxoId,
 	},
+	prelude::sp_core::crypto::ExposeSecret,
 };
-
-use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
+use base64::{Engine, engine::general_purpose};
+use bitcoin::{
+	Address, CompressedPublicKey, FeeRate, Network, Txid,
+	bip32::{ChildNumber, DerivationPath, Fingerprint},
+	key::Secp256k1,
+	secp256k1,
+};
+use clap::{Subcommand, ValueEnum};
+use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
+use polkadot_sdk::{sp_core::crypto::SecretString, *};
+use sp_runtime::{FixedPointNumber, FixedU128, testing::H256};
+use std::{
+	str::FromStr,
+	sync::{Arc, Mutex},
+	time::Duration,
+};
 
 #[derive(Subcommand, Debug)]
 pub enum LockCommands {
@@ -74,7 +81,7 @@ pub enum LockCommands {
 
 		/// The fee rate per sats (sat/vB) to use
 		#[clap(short, long, default_value = "5")]
-		fee_rate_sats_per_kb: u64,
+		fee_rate_sats_per_vb: u64,
 
 		#[clap(flatten)]
 		keypair: KeystoreParams,
@@ -90,7 +97,7 @@ pub enum LockCommands {
 
 		/// Provide the path of the derived master xpub uploaded to Argon
 		#[clap(long)]
-		master_xpub_hd_path: String,
+		hd_path: String,
 	},
 	/// Create a release psbt to submit to bitcoin
 	OwnerCosignRelease {
@@ -100,17 +107,24 @@ pub enum LockCommands {
 		utxo_id: UtxoId,
 
 		/// Provide the hd path to put as a hint into the psbt (if applicable)
-		#[clap(long)]
+		#[clap(long, required_unless_present("private_key"))]
 		hd_path: Option<String>,
 
 		/// Provide the parent fingerprint to put as a hint into the psbt (if applicable)
 		#[clap(long)]
 		parent_fingerprint: Option<String>,
 
-		/// Provide the private key directly to sign the psbt (this should be used for testnet
-		/// only).
+		/// Provide the private key directly to sign the psbt
+		#[clap(long, value_parser = secret_string_from_str)]
+		private_key: Option<SecretString>,
+
+		#[clap(flatten)]
+		xpriv_file: XprivFile,
+
+		/// Where to broadcast the transaction. If not specified, the psbt will be printed to
+		/// stdout
 		#[clap(long)]
-		private_key: Option<String>,
+		bitcoin_rpc_url: Option<String>,
 
 		/// Wait for the cosignature to be submitted if it's not found right away
 		#[clap(long)]
@@ -133,13 +147,11 @@ pub enum LockCommands {
 		#[clap(flatten)]
 		xpriv_file: XprivFile,
 
-		/// If claiming as the vault, the master xpub hd path to put as a hint into the psbt (if
-		/// applicable)
-		#[clap(long)]
-		master_xpub_hd_path: Option<String>,
-
 		/// Provide the hd path to put as a hint into the psbt (if applicable)
-		#[clap(long)]
+		/// Required if providing an XPriv.
+		/// If claiming as vault, this must be the hd_path used to create the XPub uploaded for
+		/// your vault.
+		#[clap(long, verbatim_doc_comment)]
 		hd_path: Option<String>,
 
 		/// Provide the parent fingerprint to put as a hint into the psbt (if applicable)
@@ -152,7 +164,12 @@ pub enum LockCommands {
 
 		/// The fee rate per sats to use
 		#[clap(short, long, default_value = "5")]
-		fee_rate_sats_per_kb: u64,
+		fee_rate_sats_per_vb: u64,
+
+		/// Where to broadcast the transaction. If not specified, the psbt will be printed to
+		/// stdout
+		#[clap(long)]
+		bitcoin_rpc_url: Option<String>,
 	},
 }
 
@@ -339,7 +356,7 @@ impl LockCommands {
 			LockCommands::RequestRelease {
 				utxo_id,
 				dest_pubkey,
-				fee_rate_sats_per_kb,
+				fee_rate_sats_per_vb,
 				keypair: _,
 			} => {
 				let client = MainchainClient::from_url(&rpc_url)
@@ -369,7 +386,7 @@ impl LockCommands {
 				let network_fee = cosign.calculate_fee(
 					true,
 					bitcoin_dest_pubkey.clone(),
-					FeeRate::from_sat_per_vb(fee_rate_sats_per_kb)
+					FeeRate::from_sat_per_vb(fee_rate_sats_per_vb)
 						.ok_or(anyhow!("Invalid fee rate"))?,
 				)?;
 
@@ -387,15 +404,14 @@ impl LockCommands {
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to create transaction:\n\t{}", url);
 			},
-			LockCommands::VaultCosignRelease { utxo_id, xpriv_file, master_xpub_hd_path } => {
+			LockCommands::VaultCosignRelease { utxo_id, xpriv_file, hd_path } => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
 				let at_block = FetchAt::Finalized;
-				let child_xpriv = xpriv_file.read()?.derive_priv(
-					&Secp256k1::new(),
-					&DerivationPath::from_str(&master_xpub_hd_path)?,
-				)?;
+				let child_xpriv = xpriv_file
+					.read()?
+					.derive_priv(&Secp256k1::new(), &DerivationPath::from_str(&hd_path)?)?;
 
 				let (utxo_id, lock) =
 					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
@@ -443,9 +459,11 @@ impl LockCommands {
 				hd_path,
 				private_key,
 				wait,
+				xpriv_file,
+				bitcoin_rpc_url,
 			} => {
 				let private_key = if let Some(private_key) = private_key {
-					Some(bitcoin::PrivateKey::from_str(&private_key)?)
+					Some(bitcoin::PrivateKey::from_str(private_key.expose_secret())?)
 				} else {
 					None
 				};
@@ -555,9 +573,9 @@ impl LockCommands {
 				releaser.psbt.inputs[0]
 					.bip32_derivation
 					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
-				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
+				if let (Some(hd_path), Some(parent_fingerprint)) = (&hd_path, parent_fingerprint) {
 					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
-					let hd_path = DerivationPath::from_str(&hd_path)?;
+					let hd_path = DerivationPath::from_str(hd_path)?;
 					let keysource = (fingerprint, hd_path);
 					let owner_pubkey = releaser
 						.cosign_script
@@ -573,16 +591,33 @@ impl LockCommands {
 						keysource,
 					);
 				}
+
+				let mut did_sign = false;
 				if let Some(private_key) = private_key {
 					releaser.sign(private_key)?;
+					did_sign = true;
+				}
+				if xpriv_file.xpriv_path.is_some() {
+					let xpriv = xpriv_file.read().context("Reading xpriv file")?;
+					let hd_path = DerivationPath::from_str(
+						&hd_path
+							.ok_or(anyhow!("Please supply the hd path for your bitcoin pubkey"))?,
+					)?;
+					releaser
+						.sign_derived(xpriv, hd_path)
+						.context("Signing partially signed bitcoin transaction (psbt)")?;
+					did_sign = true;
 				}
 
-				let psbt = releaser.psbt;
+				if !did_sign || bitcoin_rpc_url.is_none() {
+					println!(
+						"Import this psbt to sign and broadcast the transaction:\n\n{}",
+						general_purpose::STANDARD.encode(&releaser.psbt.serialize()[..])
+					);
+					return Ok(());
+				}
+				wait_for_confirmations(&mut releaser, bitcoin_rpc_url.unwrap()).await?;
 
-				println!(
-					"Import this psbt to sign and broadcast the transaction:\n\n{}",
-					general_purpose::STANDARD.encode(&psbt.serialize()[..])
-				);
 				return Ok(());
 			},
 			LockCommands::ClaimUtxoPsbt {
@@ -591,10 +626,10 @@ impl LockCommands {
 				claimer,
 				dest_pubkey,
 				xpriv_file,
-				master_xpub_hd_path,
-				fee_rate_sats_per_kb,
 				hd_path,
+				fee_rate_sats_per_vb,
 				parent_fingerprint,
+				bitcoin_rpc_url,
 			} => {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
@@ -615,7 +650,7 @@ impl LockCommands {
 				let network = get_bitcoin_network(&client, at_block).await?;
 				let cosign_script = get_cosign_script(&lock, network)?;
 				let txid: Txid = H256Le(utxo_ref.txid.0).into();
-				let fee_rate = FeeRate::from_sat_per_vb(fee_rate_sats_per_kb)
+				let fee_rate = FeeRate::from_sat_per_vb(fee_rate_sats_per_vb)
 					.ok_or(anyhow!("Invalid fee rate"))?;
 
 				let pay_scriptpub: BitcoinScriptPubkey = Address::from_str(&dest_pubkey)
@@ -646,42 +681,67 @@ impl LockCommands {
 				let vault_pubkey: CompressedPublicKey = vault_pubkey.try_into()?;
 				releaser.psbt.inputs[0]
 					.bip32_derivation
-					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path));
+					.insert(vault_pubkey.0, (vault_fingerprint, vault_hd_path.clone()));
 
-				if let (Some(hd_path), Some(parent_fingerprint)) = (hd_path, parent_fingerprint) {
-					let owner_pubkey: CompressedPublicKey =
-						releaser.cosign_script.script_args.owner_pubkey.try_into()?;
-					let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
-					let hd_path = DerivationPath::from_str(&hd_path)?;
-					releaser.psbt.inputs[0]
-						.bip32_derivation
-						.insert(owner_pubkey.0, (fingerprint, hd_path));
-				}
-				let mut psbt = releaser.psbt;
+				let mut did_sign = false;
 				if matches!(claimer, BitcoinClaimer::Vault) {
-					let master_xpub_hd_path = master_xpub_hd_path.ok_or(anyhow!(
-						"Master xpub hd path is required when claiming as the vault"
-					))?;
-					let vault_xpriv = xpriv_file.read()?.derive_priv(
-						&Secp256k1::new(),
-						&DerivationPath::from_str(&master_xpub_hd_path)?,
-					)?;
-					psbt.sign(&vault_xpriv, &Secp256k1::new()).map_err(|e| {
-						anyhow!(
-							"Unable to sign this bitcoin transaction with the given XPriv -> {:#?}",
-							e.1
-						)
-					})?;
+					let hd_path = hd_path.ok_or(anyhow::anyhow!("Missing hd path"))?;
+					let vault_xpriv = xpriv_file
+						.read()?
+						.derive_priv(&Secp256k1::new(), &DerivationPath::from_str(&hd_path)?)?;
+					releaser.sign_derived(vault_xpriv, vault_hd_path)?;
+					did_sign = true;
+				} else if let Some(hd_path) = hd_path {
+					let hd_path = DerivationPath::from_str(&hd_path)?;
+					if let Some(parent_fingerprint) = parent_fingerprint {
+						let owner_pubkey: CompressedPublicKey =
+							releaser.cosign_script.script_args.owner_pubkey.try_into()?;
+						let fingerprint = Fingerprint::from_str(&parent_fingerprint)?;
+						releaser.psbt.inputs[0]
+							.bip32_derivation
+							.insert(owner_pubkey.0, (fingerprint, hd_path.clone()));
+					}
+					releaser.sign_derived(xpriv_file.read()?, hd_path)?;
+					did_sign = true;
 				}
 
-				println!(
-					"Load this psbt to your wallet to claim the bitcoin:\n\n{}",
-					general_purpose::STANDARD.encode(&psbt.serialize()[..])
-				);
+				if !did_sign || bitcoin_rpc_url.is_none() {
+					println!(
+						"Load this psbt to your wallet to claim the bitcoin:\n\n{}",
+						general_purpose::STANDARD.encode(&releaser.psbt.serialize()[..])
+					);
+					return Ok(());
+				}
+
+				wait_for_confirmations(&mut releaser, bitcoin_rpc_url.unwrap()).await?;
+				println!("You have claimed this UTXO to {}", dest_pubkey);
 			},
 		}
 		Ok(())
 	}
+}
+
+async fn wait_for_confirmations(
+	releaser: &mut CosignReleaser,
+	bitcoin_rpc_url: String,
+) -> anyhow::Result<()> {
+	let confirmations = Arc::new(Mutex::new(0));
+
+	releaser
+		.broadcast(&bitcoin_rpc_url, Duration::from_secs(10), move |status| {
+			let next_confirmations = status.confirmations.unwrap_or(0);
+			let mut confirmations = confirmations.lock().unwrap();
+			if next_confirmations > *confirmations {
+				*confirmations = next_confirmations;
+				println!("Transaction confirmations: {}/6", confirmations);
+				if *confirmations >= 6 {
+					return true;
+				}
+			}
+			false
+		})
+		.await?;
+	Ok(())
 }
 
 async fn load_cosign_releaser(

@@ -1,5 +1,8 @@
+use crate::{
+	cosign_script::{CosignScript, CosignScriptArgs, ReleaseStep},
+	errors::Error,
+};
 use alloc::vec;
-
 use argon_primitives::{
 	bitcoin::{BitcoinError, BitcoinSignature, CompressedBitcoinPubkey, Satoshis},
 	ensure,
@@ -8,7 +11,7 @@ use bitcoin::{
 	Amount, EcdsaSighashType, Network, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
 	Transaction, TxIn, TxOut, Witness,
 	absolute::LockTime,
-	bip32::{KeySource, Xpriv},
+	bip32::{DerivationPath, Xpriv, Xpub},
 	ecdsa::Signature,
 	key::Secp256k1,
 	psbt::Input,
@@ -16,12 +19,8 @@ use bitcoin::{
 	transaction::Version,
 };
 use k256::ecdsa::signature::Verifier;
+use log::trace;
 use miniscript::psbt::PsbtExt;
-
-use crate::{
-	cosign_script::{CosignScript, CosignScriptArgs, ReleaseStep},
-	errors::Error,
-};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CosignReleaser {
@@ -146,22 +145,28 @@ impl CosignReleaser {
 	pub fn sign_derived(
 		&mut self,
 		master_xpriv: Xpriv,
-		key_source: KeySource,
+		hd_path: DerivationPath,
 	) -> Result<(Signature, PublicKey), Error> {
 		let psbt = &mut self.psbt;
 		let secp = Secp256k1::new();
-		let child_xpriv =
-			master_xpriv.derive_priv(&secp, &key_source.1).map_err(Error::Bip32Error)?;
+		let child_xpriv = master_xpriv.derive_priv(&secp, &hd_path).map_err(Error::Bip32Error)?;
+		let master_xpub = Xpub::from_priv(&Secp256k1::new(), &master_xpriv);
+
 		let child_priv = child_xpriv.to_priv();
 		let pubkey = child_priv.public_key(&secp);
 
-		psbt.inputs[0].bip32_derivation.insert(pubkey.inner, key_source);
+		psbt.inputs[0]
+			.bip32_derivation
+			.insert(pubkey.inner, (master_xpub.fingerprint(), hd_path.clone()));
+
+		trace!("Signing with derived key: {}", pubkey);
 
 		match psbt.sign(&master_xpriv, &secp) {
 			Ok(_) => ensure!(!psbt.inputs[0].partial_sigs.is_empty(), Error::SignatureExpected),
 			Err((_, errs)) => return Err(Error::SigningErrors(errs)),
 		};
 
+		trace!("Signed: {:?}", psbt.inputs[0].partial_sigs.len());
 		let Some((_, signature)) =
 			psbt.inputs[0].partial_sigs.iter().find(|(k, _)| k.inner == pubkey.inner)
 		else {
@@ -218,6 +223,54 @@ impl CosignReleaser {
 		}
 
 		Ok(tx)
+	}
+
+	/// Broadcasts the transaction to a Bitcoin node. NOTE: You must return `true` from the
+	/// `on_status` callback to break the loop and return from this function.
+	///
+	/// # Arguments
+	/// * `url` - The URL of the Bitcoin node to broadcast the transaction to.
+	/// * `status_check_delay` - The delay between status checks for the transaction.
+	/// * `on_status` - A callback function that is called with the transaction status. If it
+	///   returns `true`, the function will return successfully.
+	#[cfg(feature = "std")]
+	pub async fn broadcast<F>(
+		&mut self,
+		url: &str,
+		status_check_delay: std::time::Duration,
+		on_status: F,
+	) -> Result<(), Error>
+	where
+		F: Fn(bitcoincore_rpc::json::GetRawTransactionResult) -> bool + Send + Sync + 'static,
+	{
+		use bitcoincore_rpc::RpcApi;
+
+		let tx = self.extract_tx()?;
+		let url = url.parse::<url::Url>().map_err(|e| Error::BroadcastError(e.to_string()))?;
+		let auth = if url.username().is_empty() && url.password().is_none() {
+			bitcoincore_rpc::Auth::None
+		} else {
+			bitcoincore_rpc::Auth::UserPass(
+				url.username().to_string(),
+				url.password().unwrap_or("").to_string(),
+			)
+		};
+		let client = bitcoincore_rpc::Client::new(url.as_str(), auth)
+			.map_err(|e| Error::BroadcastError(e.to_string()))?;
+		let txid = client
+			.send_raw_transaction(&tx)
+			.map_err(|e| Error::BroadcastError(e.to_string()))?;
+		log::info!("Transaction broadcast with txid: {}", txid);
+		// wait for the tx to be confirmed
+		loop {
+			let info = client
+				.get_raw_transaction_info(&txid, None)
+				.map_err(|e| Error::BroadcastError(e.to_string()))?;
+			if on_status(info) {
+				return Ok(());
+			}
+			tokio::time::sleep(status_check_delay).await;
+		}
 	}
 }
 
