@@ -1,9 +1,8 @@
 use alloc::vec::Vec;
-use core::convert::{TryFrom, TryInto};
-use polkadot_sdk::*;
-
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use core::convert::{TryFrom, TryInto};
 use frame_support::pallet_prelude::TypeInfo;
+use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
@@ -219,6 +218,7 @@ pub enum NetworkKind {
 	RuntimeDebug,
 	Default,
 )]
+#[cfg_attr(all(feature = "std", not(feature = "uniffi")), derive(clap::ValueEnum))]
 pub enum BitcoinNetwork {
 	/// Mainnet Bitcoin.
 	Bitcoin,

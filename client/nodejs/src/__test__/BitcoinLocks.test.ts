@@ -63,11 +63,11 @@ describeIntegration(
 
         if (!fs.existsSync('/tmp/argon/xpriv_master')) {
           TestBitcoinCli.run(
-            `xpriv master --xpriv-path=/tmp/argon/xpriv_master --password=1234 -t ${alicechain.address}`,
+            `xpriv master --xpriv-path=/tmp/argon/xpriv_master --xpriv-password=1234 -t ${alicechain.address}`,
           );
         }
         const xpub = TestBitcoinCli.run(
-          `xpriv derive-xpub --xpriv-path=/tmp/argon/xpriv_master  --password=1234 --hd-path="m/84'/0'/0'" -t ${alicechain.address}`,
+          `xpriv derive-xpub --xpriv-path=/tmp/argon/xpriv_master  --xpriv-password=1234 --hd-path="m/84'/0'/0'" -t ${alicechain.address}`,
         );
 
         const vaultCreate = TestBitcoinCli.run(
