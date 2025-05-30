@@ -36,6 +36,7 @@ macro_rules! call_filters {
 			TypeInfo,
 			Encode,
 			Decode,
+			DecodeWithMemTracking,
 			RuntimeDebug,
 			MaxEncodedLen,
 		)]

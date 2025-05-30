@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,7 @@ pub const NOTEBOOK_VERSION: u16 = 1;
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -135,6 +136,7 @@ impl Notebook {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -168,6 +170,7 @@ impl Notarization {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -197,6 +200,7 @@ impl NewAccountOrigin {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -256,6 +260,7 @@ pub struct NotebookHeader {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -279,6 +284,7 @@ pub struct NotebookAuditResult<VerifyError: Codec> {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -318,6 +324,7 @@ impl NotebookHeader {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -363,6 +370,7 @@ pub type TransferToLocalchainId = u32;
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,

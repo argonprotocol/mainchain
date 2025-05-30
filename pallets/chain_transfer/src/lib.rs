@@ -52,6 +52,7 @@ pub mod pallet {
 			+ Member
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ Debug
 			+ Default
 			+ From<u128>

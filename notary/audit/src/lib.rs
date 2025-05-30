@@ -6,7 +6,7 @@ use alloc::{
 	vec::Vec,
 };
 use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::H256;
@@ -32,7 +32,16 @@ mod test_balanceset;
 mod test_notebook;
 
 #[derive(
-	Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, thiserror::Error,
+	Debug,
+	Clone,
+	PartialEq,
+	TypeInfo,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Serialize,
+	Deserialize,
+	thiserror::Error,
 )]
 pub enum AccountHistoryLookupError {
 	#[error("Notebook root not found")]

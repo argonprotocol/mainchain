@@ -125,6 +125,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
       /**
+       * An overflow or underflow occurred while calculating the redemption price
+       **/
+      OverflowError: AugmentedError<ApiType>;
+      /**
        * This bitcoin redemption has not been locked in
        **/
       RedemptionNotLocked: AugmentedError<ApiType>;
@@ -534,7 +538,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoApprovalsNeeded: AugmentedError<ApiType>;
       /**
-       * Multisig operation not found when attempting to cancel.
+       * Multisig operation not found in storage.
        **/
       NotFound: AugmentedError<ApiType>;
       /**
@@ -542,7 +546,8 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoTimepoint: AugmentedError<ApiType>;
       /**
-       * Only the account that originally created the multisig is able to cancel it.
+       * Only the account that originally created the multisig is able to cancel it or update
+       * its deposits.
        **/
       NotOwner: AugmentedError<ApiType>;
       /**

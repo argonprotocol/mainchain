@@ -59,6 +59,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
@@ -282,6 +283,7 @@ pub mod pallet {
 	#[derive(
 		Encode,
 		Decode,
+		DecodeWithMemTracking,
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
@@ -289,9 +291,10 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	pub struct VaultConfig<
+	pub struct VaultConfig<Balance>
+	where
 		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
-	> {
+	{
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
 		/// The amount of argons to be vaulted for bitcoin locks

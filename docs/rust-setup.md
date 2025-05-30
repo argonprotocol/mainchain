@@ -97,7 +97,7 @@ Configure the Rust toolchain to default to the latest stable version, add nightl
 rustup default stable
 rustup update
 rustup update nightly
-rustup target add wasm32-unknown-unknown --toolchain nightly
+rustup target add wasm32v1-none --toolchain nightly
 ```
 
 ## Test your set-up
@@ -134,7 +134,7 @@ nightly-x86_64-unknown-linux-gnu
 installed targets for active toolchain
 --------------------------------------
 
-wasm32-unknown-unknown
+wasm32v1-none
 x86_64-unknown-linux-gnu
 
 active toolchain
@@ -145,7 +145,7 @@ rustc 1.50.0 (cb75ad5db 2021-02-10)
 ```
 
 As you can see above, the default toolchain is stable, and the `nightly-x86_64-unknown-linux-gnu` toolchain as well as
-its `wasm32-unknown-unknown` target is installed. You also see that `nightly-2020-10-06-x86_64-unknown-linux-gnu` is
+its `wasm32v1-none` target is installed. You also see that `nightly-2020-10-06-x86_64-unknown-linux-gnu` is
 installed, but is not used unless explicitly defined as illustrated in the [specify your nightly
 version](#specifying-nightly-version) section.
 
@@ -169,7 +169,7 @@ should run:
 ```bash
 rustup update
 rustup update nightly
-rustup target add wasm32-unknown-unknown --toolchain nightly
+rustup target add wasm32v1-none --toolchain nightly
 ```
 
 > NOTE: It may be necessary to occasionally rerun `rustup update` if a change in the upstream Substrate codebase depends
@@ -196,7 +196,7 @@ rustup install nightly-<yyyy-MM-dd>
 Now, configure the nightly version to work with the Wasm compilation target:
 
 ```bash
-rustup target add wasm32-unknown-unknown --toolchain nightly-<yyyy-MM-dd>
+rustup target add wasm32v1-none --toolchain nightly-<yyyy-MM-dd>
 ```
 
 ### Specifying nightly version
@@ -219,5 +219,5 @@ version, follow these steps:
 ```bash
 rustup uninstall nightly
 rustup install nightly-<yyyy-MM-dd>
-rustup target add wasm32-unknown-unknown --toolchain nightly-<yyyy-MM-dd>
+rustup target add wasm32v1-none --toolchain nightly-<yyyy-MM-dd>
 ```

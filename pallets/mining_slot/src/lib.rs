@@ -125,6 +125,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>

@@ -1,6 +1,6 @@
-use alloc::borrow::Cow;
+use alloc::string::String;
 use argon_primitives::{tick::Tick, AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT};
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
@@ -9,7 +9,18 @@ use thiserror::Error;
 
 use crate::AccountHistoryLookupError;
 
-#[derive(Debug, PartialEq, Clone, Error, TypeInfo, Encode, Decode, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	PartialEq,
+	Clone,
+	Error,
+	TypeInfo,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Serialize,
+	Deserialize,
+)]
 pub enum VerifyError {
 	#[error("Missing account origin {account_id:?}, {account_type:?}")]
 	MissingAccountOrigin { account_id: AccountId32, account_type: AccountType },
@@ -48,7 +59,7 @@ pub enum VerifyError {
 	InvalidNoteRecipients,
 
 	#[error("An invalid balance change was submitted (#{change_index}.{note_index}): {message:?}")]
-	BalanceChangeError { change_index: u16, note_index: u16, message: Cow<'static, str> },
+	BalanceChangeError { change_index: u16, note_index: u16, message: String },
 
 	#[error("Invalid net balance changeset. Must account for all funds.")]
 	InvalidNetBalanceChangeset,

@@ -243,7 +243,7 @@ where
 		grandpa_link.shared_authority_set().clone(),
 		Vec::default(),
 	));
-	let (network, system_rpc_tx, tx_handler_controller, start_network, sync_service) =
+	let (network, system_rpc_tx, tx_handler_controller, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			net_config,
@@ -398,7 +398,6 @@ where
 			sc_consensus_grandpa::run_grandpa_voter(grandpa_voter)?,
 		);
 	}
-	start_network.start_network();
 
 	Ok(task_manager)
 }

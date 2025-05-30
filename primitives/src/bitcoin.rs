@@ -2,21 +2,21 @@ use alloc::vec::Vec;
 use core::convert::{TryFrom, TryInto};
 use polkadot_sdk::*;
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct BitcoinSyncStatus {
 	pub confirmed_block: BitcoinBlock,
 	pub synched_block: Option<BitcoinBlock>,
 	pub oldest_allowed_block_height: BitcoinHeight,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
 pub struct BitcoinBlock {
 	#[codec(compact)]
 	pub block_height: BitcoinHeight,
@@ -29,7 +29,7 @@ impl BitcoinBlock {
 	}
 }
 
-#[derive(RuntimeDebug, Encode, Decode, Clone, PartialEq, Eq, TypeInfo)]
+#[derive(RuntimeDebug, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo)]
 pub enum BitcoinError {
 	InvalidLockTime,
 	InvalidByteLength,
@@ -38,7 +38,18 @@ pub enum BitcoinError {
 	InvalidPubkey,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct CompressedBitcoinPubkey(pub [u8; 33]);
 impl From<[u8; 33]> for CompressedBitcoinPubkey {
@@ -47,7 +58,17 @@ impl From<[u8; 33]> for CompressedBitcoinPubkey {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, MaxEncodedLen)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<73>>);
 
@@ -60,14 +81,16 @@ impl TryFrom<Vec<u8>> for BitcoinSignature {
 
 /// A Script Pubkey for a Bitcoin UTXO. Supported types are:
 /// - P2WSH (Pay to Witness Script Hash)
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, Copy)]
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug, Copy,
+)]
 #[repr(transparent)]
 pub enum BitcoinCosignScriptPubkey {
 	/// Pay to Witness Script Hash
 	P2WSH { wscript_hash: H256 },
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct BitcoinScriptPubkey(pub BoundedVec<u8, ConstU32<34>>); // allow p2wsh, p2tr max
 impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
@@ -76,7 +99,18 @@ impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
 		Ok(Self(value.try_into()?))
 	}
 }
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug, Copy, MaxEncodedLen)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	RuntimeDebug,
+	Copy,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct OpaqueBitcoinXpub(pub [u8; 78]);
 impl TryFrom<Vec<u8>> for OpaqueBitcoinXpub {
@@ -87,11 +121,22 @@ impl TryFrom<Vec<u8>> for OpaqueBitcoinXpub {
 }
 
 /// A Bitcoin sighash. This is a 32-byte hash that is used to sign a Bitcoin transaction.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
 #[repr(transparent)]
 pub struct BitcoinSighash(pub [u8; 32]);
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug, Ord, PartialOrd)]
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	RuntimeDebug,
+	Ord,
+	PartialOrd,
+)]
 pub struct UtxoRef {
 	pub txid: H256Le,
 	#[codec(compact)]
@@ -99,7 +144,7 @@ pub struct UtxoRef {
 }
 
 pub type UtxoId = u64;
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct UtxoValue {
 	pub utxo_id: UtxoId,
 	pub script_pubkey: BitcoinCosignScriptPubkey,
@@ -111,7 +156,7 @@ pub struct UtxoValue {
 	pub watch_for_spent_until_height: BitcoinHeight,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum BitcoinRejectedReason {
 	/// The UTXO has a different number of satoshis than what is in the blockchain
 	SatoshisMismatch,
@@ -142,6 +187,7 @@ pub type BitcoinBlockHash = H256Le;
 #[derive(
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	TypeInfo,
 	MaxEncodedLen,
 	Debug,
@@ -161,7 +207,17 @@ pub enum NetworkKind {
 }
 
 #[derive(
-	Encode, Decode, TypeInfo, Serialize, Deserialize, Clone, PartialEq, Eq, RuntimeDebug, Default,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+	Clone,
+	PartialEq,
+	Eq,
+	RuntimeDebug,
+	Default,
 )]
 pub enum BitcoinNetwork {
 	/// Mainnet Bitcoin.
@@ -178,7 +234,17 @@ pub enum BitcoinNetwork {
 pub type XPubFingerprint = [u8; 4];
 pub type XPubChildNumber = u32;
 
-#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Eq, RuntimeDebug)]
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	MaxEncodedLen,
+	TypeInfo,
+	Clone,
+	PartialEq,
+	Eq,
+	RuntimeDebug,
+)]
 pub struct BitcoinXPub {
 	pub public_key: CompressedBitcoinPubkey,
 	/// Depth in the key derivation hierarchy.
@@ -517,6 +583,17 @@ pub const SATOSHIS_PER_BITCOIN: u64 = 100_000_000;
 
 /// Represents a bitcoin 32 bytes hash digest encoded in little-endian
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Ord, PartialOrd)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	Ord,
+	PartialOrd,
+)]
 #[repr(transparent)]
 pub struct H256Le(pub [u8; 32]);

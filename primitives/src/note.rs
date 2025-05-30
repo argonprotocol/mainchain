@@ -4,7 +4,7 @@ use alloc::{
 };
 use polkadot_sdk::*;
 
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{
@@ -23,6 +23,7 @@ use crate::{tick::Tick, AccountId, Balance, DomainHash, TransferToLocalchainId, 
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -101,6 +102,7 @@ pub const TRANSFER_TAX_CAP: Balance = 200_000;
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,

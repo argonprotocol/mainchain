@@ -50,7 +50,7 @@ authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
 homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.81.0"
+rust-version = "1.84.1"
 repository = "https://github.com/argonprotocol/mainchain"
 documentation = "https://argonprotocol.org/docs"
 
@@ -126,18 +126,6 @@ sqlx-macros = { opt-level = 3, debug = false }
 
 [workspace.lints.clippy]
 
-[patch."https://github.com/paritytech/polkadot-sdk"]
-polkadot-sdk = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-sp-debug-derive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-sp-io = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-substrate-wasm-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-
-[patch.crates-io]
-sp-core = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-sp-runtime = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix" }
-
 [workspace.dependencies]
 futures = { version = "0.3" }
 futures-timer = "3.0.1"
@@ -186,11 +174,11 @@ uuid = { version = "1.11.0" }
 sqlx = { version = "0.8.5" }
 chrono = { version = "0.4", features = ["serde"] }
 
-polkadot-sdk = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
+polkadot-sdk = { version = "2503.0.1", default-features = false }
 # substrate crates needing extra features
-substrate-wasm-builder = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
-sp-application-crypto = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
-sp-debug-derive = { git = "https://github.com/argonprotocol/polkadot-sdk", branch = "stable2412-grandpa-fix", default-features = false }
+substrate-wasm-builder = { version = "26.0.1", default-features = false }
+sp-application-crypto = { version = "40.1.0", default-features = false }
+sp-debug-derive = { version = "14.0.0", default-features = false }
 
 
 finality-grandpa = { version = "0.16", default-features = false }
@@ -242,13 +230,13 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # hyperprocessor bridge
-pallet-ismp = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-pallet-ismp-runtime-api = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-pallet-hyperbridge = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-pallet-token-gateway = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-pallet-ismp-rpc = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-ismp-grandpa = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
-ismp = { git = "https://github.com/polytope-labs/hyperbridge", branch = "polkadot-stable2412", default-features = false }
+pallet-ismp = { version = "2503.0.0", default-features = false }
+pallet-ismp-runtime-api = { version = "2503.0.0", default-features = false }
+pallet-hyperbridge = { version = "2503.0.0", default-features = false }
+pallet-token-gateway = { version = "2503.0.0", default-features = false }
+pallet-ismp-rpc = { version = "2503.0.0", default-features = false }
+ismp-grandpa = { version = "2503.0.0", default-features = false }
+ismp = { version = "1.1.0", default-features = false }
 
 ethers = { version = "2.0.14" }
 uniswap-sdk-core = { version = "=3.2.0" }

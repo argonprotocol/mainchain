@@ -1,3 +1,7 @@
+#![allow(clippy::zero_prefixed_literal)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::inconsistent_digit_grouping)]
+
 use pallet_prelude::*;
 
 use crate::{
@@ -206,7 +210,7 @@ fn calculates_redemption_prices() {
 			let expected_price = parse_price_in_cents(scenario.expected_redemption);
 			assert_eq!(
 				new_price,
-				expected_price.saturating_mul_int((MICROGONS_PER_ARGON / 100).into()),
+				expected_price.saturating_mul_int(MICROGONS_PER_ARGON / 100),
 				"{}: redemption price",
 				name
 			);
