@@ -50,13 +50,18 @@
   "dependencies": {
     "@commander-js/extra-typings": "^13.1.0",
     "@polkadot/api": "^15.8.1",
+    "@polkadot/api-base": "15.8.1",
     "@polkadot/keyring": "^13.4.3",
+    "@polkadot/rpc-core": "15.8.1",
+    "@polkadot/rpc-provider": "15.8.1",
+    "@polkadot/types": "15.8.1",
+    "@polkadot/types-codec": "15.8.1",
+    "@polkadot/util": "^13.4.3",
     "@polkadot/util-crypto": "^13.4.3",
     "bignumber.js": "^9.1.2",
     "commander": "^13.1.0",
     "console-table-printer": "^2.12.1",
-    "dotenv": "^16.4.7",
-    "nanoevents": "^9.1.0"
+    "dotenv": "^16.4.7"
   },
   "devDependencies": {
     "@argonprotocol/testing": "1.1.0",

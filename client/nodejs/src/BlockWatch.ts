@@ -1,7 +1,7 @@
 import { type ArgonClient, type GenericEvent } from './index';
 import type { Header, SignedBlock } from '@polkadot/types/interfaces';
 import { eventDataToJson, formatArgons } from './utils';
-import { createNanoEvents } from 'nanoevents';
+import { createNanoEvents } from './utils';
 
 export type BlockWatchEvents = {
   block: (
