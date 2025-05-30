@@ -66,8 +66,14 @@ __metadata:
     "@argonprotocol/testing": "npm:1.1.0"
     "@commander-js/extra-typings": "npm:^13.1.0"
     "@polkadot/api": "npm:^15.8.1"
+    "@polkadot/api-base": "npm:15.8.1"
     "@polkadot/keyring": "npm:^13.4.3"
+    "@polkadot/rpc-core": "npm:15.8.1"
+    "@polkadot/rpc-provider": "npm:15.8.1"
     "@polkadot/typegen": "npm:^15.8.1"
+    "@polkadot/types": "npm:15.8.1"
+    "@polkadot/types-codec": "npm:15.8.1"
+    "@polkadot/util": "npm:^13.4.3"
     "@polkadot/util-crypto": "npm:^13.4.3"
     "@substrate/ss58-registry": "npm:^1.49.0"
     "@types/node": "npm:^18.19.6"
@@ -75,7 +81,6 @@ __metadata:
     commander: "npm:^13.1.0"
     console-table-printer: "npm:^2.12.1"
     dotenv: "npm:^16.4.7"
-    nanoevents: "npm:^9.1.0"
     shx: "npm:^0.4.0"
     tsup: "npm:^8.4.0"
     tsx: "npm:^4.19.2"
@@ -5479,13 +5484,6 @@ __metadata:
   dependencies:
     node-gyp: "npm:latest"
   checksum: 10c0/971f963b8120631880fa47a389c71b00cadc1c1b00ef8f147782a3f4387d4fc8195d0695911272d57438c11562fb27b24c4ae5f8c05d5e4eeb4478ba51bb73c5
-  languageName: node
-  linkType: hard
-
-"nanoevents@npm:^9.1.0":
-  version: 9.1.0
-  resolution: "nanoevents@npm:9.1.0"
-  checksum: 10c0/5fb48e6fc1d3102daddaeffd6eada907c25b1c8554dcc648e9cb0a72979a1ab3ee56ffa2d2b3e566a8e561a9e2992a3783493c61cfaaa096b2986d56dbbc1ca5
   languageName: node
   linkType: hard
 

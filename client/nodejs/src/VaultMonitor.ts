@@ -10,7 +10,7 @@ import {
   formatPercent,
 } from './index';
 import { printTable } from 'console-table-printer';
-import { createNanoEvents } from 'nanoevents';
+import { createNanoEvents } from './utils';
 
 export class VaultMonitor {
   public events = createNanoEvents<{
