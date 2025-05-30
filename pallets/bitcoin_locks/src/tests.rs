@@ -1,3 +1,7 @@
+#![allow(clippy::zero_prefixed_literal)]
+#![allow(clippy::multiple_bound_locations)]
+#![allow(clippy::inconsistent_digit_grouping)]
+
 use pallet_prelude::*;
 
 use crate::{

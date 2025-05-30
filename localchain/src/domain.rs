@@ -1,9 +1,6 @@
-use alloc::borrow::Cow;
 use argon_primitives::{Domain, DomainHash, DomainTopLevel};
 use chrono::NaiveDateTime;
-use polkadot_sdk::*;
 use serde_json::json;
-use sp_core::bounded::alloc;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 
 use crate::{bail, Result};
@@ -50,7 +47,7 @@ impl DomainStore {
 
   pub fn hash_domain(&self, domain: JsDomain) -> DomainHash {
     let parsed_domain = Domain {
-      name: Cow::Owned(domain.name.clone()),
+      name: domain.name.clone(),
       top_level: domain.top_level,
     };
     parsed_domain.hash()
@@ -154,7 +151,7 @@ pub struct JsDomain {
 impl From<Domain> for JsDomain {
   fn from(domain: Domain) -> Self {
     Self {
-      name: domain.name.to_string(),
+      name: domain.name,
       top_level: domain.top_level,
     }
   }
@@ -163,7 +160,7 @@ impl From<Domain> for JsDomain {
 impl From<JsDomain> for Domain {
   fn from(val: JsDomain) -> Self {
     Domain {
-      name: Cow::Owned(val.name.clone()),
+      name: val.name,
       top_level: val.top_level,
     }
   }
@@ -173,6 +170,7 @@ impl From<JsDomain> for Domain {
 mod test {
   use super::*;
   use crate::AccountStore;
+  use polkadot_sdk::*;
   use sp_keyring::Sr25519Keyring::Bob;
   use sqlx::SqlitePool;
 

@@ -1,3 +1,4 @@
+#![allow(clippy::inconsistent_digit_grouping)]
 use std::collections::BTreeMap;
 
 use bitcoin::PublicKey;

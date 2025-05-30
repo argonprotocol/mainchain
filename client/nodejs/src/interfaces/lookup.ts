@@ -98,6 +98,10 @@ export default {
         codeHash: 'H256',
         checkVersion: 'bool',
       },
+      RejectedInvalidAuthorizedUpgrade: {
+        codeHash: 'H256',
+        error: 'SpRuntimeDispatchError',
+      },
     },
   },
   /**
@@ -232,6 +236,12 @@ export default {
         multisig: 'AccountId32',
         callHash: '[u8;32]',
       },
+      DepositPoked: {
+        who: 'AccountId32',
+        callHash: '[u8;32]',
+        oldDeposit: 'u128',
+        newDeposit: 'u128',
+      },
     },
   },
   /**
@@ -272,6 +282,12 @@ export default {
         proxyType: 'ArgonRuntimeProxyType',
         delay: 'u32',
       },
+      DepositPoked: {
+        who: 'AccountId32',
+        kind: 'PalletProxyDepositKind',
+        oldDeposit: 'u128',
+        newDeposit: 'u128',
+      },
     },
   },
   /**
@@ -288,7 +304,13 @@ export default {
     ],
   },
   /**
-   * Lookup40: pallet_mining_slot::pallet::Event<T>
+   * Lookup40: pallet_proxy::DepositKind
+   **/
+  PalletProxyDepositKind: {
+    _enum: ['Proxies', 'Announcements'],
+  },
+  /**
+   * Lookup41: pallet_mining_slot::pallet::Event<T>
    **/
   PalletMiningSlotEvent: {
     _enum: {
@@ -325,7 +347,7 @@ export default {
     },
   },
   /**
-   * Lookup42: argon_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance, argon_runtime::SessionKeys>
+   * Lookup43: argon_primitives::block_seal::MiningRegistration<sp_core::crypto::AccountId32, Balance, argon_runtime::SessionKeys>
    **/
   ArgonPrimitivesBlockSealMiningRegistration: {
     accountId: 'AccountId32',
@@ -337,22 +359,22 @@ export default {
     bidAtTick: 'Compact<u64>',
   },
   /**
-   * Lookup43: argon_runtime::SessionKeys
+   * Lookup44: argon_runtime::SessionKeys
    **/
   ArgonRuntimeSessionKeys: {
     grandpa: 'SpConsensusGrandpaAppPublic',
     blockSealAuthority: 'ArgonPrimitivesBlockSealAppPublic',
   },
   /**
-   * Lookup44: sp_consensus_grandpa::app::Public
+   * Lookup45: sp_consensus_grandpa::app::Public
    **/
   SpConsensusGrandpaAppPublic: '[u8;32]',
   /**
-   * Lookup45: argon_primitives::block_seal::app::Public
+   * Lookup46: argon_primitives::block_seal::app::Public
    **/
   ArgonPrimitivesBlockSealAppPublic: '[u8;32]',
   /**
-   * Lookup49: pallet_bitcoin_utxos::pallet::Event<T>
+   * Lookup50: pallet_bitcoin_utxos::pallet::Event<T>
    **/
   PalletBitcoinUtxosEvent: {
     _enum: {
@@ -389,24 +411,24 @@ export default {
     },
   },
   /**
-   * Lookup50: argon_primitives::bitcoin::BitcoinRejectedReason
+   * Lookup51: argon_primitives::bitcoin::BitcoinRejectedReason
    **/
   ArgonPrimitivesBitcoinBitcoinRejectedReason: {
     _enum: ['SatoshisMismatch', 'Spent', 'LookupExpired', 'DuplicateUtxo'],
   },
   /**
-   * Lookup51: argon_primitives::bitcoin::UtxoRef
+   * Lookup52: argon_primitives::bitcoin::UtxoRef
    **/
   ArgonPrimitivesBitcoinUtxoRef: {
     txid: 'ArgonPrimitivesBitcoinH256Le',
     outputIndex: 'Compact<u32>',
   },
   /**
-   * Lookup52: argon_primitives::bitcoin::H256Le
+   * Lookup53: argon_primitives::bitcoin::H256Le
    **/
   ArgonPrimitivesBitcoinH256Le: '[u8;32]',
   /**
-   * Lookup54: pallet_vaults::pallet::Event<T>
+   * Lookup55: pallet_vaults::pallet::Event<T>
    **/
   PalletVaultsEvent: {
     _enum: {
@@ -469,7 +491,7 @@ export default {
     },
   },
   /**
-   * Lookup56: pallet_bitcoin_locks::pallet::Event<T>
+   * Lookup57: pallet_bitcoin_locks::pallet::Event<T>
    **/
   PalletBitcoinLocksEvent: {
     _enum: {
@@ -518,7 +540,7 @@ export default {
     },
   },
   /**
-   * Lookup59: pallet_notaries::pallet::Event<T>
+   * Lookup60: pallet_notaries::pallet::Event<T>
    **/
   PalletNotariesEvent: {
     _enum: {
@@ -547,7 +569,7 @@ export default {
     },
   },
   /**
-   * Lookup60: argon_primitives::notary::NotaryMeta<MaxHosts>
+   * Lookup61: argon_primitives::notary::NotaryMeta<MaxHosts>
    **/
   ArgonPrimitivesNotaryNotaryMeta: {
     name: 'Bytes',
@@ -555,7 +577,7 @@ export default {
     hosts: 'Vec<Bytes>',
   },
   /**
-   * Lookup67: argon_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
+   * Lookup68: argon_primitives::notary::NotaryRecord<sp_core::crypto::AccountId32, BlockNumber, MaxHosts>
    **/
   ArgonPrimitivesNotaryNotaryRecord: {
     notaryId: 'Compact<u32>',
@@ -566,7 +588,7 @@ export default {
     meta: 'ArgonPrimitivesNotaryNotaryMeta',
   },
   /**
-   * Lookup68: pallet_notebook::pallet::Event<T>
+   * Lookup69: pallet_notebook::pallet::Event<T>
    **/
   PalletNotebookEvent: {
     _enum: {
@@ -587,7 +609,7 @@ export default {
     },
   },
   /**
-   * Lookup69: argon_notary_audit::error::VerifyError
+   * Lookup70: argon_notary_audit::error::VerifyError
    **/
   ArgonNotaryAuditErrorVerifyError: {
     _enum: {
@@ -696,13 +718,13 @@ export default {
     },
   },
   /**
-   * Lookup70: argon_primitives::account::AccountType
+   * Lookup71: argon_primitives::account::AccountType
    **/
   ArgonPrimitivesAccountAccountType: {
     _enum: ['Tax', 'Deposit'],
   },
   /**
-   * Lookup71: argon_notary_audit::AccountHistoryLookupError
+   * Lookup72: argon_notary_audit::AccountHistoryLookupError
    **/
   ArgonNotaryAuditAccountHistoryLookupError: {
     _enum: [
@@ -1074,6 +1096,10 @@ export default {
       DispatchedAs: {
         result: 'Result<Null, SpRuntimeDispatchError>',
       },
+      IfElseMainSuccess: 'Null',
+      IfElseFallbackCalled: {
+        mainError: 'SpRuntimeDispatchError',
+      },
     },
   },
   /**
@@ -1157,6 +1183,10 @@ export default {
       Kusama: 'u32',
       Substrate: '[u8;4]',
       Tendermint: '[u8;4]',
+      Relay: {
+        relay: '[u8;4]',
+        paraId: 'u32',
+      },
     },
   },
   /**
@@ -1355,14 +1385,14 @@ export default {
     specName: 'Text',
   },
   /**
-   * Lookup139: frame_system::CodeUpgradeAuthorization<T>
+   * Lookup140: frame_system::CodeUpgradeAuthorization<T>
    **/
   FrameSystemCodeUpgradeAuthorization: {
     codeHash: 'H256',
     checkVersion: 'bool',
   },
   /**
-   * Lookup140: frame_system::pallet::Call<T>
+   * Lookup141: frame_system::pallet::Call<T>
    **/
   FrameSystemCall: {
     _enum: {
@@ -1407,7 +1437,7 @@ export default {
     },
   },
   /**
-   * Lookup144: frame_system::limits::BlockWeights
+   * Lookup145: frame_system::limits::BlockWeights
    **/
   FrameSystemLimitsBlockWeights: {
     baseBlock: 'SpWeightsWeightV2Weight',
@@ -1415,7 +1445,7 @@ export default {
     perClass: 'FrameSupportDispatchPerDispatchClassWeightsPerClass',
   },
   /**
-   * Lookup145: frame_support::dispatch::PerDispatchClass<frame_system::limits::WeightsPerClass>
+   * Lookup146: frame_support::dispatch::PerDispatchClass<frame_system::limits::WeightsPerClass>
    **/
   FrameSupportDispatchPerDispatchClassWeightsPerClass: {
     normal: 'FrameSystemLimitsWeightsPerClass',
@@ -1423,7 +1453,7 @@ export default {
     mandatory: 'FrameSystemLimitsWeightsPerClass',
   },
   /**
-   * Lookup146: frame_system::limits::WeightsPerClass
+   * Lookup147: frame_system::limits::WeightsPerClass
    **/
   FrameSystemLimitsWeightsPerClass: {
     baseExtrinsic: 'SpWeightsWeightV2Weight',
@@ -1432,13 +1462,13 @@ export default {
     reserved: 'Option<SpWeightsWeightV2Weight>',
   },
   /**
-   * Lookup148: frame_system::limits::BlockLength
+   * Lookup149: frame_system::limits::BlockLength
    **/
   FrameSystemLimitsBlockLength: {
     max: 'FrameSupportDispatchPerDispatchClassU32',
   },
   /**
-   * Lookup149: frame_support::dispatch::PerDispatchClass<T>
+   * Lookup150: frame_support::dispatch::PerDispatchClass<T>
    **/
   FrameSupportDispatchPerDispatchClassU32: {
     normal: 'u32',
@@ -1446,14 +1476,14 @@ export default {
     mandatory: 'u32',
   },
   /**
-   * Lookup150: sp_weights::RuntimeDbWeight
+   * Lookup151: sp_weights::RuntimeDbWeight
    **/
   SpWeightsRuntimeDbWeight: {
     read: 'u64',
     write: 'u64',
   },
   /**
-   * Lookup151: sp_version::RuntimeVersion
+   * Lookup152: sp_version::RuntimeVersion
    **/
   SpVersionRuntimeVersion: {
     specName: 'Text',
@@ -1466,7 +1496,7 @@ export default {
     systemVersion: 'u8',
   },
   /**
-   * Lookup156: frame_system::pallet::Error<T>
+   * Lookup157: frame_system::pallet::Error<T>
    **/
   FrameSystemError: {
     _enum: [
@@ -1482,7 +1512,7 @@ export default {
     ],
   },
   /**
-   * Lookup157: argon_primitives::digests::Digestset<argon_notary_audit::error::VerifyError, sp_core::crypto::AccountId32>
+   * Lookup158: argon_primitives::digests::Digestset<argon_notary_audit::error::VerifyError, sp_core::crypto::AccountId32>
    **/
   ArgonPrimitivesDigestsDigestset: {
     author: 'AccountId32',
@@ -1493,20 +1523,20 @@ export default {
     notebooks: 'ArgonPrimitivesDigestsNotebookDigest',
   },
   /**
-   * Lookup158: argon_primitives::digests::BlockVoteDigest
+   * Lookup159: argon_primitives::digests::BlockVoteDigest
    **/
   ArgonPrimitivesDigestsBlockVoteDigest: {
     votingPower: 'Compact<u128>',
     votesCount: 'Compact<u32>',
   },
   /**
-   * Lookup160: argon_primitives::digests::ParentVotingKeyDigest
+   * Lookup161: argon_primitives::digests::ParentVotingKeyDigest
    **/
   ArgonPrimitivesDigestsParentVotingKeyDigest: {
     parentVotingKey: 'Option<H256>',
   },
   /**
-   * Lookup163: argon_primitives::fork_power::ForkPower
+   * Lookup164: argon_primitives::fork_power::ForkPower
    **/
   ArgonPrimitivesForkPower: {
     isLatestVote: 'bool',
@@ -1517,13 +1547,13 @@ export default {
     voteCreatedBlocks: 'Compact<u128>',
   },
   /**
-   * Lookup165: argon_primitives::digests::NotebookDigest<argon_notary_audit::error::VerifyError>
+   * Lookup166: argon_primitives::digests::NotebookDigest<argon_notary_audit::error::VerifyError>
    **/
   ArgonPrimitivesDigestsNotebookDigest: {
     notebooks: 'Vec<ArgonPrimitivesNotebookNotebookAuditResult>',
   },
   /**
-   * Lookup167: argon_primitives::notebook::NotebookAuditResult<argon_notary_audit::error::VerifyError>
+   * Lookup168: argon_primitives::notebook::NotebookAuditResult<argon_notary_audit::error::VerifyError>
    **/
   ArgonPrimitivesNotebookNotebookAuditResult: {
     notaryId: 'Compact<u32>',
@@ -1532,7 +1562,7 @@ export default {
     auditFirstFailure: 'Option<ArgonNotaryAuditErrorVerifyError>',
   },
   /**
-   * Lookup169: pallet_digests::pallet::Error<T>
+   * Lookup170: pallet_digests::pallet::Error<T>
    **/
   PalletDigestsError: {
     _enum: [
@@ -1551,7 +1581,7 @@ export default {
     ],
   },
   /**
-   * Lookup170: pallet_timestamp::pallet::Call<T>
+   * Lookup171: pallet_timestamp::pallet::Call<T>
    **/
   PalletTimestampCall: {
     _enum: {
@@ -1561,7 +1591,7 @@ export default {
     },
   },
   /**
-   * Lookup172: pallet_multisig::Multisig<BlockNumber, Balance, sp_core::crypto::AccountId32, MaxApprovals>
+   * Lookup173: pallet_multisig::Multisig<BlockNumber, Balance, sp_core::crypto::AccountId32, MaxApprovals>
    **/
   PalletMultisigMultisig: {
     when: 'PalletMultisigTimepoint',
@@ -1570,7 +1600,7 @@ export default {
     approvals: 'Vec<AccountId32>',
   },
   /**
-   * Lookup175: pallet_multisig::pallet::Call<T>
+   * Lookup176: pallet_multisig::pallet::Call<T>
    **/
   PalletMultisigCall: {
     _enum: {
@@ -1598,10 +1628,15 @@ export default {
         timepoint: 'PalletMultisigTimepoint',
         callHash: '[u8;32]',
       },
+      poke_deposit: {
+        threshold: 'u16',
+        otherSignatories: 'Vec<AccountId32>',
+        callHash: '[u8;32]',
+      },
     },
   },
   /**
-   * Lookup177: pallet_proxy::pallet::Call<T>
+   * Lookup178: pallet_proxy::pallet::Call<T>
    **/
   PalletProxyCall: {
     _enum: {
@@ -1651,14 +1686,15 @@ export default {
         forceProxyType: 'Option<ArgonRuntimeProxyType>',
         call: 'Call',
       },
+      poke_deposit: 'Null',
     },
   },
   /**
-   * Lookup182: pallet_ticks::pallet::Call<T>
+   * Lookup183: pallet_ticks::pallet::Call<T>
    **/
   PalletTicksCall: 'Null',
   /**
-   * Lookup183: pallet_mining_slot::pallet::Call<T>
+   * Lookup184: pallet_mining_slot::pallet::Call<T>
    **/
   PalletMiningSlotCall: {
     _enum: {
@@ -1677,7 +1713,7 @@ export default {
     },
   },
   /**
-   * Lookup184: pallet_bitcoin_utxos::pallet::Call<T>
+   * Lookup185: pallet_bitcoin_utxos::pallet::Call<T>
    **/
   PalletBitcoinUtxosCall: {
     _enum: {
@@ -1694,7 +1730,7 @@ export default {
     },
   },
   /**
-   * Lookup185: argon_primitives::inherents::BitcoinUtxoSync
+   * Lookup186: argon_primitives::inherents::BitcoinUtxoSync
    **/
   ArgonPrimitivesInherentsBitcoinUtxoSync: {
     spent: 'BTreeMap<u64, u64>',
@@ -1703,14 +1739,14 @@ export default {
     syncToBlock: 'ArgonPrimitivesBitcoinBitcoinBlock',
   },
   /**
-   * Lookup195: argon_primitives::bitcoin::BitcoinBlock
+   * Lookup196: argon_primitives::bitcoin::BitcoinBlock
    **/
   ArgonPrimitivesBitcoinBitcoinBlock: {
     blockHeight: 'Compact<u64>',
     blockHash: 'ArgonPrimitivesBitcoinH256Le',
   },
   /**
-   * Lookup196: pallet_vaults::pallet::Call<T>
+   * Lookup197: pallet_vaults::pallet::Call<T>
    **/
   PalletVaultsCall: {
     _enum: {
@@ -1736,7 +1772,7 @@ export default {
     },
   },
   /**
-   * Lookup197: pallet_vaults::pallet::VaultConfig<Balance>
+   * Lookup198: pallet_vaults::pallet::VaultConfig<Balance>
    **/
   PalletVaultsVaultConfig: {
     terms: 'ArgonPrimitivesVaultVaultTerms',
@@ -1745,7 +1781,7 @@ export default {
     securitizationRatio: 'Compact<u128>',
   },
   /**
-   * Lookup198: argon_primitives::vault::VaultTerms<Balance>
+   * Lookup199: argon_primitives::vault::VaultTerms<Balance>
    **/
   ArgonPrimitivesVaultVaultTerms: {
     bitcoinAnnualPercentRate: 'Compact<u128>',
@@ -1753,11 +1789,11 @@ export default {
     liquidityPoolProfitSharing: 'Compact<Permill>',
   },
   /**
-   * Lookup202: argon_primitives::bitcoin::OpaqueBitcoinXpub
+   * Lookup203: argon_primitives::bitcoin::OpaqueBitcoinXpub
    **/
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub: '[u8;78]',
   /**
-   * Lookup204: pallet_bitcoin_locks::pallet::Call<T>
+   * Lookup205: pallet_bitcoin_locks::pallet::Call<T>
    **/
   PalletBitcoinLocksCall: {
     _enum: {
@@ -1784,11 +1820,11 @@ export default {
     },
   },
   /**
-   * Lookup205: argon_primitives::bitcoin::CompressedBitcoinPubkey
+   * Lookup206: argon_primitives::bitcoin::CompressedBitcoinPubkey
    **/
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey: '[u8;33]',
   /**
-   * Lookup209: pallet_notaries::pallet::Call<T>
+   * Lookup210: pallet_notaries::pallet::Call<T>
    **/
   PalletNotariesCall: {
     _enum: {
@@ -1806,7 +1842,7 @@ export default {
     },
   },
   /**
-   * Lookup210: pallet_notebook::pallet::Call<T>
+   * Lookup211: pallet_notebook::pallet::Call<T>
    **/
   PalletNotebookCall: {
     _enum: {
@@ -1819,14 +1855,14 @@ export default {
     },
   },
   /**
-   * Lookup212: argon_primitives::notebook::SignedNotebookHeader
+   * Lookup213: argon_primitives::notebook::SignedNotebookHeader
    **/
   ArgonPrimitivesNotebookSignedNotebookHeader: {
     header: 'ArgonPrimitivesNotebookNotebookHeader',
     signature: '[u8;64]',
   },
   /**
-   * Lookup213: argon_primitives::notebook::NotebookHeader
+   * Lookup214: argon_primitives::notebook::NotebookHeader
    **/
   ArgonPrimitivesNotebookNotebookHeader: {
     version: 'Compact<u16>',
@@ -1846,7 +1882,7 @@ export default {
     domains: 'Vec<(H256,AccountId32)>',
   },
   /**
-   * Lookup216: argon_primitives::notebook::ChainTransfer
+   * Lookup217: argon_primitives::notebook::ChainTransfer
    **/
   ArgonPrimitivesNotebookChainTransfer: {
     _enum: {
@@ -1860,14 +1896,14 @@ export default {
     },
   },
   /**
-   * Lookup219: argon_primitives::balance_change::AccountOrigin
+   * Lookup220: argon_primitives::balance_change::AccountOrigin
    **/
   ArgonPrimitivesBalanceChangeAccountOrigin: {
     notebookNumber: 'Compact<u32>',
     accountUid: 'Compact<u32>',
   },
   /**
-   * Lookup226: pallet_chain_transfer::pallet::Call<T>
+   * Lookup227: pallet_chain_transfer::pallet::Call<T>
    **/
   PalletChainTransferCall: {
     _enum: {
@@ -1878,7 +1914,7 @@ export default {
     },
   },
   /**
-   * Lookup227: pallet_block_seal_spec::pallet::Call<T>
+   * Lookup228: pallet_block_seal_spec::pallet::Call<T>
    **/
   PalletBlockSealSpecCall: {
     _enum: {
@@ -1889,7 +1925,7 @@ export default {
     },
   },
   /**
-   * Lookup228: pallet_domains::pallet::Call<T>
+   * Lookup229: pallet_domains::pallet::Call<T>
    **/
   PalletDomainsCall: {
     _enum: {
@@ -1900,7 +1936,7 @@ export default {
     },
   },
   /**
-   * Lookup229: pallet_price_index::pallet::Call<T>
+   * Lookup230: pallet_price_index::pallet::Call<T>
    **/
   PalletPriceIndexCall: {
     _enum: {
@@ -1913,7 +1949,7 @@ export default {
     },
   },
   /**
-   * Lookup230: pallet_price_index::PriceIndex
+   * Lookup231: pallet_price_index::PriceIndex
    **/
   PalletPriceIndexPriceIndex: {
     btcUsdPrice: 'Compact<u128>',
@@ -1924,7 +1960,7 @@ export default {
     tick: 'Compact<u64>',
   },
   /**
-   * Lookup231: pallet_grandpa::pallet::Call<T>
+   * Lookup232: pallet_grandpa::pallet::Call<T>
    **/
   PalletGrandpaCall: {
     _enum: {
@@ -1943,14 +1979,14 @@ export default {
     },
   },
   /**
-   * Lookup232: sp_consensus_grandpa::EquivocationProof<primitive_types::H256, N>
+   * Lookup233: sp_consensus_grandpa::EquivocationProof<primitive_types::H256, N>
    **/
   SpConsensusGrandpaEquivocationProof: {
     setId: 'u64',
     equivocation: 'SpConsensusGrandpaEquivocation',
   },
   /**
-   * Lookup233: sp_consensus_grandpa::Equivocation<primitive_types::H256, N>
+   * Lookup234: sp_consensus_grandpa::Equivocation<primitive_types::H256, N>
    **/
   SpConsensusGrandpaEquivocation: {
     _enum: {
@@ -1959,7 +1995,7 @@ export default {
     },
   },
   /**
-   * Lookup234: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Prevote<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
+   * Lookup235: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Prevote<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
    **/
   FinalityGrandpaEquivocationPrevote: {
     roundNumber: 'u64',
@@ -1968,18 +2004,18 @@ export default {
     second: '(FinalityGrandpaPrevote,SpConsensusGrandpaAppSignature)',
   },
   /**
-   * Lookup235: finality_grandpa::Prevote<primitive_types::H256, N>
+   * Lookup236: finality_grandpa::Prevote<primitive_types::H256, N>
    **/
   FinalityGrandpaPrevote: {
     targetHash: 'H256',
     targetNumber: 'u32',
   },
   /**
-   * Lookup236: sp_consensus_grandpa::app::Signature
+   * Lookup237: sp_consensus_grandpa::app::Signature
    **/
   SpConsensusGrandpaAppSignature: '[u8;64]',
   /**
-   * Lookup238: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Precommit<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
+   * Lookup239: finality_grandpa::Equivocation<sp_consensus_grandpa::app::Public, finality_grandpa::Precommit<primitive_types::H256, N>, sp_consensus_grandpa::app::Signature>
    **/
   FinalityGrandpaEquivocationPrecommit: {
     roundNumber: 'u64',
@@ -1988,18 +2024,18 @@ export default {
     second: '(FinalityGrandpaPrecommit,SpConsensusGrandpaAppSignature)',
   },
   /**
-   * Lookup239: finality_grandpa::Precommit<primitive_types::H256, N>
+   * Lookup240: finality_grandpa::Precommit<primitive_types::H256, N>
    **/
   FinalityGrandpaPrecommit: {
     targetHash: 'H256',
     targetNumber: 'u32',
   },
   /**
-   * Lookup241: sp_core::Void
+   * Lookup242: sp_core::Void
    **/
   SpCoreVoid: 'Null',
   /**
-   * Lookup242: pallet_block_seal::pallet::Call<T>
+   * Lookup243: pallet_block_seal::pallet::Call<T>
    **/
   PalletBlockSealCall: {
     _enum: {
@@ -2009,7 +2045,7 @@ export default {
     },
   },
   /**
-   * Lookup243: argon_primitives::inherents::BlockSealInherent
+   * Lookup244: argon_primitives::inherents::BlockSealInherent
    **/
   ArgonPrimitivesInherentsBlockSealInherent: {
     _enum: {
@@ -2024,7 +2060,7 @@ export default {
     },
   },
   /**
-   * Lookup244: argon_primitives::balance_change::MerkleProof
+   * Lookup245: argon_primitives::balance_change::MerkleProof
    **/
   ArgonPrimitivesBalanceChangeMerkleProof: {
     proof: 'Vec<H256>',
@@ -2032,7 +2068,7 @@ export default {
     leafIndex: 'Compact<u32>',
   },
   /**
-   * Lookup246: argon_primitives::block_vote::BlockVoteT<primitive_types::H256>
+   * Lookup247: argon_primitives::block_vote::BlockVoteT<primitive_types::H256>
    **/
   ArgonPrimitivesBlockVoteBlockVoteT: {
     accountId: 'AccountId32',
@@ -2044,7 +2080,7 @@ export default {
     tick: 'Compact<u64>',
   },
   /**
-   * Lookup247: sp_runtime::MultiSignature
+   * Lookup248: sp_runtime::MultiSignature
    **/
   SpRuntimeMultiSignature: {
     _enum: {
@@ -2054,7 +2090,7 @@ export default {
     },
   },
   /**
-   * Lookup249: pallet_block_rewards::pallet::Call<T>
+   * Lookup250: pallet_block_rewards::pallet::Call<T>
    **/
   PalletBlockRewardsCall: {
     _enum: {
@@ -2064,11 +2100,11 @@ export default {
     },
   },
   /**
-   * Lookup250: pallet_mint::pallet::Call<T>
+   * Lookup251: pallet_mint::pallet::Call<T>
    **/
   PalletMintCall: 'Null',
   /**
-   * Lookup251: pallet_balances::pallet::Call<T, I>
+   * Lookup252: pallet_balances::pallet::Call<T, I>
    **/
   PalletBalancesCall: {
     _enum: {
@@ -2113,13 +2149,13 @@ export default {
     },
   },
   /**
-   * Lookup252: pallet_balances::types::AdjustmentDirection
+   * Lookup253: pallet_balances::types::AdjustmentDirection
    **/
   PalletBalancesAdjustmentDirection: {
     _enum: ['Increase', 'Decrease'],
   },
   /**
-   * Lookup254: pallet_tx_pause::pallet::Call<T>
+   * Lookup255: pallet_tx_pause::pallet::Call<T>
    **/
   PalletTxPauseCall: {
     _enum: {
@@ -2132,7 +2168,7 @@ export default {
     },
   },
   /**
-   * Lookup255: pallet_utility::pallet::Call<T>
+   * Lookup256: pallet_utility::pallet::Call<T>
    **/
   PalletUtilityCall: {
     _enum: {
@@ -2157,10 +2193,18 @@ export default {
         call: 'Call',
         weight: 'SpWeightsWeightV2Weight',
       },
+      if_else: {
+        main: 'Call',
+        fallback: 'Call',
+      },
+      dispatch_as_fallible: {
+        asOrigin: 'ArgonRuntimeOriginCaller',
+        call: 'Call',
+      },
     },
   },
   /**
-   * Lookup257: pallet_sudo::pallet::Call<T>
+   * Lookup258: pallet_sudo::pallet::Call<T>
    **/
   PalletSudoCall: {
     _enum: {
@@ -2185,7 +2229,7 @@ export default {
     },
   },
   /**
-   * Lookup258: pallet_ismp::pallet::Call<T>
+   * Lookup259: pallet_ismp::pallet::Call<T>
    **/
   PalletIsmpCall: {
     _enum: {
@@ -2205,7 +2249,7 @@ export default {
     },
   },
   /**
-   * Lookup260: ismp::messaging::Message
+   * Lookup261: ismp::messaging::Message
    **/
   IsmpMessagingMessage: {
     _enum: {
@@ -2217,7 +2261,7 @@ export default {
     },
   },
   /**
-   * Lookup261: ismp::messaging::ConsensusMessage
+   * Lookup262: ismp::messaging::ConsensusMessage
    **/
   IsmpMessagingConsensusMessage: {
     consensusProof: 'Bytes',
@@ -2225,7 +2269,7 @@ export default {
     signer: 'Bytes',
   },
   /**
-   * Lookup262: ismp::messaging::FraudProofMessage
+   * Lookup263: ismp::messaging::FraudProofMessage
    **/
   IsmpMessagingFraudProofMessage: {
     proof1: 'Bytes',
@@ -2234,7 +2278,7 @@ export default {
     signer: 'Bytes',
   },
   /**
-   * Lookup263: ismp::messaging::RequestMessage
+   * Lookup264: ismp::messaging::RequestMessage
    **/
   IsmpMessagingRequestMessage: {
     requests: 'Vec<IsmpRouterPostRequest>',
@@ -2242,7 +2286,7 @@ export default {
     signer: 'Bytes',
   },
   /**
-   * Lookup265: ismp::router::PostRequest
+   * Lookup266: ismp::router::PostRequest
    **/
   IsmpRouterPostRequest: {
     source: 'IsmpHostStateMachine',
@@ -2254,14 +2298,14 @@ export default {
     body: 'Bytes',
   },
   /**
-   * Lookup266: ismp::messaging::Proof
+   * Lookup267: ismp::messaging::Proof
    **/
   IsmpMessagingProof: {
     height: 'IsmpConsensusStateMachineHeight',
     proof: 'Bytes',
   },
   /**
-   * Lookup267: ismp::messaging::ResponseMessage
+   * Lookup268: ismp::messaging::ResponseMessage
    **/
   IsmpMessagingResponseMessage: {
     datagram: 'IsmpRouterRequestResponse',
@@ -2269,7 +2313,7 @@ export default {
     signer: 'Bytes',
   },
   /**
-   * Lookup268: ismp::router::RequestResponse
+   * Lookup269: ismp::router::RequestResponse
    **/
   IsmpRouterRequestResponse: {
     _enum: {
@@ -2278,7 +2322,7 @@ export default {
     },
   },
   /**
-   * Lookup270: ismp::router::Request
+   * Lookup271: ismp::router::Request
    **/
   IsmpRouterRequest: {
     _enum: {
@@ -2287,7 +2331,7 @@ export default {
     },
   },
   /**
-   * Lookup271: ismp::router::GetRequest
+   * Lookup272: ismp::router::GetRequest
    **/
   IsmpRouterGetRequest: {
     _alias: {
@@ -2303,7 +2347,7 @@ export default {
     timeoutTimestamp: 'u64',
   },
   /**
-   * Lookup273: ismp::router::Response
+   * Lookup274: ismp::router::Response
    **/
   IsmpRouterResponse: {
     _enum: {
@@ -2312,7 +2356,7 @@ export default {
     },
   },
   /**
-   * Lookup274: ismp::router::PostResponse
+   * Lookup275: ismp::router::PostResponse
    **/
   IsmpRouterPostResponse: {
     post: 'IsmpRouterPostRequest',
@@ -2320,21 +2364,21 @@ export default {
     timeoutTimestamp: 'u64',
   },
   /**
-   * Lookup275: ismp::router::GetResponse
+   * Lookup276: ismp::router::GetResponse
    **/
   IsmpRouterGetResponse: {
     get: 'IsmpRouterGetRequest',
     values: 'Vec<IsmpRouterStorageValue>',
   },
   /**
-   * Lookup277: ismp::router::StorageValue
+   * Lookup278: ismp::router::StorageValue
    **/
   IsmpRouterStorageValue: {
     key: 'Bytes',
     value: 'Option<Bytes>',
   },
   /**
-   * Lookup279: ismp::messaging::TimeoutMessage
+   * Lookup280: ismp::messaging::TimeoutMessage
    **/
   IsmpMessagingTimeoutMessage: {
     _enum: {
@@ -2352,7 +2396,7 @@ export default {
     },
   },
   /**
-   * Lookup281: ismp::messaging::CreateConsensusState
+   * Lookup282: ismp::messaging::CreateConsensusState
    **/
   IsmpMessagingCreateConsensusState: {
     consensusState: 'Bytes',
@@ -2364,14 +2408,14 @@ export default {
       'Vec<(IsmpConsensusStateMachineId,IsmpMessagingStateCommitmentHeight)>',
   },
   /**
-   * Lookup287: ismp::messaging::StateCommitmentHeight
+   * Lookup288: ismp::messaging::StateCommitmentHeight
    **/
   IsmpMessagingStateCommitmentHeight: {
     commitment: 'IsmpConsensusStateCommitment',
     height: 'u64',
   },
   /**
-   * Lookup288: ismp::consensus::StateCommitment
+   * Lookup289: ismp::consensus::StateCommitment
    **/
   IsmpConsensusStateCommitment: {
     timestamp: 'u64',
@@ -2379,7 +2423,7 @@ export default {
     stateRoot: 'H256',
   },
   /**
-   * Lookup289: pallet_ismp::utils::UpdateConsensusState
+   * Lookup290: pallet_ismp::utils::UpdateConsensusState
    **/
   PalletIsmpUtilsUpdateConsensusState: {
     consensusStateId: '[u8;4]',
@@ -2387,14 +2431,14 @@ export default {
     challengePeriods: 'BTreeMap<IsmpHostStateMachine, u64>',
   },
   /**
-   * Lookup290: pallet_ismp::utils::FundMessageParams<Balance>
+   * Lookup291: pallet_ismp::utils::FundMessageParams<Balance>
    **/
   PalletIsmpUtilsFundMessageParams: {
     commitment: 'PalletIsmpUtilsMessageCommitment',
     amount: 'u128',
   },
   /**
-   * Lookup291: pallet_ismp::utils::MessageCommitment
+   * Lookup292: pallet_ismp::utils::MessageCommitment
    **/
   PalletIsmpUtilsMessageCommitment: {
     _enum: {
@@ -2403,7 +2447,7 @@ export default {
     },
   },
   /**
-   * Lookup292: ismp_grandpa::pallet::Call<T>
+   * Lookup293: ismp_grandpa::pallet::Call<T>
    **/
   IsmpGrandpaCall: {
     _enum: {
@@ -2416,14 +2460,14 @@ export default {
     },
   },
   /**
-   * Lookup294: ismp_grandpa::AddStateMachine
+   * Lookup295: ismp_grandpa::AddStateMachine
    **/
   IsmpGrandpaAddStateMachine: {
     stateMachine: 'IsmpHostStateMachine',
     slotDuration: 'u64',
   },
   /**
-   * Lookup295: pallet_token_gateway::pallet::Call<T>
+   * Lookup296: pallet_token_gateway::pallet::Call<T>
    **/
   PalletTokenGatewayCall: {
     _enum: {
@@ -2445,7 +2489,7 @@ export default {
     },
   },
   /**
-   * Lookup296: pallet_token_gateway::types::TeleportParams<AssetId, Balance>
+   * Lookup297: pallet_token_gateway::types::TeleportParams<AssetId, Balance>
    **/
   PalletTokenGatewayTeleportParams: {
     assetId: 'u32',
@@ -2459,7 +2503,7 @@ export default {
     redeem: 'bool',
   },
   /**
-   * Lookup300: pallet_token_gateway::types::AssetRegistration<AssetId>
+   * Lookup301: pallet_token_gateway::types::AssetRegistration<AssetId>
    **/
   PalletTokenGatewayAssetRegistration: {
     localId: 'u32',
@@ -2468,7 +2512,7 @@ export default {
     precision: 'BTreeMap<IsmpHostStateMachine, u8>',
   },
   /**
-   * Lookup301: token_gateway_primitives::GatewayAssetRegistration
+   * Lookup302: token_gateway_primitives::GatewayAssetRegistration
    **/
   TokenGatewayPrimitivesGatewayAssetRegistration: {
     name: 'Bytes',
@@ -2477,7 +2521,7 @@ export default {
     minimumBalance: 'Option<u128>',
   },
   /**
-   * Lookup306: token_gateway_primitives::GatewayAssetUpdate
+   * Lookup307: token_gateway_primitives::GatewayAssetUpdate
    **/
   TokenGatewayPrimitivesGatewayAssetUpdate: {
     assetId: 'H256',
@@ -2486,14 +2530,14 @@ export default {
     newAdmins: 'Vec<(IsmpHostStateMachine,H160)>',
   },
   /**
-   * Lookup312: pallet_token_gateway::types::PrecisionUpdate<AssetId>
+   * Lookup313: pallet_token_gateway::types::PrecisionUpdate<AssetId>
    **/
   PalletTokenGatewayPrecisionUpdate: {
     assetId: 'u32',
     precisions: 'BTreeMap<IsmpHostStateMachine, u8>',
   },
   /**
-   * Lookup313: pallet_liquidity_pools::pallet::Call<T>
+   * Lookup314: pallet_liquidity_pools::pallet::Call<T>
    **/
   PalletLiquidityPoolsCall: {
     _enum: {
@@ -2509,7 +2553,7 @@ export default {
     },
   },
   /**
-   * Lookup315: pallet_multisig::pallet::Error<T>
+   * Lookup316: pallet_multisig::pallet::Error<T>
    **/
   PalletMultisigError: {
     _enum: [
@@ -2530,7 +2574,7 @@ export default {
     ],
   },
   /**
-   * Lookup318: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_runtime::ProxyType, BlockNumber>
+   * Lookup319: pallet_proxy::ProxyDefinition<sp_core::crypto::AccountId32, argon_runtime::ProxyType, BlockNumber>
    **/
   PalletProxyProxyDefinition: {
     delegate: 'AccountId32',
@@ -2538,7 +2582,7 @@ export default {
     delay: 'u32',
   },
   /**
-   * Lookup322: pallet_proxy::Announcement<sp_core::crypto::AccountId32, primitive_types::H256, BlockNumber>
+   * Lookup323: pallet_proxy::Announcement<sp_core::crypto::AccountId32, primitive_types::H256, BlockNumber>
    **/
   PalletProxyAnnouncement: {
     real: 'AccountId32',
@@ -2546,7 +2590,7 @@ export default {
     height: 'u32',
   },
   /**
-   * Lookup324: pallet_proxy::pallet::Error<T>
+   * Lookup325: pallet_proxy::pallet::Error<T>
    **/
   PalletProxyError: {
     _enum: [
@@ -2561,18 +2605,18 @@ export default {
     ],
   },
   /**
-   * Lookup325: argon_primitives::tick::Ticker
+   * Lookup326: argon_primitives::tick::Ticker
    **/
   ArgonPrimitivesTickTicker: {
     tickDurationMillis: 'Compact<u64>',
     channelHoldExpirationTicks: 'Compact<u64>',
   },
   /**
-   * Lookup327: pallet_ticks::pallet::Error<T>
+   * Lookup328: pallet_ticks::pallet::Error<T>
    **/
   PalletTicksError: 'Null',
   /**
-   * Lookup340: argon_primitives::block_seal::MiningBidStats
+   * Lookup341: argon_primitives::block_seal::MiningBidStats
    **/
   ArgonPrimitivesBlockSealMiningBidStats: {
     bidsCount: 'u32',
@@ -2581,7 +2625,7 @@ export default {
     bidAmountSum: 'u128',
   },
   /**
-   * Lookup344: argon_primitives::block_seal::MiningSlotConfig
+   * Lookup345: argon_primitives::block_seal::MiningSlotConfig
    **/
   ArgonPrimitivesBlockSealMiningSlotConfig: {
     ticksBeforeBidEndForVrfClose: 'Compact<u64>',
@@ -2589,7 +2633,7 @@ export default {
     slotBiddingStartAfterTicks: 'Compact<u64>',
   },
   /**
-   * Lookup348: pallet_mining_slot::pallet::Error<T>
+   * Lookup349: pallet_mining_slot::pallet::Error<T>
    **/
   PalletMiningSlotError: {
     _enum: [
@@ -2605,7 +2649,7 @@ export default {
     ],
   },
   /**
-   * Lookup349: argon_primitives::bitcoin::UtxoValue
+   * Lookup350: argon_primitives::bitcoin::UtxoValue
    **/
   ArgonPrimitivesBitcoinUtxoValue: {
     utxoId: 'u64',
@@ -2615,7 +2659,7 @@ export default {
     watchForSpentUntilHeight: 'Compact<u64>',
   },
   /**
-   * Lookup350: argon_primitives::bitcoin::BitcoinCosignScriptPubkey
+   * Lookup351: argon_primitives::bitcoin::BitcoinCosignScriptPubkey
    **/
   ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey: {
     _enum: {
@@ -2625,13 +2669,13 @@ export default {
     },
   },
   /**
-   * Lookup355: argon_primitives::bitcoin::BitcoinNetwork
+   * Lookup356: argon_primitives::bitcoin::BitcoinNetwork
    **/
   ArgonPrimitivesBitcoinBitcoinNetwork: {
     _enum: ['Bitcoin', 'Testnet', 'Signet', 'Regtest'],
   },
   /**
-   * Lookup358: pallet_bitcoin_utxos::pallet::Error<T>
+   * Lookup359: pallet_bitcoin_utxos::pallet::Error<T>
    **/
   PalletBitcoinUtxosError: {
     _enum: [
@@ -2650,7 +2694,7 @@ export default {
     ],
   },
   /**
-   * Lookup359: argon_primitives::vault::Vault<sp_core::crypto::AccountId32, Balance>
+   * Lookup360: argon_primitives::vault::Vault<sp_core::crypto::AccountId32, Balance>
    **/
   ArgonPrimitivesVault: {
     operatorAccountId: 'AccountId32',
@@ -2665,7 +2709,7 @@ export default {
     openedTick: 'Compact<u64>',
   },
   /**
-   * Lookup367: argon_primitives::bitcoin::BitcoinXPub
+   * Lookup368: argon_primitives::bitcoin::BitcoinXPub
    **/
   ArgonPrimitivesBitcoinBitcoinXPub: {
     publicKey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
@@ -2676,13 +2720,13 @@ export default {
     network: 'ArgonPrimitivesBitcoinNetworkKind',
   },
   /**
-   * Lookup369: argon_primitives::bitcoin::NetworkKind
+   * Lookup370: argon_primitives::bitcoin::NetworkKind
    **/
   ArgonPrimitivesBitcoinNetworkKind: {
     _enum: ['Main', 'Test'],
   },
   /**
-   * Lookup374: pallet_vaults::pallet::VaultFrameFeeRevenue<T>
+   * Lookup375: pallet_vaults::pallet::VaultFrameFeeRevenue<T>
    **/
   PalletVaultsVaultFrameFeeRevenue: {
     frameId: 'Compact<u64>',
@@ -2693,7 +2737,7 @@ export default {
     satoshisReleased: 'Compact<u64>',
   },
   /**
-   * Lookup376: pallet_vaults::pallet::Error<T>
+   * Lookup377: pallet_vaults::pallet::Error<T>
    **/
   PalletVaultsError: {
     _enum: [
@@ -2726,7 +2770,7 @@ export default {
     ],
   },
   /**
-   * Lookup377: pallet_bitcoin_locks::pallet::LockedBitcoin<T>
+   * Lookup378: pallet_bitcoin_locks::pallet::LockedBitcoin<T>
    **/
   PalletBitcoinLocksLockedBitcoin: {
     vaultId: 'Compact<u32>',
@@ -2746,7 +2790,7 @@ export default {
     fundHoldExtensions: 'BTreeMap<u64, u128>',
   },
   /**
-   * Lookup380: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
+   * Lookup381: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
    **/
   PalletBitcoinLocksLockReleaseRequest: {
     utxoId: 'Compact<u64>',
@@ -2757,7 +2801,7 @@ export default {
     redemptionPrice: 'Compact<u128>',
   },
   /**
-   * Lookup387: pallet_bitcoin_locks::pallet::Error<T>
+   * Lookup388: pallet_bitcoin_locks::pallet::Error<T>
    **/
   PalletBitcoinLocksError: {
     _enum: {
@@ -2790,10 +2834,11 @@ export default {
       NoRatchetingAvailable: 'Null',
       LockInProcessOfRelease: 'Null',
       UnverifiedLock: 'Null',
+      OverflowError: 'Null',
     },
   },
   /**
-   * Lookup388: argon_primitives::vault::VaultError
+   * Lookup389: argon_primitives::vault::VaultError
    **/
   ArgonPrimitivesVaultVaultError: {
     _enum: [
@@ -2812,7 +2857,7 @@ export default {
     ],
   },
   /**
-   * Lookup400: pallet_notaries::pallet::Error<T>
+   * Lookup401: pallet_notaries::pallet::Error<T>
    **/
   PalletNotariesError: {
     _enum: [
@@ -2828,7 +2873,7 @@ export default {
     ],
   },
   /**
-   * Lookup404: argon_primitives::notary::NotaryNotebookKeyDetails
+   * Lookup405: argon_primitives::notary::NotaryNotebookKeyDetails
    **/
   ArgonPrimitivesNotaryNotaryNotebookKeyDetails: {
     notebookNumber: 'Compact<u32>',
@@ -2838,7 +2883,7 @@ export default {
     parentSecret: 'Option<H256>',
   },
   /**
-   * Lookup407: pallet_notebook::pallet::Error<T>
+   * Lookup408: pallet_notebook::pallet::Error<T>
    **/
   PalletNotebookError: {
     _enum: [
@@ -2860,7 +2905,7 @@ export default {
     ],
   },
   /**
-   * Lookup408: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
+   * Lookup409: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
    **/
   PalletChainTransferQueuedTransferOut: {
     accountId: 'AccountId32',
@@ -2869,11 +2914,11 @@ export default {
     notaryId: 'u32',
   },
   /**
-   * Lookup414: frame_support::PalletId
+   * Lookup415: frame_support::PalletId
    **/
   FrameSupportPalletId: '[u8;8]',
   /**
-   * Lookup415: pallet_chain_transfer::pallet::Error<T>
+   * Lookup416: pallet_chain_transfer::pallet::Error<T>
    **/
   PalletChainTransferError: {
     _enum: [
@@ -2886,7 +2931,7 @@ export default {
     ],
   },
   /**
-   * Lookup419: argon_primitives::notary::NotaryNotebookVoteDigestDetails
+   * Lookup420: argon_primitives::notary::NotaryNotebookVoteDigestDetails
    **/
   ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails: {
     notaryId: 'Compact<u32>',
@@ -2896,13 +2941,13 @@ export default {
     blockVotingPower: 'Compact<u128>',
   },
   /**
-   * Lookup424: pallet_block_seal_spec::pallet::Error<T>
+   * Lookup425: pallet_block_seal_spec::pallet::Error<T>
    **/
   PalletBlockSealSpecError: {
     _enum: ['MaxNotebooksAtTickExceeded'],
   },
   /**
-   * Lookup426: pallet_domains::pallet::Error<T>
+   * Lookup427: pallet_domains::pallet::Error<T>
    **/
   PalletDomainsError: {
     _enum: [
@@ -2914,7 +2959,7 @@ export default {
     ],
   },
   /**
-   * Lookup427: pallet_price_index::pallet::Error<T>
+   * Lookup428: pallet_price_index::pallet::Error<T>
    **/
   PalletPriceIndexError: {
     _enum: [
@@ -2925,7 +2970,7 @@ export default {
     ],
   },
   /**
-   * Lookup428: pallet_grandpa::StoredState<N>
+   * Lookup429: pallet_grandpa::StoredState<N>
    **/
   PalletGrandpaStoredState: {
     _enum: {
@@ -2942,7 +2987,7 @@ export default {
     },
   },
   /**
-   * Lookup429: pallet_grandpa::StoredPendingChange<N, Limit>
+   * Lookup430: pallet_grandpa::StoredPendingChange<N, Limit>
    **/
   PalletGrandpaStoredPendingChange: {
     scheduledAt: 'u32',
@@ -2951,7 +2996,7 @@ export default {
     forced: 'Option<u32>',
   },
   /**
-   * Lookup432: pallet_grandpa::pallet::Error<T>
+   * Lookup433: pallet_grandpa::pallet::Error<T>
    **/
   PalletGrandpaError: {
     _enum: [
@@ -2965,7 +3010,7 @@ export default {
     ],
   },
   /**
-   * Lookup433: argon_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
+   * Lookup434: argon_primitives::providers::BlockSealerInfo<sp_core::crypto::AccountId32>
    **/
   ArgonPrimitivesProvidersBlockSealerInfo: {
     blockAuthorAccountId: 'AccountId32',
@@ -2973,7 +3018,7 @@ export default {
     blockSealAuthority: 'Option<ArgonPrimitivesBlockSealAppPublic>',
   },
   /**
-   * Lookup436: pallet_block_seal::pallet::Error<T>
+   * Lookup437: pallet_block_seal::pallet::Error<T>
    **/
   PalletBlockSealError: {
     _enum: [
@@ -2999,11 +3044,11 @@ export default {
     ],
   },
   /**
-   * Lookup440: pallet_block_rewards::pallet::Error<T>
+   * Lookup441: pallet_block_rewards::pallet::Error<T>
    **/
   PalletBlockRewardsError: 'Null',
   /**
-   * Lookup446: pallet_mint::pallet::MintAction<Balance>
+   * Lookup447: pallet_mint::pallet::MintAction<Balance>
    **/
   PalletMintMintAction: {
     argonBurned: 'u128',
@@ -3011,13 +3056,13 @@ export default {
     bitcoinMinted: 'u128',
   },
   /**
-   * Lookup447: pallet_mint::pallet::Error<T>
+   * Lookup448: pallet_mint::pallet::Error<T>
    **/
   PalletMintError: {
     _enum: ['TooManyPendingMints'],
   },
   /**
-   * Lookup449: pallet_balances::types::BalanceLock<Balance>
+   * Lookup450: pallet_balances::types::BalanceLock<Balance>
    **/
   PalletBalancesBalanceLock: {
     id: '[u8;8]',
@@ -3025,27 +3070,27 @@ export default {
     reasons: 'PalletBalancesReasons',
   },
   /**
-   * Lookup450: pallet_balances::types::Reasons
+   * Lookup451: pallet_balances::types::Reasons
    **/
   PalletBalancesReasons: {
     _enum: ['Fee', 'Misc', 'All'],
   },
   /**
-   * Lookup453: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
+   * Lookup454: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
    **/
   PalletBalancesReserveData: {
     id: '[u8;8]',
     amount: 'u128',
   },
   /**
-   * Lookup456: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeHoldReason, Balance>
+   * Lookup457: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeHoldReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
     id: 'ArgonRuntimeRuntimeHoldReason',
     amount: 'u128',
   },
   /**
-   * Lookup457: argon_runtime::RuntimeHoldReason
+   * Lookup458: argon_runtime::RuntimeHoldReason
    **/
   ArgonRuntimeRuntimeHoldReason: {
     _enum: {
@@ -3084,44 +3129,44 @@ export default {
     },
   },
   /**
-   * Lookup458: pallet_mining_slot::pallet::HoldReason
+   * Lookup459: pallet_mining_slot::pallet::HoldReason
    **/
   PalletMiningSlotHoldReason: {
     _enum: ['RegisterAsMiner'],
   },
   /**
-   * Lookup459: pallet_vaults::pallet::HoldReason
+   * Lookup460: pallet_vaults::pallet::HoldReason
    **/
   PalletVaultsHoldReason: {
     _enum: ['EnterVault', 'ObligationFee'],
   },
   /**
-   * Lookup460: pallet_bitcoin_locks::pallet::HoldReason
+   * Lookup461: pallet_bitcoin_locks::pallet::HoldReason
    **/
   PalletBitcoinLocksHoldReason: {
     _enum: ['ReleaseBitcoinLock'],
   },
   /**
-   * Lookup461: pallet_block_rewards::pallet::HoldReason
+   * Lookup462: pallet_block_rewards::pallet::HoldReason
    **/
   PalletBlockRewardsHoldReason: {
     _enum: ['MaturationPeriod'],
   },
   /**
-   * Lookup462: pallet_liquidity_pools::pallet::HoldReason
+   * Lookup463: pallet_liquidity_pools::pallet::HoldReason
    **/
   PalletLiquidityPoolsHoldReason: {
     _enum: ['ContributedToLiquidityPool'],
   },
   /**
-   * Lookup465: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
+   * Lookup466: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
     id: 'ArgonRuntimeRuntimeFreezeReason',
     amount: 'u128',
   },
   /**
-   * Lookup466: argon_runtime::RuntimeFreezeReason
+   * Lookup467: argon_runtime::RuntimeFreezeReason
    **/
   ArgonRuntimeRuntimeFreezeReason: {
     _enum: {
@@ -3148,13 +3193,13 @@ export default {
     },
   },
   /**
-   * Lookup467: pallet_block_rewards::pallet::FreezeReason
+   * Lookup468: pallet_block_rewards::pallet::FreezeReason
    **/
   PalletBlockRewardsFreezeReason: {
     _enum: ['MaturationPeriod'],
   },
   /**
-   * Lookup469: pallet_balances::pallet::Error<T, I>
+   * Lookup470: pallet_balances::pallet::Error<T, I>
    **/
   PalletBalancesError: {
     _enum: [
@@ -3173,31 +3218,31 @@ export default {
     ],
   },
   /**
-   * Lookup471: pallet_tx_pause::pallet::Error<T>
+   * Lookup472: pallet_tx_pause::pallet::Error<T>
    **/
   PalletTxPauseError: {
     _enum: ['IsPaused', 'IsUnpaused', 'Unpausable', 'NotFound'],
   },
   /**
-   * Lookup472: pallet_transaction_payment::Releases
+   * Lookup473: pallet_transaction_payment::Releases
    **/
   PalletTransactionPaymentReleases: {
     _enum: ['V1Ancient', 'V2'],
   },
   /**
-   * Lookup473: pallet_utility::pallet::Error<T>
+   * Lookup474: pallet_utility::pallet::Error<T>
    **/
   PalletUtilityError: {
     _enum: ['TooManyCalls'],
   },
   /**
-   * Lookup474: pallet_sudo::pallet::Error<T>
+   * Lookup475: pallet_sudo::pallet::Error<T>
    **/
   PalletSudoError: {
     _enum: ['RequireSudo'],
   },
   /**
-   * Lookup475: pallet_ismp::pallet::Error<T>
+   * Lookup476: pallet_ismp::pallet::Error<T>
    **/
   PalletIsmpError: {
     _enum: [
@@ -3209,11 +3254,11 @@ export default {
     ],
   },
   /**
-   * Lookup476: pallet_hyperbridge::pallet::Error<T>
+   * Lookup477: pallet_hyperbridge::pallet::Error<T>
    **/
   PalletHyperbridgeError: 'Null',
   /**
-   * Lookup478: pallet_token_gateway::pallet::Error<T>
+   * Lookup479: pallet_token_gateway::pallet::Error<T>
    **/
   PalletTokenGatewayError: {
     _enum: [
@@ -3229,7 +3274,7 @@ export default {
     ],
   },
   /**
-   * Lookup480: pallet_liquidity_pools::pallet::LiquidityPool<T>
+   * Lookup481: pallet_liquidity_pools::pallet::LiquidityPool<T>
    **/
   PalletLiquidityPoolsLiquidityPool: {
     contributorBalances: 'Vec<(AccountId32,u128)>',
@@ -3239,7 +3284,7 @@ export default {
     vaultSharingPercent: 'Compact<Permill>',
   },
   /**
-   * Lookup489: pallet_liquidity_pools::pallet::LiquidityPoolCapital<T>
+   * Lookup490: pallet_liquidity_pools::pallet::LiquidityPoolCapital<T>
    **/
   PalletLiquidityPoolsLiquidityPoolCapital: {
     vaultId: 'Compact<u32>',
@@ -3247,7 +3292,7 @@ export default {
     frameId: 'Compact<u64>',
   },
   /**
-   * Lookup491: pallet_liquidity_pools::pallet::Error<T>
+   * Lookup492: pallet_liquidity_pools::pallet::Error<T>
    **/
   PalletLiquidityPoolsError: {
     _enum: [
@@ -3264,47 +3309,51 @@ export default {
     ],
   },
   /**
-   * Lookup494: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup495: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup495: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup496: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup496: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup497: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup497: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup498: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup500: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup501: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup501: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup502: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup502: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup503: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup503: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup504: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup504: frame_metadata_hash_extension::Mode
+   * Lookup505: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup506: argon_runtime::Runtime
+   * Lookup506: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   **/
+  FrameSystemExtensionsWeightReclaim: 'Null',
+  /**
+   * Lookup508: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

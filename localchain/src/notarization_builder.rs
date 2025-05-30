@@ -889,7 +889,7 @@ impl NotarizationBuilder {
       DomainStore::db_insert(
         &mut tx,
         JsDomain {
-          name: domain.name.clone().into(),
+          name: domain.name.clone(),
           top_level: domain.top_level,
         },
         AccountStore::to_address(account),

@@ -1,5 +1,5 @@
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use codec::{Codec, Decode, Encode};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use sp_core::U256;
@@ -20,7 +20,7 @@ pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";
 pub const BITCOIN_INHERENT_IDENTIFIER: InherentIdentifier = *b"bitcoin_";
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherent {
 	Vote {
 		seal_strength: U256,
@@ -34,7 +34,7 @@ pub enum BlockSealInherent {
 	Compute,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum BlockSealInherentNodeSide {
 	Vote {
 		seal_strength: U256,
@@ -265,7 +265,7 @@ impl BitcoinInherentData for InherentData {
 	}
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct BitcoinUtxoSync {
 	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
 	pub verified: BTreeMap<UtxoId, UtxoRef>,

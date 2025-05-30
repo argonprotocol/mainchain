@@ -126,6 +126,7 @@ macro_rules! inject_runtime_vars {
 				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 			>,
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
+			frame_system::WeightReclaim<Runtime>,
 		);
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///

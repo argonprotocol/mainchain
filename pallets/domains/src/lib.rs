@@ -217,7 +217,7 @@ pub mod pallet {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub struct DomainRegistration<AccountId> {
 	pub account_id: AccountId,
 	pub registered_at_tick: Tick,

@@ -87,6 +87,7 @@ import type {
   FrameSystemExtensionsCheckSpecVersion,
   FrameSystemExtensionsCheckTxVersion,
   FrameSystemExtensionsCheckWeight,
+  FrameSystemExtensionsWeightReclaim,
   FrameSystemLastRuntimeUpgradeInfo,
   FrameSystemLimitsBlockLength,
   FrameSystemLimitsBlockWeights,
@@ -203,6 +204,7 @@ import type {
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyCall,
+  PalletProxyDepositKind,
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
@@ -338,6 +340,7 @@ declare module '@polkadot/types/types/registry' {
     FrameSystemExtensionsCheckSpecVersion: FrameSystemExtensionsCheckSpecVersion;
     FrameSystemExtensionsCheckTxVersion: FrameSystemExtensionsCheckTxVersion;
     FrameSystemExtensionsCheckWeight: FrameSystemExtensionsCheckWeight;
+    FrameSystemExtensionsWeightReclaim: FrameSystemExtensionsWeightReclaim;
     FrameSystemLastRuntimeUpgradeInfo: FrameSystemLastRuntimeUpgradeInfo;
     FrameSystemLimitsBlockLength: FrameSystemLimitsBlockLength;
     FrameSystemLimitsBlockWeights: FrameSystemLimitsBlockWeights;
@@ -454,6 +457,7 @@ declare module '@polkadot/types/types/registry' {
     PalletPriceIndexPriceIndex: PalletPriceIndexPriceIndex;
     PalletProxyAnnouncement: PalletProxyAnnouncement;
     PalletProxyCall: PalletProxyCall;
+    PalletProxyDepositKind: PalletProxyDepositKind;
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;

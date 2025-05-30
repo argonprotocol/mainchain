@@ -1,12 +1,13 @@
 use crate::{
 	chain_spec,
 	cli::{Cli, RandomxFlag, Subcommand},
-	runtime_api::opaque::Block,
+	runtime_api::{opaque::Block, BaseHostRuntimeApis},
 	service,
-	service::new_partial,
+	service::{new_partial, FullClient},
 };
+use argon_primitives::prelude::sp_api::ConstructRuntimeApi;
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
-use polkadot_sdk::*;
+use polkadot_sdk::{sc_service::TaskManager, *};
 use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
 use sc_network::{config::NetworkBackendType, Litep2pNetworkBackend, NetworkWorker};
@@ -221,33 +222,31 @@ pub fn run() -> sc_cli::Result<()> {
 					config.network.network_backend.unwrap_or_default(),
 					NetworkBackendType::Libp2p
 				);
-				if is_lipb2p {
-					if config.chain_spec.is_canary() {
-						service::new_full::<CanaryRuntimeApi, NetworkWorker<Block, BlockHashT>>(
-							config,
-							mining_config,
-						)
-					} else {
-						service::new_full::<ArgonRuntimeApi, NetworkWorker<Block, BlockHashT>>(
-							config,
-							mining_config,
-						)
-					}
-				} else if config.chain_spec.is_canary() {
-					service::new_full::<CanaryRuntimeApi, Litep2pNetworkBackend>(
-						config,
-						mining_config,
-					)
+				if config.chain_spec.is_canary() {
+					run_node_with_runtime::<CanaryRuntimeApi>(config, mining_config, is_lipb2p)
 				} else {
-					service::new_full::<ArgonRuntimeApi, Litep2pNetworkBackend>(
-						config,
-						mining_config,
-					)
+					run_node_with_runtime::<ArgonRuntimeApi>(config, mining_config, is_lipb2p)
 				}
-				.map_err(Error::Service)
 			})
 		},
 	}
+}
+
+fn run_node_with_runtime<R>(
+	config: sc_service::Configuration,
+	mining_config: MiningConfig,
+	is_lipb2p: bool,
+) -> Result<TaskManager, Error>
+where
+	R: ConstructRuntimeApi<Block, FullClient<R>> + Send + Sync + 'static,
+	R::RuntimeApi: BaseHostRuntimeApis,
+{
+	if is_lipb2p {
+		service::new_full::<R, NetworkWorker<Block, BlockHashT>>(config, mining_config)
+	} else {
+		service::new_full::<R, Litep2pNetworkBackend>(config, mining_config)
+	}
+	.map_err(Error::Service)
 }
 
 pub struct MiningConfig {

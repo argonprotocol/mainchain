@@ -1,5 +1,5 @@
 use crate::{tick::Tick, Balance};
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
@@ -64,6 +64,7 @@ pub type FrameId = u64;
 	CloneNoBound,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -71,11 +72,12 @@ pub type FrameId = u64;
 	Serialize,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct MiningRegistration<
-	AccountId: Parameter,
-	Balance: Parameter + MaxEncodedLen,
-	Keys: OpaqueKeys + Parameter,
-> {
+pub struct MiningRegistration<AccountId, Balance, Keys>
+where
+	AccountId: Parameter + DecodeWithMemTracking,
+	Balance: Parameter + MaxEncodedLen + DecodeWithMemTracking,
+	Keys: OpaqueKeys + Parameter + DecodeWithMemTracking,
+{
 	/// The account id the miner will operate as
 	pub account_id: AccountId,
 	/// The account that bids and argonots come from
@@ -105,7 +107,17 @@ impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>
 }
 
 #[derive(
-	Clone, Serialize, Deserialize, Encode, Decode, Eq, PartialEq, RuntimeDebug, Default, TypeInfo,
+	Clone,
+	Serialize,
+	Deserialize,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Eq,
+	PartialEq,
+	RuntimeDebug,
+	Default,
+	TypeInfo,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct MiningSlotConfig {
@@ -120,7 +132,18 @@ pub struct MiningSlotConfig {
 	pub slot_bidding_start_after_ticks: Tick,
 }
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(
+	PartialEq,
+	Eq,
+	Clone,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+)]
 pub struct PeerId(pub OpaquePeerId);
 
 impl MaxEncodedLen for PeerId {
@@ -132,14 +155,24 @@ impl MaxEncodedLen for PeerId {
 /// The starting frame id for a miner and the index of the miner in that frame
 pub type MinerIndex = (FrameId, u32);
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	PartialEq,
+	Eq,
+	Clone,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub authority_index: MinerIndex,
 	pub authority_id: AuthorityId,
 	pub account_id: AccountId,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Encode, Decode, TypeInfo)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 pub struct MiningBidStats {
 	pub bids_count: u32,
 	pub bid_amount_min: Balance,
@@ -147,8 +180,22 @@ pub struct MiningBidStats {
 	pub bid_amount_sum: Balance,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
-pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+	RuntimeDebug,
+)]
+pub struct BlockPayout<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + MaxEncodedLen,
+{
 	pub account_id: AccountId,
 	#[codec(compact)]
 	pub ownership: Balance,
@@ -158,7 +205,17 @@ pub struct BlockPayout<AccountId: Codec, Balance: Codec + MaxEncodedLen> {
 	pub block_seal_authority: Option<BlockSealAuthorityId>,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+	RuntimeDebug,
+)]
 pub enum BlockRewardType {
 	Miner,
 	Voter,

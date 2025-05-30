@@ -13,7 +13,7 @@ pub use core::{convert::TryInto, fmt::Debug, marker::PhantomData, str::FromStr};
 pub use log::{self};
 
 pub use argon_primitives::{self, prelude::*};
-pub use codec::Codec;
+pub use codec::{Codec, DecodeWithMemTracking};
 pub use frame_support::{
 	pallet_prelude::*,
 	storage::{bounded_vec, with_storage_layer},

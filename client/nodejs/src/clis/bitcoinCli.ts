@@ -1,8 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import { VaultMonitor } from '../VaultMonitor';
 import { BitcoinLocks } from '../BitcoinLocks';
-import { Accountset } from '../Accountset';
-import { MICROGONS_PER_ARGON, formatArgons } from '../utils';
+import { formatArgons, MICROGONS_PER_ARGON } from '../utils';
 import { accountsetFromCli } from './index';
 
 export default function bitcoinCli() {
