@@ -86,6 +86,7 @@ import type {
   PalletVaultsVaultFrameFeeRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
+  SpWeightsWeightV2Weight,
 } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
@@ -749,6 +750,7 @@ declare module '@polkadot/api-base/types/storage' {
             | { Kusama: any }
             | { Substrate: any }
             | { Tendermint: any }
+            | { Relay: any }
             | string
             | Uint8Array,
         ) => Observable<Option<u64>>,
@@ -1304,6 +1306,20 @@ declare module '@polkadot/api-base/types/storage' {
         [u32]
       >;
       /**
+       * The weight reclaimed for the extrinsic.
+       *
+       * This information is available until the end of the extrinsic execution.
+       * More precisely this information is removed in `note_applied_extrinsic`.
+       *
+       * Logic doing some post dispatch weight reduction must update this storage to avoid duplicate
+       * reduction.
+       **/
+      extrinsicWeightReclaimed: AugmentedQuery<
+        ApiType,
+        () => Observable<SpWeightsWeightV2Weight>,
+        []
+      >;
+      /**
        * Whether all inherents have been applied.
        **/
       inherentsApplied: AugmentedQuery<ApiType, () => Observable<bool>, []>;
@@ -1405,6 +1421,7 @@ declare module '@polkadot/api-base/types/storage' {
             | { Kusama: any }
             | { Substrate: any }
             | { Tendermint: any }
+            | { Relay: any }
             | string
             | Uint8Array,
         ) => Observable<Option<u8>>,
@@ -1432,6 +1449,7 @@ declare module '@polkadot/api-base/types/storage' {
             | { Kusama: any }
             | { Substrate: any }
             | { Tendermint: any }
+            | { Relay: any }
             | string
             | Uint8Array,
         ) => Observable<Option<Bytes>>,

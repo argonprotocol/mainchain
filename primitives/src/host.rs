@@ -2,14 +2,24 @@ use alloc::{
 	string::{String, ToString},
 	vec::Vec,
 };
-use codec::{Decode, Encode, MaxEncodedLen};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::{traits::ConstU32, BoundedVec};
+use sp_runtime::{BoundedVec, traits::ConstU32};
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	PartialEq,
+	Eq,
+	Clone,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct Host(pub BoundedVec<u8, ConstU32<253>>);
 

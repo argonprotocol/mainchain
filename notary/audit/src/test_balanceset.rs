@@ -1,20 +1,20 @@
 use frame_support::{assert_err, assert_ok};
 use polkadot_sdk::*;
-use sp_core::{bounded_vec, sr25519::Signature, H256};
+use sp_core::{H256, bounded_vec, sr25519::Signature};
 use sp_keyring::{
 	Ed25519Keyring::{Dave, Ferdie},
 	Sr25519Keyring::{Alice, Bob, Charlie},
 };
 
 use argon_primitives::{
+	AccountType, BlockVote, CHANNEL_HOLD_CLAWBACK_TICKS, LocalchainAccountId, MultiSignatureBytes,
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
-	AccountType, BlockVote, LocalchainAccountId, MultiSignatureBytes, CHANNEL_HOLD_CLAWBACK_TICKS,
 };
 
 use crate::{
-	track_block_votes, verify_changeset_signatures, verify_notarization_allocation,
-	verify_voting_sources, BalanceChangesetState, NotebookVerifyState, VerifyError,
+	BalanceChangesetState, NotebookVerifyState, VerifyError, track_block_votes,
+	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
 };
 
 fn empty_proof(balance: u128) -> Option<BalanceProof> {
@@ -36,18 +36,20 @@ fn empty_signature() -> MultiSignatureBytes {
 fn test_balance_change_allocation_errs_non_zero() {
 	assert_err!(
 		verify_notarization_allocation(
-			&vec![BalanceChange {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				balance: 100_000,
-				previous_balance_proof: None,
-				channel_hold_note: None,
-				notes: bounded_vec![Note::create(100_000, NoteType::Claim)],
-				signature: empty_signature(),
-			}
-			.sign(Alice.pair())
-			.clone()],
+			&vec![
+				BalanceChange {
+					account_id: Alice.to_account_id(),
+					account_type: AccountType::Deposit,
+					change_number: 1,
+					balance: 100_000,
+					previous_balance_proof: None,
+					channel_hold_note: None,
+					notes: bounded_vec![Note::create(100_000, NoteType::Claim)],
+					signature: empty_signature(),
+				}
+				.sign(Alice.pair())
+				.clone()
+			],
 			&[],
 			&[],
 			None,
@@ -755,17 +757,19 @@ fn verify_tax_votes() {
 		VerifyError::InvalidBlockVoteAllocation
 	);
 
-	let votes = vec![BlockVote {
-		account_id: Bob.to_account_id(),
-		block_hash: H256::zero(),
-		index: 0,
-		power: 20_000_000,
-		tick: 1,
-		block_rewards_account_id: Bob.to_account_id(),
-		signature: Signature::from_raw([0u8; 64]).into(),
-	}
-	.sign(Bob.pair())
-	.clone()];
+	let votes = vec![
+		BlockVote {
+			account_id: Bob.to_account_id(),
+			block_hash: H256::zero(),
+			index: 0,
+			power: 20_000_000,
+			tick: 1,
+			block_rewards_account_id: Bob.to_account_id(),
+			signature: Signature::from_raw([0u8; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone(),
+	];
 
 	let result =
 		verify_notarization_allocation(&set, &votes, &[], Some(1), 2).expect("should unwrap");

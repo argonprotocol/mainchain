@@ -60,10 +60,10 @@ pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeMap;
 	use argon_primitives::{
-		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
 		OnNewSlot,
+		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
 	};
-	use sp_runtime::{traits::AccountIdConversion, BoundedBTreeMap};
+	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::warn;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -89,6 +89,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
@@ -103,10 +104,7 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type LiquidityPoolVaultProvider: LiquidityPoolVaultProvider<
-			Balance = Self::Balance,
-			AccountId = Self::AccountId,
-		>;
+		type LiquidityPoolVaultProvider: LiquidityPoolVaultProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
 
 		/// The maximum number of contributors to a bond fund
 		#[pallet::constant]

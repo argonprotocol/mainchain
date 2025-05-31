@@ -3,7 +3,7 @@ import { Header } from '@polkadot/types/interfaces/runtime';
 import { GenericEvent } from '@polkadot/types';
 import { BlockWatch } from './BlockWatch';
 import { FrameCalculator } from './FrameCalculator';
-import { createNanoEvents } from 'nanoevents';
+import { createNanoEvents } from './utils';
 
 export class AccountMiners {
   public events = createNanoEvents<{

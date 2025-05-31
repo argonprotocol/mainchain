@@ -6,10 +6,10 @@ use sqlx::PgConnection;
 
 use argon_notary_apis::localchain::BalanceTipResult;
 use argon_primitives::{
-	ensure, prelude::*, AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber,
+	AccountOrigin, AccountType, BalanceTip, Note, NotebookNumber, ensure, prelude::*,
 };
 
-use crate::{stores::BoxFutureResult, Error};
+use crate::{Error, stores::BoxFutureResult};
 
 /// This table is used as a quick verification of the last balance change. It is also the last valid
 /// entry in a notebook. Without this table, you must obtain proof that a balance has not changed
@@ -229,21 +229,23 @@ mod tests {
 		);
 
 		let mut tx3 = pool.begin().await?;
-		assert!(BalanceTipStore::lock(
-			&mut tx3,
-			&Bob.to_account_id(),
-			Deposit,
-			2,
-			1000,
-			&AccountOrigin { notebook_number: 1, account_uid: 1 },
-			0,
-			None,
-			10
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.contains("lock timeout"),);
+		assert!(
+			BalanceTipStore::lock(
+				&mut tx3,
+				&Bob.to_account_id(),
+				Deposit,
+				2,
+				1000,
+				&AccountOrigin { notebook_number: 1, account_uid: 1 },
+				0,
+				None,
+				10
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.contains("lock timeout"),
+		);
 
 		assert_ok!(
 			BalanceTipStore::update(

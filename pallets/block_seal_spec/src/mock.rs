@@ -4,8 +4,8 @@ use pallet_prelude::*;
 
 use crate as pallet_block_seal_spec;
 use argon_primitives::{
-	block_seal::MiningAuthority, inherents::BlockSealInherent, notebook::NotebookNumber,
-	providers::*, tick::Ticker, NotebookSecret, VotingSchedule,
+	NotebookSecret, VotingSchedule, block_seal::MiningAuthority, inherents::BlockSealInherent,
+	notebook::NotebookNumber, providers::*, tick::Ticker,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -57,13 +57,9 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 		AuthorityList::get().len() as u32
 	}
 	fn get_authority(author: u64) -> Option<BlockSealAuthorityId> {
-		AuthorityList::get().iter().find_map(|(account, id)| {
-			if *account == author {
-				Some(id.clone())
-			} else {
-				None
-			}
-		})
+		AuthorityList::get()
+			.iter()
+			.find_map(|(account, id)| if *account == author { Some(id.clone()) } else { None })
 	}
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()

@@ -2,24 +2,24 @@ use alloc::vec::Vec;
 use polkadot_sdk::*;
 
 use crate::{
+	BlockSealAuthorityId, ComputeDifficulty, MICROGONS_PER_ARGON, NotaryId, NotebookHeader,
+	NotebookNumber, NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef,
-		SATOSHIS_PER_BITCOIN,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, SATOSHIS_PER_BITCOIN,
+		Satoshis, UtxoId, UtxoRef,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
-	NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule, MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
-use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
-use sp_core::{RuntimeDebug, H256, U256};
+use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
+use sp_core::{H256, RuntimeDebug, U256};
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys, UniqueSaturatedInto},
 	DispatchError, DispatchResult, FixedU128, Saturating,
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys},
 };
 
 pub trait NotebookProvider {
@@ -37,7 +37,7 @@ pub trait NotebookProvider {
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
 
-pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
+pub trait PriceProvider<Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128>> {
 	/// Price of the given satoshis in argon microgons
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
@@ -54,7 +54,7 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
 			.saturating_mul(microgons_per_argon)
 			.checked_div(&argon_usd_price)?;
 
-		Some((microgons.into_inner() / FixedU128::accuracy()).unique_saturated_into())
+		Some(microgons.saturating_mul_int(Balance::one()))
 	}
 
 	/// Prices of a single bitcoin in US cents
@@ -86,6 +86,8 @@ pub trait PriceProvider<Balance: Codec + AtLeast32BitUnsigned + Into<u128>> {
 				.saturating_div(MINT_TIME_SPREAD),
 		)
 	}
+
+	fn get_redemption_r_value() -> Option<FixedU128>;
 }
 
 pub trait BitcoinUtxoTracker {

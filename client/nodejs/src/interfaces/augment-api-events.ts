@@ -46,6 +46,7 @@ import type {
   PalletIsmpErrorsHandlingError,
   PalletMintMintType,
   PalletMultisigTimepoint,
+  PalletProxyDepositKind,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDispatchError,
 } from '@polkadot/types/lookup';
@@ -956,6 +957,24 @@ declare module '@polkadot/api-base/types/events' {
     };
     multisig: {
       /**
+       * The deposit for a multisig operation has been updated/poked.
+       **/
+      DepositPoked: AugmentedEvent<
+        ApiType,
+        [
+          who: AccountId32,
+          callHash: U8aFixed,
+          oldDeposit: u128,
+          newDeposit: u128,
+        ],
+        {
+          who: AccountId32;
+          callHash: U8aFixed;
+          oldDeposit: u128;
+          newDeposit: u128;
+        }
+      >;
+      /**
        * A multisig operation has been approved by someone.
        **/
       MultisigApproval: AugmentedEvent<
@@ -1316,6 +1335,24 @@ declare module '@polkadot/api-base/types/events' {
         { real: AccountId32; proxy: AccountId32; callHash: H256 }
       >;
       /**
+       * A deposit stored for proxies or announcements was poked / updated.
+       **/
+      DepositPoked: AugmentedEvent<
+        ApiType,
+        [
+          who: AccountId32,
+          kind: PalletProxyDepositKind,
+          oldDeposit: u128,
+          newDeposit: u128,
+        ],
+        {
+          who: AccountId32;
+          kind: PalletProxyDepositKind;
+          oldDeposit: u128;
+          newDeposit: u128;
+        }
+      >;
+      /**
        * A proxy was added.
        **/
       ProxyAdded: AugmentedEvent<
@@ -1453,6 +1490,14 @@ declare module '@polkadot/api-base/types/events' {
         { account: AccountId32 }
       >;
       /**
+       * An invalid authorized upgrade was rejected while trying to apply it.
+       **/
+      RejectedInvalidAuthorizedUpgrade: AugmentedEvent<
+        ApiType,
+        [codeHash: H256, error: SpRuntimeDispatchError],
+        { codeHash: H256; error: SpRuntimeDispatchError }
+      >;
+      /**
        * On on-chain remark happened.
        **/
       Remarked: AugmentedEvent<
@@ -1570,6 +1615,18 @@ declare module '@polkadot/api-base/types/events' {
         [result: Result<Null, SpRuntimeDispatchError>],
         { result: Result<Null, SpRuntimeDispatchError> }
       >;
+      /**
+       * The fallback call was dispatched.
+       **/
+      IfElseFallbackCalled: AugmentedEvent<
+        ApiType,
+        [mainError: SpRuntimeDispatchError],
+        { mainError: SpRuntimeDispatchError }
+      >;
+      /**
+       * Main call was dispatched.
+       **/
+      IfElseMainSuccess: AugmentedEvent<ApiType, []>;
       /**
        * A single item within a Batch of dispatches has completed with no error.
        **/

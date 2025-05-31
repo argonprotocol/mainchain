@@ -1,5 +1,6 @@
 use crate::{
-	middleware::{register_prometheus_metrics, MiddlewareLayer},
+	Error,
+	middleware::{MiddlewareLayer, register_prometheus_metrics},
 	notary_metrics::NotaryMetrics,
 	stores::{
 		balance_tip::BalanceTipStore,
@@ -10,7 +11,6 @@ use crate::{
 		},
 		notebook_header::NotebookHeaderStore,
 	},
-	Error,
 };
 use argon_notary_apis::{
 	get_header_url, get_notebook_url,
@@ -19,27 +19,27 @@ use argon_notary_apis::{
 	system::SystemRpcServer,
 };
 use argon_primitives::{
-	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotaryId,
-	NotebookMeta, NotebookNumber, SignedNotebookHeader,
+	NotebookMeta, NotebookNumber, SignedNotebookHeader, tick::Ticker,
 };
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
-	core::{async_trait, SubscriptionResult},
+	RpcModule, TrySendError,
+	core::{SubscriptionResult, async_trait},
 	server::{
-		middleware::{http::ProxyGetRequestLayer, rpc::either::Either},
 		BatchRequestConfig, PendingSubscriptionSink, PingConfig, RpcServiceBuilder, Server,
 		ServerBuilder, ServerHandle, SubscriptionMessage,
+		middleware::{http::ProxyGetRequestLayer, rpc::either::Either},
 	},
 	types::ErrorObjectOwned,
-	RpcModule, TrySendError,
 };
 use polkadot_sdk::*;
 use prometheus::Registry;
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
 use sp_core::H256;
-use sqlx::{pool::PoolConnection, PgPool, Postgres};
+use sqlx::{PgPool, Postgres, pool::PoolConnection};
 use std::{net::SocketAddr, num::NonZeroU32, sync::Arc, time::Duration};
 use tokio::{net::ToSocketAddrs, sync::Mutex, task::JoinHandle};
 use tower::layer::util::{Identity, Stack};
@@ -505,19 +505,19 @@ mod tests {
 	use jsonrpsee::ws_client::WsClientBuilder;
 	use polkadot_sdk::*;
 	use prometheus::Registry;
-	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
+	use sp_core::{Blake2Hasher, bounded_vec, ed25519::Signature};
 	use sp_keyring::{Ed25519Keyring::Bob, Sr25519Keyring::Ferdie};
-	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
+	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
 	use sqlx::PgPool;
 
 	use argon_primitives::{
-		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
-		ChainTransfer, NewAccountOrigin, Note, NoteType,
+		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
+		NewAccountOrigin, Note, NoteType, tick::Ticker,
 	};
 
 	use super::NotaryServer;
 	use crate::{
-		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
+		notebook_closer::{FinalizedNotebookHeaderListener, NOTARY_KEYID, NotebookCloser},
 		s3_archive::S3Archive,
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,

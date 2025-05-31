@@ -18,7 +18,7 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use super::*;
-	use argon_primitives::{digests::*, VotingKey};
+	use argon_primitives::{VotingKey, digests::*};
 	use codec::EncodeLike;
 	use frame_support::traits::FindAuthor;
 	use sp_runtime::ConsensusEngineId;

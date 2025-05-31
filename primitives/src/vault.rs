@@ -1,5 +1,5 @@
 use alloc::{collections::BTreeSet, vec};
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::PalletError;
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
@@ -8,13 +8,13 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
+	VaultId,
 	bitcoin::{
-		get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub,
-		CompressedBitcoinPubkey, Satoshis,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
+		get_rounded_up_bitcoin_day_height,
 	},
 	ensure,
 	tick::Tick,
-	VaultId,
 };
 
 pub trait MiningBidPoolProvider {
@@ -135,7 +135,9 @@ pub trait BitcoinVaultProvider {
 	fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError>;
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, PalletError)]
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PalletError,
+)]
 pub enum VaultError {
 	VaultClosed,
 	AccountWouldBeBelowMinimum,
@@ -157,11 +159,22 @@ pub enum VaultError {
 	VaultNotYetActive,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct Vault<
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct Vault<AccountId, Balance>
+where
 	AccountId: Codec,
 	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
-> {
+{
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
 	/// The securitization in the vault
@@ -191,8 +204,21 @@ pub struct Vault<
 	pub opened_tick: Tick,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct VaultTerms<Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq> {
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct VaultTerms<Balance>
+where
+	Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
+{
 	/// The annual percent rate per argon vaulted for bitcoin locks
 	#[codec(compact)]
 	pub bitcoin_annual_percent_rate: FixedU128,
@@ -211,19 +237,19 @@ pub struct BurnResult<Balance> {
 }
 
 impl<
-		AccountId: Codec,
-		Balance: Codec
-			+ Copy
-			+ MaxEncodedLen
-			+ Default
-			+ AtLeast32BitUnsigned
-			+ MaxEncodedLen
-			+ Clone
-			+ TypeInfo
-			+ core::fmt::Debug
-			+ PartialEq
-			+ Eq,
-	> Vault<AccountId, Balance>
+	AccountId: Codec,
+	Balance: Codec
+		+ Copy
+		+ MaxEncodedLen
+		+ Default
+		+ AtLeast32BitUnsigned
+		+ MaxEncodedLen
+		+ Clone
+		+ TypeInfo
+		+ core::fmt::Debug
+		+ PartialEq
+		+ Eq,
+> Vault<AccountId, Balance>
 {
 	pub fn get_activated_securitization(&self) -> Balance {
 		let activated_securitization =
@@ -450,7 +476,7 @@ impl<
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{prelude::sp_arithmetic::FixedU128, Balance};
+	use crate::{Balance, prelude::sp_arithmetic::FixedU128};
 	use polkadot_sdk::frame_support::assert_err;
 
 	#[test]

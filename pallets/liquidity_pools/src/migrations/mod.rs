@@ -1,6 +1,6 @@
 use crate::{
-	pallet::{CapitalActive, CapitalRaising, VaultPoolsByFrame},
 	Config,
+	pallet::{CapitalActive, CapitalRaising, VaultPoolsByFrame},
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
@@ -79,8 +79,8 @@ mod test {
 	use self::InnerMigrate;
 	use super::*;
 	use crate::{
-		mock::{new_test_ext, Test},
 		LiquidityPool, LiquidityPoolCapital,
+		mock::{Test, new_test_ext},
 	};
 	use frame_support::assert_ok;
 	use polkadot_sdk::sp_core::bounded_vec;

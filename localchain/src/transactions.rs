@@ -2,13 +2,13 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use argon_primitives::{AccountType, Balance, Note};
 
+use crate::Result;
 use crate::argon_file::ArgonFileType;
 use crate::keystore::Keystore;
 use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
-use crate::Result;
-use crate::{OpenChannelHold, OpenChannelHoldsStore, TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
+use crate::{CHANNEL_HOLD_MINIMUM_SETTLEMENT, OpenChannelHold, OpenChannelHoldsStore, TickerRef};
 
 #[derive(Debug, PartialOrd, PartialEq)]
 #[cfg_attr(feature = "napi", napi)]
@@ -347,8 +347,8 @@ mod tests {
 
   use argon_primitives::AccountType;
 
-  use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::CryptoScheme::{Ed25519, Sr25519};
+  use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::*;
 
   #[sqlx::test]
@@ -417,16 +417,20 @@ mod tests {
       }
     }
 
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Deposit, 1)
-      .await?
-      .is_none());
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Tax, 1)
-      .await?
-      .is_none());
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Deposit, 1)
+        .await?
+        .is_none()
+    );
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Tax, 1)
+        .await?
+        .is_none()
+    );
 
     for account in bob_accounts.clone() {
       let latest = bob_localchain
@@ -498,16 +502,20 @@ mod tests {
         assert_eq!(latest.status, BalanceChangeStatus::NotebookPublished);
       }
     }
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Deposit, 1)
-      .await?
-      .is_some());
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Tax, 1)
-      .await?
-      .is_some());
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Deposit, 1)
+        .await?
+        .is_some()
+    );
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Tax, 1)
+        .await?
+        .is_some()
+    );
 
     Ok(())
   }
@@ -578,16 +586,20 @@ mod tests {
       }
     }
 
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Deposit, 1)
-      .await?
-      .is_none());
-    assert!(alice_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Tax, 1)
-      .await?
-      .is_none());
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Deposit, 1)
+        .await?
+        .is_none()
+    );
+    assert!(
+      alice_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Tax, 1)
+        .await?
+        .is_none()
+    );
 
     for account in bob_accounts.clone() {
       let Some(latest) = bob_localchain
@@ -694,16 +706,20 @@ mod tests {
         assert_eq!(latest.change_number, 2);
       }
     }
-    assert!(bob_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Deposit, 1)
-      .await?
-      .is_some());
-    assert!(bob_localchain
-      .accounts()
-      .find_idle_jump_account(AccountType::Tax, 1)
-      .await?
-      .is_some());
+    assert!(
+      bob_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Deposit, 1)
+        .await?
+        .is_some()
+    );
+    assert!(
+      bob_localchain
+        .accounts()
+        .find_idle_jump_account(AccountType::Tax, 1)
+        .await?
+        .is_some()
+    );
 
     Ok(())
   }

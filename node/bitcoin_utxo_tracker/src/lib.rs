@@ -5,16 +5,16 @@ mod metrics;
 use anyhow::ensure;
 use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
 use argon_primitives::{
+	Balance, BitcoinApis,
 	bitcoin::{BitcoinSyncStatus, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
-	Balance, BitcoinApis,
 };
 use codec::{Decode, Encode};
 use log::info;
 pub use metrics::BitcoinMetrics;
 use parking_lot::Mutex;
 use polkadot_sdk::*;
-use sc_client_api::{backend::AuxStore, HeaderBackend};
+use sc_client_api::{HeaderBackend, backend::AuxStore};
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 use std::{sync::Arc, time::Instant};
@@ -127,7 +127,7 @@ impl UtxoTracker {
 mod test {
 	use std::{collections::BTreeMap, sync::Arc};
 
-	use bitcoin::{hashes::Hash, Address, Amount, CompressedPublicKey, Network};
+	use bitcoin::{Address, Amount, CompressedPublicKey, Network, hashes::Hash};
 	use bitcoincore_rpc::RpcApi;
 	use bitcoind::BitcoinD;
 	use lazy_static::lazy_static;

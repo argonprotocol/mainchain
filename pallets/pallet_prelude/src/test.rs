@@ -7,10 +7,10 @@ pub use frame_support::{
 	assert_storage_noop, storage_alias,
 };
 pub use frame_system::mocking::*;
-pub use sp_core::{storage::Storage, Blake2Hasher};
+pub use sp_core::{Blake2Hasher, storage::Storage};
 pub use sp_io::TestExternalities as TestState;
 pub use sp_keyring::*;
-pub use sp_runtime::{traits::IdentityLookup, BuildStorage};
+pub use sp_runtime::{BuildStorage, traits::IdentityLookup};
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_with_genesis<Test>(apply: impl FnOnce(&mut Storage)) -> TestState

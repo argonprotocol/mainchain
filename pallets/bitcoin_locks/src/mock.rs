@@ -1,3 +1,4 @@
+#![allow(clippy::inconsistent_digit_grouping)]
 use std::collections::BTreeMap;
 
 use bitcoin::PublicKey;
@@ -7,6 +8,7 @@ use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
+	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VotingSchedule,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
@@ -14,7 +16,6 @@ use argon_primitives::{
 	ensure,
 	tick::Ticker,
 	vault::{BitcoinVaultProvider, LockExtension, Vault, VaultError, VaultTerms},
-	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VotingSchedule,
 };
 use frame_support::traits::Currency;
 
@@ -66,9 +67,10 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 
 parameter_types! {
 	pub static MaxConcurrentlyReleasingLocks: u32 = 10;
-	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
-	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static BitcoinPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(62_000_00));
+	pub static ArgonPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(100));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
+	pub static ArgonTargetPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(100));
 	pub static LockReleaseCosignDeadlineBlocks: BitcoinHeight = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
@@ -137,16 +139,19 @@ impl UtxoLockEvents<u64, Balance> for EventHandler {
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
-		BitcoinPricePerUsd::get()
+		BitcoinPriceInUsdCents::get()
 	}
 	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
-		ArgonPricePerUsd::get()
+		ArgonPriceInUsdCents::get()
 	}
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
 	fn get_argon_pool_liquidity() -> Option<Balance> {
 		todo!()
+	}
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		ArgonPriceInUsdCents::get()?.checked_div(&ArgonTargetPriceInUsdCents::get().unwrap())
 	}
 }
 

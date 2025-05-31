@@ -38,6 +38,11 @@ macro_rules! inject_common_apis {
                 Runtime::metadata_versions()
             }
         }
+        impl frame_support::view_functions::runtime_api::RuntimeViewFunction<Block> for Runtime {
+            fn execute_view_function(id: frame_support::view_functions::ViewFunctionId, input: Vec<u8>) -> Result<Vec<u8>, frame_support::view_functions::ViewFunctionDispatchError> {
+                Runtime::execute_view_function(id, input)
+            }
+        }
 
         impl sp_block_builder::BlockBuilder<Block> for Runtime {
             fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
@@ -283,7 +288,7 @@ macro_rules! inject_common_apis {
             }
 
             fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
-                BitcoinLocks::get_redemption_price(&satoshis).ok()
+                BitcoinLocks::get_redemption_price(&satoshis, None).ok()
             }
 
             fn market_rate(satoshis: Satoshis) -> Option<Balance> {
@@ -342,6 +347,7 @@ macro_rules! inject_common_apis {
                 (list, storage_info)
             }
 
+		    #[allow(non_local_definitions)]
             fn dispatch_benchmark(
                 config: frame_benchmarking::BenchmarkConfig
             ) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, alloc::string::String> {

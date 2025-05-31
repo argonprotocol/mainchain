@@ -2,24 +2,23 @@ use crate::utils::{
 	create_active_notary, mining_slot_ownership_needed, register_miner_keys, register_miners,
 };
 use argon_client::{
+	FetchAt,
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
-	FetchAt,
 };
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
-use argon_testing::{test_miner_count, ArgonTestNode};
+use argon_testing::{ArgonTestNode, test_miner_count};
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
 use sp_keyring::Sr25519Keyring;
-use std::{collections::HashSet, env};
+use std::collections::HashSet;
 use tokio::join;
 
 /// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_end_to_end_default_vote_mining() {
-	env::set_var("RUST_LOG", "info");
 	let grandpa_miner = ArgonTestNode::start_with_args("alice", 0).await.unwrap();
 	let miner_threads = test_miner_count();
 	let miner_1 = grandpa_miner.fork_node("bob", miner_threads).await.unwrap();

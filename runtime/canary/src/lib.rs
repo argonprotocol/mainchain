@@ -11,7 +11,7 @@ pub mod weights;
 
 use frame_support::weights::ConstantMultiplier;
 use frame_system::EnsureSignedBy;
-use ismp::{module::IsmpModule, router::IsmpRouter, Error};
+use ismp::{Error, module::IsmpModule, router::IsmpRouter};
 pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 
@@ -21,9 +21,9 @@ use argon_runtime_common::prelude::*;
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use sp_runtime::impl_opaque_keys;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+use sp_runtime::impl_opaque_keys;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -44,7 +44,8 @@ mod runtime {
 		RuntimeOrigin,
 		RuntimeFreezeReason,
 		RuntimeHoldReason,
-		RuntimeTask
+		RuntimeTask,
+		RuntimeViewFunction
 	)]
 	pub struct Runtime;
 
@@ -473,6 +474,7 @@ impl pallet_multisig::Config for Runtime {
 	type DepositFactor = DepositFactor;
 	type MaxSignatories = MaxSignatories;
 	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+	type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -487,6 +489,7 @@ impl pallet_proxy::Config for Runtime {
 	type CallHasher = BlakeTwo256;
 	type AnnouncementDepositBase = AnnouncementDepositBase;
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
+	type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 
 impl pallet_price_index::Config for Runtime {

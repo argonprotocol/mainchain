@@ -1,12 +1,12 @@
 use crate::{
+	Error, Event,
 	mock::{ChainTransfer as ChainTransferPallet, *},
 	pallet::{ExpiringTransfersOutByNotary, NextTransferId},
-	Error, Event,
 };
 use argon_primitives::{
+	NotebookEventHandler,
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
 	tick::Tick,
-	NotebookEventHandler,
 };
 use frame_support::{assert_noop, assert_ok};
 use pallet_prelude::*;

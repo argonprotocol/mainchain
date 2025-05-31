@@ -29,12 +29,12 @@ pub mod pallet {
 	use alloc::collections::BTreeSet;
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
+		MiningSlotProvider, TickProvider,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{BitcoinVaultProvider, LiquidityPoolVaultProvider, Vault, VaultError, VaultTerms},
-		MiningSlotProvider, TickProvider,
 	};
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::vault::LockExtension;
@@ -59,6 +59,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
@@ -282,6 +283,7 @@ pub mod pallet {
 	#[derive(
 		Encode,
 		Decode,
+		DecodeWithMemTracking,
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
@@ -289,9 +291,10 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	pub struct VaultConfig<
+	pub struct VaultConfig<Balance>
+	where
 		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
-	> {
+	{
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
 		/// The amount of argons to be vaulted for bitcoin locks

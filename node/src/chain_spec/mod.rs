@@ -1,10 +1,10 @@
 use argon_primitives::{
+	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::MiningSlotConfig,
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::Ticker,
-	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
 use argon_runtime::{
 	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig,
@@ -93,7 +93,7 @@ pub(crate) fn testnet_genesis(
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let config = RuntimeGenesisConfig {
-		balances: BalancesConfig { balances: endowed_accounts },
+		balances: BalancesConfig { balances: endowed_accounts, dev_accounts: None },
 		bitcoin_locks: BitcoinLocksConfig { minimum_bitcoin_lock_satoshis, ..Default::default() },
 		price_index: PriceIndexConfig { operator: Some(price_index_operator) },
 		bitcoin_utxos: BitcoinUtxosConfig {

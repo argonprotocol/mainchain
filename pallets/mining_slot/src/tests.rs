@@ -1,4 +1,5 @@
 use crate::{
+	Error, Event, HoldReason, Registration,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
@@ -6,11 +7,10 @@ use crate::{
 		IsNextSlotBiddingOpen, MinerXorKeysByCohort, MinersByCohort, MiningConfig, NextCohortSize,
 		NextFrameId,
 	},
-	Error, Event, HoldReason, Registration,
 };
 use argon_primitives::{
-	block_seal::{MiningAuthority, MiningBidStats, MiningRegistration},
 	AuthorityProvider,
+	block_seal::{MiningAuthority, MiningBidStats, MiningRegistration},
 };
 use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;

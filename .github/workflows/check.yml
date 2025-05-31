@@ -25,9 +25,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - uses: ./.github/templates/rust-cache
         with:
@@ -83,10 +81,9 @@ jobs:
           name: cargo-${{ matrix.target }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
-          targets: ${{runner.target}},wasm32-unknown-unknown
+          target: ${{runner.target}}
 
       - uses: taiki-e/install-action@v2
         with:

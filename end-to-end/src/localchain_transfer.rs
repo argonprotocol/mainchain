@@ -2,9 +2,9 @@ use polkadot_sdk::*;
 use std::env::temp_dir;
 
 use crate::utils::create_active_notary;
-use argon_testing::{start_argon_test_node, LocalchainCli};
+use argon_testing::{LocalchainCli, start_argon_test_node};
 use serial_test::serial;
-use sp_core::{sr25519::Pair, Pair as PairT};
+use sp_core::{Pair as PairT, sr25519::Pair};
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]

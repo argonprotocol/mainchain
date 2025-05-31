@@ -1,10 +1,10 @@
 use polkadot_sdk::*;
 use sp_core::ByteArray;
-use sqlx::{query, FromRow, PgConnection};
+use sqlx::{FromRow, PgConnection, query};
 
 use crate::Error;
 use argon_primitives::{
-	ensure, tick::Tick, AccountId, ChainTransfer, NotebookNumber, TransferToLocalchainId,
+	AccountId, ChainTransfer, NotebookNumber, TransferToLocalchainId, ensure, tick::Tick,
 };
 
 pub struct ChainTransferStore;
@@ -287,20 +287,22 @@ mod tests {
 			.await
 		);
 
-		assert!(ChainTransferStore::take_and_record_transfer_local(
-			&mut tx,
-			notebook_number,
-			1,
-			&account_id,
-			transfer_id,
-			microgons,
-			change_index,
-			note_index,
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.contains("Invalid transfer to localchain"));
+		assert!(
+			ChainTransferStore::take_and_record_transfer_local(
+				&mut tx,
+				notebook_number,
+				1,
+				&account_id,
+				transfer_id,
+				microgons,
+				change_index,
+				note_index,
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.contains("Invalid transfer to localchain")
+		);
 		tx.commit().await?;
 
 		Ok(())
@@ -338,20 +340,22 @@ mod tests {
 			.await
 		);
 
-		assert!(ChainTransferStore::take_and_record_transfer_local(
-			&mut tx,
-			notebook_number,
-			11,
-			&account_id,
-			transfer_id,
-			microgons,
-			change_index,
-			note_index,
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.contains("expired"));
+		assert!(
+			ChainTransferStore::take_and_record_transfer_local(
+				&mut tx,
+				notebook_number,
+				11,
+				&account_id,
+				transfer_id,
+				microgons,
+				change_index,
+				note_index,
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.contains("expired")
+		);
 		tx.commit().await?;
 
 		Ok(())

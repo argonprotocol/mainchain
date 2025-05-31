@@ -3,14 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate as pallet_block_seal;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
+	AccountId, AuthorityProvider, BlockSealSpecProvider, BlockVoteDigest, ComputeDifficulty,
+	DomainHash, HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
+	NotebookSecret, TickProvider, VotingSchedule,
 	block_seal::{BlockSealAuthorityId, MiningAuthority},
 	block_vote::VoteMinimum,
 	digests::Digestset,
 	notebook::NotebookNumber,
 	tick::{Tick, TickDigest, Ticker},
-	AccountId, AuthorityProvider, BlockSealSpecProvider, BlockVoteDigest, ComputeDifficulty,
-	DomainHash, HashOutput, NotaryId, NotebookAuditResult, NotebookDigest, NotebookProvider,
-	NotebookSecret, TickProvider, VotingSchedule,
 };
 use frame_support::traits::FindAuthor;
 use pallet_prelude::*;
@@ -77,13 +77,9 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthori
 	}
 
 	fn get_authority(author: AccountId) -> Option<BlockSealAuthorityId> {
-		AuthorityList::get().iter().find_map(|(account, id)| {
-			if *account == author {
-				Some(id.clone())
-			} else {
-				None
-			}
-		})
+		AuthorityList::get()
+			.iter()
+			.find_map(|(account, id)| if *account == author { Some(id.clone()) } else { None })
 	}
 
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId>> {

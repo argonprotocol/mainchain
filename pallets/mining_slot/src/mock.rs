@@ -1,7 +1,7 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
-	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, vault::MiningBidPoolProvider,
-	BlockNumber, TickProvider, VotingSchedule,
+	BlockNumber, TickProvider, VotingSchedule, block_seal::MiningSlotConfig, providers::OnNewSlot,
+	tick::Ticker, vault::MiningBidPoolProvider,
 };
 
 use frame_support::traits::{Currency, StorageMapShim};

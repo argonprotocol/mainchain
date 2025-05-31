@@ -1,7 +1,7 @@
 use crate::{aux_client::AuxKey, aux_data::AuxData, block_creator::ProposalMeta};
 use argon_primitives::{
-	tick::{Tick, Ticker},
 	Balance, NotaryId,
+	tick::{Tick, Ticker},
 };
 use codec::{Decode, Encode};
 use polkadot_sdk::*;
@@ -9,8 +9,8 @@ use sc_client_api::AuxStore;
 use sp_arithmetic::traits::UniqueSaturatedInto;
 use std::{sync::Arc, time::Instant};
 use substrate_prometheus_endpoint::{
-	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
-	Registry, U64,
+	CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64,
+	prometheus, register,
 };
 
 #[derive(Debug, Clone, Decode, Encode, Default)]

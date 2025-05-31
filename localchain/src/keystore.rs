@@ -12,10 +12,10 @@ use std::sync::Arc;
 #[cfg(feature = "napi")]
 use tokio::sync::RwLock;
 
+use crate::AccountStore;
 use crate::cli::EmbeddedKeyPassword;
 use crate::embedded_keystore::{CryptoScheme, EmbeddedKeystore};
-use crate::AccountStore;
-use crate::{bail, Result};
+use crate::{Result, bail};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]

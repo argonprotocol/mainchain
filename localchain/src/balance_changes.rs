@@ -2,17 +2,17 @@ use argon_primitives::tick::Tick;
 use argon_primitives::{
   BalanceChange, BalanceProof, BalanceTip, MerkleProof, NotaryId, NotebookNumber,
 };
-use binary_merkle_tree::{verify_proof, Leaf};
+use binary_merkle_tree::{Leaf, verify_proof};
 use chrono::NaiveDateTime;
 use codec::Encode;
 use polkadot_sdk::*;
 use serde_json::{from_value, json};
-use sp_core::{bounded_vec, ed25519, H256};
+use sp_core::{H256, bounded_vec, ed25519};
 use sp_runtime::traits::BlakeTwo256;
 use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction};
 
 use crate::accounts::{AccountStore, LocalAccount};
-use crate::{bail, Result};
+use crate::{Result, bail};
 
 #[derive(FromRow, Clone, Debug)]
 #[allow(dead_code)]

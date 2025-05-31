@@ -4,11 +4,11 @@ use pallet_prelude::*;
 use crate as pallet_block_rewards;
 use crate::GrowthPath;
 use argon_primitives::{
+	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
+	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
 	block_seal::BlockPayout,
 	notary::{NotaryProvider, NotarySignature},
 	tick::Ticker,
-	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
-	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -206,6 +206,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 	fn get_argon_pool_liquidity() -> Option<Balance> {
 		Some(UniswapLiquidity::get())
+	}
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		None
 	}
 }
 

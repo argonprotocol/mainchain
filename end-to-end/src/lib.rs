@@ -12,7 +12,7 @@ mod vote_mining;
 #[cfg(test)]
 pub(crate) mod utils {
 	use argon_client::{
-		api,
+		FetchAt, TxInBlockWithEvents, api,
 		api::{
 			runtime_types::{
 				argon_primitives::block_seal,
@@ -25,11 +25,10 @@ pub(crate) mod utils {
 			tx,
 		},
 		signer::{Signer, Sr25519Signer},
-		FetchAt, TxInBlockWithEvents,
 	};
-	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
+	use argon_primitives::{BLOCK_SEAL_KEY_TYPE, prelude::*};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
-	use sp_core::{crypto::key_types::GRANDPA, Pair};
+	use sp_core::{Pair, crypto::key_types::GRANDPA};
 	use sp_keyring::{Sr25519Keyring, Sr25519Keyring::Alice};
 
 	#[allow(dead_code)]
@@ -189,7 +188,14 @@ pub(crate) mod utils {
 				.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
 				.await?
 				.unwrap_or_default();
-			println!("Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}", bids_for_next_cohort.0.iter().map(|a|  a.account_id.to_address()).collect::<Vec<_>>()	);
+			println!(
+				"Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}",
+				bids_for_next_cohort
+					.0
+					.iter()
+					.map(|a| a.account_id.to_address())
+					.collect::<Vec<_>>()
+			);
 			let block_confirm = client.block_number(register.block_hash()).await;
 			if block_confirm.is_err() {
 				println!("Block no longer finalized! {:?}", block_confirm);

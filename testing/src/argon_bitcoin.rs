@@ -1,6 +1,6 @@
 use std::{env, process, process::Command};
 
-use crate::{get_target_dir, ArgonTestNode};
+use crate::{ArgonTestNode, get_target_dir};
 
 pub async fn run_bitcoin_cli(
 	node: &ArgonTestNode,

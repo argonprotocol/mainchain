@@ -13,6 +13,7 @@ pub mod prelude {
 	pub use crate::config::*;
 	pub use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
+		Balance, BlockHash, BlockVotingKey, HashOutput, Nonce, Signature, VotingKey,
 		apis::*,
 		bitcoin::*,
 		block_seal::*,
@@ -23,18 +24,19 @@ pub mod prelude {
 		prelude::*,
 		providers::{OnNewSlot, *},
 		tick::Ticker,
-		Balance, BlockHash, BlockVotingKey, HashOutput, Nonce, Signature, VotingKey,
 	};
 	pub use frame_support::{
-		construct_runtime, derive_impl,
+		PalletId, StorageValue, construct_runtime, derive_impl,
 		genesis_builder_helper::{build_state, get_preset},
 		pallet_prelude::*,
 		parameter_types,
 		traits::{
-			fungible,
+			ConstBool, ConstU8, ConstU16, ConstU32, ConstU64, ConstU128, Contains, Currency,
+			Everything, Imbalance, InsideBoth, InstanceFilter, KeyOwnerProofSystem, OnUnbalanced,
+			Randomness, SortedMembers, StorageInfo, StorageMapShim, TransformOrigin, fungible,
 			fungible::{
-				hold::{Inspect, Mutate},
 				Balanced, Dust, Inspect as InspectT, Mutate as MutateT, Unbalanced,
+				hold::{Inspect, Mutate},
 			},
 			fungibles,
 			fungibles::{metadata, roles},
@@ -42,21 +44,17 @@ pub mod prelude {
 				DepositConsequence, Fortitude, Precision, Preservation, Provenance,
 				WithdrawConsequence,
 			},
-			ConstBool, ConstU128, ConstU16, ConstU32, ConstU64, ConstU8, Contains, Currency,
-			Everything, Imbalance, InsideBoth, InstanceFilter, KeyOwnerProofSystem, OnUnbalanced,
-			Randomness, SortedMembers, StorageInfo, StorageMapShim, TransformOrigin,
 		},
 		weights::{
+			IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
+			WeightToFeePolynomial,
 			constants::{
 				BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight,
 				WEIGHT_REF_TIME_PER_SECOND,
 			},
-			IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
-			WeightToFeePolynomial,
 		},
-		PalletId, StorageValue,
 	};
-	pub use frame_system::{limits::BlockWeights as BlockWeightsT, pallet_prelude::*, EnsureRoot};
+	pub use frame_system::{EnsureRoot, limits::BlockWeights as BlockWeightsT, pallet_prelude::*};
 	pub use ismp::host::StateMachine;
 	pub use pallet_bitcoin_locks::BitcoinVerifier;
 	pub use pallet_block_rewards::GrowthPath;
@@ -66,11 +64,10 @@ pub mod prelude {
 	pub use sp_api::{decl_runtime_apis, impl_runtime_apis};
 	pub use sp_arithmetic::{FixedU128, Perbill, Percent};
 	pub use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList, AuthorityWeight};
-	pub use sp_core::{Get, OpaqueMetadata, H256, U256};
+	pub use sp_core::{Get, H256, OpaqueMetadata, U256};
 	pub use sp_runtime::{
-		generic,
+		ApplyExtrinsicResult, Digest, DigestItem, KeyTypeId, generic,
 		traits::{BlakeTwo256, Block as BlockT, Header as HeaderT, NumberFor},
-		ApplyExtrinsicResult, Digest, DigestItem, KeyTypeId,
 	};
 	pub use sp_version::RuntimeVersion;
 }
@@ -126,6 +123,7 @@ macro_rules! inject_runtime_vars {
 				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 			>,
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
+			frame_system::WeightReclaim<Runtime>,
 		);
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///

@@ -1,6 +1,6 @@
 use argon_primitives::{
-	prelude::*, AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
-	BlockSealAuthorityId, MiningApis, Nonce, NotaryApis, NotebookApis, TickApis,
+	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
+	MiningApis, Nonce, NotaryApis, NotebookApis, TickApis, prelude::*,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi;

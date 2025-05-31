@@ -201,3 +201,38 @@ export class JsonExt {
     });
   }
 }
+
+export function createNanoEvents<
+  Events extends EventsMap = DefaultEvents,
+>(): TypedEmitter<Events> {
+  return new TypedEmitter<Events>();
+}
+
+export class TypedEmitter<Events extends EventsMap = DefaultEvents> {
+  private events: Partial<{ [E in keyof Events]: Events[E][] }> = {};
+
+  emit<K extends keyof Events>(
+    this: this,
+    event: K,
+    ...args: Parameters<Events[K]>
+  ): void {
+    for (const cb of this.events[event] || []) {
+      cb(...args);
+    }
+  }
+
+  on<K extends keyof Events>(this: this, event: K, cb: Events[K]): () => void {
+    (this.events[event] ||= []).push(cb);
+    return () => {
+      this.events[event] = this.events[event]?.filter(i => cb !== i);
+    };
+  }
+}
+
+interface EventsMap {
+  [event: string]: any;
+}
+
+interface DefaultEvents extends EventsMap {
+  [event: string]: (...args: any) => void;
+}

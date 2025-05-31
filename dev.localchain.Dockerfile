@@ -59,7 +59,7 @@ WORKDIR /app
 COPY . /app
 
 RUN rustup target add x86_64-unknown-linux-gnu
-RUN rustup target add wasm32-unknown-unknown
+RUN rustup target add wasm32v1-none
 
 RUN cargo build --target=x86_64-unknown-linux-gnu
 RUN yarn install

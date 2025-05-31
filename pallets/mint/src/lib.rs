@@ -18,13 +18,13 @@ pub mod weights;
 pub mod pallet {
 	use pallet_prelude::*;
 
-	use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
+	use argon_primitives::{BlockRewardsEventHandler, block_seal::BlockPayout};
 	use sp_runtime::FixedPointNumber;
 
 	use super::*;
 	use argon_primitives::{
-		bitcoin::UtxoId, block_seal::FrameId, ArgonCPI, BlockRewardAccountsProvider,
-		BurnEventHandler, PriceProvider, UtxoLockEvents,
+		ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider, UtxoLockEvents,
+		bitcoin::UtxoId, block_seal::FrameId,
 	};
 
 	#[pallet::pallet]
@@ -42,6 +42,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
@@ -382,17 +383,23 @@ pub mod pallet {
 		}
 	}
 
-	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, TypeInfo)]
+	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
 	pub enum MintType {
 		Bitcoin,
 		Mining,
 	}
-	#[derive(Debug, Clone, PartialEq, Eq, Encode, Default, Decode, TypeInfo)]
-	pub struct MintAction<Balance: Codec> {
-		pub argon_burned: Balance,
-		pub argon_minted: Balance,
-		pub bitcoin_minted: Balance,
+	#[derive(
+		Debug, Clone, PartialEq, Eq, Encode, Default, Decode, DecodeWithMemTracking, TypeInfo,
+	)]
+	pub struct MintAction<B>
+	where
+		B: Codec,
+	{
+		pub argon_burned: B,
+		pub argon_minted: B,
+		pub bitcoin_minted: B,
 	}
+
 	impl<T: Config> BlockRewardsEventHandler<T::AccountId, T::Balance> for Pallet<T>
 	where
 		<T as Config>::Balance: Into<u128>,

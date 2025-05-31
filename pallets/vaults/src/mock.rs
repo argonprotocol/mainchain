@@ -1,8 +1,8 @@
 use crate as pallet_vaults;
 use argon_primitives::{
+	MiningSlotProvider, TickProvider, VotingSchedule,
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
-	MiningSlotProvider, TickProvider, VotingSchedule,
 };
 use frame_support::traits::Currency;
 use pallet_prelude::*;

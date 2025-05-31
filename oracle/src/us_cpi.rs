@@ -1,8 +1,8 @@
 use crate::{
-	us_cpi_schedule::{load_cpi_schedule, CpiSchedule},
+	us_cpi_schedule::{CpiSchedule, load_cpi_schedule},
 	utils::{parse_date, parse_f64, to_fixed_i128},
 };
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{Result, anyhow, bail, ensure};
 use argon_primitives::tick::{Tick, Ticker};
 use chrono::{DateTime, Utc};
 use directories::BaseDirs;
@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use polkadot_sdk::*;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128};
+use sp_runtime::{FixedI128, FixedPointNumber, FixedU128, traits::One};
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::{env, fs::File, path::PathBuf};

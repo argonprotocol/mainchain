@@ -1,6 +1,6 @@
-use alloc::borrow::Cow;
-use argon_primitives::{tick::Tick, AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT};
-use codec::{Decode, Encode};
+use alloc::string::String;
+use argon_primitives::{AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT, tick::Tick};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
@@ -9,7 +9,18 @@ use thiserror::Error;
 
 use crate::AccountHistoryLookupError;
 
-#[derive(Debug, PartialEq, Clone, Error, TypeInfo, Encode, Decode, Serialize, Deserialize)]
+#[derive(
+	Debug,
+	PartialEq,
+	Clone,
+	Error,
+	TypeInfo,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Serialize,
+	Deserialize,
+)]
 pub enum VerifyError {
 	#[error("Missing account origin {account_id:?}, {account_type:?}")]
 	MissingAccountOrigin { account_id: AccountId32, account_type: AccountType },
@@ -48,17 +59,23 @@ pub enum VerifyError {
 	InvalidNoteRecipients,
 
 	#[error("An invalid balance change was submitted (#{change_index}.{note_index}): {message:?}")]
-	BalanceChangeError { change_index: u16, note_index: u16, message: Cow<'static, str> },
+	BalanceChangeError { change_index: u16, note_index: u16, message: String },
 
 	#[error("Invalid net balance changeset. Must account for all funds.")]
 	InvalidNetBalanceChangeset,
 
-	#[error("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: #{change_index}.{note_index})")]
+	#[error(
+		"Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: #{change_index}.{note_index})"
+	)]
 	InsufficientBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
 
-	#[error("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: #{change_index}.{note_index})")]
+	#[error(
+		"Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: #{change_index}.{note_index})"
+	)]
 	ExceededMaxBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
-	#[error("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})")]
+	#[error(
+		"Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})"
+	)]
 	BalanceChangeMismatch { change_index: u16, provided_balance: u128, calculated_balance: i128 },
 
 	#[error("Balance change not net zero (sent: {sent} vs claimed: {claimed})")]
@@ -137,7 +154,9 @@ pub enum VerifyError {
 	#[error("Invalid tax account operation")]
 	InvalidTaxOperation,
 
-	#[error("Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}")]
+	#[error(
+		"Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}"
+	)]
 	InsufficientTaxIncluded { tax_sent: u128, tax_owed: u128, account_id: AccountId32 },
 
 	#[error("Insufficient tax allocated for the given block votes")]
