@@ -94,10 +94,6 @@ impl TryFrom<i32> for AccountType {
 
 impl From<i64> for AccountType {
 	fn from(value: i64) -> Self {
-		if value == 0 {
-			AccountType::Tax
-		} else {
-			AccountType::Deposit
-		}
+		if value == 0 { AccountType::Tax } else { AccountType::Deposit }
 	}
 }

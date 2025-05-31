@@ -1,12 +1,12 @@
 use crate::{
-	formatters::{parse_number, Pct64},
+	formatters::{Pct64, parse_number},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 	lock_commands::LockCommands,
 	vault_commands::VaultCommands,
 	xpriv_commands::XPrivCommands,
 };
 use anyhow::anyhow;
-use clap::{crate_version, Parser, Subcommand};
+use clap::{Parser, Subcommand, crate_version};
 use polkadot_sdk::*;
 use sp_runtime::FixedU128;
 use std::{env, process::exit, str::FromStr};
@@ -58,11 +58,12 @@ enum Commands {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let cli = Cli::parse();
+
 	tracing_subscriber::FmtSubscriber::builder()
 		.with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
 		.try_init()
 		.expect("setting default subscriber failed");
-	env::set_var("RUST_BACKTRACE", "1");
+	color_backtrace::install();
 
 	let rpc_url = cli.trusted_rpc_url.clone();
 

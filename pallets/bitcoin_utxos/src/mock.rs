@@ -1,8 +1,8 @@
 use pallet_prelude::*;
 
 use argon_primitives::{
-	bitcoin::{BitcoinRejectedReason, UtxoId},
 	BitcoinUtxoEvents,
+	bitcoin::{BitcoinRejectedReason, UtxoId},
 };
 
 use crate as pallet_bitcoin_utxos;
@@ -34,11 +34,7 @@ parameter_types! {
 pub struct StaticEventHandler;
 impl BitcoinUtxoEvents for StaticEventHandler {
 	fn utxo_verified(_utxo_id: UtxoId) -> DispatchResult {
-		if let Some(callback) = UtxoVerifiedCallback::get() {
-			callback(_utxo_id)
-		} else {
-			Ok(())
-		}
+		if let Some(callback) = UtxoVerifiedCallback::get() { callback(_utxo_id) } else { Ok(()) }
 	}
 
 	fn utxo_rejected(_utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {

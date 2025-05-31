@@ -1,15 +1,15 @@
 use crate::mainchain_client::MainchainClient;
-use crate::{bail, AccountStore, Error, Result};
+use crate::{AccountStore, Error, Result, bail};
 use anyhow::anyhow;
-use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
 use argon_notary_apis::NotebookRpcClient;
-use argon_notary_apis::{download_notebook_header, LocalchainRpcClient};
+use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
+use argon_notary_apis::{LocalchainRpcClient, download_notebook_header};
 use argon_primitives::{
   AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
   SignedNotebookHeader,
 };
-use futures::stream::TryStreamExt;
 use futures::StreamExt;
+use futures::stream::TryStreamExt;
 use polkadot_sdk::*;
 use sp_core::ed25519;
 use sp_runtime::traits::Verify;
@@ -299,10 +299,10 @@ pub mod napi_ext {
   use super::NotaryClient;
   use super::NotaryClients;
   use super::*;
-  use crate::error::NapiOk;
   use crate::MainchainClient;
+  use crate::error::NapiOk;
   use argon_notary_apis::NotebookRpcClient;
-  use argon_primitives::{tick::Tick, AccountType, NotebookNumber};
+  use argon_primitives::{AccountType, NotebookNumber, tick::Tick};
   use napi::bindgen_prelude::*;
   use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
   use std::sync::Arc;

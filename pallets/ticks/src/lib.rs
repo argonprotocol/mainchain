@@ -24,8 +24,8 @@ pub mod pallet {
 	use super::*;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
-		tick::{Ticker, MAX_BLOCKS_PER_TICK},
 		Digestset, TickProvider, VotingSchedule,
+		tick::{MAX_BLOCKS_PER_TICK, Ticker},
 	};
 
 	#[pallet::pallet]
@@ -120,7 +120,10 @@ pub mod pallet {
 			.expect("Failed to push block hash to recent blocks at tick");
 
 			if proposed_tick < parent_tick {
-				panic!("Proposed tick is less than or equal to current tick. Proposed: {:?}, Current: {:?}", proposed_tick, parent_tick);
+				panic!(
+					"Proposed tick is less than or equal to current tick. Proposed: {:?}, Current: {:?}",
+					proposed_tick, parent_tick
+				);
 			}
 
 			<CurrentTick<T>>::put(proposed_tick);
@@ -183,7 +186,9 @@ impl<T: Config> OnTimestampSet<T::Moment> for Pallet<T> {
 		let proposed_tick = <CurrentTick<T>>::get();
 		// tick for current time must be >= the proposed tick
 		if tick_for_now < proposed_tick {
-			panic!("The proposed tick is in the future, which is not allowed. Digest tick={proposed_tick} vs Current tick={tick_for_now}");
+			panic!(
+				"The proposed tick is in the future, which is not allowed. Digest tick={proposed_tick} vs Current tick={tick_for_now}"
+			);
 		}
 	}
 }

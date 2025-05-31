@@ -1,11 +1,11 @@
 use crate::{aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics};
 use argon_notary_apis::{
-	get_header_url, get_notebook_url,
+	ArchiveHost, Client, SystemRpcClient, get_header_url, get_notebook_url,
 	notebook::{NotebookRpcClient, RawHeadersSubscription},
-	ArchiveHost, Client, SystemRpcClient,
 };
 use argon_primitives::{
-	ensure,
+	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
+	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule, ensure,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes, NotaryState,
 		NotebookBytes, SignedHeaderBytes,
@@ -13,24 +13,22 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	prelude::sc_client_api::BlockBackend,
 	tick::{Tick, Ticker},
-	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
-	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use futures::{future::join_all, task::noop_waker_ref, Stream, StreamExt};
+use futures::{Stream, StreamExt, future::join_all, task::noop_waker_ref};
 use log::{info, trace, warn};
 use polkadot_sdk::*;
 use rand::prelude::SliceRandom;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
-use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
+use sc_utils::mpsc::{TracingUnboundedReceiver, TracingUnboundedSender, tracing_unbounded};
 use sp_api::{Core, ProvideRuntimeApi, RuntimeApiInfo};
 use sp_blockchain::HeaderBackend;
 use sp_core::H256;
 use sp_runtime::{
-	traits::{Block as BlockT, Header},
 	DispatchError,
+	traits::{Block as BlockT, Header},
 };
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -551,9 +549,7 @@ where
 						let has_more_work = self_clone.queue_depth(notary_id).await > 0;
 						trace!(
 							"Processed notebook {} for notary {}. More work? {}",
-							notebook_number,
-							notary_id,
-							has_more_work
+							notebook_number, notary_id, has_more_work
 						);
 						Ok::<_, Error>(has_more_work)
 					},
@@ -566,8 +562,7 @@ where
 						) {
 							trace!(
 								"In queue, re-queuing notebook for notary {} - {:?}",
-								notary_id,
-								e
+								notary_id, e
 							);
 							self_clone
 								.enqueue_notebook(
@@ -900,9 +895,16 @@ where
 		}
 
 		if self.is_solving_blocks {
-			self.tick_voting_power_sender.lock().await.unbounded_send(voting_power).map_err(|e| {
-				Error::NotaryError(format!("Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {:?}", e))
-			})?;
+			self.tick_voting_power_sender
+				.lock()
+				.await
+				.unbounded_send(voting_power)
+				.map_err(|e| {
+					Error::NotaryError(format!(
+						"Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {:?}",
+						e
+					))
+				})?;
 		}
 		Ok(())
 	}
@@ -926,7 +928,10 @@ where
 					if digest_record.audit_first_failure != audit.audit_first_failure {
 						return Err(Error::InvalidNotebookDigest(format!(
 							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-							digest_record.notary_id, digest_record.notebook_number, digest_record.audit_first_failure, audit.audit_first_failure
+							digest_record.notary_id,
+							digest_record.notebook_number,
+							digest_record.audit_first_failure,
+							audit.audit_first_failure
 						)));
 					}
 				} else {
@@ -1328,17 +1333,17 @@ mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
 	use argon_primitives::{
+		AccountId, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
 			NotaryNotebookRawVotes, NotaryRecordWithState,
 		},
-		AccountId, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	};
 	use argon_runtime::Block;
 	use codec::{Decode, Encode};
 
 	use crate::mock_notary::setup_logs;
-	use sp_core::{bounded_vec, H256};
+	use sp_core::{H256, bounded_vec};
 	use sp_keyring::Ed25519Keyring;
 	use std::collections::BTreeMap;
 

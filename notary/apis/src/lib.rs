@@ -3,8 +3,8 @@ pub use crate::{
 };
 use anyhow::anyhow;
 use argon_primitives::{
-	notary::{NotebookBytes, SignedHeaderBytes},
 	NotaryId, Notebook, NotebookNumber, SignedNotebookHeader,
+	notary::{NotebookBytes, SignedHeaderBytes},
 };
 use codec::Decode;
 use jsonrpsee::{

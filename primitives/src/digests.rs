@@ -1,6 +1,6 @@
 use crate::{
-	ensure, fork_power::ForkPower, notary::SignedHeaderBytes, tick::TickDigest,
-	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
+	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey, ensure,
+	fork_power::ForkPower, notary::SignedHeaderBytes, tick::TickDigest,
 };
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
@@ -8,7 +8,7 @@ use frame_support_procedural::DefaultNoBound;
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ed25519::Signature, RuntimeDebug, U256};
+use sp_core::{RuntimeDebug, U256, ed25519::Signature};
 use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding

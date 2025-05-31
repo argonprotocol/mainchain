@@ -7,7 +7,7 @@ use std::str::Utf8Error;
 use tracing::error;
 
 use argon_notary_audit::VerifyError;
-use argon_primitives::{tick::Tick, NotebookNumber};
+use argon_primitives::{NotebookNumber, tick::Tick};
 
 #[derive(Debug, PartialEq, Decode, Encode, Clone, thiserror::Error)]
 pub enum Error {
@@ -24,7 +24,7 @@ pub enum Error {
 		message: String,
 	},
 	#[error(
-	"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs provided: {provided_tip:?})",
+		"Account balance tip invalid (change: {change_index}, expected previous: {stored_tip:?} vs provided: {provided_tip:?})"
 	)]
 	BalanceTipMismatch {
 		#[codec(compact)]
@@ -33,7 +33,7 @@ pub enum Error {
 		provided_tip: Option<H256>,
 	},
 	#[error(
-	"Invalid transfer to localchain (expired, already applied, or invalid) for account (change: {change_index}.{note_index})"
+		"Invalid transfer to localchain (expired, already applied, or invalid) for account (change: {change_index}.{note_index})"
 	)]
 	TransferToLocalchainNotFound {
 		#[codec(compact)]
@@ -41,7 +41,8 @@ pub enum Error {
 		#[codec(compact)]
 		change_index: u32,
 	},
-	#[error("Invalid amount claimed for Localchain transfer. (change: {change_index}.{note_index}; expected: {amount}, provided: {provided})"
+	#[error(
+		"Invalid amount claimed for Localchain transfer. (change: {change_index}.{note_index}; expected: {amount}, provided: {provided})"
 	)]
 	TransferToLocalchainInvalidAmount {
 		#[codec(compact)]
@@ -62,7 +63,9 @@ pub enum Error {
 	)]
 	NotaryFailedAudit(NotebookNumber),
 
-	#[error("The requested notebook ({notebook_age} ticks old) must be retrieved via an archive host ({archive_host}, max age = {max_age}).")]
+	#[error(
+		"The requested notebook ({notebook_age} ticks old) must be retrieved via an archive host ({archive_host}, max age = {max_age})."
+	)]
 	HistoryMustUseArchiveHost { max_age: Tick, archive_host: String, notebook_age: Tick },
 
 	#[error("{0}")]
@@ -98,7 +101,8 @@ pub enum Error {
 	#[error("Error serializing to/from json: {0}")]
 	JsonError(String),
 
-	#[error("The current notebook has reached the maximum number of transfers it can include. Please wait for the next notebook."
+	#[error(
+		"The current notebook has reached the maximum number of transfers it can include. Please wait for the next notebook."
 	)]
 	MaxNotebookChainTransfersReached,
 

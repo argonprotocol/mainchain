@@ -2,7 +2,6 @@ use argon_testing::ArgonTestNode;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use serial_test::serial;
-use std::env;
 use subxt::ext::subxt_rpcs::rpc_params;
 use tokio::select;
 
@@ -13,7 +12,6 @@ pub struct EncodedFinalityProof(pub sp_core::Bytes);
 #[tokio::test]
 #[serial]
 async fn test_can_prove_finality() {
-	env::set_var("RUST_LOG", "info");
 	let grandpa_miner = ArgonTestNode::start_with_args("alice", 0).await.unwrap();
 	let miner_threads = 1;
 	let miner_1 = grandpa_miner.fork_node("bob", miner_threads).await.unwrap();

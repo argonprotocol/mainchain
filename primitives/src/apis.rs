@@ -2,6 +2,8 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::{
+	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, VoteMinimum,
+	VotingKey,
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
 	notary::{
@@ -10,8 +12,6 @@ use crate::{
 	},
 	prelude::*,
 	tick::Ticker,
-	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, VoteMinimum,
-	VotingKey,
 };
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::Codec;

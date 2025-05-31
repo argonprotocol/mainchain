@@ -5,6 +5,8 @@ use argon_primitives::{
 	ensure,
 };
 use bitcoin::{
+	Amount, EcdsaSighashType, Network, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
+	Transaction, TxIn, TxOut, Witness,
 	absolute::LockTime,
 	bip32::{KeySource, Xpriv},
 	ecdsa::Signature,
@@ -12,8 +14,6 @@ use bitcoin::{
 	psbt::Input,
 	sighash::SighashCache,
 	transaction::Version,
-	Amount, EcdsaSighashType, Network, OutPoint, PrivateKey, Psbt, PublicKey, ScriptBuf, Sequence,
-	Transaction, TxIn, TxOut, Witness,
 };
 use k256::ecdsa::signature::Verifier;
 use miniscript::psbt::PsbtExt;
@@ -224,8 +224,8 @@ impl CosignReleaser {
 #[cfg(feature = "hwi")]
 mod hwi_ext {
 	use super::*;
-	use anyhow::{anyhow, bail, Result};
-	use hwi::{types::HWIDevice, HWIClient};
+	use anyhow::{Result, anyhow, bail};
+	use hwi::{HWIClient, types::HWIDevice};
 
 	impl CosignReleaser {
 		pub fn sign_hwi(

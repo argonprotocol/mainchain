@@ -1,16 +1,16 @@
 use crate::{
 	chain_spec,
 	cli::{Cli, RandomxFlag, Subcommand},
-	runtime_api::{opaque::Block, BaseHostRuntimeApis},
+	runtime_api::{BaseHostRuntimeApis, opaque::Block},
 	service,
-	service::{new_partial, FullClient},
+	service::{FullClient, new_partial},
 };
 use argon_primitives::prelude::sp_api::ConstructRuntimeApi;
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use polkadot_sdk::{sc_service::TaskManager, *};
 use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
-use sc_network::{config::NetworkBackendType, Litep2pNetworkBackend, NetworkWorker};
+use sc_network::{Litep2pNetworkBackend, NetworkWorker, config::NetworkBackendType};
 use sp_core::crypto::AccountId32;
 use sp_keyring::Sr25519Keyring::Alice;
 use std::cmp::max;
@@ -294,7 +294,9 @@ impl MiningConfig {
 		};
 		if compute_threads > 0 {
 			if self.compute_author.is_none() {
-				panic!("Compute fallback mining is enabled without a compute author. Unable to activate!");
+				panic!(
+					"Compute fallback mining is enabled without a compute author. Unable to activate!"
+				);
 			}
 			log::info!("Compute fallback mining is enabled with {} threads", compute_threads);
 		} else {

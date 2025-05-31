@@ -1,14 +1,14 @@
 use crate::server::ArchiveSettings;
 use anyhow::bail;
-use argon_notary_apis::{get_header_bucket, get_notebook_bucket, Error, Error::ArchiveError};
+use argon_notary_apis::{Error, Error::ArchiveError, get_header_bucket, get_notebook_bucket};
 use argon_primitives::{NotaryId, NotebookNumber};
 use base64::Engine;
 use md5::{Digest, Md5};
-use rusoto_core::{request::BufferedHttpResponse, Region};
+use rusoto_core::{Region, request::BufferedHttpResponse};
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_s3::{
 	DeleteBucketRequest, HeadBucketError, HeadBucketRequest, PutBucketPolicyRequest,
-	PutObjectOutput, PutObjectRequest, S3Client, S3,
+	PutObjectOutput, PutObjectRequest, S3, S3Client,
 };
 use std::{env, str::FromStr};
 use tokio::task;
@@ -67,8 +67,13 @@ impl S3Archive {
 	) -> anyhow::Result<(S3Archive, ArchiveSettings)> {
 		let access_key = "minioadmin";
 		let secret_key = "minioadmin";
-		env::set_var("AWS_ACCESS_KEY_ID", access_key);
-		env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+		// this is unsafe because it happens in an async context and we are setting global
+		// environment variables since it's a test, we can assume that the environment is
+		// controlled and this is safe
+		unsafe {
+			env::set_var("AWS_ACCESS_KEY_ID", access_key);
+			env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+		}
 		let minio_endpoint = archive_endpoint.unwrap_or("http://localhost:9000".to_string());
 
 		let bucket_name = archive_bucket.unwrap_or(format!("notary-archives-{}", Uuid::new_v4()));

@@ -5,19 +5,19 @@ extern crate core;
 use core::fmt::Display;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
-use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
+use sp_core::{H256, crypto::Ss58AddressFormatRegistry};
 use sp_runtime::{
-	traits::{BlakeTwo256, IdentifyAccount, Verify},
 	MultiSignature,
+	traits::{BlakeTwo256, IdentifyAccount, Verify},
 };
 
 pub use account::{AccountType, LocalchainAccountId};
 pub use balance_change::*;
-pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SEAL_KEY_TYPE};
+pub use block_seal::{BLOCK_SEAL_KEY_TYPE, BlockSealAuthorityId, BlockSealAuthoritySignature};
 pub use block_vote::*;
 #[cfg(feature = "std")]
 use core::str::FromStr;
-pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
+pub use digests::{AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, BlockSealDigest, *};
 pub use domain::*;
 pub use domain_top_level::DomainTopLevel;
 #[cfg(feature = "std")]
@@ -94,11 +94,11 @@ pub const OWNERSHIP_TOKEN_SYMBOL: &str = "ARGNOT";
 
 pub mod prelude {
 	pub use super::{
+		AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment, Nonce, NotaryId,
+		NotebookNumber, VaultId,
 		block_seal::{BlockSealAuthorityId, FrameId},
 		localchain::*,
 		tick::Tick,
-		AccountId, Balance, BlockNumber, Chain, ChainIdentity, Moment, Nonce, NotaryId,
-		NotebookNumber, VaultId,
 	};
 	pub use polkadot_sdk::*;
 }

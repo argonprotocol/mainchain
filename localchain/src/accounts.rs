@@ -1,16 +1,16 @@
 use anyhow::anyhow;
 use chrono::NaiveDateTime;
 use polkadot_sdk::*;
-use sp_core::crypto::{AccountId32, PublicError, Ss58AddressFormat, Ss58Codec};
 use sp_core::ByteArray;
+use sp_core::crypto::{AccountId32, PublicError, Ss58AddressFormat, Ss58Codec};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 
 use argon_primitives::AccountOriginUid;
 use argon_primitives::NotaryId;
 use argon_primitives::NotebookNumber;
-use argon_primitives::{AccountOrigin, AccountType, ADDRESS_PREFIX};
+use argon_primitives::{ADDRESS_PREFIX, AccountOrigin, AccountType};
 
-use crate::{bail, BalanceChangeStatus, BalanceChangeStore, Result};
+use crate::{BalanceChangeStatus, BalanceChangeStore, Result, bail};
 
 #[cfg_attr(feature = "napi", napi(object))]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
@@ -440,8 +440,8 @@ impl AccountStore {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::*;
-  use crate::error::NapiOk;
   use crate::LocalAccount;
+  use crate::error::NapiOk;
   use argon_primitives::AccountType;
 
   #[napi]

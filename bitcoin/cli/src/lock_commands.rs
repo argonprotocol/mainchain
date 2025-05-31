@@ -1,29 +1,29 @@
-use anyhow::{anyhow, bail, Context};
-use base64::{engine::general_purpose, Engine};
+use anyhow::{Context, anyhow, bail};
+use base64::{Engine, engine::general_purpose};
 use bitcoin::{
+	Address, CompressedPublicKey, FeeRate, Network, Txid,
 	bip32::{ChildNumber, DerivationPath, Fingerprint},
 	key::Secp256k1,
-	secp256k1, Address, CompressedPublicKey, FeeRate, Network, Txid,
+	secp256k1,
 };
 use clap::{Subcommand, ValueEnum};
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
+use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
 use polkadot_sdk::*;
-use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
+use sp_runtime::{FixedPointNumber, FixedU128, testing::H256};
 use std::str::FromStr;
 
 use argon_bitcoin::{Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep};
 use argon_client::{
-	api,
+	FetchAt, MainchainClient, api,
 	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::LockReleaseRequest, storage, tx},
 	conversion::from_api_fixed_u128,
-	FetchAt, MainchainClient,
 };
 use argon_primitives::{
-	bitcoin::{
-		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoId,
-		SATOSHIS_PER_BITCOIN,
-	},
 	BlockNumber, KeystoreParams, VaultId,
+	bitcoin::{
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
+		SATOSHIS_PER_BITCOIN, UtxoId,
+	},
 };
 
 use crate::{formatters::ArgonFormatter, helpers::get_bitcoin_network, xpriv_file::XprivFile};
@@ -188,8 +188,12 @@ impl LockCommands {
 				let fee = vault.terms.bitcoin_base_fee +
 					from_api_fixed_u128(vault.terms.bitcoin_annual_percent_rate)
 						.saturating_mul_int(argons_minted);
-				println!("You're locking {} sats in exchange for {}. Your Argon account needs {} for the lock cost",
-						 satoshis, ArgonFormatter(argons_minted), ArgonFormatter(fee));
+				println!(
+					"You're locking {} sats in exchange for {}. Your Argon account needs {} for the lock cost",
+					satoshis,
+					ArgonFormatter(argons_minted),
+					ArgonFormatter(fee)
+				);
 
 				let call = tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into());
 				let url = client.create_polkadotjs_deeplink(&call)?;
@@ -467,7 +471,10 @@ impl LockCommands {
 					let release_events =
 						client.live.blocks().at(release_block).await?.events().await?;
 					let release_event = release_events
-                        .find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>()?.ok_or(anyhow!("No corresponding event found for the cosign release height in the blockchain."))?;
+						.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>()?
+						.ok_or(anyhow!(
+							"No corresponding event found for the cosign release height in the blockchain."
+						))?;
 
 					signature = Some(
 						release_event

@@ -1,7 +1,7 @@
 use std::{env, fs};
 
 use crate::utils::parse_date;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};

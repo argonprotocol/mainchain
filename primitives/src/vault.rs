@@ -8,13 +8,13 @@ use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::AtLeast32BitUnsigned;
 
 use crate::{
+	VaultId,
 	bitcoin::{
-		get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub,
-		CompressedBitcoinPubkey, Satoshis,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
+		get_rounded_up_bitcoin_day_height,
 	},
 	ensure,
 	tick::Tick,
-	VaultId,
 };
 
 pub trait MiningBidPoolProvider {
@@ -237,19 +237,19 @@ pub struct BurnResult<Balance> {
 }
 
 impl<
-		AccountId: Codec,
-		Balance: Codec
-			+ Copy
-			+ MaxEncodedLen
-			+ Default
-			+ AtLeast32BitUnsigned
-			+ MaxEncodedLen
-			+ Clone
-			+ TypeInfo
-			+ core::fmt::Debug
-			+ PartialEq
-			+ Eq,
-	> Vault<AccountId, Balance>
+	AccountId: Codec,
+	Balance: Codec
+		+ Copy
+		+ MaxEncodedLen
+		+ Default
+		+ AtLeast32BitUnsigned
+		+ MaxEncodedLen
+		+ Clone
+		+ TypeInfo
+		+ core::fmt::Debug
+		+ PartialEq
+		+ Eq,
+> Vault<AccountId, Balance>
 {
 	pub fn get_activated_securitization(&self) -> Balance {
 		let activated_securitization =
@@ -476,7 +476,7 @@ impl<
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{prelude::sp_arithmetic::FixedU128, Balance};
+	use crate::{Balance, prelude::sp_arithmetic::FixedU128};
 	use polkadot_sdk::frame_support::assert_err;
 
 	#[test]

@@ -23,8 +23,8 @@ pub mod weights;
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
 	use argon_primitives::{
-		notebook::NotebookHeader, DomainHash, NotebookEventHandler, ZoneRecord,
-		MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES,
+		DomainHash, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES, NotebookEventHandler, ZoneRecord,
+		notebook::NotebookHeader,
 	};
 	use sp_core::crypto::AccountId32;
 

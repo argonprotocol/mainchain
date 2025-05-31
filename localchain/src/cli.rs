@@ -1,12 +1,12 @@
 use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
-  overview, AccountStore, CryptoScheme, DomainStore, Localchain, LocalchainConfig, MainchainClient,
-  VoteCreationOptions,
+  AccountStore, CryptoScheme, DomainStore, Localchain, LocalchainConfig, MainchainClient,
+  VoteCreationOptions, overview,
 };
 use anyhow::anyhow;
-use argon_primitives::argon_utils::format_argons;
 use argon_primitives::Domain;
+use argon_primitives::argon_utils::format_argons;
 use clap::{Args, Parser, Subcommand, ValueHint};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
@@ -378,9 +378,14 @@ where
             format!("{:?}", balance_change.status),
           ]);
         }
-        println!("{} registered at tick {} in notebook {}. Domain hash={:#?} (use this hash for zone record registration on mainchain).\
+        println!(
+          "{} registered at tick {} in notebook {}. Domain hash={:#?} (use this hash for zone record registration on mainchain).\
           \n\nChanged Accounts:\n{table}",
-                         domain, tracker.tick, tracker.notebook_number, argon_domain.hash());
+          domain,
+          tracker.tick,
+          tracker.notebook_number,
+          argon_domain.hash()
+        );
       }
     },
 

@@ -1,7 +1,7 @@
 use crate::get_header_url;
 use argon_primitives::{
-	prelude::Tick, AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookMeta,
-	NotebookNumber, SignedNotebookHeader,
+	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookMeta, NotebookNumber,
+	SignedNotebookHeader, prelude::Tick,
 };
 use codec::{Decode, Encode};
 use jsonrpsee::{
@@ -12,7 +12,7 @@ use jsonrpsee::{
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::Deserialize;
-use sp_core::{RuntimeDebug, H256};
+use sp_core::{H256, RuntimeDebug};
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {

@@ -7,10 +7,10 @@ use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 use sp_runtime::RuntimeDebug;
 
 use crate::{
-	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
-	notary::SignedHeaderBytes,
 	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
 	SignedNotebookHeader,
+	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
+	notary::SignedHeaderBytes,
 };
 
 pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"seal_arg";

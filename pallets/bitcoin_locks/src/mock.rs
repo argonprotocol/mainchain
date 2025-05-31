@@ -8,6 +8,7 @@ use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
+	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VotingSchedule,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
@@ -15,7 +16,6 @@ use argon_primitives::{
 	ensure,
 	tick::Ticker,
 	vault::{BitcoinVaultProvider, LockExtension, Vault, VaultError, VaultTerms},
-	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VotingSchedule,
 };
 use frame_support::traits::Currency;
 

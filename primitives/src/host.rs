@@ -7,7 +7,7 @@ use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::{traits::ConstU32, BoundedVec};
+use sp_runtime::{BoundedVec, traits::ConstU32};
 
 #[derive(
 	PartialEq,

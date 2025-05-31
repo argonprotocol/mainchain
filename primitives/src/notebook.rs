@@ -3,13 +3,13 @@ use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{bounded::BoundedVec, ed25519::Signature, ConstU32, H256};
+use sp_core::{ConstU32, H256, bounded::BoundedVec, ed25519::Signature};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 
 use crate::{
-	balance_change::BalanceChange, block_vote::BlockVote, notary::NotarySignature, tick::Tick,
-	AccountId, AccountType, DomainHash, NotaryId,
+	AccountId, AccountType, DomainHash, NotaryId, balance_change::BalanceChange,
+	block_vote::BlockVote, notary::NotarySignature, tick::Tick,
 };
 pub use crate::{AccountOrigin, BalanceTip};
 

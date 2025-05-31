@@ -1,7 +1,7 @@
 use crate::ensure;
 use argon_primitives::tick::Tick;
 use polkadot_sdk::*;
-use sp_core::{ed25519, ByteArray};
+use sp_core::{ByteArray, ed25519};
 
 use argon_notary_apis::error::Error;
 

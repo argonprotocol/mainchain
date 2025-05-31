@@ -3,14 +3,14 @@ use crate::{
 	command::MiningConfig,
 	rpc,
 	rpc::GrandpaDeps,
-	runtime_api::{opaque::Block, BaseHostRuntimeApis},
+	runtime_api::{BaseHostRuntimeApis, opaque::Block},
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
-	aux_client::ArgonAux, create_import_queue, run_block_builder_task, run_notary_sync,
-	BlockBuilderParams, NotaryClient, NotebookDownloader,
+	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
+	create_import_queue, run_block_builder_task, run_notary_sync,
 };
-use argon_primitives::{tick::Ticker, AccountId, TickApis};
+use argon_primitives::{AccountId, TickApis, tick::Ticker};
 use polkadot_sdk::*;
 use sc_client_api::BlockBackend;
 use sc_consensus::BasicQueue;
@@ -20,7 +20,7 @@ use sc_consensus_grandpa::{
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
-	config::Configuration, error::Error as ServiceError, TaskManager, WarpSyncConfig,
+	TaskManager, WarpSyncConfig, config::Configuration, error::Error as ServiceError,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;

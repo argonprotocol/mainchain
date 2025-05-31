@@ -4,8 +4,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use sp_core::crypto::AccountId32;
 use sp_core::Decode;
+use sp_core::crypto::AccountId32;
 use sp_core::{ByteArray, H256};
 use sp_runtime::MultiSignature;
 use subxt::runtime_api::Payload as RuntimeApiPayload;
@@ -19,8 +19,8 @@ use argon_client::api::{runtime_types, tx};
 
 use argon_client::api::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use argon_client::{
-  api, ArgonConfig, ArgonExtrinsicParamsBuilder, FetchAt, MainchainClient as InnerMainchainClient,
-  TxInBlockWithEvents,
+  ArgonConfig, ArgonExtrinsicParamsBuilder, FetchAt, MainchainClient as InnerMainchainClient,
+  TxInBlockWithEvents, api,
 };
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
@@ -30,7 +30,7 @@ use argon_primitives::{
 
 use crate::AccountStore;
 use crate::Keystore;
-use crate::{bail, Result};
+use crate::{Result, bail};
 
 #[cfg_attr(feature = "napi", napi)]
 #[allow(clippy::type_complexity)]
@@ -241,7 +241,7 @@ impl MainchainClient {
         }
       };
 
-      let prim_host: Host = host.host.0 .0.into();
+      let prim_host: Host = host.host.0.0.into();
       let host_string: String = prim_host.try_into()?;
       versions.insert(
         format!("{}.{}.{}", version.major, version.minor, version.patch),
@@ -279,7 +279,7 @@ impl MainchainClient {
       .hosts
       .0
       .into_iter()
-      .map(|h| Host::from(h.0 .0).try_into())
+      .map(|h| Host::from(h.0.0).try_into())
       .collect();
     let notary = NotaryDetails {
       id: notary.notary_id,

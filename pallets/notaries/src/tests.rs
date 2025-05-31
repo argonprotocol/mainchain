@@ -3,12 +3,12 @@ use pallet_prelude::*;
 use sp_keyring::Ed25519Keyring;
 
 use crate::{
+	Error, Event,
 	mock::*,
 	pallet::{
 		ActiveNotaries, ExpiringProposals, NotaryKeyHistory, ProposedNotaries,
 		QueuedNotaryMetaChanges,
 	},
-	Error, Event,
 };
 use argon_primitives::{
 	host::Host,

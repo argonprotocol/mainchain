@@ -1,40 +1,38 @@
 use bitcoin::{
+	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
 	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
 	secp256k1::{All, Secp256k1},
-	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
 };
 use bitcoind::{
-	anyhow,
-	bitcoincore_rpc::{bitcoincore_rpc_json::AddressType, jsonrpc::serde_json, RpcApi},
-	BitcoinD,
+	BitcoinD, anyhow,
+	bitcoincore_rpc::{RpcApi, bitcoincore_rpc_json::AddressType, jsonrpc::serde_json},
 };
 use polkadot_sdk::*;
 use sp_arithmetic::FixedU128;
-use sp_core::{crypto::AccountId32, sr25519, Pair};
+use sp_core::{Pair, crypto::AccountId32, sr25519};
 use std::{env, str::FromStr, sync::Arc};
 
 use crate::utils::{create_active_notary, register_miner_keys, register_miners};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
-	api,
+	ArgonConfig, FetchAt, MainchainClient, api,
 	api::{
 		price_index::calls::types::submit::Index,
 		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
-	ArgonConfig, FetchAt, MainchainClient,
 };
 use argon_primitives::{
-	argon_utils::format_argons,
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, Satoshis, UtxoId, SATOSHIS_PER_BITCOIN},
-	tick::{Tick, Ticker},
 	Balance, VaultId,
+	argon_utils::format_argons,
+	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId},
+	tick::{Tick, Ticker},
 };
 use argon_testing::{
-	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
-	ArgonTestNode, ArgonTestOracle,
+	ArgonTestNode, ArgonTestOracle, add_blocks, add_wallet_address, fund_script_address,
+	run_bitcoin_cli, start_argon_test_node,
 };
 use serial_test::serial;
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
@@ -43,7 +41,6 @@ use tokio::fs;
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_bitcoin_minting_e2e() {
-	env::set_var("RUST_LOG", "info");
 	let test_node = start_argon_test_node().await;
 	// need a test notary to get ownership rewards, so we can actually mint.
 	let _test_notary = create_active_notary(&test_node).await.expect("Notary registered");
@@ -295,7 +292,7 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 			let desc_str = desc["desc"].as_str().unwrap();
 			let is_internal = desc["internal"].as_bool().unwrap();
 			if desc_str.contains(&hardened_parent_hd_key_path) && is_internal == is_internal_hd {
-				let bracketed = desc_str.split('[').last().unwrap();
+				let bracketed = desc_str.split('[').next_back().unwrap();
 				let xpub = bracketed.split(']').next().unwrap();
 				let fingerprint = xpub.split('/').next().unwrap();
 				Some(fingerprint)
@@ -529,11 +526,13 @@ async fn confirm_bond(
 		assert_eq!(cosign_script_pubkey, lock_api.utxo_script_pubkey.clone().into());
 	}
 
-	assert!(lock_cli_get
-		.lines()
-		.find(|line| line.contains("Minted Argons"))
-		.unwrap()
-		.contains(&format!("₳0 of {}", format_argons(lock_api.lock_price))));
+	assert!(
+		lock_cli_get
+			.lines()
+			.find(|line| line.contains("Minted Argons"))
+			.unwrap()
+			.contains(&format!("₳0 of {}", format_argons(lock_api.lock_price)))
+	);
 	let lock_amount = lock_api.lock_price;
 	Ok((lock_api.utxo_script_pubkey.into(), lock_amount))
 }
@@ -738,7 +737,7 @@ async fn owner_sees_signature_and_unlocks(
 	let psbt_text = owner_cosign_cli
 		.trim()
 		.split('\n')
-		.last()
+		.next_back()
 		.ok_or(anyhow!("No psbt in text found"))?
 		.trim();
 

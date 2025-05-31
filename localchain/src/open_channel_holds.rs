@@ -2,22 +2,22 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::keystore::Keystore;
 use crate::notary_client::NotaryClients;
-use crate::{bail, BalanceChangeStatus, Error, Result};
-use crate::{TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
+use crate::{BalanceChangeStatus, Error, Result, bail};
+use crate::{CHANNEL_HOLD_MINIMUM_SETTLEMENT, TickerRef};
 use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
 use argon_primitives::tick::Tick;
 use argon_primitives::{
-  AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
-  CHANNEL_HOLD_CLAWBACK_TICKS, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
+  AccountType, Balance, BalanceChange, BalanceTip, CHANNEL_HOLD_CLAWBACK_TICKS,
+  MINIMUM_CHANNEL_HOLD_SETTLEMENT, MultiSignatureBytes, NoteType, NotebookNumber,
 };
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
 use codec::Encode;
 use lazy_static::lazy_static;
 use polkadot_sdk::*;
-use sp_core::ed25519::Signature;
 use sp_core::Decode;
+use sp_core::ed25519::Signature;
 use sp_runtime::MultiSignature;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use std::sync::Arc;
@@ -344,7 +344,9 @@ impl OpenChannelHold {
 
   pub async fn sign(&self, settled_amount: Balance) -> Result<SignatureResult> {
     if settled_amount < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
-      bail!("Settled amount must be greater than the minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})");
+      bail!(
+        "Settled amount must be greater than the minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})"
+      );
     }
     let mut channel_hold = self.channel_hold.lock().await;
     let mut tx = self.db.begin().await?;
@@ -389,7 +391,9 @@ impl OpenChannelHold {
     signature: Vec<u8>,
   ) -> Result<()> {
     if microgons < MINIMUM_CHANNEL_HOLD_SETTLEMENT {
-      bail!("Settled amount is less than minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})");
+      bail!(
+        "Settled amount is less than minimum channel_hold settlement amount ({MINIMUM_CHANNEL_HOLD_SETTLEMENT})"
+      );
     }
     let mut channel_hold = self.channel_hold.lock().await;
     let mut db = self.db.acquire().await?;
@@ -748,7 +752,7 @@ mod tests {
   use super::*;
   use crate::balance_change_builder::BalanceChangeBuilder;
   use crate::notarization_builder::NotarizationBuilder;
-  use crate::test_utils::{create_mock_notary, mock_notary_clients, MockNotary};
+  use crate::test_utils::{MockNotary, create_mock_notary, mock_notary_clients};
   use crate::transactions::Transactions;
   use crate::*;
   use argon_primitives::tick::Tick;
@@ -995,10 +999,12 @@ mod tests {
       balance_change.signature = signature.into();
       (balance_change.signature, balance_change.notes[0].microgons)
     };
-    assert!(alice_channel_hold
-      .record_updated_settlement(updated_total, updated_signature.encode())
-      .await
-      .is_ok());
+    assert!(
+      alice_channel_hold
+        .record_updated_settlement(updated_total, updated_signature.encode())
+        .await
+        .is_ok()
+    );
 
     Ok(())
   }
@@ -1191,11 +1197,13 @@ mod tests {
     let result = alice_store.import_channel_hold(json.clone()).await;
     assert!(result.is_err());
     println!("{:?}", result.as_ref().err());
-    assert!(result
-      .err()
-      .expect("")
-      .to_string()
-      .contains("This localchain is not configured to accept payments addressed "));
+    assert!(
+      result
+        .err()
+        .expect("")
+        .to_string()
+        .contains("This localchain is not configured to accept payments addressed ")
+    );
     Ok(())
   }
 }

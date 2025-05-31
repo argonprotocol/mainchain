@@ -8,14 +8,14 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{
-	crypto::{Ss58AddressFormat, Ss58Codec},
 	ConstU32, RuntimeDebug,
+	crypto::{Ss58AddressFormat, Ss58Codec},
 };
 use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{tick::Tick, AccountId, Balance, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
+use crate::{ADDRESS_PREFIX, AccountId, Balance, DomainHash, TransferToLocalchainId, tick::Tick};
 
 #[derive(
 	Clone,
@@ -47,11 +47,7 @@ impl Note {
 
 	pub fn calculate_transfer_tax(amount: Balance) -> Balance {
 		// less than one argon is percent based
-		if amount < 1_000_000 {
-			round_up(amount, TAX_PERCENT_BASE)
-		} else {
-			TRANSFER_TAX_CAP
-		}
+		if amount < 1_000_000 { round_up(amount, TAX_PERCENT_BASE) } else { TRANSFER_TAX_CAP }
 	}
 
 	pub fn calculate_channel_hold_tax(amount: u128) -> u128 {

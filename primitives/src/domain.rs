@@ -1,7 +1,6 @@
 use alloc::{
 	collections::btree_map::BTreeMap,
 	string::{String, ToString},
-	vec::Vec,
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::{cmp::Ordering, str};
@@ -13,7 +12,7 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec};
 
-use crate::{domain_top_level::DomainTopLevel, host::Host, Balance, NotaryId};
+use crate::{Balance, NotaryId, domain_top_level::DomainTopLevel, host::Host};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 

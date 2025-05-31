@@ -10,12 +10,12 @@ use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBou
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ed25519, Get, RuntimeDebug, H256};
-use sp_runtime::{traits::Block as BlockT, BoundedVec};
+use sp_core::{Get, H256, RuntimeDebug, ed25519};
+use sp_runtime::{BoundedVec, traits::Block as BlockT};
 
 use crate::{
-	host::Host, tick::Tick, AccountOrigin, BlockVotingPower, NotebookHeader, NotebookNumber,
-	NotebookSecret, NotebookSecretHash, TransferToLocalchainId,
+	AccountOrigin, BlockVotingPower, NotebookHeader, NotebookNumber, NotebookSecret,
+	NotebookSecretHash, TransferToLocalchainId, host::Host, tick::Tick,
 };
 
 pub type NotaryId = u32;

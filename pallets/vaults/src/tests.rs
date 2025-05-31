@@ -1,10 +1,10 @@
 use crate::{
+	Error, Event, HoldReason, VaultConfig,
 	mock::{Vaults, *},
 	pallet::{
 		NextVaultId, PendingTermsModificationsByTick, PerFrameFeeRevenueByVault,
 		VaultFundsReleasingByHeight, VaultMetricUpdate, VaultXPubById, VaultsById,
 	},
-	Error, Event, HoldReason, VaultConfig,
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},

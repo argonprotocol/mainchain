@@ -1,4 +1,4 @@
-use age::{secrecy::SecretString, Decryptor, Encryptor};
+use age::{Decryptor, Encryptor, secrecy::SecretString};
 use anyhow::{anyhow, bail};
 use argon_primitives::KeystoreParams;
 use bitcoin::bip32::Xpriv;

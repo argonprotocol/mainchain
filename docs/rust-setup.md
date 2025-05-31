@@ -91,13 +91,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 ```
 
-Configure the Rust toolchain to default to the latest stable version, add nightly and the nightly wasm target:
+The Rust toolchain will use the rust-toolchain.toml file to determine the version of Rust to use and targets to build.
 
 ```bash
-rustup default stable
-rustup update
-rustup update nightly
-rustup target add wasm32v1-none --toolchain nightly
+rustup --version
 ```
 
 ## Test your set-up
@@ -110,45 +107,6 @@ steps in [our first Substrate tutorial](https://docs.substrate.io/tutorials/v3/c
 Sometimes you can't get the Substrate node template to compile out of the box. Here are some tips to help you work
 through that.
 
-### Rust configuration check
-
-To see what Rust toolchain you are presently using, run:
-
-```bash
-rustup show
-```
-
-This will show something like this (Ubuntu example) output:
-
-```text
-Default host: x86_64-unknown-linux-gnu
-rustup home:  /home/user/.rustup
-
-installed toolchains
---------------------
-
-stable-x86_64-unknown-linux-gnu (default)
-nightly-2020-10-06-x86_64-unknown-linux-gnu
-nightly-x86_64-unknown-linux-gnu
-
-installed targets for active toolchain
---------------------------------------
-
-wasm32v1-none
-x86_64-unknown-linux-gnu
-
-active toolchain
-----------------
-
-stable-x86_64-unknown-linux-gnu (default)
-rustc 1.50.0 (cb75ad5db 2021-02-10)
-```
-
-As you can see above, the default toolchain is stable, and the `nightly-x86_64-unknown-linux-gnu` toolchain as well as
-its `wasm32v1-none` target is installed. You also see that `nightly-2020-10-06-x86_64-unknown-linux-gnu` is
-installed, but is not used unless explicitly defined as illustrated in the [specify your nightly
-version](#specifying-nightly-version) section.
-
 ### WebAssembly compilation
 
 Substrate uses [WebAssembly](https://webassembly.org) (Wasm) to produce portable blockchain runtimes. You will need to
@@ -158,66 +116,3 @@ allow you to compile Substrate runtime code to the Wasm target.
 > There are upstream issues in Rust that need to be resolved before all of Substrate can use the stable Rust toolchain.
 > [This is our tracking issue](https://github.com/paritytech/substrate/issues/1252) if you're curious as to why and how
 > this will be resolved.
-
-#### Latest nightly for Substrate `master`
-
-Developers who are building Substrate _itself_ should always use the latest bug-free versions of Rust stable and
-nightly. This is because the Substrate codebase follows the tip of Rust nightly, which means that changes in Substrate
-often depend on upstream changes in the Rust nightly compiler. To ensure your Rust compiler is always up to date, you
-should run:
-
-```bash
-rustup update
-rustup update nightly
-rustup target add wasm32v1-none --toolchain nightly
-```
-
-> NOTE: It may be necessary to occasionally rerun `rustup update` if a change in the upstream Substrate codebase depends
-> on a new feature of the Rust compiler. When you do this, both your nightly and stable toolchains will be pulled to the
-> most recent release, and for nightly, it is generally _not_ expected to compile WASM without error (although it very
-> often does). Be sure to [specify your nightly version](#specifying-nightly-version) if you get WASM build errors from
-> `rustup` and [downgrade nightly as needed](#downgrading-rust-nightly).
-
-#### Rust nightly toolchain
-
-If you want to guarantee that your build works on your computer as you update Rust and other dependencies, you should
-use a specific Rust nightly version that is known to be compatible with the version of Substrate they are using; this
-version will vary from project to project and different projects may use different mechanisms to communicate this
-version to developers. For instance, the Polkadot client specifies this information in its [release
-notes](https://github.com/paritytech/polkadot-sdk/releases).
-
-```bash
-# Specify the specific nightly toolchain in the date below:
-rustup install nightly-<yyyy-MM-dd>
-```
-
-#### Wasm toolchain
-
-Now, configure the nightly version to work with the Wasm compilation target:
-
-```bash
-rustup target add wasm32v1-none --toolchain nightly-<yyyy-MM-dd>
-```
-
-### Specifying nightly version
-
-Use the `WASM_BUILD_TOOLCHAIN` environment variable to specify the Rust nightly version a Substrate project should use
-for Wasm compilation:
-
-```bash
-WASM_BUILD_TOOLCHAIN=nightly-<yyyy-MM-dd> cargo build --release
-```
-
-> Note that this only builds _the runtime_ with the specified nightly. The rest of project will be compiled with **your
-> default toolchain**, i.e. the latest installed stable toolchain.
-
-### Downgrading Rust nightly
-
-If your computer is configured to use the latest Rust nightly and you would like to downgrade to a specific nightly
-version, follow these steps:
-
-```bash
-rustup uninstall nightly
-rustup install nightly-<yyyy-MM-dd>
-rustup target add wasm32v1-none --toolchain nightly-<yyyy-MM-dd>
-```

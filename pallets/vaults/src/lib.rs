@@ -29,12 +29,12 @@ pub mod pallet {
 	use alloc::collections::BTreeSet;
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
+		MiningSlotProvider, TickProvider,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{BitcoinVaultProvider, LiquidityPoolVaultProvider, Vault, VaultError, VaultTerms},
-		MiningSlotProvider, TickProvider,
 	};
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::vault::LockExtension;

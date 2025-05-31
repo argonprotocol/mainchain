@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::LocalAccount;
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
 use crate::keystore::Keystore;
@@ -8,21 +9,20 @@ use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::open_channel_holds::OpenChannelHoldsStore;
 use crate::transactions::{TransactionType, Transactions};
-use crate::LocalAccount;
-use crate::{bail, Error, Result};
 use crate::{ChannelHold, MainchainClient};
+use crate::{Error, Result, bail};
 use crate::{Localchain, OpenChannelHold};
 use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
 use argon_notary_apis::Error as NotaryError;
 use argon_notary_audit::VerifyError;
 use argon_primitives::tick::Tick;
-use argon_primitives::{ensure, AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
+use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber, ensure};
 use polkadot_sdk::*;
 use serde_json::json;
-use sp_core::sr25519::Signature;
 use sp_core::Decode;
 use sp_core::H256;
+use sp_core::sr25519::Signature;
 use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use tokio::sync::{Mutex, RwLock};
@@ -88,9 +88,9 @@ impl BalanceSyncResult {
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
+  use crate::ChannelHold;
   use crate::notarization_tracker::uniffi_ext::BalanceChange;
   use crate::notarization_tracker::uniffi_ext::NotarizationTracker;
-  use crate::ChannelHold;
   use std::sync::Arc;
 
   #[derive(uniffi::Record)]
@@ -334,12 +334,12 @@ impl BalanceSync {
     tracing::debug!(
       "Finished processing sync.\nUnsettled Balances synced: {},\nBlock Votes {},\n\
       Mainchain Transfers {}\nChannel Holds: {} notarized/{} updated\nJump Account Consolidations: {}",
-        balance_changes.len(),
-        block_votes.len(),
-        mainchain_transfers.len(),
-        channel_hold_notarizations.len(),
-        channel_holds_updated.len(),
-        jump_account_consolidations.len(),
+      balance_changes.len(),
+      block_votes.len(),
+      mainchain_transfers.len(),
+      channel_hold_notarizations.len(),
+      channel_holds_updated.len(),
+      jump_account_consolidations.len(),
     );
 
     Ok(BalanceSyncResult {
@@ -737,10 +737,7 @@ impl BalanceSync {
 
     trace!(
       "Checking if we should create a vote for account {}. Total to use: {}. Configured minimum for vote: {:?}. Votes {}",
-      account.id,
-      total_tax_for_vote,
-      options.minimum_vote_amount,
-      votes
+      account.id, total_tax_for_vote, options.minimum_vote_amount, votes
     );
 
     balance_change.send_to_vote(total_tax_for_vote).await?;
@@ -1042,11 +1039,11 @@ impl BalanceSync {
         .await?;
       tracing::debug!(
         "Downloaded notarization for balance change. id={}, notarization_id={:?}, change={}. In notebook #{}, tick {}.",
-          balance_change.id,
-          balance_change.notarization_id,
-          balance_change.change_number,
-          tip.notebook_number,
-          tip.tick
+        balance_change.id,
+        balance_change.notarization_id,
+        balance_change.change_number,
+        tip.notebook_number,
+        tip.tick
       );
 
       let json = json!(notarization);

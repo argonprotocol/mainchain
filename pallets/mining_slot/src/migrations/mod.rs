@@ -1,9 +1,9 @@
 use crate::{
+	Config, Registration,
 	pallet::{
 		AccountIndexLookup, BidsForNextSlotCohort, MinerXorKeysByCohort, MinersByCohort,
 		NextCohortSize, NextFrameId,
 	},
-	Config, Registration,
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
@@ -255,7 +255,7 @@ pub type FrameMigration<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{new_test_ext, Test};
+	use crate::mock::{Test, new_test_ext};
 	use frame_support::assert_ok;
 	use old_storage::RewardDestination::Owner;
 

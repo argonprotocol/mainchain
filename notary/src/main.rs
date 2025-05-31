@@ -1,21 +1,21 @@
 use anyhow::Context;
 use argon_client::{
-	api::{notaries::storage::types, storage},
 	FetchAt, MainchainClient,
+	api::{notaries::storage::types, storage},
 };
 use argon_notary::{
+	NotaryServer,
 	block_watch::spawn_block_sync,
-	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
+	notebook_closer::{NOTARY_KEYID, spawn_notebook_closer},
 	s3_archive::S3Archive,
 	server::{ArchiveSettings, RpcConfig},
-	NotaryServer,
 };
-use argon_primitives::{tick::Ticker, AccountId, CryptoType, KeystoreParams, NotaryId};
+use argon_primitives::{AccountId, CryptoType, KeystoreParams, NotaryId, tick::Ticker};
 use clap::{Parser, Subcommand};
 use futures::StreamExt;
 use polkadot_sdk::*;
 use prometheus::Registry;
-use sp_core::{crypto::Ss58Codec, sr25519, ByteArray, Pair};
+use sp_core::{ByteArray, Pair, crypto::Ss58Codec, sr25519};
 use sqlx::{migrate, postgres::PgPoolOptions};
 use std::{env, time::Duration};
 use tracing::warn;
@@ -138,7 +138,6 @@ async fn main() -> anyhow::Result<()> {
 		.with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
 		.try_init()
 		.expect("setting default subscriber failed");
-	env::set_var("RUST_BACKTRACE", "1");
 
 	match cli.command {
 		Commands::Run {

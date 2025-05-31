@@ -16,13 +16,13 @@ pub mod weights;
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
-	use sp_runtime::{app_crypto::RuntimePublic, BoundedBTreeMap};
+	use sp_runtime::{BoundedBTreeMap, app_crypto::RuntimePublic};
 
 	use argon_primitives::{
+		TickProvider,
 		notary::{
 			GenesisNotary, NotaryMeta, NotaryProvider, NotaryPublic, NotaryRecord, NotarySignature,
 		},
-		TickProvider,
 	};
 
 	use super::*;
@@ -391,11 +391,7 @@ pub mod pallet {
 
 		fn notary_operator_account_id(notary_id: NotaryId) -> Option<T::AccountId> {
 			<ActiveNotaries<T>>::get().into_iter().find_map(|n| {
-				if n.notary_id == notary_id {
-					Some(n.operator_account_id)
-				} else {
-					None
-				}
+				if n.notary_id == notary_id { Some(n.operator_account_id) } else { None }
 			})
 		}
 	}

@@ -4,32 +4,32 @@ use pallet_prelude::*;
 use sp_core::ed25519::{Public, Signature};
 use sp_inherents::InherentDataProvider;
 use sp_keyring::{
-	ed25519::Keyring,
 	Ed25519Keyring,
 	Ed25519Keyring::Alice,
 	Sr25519Keyring::{Bob, Ferdie},
+	ed25519::Keyring,
 };
 use sp_runtime::MultiSignature;
 use std::panic::catch_unwind;
 
 use crate::{
+	Call, Error,
 	mock::{BlockSeal, *},
 	pallet::{
 		BlockForkPower, IsBlockFromVoteSeal, LastBlockSealerInfo, LastTickWithVoteSeal,
 		ParentVotingKey, TempSealInherent, VotesInPast3Ticks,
 	},
-	Call, Error,
 };
 use argon_primitives::{
+	BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey, Domain,
+	DomainTopLevel, FORK_POWER_DIGEST, MerkleProof, PARENT_VOTING_KEY_DIGEST,
+	ParentVotingKeyDigest, VotingSchedule,
 	block_seal::MiningAuthority,
 	digests::BlockVoteDigest,
 	fork_power::ForkPower,
 	inherents::{BlockSealInherent, BlockSealInherentDataProvider, SealInherentError},
 	localchain::BlockVote,
 	notary::NotaryNotebookRawVotes,
-	BlockSealAuthoritySignature, BlockSealDigest, BlockVoteT, BlockVotingKey, Domain,
-	DomainTopLevel, MerkleProof, ParentVotingKeyDigest, VotingSchedule, FORK_POWER_DIGEST,
-	PARENT_VOTING_KEY_DIGEST,
 };
 
 fn empty_signature() -> BlockSealAuthoritySignature {

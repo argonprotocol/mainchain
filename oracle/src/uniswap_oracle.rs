@@ -1,8 +1,8 @@
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_primitives::{address, aliases::I56, Address, U160};
+use alloy_primitives::{Address, U160, address, aliases::I56};
 use alloy_provider::RootProvider;
 use alloy_transport::BoxTransport;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use argon_primitives::Balance;
 use polkadot_sdk::*;
 use sp_runtime::{FixedPointNumber, FixedU128};

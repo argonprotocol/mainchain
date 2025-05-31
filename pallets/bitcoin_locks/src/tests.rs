@@ -5,17 +5,17 @@
 use pallet_prelude::*;
 
 use crate::{
+	Error, Event, HoldReason, LockReleaseRequest,
 	mock::*,
 	pallet::{LockReleaseCosignHeightById, LocksByUtxoId, LocksPendingReleaseByUtxoId},
-	Error, Event, HoldReason, LockReleaseRequest,
 };
 use argon_primitives::{
+	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider,
 	bitcoin::{
 		BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey,
-		H256Le, UtxoRef, SATOSHIS_PER_BITCOIN,
+		H256Le, SATOSHIS_PER_BITCOIN, UtxoRef,
 	},
 	vault::LockExtension,
-	BitcoinUtxoEvents, PriceProvider, MICROGONS_PER_ARGON,
 };
 
 #[test]
