@@ -2,15 +2,15 @@ use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_support::BoundedVec;
 use jsonrpsee::{
-  core::{async_trait, SubscriptionResult},
+  RpcModule,
+  core::{SubscriptionResult, async_trait},
   server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
   types::error::ErrorObjectOwned,
-  RpcModule,
 };
 use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
 use sp_core::ed25519::Signature;
-use sp_core::{Blake2Hasher, LogLevelFilter, Pair, H256};
+use sp_core::{Blake2Hasher, H256, LogLevelFilter, Pair};
 use sp_keyring::Ed25519Keyring;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -28,7 +28,7 @@ use crate::{
   NotaryClient, NotaryClients, TickerRef,
 };
 use argon_notary::server::NotebookHeaderStream;
-use argon_notary::server::{pipe_from_stream_and_drop, NotebookHeaderInfo};
+use argon_notary::server::{NotebookHeaderInfo, pipe_from_stream_and_drop};
 use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer};
 use argon_notary_apis::notebook::{NotebookRpcServer, NotebookSubscriptionBroadcast};
 use argon_notary_apis::system::SystemRpcServer;
@@ -43,7 +43,7 @@ use argon_primitives::{
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{Router, http::StatusCode, routing::get};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 

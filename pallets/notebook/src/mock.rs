@@ -1,12 +1,12 @@
 use crate as pallet_notebook;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
-	block_vote::VoteMinimum,
-	notary::{NotaryProvider, NotarySignature},
-	tick::{TickDigest, Ticker},
 	BlockSealSpecProvider, BlockVoteDigest, ChainTransferLookup, ComputeDifficulty, Digestset,
 	NotebookDigest, NotebookEventHandler, NotebookHeader, TickProvider, TransferToLocalchainId,
 	VotingSchedule,
+	block_vote::VoteMinimum,
+	notary::{NotaryProvider, NotarySignature},
+	tick::{TickDigest, Ticker},
 };
 use pallet_prelude::*;
 

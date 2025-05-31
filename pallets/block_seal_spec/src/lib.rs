@@ -40,13 +40,13 @@ pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
+		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
+		NotebookEventHandler, NotebookProvider, TickProvider,
 		block_vote::VoteMinimum,
-		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
+		digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest},
 		inherents::BlockSealInherent,
 		notary::NotaryNotebookVoteDigestDetails,
 		notebook::{BlockVotingPower, NotebookHeader},
-		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
-		NotebookEventHandler, NotebookProvider, TickProvider,
 	};
 	use sp_runtime::DigestItem;
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -65,11 +65,7 @@ pub mod pallet {
 		/// The desired percent of the default block time to use for compute
 		type TargetComputeBlockPercent: Get<FixedU128>;
 
-		type AuthorityProvider: AuthorityProvider<
-			BlockSealAuthorityId,
-			Self::Block,
-			Self::AccountId,
-		>;
+		type AuthorityProvider: AuthorityProvider<BlockSealAuthorityId, Self::Block, Self::AccountId>;
 
 		/// The maximum active notaries allowed
 		#[pallet::constant]

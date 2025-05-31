@@ -3,13 +3,13 @@ use crate::{
 	aux_data::AuxData, error::Error, metrics::BlockMetrics, notary_client::VotingPowerInfo,
 };
 use argon_primitives::{
+	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 	fork_power::ForkPower,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails, SignedHeaderBytes,
 	},
 	tick::Tick,
-	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
 use argon_runtime::NotebookVerifyError;
 use codec::{Codec, Decode, Encode};
@@ -19,7 +19,7 @@ use parking_lot::RwLock;
 use polkadot_sdk::*;
 use sc_client_api::{self, backend::AuxStore};
 use schnellru::{ByLength, LruMap};
-use sp_core::{RuntimeDebug, H256};
+use sp_core::{H256, RuntimeDebug};
 use sp_runtime::traits::Block as BlockT;
 use std::{
 	any::Any,
@@ -423,9 +423,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 		trace!(
 			"Storing vote details for tick {} and notary {} at notebook #{}",
-			tick,
-			notary_id,
-			notebook_number
+			tick, notary_id, notebook_number
 		);
 
 		let mut voting_power = 0u128;
@@ -780,10 +778,12 @@ mod test {
 			if i > OLDEST_TICK_STATE {
 				let cleaned_tick = tick.saturating_sub(OLDEST_TICK_STATE);
 				let oldest_state = argon_aux.get_notebook_tick_state(cleaned_tick).unwrap();
-				assert!(changes
-					.iter()
-					.any(|a| a.0 == AuxKey::NotaryStateAtTick(cleaned_tick).encode() &&
-						a.1.is_none()));
+				assert!(
+					changes
+						.iter()
+						.any(|a| a.0 == AuxKey::NotaryStateAtTick(cleaned_tick).encode() &&
+							a.1.is_none())
+				);
 				assert_eq!(oldest_state.get().notebook_key_details_by_notary.len(), 0);
 				assert_eq!(
 					aux.get_aux(&AuxKey::NotaryStateAtTick(cleaned_tick).encode()[..]).unwrap(),

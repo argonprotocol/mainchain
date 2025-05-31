@@ -287,8 +287,8 @@ mod bitcoin_compat {
 	use ::bip32::secp256k1::ecdsa::VerifyingKey;
 	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
 	use bitcoin::{
-		hashes::{FromSliceError, Hash},
 		Network,
+		hashes::{FromSliceError, Hash},
 	};
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;

@@ -16,15 +16,15 @@ use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
 };
 use argon_primitives::{
-	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, Balance, BalanceChange,
-	BalanceProof, BalanceTip, BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin,
-	Notarization, NotaryId, NoteType, NotebookNumber,
+	AccountId, AccountOrigin, AccountType, Balance, BalanceChange, BalanceProof, BalanceTip,
+	BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId, NoteType,
+	NotebookNumber, ensure, tick::Ticker,
 };
 use codec::Encode;
 use polkadot_sdk::*;
 use serde_json::{from_value, json};
 use sp_runtime::BoundedVec;
-use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
+use sqlx::{FromRow, PgConnection, PgPool, query, types::Json};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -483,9 +483,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notarizations DROP CONSTRAINT IF EXISTS notarizations_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notarizations DROP CONSTRAINT IF EXISTS notarizations_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		let notebook_number = 1;
 		let changeset = vec![
 			BalanceChange {
@@ -513,17 +515,19 @@ mod tests {
 			},
 		];
 
-		let block_votes = vec![BlockVote {
-			block_hash: [0u8; 32].into(),
-			power: 1222,
-			tick: 1,
-			account_id: Bob.to_account_id(),
-			index: 0,
-			block_rewards_account_id: Bob.to_account_id(),
-			signature: Signature::from_raw([0u8; 64]).into(),
-		}
-		.sign(Bob.pair())
-		.clone()];
+		let block_votes = vec![
+			BlockVote {
+				block_hash: [0u8; 32].into(),
+				power: 1222,
+				tick: 1,
+				account_id: Bob.to_account_id(),
+				index: 0,
+				block_rewards_account_id: Bob.to_account_id(),
+				signature: Signature::from_raw([0u8; 64]).into(),
+			}
+			.sign(Bob.pair())
+			.clone(),
+		];
 		let domains =
 			vec![(Domain::new("test", DomainTopLevel::Analytics).hash(), Bob.to_account_id())];
 
@@ -565,15 +569,17 @@ mod tests {
 			.unwrap();
 			assert_eq!(result, notarization.clone());
 
-			assert!(NotarizationsStore::get_account_change(
-				&mut tx,
-				notebook_number,
-				Ferdie.to_account_id(),
-				AccountType::Deposit,
-				3,
-			)
-			.await
-			.is_err());
+			assert!(
+				NotarizationsStore::get_account_change(
+					&mut tx,
+					notebook_number,
+					Ferdie.to_account_id(),
+					AccountType::Deposit,
+					3,
+				)
+				.await
+				.is_err()
+			);
 			tx.commit().await?;
 		}
 

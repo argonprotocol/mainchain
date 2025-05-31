@@ -1,5 +1,5 @@
 use alloc::string::String;
-use argon_primitives::{tick::Tick, AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT};
+use argon_primitives::{AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT, tick::Tick};
 use codec::{Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -64,12 +64,18 @@ pub enum VerifyError {
 	#[error("Invalid net balance changeset. Must account for all funds.")]
 	InvalidNetBalanceChangeset,
 
-	#[error("Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: #{change_index}.{note_index})")]
+	#[error(
+		"Insufficient balance for account  (balance: {balance}, amount: {amount}) (change: #{change_index}.{note_index})"
+	)]
 	InsufficientBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
 
-	#[error("Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: #{change_index}.{note_index})")]
+	#[error(
+		"Exceeded max balance for account (pre-balance: {balance}, amount: {amount}), (change: #{change_index}.{note_index})"
+	)]
 	ExceededMaxBalance { balance: u128, amount: u128, note_index: u16, change_index: u16 },
-	#[error("Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})")]
+	#[error(
+		"Balance change mismatch (provided_balance: {provided_balance}, calculated_balance: {calculated_balance}) (#{change_index})"
+	)]
 	BalanceChangeMismatch { change_index: u16, provided_balance: u128, calculated_balance: i128 },
 
 	#[error("Balance change not net zero (sent: {sent} vs claimed: {claimed})")]
@@ -148,7 +154,9 @@ pub enum VerifyError {
 	#[error("Invalid tax account operation")]
 	InvalidTaxOperation,
 
-	#[error("Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}")]
+	#[error(
+		"Invalid tax amount included (sent: {tax_sent}, owed: {tax_owed}) for account {account_id:?}"
+	)]
 	InsufficientTaxIncluded { tax_sent: u128, tax_owed: u128, account_id: AccountId32 },
 
 	#[error("Insufficient tax allocated for the given block votes")]

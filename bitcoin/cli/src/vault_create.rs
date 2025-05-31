@@ -1,7 +1,7 @@
 use std::{fmt, io, io::Write, iter::Iterator, string::ToString};
 
 use crate::{
-	formatters::{parse_number, Argons, Pct},
+	formatters::{Argons, Pct, parse_number},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 };
 use argon_bitcoin_cli_macros::ReadDocs;
@@ -13,9 +13,9 @@ use argon_client::{
 use argon_primitives::bitcoin::BitcoinXPub;
 use clap::Args;
 use inquire::{
+	CustomUserError, InquireError, Select, Text,
 	error::InquireResult,
 	validator::{StringValidator, Validation},
-	CustomUserError, InquireError, Select, Text,
 };
 use polkadot_sdk::*;
 use sp_runtime::{FixedU128, Permill};

@@ -1,9 +1,9 @@
 use anyhow::bail;
 use argon_bitcoin::client::Client;
 use argon_client::{
+	ArgonConfig, FetchAt, ReconnectingClient,
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
-	ArgonConfig, FetchAt, ReconnectingClient,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 use bitcoincore_rpc::{Auth, RpcApi};
@@ -84,18 +84,18 @@ pub async fn bitcoin_loop(
 #[cfg(test)]
 mod tests {
 	use argon_client::{
+		MainchainClient,
 		api::{
 			bitcoin_utxos::storage::types::confirmed_bitcoin_block_tip::ConfirmedBitcoinBlockTip,
 			storage,
 		},
 		signer::Sr25519Signer,
-		MainchainClient,
 	};
 	use argon_primitives::bitcoin::BitcoinNetwork;
 	use argon_testing::start_argon_test_node;
-	use bitcoin::{hashes::Hash, Network};
+	use bitcoin::{Network, hashes::Hash};
 	use polkadot_sdk::*;
-	use sp_core::{sr25519, Pair};
+	use sp_core::{Pair, sr25519};
 
 	use super::*;
 

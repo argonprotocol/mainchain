@@ -1,9 +1,9 @@
 use crate::{
+	Error, Event, HoldReason, LiquidityPool, LiquidityPoolCapital,
 	mock::{LiquidityPools, *},
 	pallet::{CapitalActive, CapitalRaising, VaultPoolsByFrame},
-	Error, Event, HoldReason, LiquidityPool, LiquidityPoolCapital,
 };
-use argon_primitives::{vault::MiningBidPoolProvider, OnNewSlot};
+use argon_primitives::{OnNewSlot, vault::MiningBidPoolProvider};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
 use pallet_prelude::*;
 use sp_core::bounded_vec;

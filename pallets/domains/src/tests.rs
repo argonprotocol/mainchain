@@ -1,16 +1,16 @@
 use crate::{
+	DomainRegistration, Error, Event,
 	mock::{Domain as DomainPallet, *},
 	pallet::{ExpiringDomainsByBlock, RegisteredDomains},
-	DomainRegistration, Error, Event,
 };
 use argon_primitives::{
-	notebook::NotebookHeader, tick::Tick, AccountId, Domain, DomainHash, DomainTopLevel,
-	NotebookEventHandler, Semver, VersionHost, ZoneRecord,
+	AccountId, Domain, DomainHash, DomainTopLevel, NotebookEventHandler, Semver, VersionHost,
+	ZoneRecord, notebook::NotebookHeader, tick::Tick,
 };
 use frame_support::{assert_err, assert_ok, traits::Hooks};
 use pallet_prelude::*;
 use sp_keyring::Sr25519Keyring::{Alice, Bob};
-use sp_runtime::{testing::H256, BoundedVec};
+use sp_runtime::{BoundedVec, testing::H256};
 use std::collections::BTreeMap;
 
 #[test]

@@ -12,14 +12,12 @@ homepage.workspace = true
 [dependencies]
 anyhow = { workspace = true, features = ["default"] }
 parking_lot = { workspace = true }
-futures = { workspace = true }
-thiserror = { workspace = true, features = ["default"] }
+color-backtrace = { workspace = true, features = ["default"] }
 tokio = { workspace = true }
 serde = { workspace = true, features = ["default"] }
 serde_json = { workspace = true, features = ["default"] }
 reqwest = { workspace = true, features = ["default"] }
 scraper = { workspace = true }
-hex = { workspace = true }
 tracing = { workspace = true, features = ["default"] }
 polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "binary-merkle-tree"] }
 tracing-subscriber = { workspace = true }
@@ -31,7 +29,6 @@ argon-bitcoin = { workspace = true, features = ["default"] }
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 url = { workspace = true }
-ethers = { workspace = true }
 uniswap-sdk-core = { workspace = true }
 uniswap-v3-sdk = { workspace = true, features = ["extensions"] }
 uniswap-lens = { workspace = true }
@@ -43,7 +40,6 @@ lazy_static = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-eips = { workspace = true }
 alloy-transport = { workspace = true }
-alloy-transport-http = { workspace = true }
 alloy-provider = { workspace = true }
 
 [dev-dependencies]

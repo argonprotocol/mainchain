@@ -11,7 +11,7 @@ pub mod weights;
 
 use frame_support::weights::ConstantMultiplier;
 use frame_system::EnsureSignedBy;
-use ismp::{module::IsmpModule, router::IsmpRouter, Error};
+use ismp::{Error, module::IsmpModule, router::IsmpRouter};
 pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 use polkadot_sdk::*;
@@ -22,9 +22,9 @@ use argon_runtime_common::prelude::*;
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use sp_runtime::impl_opaque_keys;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+use sp_runtime::impl_opaque_keys;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 

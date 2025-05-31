@@ -2,28 +2,27 @@ use polkadot_sdk::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
+	Error,
 	notebook_closer::notary_sign,
 	stores::{
-		chain_transfer::ChainTransferStore, notarizations::NotarizationsStore,
+		BoxFutureResult, chain_transfer::ChainTransferStore, notarizations::NotarizationsStore,
 		notebook_header::NotebookHeaderStore, notebook_new_accounts::NotebookNewAccountsStore,
-		BoxFutureResult,
 	},
-	Error,
 };
 use argon_primitives::{
-	ensure, tick::Tick, AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote,
-	ChainTransfer, LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin,
-	Notarization, NotaryId, Note, NoteType, Notebook, NotebookNumber,
+	AccountId, AccountOrigin, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer,
+	LocalchainAccountId, MaxNotebookNotarizations, MerkleProof, NewAccountOrigin, Notarization,
+	NotaryId, Note, NoteType, Notebook, NotebookNumber, ensure, tick::Tick,
 };
-use binary_merkle_tree::{merkle_proof, merkle_root, verify_proof, Leaf};
+use binary_merkle_tree::{Leaf, merkle_proof, merkle_root, verify_proof};
 use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json};
 use sp_core::{
+	Blake2Hasher, H256, RuntimeDebug,
 	bounded::BoundedVec,
 	ed25519::{Public, Signature},
-	Blake2Hasher, RuntimeDebug, H256,
 };
 use sp_keystore::KeystorePtr;
 use sqlx::PgConnection;
@@ -376,7 +375,7 @@ mod tests {
 	use polkadot_sdk::*;
 	use sp_core::{bounded_vec, ed25519::Signature};
 	use sp_keyring::Sr25519Keyring::{Alice, Bob, Dave, Ferdie};
-	use sp_keystore::{testing::MemoryKeystore, Keystore};
+	use sp_keystore::{Keystore, testing::MemoryKeystore};
 	use sqlx::PgPool;
 	use std::ops::Add;
 

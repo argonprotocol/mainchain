@@ -12,9 +12,8 @@ documentation.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-codec = { workspace = true, features = ["default"] }
 polkadot-sdk = { workspace = true, features = ["sp-runtime"] }
-
+color-backtrace = { workspace = true, features = ["default"] }
 subxt = { workspace = true }
 tokio = { workspace = true }
 
@@ -31,8 +30,6 @@ base64 = { workspace = true }
 bitcoin = { workspace = true, features = ["base64"] }
 bip39 = { workspace = true }
 age = { workspace = true }
-
-url = { workspace = true, features = [] }
 
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default"] }

@@ -1,16 +1,16 @@
 use argon_primitives::{
-  AccountId, AccountType, Balance, BalanceChange, Domain, MultiSignatureBytes, Note, NoteType,
-  DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
+  AccountId, AccountType, Balance, BalanceChange, DOMAIN_LEASE_COST, Domain,
+  MINIMUM_CHANNEL_HOLD_SETTLEMENT, MultiSignatureBytes, Note, NoteType,
 };
 use lazy_static::lazy_static;
 use polkadot_sdk::*;
 use sp_core::bounded_vec::BoundedVec;
-use sp_core::{ed25519::Signature as EdSignature, ByteArray};
+use sp_core::{ByteArray, ed25519::Signature as EdSignature};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::bail;
 use crate::Result;
+use crate::bail;
 use crate::{AccountStore, BalanceChangeStatus, LocalchainTransfer};
 
 lazy_static! {

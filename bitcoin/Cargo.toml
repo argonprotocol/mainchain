@@ -29,6 +29,8 @@ argon-primitives = { workspace = true, default-features = false, features = ["bi
 log = { workspace = true }
 minreq = { workspace = true, optional = true, features = ["https", "json-using-serde"] }
 serde_json = { workspace = true }
+url = { workspace = true, default-features = false }
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["frame-support", "sp-keyring"], default-features = true }
@@ -56,5 +58,7 @@ std = [
 	"polkadot-sdk/std",
 	"serde_json/std",
 	"thiserror/std",
+	"tokio",
+	"url/std",
 ]
 hwi = [ "dep:hwi" ]

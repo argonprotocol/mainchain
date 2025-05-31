@@ -3,9 +3,9 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{bounded::BoundedVec, ecdsa, ed25519, sr25519, ConstU32, H256};
+use sp_core::{ConstU32, H256, bounded::BoundedVec, ecdsa, ed25519, sr25519};
 use sp_crypto_hashing::blake2_256;
-use sp_runtime::{traits::Verify, MultiSignature};
+use sp_runtime::{MultiSignature, traits::Verify};
 
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
@@ -15,8 +15,8 @@ use sp_debug_derive::RuntimeDebug;
 use crate::serialize_unsafe_u128_as_string;
 
 use crate::{
-	notary::NotaryId, tick::Tick, AccountId, AccountOriginUid, AccountType, Note, NoteType,
-	NotebookNumber,
+	AccountId, AccountOriginUid, AccountType, Note, NoteType, NotebookNumber, notary::NotaryId,
+	tick::Tick,
 };
 
 #[derive(

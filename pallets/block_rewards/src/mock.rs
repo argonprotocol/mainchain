@@ -4,11 +4,11 @@ use pallet_prelude::*;
 use crate as pallet_block_rewards;
 use crate::GrowthPath;
 use argon_primitives::{
+	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
+	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
 	block_seal::BlockPayout,
 	notary::{NotaryProvider, NotarySignature},
 	tick::Ticker,
-	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
-	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;

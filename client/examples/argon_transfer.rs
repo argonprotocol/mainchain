@@ -1,10 +1,10 @@
 use polkadot_sdk::*;
 use sp_core::Pair;
 use sp_keyring::Sr25519Keyring::{Alice, Bob};
-use subxt::{tx::TxStatus, Config, OnlineClient};
+use subxt::{Config, OnlineClient, tx::TxStatus};
 
 use argon_client::{
-	api, signer::Sr25519Signer, ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient,
+	ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient, api, signer::Sr25519Signer,
 };
 
 #[tokio::main]

@@ -1,12 +1,11 @@
 use bitcoin::hashes::serde;
 use bitcoincore_rpc::{
-	jsonrpc,
-	jsonrpc::{base64, minreq, minreq_http::HttpError, Request, Response},
-	Auth, Error, RpcApi,
+	Auth, Error, RpcApi, jsonrpc,
+	jsonrpc::{Request, Response, base64, minreq, minreq_http::HttpError},
 };
 use log::{
-	debug, log_enabled, trace,
 	Level::{Debug, Trace, Warn},
+	debug, log_enabled, trace,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -109,11 +108,11 @@ impl RpcApi for Client {
 fn log_response(cmd: &str, resp: &bitcoincore_rpc::Result<jsonrpc::Response>) {
 	if log_enabled!(Warn) || log_enabled!(Debug) || log_enabled!(Trace) {
 		match resp {
-			Err(ref e) =>
+			Err(e) =>
 				if log_enabled!(Debug) {
 					debug!(target: "bitcoincore_rpc", "JSON-RPC failed parsing reply of {}: {:?}", cmd, e);
 				},
-			Ok(ref resp) =>
+			Ok(resp) =>
 				if let Some(ref e) = resp.error {
 					if log_enabled!(Debug) {
 						debug!(target: "bitcoincore_rpc", "JSON-RPC error for {}: {:?}", cmd, e);

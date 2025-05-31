@@ -6,9 +6,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::Result;
 use crate::mainchain_transfer::MainchainTransferIn;
 use crate::transactions::TransactionType;
-use crate::Result;
 use crate::{AccountStore, BalanceChangeRow};
 use crate::{BalanceChangeStatus, LocalAccount, MainchainClient};
 use argon_primitives::argon_utils::format_argons;
@@ -373,8 +373,8 @@ impl OverviewStore {
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
-  use crate::transactions::TransactionType;
   use crate::BalanceChangeStatus;
+  use crate::transactions::TransactionType;
   use argon_primitives::{AccountType, Chain};
 
   #[derive(uniffi::Record, Clone, Debug)]
@@ -511,9 +511,9 @@ pub mod uniffi_ext {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::OverviewStore;
+  use crate::BalanceChangeStatus;
   use crate::error::NapiOk;
   use crate::transactions::TransactionType;
-  use crate::BalanceChangeStatus;
   use argon_primitives::{AccountType, Chain};
   use napi::bindgen_prelude::*;
 
@@ -670,10 +670,10 @@ mod tests {
   use sp_keyring::Ed25519Keyring::Ferdie;
   use sp_keyring::Sr25519Keyring::{Alice, Bob};
 
+  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::overview::OverviewStore;
   use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::transactions::TransactionType;
-  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::*;
 
   #[sqlx::test]

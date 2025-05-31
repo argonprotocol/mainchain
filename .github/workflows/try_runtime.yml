@@ -22,11 +22,7 @@ jobs:
           persist-credentials: false
 
       - name: Install
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-          components: rust-src
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - uses: ./.github/templates/rust-cache
         with:

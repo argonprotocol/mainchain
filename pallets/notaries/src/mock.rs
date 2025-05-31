@@ -1,4 +1,4 @@
-use argon_primitives::{tick::Ticker, TickProvider, VotingSchedule};
+use argon_primitives::{TickProvider, VotingSchedule, tick::Ticker};
 use pallet_prelude::*;
 
 use frame_support::traits::ConstU16;

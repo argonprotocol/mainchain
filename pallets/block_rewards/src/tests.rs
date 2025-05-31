@@ -1,11 +1,11 @@
 use crate::{
+	Event, RewardAmounts,
 	mock::{Balances, BlockRewards, Ownership, *},
 	pallet::{ArgonsPerBlock, BlockRewardsByCohort},
-	Event, RewardAmounts,
 };
 use argon_primitives::{
-	block_seal::{BlockPayout, BlockRewardType},
 	BlockSealAuthorityId, BlockSealerInfo, OnNewSlot,
+	block_seal::{BlockPayout, BlockRewardType},
 };
 use pallet_prelude::*;
 use sp_core::ByteArray;

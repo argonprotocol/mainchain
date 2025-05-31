@@ -1,8 +1,8 @@
 use pallet_prelude::*;
 
-use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider};
+use argon_primitives::{ArgonCPI, PriceProvider, bitcoin::SATOSHIS_PER_BITCOIN};
 
-use crate::{mock::*, Current, Operator, PriceIndex as PriceIndexEntry};
+use crate::{Current, Operator, PriceIndex as PriceIndexEntry, mock::*};
 
 type Event = crate::Event<Test>;
 type Error = crate::Error<Test>;

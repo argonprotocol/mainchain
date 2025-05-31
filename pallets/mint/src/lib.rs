@@ -18,13 +18,13 @@ pub mod weights;
 pub mod pallet {
 	use pallet_prelude::*;
 
-	use argon_primitives::{block_seal::BlockPayout, BlockRewardsEventHandler};
+	use argon_primitives::{BlockRewardsEventHandler, block_seal::BlockPayout};
 	use sp_runtime::FixedPointNumber;
 
 	use super::*;
 	use argon_primitives::{
-		bitcoin::UtxoId, block_seal::FrameId, ArgonCPI, BlockRewardAccountsProvider,
-		BurnEventHandler, PriceProvider, UtxoLockEvents,
+		ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider, UtxoLockEvents,
+		bitcoin::UtxoId, block_seal::FrameId,
 	};
 
 	#[pallet::pallet]

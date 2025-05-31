@@ -1,18 +1,18 @@
 use std::{env, fs::File, str::FromStr};
 
 use anyhow::anyhow;
-use bitcoind::{downloaded_exe_path, BitcoinD, Conf};
+use bitcoind::{BitcoinD, Conf, downloaded_exe_path};
 use fs2::FileExt;
 use lazy_static::lazy_static;
 use rand::RngCore;
 
 use argon_primitives::bitcoin::Satoshis;
 use bitcoin::{
+	Address, Amount, CompressedPublicKey, Network, Txid,
 	bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
 	secp256k1::Secp256k1,
-	Address, Amount, CompressedPublicKey, Network, Txid,
 };
-use bitcoincore_rpc::{json::GetRawTransactionResult, RpcApi};
+use bitcoincore_rpc::{RpcApi, json::GetRawTransactionResult};
 
 lazy_static! {
 	static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());

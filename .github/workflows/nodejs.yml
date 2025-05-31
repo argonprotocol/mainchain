@@ -68,15 +68,7 @@ jobs:
 
       - name: Install
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - uses: taiki-e/setup-cross-toolchain-action@v1
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        with:
-          target: ${{ matrix.target }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - uses: taiki-e/install-action@v2
         if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
@@ -228,11 +220,10 @@ jobs:
         run: yarn install
 
       - name: Install
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         if: ${{ !matrix.docker }}
         with:
-          toolchain: stable
-          targets: ${{ matrix.target }}
+          target: ${{ matrix.target }}
 
       - uses: ./.github/templates/rust-cache
         with:
@@ -447,9 +438,8 @@ jobs:
         run: chmod +x ./target/debug/argon-*
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
           target: ${{ matrix.target }}
 
       - name: Install bitcoind

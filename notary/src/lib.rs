@@ -1,4 +1,4 @@
-pub use argon_notary_apis::{create_client, Client};
+pub use argon_notary_apis::{Client, create_client};
 
 pub mod apis {
 	pub use argon_notary_apis::{localchain, notebook};

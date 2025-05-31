@@ -1,10 +1,10 @@
 use argon_primitives::{
+	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 	bitcoin::{BitcoinNetwork, Satoshis},
 	block_seal::MiningSlotConfig,
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::Ticker,
-	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
 };
 use argon_runtime::{
 	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig,

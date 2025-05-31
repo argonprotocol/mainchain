@@ -3,15 +3,15 @@ extern crate alloc;
 extern crate core;
 
 use argon_primitives::{
+	SlotEvents, TickProvider,
 	block_seal::{MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig},
 	inherents::BlockSealInherent,
 	providers::*,
 	vault::MiningBidPoolProvider,
-	SlotEvents, TickProvider,
 };
 pub use pallet::*;
 use pallet_prelude::*;
-use sp_runtime::{traits::OpaqueKeys, RuntimeAppPublic};
+use sp_runtime::{RuntimeAppPublic, traits::OpaqueKeys};
 pub use weights::*;
 
 #[cfg(test)]
@@ -57,7 +57,7 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		block_seal::MiningRegistration, vault::MiningBidPoolProvider, SlotEvents, TickProvider,
+		SlotEvents, TickProvider, block_seal::MiningRegistration, vault::MiningBidPoolProvider,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
@@ -143,10 +143,7 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BidPoolProvider: MiningBidPoolProvider<
-			Balance = Self::Balance,
-			AccountId = Self::AccountId,
-		>;
+		type BidPoolProvider: MiningBidPoolProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 

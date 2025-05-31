@@ -1,15 +1,15 @@
 use crate::{
 	aux_client::ArgonAux,
 	block_creator::BlockCreator,
-	compute_worker::{run_compute_solver_threads, ComputeHandle},
+	compute_worker::{ComputeHandle, run_compute_solver_threads},
 	notary_client::VotingPowerInfo,
 	notebook_sealer::NotebookSealer,
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_primitives::{
-	inherents::BlockSealInherentNodeSide, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
+	BLOCK_SEAL_KEY_TYPE, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
 	BlockSealAuthorityId, MiningApis, NotaryApis, NotebookApis, TickApis, VotingSchedule,
-	BLOCK_SEAL_KEY_TYPE,
+	inherents::BlockSealInherentNodeSide,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
@@ -42,7 +42,7 @@ pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
 
-pub use notary_client::{run_notary_sync, NotaryClient, NotebookDownloader};
+pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
 pub use import_queue::create_import_queue;

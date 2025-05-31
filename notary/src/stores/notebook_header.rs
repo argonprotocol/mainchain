@@ -1,23 +1,23 @@
 use std::collections::BTreeSet;
 
 use crate::{
-	stores::{
-		notarizations::NotarizationsStore, notebook_constraints::NotebookConstraintsStore,
-		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
-		BoxFutureResult,
-	},
 	Error,
+	stores::{
+		BoxFutureResult, notarizations::NotarizationsStore,
+		notebook_constraints::NotebookConstraintsStore,
+		notebook_new_accounts::NotebookNewAccountsStore, notebook_status::NotebookStatusStore,
+	},
 };
 use argon_primitives::{
-	ensure, notary::NotarySignature, prelude::*, AccountOrigin, BlockVotingPower, ChainTransfer,
-	DomainHash, NotebookHeader, NotebookMeta, SignedNotebookHeader, NOTEBOOK_VERSION,
+	AccountOrigin, BlockVotingPower, ChainTransfer, DomainHash, NOTEBOOK_VERSION, NotebookHeader,
+	NotebookMeta, SignedNotebookHeader, ensure, notary::NotarySignature, prelude::*,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
 use rand::RngCore;
 use serde_json::{from_value, json};
-use sp_core::{bounded::BoundedVec, H256};
-use sqlx::{query, types::JsonValue, FromRow, PgConnection};
+use sp_core::{H256, bounded::BoundedVec};
+use sqlx::{FromRow, PgConnection, query, types::JsonValue};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -432,14 +432,14 @@ mod tests {
 	use chrono::{Duration, Utc};
 	use sp_core::H256;
 	use sp_keyring::Sr25519Keyring::Alice;
-	use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+	use sp_keystore::{KeystoreExt, testing::MemoryKeystore};
 	use sp_runtime::traits::Verify;
 	use sqlx::PgPool;
 
 	use argon_primitives::{AccountOrigin, ChainTransfer, NOTEBOOK_VERSION};
 
 	use crate::{
-		notebook_closer::{notary_sign, NOTARY_KEYID},
+		notebook_closer::{NOTARY_KEYID, notary_sign},
 		stores::notebook_header::NotebookHeaderStore,
 	};
 
