@@ -1,6 +1,6 @@
-use crate::{helpers::get_bitcoin_network, xpriv_file::XprivFile};
+use crate::xpriv_file::XprivFile;
 use anyhow::anyhow;
-use argon_client::{FetchAt, MainchainClient};
+use argon_primitives::bitcoin::BitcoinNetwork;
 use bip39::Mnemonic;
 use bitcoin::{
 	bip32,
@@ -22,6 +22,10 @@ pub(crate) enum XPrivCommands {
 		/// Optionally import your own mnemonic to generate the Master XPriv
 		#[clap(long)]
 		mnemonic: Option<String>,
+
+		/// If running tests, configure the bitcoin network to use
+		#[clap(long)]
+		bitcoin_network: Option<BitcoinNetwork>,
 	},
 	#[clap(name = "derive-xpub")]
 	/// Derive an XPub from your Master XPriv
@@ -33,6 +37,16 @@ pub(crate) enum XPrivCommands {
 		#[clap(long)]
 		hd_path: String,
 	},
+
+	/// Derive an Bitcoin Pubkey from your Master XPriv
+	DerivePubkey {
+		#[clap(flatten)]
+		xpriv_file: XprivFile,
+
+		/// HD Path to derive the Pubkey from
+		#[clap(long)]
+		hd_path: String,
+	},
 }
 
 #[derive(Parser, Debug)]
@@ -40,22 +54,11 @@ struct OneArg {
 	arg: String,
 }
 impl XPrivCommands {
-	pub async fn process(self, rpc_url: String) -> anyhow::Result<()> {
+	pub async fn process(self) -> anyhow::Result<()> {
 		match self {
-			XPrivCommands::Master { xpriv_file, mnemonic } => {
-				let client = MainchainClient::from_url(&rpc_url).await?;
-				let network = get_bitcoin_network(&client, FetchAt::Finalized).await?;
-				println!(
-					"Based on connected Argon chain, this will create an xpriv for Bitcoin {:?}",
-					match network {
-						bitcoin::Network::Bitcoin => "Mainnet",
-						bitcoin::Network::Testnet => "Testnet",
-						bitcoin::Network::Testnet4 => "Testnet4",
-						bitcoin::Network::Regtest => "Regtest",
-						bitcoin::Network::Signet => "Signet",
-						_ => "Network with Unknown Identity",
-					}
-				);
+			XPrivCommands::Master { xpriv_file, mnemonic, bitcoin_network } => {
+				let network = bitcoin_network.unwrap_or(BitcoinNetwork::Bitcoin);
+
 				let mnemonic = if let Some(x) = mnemonic {
 					Mnemonic::from_str(&x).map_err(|e| anyhow!(e))?
 				} else {
@@ -80,6 +83,15 @@ impl XPrivCommands {
 
 				let child_xpub = Xpub::from_priv(&Secp256k1::new(), &child);
 				println!("{}", child_xpub);
+			},
+			XPrivCommands::DerivePubkey { xpriv_file, hd_path } => {
+				let xpriv = xpriv_file.read()?;
+				let hd_path = bip32::DerivationPath::from_str(&hd_path).map_err(|e| anyhow!(e))?;
+
+				let child = xpriv.derive_priv(&Secp256k1::new(), &hd_path)?;
+
+				let pubkey = child.to_keypair(&Secp256k1::new()).public_key();
+				println!("{}", pubkey);
 			},
 		}
 		Ok(())

@@ -34,55 +34,6 @@ Removing the excess currency allows the price to rise.
 
 ## Lock Flow
 
-We'll show examples in this flow using Electrum. After you have opened Electrum, follow the flow to create a new wallet
-or access your existing wallet.
-![<img src="./images/electrum-wallet.png" width="200px" alt="Electrum Wallet Setup">](images/electrum-wallet.png)
-
-You'll need to acquire BTC or have some available that you will send to a multisig that you'll create with a Vault in
-these steps.
-
-### Testnet
-
-#### Wallet connected to Signet
-
-You'll need a bitcoin wallet that supports a custom Signet. NOTE: as explained below, Argon needs wallets that support
-Miniscript, but they are currently limited and Bitcoin Core takes a good deal of disk space and several hours to sync.
-Because of that, we are using Electrum for this flow.
-
-To make transactions more reliable on Bitcoin and faucet tokens available, we have set up a custom Signet. It currently
-only has a single node with blocks timed to 10 minutes. You can connect to it using the following parameters:
-
-To launch in Signet:
-
-- [Electrum](https://electrum.org/#home): Open with --signet. Eg, in Mac
-  OS: `open -a Electrum.app --args --oneserver --signet --server=electrs.testnet.argonprotocol.org:50002:s`
-- [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
-  and `addnode=bitcoin-node0.testnet.argonprotocol.org:38333`
-
-Ensure you did in fact use Signet (the message will say Testnet):
-![Electrum signet.png](images/electrum-testnet.png)
-
-Now go to addresses and copy the address you want to get funds from the Signet faucet:
-![Electrum address.png](images/electrum-address.png)
-
-#### Get Faucet BTC
-
-The Argon testnet is a place to experiment with the Argon Network. It is connected to a custom Bitcoin Signet. You will
-likely need to acquire testnet Argons and Bitcoins to experiment with this feature.
-
-- [Argon Testnet Faucet](./account-setup.md#requesting-testnet-funds)
-- The Testnet Faucet will also grant you Signet Bitcoins (good only on the Argon Testnet). To use it, go to
-  our [Discord](https://discord.gg/6JxjCNvu6x) `testnet` channel and type `/drip-bitcoin`. Enter your address at the
-  prompt:
-  ![Discord Faucet.png](images/discord-faucet-bitcoin.png)
-
-### Insecure Flow Note
-
-We'll be adding support for Hardware wallets and additional software wallets in future releases. It's a goal of this
-project for self-custody of Bitcoins to be supported with a wide range of tools, however, miniscript support is
-currently limited. For now, we'll show you how to use Electrum for most commands (simply to bypass synching the entire
-Bitcoin blockchain - ie, Bitcoin Core QT), and we'll sign the psbt using the Argon CLI.
-
 ### Bitcoin Lock Command Line
 
 Argon has a command line interface to simplify the process of creating a Bitcoin Lock. You can find the latest release
@@ -129,7 +80,33 @@ _Testnet_
 $ export TRUSTED_MAINCHAIN_URL=wss://rpc.testnet.argonprotocol.org
 ```
 
-### 1. Choose a Vault
+### 1. Create a new master XPriv key
+
+You'll need to create a new keypair to share custody of your bitcoin. We've created a cli tool to generate a Bitcoin
+XPriv, which is a keypair that can create 1 or more subkeys, called "derived" keys.
+
+> This key is the ONLY way you'll be able to release your bitcoin, so ensure you copy the file somewhere secure. You can
+> also re-use the same mnemonic you created in your [account setup](./account-setup.md).
+
+```bash
+$ argon-bitcoin-cli xpriv master --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv
+```
+
+> NOTE: for testnet, you must append `--bitcoin-network=signet`
+
+### 2. Create a Cosign Keypair
+
+Next you'll use the XPriv from step 1 to create your first public key. For each Locked Bitcoin, you'll pick an HD path
+that you must record for future use (we recommend using the date, or waiting to get your UtxoId in step 5 and recording
+alongside it).
+
+> You can use this XPriv again with a different HD Path for as many combinations as you'd like.
+
+```bash
+$ argon-bitcoin-cli xpriv derive-pubkey --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv --hd-path="m/84'/0'/0'"
+```
+
+### 3. Choose a Vault
 
 Every Vault sets terms on a fee (base fee + apr per satoshi) and the amount of collateral they're willing to put up (
 securitization) to repay a Bitcoin holder in the cause of fraud. The Bitcoin holder chooses a Vault with terms they like
@@ -151,11 +128,11 @@ $ argon-bitcoin-cli vault list --btc=0.00005
 
 Showing for: 5e-5 btc
 Current mint value: ₳2.79 argons
-╭────┬──────────────────┬─────────────────┬────────────────┬───────╮
-│ Id ┆ Available argons ┆ Reserved argons ┆ Securitization ┆ Fee   │
-╞════╪══════════════════╪═════════════════╪════════════════╪═══════╡
-│ 1  ┆ ₳97.09           ┆ ₳2.90           ┆ ₳100           ┆ ₳0.51 │
-╰────┴──────────────────┴─────────────────┴────────────────┴───────╯
+╭────┬──────────────────┬─────────────────┬───────┬────────╮
+│ Id ┆ Free argons      ┆ Securitization  ┆ Fee   │ State  │
+╞════╪══════════════════╪═════════════════╪═══════╪════════╡
+│ 1  ┆ ₳97.09           ┆ 2x              ┆ ₳0.51 │ Active │
+╰────┴──────────────────┴─────────────────┴───────┴────────╯
 ```
 
 #### Fee Calculation
@@ -170,17 +147,15 @@ found in the Vault Storage and Price Index Storage (plug-in your `satoshis` and 
 - _Base Fee:_ _Storage:_ `[Chosen Vault] -> bitcoinArgons -> baseFee`
 - _Annual Percent Rate:_ _Storage:_ `[Chosen Vault] -> bitcoinArgons -> apr`
 
-### 2. Submit a lock request
+### 4. Submit a lock request
 
 You need to set-up an account on the [Argon Network](./account-setup.md) to submit a `BitcoinLocks.request` request.
 Based on the Vault terms, you will need enough `balance` (eg, _Storage_: `System -> Account -> data -> free`) in your
 account to cover the Vault Fee as well as the Fee to submit the transaction to the network.
 
-You'll need to fill in your Satoshis, the Vault ID and you need to tell the Vault what Pubkey you'll
-use for the "release" cosignature (eg, select the address of the next pubkey from Electrum).
+> Testnet: for use of the testnet, you'll want to obtain funds as [below](#testnet)
 
-> To Extract from Electrum, double-click the next Address. You will copy the public key.
-> ![Electrum - Next Address](images/electrum-key-details.png)
+You'll need to fill in your Satoshis, the Vault ID and your Pubkey from step 2.
 
 #### Using the Polkadot.js interface:
 
@@ -203,7 +178,7 @@ available in your account.
 
 ![Lock Apply](images/pjs-lockbitcoin.png)
 
-### 3. Wait for your Utxo Id
+### $. Wait for your Utxo Id
 
 Once you've submitted your lock application, you'll need to wait for your lock to be accepted (a green checkmark will
 appear on Polkadot.js).
@@ -214,7 +189,7 @@ Now head to the block Explorer and find your lock in the most recent Block. You 
 
 ![UtxoId](images/pjs-utxoid.png)
 
-### 4. Send funds to the Bitcoin UTXO
+### 6. Send funds to the Bitcoin UTXO
 
 The information in the lock event will tell you the details needed to recreate the UTXO you need to send your Bitcoin
 to. The easiest way to generate the UTXO address is to use the bitcoin CLI command (replace your utxo id):
@@ -223,35 +198,34 @@ NOTE: The resulting utxo must have the same amount of Satoshis as you specify in
 to add on top of the amount you specify.
 
 ```bash
-$ argon-bitcoin-cli lock send-to-address --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock send-to-address --utxo-id=1
 ```
 
-This will output a Pay to Address that you need to send the EXACT funds into. You can use Electrum (or whichever tool
-holds your BTC) to send the funds to the MultiSig address.
-![Electrum - Multisig](images/electrum-pay.png)
+This will output a Pay to Address that you need to send the EXACT funds into. You can use any tool holding your BTC to
+send the funds to the MultiSig address.
 
 > IMPORTANT: The resulting utxo must have the same amount of Satoshis as you requested to lock. Ensure your fees
 > are set to add on top of the amount you specify.
 
-### 5. Wait for Argon Verification
+### 7. Wait for Argon Verification
 
 Argon will sync your UTXO once it has 6 confirmations. You can use the CLI to check the verification status of your
 lock:
 
 ```bash
-$ argon-bitcoin-cli lock status --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1
 ```
 
 You can also use Polkadot.js to verify your Bitcoin UTXO by looking at the
 _Storage_: `BitcoinUtxos -> utxosPendingConfirmation()`.
 ![Utxo Pending](images/pjs-utxopending.png)
 
-### 6. Monitoring for Minting
+### 8. Monitoring for Minting
 
 You can monitor your Bitcoin Lock status using the `lock status` cli command.
 
 ```bash
-$ argon-bitcoin-cli lock status --utxo-id=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1
 ```
 
 ![Argon Cli Lock-Status](images/cli-lockstatus.png)
@@ -265,26 +239,24 @@ UtxoId in as the first parameter.
 To release your LockedBitcoin, you'll need to have enough Argons in your account to cover the release fee. You can see
 the "redemption price" using the `lock status` command.
 
+> Ensure you set-up your RPC from [step 0](#0-set-up-your-network)
+
 ```bash
-$ argon-bitcoin-cli lock status --utxo-id=1 -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock status --utxo-id=1
 ```
 
-### 1. Submit an release request
+### 1. Submit a release request
 
 The first step is to submit a release request to the mainchain. Your release request requires the `UtxoId`, an address
 you'd like to send the Bitcoin to, and the `Network Fee` you are willing to pay to release the LockedBitcoin.
 
 NOTE: the network fee will normally change from when you submit the request to when it is processed. However, in the
-custom Signet, fees will be stable. The Vault will co-sign the transaction so that you can add additional inputs to
-cover the fee. You can see recent fees sent over the public signet using https://mempool.space/signet. The
-CLI `fee-rate-sats-per-kb` is in satoshis per byte.
-
-You'll want to get a destination address from Electrum, and see what the current Fee Rate is on the network.
-![Electrum - Address](images/electrum-copyaddress.png)
-The CLI can help you calculate the network fee:
+Argon testnet, fees are stable. The Vault will co-sign the transaction so that you can add additional inputs to
+cover the fee. You can see recent fees using https://mempool.space. The CLI `fee-rate-sats-per-vb` is in satoshis per
+virtual byte (vByte).
 
 ```bash
-$ argon-bitcoin-cli lock request-release --utxo-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-kb=1 -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock request-release --utxo-id=1 --dest-pubkey=tb1qq0jnaqfkaf298yhx2v02azznk6a6yu8y5deqlv --fee-rate-sats-per-vb=1
 ```
 
 This will provide a link to complete the transaction on the Polkadot.js interface.
@@ -297,17 +269,47 @@ LockedBitcoin.
 You can monitor the Polkadot.js interface for the Vault to sign the transaction, or you can pre-sign the transaction and
 use the "wait"parameter on the CLI to wait for the transaction to be included in a block.
 
-> TEMPORARY HACK!: Electrum doesn't support miniscript yet, so can't understand the PSBT. You can use the Argon CLI to
-> sign the PSBT instead. See below to copy out the private key and sign the PSBT.
->
-> ![Electrum - Private key](images/electrum-privatekey.png)
+This step requires you to input the `XPriv` path and HD Path from Bitcoin Lock, [step 2](#2-create-a-cosign-keypair).
+You need to supply a trusted bitcoin rpc url in this step.
+
+This must be a trusted JSON-RPC endpoint (not REST or WebSocket). Example providers include:
+
+- [Chainstack](https://chainstack.com)
+- [GetBlock](https://getblock.io)
+- [QuickNode](https://www.quicknode.com/)
+- Your own node running [Bitcoin Core](https://bitcoincore.org/en/download/) with `rpcuser`/`rpcpassword` configured
+
+For testnet, you can use `https://bitcoin:bitcoin@electrs.testnet.argonprotocol.org`
 
 ```bash
-$ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --private-key=p2wpkh:cMbSXe9bkx3e8xD474wBepzRvqTsNkMMU6sZveLqeENBfPAtWpCw --wait -t=wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv \
+  --bitcoin-rpc-url=https://btc.getblock.io/mainnet/?api_key=your_api_key \
+  --hd-path="m/84'/0'/0'" --wait
 ```
 
-This command will sit for a while waiting for the transaction to be included in a block. When it completes, you will see
-a psbt output that you can import into Electrum.
-![Electrum - Import](images/electrum-import-psbt.png)
+### Testnet
 
-You'll want to double-check it and then broadcast the transaction (it should be fully signed now)
+#### Wallet connected to Signet
+
+To make transactions more reliable on Bitcoin and faucet tokens available, we have set up a custom Signet. It currently
+only has a single node with blocks timed to 10 minutes. You can connect to it using the following parameters:
+
+To launch in Signet:
+
+- [Bitcoin Core](https://bitcoincore.org/en/download/): Modify bitcoin.conf to include `signet=1`
+  and `addnode=bitcoin-node0.testnet.argonprotocol.org:38333`
+- [Electrum](https://electrum.org/#home): Open with --signet. Eg, in Mac
+  OS: `open -a Electrum.app --args --oneserver --signet --server=electrs.testnet.argonprotocol.org:50002:s`
+  ***
+  ![Electrum signet.png](images/electrum-testnet.png)
+
+#### Get Faucet BTC
+
+The Argon testnet is a place to experiment with the Argon Network. It is connected to a custom Bitcoin Signet. You will
+likely need to acquire testnet Argons and Bitcoins to experiment with this feature.
+
+- [Argon Testnet Faucet](./account-setup.md#requesting-testnet-funds)
+- The Testnet Faucet will also grant you Signet Bitcoins (good only on the Argon Testnet). To use it, go to
+  our [Discord](https://discord.gg/6JxjCNvu6x) `testnet` channel and type `/drip-bitcoin`. Enter your address at the
+  prompt:
+  ![Discord Faucet.png](images/discord-faucet-bitcoin.png)

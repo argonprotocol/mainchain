@@ -129,7 +129,7 @@ uncover through the vault activities.
 > a password encrypted file.
 
 ```bash
-$ argon-bitcoin-cli xpriv master --password=supersecret --xpriv-path=/tmp/vault1.xpriv -t wss://rpc.testnet.argonprotocol.org
+$ argon-bitcoin-cli xpriv master --xpriv-password=supersecret --xpriv-path=/tmp/vault1.xpriv -t wss://rpc.testnet.argonprotocol.org
 ```
 
 ### 2. Create an upload-able XPub key
@@ -148,7 +148,7 @@ internally, which hd path you need to provide to the cli). Let's generate the XP
 > the key is secure.
 
 ```bash
-$ argon-bitcoin-cli xpriv derive-xpub --xpriv-path=~/.xpriv/vault1.xpriv --password=supersecret --hd-path="m/84'/0'/0'"
+$ argon-bitcoin-cli xpriv derive-xpub --xpriv-path=~/.xpriv/vault1.xpriv --xpriv-password=supersecret --hd-path="m/84'/0'/0'"
 ```
 
 ### 3. Create a Vault
@@ -218,7 +218,7 @@ When you encounter a LockedBitcoin Cosign Request, you will need to know:
 
 ```bash
 $ argon-bitcoin-cli lock vault-cosign-release --utxo-id=1 \
-  --xpriv-path=~/.xpriv/vault.xpub --password=supersecret --hd-path="m/84'/0'/0'" \
+  --xpriv-path=~/.xpriv/vault.xpub --xpriv-password=supersecret --hd-path="m/84'/0'/0'" \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
 ```
 
@@ -240,14 +240,15 @@ you'd like to use for the transaction. You can find current rates here: https://
 
 ```bash
 $ argon-bitcoin-cli lock claim-utxo-psbt --utxo-id=1 \
-  --xpriv-path=~/.xpriv/vault.xpub --password=supersecret --master-xpub-hd-path="m/84'/0'/0'" \
+  --xpriv-path=~/.xpriv/vault.xpub --xpriv-password=supersecret --hd-path="m/84'/0'/0'" \
   --dest_pubkey=tb1q3hkkt02k975ddxzeeeupy9cpysr2cy929ck4qp \
-  --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
+  --fee-rate-sats-per-vb=3 \
+  --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
+  --bitcoin-rpc-url=https://btc.getblock.io/mainnet/?api_key=your_api_key
 ```
 
-This will output a psbt string you can import into bitcoin-core or another wallet that supports PSBTs. Here's an example
-of where you can import (and broadcast) into Electrum:
-![Electrum PSBT Import](images/electrum-import-psbt.png)
+This will submit the transaction to the bitcoin rpc node of your choice. For some examples, check
+this [list](./bitcoin-lock.md#2-wait-for-the-vault-to-cosign-the-release).
 
 ## Vault Rules
 
@@ -265,5 +266,5 @@ The following are a few rules around how and when you can add funding to a vault
   exception is that prior to bidding for Slot 1, there are no delays.
 - Vaults must never move a Bitcoin on the Bitcoin network without releasing the lock first on Argon. If they do so, they
   will forfeit funds.
-- Bitcoin base fees are a non-refundable fee charged to the LockedBitcoin creator. However, any APR charges
-  will be refunded on "release" based on the duration of the funds being held in ticks.
+- Bitcoin fees are a non-refundable fee charged to the LockedBitcoin creator. Any ratchets are charged as base fee + a
+  prorated apr for the remainder of the year term (down-ratchets have no apr fee)
