@@ -3,15 +3,13 @@ use argon_client::{
 	api::runtime_types::argon_notary_audit::error::VerifyError, conversion::SubxtRuntime,
 };
 use argon_primitives::ArgonDigests;
-use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary};
+use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
 use serial_test::serial;
-use std::env;
 
 /// Tests importing a block with a notary down
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_import_of_block_with_notary_down() {
-	env::set_var("RUST_LOG", "info");
 	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
 	let archive_bucket = ArgonTestNotary::create_archive_bucket();
 	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());

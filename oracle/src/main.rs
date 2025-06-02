@@ -1,12 +1,13 @@
 use anyhow::{anyhow, bail, ensure};
 use argon_client::signer::KeystoreSigner;
-use argon_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
+use argon_primitives::{ADDRESS_PREFIX, AccountId, CryptoType, KeystoreParams};
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use polkadot_sdk::*;
 use sp_core::{
-	crypto::{key_types::ACCOUNT, Ss58Codec},
-	sr25519, Pair as PairT,
+	Pair as PairT,
+	crypto::{Ss58Codec, key_types::ACCOUNT},
+	sr25519,
 };
 use sp_runtime::traits::IdentifyAccount;
 use std::env;
@@ -116,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
 				.unwrap_or(tracing_subscriber::EnvFilter::from("info")),
 		)
 		.try_init();
-	env::set_var("RUST_BACKTRACE", "1");
+	color_backtrace::install();
 	dotenv().ok();
 	dotenv::from_filename("oracle/.env").ok();
 

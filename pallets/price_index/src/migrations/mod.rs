@@ -75,8 +75,8 @@ mod test {
 	use self::InnerMigrate;
 	use super::*;
 	use crate::{
-		mock::{new_test_ext, Test},
 		Current,
+		mock::{Test, new_test_ext},
 	};
 	use frame_support::assert_ok;
 	use sp_arithmetic::FixedU128;

@@ -2,7 +2,6 @@
 #[macro_use]
 extern crate napi_derive;
 
-use std::env;
 use std::fs::create_dir_all;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -10,9 +9,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub use accounts::*;
-use anyhow::{anyhow, Context};
-use argon_primitives::tick::{Tick, Ticker};
+use anyhow::{Context, anyhow};
 use argon_primitives::Chain;
+use argon_primitives::tick::{Tick, Ticker};
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
@@ -27,10 +26,10 @@ pub use notary_client::*;
 pub use open_channel_holds::*;
 use parking_lot::RwLock;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
-use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use sqlx::{Executor, Sqlite};
+use sqlx::{SqlitePool, migrate::MigrateDatabase};
 use tokio::sync::RwLock as AsyncRwLock;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
@@ -407,18 +406,16 @@ impl Localchain {
     let trace = trace.with_ansi(false);
 
     let _ = trace.try_init();
-
-    env::set_var("RUST_BACKTRACE", "1");
   }
 }
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
   use super::{balance_sync, transactions};
-  use crate::cli::EmbeddedKeyPassword;
-  use crate::error::UniffiResult;
   use crate::CryptoScheme;
   use crate::MainchainClient;
+  use crate::cli::EmbeddedKeyPassword;
+  use crate::error::UniffiResult;
 
   #[derive(uniffi::Record)]
   pub struct LocalchainConfig {
@@ -576,8 +573,8 @@ pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
   use super::*;
-  use crate::keystore::napi_ext::KeystorePasswordOption;
   pub use crate::TickerRef;
+  use crate::keystore::napi_ext::KeystorePasswordOption;
 
   impl ObjectFinalize for Localchain {
     fn finalize(self, _: Env) -> napi::Result<()> {

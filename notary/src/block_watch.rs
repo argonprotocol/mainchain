@@ -1,5 +1,5 @@
 use codec::Decode;
-use sp_core::{ed25519::Public as Ed25519Public, H256};
+use sp_core::{H256, ed25519::Public as Ed25519Public};
 use sqlx::{PgConnection, PgPool};
 use std::time::Duration;
 use subxt::{
@@ -9,11 +9,11 @@ use subxt::{
 use tracing::{error, info, trace, warn};
 
 pub use argon_client;
-use argon_client::{api, ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient};
+use argon_client::{ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, api};
 use argon_primitives::{
+	NotebookDigest,
 	prelude::*,
 	tick::{TickDigest, Ticker},
-	NotebookDigest,
 };
 
 use crate::stores::{

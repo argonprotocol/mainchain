@@ -1,10 +1,10 @@
 use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error};
 use argon_primitives::{
+	BLOCK_SEAL_KEY_TYPE, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	BlockVote, BlockVotingPower, TickApis, VotingSchedule,
 	block_seal::BLOCK_SEAL_CRYPTO_ID,
 	fork_power::ForkPower,
 	tick::{Tick, Ticker},
-	BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, BlockVote,
-	BlockVotingPower, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
 };
 use argon_runtime::NotebookVerifyError;
 use codec::Codec;
@@ -89,8 +89,7 @@ where
 		if current_tick <= notebook_tick {
 			trace!(
 				"Current tick {} is not greater than notebook tick {}",
-				current_tick,
-				notebook_tick
+				current_tick, notebook_tick
 			);
 			return Ok(());
 		}
@@ -125,8 +124,12 @@ where
 		let blocks_to_build_on = self
 			.get_parent_blocks_to_build_on(&voting_schedule, notebooks, voting_power)
 			.await?;
-		trace!( "Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
-			votes_tick, votes_count, blocks_to_build_on.len());
+		trace!(
+			"Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
+			votes_tick,
+			votes_count,
+			blocks_to_build_on.len()
+		);
 
 		for (block_hash, best_seal_strength) in blocks_to_build_on.into_iter() {
 			// TODO: should we add more top seals to check to ensure someone matches a block?
@@ -144,8 +147,10 @@ where
 					error!("Unable to lookup vote block seals: {:?}", e);
 				})
 			else {
-				trace!( "Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
-					block_hash, notebook_tick, votes_tick, best_seal_strength);
+				trace!(
+					"Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
+					block_hash, notebook_tick, votes_tick, best_seal_strength
+				);
 				continue;
 			};
 
@@ -206,8 +211,7 @@ where
 			else {
 				trace!(
 					"Adding parent block (at tick {}) since no competition {:?}",
-					parent_tick,
-					leaf
+					parent_tick, leaf
 				);
 				// if not trying to beat anyone, just add the parent hash
 				blocks_to_build_on.insert(parent_block, U256::MAX);
@@ -230,8 +234,7 @@ where
 			if theoretical_power > fork_power_to_beat {
 				trace!(
 					"Adding parent block (at tick {}) since we can beat the competition {:?}",
-					parent_tick,
-					leaf
+					parent_tick, leaf
 				);
 				blocks_to_build_on.insert(parent_block, best_seal_strength);
 			}
@@ -323,7 +326,7 @@ mod tests {
 	use frame_support::assert_ok;
 	use sp_core::H256;
 	use sp_keyring::Ed25519Keyring;
-	use sp_keystore::{testing::MemoryKeystore, Keystore};
+	use sp_keystore::{Keystore, testing::MemoryKeystore};
 
 	use argon_primitives::block_seal::BLOCK_SEAL_KEY_TYPE;
 

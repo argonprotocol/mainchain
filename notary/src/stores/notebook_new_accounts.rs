@@ -115,9 +115,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_storage(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notebook_origins DROP CONSTRAINT IF EXISTS notebook_origins_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notebook_origins DROP CONSTRAINT IF EXISTS notebook_origins_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		{
 			let mut tx = pool.begin().await?;
 
@@ -175,9 +177,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn can_reset_the_sequences(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notebook_origins DROP CONSTRAINT IF EXISTS notebook_origins_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notebook_origins DROP CONSTRAINT IF EXISTS notebook_origins_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		let mut tx = pool.begin().await?;
 
 		let origin =

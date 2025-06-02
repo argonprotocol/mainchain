@@ -18,12 +18,12 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
+		BitcoinUtxoEvents, BitcoinUtxoTracker,
 		bitcoin::{
 			BitcoinBlock, BitcoinBlockHash, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinRejectedReason, BitcoinSyncStatus, Satoshis, UtxoId, UtxoRef, UtxoValue,
 		},
 		inherents::{BitcoinInherentData, BitcoinInherentError, BitcoinUtxoSync},
-		BitcoinUtxoEvents, BitcoinUtxoTracker,
 	};
 
 	#[pallet::pallet]
@@ -500,7 +500,7 @@ pub mod pallet {
 
 		fn check_inherent(call: &Self::Call, data: &InherentData) -> Result<(), Self::Error> {
 			let sync = match call {
-				Call::sync { ref utxo_sync } => utxo_sync,
+				Call::sync { utxo_sync } => utxo_sync,
 				_ => return Ok(()),
 			};
 

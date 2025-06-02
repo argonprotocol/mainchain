@@ -2,14 +2,14 @@
 use crate::serialize_unsafe_u128_as_string;
 use polkadot_sdk::*;
 
-use crate::{tick::Tick, AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber};
+use crate::{AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber, tick::Tick};
 use alloc::vec::Vec;
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use serde::{Deserialize, Serialize};
 use sp_core::{H256, U256};
 use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::{scale_info::TypeInfo, MultiSignature};
+use sp_runtime::{MultiSignature, scale_info::TypeInfo};
 
 pub type VoteMinimum = u128;
 
@@ -19,6 +19,7 @@ pub type VoteMinimum = u128;
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -26,7 +27,10 @@ pub type VoteMinimum = u128;
 	Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct BlockVoteT<Hash: Codec = H256> {
+pub struct BlockVoteT<Hash>
+where
+	Hash: Codec,
+{
 	/// The creator of the block vote
 	pub account_id: AccountId,
 	/// The block hash being voted on. Must be in last 2 ticks.
@@ -48,7 +52,10 @@ pub struct BlockVoteT<Hash: Codec = H256> {
 }
 
 #[derive(Encode)]
-struct BlockVoteHashMessage<Hash: Codec> {
+struct BlockVoteHashMessage<Hash>
+where
+	Hash: Codec,
+{
 	prefix: &'static str,
 	account_id: AccountId,
 	block_hash: Hash,

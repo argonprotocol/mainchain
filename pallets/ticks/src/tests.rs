@@ -2,7 +2,7 @@ use crate::{
 	mock::{System, Ticks, *},
 	pallet::RecentBlocksAtTicks,
 };
-use argon_primitives::{tick::MAX_BLOCKS_PER_TICK, NotebookAuditResult, TickProvider};
+use argon_primitives::{NotebookAuditResult, TickProvider, tick::MAX_BLOCKS_PER_TICK};
 use frame_support::traits::OnTimestampSet;
 use pallet_prelude::*;
 use std::panic::catch_unwind;

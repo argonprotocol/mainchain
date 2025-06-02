@@ -1,12 +1,12 @@
-use crate::uniswap_oracle::{PriceAndLiquidity, UniswapOracle, USDC_ADDRESS, USDC_ADDRESS_SEPOLIA};
+use crate::uniswap_oracle::{PriceAndLiquidity, USDC_ADDRESS, USDC_ADDRESS_SEPOLIA, UniswapOracle};
 use anyhow::Result;
 use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
 use argon_primitives::{
-	tick::{Tick, Ticker},
 	ARGON_TOKEN_SYMBOL,
+	tick::{Tick, Ticker},
 };
 use polkadot_sdk::*;
-use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128, Saturating};
+use sp_runtime::{FixedI128, FixedPointNumber, FixedU128, Saturating, traits::One};
 use std::env;
 use uniswap_sdk_core::{prelude::*, token};
 
@@ -232,10 +232,12 @@ mod test {
 
 	fn before_each() {
 		dotenv::dotenv().ok();
-		env::set_var("USE_SEPOLIA", "true");
-		env::set_var("INFURA_PROJECT_ID", "test");
-		env::set_var("ARGON_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
-		env::set_var("ARGONOT_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+		unsafe {
+			env::set_var("USE_SEPOLIA", "true");
+			env::set_var("INFURA_PROJECT_ID", "test");
+			env::set_var("ARGON_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+			env::set_var("ARGONOT_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+		}
 	}
 
 	#[tokio::test]

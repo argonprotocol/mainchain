@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use argon_primitives::{Balance, TransferToLocalchainId};
 
-use crate::{bail, AccountStore, Keystore, LocalchainTransfer, MainchainClient, Result};
+use crate::{AccountStore, Keystore, LocalchainTransfer, MainchainClient, Result, bail};
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]

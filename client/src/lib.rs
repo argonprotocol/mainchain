@@ -8,11 +8,12 @@ use jsonrpsee::{
 	ws_client::{PingConfig, WsClient},
 };
 pub(crate) use polkadot_sdk::*;
-use sp_core::{blake2_256, crypto::AccountId32, H256};
+use sp_core::{H256, blake2_256, crypto::AccountId32};
 use sp_runtime::{MultiAddress, MultiSignature};
 use std::{fmt::Debug, io::Write, sync::Arc};
 use subxt::{
-	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
+	Metadata, OnlineClient,
+	backend::{BackendExt, BlockRef, legacy::LegacyRpcMethods, rpc::RpcClient},
 	blocks::ExtrinsicEvents,
 	config::{
 		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
@@ -24,16 +25,15 @@ use subxt::{
 	storage::Address as StorageAddress,
 	tx::{Payload, Signer, TxInBlock, TxProgress, TxStatus},
 	utils::Yes,
-	Metadata, OnlineClient,
 };
 use tokio::{
-	sync::{mpsc, Mutex, RwLock},
+	sync::{Mutex, RwLock, mpsc},
 	task::JoinHandle,
 };
 use tracing::{info, log::debug, warn};
 
 use argon_primitives::{
-	tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule,
+	AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule, tick::Tick,
 };
 pub use spec::api;
 

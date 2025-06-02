@@ -1,5 +1,8 @@
-use alloc::{borrow::Cow, collections::btree_map::BTreeMap};
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use alloc::{
+	collections::btree_map::BTreeMap,
+	string::{String, ToString},
+};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::{cmp::Ordering, str};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
@@ -9,7 +12,7 @@ use sp_crypto_hashing::blake2_256;
 use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec};
 
-use crate::{domain_top_level::DomainTopLevel, host::Host, Balance, NotaryId};
+use crate::{Balance, NotaryId, domain_top_level::DomainTopLevel, host::Host};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 
@@ -19,10 +22,21 @@ pub const MIN_DOMAIN_NAME_LENGTH: usize = 2;
 
 pub type DomainHash = H256;
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Domain {
-	pub name: Cow<'static, str>,
+	pub name: String,
 	pub top_level: DomainTopLevel,
 }
 
@@ -44,18 +58,18 @@ impl Ord for Domain {
 			return self.top_level.cmp(&other.top_level);
 		}
 
-		self.name.as_ref().cmp(other.name.as_ref())
+		self.name.cmp(&other.name)
 	}
 }
 
 impl Domain {
 	pub fn new(name: &'static str, top_level: DomainTopLevel) -> Self {
-		Self { name: Cow::Borrowed(name), top_level }
+		Self { name: name.to_string(), top_level }
 	}
 
 	#[cfg(feature = "std")]
 	pub fn from_string(name: String, top_level: DomainTopLevel) -> Self {
-		Self { name: Cow::Owned(name.to_lowercase()), top_level }
+		Self { name, top_level }
 	}
 
 	#[cfg(feature = "std")]
@@ -84,10 +98,24 @@ impl Domain {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+)]
 #[serde(rename_all = "camelCase")]
 /// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
-pub struct ZoneRecord<AccountId: Codec> {
+pub struct ZoneRecord<AccountId>
+where
+	AccountId: Codec,
+{
 	pub payment_account: AccountId,
 	/// The notary that payments must be notarized through
 	pub notary_id: NotaryId,
@@ -95,7 +123,17 @@ pub struct ZoneRecord<AccountId: Codec> {
 	pub versions: BTreeMap<Semver, VersionHost>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 /// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
 pub struct BoundZoneRecord {
 	/// A mapping of versions to host addresses.
@@ -114,6 +152,7 @@ impl<A: Codec> ZoneRecord<A> {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,
@@ -134,6 +173,7 @@ pub struct VersionHost {
 	Eq,
 	Encode,
 	Decode,
+	DecodeWithMemTracking,
 	RuntimeDebug,
 	TypeInfo,
 	MaxEncodedLen,

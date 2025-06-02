@@ -1,4 +1,4 @@
-use crate::{api::runtime_types, BlakeTwo256};
+use crate::{BlakeTwo256, api::runtime_types};
 use argon_primitives::BlockNumber;
 use polkadot_sdk::*;
 use sp_arithmetic::{FixedU128, Permill};
@@ -127,7 +127,7 @@ impl TryFrom<runtime_types::argon_primitives::bitcoin::BitcoinSignature>
 	fn try_from(
 		value: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 	) -> Result<Self, Self::Error> {
-		value.0 .0.try_into()
+		value.0.0.try_into()
 	}
 }
 
@@ -146,7 +146,7 @@ impl TryFrom<runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey>
 	fn try_from(
 		value: runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey,
 	) -> Result<Self, Self::Error> {
-		value.0 .0.try_into()
+		value.0.0.try_into()
 	}
 }
 

@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use argon_client::{api::storage, FetchAt, MainchainClient};
+use argon_client::{FetchAt, MainchainClient, api::storage};
 use argon_primitives::bitcoin::{BitcoinNetwork, OpaqueBitcoinXpub};
 use base58::FromBase58;
 use bitcoin::Network;

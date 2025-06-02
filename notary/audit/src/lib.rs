@@ -5,8 +5,8 @@ use alloc::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
-use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
-use codec::{Decode, Encode};
+use binary_merkle_tree::{Leaf, merkle_root, verify_proof};
+use codec::{Decode, DecodeWithMemTracking, Encode};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::H256;
@@ -16,11 +16,11 @@ use sp_runtime::{
 };
 
 use argon_primitives::{
-	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
-	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DomainHash,
-	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
-	NotebookNumber, TransferToLocalchainId, ABSOLUTE_TAX_VOTE_MINIMUM, CHANNEL_HOLD_CLAWBACK_TICKS,
-	DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT, TAX_PERCENT_BASE,
+	ABSOLUTE_TAX_VOTE_MINIMUM, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, CHANNEL_HOLD_CLAWBACK_TICKS, ChainTransfer,
+	DOMAIN_LEASE_COST, DomainHash, LocalchainAccountId, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
+	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
+	TAX_PERCENT_BASE, TransferToLocalchainId, ensure, round_up, tick::Tick,
 };
 
 pub use crate::error::VerifyError;
@@ -32,7 +32,16 @@ mod test_balanceset;
 mod test_notebook;
 
 #[derive(
-	Debug, Clone, PartialEq, TypeInfo, Encode, Decode, Serialize, Deserialize, thiserror::Error,
+	Debug,
+	Clone,
+	PartialEq,
+	TypeInfo,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Serialize,
+	Deserialize,
+	thiserror::Error,
 )]
 pub enum AccountHistoryLookupError {
 	#[error("Notebook root not found")]

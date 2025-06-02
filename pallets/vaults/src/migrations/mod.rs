@@ -1,6 +1,6 @@
 use crate::{
-	pallet::{VaultFundsReleasingByHeight, VaultsById},
 	Config,
+	pallet::{VaultFundsReleasingByHeight, VaultsById},
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::{
@@ -199,7 +199,7 @@ pub type ObligationMigration<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{new_test_ext, Test};
+	use crate::mock::{Test, new_test_ext};
 	use frame_support::assert_ok;
 	use pallet_prelude::argon_primitives::vault::VaultTerms;
 

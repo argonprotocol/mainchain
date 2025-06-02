@@ -3,8 +3,8 @@ use std::{env, time::Duration};
 use anyhow::{anyhow, ensure};
 use polkadot_sdk::*;
 use sp_runtime::{
-	traits::{One, Zero},
 	FixedU128, Saturating,
+	traits::{One, Zero},
 };
 use tokio::{join, time::sleep};
 use tracing::info;
@@ -14,10 +14,10 @@ use crate::{
 	us_cpi::UsCpiRetriever,
 };
 use argon_client::{
+	FetchAt, MainchainClient, ReconnectingClient,
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
-	FetchAt, MainchainClient, ReconnectingClient,
 };
 
 pub async fn price_index_loop(
@@ -192,10 +192,11 @@ mod tests {
 	use alloy_primitives::Address;
 	use polkadot_sdk::*;
 	use sp_core::{
-		crypto::{key_types::ACCOUNT, AccountId32},
-		sr25519, Pair,
+		Pair,
+		crypto::{AccountId32, key_types::ACCOUNT},
+		sr25519,
 	};
-	use sp_keystore::{testing::MemoryKeystore, Keystore};
+	use sp_keystore::{Keystore, testing::MemoryKeystore};
 	use sp_runtime::FixedU128;
 	use std::{env, str::FromStr};
 	use tokio::spawn;
@@ -205,9 +206,9 @@ mod tests {
 	use argon_testing::start_argon_test_node;
 
 	use crate::{
-		coin_usd_prices::{use_mock_price_lookups, PriceLookups},
+		coin_usd_prices::{PriceLookups, use_mock_price_lookups},
 		price_index_loop,
-		uniswap_oracle::{use_mock_uniswap_prices, PriceAndLiquidity},
+		uniswap_oracle::{PriceAndLiquidity, use_mock_uniswap_prices},
 		us_cpi::use_mock_cpi_values,
 	};
 
@@ -221,10 +222,11 @@ mod tests {
 
 		const ARGON_TOKEN_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 		const ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
-		env::set_var("ARGON_TOKEN_ADDRESS", ARGON_TOKEN_ADDRESS);
-		env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
-		env::set_var("INFURA_PROJECT_ID", "test");
-
+		unsafe {
+			env::set_var("ARGON_TOKEN_ADDRESS", ARGON_TOKEN_ADDRESS);
+			env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
+			env::set_var("INFURA_PROJECT_ID", "test");
+		}
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
 		spawn(price_index_loop(node.client.url.clone(), signer, false));
 

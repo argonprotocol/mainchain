@@ -1,7 +1,7 @@
 use argon_notary_apis::error::Error;
-use argon_primitives::{tick::Tick, NotebookNumber};
+use argon_primitives::{NotebookNumber, tick::Tick};
 use chrono::{DateTime, Utc};
-use sqlx::{query, Executor, FromRow, PgConnection};
+use sqlx::{Executor, FromRow, PgConnection, query};
 
 use crate::ensure;
 
@@ -212,9 +212,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_locks(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		let _ = tracing_subscriber::fmt::try_init();
 		let notebook_number = 1;
 		{
@@ -243,9 +245,11 @@ mod tests {
 			);
 
 			let mut fail_tx = pool.begin().await?;
-			assert!(NotebookStatusStore::lock_to_stop_appends(&mut fail_tx, notebook_number)
-				.await
-				.is_err());
+			assert!(
+				NotebookStatusStore::lock_to_stop_appends(&mut fail_tx, notebook_number)
+					.await
+					.is_err()
+			);
 			fail_tx.commit().await?;
 
 			tx1.commit().await?;
@@ -296,9 +300,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_locks_step(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		let _ = tracing_subscriber::fmt::try_init();
 		{
 			let mut tx = pool.begin().await?;
@@ -334,9 +340,11 @@ mod tests {
 
 	#[sqlx::test]
 	async fn test_expire_open(pool: PgPool) -> anyhow::Result<()> {
-		sqlx::query!("ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey")
-			.execute(&pool)
-			.await?;
+		sqlx::query!(
+			"ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
 		let mut tx = pool.begin().await?;
 
 		NotebookStatusStore::create(

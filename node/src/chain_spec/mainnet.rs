@@ -1,10 +1,10 @@
-use crate::chain_spec::{testnet_genesis, ChainSpec, GenesisSettings};
+use crate::chain_spec::{ChainSpec, GenesisSettings, testnet_genesis};
 use argon_primitives::{
+	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, AccountId, Chain, ComputeDifficulty, TOKEN_DECIMALS,
 	bitcoin::BitcoinNetwork,
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::Ticker,
-	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 use argon_runtime::WASM_BINARY;
 use core::str::FromStr;
@@ -12,7 +12,7 @@ use polkadot_sdk::*;
 use sc_network::config::MultiaddrWithPeerId;
 use sc_service::{ChainType, Properties};
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{hexdisplay::AsBytesRef, ByteArray};
+use sp_core::{ByteArray, hexdisplay::AsBytesRef};
 
 pub fn mainnet_config() -> Result<ChainSpec, String> {
 	let mut properties = Properties::new();

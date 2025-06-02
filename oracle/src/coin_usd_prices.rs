@@ -1,11 +1,11 @@
 use crate::utils::parse_f64;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use polkadot_sdk::*;
 use reqwest::Client;
 use serde::Deserialize;
 use sp_runtime::{
-	traits::{One, Zero},
 	FixedU128,
+	traits::{One, Zero},
 };
 use std::collections::HashMap;
 use tokio::{join, time::Instant};

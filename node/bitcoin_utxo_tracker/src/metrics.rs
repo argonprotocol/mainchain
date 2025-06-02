@@ -1,7 +1,7 @@
 use argon_primitives::inherents::BitcoinUtxoSync;
 use polkadot_sdk::substrate_prometheus_endpoint::{
-	prometheus, register, CounterVec, Gauge, HistogramOpts, HistogramVec, Opts, PrometheusError,
-	Registry, U64,
+	CounterVec, Gauge, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64,
+	prometheus, register,
 };
 use std::time::Instant;
 

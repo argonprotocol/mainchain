@@ -1,16 +1,16 @@
-use crate::{aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error, NotaryClient};
-use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
+use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
+use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
+	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	NotaryApis, NotebookApis, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
-	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	NotaryApis, NotebookApis, TickApis,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
 use polkadot_sdk::*;
-use sc_client_api::{self, backend::AuxStore, BlockBackend};
+use sc_client_api::{self, BlockBackend, backend::AuxStore};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
 	ForkChoiceStrategy, ImportResult, StateAction, StorageChanges, Verifier as VerifierT,
@@ -22,8 +22,8 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
-	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 	Justification,
+	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
 use std::{marker::PhantomData, sync::Arc};
 use tracing::{error, warn};

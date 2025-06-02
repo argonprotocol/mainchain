@@ -2,15 +2,15 @@ use crate::{
 	aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics,
 	notary_client::get_notebook_header_data,
 };
-use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
+use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
+	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 	inherents::{
 		BitcoinInherentDataProvider, BlockSealInherentDataProvider, BlockSealInherentNodeSide,
 		NotebooksInherentDataProvider,
 	},
 	tick::{Tick, TickDigest, Ticker},
-	Balance, BestBlockVoteSeal, BitcoinApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	Digestset, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
@@ -24,8 +24,8 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_runtime::{
-	traits::{Block as BlockT, Header as HeaderT},
 	Digest,
+	traits::{Block as BlockT, Header as HeaderT},
 };
 use sp_timestamp::Timestamp;
 use std::{sync::Arc, time::Duration};

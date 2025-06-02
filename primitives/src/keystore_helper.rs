@@ -6,10 +6,11 @@ use anyhow::{anyhow, bail};
 use clap::{Args, ValueEnum};
 use sc_keystore::LocalKeystore;
 use sp_core::{
+	Pair,
 	crypto::{ExposeSecret, KeyTypeId, SecretString, Ss58Codec},
-	ed25519, sr25519, Pair,
+	ed25519, sr25519,
 };
-use sp_keystore::{testing::MemoryKeystore, KeystorePtr};
+use sp_keystore::{KeystorePtr, testing::MemoryKeystore};
 
 /// Parameters of the keystore
 #[derive(Debug, Clone, Args)]
@@ -145,11 +146,7 @@ impl KeystoreParams {
 	pub fn read_uri(uri: Option<&String>) -> anyhow::Result<String> {
 		let uri = if let Some(uri) = uri {
 			let file = PathBuf::from(&uri);
-			if file.is_file() {
-				fs::read_to_string(uri)?.trim_end().to_owned()
-			} else {
-				uri.into()
-			}
+			if file.is_file() { fs::read_to_string(uri)?.trim_end().to_owned() } else { uri.into() }
 		} else {
 			rpassword::prompt_password("URI: ")?
 		};

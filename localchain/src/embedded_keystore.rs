@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::string::String;
 use std::sync::Arc;
 
-use crate::{bail, Result};
+use crate::{Result, bail};
 use anyhow::anyhow;
 use clap::ValueEnum;
 use polkadot_sdk::*;
@@ -361,7 +361,7 @@ impl PairWrapper {
 
 #[cfg(test)]
 mod tests {
-  use sp_core::{sr25519, Pair};
+  use sp_core::{Pair, sr25519};
   use sp_keyring::Sr25519Keyring;
 
   use super::*;
@@ -425,10 +425,12 @@ mod tests {
     assert!(keystore2.unlock(None).await.is_err());
     assert!(!(keystore2.can_sign(address.clone()).await));
 
-    assert!(keystore2
-      .unlock(Some(password.clone().into()))
-      .await
-      .is_ok());
+    assert!(
+      keystore2
+        .unlock(Some(password.clone().into()))
+        .await
+        .is_ok()
+    );
     assert!(keystore2.can_sign(address).await);
 
     Ok(())

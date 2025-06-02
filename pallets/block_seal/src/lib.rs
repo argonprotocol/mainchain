@@ -22,22 +22,22 @@ pub mod pallet {
 	use alloc::collections::btree_map::BTreeMap;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
+		AuthorityProvider, BlockSealAuthorityId, BlockSealDigest, BlockSealEventHandler,
+		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingKey,
+		FORK_POWER_DIGEST, MerkleProof, NotebookProvider, PARENT_VOTING_KEY_DIGEST,
+		ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
 		digests::Digestset,
 		fork_power::ForkPower,
 		inherents::{BlockSealInherent, BlockSealInherentData, SealInherentError},
 		localchain::{BestBlockVoteSeal, BlockVote, BlockVoteT},
 		notary::NotaryNotebookRawVotes,
-		AuthorityProvider, BlockSealAuthorityId, BlockSealDigest, BlockSealEventHandler,
-		BlockSealSpecProvider, BlockSealerInfo, BlockSealerProvider, BlockVotingKey, MerkleProof,
-		NotebookProvider, ParentVotingKeyDigest, TickProvider, VotingKey, VotingSchedule,
-		FORK_POWER_DIGEST, PARENT_VOTING_KEY_DIGEST,
 	};
 	use binary_merkle_tree::{merkle_proof, verify_proof};
 	use frame_support::traits::FindAuthor;
 	use sp_core::ByteArray;
 	use sp_runtime::{
-		traits::{Block as BlockT, Verify},
 		Digest, DigestItem, RuntimeAppPublic,
+		traits::{Block as BlockT, Verify},
 	};
 
 	#[pallet::pallet]

@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::zero_prefixed_literal)]
 
 extern crate alloc;
 extern crate core;
@@ -62,14 +63,14 @@ pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
+		BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents,
+		VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
 			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
 			XPubFingerprint,
 		},
 		vault::{BitcoinVaultProvider, LockExtension, VaultError},
-		BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents,
-		VaultId,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
@@ -94,6 +95,7 @@ pub mod pallet {
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
+			+ DecodeWithMemTracking
 			+ core::fmt::Debug
 			+ Default
 			+ From<u128>
@@ -118,10 +120,7 @@ pub mod pallet {
 
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 
-		type VaultProvider: BitcoinVaultProvider<
-			AccountId = Self::AccountId,
-			Balance = Self::Balance,
-		>;
+		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
 
 		/// Argon blocks per day
 		#[pallet::constant]

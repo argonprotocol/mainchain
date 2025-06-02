@@ -1,6 +1,6 @@
 use crate::{
-	pallet::{LockExpirationsByBitcoinHeight, LocksByUtxoId, LocksPendingReleaseByUtxoId},
 	Config, LockReleaseRequest,
+	pallet::{LockExpirationsByBitcoinHeight, LocksByUtxoId, LocksPendingReleaseByUtxoId},
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
@@ -9,11 +9,11 @@ mod old_storage {
 	use super::*;
 	use crate::Config;
 	use argon_primitives::{
+		VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey, CompressedBitcoinPubkey,
 			Satoshis, UtxoId, XPubChildNumber, XPubFingerprint,
 		},
-		VaultId,
 	};
 	use frame_support::storage_alias;
 	pub type ObligationId = u64;
@@ -213,7 +213,7 @@ pub type RatchetMigration<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{new_test_ext, Test};
+	use crate::mock::{Test, new_test_ext};
 	use argon_primitives::bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey};
 	use frame_support::assert_ok;
 	use sp_core::H256;

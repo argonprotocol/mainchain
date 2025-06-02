@@ -3,20 +3,20 @@ use pallet_prelude::*;
 use sp_core::crypto::AccountId32;
 
 use argon_primitives::{
-	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
+	MerkleProof, NotaryId, NotebookEventHandler,
+	digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest},
 	inherents::BlockSealInherent,
 	localchain::BlockVote,
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
-	MerkleProof, NotaryId, NotebookEventHandler,
 };
 
 use crate::{
+	Event, KEY_BLOCK_ROTATION,
 	mock::{BlockSealSpec, System, *},
 	pallet::{
 		CurrentComputeKeyBlock, PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp,
 	},
-	Event, KEY_BLOCK_ROTATION,
 };
 
 #[test]

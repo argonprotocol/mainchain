@@ -3,11 +3,11 @@ use jsonrpsee::{proc_macros::rpc, types::ErrorObjectOwned};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{RuntimeDebug, H256};
+use sp_core::{H256, RuntimeDebug};
 
 use argon_primitives::{
-	tick::Tick, AccountId, AccountOrigin, AccountType, NewAccountOrigin,
-	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotebookNumber,
+	AccountId, AccountOrigin, AccountType, NewAccountOrigin, NotarizationBalanceChangeset,
+	NotarizationBlockVotes, NotarizationDomains, NotebookNumber, tick::Tick,
 };
 
 #[rpc(server, client, namespace = "localchain")]

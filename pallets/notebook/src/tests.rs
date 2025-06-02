@@ -1,13 +1,15 @@
 use crate::{
+	Error, Event,
 	mock::*,
 	pallet::{
 		AccountOriginLastChangedNotebookByNotary, LastNotebookDetailsByNotary,
 		NotariesLockedForFailedAudit, NotebookChangedAccountsRootByNotary,
 	},
-	Error, Event,
 };
 use argon_notary_audit::{AccountHistoryLookupError, VerifyError};
 use argon_primitives::{
+	BalanceProof, BlockVote, MerkleProof, NotebookAuditResult, NotebookDigest, NotebookProvider,
+	SignedNotebookHeader,
 	localchain::{AccountType, BalanceChange, Note, NoteType},
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails, NotaryNotebookKeyDetails,
@@ -17,12 +19,10 @@ use argon_primitives::{
 		AccountOrigin, BalanceTip, ChainTransfer, NewAccountOrigin, Notarization, NotebookHeader,
 		NotebookNumber,
 	},
-	BalanceProof, BlockVote, MerkleProof, NotebookAuditResult, NotebookDigest, NotebookProvider,
-	SignedNotebookHeader,
 };
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use pallet_prelude::*;
-use sp_core::{bounded_vec, ed25519, Pair};
+use sp_core::{Pair, bounded_vec, ed25519};
 use sp_keyring::{
 	Ed25519Keyring,
 	Sr25519Keyring::{Alice, Bob},
@@ -508,15 +508,17 @@ fn it_can_audit_notebooks() {
 			notebook_number: 1,
 			tick: 1,
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
-			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
-				account_id: who.clone(),
-				account_type: AccountType::Deposit,
-				change_number: 1,
-				balance: 2000,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
-			}
-			.encode()]),
+			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![
+				BalanceTip {
+					account_id: who.clone(),
+					account_type: AccountType::Deposit,
+					change_number: 1,
+					balance: 2000,
+					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+					channel_hold_note: None,
+				}
+				.encode(),
+			]),
 			changed_account_origins: bounded_vec![AccountOrigin {
 				notebook_number: 1,
 				account_uid: 1
@@ -800,22 +802,24 @@ fn it_handles_bad_secrets() {
 			// wrong secret hash
 			header.parent_secret = Some(secrets[1]);
 
-			assert!(!Notebook::check_audit_result(
-				1,
-				header.notebook_number,
-				header.tick,
-				header.hash(),
-				&NotebookDigest {
-					notebooks: vec![NotebookAuditResult {
-						notary_id: 1,
-						notebook_number: header.notebook_number,
-						tick: header.tick,
-						audit_first_failure: None
-					}]
-				},
-				header.parent_secret
-			)
-			.expect("shouldn't throw an error "));
+			assert!(
+				!Notebook::check_audit_result(
+					1,
+					header.notebook_number,
+					header.tick,
+					header.hash(),
+					&NotebookDigest {
+						notebooks: vec![NotebookAuditResult {
+							notary_id: 1,
+							notebook_number: header.notebook_number,
+							tick: header.tick,
+							audit_first_failure: None
+						}]
+					},
+					header.parent_secret
+				)
+				.expect("shouldn't throw an error ")
+			);
 			System::assert_last_event(
 				Event::<Test>::NotebookAuditFailure {
 					notary_id: 1,

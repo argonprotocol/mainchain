@@ -21,8 +21,12 @@ pub mod pallet {
 	use tracing::{info, trace, warn};
 
 	use super::*;
-	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
+	use argon_notary_audit::{AccountHistoryLookupError, NotebookHistoryLookup, notebook_verify};
 	use argon_primitives::{
+		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
+		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
+		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
+		TransferToLocalchainId,
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{
 			NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
@@ -30,10 +34,6 @@ pub mod pallet {
 			NotaryNotebookRawVotes, NotaryProvider, NotaryState,
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
-		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
-		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
-		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
-		TransferToLocalchainId,
 	};
 
 	type NotebookDigest = NotebookDigestT<NotebookVerifyError>;
@@ -601,7 +601,6 @@ pub mod pallet {
 					.map(|audit_summary| {
 						audit_summary.try_into().map_err(|_| {
 							warn!(
-
 								"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}"
 							);
 							NotebookVerifyError::DecodeError
@@ -653,8 +652,8 @@ pub mod pallet {
 
 			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
 				warn!(
-
-					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
+					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}",
+					e.to_string()
 				);
 				NotebookVerifyError::DecodeError
 			})?;
@@ -703,8 +702,8 @@ pub mod pallet {
 			)
 			.inspect_err(|e| {
 				info!(
-
-					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}", e.to_string()
+					"Notebook audit failed for notary {notary_id}, notebook {notebook_number}: {:?}",
+					e.to_string()
 				);
 			})?;
 
