@@ -23,6 +23,8 @@ jobs:
 
       - name: Install
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: 'false'
 
       - uses: ./.github/templates/rust-cache
         with:

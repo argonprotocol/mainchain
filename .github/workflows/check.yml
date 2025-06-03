@@ -26,6 +26,8 @@ jobs:
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: 'false'
 
       - uses: ./.github/templates/rust-cache
         with:
@@ -83,6 +85,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          cache: 'false'
           target: ${{runner.target}}
 
       - uses: taiki-e/install-action@v2
