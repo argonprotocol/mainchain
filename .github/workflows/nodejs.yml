@@ -5,11 +5,6 @@ name: Build + Test Node.js Apis
       - main
       - v[0-9]+.*
   workflow_dispatch:
-    inputs:
-      SKIP_REBUILD_DOCKER:
-        description: 'Should we skip rebuilding the docker images'
-        required: true
-        default: 'false'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,11 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Free Disk Space
-        if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+        if: ${{startsWith(matrix.os, 'ubuntu')}}
         uses: ./.github/templates/clear-space
 
       - name: Install linux dependencies
-        if: ${{startsWith(matrix.os, 'ubuntu') && (github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+        if: ${{startsWith(matrix.os, 'ubuntu')}}
         run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
 
       - name: Install mac dependencies
@@ -61,22 +56,22 @@ jobs:
         run: brew install protobuf
 
       - uses: ./.github/templates/rust-cache
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: cargo-${{ matrix.target }}
 
-      - name: Install
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+      - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: 'false'
+          target: ${{ matrix.target }}
 
-      - uses: taiki-e/install-action@v2
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+      - name: Install sqlx-cli
+        uses: taiki-e/install-action@v2
         with:
           tool: sqlx-cli@0.8.5
 
       - name: Migrate Notary Db
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: notary
         run: cargo sqlx database setup
 
@@ -89,20 +84,21 @@ jobs:
           cat .env
 
       - name: Migrate Localchain Db
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
         working-directory: localchain
         run: cargo sqlx database setup
 
       - name: Build
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
-        run: cargo build
+        run: cargo build --target=${{ matrix.target }}
         env:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUST_LOG: info
 
+      - name: List assets
+        run: ls -lart target/
+
       - name: Upload Debug Assets
-        if: ${{(github.event.inputs.SKIP_REBUILD_DOCKER != 'true')}}
+
         uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.target }}
@@ -165,40 +161,23 @@ jobs:
         include:
           - os: macos-latest
             target: x86_64-apple-darwin
-            build: |
+            prebuild: |
               export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
-              yarn build:debug --target x86_64-apple-darwin
-              strip -x *.node
           - os: macos-latest
             target: aarch64-apple-darwin
-            build: |
+            prebuild: |
               sudo rm -Rf /Library/Developer/CommandLineTools/SDKs/*;
               export CC=$(xcrun -f clang);
               export CXX=$(xcrun -f clang++);
               SYSROOT=$(xcrun --sdk macosx --show-sdk-path);
               export RUSTFLAGS="-C link-args=-Wl,-undefined,dynamic_lookup"
               export CFLAGS="-isysroot $SYSROOT -isystem $SYSROOT";
-              yarn build:debug --target aarch64-apple-darwin
-              strip -x *.node
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
-            build: |
-              cd localchain
-              yarn build:debug -- --lib
-              strip -x *.node
-          - os: ubuntu-latest
+          - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: |
-              cd localchain
-              yarn build:debug --target aarch64-unknown-linux-gnu -- --lib
-              aarch64-unknown-linux-gnu-strip -x *.node
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            build: |
-              yarn build:debug --target x86_64-pc-windows-msvc
-              strip -x *.node
     name: localchain - ${{ matrix.target }} - node@20
     runs-on: ${{matrix.os}}
     env:
@@ -210,7 +189,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup node
-        if: ${{ !matrix.docker }}
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -221,8 +199,8 @@ jobs:
 
       - name: Install
         uses: actions-rust-lang/setup-rust-toolchain@v1
-        if: ${{ !matrix.docker }}
         with:
+          cache: 'false'
           target: ${{ matrix.target }}
 
       - uses: ./.github/templates/rust-cache
@@ -246,28 +224,15 @@ jobs:
         run: echo "HOME_DIR=$HOME" >> $GITHUB_ENV
         shell: bash
 
-      - name: Build in docker
-        uses: addnab/docker-run-action@v3
-        if: ${{ matrix.docker }}
-        with:
-          image: ${{ matrix.docker }}
-          options: |
-            --user 0:0
-            -e SQLX_OFFLINE=true
-            -e SKIP_WASM_BUILD=1
-            -e RUST_BACKTRACE=1
-            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            -v ${{ env.HOME_DIR }}/.cargo/git/db:/usr/local/cargo/git/db
-            -v ${{ env.HOME_DIR }}/.cargo/registry/cache:/usr/local/cargo/registry/cache
-            -v ${{ env.HOME_DIR }}/.cargo/registry/index:/usr/local/cargo/registry/index
-            -v ${{ github.workspace }}:/build
-            -v ${{ env.TARGET_BASEDIR }}/target:/build/target
-            -w /build
-          run: ${{ matrix.build }}
+      - name: Prebuild
+        if: ${{ matrix.prebuild }}
+        run: ${{ matrix.prebuild }}
+        shell: bash
 
       - name: Build
-        if: ${{ !matrix.docker }}
-        run: ${{ matrix.build }}
+        run: |
+          yarn build:debug --target ${{ matrix.target }} -- --lib
+          strip -x *.node
         shell: bash
         working-directory: ./localchain
         env:
@@ -440,6 +405,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          cache: 'false'
           target: ${{ matrix.target }}
 
       - name: Install bitcoind
