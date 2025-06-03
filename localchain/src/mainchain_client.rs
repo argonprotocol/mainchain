@@ -330,7 +330,7 @@ impl MainchainClient {
     let client = self.client().await?;
     let account_id32 = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let nonce = client.get_account_nonce(&account_id32).await?;
-    Ok(nonce as u32)
+    Ok(nonce)
   }
 
   pub async fn get_transfer_to_localchain_finalized_block(

@@ -15,145 +15,13 @@ permissions:
   packages: read
   actions: write
 
+env:
+  RUST_BACKTRACE: 1
+  RUSTUP_MAX_RETRIES: 10
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: true
+
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-          - os: ubuntu-22.04-arm
-            target: aarch64-unknown-linux-gnu
-
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    name: Build All ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Free Disk Space
-        if: ${{startsWith(matrix.os, 'ubuntu')}}
-        uses: ./.github/templates/clear-space
-
-      - name: Install linux dependencies
-        if: ${{startsWith(matrix.os, 'ubuntu')}}
-        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
-
-      - name: Install mac dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: brew install protobuf
-
-      - uses: ./.github/templates/rust-cache
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: cargo-${{ matrix.target }}
-
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: 'false'
-          target: ${{ matrix.target }}
-
-      - name: Install sqlx-cli
-        uses: taiki-e/install-action@v2
-        with:
-          tool: sqlx-cli@0.8.5
-
-      - name: Migrate Notary Db
-        working-directory: notary
-        run: cargo sqlx database setup
-
-      - name: Create and Set Database URL
-        working-directory: localchain
-        run: |
-          touch ${{ runner.temp }}/temp.db
-          chmod 777 ${{ runner.temp }}/temp.db
-          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
-          cat .env
-
-      - name: Migrate Localchain Db
-        working-directory: localchain
-        run: cargo sqlx database setup
-
-      - name: Build
-        run: cargo build --target=${{ matrix.target }}
-        env:
-          CARGO_INCREMENTAL: 0
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUST_LOG: info
-
-      - name: List assets
-        run: ls -lart target/
-
-      - name: Upload Debug Assets
-
-        uses: actions/upload-artifact@v4
-        with:
-          name: bins-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/argon-*
-          if-no-files-found: error
-
-  docker:
-    name: Docker
-    needs:
-      - build
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
-        with:
-          name: bins-x86_64-unknown-linux-gnu
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: ./amd64
-
-      - name: Download amd artifacts
-        uses: actions/download-artifact@v4
-        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
-        with:
-          name: bins-aarch64-unknown-linux-gnu
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: ./arm64
-
-      - name: List assets in root
-        run: ls
-        shell: bash
-
-      - name: Argon Node
-        uses: ./.github/templates/docker
-        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
-        with:
-          image: ghcr.io/argonprotocol/argon-miner
-          bin: argon-node
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Notary
-        uses: ./.github/templates/docker
-        if: ${{ (github.event.inputs.SKIP_REBUILD_DOCKER != 'true') }}
-        with:
-          image: ghcr.io/argonprotocol/argon-notary
-          bin: argon-notary
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
   localchain:
     strategy:
       fail-fast: false
@@ -182,9 +50,7 @@ jobs:
     runs-on: ${{matrix.os}}
     env:
       DEBUG: napi:*
-      APP_NAME: localchain
       MACOSX_DEPLOYMENT_TARGET: '14.0'
-      RUST_BACKTRACE: 1
     steps:
       - uses: actions/checkout@v4
 
@@ -236,16 +102,14 @@ jobs:
         shell: bash
         working-directory: ./localchain
         env:
-          SQLX_OFFLINE: true
-          RUST_BACKTRACE: 1
-          SKIP_WASM_BUILD: 1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKIP_WASM_BUILD: 1
 
       - name: Upload Localchain artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.target }}
-          path: localchain/${{ env.APP_NAME }}.*.node
+          path: localchain/localchain.*.node
           if-no-files-found: error
   test-mac-win:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
@@ -253,15 +117,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - macos-latest
-          - windows-latest
+        node: [ 20, 22 ]
+        os: [ macos-latest, windows-latest ]
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-        node: [ 18, 20 ]
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -285,26 +147,26 @@ jobs:
           name: bindings-${{ matrix.target }}
           path: localchain
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      #          run-id: 8755170162
 
       - name: Test bindings
         run: yarn test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
-          SQLX_OFFLINE: true
+          SKIP_WASM_BUILD: 1
   test-linux:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
-    needs: [ localchain, docker ]
+    needs: [ localchain ]
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
+        node: [ 20, 22 ]
+        os: [ ubuntu-latest, ubuntu-22.04-arm ]
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-        node: [ 18, 20 ]
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
 
     services:
       postgres:
@@ -323,28 +185,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/checkout@v4
+      - name: Free Disk Space
+        uses: ./.github/templates/clear-space
+
+      - name: Install linux dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+
+      - uses: ./.github/templates/rust-cache
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-${{ env.TARGET }}
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: 'false'
+
+      - name: Build
+        run: cargo build
+        env:
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List assets
+        run: ls -lart target/
+
       - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: yarn
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install dependencies
         run: yarn
 
       - name: Build typescript
         run: yarn tsc
-
-      - name: Docker Internal Host
-        run: |
-          echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
       - name: Run MinIO container
         run: |
@@ -368,16 +245,12 @@ jobs:
             sleep 2
           done
 
-      - name: Pull Miner
-        run: docker pull ghcr.io/argonprotocol/argon-miner:dev && docker pull ghcr.io/argonprotocol/argon-notary:dev
-
       - name: Download localchain bindings
         uses: actions/download-artifact@v4
         with:
-          name: bindings-${{ matrix.target }}
           path: localchain
+          name: bindings-${{ matrix.target }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      #          run-id: 8755170162
 
       - name: Test bindings
         run: yarn test
@@ -385,31 +258,16 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_S3_ENDPOINT: http://localhost:9000
           RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
-          ADD_DOCKER_HOST: true
-          ARGON_USE_DOCKER_BINS: 1
           RUST_LOG: debug,sqlx=info
-          SQLX_OFFLINE: true
-          AWS_S3_ENDPOINT: http://host.docker.internal:9000
-
-      - name: Download binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: bins-x86_64-unknown-linux-gnu
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: target/debug/
-
-      - name: Make binary executable
-        run: chmod +x ./target/debug/argon-*
+          SKIP_WASM_BUILD: 1
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
-
-      - name: Install bitcoind
-        run: cargo build -p argon-testing-bitcoin
 
       - name: Test client
         run: yarn test:ci
