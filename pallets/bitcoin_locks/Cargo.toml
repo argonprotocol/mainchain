@@ -23,7 +23,7 @@ argon-bitcoin = { workspace = true, default-features = false }
 pallet-prelude = { workspace = true, default-features = false }
 
 [dev-dependencies]
-polkadot-sdk = { workspace = true, features = ["pallet-balances", "sp-io"], default-features = true }
+polkadot-sdk = { workspace = true, features = ["pallet-balances", "sp-io", "sp-arithmetic"], default-features = true }
 bitcoin = { workspace = true, features = ["rand-std"] }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

@@ -56,6 +56,12 @@ impl PriceIndex {
 			.unwrap_or(FixedU128::one());
 		ArgonCPI::from_inner(ratio.into_inner() as i128) - FixedI128::one()
 	}
+
+	pub fn redemption_r_value(&self) -> FixedU128 {
+		self.argonot_usd_price
+			.checked_div(&self.argon_usd_target_price)
+			.unwrap_or(FixedU128::one())
+	}
 }
 
 #[frame_support::pallet(dev_mode)]
@@ -295,6 +301,10 @@ pub mod pallet {
 
 		fn get_argon_pool_liquidity() -> Option<T::Balance> {
 			Self::get_current().map(|a| a.argon_time_weighted_average_liquidity.into())
+		}
+
+		fn get_redemption_r_value() -> Option<FixedU128> {
+			Self::get_current().map(|a| a.redemption_r_value())
 		}
 	}
 }
