@@ -16,12 +16,12 @@ codec = { workspace = true, default-features = false }
 
 polkadot-sdk = { workspace = true, features = ["sp-runtime", "sp-core", "sp-io"] }
 bitcoin = { workspace = true, default-features = false }
+bip39 = { workspace = true, default-features = false }
 miniscript = { workspace = true, default-features = false, features = ["compiler", "no-std"] }
 k256 = { workspace = true, features = ["alloc", "ecdsa"], default-features = false }
 bitcoincore-rpc = { workspace = true, optional = true }
 
-anyhow = { workspace = true, optional = true }
-
+anyhow = { workspace = true, default-features = false }
 parking_lot = { workspace = true, optional = true }
 hwi = { workspace = true, optional = true }
 
@@ -47,6 +47,7 @@ std = [
 	"anyhow/std",
 	"argon-primitives/bitcoin",
 	"argon-primitives/std",
+	"bip39/std",
 	"bitcoin/std",
 	"bitcoincore-rpc/default",
 	"codec/std",

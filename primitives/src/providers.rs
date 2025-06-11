@@ -15,7 +15,10 @@ use crate::{
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
-use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
+use sp_arithmetic::{
+	FixedI128, FixedPointNumber,
+	traits::{UniqueSaturatedInto, Zero},
+};
 use sp_core::{H256, RuntimeDebug, U256};
 use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,

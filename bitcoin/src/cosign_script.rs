@@ -248,7 +248,7 @@ mod test {
 
 		let block_height = bitcoind.client.get_block_count().unwrap();
 
-		let (master_xpriv, fingerprint) = create_xpriv(network);
+		let (master_xpriv, _fingerprint) = create_xpriv(network);
 		let (vault_compressed_pubkey, vault_hd_path) = derive(&master_xpriv, "m/0'/0/1");
 		let (vault_claim_pubkey, vault_reclaim_hd_path) = derive(&master_xpriv, "m/0'/1/0");
 
@@ -317,9 +317,7 @@ mod test {
 			.expect("unlocker");
 
 			unlocker.psbt.unsigned_tx.lock_time = LockTime::from_consensus(block_height as u32);
-			unlocker
-				.sign_derived(master_xpriv, (fingerprint, vault_hd_path.clone()))
-				.expect("sign");
+			unlocker.sign_derived(master_xpriv, vault_hd_path.clone()).expect("sign");
 
 			assert!(unlocker.extract_tx().is_err());
 		}
@@ -338,7 +336,7 @@ mod test {
 
 			unlocker.psbt.unsigned_tx.lock_time = LockTime::from_consensus(block_height as u32);
 			unlocker
-				.sign_derived(master_xpriv, (fingerprint, vault_reclaim_hd_path.clone()))
+				.sign_derived(master_xpriv, vault_reclaim_hd_path.clone())
 				.expect("sign");
 
 			assert!(unlocker.extract_tx().is_err());
@@ -356,7 +354,7 @@ mod test {
 		.expect("unlocker");
 
 		unlocker
-			.sign_derived(master_xpriv, (fingerprint, vault_reclaim_hd_path.clone()))
+			.sign_derived(master_xpriv, vault_reclaim_hd_path.clone())
 			.expect("sign");
 
 		let tx = unlocker.extract_tx().expect("tx");
@@ -668,7 +666,7 @@ mod test {
 		let owner_pubkey: CompressedBitcoinPubkey = owner_compressed_pubkey.into();
 		let amount: Satoshis = Amount::ONE_BTC.to_sat() * 5;
 
-		let (vault_master_xpriv, vault_fingerprint) = create_xpriv(network);
+		let (vault_master_xpriv, _vault_fingerprint) = create_xpriv(network);
 		let (vault_compressed_pubkey, vault_hd_path) =
 			derive(&vault_master_xpriv, "m/48'/0'/0'/0/1");
 		let vault_claim_pubkey = derive(&vault_master_xpriv, "m/48'/0'/0'/1/0").0;
@@ -769,9 +767,8 @@ mod test {
 			)
 			.expect("unlocker");
 
-			let (vault_signature, vault_pubkey) = unlocker
-				.sign_derived(vault_master_xpriv, (vault_fingerprint, vault_hd_path))
-				.expect("sign");
+			let (vault_signature, vault_pubkey) =
+				unlocker.sign_derived(vault_master_xpriv, vault_hd_path).expect("sign");
 
 			// test can verify signature
 			let vault_signature_api: BitcoinSignature = vault_signature.try_into().unwrap();

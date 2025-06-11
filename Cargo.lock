@@ -836,6 +836,7 @@ dependencies = [
  "argon-primitives",
  "argon-testing",
  "base64 0.22.1",
+ "bip39",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoind",
@@ -5505,6 +5506,7 @@ dependencies = [
  "argon-testing",
  "base64 0.22.1",
  "bitcoin",
+ "bitcoincore-rpc",
  "bitcoind",
  "hex",
  "lazy_static",
@@ -5516,6 +5518,7 @@ dependencies = [
  "serial_test",
  "subxt 0.41.0",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -1,18 +1,3 @@
-use bitcoin::{
-	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
-	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
-	hashes::Hash,
-	secp256k1::{All, Secp256k1},
-};
-use bitcoind::{
-	BitcoinD, anyhow,
-	bitcoincore_rpc::{RpcApi, bitcoincore_rpc_json::AddressType, jsonrpc::serde_json},
-};
-use polkadot_sdk::*;
-use sp_arithmetic::FixedU128;
-use sp_core::{Pair, crypto::AccountId32, sr25519};
-use std::{env, str::FromStr, sync::Arc};
-
 use crate::utils::{create_active_notary, register_miner_keys, register_miners};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
@@ -34,12 +19,25 @@ use argon_testing::{
 	ArgonTestNode, ArgonTestOracle, add_blocks, add_wallet_address, fund_script_address,
 	run_bitcoin_cli, start_argon_test_node,
 };
-use serial_test::serial;
+use bitcoin::{
+	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
+	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
+	hashes::Hash,
+	secp256k1::{All, Secp256k1},
+};
+use bitcoind::{
+	BitcoinD, anyhow,
+	bitcoincore_rpc::{Auth, RpcApi, bitcoincore_rpc_json::AddressType, jsonrpc::serde_json},
+};
+use polkadot_sdk::*;
+use sp_arithmetic::FixedU128;
+use sp_core::{Pair, crypto::AccountId32, sr25519};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
-use tokio::fs;
+use std::{env, str::FromStr, sync::Arc, time::Duration};
+use tokio::{fs, time::sleep};
+use url::Url;
 
 #[tokio::test(flavor = "multi_thread")]
-#[serial]
 async fn test_bitcoin_minting_e2e() {
 	let test_node = start_argon_test_node().await;
 	// need a test notary to get ownership rewards, so we can actually mint.
@@ -85,7 +83,7 @@ async fn test_bitcoin_minting_e2e() {
 	let client = Arc::new(client);
 
 	let (vault_xpriv_path, vault_xpriv_pwd, vault_xpub, vault_xpub_hd_path) =
-		create_xpriv(&test_node).await.unwrap();
+		create_xpriv_and_master_xpub(&test_node, "vault0").await.unwrap();
 	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
 
 	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await.unwrap();
@@ -127,7 +125,7 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	let (script_address, lock_amount) = confirm_bond(
+	let (script_address, lock_amount) = confirm_lock(
 		&test_node,
 		&secp,
 		owner_compressed_pubkey,
@@ -200,9 +198,9 @@ async fn test_bitcoin_minting_e2e() {
 	println!("Submitting new bitcoin price");
 	submit_price(&ticker, &client, &price_index_operator).await;
 
-	// 5. Ask for the bitcoin to be unlocked
-	println!("\nOwner requests unlock");
-	owner_requests_unlock(
+	// 5. Ask for the bitcoin to be released
+	println!("\nOwner requests release");
+	owner_requests_release(
 		&test_node,
 		bitcoind,
 		network,
@@ -214,9 +212,9 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	// 5. vault sees unlock request (outaddress, fee) and creates a transaction
+	// 5. vault sees release request (outaddress, fee) and creates a transaction
 	println!("\nVault publishes cosign tx");
-	vault_cosigns_unlock(
+	vault_cosigns_release(
 		&test_node,
 		client,
 		&vault_signer,
@@ -231,7 +229,7 @@ async fn test_bitcoin_minting_e2e() {
 
 	println!("\nOwner sees the transaction and cosigns");
 	// 6. Owner sees the transaction and can submit it
-	owner_sees_signature_and_unlocks(
+	owner_sees_signature_and_releases(
 		&test_node,
 		bitcoind,
 		&utxo_id,
@@ -240,6 +238,190 @@ async fn test_bitcoin_minting_e2e() {
 	)
 	.await
 	.unwrap();
+	drop(test_node);
+}
+
+#[tokio::test]
+async fn test_bitcoin_xpriv_lock_e2e() {
+	let test_node = start_argon_test_node().await;
+	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
+	let (bitcoin_url, auth) = test_node.get_bitcoin_url();
+	let bitcoind_client = bitcoincore_rpc::Client::new(&bitcoin_url, auth).unwrap();
+	let block_creator = add_wallet_address(bitcoind);
+	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
+
+	// 1. Owner creates a new pubkey and submits to blockchain
+	let network: BitcoinNetwork = test_node
+		.client
+		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
+		.await
+		.unwrap()
+		.ok_or(anyhow!("No bitcoin network found"))
+		.unwrap()
+		.into();
+	let network: Network = network.into();
+	let secp = Secp256k1::new();
+
+	let (owner_xpriv_path, owner_xpriv_pwd, owner_compressed_pubkey, owner_hd_path) =
+		create_xpriv_and_derive(&test_node).await.unwrap();
+
+	let utxo_satoshis: Satoshis = Amount::ONE_BTC.to_sat() + 500;
+	let utxo_btc = utxo_satoshis as f64 / SATOSHIS_PER_BITCOIN as f64;
+	let alice_sr25519 = Alice.pair();
+	let price_index_operator = Eve.pair();
+	let bitcoin_owner_pair = Bob.pair();
+
+	let client = test_node.client.clone();
+	let client = Arc::new(client);
+
+	let (vault_xpriv_path, vault_xpriv_pwd, vault_xpub, vault_xpub_hd_path) =
+		create_xpriv_and_master_xpub(&test_node, "vault1").await.unwrap();
+	let vault_signer = Sr25519Signer::new(alice_sr25519.clone());
+
+	let _oracle = ArgonTestOracle::bitcoin_tip(&test_node).await.unwrap();
+
+	add_blocks(bitcoind, 1, &block_creator);
+
+	let vault_owner = alice_sr25519.clone();
+	let vault_owner_account_id32: AccountId32 = vault_owner.public().into();
+
+	// 2. A vault is setup with enough funds
+	let vault_id = create_vault(&test_node, &vault_xpub, &vault_owner_account_id32, &vault_signer)
+		.await
+		.unwrap();
+
+	let ticker = client.lookup_ticker().await.expect("ticker");
+	let _last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+
+	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
+		.await
+		.unwrap();
+
+	// 3. Owner calls api to request a bitcoin lock
+	let utxo_id = request_bitcoin_lock(
+		&test_node,
+		vault_id,
+		utxo_btc,
+		&owner_compressed_pubkey,
+		&bitcoin_owner_pair,
+	)
+	.await
+	.unwrap();
+
+	let send_to_address = run_bitcoin_cli(
+		&test_node,
+		vec!["lock", "send-to-address", "--utxo-id", &utxo_id.to_string()],
+	)
+	.await
+	.unwrap();
+
+	let (script_address, _lock_amount) = confirm_lock(
+		&test_node,
+		&secp,
+		owner_compressed_pubkey,
+		utxo_satoshis,
+		&client,
+		&vault_xpub,
+		network,
+		vault_id,
+		&utxo_id,
+	)
+	.await
+	.unwrap();
+
+	// 4. Owner funds the LockedBitcoin utxo and submits it
+	let scriptbuf: ScriptBuf = script_address.into();
+	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
+	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
+	assert!(send_to_address.contains(&format!("{} satoshis to {}", utxo_satoshis, scriptaddress)));
+
+	let _ = fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
+
+	add_blocks(bitcoind, 5, &block_creator);
+	let mut block_sub = test_node.client.live.blocks().subscribe_finalized().await.unwrap();
+	while let Some(next) = block_sub.next().await {
+		let utxo_lock = test_node
+			.client
+			.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
+			.await
+			.unwrap()
+			.expect("Utxo state should be present");
+		if utxo_lock.is_verified {
+			println!("Utxo lock is verified in block {:?}", next.unwrap().hash());
+			break;
+		}
+		println!("Waiting for utxo lock to be verified in block {:?}", next.unwrap().hash());
+	}
+
+	// 5. Ask for the bitcoin to be releaseed
+	println!("\nOwner requests release");
+	owner_requests_release(
+		&test_node,
+		bitcoind,
+		network,
+		&bitcoin_owner_pair,
+		&client,
+		vault_id,
+		utxo_id,
+	)
+	.await
+	.unwrap();
+
+	// 5. vault sees release request (outaddress, fee) and creates a transaction
+	println!("\nVault publishes cosign tx");
+	vault_cosigns_release(
+		&test_node,
+		client,
+		&vault_signer,
+		&vault_id,
+		&utxo_id,
+		&vault_xpriv_path,
+		&vault_xpriv_pwd,
+		&vault_xpub_hd_path,
+	)
+	.await
+	.unwrap();
+
+	println!("\nOwner sees the transaction and cosigns");
+	let (bitcoin_url, auth) = test_node.get_bitcoin_url();
+	let mut bitcoin_url = Url::parse(&bitcoin_url).unwrap();
+	if let Auth::UserPass(user, pass) = auth {
+		bitcoin_url.set_username(&user).unwrap();
+		bitcoin_url.set_password(Some(&pass)).unwrap();
+	}
+	println!("Owner pubkey is {}", owner_compressed_pubkey);
+	tokio::spawn(async move {
+		loop {
+			bitcoind_client.generate_to_address(1, &block_creator).unwrap();
+			println!("Bitcoin block generated");
+			sleep(Duration::from_secs(5)).await;
+		}
+	});
+	// 6. Owner sees the transaction and can submit it
+	let owner_cosign_cli = run_bitcoin_cli(
+		&test_node,
+		vec![
+			"lock",
+			"owner-cosign-release",
+			"--utxo-id",
+			&utxo_id.to_string(),
+			"--hd-path",
+			&owner_hd_path,
+			"--xpriv-path",
+			&owner_xpriv_path,
+			"--xpriv-password",
+			&owner_xpriv_pwd,
+			"--bitcoin-rpc-url",
+			bitcoin_url.as_ref(),
+			"--wait",
+		],
+	)
+	.await
+	.unwrap();
+	assert!(
+		owner_cosign_cli.contains("confirmations: 6"),
+		"Got 6 confirmations for the transaction"
+	);
 	drop(test_node);
 }
 
@@ -306,17 +488,79 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 	master_fingerprint
 }
 
-async fn create_xpriv(
+async fn create_xpriv_and_derive(
 	test_node: &ArgonTestNode,
-) -> anyhow::Result<(String, String, String, String)> {
-	let path = env::temp_dir().join("vault0.xpriv");
+) -> anyhow::Result<(String, String, bitcoin::PublicKey, String)> {
+	let path = env::temp_dir().join("owner0.xpriv");
 	if path.is_file() {
 		fs::remove_file(&path).await?;
 	}
 	let password = "Password123";
 	let _ = run_bitcoin_cli(
 		test_node,
-		vec!["xpriv", "master", "--password", password, "--xpriv-path", path.to_str().unwrap()],
+		vec![
+			"xpriv",
+			"master",
+			"--xpriv-password",
+			password,
+			"--xpriv-path",
+			path.to_str().unwrap(),
+			"--bitcoin-network",
+			"regtest",
+		],
+	)
+	.await?;
+	let derivation_path = "m/84'/0'/0'";
+
+	let result = run_bitcoin_cli(
+		test_node,
+		vec![
+			"xpriv",
+			"derive-pubkey",
+			"--xpriv-path",
+			path.to_str().unwrap(),
+			"--xpriv-password",
+			password,
+			"--hd-path",
+			derivation_path,
+		],
+	)
+	.await?;
+
+	println!("Result from derive-pubkey: {}", result.trim());
+
+	let pubkey = PublicKey::from_str(result.trim())
+		.map_err(|e| anyhow!("Failed to parse public key: {}", e))?;
+
+	Ok((
+		path.to_str().unwrap().to_string(),
+		password.to_string(),
+		pubkey,
+		derivation_path.to_string(),
+	))
+}
+
+async fn create_xpriv_and_master_xpub(
+	test_node: &ArgonTestNode,
+	name: &str,
+) -> anyhow::Result<(String, String, Xpub, String)> {
+	let path = env::temp_dir().join(format!("{}.xpriv", name));
+	if path.is_file() {
+		fs::remove_file(&path).await?;
+	}
+	let password = "Password123";
+	let _ = run_bitcoin_cli(
+		test_node,
+		vec![
+			"xpriv",
+			"master",
+			"--xpriv-password",
+			password,
+			"--xpriv-path",
+			path.to_str().unwrap(),
+			"--bitcoin-network",
+			"regtest",
+		],
 	)
 	.await?;
 	let derivation_path = "m/0'";
@@ -328,7 +572,7 @@ async fn create_xpriv(
 			"derive-xpub",
 			"--xpriv-path",
 			path.to_str().unwrap(),
-			"--password",
+			"--xpriv-password",
 			password,
 			"--hd-path",
 			derivation_path,
@@ -336,17 +580,20 @@ async fn create_xpriv(
 	)
 	.await?;
 
+	let xpub =
+		Xpub::from_str(xpub_result.trim()).map_err(|e| anyhow!("Failed to parse xpub: {}", e))?;
+
 	Ok((
 		path.to_str().unwrap().to_string(),
 		password.to_string(),
-		xpub_result.trim().to_string(),
+		xpub,
 		derivation_path.to_string(),
 	))
 }
 
 async fn create_vault(
 	test_node: &ArgonTestNode,
-	xpubkey: &str,
+	xpubkey: &Xpub,
 	vault_owner_account_id32: &AccountId32,
 	vault_signer: &impl Signer<ArgonConfig>,
 ) -> anyhow::Result<VaultId> {
@@ -384,7 +631,7 @@ async fn create_vault(
 			"--securitization-ratio",
 			"1x",
 			"--bitcoin-xpub",
-			xpubkey,
+			&xpubkey.to_string(),
 			"--bitcoin-apr",
 			"1.0",
 			"--bitcoin-base-fee",
@@ -452,6 +699,8 @@ async fn request_bitcoin_lock(
 	)
 	.await?;
 
+	println!("Owner locked bitcoin with pubkey: {}", owner_compressed_pubkey);
+
 	let lock_tx = test_node
 		.client
 		.submit_from_polkadot_url(
@@ -471,13 +720,13 @@ async fn request_bitcoin_lock(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn confirm_bond(
+async fn confirm_lock(
 	test_node: &ArgonTestNode,
 	secp: &Secp256k1<All>,
 	owner_compressed_pubkey: PublicKey,
 	utxo_satoshis: Satoshis,
 	client: &Arc<MainchainClient>,
-	xpubkey: &str,
+	xpubkey: &Xpub,
 	bitcoin_network: Network,
 	vault_id: VaultId,
 	utxo_id: &UtxoId,
@@ -485,8 +734,6 @@ async fn confirm_bond(
 	let lock_cli_get =
 		run_bitcoin_cli(test_node, vec!["lock", "status", "--utxo-id", &utxo_id.to_string()])
 			.await?;
-
-	let xpubkey = Xpub::from_str(xpubkey).expect("valid xpub");
 
 	let lock_api = client
 		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
@@ -622,7 +869,7 @@ async fn wait_for_mint(
 	Ok(())
 }
 
-async fn owner_requests_unlock(
+async fn owner_requests_release(
 	test_node: &ArgonTestNode,
 	bitcoind: &BitcoinD,
 	network: Network,
@@ -654,19 +901,19 @@ async fn owner_requests_unlock(
 		.await?
 		.wait_for_finalized_success()
 		.await?;
-	println!("bitcoin unlock request finalized");
+	println!("bitcoin release request finalized");
 	// this is the event that a vault would also monitor
-	let unlock_event = release_tx
+	let release_event = release_tx
 		.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosignRequested>()?
-		.expect("unlock event");
-	assert_eq!(unlock_event.utxo_id, utxo_id);
-	assert_eq!(unlock_event.vault_id, vault_id);
+		.expect("release event");
+	assert_eq!(release_event.utxo_id, utxo_id);
+	assert_eq!(release_event.vault_id, vault_id);
 
 	Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn vault_cosigns_unlock(
+async fn vault_cosigns_release(
 	test_node: &ArgonTestNode,
 	client: Arc<MainchainClient>,
 	vault_signer: &Sr25519Signer,
@@ -676,16 +923,16 @@ async fn vault_cosigns_unlock(
 	xpriv_pwd: &str,
 	uploaded_xpub_hd_path: &str,
 ) -> anyhow::Result<()> {
-	let pending_unlock = run_bitcoin_cli(
+	let pending_release = run_bitcoin_cli(
 		test_node,
 		vec!["vault", "pending-release", "--vault-id", &vault_id.to_string()],
 	)
 	.await?;
 
-	assert!(pending_unlock.lines().count() > 3);
-	assert!(pending_unlock.contains('1'));
+	assert!(pending_release.lines().count() > 3);
+	assert!(pending_release.contains('1'));
 
-	let unlock_fulfill_cli = run_bitcoin_cli(
+	let release_fulfill_cli = run_bitcoin_cli(
 		test_node,
 		vec![
 			"lock",
@@ -694,16 +941,16 @@ async fn vault_cosigns_unlock(
 			&utxo_id.to_string(),
 			"--xpriv-path",
 			xpriv_path,
-			"--password",
+			"--xpriv-password",
 			xpriv_pwd,
-			"--master-xpub-hd-path",
+			"--hd-path",
 			uploaded_xpub_hd_path,
 		],
 	)
 	.await?;
 
 	let _ = client
-		.submit_from_polkadot_url(&unlock_fulfill_cli, vault_signer, None)
+		.submit_from_polkadot_url(&release_fulfill_cli, vault_signer, None)
 		.await?
 		.wait_for_finalized_success()
 		.await?;
@@ -711,7 +958,7 @@ async fn vault_cosigns_unlock(
 	Ok(())
 }
 
-async fn owner_sees_signature_and_unlocks(
+async fn owner_sees_signature_and_releases(
 	test_node: &ArgonTestNode,
 	bitcoind: &BitcoinD,
 	utxo_id: &UtxoId,
