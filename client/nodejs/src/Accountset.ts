@@ -11,6 +11,7 @@ import * as process from 'node:process';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import { AccountMiners } from './AccountMiners';
 import { ApiDecoration } from '@polkadot/api/types';
+import { Bool } from '@polkadot/types-codec';
 
 export type SubaccountRange = readonly number[];
 
@@ -22,6 +23,7 @@ export interface ISubaccountMiner {
   seat?: {
     frameId: number;
     index: number;
+    bidAmount: bigint;
   };
   isLastDay: boolean;
 }
@@ -29,6 +31,7 @@ export interface ISubaccountMiner {
 export interface IMiningIndex {
   frameId: number;
   index: number;
+  bidAmount: bigint;
 }
 
 export class Accountset {
@@ -176,14 +179,33 @@ export class Accountset {
     const addresses = Object.keys(this.subAccountsByAddress);
     const rawIndices =
       await api.query.miningSlot.accountIndexLookup.multi(addresses);
+    const frameIds = [
+      ...new Set(
+        rawIndices.map(x => (x.isNone ? undefined : x.value[0].toNumber())).filter(x => x !== undefined),
+      ),
+    ];
+    const bidAmountsByFrame: { [frameId: number]: bigint[] } = {};
+    if (frameIds.length) {
+      console.log('Looking up cohorts for frames', frameIds);
+      const cohorts = await api.query.miningSlot.minersByCohort.multi(frameIds);
+      for (let i = 0; i < frameIds.length; i++) {
+        const cohort = cohorts[i];
+        const frameId = frameIds[i]!;
+        bidAmountsByFrame[frameId] = cohort.map(x => x.bid.toBigInt());
+      }
+    }
     const addressToMiningIndex: { [address: string]: IMiningIndex } = {};
     for (let i = 0; i < addresses.length; i++) {
       const address = addresses[i];
       if (rawIndices[i].isNone) continue;
-      const [frameId, index] = rawIndices[i].value;
+      const [frameIdRaw, indexRaw] = rawIndices[i].value;
+      const frameId = frameIdRaw.toNumber();
+      const index = indexRaw.toNumber();
+      const bidAmount = bidAmountsByFrame[frameId]?.[index];
       addressToMiningIndex[address] = {
-        frameId: frameId.toNumber(),
-        index: index.toNumber(),
+        frameId,
+        index,
+        bidAmount: bidAmount ?? 0n,
       };
     }
     const nextFrameId = await api.query.miningSlot.nextFrameId();
@@ -221,7 +243,7 @@ export class Accountset {
       return {
         ...miner,
         hasWinningBid: !!bid,
-        bidAmount: bid?.bid.toBigInt(),
+        bidAmount: bid?.bid.toBigInt() ?? miner.seat?.bidAmount ?? 0n,
       };
     });
   }

@@ -1,5 +1,6 @@
 import {
-  describeIntegration,
+  addTeardown,
+  describeIntegration, runOnTeardown,
   sudo,
   teardown,
   TestBitcoinCli,
@@ -61,13 +62,13 @@ describeIntegration(
         );
         await vaultMonitor.monitor(false);
 
-        if (!fs.existsSync('/tmp/argon/xpriv_master')) {
-          TestBitcoinCli.run(
-            `xpriv master --xpriv-path=/tmp/argon/xpriv_master --xpriv-password=1234 -t ${alicechain.address}`,
-          );
-        }
+        const path = fs.mkdtempSync('/tmp/argon-bitcoin-locks-test-');
+        runOnTeardown(() => fs.promises.rm(path, { recursive: true }));
+        TestBitcoinCli.run(
+          `xpriv master --xpriv-path="${path}/xpriv.key" --xpriv-password=1234 --bitcoin-network=regtest`,
+        );
         const xpub = TestBitcoinCli.run(
-          `xpriv derive-xpub --xpriv-path=/tmp/argon/xpriv_master  --xpriv-password=1234 --hd-path="m/84'/0'/0'" -t ${alicechain.address}`,
+          `xpriv derive-xpub --xpriv-path="${path}/xpriv.key"  --xpriv-password=1234 --hd-path="m/84'/0'/0'"`,
         );
 
         const vaultCreate = TestBitcoinCli.run(
