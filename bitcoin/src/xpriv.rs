@@ -15,12 +15,12 @@ pub fn xpriv_from_mnemonic(mnemonic: &str, network: BitcoinNetwork) -> anyhow::R
 }
 
 pub fn xpriv_from_seed(seed: &[u8], network: BitcoinNetwork) -> anyhow::Result<Xpriv> {
-	let xpriv = Xpriv::new_master(network, &seed).map_err(|e| anyhow!(e))?;
+	let xpriv = Xpriv::new_master(network, seed).map_err(|e| anyhow!(e))?;
 	Ok(xpriv)
 }
 
 pub fn derive_xpub(xpriv: &Xpriv, hd_path: &str) -> anyhow::Result<Xpub> {
-	let hd_path = DerivationPath::from_str(&hd_path).map_err(|e| anyhow!(e))?;
+	let hd_path = DerivationPath::from_str(hd_path).map_err(|e| anyhow!(e))?;
 
 	let child = xpriv.derive_priv(&Secp256k1::new(), &hd_path).map_err(|e| anyhow!(e))?;
 
@@ -29,7 +29,7 @@ pub fn derive_xpub(xpriv: &Xpriv, hd_path: &str) -> anyhow::Result<Xpub> {
 }
 
 pub fn derive_pubkey(xpriv: &Xpriv, hd_path: &str) -> anyhow::Result<PublicKey> {
-	let hd_path = DerivationPath::from_str(&hd_path).map_err(|e| anyhow!(e))?;
+	let hd_path = DerivationPath::from_str(hd_path).map_err(|e| anyhow!(e))?;
 
 	let child = xpriv.derive_priv(&Secp256k1::new(), &hd_path).map_err(|e| anyhow!(e))?;
 
