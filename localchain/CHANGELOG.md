@@ -1,8 +1,17 @@
 # Changelog
 
-## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.8...508ae441cd6f8d46fe0661978bab1362f45d29b2) (2025-05-12)
+## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...bb1cd6be76ccc2a634357ab48504b453fb92f86d) (2025-06-11)
 
-## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.8) (2025-05-09)
+### Features
+
+* **ci:** split docker from nodejs
+([1e4d209](https://github.com/argonprotocol/mainchain/commit/1e4d2093845583e47eb619b1b95dd2f57e032c86))
+* **bitcoin_lock:** ratcheting
+([d47296e](https://github.com/argonprotocol/mainchain/commit/d47296e42e763ac182d496fe0a002441d70920e2))
+* **mining_slot:** dynamic seats
+([d874e82](https://github.com/argonprotocol/mainchain/commit/d874e82b2a2ef42614e739d7e9472318a99769c7))
+
+## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0) (2025-05-12)
 
 ### Features
 

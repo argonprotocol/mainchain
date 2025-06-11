@@ -1,21 +1,37 @@
 # Changelog
 
-## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0-rc.8...508ae441cd6f8d46fe0661978bab1362f45d29b2) (2025-05-12)
+## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...bb1cd6be76ccc2a634357ab48504b453fb92f86d) (2025-06-11)
+
+### Features
+
+* **bitcoin:** use xpriv for bitcoin
+([0847d50](https://github.com/argonprotocol/mainchain/commit/0847d50158d1decc25b1f935242f2edfa8981b69))
+* **ci:** split docker from nodejs
+([1e4d209](https://github.com/argonprotocol/mainchain/commit/1e4d2093845583e47eb619b1b95dd2f57e032c86))
+* **bitcoin:** implement whitepaper unlock formula
+([34581b9](https://github.com/argonprotocol/mainchain/commit/34581b91244db5116fd419889ef9d783293035e4))
+* **bitcoin_lock:** ratcheting
+([d47296e](https://github.com/argonprotocol/mainchain/commit/d47296e42e763ac182d496fe0a002441d70920e2))
+* **mining_slot:** dynamic seats
+([d874e82](https://github.com/argonprotocol/mainchain/commit/d874e82b2a2ef42614e739d7e9472318a99769c7))
+
+### Fixes
+
+* **ci:** attempt to fix github actions
+([fa9d2fe](https://github.com/argonprotocol/mainchain/commit/fa9d2fedae733480edc7cf19ccfc4f8e51f2a353))
+* remove nanoevents dependency
+([8009109](https://github.com/argonprotocol/mainchain/commit/8009109481f8d75043b93a2dc5682b9383b1f718))
+* **client/node:** don’t make deps optional
+([1328e6e](https://github.com/argonprotocol/mainchain/commit/1328e6e1834d969bba01de135ca32b391f6d3919))
+* end-to-end compile issue
+([1a4e69d](https://github.com/argonprotocol/mainchain/commit/1a4e69d17c94973b5fafe554d953fff904df5a8e))
+
+## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0) (2025-05-12)
 
 ### Features
 
 * **vaults:** track revenue per frame
 ([0147fce](https://github.com/argonprotocol/mainchain/commit/0147fce4098aa9a59d03e135d145a0fc826dddf2))
-
-### Fixes
-
-* **vaults:** make all fees paid upfront
-([c898195](https://github.com/argonprotocol/mainchain/commit/c89819521d782f415b01b4aad2068e67137894e2))
-
-## [v1.1.0-rc.8](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0-rc.8) (2025-05-09)
-
-### Features
-
 * **client:** add bidding history to cohortbidder
 ([8a69d17](https://github.com/argonprotocol/mainchain/commit/8a69d17184682baa34d70262488eb6813c6ce865))
 * **client:** ability to use a password file
@@ -39,6 +55,8 @@
 
 ### Fixes
 
+* **vaults:** make all fees paid upfront
+([c898195](https://github.com/argonprotocol/mainchain/commit/c89819521d782f415b01b4aad2068e67137894e2))
 * **client:** cap budget by balance
 ([4286a17](https://github.com/argonprotocol/mainchain/commit/4286a172c15741fd3ba618ece025cdf959bc8456))
 * **node:** check finalization before marking best
