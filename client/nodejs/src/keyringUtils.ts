@@ -7,9 +7,7 @@ export function keyringFromSuri(
   return new Keyring({ type: cryptoType }).createFromUri(suri);
 }
 
-export function createKeyringPair(opts: {
-  cryptoType?: 'sr25519' | 'ed25519';
-}): KeyringPair {
+export function createKeyringPair(opts: { cryptoType?: 'sr25519' | 'ed25519' }): KeyringPair {
   const { cryptoType } = opts;
   const seed = mnemonicGenerate();
   return keyringFromSuri(seed, cryptoType);

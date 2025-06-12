@@ -30,14 +30,9 @@ export default class TestOracle implements ITeardownable {
   ) {
     const { pathToBin, mainchainUrl, bitcoinRpcUrl } = options;
     const operatorSuri =
-      service == 'bitcoin'
-        ? TestOracle.BitcoinOperator
-        : TestOracle.PriceIndexOperator;
-    this.operator = new Keyring({ type: 'sr25519' }).createFromUri(
-      operatorSuri,
-    );
-    const binPath =
-      pathToBin ?? Path.join(projectRoot(), 'target/debug/argon-oracle');
+      service == 'bitcoin' ? TestOracle.BitcoinOperator : TestOracle.PriceIndexOperator;
+    this.operator = new Keyring({ type: 'sr25519' }).createFromUri(operatorSuri);
+    const binPath = pathToBin ?? Path.join(projectRoot(), 'target/debug/argon-oracle');
     if (!fs.existsSync(binPath)) {
       throw new Error(`Oracle binary not found at ${binPath}`);
     }

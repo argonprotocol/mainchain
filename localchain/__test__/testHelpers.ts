@@ -43,18 +43,13 @@ export class KeyringSigner {
     return this.keyring.addPair(pair).address;
   }
 
-  static async load(
-    mainSuri: string,
-    type: KeypairType = 'sr25519',
-  ): Promise<KeyringSigner> {
+  static async load(mainSuri: string, type: KeypairType = 'sr25519'): Promise<KeyringSigner> {
     await waitForLoad();
     return new KeyringSigner(mainSuri, type);
   }
 }
 
-export async function createLocalchain(
-  mainchainUrl: string,
-): Promise<Localchain> {
+export async function createLocalchain(mainchainUrl: string): Promise<Localchain> {
   const localchain = await Localchain.load({
     mainchainUrl,
     path: ':memory:',
@@ -63,10 +58,7 @@ export async function createLocalchain(
   return localchain;
 }
 
-export async function getMainchainBalance(
-  client: ArgonClient,
-  address: string,
-): Promise<bigint> {
+export async function getMainchainBalance(client: ArgonClient, address: string): Promise<bigint> {
   const { data } = await client.query.system.account(address);
   return data.free.toBigInt();
 }
@@ -85,11 +77,8 @@ export async function transferToLocalchain(
           checkForExtrinsicSuccess(events, client)
             .then(() => {
               for (const { event } of events) {
-                if (
-                  client.events.chainTransfer.TransferToLocalchain.is(event)
-                ) {
-                  let transferId =
-                    event.data.transferId.toPrimitive() as number;
+                if (client.events.chainTransfer.TransferToLocalchain.is(event)) {
+                  let transferId = event.data.transferId.toPrimitive() as number;
                   resolve(transferId);
                 }
               }

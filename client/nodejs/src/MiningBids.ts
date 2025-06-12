@@ -62,35 +62,26 @@ export class MiningBids {
   ): Promise<{ unsubscribe: () => void }> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
-    const unsubscribe = await api.query.miningSlot.bidsForNextSlotCohort(
-      async next => {
-        this.nextCohort = await Promise.all(
-          next.map(x => this.toBid(accountNames, x)),
-        );
-        if (!this.shouldLog) return;
-        console.clear();
-        const block = await client.query.system.number();
-        if (!printFn) {
-          console.log('At block', block.toNumber());
-          this.print();
-        } else {
-          printFn(block.toNumber());
-        }
-      },
-    );
+    const unsubscribe = await api.query.miningSlot.bidsForNextSlotCohort(async next => {
+      this.nextCohort = await Promise.all(next.map(x => this.toBid(accountNames, x)));
+      if (!this.shouldLog) return;
+      console.clear();
+      const block = await client.query.system.number();
+      if (!printFn) {
+        console.log('At block', block.toNumber());
+        this.print();
+      } else {
+        printFn(block.toNumber());
+      }
+    });
     return { unsubscribe };
   }
 
-  public async loadAt(
-    accountNames: IAddressNames,
-    blockHash?: Uint8Array,
-  ): Promise<void> {
+  public async loadAt(accountNames: IAddressNames, blockHash?: Uint8Array): Promise<void> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
     const nextCohort = await api.query.miningSlot.bidsForNextSlotCohort();
-    this.nextCohort = await Promise.all(
-      nextCohort.map(x => this.toBid(accountNames, x)),
-    );
+    this.nextCohort = await Promise.all(nextCohort.map(x => this.toBid(accountNames, x)));
   }
 
   private async toBid(

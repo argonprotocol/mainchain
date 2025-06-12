@@ -25,12 +25,7 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type {
-  AccountId32,
-  Call,
-  H256,
-  MultiAddress,
-} from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
   ArgonPrimitivesBitcoinH256Le,
@@ -64,8 +59,7 @@ import type {
 } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
-export type __SubmittableExtrinsic<ApiType extends ApiTypes> =
-  SubmittableExtrinsic<ApiType>;
+export type __SubmittableExtrinsic<ApiType extends ApiTypes> = SubmittableExtrinsic<ApiType>;
 export type __SubmittableExtrinsicFunction<ApiType extends ApiTypes> =
   SubmittableExtrinsicFunction<ApiType>;
 
@@ -273,9 +267,7 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     bitcoinLocks: {
       adminModifyMinimumLockedSats: AugmentedSubmittable<
-        (
-          satoshis: u64 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u64]
       >;
       /**
@@ -306,10 +298,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
-          bitcoinPubkey:
-            | ArgonPrimitivesBitcoinCompressedBitcoinPubkey
-            | string
-            | Uint8Array,
+          bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]
       >;
@@ -372,9 +361,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * * `account_id` - the account id of the operator
        **/
       setOperator: AugmentedSubmittable<
-        (
-          accountId: AccountId32 | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (accountId: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [AccountId32]
       >;
       /**
@@ -414,12 +401,7 @@ declare module '@polkadot/api-base/types/submittable' {
       configure: AugmentedSubmittable<
         (
           voteMinimum: Option<u128> | null | Uint8Array | u128 | AnyNumber,
-          computeDifficulty:
-            | Option<u128>
-            | null
-            | Uint8Array
-            | u128
-            | AnyNumber,
+          computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<u128>, Option<u128>]
       >;
@@ -706,12 +688,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | { grandpa?: any; blockSealAuthority?: any }
             | string
             | Uint8Array,
-          miningAccountId:
-            | Option<AccountId32>
-            | null
-            | Uint8Array
-            | AccountId32
-            | string,
+          miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
         [u128, ArgonRuntimeSessionKeys, Option<AccountId32>]
       >;
@@ -721,12 +698,7 @@ declare module '@polkadot/api-base/types/submittable' {
       configureMiningSlotDelay: AugmentedSubmittable<
         (
           miningSlotDelay: Option<u64> | null | Uint8Array | u64 | AnyNumber,
-          ticksBeforeBidEndForVrfClose:
-            | Option<u64>
-            | null
-            | Uint8Array
-            | u64
-            | AnyNumber,
+          ticksBeforeBidEndForVrfClose: Option<u64> | null | Uint8Array | u64 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<u64>, Option<u64>]
       >;
@@ -768,9 +740,7 @@ declare module '@polkadot/api-base/types/submittable' {
       approveAsMulti: AugmentedSubmittable<
         (
           threshold: u16 | AnyNumber | Uint8Array,
-          otherSignatories:
-            | Vec<AccountId32>
-            | (AccountId32 | string | Uint8Array)[],
+          otherSignatories: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
           maybeTimepoint:
             | Option<PalletMultisigTimepoint>
             | null
@@ -785,13 +755,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [
-          u16,
-          Vec<AccountId32>,
-          Option<PalletMultisigTimepoint>,
-          U8aFixed,
-          SpWeightsWeightV2Weight,
-        ]
+        [u16, Vec<AccountId32>, Option<PalletMultisigTimepoint>, U8aFixed, SpWeightsWeightV2Weight]
       >;
       /**
        * Register approval for a dispatch to be made from a deterministic composite account if
@@ -837,9 +801,7 @@ declare module '@polkadot/api-base/types/submittable' {
       asMulti: AugmentedSubmittable<
         (
           threshold: u16 | AnyNumber | Uint8Array,
-          otherSignatories:
-            | Vec<AccountId32>
-            | (AccountId32 | string | Uint8Array)[],
+          otherSignatories: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
           maybeTimepoint:
             | Option<PalletMultisigTimepoint>
             | null
@@ -854,13 +816,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [
-          u16,
-          Vec<AccountId32>,
-          Option<PalletMultisigTimepoint>,
-          Call,
-          SpWeightsWeightV2Weight,
-        ]
+        [u16, Vec<AccountId32>, Option<PalletMultisigTimepoint>, Call, SpWeightsWeightV2Weight]
       >;
       /**
        * Immediately dispatch a multi-signature call using a single approval from the caller.
@@ -878,9 +834,7 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       asMultiThreshold1: AugmentedSubmittable<
         (
-          otherSignatories:
-            | Vec<AccountId32>
-            | (AccountId32 | string | Uint8Array)[],
+          otherSignatories: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [Vec<AccountId32>, Call]
@@ -911,14 +865,8 @@ declare module '@polkadot/api-base/types/submittable' {
       cancelAsMulti: AugmentedSubmittable<
         (
           threshold: u16 | AnyNumber | Uint8Array,
-          otherSignatories:
-            | Vec<AccountId32>
-            | (AccountId32 | string | Uint8Array)[],
-          timepoint:
-            | PalletMultisigTimepoint
-            | { height?: any; index?: any }
-            | string
-            | Uint8Array,
+          otherSignatories: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
+          timepoint: PalletMultisigTimepoint | { height?: any; index?: any } | string | Uint8Array,
           callHash: U8aFixed | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u16, Vec<AccountId32>, PalletMultisigTimepoint, U8aFixed]
@@ -941,9 +889,7 @@ declare module '@polkadot/api-base/types/submittable' {
       pokeDeposit: AugmentedSubmittable<
         (
           threshold: u16 | AnyNumber | Uint8Array,
-          otherSignatories:
-            | Vec<AccountId32>
-            | (AccountId32 | string | Uint8Array)[],
+          otherSignatories: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
           callHash: U8aFixed | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u16, Vec<AccountId32>, U8aFixed]
@@ -951,9 +897,7 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     notaries: {
       activate: AugmentedSubmittable<
-        (
-          operatorAccount: AccountId32 | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (operatorAccount: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [AccountId32]
       >;
       propose: AugmentedSubmittable<
@@ -998,9 +942,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [Vec<ArgonPrimitivesNotebookSignedNotebookHeader>]
       >;
       unlock: AugmentedSubmittable<
-        (
-          notaryId: u32 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u32]
       >;
     };
@@ -1212,9 +1154,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * * `account_id` - the account id of the operator
        **/
       setOperator: AugmentedSubmittable<
-        (
-          accountId: AccountId32 | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (accountId: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [AccountId32]
       >;
       /**
@@ -1399,10 +1339,7 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * Emits `DepositPoked` if successful.
        **/
-      pokeDeposit: AugmentedSubmittable<
-        () => SubmittableExtrinsic<ApiType>,
-        []
-      >;
+      pokeDeposit: AugmentedSubmittable<() => SubmittableExtrinsic<ApiType>, []>;
       /**
        * Dispatch the given `call` from an account that the sender is authorised for through
        * `add_proxy`.
@@ -1552,10 +1489,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * WARNING: This may be called on accounts created by `pure`, however if done, then
        * the unreserved fees will be inaccessible. **All access to this account will be lost.**
        **/
-      removeProxies: AugmentedSubmittable<
-        () => SubmittableExtrinsic<ApiType>,
-        []
-      >;
+      removeProxies: AugmentedSubmittable<() => SubmittableExtrinsic<ApiType>, []>;
       /**
        * Unregister a proxy account for the sender.
        *
@@ -1620,9 +1554,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Authenticates the sudo key and dispatches a function call with `Root` origin.
        **/
       sudo: AugmentedSubmittable<
-        (
-          call: Call | IMethod | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (call: Call | IMethod | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Call]
       >;
       /**
@@ -1722,9 +1654,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Kill some items from storage.
        **/
       killStorage: AugmentedSubmittable<
-        (
-          keys: Vec<Bytes> | (Bytes | string | Uint8Array)[],
-        ) => SubmittableExtrinsic<ApiType>,
+        (keys: Vec<Bytes> | (Bytes | string | Uint8Array)[]) => SubmittableExtrinsic<ApiType>,
         [Vec<Bytes>]
       >;
       /**
@@ -1803,9 +1733,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * - 1 event handler `on_timestamp_set`. Must be `O(1)`.
        **/
       set: AugmentedSubmittable<
-        (
-          now: Compact<u64> | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (now: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Compact<u64>]
       >;
     };
@@ -1831,9 +1759,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Set the token gateway address for specified chains
        **/
       setTokenGatewayAddresses: AugmentedSubmittable<
-        (
-          addresses: BTreeMap<IsmpHostStateMachine, Bytes>,
-        ) => SubmittableExtrinsic<ApiType>,
+        (addresses: BTreeMap<IsmpHostStateMachine, Bytes>) => SubmittableExtrinsic<ApiType>,
         [BTreeMap<IsmpHostStateMachine, Bytes>]
       >;
       /**
@@ -2005,11 +1931,7 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       dispatchAs: AugmentedSubmittable<
         (
-          asOrigin:
-            | ArgonRuntimeOriginCaller
-            | { system: any }
-            | string
-            | Uint8Array,
+          asOrigin: ArgonRuntimeOriginCaller | { system: any } | string | Uint8Array,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [ArgonRuntimeOriginCaller, Call]
@@ -2023,11 +1945,7 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       dispatchAsFallible: AugmentedSubmittable<
         (
-          asOrigin:
-            | ArgonRuntimeOriginCaller
-            | { system: any }
-            | string
-            | Uint8Array,
+          asOrigin: ArgonRuntimeOriginCaller | { system: any } | string | Uint8Array,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [ArgonRuntimeOriginCaller, Call]
@@ -2111,9 +2029,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * locks. As funds are returned, they will be released to the vault owner.
        **/
       close: AugmentedSubmittable<
-        (
-          vaultId: u32 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
+        (vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u32]
       >;
       create: AugmentedSubmittable<
@@ -2176,10 +2092,7 @@ declare module '@polkadot/api-base/types/submittable' {
       replaceBitcoinXpub: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
-          bitcoinXpub:
-            | ArgonPrimitivesBitcoinOpaqueBitcoinXpub
-            | string
-            | Uint8Array,
+          bitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]
       >;

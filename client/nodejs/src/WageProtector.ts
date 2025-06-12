@@ -25,10 +25,7 @@ export class WageProtector {
    * @returns The protected wage
    */
   public getProtectedWage(baseWage: bigint): bigint {
-    return (
-      (baseWage * this.latestCpi.argonUsdTargetPrice) /
-      this.latestCpi.argonUsdPrice
-    );
+    return (baseWage * this.latestCpi.argonUsdTargetPrice) / this.latestCpi.argonUsdPrice;
   }
 
   /**

@@ -7,10 +7,7 @@ export default class TestBitcoinCli {
    * Returns the localhost address of the notary (NOTE: not accessible from containers)
    */
   public static run(command: string): string {
-    const binPath = Path.join(
-      `${projectRoot()}`,
-      'target/debug/argon-bitcoin-cli',
-    );
+    const binPath = Path.join(`${projectRoot()}`, 'target/debug/argon-bitcoin-cli');
 
     try {
       return child_process

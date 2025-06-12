@@ -3,11 +3,7 @@ import './interfaces/augment-types';
 import './interfaces/types-lookup';
 import type { KeyringPair, KeyringPair$Json } from '@polkadot/keyring/types';
 import { ApiPromise, HttpProvider, Keyring, WsProvider } from '@polkadot/api';
-import {
-  cryptoWaitReady,
-  decodeAddress,
-  mnemonicGenerate,
-} from '@polkadot/util-crypto';
+import { cryptoWaitReady, decodeAddress, mnemonicGenerate } from '@polkadot/util-crypto';
 import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
@@ -18,11 +14,7 @@ export { Accountset } from './Accountset';
 export { MiningBids } from './MiningBids';
 export { AccountMiners } from './AccountMiners';
 export { FrameCalculator } from './FrameCalculator';
-export {
-  BlockWatch,
-  getAuthorFromHeader,
-  getTickFromHeader,
-} from './BlockWatch';
+export { BlockWatch, getAuthorFromHeader, getTickFromHeader } from './BlockWatch';
 export * from './utils';
 export { AccountRegistry } from './AccountRegistry';
 export { Vault } from './Vault';
@@ -32,14 +24,7 @@ export { CohortBidderHistory } from './CohortBidderHistory';
 export { BidPool } from './BidPool';
 export { BitcoinLocks } from './BitcoinLocks';
 export { keyringFromSuri, createKeyringPair } from './keyringUtils';
-export {
-  Keyring,
-  KeyringPair,
-  KeyringPair$Json,
-  KeypairType,
-  mnemonicGenerate,
-  decodeAddress,
-};
+export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
 
 export * from '@polkadot/types';
 export * from '@polkadot/types/lookup';

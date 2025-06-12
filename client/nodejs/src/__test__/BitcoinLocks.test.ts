@@ -1,19 +1,14 @@
 import {
   addTeardown,
-  describeIntegration, runOnTeardown,
+  describeIntegration,
+  runOnTeardown,
   sudo,
   teardown,
   TestBitcoinCli,
   TestMainchain,
   TestOracle,
 } from '@argonprotocol/testing';
-import {
-  Accountset,
-  ArgonClient,
-  BitcoinLocks,
-  TxSubmitter,
-  VaultMonitor,
-} from '../index';
+import { Accountset, ArgonClient, BitcoinLocks, TxSubmitter, VaultMonitor } from '../index';
 import { parseSubaccountRange } from '../Accountset';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { mnemonicGenerate } from '@polkadot/util-crypto';
@@ -97,9 +92,7 @@ describeIntegration(
           argonTimeWeightedAverageLiquidity: BigInt(1_000e18),
           tick: currentTick.toNumber(),
         }),
-        new Keyring({ type: 'sr25519' }).addFromUri(
-          TestOracle.PriceIndexOperator,
-        ),
+        new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
       );
       await tx.submit({ waitForBlock: true });
 
@@ -134,9 +127,7 @@ describeIntegration(
       const lockSendOutput = TestBitcoinCli.run(
         `lock send-to-address --utxo-id 1 -t ${alicechain.address}`,
       );
-      const vaultScriptpub = lockSendOutput.match(
-        /satoshis to ([a-z0-9]+1[a-z0-9]+)/,
-      )?.[1];
+      const vaultScriptpub = lockSendOutput.match(/satoshis to ([a-z0-9]+1[a-z0-9]+)/)?.[1];
 
       console.log('Sending to vault scriptpub', vaultScriptpub, lockSendOutput);
 
@@ -149,17 +140,14 @@ describeIntegration(
 
       // wait for the bitcoin to verify
       await new Promise<void>(async (resolve, reject) => {
-        const unsub = await aliceClient.query.bitcoinLocks.locksByUtxoId(
-          1,
-          y => {
-            if (!y.isSome) reject('No lock found');
-            const lock = y.unwrap();
-            if (lock.isVerified) {
-              resolve();
-              unsub();
-            }
-          },
-        );
+        const unsub = await aliceClient.query.bitcoinLocks.locksByUtxoId(1, y => {
+          if (!y.isSome) reject('No lock found');
+          const lock = y.unwrap();
+          if (lock.isVerified) {
+            resolve();
+            unsub();
+          }
+        });
       });
     });
   },

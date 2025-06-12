@@ -2,12 +2,7 @@ import { customAlphabet } from 'nanoid';
 import pg from 'pg';
 import type { Client } from 'pg';
 import * as child_process from 'node:child_process';
-import {
-  ArgonClient,
-  Keyring,
-  KeyringPair,
-  TxSubmitter,
-} from '@argonprotocol/mainchain';
+import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
 import {
@@ -73,8 +68,7 @@ export default class TestNotary implements ITeardownable {
       '//Ferdie//notary',
     ).publicKey;
 
-    let notaryPath =
-      pathToNotaryBin ?? Path.join(projectRoot(), 'target/debug/argon-notary');
+    let notaryPath = pathToNotaryBin ?? Path.join(projectRoot(), 'target/debug/argon-notary');
     if (process.env.ARGON_USE_DOCKER_BINS) {
       this.containerName = 'notary_' + uuid;
       const addHost = process.env.ADD_DOCKER_HOST
@@ -95,10 +89,7 @@ export default class TestNotary implements ITeardownable {
       while (tries > 0) {
         dbName = `notary_${uuid}`;
         // check if the db path  notary_{id} exists
-        const result = await client.query(
-          'SELECT 1 FROM pg_database WHERE datname = $1',
-          [dbName],
-        );
+        const result = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
         if (result.rowCount === 0) {
           break;
         }

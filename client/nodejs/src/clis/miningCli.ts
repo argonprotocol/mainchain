@@ -8,9 +8,7 @@ import { accountsetFromCli, globalOptions, saveKeyringPair } from './index';
 import { CohortBidder } from '../CohortBidder';
 
 export default function miningCli() {
-  const program = new Command('mining').description(
-    'Watch mining seats or setup bidding',
-  );
+  const program = new Command('mining').description('Watch mining seats or setup bidding');
 
   program
     .command('list', { isDefault: true })
@@ -47,69 +45,61 @@ export default function miningCli() {
           );
         }
         if (!bids.nextCohort.length) {
-          console.log(
-            '-------------------------------------\nNo bids for next cohort',
-          );
+          console.log('-------------------------------------\nNo bids for next cohort');
         } else {
           bids.print();
         }
       }
 
-      const { unsubscribe } = await bids.watch(
-        accountset.namedAccounts,
-        undefined,
-        print,
-      );
+      const { unsubscribe } = await bids.watch(accountset.namedAccounts, undefined, print);
       console.log('Watching miners...');
       const minMiners = api.consts.miningSlot.minCohortSize.toNumber();
 
-      const unsub = await api.query.miningSlot.nextFrameId(
-        async nextFrameId => {
-          const frames = new Array(nextFrameId.toNumber())
-            .fill(0)
-            .map((_, i) => nextFrameId.toNumber() - i)
-            .sort();
-          const unseenFrames = new Set(frames);
-          const entries = await api.query.miningSlot.minersByCohort.entries();
-          const block = await api.query.system.number();
+      const unsub = await api.query.miningSlot.nextFrameId(async nextFrameId => {
+        const frames = new Array(nextFrameId.toNumber())
+          .fill(0)
+          .map((_, i) => nextFrameId.toNumber() - i)
+          .sort();
+        const unseenFrames = new Set(frames);
+        const entries = await api.query.miningSlot.minersByCohort.entries();
+        const block = await api.query.system.number();
 
-          const sortedEntries = entries.sort((a, b) => {
-            const aIndex = a[0].args[0].toNumber();
-            const bIndex = b[0].args[0].toNumber();
-            return aIndex - bIndex;
-          });
+        const sortedEntries = entries.sort((a, b) => {
+          const aIndex = a[0].args[0].toNumber();
+          const bIndex = b[0].args[0].toNumber();
+          return aIndex - bIndex;
+        });
 
-          for (const [rawFrameId, miners] of sortedEntries) {
-            const frameId = rawFrameId.args[0].toNumber();
-            unseenFrames.delete(frameId);
-            let i = 0;
-            for (const miner of miners) {
-              const address = miner.accountId.toHuman();
-              const startingFrameId = miner.startingFrameId.toNumber();
-              lastMiners[`${frameId}-${i}`] = {
-                miner: accountset.namedAccounts.get(address) ?? address,
-                bid: miner.bid.toBigInt(),
-                isLastDay: nextFrameId.toNumber() - startingFrameId === 10,
-              };
-              i++;
-            }
-            while (i < minMiners) {
-              lastMiners[`${frameId}-${i}`] = {
-                miner: 'none',
-              };
-              i++;
-            }
+        for (const [rawFrameId, miners] of sortedEntries) {
+          const frameId = rawFrameId.args[0].toNumber();
+          unseenFrames.delete(frameId);
+          let i = 0;
+          for (const miner of miners) {
+            const address = miner.accountId.toHuman();
+            const startingFrameId = miner.startingFrameId.toNumber();
+            lastMiners[`${frameId}-${i}`] = {
+              miner: accountset.namedAccounts.get(address) ?? address,
+              bid: miner.bid.toBigInt(),
+              isLastDay: nextFrameId.toNumber() - startingFrameId === 10,
+            };
+            i++;
           }
-          for (const frameId of unseenFrames) {
-            for (let i = 0; i < minMiners; i++) {
-              lastMiners[`${frameId}-${i}`] = {
-                miner: 'none',
-              };
-            }
+          while (i < minMiners) {
+            lastMiners[`${frameId}-${i}`] = {
+              miner: 'none',
+            };
+            i++;
           }
-          print(block.toNumber());
-        },
-      );
+        }
+        for (const frameId of unseenFrames) {
+          for (let i = 0; i < minMiners; i++) {
+            lastMiners[`${frameId}-${i}`] = {
+              miner: 'none',
+            };
+          }
+        }
+        print(block.toNumber());
+      });
       process.on('SIGINT', () => {
         unsubscribe();
         unsub();
@@ -122,11 +112,7 @@ export default function miningCli() {
     .description('Submit mining bids within a range of parameters')
     .option('--min-bid <amount>', 'The minimum bid amount to use', parseFloat)
     .option('--max-bid <amount>', 'The maximum bid amount to use', parseFloat)
-    .option(
-      '--max-seats <n>',
-      'The maximum number of seats to bid on for the slot',
-      parseInt,
-    )
+    .option('--max-seats <n>', 'The maximum number of seats to bid on for the slot', parseInt)
     .option(
       '--max-balance <argons>',
       "Use a maximum amount of the user's balance for the slot. If this ends in a percent, it will be a percent of the funds",
@@ -180,23 +166,18 @@ export default function miningCli() {
             const balance = await accountset.balance();
             const feeWiggleRoom = BigInt(25e3);
             const amountAvailable = balance - feeWiggleRoom;
-            let maxBidAmount = maxBid
-              ? BigInt(maxBid * MICROGONS_PER_ARGON)
-              : undefined;
+            let maxBidAmount = maxBid ? BigInt(maxBid * MICROGONS_PER_ARGON) : undefined;
             let maxBalanceToUse = amountAvailable;
             if (maxBalance !== undefined) {
               if (maxBalance!.endsWith('%')) {
                 let maxBalancePercent = parseInt(maxBalance);
-                let amountToBid =
-                  (amountAvailable * BigInt(maxBalancePercent)) / 100n;
+                let amountToBid = (amountAvailable * BigInt(maxBalancePercent)) / 100n;
                 if (amountToBid > balance) {
                   amountToBid = balance;
                 }
                 maxBalanceToUse = amountToBid;
               } else {
-                maxBalanceToUse = BigInt(
-                  Math.floor(parseFloat(maxBalance) * MICROGONS_PER_ARGON),
-                );
+                maxBalanceToUse = BigInt(Math.floor(parseFloat(maxBalance) * MICROGONS_PER_ARGON));
               }
 
               maxBidAmount ??= maxBalanceToUse / BigInt(seatsToWin);
@@ -208,29 +189,18 @@ export default function miningCli() {
               console.error('No max bid amount set');
               process.exit(1);
             }
-            const subaccountRange =
-              await accountset.getAvailableMinerAccounts(seatsToWin);
+            const subaccountRange = await accountset.getAvailableMinerAccounts(seatsToWin);
 
-            if (
-              cohortBidder &&
-              cohortBidder?.cohortStartingFrameId !== cohortStartingFrameId
-            ) {
+            if (cohortBidder && cohortBidder?.cohortStartingFrameId !== cohortStartingFrameId) {
               await stopBidder(unsubscribe);
             }
-            cohortBidder = new CohortBidder(
-              accountset,
-              cohortStartingFrameId,
-              subaccountRange,
-              {
-                maxBid: maxBidAmount,
-                minBid: BigInt((minBid ?? 0) * MICROGONS_PER_ARGON),
-                bidIncrement: BigInt(
-                  Math.floor(bidIncrement * MICROGONS_PER_ARGON),
-                ),
-                maxBudget: maxBalanceToUse,
-                bidDelay,
-              },
-            );
+            cohortBidder = new CohortBidder(accountset, cohortStartingFrameId, subaccountRange, {
+              maxBid: maxBidAmount,
+              minBid: BigInt((minBid ?? 0) * MICROGONS_PER_ARGON),
+              bidIncrement: BigInt(Math.floor(bidIncrement * MICROGONS_PER_ARGON)),
+              maxBudget: maxBalanceToUse,
+              bidDelay,
+            });
             await cohortBidder.start();
           },
         });
@@ -249,10 +219,7 @@ export default function miningCli() {
       'How many argons should be sent to the proxy account for fees (proxies must pay fees)',
       parseFloat,
     )
-    .option(
-      '--proxy-passphrase <passphrase>',
-      'The passphrase for your proxy account',
-    )
+    .option('--proxy-passphrase <passphrase>', 'The passphrase for your proxy account')
     .action(async ({ outfile, proxyPassphrase, feeArgons }) => {
       const { mainchainUrl } = globalOptions(program);
       const client = await getClient(mainchainUrl);
@@ -262,15 +229,10 @@ export default function miningCli() {
         passphrase: proxyPassphrase,
       });
       const address = keyringPair.address;
-      console.log(
-        `✅ Created proxy account at "${outfile}" with address ${address}`,
-      );
+      console.log(`✅ Created proxy account at "${outfile}" with address ${address}`);
       const tx = client.tx.utility.batchAll([
         client.tx.proxy.addProxy(address, 'MiningBid', 0),
-        client.tx.balances.transferAllowDeath(
-          address,
-          BigInt(feeArgons * MICROGONS_PER_ARGON),
-        ),
+        client.tx.balances.transferAllowDeath(address, BigInt(feeArgons * MICROGONS_PER_ARGON)),
       ]);
       let keypair: KeyringPair;
       try {

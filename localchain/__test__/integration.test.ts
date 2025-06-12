@@ -1,11 +1,6 @@
 import { AccountType, MainchainClient, NotaryClient } from '../index';
 import { Keyring } from '@argonprotocol/mainchain';
-import {
-  describeIntegration,
-  teardown,
-  TestMainchain,
-  TestNotary,
-} from './testHelpers';
+import { describeIntegration, teardown, TestMainchain, TestNotary } from './testHelpers';
 
 import { afterAll, afterEach, expect, it } from 'vitest';
 
@@ -45,17 +40,10 @@ describeIntegration('Integration tests', () => {
 
     const addressKeyring = new Keyring({ type: 'sr25519' });
     const bob = addressKeyring.createFromUri('//Bob', { type: 'ed25519' });
-    const client = await NotaryClient.connect(
-      1,
-      Buffer.from(bob.publicKey),
-      notaryUrl,
-      false,
-    );
+    const client = await NotaryClient.connect(1, Buffer.from(bob.publicKey), notaryUrl, false);
     const metadata = await client.metadata;
     expect(metadata.finalizedNotebookNumber).toBeGreaterThanOrEqual(0);
 
-    await expect(
-      client.getBalanceTip(bob.address, AccountType.Deposit),
-    ).rejects.toThrow();
+    await expect(client.getBalanceTip(bob.address, AccountType.Deposit)).rejects.toThrow();
   });
 });

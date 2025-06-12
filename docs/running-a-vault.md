@@ -131,6 +131,7 @@ uncover through the vault activities.
 ```bash
 $ argon-bitcoin-cli xpriv master --xpriv-password=supersecret --xpriv-path=/tmp/vault1.xpriv
 ```
+
 > NOTE: on testnet, you must add `--bitcoin-network=signet` to the command above to create a Signet XPriv key.
 
 ### 2. Create an upload-able XPub key

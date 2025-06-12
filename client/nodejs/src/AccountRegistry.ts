@@ -16,6 +16,5 @@ export class AccountRegistry {
     this.namedAccounts.set(address, name);
   }
 
-  public static factory: (name?: string) => AccountRegistry = name =>
-    new AccountRegistry(name);
+  public static factory: (name?: string) => AccountRegistry = name => new AccountRegistry(name);
 }

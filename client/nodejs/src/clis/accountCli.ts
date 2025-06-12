@@ -9,9 +9,7 @@ import * as process from 'node:process';
 import { accountsetFromCli, globalOptions } from './index';
 
 export default function accountCli() {
-  const program = new Command('accounts').description(
-    'Manage subaccounts from a single keypair',
-  );
+  const program = new Command('accounts').description('Manage subaccounts from a single keypair');
 
   program
     .command('watch')
@@ -47,9 +45,7 @@ export default function accountCli() {
         accountset.miningSeats(),
         accountset.bids(),
       ]);
-      const accountSubset = subaccounts
-        ? accountset.getAccountsInRange(subaccounts)
-        : undefined;
+      const accountSubset = subaccounts ? accountset.getAccountsInRange(subaccounts) : undefined;
       const status = accountset.status({
         argons,
         argonots,
@@ -68,13 +64,9 @@ export default function accountCli() {
       '--path <path>',
       'The path to an env file to create (convention is .env.<name>)',
     )
-    .option(
-      '--register-keys-to <url>',
-      'Register the keys to a url (normally this is localhost)',
-    )
+    .option('--register-keys-to <url>', 'Register the keys to a url (normally this is localhost)')
     .action(async ({ registerKeysTo, path }) => {
-      const { accountPassphrase, accountSuri, accountFilePath } =
-        globalOptions(program);
+      const { accountPassphrase, accountSuri, accountFilePath } = globalOptions(program);
       const accountset = await accountsetFromCli(program);
       process.env.KEYS_MNEMONIC ||= mnemonicGenerate();
       if (registerKeysTo) {
@@ -106,10 +98,7 @@ export default function accountCli() {
     .action(async () => {
       await cryptoWaitReady();
       const mnemonic = mnemonicGenerate();
-      console.log(
-        'New mnemonic (add this to your .env as KEYS_MNEMONIC):',
-        mnemonic,
-      );
+      console.log('New mnemonic (add this to your .env as KEYS_MNEMONIC):', mnemonic);
       process.exit(0);
     });
 
@@ -121,10 +110,7 @@ export default function accountCli() {
       'The url to your node host (should be installed on machine via localhost)',
       'http://localhost:9944',
     )
-    .option(
-      '--print-only',
-      'Output as curl commands instead of direct registration',
-    )
+    .option('--print-only', 'Output as curl commands instead of direct registration')
     .action(async (nodeRpcUrl, { printOnly }) => {
       const accountset = await accountsetFromCli(program);
       if (printOnly) {

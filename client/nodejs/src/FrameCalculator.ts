@@ -13,23 +13,17 @@ export class FrameCalculator {
   private genesisTick: number | undefined;
 
   async getForTick(client: ArgonClient, tick: number) {
-    const { ticksBetweenFrames, biddingStartTick } =
-      await this.getConfig(client);
+    const { ticksBetweenFrames, biddingStartTick } = await this.getConfig(client);
 
     const ticksSinceMiningStart = tick - biddingStartTick;
 
     return Math.floor(ticksSinceMiningStart / ticksBetweenFrames);
   }
 
-  async getTickRangeForFrame(
-    client: ArgonClient,
-    frameId: number,
-  ): Promise<[number, number]> {
-    const { ticksBetweenFrames, biddingStartTick } =
-      await this.getConfig(client);
+  async getTickRangeForFrame(client: ArgonClient, frameId: number): Promise<[number, number]> {
+    const { ticksBetweenFrames, biddingStartTick } = await this.getConfig(client);
 
-    const startingTick =
-      biddingStartTick + Math.floor(frameId * ticksBetweenFrames);
+    const startingTick = biddingStartTick + Math.floor(frameId * ticksBetweenFrames);
     const endingTick = startingTick + ticksBetweenFrames - 1;
 
     return [startingTick, endingTick];
@@ -43,12 +37,10 @@ export class FrameCalculator {
   }
 
   private async getConfig(client: ArgonClient) {
-    this.miningConfig ??= await client.query.miningSlot
-      .miningConfig()
-      .then(x => ({
-        ticksBetweenSlots: x.ticksBetweenSlots.toNumber(),
-        slotBiddingStartAfterTicks: x.slotBiddingStartAfterTicks.toNumber(),
-      }));
+    this.miningConfig ??= await client.query.miningSlot.miningConfig().then(x => ({
+      ticksBetweenSlots: x.ticksBetweenSlots.toNumber(),
+      slotBiddingStartAfterTicks: x.slotBiddingStartAfterTicks.toNumber(),
+    }));
     this.genesisTick ??= await client.query.ticks
       .genesisTick()
       .then((x: { toNumber: () => number }) => x.toNumber());

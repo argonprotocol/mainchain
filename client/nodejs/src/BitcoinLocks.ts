@@ -1,9 +1,4 @@
-import {
-  Accountset,
-  type ArgonClient,
-  type KeyringPair,
-  VaultMonitor,
-} from './index';
+import { Accountset, type ArgonClient, type KeyringPair, VaultMonitor } from './index';
 import { formatArgons } from './utils';
 import { Vault } from './Vault';
 
@@ -15,10 +10,7 @@ export class BitcoinLocks {
   public async getMarketRate(satoshis: bigint): Promise<bigint> {
     const client = await this.client;
     const sats = client.createType('U64', satoshis.toString());
-    const marketRate = await client.rpc.state.call(
-      'BitcoinApis_market_rate',
-      sats.toHex(true),
-    );
+    const marketRate = await client.rpc.state.call('BitcoinApis_market_rate', sats.toHex(true));
     const rate = client.createType('Option<U128>', marketRate);
     if (!rate.isSome) {
       throw new Error('Market rate not available');
@@ -51,22 +43,14 @@ export class BitcoinLocks {
      * 1_000_000 / 100 = 10_000 satoshis needed
      */
     // Add wiggle room for fluctuating price
-    const satoshisNeeded =
-      (amount * SATS_PER_BTC) / marketRatePerBitcoin - 500n;
+    const satoshisNeeded = (amount * SATS_PER_BTC) / marketRatePerBitcoin - 500n;
 
-    const tx = client.tx.bitcoinLocks.initialize(
-      vaultId,
-      satoshisNeeded,
-      bitcoinXpub,
-    );
-    const existentialDeposit =
-      client.consts.balances.existentialDeposit.toBigInt();
+    const tx = client.tx.bitcoinLocks.initialize(vaultId, satoshisNeeded, bitcoinXpub);
+    const existentialDeposit = client.consts.balances.existentialDeposit.toBigInt();
     const finalTip = tip ?? 0n;
     const fees = await tx.paymentInfo(keypair.address, { tip });
     const txFee = fees.partialFee.toBigInt();
-    const tickDuration = (
-      await client.query.ticks.genesisTicker()
-    ).tickDurationMillis.toNumber();
+    const tickDuration = (await client.query.ticks.genesisTicker()).tickDurationMillis.toNumber();
     const rawVault = await client.query.vaults.vaultsById(vaultId);
     const vault = new Vault(vaultId, rawVault.unwrap(), tickDuration);
     const btcFee = vault.calculateBitcoinFee(amount);
@@ -118,17 +102,14 @@ export class BitcoinLocks {
 
         try {
           const bitcoinLock = new BitcoinLocks(accountset.client);
-          const { tx, satoshis, btcFee, txFee } =
-            await bitcoinLock.buildBitcoinLockTx({
-              vaultId,
-              keypair: accountset.txSubmitterPair,
-              amount: argonAmount,
-              bitcoinXpub,
-              tip,
-            });
-          const result = await accountset
-            .tx(tx)
-            .then(x => x.submit({ waitForBlock: true, tip }));
+          const { tx, satoshis, btcFee, txFee } = await bitcoinLock.buildBitcoinLockTx({
+            vaultId,
+            keypair: accountset.txSubmitterPair,
+            amount: argonAmount,
+            bitcoinXpub,
+            tip,
+          });
+          const result = await accountset.tx(tx).then(x => x.submit({ waitForBlock: true, tip }));
 
           const client = await accountset.client;
           const utxoId = result.events

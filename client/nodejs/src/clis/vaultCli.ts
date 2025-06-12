@@ -7,9 +7,7 @@ import { accountsetFromCli } from './index';
 import { MICROGONS_PER_ARGON } from '../utils';
 
 export default function vaultCli() {
-  const program = new Command('vaults').description(
-    'Monitor vaults and manage securitization',
-  );
+  const program = new Command('vaults').description('Monitor vaults and manage securitization');
 
   program
     .command('list', { isDefault: true })
@@ -33,11 +31,7 @@ export default function vaultCli() {
       parseFloat,
     )
     .option('--ratio <ratio>', 'The new securitization ratio', parseFloat)
-    .option(
-      '--tip <amount>',
-      'The tip to include with the transaction',
-      parseFloat,
-    )
+    .option('--tip <amount>', 'The tip to include with the transaction', parseFloat)
     .action(async ({ tip, argons, vaultId, ratio }) => {
       const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
@@ -50,8 +44,7 @@ export default function vaultCli() {
         process.exit(1);
       }
       const existingFunds = rawVault.securitization.toBigInt();
-      const additionalFunds =
-        microgons > existingFunds ? microgons - existingFunds : 0n;
+      const additionalFunds = microgons > existingFunds ? microgons - existingFunds : 0n;
       const tx = client.tx.vaults.modifyFunding(
         vaultId,
         microgons,
@@ -84,44 +77,26 @@ export default function vaultCli() {
 
   program
     .command('make-bitcoin-space')
-    .description(
-      'Make bitcoin space in a vault and lock it immediately in the same tx.',
-    )
+    .description('Make bitcoin space in a vault and lock it immediately in the same tx.')
     .requiredOption('-v, --vault-id <id>', 'The vault id to use', parseInt)
-    .requiredOption(
-      '-a, --argons <amount>',
-      'The number of argons to add',
-      parseFloat,
-    )
-    .requiredOption(
-      '--bitcoin-pubkey <pubkey>',
-      'The pubkey to use for the bitcoin lock',
-    )
-    .option(
-      '--tip <amount>',
-      'The tip to include with the transaction',
-      parseFloat,
-    )
+    .requiredOption('-a, --argons <amount>', 'The number of argons to add', parseFloat)
+    .requiredOption('--bitcoin-pubkey <pubkey>', 'The pubkey to use for the bitcoin lock')
+    .option('--tip <amount>', 'The tip to include with the transaction', parseFloat)
     .action(async ({ tip, argons, vaultId, bitcoinPubkey }) => {
       let pubkey = bitcoinPubkey;
       if (!bitcoinPubkey.startsWith('0x')) {
         pubkey = `0x${bitcoinPubkey}`;
       }
       if (pubkey.length !== 68) {
-        throw new Error(
-          'Bitcoin pubkey must be 66 characters (add 0x in front optionally)',
-        );
+        throw new Error('Bitcoin pubkey must be 66 characters (add 0x in front optionally)');
       }
       const accountset = await accountsetFromCli(program);
       const client = await accountset.client;
       const resolvedTip = tip ? BigInt(tip * MICROGONS_PER_ARGON) : 0n;
       const microgons = BigInt(argons * MICROGONS_PER_ARGON);
       const bitcoinLocks = new BitcoinLocks(Promise.resolve(client));
-      const existentialDeposit =
-        client.consts.balances.existentialDeposit.toBigInt();
-      const tickDuration = (
-        await client.query.ticks.genesisTicker()
-      ).tickDurationMillis.toNumber();
+      const existentialDeposit = client.consts.balances.existentialDeposit.toBigInt();
+      const tickDuration = (await client.query.ticks.genesisTicker()).tickDurationMillis.toNumber();
 
       const rawVault = (await client.query.vaults.vaultsById(vaultId)).unwrap();
       if (rawVault.operatorAccountId.toHuman() !== accountset.seedAddress) {
@@ -156,28 +131,19 @@ export default function vaultCli() {
         reducedBalanceBy: argonsNeeded + vaultTxFee + resolvedTip,
       });
       if (
-        argonsNeeded +
-          txFee +
-          vaultTxFee +
-          resolvedTip +
-          btcFee +
-          existentialDeposit >
+        argonsNeeded + txFee + vaultTxFee + resolvedTip + btcFee + existentialDeposit >
         freeBalance
       ) {
-        console.warn(
-          'Insufficient balance to add bitcoin space and use bitcoins',
-          {
-            freeBalance,
-            txFee,
-            vaultTxFee,
-            btcFee,
-            argonsAvailable,
-            vaultMicrogons: microgons,
-            existentialDeposit,
-            neededBalanceAboveED:
-              argonsNeeded + txFee + resolvedTip + btcFee + vaultTxFee,
-          },
-        );
+        console.warn('Insufficient balance to add bitcoin space and use bitcoins', {
+          freeBalance,
+          txFee,
+          vaultTxFee,
+          btcFee,
+          argonsAvailable,
+          vaultMicrogons: microgons,
+          existentialDeposit,
+          neededBalanceAboveED: argonsNeeded + txFee + resolvedTip + btcFee + vaultTxFee,
+        });
         process.exit(1);
       }
       console.log('Adding bitcoin space and locking bitcoins...', {

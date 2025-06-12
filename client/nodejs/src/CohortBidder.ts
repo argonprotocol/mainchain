@@ -1,16 +1,8 @@
 import type { Accountset } from './Accountset';
-import {
-  ArgonClient,
-  ArgonPrimitivesBlockSealMiningRegistration,
-  ExtrinsicError,
-} from './index';
+import { ArgonClient, ArgonPrimitivesBlockSealMiningRegistration, ExtrinsicError } from './index';
 import { formatArgons } from './utils';
 import { Bool, u64, Vec } from '@polkadot/types-codec';
-import {
-  CohortBidderHistory,
-  IBidHistoryEntry,
-  SeatReductionReason,
-} from './CohortBidderHistory';
+import { CohortBidderHistory, IBidHistoryEntry, SeatReductionReason } from './CohortBidderHistory';
 
 export class CohortBidder {
   public get client(): Promise<ArgonClient> {
@@ -69,20 +61,15 @@ export class CohortBidder {
       client.query.miningSlot.nextFrameId as any,
       client.query.miningSlot.isNextSlotBiddingOpen,
     ]);
-    if (
-      nextFrameId.toNumber() === this.cohortStartingFrameId &&
-      isBiddingOpen.isTrue
-    ) {
+    if (nextFrameId.toNumber() === this.cohortStartingFrameId && isBiddingOpen.isTrue) {
       console.log('Bidding is still open, waiting for it to close');
       await new Promise<void>(async resolve => {
-        const unsub = await client.query.miningSlot.isNextSlotBiddingOpen(
-          isOpen => {
-            if (isOpen.isFalse) {
-              unsub();
-              resolve();
-            }
-          },
-        );
+        const unsub = await client.query.miningSlot.isNextSlotBiddingOpen(isOpen => {
+          if (isOpen.isFalse) {
+            unsub();
+            resolve();
+          }
+        });
       });
     }
     // wait for any pending request to finish updating stats
@@ -147,9 +134,7 @@ export class CohortBidder {
     );
   }
 
-  private async checkWinningBids(
-    bids: ArgonPrimitivesBlockSealMiningRegistration[],
-  ) {
+  private async checkWinningBids(bids: ArgonPrimitivesBlockSealMiningRegistration[]) {
     if (this.isStopped) return;
     clearTimeout(this.retryTimeout);
 
@@ -165,14 +150,9 @@ export class CohortBidder {
 
     if (this.pendingRequest) return;
 
-    const ticksSinceLastBid = Math.floor(
-      (Date.now() - this.lastBidTime) / this.millisPerTick!,
-    );
+    const ticksSinceLastBid = Math.floor((Date.now() - this.lastBidTime) / this.millisPerTick!);
     if (ticksSinceLastBid < this.options.bidDelay) {
-      this.retryTimeout = setTimeout(
-        () => void this.checkCurrentSeats(),
-        this.millisPerTick!,
-      );
+      this.retryTimeout = setTimeout(() => void this.checkCurrentSeats(), this.millisPerTick!);
       return;
     }
     console.log(
@@ -231,15 +211,9 @@ export class CohortBidder {
     }
     if (nextBid < lowestBid) {
       console.log(
-        `Can't bid ${formatArgons(nextBid)}. Current lowest bid is ${formatArgons(
-          lowestBid,
-        )}.`,
+        `Can't bid ${formatArgons(nextBid)}. Current lowest bid is ${formatArgons(lowestBid)}.`,
       );
-      this.history.maybeReducingSeats(
-        winningBids,
-        SeatReductionReason.MaxBidTooLow,
-        historyEntry,
-      );
+      this.history.maybeReducingSeats(winningBids, SeatReductionReason.MaxBidTooLow, historyEntry);
       return;
     }
 
@@ -252,18 +226,12 @@ export class CohortBidder {
           maxBid: formatArgons(this.options.maxBid),
         },
       );
-      this.history.maybeReducingSeats(
-        winningBids,
-        SeatReductionReason.MaxBidTooLow,
-        historyEntry,
-      );
+      this.history.maybeReducingSeats(winningBids, SeatReductionReason.MaxBidTooLow, historyEntry);
       return;
     }
 
     const seatsInBudget =
-      nextBid === 0n
-        ? this.subaccounts.length
-        : Number(budgetForSeats / nextBid);
+      nextBid === 0n ? this.subaccounts.length : Number(budgetForSeats / nextBid);
 
     let accountsToUse = [...this.subaccounts];
     // 3. if we have more seats than we can afford, we need to remove some
@@ -329,8 +297,7 @@ export class CohortBidder {
         blockNumber = await api.query.system.number().then(x => x.toNumber());
       }
 
-      const successfulBids =
-        txResult.batchInterruptedIndex ?? subaccounts.length;
+      const successfulBids = txResult.batchInterruptedIndex ?? subaccounts.length;
       this.history.onBidResult(historyEntry, {
         blockNumber,
         successfulBids,
@@ -348,10 +315,7 @@ export class CohortBidder {
       if (bidError) throw bidError;
     } catch (err) {
       this.lastBidTime = prevLastBidTime;
-      console.error(
-        `Error bidding for cohort ${this.cohortStartingFrameId}:`,
-        err,
-      );
+      console.error(`Error bidding for cohort ${this.cohortStartingFrameId}:`, err);
       clearTimeout(this.retryTimeout);
       this.retryTimeout = setTimeout(() => void this.checkCurrentSeats(), 1000);
     } finally {

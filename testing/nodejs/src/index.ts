@@ -1,9 +1,4 @@
-import {
-  ArgonClient,
-  Keyring,
-  KeyringPair,
-  TxSubmitter,
-} from '@argonprotocol/mainchain';
+import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
 import { describe, SuiteAPI } from 'vitest';
 import * as process from 'node:process';
 import HttpProxy from 'http-proxy';
@@ -113,10 +108,7 @@ export async function teardown() {
   toTeardown.length = 0;
 }
 
-export function cleanHostForDocker(
-  host: string,
-  replacer = 'host.docker.internal',
-): string {
+export function cleanHostForDocker(host: string, replacer = 'host.docker.internal'): string {
   if (process.env.ARGON_USE_DOCKER_BINS) {
     return host
       .replace('localhost', replacer)
@@ -134,16 +126,12 @@ export function runOnTeardown(teardown: () => Promise<void>) {
   addTeardown({ teardown });
 }
 
-export function closeOnTeardown<T extends { close(): Promise<void> }>(
-  closeable: T,
-): T {
+export function closeOnTeardown<T extends { close(): Promise<void> }>(closeable: T): T {
   addTeardown({ teardown: () => closeable.close() });
   return closeable;
 }
 
-export function disconnectOnTeardown<T extends { disconnect(): Promise<void> }>(
-  closeable: T,
-): T {
+export function disconnectOnTeardown<T extends { disconnect(): Promise<void> }>(closeable: T): T {
   addTeardown({ teardown: () => closeable.disconnect() });
   return closeable;
 }
@@ -152,17 +140,11 @@ export function sudo(): KeyringPair {
   return new Keyring({ type: 'sr25519' }).createFromUri('//Alice');
 }
 
-export async function activateNotary(
-  sudo: KeyringPair,
-  client: ArgonClient,
-  notary: TestNotary,
-) {
+export async function activateNotary(sudo: KeyringPair, client: ArgonClient, notary: TestNotary) {
   await notary.register(client);
   await new TxSubmitter(
     client,
-    client.tx.sudo.sudo(
-      client.tx.notaries.activate(notary.operator!.publicKey),
-    ),
+    client.tx.sudo.sudo(client.tx.notaries.activate(notary.operator!.publicKey)),
     sudo,
   ).submit({ waitForBlock: true });
 }

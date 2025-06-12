@@ -37,31 +37,19 @@ describeIntegration('ChannelHold integration', () => {
     const mainchainUrl = await mainchain.launch();
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
-    const domainHash = Crypto.createHash('sha256')
-      .update('example.com')
-      .digest();
+    const domainHash = Crypto.createHash('sha256').update('example.com').digest();
     const ferdieDomainAddress = new Keyring({ type: 'sr25519' }).createFromUri(
       '//Ferdie//domain//1',
     );
     const ferdie = new Keyring({ type: 'sr25519' }).createFromUri('//Ferdie');
 
     await expect(
-      registerZoneRecord(
-        mainchainClient,
-        domainHash,
-        ferdie,
-        ferdieDomainAddress.publicKey,
-        1,
-        {
-          '1.0.0': mainchainClient.createType(
-            'ArgonPrimitivesDomainVersionHost',
-            {
-              datastoreId: mainchainClient.createType('Bytes', 'default'),
-              host: 'ws://192.168.1.1:80',
-            },
-          ),
-        },
-      ),
+      registerZoneRecord(mainchainClient, domainHash, ferdie, ferdieDomainAddress.publicKey, 1, {
+        '1.0.0': mainchainClient.createType('ArgonPrimitivesDomainVersionHost', {
+          datastoreId: mainchainClient.createType('Bytes', 'default'),
+          host: 'ws://192.168.1.1:80',
+        }),
+      }),
     ).rejects.toThrow('ExtrinsicFailed:: domains.DomainNotRegistered');
   }, 120e3);
 
@@ -77,9 +65,7 @@ describeIntegration('ChannelHold integration', () => {
     const bobkeys = new Keyring({ type: 'sr25519' });
 
     const bob = bobkeys.addFromUri('//Bob');
-    const ferdieVotesAddress = new Keyring({ type: 'sr25519' }).createFromUri(
-      '//Ferdie//voter//1',
-    );
+    const ferdieVotesAddress = new Keyring({ type: 'sr25519' }).createFromUri('//Ferdie//voter//1');
 
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
@@ -92,9 +78,7 @@ describeIntegration('ChannelHold integration', () => {
     await bobchain.keystore.useExternal(
       bob.address,
       async (address, signatureMessage) => {
-        return bobkeys
-          .getPair(address)
-          ?.sign(signatureMessage, { withType: true });
+        return bobkeys.getPair(address)?.sign(signatureMessage, { withType: true });
       },
       async hd_path => {
         return bobkeys.addPair(bob.derive(hd_path)).address;
@@ -102,11 +86,7 @@ describeIntegration('ChannelHold integration', () => {
     );
 
     const ferdiechain = await createLocalchain(mainchainUrl);
-    await ferdiechain.keystore.useExternal(
-      ferdiekeys.address,
-      ferdiekeys.sign,
-      ferdiekeys.derive,
-    );
+    await ferdiechain.keystore.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
 
     const domain = {
       name: 'example',
@@ -115,13 +95,7 @@ describeIntegration('ChannelHold integration', () => {
     const domainHash = DomainStore.getHash('example.analytics');
     {
       const [bobChange, ferdieChange] = await Promise.all([
-        transferMainchainToLocalchain(
-          mainchainClient,
-          bobchain,
-          bob,
-          5_200_000,
-          1,
-        ),
+        transferMainchainToLocalchain(mainchainClient, bobchain, bob, 5_200_000, 1),
         transferMainchainToLocalchain(
           mainchainClient,
           ferdiechain,
@@ -130,10 +104,7 @@ describeIntegration('ChannelHold integration', () => {
           1,
         ),
       ]);
-      await ferdieChange.notarization.leaseDomain(
-        'example.Analytics',
-        ferdiekeys.address,
-      );
+      await ferdieChange.notarization.leaseDomain('example.Analytics', ferdiekeys.address);
       let [ferdieTracker] = await Promise.all([
         bobChange.notarization.notarizeAndWaitForNotebook(),
         ferdieChange.notarization.notarizeAndWaitForNotebook(),
@@ -146,10 +117,7 @@ describeIntegration('ChannelHold integration', () => {
       const ferdieMainchainClient = await ferdiechain.mainchainClient;
       await ferdieTracker.waitForImmortalized(ferdieMainchainClient);
       await expect(
-        ferdieMainchainClient.getDomainRegistration(
-          domain.name,
-          domain.topLevel,
-        ),
+        ferdieMainchainClient.getDomainRegistration(domain.name, domain.topLevel),
       ).resolves.toBeTruthy();
     }
 
@@ -160,21 +128,15 @@ describeIntegration('ChannelHold integration', () => {
       ferdiekeys.defaultPair.publicKey,
       1,
       {
-        '1.0.0': mainchainClient.createType(
-          'ArgonPrimitivesDomainVersionHost',
-          {
-            datastoreId: mainchainClient.createType('Bytes', 'default'),
-            host: 'ws://192.168.1.1:80',
-          },
-        ),
+        '1.0.0': mainchainClient.createType('ArgonPrimitivesDomainVersionHost', {
+          datastoreId: mainchainClient.createType('Bytes', 'default'),
+          host: 'ws://192.168.1.1:80',
+        }),
       },
     );
 
     const mainchainClientBob = await bobchain.mainchainClient;
-    const zoneRecord = await mainchainClientBob.getDomainZoneRecord(
-      domain.name,
-      domain.topLevel,
-    );
+    const zoneRecord = await mainchainClientBob.getDomainZoneRecord(domain.name, domain.topLevel);
     expect(zoneRecord).toBeTruthy();
     expect(zoneRecord.notaryId).toBe(1);
     expect(zoneRecord.paymentAddress).toBe(ferdiekeys.address);
@@ -183,20 +145,13 @@ describeIntegration('ChannelHold integration', () => {
     await channelHoldFunding.notarize();
 
     const bobChannelHold = bobchain.beginChange();
-    const change = await bobChannelHold.addAccountById(
-      jumpAccount.localAccountId,
-    );
-    await change.createChannelHold(
-      5_000_000n,
-      zoneRecord.paymentAddress,
-      'example.Analytics',
-    );
+    const change = await bobChannelHold.addAccountById(jumpAccount.localAccountId);
+    await change.createChannelHold(5_000_000n, zoneRecord.paymentAddress, 'example.Analytics');
     const holdTracker = await bobChannelHold.notarizeAndWaitForNotebook();
 
-    const clientChannelHold =
-      await bobchain.openChannelHolds.openClientChannelHold(
-        jumpAccount.localAccountId,
-      );
+    const clientChannelHold = await bobchain.openChannelHolds.openClientChannelHold(
+      jumpAccount.localAccountId,
+    );
     await clientChannelHold.sign(5_000_000n);
     const channelHoldJson = await clientChannelHold.exportForSend();
     {
@@ -206,9 +161,7 @@ describeIntegration('ChannelHold integration', () => {
       expect(parsed.channelHoldNote).toBeTruthy();
       expect(parsed.channelHoldNote.microgons).toBe(5_000_000);
       expect(parsed.notes[0].microgons).toBe(5_000_000);
-      expect(parsed.balance).toBe(
-        parsed.previousBalanceProof.balance - 5_000_000,
-      );
+      expect(parsed.balance).toBe(parsed.previousBalanceProof.balance - 5_000_000);
     }
 
     const ferdieChannelHoldRecord =
@@ -219,10 +172,7 @@ describeIntegration('ChannelHold integration', () => {
       const next = await clientChannelHold.sign(5_000n + i * 200n);
       // now we would send to ferdie
       await expect(
-        ferdieChannelHoldRecord.recordUpdatedSettlement(
-          next.microgons,
-          next.signature,
-        ),
+        ferdieChannelHoldRecord.recordUpdatedSettlement(next.microgons, next.signature),
       ).resolves.toBeUndefined();
     }
 
@@ -250,22 +200,15 @@ describeIntegration('ChannelHold integration', () => {
       insideChannelHold.expirationTick,
     );
     expect(timeForExpired.getTime() - Date.now()).toBeLessThan(30e3);
-    await new Promise(resolve =>
-      setTimeout(resolve, timeForExpired.getTime() - Date.now() + 10),
-    );
+    await new Promise(resolve => setTimeout(resolve, timeForExpired.getTime() - Date.now() + 10));
 
     const ferdieMainchainClient = await ferdiechain.mainchainClient;
     // in the balance sync, we'd normally just keep trying to vote with the latest expiring channelHolds, but in this test, we only have 1, so we need to wait for a grandparent hash
     for (let i = 0; i < 10; i += 1) {
       try {
-        const voteBlocks = await ferdieMainchainClient.getVoteBlockHash(
-          ferdiechain.currentTick,
-        );
+        const voteBlocks = await ferdieMainchainClient.getVoteBlockHash(ferdiechain.currentTick);
         if (voteBlocks.blockHash) {
-          console.log(
-            'Vote block hash=%s',
-            Buffer.from(voteBlocks.blockHash).toString('hex'),
-          );
+          console.log('Vote block hash=%s', Buffer.from(voteBlocks.blockHash).toString('hex'));
           break;
         }
       } catch {}
@@ -317,15 +260,9 @@ async function transferMainchainToLocalchain(
   notarization: NotarizationBuilder;
   balanceChange: BalanceChangeBuilder;
 }> {
-  const transferId = await transferToLocalchain(
-    account,
-    amount,
-    notaryId,
-    mainchainClient,
-  );
+  const transferId = await transferToLocalchain(account, amount, notaryId, mainchainClient);
   const locMainchainClient = await localchain.mainchainClient;
-  const transfer =
-    await locMainchainClient.waitForLocalchainTransfer(transferId);
+  const transfer = await locMainchainClient.waitForLocalchainTransfer(transferId);
   await new Promise(resolve => setTimeout(resolve, 500));
   const notarization = localchain.beginChange();
   const balanceChange = await notarization.claimFromMainchain(transfer);
@@ -348,10 +285,7 @@ async function registerZoneRecord(
       minor,
       patch,
     });
-    codecVersions.set(
-      versionCodec,
-      client.createType('ArgonPrimitivesDomainVersionHost', host),
-    );
+    codecVersions.set(versionCodec, client.createType('ArgonPrimitivesDomainVersionHost', host));
   }
 
   await new Promise((resolve, reject) =>
