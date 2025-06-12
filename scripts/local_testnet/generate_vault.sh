@@ -14,7 +14,7 @@ TRUSTED_RPC_URL="$MAINCHAIN_URL"
 cd $TARGETS_DIR
 
 if [ ! -f /tmp/argon/xpriv_master ]; then
-  ./argon-bitcoin-cli xpriv master --xpriv-path=/tmp/argon/xpriv_master --xpriv-password=$PASSWORD
+  ./argon-bitcoin-cli xpriv master --xpriv-path=/tmp/argon/xpriv_master --xpriv-password=$PASSWORD --bitcoin-network=signet
 fi
 XPUB=$(./argon-bitcoin-cli xpriv derive-xpub --xpriv-path=/tmp/argon/xpriv_master  --xpriv-password=$PASSWORD --hd-path="m/84'/0'/0'")
 

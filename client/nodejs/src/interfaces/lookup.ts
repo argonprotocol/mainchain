@@ -3048,7 +3048,7 @@ export default {
    **/
   PalletBlockRewardsError: 'Null',
   /**
-   * Lookup447: pallet_mint::pallet::MintAction<Balance>
+   * Lookup447: pallet_mint::pallet::MintAction<B>
    **/
   PalletMintMintAction: {
     argonBurned: 'u128',

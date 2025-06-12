@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     testTimeout: 120_000,
     hookTimeout: 120_000,
-    retry: 1,
+    retry: 0,
     maxConcurrency: 1,
     reporters: process.env.GITHUB_ACTIONS
       ? ['dot', 'github-actions', 'junit']

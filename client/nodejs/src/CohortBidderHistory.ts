@@ -207,9 +207,12 @@ export class CohortBidderHistory {
         this.stats.lastBlockNumber,
       );
     }
-    historyEntry.myBidsPlaced!.failureReason = bidError;
-    historyEntry.myBidsPlaced!.successfulBids = successfulBids;
-    historyEntry.myBidsPlaced!.txFeePlusTip = txFeePlusTip;
+
+    if (historyEntry.myBidsPlaced) {
+      historyEntry.myBidsPlaced!.failureReason = bidError;
+      historyEntry.myBidsPlaced!.successfulBids = successfulBids;
+      historyEntry.myBidsPlaced!.txFeePlusTip = txFeePlusTip;
+    }
   }
 
   public static async getStartingData(
