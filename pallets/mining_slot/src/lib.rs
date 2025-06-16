@@ -1043,27 +1043,27 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
-	pub(crate) fn release_failed_bid(registration: &Registration<T>) -> DispatchResult {
-		let funding_account = registration
+	pub(crate) fn release_failed_bid(bid_registration: &Registration<T>) -> DispatchResult {
+		let funding_account = bid_registration
 			.external_funding_account
 			.clone()
-			.unwrap_or(registration.account_id.clone());
-		let account_id = registration.account_id.clone();
+			.unwrap_or(bid_registration.account_id.clone());
+		let account_id = bid_registration.account_id.clone();
 
-		if registration.bid > T::Balance::zero() {
+		if bid_registration.bid > T::Balance::zero() {
 			let pool_account = T::BidPoolProvider::get_bid_pool_account();
 			T::ArgonCurrency::transfer(
 				&pool_account,
 				&funding_account,
-				registration.bid,
+				bid_registration.bid,
 				Preservation::Expendable,
 			)?;
 		}
 
 		let mut held_argonots = false;
-		let mut argonots_to_unhold: T::Balance = registration.argonots;
+		let mut argonots_to_unhold: T::Balance = bid_registration.argonots;
 		if let Some(active) = Self::get_active_registration(&account_id) {
-			argonots_to_unhold -= active.argonots;
+			argonots_to_unhold.saturating_reduce(active.argonots);
 			held_argonots = true;
 		}
 
