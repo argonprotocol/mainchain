@@ -39,22 +39,17 @@ export function buildCli() {
       ).env('ACCOUNT_JSON_PATH'),
     )
     .addOption(
-      new Option(
-        '--account-suri <secretUri>',
-        'A secret uri (suri) to use for the account',
-      ).env('ACCOUNT_SURI'),
-    )
-    .addOption(
-      new Option(
-        '--account-passphrase <password>',
-        'The password for your seed file',
-      ).env('ACCOUNT_PASSPHRASE'),
-    )
-    .addOption(
-      new Option(
-        '--account-passphrase-file <path>',
-        'The path to a password for your seed file',
+      new Option('--account-suri <secretUri>', 'A secret uri (suri) to use for the account').env(
+        'ACCOUNT_SURI',
       ),
+    )
+    .addOption(
+      new Option('--account-passphrase <password>', 'The password for your seed file').env(
+        'ACCOUNT_PASSPHRASE',
+      ),
+    )
+    .addOption(
+      new Option('--account-passphrase-file <path>', 'The path to a password for your seed file'),
     )
     .addOption(
       new Option(
@@ -125,9 +120,7 @@ export function addGlobalArgs(program: ReturnType<typeof buildCli>) {
   }
 }
 
-export function applyEnv(
-  program: ReturnType<typeof buildCli>,
-): string | undefined {
+export function applyEnv(program: ReturnType<typeof buildCli>): string | undefined {
   program.parseOptions(process.argv);
   const { env } = program.optsWithGlobals();
   if (env) {

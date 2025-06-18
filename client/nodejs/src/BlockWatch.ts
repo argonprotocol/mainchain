@@ -14,10 +14,7 @@ export type BlockWatchEvents = {
     header: Header,
     lockedBitcoin: { utxoId: number; vaultId: number; lockPrice: bigint },
   ) => void;
-  'mining-bid': (
-    header: Header,
-    bid: { amount: bigint; accountId: string },
-  ) => void;
+  'mining-bid': (header: Header, bid: { amount: bigint; accountId: string }) => void;
   'mining-bid-ousted': (
     header: Header,
     bid: {
@@ -28,10 +25,7 @@ export type BlockWatchEvents = {
   event: (header: Header, event: GenericEvent) => void;
 };
 
-export function getTickFromHeader(
-  client: ArgonClient,
-  header: Header,
-): number | undefined {
+export function getTickFromHeader(client: ArgonClient, header: Header): number | undefined {
   for (const x of header.digest.logs) {
     if (x.isPreRuntime) {
       const [engineId, data] = x.asPreRuntime;
@@ -43,10 +37,7 @@ export function getTickFromHeader(
   return undefined;
 }
 
-export function getAuthorFromHeader(
-  client: ArgonClient,
-  header: Header,
-): string | undefined {
+export function getAuthorFromHeader(client: ArgonClient, header: Header): string | undefined {
   for (const x of header.digest.logs) {
     if (x.isPreRuntime) {
       const [engineId, data] = x.asPreRuntime;
@@ -100,8 +91,7 @@ export class BlockWatch {
       }
     };
     if (this.options.finalizedBlocks) {
-      this.unsubscribe =
-        await client.rpc.chain.subscribeFinalizedHeads(onBlock);
+      this.unsubscribe = await client.rpc.chain.subscribeFinalizedHeads(onBlock);
     } else {
       this.unsubscribe = await client.rpc.chain.subscribeNewHeads(onBlock);
     }
@@ -139,13 +129,9 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
           data.burned = formatArgons(bidPoolBurned.toBigInt());
           data.distributed = formatArgons(bidPoolDistributed.toBigInt());
           logEvent = true;
-        } else if (
-          client.events.liquidityPools.NextBidPoolCapitalLocked.is(event)
-        ) {
+        } else if (client.events.liquidityPools.NextBidPoolCapitalLocked.is(event)) {
           const { totalActivatedCapital } = event.data;
-          data.totalActivatedCapital = formatArgons(
-            totalActivatedCapital.toBigInt(),
-          );
+          data.totalActivatedCapital = formatArgons(totalActivatedCapital.toBigInt());
           logEvent = true;
         }
       } else if (event.section === 'bitcoinLocks') {
@@ -184,10 +170,7 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
         logEvent = true;
         if (client.events.bitcoinUtxos.UtxoVerified.is(event)) {
           const { utxoId } = event.data;
-          const details = await this.getBitcoinLockDetails(
-            utxoId.toNumber(),
-            blockHash,
-          );
+          const details = await this.getBitcoinLockDetails(utxoId.toNumber(), blockHash);
           this.events.emit('bitcoin-verified', header, {
             utxoId: utxoId.toNumber(),
             vaultId: details.vaultId,
@@ -226,8 +209,7 @@ BLOCK #${header.number}, ${header.hash.toHuman()}`);
       }
       this.events.emit('event', header, event);
     }
-    if (reloadVaults.size)
-      this.events.emit('vaults-updated', header, reloadVaults);
+    if (reloadVaults.size) this.events.emit('vaults-updated', header, reloadVaults);
 
     const tick = getTickFromHeader(client, header)!;
     const author = getAuthorFromHeader(client, header)!;

@@ -46,8 +46,7 @@ export default class TestMainchain implements ITeardownable {
   }
 
   constructor(binPath?: string) {
-    this.#binPath =
-      binPath ?? Path.join(projectRoot(), `target/debug/argon-node`);
+    this.#binPath = binPath ?? Path.join(projectRoot(), `target/debug/argon-node`);
     this.#binPath = Path.resolve(this.#binPath);
     if (!process.env.ARGON_USE_DOCKER_BINS && !fs.existsSync(this.#binPath)) {
       throw new Error(`Mainchain binary not found at ${this.#binPath}`);
@@ -76,12 +75,7 @@ export default class TestMainchain implements ITeardownable {
     author?: string;
     launchBitcoin?: boolean;
   }): Promise<string> {
-    const {
-      miningThreads = 1,
-      bootnodes,
-      author = 'alice',
-      launchBitcoin = false,
-    } = options ?? {};
+    const { miningThreads = 1, bootnodes, author = 'alice', launchBitcoin = false } = options ?? {};
     let port = 0;
     let rpcPort = 0;
     let execArgs: string[] = [];
@@ -139,11 +133,9 @@ export default class TestMainchain implements ITeardownable {
       console.log('Main >> %s', data);
     });
 
-    const int1 = readline
-      .createInterface({ input: this.#process.stdout! })
-      .on('line', line => {
-        if (line) console.log('Main >> %s', line);
-      });
+    const int1 = readline.createInterface({ input: this.#process.stdout! }).on('line', line => {
+      if (line) console.log('Main >> %s', line);
+    });
     this.#interfaces.push(int1);
 
     this.port = await new Promise<string>((resolve, reject) => {
@@ -152,16 +144,14 @@ export default class TestMainchain implements ITeardownable {
         reject(err);
       });
 
-      const int2 = readline
-        .createInterface({ input: this.#process!.stderr! })
-        .on('line', line => {
-          console.log('Main >> %s', line);
-          let match = line.match(/Running JSON-RPC server: addr=([\d.:]+)/);
-          if (match) {
-            let ipv4 = match[1].split(',').at(0);
-            resolve(ipv4!.split(':').pop()!);
-          }
-        });
+      const int2 = readline.createInterface({ input: this.#process!.stderr! }).on('line', line => {
+        console.log('Main >> %s', line);
+        let match = line.match(/Running JSON-RPC server: addr=([\d.:]+)/);
+        if (match) {
+          let ipv4 = match[1].split(',').at(0);
+          resolve(ipv4!.split(':').pop()!);
+        }
+      });
       this.#interfaces.push(int2);
     });
     if (this.containerName) {
@@ -230,12 +220,9 @@ export default class TestMainchain implements ITeardownable {
       const release = await lockfile.lock(lockPath, { retries: 10 });
       try {
         rpcPort = await detectPort();
-        const path = execSync(
-          Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`),
-          {
-            encoding: 'utf8',
-          },
-        ).trim();
+        const path = execSync(Path.join(projectRoot(), `target/debug/argon-testing-bitcoin`), {
+          encoding: 'utf8',
+        }).trim();
 
         const tmpDir = fs.mkdtempSync('/tmp/argon-bitcoin-' + this.uuid);
 

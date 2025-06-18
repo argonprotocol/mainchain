@@ -78,9 +78,7 @@ export class TxSubmitter {
     }
     args.unshift(txString.join('->'));
     if (options.useLatestNonce && !options.nonce) {
-      options.nonce = await this.client.rpc.system.accountNextIndex(
-        this.pair.address,
-      );
+      options.nonce = await this.client.rpc.system.accountNextIndex(this.pair.address);
     }
 
     console.log('Submitting transaction:', ...args);
@@ -155,11 +153,7 @@ export class TxResult {
           this.batchInterruptedIndex = batchErrorIndex;
           encounteredError = event.event.data[1] as any;
         }
-        if (
-          this.client.events.transactionPayment.TransactionFeePaid.is(
-            event.event,
-          )
-        ) {
+        if (this.client.events.transactionPayment.TransactionFeePaid.is(event.event)) {
           const [_who, actualFee, tip] = event.event.data;
           this.finalFee = actualFee.toBigInt();
           this.finalFeeTip = tip.toBigInt();
@@ -167,11 +161,7 @@ export class TxResult {
       }
 
       if (encounteredError) {
-        const error = dispatchErrorToExtrinsicError(
-          this.client,
-          encounteredError,
-          batchErrorIndex,
-        );
+        const error = dispatchErrorToExtrinsicError(this.client, encounteredError, batchErrorIndex);
         this.reject(error);
       } else {
         this.inBlockResolve(status.asInBlock.toU8a());

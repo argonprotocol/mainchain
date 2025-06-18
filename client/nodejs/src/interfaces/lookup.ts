@@ -294,14 +294,7 @@ export default {
    * Lookup38: argon_runtime::ProxyType
    **/
   ArgonRuntimeProxyType: {
-    _enum: [
-      'Any',
-      'NonTransfer',
-      'PriceIndex',
-      'MiningBid',
-      'BitcoinCosign',
-      'VaultAdmin',
-    ],
+    _enum: ['Any', 'NonTransfer', 'PriceIndex', 'MiningBid', 'BitcoinCosign', 'VaultAdmin'],
   },
   /**
    * Lookup40: pallet_proxy::DepositKind
@@ -838,8 +831,7 @@ export default {
   ArgonPrimitivesDomainZoneRecord: {
     paymentAccount: 'AccountId32',
     notaryId: 'u32',
-    versions:
-      'BTreeMap<ArgonPrimitivesDomainSemver, ArgonPrimitivesDomainVersionHost>',
+    versions: 'BTreeMap<ArgonPrimitivesDomainSemver, ArgonPrimitivesDomainVersionHost>',
   },
   /**
    * Lookup80: argon_primitives::domain::Semver

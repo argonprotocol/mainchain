@@ -17,8 +17,7 @@ import type {
   SpWeightsRuntimeDbWeight,
 } from '@polkadot/types/lookup';
 
-export type __AugmentedConst<ApiType extends ApiTypes> =
-  AugmentedConst<ApiType>;
+export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
 
 declare module '@polkadot/api-base/types/consts' {
   interface AugmentedConsts<ApiType extends ApiTypes> {

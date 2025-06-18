@@ -121,10 +121,7 @@ export class CohortBidderHistory {
     }
     this.stats.seatsWon = winningBids;
     this.stats.totalArgonsBid = totalArgonsBid;
-    this.stats.lastBlockNumber = Math.max(
-      blockNumber,
-      this.stats.lastBlockNumber,
-    );
+    this.stats.lastBlockNumber = Math.max(blockNumber, this.stats.lastBlockNumber);
 
     const historyEntry: IBidHistoryEntry = {
       cohortStartingFrameId: this.cohortStartingFrameId,
@@ -134,17 +131,14 @@ export class CohortBidderHistory {
       winningSeats: winningBids,
       maxSeatsInPlay: this.maxSeatsInPlay,
     };
-    const hasDiffs =
-      JsonExt.stringify(nextEntrants) !== JsonExt.stringify(this.lastBids);
+    const hasDiffs = JsonExt.stringify(nextEntrants) !== JsonExt.stringify(this.lastBids);
 
     if (!isLastEntry || hasDiffs) {
       this.bidHistory.unshift(historyEntry);
     }
     if (hasDiffs) {
       nextEntrants.forEach(({ address, bid }, i) => {
-        const prevBidIndex = this.lastBids.findIndex(
-          y => y.address === address,
-        );
+        const prevBidIndex = this.lastBids.findIndex(y => y.address === address);
         const entry: any = {
           address,
           bidAmount: bid,
@@ -188,24 +182,15 @@ export class CohortBidderHistory {
       bidError?: ExtrinsicError;
     },
   ) {
-    const {
-      txFeePlusTip,
-      bidPerSeat,
-      bidsAttempted,
-      successfulBids,
-      blockNumber,
-      bidError,
-    } = param;
+    const { txFeePlusTip, bidPerSeat, bidsAttempted, successfulBids, blockNumber, bidError } =
+      param;
     this.stats.fees += txFeePlusTip;
     this.stats.bidsAttempted += bidsAttempted;
     if (bidPerSeat > this.stats.maxBidPerSeat) {
       this.stats.maxBidPerSeat = bidPerSeat;
     }
     if (blockNumber !== undefined) {
-      this.stats.lastBlockNumber = Math.max(
-        blockNumber,
-        this.stats.lastBlockNumber,
-      );
+      this.stats.lastBlockNumber = Math.max(blockNumber, this.stats.lastBlockNumber);
     }
 
     if (historyEntry.myBidsPlaced) {

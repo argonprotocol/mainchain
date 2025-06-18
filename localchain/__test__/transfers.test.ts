@@ -29,26 +29,16 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
     const alice = new Keyring({ type: 'sr25519' }).createFromUri('//Alice');
     const bob = await KeyringSigner.load('//Bob');
     await activateNotary(alice, mainchainClient, notary);
-    const transferId = await transferToLocalchain(
-      bob.defaultPair,
-      5_000_000,
-      1,
-      mainchainClient,
-    );
+    const transferId = await transferToLocalchain(bob.defaultPair, 5_000_000, 1, mainchainClient);
     const bobchain = await createLocalchain(mainchainUrl);
     await bobchain.keystore.importSuri('//Bob', CryptoScheme.Sr25519);
     const bobMainchainClient = await bobchain.mainchainClient;
-    const transfer =
-      await bobMainchainClient.waitForLocalchainTransfer(transferId);
+    const transfer = await bobMainchainClient.waitForLocalchainTransfer(transferId);
 
     expect(transfer).toBeTruthy();
     expect(transfer?.amount).toBe(5_000_000n);
     const notarization = bobchain.beginChange();
-    const balanceChange = await notarization.addAccount(
-      bob.address,
-      AccountType.Deposit,
-      1,
-    );
+    const balanceChange = await notarization.addAccount(bob.address, AccountType.Deposit, 1);
     await balanceChange.claimFromMainchain(transfer);
 
     const tracker = await notarization.notarizeAndWaitForNotebook();
@@ -80,10 +70,7 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
     // TODO: convert this to export pkcs8 and then import it
     await bobchain.keystore.importSuri('//Bob', CryptoScheme.Sr25519);
     {
-      const transfer = await bobchain.mainchainTransfers.sendToLocalchain(
-        5_000_000n,
-        1,
-      );
+      const transfer = await bobchain.mainchainTransfers.sendToLocalchain(5_000_000n, 1);
       console.log('Transfer', transfer);
       expect(transfer.transferId).toBe(1);
 
@@ -98,22 +85,16 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
       await tracker.getNotebookProof();
     }
 
-    const bobSendArgonFile = await bobchain.transactions.send(5_000_000n, [
-      ferdie.address,
-    ]);
+    const bobSendArgonFile = await bobchain.transactions.send(5_000_000n, [ferdie.address]);
 
     let expectedAliceBalance = 0n;
     {
       const ferdiechain = await createLocalchain(mainchainUrl);
-      await ferdiechain.keystore.importSuri(
-        '//Ferdie//1',
-        CryptoScheme.Sr25519,
-      );
+      await ferdiechain.keystore.importSuri('//Ferdie//1', CryptoScheme.Sr25519);
       const notarization = ferdiechain.beginChange();
       await notarization.importArgonFile(bobSendArgonFile);
       const balanceChange = (await notarization.balanceChangeBuilders).find(
-        x =>
-          x.address == ferdie.address && x.accountType == AccountType.Deposit,
+        x => x.address == ferdie.address && x.accountType == AccountType.Deposit,
       );
       const balance = await balanceChange?.balance;
       expectedAliceBalance = balance;
@@ -129,11 +110,7 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
         tracker.notaryId,
         tracker.notebookNumber,
       );
-      console.log(
-        'Finalized notebook %s at %s',
-        tracker.notebookNumber,
-        finalized,
-      );
+      console.log('Finalized notebook %s at %s', tracker.notebookNumber, finalized);
       const changesRoot = await mainchainClient.getAccountChangesRoot(
         tracker.notaryId,
         tracker.notebookNumber,
@@ -141,8 +118,7 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
       console.log('Changes root', changesRoot);
       expect(changesRoot).toBeTruthy();
       try {
-        const finalizedBlock =
-          await tracker.waitForImmortalized(mainchainClient);
+        const finalizedBlock = await tracker.waitForImmortalized(mainchainClient);
         console.log('Finalized block %s', finalizedBlock);
       } catch (err) {
         console.error(err);
@@ -151,10 +127,7 @@ describeIntegration('Transfer Localchain <-> Mainchain', () => {
       console.log('Got proof', proof);
     }
 
-    const ferdieMainchainBalance = await getMainchainBalance(
-      mainchainClient,
-      ferdie.address,
-    );
+    const ferdieMainchainBalance = await getMainchainBalance(mainchainClient, ferdie.address);
     expect(ferdieMainchainBalance).toBeGreaterThanOrEqual(expectedAliceBalance);
   }, 120e3);
 });

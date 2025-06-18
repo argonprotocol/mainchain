@@ -27,11 +27,7 @@ const json = JSON.parse(readFileSync(jsonFile, 'utf8'));
   rl.question('Enter password: ', async (password: string) => {
     account.decodePkcs8(password);
     let secretKey: Uint8Array;
-    const decoded = decodePair(
-      password,
-      base64Decode(json.encoded),
-      json.encoding.type,
-    );
+    const decoded = decodePair(password, base64Decode(json.encoded), json.encoding.type);
     if (decoded.secretKey.length === 64) {
       secretKey = decoded.secretKey;
     } else {

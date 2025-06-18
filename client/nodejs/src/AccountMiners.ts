@@ -73,10 +73,7 @@ export class AccountMiners {
     if (author) {
       const voteAuthor = this.trackedAccountsByAddress[author];
       if (voteAuthor && this.options.shouldLog) {
-        console.log(
-          '> Our vote author',
-          this.accountset.accountRegistry.getName(author),
-        );
+        console.log('> Our vote author', this.accountset.accountRegistry.getName(author));
       }
     } else {
       console.warn('> No vote author found');
@@ -111,10 +108,8 @@ export class AccountMiners {
               argonsMined: 0n,
               argonotsMined: 0n,
             };
-            dataByCohort[entry.startingFrameId].argonotsMined +=
-              ownership.toBigInt();
-            dataByCohort[entry.startingFrameId].argonsMined +=
-              argons.toBigInt();
+            dataByCohort[entry.startingFrameId].argonotsMined += ownership.toBigInt();
+            dataByCohort[entry.startingFrameId].argonsMined += argons.toBigInt();
             this.events.emit('mined', header, {
               author,
               argons: argons.toBigInt(),
@@ -129,9 +124,7 @@ export class AccountMiners {
         const { perMiner } = event.data;
         const amountPerMiner = perMiner.toBigInt();
         if (amountPerMiner > 0n) {
-          for (const [address, info] of Object.entries(
-            this.trackedAccountsByAddress,
-          )) {
+          for (const [address, info] of Object.entries(this.trackedAccountsByAddress)) {
             const { startingFrameId } = info;
             dataByCohort[startingFrameId] ??= {
               argonsMinted: 0n,
@@ -156,9 +149,7 @@ export class AccountMiners {
   }
 
   private newCohortMiners(frameId: number, addresses: string[]) {
-    for (const [address, info] of Object.entries(
-      this.trackedAccountsByAddress,
-    )) {
+    for (const [address, info] of Object.entries(this.trackedAccountsByAddress)) {
       if (info.startingFrameId === frameId - 10) {
         delete this.trackedAccountsByAddress[address];
       }

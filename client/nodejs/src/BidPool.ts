@@ -1,9 +1,4 @@
-import {
-  convertPermillToBigNumber,
-  filterUndefined,
-  formatArgons,
-  formatPercent,
-} from './utils';
+import { convertPermillToBigNumber, filterUndefined, formatArgons, formatPercent } from './utils';
 import { Table } from 'console-table-printer';
 import BigNumber from 'bignumber.js';
 import { BlockWatch } from './BlockWatch';
@@ -74,15 +69,10 @@ export class BidPool {
     this.blockWatch = new BlockWatch(client, { shouldLog: false });
   }
 
-  private async onVaultsUpdated(
-    blockHash: Uint8Array,
-    vaultIdSet: Set<number>,
-  ) {
+  private async onVaultsUpdated(blockHash: Uint8Array, vaultIdSet: Set<number>) {
     const client = await this.client;
 
-    this.tickDuration ??= (
-      await client.query.ticks.genesisTicker()
-    ).tickDurationMillis.toNumber();
+    this.tickDuration ??= (await client.query.ticks.genesisTicker()).tickDurationMillis.toNumber();
     const api = await client.at(blockHash);
     const vaultIds = [...vaultIdSet];
     const rawVaults = await api.query.vaults.vaultsById.multi(vaultIds);
@@ -90,11 +80,7 @@ export class BidPool {
       const rawVault = rawVaults[i];
       if (rawVault.isNone) continue;
       const vaultId = vaultIds[i];
-      this.vaultsById[vaultId] = new Vault(
-        vaultId,
-        rawVault.unwrap(),
-        this.tickDuration,
-      );
+      this.vaultsById[vaultId] = new Vault(vaultId, rawVault.unwrap(), this.tickDuration);
     }
 
     const vaults = Object.entries(this.vaultsById);
@@ -119,10 +105,7 @@ export class BidPool {
 
   public async getBidPool(): Promise<bigint> {
     const client = await this.client;
-    const balanceBytes = await client.rpc.state.call(
-      'MiningSlotApi_bid_pool',
-      '',
-    );
+    const balanceBytes = await client.rpc.state.call('MiningSlotApi_bid_pool', '');
     const balance = client.createType('U128', balanceBytes);
     return balance.toBigInt();
   }
@@ -136,29 +119,20 @@ export class BidPool {
     this.bidPoolAmount = await this.getBidPool();
     this.nextFrameId = (await api.query.miningSlot.nextFrameId()).toNumber();
 
-    const contributors =
-      await api.query.liquidityPools.vaultPoolsByFrame.entries();
+    const contributors = await api.query.liquidityPools.vaultPoolsByFrame.entries();
     for (const [frameId, funds] of contributors) {
       const FrameIdNumber = frameId.args[0].toNumber();
       this.loadFrameData(FrameIdNumber, funds);
     }
     for (const entrant of await api.query.liquidityPools.capitalActive()) {
-      this.setVaultFrameData(
-        entrant.frameId.toNumber(),
-        entrant.vaultId.toNumber(),
-        {
-          activatedCapital: entrant.activatedCapital.toBigInt(),
-        },
-      );
+      this.setVaultFrameData(entrant.frameId.toNumber(), entrant.vaultId.toNumber(), {
+        activatedCapital: entrant.activatedCapital.toBigInt(),
+      });
     }
     for (const entrant of await api.query.liquidityPools.capitalRaising()) {
-      this.setVaultFrameData(
-        entrant.frameId.toNumber(),
-        entrant.vaultId.toNumber(),
-        {
-          activatedCapital: entrant.activatedCapital.toBigInt(),
-        },
-      );
+      this.setVaultFrameData(entrant.frameId.toNumber(), entrant.vaultId.toNumber(), {
+        activatedCapital: entrant.activatedCapital.toBigInt(),
+      });
     }
     await this.onVaultsUpdated(blockHash, new Set(vaultIds));
     this.print();
@@ -167,9 +141,7 @@ export class BidPool {
   public async watch(): Promise<{ unsubscribe: () => void }> {
     await this.loadAt();
     await this.blockWatch.start();
-    this.blockWatch.events.on('vaults-updated', (b, v) =>
-      this.onVaultsUpdated(b.hash, v),
-    );
+    this.blockWatch.events.on('vaults-updated', (b, v) => this.onVaultsUpdated(b.hash, v));
     const api = await this.client;
     this.blockWatch.events.on('event', async (_, event) => {
       if (api.events.liquidityPools.BidPoolDistributed.is(event)) {
@@ -178,8 +150,7 @@ export class BidPool {
         this.bidPoolAmount = await this.getBidPool();
 
         this.FrameSubscriptions[rawFrameId.toNumber()]?.();
-        const entrant =
-          await api.query.liquidityPools.vaultPoolsByFrame(rawFrameId);
+        const entrant = await api.query.liquidityPools.vaultPoolsByFrame(rawFrameId);
         this.loadFrameData(rawFrameId.toNumber(), entrant);
         this.printDebounce();
       }
@@ -189,14 +160,13 @@ export class BidPool {
         for (let inc = 0; inc < 2; inc++) {
           const id = frameId.toNumber() + inc;
           if (!this.FrameSubscriptions[id]) {
-            this.FrameSubscriptions[id] =
-              await api.query.liquidityPools.vaultPoolsByFrame(
-                id,
-                async entrant => {
-                  this.loadFrameData(id, entrant);
-                  this.printDebounce();
-                },
-              );
+            this.FrameSubscriptions[id] = await api.query.liquidityPools.vaultPoolsByFrame(
+              id,
+              async entrant => {
+                this.loadFrameData(id, entrant);
+                this.printDebounce();
+              },
+            );
           }
         }
       }
@@ -216,25 +186,13 @@ export class BidPool {
         api.query.liquidityPools.capitalActive as any,
         api.query.liquidityPools.capitalRaising as any,
       ],
-      async ([
-        _bids,
-        nextFrameId,
-        openVaultBidPoolCapital,
-        nextPoolCapital,
-      ]) => {
+      async ([_bids, nextFrameId, openVaultBidPoolCapital, nextPoolCapital]) => {
         this.bidPoolAmount = await this.getBidPool();
         this.nextFrameId = nextFrameId.toNumber();
-        for (const entrant of [
-          ...openVaultBidPoolCapital,
-          ...nextPoolCapital,
-        ]) {
-          this.setVaultFrameData(
-            entrant.frameId.toNumber(),
-            entrant.vaultId.toNumber(),
-            {
-              activatedCapital: entrant.activatedCapital.toBigInt(),
-            },
-          );
+        for (const entrant of [...openVaultBidPoolCapital, ...nextPoolCapital]) {
+          this.setVaultFrameData(entrant.frameId.toNumber(), entrant.vaultId.toNumber(), {
+            activatedCapital: entrant.activatedCapital.toBigInt(),
+          });
         }
         this.printDebounce();
       },
@@ -284,17 +242,13 @@ export class BidPool {
 
   public getOperatorName(vaultId: number): string {
     const vault = this.vaultsById[vaultId];
-    return (
-      this.accountRegistry.getName(vault.operatorAccountId) ??
-      vault.operatorAccountId
-    );
+    return this.accountRegistry.getName(vault.operatorAccountId) ?? vault.operatorAccountId;
   }
 
   public print() {
     console.clear();
     const lastDistributedFrameId = this.lastDistributedFrameId;
-    const distributedFrame =
-      this.poolVaultCapitalByFrame[this.lastDistributedFrameId ?? -1] ?? {};
+    const distributedFrame = this.poolVaultCapitalByFrame[this.lastDistributedFrameId ?? -1] ?? {};
     if (Object.keys(distributedFrame).length > 0) {
       console.log(`\n\nDistributed (Frame ${lastDistributedFrameId})`);
 
@@ -360,8 +314,7 @@ export class BidPool {
       }).printTable();
     }
 
-    const raisingFunds =
-      this.poolVaultCapitalByFrame[this.nextFrameId + 1] ?? [];
+    const raisingFunds = this.poolVaultCapitalByFrame[this.nextFrameId + 1] ?? [];
     let maxWidth = 0;
     const nextCapital = [];
     for (const x of this.vaultSecuritization) {
@@ -396,31 +349,18 @@ export class BidPool {
     }
   }
 
-  private setVaultFrameData(
-    frameId: number,
-    vaultId: number,
-    data: Partial<IVaultMiningBondFund>,
-  ) {
+  private setVaultFrameData(frameId: number, vaultId: number, data: Partial<IVaultMiningBondFund>) {
     this.poolVaultCapitalByFrame ??= {};
     this.poolVaultCapitalByFrame[frameId] ??= {};
     this.poolVaultCapitalByFrame[frameId][vaultId] ??= {
       activatedCapital:
-        data.activatedCapital ??
-        data.contributors?.reduce((a, b) => a + b.amount, 0n) ??
-        0n,
+        data.activatedCapital ?? data.contributors?.reduce((a, b) => a + b.amount, 0n) ?? 0n,
     };
 
-    Object.assign(
-      this.poolVaultCapitalByFrame[frameId][vaultId],
-      filterUndefined(data),
-    );
+    Object.assign(this.poolVaultCapitalByFrame[frameId][vaultId], filterUndefined(data));
   }
 
-  private createBondCapitalTable(
-    total: bigint,
-    contributors: IContributor[],
-    title = 'Total',
-  ) {
+  private createBondCapitalTable(total: bigint, contributors: IContributor[], title = 'Total') {
     const table = new Table({
       style: EMPTY_TABLE,
       columns: [
@@ -463,9 +403,7 @@ export class BidPool {
         earnings: fund.distributedProfits.isSome
           ? fund.distributedProfits.unwrap().toBigInt()
           : undefined,
-        vaultSharingPercent: convertPermillToBigNumber(
-          fund.vaultSharingPercent.toBigInt(),
-        ),
+        vaultSharingPercent: convertPermillToBigNumber(fund.vaultSharingPercent.toBigInt()),
         contributors,
       });
     }

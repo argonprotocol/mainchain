@@ -66,9 +66,7 @@ export class VaultMonitor {
   public async monitor(justPrint = false) {
     const client = await this.mainchain;
 
-    this.tickDuration = (
-      await client.query.ticks.genesisTicker()
-    ).tickDurationMillis.toNumber();
+    this.tickDuration = (await client.query.ticks.genesisTicker()).tickDurationMillis.toNumber();
     const blockHeader = await client.rpc.chain.getHeader();
     const blockHash = blockHeader.hash.toU8a();
     console.log(
@@ -86,8 +84,7 @@ export class VaultMonitor {
       this.activatedCapitalByVault = {};
       for (const entry of x) {
         const vaultId = entry.vaultId.toNumber();
-        this.activatedCapitalByVault[vaultId] =
-          entry.activatedCapital.toBigInt();
+        this.activatedCapitalByVault[vaultId] = entry.activatedCapital.toBigInt();
       }
       for (const [vaultId, vault] of Object.entries(this.vaultsById)) {
         const id = Number(vaultId);
@@ -115,11 +112,7 @@ export class VaultMonitor {
         securActivated: `${formatArgons(vault.activatedSecuritizationPerSlot())}/slot`,
         liquidPoolDeal: `${formatPercent(vault.terms.liquidityPoolProfitSharing)} sharing`,
         operator: `${this.accountset.namedAccounts.has(vault.operatorAccountId) ? ` (${this.accountset.namedAccounts.get(vault.operatorAccountId)})` : vault.operatorAccountId}`,
-        state: vault.isClosed
-          ? 'closed'
-          : vault.openedDate < new Date()
-            ? 'open'
-            : 'pending',
+        state: vault.isClosed ? 'closed' : vault.openedDate < new Date() ? 'open' : 'pending',
       });
     }
     if (vaults.length) {
@@ -136,9 +129,7 @@ export class VaultMonitor {
     if (this.shouldLog) {
       console.log(`Waiting for vault ${vaultId} to activate ${activationDate}`);
     }
-    await new Promise(resolve =>
-      setTimeout(resolve, activationDate.getTime() - Date.now()),
-    );
+    await new Promise(resolve => setTimeout(resolve, activationDate.getTime() - Date.now()));
     const client = await this.mainchain;
     let isReady = false;
     while (!isReady) {
@@ -158,10 +149,7 @@ export class VaultMonitor {
 
   private async onVaultsUpdated(blockHash: Uint8Array, vaultIds: Set<number>) {
     await this.reloadVaultsAt([...vaultIds], blockHash).catch(err => {
-      console.error(
-        `Failed to reload vault ${[...vaultIds]} at block ${blockHash}:`,
-        err,
-      );
+      console.error(`Failed to reload vault ${[...vaultIds]} at block ${blockHash}:`, err);
     });
     this.printVaults();
   }

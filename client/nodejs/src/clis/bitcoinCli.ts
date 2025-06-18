@@ -18,9 +18,7 @@ export default function bitcoinCli() {
     .action(async ({ argons }) => {
       const accountset = await accountsetFromCli(program);
       const bot = new VaultMonitor(accountset, {
-        bitcoinSpaceAvailable: argons
-          ? BigInt(argons * MICROGONS_PER_ARGON)
-          : 1n,
+        bitcoinSpaceAvailable: argons ? BigInt(argons * MICROGONS_PER_ARGON) : 1n,
       });
       bot.events.on('bitcoin-space-above', async (vaultId, amount) => {
         const vault = bot.vaultsById[vaultId];
@@ -41,21 +39,9 @@ export default function bitcoinCli() {
       'Bitcoin argons needed. NOTE: your account must have enough to cover fees + tip after this amount.',
       parseFloat,
     )
-    .requiredOption(
-      '--bitcoin-xpub <xpub>',
-      'The xpub key to use for bitcoin locking',
-    )
-    .option(
-      '--max-lock-fee <argons>',
-      "The max lock fee you're willing to pay",
-      parseFloat,
-    )
-    .option(
-      '--tip <amount>',
-      'The tip to include with the transaction',
-      parseFloat,
-      0.0,
-    )
+    .requiredOption('--bitcoin-xpub <xpub>', 'The xpub key to use for bitcoin locking')
+    .option('--max-lock-fee <argons>', "The max lock fee you're willing to pay", parseFloat)
+    .option('--tip <amount>', 'The tip to include with the transaction', parseFloat, 0.0)
     .action(async ({ argons, bitcoinXpub, maxLockFee, tip }) => {
       const amountToLock = BigInt(argons * MICROGONS_PER_ARGON);
 
@@ -63,10 +49,7 @@ export default function bitcoinCli() {
       await BitcoinLocks.waitForSpace(accountset, {
         argonAmount: amountToLock,
         bitcoinXpub,
-        maxLockFee:
-          maxLockFee !== undefined
-            ? BigInt(maxLockFee * MICROGONS_PER_ARGON)
-            : undefined,
+        maxLockFee: maxLockFee !== undefined ? BigInt(maxLockFee * MICROGONS_PER_ARGON) : undefined,
         tip: BigInt(tip * MICROGONS_PER_ARGON),
       }).then(({ vaultId, satoshis, txFee, btcFee }) => {
         console.log(

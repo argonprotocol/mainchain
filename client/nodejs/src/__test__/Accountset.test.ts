@@ -6,12 +6,7 @@ import {
   TxSubmitter,
   mnemonicGenerate,
 } from '../index';
-import {
-  describeIntegration,
-  sudo,
-  teardown,
-  TestMainchain,
-} from '@argonprotocol/testing';
+import { describeIntegration, sudo, teardown, TestMainchain } from '@argonprotocol/testing';
 import { parseSubaccountRange } from '../Accountset';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -36,9 +31,7 @@ describeIntegration('Accountset tests', () => {
     });
 
     expect(Object.keys(accountset.subAccountsByAddress).length).toBe(50);
-    expect(accountset.accountRegistry.getName(seedAccount.address)).toContain(
-      '//seed',
-    );
+    expect(accountset.accountRegistry.getName(seedAccount.address)).toContain('//seed');
     for (const i of Object.keys(accountset.subAccountsByAddress)) {
       expect(accountset.accountRegistry.getName(i)).toBeTruthy();
     }

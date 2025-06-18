@@ -84,12 +84,7 @@ declare module '@polkadot/types/lookup' {
     readonly isPreRuntime: boolean;
     readonly asPreRuntime: ITuple<[U8aFixed, Bytes]>;
     readonly isRuntimeEnvironmentUpdated: boolean;
-    readonly type:
-      | 'Other'
-      | 'Consensus'
-      | 'Seal'
-      | 'PreRuntime'
-      | 'RuntimeEnvironmentUpdated';
+    readonly type: 'Other' | 'Consensus' | 'Seal' | 'PreRuntime' | 'RuntimeEnvironmentUpdated';
   }
 
   /** @name FrameSystemEventRecord (20) */
@@ -542,11 +537,7 @@ declare module '@polkadot/types/lookup' {
     readonly isSpent: boolean;
     readonly isLookupExpired: boolean;
     readonly isDuplicateUtxo: boolean;
-    readonly type:
-      | 'SatoshisMismatch'
-      | 'Spent'
-      | 'LookupExpired'
-      | 'DuplicateUtxo';
+    readonly type: 'SatoshisMismatch' | 'Spent' | 'LookupExpired' | 'DuplicateUtxo';
   }
 
   /** @name ArgonPrimitivesBitcoinUtxoRef (52) */
@@ -779,10 +770,7 @@ declare module '@polkadot/types/lookup' {
       readonly notaryId: u32;
       readonly notebookNumber: u32;
     } & Struct;
-    readonly type:
-      | 'NotebookSubmitted'
-      | 'NotebookAuditFailure'
-      | 'NotebookReadyForReprocess';
+    readonly type: 'NotebookSubmitted' | 'NotebookAuditFailure' | 'NotebookReadyForReprocess';
   }
 
   /** @name ArgonNotaryAuditErrorVerifyError (70) */
@@ -1107,10 +1095,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesDomainZoneRecord extends Struct {
     readonly paymentAccount: AccountId32;
     readonly notaryId: u32;
-    readonly versions: BTreeMap<
-      ArgonPrimitivesDomainSemver,
-      ArgonPrimitivesDomainVersionHost
-    >;
+    readonly versions: BTreeMap<ArgonPrimitivesDomainSemver, ArgonPrimitivesDomainVersionHost>;
   }
 
   /** @name ArgonPrimitivesDomainSemver (80) */
@@ -1530,13 +1515,7 @@ declare module '@polkadot/types/lookup' {
       readonly relay: U8aFixed;
       readonly paraId: u32;
     } & Struct;
-    readonly type:
-      | 'Evm'
-      | 'Polkadot'
-      | 'Kusama'
-      | 'Substrate'
-      | 'Tendermint'
-      | 'Relay';
+    readonly type: 'Evm' | 'Polkadot' | 'Kusama' | 'Substrate' | 'Tendermint' | 'Relay';
   }
 
   /** @name IsmpConsensusStateMachineHeight (114) */
@@ -1593,10 +1572,7 @@ declare module '@polkadot/types/lookup' {
       readonly amount: u128;
       readonly account: AccountId32;
     } & Struct;
-    readonly type:
-      | 'HostParamsUpdated'
-      | 'RelayerFeeWithdrawn'
-      | 'ProtocolRevenueWithdrawn';
+    readonly type: 'HostParamsUpdated' | 'RelayerFeeWithdrawn' | 'ProtocolRevenueWithdrawn';
   }
 
   /** @name PalletHyperbridgeVersionedHostParams (124) */
@@ -2129,10 +2105,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesInherentsBitcoinUtxoSync extends Struct {
     readonly spent: BTreeMap<u64, u64>;
     readonly verified: BTreeMap<u64, ArgonPrimitivesBitcoinUtxoRef>;
-    readonly invalid: BTreeMap<
-      u64,
-      ArgonPrimitivesBitcoinBitcoinRejectedReason
-    >;
+    readonly invalid: BTreeMap<u64, ArgonPrimitivesBitcoinBitcoinRejectedReason>;
     readonly syncToBlock: ArgonPrimitivesBitcoinBitcoinBlock;
   }
 
@@ -2168,12 +2141,7 @@ declare module '@polkadot/types/lookup' {
       readonly vaultId: u32;
       readonly bitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub;
     } & Struct;
-    readonly type:
-      | 'Create'
-      | 'ModifyFunding'
-      | 'ModifyTerms'
-      | 'Close'
-      | 'ReplaceBitcoinXpub';
+    readonly type: 'Create' | 'ModifyFunding' | 'ModifyTerms' | 'Close' | 'ReplaceBitcoinXpub';
   }
 
   /** @name PalletVaultsVaultConfig (198) */
@@ -2379,10 +2347,7 @@ declare module '@polkadot/types/lookup' {
       readonly delay: u32;
       readonly bestFinalizedBlockNumber: u32;
     } & Struct;
-    readonly type:
-      | 'ReportEquivocation'
-      | 'ReportEquivocationUnsigned'
-      | 'NoteStalled';
+    readonly type: 'ReportEquivocation' | 'ReportEquivocationUnsigned' | 'NoteStalled';
   }
 
   /** @name SpConsensusGrandpaEquivocationProof (233) */
@@ -2404,12 +2369,8 @@ declare module '@polkadot/types/lookup' {
   interface FinalityGrandpaEquivocationPrevote extends Struct {
     readonly roundNumber: u64;
     readonly identity: SpConsensusGrandpaAppPublic;
-    readonly first: ITuple<
-      [FinalityGrandpaPrevote, SpConsensusGrandpaAppSignature]
-    >;
-    readonly second: ITuple<
-      [FinalityGrandpaPrevote, SpConsensusGrandpaAppSignature]
-    >;
+    readonly first: ITuple<[FinalityGrandpaPrevote, SpConsensusGrandpaAppSignature]>;
+    readonly second: ITuple<[FinalityGrandpaPrevote, SpConsensusGrandpaAppSignature]>;
   }
 
   /** @name FinalityGrandpaPrevote (236) */
@@ -2425,12 +2386,8 @@ declare module '@polkadot/types/lookup' {
   interface FinalityGrandpaEquivocationPrecommit extends Struct {
     readonly roundNumber: u64;
     readonly identity: SpConsensusGrandpaAppPublic;
-    readonly first: ITuple<
-      [FinalityGrandpaPrecommit, SpConsensusGrandpaAppSignature]
-    >;
-    readonly second: ITuple<
-      [FinalityGrandpaPrecommit, SpConsensusGrandpaAppSignature]
-    >;
+    readonly first: ITuple<[FinalityGrandpaPrecommit, SpConsensusGrandpaAppSignature]>;
+    readonly second: ITuple<[FinalityGrandpaPrecommit, SpConsensusGrandpaAppSignature]>;
   }
 
   /** @name FinalityGrandpaPrecommit (240) */
@@ -2656,12 +2613,7 @@ declare module '@polkadot/types/lookup' {
       readonly call: Call;
     } & Struct;
     readonly isRemoveKey: boolean;
-    readonly type:
-      | 'Sudo'
-      | 'SudoUncheckedWeight'
-      | 'SetKey'
-      | 'SudoAs'
-      | 'RemoveKey';
+    readonly type: 'Sudo' | 'SudoUncheckedWeight' | 'SetKey' | 'SudoAs' | 'RemoveKey';
   }
 
   /** @name PalletIsmpCall (259) */
@@ -2701,12 +2653,7 @@ declare module '@polkadot/types/lookup' {
     readonly asResponse: IsmpMessagingResponseMessage;
     readonly isTimeout: boolean;
     readonly asTimeout: IsmpMessagingTimeoutMessage;
-    readonly type:
-      | 'Consensus'
-      | 'FraudProof'
-      | 'Request'
-      | 'Response'
-      | 'Timeout';
+    readonly type: 'Consensus' | 'FraudProof' | 'Request' | 'Response' | 'Timeout';
   }
 
   /** @name IsmpMessagingConsensusMessage (262) */
@@ -3167,9 +3114,7 @@ declare module '@polkadot/types/lookup' {
     readonly securitizationRatio: Compact<u128>;
     readonly isClosed: bool;
     readonly terms: ArgonPrimitivesVaultVaultTerms;
-    readonly pendingTerms: Option<
-      ITuple<[u64, ArgonPrimitivesVaultVaultTerms]>
-    >;
+    readonly pendingTerms: Option<ITuple<[u64, ArgonPrimitivesVaultVaultTerms]>>;
     readonly openedTick: Compact<u64>;
   }
 
@@ -3477,8 +3422,7 @@ declare module '@polkadot/types/lookup' {
   }
 
   /** @name ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails (420) */
-  interface ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails
-    extends Struct {
+  interface ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails extends Struct {
     readonly notaryId: Compact<u32>;
     readonly notebookNumber: Compact<u32>;
     readonly tick: Compact<u64>;
@@ -3669,12 +3613,7 @@ declare module '@polkadot/types/lookup' {
     readonly asBlockRewards: PalletBlockRewardsHoldReason;
     readonly isLiquidityPools: boolean;
     readonly asLiquidityPools: PalletLiquidityPoolsHoldReason;
-    readonly type:
-      | 'MiningSlot'
-      | 'Vaults'
-      | 'BitcoinLocks'
-      | 'BlockRewards'
-      | 'LiquidityPools';
+    readonly type: 'MiningSlot' | 'Vaults' | 'BitcoinLocks' | 'BlockRewards' | 'LiquidityPools';
   }
 
   /** @name PalletMiningSlotHoldReason (459) */
@@ -3885,8 +3824,7 @@ declare module '@polkadot/types/lookup' {
   type FrameSystemExtensionsCheckWeight = Null;
 
   /** @name PalletTransactionPaymentChargeTransactionPayment (503) */
-  interface PalletTransactionPaymentChargeTransactionPayment
-    extends Compact<u128> {}
+  interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
   /** @name FrameMetadataHashExtensionCheckMetadataHash (504) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {

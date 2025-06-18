@@ -1,9 +1,6 @@
 import type { ArgonPrimitivesVault } from './index';
 import BigNumber, * as BN from 'bignumber.js';
-import {
-  convertFixedU128ToBigNumber,
-  convertPermillToBigNumber,
-} from './utils';
+import { convertFixedU128ToBigNumber, convertPermillToBigNumber } from './utils';
 
 const { ROUND_FLOOR } = BN;
 
@@ -23,9 +20,7 @@ export class Vault {
 
   constructor(id: number, vault: ArgonPrimitivesVault, tickDuration: number) {
     this.securitization = vault.securitization.toBigInt();
-    this.securitizationRatio = convertFixedU128ToBigNumber(
-      vault.securitizationRatio.toBigInt(),
-    );
+    this.securitizationRatio = convertFixedU128ToBigNumber(vault.securitizationRatio.toBigInt());
     this.argonsLocked = vault.argonsLocked.toBigInt();
     this.argonsPendingActivation = vault.argonsPendingActivation.toBigInt();
     if (vault.argonsScheduledForRelease.size > 0) {
@@ -68,30 +63,18 @@ export class Vault {
   public availableBitcoinSpace(): bigint {
     const recoverySecuritization = this.recoverySecuritization();
     const reLockable = this.getRelockCapacity();
-    return (
-      this.securitization -
-      recoverySecuritization -
-      this.argonsLocked +
-      reLockable
-    );
+    return this.securitization - recoverySecuritization - this.argonsLocked + reLockable;
   }
 
   public getRelockCapacity(): bigint {
-    return [...this.argonsScheduledForRelease.values()].reduce(
-      (acc, val) => acc + val,
-      0n,
-    );
+    return [...this.argonsScheduledForRelease.values()].reduce((acc, val) => acc + val, 0n);
   }
 
   public recoverySecuritization(): bigint {
     const reserved = new BigNumber(1).div(this.securitizationRatio);
     return (
       this.securitization -
-      BigInt(
-        reserved
-          .multipliedBy(this.securitization.toString())
-          .toFixed(0, ROUND_FLOOR),
-      )
+      BigInt(reserved.multipliedBy(this.securitization.toString()).toFixed(0, ROUND_FLOOR))
     );
   }
 
@@ -110,9 +93,7 @@ export class Vault {
     if (this.securitizationRatio.toNumber() > 2) {
       maxRatio = BigNumber(2);
     }
-    return BigInt(
-      maxRatio.multipliedBy(activated.toString()).toFixed(0, ROUND_FLOOR),
-    );
+    return BigInt(maxRatio.multipliedBy(activated.toString()).toFixed(0, ROUND_FLOOR));
   }
 
   /**

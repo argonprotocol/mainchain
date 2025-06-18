@@ -7,8 +7,7 @@ import '@polkadot/api-base/types/errors';
 
 import type { ApiTypes, AugmentedError } from '@polkadot/api-base/types';
 
-export type __AugmentedError<ApiType extends ApiTypes> =
-  AugmentedError<ApiType>;
+export type __AugmentedError<ApiType extends ApiTypes> = AugmentedError<ApiType>;
 
 declare module '@polkadot/api-base/types/errors' {
   interface AugmentedErrors<ApiType extends ApiTypes> {

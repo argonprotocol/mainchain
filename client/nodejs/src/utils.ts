@@ -10,10 +10,7 @@ export const MICROGONS_PER_ARGON = 1_000_000;
 export function formatArgons(x: bigint | number): string {
   if (x === undefined || x === null) return 'na';
   const isNegative = x < 0;
-  let format = BigNumber(x.toString())
-    .abs()
-    .div(MICROGONS_PER_ARGON)
-    .toFormat(2, ROUND_FLOOR);
+  let format = BigNumber(x.toString()).abs().div(MICROGONS_PER_ARGON).toFormat(2, ROUND_FLOOR);
   if (format.endsWith('.00')) {
     format = format.slice(0, -3);
   }
@@ -33,9 +30,7 @@ export function filterUndefined<T extends Record<string, any>>(
   obj: Partial<T>,
 ): NonNullableProps<T> {
   return Object.fromEntries(
-    Object.entries(obj).filter(
-      ([_, value]) => value !== undefined && value !== null,
-    ),
+    Object.entries(obj).filter(([_, value]) => value !== undefined && value !== null),
   ) as NonNullableProps<T>;
 }
 
@@ -64,10 +59,7 @@ export async function gettersToObject<T>(obj: T): Promise<T> {
     if (descriptor && typeof descriptor.value === 'function') {
       continue;
     }
-    const value =
-      descriptor && descriptor.get
-        ? descriptor.get.call(obj)
-        : obj[key as keyof T];
+    const value = descriptor && descriptor.get ? descriptor.get.call(obj) : obj[key as keyof T];
     if (typeof value === 'function') continue;
 
     result[key] = await gettersToObject(value);
@@ -98,10 +90,7 @@ export function eventDataToJson(event: GenericEvent): any {
   return obj;
 }
 
-export function dispatchErrorToString(
-  client: ArgonClient,
-  error: DispatchError,
-) {
+export function dispatchErrorToString(client: ArgonClient, error: DispatchError) {
   let message = error.toString();
   if (error.isModule) {
     const decoded = client.registry.findMetaError(error.asModule);
@@ -137,11 +126,7 @@ export function dispatchErrorToExtrinsicError(
   if (error.isModule) {
     const decoded = client.registry.findMetaError(error.asModule);
     const { docs, name, section } = decoded;
-    return new ExtrinsicError(
-      `${section}.${name}`,
-      docs.join(' '),
-      batchInterruptedIndex,
-    );
+    return new ExtrinsicError(`${section}.${name}`, docs.join(' '), batchInterruptedIndex);
   }
   return new ExtrinsicError(error.toString(), undefined, batchInterruptedIndex);
 }
@@ -170,11 +155,7 @@ export function checkForExtrinsicSuccess(
           errorInfo = `${decoded.section}.${decoded.name}`;
         }
 
-        reject(
-          new Error(
-            `${event.section}.${event.method}:: ExtrinsicFailed:: ${errorInfo}`,
-          ),
-        );
+        reject(new Error(`${event.section}.${event.method}:: ExtrinsicFailed:: ${errorInfo}`));
       }
     }
   });
@@ -185,11 +166,7 @@ export function checkForExtrinsicSuccess(
  */
 export class JsonExt {
   public static stringify(obj: any, space?: number): string {
-    return JSON.stringify(
-      obj,
-      (_, v) => (typeof v === 'bigint' ? `${v}n` : v),
-      space,
-    );
+    return JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? `${v}n` : v), space);
   }
 
   public static parse<T = any>(str: string): T {
@@ -202,20 +179,14 @@ export class JsonExt {
   }
 }
 
-export function createNanoEvents<
-  Events extends EventsMap = DefaultEvents,
->(): TypedEmitter<Events> {
+export function createNanoEvents<Events extends EventsMap = DefaultEvents>(): TypedEmitter<Events> {
   return new TypedEmitter<Events>();
 }
 
 export class TypedEmitter<Events extends EventsMap = DefaultEvents> {
   private events: Partial<{ [E in keyof Events]: Events[E][] }> = {};
 
-  emit<K extends keyof Events>(
-    this: this,
-    event: K,
-    ...args: Parameters<Events[K]>
-  ): void {
+  emit<K extends keyof Events>(this: this, event: K, ...args: Parameters<Events[K]>): void {
     for (const cb of this.events[event] || []) {
       cb(...args);
     }

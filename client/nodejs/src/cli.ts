@@ -1,4 +1,4 @@
-#!/bin/env node
+#!/usr/bin/env node
 import { addGlobalArgs, applyEnv, buildCli } from './clis';
 
 const program = buildCli();

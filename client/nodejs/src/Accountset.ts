@@ -1,9 +1,4 @@
-import {
-  type ArgonClient,
-  getClient,
-  Keyring,
-  type KeyringPair,
-} from './index';
+import { type ArgonClient, getClient, Keyring, type KeyringPair } from './index';
 import { dispatchErrorToString, formatArgons } from './utils';
 import { logExtrinsicResult, TxSubmitter } from './TxSubmitter';
 import { AccountRegistry } from './AccountRegistry';
@@ -80,30 +75,21 @@ export class Accountset {
       this.seedAddress = options.seedAddress;
     }
     this.sessionKeyMnemonic = options.sessionKeyMnemonic;
-    this.accountRegistry =
-      options.accountRegistry ?? AccountRegistry.factory(options.name);
+    this.accountRegistry = options.accountRegistry ?? AccountRegistry.factory(options.name);
     this.client = options.client;
     const defaultRange = options.subaccountRange ?? getDefaultSubaccountRange();
-    this.accountRegistry.register(
-      this.seedAddress,
-      `${this.accountRegistry.me}//seed`,
-    );
+    this.accountRegistry.register(this.seedAddress, `${this.accountRegistry.me}//seed`);
     for (const i of defaultRange) {
       const pair = this.txSubmitterPair.derive(`//${i}`);
       this.subAccountsByAddress[pair.address] = { pair, index: i };
-      this.accountRegistry.register(
-        pair.address,
-        `${this.accountRegistry.me}//${i}`,
-      );
+      this.accountRegistry.register(pair.address, `${this.accountRegistry.me}//${i}`);
     }
   }
 
   public async submitterBalance(blockHash?: Uint8Array): Promise<bigint> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
-    const accountData = await api.query.system.account(
-      this.txSubmitterPair.address,
-    );
+    const accountData = await api.query.system.account(this.txSubmitterPair.address);
 
     return accountData.data.free.toBigInt();
   }
@@ -173,15 +159,14 @@ export class Accountset {
     return subaccountRange;
   }
 
-  public async loadRegisteredMiners(
-    api: ApiDecoration<'promise'>,
-  ): Promise<ISubaccountMiner[]> {
+  public async loadRegisteredMiners(api: ApiDecoration<'promise'>): Promise<ISubaccountMiner[]> {
     const addresses = Object.keys(this.subAccountsByAddress);
-    const rawIndices =
-      await api.query.miningSlot.accountIndexLookup.multi(addresses);
+    const rawIndices = await api.query.miningSlot.accountIndexLookup.multi(addresses);
     const frameIds = [
       ...new Set(
-        rawIndices.map(x => (x.isNone ? undefined : x.value[0].toNumber())).filter(x => x !== undefined),
+        rawIndices
+          .map(x => (x.isNone ? undefined : x.value[0].toNumber()))
+          .filter(x => x !== undefined),
       ),
     ];
     const bidAmountsByFrame: { [frameId: number]: bigint[] } = {};
@@ -220,8 +205,7 @@ export class Accountset {
         address,
         seat: cohort,
         isLastDay,
-        subaccountIndex:
-          this.subAccountsByAddress[address]?.index ?? Number.NaN,
+        subaccountIndex: this.subAccountsByAddress[address]?.index ?? Number.NaN,
       };
     });
   }
@@ -250,9 +234,7 @@ export class Accountset {
 
   public async bids(
     blockHash?: Uint8Array,
-  ): Promise<
-    { address: string; bidPlace?: number; index: number; bidAmount: bigint }[]
-  > {
+  ): Promise<{ address: string; bidPlace?: number; index: number; bidAmount: bigint }[]> {
     const client = await this.client;
     const api = blockHash ? await client.at(blockHash) : client;
     const addresses = Object.keys(this.subAccountsByAddress);
@@ -279,8 +261,7 @@ export class Accountset {
   ): Promise<{ index: number; inBlock?: string; failedError?: Error }[]> {
     const client = await this.client;
     const accounts = this.getAccountsInRange(subaccounts);
-    const results: { index: number; inBlock?: string; failedError?: Error }[] =
-      [];
+    const results: { index: number; inBlock?: string; failedError?: Error }[] = [];
     await Promise.allSettled(
       accounts.map(({ pair, index }) => {
         if (!pair) {
@@ -303,9 +284,7 @@ export class Accountset {
 
                 results.push({
                   index,
-                  failedError: new Error(
-                    `Error consolidating //${index}: ${error}`,
-                  ),
+                  failedError: new Error(`Error consolidating //${index}: ${error}`),
                 });
                 resolve();
               }
@@ -336,20 +315,13 @@ export class Accountset {
       {
         index: 'main',
         address: this.seedAddress,
-        argons: formatArgons(
-          argons.find(x => x.address === this.seedAddress)?.amount ?? 0n,
-        ),
-        argonots: formatArgons(
-          argonots.find(x => x.address === this.seedAddress)?.amount ?? 0n,
-        ),
+        argons: formatArgons(argons.find(x => x.address === this.seedAddress)?.amount ?? 0n),
+        argonots: formatArgons(argonots.find(x => x.address === this.seedAddress)?.amount ?? 0n),
       },
     ];
-    for (const [address, { index }] of Object.entries(
-      this.subAccountsByAddress,
-    )) {
+    for (const [address, { index }] of Object.entries(this.subAccountsByAddress)) {
       const argonAmount = argons.find(x => x.address === address)?.amount ?? 0n;
-      const argonotAmount =
-        argonots.find(x => x.address === address)?.amount ?? 0n;
+      const argonotAmount = argonots.find(x => x.address === address)?.amount ?? 0n;
       const bid = bids.find(x => x.address === address);
       const seat = seats.find(x => x.address === address)?.seat;
       const entry: IAccountStatus = {
@@ -374,11 +346,7 @@ export class Accountset {
     const keys = this.keys();
     for (const [name, key] of Object.entries(keys)) {
       console.log('Registering key', name, key.publicKey);
-      const result = await client.rpc.author.insertKey(
-        name,
-        key.privateKey,
-        key.publicKey,
-      );
+      const result = await client.rpc.author.insertKey(name, key.privateKey, key.publicKey);
       // verify keys
       const saved = await client.rpc.author.hasKey(key.publicKey, name);
       if (!saved) {
@@ -400,9 +368,7 @@ export class Accountset {
     }
     const seedMnemonic = this.sessionKeyMnemonic ?? process.env.KEYS_MNEMONIC;
     if (!seedMnemonic) {
-      throw new Error(
-        'KEYS_MNEMONIC environment variable not set. Cannot derive keys.',
-      );
+      throw new Error('KEYS_MNEMONIC environment variable not set. Cannot derive keys.');
     }
     const blockSealKey = `${seedMnemonic}//block-seal//${version}`;
     const granKey = `${seedMnemonic}//grandpa//${version}`;
@@ -524,9 +490,7 @@ export class Accountset {
       useLatestNonce: true,
     });
 
-    const bidError = await txResult.inBlockPromise
-      .then(() => undefined)
-      .catch((x: Error) => x);
+    const bidError = await txResult.inBlockPromise.then(() => undefined).catch((x: Error) => x);
     return {
       finalFee: txResult.finalFee,
       bidError,

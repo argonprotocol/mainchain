@@ -6,9 +6,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     retry: 0,
     maxConcurrency: 1,
-    reporters: process.env.GITHUB_ACTIONS
-      ? ['dot', 'github-actions', 'junit']
-      : ['dot'],
+    reporters: process.env.GITHUB_ACTIONS ? ['dot', 'github-actions', 'junit'] : ['dot'],
     outputFile: {
       junit: 'vitest-results.xml',
     },

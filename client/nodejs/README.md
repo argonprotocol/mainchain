@@ -32,14 +32,9 @@ Or you can subscribe to changes (for instance, to track a series of valid cpi ad
 ```javascript
 const { WageProtector } = require('@argonprotocol/mainchain');
 const basePrice = 1_000_000n; // 1 Argon
-const { unsubscribe } = await WageProtector.subscribe(
-  client,
-  protectedPrice => {
-    console.log(
-      `Protected price: ${protectedPrice.getProtectedWage(basePrice)}`,
-    );
-  },
-);
+const { unsubscribe } = await WageProtector.subscribe(client, protectedPrice => {
+  console.log(`Protected price: ${protectedPrice.getProtectedWage(basePrice)}`);
+});
 ```
 
 Each `WageProtector` instance has the details of the Argon Target Price and USD price at the time of creation.
