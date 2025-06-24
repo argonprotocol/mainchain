@@ -57,10 +57,10 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}
-	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}
-	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}
 	fn get_argon_pool_liquidity() -> Option<Balance> {

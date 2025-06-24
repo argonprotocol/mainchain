@@ -320,6 +320,12 @@ mod bitcoin_compat {
 			child_number.is_hardened()
 		}
 
+		/// Derives a child public key from the current xpub at the given index.
+		/// NOTE: this uses unhardened derivation because it's in the public blockchain and hardened
+		/// derivation requires a private key. This does mean that if a single private key for a
+		/// vault is compromised, all the other xprivs derived from it can be compromised as well.
+		/// TODO: when we switch to taproot, we can use hardened derivation for the vault xpub
+		/// equivalent.
 		pub fn derive_pubkey(&self, index: u32) -> Result<BitcoinXPub, XpubErrors> {
 			let child_number =
 				ChildNumber::new(index, false).map_err(|_| XpubErrors::InvalidXpubkeyChild)?;

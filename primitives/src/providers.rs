@@ -44,8 +44,8 @@ pub trait PriceProvider<Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128
 		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
 		let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);
 
-		let btc_usd_price = Self::get_latest_btc_price_in_us_cents()?;
-		let argon_usd_price = Self::get_latest_argon_price_in_us_cents()?;
+		let btc_usd_price = Self::get_latest_btc_price_in_usd()?;
+		let argon_usd_price = Self::get_latest_argon_price_in_usd()?;
 
 		let satoshi_cents =
 			satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
@@ -57,10 +57,10 @@ pub trait PriceProvider<Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128
 		Some(microgons.saturating_mul_int(Balance::one()))
 	}
 
-	/// Prices of a single bitcoin in US cents
-	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128>;
-	/// Prices of a single argon in US cents
-	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128>;
+	/// Prices of a single bitcoin in USD
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128>;
+	/// Prices of a single argon in USD
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128>;
 
 	/// Get argon liquidity in the pool
 	fn get_argon_pool_liquidity() -> Option<Balance>;
