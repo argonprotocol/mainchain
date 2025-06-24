@@ -378,7 +378,7 @@ pub mod pallet {
 			let next_vault_id = vault_id.increment().ok_or(Error::<T>::NoMoreVaultIds)?;
 			NextVaultId::<T>::set(Some(next_vault_id));
 
-			let opened_tick = Self::get_terms_active_tick();
+			let opened_tick = T::TickProvider::current_tick();
 
 			ensure!(securitization > T::Balance::zero(), Error::<T>::InvalidVaultAmount);
 
