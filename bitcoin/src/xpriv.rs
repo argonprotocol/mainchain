@@ -1,6 +1,5 @@
 use anyhow::anyhow;
 use argon_primitives::bitcoin::BitcoinNetwork;
-use bip39::Mnemonic;
 use bitcoin::{
 	bip32::{DerivationPath, Xpriv, Xpub},
 	key::Secp256k1,
@@ -10,7 +9,7 @@ use core::str::FromStr;
 
 #[cfg(feature = "std")]
 pub fn xpriv_from_mnemonic(mnemonic: &str, network: BitcoinNetwork) -> anyhow::Result<Xpriv> {
-	let mnemonic = Mnemonic::from_str(mnemonic).map_err(|e| anyhow!(e))?;
+	let mnemonic = bip39::Mnemonic::from_str(mnemonic).map_err(|e| anyhow!(e))?;
 	xpriv_from_seed(&mnemonic.to_seed(""), network)
 }
 

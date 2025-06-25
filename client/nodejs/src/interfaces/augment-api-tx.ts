@@ -572,11 +572,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           message:
             | PalletIsmpUtilsUpdateConsensusState
-            | {
-                consensusStateId?: any;
-                unbondingPeriod?: any;
-                challengePeriods?: any;
-              }
+            | { consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1809,12 +1805,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           asset:
             | TokenGatewayPrimitivesGatewayAssetUpdate
-            | {
-                assetId?: any;
-                addChains?: any;
-                removeChains?: any;
-                newAdmins?: any;
-              }
+            | { assetId?: any; addChains?: any; removeChains?: any; newAdmins?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -2036,12 +2027,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultConfig:
             | PalletVaultsVaultConfig
-            | {
-                terms?: any;
-                securitization?: any;
-                bitcoinXpubkey?: any;
-                securitizationRatio?: any;
-              }
+            | { terms?: any; securitization?: any; bitcoinXpubkey?: any; securitizationRatio?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,

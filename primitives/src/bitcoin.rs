@@ -213,12 +213,14 @@ pub enum NetworkKind {
 	Serialize,
 	Deserialize,
 	Clone,
+	Copy,
 	PartialEq,
 	Eq,
 	RuntimeDebug,
 	Default,
 )]
 #[cfg_attr(all(feature = "std", not(feature = "uniffi")), derive(clap::ValueEnum))]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum BitcoinNetwork {
 	/// Mainnet Bitcoin.
 	Bitcoin,

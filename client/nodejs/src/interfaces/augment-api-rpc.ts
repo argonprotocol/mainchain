@@ -306,14 +306,7 @@ declare module '@polkadot/rpc-core/types/jsonrpc' {
         (
           request:
             | InstantiateRequestV1
-            | {
-                origin?: any;
-                value?: any;
-                gasLimit?: any;
-                code?: any;
-                data?: any;
-                salt?: any;
-              }
+            | { origin?: any; value?: any; gasLimit?: any; code?: any; data?: any; salt?: any }
             | string
             | Uint8Array,
           at?: BlockHash | string | Uint8Array,
@@ -510,13 +503,7 @@ declare module '@polkadot/rpc-core/types/jsonrpc' {
         (
           filter:
             | EthFilter
-            | {
-                fromBlock?: any;
-                toBlock?: any;
-                blockHash?: any;
-                address?: any;
-                topics?: any;
-              }
+            | { fromBlock?: any; toBlock?: any; blockHash?: any; address?: any; topics?: any }
             | string
             | Uint8Array,
         ) => Observable<Vec<EthLog>>
@@ -637,13 +624,7 @@ declare module '@polkadot/rpc-core/types/jsonrpc' {
         (
           filter:
             | EthFilter
-            | {
-                fromBlock?: any;
-                toBlock?: any;
-                blockHash?: any;
-                address?: any;
-                topics?: any;
-              }
+            | { fromBlock?: any; toBlock?: any; blockHash?: any; address?: any; topics?: any }
             | string
             | Uint8Array,
         ) => Observable<U256>

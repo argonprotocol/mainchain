@@ -59,6 +59,7 @@
     "@polkadot/util": "^13.5.1",
     "@polkadot/util-crypto": "^13.5.1",
     "bignumber.js": "^9.3.0",
+    "bs58check": "^4.0.0",
     "commander": "^13.1.0",
     "console-table-printer": "^2.12.1",
     "dotenv": "^16.4.7"

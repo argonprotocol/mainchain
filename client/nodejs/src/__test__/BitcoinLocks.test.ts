@@ -143,7 +143,7 @@ describeIntegration(
         const unsub = await aliceClient.query.bitcoinLocks.locksByUtxoId(1, y => {
           if (!y.isSome) reject('No lock found');
           const lock = y.unwrap();
-          if (lock.isVerified) {
+          if (lock.isVerified.isTrue) {
             resolve();
             unsub();
           }
