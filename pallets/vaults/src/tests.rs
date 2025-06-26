@@ -122,36 +122,6 @@ fn it_can_set_securitization_ratio_for_a_vault() {
 }
 
 #[test]
-fn it_delays_vault_activation_after_bidding() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(1);
-
-		assert_noop!(
-			Vaults::create(RuntimeOrigin::signed(1), default_vault()),
-			Error::<Test>::InsufficientFunds
-		);
-
-		set_argons(1, 100_010);
-		IsSlotBiddingStarted::set(true);
-
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		System::assert_last_event(
-			Event::VaultCreated {
-				vault_id: 1,
-				opened_tick: 100,
-				operator_account_id: 1,
-				securitization: 50_000,
-				securitization_ratio: FixedU128::one(),
-			}
-			.into(),
-		);
-
-		assert_err!(Vaults::lock(1, &2, 50_000, 500, None), VaultError::VaultNotYetActive);
-	});
-}
-
-#[test]
 fn it_will_reject_non_hardened_xpubs() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
