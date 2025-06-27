@@ -6,10 +6,17 @@ use argon_primitives::{
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
+	prelude::{sc_network::NetworkSyncForkRequest, sp_arithmetic::traits::Zero},
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
-use codec::Codec;
-use polkadot_sdk::*;
+use codec::{Codec, Encode};
+use futures::StreamExt;
+use polkadot_sdk::{
+	sc_client_api::BlockchainEvents,
+	sc_consensus::ImportedAux,
+	sp_core::{H256, blake2_256},
+	*,
+};
 use sc_client_api::{self, BlockBackend, backend::AuxStore};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
@@ -25,7 +32,7 @@ use sp_runtime::{
 	Justification,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
-use std::{marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use tracing::{error, warn};
 
 /// A block importer for argon.
@@ -34,6 +41,10 @@ pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
 	import_lock: Arc<tokio::sync::Mutex<()>>,
+	/// children that arrived with `ExecuteIfPossible` while the parent’s
+	/// state was still pruned. Key = parent_hash.
+	pending_children:
+		Arc<tokio::sync::Mutex<HashMap<<B as BlockT>::Hash, Vec<BlockImportParams<B>>>>>,
 	_phantom: PhantomData<AC>,
 }
 
@@ -42,6 +53,7 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 		Self {
 			inner: self.inner.clone(),
 			client: self.client.clone(),
+			pending_children: self.pending_children.clone(),
 			aux_client: self.aux_client.clone(),
 			import_lock: self.import_lock.clone(),
 			_phantom: PhantomData,
@@ -56,7 +68,7 @@ where
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
 	C: HeaderBackend<B> + BlockBackend<B> + AuxStore + Send + Sync + 'static,
-	AC: Codec + Send + Sync + 'static,
+	AC: Clone + Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
 
@@ -64,23 +76,87 @@ where
 		self.inner.check_block(block.clone()).await.map_err(Into::into)
 	}
 
+	/// ARGON BLOCK IMPORT ‑ Quick‐reference (keep IDE‑friendly)
+	///
+	/// PIPELINE
+	///   network → BasicQueue.check_block → Verifier.verify → *import_block* (this fn)
+	///
+	/// LOCKING
+	///   - `import_lock` serialises every import so `client.info()` and aux writes remain atomic.
+	///
+	/// EARLY EXITS
+	///   - Parent state missing + `ExecuteIfPossible` → `ImportResult::MissingState`
+	///   - Header already in DB AND no new body/state → `ImportResult::AlreadyInChain`
+	///
+	/// FORK‑CHOICE
+	///   - `fork_power > best_power`                                   ⇒ set_best = true
+	///   - `fork_power == best_power` & `hash < best_hash`             ⇒ set_best = true
+	///   - else                                                        ⇒ set_best = false
+	///   - `set_best` additionally requires `has_state_or_block` & `can_finalize`
+	///   - tie‑loser: `block.import_existing = true` + `aux.check_duplicate_block_at_tick(...)`
+	///
+	/// AUX WRITES
+	///   - `clean_state_history()`      — winner of each `(height, power)`
+	///   - `check_duplicate_block_at_tick()`  - block duplicated blocks
+	///
+	/// TYPICAL ENTRY VARIANTS
+	///   - Gap header           : NetworkInitialSync + `Skip`                  → store header, not
+	///     best
+	///   - Warp header + state  : NetworkInitialSync + `Import(changes)`       → may become best
+	///   - Gossip header + body : `ExecuteIfPossible`                          → exec or
+	///     MissingState
+	///   - Full block           : `ApplyChanges::Changes`                      → full import
+	///   - Finalized block      : `finalized = true`                           → advance finalized
+	///
+	/// RE-IMPORTING THE SAME BLOCK
+	/// Multiple legitimate paths can cause the same hash to arrive here again:
+	///   • Gap header then later state: first call has state_action = Skip; the second
+	///     call carries ApplyChanges::Import. This upgrades the header to
+	///     InChainWithState because has_state_or_block is true.
+	///   • Parent state race: a gossip block with ExecuteIfPossible beats its
+	///     parent’s state. We return MissingState; BasicQueue retries the same
+	///     block when the parent executes.
+	///   • Multi-peer broadcast: two peers deliver an identical header; the second
+	///     call hits AlreadyInChain and exits quickly.
+	///   • Justification / finality upgrade: a header first imported without
+	///     finality may be re-imported later with block.finalized = true or an
+	///     attached justification. This second import can advance finality.
+	///   • Tie‑loser replay: a block previously stored as non-best can be
+	///     re-broadcast; import_existing = true makes the operation idempotent.
+	///   • Node restart: after a restart the DB already has the header but peers
+	///     replay it; AlreadyInChain handles the redundancy.
+	///
+	/// INVARIANTS
+	///   - Deterministic fork‑choice (hash tie‑break).
+	///   - ≤ 512/1024 children per height (fork‑tree limit).
+	///   - Duplicate author spam at a tick rejected pre‑DB.
+	///
+	/// RETURN
+	///   One of the standard `ImportResult` variants that BasicQueue converts
+	///   into `BlockImportStatus`.
 	async fn import_block(
 		&self,
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
-		let hash = block.post_hash();
-		let number = *block.header.number();
-
-		let parent = *block.header.parent_hash();
+		// single thread the import queue to ensure we don't have multiple imports
+		let import_lock = self.import_lock.lock().await;
+		let block_hash = block.post_hash();
+		let block_number = *block.header.number();
+		let parent_hash = *block.header.parent_hash();
 
 		let info = self.client.info();
-		let is_block_gap = info.block_gap.is_some_and(|a| a.start <= number && number <= a.end);
+		let is_block_gap =
+			info.block_gap.is_some_and(|a| a.start <= block_number && block_number <= a.end);
+		let parent_block_state =
+			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
+		let block_status =
+			self.client.status(block_hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
 		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
 		// imported. Various sync strategies will access this path without state set yet
 		tracing::trace!(
-			number=?number,
-			hash=?hash,
-			parent=?parent,
+			number=?block_number,
+			hash=?block_hash,
+			parent=?parent_hash,
 			is_block_gap,
 			action=match block.state_action {
 				StateAction::ApplyChanges(StorageChanges::Changes(_)) => "state_apply",
@@ -89,37 +165,42 @@ where
 				StateAction::ExecuteIfPossible => "execute_if_possible",
 				StateAction::Skip => "skip",
 			},
-			is_ours=block.origin == BlockOrigin::Own,
+			origin=?block.origin,
+			parent_block_state=?parent_block_state,
+			block_status=?block_status,
 			"Begin import."
 		);
-		let digest = block.header.digest();
-		let block_author: AC = digest
-			.convert_first(|a| a.as_author())
-			.ok_or(Error::UnableToDecodeDigest("author".to_string()))?;
 
-		let tick = digest
-			.convert_first(|a| a.as_tick())
-			.ok_or(Error::UnableToDecodeDigest("tick".to_string()))?
-			.0;
+		if matches!(block.state_action, StateAction::ExecuteIfPossible) &&
+			parent_block_state != BlockStatus::InChainWithState
+		{
+			tracing::debug!(?block_hash, ?block_number, "parent state missing – header only");
 
-		let voting_key = digest
-			.convert_first(|a| a.as_parent_voting_key())
-			.ok_or(Error::UnableToDecodeDigest("voting key".to_string()))?
-			.parent_voting_key;
+			let mut header_only =
+				BlockImportParams::new(block.origin.clone(), block.header.clone());
+			header_only.state_action = StateAction::Skip;
+			header_only.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+			header_only.post_digests = block.post_digests.clone();
+			header_only.post_hash = block.post_hash;
+			header_only.create_gap = false;
+			let _ = self.inner.import_block(header_only).await.map_err(Into::into)?;
 
-		let fork_power = ForkPower::try_from(digest)
-			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
+			self.pending_children.lock().await.entry(parent_hash).or_default().push(block);
 
-		// hold for rest of block import
-		let _lock = self.import_lock.lock().await;
+			return Ok(ImportResult::Imported(ImportedAux {
+				header_only: true,
+				clear_justification_requests: false,
+				needs_justification: false,
+				bad_justification: false,
+				is_new_best: false,
+			}));
+		}
 
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-		let finalized_hash = self.client.info().finalized_hash;
 		let is_finalized_descendent = is_on_finalized_chain(
 			&(*self.client),
 			&block,
-			&finalized_hash,
-			self.client.info().finalized_number,
+			&info.finalized_hash,
+			info.finalized_number,
 		)
 		.unwrap_or_default();
 
@@ -127,62 +208,121 @@ where
 			block.origin == BlockOrigin::NetworkInitialSync ||
 			block.finalized;
 
-		// We only want to set a best block if the state is imported. When
-		// syncing, we will sometimes import state, but be grabbing a gap block, in which case we
-		// don't want to set interim blocks as best block
-		let has_state = match block.state_action {
-			StateAction::ApplyChanges(_) | StateAction::Execute => true,
-			StateAction::ExecuteIfPossible =>
-				self.client.block_status(parent).unwrap_or(BlockStatus::Unknown) ==
-					BlockStatus::InChainWithState,
-			StateAction::Skip => false,
-		};
-
-		let is_block_already_imported =
-			self.client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown) ==
-				sp_blockchain::BlockStatus::InChain;
-		if is_block_already_imported && !can_finalize {
+		let is_block_already_imported = block_status == sp_blockchain::BlockStatus::InChain;
+		let has_state_or_block = !block.state_action.skip_execution_checks();
+		// If the header is already in the DB we usually short‑circuit unless the
+		// new import carries *something* we still need (state/body *or* finality).
+		if is_block_already_imported && !has_state_or_block && !block.finalized {
 			tracing::debug!(
-				?hash,
-				?number,
-				"Skipping reimport of known block not in finalized chain"
+				?block_hash,
+				?block_number,
+				"Skipping reimport of known block without state or finalization"
 			);
 			return Ok(ImportResult::AlreadyInChain);
 		}
-		if has_state && !is_block_gap {
-			let max_fork_power = if is_block_already_imported {
-				self.aux_client.strongest_fork_power()?.get()
-			} else {
-				self.aux_client.record_block(
-					&mut block.auxiliary,
-					block_author,
-					voting_key,
-					tick,
-					fork_power.is_latest_vote,
-				)?
-			};
+		// Otherwise (e.g. now finalized or now with state) we fall through and let
+		// `inner.import_block` upgrade the existing header.
+		let best_header = self
+			.client
+			.header(info.best_hash)
+			.expect("Best header should always be available")
+			.expect("Best header should always exist");
+
+		let best_block_power = if info.best_number.is_zero() {
+			ForkPower::default()
+		} else {
+			ForkPower::try_from(best_header.digest()).map_err(|e| {
+				Error::MissingRuntimeData(format!("Failed to get best fork power: {:?}", e))
+			})?
+		};
+
+		let mut set_to_best = false;
+		let digest = block.header.digest();
+		let block_author: AC = digest
+			.convert_first(|a| a.as_author())
+			.ok_or(Error::UnableToDecodeDigest("author".to_string()))?;
+		let tick = digest
+			.convert_first(|a| a.as_tick())
+			.ok_or(Error::UnableToDecodeDigest("tick".to_string()))?
+			.0;
+		let fork_power = ForkPower::try_from(digest)
+			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
+
+		if fork_power >= best_block_power {
 			// NOTE: only import as best block if it beats the best stored block. There are cases
 			// where importing a tie will yield too many blocks at a height and break substrate
-			if can_finalize && fork_power > max_fork_power {
-				tracing::info!(
-					block_hash = ?hash,
-					?fork_power,
-					"New best fork imported"
+			set_to_best = has_state_or_block && can_finalize;
+			if set_to_best && fork_power == best_block_power {
+				// if fork power is equal, choose a deterministic option to set the best block
+				set_to_best = info.best_hash > block_hash;
+				// check if this is a "duplicate" block from the same author at the same tick
+				// eg - a block with the same fork power, which we should reject so that we
+				// don't fill up the max quota of blocks at a height. this can happen when
+				// nodes try to ensure everyone knows their best block, but we have already
+				// imported it as non-best, and will keep filling it in
+				let fork_power_hash = blake2_256(&fork_power.encode());
+				self.aux_client.check_duplicate_block_at_tick(
+					block_author.clone(),
+					H256::from(fork_power_hash),
+					tick,
+				)?;
+				if !set_to_best {
+					// this flag forces us to revalidate the block
+					block.import_existing = true;
+				}
+			}
+			tracing::info!(
+				number=?block_number,
+				block_hash = ?block_hash,
+				can_finalize = is_finalized_descendent,
+				finalized = block.finalized,
+				set_to_best,
+				"New best fork imported"
+			);
+		}
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(set_to_best));
+
+		if set_to_best {
+			self.aux_client.clean_state_history(&mut block.auxiliary, tick)?;
+		}
+
+		if !is_block_gap && !is_block_already_imported && fork_power.is_latest_vote {
+			let voting_key = digest
+				.convert_first(|a| a.as_parent_voting_key())
+				.ok_or(Error::UnableToDecodeDigest("voting key".to_string()))?
+				.parent_voting_key;
+
+			// Block abuse prevention. Do not allow a block author to submit more than one vote
+			// block per tick pertaining to the same voting key.
+			//
+			// The "next_voting_key" represents a combination of the notebooks that were
+			// includedA at a given tick. No voting key means there are no notebooks at
+			// tick.
+			let next_voting_key = voting_key.unwrap_or(H256::zero());
+			self.aux_client
+				.check_duplicate_block_at_tick(block_author, next_voting_key, tick)?;
+		}
+		let result = self.inner.import_block(block).await.map_err(Into::into)?;
+
+		// if we actually wrote state (or executed), flush any queued children
+		if has_state_or_block {
+			// make this two lines so it doesn't hold the lock
+			let children = self.pending_children.lock().await.remove(&block_hash);
+			if let Some(children) = children {
+				drop(import_lock); // release the lock before we import any more blocks
+				tracing::debug!(
+					?block_hash,
+					?block_number,
+					"Importing {} children that arrived with ExecuteIfPossible. Parent state now available.",
+					children.len()
 				);
-				block.fork_choice = Some(ForkChoiceStrategy::Custom(true));
+				for child in children {
+					// re-import with the original state_action
+					let _ = self.import_block(child).await;
+				}
 			}
 		}
-		match self.inner.import_block(block).await {
-			Ok(result) => {
-				if can_finalize {
-					self.aux_client.block_accepted(fork_power).inspect_err(|e| {
-						log::error!("Failed to record block accepted for {:?}: {:?}", hash, e)
-					})?;
-				}
-				Ok(result)
-			},
-			Err(e) => Err(e.into()),
-		}
+		Ok(result)
 	}
 }
 
@@ -201,7 +341,7 @@ where
 	let mut block_hash = block.post_hash();
 	while number >= finalized_number {
 		if number == finalized_number {
-			return Ok(block_hash == *finalized)
+			return Ok(block_hash == *finalized);
 		}
 		let header = client
 			.header(parent_hash)?
@@ -282,7 +422,7 @@ where
 			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(
 				block_params.with_state() || block_params.origin == BlockOrigin::NetworkInitialSync,
 			));
-			return Ok(block_params)
+			return Ok(block_params);
 		}
 
 		let post_hash = block_params.header.hash();
@@ -299,27 +439,27 @@ where
 		// The import queue can import headers and also blocks. Sometimes these blocks come in and
 		// the parent state isn't yet available
 		if let Some(inner_body) = block_params.body.clone() {
-			// sanity check to log if we somehow DON'T have state
 			if self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
 				BlockStatus::InChainWithState
 			{
+				// Parent state is still pruned.  Do *not* reject the block outright;
+				// let the importer store the header once as `InChainPruned` and wait
+				// for the real body/state on a later re‑broadcast.
 				warn!(
 					block_hash = ?post_hash,
 					?block_number,
 					?parent_hash,
 					origin = ?block_params.origin,
-					fork_choice = ?block_params.fork_choice,
-					import_existing = ?block_params.import_existing,
-					finalized = ?block_params.finalized,
-					"Unable to verify block with `ExecuteIfPossible` due to missing state for parent block."
+					"Parent state missing – downgrade to header‑only; importer will retry later"
 				);
-				if block_params.origin == BlockOrigin::NetworkInitialSync {
-					return Ok(block_params)
-				}
 
 				if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
-					return Err("Parent state not available".into())
+					// Downgrade so the importer treats this as a gap header.
+					block_params.state_action = StateAction::Skip;
+					block_params.fork_choice = Some(ForkChoiceStrategy::Custom(false));
 				}
+				// Return the modified params; importer will handle storage/back‑off.
+				return Ok(block_params);
 			}
 
 			let runtime_api = self.client.runtime_api();
@@ -459,6 +599,7 @@ where
 		client: client.clone(),
 		aux_client,
 		import_lock: Default::default(),
+		pending_children: Default::default(),
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
@@ -479,4 +620,800 @@ where
 		),
 		importer,
 	)
+}
+
+pub fn ensure_best_block_state_task<B, C, S>(
+	client: Arc<C>,
+	sync_service: Arc<S>,
+) -> Result<impl futures::Future<Output = ()> + Send, Error>
+where
+	B: BlockT,
+	C: ProvideRuntimeApi<B>
+		+ HeaderBackend<B>
+		+ BlockBackend<B>
+		+ BlockchainEvents<B>
+		+ Send
+		+ Sync
+		+ AuxStore
+		+ 'static,
+	S: NetworkSyncForkRequest<B::Hash, NumberFor<B>> + Send + Sync + 'static,
+{
+	// ──────────────────────────────────────────────────────────────────────────
+	// 📦  Boot‑time check: if the stored head has no state, start warp sync
+	// ──────────────────────────────────────────────────────────────────────────
+	{
+		let info = client.info();
+		if matches!(
+			client.block_status(info.best_hash).unwrap_or(BlockStatus::Unknown),
+			BlockStatus::InChainPruned
+		) {
+			tracing::warn!(
+				best_hash = ?info.best_hash,
+				best_number = ?info.best_number,
+				"DB head lacks state – starting warp‑sync"
+			);
+			sync_service.set_sync_fork_request(Vec::new(), info.best_hash, info.best_number);
+		}
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
+	// 🛰  Runtime watcher: re‑enter warp sync whenever the canonical head
+	//     switches to a block whose state is still pruned.
+	// ──────────────────────────────────────────────────────────────────────────
+
+	let client_for_task = client.clone();
+	let sync_for_task = sync_service.clone();
+	Ok(async move {
+		let mut notifs = client_for_task.import_notification_stream();
+		while let Some(n) = notifs.next().await {
+			if !n.is_new_best {
+				continue;
+			}
+			if matches!(
+				client_for_task.block_status(n.hash).unwrap_or(BlockStatus::Unknown),
+				BlockStatus::InChainPruned
+			) {
+				tracing::info!(
+					hash = ?n.hash,
+					number = ?n.header.number(),
+					"New best is pruned – starting warp sync"
+				);
+				sync_for_task.set_sync_fork_request(Vec::new(), n.hash, *n.header.number());
+			}
+		}
+	})
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use argon_primitives::{
+		BlockSealAuthoritySignature, ComputeDifficulty, Digestset, FORK_POWER_DIGEST,
+		HashOutput as BlockHash, NotebookDigest, PARENT_VOTING_KEY_DIGEST, ParentVotingKeyDigest,
+		VotingKey,
+		prelude::{
+			sp_runtime::{generic::SignedBlock, traits::BlakeTwo256},
+			*,
+		},
+	};
+	use async_trait::async_trait;
+	use polkadot_sdk::{
+		frame_support::assert_ok,
+		sc_client_api::KeyValueStates,
+		sc_consensus::ImportedState,
+		sp_core::{ByteArray, U256},
+		sp_runtime::DigestItem,
+	};
+	use sc_consensus::{
+		BlockCheckParams, BlockImportParams, ImportResult, ImportedAux, StateAction::*,
+	};
+	use sp_blockchain::{BlockStatus, Error as BlockchainError, HeaderBackend};
+	use sp_runtime::{
+		Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
+		traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	};
+	use std::{
+		collections::{BTreeMap, HashMap},
+		sync::{Arc, Mutex},
+	};
+	// -------------------------------------------
+	// Tiny in–memory client & mini importer
+	// -------------------------------------------
+
+	#[derive(Clone)]
+	pub struct MemChain {
+		headers: Arc<Mutex<HashMap<BlockHash, Header>>>,
+		block_status: Arc<Mutex<HashMap<BlockHash, BlockStatus>>>,
+		block_state: Arc<Mutex<HashMap<BlockHash, sp_consensus::BlockStatus>>>,
+		best: Arc<Mutex<(BlockNumber, BlockHash)>>,
+		finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
+		aux: Arc<Mutex<BTreeMap<Vec<u8>, Vec<u8>>>>,
+	}
+	impl MemChain {
+		pub fn new(genesis: Header) -> Self {
+			let h = genesis.hash();
+			Self {
+				headers: Arc::new(Mutex::new([(h, genesis)].into())),
+				block_status: Arc::new(Mutex::new([(h, BlockStatus::InChain)].into())),
+				block_state: Arc::new(Mutex::new(
+					[(h, sp_consensus::BlockStatus::InChainWithState)].into(),
+				)),
+				best: Arc::new(Mutex::new((0u32, h))),
+				finalized: Arc::new(Mutex::new((0u32, h))),
+				aux: Arc::new(Mutex::new(BTreeMap::new())),
+			}
+		}
+		pub fn insert(&self, hdr: Header) {
+			let h = hdr.hash();
+			self.block_status.lock().unwrap().insert(h, BlockStatus::InChain);
+			self.block_state
+				.lock()
+				.unwrap()
+				.insert(h, sp_consensus::BlockStatus::InChainPruned); // header only, no state yet
+			self.headers.lock().unwrap().insert(h, hdr);
+		}
+
+		pub fn set_state(&self, h: BlockHash, state: sp_consensus::BlockStatus) {
+			self.block_status.lock().unwrap().insert(h, BlockStatus::InChain);
+			self.block_state.lock().unwrap().insert(h, state);
+		}
+	}
+	impl HeaderBackend<Block> for MemChain {
+		fn header(&self, h: BlockHash) -> Result<Option<Header>, BlockchainError> {
+			Ok(self.headers.lock().unwrap().get(&h).cloned())
+		}
+		fn info(&self) -> sp_blockchain::Info<Block> {
+			let best = *self.best.lock().unwrap();
+			let fin = *self.finalized.lock().unwrap();
+			sp_blockchain::Info {
+				finalized_hash: fin.1,
+				finalized_number: fin.0,
+				finalized_state: None,
+				best_hash: best.1,
+				best_number: best.0,
+				block_gap: None,
+				genesis_hash: best.1,
+				number_leaves: 0,
+			}
+		}
+		fn status(&self, h: BlockHash) -> Result<BlockStatus, BlockchainError> {
+			Ok(if self.headers.lock().unwrap().contains_key(&h) {
+				BlockStatus::InChain
+			} else {
+				BlockStatus::Unknown
+			})
+		}
+
+		fn number(&self, hash: BlockHash) -> sp_blockchain::Result<Option<BlockNumber>> {
+			Ok(self.headers.lock().unwrap().get(&hash).map(|h| *h.number()))
+		}
+
+		fn hash(&self, number: NumberFor<Block>) -> sp_blockchain::Result<Option<BlockHash>> {
+			Ok(self
+				.headers
+				.lock()
+				.unwrap()
+				.values()
+				.find(|h| *h.number() == number)
+				.map(|h| h.hash()))
+		}
+	}
+
+	impl BlockBackend<Block> for MemChain {
+		fn block_body(
+			&self,
+			_hash: BlockHash,
+		) -> sc_client_api::blockchain::Result<Option<Vec<UncheckedExtrinsic>>> {
+			Ok(Some(Vec::new()))
+		}
+		fn block(&self, hash: BlockHash) -> sp_blockchain::Result<Option<SignedBlock<Block>>> {
+			if let Some(header) = self.headers.lock().unwrap().get(&hash) {
+				Ok(Some(SignedBlock {
+					block: Block::new(header.clone(), Vec::new()),
+					justifications: None,
+				}))
+			} else {
+				Ok(None)
+			}
+		}
+		fn block_status(
+			&self,
+			hash: BlockHash,
+		) -> sc_client_api::blockchain::Result<sp_consensus::BlockStatus> {
+			let map = self.block_state.lock().unwrap();
+			Ok(map.get(&hash).cloned().unwrap_or(sp_consensus::BlockStatus::Unknown))
+		}
+
+		fn justifications(
+			&self,
+			_hash: BlockHash,
+		) -> sc_client_api::blockchain::Result<Option<sp_runtime::Justifications>> {
+			Ok(None)
+		}
+
+		fn block_indexed_body(
+			&self,
+			_hash: BlockHash,
+		) -> sc_client_api::blockchain::Result<Option<Vec<Vec<u8>>>> {
+			Ok(Some(Vec::new()))
+		}
+
+		fn requires_full_sync(&self) -> bool {
+			false
+		}
+
+		fn block_hash(&self, number: NumberFor<Block>) -> sp_blockchain::Result<Option<BlockHash>> {
+			Ok(self
+				.headers
+				.lock()
+				.unwrap()
+				.values()
+				.find(|h| *h.number() == number)
+				.map(|h| h.hash()))
+		}
+
+		fn indexed_transaction(&self, _hash: BlockHash) -> sp_blockchain::Result<Option<Vec<u8>>> {
+			Ok(None)
+		}
+	}
+
+	impl AuxStore for MemChain {
+		fn insert_aux<
+			'a,
+			'b: 'a,
+			'c: 'a,
+			I: IntoIterator<Item = &'a (&'c [u8], &'c [u8])>,
+			D: IntoIterator<Item = &'a &'b [u8]>,
+		>(
+			&self,
+			insert: I,
+			delete: D,
+		) -> sc_client_api::blockchain::Result<()> {
+			let mut aux = self.aux.lock().expect("aux is poisoned");
+			for (k, v) in insert {
+				aux.insert(k.to_vec(), v.to_vec());
+			}
+			for k in delete {
+				aux.remove(*k);
+			}
+			Ok(())
+		}
+
+		fn get_aux(&self, key: &[u8]) -> sc_client_api::blockchain::Result<Option<Vec<u8>>> {
+			let aux = self.aux.lock().unwrap();
+			Ok(aux.get(key).cloned())
+		}
+	}
+
+	/// Opaque block header type.
+	type Header = generic::Header<BlockNumber, BlakeTwo256>;
+	/// Opaque block type.
+	type Block = generic::Block<Header, UncheckedExtrinsic>;
+
+	#[async_trait]
+	impl sc_consensus::BlockImport<Block> for MemChain {
+		type Error = ConsensusError;
+
+		async fn check_block(
+			&self,
+			_: BlockCheckParams<Block>,
+		) -> Result<ImportResult, Self::Error> {
+			Ok(ImportResult::Imported(ImportedAux::default()))
+		}
+
+		async fn import_block(
+			&self,
+			params: BlockImportParams<Block>,
+		) -> Result<ImportResult, Self::Error> {
+			let num = *params.header.number();
+			let hash = params.header.hash();
+			// store/overwrite header so later calls see it in MemChain
+			self.insert(params.header.clone());
+			match params.state_action {
+				ApplyChanges(_) | Execute =>
+					self.set_state(hash, sp_consensus::BlockStatus::InChainWithState),
+				ExecuteIfPossible => {
+					// If the parent already has full state we can execute immediately.
+					let p_hash = *params.header.parent_hash();
+					let parent_has_state = matches!(
+						self.block_state.lock().unwrap().get(&p_hash),
+						Some(sp_consensus::BlockStatus::InChainWithState)
+					);
+					if parent_has_state {
+						self.set_state(hash, sp_consensus::BlockStatus::InChainWithState);
+					} else {
+						// header‑only until the parent’s state arrives
+						// (behaves like real client which retries later)
+					}
+				},
+				Skip => {}, // header only
+			}
+			// minimal: just mark best/finalized if fork_choice says so
+			if let Some(fork_choice) = params.fork_choice {
+				match fork_choice {
+					sc_consensus::ForkChoiceStrategy::Custom(set_best) if set_best => {
+						let mut best = self.best.lock().unwrap();
+						if num > best.0 || (num == best.0 && hash != best.1) {
+							*best = (num, hash);
+						}
+					},
+					_ => {},
+				}
+			}
+			if params.finalized {
+				let mut fin = self.finalized.lock().unwrap();
+				if num > fin.0 || (num == fin.0 && hash != fin.1) {
+					*fin = (num, hash);
+				}
+			}
+			Ok(ImportResult::Imported(ImportedAux::default()))
+		}
+	}
+
+	fn create_header(
+		number: BlockNumber,
+		parent: H256,
+		compute_difficulty: ComputeDifficulty,
+		voting_key: Option<VotingKey>,
+		author: AccountId,
+	) -> (Header, DigestItem) {
+		let (digest, block_digest) = create_digest(compute_difficulty, voting_key, author);
+		(Header::new(number, H256::zero(), H256::zero(), parent, digest), block_digest)
+	}
+	fn has_state(db: &MemChain, h: H256) -> bool {
+		matches!(
+			db.block_state.lock().unwrap().get(&h),
+			Some(sp_consensus::BlockStatus::InChainWithState)
+		)
+	}
+
+	fn create_digest(
+		compute_difficulty: ComputeDifficulty,
+		voting_key: Option<VotingKey>,
+		author: AccountId,
+	) -> (Digest, DigestItem) {
+		let mut power = ForkPower::default();
+		if compute_difficulty > 0 {
+			power.add(0, 0, BlockSealDigest::Compute { nonce: U256::zero() }, compute_difficulty);
+		} else {
+			power.add(
+				500,
+				1,
+				BlockSealDigest::Vote {
+					seal_strength: U256::one(),
+					signature: BlockSealAuthoritySignature::from_slice(&[0u8; 64])
+						.expect("serialization of block seal strength failed"),
+				},
+				0,
+			);
+		}
+		let digests = Digestset {
+			author,
+			block_vote: Default::default(),
+			voting_key: None, // runtime digest
+			fork_power: None, // runtime digest
+			tick: Default::default(),
+			notebooks: NotebookDigest::<NotebookVerifyError> { notebooks: Vec::new() },
+		};
+		let mut digest = digests.create_pre_runtime_digest();
+		digest.push(DigestItem::Consensus(FORK_POWER_DIGEST, power.encode()));
+		digest.push(DigestItem::Consensus(
+			PARENT_VOTING_KEY_DIGEST,
+			ParentVotingKeyDigest { parent_voting_key: voting_key }.encode(),
+		));
+		let block_digest = BlockSealDigest::Compute { nonce: U256::zero() };
+		(digest, block_digest.to_digest())
+	}
+
+	fn new_importer() -> (ArgonBlockImport<Block, MemChain, MemChain, H256>, MemChain) {
+		let genesis = Header::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
+		let client = MemChain::new(genesis.clone());
+		let db_arc = std::sync::Arc::new(client.clone());
+		let importer = ArgonBlockImport::<Block, _, _, _> {
+			inner: client.clone(),
+			client: db_arc.clone(),
+			aux_client: ArgonAux::new(db_arc.clone()),
+			import_lock: Default::default(),
+			pending_children: Default::default(),
+			_phantom: PhantomData,
+		};
+		(importer, client)
+	}
+
+	fn create_params(
+		block_number: BlockNumber,
+		parent_hash: H256,
+		compute_difficulty: ComputeDifficulty,
+		voting_key: Option<VotingKey>,
+		origin: BlockOrigin,
+		state_action: StateAction<Block>,
+		author: Option<AccountId>,
+	) -> BlockImportParams<Block> {
+		let author = author.unwrap_or_else(|| AccountId::from([0u8; 32]));
+		let (header, post_digest) =
+			create_header(block_number, parent_hash, compute_difficulty, voting_key, author);
+		let mut params = BlockImportParams::new(origin, header.clone());
+		params.state_action = state_action;
+		params.post_digests.push(post_digest);
+		params.post_hash = Some(header.hash());
+		params
+	}
+
+	#[tokio::test]
+	async fn gap_header_not_best() {
+		let (importer, client) = new_importer();
+		let parent = client.info().best_hash;
+		let params = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+
+		let res = importer.import_block(params).await.unwrap();
+		assert!(matches!(res, ImportResult::Imported(_)));
+		assert_eq!(client.info().best_number, 0u32);
+	}
+
+	#[tokio::test]
+	async fn higher_fork_power_sets_best() {
+		let (importer, client) = new_importer();
+		let parent = client.info().best_hash;
+
+		// weaker block (power 1)
+		let p1 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Execute,
+			None,
+		);
+
+		let _ = importer.import_block(p1).await.unwrap();
+
+		// stronger block (power 2)
+		let p2 = create_params(
+			1,
+			parent,
+			2,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Execute,
+			None,
+		);
+		let h2 = p2.header.hash();
+		let _ = importer.import_block(p2).await.unwrap();
+
+		assert_eq!(client.info().best_hash, h2);
+	}
+
+	#[tokio::test]
+	async fn header_plus_state_can_be_best() {
+		let (importer, _client) = new_importer();
+		let parent = importer.client.info().best_hash;
+		let params = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+				block: H256::zero(),
+				state: KeyValueStates(Vec::new()),
+			})),
+			None,
+		);
+
+		let res = importer.import_block(params).await.unwrap();
+		// We just care that full import ran; NoopImport returns Imported(...)
+		assert!(matches!(res, ImportResult::Imported(_)));
+	}
+
+	#[tokio::test]
+	async fn state_ugprade_test() {
+		let (importer, client) = new_importer();
+		let parent = importer.client.info().best_hash;
+		// header-only import
+		let gap = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+		let hash = gap.header.hash();
+		importer.import_block(gap).await.unwrap();
+		assert!(!has_state(&client, hash));
+
+		// now with state
+		let state = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+				block: H256::zero(),
+				state: KeyValueStates(Vec::new()),
+			})),
+			None,
+		);
+		importer.import_block(state).await.unwrap();
+		assert!(has_state(&client, hash));
+	}
+
+	#[tokio::test]
+	async fn parent_state_inserts_header_only_and_queues() {
+		let (importer, client) = new_importer();
+
+		// insert parent header (#1) without state
+		let (parent_hdr, _) =
+			create_header(1, client.info().best_hash, 1, None, AccountId::from([0u8; 32]));
+		client.insert(parent_hdr.clone());
+
+		// child header (#2) with body, ExecuteIfPossible
+		let child_params = create_params(
+			2,
+			parent_hdr.hash(),
+			2,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::ExecuteIfPossible,
+			None,
+		);
+		let child_block_hash = child_params.post_hash();
+		let parent_block_hash = parent_hdr.hash();
+
+		let res = importer.import_block(child_params).await.unwrap();
+		assert!(matches!(res, ImportResult::Imported(_)));
+		// should insert a header only
+		let ImportResult::Imported(ImportedAux { header_only, .. }) = res else {
+			panic!("Expected ImportResult::Imported");
+		};
+		assert_eq!(header_only, true);
+		assert_eq!(importer.pending_children.lock().await.len(), 1);
+		assert!(importer.pending_children.lock().await.contains_key(&parent_block_hash));
+
+		// now test that when we import the parent state, the child is reimported
+		let state = create_params(
+			1,
+			parent_hdr.parent_hash,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+				block: H256::zero(),
+				state: KeyValueStates(Vec::new()),
+			})),
+			Some(AccountId::from([0u8; 32])),
+		);
+		let res = importer.import_block(state).await.unwrap();
+		assert!(matches!(res, ImportResult::Imported(_)));
+		assert!(has_state(&client, parent_hdr.hash()));
+
+		// should reimport the child
+		assert!(has_state(&client, child_block_hash));
+	}
+
+	#[tokio::test]
+	async fn finalized_upgrade_reimports() {
+		let (importer, _client) = new_importer();
+		let parent = importer.client.info().best_hash;
+		let params1 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Skip,
+			None,
+		);
+		let _ = importer.import_block(params1).await.unwrap();
+
+		// second import – now marked finalized
+		let mut params2 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Skip,
+			None,
+		);
+		params2.finalized = true;
+
+		let res2 = importer.import_block(params2).await.unwrap();
+		assert!(matches!(res2, ImportResult::Imported(_)));
+	}
+
+	#[tokio::test]
+	async fn duplicate_header_short_circuits() {
+		let (importer, _client) = new_importer();
+		let parent = importer.client.info().best_hash;
+		let params = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Skip,
+			None,
+		);
+
+		// first import
+		let _ = importer.import_block(params).await.unwrap();
+
+		// build identical params again (BlockImportParams isn't Clone)
+		let params2 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Skip,
+			None,
+		);
+
+		let res2 = importer.import_block(params2).await.unwrap();
+		assert!(matches!(res2, ImportResult::AlreadyInChain));
+	}
+
+	#[tokio::test]
+	async fn tie_loser_test() {
+		let (importer, client) = new_importer();
+		let parent = client.info().best_hash;
+
+		// loser (hash2 > hash1)
+		let loser = create_params(1, parent, 1, None, BlockOrigin::Own, StateAction::Execute, None);
+		assert_ok!(importer.import_block(loser).await); // Imported
+
+		// winner (smaller hash)
+		let winner = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::Own,
+			StateAction::Execute,
+			Some(AccountId::from([1u8; 32])),
+		);
+		let h_win = winner.header.hash();
+		assert_ok!(importer.import_block(winner).await); // Imported(best)
+
+		assert_eq!(client.info().best_hash, h_win);
+
+		// replay loser
+		let loser2 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::Own,
+			StateAction::Skip,
+			Some(AccountId::from([0u8; 32])),
+		);
+		let res = importer.import_block(loser2).await.unwrap();
+		assert!(matches!(res, ImportResult::AlreadyInChain));
+		assert_eq!(client.info().best_hash, h_win);
+	}
+
+	#[tokio::test]
+	async fn duplicate_vote_block_same_tick_fails() {
+		let (importer, _client) = new_importer();
+		let parent = importer.client.info().best_hash;
+
+		let author = AccountId::from([9u8; 32]);
+		let vote_key = H256::random();
+
+		// First vote → ok
+		let p1 = create_params(
+			1,
+			parent,
+			0,
+			Some(vote_key),
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Execute,
+			Some(author.clone()),
+		);
+		let p1_hash = p1.post_hash();
+		assert!(matches!(importer.import_block(p1).await.unwrap(), ImportResult::Imported(_)));
+
+		// Second vote by same author + same voting_key at same tick ⇒ Err
+		let mut p2 = create_params(
+			1,
+			parent,
+			0,
+			Some(vote_key),
+			BlockOrigin::NetworkBroadcast,
+			StateAction::Execute,
+			Some(author),
+		);
+		p2.header.extrinsics_root = H256::random();
+		p2.header.state_root = H256::random();
+		p2.post_hash = Some(p2.header.hash()); // refresh the cached value
+		let p2_hash = p2.post_hash();
+		let err = importer.import_block(p2).await;
+
+		assert_ne!(p1_hash, p2_hash, "post hashes should differ");
+
+		assert!(err.is_err(), "duplicate vote block should fail");
+	}
+
+	#[tokio::test]
+	async fn duplicate_compute_loser_same_power_fails() {
+		let (importer, client) = new_importer();
+		let parent = client.info().best_hash;
+
+		// Winner first (smaller hash) so later blocks at same power are losers
+		let winner = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::Own,
+			StateAction::Execute,
+			Some(AccountId::from([1u8; 32])),
+		);
+		importer.import_block(winner).await.unwrap();
+
+		// First loser from author X
+		let author = AccountId::from([2u8; 32]);
+		let loser1 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::Own,
+			StateAction::Execute,
+			Some(author.clone()),
+		);
+		importer.import_block(loser1).await.unwrap(); // ok
+
+		// Second loser, same author, same fork-power, same tick ⇒ Err
+		let loser2 =
+			create_params(1, parent, 1, None, BlockOrigin::Own, StateAction::Execute, Some(author));
+		let err = importer.import_block(loser2).await;
+		assert!(err.is_err(), "duplicate compute loser should fail");
+	}
+
+	#[tokio::test]
+	async fn reorg_to_lower_power_then_recover() {
+		let (importer, client) = new_importer();
+		let genesis = client.info().best_hash;
+
+		// Node-2 fork: height 1..100, power 200.
+		let mut parent = genesis;
+		let mut hash50 = H256::zero();
+		for n in 1..=100 {
+			let p =
+				create_params(n, parent, 200 + n as u128, None, BlockOrigin::Own, Execute, None);
+			if n == 50 {
+				hash50 = p.header.hash();
+			}
+			parent = p.header.hash();
+			importer.import_block(p).await.unwrap();
+		}
+		assert_eq!(client.info().best_number, 100);
+
+		// Archive node finalises *lower-power* fork at height 51, power 151.
+		let p = create_params(51, hash50, 151, None, BlockOrigin::Own, Execute, None);
+		let back_best = p.header.hash();
+		assert_ok!(importer.import_block(p).await);
+		*client.best.lock().unwrap() = (51, back_best);
+
+		// Fresh block from node-2 with power 152 must become best.
+		let p =
+			create_params(52, client.info().best_hash, 152, None, BlockOrigin::Own, Execute, None);
+		let hash130 = p.header.hash();
+		importer.import_block(p).await.unwrap();
+
+		assert_eq!(client.info().best_hash, hash130);
+	}
 }

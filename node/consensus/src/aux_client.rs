@@ -4,7 +4,6 @@ use crate::{
 };
 use argon_primitives::{
 	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
-	fork_power::ForkPower,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails, SignedHeaderBytes,
@@ -37,7 +36,6 @@ pub enum AuxState<C: AuxStore> {
 	),
 	NotaryAuditSummaries(Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>),
 	VotesAtTick(Arc<AuxData<Vec<NotaryNotebookRawVotes>, C>>),
-	MaxForkPower(Arc<AuxData<ForkPower, C>>),
 	BlockMetrics(Arc<AuxData<BlockMetrics, C>>),
 	Version(Arc<AuxData<u32, C>>),
 }
@@ -54,7 +52,6 @@ impl<C: AuxStore + 'static> AuxStateData for AuxState<C> {
 			AuxState::NotaryNotebooks(a) => a,
 			AuxState::VotesAtTick(a) => a,
 			AuxState::NotaryAuditSummaries(a) => a,
-			AuxState::MaxForkPower(a) => a,
 			AuxState::BlockMetrics(a) => a,
 			AuxState::Version(a) => a,
 		}
@@ -67,7 +64,6 @@ pub enum AuxKey {
 	NotaryNotebooks(NotaryId),
 	VotesAtTick(Tick),
 	NotaryAuditSummaries(NotaryId),
-	MaxForkPower,
 	BlockMetrics,
 	Version,
 }
@@ -85,8 +81,6 @@ impl AuxKey {
 				AuxState::VotesAtTick(AuxData::new(client, self.clone()).into()),
 			AuxKey::NotaryAuditSummaries(_) =>
 				AuxState::NotaryAuditSummaries(AuxData::new(client, self.clone()).into()),
-			AuxKey::MaxForkPower =>
-				AuxState::MaxForkPower(AuxData::new(client, self.clone()).into()),
 			AuxKey::BlockMetrics =>
 				AuxState::BlockMetrics(AuxData::new(client, self.clone()).into()),
 			AuxKey::Version => AuxState::Version(AuxData::new(client, self.clone()).into()),
@@ -146,6 +140,11 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			return Ok(());
 		}
 
+		if runtime_tick == 0 {
+			version.mutate(|a| *a = VERSION)?;
+			return Ok(());
+		}
+
 		info!("Migrating argon aux data from version {} to {}", version.get(), VERSION);
 
 		let mut to_delete = vec![];
@@ -179,33 +178,30 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		Ok(())
 	}
 
-	pub fn record_block<AC: Codec>(
+	pub fn check_duplicate_block_at_tick<AC: Codec>(
+		&self,
+		author: AC,
+		block_key: H256,
+		tick: Tick,
+	) -> Result<(), Error> {
+		let _lock = self.lock.write();
+		self.authors_at_tick(tick)?.mutate(|authors_at_height| {
+			let account_id = AccountId::decode(&mut &author.encode()[..])
+				.map_err(|e| Error::StringError(format!("Failed to decode author: {:?}", e)))?;
+			if !authors_at_height.entry(block_key).or_default().insert(account_id.clone()) {
+				return Err(Error::DuplicateAuthoredBlock(account_id));
+			}
+			Ok::<(), Error>(())
+		})??;
+
+		Ok(())
+	}
+
+	pub fn clean_state_history(
 		&self,
 		auxiliary_changes: &mut Vec<(Vec<u8>, Option<Vec<u8>>)>,
-		author: AC,
-		voting_key: Option<H256>,
 		tick: Tick,
-		is_vote_block: bool,
-	) -> Result<ForkPower, Error> {
-		let _lock = self.lock.write();
-
-		// add author to voting key
-		if is_vote_block {
-			if let Some(voting_key) = voting_key {
-				self.authors_by_voting_key_at_tick(tick)?.mutate(|authors_at_height| {
-					let account_id = AccountId::decode(&mut &author.encode()[..]).map_err(|e| {
-						Error::StringError(format!("Failed to decode author: {:?}", e))
-					})?;
-					if !authors_at_height.entry(voting_key).or_default().insert(account_id.clone())
-					{
-						return Err(Error::DuplicateAuthoredBlock(account_id));
-					}
-					Ok::<(), Error>(())
-				})??;
-			}
-		}
-		let max_fork_power = self.strongest_fork_power()?.get();
-
+	) -> Result<(), Error> {
 		// cleanup old votes (None deletes)
 		if tick >= 10 {
 			let cleanup_height = tick - 10;
@@ -224,16 +220,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 				self.state.write().remove(&AuxKey::NotaryStateAtTick(tick));
 			}
 		}
-		Ok(max_fork_power)
-	}
-
-	pub fn block_accepted(&self, fork_power: ForkPower) -> Result<(), Error> {
-		self.strongest_fork_power()?.mutate(|existing| {
-			if fork_power > *existing {
-				*existing = fork_power;
-			}
-			Ok::<_, Error>(())
-		})?
+		Ok(())
 	}
 
 	pub fn get_tick_voting_power(&self, tick: Tick) -> Result<Option<VotingPowerInfo>, Error> {
@@ -340,7 +327,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.get_or_insert_state(key)
 	}
 
-	pub fn authors_by_voting_key_at_tick(
+	pub fn authors_at_tick(
 		&self,
 		tick: Tick,
 	) -> Result<Arc<AuxData<BTreeMap<H256, BTreeSet<AccountId>>, C>>, Error> {
@@ -372,11 +359,6 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		notary_id: NotaryId,
 	) -> Result<Arc<AuxData<Vec<NotaryNotebookAuditSummary>, C>>, Error> {
 		let key = AuxKey::NotaryAuditSummaries(notary_id);
-		self.get_or_insert_state(key)
-	}
-
-	pub fn strongest_fork_power(&self) -> Result<Arc<AuxData<ForkPower, C>>, Error> {
-		let key = AuxKey::MaxForkPower;
 		self.get_or_insert_state(key)
 	}
 
@@ -752,7 +734,7 @@ mod test {
 			};
 
 			let mut changes = vec![];
-			argon_aux.record_block(&mut changes, 1, None, i as Tick, false).unwrap();
+			argon_aux.clean_state_history(&mut changes, i as Tick).unwrap();
 			argon_aux
 				.store_notebook_result(
 					audit,
