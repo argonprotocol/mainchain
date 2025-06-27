@@ -158,7 +158,7 @@ pub mod pallet {
 			if let Some(operator) = &self.tip_oracle_operator {
 				<OracleOperatorAccount<T>>::put(operator);
 			}
-			<BitcoinNetwork<T>>::put(self.network.clone());
+			<BitcoinNetwork<T>>::put(self.network);
 		}
 	}
 	#[pallet::hooks]

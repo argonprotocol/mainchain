@@ -11,6 +11,7 @@ import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
 import TestBitcoinCli from './TestBitcoinCli';
 import TestOracle from './TestOracle';
+import * as util from 'node:util';
 
 export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle };
 
@@ -70,6 +71,22 @@ export async function getProxy() {
   }
   const port = (proxyServer!.address() as net.AddressInfo).port;
   return `ws://host.docker.internal:${port}`;
+}
+
+export function stringifyExt(obj: any): any {
+  return JSON.stringify(
+    obj,
+    (_key, value) => {
+      if (typeof value === 'bigint') {
+        return value.toString() + 'n'; // Append 'n' to indicate bigint
+      }
+      if (Buffer.isBuffer(value)) {
+        return `0x${Buffer.from(value).toString('hex')}`; // Convert Buffer to hex string
+      }
+      return value;
+    },
+    2,
+  );
 }
 
 export function projectRoot() {
