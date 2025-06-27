@@ -67,6 +67,17 @@ export async function gettersToObject<T>(obj: T): Promise<T> {
   return result;
 }
 
+export function toFixedNumber(value: number, base: number): bigint {
+  const decimalFactor = new BigNumber(10).pow(base);
+  const rawValue = new BigNumber(value.toString()); // Parse the number value into BN
+  // Convert the value to fixed-point
+  return BigInt(rawValue.times(decimalFactor).toFixed(0, ROUND_FLOOR));
+}
+
+export function convertNumberToFixedU128(value: number): bigint {
+  return toFixedNumber(value, 18);
+}
+
 export function convertFixedU128ToBigNumber(fixedU128: bigint): BigNumber {
   const decimalFactor = new BigNumber(10).pow(new BigNumber(18)); // Fixed point precision (18 decimals)
   const rawValue = new BigNumber(fixedU128.toString()); // Parse the u128 string value into BN
@@ -79,6 +90,10 @@ export function convertPermillToBigNumber(permill: bigint): BigNumber {
   const rawValue = new BigNumber(permill.toString()); // Parse the u128 string value into BN
   // Convert the value to fixed-point
   return rawValue.div(decimalFactor);
+}
+
+export function convertNumberToPermill(value: number): bigint {
+  return toFixedNumber(value, 6);
 }
 
 export function eventDataToJson(event: GenericEvent): any {

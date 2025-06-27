@@ -1,0 +1,46 @@
+{
+  "name": "@argonprotocol/bitcoin",
+  "version": "1.2.0",
+  "description": "A client for interop with bitcoin in nodejs.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argonprotocol/mainchain.git"
+  },
+  "author": "Argon Foundation",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/argonprotocol/mainchain/issues"
+  },
+  "homepage": "https://github.com/argonprotocol/mainchain#readme",
+  "scripts": {
+    "wasm-pack": "wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack --no-opt",
+    "build": "yarn wasm-pack && yarn tsc",
+    "tsc": "tsup",
+    "test": "yarn build && vitest --run --typecheck --disableConsoleIntercept"
+  },
+  "files": [
+    "lib/"
+  ],
+  "type": "module",
+  "bin": "./lib/cli.js",
+  "module": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "dependencies": {
+    "@argonprotocol/mainchain": "1.2.0",
+    "bignumber.js": "^9.1.2",
+    "bip32": "^4.0.0",
+    "bip39": "^3.1.0",
+    "bitcoinjs-lib": "^6.1.7",
+    "tiny-secp256k1": "^2.2.3"
+  },
+  "devDependencies": {
+    "@argonprotocol/testing": "1.2.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vite-plugin-wasm": "^3.4.1",
+    "vitest": "^3.1.1",
+    "wasm-pack": "^0.13.1"
+  },
+  "packageManager": "yarn@4.1.0"
+}

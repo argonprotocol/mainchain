@@ -68,7 +68,7 @@ export class VaultMonitor {
 
     this.tickDuration = (await client.query.ticks.genesisTicker()).tickDurationMillis.toNumber();
     const blockHeader = await client.rpc.chain.getHeader();
-    const blockHash = blockHeader.hash.toU8a();
+    const blockHash = Buffer.from(blockHeader.hash);
     console.log(
       `${justPrint ? 'Run' : 'Started'} at block ${blockHeader.number} - ${blockHeader.hash.toHuman()}`,
     );

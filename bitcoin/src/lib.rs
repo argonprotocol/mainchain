@@ -11,7 +11,10 @@ pub use xpriv::*;
 
 pub mod primitives {
 	pub use argon_primitives::bitcoin::*;
-	pub use bitcoin::bip32::DerivationPath;
+	pub use bitcoin::{
+		CompressedPublicKey, FeeRate, Network, PrivateKey, Psbt, ScriptBuf, Txid,
+		bip32::{DerivationPath, Xpriv, Xpub},
+	};
 }
 
 mod cosign_releaser;
@@ -20,6 +23,7 @@ mod cosign_script;
 #[cfg(feature = "std")]
 pub mod client;
 mod errors;
+pub mod psbt_utils;
 #[cfg(feature = "std")]
 mod utxo_spend_filter;
 mod xpriv;

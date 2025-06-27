@@ -14,8 +14,6 @@ rustc-ice*
 node_modules
 /localchain/test.db-wal
 /localchain/test.db
-/client/nodejs/lib
-!/client/nodejs/lib/cjs/package.json
 /.run/
 /localchain/apple/Localchain/*.a
 /.btcdeb_history
@@ -26,4 +24,4 @@ node_modules
 /scripts/hyperbridge/**/*-messaging-relayer.toml
 /docs/.obsidian
 **/*.tsbuildinfo
-/testing/nodejs/lib
+**/nodejs/lib/

@@ -118,15 +118,17 @@ export default function vaultCli() {
 
       const account = await client.query.system.account(accountset.seedAddress);
       const freeBalance = account.data.free.toBigInt();
+      let satoshis = await bitcoinLocks.requiredSatoshisForArgonLiquidity(argonsAvailable);
+      satoshis -= 100n; // keep some wiggle room since price can change
       const {
         tx: lockTx,
-        btcFee,
+        securityFee: btcFee,
         txFee,
-      } = await bitcoinLocks.buildBitcoinLockTx({
-        vaultId,
-        keypair: accountset.txSubmitterPair,
-        amount: argonsAvailable,
-        bitcoinXpub: pubkey,
+      } = await bitcoinLocks.createInitializeLockTx({
+        vault,
+        argonKeyring: accountset.txSubmitterPair,
+        satoshis,
+        ownerBitcoinPubkey: Buffer.from(pubkey, 'hex'),
         tip: resolvedTip,
         reducedBalanceBy: argonsNeeded + vaultTxFee + resolvedTip,
       });

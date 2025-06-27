@@ -35,9 +35,8 @@ anyhow = { workspace = true, optional = true }
 
 bip32 = { workspace = true, optional = true, features = ["secp256k1"] }
 base58 = { workspace = true, optional = true }
-
+wasm-bindgen = { workspace = true, optional = true }
 polkadot-sdk.workspace = true
-
 polkadot-sdk.features = [
     "sp-runtime",
     "sp-inherents",
@@ -68,6 +67,7 @@ std = [
 	"codec/derive",
 	"codec/std",
 	"hex",
+	"hex?/std",
 	"polkadot-sdk/sc-keystore",
 	"polkadot-sdk/sp-keystore",
 	"polkadot-sdk/std",
@@ -82,7 +82,9 @@ std = [
 	"sp-debug-derive/force-debug",
 	"sp-debug-derive/std",
 	"thiserror/std",
+	"wasm-bindgen?/std",
 ]
+wasm = [ "wasm-bindgen" ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
 bitcoin = [ "base58", "bip32", "dep:bitcoin" ]

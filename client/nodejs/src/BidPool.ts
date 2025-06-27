@@ -112,7 +112,7 @@ export class BidPool {
 
   public async loadAt(blockHash?: Uint8Array) {
     const client = await this.client;
-    blockHash ??= (await client.rpc.chain.getHeader()).hash.toU8a();
+    blockHash ??= Buffer.from((await client.rpc.chain.getHeader()).hash);
     const api = await client.at(blockHash);
     const rawVaultIds = await api.query.vaults.vaultsById.keys();
     const vaultIds = rawVaultIds.map(x => x.args[0].toNumber());

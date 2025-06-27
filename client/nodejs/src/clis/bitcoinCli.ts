@@ -51,11 +51,11 @@ export default function bitcoinCli() {
         bitcoinXpub,
         maxLockFee: maxLockFee !== undefined ? BigInt(maxLockFee * MICROGONS_PER_ARGON) : undefined,
         tip: BigInt(tip * MICROGONS_PER_ARGON),
-      }).then(({ vaultId, satoshis, txFee, btcFee }) => {
+      }).then(({ vaultId, satoshis, txFee, securityFee }) => {
         console.log(
           `Locked ${satoshis} satoshis in vault ${vaultId}. Tx fee=${formatArgons(
             txFee,
-          )}, Lock fee=${formatArgons(btcFee)}.`,
+          )}, Lock fee=${formatArgons(securityFee)}.`,
         );
         process.exit(0);
       });

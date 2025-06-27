@@ -143,7 +143,7 @@ export class TxResult {
     }
     const { events, status, dispatchError, isFinalized } = result;
     if (status.isInBlock) {
-      this.includedInBlock = status.asInBlock.toU8a();
+      this.includedInBlock = Buffer.from(status.asInBlock);
       let encounteredError = dispatchError;
       let batchErrorIndex: number | undefined;
       for (const event of events) {
@@ -164,7 +164,7 @@ export class TxResult {
         const error = dispatchErrorToExtrinsicError(this.client, encounteredError, batchErrorIndex);
         this.reject(error);
       } else {
-        this.inBlockResolve(status.asInBlock.toU8a());
+        this.inBlockResolve(Buffer.from(status.asInBlock));
       }
     }
     if (isFinalized) {

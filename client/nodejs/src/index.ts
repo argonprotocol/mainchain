@@ -22,8 +22,8 @@ export { VaultMonitor } from './VaultMonitor';
 export { CohortBidder } from './CohortBidder';
 export { CohortBidderHistory } from './CohortBidderHistory';
 export { BidPool } from './BidPool';
-export { BitcoinLocks } from './BitcoinLocks';
-export { keyringFromSuri, createKeyringPair } from './keyringUtils';
+export * from './BitcoinLocks';
+export * from './keyringUtils';
 export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
 
 export * from '@polkadot/types';

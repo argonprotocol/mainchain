@@ -237,12 +237,7 @@ declare module '@polkadot/api-base/types/events' {
       BitcoinCosignPastDue: AugmentedEvent<
         ApiType,
         [utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32],
-        {
-          utxoId: u64;
-          vaultId: u32;
-          compensationAmount: u128;
-          compensatedAccountId: AccountId32;
-        }
+        { utxoId: u64; vaultId: u32; compensationAmount: u128; compensatedAccountId: AccountId32 }
       >;
       BitcoinLockBurned: AugmentedEvent<
         ApiType,
@@ -304,18 +299,12 @@ declare module '@polkadot/api-base/types/events' {
       UtxoExpiredError: AugmentedEvent<
         ApiType,
         [utxoRef: ArgonPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError],
-        {
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          error: SpRuntimeDispatchError;
-        }
+        { utxoRef: ArgonPrimitivesBitcoinUtxoRef; error: SpRuntimeDispatchError }
       >;
       UtxoRejected: AugmentedEvent<
         ApiType,
         [utxoId: u64, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason],
-        {
-          utxoId: u64;
-          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
-        }
+        { utxoId: u64; rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason }
       >;
       UtxoRejectedError: AugmentedEvent<
         ApiType,
@@ -366,12 +355,7 @@ declare module '@polkadot/api-base/types/events' {
       ComputeDifficultyAdjusted: AugmentedEvent<
         ApiType,
         [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128],
-        {
-          expectedBlockTime: u64;
-          actualBlockTime: u64;
-          startDifficulty: u128;
-          newDifficulty: u128;
-        }
+        { expectedBlockTime: u64; actualBlockTime: u64; startDifficulty: u128; newDifficulty: u128 }
       >;
       VoteMinimumAdjusted: AugmentedEvent<
         ApiType,
@@ -405,12 +389,7 @@ declare module '@polkadot/api-base/types/events' {
       TaxationError: AugmentedEvent<
         ApiType,
         [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError],
-        {
-          notaryId: u32;
-          notebookNumber: u32;
-          tax: u128;
-          error: SpRuntimeDispatchError;
-        }
+        { notaryId: u32; notebookNumber: u32; tax: u128; error: SpRuntimeDispatchError }
       >;
       /**
        * Transfer from Localchain to Mainchain
@@ -512,11 +491,7 @@ declare module '@polkadot/api-base/types/events' {
       DomainRegistrationError: AugmentedEvent<
         ApiType,
         [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError],
-        {
-          domainHash: H256;
-          accountId: AccountId32;
-          error: SpRuntimeDispatchError;
-        }
+        { domainHash: H256; accountId: AccountId32; error: SpRuntimeDispatchError }
       >;
       /**
        * A domain was registered
@@ -566,10 +541,7 @@ declare module '@polkadot/api-base/types/events' {
       HostParamsUpdated: AugmentedEvent<
         ApiType,
         [old: PalletHyperbridgeVersionedHostParams, new_: PalletHyperbridgeVersionedHostParams],
-        {
-          old: PalletHyperbridgeVersionedHostParams;
-          new_: PalletHyperbridgeVersionedHostParams;
-        }
+        { old: PalletHyperbridgeVersionedHostParams; new_: PalletHyperbridgeVersionedHostParams }
       >;
       /**
        * Hyperbridge has withdrawn it's protocol revenue
@@ -717,12 +689,7 @@ declare module '@polkadot/api-base/types/events' {
       BidPoolDistributed: AugmentedEvent<
         ApiType,
         [frameId: u64, bidPoolDistributed: u128, bidPoolBurned: u128, bidPoolShares: u32],
-        {
-          frameId: u64;
-          bidPoolDistributed: u128;
-          bidPoolBurned: u128;
-          bidPoolShares: u32;
-        }
+        { frameId: u64; bidPoolDistributed: u128; bidPoolBurned: u128; bidPoolShares: u32 }
       >;
       /**
        * An error occurred burning from the bid pool
@@ -891,12 +858,7 @@ declare module '@polkadot/api-base/types/events' {
       DepositPoked: AugmentedEvent<
         ApiType,
         [who: AccountId32, callHash: U8aFixed, oldDeposit: u128, newDeposit: u128],
-        {
-          who: AccountId32;
-          callHash: U8aFixed;
-          oldDeposit: u128;
-          newDeposit: u128;
-        }
+        { who: AccountId32; callHash: U8aFixed; oldDeposit: u128; newDeposit: u128 }
       >;
       /**
        * A multisig operation has been approved by someone.
@@ -986,11 +948,7 @@ declare module '@polkadot/api-base/types/events' {
       NotaryMetaUpdateError: AugmentedEvent<
         ApiType,
         [notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta],
-        {
-          notaryId: u32;
-          error: SpRuntimeDispatchError;
-          meta: ArgonPrimitivesNotaryNotaryMeta;
-        }
+        { notaryId: u32; error: SpRuntimeDispatchError; meta: ArgonPrimitivesNotaryNotaryMeta }
       >;
       /**
        * Notary metadata queued for update
@@ -998,11 +956,7 @@ declare module '@polkadot/api-base/types/events' {
       NotaryMetaUpdateQueued: AugmentedEvent<
         ApiType,
         [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64],
-        {
-          notaryId: u32;
-          meta: ArgonPrimitivesNotaryNotaryMeta;
-          effectiveTick: u64;
-        }
+        { notaryId: u32; meta: ArgonPrimitivesNotaryNotaryMeta; effectiveTick: u64 }
       >;
       /**
        * A user has proposed operating as a notary
@@ -1010,11 +964,7 @@ declare module '@polkadot/api-base/types/events' {
       NotaryProposed: AugmentedEvent<
         ApiType,
         [operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32],
-        {
-          operatorAccount: AccountId32;
-          meta: ArgonPrimitivesNotaryNotaryMeta;
-          expires: u32;
-        }
+        { operatorAccount: AccountId32; meta: ArgonPrimitivesNotaryNotaryMeta; expires: u32 }
       >;
     };
     notebook: {
@@ -1248,12 +1198,7 @@ declare module '@polkadot/api-base/types/events' {
       DepositPoked: AugmentedEvent<
         ApiType,
         [who: AccountId32, kind: PalletProxyDepositKind, oldDeposit: u128, newDeposit: u128],
-        {
-          who: AccountId32;
-          kind: PalletProxyDepositKind;
-          oldDeposit: u128;
-          newDeposit: u128;
-        }
+        { who: AccountId32; kind: PalletProxyDepositKind; oldDeposit: u128; newDeposit: u128 }
       >;
       /**
        * A proxy was added.
@@ -1360,10 +1305,7 @@ declare module '@polkadot/api-base/types/events' {
       ExtrinsicFailed: AugmentedEvent<
         ApiType,
         [dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSystemDispatchEventInfo],
-        {
-          dispatchError: SpRuntimeDispatchError;
-          dispatchInfo: FrameSystemDispatchEventInfo;
-        }
+        { dispatchError: SpRuntimeDispatchError; dispatchInfo: FrameSystemDispatchEventInfo }
       >;
       /**
        * An extrinsic completed successfully.
@@ -1429,13 +1371,7 @@ declare module '@polkadot/api-base/types/events' {
       AssetTeleported: AugmentedEvent<
         ApiType,
         [from: AccountId32, to: H256, amount: u128, dest: IsmpHostStateMachine, commitment: H256],
-        {
-          from: AccountId32;
-          to: H256;
-          amount: u128;
-          dest: IsmpHostStateMachine;
-          commitment: H256;
-        }
+        { from: AccountId32; to: H256; amount: u128; dest: IsmpHostStateMachine; commitment: H256 }
       >;
       /**
        * ERC6160 asset creation request dispatched to hyperbridge
@@ -1555,22 +1491,13 @@ declare module '@polkadot/api-base/types/events' {
       LostBitcoinCompensated: AugmentedEvent<
         ApiType,
         [vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128],
-        {
-          vaultId: u32;
-          beneficiary: AccountId32;
-          toBeneficiary: u128;
-          burned: u128;
-        }
+        { vaultId: u32; beneficiary: AccountId32; toBeneficiary: u128; burned: u128 }
       >;
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultClosed: AugmentedEvent<
         ApiType,
         [vaultId: u32, securitizationRemaining: u128, securitizationReleased: u128],
-        {
-          vaultId: u32;
-          securitizationRemaining: u128;
-          securitizationReleased: u128;
-        }
+        { vaultId: u32; securitizationRemaining: u128; securitizationReleased: u128 }
       >;
       VaultCreated: AugmentedEvent<
         ApiType,

@@ -1,0 +1,38 @@
+[package]
+name = "argon-bitcoin-wasm"
+description = "Wasm bindings to Argon Bitcoin psbt"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+documentation.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+lto = true
+opt-level = "z"  # or "s"
+codegen-units = 1
+
+[dependencies]
+anyhow = { workspace = true, default-features = false }
+wasm-bindgen = { workspace = true, default-features = false }
+console_error_panic_hook = { workspace = true, default-features = false }
+wee_alloc = { workspace = true, default-features = false }
+argon-bitcoin = { workspace = true, default-features = false }
+hex = { workspace = true, default-features = false }
+argon-primitives = { workspace = true, default-features = false, features = ["wasm"] }
+
+[features]
+default = []
+std = [
+	"anyhow/std",
+	"argon-bitcoin/std",
+	"argon-primitives/std",
+	"hex/std",
+	"wasm-bindgen/std",
+]
