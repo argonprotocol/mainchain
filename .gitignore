@@ -25,3 +25,4 @@ node_modules
 /docs/.obsidian
 **/*.tsbuildinfo
 **/nodejs/lib/
+/bitcoin/nodejs/.port-lock

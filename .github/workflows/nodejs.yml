@@ -95,7 +95,7 @@ jobs:
         run: ${{ matrix.prebuild }}
         shell: bash
 
-      - name: Build
+      - name: Build Localchain
         run: |
           yarn build:debug --target ${{ matrix.target }} -- --lib
           strip -x *.node
@@ -110,6 +110,30 @@ jobs:
         with:
           name: bindings-${{ matrix.target }}
           path: localchain/localchain.*.node
+          if-no-files-found: error
+
+      - name: Build Client
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: yarn build
+        shell: bash
+        working-directory: ./client/nodejs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Bitcoin
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: yarn build
+        shell: bash
+        working-directory: ./bitcoin/nodejs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Bitcoin artifact
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-wasm
+          path: bitcoin/nodejs/ts/wasm/*
           if-no-files-found: error
   test-mac-win:
     name: Test bindings on ${{ matrix.target }} - node@${{ matrix.node }}
@@ -138,9 +162,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build typescript
-        run: yarn tsc
-
       - name: Download localchain artifacts
         uses: actions/download-artifact@v4
         with:
@@ -148,8 +169,18 @@ jobs:
           path: localchain
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download bitcoin artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bitcoin-wasm
+          path: bitcoin/nodejs/ts/wasm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build typescript
+        run: yarn tsc
+
       - name: Test bindings
-        run: yarn test
+        run: yarn test:ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SKIP_E2E: true
@@ -220,6 +251,20 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Download localchain bindings
+        uses: actions/download-artifact@v4
+        with:
+          path: localchain
+          name: bindings-${{ matrix.target }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download localchain artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bitcoin-wasm
+          path: bitcoin/nodejs/ts/wasm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build typescript
         run: yarn tsc
 
@@ -245,15 +290,8 @@ jobs:
             sleep 2
           done
 
-      - name: Download localchain bindings
-        uses: actions/download-artifact@v4
-        with:
-          path: localchain
-          name: bindings-${{ matrix.target }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Test bindings
-        run: yarn test
+        run: yarn test:ci
         working-directory: ./localchain
         continue-on-error: true
         env:
@@ -262,6 +300,13 @@ jobs:
           RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
           RUST_LOG: debug,sqlx=info
           SKIP_WASM_BUILD: 1
+
+      - name: Test bitcoin
+        run: yarn test:ci
+        working-directory: ./bitcoin/nodejs
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -306,14 +351,21 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
-      - name: Build client
-        run: yarn tsc
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: localchain/artifacts
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download bitcoin artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bitcoin-wasm
+          path: bitcoin/nodejs/ts/wasm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build client
+        run: yarn tsc
 
       - name: Move artifacts
         run: yarn artifacts
@@ -325,7 +377,7 @@ jobs:
           commit_message: Check-in binding files
           commit_user_name: github-actions[bot]
           commit_user_email: github-actions[bot]@users.noreply.github.com
-          file_pattern: ./localchain/npm/**/*.node
+          file_pattern: ./localchain/npm/**/*.node,./bitcoin/nodejs/ts/wasm/*
           create_branch: true
           push_options: '--force-with-lease'
 
@@ -337,9 +389,13 @@ jobs:
       - name: Upload artifacts to release
         if: github.ref_name != 'main'
         run: |
+          tar -czf bitcoin-wasm.tar.gz -C bitcoin/nodejs/ts/wasm .
           RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft == true) | .tagName" | head -n 1)
           if [[ -n "$RELEASE_EXISTS" ]]; then
-            gh release upload ${{ github.ref_name }} ./localchain/npm/**/*.node --clobber
+            gh release upload ${{ github.ref_name }} \
+              ./localchain/npm/**/*.node \
+              bitcoin-wasm.tar.gz \
+              --clobber
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

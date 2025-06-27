@@ -7,6 +7,7 @@
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "lint": "yarn prettier --write \"**/*.{ts,js,json,md}\"",
     "test": "yarn pretest && yarn workspaces foreach --all run test",
+    "test:ci": "yarn pretest && yarn workspaces foreach --all run test:ci",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
   },
   "private": true,

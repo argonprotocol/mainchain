@@ -18,6 +18,7 @@
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
     "test": "npm run pretest && vitest run --typecheck --disableConsoleIntercept",
+    "test:ci": "vitest run --typecheck --disableConsoleIntercept",
     "version": "napi version"
   },
   "license": "MIT",

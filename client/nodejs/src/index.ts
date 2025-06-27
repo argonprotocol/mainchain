@@ -48,7 +48,7 @@ export async function waitForLoad(): Promise<void> {
  */
 export async function getClient(host: string): Promise<ArgonClient> {
   let provider: ProviderInterface;
-  if (host.startsWith('http:')) {
+  if (host.startsWith('http')) {
     provider = new HttpProvider(host);
   } else {
     provider = new WsProvider(host);
