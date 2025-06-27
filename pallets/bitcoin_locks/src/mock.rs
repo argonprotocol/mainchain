@@ -67,10 +67,10 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 
 parameter_types! {
 	pub static MaxConcurrentlyReleasingLocks: u32 = 10;
-	pub static BitcoinPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(62_000_00));
-	pub static ArgonPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(100));
+	pub static BitcoinPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(62_000_00, 100));
+	pub static ArgonPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
-	pub static ArgonTargetPriceInUsdCents: Option<FixedU128> = Some(FixedU128::from_u32(100));
+	pub static ArgonTargetPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static LockReleaseCosignDeadlineBlocks: BitcoinHeight = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
@@ -138,11 +138,11 @@ impl UtxoLockEvents<u64, Balance> for EventHandler {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
-	fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
-		BitcoinPriceInUsdCents::get()
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		BitcoinPriceInUsd::get()
 	}
-	fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
-		ArgonPriceInUsdCents::get()
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonPriceInUsd::get()
 	}
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
@@ -151,7 +151,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 		todo!()
 	}
 	fn get_redemption_r_value() -> Option<FixedU128> {
-		ArgonPriceInUsdCents::get()?.checked_div(&ArgonTargetPriceInUsdCents::get().unwrap())
+		ArgonPriceInUsd::get()?.checked_div(&ArgonTargetPriceInUsd::get().unwrap())
 	}
 }
 

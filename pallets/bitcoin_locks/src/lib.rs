@@ -63,12 +63,12 @@ pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
-		BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents,
-		VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, TickProvider,
+		UtxoLockEvents, VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
-			BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId, XPubChildNumber,
-			XPubFingerprint,
+			BitcoinSignature, CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId,
+			XPubChildNumber, XPubFingerprint,
 		},
 		vault::{BitcoinVaultProvider, LockExtension, VaultError},
 	};
@@ -552,7 +552,7 @@ pub mod pallet {
 			// if no refund is needed, we can just cancel the lock
 			if !lock.is_verified && !lock.is_rejected_needs_release {
 				Self::cancel_lock(utxo_id)?;
-				return Ok(())
+				return Ok(());
 			}
 
 			let mut redemption_price = T::Balance::zero();
@@ -966,22 +966,25 @@ pub mod pallet {
 			satoshis: &Satoshis,
 			lock_price: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
-			let satoshis: u128 = (*satoshis).into();
-			let mut price: u128 = T::PriceProvider::get_latest_btc_price_in_us_cents()
+			let satoshis = FixedU128::from_rational(*satoshis as u128, 1);
+			let sats_per_argon =
+				FixedU128::from_rational(SATOSHIS_PER_BITCOIN as u128 / MICROGONS_PER_ARGON, 1);
+
+			let mut price = T::PriceProvider::get_latest_btc_price_in_usd()
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-				.saturating_mul_int(satoshis)
-				// has 2 decimal places, but argons are in 6, so we need to scale it
-				.saturating_div(10_000u128);
+				.checked_div(&sats_per_argon)
+				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+				.saturating_mul(satoshis);
 
 			if let Some(lock_price) = lock_price {
-				price = price.min(lock_price.into());
+				price = price.min(FixedU128::from_rational(lock_price.into(), 1u128));
 			}
 
 			let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
 
 			// Case 1: If argon is at or above target price, no penalty — unlock cost is just b.
-			let price: T::Balance = if r >= FixedU128::one() {
-				price
+			let multiplier = if r >= FixedU128::one() {
+				FixedU128::one()
 			}
 			// Case 2: Mild deviation (0.90 ≤ r < 1) — apply quadratic curve to scale unlock cost.
 			else if r >= FixedU128::from_rational(0_9, 1_0) {
@@ -993,7 +996,6 @@ pub mod pallet {
 				((FX_20 * r.saturating_pow(2)) + FX_19)
 					.ensure_sub(FX_38 * r)
 					.map_err(|_| Error::<T>::OverflowError)?
-					.saturating_mul_int(price)
 			}
 			// Case 3: Moderate deviation (0.01 ≤ r < 0.90) — apply rational linear formula.
 			else if r >= FixedU128::from_rational(0_01, 1_00) {
@@ -1003,20 +1005,18 @@ pub mod pallet {
 				((FX_0_5618 * r) + FX_0_3944)
 					.ensure_div(r)
 					.map_err(|_| Error::<T>::OverflowError)?
-					.saturating_mul_int(price)
 			}
 			// Case 4: Extreme deviation (r < 0.01) — maximize burn using an aggressive slope.
 			else {
 				const FX_0_576: FixedU128 = FixedU128::from_rational(0_576, 1_000);
 				const FX_0_4: FixedU128 = FixedU128::from_rational(0_4, 1_0);
 				// Formula: (b / r) * (0.576r + 0.4)
-				FixedU128::from_u32(1)
-					.div(r)
-					.saturating_mul((FX_0_576 * r) + FX_0_4)
-					.saturating_mul_int(price)
-			}
-			.into();
-			Ok(price)
+				FixedU128::from_u32(1).div(r).saturating_mul((FX_0_576 * r) + FX_0_4)
+			};
+			let price = price.saturating_mul(multiplier);
+			// now scale to argons (really microgons)
+			let argons = price.saturating_mul_int(T::Balance::one());
+			Ok(argons)
 		}
 
 		fn cancel_lock(utxo_id: UtxoId) -> Result<(), Error<T>> {

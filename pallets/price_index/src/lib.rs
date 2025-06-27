@@ -58,7 +58,7 @@ impl PriceIndex {
 	}
 
 	pub fn redemption_r_value(&self) -> FixedU128 {
-		self.argonot_usd_price
+		self.argon_usd_price
 			.checked_div(&self.argon_usd_target_price)
 			.unwrap_or(FixedU128::one())
 	}
@@ -291,11 +291,11 @@ pub mod pallet {
 		fn get_argon_cpi() -> Option<ArgonCPI> {
 			Self::get_current().map(|a| a.argon_cpi())
 		}
-		fn get_latest_argon_price_in_us_cents() -> Option<FixedU128> {
+		fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_price)
 		}
 
-		fn get_latest_btc_price_in_us_cents() -> Option<FixedU128> {
+		fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.btc_usd_price)
 		}
 
