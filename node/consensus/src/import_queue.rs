@@ -43,6 +43,7 @@ pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	import_lock: Arc<tokio::sync::Mutex<()>>,
 	/// children that arrived with `ExecuteIfPossible` while the parent’s
 	/// state was still pruned. Key = parent_hash.
+	#[allow(clippy::type_complexity)]
 	pending_children:
 		Arc<tokio::sync::Mutex<HashMap<<B as BlockT>::Hash, Vec<BlockImportParams<B>>>>>,
 	_phantom: PhantomData<AC>,
@@ -176,8 +177,7 @@ where
 		{
 			tracing::debug!(?block_hash, ?block_number, "parent state missing – header only");
 
-			let mut header_only =
-				BlockImportParams::new(block.origin.clone(), block.header.clone());
+			let mut header_only = BlockImportParams::new(block.origin, block.header.clone());
 			header_only.state_action = StateAction::Skip;
 			header_only.fork_choice = Some(ForkChoiceStrategy::Custom(false));
 			header_only.post_digests = block.post_digests.clone();
@@ -265,6 +265,7 @@ where
 					block_author.clone(),
 					H256::from(fork_power_hash),
 					tick,
+					false,
 				)?;
 				if !set_to_best {
 					// this flag forces us to revalidate the block
@@ -299,8 +300,12 @@ where
 			// includedA at a given tick. No voting key means there are no notebooks at
 			// tick.
 			let next_voting_key = voting_key.unwrap_or(H256::zero());
-			self.aux_client
-				.check_duplicate_block_at_tick(block_author, next_voting_key, tick)?;
+			self.aux_client.check_duplicate_block_at_tick(
+				block_author,
+				next_voting_key,
+				tick,
+				true,
+			)?;
 		}
 		let result = self.inner.import_block(block).await.map_err(Into::into)?;
 
@@ -1177,7 +1182,7 @@ mod test {
 		let ImportResult::Imported(ImportedAux { header_only, .. }) = res else {
 			panic!("Expected ImportResult::Imported");
 		};
-		assert_eq!(header_only, true);
+		assert!(header_only);
 		assert_eq!(importer.pending_children.lock().await.len(), 1);
 		assert!(importer.pending_children.lock().await.contains_key(&parent_block_hash));
 

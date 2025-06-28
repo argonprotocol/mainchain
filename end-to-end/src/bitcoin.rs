@@ -30,6 +30,7 @@ use bitcoind::{
 	bitcoincore_rpc::{Auth, RpcApi, bitcoincore_rpc_json::AddressType, jsonrpc::serde_json},
 };
 use polkadot_sdk::*;
+use serial_test::serial;
 use sp_arithmetic::FixedU128;
 use sp_core::{Pair, crypto::AccountId32, sr25519};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
@@ -38,6 +39,7 @@ use tokio::{fs, time::sleep};
 use url::Url;
 
 #[tokio::test(flavor = "multi_thread")]
+#[serial]
 async fn test_bitcoin_minting_e2e() {
 	let test_node = start_argon_test_node().await;
 	// need a test notary to get ownership rewards, so we can actually mint.
@@ -241,7 +243,8 @@ async fn test_bitcoin_minting_e2e() {
 	drop(test_node);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 async fn test_bitcoin_xpriv_lock_e2e() {
 	let test_node = start_argon_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
@@ -352,6 +355,9 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 		}
 		println!("Waiting for utxo lock to be verified in block {:?}", next.unwrap().hash());
 	}
+
+	println!("Submitting new bitcoin price");
+	submit_price(&ticker, &client, &price_index_operator).await;
 
 	// 5. Ask for the bitcoin to be releaseed
 	println!("\nOwner requests release");

@@ -183,13 +183,15 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		author: AC,
 		block_key: H256,
 		tick: Tick,
+		is_vote: bool,
 	) -> Result<(), Error> {
 		let _lock = self.lock.write();
 		self.authors_at_tick(tick)?.mutate(|authors_at_height| {
 			let account_id = AccountId::decode(&mut &author.encode()[..])
 				.map_err(|e| Error::StringError(format!("Failed to decode author: {:?}", e)))?;
 			if !authors_at_height.entry(block_key).or_default().insert(account_id.clone()) {
-				return Err(Error::DuplicateAuthoredBlock(account_id));
+				let block_type = if is_vote { "vote" } else { "compute" };
+				return Err(Error::DuplicateAuthoredBlock(account_id, block_type.to_string()));
 			}
 			Ok::<(), Error>(())
 		})??;
