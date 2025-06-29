@@ -125,7 +125,7 @@ pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKe
 		let (msg, ecdsa_type) = psbt.sighash_ecdsa(i, &mut cache).map_err(Error::SignError)?;
 		let sig = secp.sign_ecdsa(&msg, &privkey.inner);
 		let signature = Signature { signature: sig, sighash_type: ecdsa_type };
-		signatures.push((pubkey.clone(), signature));
+		signatures.push((pubkey, signature));
 	}
 	let mut result = None;
 	for (pubkey, signature) in signatures {
@@ -168,7 +168,7 @@ pub fn sign_derived(
 		else {
 			return Err(Error::DerivedKeySignError);
 		};
-		signatures.push((signature.clone(), pubkey.clone()));
+		signatures.push((*signature, pubkey));
 	}
 
 	Ok(signatures.remove(0))

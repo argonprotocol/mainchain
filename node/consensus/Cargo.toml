@@ -38,6 +38,7 @@ polkadot-sdk.features = [
     'sp-arithmetic',
     "sc-transaction-pool",
     "sc-transaction-pool-api",
+    "sc-network-sync",
     "sc-utils",
     "sc-executor",
     "sp-io",
