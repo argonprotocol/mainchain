@@ -20,9 +20,8 @@ codegen-units = 1
 
 [dependencies]
 anyhow = { workspace = true, default-features = false }
-wasm-bindgen = { workspace = true, default-features = false }
+wasm-bindgen = { workspace = true, default-features = false, features = ["msrv"] }
 console_error_panic_hook = { workspace = true, default-features = false }
-wee_alloc = { workspace = true, default-features = false }
 argon-bitcoin = { workspace = true, default-features = false }
 hex = { workspace = true, default-features = false }
 argon-primitives = { workspace = true, default-features = false, features = ["wasm"] }

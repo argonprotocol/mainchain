@@ -18,9 +18,6 @@ use argon_primitives::bitcoin::{
 use core::str::FromStr;
 use wasm_bindgen::prelude::*;
 
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 fn create_cosign(
 	vault_pubkey_hex: &str,
 	vault_claim_pubkey_hex: &str,
