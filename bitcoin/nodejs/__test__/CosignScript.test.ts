@@ -1,5 +1,6 @@
 import {
   describeIntegration,
+  stringifyExt,
   sudo,
   teardown,
   TestMainchain,
@@ -81,7 +82,7 @@ describeIntegration(
       });
       bitcoinLocks = new BitcoinLocks(Promise.resolve(vaulterClient));
       config = await bitcoinLocks.getConfig();
-      console.log('Bitcoin Locks config:', config);
+      console.log('Bitcoin Locks config:', stringifyExt(config));
       bitcoinNetwork = CosignScript.getBitcoinJsNetwork(config.bitcoinNetwork);
 
       vaultXpriv = getChildXpriv(devSeed, vaulterHdPath, bitcoinNetwork);
@@ -152,7 +153,7 @@ describeIntegration(
         ownerBitcoinPubkey,
         argonKeyring: bitcoinLocker.txSubmitterPair,
       });
-      console.log('Locked bitcoin', result);
+      console.log('Locked bitcoin', result.lock);
       lock = result.lock;
       expect(lock.vaultId).toBe(1);
       expect(lock.satoshis).toBeGreaterThan(1000);
@@ -301,10 +302,7 @@ describeIntegration(
         utxoRef,
         ownerXpriv: ownerBitcoinXpriv,
       });
-      console.log('Cosigned Tx:', JSON.stringify(cosignedTx, (key, value) => {
-        if (Buffer.isBuffer(value)) return `0x${value.toString('hex')}`;
-        return value;
-      }, 2));
+      console.log('Cosigned Tx:', stringifyExt(cosignedTx));
       const btcClient = vaulterchain.getBitcoinClient();
       const txHex = cosignedTx.toHex();
       const txid = await btcClient.command('sendrawtransaction', txHex);

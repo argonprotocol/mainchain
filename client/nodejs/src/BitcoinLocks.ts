@@ -244,7 +244,9 @@ export class BitcoinLocks {
     for (let i = 0; i < 10; i++) {
       const currentHeight = await client.query.system.number().then(x => x.toNumber());
       if (atHeight > currentHeight) {
-        console.warn(`Requested block height ${atHeight} is greater than current height ${currentHeight}. Retrying...`);
+        console.warn(
+          `Requested block height ${atHeight} is greater than current height ${currentHeight}. Retrying...`,
+        );
         await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1 second before retrying
         continue;
       }

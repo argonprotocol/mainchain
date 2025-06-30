@@ -193,7 +193,7 @@ fn calculates_redemption_prices() {
 			let price: f64 = price
 				.replace(",", "")
 				.parse()
-				.expect(format!("should parse price {}", price).as_str());
+				.unwrap_or_else(|_| panic!("should parse price {}", price));
 
 			FixedU128::from_float(price)
 		}
