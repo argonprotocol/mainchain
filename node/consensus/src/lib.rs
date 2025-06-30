@@ -266,10 +266,15 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							continue;
 						}
 						// If this block can still be finalized, see if we can beat it. This could be the best block
-						// or could be a new branch
+						// or could be a new branch. NOTE: we only want to do this if we have notebooks, otherwise we might kick the
+						// chain back to compute. We will try to solve again once the notebook arrives anyway and look for beatable blocks
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
 						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
-							check_for_better_blocks = info
+							if let Some((_, _, notebooks)) = info {
+								if notebooks > 0 {
+									check_for_better_blocks = info;
+								}
+							}
 						}
 					}
 				},
