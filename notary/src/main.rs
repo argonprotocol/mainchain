@@ -270,7 +270,10 @@ async fn main() -> anyhow::Result<()> {
 		Commands::InsertKey { suri, keystore_params, verify_address } => {
 			let (_, address) = keystore_params
 				.open_with_account(suri.as_ref(), CryptoType::Ed25519, NOTARY_KEYID, false)
-				.map_err(|_| Error::KeystoreOperation)?;
+				.map_err(|e| {
+					tracing::error!("Failed to insert key: {}", e);
+					Error::KeystoreOperation
+				})?;
 			if let Some(verify_address) = verify_address {
 				if *verify_address != address {
 					warn!(

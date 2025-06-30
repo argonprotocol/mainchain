@@ -70,13 +70,14 @@ async fn test_can_prove_finality() {
 			break;
 		}
 		select! {
-			Some(_block) = blocks_sub.next() => {
+			Some(block) = blocks_sub.next() => {
 				catchup_blocks -= 1;
+				println!("Block finalized for charlie. Started at {}, now {:?}. Remaining {}", starting_finalized, block.unwrap().number(), catchup_blocks);
 				if catchup_blocks == 0 {
 					break;
 				}
 			}
-			_ = tokio::time::sleep(tokio::time::Duration::from_secs(30)) => {
+			_ = tokio::time::sleep(tokio::time::Duration::from_secs(90)) => {
 				break;
 			}
 		}

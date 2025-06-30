@@ -181,13 +181,30 @@ export function checkForExtrinsicSuccess(
  */
 export class JsonExt {
   public static stringify(obj: any, space?: number): string {
-    return JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? `${v}n` : v), space);
+    return JSON.stringify(
+      obj,
+      (_, v) => {
+        if (typeof v === 'bigint') {
+          return `${v}n`; // Append 'n' to indicate BigInt
+        }
+        // convert Buffer objects to a JSON representation
+        if (Buffer.isBuffer(v)) {
+          return Buffer.from(v).toJSON();
+        }
+        return v;
+      },
+      space,
+    );
   }
 
   public static parse<T = any>(str: string): T {
     return JSON.parse(str, (_, v) => {
-      if (typeof v === 'string' && v.endsWith('n')) {
+      if (typeof v === 'string' && v.match(/^\d+n$/)) {
         return BigInt(v.slice(0, -1));
+      }
+      // rehydrate buffer objects
+      if (typeof v === 'object' && v !== null && v.type === 'Buffer' && Array.isArray(v.data)) {
+        return Buffer.from(v.data);
       }
       return v;
     });

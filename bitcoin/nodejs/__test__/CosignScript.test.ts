@@ -27,8 +27,8 @@ import {
   getCompressedPubkey,
   getXpubFromXpriv,
   keyToBuffer,
+  CosignScript,
 } from '../ts';
-import CosignScript from '../ts/CosignScript';
 import { address, networks } from 'bitcoinjs-lib';
 import { BIP32Interface } from 'bip32';
 

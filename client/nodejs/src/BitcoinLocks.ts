@@ -213,6 +213,10 @@ export class BitcoinLocks {
       }
     }
 
+    if (!waitForSignatureMillis) {
+      return undefined;
+    }
+
     return await new Promise(async (resolve, reject) => {
       let timeout: NodeJS.Timeout | undefined;
       const unsub = await client.rpc.chain.subscribeNewHeads(header => {
@@ -472,6 +476,8 @@ export class BitcoinLocks {
     tip?: bigint;
     vault: Vault;
   }): Promise<{
+    securityFee: bigint;
+    txFee: bigint;
     newLockPrice: bigint;
     pendingMint: bigint;
     burned: bigint;
@@ -521,6 +527,8 @@ export class BitcoinLocks {
       mintAmount -= originalLockPrice.toBigInt();
     }
     return {
+      txFee: submission.finalFee ?? 0n,
+      securityFee: ratchetPrice.ratchetingFee,
       pendingMint: mintAmount,
       newLockPrice: newLockPrice.toBigInt(),
       burned: amountBurned.toBigInt(),

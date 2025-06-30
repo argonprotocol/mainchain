@@ -15,7 +15,7 @@ import {
 } from './wasm/bitcoin_bindings.js';
 import { addressBytesHex, keyToBuffer } from './KeysHelper';
 
-export default class CosignScript {
+export class CosignScript {
   private readonly network: networks.Network;
   constructor(
     readonly lock: IBitcoinLock,

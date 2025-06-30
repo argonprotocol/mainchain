@@ -25,5 +25,8 @@
     "@lerna-lite/version": "^3.12.3",
     "prettier": "^3.5.1"
   },
+  "resolutions": {
+    "axios": "^0.30.0"
+  },
   "packageManager": "yarn@4.1.1"
 }
