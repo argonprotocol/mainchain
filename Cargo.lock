@@ -14197,6 +14197,7 @@ dependencies = [
  "sc-executor",
  "sc-keystore",
  "sc-network",
+ "sc-network-sync",
  "sc-network-types",
  "sc-offchain",
  "sc-rpc",

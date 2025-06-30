@@ -77,8 +77,8 @@ pub enum Error {
 	#[error("Notary sync missing notebook dependencies: {0}")]
 	MissingNotebooksError(String),
 
-	#[error("A duplicate block was created by this author {0} for the given voting key")]
-	DuplicateAuthoredBlock(AccountId),
+	#[error("A duplicate block was created by this author {0} for the given {1} key")]
+	DuplicateAuthoredBlock(AccountId, String),
 
 	#[error("The block state is not available")]
 	StateUnavailableError,

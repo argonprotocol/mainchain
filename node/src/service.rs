@@ -8,7 +8,8 @@ use crate::{
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::{
 	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
-	create_import_queue, run_block_builder_task, run_notary_sync,
+	create_import_queue, import_queue::ensure_best_block_state_task, run_block_builder_task,
+	run_notary_sync,
 };
 use argon_primitives::{AccountId, TickApis, tick::Ticker};
 use polkadot_sdk::*;
@@ -133,13 +134,13 @@ where
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
 	let ticker = {
-		let best_hash = client.info().best_hash;
-		let ticker: Ticker = client.runtime_api().ticker(best_hash).map_err(|e| {
+		let finalized_hash = client.info().finalized_hash;
+		let ticker: Ticker = client.runtime_api().ticker(finalized_hash).map_err(|e| {
 			ServiceError::Other(format!("Failed to establish runtime ticker: {:?}", e))
 		})?;
 		let latest_tick = client
 			.runtime_api()
-			.current_tick(best_hash)
+			.current_tick(finalized_hash)
 			.map_err(|e| ServiceError::Other(format!("Failed to get runtime tick: {:?}", e)))?;
 		aux_client
 			.migrate(latest_tick)
@@ -256,6 +257,16 @@ where
 			block_relay: None,
 			metrics,
 		})?;
+
+	let best_block_state_service =
+		ensure_best_block_state_task(client.clone(), sync_service.clone()).map_err(|e| {
+			ServiceError::Other(format!("Failed to start best block service {:?}", e))
+		})?;
+	task_manager.spawn_essential_handle().spawn_blocking(
+		"best-block-state",
+		None,
+		best_block_state_service,
+	);
 
 	let role = config.role;
 	let name = config.network.node_name.clone();

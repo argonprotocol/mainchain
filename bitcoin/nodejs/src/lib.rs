@@ -70,6 +70,7 @@ pub fn create_cosign_pubkey(
 }
 
 #[wasm_bindgen(js_name = "calculateFee")]
+#[allow(clippy::too_many_arguments)]
 pub fn calculate_fee(
 	vault_pubkey_hex: &str,
 	vault_claim_pubkey_hex: &str,
@@ -143,6 +144,7 @@ pub fn sign_psbt(
 }
 
 #[wasm_bindgen(js_name = "getCosignPsbt")]
+#[allow(clippy::too_many_arguments)]
 pub fn get_cosigned_psbt(
 	txid: &str,
 	vout: u32,
