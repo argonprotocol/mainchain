@@ -26,7 +26,8 @@
     "prettier": "^3.5.1"
   },
   "resolutions": {
-    "axios": "^0.30.0"
+    "axios": "^0.30.0",
+    "@octokit/plugin-paginate-rest": "^11.4.1"
   },
   "packageManager": "yarn@4.1.1"
 }
