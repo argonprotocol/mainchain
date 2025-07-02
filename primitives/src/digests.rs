@@ -8,7 +8,7 @@ use frame_support_procedural::DefaultNoBound;
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedVec, *};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{RuntimeDebug, U256, ed25519::Signature};
+use sp_core::{RuntimeDebug, U256};
 use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding
@@ -32,14 +32,8 @@ pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
-	Vote { seal_strength: U256, signature: BlockSealAuthoritySignature },
+	Vote { seal_strength: U256, signature: BlockSealAuthoritySignature, xor_distance: Option<U256> },
 	Compute { nonce: U256 },
-}
-
-impl BlockSealDigest {
-	pub fn pre_final_vote(seal_strength: U256) -> Self {
-		BlockSealDigest::Vote { seal_strength, signature: Signature::from_raw([0u8; 64]).into() }
-	}
 }
 
 impl TryFrom<DigestItem> for TickDigest {
@@ -56,7 +50,7 @@ impl TryFrom<&Digest> for ForkPower {
 	fn try_from(digest: &Digest) -> Result<Self, Self::Error> {
 		for digest_item in digest.logs.iter() {
 			if let Some(fork) = digest_item.as_fork_power() {
-				return Ok(fork)
+				return Ok(fork);
 			}
 		}
 		Err(codec::Error::from("Digest not found"))
@@ -154,21 +148,21 @@ pub trait ArgonDigests {
 impl ArgonDigests for DigestItem {
 	fn as_tick(&self) -> Option<TickDigest> {
 		if let DigestItem::PreRuntime(TICK_DIGEST_ID, value) = self {
-			return TickDigest::decode(&mut &value[..]).ok()
+			return TickDigest::decode(&mut &value[..]).ok();
 		}
 		None
 	}
 
 	fn as_author<AC: Codec>(&self) -> Option<AC> {
 		if let DigestItem::PreRuntime(AUTHOR_DIGEST_ID, value) = self {
-			return AC::decode(&mut &value[..]).ok()
+			return AC::decode(&mut &value[..]).ok();
 		}
 		None
 	}
 
 	fn as_block_vote(&self) -> Option<BlockVoteDigest> {
 		if let DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, value) = self {
-			return BlockVoteDigest::decode(&mut &value[..]).ok()
+			return BlockVoteDigest::decode(&mut &value[..]).ok();
 		}
 		None
 	}
@@ -177,28 +171,28 @@ impl ArgonDigests for DigestItem {
 		&self,
 	) -> Option<NotebookDigest<VerifyError>> {
 		if let DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, value) = self {
-			return NotebookDigest::<VerifyError>::decode(&mut &value[..]).ok()
+			return NotebookDigest::<VerifyError>::decode(&mut &value[..]).ok();
 		}
 		None
 	}
 
 	fn as_parent_voting_key(&self) -> Option<ParentVotingKeyDigest> {
 		if let DigestItem::Consensus(PARENT_VOTING_KEY_DIGEST, value) = self {
-			return ParentVotingKeyDigest::decode(&mut &value[..]).ok()
+			return ParentVotingKeyDigest::decode(&mut &value[..]).ok();
 		}
 		None
 	}
 
 	fn as_fork_power(&self) -> Option<ForkPower> {
 		if let DigestItem::Consensus(FORK_POWER_DIGEST, value) = self {
-			return ForkPower::decode(&mut &value[..]).ok()
+			return ForkPower::decode(&mut &value[..]).ok();
 		}
 		None
 	}
 
 	fn as_block_seal(&self) -> Option<BlockSealDigest> {
 		if let DigestItem::Seal(BLOCK_SEAL_DIGEST_ID, value) = self {
-			return BlockSealDigest::decode(&mut &value[..]).ok()
+			return BlockSealDigest::decode(&mut &value[..]).ok();
 		}
 		None
 	}
@@ -216,7 +210,7 @@ impl BlockSealDigest {
 	pub fn is_seal(digest_item: &DigestItem) -> bool {
 		if let DigestItem::Seal(id, _) = digest_item {
 			if id == &BLOCK_SEAL_DIGEST_ID {
-				return true
+				return true;
 			}
 		}
 		false

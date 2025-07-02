@@ -176,6 +176,23 @@ macro_rules! inject_common_apis {
                 Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength, expected_notebook_tick)?)
             }
 
+            fn find_better_vote_block_seal(
+                notebook_votes: Vec<NotaryNotebookRawVotes>,
+                best_strength: U256,
+                closest_xor_distance: U256,
+                with_signing_key: BlockSealAuthorityId,
+                expected_notebook_tick: Tick,
+            ) -> Result<Option<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>>, DispatchError> {
+                Ok(BlockSeal::find_better_vote_block_seal(
+                    notebook_votes,
+                    best_strength,
+                    closest_xor_distance,
+                    with_signing_key,
+                    expected_notebook_tick,
+                )?)
+            }
+
+
             fn has_eligible_votes() -> bool {
                 BlockSeal::has_eligible_votes()
             }

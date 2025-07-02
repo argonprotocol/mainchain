@@ -37,7 +37,7 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static AuthorityList: Vec<(AccountId, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, AccountId>> = None;
+	pub static XorClosest: Option<(MiningAuthority<BlockSealAuthorityId, AccountId>, U256)> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static GrandpaVoteMinimum: Option<VoteMinimum> = None;
 	pub static MinerZero: Option<(AccountId, MiningAuthority<BlockSealAuthorityId, AccountId>)> = None;
@@ -83,7 +83,38 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthori
 	}
 
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, AccountId>> {
-		XorClosest::get().clone()
+		XorClosest::get().map(|a| a.0).clone()
+	}
+
+	fn xor_closest_managed_authority(
+		_: U256,
+		signing_key: &BlockSealAuthorityId,
+		xor_distance: Option<U256>,
+	) -> Option<(MiningAuthority<BlockSealAuthorityId, AccountId>, U256, Permill)> {
+		if let Some((authority, distance)) = XorClosest::get() {
+			if authority.authority_id == *signing_key &&
+				(xor_distance.is_none() || xor_distance.unwrap() > distance)
+			{
+				return Some((authority, distance, Permill::one()));
+			}
+		}
+		None
+	}
+
+	fn get_authority_distance(
+		_seal_proof: U256,
+		authority_id: &BlockSealAuthorityId,
+		account: &AccountId,
+	) -> Option<U256> {
+		if let Some((authority, distance)) = XorClosest::get() {
+			if authority.authority_id == *authority_id || authority.account_id == *account {
+				Some(distance)
+			} else {
+				None
+			}
+		} else {
+			None
+		}
 	}
 }
 

@@ -1,9 +1,13 @@
-use crate::{aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error};
+use crate::{
+	NotebookTickChecker, aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error,
+};
 use argon_primitives::{
-	BLOCK_SEAL_KEY_TYPE, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	BlockVote, BlockVotingPower, TickApis, VotingSchedule,
-	block_seal::BLOCK_SEAL_CRYPTO_ID,
+	AccountId, BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
+	BlockSealDigest, BlockVote, TickApis, VotingSchedule,
+	block_seal::{BLOCK_SEAL_CRYPTO_ID, BLOCK_SEAL_KEY_TYPE},
 	fork_power::ForkPower,
+	notary::NotaryNotebookRawVotes,
+	prelude::sp_api::{Core, RuntimeApiInfo},
 	tick::{Tick, Ticker},
 };
 use argon_runtime::NotebookVerifyError;
@@ -18,7 +22,8 @@ use sp_consensus::{Error as ConsensusError, SelectChain};
 use sp_core::{ByteArray, U256};
 use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc};
+use tokio::time::Instant;
 
 pub struct NotebookSealer<B: BlockT, C: AuxStore, SC, AC: Clone + Codec> {
 	client: Arc<C>,
@@ -47,6 +52,12 @@ where
 			_phantom: PhantomData,
 		}
 	}
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CheckForNotebookResult {
+	pub found_block: bool,
+	pub recheck_notebook_tick_time: Option<Instant>,
 }
 
 impl<B, C, SC, AC> NotebookSealer<B, C, SC, AC>
@@ -81,34 +92,39 @@ where
 	pub async fn check_for_new_blocks(
 		&self,
 		notebook_tick: Tick,
-		voting_power: BlockVotingPower,
-		notebooks: u32,
-	) -> Result<(), Error> {
-		let current_tick = self.ticker.current();
+	) -> Result<CheckForNotebookResult, Error> {
+		let current_clocktime_tick = self.ticker.current();
+		let mut result = CheckForNotebookResult::default();
 
-		if current_tick <= notebook_tick {
-			trace!(
-				"Current tick {} is not greater than notebook tick {}",
-				current_tick, notebook_tick
+		if current_clocktime_tick <= notebook_tick {
+			tracing::trace!(
+				current_clocktime_tick,
+				notebook_tick,
+				"Clock-time current tick is before notebook tick",
 			);
-			return Ok(());
+			return Ok(result);
 		}
 
 		// Votes only work when they're for active ticks, so no point in doing this for old ticks
 		const OLDEST_TICK_TO_SOLVE_FOR: Tick = 5;
 
-		if notebook_tick < current_tick.saturating_sub(OLDEST_TICK_TO_SOLVE_FOR) {
+		if notebook_tick < current_clocktime_tick.saturating_sub(OLDEST_TICK_TO_SOLVE_FOR) {
 			trace!(
 				"Notebook tick {} is too old to be considered for block creation with votes",
 				notebook_tick
 			);
-			return Ok(());
+			return Ok(result);
 		}
 
-		let keys = self.keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE);
+		let keys: Vec<BlockSealAuthorityId> = self
+			.keystore
+			.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE)
+			.into_iter()
+			.map(Into::into)
+			.collect::<Vec<_>>();
 		if keys.is_empty() {
 			trace!("No block vote keys to sign block with");
-			return Ok(());
+			return Ok(result);
 		}
 
 		let voting_schedule = VotingSchedule::on_notebook_tick_state(notebook_tick);
@@ -118,161 +134,238 @@ where
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
 			trace!("No block votes at tick {}", votes_tick);
-			return Ok(());
+			return Ok(result);
 		}
 
-		let blocks_to_build_on = self
-			.get_parent_blocks_to_build_on(&voting_schedule, notebooks, voting_power)
-			.await?;
-		trace!(
-			"Checking tick {} for better blocks with {} votes. Found {} blocks to attempt to build on",
+		let finalized_hash = self.client.info().finalized_hash;
+		let finalized_tick = self.client.runtime_api().current_tick(finalized_hash)?;
+		if voting_schedule.block_tick() <= finalized_tick {
+			tracing::trace!(
+				notebook_tick,
+				finalized_tick,
+				include_in_block_tick = ?voting_schedule.block_tick(),
+				"Block tick for received notebook has already been finalized, no need to seal block",
+			);
+			return Ok(result);
+		}
+
+		let Some((block_hash, seal_strength, xor_distance)) =
+			self.get_best_block_at_parent(&voting_schedule).await?
+		else {
+			trace!("No parent block to build on for tick {}", votes_tick);
+			return Ok(result);
+		};
+		tracing::trace!(
 			votes_tick,
 			votes_count,
-			blocks_to_build_on.len()
+			block_hash = ?block_hash,
+			seal_strength = ?seal_strength,
+			xor_distance = ?xor_distance,
+			"Building vote seal on block",
 		);
 
-		for (block_hash, best_seal_strength) in blocks_to_build_on.into_iter() {
-			// TODO: should we add more top seals to check to ensure someone matches a block?
-			//   - we could delay the later ones to publish only if still best after a delay
-			let Ok(stronger_seals) = self
-				.client
-				.runtime_api()
-				.find_vote_block_seals(
-					block_hash,
-					block_votes.clone(),
-					best_seal_strength,
-					votes_tick,
-				)?
-				.inspect_err(|e| {
-					error!("Unable to lookup vote block seals: {:?}", e);
-				})
-			else {
-				trace!(
-					"Could not find any stronger seals for block {:?}. Notebook tick {}, votes at tick {}. Existing power {:?}.",
-					block_hash, notebook_tick, votes_tick, best_seal_strength
-				);
-				continue;
-			};
+		let api_version = self.client.runtime_api().version(block_hash)?;
+		let block_seal_version = api_version
+			.api_version(&<dyn BlockSealApis<B, AccountId, BlockSealAuthorityId>>::ID)
+			.unwrap_or_default();
 
-			for vote in stronger_seals.into_iter() {
-				let raw_authority = vote.closest_miner.1.to_raw_vec();
-				if !self.keystore.has_keys(&[(raw_authority, BLOCK_SEAL_KEY_TYPE)]) {
-					trace!(
-						"Could not sign vote for block with seal strength {}",
-						vote.seal_strength
-					);
-					continue;
-				}
-
-				trace!("Found vote-eligible block with seal strength {}", vote.seal_strength);
-				self.sender
-					.unbounded_send(CreateTaxVoteBlock::<B, AC> {
-						current_tick: notebook_tick + 1,
-						timestamp_millis: self.ticker.now_adjusted_to_ntp(),
-						vote,
-						parent_hash: block_hash,
-					})
-					.map_err(|e| {
-						Error::StringError(format!(
-							"Failed to send CreateTaxVoteBlock message: {:?}",
-							e
-						))
-					})?;
-				return Ok(());
+		// TODO: remove v1 once we have safely migrated to v2 (July 2025)
+		let seal = if block_seal_version == 1 {
+			self.check_v1_seals(&block_votes, block_hash, seal_strength, votes_tick).await?
+		} else {
+			self.check_v2_seals(
+				&block_votes,
+				keys,
+				block_hash,
+				seal_strength,
+				xor_distance,
+				votes_tick,
+			)
+			.await?
+		};
+		if let Some(vote_seal) = seal {
+			tracing::trace!(block = ?block_hash, strength = ?vote_seal.seal_strength, miner_xor_distance = ?vote_seal.miner_xor_distance,
+				"Found vote-eligible block");
+			let block_tick = voting_schedule.block_tick();
+			if let Some(recheck_at) = NotebookTickChecker::should_delay_block_attempt(
+				block_tick,
+				&self.ticker,
+				vote_seal.miner_xor_distance,
+			) {
+				result.recheck_notebook_tick_time = Some(recheck_at);
+				return Ok(result);
 			}
+			self.sender
+				.unbounded_send(CreateTaxVoteBlock::<B, AC> {
+					current_tick: block_tick,
+					timestamp_millis: self.ticker.now_adjusted_to_ntp(),
+					vote: vote_seal,
+					parent_hash: block_hash,
+				})
+				.map_err(|e| {
+					Error::StringError(format!(
+						"Failed to send CreateTaxVoteBlockV2 message: {:?}",
+						e
+					))
+				})?;
+			result.found_block = true;
+			return Ok(result);
 		}
-		Ok(())
+
+		tracing::trace!(
+			block_hash = ?block_hash, notebook_tick, votes_tick, best_seal_strength = ?seal_strength, best_xor = ?xor_distance,
+			"Could not find any stronger seals for block",
+		);
+		Ok(result)
 	}
 
-	async fn get_parent_blocks_to_build_on(
+	async fn check_v2_seals(
+		&self,
+		block_votes: &[NotaryNotebookRawVotes],
+		keys: Vec<BlockSealAuthorityId>,
+		block_hash: B::Hash,
+		mut best_seal_strength: U256,
+		mut best_xor_distance: Option<U256>,
+		votes_tick: Tick,
+	) -> Result<Option<BestBlockVoteSeal<AC, BlockSealAuthorityId>>, Error> {
+		let mut best_block_vote_seal = None;
+
+		for key in keys {
+			match self.client.runtime_api().find_better_vote_block_seal(
+				block_hash,
+				block_votes.to_owned(),
+				best_seal_strength,
+				best_xor_distance.unwrap_or(U256::MAX),
+				key,
+				votes_tick,
+			) {
+				Ok(Ok(Some(strongest))) => {
+					best_seal_strength = strongest.seal_strength;
+					best_xor_distance = strongest.miner_xor_distance.map(|(d, _)| d);
+					best_block_vote_seal = Some(strongest.clone());
+				},
+				Err(e) => {
+					tracing::error!(err = ?e, block=?block_hash, "Unable to call vote block seals v2");
+				},
+				Ok(Err(e)) => {
+					tracing::error!(err = ?e, block=?block_hash, "Unable to lookup vote block seals v2");
+				},
+				_ => {},
+			}
+		}
+		Ok(best_block_vote_seal)
+	}
+
+	async fn check_v1_seals(
+		&self,
+		block_votes: &[NotaryNotebookRawVotes],
+		block_hash: B::Hash,
+		best_seal_strength: U256,
+		votes_tick: Tick,
+	) -> Result<Option<BestBlockVoteSeal<AC, BlockSealAuthorityId>>, Error> {
+		let stronger_seals = self
+			.client
+			.runtime_api()
+			.find_vote_block_seals(
+				block_hash,
+				block_votes.to_owned(),
+				best_seal_strength,
+				votes_tick,
+			)
+			.inspect_err(|e| {
+				tracing::error!(err = ?e, block=?block_hash, "Unable to call vote block seals");
+			})?
+			.inspect_err(|e| {
+				tracing::error!(err = ?e, block=?block_hash, "Unable to lookup vote block seals");
+			})
+			.unwrap_or_default();
+
+		for vote in stronger_seals.into_iter() {
+			let raw_authority = vote.closest_miner.1.to_raw_vec();
+			if !self.keystore.has_keys(&[(raw_authority, BLOCK_SEAL_KEY_TYPE)]) {
+				tracing::trace!(block = ?block_hash, strength = ?vote.seal_strength,
+					"Could not sign vote for block",
+				);
+				continue;
+			}
+			return Ok(Some(vote));
+		}
+		Ok(None)
+	}
+
+	async fn get_best_block_at_parent(
 		&self,
 		voting_schedule: &VotingSchedule,
-		notebooks: u32,
-		voting_power: BlockVotingPower,
-	) -> Result<HashMap<B::Hash, U256>, Error> {
+	) -> Result<Option<(B::Hash, U256, Option<U256>)>, Error> {
 		let leaves = self.select_chain.leaves().await?;
-
-		let mut blocks_to_build_on = HashMap::new();
-		let finalized_block = self.client.info().finalized_number;
-
 		// Blocks are always created with a tick at least notebook tick +1, so the parent will be at
 		// notebook tick
-		let notebook_in_block_tick = voting_schedule.block_tick();
 		let parent_tick = voting_schedule.parent_block_tick();
+		let mut best_parent: Option<(B::Hash, ForkPower)> = None;
+		for leaf in &leaves {
+			let Some(parent_hash) = self.get_block_ancestor_with_tick(*leaf, parent_tick) else {
+				continue;
+			};
+			// **only** consider it if there really are votes to seal here
+			if !self.client.runtime_api().has_eligible_votes(parent_hash).unwrap_or(false) {
+				continue;
+			}
+
+			let forkpower = self.get_fork_power(parent_hash)?;
+			if let Some((_, best_forkpower)) = &best_parent {
+				// If we already have a parent, we only want to replace it if the new one has
+				// strictly more fork power.
+				if forkpower <= *best_forkpower {
+					continue;
+				}
+			}
+			best_parent = Some((parent_hash, forkpower));
+		}
+		let Some((best_parent_hash, _)) = best_parent else {
+			tracing::trace!(parent_tick, "Could not find any parent block with votes to seal",);
+			return Ok(None);
+		};
+
+		// now figure out of there's a descendent we want to be able to beat
+		let mut best_child: Option<ForkPower> = None;
+		let notebook_in_block_tick = voting_schedule.block_tick();
 		for leaf in leaves {
-			let Some(parent_block) = self.get_block_descendent_with_tick(leaf, parent_tick) else {
-				trace!("No block at notebook parent tick {} for leaf {:?}", parent_tick, leaf);
+			if leaf == best_parent_hash {
 				continue;
-			};
-
-			// blocks to beat that include notebook are tick +1
-			let Some(block_hash_to_beat) =
-				self.get_block_descendent_with_tick(leaf, notebook_in_block_tick)
-			else {
-				trace!(
-					"Adding parent block (at tick {}) since no competition {:?}",
-					parent_tick, leaf
-				);
-				// if not trying to beat anyone, just add the parent hash
-				blocks_to_build_on.insert(parent_block, U256::MAX);
+			}
+			let blocks_at_parent_tick =
+				self.client.runtime_api().blocks_at_tick(leaf, parent_tick).unwrap_or_default();
+			if blocks_at_parent_tick.is_empty() ||
+				!blocks_at_parent_tick.contains(&best_parent_hash)
+			{
 				continue;
-			};
+			}
 
-			let fork_power_to_beat = self.get_fork_power(block_hash_to_beat)?;
-			let best_seal_strength = fork_power_to_beat.seal_strength;
-
-			// pretend we beat the best vote - could we beat this fork power?
-			let mut theoretical_power = self.get_fork_power(parent_block)?;
-			theoretical_power.add_vote(
-				voting_power,
-				notebooks,
-				best_seal_strength.saturating_sub(U256::one()),
-			);
-
-			// needs to be greater or we will start creating blocks to match our own and out-pace
-			// the fork depth
-			if theoretical_power > fork_power_to_beat {
-				trace!(
-					"Adding parent block (at tick {}) since we can beat the competition {:?}",
-					parent_tick, leaf
-				);
-				blocks_to_build_on.insert(parent_block, best_seal_strength);
+			if let Some(competing_hash) =
+				self.get_block_ancestor_with_tick(leaf, notebook_in_block_tick)
+			{
+				let fork_power = self.get_fork_power(competing_hash)?;
+				// If we already have a child, we only want to replace it if the new one has
+				// strictly more fork power.
+				if let Some(best_fork_power) = &best_child {
+					if fork_power < *best_fork_power {
+						continue;
+					}
+				}
+				best_child = Some(fork_power);
 			}
 		}
-		blocks_to_build_on.retain(|block, strength| {
-			let block_number = match self.client.header(*block) {
-				Ok(Some(header)) => *header.number(),
-				_ => {
-					trace!("Could not get block number for block {:?}", block);
-					return false
-				},
-			};
-			// don't try to build on something older than the latest finalized block
-			if block_number < finalized_block {
-				trace!(
-					"Block {:?} is older than finalized block {}. Not building on it",
-					block,
-					finalized_block
-				);
-				return false;
-			}
-			let has_eligible_votes =
-				self.client.runtime_api().has_eligible_votes(*block).unwrap_or_default();
-			let block_tick = self.client.runtime_api().current_tick(*block).unwrap_or_default();
-			trace!(
-				"Looking at parent blocks to build on. Block {:?} with strength {}. Has Votes? {}. Block Runtime Tick {}",
-				block,
-				strength,
-				has_eligible_votes,
-				block_tick
-			);
-			has_eligible_votes
-		});
 
-		Ok(blocks_to_build_on)
+		let (best_peer_seal_strength, best_peer_xor_distance) = if let Some(power) = &best_child {
+			(power.seal_strength, power.miner_vote_xor_distance)
+		} else {
+			(U256::MAX, None)
+		};
+
+		Ok(Some((best_parent_hash, best_peer_seal_strength, best_peer_xor_distance)))
 	}
 
-	fn get_block_descendent_with_tick(&self, hash: B::Hash, tick: Tick) -> Option<B::Hash> {
+	fn get_block_ancestor_with_tick(&self, hash: B::Hash, tick: Tick) -> Option<B::Hash> {
 		// first check this because `block_at_tick` can't include a block until it's a parent block
 		if let Ok(current_tick) = self.client.runtime_api().current_tick(hash) {
 			if current_tick == tick {
@@ -301,6 +394,7 @@ pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 	pre_hash: &Hash,
 	vote_authority: &BlockSealAuthorityId,
 	seal_strength: U256,
+	xor_distance: Option<U256>,
 ) -> Result<BlockSealDigest, Error> {
 	let message = BlockVote::seal_signature_message(pre_hash);
 	let signature = keystore
@@ -317,8 +411,7 @@ pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 		.clone()
 		.try_into()
 		.map_err(|_| ConsensusError::InvalidSignature(signature, vote_authority.to_raw_vec()))?;
-
-	Ok(BlockSealDigest::Vote { seal_strength, signature })
+	Ok(BlockSealDigest::Vote { seal_strength, signature, xor_distance })
 }
 
 #[cfg(test)]
@@ -351,7 +444,8 @@ mod tests {
 			&keystore,
 			&H256::from_slice(&[2u8; 32]),
 			&Ed25519Keyring::Alice.public().into(),
-			U256::from(1)
+			U256::from(1),
+			None
 		));
 	}
 
@@ -364,7 +458,13 @@ mod tests {
 		let nonce = U256::from(1);
 
 		assert!(matches!(
-			create_vote_seal(&keystore, &block_hash, &Ed25519Keyring::Bob.public().into(), nonce),
+			create_vote_seal(
+				&keystore,
+				&block_hash,
+				&Ed25519Keyring::Bob.public().into(),
+				nonce,
+				None
+			),
 			Err(Error::ConsensusError(ConsensusError::CannotSign(_)))
 		),);
 	}

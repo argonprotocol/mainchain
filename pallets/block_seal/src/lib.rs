@@ -154,6 +154,8 @@ pub mod pallet {
 		BlockSealDecodeError,
 		/// Compute blocks cant be added in the same tick as a vote
 		InvalidComputeBlockTick,
+		/// The xor distance supplied is invalid
+		InvalidMinerXorDistance,
 	}
 
 	#[pallet::hooks]
@@ -299,6 +301,7 @@ pub mod pallet {
 					notary_id,
 					ref source_notebook_proof,
 					source_notebook_number,
+					xor_distance,
 				} => {
 					let voting_schedule =
 						VotingSchedule::when_evaluating_runtime_seals(current_tick);
@@ -322,6 +325,7 @@ pub mod pallet {
 						block_vote,
 						&block_author,
 						&voting_schedule,
+						xor_distance,
 					)?;
 					Self::verify_vote_source(
 						notary_id,
@@ -332,7 +336,12 @@ pub mod pallet {
 					)?;
 
 					BlockForkPower::<T>::mutate(|fork| {
-						fork.add_vote(vote_digest.voting_power, notebooks, seal_strength);
+						fork.add_vote(
+							vote_digest.voting_power,
+							notebooks,
+							seal_strength,
+							xor_distance,
+						);
 					});
 				},
 			}
@@ -373,6 +382,7 @@ pub mod pallet {
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
+			xor_distance: Option<U256>,
 		) -> DispatchResult {
 			if !block_vote.is_proxy_vote() {
 				let grandpa_tick_block =
@@ -403,11 +413,25 @@ pub mod pallet {
 			let authority_id = T::AuthorityProvider::get_authority(block_author.clone())
 				.ok_or(Error::<T>::UnregisteredBlockAuthor)?;
 
-			// ensure this miner is eligible to submit this tax proof
-			let block_peer = T::AuthorityProvider::xor_closest_authority(seal_proof)
-				.ok_or(Error::<T>::InvalidSubmitter)?;
+			if let Some(distance) = xor_distance {
+				// in v2, any miner can submit a seal, but we'll only take the closest one
+				// ensure the xor distance is correct
+				let expected_distance = T::AuthorityProvider::get_authority_distance(
+					seal_proof,
+					&authority_id,
+					block_author,
+				)
+				.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
 
-			ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
+				ensure!(expected_distance == distance, Error::<T>::InvalidMinerXorDistance);
+			} else {
+				// in v1, only the closest miner could submit a seal
+				// ensure this miner is eligible to submit this tax proof
+				let block_peer = T::AuthorityProvider::xor_closest_authority(seal_proof)
+					.ok_or(Error::<T>::InvalidSubmitter)?;
+
+				ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
+			}
 
 			<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 				block_author_account_id: block_author.clone(),
@@ -465,29 +489,29 @@ pub mod pallet {
 			vote_history.iter().any(|(tick, votes)| *tick == votes_tick && *votes > 0)
 		}
 
-		/// This API will find block votes from the perspective of a new block creation activity
+		/// This fn will find block votes from the perspective of a new block creation activity
 		/// calling into the runtime while trying to build the next block.
 		///
 		/// That means we're using the votes from the notebooks themselves
-		pub fn find_vote_block_seals(
+		pub(crate) fn find_top_votes(
 			notebook_votes: Vec<NotaryNotebookRawVotes>,
-			with_better_strength: U256,
+			max_seal_strength: U256,
 			expected_notebook_tick: Tick,
-		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
+		) -> Result<TopVotes<T::Block>, Error<T>> {
 			let Some(parent_key) = <ParentVotingKey<T>>::get() else {
-				return Ok(BoundedVec::new());
+				return Ok(Default::default());
 			};
 
 			// runtime tick will have the voting key for the parent
 			let current_tick = T::TickProvider::current_tick();
 			let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(current_tick);
 			if !voting_schedule.is_voting_started() {
-				return Ok(BoundedVec::new());
+				return Ok(Default::default());
 			}
 
 			// no authorities, so no point in wasting cycles
 			if T::AuthorityProvider::authority_count() == 0 {
-				return Ok(BoundedVec::new());
+				return Ok(Default::default());
 			}
 
 			ensure!(
@@ -504,7 +528,7 @@ pub mod pallet {
 					"No eligible blocks to vote on in grandparent tick {:?}",
 					voted_for_block_at_tick
 				);
-				return Ok(BoundedVec::new());
+				return Ok(Default::default());
 			};
 
 			log::info!(
@@ -538,15 +562,105 @@ pub mod pallet {
 						BlockVote::calculate_seal_proof(vote_bytes.clone(), notary_id, parent_key);
 
 					let seal_strength = BlockVote::calculate_seal_strength(*power, seal_proof);
-					if seal_strength >= with_better_strength {
-						continue;
+					if seal_strength <= max_seal_strength {
+						best_votes.push((
+							seal_strength,
+							seal_proof,
+							notary_id,
+							notebook_number,
+							index,
+						));
 					}
-					best_votes.push((seal_strength, seal_proof, notary_id, notebook_number, index));
 				}
 			}
 			best_votes.sort_by(|a, b| a.0.cmp(&b.0));
+			Ok(TopVotes { best_votes, leafs_by_notary, grandparent_tick_blocks })
+		}
 
+		/// Finds votes eligible for the node to submit for new blocks.
+		///
+		/// This is v2 of the api, where multiple miners can submit the same vote, but the best xor
+		/// distance will form the longest chain.
+		#[allow(clippy::type_complexity)]
+		pub fn find_better_vote_block_seal(
+			notebook_votes: Vec<NotaryNotebookRawVotes>,
+			best_strength: U256,
+			closest_xor_distance: U256,
+			with_managed_key: T::AuthorityId,
+			expected_notebook_tick: Tick,
+		) -> Result<Option<BestBlockVoteSeal<T::AccountId, T::AuthorityId>>, Error<T>> {
+			let TopVotes { best_votes, leafs_by_notary, grandparent_tick_blocks } =
+				Self::find_top_votes(notebook_votes, best_strength, expected_notebook_tick)?;
+			for (seal_strength, seal_proof, notary_id, source_notebook_number, index) in
+				best_votes.into_iter()
+			{
+				let better_distance =
+					if best_strength == seal_strength { Some(closest_xor_distance) } else { None };
+
+				let Some((closer_authority, distance, percentile)) =
+					T::AuthorityProvider::xor_closest_managed_authority(
+						seal_proof, /* NOTE: use seal_proof since strength is modified by
+						             * funding and breaks xor distance */
+						&with_managed_key,
+						better_distance,
+					)
+				else {
+					continue;
+				};
+
+				let leafs = leafs_by_notary.get(&notary_id).expect("just created");
+
+				let vote =
+					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
+						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
+
+				// proxy votes can use any block
+				if !vote.is_proxy_vote() && !grandparent_tick_blocks.contains(&vote.block_hash) {
+					log::info!(
+						"Cant use vote for grandparent tick {:?} - voted for {:?}",
+						grandparent_tick_blocks,
+						vote.block_hash
+					);
+					continue;
+				}
+
+				let proof = merkle_proof::<BlakeTwo256, _, _>(leafs, index as u32);
+				// votes are in order of top seal strength, so we can return the first one that
+				// works
+				return Ok(Some(BestBlockVoteSeal {
+					notary_id,
+					seal_strength,
+					block_vote_bytes: leafs[index].clone(),
+					source_notebook_number,
+					source_notebook_proof: MerkleProof {
+						proof: BoundedVec::truncate_from(proof.proof),
+						leaf_index: proof.leaf_index,
+						number_of_leaves: proof.number_of_leaves,
+					},
+					closest_miner: (closer_authority.account_id, closer_authority.authority_id),
+					miner_xor_distance: Some((distance, percentile)),
+				}));
+			}
+			Ok(None)
+		}
+
+		/// Finds 0 or more block vote seals that are eligible for the current block.
+		///
+		/// This is the v1 of this api. In v1, only one miner was eligible for each vote.
+		pub fn find_vote_block_seals(
+			notebook_votes: Vec<NotaryNotebookRawVotes>,
+			with_better_strength: U256,
+			expected_notebook_tick: Tick,
+		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
 			let mut result = BoundedVec::new();
+			let TopVotes { best_votes, leafs_by_notary, grandparent_tick_blocks } =
+				Self::find_top_votes(
+					notebook_votes,
+					// in v1, we don't use the xor distance. we only want votes stronger than the
+					// current best
+					with_better_strength.saturating_sub(U256::one()),
+					expected_notebook_tick,
+				)?;
 			for (seal_strength, seal_proof, notary_id, source_notebook_number, index) in
 				best_votes.into_iter()
 			{
@@ -577,10 +691,11 @@ pub mod pallet {
 					source_notebook_number,
 					source_notebook_proof: MerkleProof {
 						proof: BoundedVec::truncate_from(proof.proof),
-						leaf_index: proof.leaf_index as u32,
-						number_of_leaves: proof.number_of_leaves as u32,
+						leaf_index: proof.leaf_index,
+						number_of_leaves: proof.number_of_leaves,
 					},
 					closest_miner: (closest_authority.account_id, closest_authority.authority_id),
+					miner_xor_distance: None,
 				};
 				if result.try_push(best_nonce).is_err() {
 					break;
@@ -649,5 +764,12 @@ pub mod pallet {
 		fn get() -> BlockSealInherent {
 			<TempSealInherent<T>>::get().expect("Seal inherent must be set")
 		}
+	}
+
+	#[derive(DefaultNoBound)]
+	pub(crate) struct TopVotes<Block: BlockT> {
+		best_votes: Vec<(U256, U256, NotaryId, NotebookNumber, usize)>,
+		leafs_by_notary: BTreeMap<NotaryId, Vec<Vec<u8>>>,
+		grandparent_tick_blocks: Vec<Block::Hash>,
 	}
 }

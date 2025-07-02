@@ -13,6 +13,7 @@ use crate::{
 	tick::{Tick, Ticker},
 };
 use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use polkadot_sdk::sp_runtime::Permill;
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
@@ -209,10 +210,21 @@ pub trait MiningSlotProvider {
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>
 where
 	Block: BlockT,
+	AuthorityId: PartialEq,
 {
 	fn authority_count() -> u32;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn xor_closest_authority(nonce: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
+	fn xor_closest_authority(seal_proof: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
+	fn xor_closest_managed_authority(
+		seal_proof: U256,
+		signing_key: &AuthorityId,
+		xor_distance: Option<U256>,
+	) -> Option<(MiningAuthority<AuthorityId, AccountId>, U256, Permill)>;
+	fn get_authority_distance(
+		seal_proof: U256,
+		authority_id: &AuthorityId,
+		account: &AccountId,
+	) -> Option<U256>;
 }
 
 pub trait TickProvider<B: BlockT> {

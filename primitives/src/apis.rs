@@ -1,5 +1,6 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::multiple_bound_locations)]
 
 use crate::{
 	BestBlockVoteSeal, BlockSealDigest, BlockVoteDigest, NotebookAuditResult, VoteMinimum,
@@ -20,6 +21,7 @@ use sp_core::{ConstU32, H256, U256};
 use sp_runtime::{BoundedVec, Digest, DispatchError};
 
 sp_api::decl_runtime_apis! {
+	#[api_version(2)]
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
 		fn vote_minimum() -> VoteMinimum;
 		fn compute_puzzle() -> ComputePuzzle<Block>;
@@ -29,6 +31,14 @@ sp_api::decl_runtime_apis! {
 			with_better_strength: U256,
 			expected_notebook_tick: Tick,
 		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
+		#[api_version(2)]
+		fn find_better_vote_block_seal(
+			notebook_votes: Vec<NotaryNotebookRawVotes>,
+			best_strength: U256,
+			closest_xor_distance: U256,
+			with_signing_key: BlockSealAuthorityId,
+			expected_notebook_tick: Tick,
+		) -> Result<Option<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>>, DispatchError>;
 		fn has_eligible_votes() -> bool;
 		fn is_bootstrap_mining() -> bool;
 		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
@@ -62,7 +72,7 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait MiningApis<AccountId, BlockSealAuthorityId> where BlockSealAuthorityId: Codec, AccountId: Codec {
+	pub trait MiningApis<AccountId, BlockSealAuthorityId> where BlockSealAuthorityId: Codec + PartialEq, AccountId: Codec {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority<BlockSealAuthorityId,AccountId>>;
 		fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>>;
 	}

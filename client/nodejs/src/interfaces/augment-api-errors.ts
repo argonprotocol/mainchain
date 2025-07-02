@@ -236,6 +236,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidForkPowerParent: AugmentedError<ApiType>;
       /**
+       * The xor distance supplied is invalid
+       **/
+      InvalidMinerXorDistance: AugmentedError<ApiType>;
+      /**
        * Vote not submitted by the right miner
        **/
       InvalidSubmitter: AugmentedError<ApiType>;

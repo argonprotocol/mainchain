@@ -40,6 +40,8 @@ pub enum BlockSealInherent {
 		source_notebook_number: NotebookNumber,
 		source_notebook_proof: MerkleProof,
 		block_vote: BlockVote,
+		/// The xor distance to the miner. This allows multiple miners to now submit the same vote
+		xor_distance: Option<U256>,
 	},
 	Compute,
 }
@@ -55,6 +57,7 @@ pub enum BlockSealInherentNodeSide {
 		source_notebook_proof: MerkleProof,
 		/// Encoded block vote on node side
 		block_vote_bytes: Vec<u8>,
+		miner_xor_distance: Option<U256>,
 	},
 	Compute,
 }
@@ -67,6 +70,7 @@ impl BlockSealInherentNodeSide {
 			source_notebook_number: best_vote.source_notebook_number,
 			source_notebook_proof: best_vote.source_notebook_proof,
 			block_vote_bytes: best_vote.block_vote_bytes,
+			miner_xor_distance: best_vote.miner_xor_distance.map(|(distance, _)| distance),
 		}
 	}
 }
@@ -74,9 +78,14 @@ impl BlockSealInherentNodeSide {
 impl BlockSealInherent {
 	pub fn matches(&self, seal_digest: BlockSealDigest) -> bool {
 		match self {
-			Self::Vote { seal_strength, .. } => match seal_digest {
-				BlockSealDigest::Vote { seal_strength: included_seal_strength, .. } =>
-					seal_strength == &included_seal_strength,
+			Self::Vote { seal_strength, xor_distance, .. } => match seal_digest {
+				BlockSealDigest::Vote {
+					seal_strength: included_seal_strength,
+					xor_distance: included_xor_distance,
+					..
+				} =>
+					seal_strength == &included_seal_strength &&
+						xor_distance == &included_xor_distance,
 				_ => false,
 			},
 			Self::Compute => matches!(seal_digest, BlockSealDigest::Compute { .. }),
@@ -94,6 +103,7 @@ impl TryInto<BlockSealInherent> for BlockSealInherentNodeSide {
 				block_vote_bytes,
 				source_notebook_number,
 				source_notebook_proof,
+				miner_xor_distance,
 			} => BlockSealInherent::Vote {
 				seal_strength,
 				notary_id,
@@ -102,6 +112,7 @@ impl TryInto<BlockSealInherent> for BlockSealInherentNodeSide {
 				})?,
 				source_notebook_number,
 				source_notebook_proof,
+				xor_distance: miner_xor_distance,
 			},
 			BlockSealInherentNodeSide::Compute => BlockSealInherent::Compute,
 		})

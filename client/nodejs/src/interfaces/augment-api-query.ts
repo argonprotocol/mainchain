@@ -587,6 +587,20 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       nonce: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
+       * The previous verified height for a state machine
+       **/
+      previousStateMachineHeight: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | IsmpConsensusStateMachineId
+            | { stateId?: any; consensusStateId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<u64>>,
+        [IsmpConsensusStateMachineId]
+      >;
+      /**
        * Tracks requests that have been responded to
        * The key is the request commitment
        **/

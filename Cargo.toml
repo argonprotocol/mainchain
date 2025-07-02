@@ -233,13 +233,13 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # hyperprocessor bridge
-pallet-ismp = { version = "2503.0.0", default-features = false }
-pallet-ismp-runtime-api = { version = "2503.0.0", default-features = false }
-pallet-hyperbridge = { version = "2503.0.0", default-features = false }
-pallet-token-gateway = { version = "2503.0.0", default-features = false }
-pallet-ismp-rpc = { version = "2503.0.0", default-features = false }
-ismp-grandpa = { version = "2503.0.0", default-features = false }
-ismp = { version = "1.1.0", default-features = false }
+pallet-ismp = { version = "2503.1.0", default-features = false }
+pallet-ismp-runtime-api = { version = "2503.1.0", default-features = false }
+pallet-hyperbridge = { version = "2503.1.0", default-features = false }
+pallet-token-gateway = { version = "2503.1.0", default-features = false }
+pallet-ismp-rpc = { version = "2503.1.0", default-features = false }
+ismp-grandpa = { version = "2503.1.0", default-features = false }
+ismp = { version = "1.2.0", default-features = false }
 
 ethers = { version = "2.0.14" }
 uniswap-sdk-core = { version = "=3.2.0" }
