@@ -118,6 +118,7 @@ impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>
 	RuntimeDebug,
 	Default,
 	TypeInfo,
+	MaxEncodedLen,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct MiningSlotConfig {
@@ -172,7 +173,18 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub account_id: AccountId,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Default, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
+#[derive(
+	Clone,
+	Debug,
+	PartialEq,
+	Eq,
+	Default,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 pub struct MiningBidStats {
 	pub bids_count: u32,
 	pub bid_amount_min: Balance,

@@ -10,7 +10,6 @@ use argon_primitives::{
 };
 use pallet_prelude::*;
 
-use ed25519::Keyring;
 use frame_support::traits::Currency;
 use sp_core::crypto::AccountId32;
 
@@ -64,12 +63,12 @@ parameter_types! {
 
 	pub static Digests: Digestset<VerifyError, AccountId32> = Digestset {
 		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
-		author: Keyring::Alice.to_account_id(),
+		author: sp_keyring::ed25519::Keyring::Alice.to_account_id(),
 		voting_key: None,
 		tick: TickDigest(2),
 		fork_power: None,
 		notebooks: NotebookDigest {
-			notebooks: vec![],
+			notebooks: BoundedVec::truncate_from(vec![]),
 		},
 	};
 }

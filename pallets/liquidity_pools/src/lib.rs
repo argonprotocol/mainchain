@@ -55,7 +55,7 @@ pub use pallet::*;
 /// The limitations to bonding argons are:
 /// - The maximum number of contributors to a fund (`MaxLiquidityPoolContributors`)
 /// - The minimum amount of bonded argons per contributor (`MinimumArgonsPerContributor`)
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeMap;
@@ -256,7 +256,7 @@ pub mod pallet {
 		/// - `amount`: The amount of argons to contribute to the fund. If you change this amount,
 		///   it will just add the incremental amount
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)] //T::WeightInfo::hold())]
+		#[pallet::weight(T::WeightInfo::bond_argons())]
 		pub fn bond_argons(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -350,7 +350,7 @@ pub mod pallet {
 		/// Allows a user to remove their bonded argons from the fund after the hold is released
 		/// (once epoch starting at bonded frame is complete).
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)] //T::WeightInfo::hold())]
+		#[pallet::weight(T::WeightInfo::unbond_argons())]
 		pub fn unbond_argons(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -694,7 +694,9 @@ pub mod pallet {
 		}
 	}
 
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound, TypeInfo)]
+	#[derive(
+		Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen,
+	)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LiquidityPoolCapital<T: Config> {
 		#[codec(compact)]
@@ -707,7 +709,15 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Encode, Decode, Clone, PartialEqNoBound, Eq, RuntimeDebugNoBound, TypeInfo, DefaultNoBound,
+		Encode,
+		Decode,
+		Clone,
+		PartialEqNoBound,
+		Eq,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		DefaultNoBound,
+		MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LiquidityPool<T: Config> {

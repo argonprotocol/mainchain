@@ -5525,6 +5525,7 @@ dependencies = [
  "argon-bitcoin",
  "argon-bitcoin-utxo-tracker",
  "argon-client",
+ "argon-notary-audit",
  "argon-primitives",
  "argon-testing",
  "base64 0.22.1",

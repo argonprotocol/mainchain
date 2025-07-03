@@ -14,7 +14,7 @@ mod tests;
 
 pub mod weights;
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use alloc::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
 	use sp_core::crypto::AccountId32;
@@ -196,7 +196,17 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((
+			T::WeightInfo::submit(notebooks.len() as u32)
+				.saturating_add(
+					notebooks.iter()
+						.map(|notebook| {
+							T::WeightInfo::submit_with_account_origins(notebook.header.changed_account_origins.len() as u32)
+						})
+						.fold(Weight::zero(), Weight::saturating_add)
+				),
+			DispatchClass::Mandatory
+		))]
 		pub fn submit(
 			origin: OriginFor<T>,
 			notebooks: Vec<SignedNotebookHeader>,
@@ -309,7 +319,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::unlock())]
 		pub fn unlock(origin: OriginFor<T>, notary_id: NotaryId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let notary_operator = T::NotaryProvider::notary_operator_account_id(notary_id)

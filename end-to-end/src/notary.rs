@@ -1,7 +1,6 @@
 use crate::utils::create_active_notary_with_archive_bucket;
-use argon_client::{
-	api::runtime_types::argon_notary_audit::error::VerifyError, conversion::SubxtRuntime,
-};
+use argon_client::conversion::SubxtRuntime;
+use argon_notary_audit::VerifyError;
 use argon_primitives::ArgonDigests;
 use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
 use serial_test::serial;

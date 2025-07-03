@@ -32,6 +32,12 @@ impl_opaque_keys! {
 	pub struct SessionKeys {
 	pub grandpa: Grandpa,
 	pub block_seal_authority: MiningSlot,
+	// NOTE: if you add a key, you must also update the `max_encoded_len` method
+	}
+}
+impl MaxEncodedLen for SessionKeys {
+	fn max_encoded_len() -> usize {
+		GrandpaId::max_encoded_len() + BlockSealAuthorityId::max_encoded_len()
 	}
 }
 
@@ -181,7 +187,7 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type NotebookProvider = Notebook;
 	type TickProvider = Ticks;
-	type WeightInfo = pallet_block_seal_spec::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
 	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
 	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
@@ -198,7 +204,7 @@ impl Get<Tick> for NotebookTickProvider {
 
 impl pallet_block_rewards::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_block_rewards::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
@@ -224,7 +230,7 @@ impl pallet_block_rewards::Config for Runtime {
 
 impl pallet_domains::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_domains::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type DomainExpirationTicks = DomainExpirationTicks;
 	type NotebookTick = NotebookTickProvider;
 	type HistoricalPaymentAddressTicksToKeep = HistoricalPaymentAddressTicksToKeep;
@@ -237,7 +243,7 @@ impl pallet_authorship::Config for Runtime {
 
 impl pallet_digests::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_digests::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type NotebookVerifyError = NotebookVerifyError;
 }
 
@@ -270,7 +276,7 @@ impl Get<FrameId> for GetCurrentFrameId {
 
 impl pallet_vaults::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_vaults::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -287,7 +293,7 @@ pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bitcoin_locks::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bitcoin_locks::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -351,7 +357,7 @@ parameter_types! {
 
 impl pallet_liquidity_pools::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_liquidity_pools::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -366,7 +372,7 @@ impl pallet_liquidity_pools::Config for Runtime {
 
 impl pallet_mining_slot::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mining_slot::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
@@ -391,7 +397,7 @@ impl pallet_mining_slot::Config for Runtime {
 
 impl pallet_block_seal::Config for Runtime {
 	type AuthorityId = BlockSealAuthorityId;
-	type WeightInfo = pallet_block_seal::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type AuthorityProvider = MiningSlot;
 	type NotebookProvider = Notebook;
 	type BlockSealSpecProvider = BlockSealSpec;
@@ -413,7 +419,7 @@ impl pallet_grandpa::Config for Runtime {
 
 impl pallet_chain_transfer::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_chain_transfer::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;
 	type NotebookProvider = Notebook;
@@ -426,7 +432,7 @@ impl pallet_chain_transfer::Config for Runtime {
 
 impl pallet_notebook::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_notebook::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
 	type NotaryProvider = Notaries;
 	type ChainTransferLookup = ChainTransfer;
@@ -437,7 +443,7 @@ impl pallet_notebook::Config for Runtime {
 
 impl pallet_notaries::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_notaries::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
@@ -494,7 +500,7 @@ impl pallet_proxy::Config for Runtime {
 
 impl pallet_price_index::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_price_index::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
@@ -505,7 +511,7 @@ impl pallet_price_index::Config for Runtime {
 
 impl pallet_bitcoin_utxos::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_bitcoin_utxos::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type EventHandler = BitcoinLocks;
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
@@ -513,7 +519,7 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 
 impl pallet_mint::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_mint::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	type Currency = Balances;
 	type PriceProvider = PriceIndex;
 	type Balance = Balance;

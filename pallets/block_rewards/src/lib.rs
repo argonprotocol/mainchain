@@ -18,7 +18,7 @@ pub mod weights;
 /// (Incremental increase per block, blocks between increments, max value)
 pub type GrowthPath<Balance> = (Balance, Tick, Balance);
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use core::any::TypeId;
 	use frame_support::traits::fungible::{InspectFreeze, Mutate, MutateFreeze};
@@ -277,7 +277,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::set_block_rewards_paused())]
 		pub fn set_block_rewards_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
 			ensure_root(origin)?;
 			<BlockRewardsPaused<T>>::set(paused);

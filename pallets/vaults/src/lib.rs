@@ -23,7 +23,7 @@ pub mod weights;
 /// A vault can create liquidity pools up to 2x the locked securitization used for Bitcoin. This
 /// added securitization is locked up for the duration of the bitcoin locks, and will be taken in
 /// the case of bitcoins not being cosigned on release.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeSet;
@@ -350,7 +350,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::create())]
 		pub fn create(
 			origin: OriginFor<T>,
 			vault_config: VaultConfig<T::Balance>,
@@ -419,7 +419,7 @@ pub mod pallet {
 		/// funds in this vault as bitcoin locks are released. To stop issuing any more bitcoin
 		/// locks, use the `close` api.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::modify_funding())]
 		pub fn modify_funding(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -471,7 +471,7 @@ pub mod pallet {
 		/// Change the terms of this vault. The change will be applied at the next mining slot
 		/// change that is at least `MinTermsModificationBlockDelay` blocks away.
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::modify_terms())]
 		pub fn modify_terms(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -507,7 +507,7 @@ pub mod pallet {
 		/// Stop offering additional bitcoin locks from this vault. Will not affect existing
 		/// locks. As funds are returned, they will be released to the vault owner.
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::close())]
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -536,7 +536,7 @@ pub mod pallet {
 		/// but will be used for any locks after this point. Will be rejected if already
 		/// used.
 		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::replace_bitcoin_xpub())]
 		pub fn replace_bitcoin_xpub(
 			origin: OriginFor<T>,
 			vault_id: VaultId,

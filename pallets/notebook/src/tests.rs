@@ -33,19 +33,21 @@ fn notebook_digest(
 	books: Vec<(NotaryId, NotebookNumber, Tick, bool)>,
 ) -> NotebookDigest<VerifyError> {
 	NotebookDigest {
-		notebooks: books
-			.into_iter()
-			.map(|(notary_id, notebook_number, tick, has_error)| NotebookAuditResult {
-				notebook_number,
-				notary_id,
-				tick,
-				audit_first_failure: if has_error {
-					Some(VerifyError::InvalidBlockVoteRoot)
-				} else {
-					None
-				},
-			})
-			.collect(),
+		notebooks: BoundedVec::truncate_from(
+			books
+				.into_iter()
+				.map(|(notary_id, notebook_number, tick, has_error)| NotebookAuditResult {
+					notebook_number,
+					notary_id,
+					tick,
+					audit_first_failure: if has_error {
+						Some(VerifyError::InvalidBlockVoteRoot)
+					} else {
+						None
+					},
+				})
+				.collect(),
+		),
 	}
 }
 
@@ -809,12 +811,12 @@ fn it_handles_bad_secrets() {
 					header.tick,
 					header.hash(),
 					&NotebookDigest {
-						notebooks: vec![NotebookAuditResult {
+						notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult {
 							notary_id: 1,
 							notebook_number: header.notebook_number,
 							tick: header.tick,
 							audit_first_failure: None
-						}]
+						}])
 					},
 					header.parent_secret
 				)

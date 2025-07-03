@@ -1,13 +1,48 @@
-use alloc::string::String;
-use argon_primitives::{AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT, tick::Tick};
-use codec::{Decode, DecodeWithMemTracking, Encode};
+use crate::AccountHistoryLookupError;
+use alloc::{string::String, vec::Vec};
+use argon_primitives::{
+	AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
+	prelude::{frame_support::BoundedVec, sp_core::ConstU32},
+	tick::Tick,
+};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use core::fmt::Display;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
 use sp_runtime::scale_info::TypeInfo;
 use thiserror::Error;
 
-use crate::AccountHistoryLookupError;
+#[derive(
+	Debug,
+	PartialEq,
+	Clone,
+	TypeInfo,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Serialize,
+	Deserialize,
+	MaxEncodedLen,
+)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct MaxLengthString(pub BoundedVec<u8, ConstU32<100>>);
+
+impl Display for MaxLengthString {
+	fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+		let str_value = String::from_utf8(self.0.clone().into_inner()).unwrap_or_default();
+		write!(f, "{}", str_value)
+	}
+}
+
+impl TryFrom<String> for MaxLengthString {
+	type Error = Vec<u8>;
+	fn try_from(s: String) -> Result<Self, Self::Error> {
+		let vec = BoundedVec::try_from(s.into_bytes())?;
+		Ok(Self(vec))
+	}
+}
 
 #[derive(
 	Debug,
@@ -20,6 +55,7 @@ use crate::AccountHistoryLookupError;
 	DecodeWithMemTracking,
 	Serialize,
 	Deserialize,
+	MaxEncodedLen,
 )]
 pub enum VerifyError {
 	#[error("Missing account origin {account_id:?}, {account_type:?}")]
@@ -58,8 +94,8 @@ pub enum VerifyError {
 	#[error("Some notes with restricted recipients did not balance to zero.")]
 	InvalidNoteRecipients,
 
-	#[error("An invalid balance change was submitted (#{change_index}.{note_index}): {message:?}")]
-	BalanceChangeError { change_index: u16, note_index: u16, message: String },
+	#[error("An invalid balance change was submitted (#{change_index}.{note_index}): {message}")]
+	BalanceChangeError { change_index: u16, note_index: u16, message: MaxLengthString },
 
 	#[error("Invalid net balance changeset. Must account for all funds.")]
 	InvalidNetBalanceChangeset,

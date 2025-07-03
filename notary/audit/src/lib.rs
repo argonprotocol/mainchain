@@ -1,12 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+extern crate core;
 
 use alloc::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
 use binary_merkle_tree::{Leaf, merkle_root, verify_proof};
-use codec::{Decode, DecodeWithMemTracking, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::H256;
@@ -42,6 +43,7 @@ mod test_notebook;
 	Serialize,
 	Deserialize,
 	thiserror::Error,
+	MaxEncodedLen,
 )]
 pub enum AccountHistoryLookupError {
 	#[error("Notebook root not found")]

@@ -149,6 +149,11 @@ impl_opaque_keys! {
 		pub dummy: UintAuthorityId,
 	}
 }
+impl MaxEncodedLen for MockSessionKeys {
+	fn max_encoded_len() -> usize {
+		<UintAuthorityId as MaxEncodedLen>::max_encoded_len()
+	}
+}
 
 impl Get<UintAuthorityId> for MockSessionKeys {
 	fn get() -> UintAuthorityId {

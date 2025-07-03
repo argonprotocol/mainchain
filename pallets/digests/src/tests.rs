@@ -29,12 +29,12 @@ fn it_disallows_duplicates() {
 			tick: TickDigest(2),
 			fork_power: None,
 			notebooks: NotebookDigest {
-				notebooks: vec![NotebookAuditResult::<VerifyError> {
+				notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult::<VerifyError> {
 					notary_id: 1,
 					notebook_number: 1,
 					tick: 1,
 					audit_first_failure: None,
-				}],
+				}]),
 			},
 		}
 		.create_pre_runtime_digest();
@@ -57,12 +57,12 @@ fn it_should_read_and_clear_the_digests() {
 			fork_power: None,
 			tick: TickDigest(2),
 			notebooks: NotebookDigest::<VerifyError> {
-				notebooks: vec![NotebookAuditResult {
+				notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult {
 					notary_id: 1,
 					notebook_number: 1,
 					tick: 1,
 					audit_first_failure: Some(VerifyError::InvalidSecretProvided),
-				}],
+				}]),
 			},
 		}
 		.create_pre_runtime_digest();

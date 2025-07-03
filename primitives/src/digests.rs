@@ -5,7 +5,7 @@ use crate::{
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, MaxEncodedLen};
 use frame_support_procedural::DefaultNoBound;
-use polkadot_sdk::*;
+use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedVec, *};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{RuntimeDebug, U256, ed25519::Signature};
@@ -93,8 +93,8 @@ pub enum DecodeDigestError {
 
 impl<NV, AC> TryFrom<Digest> for Digestset<NV, AC>
 where
-	NV: Codec + Clone,
-	AC: Codec + Clone,
+	NV: Codec + Clone + MaxEncodedLen,
+	AC: Codec + Clone + MaxEncodedLen,
 {
 	type Error = DecodeDigestError;
 
@@ -143,7 +143,9 @@ pub trait ArgonDigests {
 	fn as_tick(&self) -> Option<TickDigest>;
 	fn as_author<AC: Codec>(&self) -> Option<AC>;
 	fn as_block_vote(&self) -> Option<BlockVoteDigest>;
-	fn as_notebooks<VerifyError: Codec>(&self) -> Option<NotebookDigest<VerifyError>>;
+	fn as_notebooks<VerifyError: Codec + MaxEncodedLen>(
+		&self,
+	) -> Option<NotebookDigest<VerifyError>>;
 	fn as_parent_voting_key(&self) -> Option<ParentVotingKeyDigest>;
 	fn as_fork_power(&self) -> Option<ForkPower>;
 	fn as_block_seal(&self) -> Option<BlockSealDigest>;
@@ -171,7 +173,9 @@ impl ArgonDigests for DigestItem {
 		None
 	}
 
-	fn as_notebooks<VerifyError: Codec>(&self) -> Option<NotebookDigest<VerifyError>> {
+	fn as_notebooks<VerifyError: Codec + MaxEncodedLen>(
+		&self,
+	) -> Option<NotebookDigest<VerifyError>> {
 		if let DigestItem::PreRuntime(NOTEBOOKS_DIGEST_ID, value) = self {
 			return NotebookDigest::<VerifyError>::decode(&mut &value[..]).ok()
 		}
@@ -254,6 +258,7 @@ pub struct BlockVoteDigest {
 	Serialize,
 	Deserialize,
 	DefaultNoBound,
+	MaxEncodedLen,
 )]
 pub struct ParentVotingKeyDigest {
 	pub parent_voting_key: Option<VotingKey>,
@@ -270,9 +275,10 @@ pub struct ParentVotingKeyDigest {
 	Serialize,
 	Deserialize,
 	DefaultNoBound,
+	MaxEncodedLen,
 )]
-pub struct NotebookDigest<VerifyError: Codec> {
-	pub notebooks: Vec<NotebookAuditResult<VerifyError>>,
+pub struct NotebookDigest<VerifyError: Codec + MaxEncodedLen> {
+	pub notebooks: BoundedVec<NotebookAuditResult<VerifyError>, ConstU32<256>>,
 }
 
 #[derive(
@@ -287,14 +293,18 @@ pub struct NotebookDigest<VerifyError: Codec> {
 	Deserialize,
 	DefaultNoBound,
 )]
-pub struct NotebookHeaderData<VerifyError: Codec> {
+pub struct NotebookHeaderData<VerifyError: Codec + MaxEncodedLen> {
 	pub signed_headers: Vec<SignedHeaderBytes>,
 	pub notebook_digest: NotebookDigest<VerifyError>,
 	pub vote_digest: BlockVoteDigest,
 }
 
-#[derive(Clone, Encode, Decode, TypeInfo)]
-pub struct Digestset<NotebookVerifyError: Codec + Clone, AccountId: Codec + Clone> {
+#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen)]
+pub struct Digestset<NotebookVerifyError, AccountId>
+where
+	NotebookVerifyError: Codec + Clone + MaxEncodedLen,
+	AccountId: Codec + Clone + MaxEncodedLen,
+{
 	pub author: AccountId,
 	pub block_vote: BlockVoteDigest,
 	// this is optional because it is generated in the runtime, so will not be available in a newly
@@ -307,7 +317,11 @@ pub struct Digestset<NotebookVerifyError: Codec + Clone, AccountId: Codec + Clon
 	pub notebooks: NotebookDigest<NotebookVerifyError>,
 }
 
-impl<N: Codec + Clone, AC: Codec + Clone> Digestset<N, AC> {
+impl<N, AC> Digestset<N, AC>
+where
+	N: Codec + Clone + MaxEncodedLen,
+	AC: Codec + Clone + MaxEncodedLen,
+{
 	pub fn create_pre_runtime_digest(&self) -> Digest {
 		Digest {
 			logs: vec![

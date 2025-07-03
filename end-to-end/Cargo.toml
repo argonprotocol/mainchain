@@ -23,6 +23,7 @@ argon-client = { workspace = true }
 argon-testing = { workspace = true }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-bitcoin-utxo-tracker = { workspace = true }
+argon-notary-audit = { workspace = true }
 argon-bitcoin = { workspace = true }
 bitcoincore-rpc = { workspace = true }
 hex = { workspace = true }

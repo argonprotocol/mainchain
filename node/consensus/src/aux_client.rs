@@ -272,12 +272,16 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 
 			notebook_count += 1;
 			headers.signed_headers.push(notebook.raw_signed_header.clone());
-			headers.notebook_digest.notebooks.push(NotebookAuditResult {
+			let res = headers.notebook_digest.notebooks.try_push(NotebookAuditResult {
 				notary_id,
 				notebook_number: notebook.notebook_number,
 				tick,
 				audit_first_failure: notebook.audit_first_failure.clone(),
 			});
+			// if we can't push more notebooks, we stop
+			if res.is_err() {
+				break;
+			}
 
 			if headers.signed_headers.len() >= max_notebooks as usize {
 				break;

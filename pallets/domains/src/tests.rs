@@ -114,7 +114,9 @@ fn it_registers_zone_records() {
 					host: "wss://127.0.0.1:8080".into(),
 					datastore_id: BoundedVec::truncate_from(b"test".to_vec()),
 				},
-			)]),
+			)])
+			.try_into()
+			.unwrap(),
 		};
 
 		assert_ok!(DomainPallet::set_zone_record(

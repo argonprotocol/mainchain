@@ -1,16 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+use argon_primitives::{NotebookEventHandler, notebook::NotebookHeader};
 pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
 
 #[cfg(test)]
 mod mock;
-
 #[cfg(test)]
 mod tests;
-
 pub mod weights;
 
 ///
@@ -20,12 +19,9 @@ pub mod weights;
 /// host addresses where it can be accessed.
 ///
 /// If more than one domain registration is received in a tick, they are canceled out.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
-	use argon_primitives::{
-		DomainHash, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES, NotebookEventHandler, ZoneRecord,
-		notebook::NotebookHeader,
-	};
+	use argon_primitives::{DomainHash, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES, ZoneRecord};
 	use sp_core::crypto::AccountId32;
 
 	use super::*;
@@ -50,7 +46,7 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type RegisteredDomains<T: Config> =
+	pub type RegisteredDomains<T: Config> =
 		StorageMap<_, Blake2_128Concat, DomainHash, DomainRegistrationOf<T>, OptionQuery>;
 	#[pallet::storage]
 	pub(super) type ZoneRecordsByDomain<T: Config> =
@@ -123,7 +119,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::set_zone_record())]
 		pub fn set_zone_record(
 			origin: OriginFor<T>,
 			domain_hash: DomainHash,
@@ -217,8 +213,21 @@ pub mod pallet {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
-pub struct DomainRegistration<AccountId> {
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct DomainRegistration<AccountId>
+where
+	AccountId: MaxEncodedLen,
+{
 	pub account_id: AccountId,
 	pub registered_at_tick: Tick,
 }

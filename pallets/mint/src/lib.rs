@@ -14,7 +14,7 @@ mod tests;
 
 pub mod weights;
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use pallet_prelude::*;
 
@@ -383,17 +383,29 @@ pub mod pallet {
 		}
 	}
 
-	#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
+	#[derive(
+		Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+	)]
 	pub enum MintType {
 		Bitcoin,
 		Mining,
 	}
+
 	#[derive(
-		Debug, Clone, PartialEq, Eq, Encode, Default, Decode, DecodeWithMemTracking, TypeInfo,
+		Debug,
+		Clone,
+		PartialEq,
+		Eq,
+		Encode,
+		Default,
+		Decode,
+		DecodeWithMemTracking,
+		TypeInfo,
+		MaxEncodedLen,
 	)]
 	pub struct MintAction<B>
 	where
-		B: Codec,
+		B: Codec + MaxEncodedLen,
 	{
 		pub argon_burned: B,
 		pub argon_minted: B,

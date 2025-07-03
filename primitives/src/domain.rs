@@ -1,7 +1,4 @@
-use alloc::{
-	collections::btree_map::BTreeMap,
-	string::{String, ToString},
-};
+use alloc::string::{String, ToString};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::{cmp::Ordering, str};
 use polkadot_sdk::*;
@@ -109,6 +106,7 @@ impl Domain {
 	TypeInfo,
 	Serialize,
 	Deserialize,
+	MaxEncodedLen,
 )]
 #[serde(rename_all = "camelCase")]
 /// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
@@ -120,7 +118,7 @@ where
 	/// The notary that payments must be notarized through
 	pub notary_id: NotaryId,
 	/// A mapping of versions to host addresses.
-	pub versions: BTreeMap<Semver, VersionHost>,
+	pub versions: BoundedBTreeMap<Semver, VersionHost, ConstU32<500>>,
 }
 
 #[derive(

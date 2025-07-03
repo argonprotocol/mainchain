@@ -186,9 +186,8 @@ impl CosignScript {
 			let descriptor = policy
 				.compile_to_descriptor::<Segwitv0>(DescriptorCtx::Wsh)
 				.map_err(|_| BitcoinError::InvalidPolicy)?;
-			#[cfg(debug_assertions)]
+			#[cfg(all(debug_assertions, feature = "std"))]
 			if let Descriptor::Wsh(ref wsh) = descriptor {
-				#[cfg(debug_assertions)]
 				println!("Miniscript: {}", wsh);
 			}
 

@@ -233,7 +233,7 @@ impl MainchainClient {
       }
     };
     let mut versions = HashMap::new();
-    for (version, host) in zone_record.versions {
+    for (version, host) in zone_record.versions.0 {
       let datastore_id = match String::from_utf8(host.datastore_id.0) {
         Ok(s) => s,
         Err(_) => {
