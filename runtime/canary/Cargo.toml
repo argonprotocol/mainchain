@@ -55,6 +55,7 @@ polkadot-sdk.features = [
     "pallet-transaction-payment-rpc-runtime-api",
 ]
 sp-debug-derive = { workspace = true, features = ["force-debug"] }
+frame-benchmarking = { workspace = true, optional = true }
 
 pallet-token-gateway = { workspace = true }
 pallet-ismp = { workspace = true, features = ["unsigned"] }
@@ -87,6 +88,7 @@ argon-runtime-common = { workspace = true, default-features = false }
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
 
+
 [features]
 default = [ "std" ]
 std = [
@@ -94,6 +96,7 @@ std = [
 	"argon-primitives/std",
 	"argon-runtime-common/std",
 	"codec/std",
+	"frame-benchmarking/std",
 	"ismp-grandpa/std",
 	"ismp/std",
 	"log/std",
@@ -124,7 +127,9 @@ std = [
 	"substrate-wasm-builder",
 ]
 runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
 	"argon-runtime-common/runtime-benchmarks",
+	"frame-benchmarking/runtime-benchmarks",
 	"ismp-grandpa/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
@@ -144,6 +149,7 @@ runtime-benchmarks = [
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
+	"polkadot-sdk/frame-system-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [

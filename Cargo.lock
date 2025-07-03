@@ -929,6 +929,7 @@ dependencies = [
  "anyhow",
  "argon-primitives",
  "argon-runtime-common",
+ "frame-benchmarking",
  "ismp",
  "ismp-grandpa",
  "log",
@@ -1265,6 +1266,7 @@ dependencies = [
  "anyhow",
  "argon-primitives",
  "argon-runtime-common",
+ "frame-benchmarking",
  "ismp",
  "ismp-grandpa",
  "log",
@@ -1303,6 +1305,7 @@ version = "1.2.0"
 dependencies = [
  "anyhow",
  "argon-primitives",
+ "frame-benchmarking",
  "ismp",
  "ismp-grandpa",
  "log",

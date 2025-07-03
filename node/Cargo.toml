@@ -58,7 +58,6 @@ polkadot-sdk.features = [
     "sp-keystore",
     "sp-keyring",
     "frame-system",
-    "frame-benchmarking-cli",
     "pallet-transaction-payment",
     "sp-api",
     "sc-rpc",
@@ -97,6 +96,7 @@ default = []
 # Dependencies that are only required if runtime benchmarking should be built
 runtime-benchmarks = [
 	"argon-canary-runtime/runtime-benchmarks",
+	"argon-primitives/runtime-benchmarks",
 	"argon-runtime/runtime-benchmarks",
 	"polkadot-sdk/runtime-benchmarks",
 ]

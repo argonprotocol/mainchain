@@ -83,6 +83,8 @@ pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
 argon-primitives = { workspace = true }
 
+frame-benchmarking = { workspace = true, optional = true }
+
 [features]
 default = [ "std" ]
 canary = []
@@ -90,6 +92,7 @@ std = [
 	"anyhow/std",
 	"argon-primitives/std",
 	"codec/std",
+	"frame-benchmarking/std",
 	"ismp-grandpa/std",
 	"ismp/std",
 	"log/std",
@@ -119,6 +122,8 @@ std = [
 	"sp-debug-derive/std",
 ]
 runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"frame-benchmarking/runtime-benchmarks",
 	"ismp-grandpa/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
@@ -138,6 +143,7 @@ runtime-benchmarks = [
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
+	"polkadot-sdk/frame-system-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [

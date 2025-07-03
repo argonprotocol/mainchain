@@ -39,6 +39,7 @@ std = [
 	"scale-info/std",
 ]
 runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]

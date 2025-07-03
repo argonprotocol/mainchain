@@ -6,7 +6,6 @@ use crate::{
 	service::{FullClient, new_partial},
 };
 use argon_primitives::prelude::sp_api::ConstructRuntimeApi;
-use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use polkadot_sdk::{sc_service::TaskManager, *};
 use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
@@ -132,61 +131,6 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::PurgeChain(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run(config.database))
-		},
-		Some(Subcommand::Benchmark(cmd)) => {
-			let runner = cli.create_runner(cmd)?;
-			// Switch on the concrete benchmark sub-command-variant.
-			match cmd {
-				BenchmarkCmd::Pallet(cmd) =>
-					if cfg!(feature = "runtime-benchmarks") {
-						runner.sync_run(|config| {
-							cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, ()>(Some(
-								config.chain_spec,
-							))
-						})
-					} else {
-						Err("Benchmarking wasn't enabled when building the node. \
-					You can enable it with `--features runtime-benchmarks`."
-							.into())
-					},
-				BenchmarkCmd::Block(cmd) => runner.sync_run(|config| {
-					let mining_config = MiningConfig::new(&cli);
-					if config.chain_spec.is_canary() {
-						let partials = new_partial::<CanaryRuntimeApi>(&config, &mining_config)?;
-						cmd.run(partials.client)
-					} else {
-						let partials = new_partial::<ArgonRuntimeApi>(&config, &mining_config)?;
-						cmd.run(partials.client)
-					}
-				}),
-				#[cfg(not(feature = "runtime-benchmarks"))]
-				BenchmarkCmd::Storage(_) => Err(Error::Input(
-					"Compile with --features=runtime-benchmarks \
-						to enable storage benchmarks."
-						.into(),
-				)),
-				#[cfg(feature = "runtime-benchmarks")]
-				BenchmarkCmd::Storage(cmd) => runner.sync_run(|config| {
-					let mining_config = cli.into();
-					if config.chain_spec.is_canary() {
-						let partials = new_partial::<CanaryRuntimeApi>(&config, &mining_config)?;
-						let db = partials.backend.expose_db();
-						let storage = partials.backend.expose_storage();
-						cmd.run(config, partials.client.clone(), db, storage)
-					} else {
-						let partials = new_partial::<ArgonRuntimeApi>(&config, &mining_config)?;
-						let db = partials.backend.expose_db();
-						let storage = partials.backend.expose_storage();
-						cmd.run(config, partials.client.clone(), db, storage)
-					}
-				}),
-				BenchmarkCmd::Machine(cmd) =>
-					runner.sync_run(|config| cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())),
-				// NOTE: this allows the Client to leniently implement
-				// new benchmark commands without requiring a companion MR.
-				#[allow(unreachable_patterns)]
-				_ => Err("Benchmarking sub-command unsupported".into()),
-			}
 		},
 		Some(Subcommand::ChainInfo(cmd)) => {
 			let runner = cli.create_runner(cmd)?;

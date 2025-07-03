@@ -22,3 +22,7 @@ env_logger = { workspace = true, optional = true }
 default = [ "std" ]
 test = [ "dep:env_logger", "polkadot-sdk/sp-keyring", "std" ]
 std = [ "argon-primitives/std", "codec/std", "log/std", "polkadot-sdk/std" ]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"polkadot-sdk/runtime-benchmarks",
+]
