@@ -100,22 +100,22 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type NextVaultId<T: Config> = StorageValue<_, VaultId, OptionQuery>;
+	pub type NextVaultId<T: Config> = StorageValue<_, VaultId, OptionQuery>;
 
 	/// Vaults by id
 	#[pallet::storage]
-	pub(super) type VaultsById<T: Config> =
+	pub type VaultsById<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, Vault<T::AccountId, T::Balance>, OptionQuery>;
 
 	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
-	pub(super) type VaultXPubById<T: Config> =
+	pub type VaultXPubById<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, (BitcoinXPub, u32), OptionQuery>;
 
 	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
 	/// change away)
 	#[pallet::storage]
-	pub(super) type PendingTermsModificationsByTick<T: Config> = StorageMap<
+	pub type PendingTermsModificationsByTick<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		Tick,
@@ -125,7 +125,7 @@ pub mod pallet {
 
 	/// The vaults that have funds releasing at a given bitcoin height
 	#[pallet::storage]
-	pub(super) type VaultFundsReleasingByHeight<T: Config> = StorageMap<
+	pub type VaultFundsReleasingByHeight<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BitcoinHeight,
@@ -137,7 +137,7 @@ pub mod pallet {
 	/// "mining day" in Argon). The total revenue for a vault includes Liquidity Pools, of which the
 	/// associated data can be found in that pallet.
 	#[pallet::storage]
-	pub(super) type PerFrameFeeRevenueByVault<T: Config> = StorageMap<
+	pub type PerFrameFeeRevenueByVault<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		VaultId,

@@ -73,10 +73,10 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type NextNotaryId<T: Config> = StorageValue<_, u32, OptionQuery>;
+	pub type NextNotaryId<T: Config> = StorageValue<_, u32, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type ProposedNotaries<T: Config> = StorageMap<
+	pub type ProposedNotaries<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		T::AccountId,
@@ -85,7 +85,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type ExpiringProposals<T: Config> = StorageMap<
+	pub type ExpiringProposals<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
@@ -95,11 +95,11 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn notaries)]
-	pub(super) type ActiveNotaries<T: Config> =
+	pub type ActiveNotaries<T: Config> =
 		StorageValue<_, BoundedVec<NotaryRecordOf<T>, T::MaxActiveNotaries>, ValueQuery>;
 
 	#[pallet::storage]
-	pub(super) type NotaryKeyHistory<T: Config> = StorageMap<
+	pub type NotaryKeyHistory<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		NotaryId,
@@ -109,7 +109,7 @@ pub mod pallet {
 
 	/// Metadata changes to be activated at the given tick
 	#[pallet::storage]
-	pub(super) type QueuedNotaryMetaChanges<T: Config> = StorageMap<
+	pub type QueuedNotaryMetaChanges<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		Tick,

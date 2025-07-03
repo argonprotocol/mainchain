@@ -66,7 +66,7 @@ pub mod pallet {
 	/// a) CPI >= 0 and
 	/// b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining
 	#[pallet::storage]
-	pub(super) type PendingMintUtxos<T: Config> = StorageValue<
+	pub type PendingMintUtxos<T: Config> = StorageValue<
 		_,
 		BoundedVec<(UtxoId, T::AccountId, T::Balance), T::MaxPendingMintUtxos>,
 		ValueQuery,
@@ -74,22 +74,22 @@ pub mod pallet {
 
 	/// The total amount of argons minted for mining
 	#[pallet::storage]
-	pub(super) type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+	pub type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
 	/// The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
 	#[pallet::storage]
-	pub(super) type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+	pub type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
 
 	/// The amount of argons minted per mining cohort (ie, grouped by starting frame id)
 	#[pallet::storage]
-	pub(super) type MiningMintPerCohort<T: Config> = StorageValue<
+	pub type MiningMintPerCohort<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<FrameId, T::Balance, T::MaxMintHistoryToMaintain>,
 		ValueQuery,
 	>;
 
 	#[pallet::storage]
-	pub(super) type BlockMintAction<T> =
+	pub type BlockMintAction<T> =
 		StorageValue<_, (BlockNumberFor<T>, MintAction<<T as Config>::Balance>), ValueQuery>;
 
 	#[pallet::event]

@@ -124,7 +124,7 @@ pub mod pallet {
 
 	/// Historical payouts by block number
 	#[pallet::storage]
-	pub(super) type PayoutsByBlock<T: Config> = StorageMap<
+	pub type PayoutsByBlock<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		BlockNumberFor<T>,
@@ -134,17 +134,17 @@ pub mod pallet {
 
 	/// Bool if block rewards are paused
 	#[pallet::storage]
-	pub(super) type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// The cohort block rewards by mining cohort (ie, with the same starting frame id)
 	#[pallet::storage]
-	pub(super) type BlockRewardsByCohort<T: Config> =
+	pub type BlockRewardsByCohort<T: Config> =
 		StorageValue<_, BoundedVec<(FrameId, T::Balance), T::CohortBlockRewardsToKeep>, ValueQuery>;
 
 	/// The current scaled block rewards. It will adjust based on the argon movement away from price
 	/// target
 	#[pallet::storage]
-	pub(super) type ArgonsPerBlock<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub type ArgonsPerBlock<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]

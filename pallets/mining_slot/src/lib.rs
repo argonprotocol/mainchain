@@ -172,11 +172,11 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type HasAddedGrandpaRotation<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type HasAddedGrandpaRotation<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// Miners that are active in the current block (post initialize) by their starting frame
 	#[pallet::storage]
-	pub(super) type MinersByCohort<T: Config> = StorageMap<
+	pub type MinersByCohort<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		FrameId,
@@ -185,12 +185,12 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
+	pub type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
 	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
 	/// id and the block hash at time of activation.
 	#[pallet::storage]
-	pub(super) type MinerXorKeysByCohort<T: Config> = StorageValue<
+	pub type MinerXorKeysByCohort<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<FrameId, BoundedVec<U256, T::MaxCohortSize>, T::FramesPerMiningTerm>,
 		ValueQuery,
@@ -198,22 +198,22 @@ pub mod pallet {
 
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
-	pub(super) type ArgonotsPerMiningSeat<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub type ArgonotsPerMiningSeat<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	/// Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
 	#[pallet::storage]
-	pub(super) type AccountIndexLookup<T: Config> =
+	pub type AccountIndexLookup<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, MinerIndex, OptionQuery>;
 
 	/// The cohort set to go into effect in the next slot. The Vec has all
 	/// registrants with their bid amount
 	#[pallet::storage]
-	pub(super) type BidsForNextSlotCohort<T: Config> =
+	pub type BidsForNextSlotCohort<T: Config> =
 		StorageValue<_, BoundedVec<Registration<T>, T::MaxCohortSize>, ValueQuery>;
 
 	/// The miners released in the last block (only kept for a single block)
 	#[pallet::storage]
-	pub(super) type ReleasedMinersByAccountId<T: Config> = StorageValue<
+	pub type ReleasedMinersByAccountId<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<T::AccountId, Registration<T>, T::MaxCohortSize>,
 		ValueQuery,
@@ -221,38 +221,38 @@ pub mod pallet {
 
 	/// Is the next slot still open for bids
 	#[pallet::storage]
-	pub(super) type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
-	pub(super) type HistoricalBidsPerSlot<T: Config> =
+	pub type HistoricalBidsPerSlot<T: Config> =
 		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
 
 	/// The average price per seat for the last 10 frames (newest first)
 	#[pallet::storage]
-	pub(super) type AveragePricePerSeat<T: Config> =
+	pub type AveragePricePerSeat<T: Config> =
 		StorageValue<_, BoundedVec<T::Balance, ConstU32<10>>, ValueQuery>;
 
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
-	pub(super) type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
+	pub type MiningConfig<T: Config> = StorageValue<_, MiningSlotConfig, ValueQuery>;
 
 	/// The next frameId. A frame in argon is the 24 hours between the start of two different mining
 	/// cohorts.
 	#[pallet::storage]
-	pub(super) type NextFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
+	pub type NextFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
 
 	/// The number of allow miners to bid for the next mining cohort
 	#[pallet::storage]
-	pub(super) type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
+	pub type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	/// Did this block activate a new frame
 	#[pallet::storage]
-	pub(super) type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// The previous 10 frame start block numbers
 	#[pallet::storage]
-	pub(super) type FrameStartBlockNumbers<T: Config> =
+	pub type FrameStartBlockNumbers<T: Config> =
 		StorageValue<_, BoundedVec<BlockNumberFor<T>, ConstU32<10>>, ValueQuery>;
 
 	#[pallet::genesis_config]

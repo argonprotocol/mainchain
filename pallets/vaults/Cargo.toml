@@ -42,6 +42,7 @@ std = [
 	"tracing/std",
 ]
 runtime-benchmarks = [
+	"pallet-prelude/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]

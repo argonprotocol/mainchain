@@ -49,16 +49,15 @@ pub mod pallet {
 	/// Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
 	/// the expiration block, the funds are burned and the UTXO is unlocked.
 	#[pallet::storage]
-	pub(super) type LockedUtxos<T: Config> =
+	pub type LockedUtxos<T: Config> =
 		StorageMap<_, Blake2_128Concat, UtxoRef, UtxoValue, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type UtxoIdToRef<T: Config> =
-		StorageMap<_, Twox64Concat, UtxoId, UtxoRef, OptionQuery>;
+	pub type UtxoIdToRef<T: Config> = StorageMap<_, Twox64Concat, UtxoId, UtxoRef, OptionQuery>;
 
 	/// Bitcoin UTXOs that have been submitted for ownership confirmation
 	#[pallet::storage]
-	pub(super) type UtxosPendingConfirmation<T: Config> = StorageValue<
+	pub type UtxosPendingConfirmation<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
 		ValueQuery,
@@ -66,36 +65,35 @@ pub mod pallet {
 
 	/// The genesis set bitcoin network that this chain is tied to
 	#[pallet::storage]
-	pub(super) type BitcoinNetwork<T: Config> =
+	pub type BitcoinNetwork<T: Config> =
 		StorageValue<_, argon_primitives::bitcoin::BitcoinNetwork, ValueQuery>;
 
 	/// An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
 	#[pallet::storage]
-	pub(super) type ConfirmedBitcoinBlockTip<T: Config> =
-		StorageValue<_, BitcoinBlock, OptionQuery>;
+	pub type ConfirmedBitcoinBlockTip<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type PreviousBitcoinBlockTip<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
+	pub type PreviousBitcoinBlockTip<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
 
 	/// Stores if parent block had a confirmed bitcoin block
 	#[pallet::storage]
-	pub(super) type TempParentHasSyncState<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type TempParentHasSyncState<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// The last synched bitcoin block
 	#[pallet::storage]
-	pub(super) type SynchedBitcoinBlock<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
+	pub type SynchedBitcoinBlock<T: Config> = StorageValue<_, BitcoinBlock, OptionQuery>;
 
 	/// Bitcoin Oracle Operator Account
 	#[pallet::storage]
-	pub(super) type OracleOperatorAccount<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
+	pub type OracleOperatorAccount<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
 	/// Check if the inherent was included
 	#[pallet::storage]
-	pub(super) type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// Expiration date as a day since unix timestamp mapped to Bitcoin UTXOs
 	#[pallet::storage]
-	pub(super) type LockedUtxoExpirationsByBlock<T: Config> = StorageMap<
+	pub type LockedUtxoExpirationsByBlock<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BitcoinHeight,

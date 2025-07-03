@@ -96,42 +96,42 @@ pub mod pallet {
 	/// The current vote minimum of the chain. Block votes use this minimum to determine the
 	/// minimum amount of tax or compute needed to create a vote. It is adjusted up or down to
 	/// target a max number of votes
-	pub(super) type CurrentVoteMinimum<T: Config> = StorageValue<_, VoteMinimum, ValueQuery>;
+	pub type CurrentVoteMinimum<T: Config> = StorageValue<_, VoteMinimum, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn compute_difficulty)]
 	/// The current vote minimum of the chain. Block votes use this minimum to determine the
 	/// minimum amount of tax or compute needed to create a vote. It is adjusted up or down to
 	/// target a max number of votes
-	pub(super) type CurrentComputeDifficulty<T: Config> = StorageValue<_, u128, ValueQuery>;
+	pub type CurrentComputeDifficulty<T: Config> = StorageValue<_, u128, ValueQuery>;
 
 	/// The key K is selected to be the hash of a block in the blockchain - this block is called
 	/// the 'key block'. For optimal mining and verification performance, the key should
 	/// change every day
 	#[pallet::storage]
-	pub(super) type CurrentComputeKeyBlock<T: Config> =
+	pub type CurrentComputeKeyBlock<T: Config> =
 		StorageValue<_, <T::Block as BlockT>::Hash, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type PastComputeBlockTimes<T: Config> =
+	pub type PastComputeBlockTimes<T: Config> =
 		StorageValue<_, BoundedVec<u64, T::HistoricalComputeBlocksForAverage>, ValueQuery>;
 
 	/// The timestamp from the previous block
 	#[pallet::storage]
-	pub(super) type PreviousBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
+	pub type PreviousBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type TempBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
+	pub type TempBlockTimestamp<T: Config> = StorageValue<_, T::Moment, OptionQuery>;
 
 	const VOTE_MINIMUM_HISTORY_LEN: u32 = 3;
 	/// Keeps the last 3 vote minimums. The first one applies to the current block.
 	#[pallet::storage]
-	pub(super) type VoteMinimumHistory<T: Config> =
+	pub type VoteMinimumHistory<T: Config> =
 		StorageValue<_, BoundedVec<VoteMinimum, ConstU32<VOTE_MINIMUM_HISTORY_LEN>>, ValueQuery>;
 
 	/// Temporary store of any current tick notebooks included in this block (vs tick)
 	#[pallet::storage]
-	pub(super) type TempCurrentTickNotebooksInBlock<T: Config> = StorageValue<
+	pub type TempCurrentTickNotebooksInBlock<T: Config> = StorageValue<
 		_,
 		BoundedVec<NotaryNotebookVoteDigestDetails, T::MaxActiveNotaries>,
 		ValueQuery,
@@ -139,10 +139,10 @@ pub mod pallet {
 
 	/// Temporary store the vote digest
 	#[pallet::storage]
-	pub(super) type TempBlockVoteDigest<T: Config> = StorageValue<_, BlockVoteDigest, OptionQuery>;
+	pub type TempBlockVoteDigest<T: Config> = StorageValue<_, BlockVoteDigest, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type PastBlockVotes<T: Config> = StorageValue<
+	pub type PastBlockVotes<T: Config> = StorageValue<
 		_,
 		BoundedVec<(Tick, u32, BlockVotingPower), T::HistoricalVoteBlocksForAverage>,
 		ValueQuery,

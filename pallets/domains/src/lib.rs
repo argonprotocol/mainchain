@@ -49,11 +49,11 @@ pub mod pallet {
 	pub type RegisteredDomains<T: Config> =
 		StorageMap<_, Blake2_128Concat, DomainHash, DomainRegistrationOf<T>, OptionQuery>;
 	#[pallet::storage]
-	pub(super) type ZoneRecordsByDomain<T: Config> =
+	pub type ZoneRecordsByDomain<T: Config> =
 		StorageMap<_, Blake2_128Concat, DomainHash, ZoneRecord<T::AccountId>, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type ExpiringDomainsByBlock<T: Config> = StorageMap<
+	pub type ExpiringDomainsByBlock<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		Tick,

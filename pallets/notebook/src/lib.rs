@@ -71,7 +71,7 @@ pub mod pallet {
 
 	/// Double storage map of notary id + notebook # to the change root
 	#[pallet::storage]
-	pub(super) type NotebookChangedAccountsRootByNotary<T: Config> = StorageDoubleMap<
+	pub type NotebookChangedAccountsRootByNotary<T: Config> = StorageDoubleMap<
 		Hasher1 = Blake2_128Concat,
 		Hasher2 = Twox64Concat,
 		Key1 = NotaryId,
@@ -84,7 +84,7 @@ pub mod pallet {
 	/// notebook containing this account in the changed accounts merkle root
 	/// (NotebookChangedAccountsRootByNotary)
 	#[pallet::storage]
-	pub(super) type AccountOriginLastChangedNotebookByNotary<T: Config> = StorageDoubleMap<
+	pub type AccountOriginLastChangedNotebookByNotary<T: Config> = StorageDoubleMap<
 		Hasher1 = Blake2_128Concat,
 		Hasher2 = Blake2_128Concat,
 		Key1 = NotaryId,
@@ -96,7 +96,7 @@ pub mod pallet {
 	/// List of last few notebook details by notary. The bool is whether the notebook is eligible
 	/// for votes (received at correct tick and audit passed)
 	#[pallet::storage]
-	pub(super) type LastNotebookDetailsByNotary<T: Config> = StorageMap<
+	pub type LastNotebookDetailsByNotary<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		NotaryId,
@@ -106,21 +106,21 @@ pub mod pallet {
 
 	/// The notebooks included in this block
 	#[pallet::storage]
-	pub(super) type BlockNotebooks<T: Config> = StorageValue<_, NotebookDigest, ValueQuery>;
+	pub type BlockNotebooks<T: Config> = StorageValue<_, NotebookDigest, ValueQuery>;
 
 	/// Check if the inherent was included
 	#[pallet::storage]
-	pub(super) type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type InherentIncluded<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// Notaries locked for failing audits
 	#[pallet::storage]
 	#[pallet::getter(fn notary_failed_audit_by_id)]
-	pub(super) type NotariesLockedForFailedAudit<T: Config> =
+	pub type NotariesLockedForFailedAudit<T: Config> =
 		StorageMap<_, Blake2_128Concat, NotaryId, (NotebookNumber, Tick, NotebookVerifyError)>;
 
 	/// Notaries ready to start reprocessing at a given notebook number
 	#[pallet::storage]
-	pub(super) type LockedNotaryReadyForReprocess<T: Config> =
+	pub type LockedNotaryReadyForReprocess<T: Config> =
 		StorageMap<_, Blake2_128Concat, NotaryId, NotebookNumber>;
 
 	#[pallet::event]

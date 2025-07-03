@@ -157,25 +157,25 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type NextUtxoId<T: Config> = StorageValue<_, UtxoId, OptionQuery>;
+	pub type NextUtxoId<T: Config> = StorageValue<_, UtxoId, OptionQuery>;
 
 	/// Stores bitcoin utxos that have requested to be released
 	#[pallet::storage]
-	pub(super) type LocksByUtxoId<T: Config> =
+	pub type LocksByUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, LockedBitcoin<T>, OptionQuery>;
 
 	/// Stores the block number where the lock was released
 	#[pallet::storage]
-	pub(super) type LockReleaseCosignHeightById<T: Config> =
+	pub type LockReleaseCosignHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
 
 	/// The minimum number of satoshis that can be locked
 	#[pallet::storage]
-	pub(super) type MinimumSatoshis<T: Config> = StorageValue<_, Satoshis, ValueQuery>;
+	pub type MinimumSatoshis<T: Config> = StorageValue<_, Satoshis, ValueQuery>;
 
 	/// Utxos that have been requested to be cosigned for releasing
 	#[pallet::storage]
-	pub(super) type LocksPendingReleaseByUtxoId<T: Config> = StorageValue<
+	pub type LocksPendingReleaseByUtxoId<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<UtxoId, LockReleaseRequest<T::Balance>, T::MaxConcurrentlyReleasingLocks>,
 		ValueQuery,
@@ -184,7 +184,7 @@ pub mod pallet {
 	/// Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
 	/// unlock it
 	#[pallet::storage]
-	pub(super) type LockExpirationsByBitcoinHeight<T: Config> = StorageMap<
+	pub type LockExpirationsByBitcoinHeight<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BitcoinHeight,

@@ -137,7 +137,7 @@ pub mod pallet {
 	/// The currently earning contributors for the current epoch's bond funds. Sorted by highest
 	/// bids first
 	#[pallet::storage]
-	pub(super) type VaultPoolsByFrame<T: Config> = StorageMap<
+	pub type VaultPoolsByFrame<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		FrameId,
@@ -148,7 +148,7 @@ pub mod pallet {
 	/// The liquidity pool for the current frame. This correlates with the bids coming in for the
 	/// current frame. Sorted with the biggest share last. (current frame + 1)
 	#[pallet::storage]
-	pub(super) type CapitalActive<T: Config> = StorageValue<
+	pub type CapitalActive<T: Config> = StorageValue<
 		_,
 		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,
@@ -156,7 +156,7 @@ pub mod pallet {
 
 	/// The liquidity pool still raising capital. (current frame + 2)
 	#[pallet::storage]
-	pub(super) type CapitalRaising<T: Config> = StorageValue<
+	pub type CapitalRaising<T: Config> = StorageValue<
 		_,
 		BoundedVec<LiquidityPoolCapital<T>, T::MaxBidPoolVaultParticipants>,
 		ValueQuery,

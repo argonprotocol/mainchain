@@ -77,34 +77,34 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type LastBlockSealerInfo<T: Config> =
+	pub type LastBlockSealerInfo<T: Config> =
 		StorageValue<_, BlockSealerInfo<T::AccountId>, OptionQuery>;
 
 	/// The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed
 	/// Secret + VotesMerkleRoot of the parent block notebooks.
 	#[pallet::storage]
-	pub(super) type ParentVotingKey<T: Config> = StorageValue<_, Option<H256>, ValueQuery>;
+	pub type ParentVotingKey<T: Config> = StorageValue<_, Option<H256>, ValueQuery>;
 
 	/// The calculated strength in the runtime so that it can be
 	/// upgraded, but is used by the node to determine which fork to follow
 	#[pallet::storage]
-	pub(super) type BlockForkPower<T: Config> = StorageValue<_, ForkPower, ValueQuery>;
+	pub type BlockForkPower<T: Config> = StorageValue<_, ForkPower, ValueQuery>;
 
 	/// The count of votes in the last 3 ticks
 	#[pallet::storage]
-	pub(super) type VotesInPast3Ticks<T> =
+	pub type VotesInPast3Ticks<T> =
 		StorageValue<_, BoundedVec<(Tick, u32), ConstU32<3>>, ValueQuery>;
 
 	/// Ensures only a single inherent is applied
 	#[pallet::storage]
-	pub(super) type TempSealInherent<T: Config> = StorageValue<_, BlockSealInherent, OptionQuery>;
+	pub type TempSealInherent<T: Config> = StorageValue<_, BlockSealInherent, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type LastTickWithVoteSeal<T: Config> = StorageValue<_, Tick, ValueQuery>;
+	pub type LastTickWithVoteSeal<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	/// Is the block from a vote seal?
 	#[pallet::storage]
-	pub(super) type IsBlockFromVoteSeal<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type IsBlockFromVoteSeal<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	type FindBlockVoteSealResult<T> = BoundedVec<
 		BestBlockVoteSeal<

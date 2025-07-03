@@ -42,22 +42,22 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type PreviousTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
+	pub type PreviousTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn current_tick)]
-	pub(super) type CurrentTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
+	pub type CurrentTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
-	pub(super) type GenesisTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
+	pub type GenesisTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
-	pub(super) type GenesisTicker<T: Config> = StorageValue<_, Ticker, ValueQuery>;
+	pub type GenesisTicker<T: Config> = StorageValue<_, Ticker, ValueQuery>;
 
 	/// Blocks from the last 100 ticks. Trimmed in on_initialize.
 	/// NOTE: cannot include the current block hash until next block
 	#[pallet::storage]
-	pub(super) type RecentBlocksAtTicks<T: Config> = StorageMap<
+	pub type RecentBlocksAtTicks<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		Tick,

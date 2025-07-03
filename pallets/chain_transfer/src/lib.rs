@@ -74,11 +74,10 @@ pub mod pallet {
 	}
 
 	#[pallet::storage]
-	pub(super) type NextTransferId<T: Config> =
-		StorageValue<_, TransferToLocalchainId, OptionQuery>;
+	pub type NextTransferId<T: Config> = StorageValue<_, TransferToLocalchainId, OptionQuery>;
 
 	#[pallet::storage]
-	pub(super) type PendingTransfersOut<T: Config> = StorageMap<
+	pub type PendingTransfersOut<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
 		TransferToLocalchainId,
@@ -87,7 +86,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type ExpiringTransfersOutByNotary<T: Config> = StorageDoubleMap<
+	pub type ExpiringTransfersOutByNotary<T: Config> = StorageDoubleMap<
 		Hasher1 = Twox64Concat,
 		Hasher2 = Twox64Concat,
 		Key1 = NotaryId,
@@ -97,7 +96,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	pub(super) type TransfersUsedInBlockNotebooks<T: Config> = StorageMap<
+	pub type TransfersUsedInBlockNotebooks<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		BlockNumberFor<T>,
@@ -110,7 +109,7 @@ pub mod pallet {
 
 	/// The admin of the hyperbridge token gateway
 	#[pallet::storage]
-	pub(super) type HyperbridgeTokenAdmin<T: Config> =
+	pub type HyperbridgeTokenAdmin<T: Config> =
 		StorageValue<_, <T as frame_system::Config>::AccountId, OptionQuery>;
 
 	#[pallet::event]
