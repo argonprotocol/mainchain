@@ -73,6 +73,7 @@ import type {
   PalletHyperbridgeVersionedHostParams,
   PalletLiquidityPoolsLiquidityPool,
   PalletLiquidityPoolsLiquidityPoolCapital,
+  PalletLiquidityPoolsPrebondedArgons,
   PalletMintMintAction,
   PalletMultisigMultisig,
   PalletPriceIndexPriceIndex,
@@ -678,6 +679,17 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
         []
+      >;
+      /**
+       * Any vaults that have been pre-registered for bonding argons. This is used by the vault
+       * operator to allocate argons to be bonded once bitcoins are securitized in their vault.
+       **/
+      prebondedByVaultId: AugmentedQuery<
+        ApiType,
+        (
+          arg: u32 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletLiquidityPoolsPrebondedArgons>>,
+        [u32]
       >;
       /**
        * The currently earning contributors for the current epoch's bond funds. Sorted by highest

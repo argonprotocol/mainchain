@@ -1667,13 +1667,20 @@ declare module '@polkadot/types/lookup' {
       readonly amount: u128;
       readonly accountId: AccountId32;
     } & Struct;
+    readonly isVaultOperatorPrebond: boolean;
+    readonly asVaultOperatorPrebond: {
+      readonly vaultId: u32;
+      readonly accountId: AccountId32;
+      readonly amount: u128;
+    } & Struct;
     readonly type:
       | 'CouldNotDistributeBidPool'
       | 'CouldNotBurnBidPool'
       | 'BidPoolDistributed'
       | 'NextBidPoolCapitalLocked'
       | 'ErrorRefundingLiquidityPoolCapital'
-      | 'RefundedLiquidityPoolCapital';
+      | 'RefundedLiquidityPoolCapital'
+      | 'VaultOperatorPrebond';
   }
 
   /** @name PalletSkipFeelessPaymentEvent (133) */
@@ -2932,7 +2939,13 @@ declare module '@polkadot/types/lookup' {
       readonly vaultId: u32;
       readonly frameId: u64;
     } & Struct;
-    readonly type: 'BondArgons' | 'UnbondArgons';
+    readonly isVaultOperatorPrebond: boolean;
+    readonly asVaultOperatorPrebond: {
+      readonly vaultId: u32;
+      readonly amount: u128;
+      readonly maxAmountPerFrame: u128;
+    } & Struct;
+    readonly type: 'BondArgons' | 'UnbondArgons' | 'VaultOperatorPrebond';
   }
 
   /** @name PalletMultisigError (321) */
@@ -3784,7 +3797,17 @@ declare module '@polkadot/types/lookup' {
     readonly frameId: Compact<u64>;
   }
 
-  /** @name PalletLiquidityPoolsError (497) */
+  /** @name PalletLiquidityPoolsPrebondedArgons (497) */
+  interface PalletLiquidityPoolsPrebondedArgons extends Struct {
+    readonly vaultId: Compact<u32>;
+    readonly accountId: AccountId32;
+    readonly amountUnbonded: Compact<u128>;
+    readonly startingFrameId: Compact<u64>;
+    readonly bondedByStartOffset: Vec<u128>;
+    readonly maxAmountPerFrame: Compact<u128>;
+  }
+
+  /** @name PalletLiquidityPoolsError (498) */
   interface PalletLiquidityPoolsError extends Enum {
     readonly isContributionTooLow: boolean;
     readonly isVaultNotAcceptingMiningBonds: boolean;
@@ -3796,6 +3819,8 @@ declare module '@polkadot/types/lookup' {
     readonly isActivatedSecuritizationExceeded: boolean;
     readonly isMaxVaultsExceeded: boolean;
     readonly isAlreadyRenewed: boolean;
+    readonly isNotAVaultOperator: boolean;
+    readonly isMaxAmountBelowMinimum: boolean;
     readonly type:
       | 'ContributionTooLow'
       | 'VaultNotAcceptingMiningBonds'
@@ -3806,45 +3831,47 @@ declare module '@polkadot/types/lookup' {
       | 'MaxContributorsExceeded'
       | 'ActivatedSecuritizationExceeded'
       | 'MaxVaultsExceeded'
-      | 'AlreadyRenewed';
+      | 'AlreadyRenewed'
+      | 'NotAVaultOperator'
+      | 'MaxAmountBelowMinimum';
   }
 
-  /** @name FrameSystemExtensionsCheckNonZeroSender (500) */
+  /** @name FrameSystemExtensionsCheckNonZeroSender (501) */
   type FrameSystemExtensionsCheckNonZeroSender = Null;
 
-  /** @name FrameSystemExtensionsCheckSpecVersion (501) */
+  /** @name FrameSystemExtensionsCheckSpecVersion (502) */
   type FrameSystemExtensionsCheckSpecVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckTxVersion (502) */
+  /** @name FrameSystemExtensionsCheckTxVersion (503) */
   type FrameSystemExtensionsCheckTxVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckGenesis (503) */
+  /** @name FrameSystemExtensionsCheckGenesis (504) */
   type FrameSystemExtensionsCheckGenesis = Null;
 
-  /** @name FrameSystemExtensionsCheckNonce (506) */
+  /** @name FrameSystemExtensionsCheckNonce (507) */
   interface FrameSystemExtensionsCheckNonce extends Compact<u32> {}
 
-  /** @name FrameSystemExtensionsCheckWeight (507) */
+  /** @name FrameSystemExtensionsCheckWeight (508) */
   type FrameSystemExtensionsCheckWeight = Null;
 
-  /** @name PalletTransactionPaymentChargeTransactionPayment (508) */
+  /** @name PalletTransactionPaymentChargeTransactionPayment (509) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name FrameMetadataHashExtensionCheckMetadataHash (509) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (510) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
     readonly mode: FrameMetadataHashExtensionMode;
   }
 
-  /** @name FrameMetadataHashExtensionMode (510) */
+  /** @name FrameMetadataHashExtensionMode (511) */
   interface FrameMetadataHashExtensionMode extends Enum {
     readonly isDisabled: boolean;
     readonly isEnabled: boolean;
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name FrameSystemExtensionsWeightReclaim (511) */
+  /** @name FrameSystemExtensionsWeightReclaim (512) */
   type FrameSystemExtensionsWeightReclaim = Null;
 
-  /** @name ArgonRuntimeRuntime (513) */
+  /** @name ArgonRuntimeRuntime (514) */
   type ArgonRuntimeRuntime = Null;
 } // declare module

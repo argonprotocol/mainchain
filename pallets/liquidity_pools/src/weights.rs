@@ -5,6 +5,7 @@ pub trait WeightInfo {
 	// Main extrinsic functions
 	fn bond_argons() -> Weight;
 	fn unbond_argons() -> Weight;
+	fn vault_operator_prebond() -> Weight;
 
 	// Frame transition operations (DoS attack prevention)
 	fn distribute_bid_pool(v: u32, c: u32) -> Weight;
@@ -20,6 +21,10 @@ impl WeightInfo for () {
 	}
 
 	fn unbond_argons() -> Weight {
+		Weight::zero()
+	}
+
+	fn vault_operator_prebond() -> Weight {
 		Weight::zero()
 	}
 

@@ -1,7 +1,8 @@
 use crate::{
-	Error, Event, HoldReason, LiquidityPool, LiquidityPoolCapital,
+	Error, Event, HoldReason, LiquidityPool, LiquidityPoolCapital, PrebondedArgons,
+	PrebondedByVaultId,
 	mock::{LiquidityPools, *},
-	pallet::{CapitalActive, CapitalRaising, VaultPoolsByFrame},
+	pallet::{CapitalActive, CapitalRaising, InsertContributorResponse, VaultPoolsByFrame},
 };
 use argon_primitives::{OnNewSlot, vault::MiningBidPoolProvider};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
@@ -590,6 +591,285 @@ fn it_can_exit_auto_renew() {
 			Balances::free_balance(2),
 			200_000_000,
 			"should have released the 200 to the exiting contributor"
+		);
+	});
+}
+
+#[test]
+fn test_prebonded_argons() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 100_000_000,
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+
+		assert_err!(
+			LiquidityPools::vault_operator_prebond(
+				RuntimeOrigin::signed(2),
+				1,
+				100_000_000,
+				10_000_000
+			),
+			Error::<Test>::NotAVaultOperator
+		);
+
+		assert_err!(
+			LiquidityPools::vault_operator_prebond(
+				RuntimeOrigin::signed(1),
+				1,
+				100_000_000,
+				10_000_000
+			),
+			DispatchError::Token(TokenError::FundsUnavailable)
+		);
+
+		set_argons(1, 200_000_000);
+		assert_ok!(LiquidityPools::vault_operator_prebond(
+			RuntimeOrigin::signed(1),
+			1,
+			100_000_000,
+			10_000_000
+		));
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
+			100_000_000
+		);
+		assert_eq!(
+			PrebondedByVaultId::<Test>::get(1).unwrap().bonded_by_start_offset.to_vec(),
+			vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+		);
+		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().starting_frame_id, 1);
+		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 100_000_000);
+		System::assert_last_event(
+			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 100_000_000 }
+				.into(),
+		);
+
+		// if we add more funds, it should be additive
+		assert_err!(
+			LiquidityPools::vault_operator_prebond(
+				RuntimeOrigin::signed(1),
+				1,
+				50_000_000,
+				14_000_000
+			),
+			Error::<Test>::MaxAmountBelowMinimum //	"cant reduce the max amount"
+		);
+		assert_ok!(LiquidityPools::vault_operator_prebond(
+			RuntimeOrigin::signed(1),
+			1,
+			50_000_000,
+			15_000_000
+		));
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
+			150_000_000
+		);
+		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 150_000_000);
+		System::assert_last_event(
+			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 50_000_000 }
+				.into(),
+		);
+	});
+}
+
+#[test]
+fn test_liquidity_pool_struct() {
+	MaxLiquidityPoolContributors::set(2);
+	new_test_ext().execute_with(|| {
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 50_000_000_000,
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+
+		let mut pool = LiquidityPool::<Test>::new(1);
+		assert_eq!(pool.vault_sharing_percent, Permill::from_percent(10));
+		assert!(pool.can_add_contributor(&1));
+		assert_eq!(
+			pool.try_insert_contributor(1, 50).ok(),
+			Some(InsertContributorResponse { hold_amount: 50, needs_refund: None })
+		);
+		assert_eq!(pool.contributor_balances.len(), 1);
+		assert_eq!(
+			pool.try_insert_contributor(2, 500).ok(),
+			Some(InsertContributorResponse { hold_amount: 500, needs_refund: None })
+		);
+		assert_eq!(pool.contributor_balances.len(), 2);
+		assert_eq!(
+			pool.try_insert_contributor(3, 1000).ok(),
+			Some(InsertContributorResponse { hold_amount: 1000, needs_refund: Some((1, 50)) }),
+			"should remove the first contributor"
+		);
+		assert_eq!(pool.contributor_balances.to_vec(), vec![(3, 1000), (2, 500)]);
+		assert!(pool.can_add_contributor(&2), "should be able to move contributor 2 to the front");
+		assert_eq!(
+			pool.try_insert_contributor(2, 2000).ok(),
+			Some(InsertContributorResponse { hold_amount: 2000 - 500, needs_refund: None }),
+			"should update the second contributor"
+		);
+		assert_eq!(pool.contributor_balances.to_vec(), vec![(2, 2000), (3, 1000),]);
+	});
+}
+
+#[test]
+fn test_capital_raise_with_prebonded() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 5_000_000_000, // activates 500_000_000 per frame
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+
+		set_argons(1, 5_000_000_000);
+		assert_ok!(LiquidityPools::vault_operator_prebond(
+			RuntimeOrigin::signed(1),
+			1,
+			5_000_000_000,
+			500_000_000
+		));
+
+		LiquidityPools::end_pool_capital_raise(1);
+
+		let frame_1_pools = VaultPoolsByFrame::<Test>::get(1);
+		let vault_1_frame_1 = frame_1_pools.get(&1).unwrap();
+
+		assert_eq!(
+			vault_1_frame_1.contributor_balances.to_vec(),
+			vec![(1, 500_000_000)],
+			"should add if space"
+		);
+		assert_eq!(
+			CapitalActive::<Test>::get().to_vec(),
+			vec![LiquidityPoolCapital { vault_id: 1, activated_capital: 500_000_000, frame_id: 1 }]
+		);
+	});
+}
+
+#[test]
+fn test_capital_raise_with_prebonded_when_no_space() {
+	MaxLiquidityPoolContributors::set(2);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 5_000_000_000, // activates 500_000_000 per frame
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+
+		set_argons(2, 1_000_000_000);
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 500_000_000));
+		assert_eq!(
+			VaultPoolsByFrame::<Test>::get(3).get(&1).unwrap().contributor_balances.to_vec(),
+			vec![(2, 500_000_000)]
+		);
+
+		set_argons(1, 5_000_000_000);
+		assert_ok!(LiquidityPools::vault_operator_prebond(
+			RuntimeOrigin::signed(1),
+			1,
+			5_000_000_000,
+			500_000_000
+		));
+
+		LiquidityPools::end_pool_capital_raise(3);
+		// should not be able to add the prebonded funds as there is no space
+
+		let frame_3_pools = VaultPoolsByFrame::<Test>::get(3);
+		let vault_1_frame_3 = frame_3_pools.get(&1).unwrap();
+		assert_eq!(
+			vault_1_frame_3.contributor_balances.to_vec(),
+			vec![(2, 500_000_000)],
+			"should not add if no space"
+		);
+		assert_eq!(
+			CapitalActive::<Test>::get().to_vec(),
+			vec![LiquidityPoolCapital { vault_id: 1, activated_capital: 500_000_000, frame_id: 3 }]
+		);
+
+		// now try if we have just a small amount that can be filled
+		CurrentFrameId::set(2);
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 400_000_000));
+		assert_eq!(
+			VaultPoolsByFrame::<Test>::get(4).get(&1).unwrap().contributor_balances.to_vec(),
+			vec![(2, 400_000_000)]
+		);
+
+		LiquidityPools::end_pool_capital_raise(4);
+		// should not be able to add the prebonded funds as there is no space
+
+		let frame_4_pools = VaultPoolsByFrame::<Test>::get(4);
+		let vault_1_frame_4 = frame_4_pools.get(&1).unwrap();
+		assert_eq!(
+			vault_1_frame_4.contributor_balances.to_vec(),
+			vec![(2, 400_000_000), (1, 100_000_000)],
+			"should have the prebonded funds added as there is space now"
+		);
+		assert_eq!(
+			CapitalActive::<Test>::get().to_vec(),
+			vec![LiquidityPoolCapital { vault_id: 1, activated_capital: 500_000_000, frame_id: 4 }]
+		);
+	});
+}
+
+#[test]
+fn test_prebonded_argons_struct() {
+	new_test_ext().execute_with(|| {
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 5_000_000,
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+		CurrentFrameId::set(1);
+		let mut prebonded = PrebondedArgons::<Test>::new(1, 1, 5_000_000, 500_000);
+		assert_eq!(prebonded.bonded_by_start_offset.len(), 10);
+		assert_eq!(prebonded.bonded_by_start_offset.to_vec(), vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+		assert_eq!(prebonded.starting_frame_id, 1);
+
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 500_000);
+		assert_eq!(
+			prebonded.bonded_by_start_offset.to_vec(),
+			vec![0, 500_000, 0, 0, 0, 0, 0, 0, 0, 0]
+		);
+		assert_eq!(prebonded.starting_frame_id, 1);
+
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 0, "already maxed out");
+		assert_eq!(prebonded.take_unbonded(12, 1_000_000), 0, "next pass also maxed out");
+
+		assert_eq!(prebonded.take_unbonded(3, 300_000), 300_000, "takes max available");
+		assert_eq!(
+			prebonded.bonded_by_start_offset.to_vec(),
+			vec![0, 500_000, 300_000, 0, 0, 0, 0, 0, 0, 0]
+		);
+		assert_eq!(prebonded.take_unbonded(13, 300_000), 200_000, "caps out at 500k on next pass");
+		assert_eq!(
+			prebonded.bonded_by_start_offset.to_vec(),
+			vec![0, 500_000, 500_000, 0, 0, 0, 0, 0, 0, 0]
 		);
 	});
 }
