@@ -15,7 +15,17 @@ pub struct BitcoinSyncStatus {
 	pub oldest_allowed_block_height: BitcoinHeight,
 }
 
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
 pub struct BitcoinBlock {
 	#[codec(compact)]
 	pub block_height: BitcoinHeight,
@@ -81,7 +91,16 @@ impl TryFrom<Vec<u8>> for BitcoinSignature {
 /// A Script Pubkey for a Bitcoin UTXO. Supported types are:
 /// - P2WSH (Pay to Witness Script Hash)
 #[derive(
-	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug, Copy,
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	RuntimeDebug,
+	Copy,
+	MaxEncodedLen,
 )]
 #[repr(transparent)]
 pub enum BitcoinCosignScriptPubkey {
@@ -89,7 +108,17 @@ pub enum BitcoinCosignScriptPubkey {
 	P2WSH { wscript_hash: H256 },
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	RuntimeDebug,
+	MaxEncodedLen,
+)]
 #[repr(transparent)]
 pub struct BitcoinScriptPubkey(pub BoundedVec<u8, ConstU32<34>>); // allow p2wsh, p2tr max
 impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
@@ -135,6 +164,7 @@ pub struct BitcoinSighash(pub [u8; 32]);
 	RuntimeDebug,
 	Ord,
 	PartialOrd,
+	MaxEncodedLen,
 )]
 pub struct UtxoRef {
 	pub txid: H256Le,
@@ -143,7 +173,17 @@ pub struct UtxoRef {
 }
 
 pub type UtxoId = u64;
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 pub struct UtxoValue {
 	pub utxo_id: UtxoId,
 	pub script_pubkey: BitcoinCosignScriptPubkey,
@@ -218,6 +258,7 @@ pub enum NetworkKind {
 	Eq,
 	RuntimeDebug,
 	Default,
+	MaxEncodedLen,
 )]
 #[cfg_attr(all(feature = "std", not(feature = "uniffi")), derive(clap::ValueEnum))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -602,6 +643,7 @@ pub const SATOSHIS_PER_BITCOIN: u64 = 100_000_000;
 	TypeInfo,
 	Ord,
 	PartialOrd,
+	MaxEncodedLen,
 )]
 #[repr(transparent)]
 pub struct H256Le(pub [u8; 32]);

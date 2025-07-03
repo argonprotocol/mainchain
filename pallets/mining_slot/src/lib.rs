@@ -49,7 +49,7 @@ pub mod weights;
 /// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
 /// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
 /// LiquidityPools.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use codec::FullCodec;
 	use core::cmp::Ordering;
@@ -154,7 +154,7 @@ pub mod pallet {
 		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo;
 
 		/// The authority signing keys.
-		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize;
+		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize + MaxEncodedLen;
 
 		/// The current tick
 		type TickProvider: TickProvider<Self::Block>;
@@ -406,7 +406,7 @@ pub mod pallet {
 		/// - `mining_account_id`: This account_id allows you to operate as this miner account id,
 		///   but use funding (argonots and bid) from the submitting account
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)] //T::WeightInfo::hold())]
+		#[pallet::weight(T::WeightInfo::bid())]
 		pub fn bid(
 			origin: OriginFor<T>,
 			bid: T::Balance,
@@ -509,7 +509,7 @@ pub mod pallet {
 
 		/// Admin function to update the mining slot delay.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)] //T::WeightInfo::hold())]
+		#[pallet::weight(T::WeightInfo::configure_mining_slot_delay())]
 		pub fn configure_mining_slot_delay(
 			origin: OriginFor<T>,
 			mining_slot_delay: Option<Tick>,

@@ -64,7 +64,7 @@ impl PriceIndex {
 	}
 }
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use sp_arithmetic::FixedPointNumber;
 
@@ -187,7 +187,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::submit(), DispatchClass::Operational))]
 		#[pallet::feeless_if(|origin: &OriginFor<T>, _index: &PriceIndex| -> bool {
 			let Ok(who) = ensure_signed(origin.clone()) else {
 				return false;
@@ -225,7 +225,7 @@ pub mod pallet {
 		/// # Arguments
 		/// * `account_id` - the account id of the operator
 		#[pallet::call_index(1)]
-		#[pallet::weight(<T as Config>::WeightInfo::insert_oracle_operator())]
+		#[pallet::weight(T::WeightInfo::set_operator())]
 		pub fn set_operator(origin: OriginFor<T>, account_id: T::AccountId) -> DispatchResult {
 			ensure_root(origin)?;
 			<Operator<T>>::put(account_id.clone());

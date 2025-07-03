@@ -1,7 +1,7 @@
 use alloc::collections::btree_map::BTreeMap;
 
-use Sr25519Keyring::Alice;
 use pallet_prelude::*;
+use sp_keyring::Sr25519Keyring::Alice;
 
 use crate as pallet_chain_transfer;
 use argon_primitives::{NotebookProvider, NotebookSecret};

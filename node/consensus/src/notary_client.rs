@@ -1252,11 +1252,20 @@ where
 			},
 		};
 
-		headers.signed_headers.append(&mut notary_headers.signed_headers);
-		headers
+		let res = headers
 			.notebook_digest
 			.notebooks
-			.append(&mut notary_headers.notebook_digest.notebooks);
+			.try_append(&mut notary_headers.notebook_digest.notebooks.to_vec());
+		if let Err(e) = res {
+			error!(
+				error = ?e,
+				notary_id = notary.notary_id,
+				notebook_tick = voting_schedule.notebook_tick(),
+				"Error appending notary notebooks to digest"
+			);
+			break;
+		}
+		headers.signed_headers.append(&mut notary_headers.signed_headers);
 		if let Some(tick_notebook) = tick_notebook {
 			tick_notebooks.push(tick_notebook);
 		}

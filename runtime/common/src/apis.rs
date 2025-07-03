@@ -198,7 +198,7 @@ macro_rules! inject_common_apis {
                 digests: &Digest,
             ) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, DispatchError> {
                 let digests = Digests::decode(digests)?;
-                Ok(digests.notebooks.notebooks.clone())
+                Ok(digests.notebooks.notebooks.to_vec())
             }
         }
 

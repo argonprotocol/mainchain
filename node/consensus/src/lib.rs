@@ -12,7 +12,7 @@ use argon_primitives::{
 	inherents::BlockSealInherentNodeSide,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
-use codec::Codec;
+use codec::{Codec, MaxEncodedLen};
 use futures::prelude::*;
 use polkadot_sdk::*;
 use sc_client_api::{AuxStore, BlockBackend, BlockchainEvents};
@@ -110,7 +110,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		+ BitcoinApis<Block, Balance>,
 	PF: Environment<Block> + Send + Sync + 'static,
 	PF::Proposer: sp_consensus::Proposer<Block>,
-	A: Codec + Clone + PartialEq + Send + Sync + 'static,
+	A: Codec + Clone + MaxEncodedLen + PartialEq + Send + Sync + 'static,
 	SC: SelectChain<Block> + Clone + Send + Sync + 'static,
 	SO: SyncOracle + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,

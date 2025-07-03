@@ -28,7 +28,7 @@ parameter_types! {
 		tick: TickDigest(2),
 		fork_power: None,
 		notebooks: NotebookDigest {
-			notebooks: vec![],
+			notebooks: BoundedVec::truncate_from(vec![]),
 		},
 	};
 }

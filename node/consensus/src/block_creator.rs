@@ -13,7 +13,7 @@ use argon_primitives::{
 	tick::{Tick, TickDigest, Ticker},
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
-use codec::Codec;
+use codec::{Codec, MaxEncodedLen};
 use frame_support::CloneNoBound;
 use log::*;
 use polkadot_sdk::*;
@@ -75,7 +75,7 @@ where
 		+ BitcoinApis<Block, Balance>,
 	PF: Environment<Block> + Send + Sync + 'static,
 	PF::Proposer: Proposer<Block, Proof = Proof>,
-	A: Codec + Clone + Send + Sync + 'static,
+	A: Codec + MaxEncodedLen + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
 {

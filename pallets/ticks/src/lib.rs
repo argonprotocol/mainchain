@@ -19,7 +19,7 @@ pub mod weights;
 const MAX_RECENT_BLOCKS: u64 = 10;
 
 /// This pallet tracks the current tick of the system
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_notary_audit::VerifyError;

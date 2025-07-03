@@ -14,7 +14,7 @@ mod tests;
 
 pub mod weights;
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
@@ -207,7 +207,7 @@ pub mod pallet {
 		[u8; 32]: From<<T as frame_system::Config>::AccountId>,
 	{
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::send_to_localchain())]
 		pub fn send_to_localchain(
 			origin: OriginFor<T>,
 			#[pallet::compact] amount: <T as Config>::Balance,
@@ -421,8 +421,8 @@ pub mod pallet {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
-#[codec(mel_bound(Balance: MaxEncodedLen, BlockNumber: MaxEncodedLen))]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[codec(mel_bound(AccountId: MaxEncodedLen, Balance: MaxEncodedLen))]
 pub struct QueuedTransferOut<AccountId, Balance> {
 	pub account_id: AccountId,
 	pub amount: Balance,

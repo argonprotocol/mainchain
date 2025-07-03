@@ -36,7 +36,7 @@ pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 ///
 /// ComputeDifficulty is an average number of hashes that need to be checked in order mine a block.
 /// - To pass the difficulty test: `big endian(hash with nonce) <= U256::max_value / difficulty`.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
@@ -191,7 +191,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as Config>::WeightInfo::configure())]
 		pub fn configure(
 			origin: OriginFor<T>,
 			vote_minimum: Option<VoteMinimum>,

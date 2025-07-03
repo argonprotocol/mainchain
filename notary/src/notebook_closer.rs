@@ -829,7 +829,10 @@ mod tests {
 					runtime_types::argon_primitives::domain::ZoneRecord {
 						payment_account: account.public().into(),
 						notary_id: 1,
-						versions: subxt::utils::KeyedVec::new(),
+						versions:
+							runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap(
+								subxt::utils::KeyedVec::new(),
+							),
 					},
 				),
 				&signer,

@@ -14,7 +14,7 @@ mod tests;
 pub mod weights;
 // const LOG_TARGET: &str = "runtime::notaries";
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use sp_runtime::{BoundedBTreeMap, app_crypto::RuntimePublic};
 
@@ -235,7 +235,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::propose())]
 		pub fn propose(origin: OriginFor<T>, meta: NotaryMetaOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -264,7 +264,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::activate())]
 		pub fn activate(origin: OriginFor<T>, operator_account: T::AccountId) -> DispatchResult {
 			ensure_root(origin)?;
 
@@ -288,7 +288,7 @@ pub mod pallet {
 		/// Update the metadata of a notary, to be effective at the given tick height, which must be
 		/// >= MetaChangesTickDelay ticks in the future.
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::update())]
 		pub fn update(
 			origin: OriginFor<T>,
 			#[pallet::compact] notary_id: NotaryId,

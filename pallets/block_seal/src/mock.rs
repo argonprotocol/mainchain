@@ -53,12 +53,12 @@ parameter_types! {
 		fork_power: None,
 		tick: TickDigest(2),
 		notebooks: NotebookDigest {
-			notebooks: vec![NotebookAuditResult::<VerifyError> {
+			notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult::<VerifyError> {
 				notary_id: 1,
 				notebook_number: 1,
 				tick: 1,
 				audit_first_failure: None,
-			}],
+			}]),
 		},
 	};
 }

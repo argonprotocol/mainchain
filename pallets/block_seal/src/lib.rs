@@ -16,7 +16,7 @@ mod tests;
 mod benchmarking;
 pub mod weights;
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use alloc::collections::btree_map::BTreeMap;
@@ -229,7 +229,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((T::WeightInfo::apply(), DispatchClass::Mandatory))]
 		pub fn apply(origin: OriginFor<T>, seal: BlockSealInherent) -> DispatchResult {
 			ensure_none(origin)?;
 			Self::apply_seal(seal).inspect_err(|e| {

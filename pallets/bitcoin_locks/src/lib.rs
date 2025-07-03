@@ -58,7 +58,7 @@ pub mod weights;
 ///    will be penalized by the amount of the UTXOs' current value.
 /// 2. If a vault operator fails to counter-sign a transaction within 10 days, they will lose their
 ///    ownership tokens and the market value of underlying Bitcoin locks.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
@@ -192,7 +192,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LockedBitcoin<T: Config> {
 		#[codec(compact)]
@@ -227,8 +227,19 @@ pub mod pallet {
 		}
 	}
 
-	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
-	pub struct LockReleaseRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
+	#[derive(
+		Decode,
+		Encode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct LockReleaseRequest<
+		Balance: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
+	> {
 		#[codec(compact)]
 		pub utxo_id: UtxoId,
 		#[codec(compact)]
@@ -435,7 +446,7 @@ pub mod pallet {
 		/// NOTE: A "lock-er" must send btc to the cosigner UTXO address to "complete" the
 		/// LockedBitcoin and be added to the Bitcoin Mint line.
 		#[pallet::call_index(0)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::initialize())]
 		pub fn initialize(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -532,7 +543,7 @@ pub mod pallet {
 		///
 		/// Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::request_release())]
 		pub fn request_release(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,
@@ -609,7 +620,7 @@ pub mod pallet {
 		/// This is submitted as a no-fee transaction off chain to allow keys to remain in cold
 		/// wallets.
 		#[pallet::call_index(2)]
-		#[pallet::weight((0, DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::cosign_release(), DispatchClass::Operational))]
 		#[pallet::feeless_if(|origin: &OriginFor<T>, utxo_id: &UtxoId, _signature: &BitcoinSignature| -> bool {
 			let Ok(who) = ensure_signed(origin.clone()) else {
 				return false;
@@ -727,7 +738,7 @@ pub mod pallet {
 		/// prorated fee for the remainder of your existing lock duration. You are added to the mint
 		/// queue for the difference in your new lock price vs the previous lock price.
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::ratchet())]
 		pub fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
@@ -814,7 +825,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(4)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::admin_modify_minimum_locked_sats())]
 		pub fn admin_modify_minimum_locked_sats(
 			origin: OriginFor<T>,
 			satoshis: Satoshis,

@@ -26,3 +26,4 @@ node_modules
 **/*.tsbuildinfo
 **/nodejs/lib/
 /bitcoin/nodejs/.port-lock
+/build.log

@@ -703,7 +703,7 @@ mod test {
 	};
 	use async_trait::async_trait;
 	use polkadot_sdk::{
-		frame_support::assert_ok,
+		frame_support::{BoundedVec, assert_ok},
 		sc_client_api::KeyValueStates,
 		sc_consensus::ImportedState,
 		sp_core::{ByteArray, U256},
@@ -998,7 +998,7 @@ mod test {
 			voting_key: None, // runtime digest
 			fork_power: None, // runtime digest
 			tick: Default::default(),
-			notebooks: NotebookDigest::<NotebookVerifyError> { notebooks: Vec::new() },
+			notebooks: NotebookDigest::<NotebookVerifyError> { notebooks: BoundedVec::new() },
 		};
 		let mut digest = digests.create_pre_runtime_digest();
 		digest.push(DigestItem::Consensus(FORK_POWER_DIGEST, power.encode()));

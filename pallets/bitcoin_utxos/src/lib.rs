@@ -14,7 +14,7 @@ mod tests;
 
 pub mod weights;
 
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
@@ -188,7 +188,14 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Submitted when a bitcoin UTXO has been moved or confirmed
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((
+			T::WeightInfo::sync(
+				utxo_sync.spent.len() as u32,
+				utxo_sync.verified.len() as u32,
+				utxo_sync.invalid.len() as u32
+			),
+			DispatchClass::Mandatory
+		))]
 		pub fn sync(origin: OriginFor<T>, utxo_sync: BitcoinUtxoSync) -> DispatchResult {
 			ensure_none(origin)?;
 			log::info!(
@@ -286,7 +293,7 @@ pub mod pallet {
 		/// # Arguments
 		/// * `bitcoin_height` - the latest bitcoin block height to be confirmed
 		#[pallet::call_index(1)]
-		#[pallet::weight((0, DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::set_confirmed_block(), DispatchClass::Operational))]
 		#[pallet::feeless_if(|origin: &OriginFor<T>, _height: &BitcoinHeight, _hash: &BitcoinBlockHash, | -> bool {
 			let Ok(who) = ensure_signed(origin.clone()) else {
 				return false;
@@ -317,7 +324,7 @@ pub mod pallet {
 		/// # Arguments
 		/// * `account_id` - the account id of the operator
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(T::WeightInfo::set_operator())]
 		pub fn set_operator(origin: OriginFor<T>, account_id: T::AccountId) -> DispatchResult {
 			ensure_root(origin)?;
 			<OracleOperatorAccount<T>>::put(account_id.clone());

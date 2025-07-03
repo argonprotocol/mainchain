@@ -355,7 +355,17 @@ pub struct NotaryNotebookAuditSummaryDetails {
 	pub block_votes_root: H256,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	RuntimeDebug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 pub struct NotaryNotebookVoteDigestDetails {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
@@ -392,7 +402,7 @@ impl<H: Codec> From<&NotaryNotebookDetails<H>> for NotaryNotebookVoteDigestDetai
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct NotaryNotebookKeyDetails {
 	#[codec(compact)]
 	pub notebook_number: NotebookNumber,

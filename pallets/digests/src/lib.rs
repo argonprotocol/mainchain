@@ -15,7 +15,7 @@ mod tests;
 pub mod weights;
 
 /// This pallet decodes system digests and temporarily provides them to the runtime.
-#[frame_support::pallet(dev_mode)]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{VotingKey, digests::*};
@@ -31,11 +31,11 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>>
 			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
-		type NotebookVerifyError: Codec + EncodeLike + Clone + TypeInfo;
+		type NotebookVerifyError: Codec + EncodeLike + Clone + TypeInfo + MaxEncodedLen;
 	}
 
 	#[pallet::storage]
-	pub(super) type TempDigests<T: Config> =
+	pub type TempDigests<T: Config> =
 		StorageValue<_, Digestset<T::NotebookVerifyError, T::AccountId>, OptionQuery>;
 
 	#[pallet::event]

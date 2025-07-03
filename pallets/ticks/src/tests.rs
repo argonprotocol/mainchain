@@ -51,12 +51,12 @@ fn it_tests_the_current_tick() {
 		assert!(err.is_err());
 
 		Digests::mutate(|a| {
-			a.notebooks.notebooks.push(NotebookAuditResult {
+			let _ = a.notebooks.notebooks.try_push(NotebookAuditResult {
 				tick: 3,
 				notary_id: 1,
 				notebook_number: 10,
 				audit_first_failure: None,
-			})
+			});
 		});
 
 		Ticks::on_initialize(9);
