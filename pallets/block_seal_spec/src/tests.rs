@@ -285,6 +285,7 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
+			xor_distance: Some(U256::one()),
 		});
 
 		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {

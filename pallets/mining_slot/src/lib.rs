@@ -151,7 +151,7 @@ pub mod pallet {
 		type GrandpaRotationBlocks: Get<BlockNumberFor<Self>>;
 
 		/// The mining authority runtime public key
-		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo;
+		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo + PartialEq;
 
 		/// The authority signing keys.
 		type Keys: OpaqueKeys + Member + Parameter + MaybeSerializeDeserialize + MaxEncodedLen;
@@ -551,7 +551,7 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	fn get_block_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, FrameId)> {
 		let released_miners = ReleasedMinersByAccountId::<T>::get();
 		if let Some(x) = released_miners.get(author) {
-			return Some((x.rewards_account(), x.starting_frame_id))
+			return Some((x.rewards_account(), x.starting_frame_id));
 		}
 
 		let registration = Self::get_active_registration(author)?;
@@ -601,6 +601,59 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		}
 
 		Self::get_mining_authority_by_index(closest?)
+	}
+
+	fn xor_closest_managed_authority(
+		seal_proof: U256,
+		signing_key: &T::MiningAuthorityId,
+		xor_distance: Option<U256>,
+	) -> Option<(MiningAuthority<T::MiningAuthorityId, T::AccountId>, U256, Permill)> {
+		let xor_keys = <MinerXorKeysByCohort<T>>::get();
+		let mut closest_distance = xor_distance.unwrap_or(U256::MAX);
+		let mut closest = None;
+		let mut distances = vec![];
+
+		for (frame_id, cohort) in xor_keys {
+			for (i, peer_hash) in cohort.into_iter().enumerate() {
+				let distance = seal_proof ^ peer_hash;
+				distances.push(distance);
+				if distance < closest_distance {
+					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
+					if &authority.authority_id == signing_key {
+						closest_distance = distance;
+						closest = Some(authority);
+					}
+				}
+			}
+		}
+		let closest = closest?;
+
+		distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+		let index = distances
+			.iter()
+			.position(|&x| x == closest_distance)
+			.expect("should exist, just checked");
+		Some((
+			closest,
+			closest_distance,
+			Permill::from_rational(index as u32, distances.len() as u32),
+		))
+	}
+
+	fn get_authority_distance(
+		seal_proof: U256,
+		authority_id: &T::MiningAuthorityId,
+		account_id: &T::AccountId,
+	) -> Option<U256> {
+		let miner_index = AccountIndexLookup::<T>::get(account_id)?;
+		let authority = Self::get_mining_authority_by_index(miner_index)?;
+		if authority.authority_id != *authority_id {
+			return None;
+		}
+		let xor_keys = MinerXorKeysByCohort::<T>::get();
+		let peer_hash = xor_keys.get(&miner_index.0)?.get(miner_index.1 as usize)?;
+		let distance = seal_proof ^ (*peer_hash);
+		Some(distance)
 	}
 }
 
@@ -858,7 +911,7 @@ impl<T: Config> Pallet<T> {
 			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
 			let frame_id = NextFrameId::<T>::get();
 			Self::deposit_event(Event::<T>::MiningBidsClosed { frame_id });
-			return true
+			return true;
 		}
 
 		false
@@ -904,7 +957,7 @@ impl<T: Config> Pallet<T> {
 	pub fn tick_for_frame(frame_id: FrameId) -> Tick {
 		if frame_id == 0 {
 			// return genesis tick for slot 0
-			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks())
+			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks());
 		}
 		let slot_1_tick = Self::slot_1_tick();
 		let added_ticks = (frame_id - 1) * Self::ticks_between_slots();
@@ -1111,7 +1164,7 @@ impl<T: Config> MiningSlotProvider for Pallet<T> {
 impl<T: Config> BlockSealEventHandler for Pallet<T> {
 	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>) {
 		if !matches!(seal, BlockSealInherent::Vote { .. }) {
-			return
+			return;
 		}
 		// If bids are open, and we're in the closing-period, check if bidding should close.
 		// NOTE: This should run first to ensure bids in this block can't be manipulated once

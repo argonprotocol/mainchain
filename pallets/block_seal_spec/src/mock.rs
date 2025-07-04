@@ -64,6 +64,20 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
 		XorClosest::get().clone()
 	}
+	fn xor_closest_managed_authority(
+		_seal_proof: U256,
+		_signing_key: &BlockSealAuthorityId,
+		_xor_distance: Option<U256>,
+	) -> Option<(MiningAuthority<BlockSealAuthorityId, u64>, U256, Permill)> {
+		todo!()
+	}
+	fn get_authority_distance(
+		_seal_proof: U256,
+		_authority_id: &BlockSealAuthorityId,
+		_account: &u64,
+	) -> Option<U256> {
+		todo!()
+	}
 }
 
 pub struct StaticNotebookProvider;

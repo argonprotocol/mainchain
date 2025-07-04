@@ -6882,9 +6882,9 @@ dependencies = [
 
 [[package]]
 name = "grandpa-verifier"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3501ec1caae425d6fbcdf0db5e3720c7116261c814fc93446cd535a03c7b5e8"
+checksum = "744df8a0223499bf62fb656438c6ae69a6d7677b01ce1a6d9cd849eed0a4ef7a"
 dependencies = [
  "anyhow",
  "derive_more 0.99.20",
@@ -6898,9 +6898,9 @@ dependencies = [
 
 [[package]]
 name = "grandpa-verifier-primitives"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22f0dc6df057f51831e49e54128b9eed2eb78a0d803a40344626865bb7d1410d"
+checksum = "ce37b0231b8dfb0201180c47334c8cc3d6c3afca01aec89a4c668f27ec131919"
 dependencies = [
  "anyhow",
  "finality-grandpa",
@@ -7982,9 +7982,9 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
 name = "ismp"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "debe08d65c32fd43c585ef1ed5bf623d551185661edde48fd5211791918a5fd1"
+checksum = "25e6e457045b65e80521632ea2eb175b2901edbe94210c89bd03bf554e5bc55d"
 dependencies = [
  "anyhow",
  "derive_more 1.0.0",
@@ -8000,9 +8000,9 @@ dependencies = [
 
 [[package]]
 name = "ismp-grandpa"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21818112601ec23fb79864f2882f2c2d6f8bd6ad7327a2f9a1d0d0e4f56e6e83"
+checksum = "c37767339aba237b060c3fa3917d2051ab69a52f8ab297fa244d3333e6c38065"
 dependencies = [
  "anyhow",
  "ckb-merkle-mountain-range",
@@ -11156,9 +11156,9 @@ dependencies = [
 
 [[package]]
 name = "pallet-hyperbridge"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9cd651105a392fefd7351cb340a82bb2494ed3feda057d0fee2e2bbb11760c3"
+checksum = "5278bd1294bf4ffd54af846c942e317605f648f015f16f1ac360927582d929f7"
 dependencies = [
  "anyhow",
  "ismp",
@@ -11236,9 +11236,9 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d187de06d465e79264d88e9e8f98e5519f66357f1ec8b535d289bdfe4e110dbd"
+checksum = "7417544ab8b56f00d482c22a427a68070b829762de3e3f7d04c0f66fb5c15869"
 dependencies = [
  "anyhow",
  "fortuples",
@@ -11253,9 +11253,9 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp-rpc"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14f8bce4b8155c35f359e5133c068d797a786fa01cc916d2564f6094cc6c4f9a"
+checksum = "1275cc069ae1a7f029015984e506a1eed8bce09fb35dff6835b4e373892f6c17"
 dependencies = [
  "anyhow",
  "hash-db",
@@ -11275,9 +11275,9 @@ dependencies = [
 
 [[package]]
 name = "pallet-ismp-runtime-api"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e859414c61afb3735bdb2b6e64f3d1162b3a0e6912276501501b36d9ade055"
+checksum = "17d7fa0ebc274d8560b24b8406c0fb959f1602b1a153d78540da6c001c61caa1"
 dependencies = [
  "ismp",
  "pallet-ismp",
@@ -12215,9 +12215,9 @@ dependencies = [
 
 [[package]]
 name = "pallet-token-gateway"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73b393da3e1c9addffebdb40ae840473ae8bba1c4155a27d32614053c3940189"
+checksum = "6638b84d105e4754c4b1b38de02e6f3d1697127727718448051370e61962e050"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",
@@ -20213,9 +20213,9 @@ dependencies = [
 
 [[package]]
 name = "substrate-state-machine"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61e08956b72367d7622dfa3444bfc291f260b9febcd2bdef4a4e2b266de6993a"
+checksum = "0b5391fe53d91eaa2ac0c1750334d42ba588ca882fd47998456bfe2173bcff61"
 dependencies = [
  "hash-db",
  "ismp",
@@ -20225,6 +20225,7 @@ dependencies = [
  "primitive-types 0.13.1",
  "scale-info",
  "serde",
+ "trie-db",
 ]
 
 [[package]]
@@ -21005,9 +21006,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-gateway-primitives"
-version = "2503.0.0"
+version = "2503.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31fd05cd9dc916dbca3321a6af458cd09e517d1e9e32fae198797dd4f93452b2"
+checksum = "d7eb1935885ef4b85684ef703622629f57b9c0d55ad030bc35238526fb40424b"
 dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",

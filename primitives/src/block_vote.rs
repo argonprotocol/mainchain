@@ -5,6 +5,7 @@ use polkadot_sdk::*;
 use crate::{AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber, tick::Tick};
 use alloc::vec::Vec;
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use polkadot_sdk::sp_runtime::Permill;
 use serde::{Deserialize, Serialize};
 use sp_core::{H256, U256};
 use sp_crypto_hashing::blake2_256;
@@ -174,6 +175,8 @@ pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
 	/// Proof the vote was included in the block vote root of a notary header
 	pub source_notebook_proof: MerkleProof,
 	pub closest_miner: (AccountId, Authority),
+	/// The XOR distance of the closest miner to the vote, and the percentile of the seal strength
+	pub miner_xor_distance: Option<(U256, Permill)>,
 }
 
 /// This struct exists mostly because the mental model of the voting is so difficult to

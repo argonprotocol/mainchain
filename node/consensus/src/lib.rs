@@ -10,6 +10,8 @@ use argon_primitives::{
 	BLOCK_SEAL_KEY_TYPE, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
 	BlockSealAuthorityId, MiningApis, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 	inherents::BlockSealInherentNodeSide,
+	prelude::{sp_arithmetic::Permill, sp_core::U256},
+	tick::{Tick, Ticker},
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::{Codec, MaxEncodedLen};
@@ -26,7 +28,7 @@ use sp_consensus::{BlockOrigin, Environment, SelectChain, SyncOracle};
 use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::{Block as BlockT, Header};
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time};
+use tokio::{sync::Mutex, time, time::Instant};
 use tracing::{debug, info, trace, warn};
 
 #[cfg(test)]
@@ -189,6 +191,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						let vote = command.vote;
 						let seal_strength = vote.seal_strength;
 						let author = vote.closest_miner.0.clone();
+						let xor_distance = vote.miner_xor_distance.map(|(distance, _)| distance);
 						let authority = vote.closest_miner.1.clone();
 
 						let Some(proposal) =  creator
@@ -208,6 +211,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							&pre_hash,
 							&authority,
 							seal_strength,
+							xor_distance,
 						) {
 							Ok(x) => x,
 							Err(err) => {
@@ -242,12 +246,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		let mut stale_branches = LruMap::new(ByLength::new(500));
 
 		let compute_state = ComputeState::new(compute_handle.clone(), client.clone(), ticker);
+		let mut notebook_ticks_recheck = NotebookTickChecker::new();
 		loop {
-			let mut check_for_better_blocks: Option<VotingPowerInfo> = None;
+			let mut check_notebook_tick: Option<Tick> = None;
 			let mut next_notebooks_at_tick: Option<VotingPowerInfo> = None;
 			tokio::select! {
 				notebook = notebook_tick_rx.next() => {
-					check_for_better_blocks = notebook;
+					check_notebook_tick = notebook.map(|(t,_,_)| t);
 					next_notebooks_at_tick = notebook;
 				},
 				block_next = import_stream.next() => {
@@ -269,11 +274,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						// or could be a new branch. NOTE: we only want to do this if we have notebooks, otherwise we might kick the
 						// chain back to compute. We will try to solve again once the notebook arrives anyway and look for beatable blocks
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
-						if let Ok(info) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
-							if let Some((_, _, notebooks)) = info {
-								if notebooks > 0 {
-									check_for_better_blocks = info;
-								}
+						if let Ok( Some((tick, _, notebooks))) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
+							if notebooks > 0 {
+								check_notebook_tick = Some(tick);
 							}
 						}
 					}
@@ -312,7 +315,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						}
 					}
 				},
-				_on_delay = time::sleep(idle_delay) => {},
+				_on_delay = time::sleep(idle_delay.min(notebook_ticks_recheck.get_next_check_delay())) => {},
 			}
 
 			// don't try to check for blocks during a sync
@@ -342,13 +345,20 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				*notary_client.pause_queue_processing.write().await = false;
 			}
 
-			if let Some((notebook_tick, voting_power, notebooks)) = check_for_better_blocks {
-				if let Err(err) = notebook_sealer
-					.check_for_new_blocks(notebook_tick, voting_power, notebooks)
-					.await
-				{
-					warn!("Error while checking for new blocks: {:?}", err);
-				}
+			let mut notebooks_to_check = notebook_ticks_recheck.get_ready();
+			if let Some(notebook_tick) = check_notebook_tick {
+				notebooks_to_check.insert(notebook_tick);
+			}
+			for notebook_tick in notebooks_to_check {
+				match notebook_sealer.check_for_new_blocks(notebook_tick).await {
+					Ok(result) =>
+						if let Some(at_time) = result.recheck_notebook_tick_time {
+							notebook_ticks_recheck.add(notebook_tick, at_time);
+						},
+					Err(err) => {
+						tracing::warn!(notebook_tick, ?err, "Error while checking for new blocks",)
+					},
+				};
 			}
 
 			if !is_compute_enabled {
@@ -401,13 +411,87 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	handle.spawn("block-creator", Some("block-authoring"), block_creator_task);
 }
 
+pub(crate) struct NotebookTickChecker {
+	to_check: Vec<(Tick, Instant)>,
+}
+
+impl NotebookTickChecker {
+	pub fn new() -> Self {
+		Self { to_check: vec![] }
+	}
+
+	pub fn add(&mut self, tick: Tick, at_time: Instant) {
+		if !self.to_check.iter().any(|(t, _)| *t == tick) {
+			self.to_check.push((tick, at_time));
+		}
+	}
+
+	pub fn get_next_check_delay(&self) -> Duration {
+		if let Some(min_time) = self.to_check.iter().map(|(_, at_time)| *at_time).min() {
+			let now = Instant::now();
+			if min_time > now {
+				return min_time.saturating_duration_since(now);
+			}
+		}
+		Duration::from_secs(0)
+	}
+
+	pub(crate) fn should_delay_block_attempt(
+		block_tick: Tick,
+		ticker: &Ticker,
+		miner_xor_distance: Option<(U256, Permill)>,
+	) -> Option<Instant> {
+		let (_, percentile) = miner_xor_distance?;
+		if block_tick == ticker.current() {
+			// offset the block creation by the miner's percentile of xor distance
+			// it must account for the current delay into the tick duration
+			let duration_to_next_tick = ticker.duration_to_next_tick();
+			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
+			let elapsed = duration_per_tick.saturating_sub(duration_to_next_tick);
+			let millis_offset = percentile.mul_floor(duration_per_tick.as_millis() as u64);
+			let start_delay = Duration::from_millis(millis_offset);
+			if start_delay > elapsed {
+				let start_time = Some(Instant::now() + start_delay);
+				tracing::trace!(
+					start_delay = ?start_delay,
+					miner_percentile = ?percentile,
+					duration_to_next_tick = ?duration_to_next_tick,
+					"Delay vote block creation due to miner percentile vs tick elapsed"
+				);
+				return start_time;
+			}
+		}
+		None
+	}
+
+	pub fn get_ready(&mut self) -> HashSet<Tick> {
+		let mut notebooks_to_check = HashSet::new();
+		self.to_check.retain(|(tick, at_time)| {
+			if at_time <= &Instant::now() {
+				info!(notebook_tick = tick, "Re-checking beatable blocks at notebook tick");
+				notebooks_to_check.insert(*tick);
+				return false;
+			}
+			true
+		});
+		notebooks_to_check
+	}
+}
+
 #[cfg(test)]
 mod test {
+	use crate::NotebookTickChecker;
+	use argon_primitives::{
+		prelude::{sp_core::U256, sp_runtime::Permill, *},
+		tick::Ticker,
+	};
 	use argon_runtime::{Block, Header};
 	use codec::{Decode, Encode};
-	use polkadot_sdk::*;
 	use sc_consensus_grandpa::{FinalityProof, GrandpaJustification};
 	use sp_runtime::RuntimeAppPublic;
+	use std::{collections::HashSet, time::Duration};
+	use tokio::time::Instant;
+
 	#[test]
 	fn decode_finality() {
 		// First block in mainnet on 105 is 17572. Version deployed on
@@ -431,6 +515,36 @@ mod test {
 					assert_eq!(i, 0);
 				}
 			}
+		}
+	}
+
+	#[test]
+	fn test_notebook_tick_checker() {
+		let mut checker = NotebookTickChecker::new();
+		let tick_1 = 1;
+		let tick_2 = 2;
+		let now = Instant::now();
+		checker.add(tick_1, now + Duration::from_secs(10));
+		checker.add(tick_2, now - Duration::from_secs(5));
+
+		assert_eq!(checker.get_ready(), [tick_2].into_iter().collect::<HashSet<_>>());
+		assert_eq!(checker.get_next_check_delay().as_secs(), 9);
+
+		assert_eq!(checker.to_check.len(), 1);
+	}
+
+	#[test]
+	fn test_notebook_tick_checker_should_delay_block_attempt() {
+		let ticker = Ticker::start(Duration::from_secs(2), 2);
+		let miner_xor_distance = Some((U256::from(100), Permill::from_percent(50)));
+		let now = Instant::now();
+		// we can't guarantee when this will run, so we just check it if it does
+		if let Some(delay) = NotebookTickChecker::should_delay_block_attempt(
+			ticker.current(),
+			&ticker,
+			miner_xor_distance,
+		) {
+			assert_eq!(delay.duration_since(now).as_secs(), 1);
 		}
 	}
 }

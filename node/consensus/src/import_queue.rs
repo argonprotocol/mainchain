@@ -252,7 +252,7 @@ where
 			// NOTE: only import as best block if it beats the best stored block. There are cases
 			// where importing a tie will yield too many blocks at a height and break substrate
 			set_to_best = has_state_or_block && can_finalize;
-			if set_to_best && fork_power == best_block_power {
+			if set_to_best && fork_power.eq_weight(&best_block_power) {
 				// if fork power is equal, choose a deterministic option to set the best block
 				set_to_best = info.best_hash > block_hash;
 				// check if this is a "duplicate" block from the same author at the same tick
@@ -473,7 +473,7 @@ where
 			let pre_hash = block_params.header.hash();
 
 			// TODO: should we move all of this to the runtime? Main holdup is building randomx for
-			// wasm
+			// 	wasm
 			if seal_digest.is_vote() {
 				let is_valid = runtime_api
 					.is_valid_signature(parent_hash, pre_hash, &seal_digest, digest)
@@ -986,6 +986,7 @@ mod test {
 				1,
 				BlockSealDigest::Vote {
 					seal_strength: U256::one(),
+					xor_distance: Some(U256::one()),
 					signature: BlockSealAuthoritySignature::from_slice(&[0u8; 64])
 						.expect("serialization of block seal strength failed"),
 				},
@@ -1287,7 +1288,7 @@ mod test {
 			None,
 			BlockOrigin::Own,
 			StateAction::Execute,
-			Some(AccountId::from([1u8; 32])),
+			Some(AccountId::from([2u8; 32])),
 		);
 		let h_win = winner.header.hash();
 		assert_ok!(importer.import_block(winner).await); // Imported(best)
