@@ -36,12 +36,12 @@ jobs:
       - name: Update latest
         if: ${{ github.event.release.draft == false }}
         run: |
-          docker pull ghcr.io/argonprotocol/argon-miner:${{ env.VERSION }}
-          docker pull ghcr.io/argonprotocol/argon-notary:${{ env.VERSION }}
-          docker tag ghcr.io/argonprotocol/argon-miner:${{ env.VERSION }} ghcr.io/argonprotocol/argon-miner:latest
-          docker tag ghcr.io/argonprotocol/argon-notary:${{ env.VERSION }} ghcr.io/argonprotocol/argon-notary:latest
-          docker push ghcr.io/argonprotocol/argon-miner:latest
-          docker push ghcr.io/argonprotocol/argon-notary:latest
+          for name in argon-miner argon-oracle argon-notary; do
+            image=ghcr.io/argonprotocol/$name
+            docker pull $image:${{ env.VERSION }}
+            docker tag $image:${{ env.VERSION }} $image:latest
+            docker push $image:latest
+          done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.get_latest.outputs.latest }}

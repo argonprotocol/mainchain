@@ -77,6 +77,18 @@ jobs:
             type=semver,pattern=${{env.VERSION}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
+
+      - name: Oracle
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-oracle
+          bin: argon-oracle
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
+          tags: |
+            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
   npm:
     name: Publish
     permissions:

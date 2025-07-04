@@ -8,7 +8,7 @@ validators=(alice bob dave)
 
 # Check if minio is active on port 9000
 if ! nc -z localhost 9000; then
-  echo "Minio is not running on port 9000. Please start minio and try again (`./docker_minio.sh`)."
+  echo "Minio is not running on port 9000. Please start minio and try again (`../docker_minio.sh`)."
   exit 1
 fi
 

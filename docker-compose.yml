@@ -1,0 +1,378 @@
+## Shared configs
+x-oracle-config: &oracle
+  image: ghcr.io/argonprotocol/argon-oracle:${VERSION:-latest}
+  build:
+    context: .
+    dockerfile: dev.Dockerfile
+    target: oracle
+  restart: on-failure
+x-notary-config: &notary
+  image: ghcr.io/argonprotocol/argon-notary:${VERSION:-latest}
+  build:
+    context: .
+    dockerfile: dev.Dockerfile
+    target: argon-notary
+  restart: on-failure
+x-node-config: &node
+  image: ghcr.io/argonprotocol/argon-node:${VERSION:-latest}
+  build:
+    context: .
+    dockerfile: dev.Dockerfile
+    target: argon-node
+  restart: on-failure
+x-bitcoin-config: &bitcoin
+  image: ghcr.io/argonprotocol/bitcoin-unverified-node:latest
+  build:
+    context: .
+    dockerfile: docker/bitcoin.Dockerfile
+  restart: on-failure
+  volumes:
+    - bitcoin-data:/bitcoin
+
+services:
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "0:9000"
+      - "0:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: >
+        curl -f "http://localhost:9000/minio/health/live" || exit 1
+      interval: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: notary
+    ports:
+      - "0:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 10
+
+  bitcoin:
+    <<: *bitcoin
+    entrypoint: ["bitcoind"]
+    command:
+      - --chain=regtest
+      - --rpcport=18444
+      - --rpcuser=bitcoin
+      - --rpcpassword=bitcoin
+      - --rpcbind=0.0.0.0
+      - --rpcallowip=0.0.0.0/0
+      - --fallbackfee=0.0001
+      - --listen=0
+      - --datadir=/bitcoin
+      - --blockfilterindex
+      - --txindex
+      - --wallet=1
+    ports:
+      - "0:18444"
+    healthcheck:
+      test: >
+        echo '{"jsonrpc":"1.0","id":"curltest","method":"getblockchaininfo","params":[]}' | curl --fail -s --user bitcoin:bitcoin -H "content-type: text/plain;" --data-binary @- http://localhost:18444/
+      interval: 5s
+      retries: 10
+
+  bitcoin-wallet-init:
+    <<: *bitcoin
+    command: >
+      sh -c '
+        set -e
+        echo "[regtest]" > /bitcoin/bitcoin.conf
+        echo "rpcuser=bitcoin" >> /bitcoin/bitcoin.conf
+        echo "rpcpassword=bitcoin" >> /bitcoin/bitcoin.conf
+        echo "rpcconnect=bitcoin" >> /bitcoin/bitcoin.conf
+        echo "rpcport=18444" >> /bitcoin/bitcoin.conf
+        echo "txindex=1" >> /bitcoin/bitcoin.conf
+        echo "blockfilterindex=1" >> /bitcoin/bitcoin.conf
+        echo "wallet=default" >> /bitcoin/bitcoin.conf
+
+        if ! bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf getwalletinfo >/dev/null 2>&1; then
+          bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf createwallet default 2>/dev/null \
+          || bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf loadwallet default
+        fi
+      '
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+
+  bitcoin-init:
+    <<: *bitcoin
+    command: ./init-bitcoin.sh
+    environment:
+      BITCOIN_CLI_ARGS: >-
+        -regtest
+        -datadir=/bitcoin
+        -conf=/bitcoin/bitcoin.conf
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+
+  archive-node:
+    <<: *node
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+      bitcoin-init:
+        condition: service_completed_successfully
+    command: >
+      --alice
+      --compute-miners=1
+      --port=30334
+      --rpc-port=9944
+      --node-key=16ec4f460237d066d15d09a44959a7d49ea6405e98429826f1c28b9087bd60ea
+      --base-path=/data
+      --chain=local
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --notebook-archive-hosts=http://minio:9000
+      --no-mdns
+      --no-telemetry
+      --detailed-log-output
+      --rpc-cors=all
+      --rpc-methods=unsafe
+      --unsafe-rpc-external
+      --validator
+      --pruning=archive
+    ports:
+      - "${RPC_PORT:-9944}:9944"
+      - "0:30334"
+    volumes:
+      - archive-data:/data
+    environment:
+      RUST_LOG: info,argon=info,pallet=trace
+    healthcheck:
+      test: >
+        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+      interval: 5s
+      retries: 10
+
+  miner-1:
+    <<: *node
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+      bitcoin-init:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+    command: >
+      --bob
+      --compute-miners=1
+      --port=30335
+      --rpc-port=9944
+      --node-key=f1425b14b3333b7e20bead4d3c3bcc35c908609c843194bb9753e2af6374a87f
+      --public-addr=/dns/miner-1/tcp/30335/p2p/12D3KooWL2HqeruEZvKCDxgb9zEQgx74R2pHWV2FzctCSvtvT7zu
+      --base-path=/data
+      --bootnodes=/dns/archive-node/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn
+      --chain=local
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --notebook-archive-hosts=http://minio:9000
+      --no-mdns
+      --no-telemetry
+      --detailed-log-output
+      --rpc-cors=all
+      --rpc-methods=unsafe
+      --unsafe-rpc-external
+      --validator
+      --pruning=archive
+    ports:
+      - "0:9944"
+      - "0:30335"
+    volumes:
+      - miner1-data:/data
+    environment:
+      RUST_LOG: info,argon=info,pallet=trace
+    healthcheck:
+      test:
+        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+      interval: 5s
+      retries: 10
+    profiles:
+      - miners
+      - bob
+      - all
+
+  miner-2:
+    <<: *node
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+      bitcoin-init:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+    command: >
+      --dave
+      --compute-miners=1
+      --port=30336
+      --rpc-port=9944
+      --node-key=7e730d590cea52bc2219249da8647147ef53d5dbd00840ea8ed6d00d5f747935
+      --public-addr=/dns/miner-2/tcp/30336/p2p/12D3KooWJSbmepuSKfkxNq8aPeqr3oRQsN3E7SyprkzSuqR1nu23
+      --base-path=/data
+      --bootnodes=/dns/archive-node/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn
+      --chain=local
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --notebook-archive-hosts=http://minio:9000
+      --no-mdns
+      --no-telemetry
+      --detailed-log-output
+      --rpc-cors=all
+      --rpc-methods=unsafe
+      --unsafe-rpc-external
+      --validator
+      --pruning=archive
+    ports:
+      - "0:9944"
+      - "0:30336"
+    volumes:
+      - miner2-data:/data
+    environment:
+      RUST_LOG: info,argon=info,pallet=trace
+    healthcheck:
+      test:
+        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+      interval: 5s
+      retries: 10
+    profiles:
+      - miners
+      - dave
+      - all
+
+  notary-insert-key:
+    <<: *notary
+    command: insert-key --keystore-path=/keystore --suri=//Ferdie//notary
+    volumes:
+      - notary-keystore:/keystore
+
+  notary-migrate:
+    <<: *notary
+    environment:
+      RUST_LOG: info
+    command: migrate --db-url=postgres://postgres:password@postgres:5432/notary
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notary:
+    <<: *notary
+    depends_on:
+      notary-insert-key:
+        condition: service_completed_successfully
+      notary-migrate:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command:
+      - run
+      - --operator-address=5CiPPseXPECbkjWCa6MnjNokrgYjMqmKndv2rSnekmSK2DjL
+      - --db-url=postgres://postgres:password@postgres:5432/notary
+      - --keystore-path=/keystore
+      - --archive-endpoint=http://minio:9000
+      - --dev
+      - --bind-addr=0.0.0.0:9925
+    ports:
+      - "0:9925"
+    volumes:
+      - notary-keystore:/keystore
+    networks:
+      default:
+        aliases:
+          - notary.localhost
+    environment:
+      - TRUSTED_RPC_URL=ws://archive-node:9944
+
+  oracle-btc-insert-key:
+    <<: *oracle
+    command:
+      - insert-key
+      - --keystore-path=/keystore
+      - --suri=//Dave
+      - --crypto-type=sr25519
+    volumes:
+      - oracle-btc-keystore:/keystore
+
+  oracle-btc:
+    <<: *oracle
+    depends_on:
+      oracle-btc-insert-key:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+    command:
+      - bitcoin
+      - --keystore-path=/keystore
+      - --signer-crypto=sr25519
+      - --signer-address=5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy
+      - --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+    volumes:
+      - oracle-btc-keystore:/keystore
+    environment:
+      - TRUSTED_RPC_URL=ws://archive-node:9944
+
+  oracle-price-insert-key:
+    <<: *oracle
+    command:
+      - insert-key
+      - --keystore-path=/keystore
+      - --suri=//Eve
+      - --crypto-type=sr25519
+    volumes:
+      - oracle-price-keystore:/keystore
+    profiles:
+      - price-oracle
+      - all
+
+  oracle-price:
+    <<: *oracle
+    depends_on:
+      oracle-price-insert-key:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+    command:
+      - price-index
+      - --keystore-path=/keystore
+      - --signer-crypto=sr25519
+      - --signer-address=5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw
+      - --simulate-prices
+    volumes:
+      - oracle-price-keystore:/keystore
+      - /tmp/oracle/data/US_CPI_State.json:/tmp/oracle/data/US_CPI_State.json
+    environment:
+      - TRUSTED_RPC_URL=ws://archive-node:9944
+      - ARGON_TOKEN_ADDRESS=${ARGON_TOKEN_ADDRESS:-6b175474e89094c44da98b954eedeac495271d0f}
+      - ARGONOT_TOKEN_ADDRESS=${ARGONOT_TOKEN_ADDRESS:-6b175474e89094c44da98b954eedeac495271d0f}
+      - BLS_API_KEY=${BLS_API_KEY}
+      - INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
+      - ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json
+    profiles:
+      - price-oracle
+      - all
+
+volumes:
+  minio-data:
+  pgdata:
+  bitcoin-data:
+  archive-data:
+  miner1-data:
+  miner2-data:
+  notary-keystore:
+  oracle-btc-keystore:
+  oracle-price-keystore:
