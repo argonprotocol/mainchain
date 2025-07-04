@@ -27,3 +27,4 @@ node_modules
 **/nodejs/lib/
 /bitcoin/nodejs/.port-lock
 /build.log
+.env*.local

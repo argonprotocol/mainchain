@@ -78,12 +78,12 @@ PostgresSQL database to keep track of its history and users' balance tips.
   localchain [here](./docs/localchain.md).
 - `node`: The node implementation is the entry point for the Argon blockchain. It is responsible for networking,
   consensus, and running the blockchain.
-  - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
-    for creating all blocks during "Slot 0", before miners register for slots.
-  - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
-    has logic for retrieving notebooks from notaries and prioritizing blocks.
-  - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
-    back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
+    - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
+      for creating all blocks during "Slot 0", before miners register for slots.
+    - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
+      has logic for retrieving notebooks from notaries and prioritizing blocks.
+    - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
+      back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
 - `notary`: The notary validates localchain transactions and confirms they are operating on their latest tip. A notary
   runs on a Postgres database. It must submit notebooks rolling up all the localchain balance changes, votes and
   registered domains. Notebooks are submitted for each system "tick".
@@ -92,27 +92,27 @@ PostgresSQL database to keep track of its history and users' balance tips.
 - `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
 - `pallets`: The pallets are the various "tables" that make up the blockchain. They define the storage, dispatchables,
   events, and errors of the blockchain.
-  - `bitcoin_locks`: Main interaction point to lock and release bitcoins into a vault.
-  - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
-  - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
-    spent).
-  - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
-  - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-  - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
-  - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
-    akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
-  - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity pools offer early
-    liquidity to locked bitcoins and earn participants a share of the mining bid pool.
-  - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
-    mine blocks created by the notebook commit reveal scheme.
-  - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
-  - `notaries`: Registers the notaries and metadata to connect to them
-  - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
-    notebook. Also tracks the last changed notebook per localchain.
-  - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
-    inflation since the starting time.
-  - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-  - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create LiquidityPools.
+    - `bitcoin_locks`: Main interaction point to lock and release bitcoins into a vault.
+    - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
+    - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
+      spent).
+    - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
+    - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
+    - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
+    - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
+      akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
+    - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity pools offer early
+      liquidity to locked bitcoins and earn participants a share of the mining bid pool.
+    - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
+      mine blocks created by the notebook commit reveal scheme.
+    - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
+    - `notaries`: Registers the notaries and metadata to connect to them
+    - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
+      notebook. Also tracks the last changed notebook per localchain.
+    - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
+      inflation since the starting time.
+    - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
+    - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create LiquidityPools.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets
@@ -191,6 +191,53 @@ Depending on your operating system and Rust version, there might be additional p
 project.
 Check the [Substrate Install](https://docs.substrate.io/install/) instructions for your platform for the most common
 dependencies.
+
+## Running from Docker
+
+A docker compose is present to run the entire network using the "local testnet".
+
+You can build this using source, or run the pre-built images from the Docker Hub. To run with a specific version, you
+should pass a `VERSION=v1.3.0` (or whatever version you want) to the `docker compose` command.
+
+To run the local testnet using Docker, you can use the following command:
+
+```sh
+VERSION=v1.3.0 RPC_PORT=9944 docker compose up
+```
+
+### Profiles
+
+The docker compose file has several profiles that can be used to run different parts of the network.
+
+- `Default (no profile)`: If you don't use a profile, it will run the entire network with an argon node, bitcoin node,
+  notary and bitcoin oracle.
+- `miners`: Adds 2 compute miners.
+- `price-oracle`: Adds a price oracle to the network. You must supply an `Infura` and `BLS` key in the `.env` file for
+  this to work (see below).
+- `all`: Run the entire network: 1 archive node, 2 miners, 1 bitcoin node, 1 notary, 1 bitcoin oracle and 1 price
+  oracle.
+
+Profiles must be specified with the `--profile` flag in the `docker compose` command. Omitting will use the default
+profile.
+
+To run multiple compose instances, you need to set `RPC_PORT=0`, otherwise, each will bind an rpc port on 9944.
+
+```sh
+VERSION=v1.3.0 RPC_PORT=0 docker compose --profile all up
+```
+
+NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and
+an [Infura](https://docs.metamask.io/services/get-started/infura/) key to run the price oracle. They should be added to
+an `.env` file that you load with docker compose.
+
+```dotenv
+BLS_API_KEY=02c566df8f7d4e8as2342asdf2342
+INFURA_PROJECT_ID=7a5b4a7c036346cfa234234234234
+```
+
+```sh
+docker compose --env-file .env up
+```
 
 ### Cargo Make
 
