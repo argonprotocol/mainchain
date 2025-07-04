@@ -1,6 +1,34 @@
 # Changelog
 
-## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...bb1cd6be76ccc2a634357ab48504b453fb92f86d) (2025-06-11)
+## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...1fb31f9715ab016afece1f636a7f0af7cad5e5da) (2025-07-04)
+
+### Features
+
+* add a docker compose to run local testnet
+([6d8c7f1](https://github.com/argonprotocol/mainchain/commit/6d8c7f1a1b6cf8a96ead05721efa9d9237ea80d6))
+* **liquidity_pools:** vault operator prebonding
+([e6066fe](https://github.com/argonprotocol/mainchain/commit/e6066febe05897393c648afca2bce75d5cba6772))
+* **node:** allow multiple miners to submit a vote
+([b98e8fa](https://github.com/argonprotocol/mainchain/commit/b98e8fa81e8982f7879601c048f19514886bfaa0))
+* **bitcoin:** nodejs library for psbt
+([83d2288](https://github.com/argonprotocol/mainchain/commit/83d2288eced197b87087736719662513cac17753))
+* **vaults:** remove opened delay
+([d874b04](https://github.com/argonprotocol/mainchain/commit/d874b043e30f226327b6ac390c1fec996bbabf46))
+
+### Fixes
+
+* **bitcoin:** wasm generation
+([1ceaa00](https://github.com/argonprotocol/mainchain/commit/1ceaa00406b69d79ba13ac8d189de1975e5af578))
+* **consensus:** ensure we have notebooks for block
+([3dd8284](https://github.com/argonprotocol/mainchain/commit/3dd828436c1062fb69f74d5d335b0688bfc39de0))
+* **import_queue:** make re-imports safe
+([79ed9ce](https://github.com/argonprotocol/mainchain/commit/79ed9ceca8a004ba3621d1786fc563596ab744f9))
+* **bitcoin_locks:** truncation in redemption price
+([8b7726e](https://github.com/argonprotocol/mainchain/commit/8b7726e89b0e7f5d8d5deaece2edff0b685781b9))
+* prevent underflow
+([d8e7bf9](https://github.com/argonprotocol/mainchain/commit/d8e7bf987c30cedd8e936bd31fbca63fbb689c05))
+
+## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...v1.2.0) (2025-06-11)
 
 ### Features
 
@@ -17,6 +45,8 @@
 
 ### Fixes
 
+* **client:** tests broken from xpriv
+([7eddd59](https://github.com/argonprotocol/mainchain/commit/7eddd59d2058e9dfc2631954f98b05c6acc916ff))
 * **ci:** attempt to fix github actions
 ([fa9d2fe](https://github.com/argonprotocol/mainchain/commit/fa9d2fedae733480edc7cf19ccfc4f8e51f2a353))
 * remove nanoevents dependency
