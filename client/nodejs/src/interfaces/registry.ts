@@ -178,6 +178,7 @@ import type {
   PalletLiquidityPoolsHoldReason,
   PalletLiquidityPoolsLiquidityPool,
   PalletLiquidityPoolsLiquidityPoolCapital,
+  PalletLiquidityPoolsPrebondedArgons,
   PalletMiningSlotCall,
   PalletMiningSlotError,
   PalletMiningSlotEvent,
@@ -431,6 +432,7 @@ declare module '@polkadot/types/types/registry' {
     PalletLiquidityPoolsHoldReason: PalletLiquidityPoolsHoldReason;
     PalletLiquidityPoolsLiquidityPool: PalletLiquidityPoolsLiquidityPool;
     PalletLiquidityPoolsLiquidityPoolCapital: PalletLiquidityPoolsLiquidityPoolCapital;
+    PalletLiquidityPoolsPrebondedArgons: PalletLiquidityPoolsPrebondedArgons;
     PalletMiningSlotCall: PalletMiningSlotCall;
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;

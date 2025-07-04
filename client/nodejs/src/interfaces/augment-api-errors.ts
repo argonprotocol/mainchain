@@ -462,6 +462,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
+       * The maximum amount per frame would result in funds never used (below 1/10th of the
+       * amount)
+       **/
+      MaxAmountBelowMinimum: AugmentedError<ApiType>;
+      /**
        * Max contributors for a fund exceeded
        **/
       MaxContributorsExceeded: AugmentedError<ApiType>;
@@ -473,6 +478,10 @@ declare module '@polkadot/api-base/types/errors' {
        * This account is not an active mining fund contributor
        **/
       NotAFundContributor: AugmentedError<ApiType>;
+      /**
+       * Vault operator only
+       **/
+      NotAVaultOperator: AugmentedError<ApiType>;
       /**
        * The given vault is not accepting mining bonds
        **/
