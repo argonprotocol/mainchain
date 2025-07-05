@@ -15287,7 +15287,7 @@ dependencies = [
 [[package]]
 name = "randomx-rs"
 version = "1.3.0"
-source = "git+https://github.com/argonprotocol/randomx-rs?branch=memory-safety#12a20b480e0f610acf5ed05d88f144002d59272e"
+source = "git+https://github.com/argonprotocol/randomx-rs?branch=main#4bea9f8c9d01152eff7431eeae49ef2b22af84e1"
 dependencies = [
  "bitflags 2.9.1",
  "libc",

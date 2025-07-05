@@ -500,6 +500,7 @@ where
 					&key_block_hash,
 					compute_difficulty,
 				) {
+					tracing::warn!(?key_block_hash, ?compute_difficulty, ?nonce, block_hash=?post_hash, pre_hash=?pre_hash, "Invalid compute nonce!");
 					return Err(Error::InvalidComputeNonce.into());
 				}
 			}
