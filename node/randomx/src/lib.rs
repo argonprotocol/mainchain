@@ -50,7 +50,7 @@ pub mod full_vm {
 		static VM: RefCell<Option<(H256, RandomXVM)>> = const { RefCell::new(None) };
 	}
 
-	pub fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
+	pub(crate) fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
 		alloc_vm_if_needed(key_hash)?;
 		VM.with_borrow_mut(|vm| {
 			let (_, vm) = vm.as_mut().expect("Local VMS always set to Some above; qed");
@@ -122,14 +122,11 @@ pub mod full_vm {
 	pub fn set_global_config(config: Config) -> Result<(), Config> {
 		GLOBAL_CONFIG.set(config)
 	}
-	pub struct VMData {
+	pub(crate) struct VMData {
 		cache: RandomXCache,
 		dataset: Option<RandomXDataset>,
 		flags: RandomXFlag,
 	}
-
-	unsafe impl Send for VMData {}
-	unsafe impl Sync for VMData {}
 
 	impl VMData {
 		pub fn new(key: &[u8], config: &Config, use_dataset: bool) -> Result<Self, RandomXError> {

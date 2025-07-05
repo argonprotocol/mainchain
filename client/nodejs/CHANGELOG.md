@@ -1,6 +1,22 @@
 # Changelog
 
-## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...bb1cd6be76ccc2a634357ab48504b453fb92f86d) (2025-06-11)
+## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...1fb31f9715ab016afece1f636a7f0af7cad5e5da) (2025-07-04)
+
+### Features
+
+* **liquidity_pools:** vault operator prebonding
+([e6066fe](https://github.com/argonprotocol/mainchain/commit/e6066febe05897393c648afca2bce75d5cba6772))
+* **node:** allow multiple miners to submit a vote
+([b98e8fa](https://github.com/argonprotocol/mainchain/commit/b98e8fa81e8982f7879601c048f19514886bfaa0))
+* **bitcoin:** nodejs library for psbt
+([83d2288](https://github.com/argonprotocol/mainchain/commit/83d2288eced197b87087736719662513cac17753))
+
+### Fixes
+
+* **bitcoin:** wasm generation
+([1ceaa00](https://github.com/argonprotocol/mainchain/commit/1ceaa00406b69d79ba13ac8d189de1975e5af578))
+
+## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...v1.2.0) (2025-06-11)
 
 ### Features
 
@@ -13,6 +29,8 @@
 
 ### Fixes
 
+* **client:** tests broken from xpriv
+([7eddd59](https://github.com/argonprotocol/mainchain/commit/7eddd59d2058e9dfc2631954f98b05c6acc916ff))
 * remove nanoevents dependency
 ([8009109](https://github.com/argonprotocol/mainchain/commit/8009109481f8d75043b93a2dc5682b9383b1f718))
 * **client/node:** don’t make deps optional

@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...bb1cd6be76ccc2a634357ab48504b453fb92f86d) (2025-06-11)
+## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...1fb31f9715ab016afece1f636a7f0af7cad5e5da) (2025-07-04)
+
+### Fixes
+
+* **bitcoin:** wasm generation
+([1ceaa00](https://github.com/argonprotocol/mainchain/commit/1ceaa00406b69d79ba13ac8d189de1975e5af578))
+
+## [v1.2.0](https://github.com/argonprotocol/mainchain/compare/v1.1.0...v1.2.0) (2025-06-11)
 
 ### Features
 
@@ -10,6 +17,11 @@
 ([d47296e](https://github.com/argonprotocol/mainchain/commit/d47296e42e763ac182d496fe0a002441d70920e2))
 * **mining_slot:** dynamic seats
 ([d874e82](https://github.com/argonprotocol/mainchain/commit/d874e82b2a2ef42614e739d7e9472318a99769c7))
+
+### Fixes
+
+* **client:** tests broken from xpriv
+([7eddd59](https://github.com/argonprotocol/mainchain/commit/7eddd59d2058e9dfc2631954f98b05c6acc916ff))
 
 ## [v1.1.0](https://github.com/argonprotocol/mainchain/compare/v1.0.18...v1.1.0) (2025-05-12)
 
