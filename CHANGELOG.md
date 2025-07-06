@@ -1,6 +1,15 @@
 # Changelog
 
-## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...1fb31f9715ab016afece1f636a7f0af7cad5e5da) (2025-07-04)
+## [v1.3.1](https://github.com/argonprotocol/mainchain/compare/v1.3.0...5dabcb3c49438ea2dd397193176783b0a48ddda6) (2025-07-06)
+
+### Fixes
+
+* **consensus:** log prehash for compute
+([c229516](https://github.com/argonprotocol/mainchain/commit/c2295164102e7df997a6a4f10016b231548daea0))
+* **actions:** add oracle for aarch to gh actions
+([962e2cc](https://github.com/argonprotocol/mainchain/commit/962e2cc0e199eb66e6331985e7bb881e945b9ebf))
+
+## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...v1.3.0) (2025-07-04)
 
 ### Features
 
