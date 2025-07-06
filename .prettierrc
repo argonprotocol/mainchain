@@ -4,5 +4,6 @@
   "tabWidth": 2,
   "arrowParens": "avoid",
   "semi": true,
-  "printWidth": 100
+  "printWidth": 100,
+  "proseWrap": "always"
 }

@@ -1,8 +1,11 @@
-This is a Node.js client for the Argon Protocol (https://argonprotocol.org). It has the following core features:
+This is a Node.js client for the Argon Protocol (https://argonprotocol.org). It has the following
+core features:
 
 1. A typescript generated RPC client for the Argon Protocol.
-2. A CLI for interacting with a subset of the Argon Protocol (Mining Bidding, Vaults, Liquidity Pools, Bitcoin)
-3. A "Wage Protector" class that can be used to protect wages against inflation or deflation of the Argon.
+2. A CLI for interacting with a subset of the Argon Protocol (Mining Bidding, Vaults, Liquidity
+   Pools, Bitcoin)
+3. A "Wage Protector" class that can be used to protect wages against inflation or deflation of the
+   Argon.
 
 ## Installation
 
@@ -12,13 +15,13 @@ npm install @argonprotocol/mainchain
 
 ## Client Usage
 
-To create a client, you can use the `getClient(host)` function in the main module. This will return a client object that
-is typed to the argon apis.
+To create a client, you can use the `getClient(host)` function in the main module. This will return
+a client object that is typed to the argon apis.
 
 ## Wage Protector
 
-If you want to protect wages against inflation or deflation of the Argon, there is a `WageProtector` class that can be
-used. You can use it a single time:
+If you want to protect wages against inflation or deflation of the Argon, there is a `WageProtector`
+class that can be used. You can use it a single time:
 
 ```javascript
 const { WageProtector } = require('@argonprotocol/mainchain');
@@ -37,7 +40,8 @@ const { unsubscribe } = await WageProtector.subscribe(client, protectedPrice => 
 });
 ```
 
-Each `WageProtector` instance has the details of the Argon Target Price and USD price at the time of creation.
+Each `WageProtector` instance has the details of the Argon Target Price and USD price at the time of
+creation.
 
 ```typescript
 interface IArgonCpiSnapshot {
@@ -56,8 +60,8 @@ interface IArgonCpiSnapshot {
 
 The library has a few classes that are used to interact with the Argon Protocol.
 
-`clis` - this is a collection of cli commands and helpers. Included here are two helpers to read and store encrypted
-wallets from Polkadot.js or a wallet like [Talisman](https://talisman.xyz/).
+`clis` - this is a collection of cli commands and helpers. Included here are two helpers to read and
+store encrypted wallets from Polkadot.js or a wallet like [Talisman](https://talisman.xyz/).
 
 `Accountset.ts` - manage subaccounts from a single keypair
 
@@ -141,8 +145,8 @@ const { unsubscribe } = await miningBids.onCohortChange({
 
 ## Cli
 
-To use this CLI, the easiest way is to define an .env file with the following variables (you can also provide these to
-each command).
+To use this CLI, the easiest way is to define an .env file with the following variables (you can
+also provide these to each command).
 
 ```env
 MAINCHAIN_URL=ws://localhost:9944
@@ -155,8 +159,8 @@ KEYS_MNEMONIC=# a mnemonic for the keys to generate
 
 ### Setup
 
-To perform actions like `bidding on mining seats`, this cli will need to run for a long period of time. The easiest way
-to do so is to install it alongside a full node. This gives you a server that:
+To perform actions like `bidding on mining seats`, this cli will need to run for a long period of
+time. The easiest way to do so is to install it alongside a full node. This gives you a server that:
 
 1. Will stay alive.
 2. Can have signing keys installed without exposing apis.
@@ -174,7 +178,8 @@ Or with an exported Polkadotjs account (eg, from Talisman, Polkadot Extension, e
 npx @argonprotocol/mainchain accounts create --path=.env.bob --account-file-path=./bob.json --account-passphrase=1234 --register-keys=http://localhost:9944
 ```
 
-This will register your keys with the local node and serve as your `--env` file for the rest of the commands.
+This will register your keys with the local node and serve as your `--env` file for the rest of the
+commands.
 
 ### Exporting PolkadotJs Keys
 
@@ -185,19 +190,22 @@ You can export encrypted json accounts from Polkadot.js to use in this tool.
 3. Click on the "Export Account" button.
 4. Enter a password to encrypt the JSON file.
 5. Move the file to somewhere accessible from where this tool is run (or to mounted docker volumes).
-6. Ensure your `.env.<account>` file has a relative path to this JSON file and the password you used to encrypt it.
+6. Ensure your `.env.<account>` file has a relative path to this JSON file and the password you used
+   to encrypt it.
 
 ### Security Concerns (Bid Proxy Account)
 
-You might find the idea of putting an account on your server with the private key to be too risky. You can optionally
-create a proxy account for your bidder script using `npx @argonprotocol/mainchain mining create-bid-proxy`. You will
-need to run this from a machine with access to your full account keys (either via export or Polkadotjs directly). This
-will create a new `env`account file with the proxy details, which you'll use as your env file for the rest of the
-commands. The proxy will only be able to make `bid` calls and will not be able to transfer funds or do anything else
-with the account. This is a good way to limit the exposure of your main account keys.
+You might find the idea of putting an account on your server with the private key to be too risky.
+You can optionally create a proxy account for your bidder script using
+`npx @argonprotocol/mainchain mining create-bid-proxy`. You will need to run this from a machine
+with access to your full account keys (either via export or Polkadotjs directly). This will create a
+new `env`account file with the proxy details, which you'll use as your env file for the rest of the
+commands. The proxy will only be able to make `bid` calls and will not be able to transfer funds or
+do anything else with the account. This is a good way to limit the exposure of your main account
+keys.
 
-NOTE: you will still pay fees from your proxy account, so ensure you keep this account loaded up with fees. This is a
-major downside to this approach that we are still seeking to solve.
+NOTE: you will still pay fees from your proxy account, so ensure you keep this account loaded up
+with fees. This is a major downside to this approach that we are still seeking to solve.
 
 ### Commands
 
@@ -225,8 +233,8 @@ Commands:
 
 ### Example Commands
 
-Create a dynamic bid for a mining seat, maxed at 10 argons per seat. Without a budget, this will use up to 100 argons (
-eg, 10 seats).
+Create a dynamic bid for a mining seat, maxed at 10 argons per seat. Without a budget, this will use
+up to 100 argons ( eg, 10 seats).
 
 ```bash
 npx @argonprotocol/mainchain --env=accounts/.env.bob mining bid --min-bid=1 --max-bid=10 --bid-increment=0.1
@@ -234,6 +242,7 @@ npx @argonprotocol/mainchain --env=accounts/.env.bob mining bid --min-bid=1 --ma
 
 ### Subaccounts
 
-If you want to work with subaccounts during `consolidate` or setup of an account you can use the `-s, --subaccounts`
-flag to specify which subaccount to work with. `-s=0-9` is the default. You can also use `-s=0,1,2` to specify a list of
-subaccounts. You can also use `-s=0-2,4` to specify a range and a list of subaccounts.
+If you want to work with subaccounts during `consolidate` or setup of an account you can use the
+`-s, --subaccounts` flag to specify which subaccount to work with. `-s=0-9` is the default. You can
+also use `-s=0,1,2` to specify a list of subaccounts. You can also use `-s=0-2,4` to specify a range
+and a list of subaccounts.

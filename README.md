@@ -1,155 +1,177 @@
 # Argon
 
-An inflation-proof stablecoin backed by [Bitcoin](https://bitcoin.org) and the [Ulixee](https://ulixee.org) data
-network. The Argon is designed as a transactional
-currency that can scale to micropayments as low as 1 millionth of a dollar. It is built on the
-Polkadot [Substrate](https://substrate.dev) framework.
+An inflation-proof stablecoin backed by [Bitcoin](https://bitcoin.org) and the
+[Ulixee](https://ulixee.org) data network. The Argon is designed as a transactional currency that
+can scale to micropayments as low as 1 millionth of a dollar. It is built on the Polkadot
+[Substrate](https://substrate.dev) framework.
 
 ## Overview
 
-The Argon mainchain is the stabilization layer of the Argon network. Argon stabilizes the value of the Argon by removing
-excess currency from supply when the price of argon falls below target (ie, less is desired by the market) and minting
-new supply when price is above target (ie, more is in demand than exists).
+The Argon mainchain is the stabilization layer of the Argon network. Argon stabilizes the value of
+the Argon by removing excess currency from supply when the price of argon falls below target (ie,
+less is desired by the market) and minting new supply when price is above target (ie, more is in
+demand than exists).
 
-Minting can be done through two mechanisms. The first is via mining for the Argon, where miners are given permission to
-mint new Argons when the price is above target. The second is through a "Liquid Locking" offering for Bitcoins, where
-Bitcoins are able to mint liquidity equal to their Bitcoin's market value by committing to locking their Bitcoins and an
-equivalent amount of Argons for a year.
+Minting can be done through two mechanisms. The first is via mining for the Argon, where miners are
+given permission to mint new Argons when the price is above target. The second is through a "Liquid
+Locking" offering for Bitcoins, where Bitcoins are able to mint liquidity equal to their Bitcoin's
+market value by committing to locking their Bitcoins and an equivalent amount of Argons for a year.
 
-The Bitcoin "locks" transform into "options" that allow a holder to profit from the volatility of both the Bitcoin price
-and the Argon price. To call an option, a Bitcoin holder must issue a "system burn" of argons equivalent to the current
-market price of Bitcoin. This creates a dynamically adjusting "burn rate" to forcefully remove unwanted currency from
-the system (unwanted, meaning, the market price of the Argon is below target, ergo less desirable).
+The Bitcoin "locks" transform into "options" that allow a holder to profit from the volatility of
+both the Bitcoin price and the Argon price. To call an option, a Bitcoin holder must issue a "system
+burn" of argons equivalent to the current market price of Bitcoin. This creates a dynamically
+adjusting "burn rate" to forcefully remove unwanted currency from the system (unwanted, meaning, the
+market price of the Argon is below target, ergo less desirable).
 
-The Argon's second layer of excess currency removal (ie, stabilization) occurs through the collection of a tax on
-all transactions that occur on the L2 of the Argon network, the Localchains. This second layer tax will dynamically
-adjust to the price of the Argon, ensuring sufficient supply can be removed quickly from the system.
+The Argon's second layer of excess currency removal (ie, stabilization) occurs through the
+collection of a tax on all transactions that occur on the L2 of the Argon network, the Localchains.
+This second layer tax will dynamically adjust to the price of the Argon, ensuring sufficient supply
+can be removed quickly from the system.
 
-Localchains are the person-to-person Layer 2 of the Argon network. They are a personal "blockchain" that keeps a
-cryptographic proof of the "current balance" of each user, which can be signed and sent to another user for exchanging
-funds. Localchains are expected to be used for high-frequency transactions, such as micropayments for queries in
-[Ulixee Datastores](https://ulixee.org/docs/datastore). Localchains submit balance changes in "notarizations" to the
-Argon mainchain via Notaries, which are network approved entities that audit the balance changes and batch them to the
-mainchain.
+Localchains are the person-to-person Layer 2 of the Argon network. They are a personal "blockchain"
+that keeps a cryptographic proof of the "current balance" of each user, which can be signed and sent
+to another user for exchanging funds. Localchains are expected to be used for high-frequency
+transactions, such as micropayments for queries in
+[Ulixee Datastores](https://ulixee.org/docs/datastore). Localchains submit balance changes in
+"notarizations" to the Argon mainchain via Notaries, which are network approved entities that audit
+the balance changes and batch them to the mainchain.
 
 ## Consensus
 
-The Argon mainchain uses a hybrid consensus model. The first form of consensus is
-a [Randomx](https://github.com/tevador/RandomX) proof-of-compute
-algorithm that is active during "Slot Zero" before miners register for slots. Randomx was developed as part of the
-Monero blockchain to create a proof of work that does not favor GPUs, allowing regular desktops to compete. The argon
-has no funds minted in the genesis block, so this period can be viewed as the bootstrapping period for the network.
+The Argon mainchain uses a hybrid consensus model. The first form of consensus is a
+[Randomx](https://github.com/tevador/RandomX) proof-of-compute algorithm that is active during "Slot
+Zero" before miners register for slots. Randomx was developed as part of the Monero blockchain to
+create a proof of work that does not favor GPUs, allowing regular desktops to compete. The argon has
+no funds minted in the genesis block, so this period can be viewed as the bootstrapping period for
+the network.
 
-The second form of consensus is a registered mining phase, where miners bid for slots to mine blocks. They must bid for
-a slot. Miners are given priority to register blocks in the system over proof of compute blocks, so after this phase
-activates, the network is secured by the miners and only uses proof of compute when no miners are registered or
-active. Miners are matched to votes provided by Localchain users using an XOR closest algorithm (more details to come in
-the whitepaper).
+The second form of consensus is a registered mining phase, where miners bid for slots to mine
+blocks. They must bid for a slot. Miners are given priority to register blocks in the system over
+proof of compute blocks, so after this phase activates, the network is secured by the miners and
+only uses proof of compute when no miners are registered or active. Miners are matched to votes
+provided by Localchain users using an XOR closest algorithm (more details to come in the
+whitepaper).
 
 ## Technology Brief
 
-The Argon mainchain is built using the [Substrate](https://substrate.dev) framework. Substrate is a modular blockchain
-framework that allows developers to build custom blockchains that operate independently, but can connect into a shared
-ecosystem called "Parachains". Substrate is built in Rust and has a WebAssembly runtime that allows for upgrades to the
-blockchain without forks. Argon runs as a "solochain", which means our consensus is not shared with other chains.
+The Argon mainchain is built using the [Substrate](https://substrate.dev) framework. Substrate is a
+modular blockchain framework that allows developers to build custom blockchains that operate
+independently, but can connect into a shared ecosystem called "Parachains". Substrate is built in
+Rust and has a WebAssembly runtime that allows for upgrades to the blockchain without forks. Argon
+runs as a "solochain", which means our consensus is not shared with other chains.
 
-Cross-chain transfers are enabled via [Hyperbridge](https://hyperbridge.network), which is a zero-trust, decentralized
-bridge. Fees are payable in Argons when going Argon -> Ethereum/Base/Binance Chain/etc, and the native token of a source
-chain when transferring into Argon.
+Cross-chain transfers are enabled via [Hyperbridge](https://hyperbridge.network), which is a
+zero-trust, decentralized bridge. Fees are payable in Argons when going Argon ->
+Ethereum/Base/Binance Chain/etc, and the native token of a source chain when transferring into
+Argon.
 
-A Uniswap liquidity pool with USDC is used to create a price-point for the Argon. The main Uniswap contract initially in
-use is on Ethereum.
+A Uniswap liquidity pool with USDC is used to create a price-point for the Argon. The main Uniswap
+contract initially in use is on Ethereum.
 
-The Localchain is a Rust library that can be run in a standalone cli, within Node.js via bindings created
-using [napi-rs](https://napi.rs) or as a library in iOS/Android using [uniffi](https://github.com/mozilla/uniffi-rs). It
-uses a Sqlite database to store the balance changes and notarizations.
+The Localchain is a Rust library that can be run in a standalone cli, within Node.js via bindings
+created using [napi-rs](https://napi.rs) or as a library in iOS/Android using
+[uniffi](https://github.com/mozilla/uniffi-rs). It uses a Sqlite database to store the balance
+changes and notarizations.
 
-The Notary is a Rust-based API that uses Json-RPC to communicate with the Localchains and the Argon mainchain. It uses a
-PostgresSQL database to keep track of its history and users' balance tips.
+The Notary is a Rust-based API that uses Json-RPC to communicate with the Localchains and the Argon
+mainchain. It uses a PostgresSQL database to keep track of its history and users' balance tips.
 
 ## Repository Structure
 
-- `bitcoin`: This module has a cli for bitcoin bonds and vaults, and shared code around the Bitcoin miniscript used for
-  the vaulted bitcoins.
+- `bitcoin`: This module has a cli for bitcoin bonds and vaults, and shared code around the Bitcoin
+  miniscript used for the vaulted bitcoins.
 - `client`: Mainchain client library in rust and for nodejs.
 - `end-to-end`: Tests intending to be run using the end-user tools.
-- `localchain`: Localchain is the layer 2 of Argon run by individual wallets. This repo includes bindings for nodejs, a
-  standalone cli, and code to run the localchain inside iOS/Android. More about the
-  localchain [here](./docs/localchain.md).
-- `node`: The node implementation is the entry point for the Argon blockchain. It is responsible for networking,
-  consensus, and running the blockchain.
-    - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work algorithm. It is eligible
-      for creating all blocks during "Slot 0", before miners register for slots.
-    - `consensus`: The second form of consensus comes from votes submitted by localchains to the notaries. This module
-      has logic for retrieving notebooks from notaries and prioritizing blocks.
-    - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all Bitcoin UTXOs that
-      back the Argon via bonds. This is done by tracking BlockFilters in bitcoin against the bonded UTXOs.
-- `notary`: The notary validates localchain transactions and confirms they are operating on their latest tip. A notary
-  runs on a Postgres database. It must submit notebooks rolling up all the localchain balance changes, votes and
-  registered domains. Notebooks are submitted for each system "tick".
-- `runtime`: The runtime implementation is the core logic of the blockchain. It defines the state transition function
-  and the blockchain's logic. The runtime is built as a wasm binary and can be upgraded without a hard fork.
-- `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to the blockchain.
-- `pallets`: The pallets are the various "tables" that make up the blockchain. They define the storage, dispatchables,
-  events, and errors of the blockchain.
-    - `bitcoin_locks`: Main interaction point to lock and release bitcoins into a vault.
-    - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
-    - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being allowed to be
-      spent).
-    - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible work.
-    - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-    - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain and Mainchain.
-    - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel holds with ip routing
-      akin to a dns lookup. They're prominently used for [Ulixee Datastores](https://ulixee.org/docs/datastore).
-    - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity pools offer early
-      liquidity to locked bitcoins and earn participants a share of the mining bid pool.
-    - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who is eligible to
-      mine blocks created by the notebook commit reveal scheme.
-    - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
-    - `notaries`: Registers the notaries and metadata to connect to them
-    - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change roots for each
-      notebook. Also tracks the last changed notebook per localchain.
-    - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target price given CPI
-      inflation since the starting time.
-    - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
-    - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create LiquidityPools.
+- `localchain`: Localchain is the layer 2 of Argon run by individual wallets. This repo includes
+  bindings for nodejs, a standalone cli, and code to run the localchain inside iOS/Android. More
+  about the localchain [here](./docs/localchain.md).
+- `node`: The node implementation is the entry point for the Argon blockchain. It is responsible for
+  networking, consensus, and running the blockchain.
+  - `randomx`: Argon has two forms of block consensus. The first is a randomx proof-of-work
+    algorithm. It is eligible for creating all blocks during "Slot 0", before miners register for
+    slots.
+  - `consensus`: The second form of consensus comes from votes submitted by localchains to the
+    notaries. This module has logic for retrieving notebooks from notaries and prioritizing blocks.
+  - `bitcoin_utxo_tracker`: Each block created and validated by the Argon blockchain must track all
+    Bitcoin UTXOs that back the Argon via bonds. This is done by tracking BlockFilters in bitcoin
+    against the bonded UTXOs.
+- `notary`: The notary validates localchain transactions and confirms they are operating on their
+  latest tip. A notary runs on a Postgres database. It must submit notebooks rolling up all the
+  localchain balance changes, votes and registered domains. Notebooks are submitted for each system
+  "tick".
+- `runtime`: The runtime implementation is the core logic of the blockchain. It defines the state
+  transition function and the blockchain's logic. The runtime is built as a wasm binary and can be
+  upgraded without a hard fork.
+- `oracle`: The code for running the oracles that submit price data and the bitcoin confirmed tip to
+  the blockchain.
+- `pallets`: The pallets are the various "tables" that make up the blockchain. They define the
+  storage, dispatchables, events, and errors of the blockchain.
+  - `bitcoin_locks`: Main interaction point to lock and release bitcoins into a vault.
+  - `bitcoin_utxos`: Tracks the Bitcoin UTXOs that back the Argon.
+  - `block_rewards`: Allocates and unlocks block rewards (they are frozen for a period before being
+    allowed to be spent).
+  - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible
+    work.
+  - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
+  - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain
+    and Mainchain.
+  - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel
+    holds with ip routing akin to a dns lookup. They're prominently used for
+    [Ulixee Datastores](https://ulixee.org/docs/datastore).
+  - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity
+    pools offer early liquidity to locked bitcoins and earn participants a share of the mining bid
+    pool.
+  - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who
+    is eligible to mine blocks created by the notebook commit reveal scheme.
+  - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
+  - `notaries`: Registers the notaries and metadata to connect to them
+  - `notebook`: Tracks the recent notebooks submitted by the notaries, as well as the account change
+    roots for each notebook. Also tracks the last changed notebook per localchain.
+  - `price_index`: Tracks Argon-USD and Bitcoin USD pricing, as well as the current Argon Target
+    price given CPI inflation since the starting time.
+  - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
+  - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create
+    LiquidityPools.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets
 
 Argon makes use of a few runtime pallets that are useful to know about as a user of the system.
 
-- `Balances`: This is an instance of
-  the [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet that is used to
-  track the
-  balances of the Argon
-  currency. NOTE: balances are stored in the System Account, not the pallet. This can make some api calls confusing.
-- `Ownership`: This is an instance of
-  the [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet that is used to
-  track the Ownership Tokens
-  of an account. Ownership tokens allow you to bid on mining slots.
-- `Grandpa`: Argon uses the [Grandpa](https://github.com/w3f/consensus/blob/master/pdf/grandpa.pdf) Finality gadget to
-  finalize blocks. This pallet is used to track the finality authorities (which correspond to the active miners) and
-  equivocations (which are penalties for not following grandpa rules).
-- `Multisig`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_multisig/index.html) allows you to
-  create a multi-signature account. Substrate's multisig is a little different from other systems, as it requires each
-  party to submit their portion of the signature in a separate transaction.
-- `Proxy`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_proxy/index.html) allows you to create
-  a proxy account that can submit transactions on behalf of another account. This is useful for creating a cold wallet
-  that can still submit transactions. The cold wallet will pay for the transaction fees but doesn't have to have keys
-  loaded into memory.
-- `Utility`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_utility/index.html) allows you to
-  batch multiple api calls into a single transaction. This is useful for creating a single transaction that performs
-  multiple actions you want to all succeed or fail as one.
-- `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`, `token_gateway`) here to
-  activate the Argon ability to move tokens cross-chain. Learn more about
+- `Balances`: This is an instance of the
+  [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet
+  that is used to track the balances of the Argon currency. NOTE: balances are stored in the System
+  Account, not the pallet. This can make some api calls confusing.
+- `Ownership`: This is an instance of the
+  [balances](https://paritytech.github.io/polkadot-sdk/master/pallet_balances/index.html) pallet
+  that is used to track the Ownership Tokens of an account. Ownership tokens allow you to bid on
+  mining slots.
+- `Grandpa`: Argon uses the [Grandpa](https://github.com/w3f/consensus/blob/master/pdf/grandpa.pdf)
+  Finality gadget to finalize blocks. This pallet is used to track the finality authorities (which
+  correspond to the active miners) and equivocations (which are penalties for not following grandpa
+  rules).
+- `Multisig`: This
+  [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_multisig/index.html) allows you
+  to create a multi-signature account. Substrate's multisig is a little different from other
+  systems, as it requires each party to submit their portion of the signature in a separate
+  transaction.
+- `Proxy`: This [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_proxy/index.html)
+  allows you to create a proxy account that can submit transactions on behalf of another account.
+  This is useful for creating a cold wallet that can still submit transactions. The cold wallet will
+  pay for the transaction fees but doesn't have to have keys loaded into memory.
+- `Utility`: This
+  [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_utility/index.html) allows you to
+  batch multiple api calls into a single transaction. This is useful for creating a single
+  transaction that performs multiple actions you want to all succeed or fail as one.
+- `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`,
+  `token_gateway`) here to activate the Argon ability to move tokens cross-chain. Learn more about
   hyperbridge [here](https://hyperbridge.network).
 
 ## Experimental Mainnet
 
-Argon has an experimental Mainnet. Experimental here means it is persistent long term, but not yet in a fully
-stable/secure state. It's ready to test technically and economically with small amounts of value and connected to live
-Ethereum, Bitcoin, Base, and several other EVM chains.
+Argon has an experimental Mainnet. Experimental here means it is persistent long term, but not yet
+in a fully stable/secure state. It's ready to test technically and economically with small amounts
+of value and connected to live Ethereum, Bitcoin, Base, and several other EVM chains.
 
 Useful Urls:
 
@@ -161,12 +183,12 @@ Useful Urls:
 
 ## Using the Testnet
 
-The Argon testnet is intended to be used for testing and development. All changes will be deployed to this network
-before the mainnet. You can connect to
-the [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network) to
-interact with the testnet. We are also publishing binary versions of the localchain and bitcoin cli that are useful to
-test out connecting to the testnet. Those versions can be found on
-the [releases page](https://github.com/argonprotocol/argon/releases/latest).
+The Argon testnet is intended to be used for testing and development. All changes will be deployed
+to this network before the mainnet. You can connect to the
+[Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network) to
+interact with the testnet. We are also publishing binary versions of the localchain and bitcoin cli
+that are useful to test out connecting to the testnet. Those versions can be found on the
+[releases page](https://github.com/argonprotocol/argon/releases/latest).
 
 Useful Urls:
 
@@ -187,17 +209,17 @@ Here are some tutorials to get you started:
 
 ## Running Locally
 
-Depending on your operating system and Rust version, there might be additional packages required to compile this
-project.
-Check the [Substrate Install](https://docs.substrate.io/install/) instructions for your platform for the most common
-dependencies.
+Depending on your operating system and Rust version, there might be additional packages required to
+compile this project. Check the [Substrate Install](https://docs.substrate.io/install/) instructions
+for your platform for the most common dependencies.
 
 ## Running from Docker
 
 A docker compose is present to run the entire network using the "local testnet".
 
-You can build this using source, or run the pre-built images from the Docker Hub. To run with a specific version, you
-should pass a `VERSION=v1.3.0` (or whatever version you want) to the `docker compose` command.
+You can build this using source, or run the pre-built images from the Docker Hub. To run with a
+specific version, you should pass a `VERSION=v1.3.0` (or whatever version you want) to the
+`docker compose` command.
 
 To run the local testnet using Docker, you can use the following command:
 
@@ -209,26 +231,27 @@ VERSION=v1.3.0 RPC_PORT=9944 docker compose up
 
 The docker compose file has several profiles that can be used to run different parts of the network.
 
-- `Default (no profile)`: If you don't use a profile, it will run the entire network with an argon node, bitcoin node,
-  notary and bitcoin oracle.
+- `Default (no profile)`: If you don't use a profile, it will run the entire network with an argon
+  node, bitcoin node, notary and bitcoin oracle.
 - `miners`: Adds 2 compute miners.
-- `price-oracle`: Adds a price oracle to the network. You must supply an `Infura` and `BLS` key in the `.env` file for
-  this to work (see below).
-- `all`: Run the entire network: 1 archive node, 2 miners, 1 bitcoin node, 1 notary, 1 bitcoin oracle and 1 price
-  oracle.
+- `price-oracle`: Adds a price oracle to the network. You must supply an `Infura` and `BLS` key in
+  the `.env` file for this to work (see below).
+- `all`: Run the entire network: 1 archive node, 2 miners, 1 bitcoin node, 1 notary, 1 bitcoin
+  oracle and 1 price oracle.
 
-Profiles must be specified with the `--profile` flag in the `docker compose` command. Omitting will use the default
-profile.
+Profiles must be specified with the `--profile` flag in the `docker compose` command. Omitting will
+use the default profile.
 
-To run multiple compose instances, you need to set `RPC_PORT=0`, otherwise, each will bind an rpc port on 9944.
+To run multiple compose instances, you need to set `RPC_PORT=0`, otherwise, each will bind an rpc
+port on 9944.
 
 ```sh
 VERSION=v1.3.0 RPC_PORT=0 docker compose --profile all up
 ```
 
-NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and
-an [Infura](https://docs.metamask.io/services/get-started/infura/) key to run the price oracle. They should be added to
-an `.env` file that you load with docker compose.
+NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and an
+[Infura](https://docs.metamask.io/services/get-started/infura/) key to run the price oracle. They
+should be added to an `.env` file that you load with docker compose.
 
 ```dotenv
 BLS_API_KEY=02c566df8f7d4e8as2342asdf2342
@@ -241,8 +264,9 @@ docker compose --env-file .env up
 
 ### Cargo Make
 
-There's a `Makefile.toml` in the root of the project that defines some common tasks for the project. You can run these
-tasks using `cargo make <task-name>`. For example, to run the tests, you can run `cargo make test`.
+There's a `Makefile.toml` in the root of the project that defines some common tasks for the project.
+You can run these tasks using `cargo make <task-name>`. For example, to run the tests, you can run
+`cargo make test`.
 
 - Cargo Make: `cargo install --force cargo-make` to run make commands
 
@@ -251,8 +275,8 @@ tasks using `cargo make <task-name>`. For example, to run the tests, you can run
 You'll need the following additional dependencies to run a notary (or tests):
 
 - `PostgreSQL` 14+ running at localhost:5432
-- `minIO` (https://github.com/minio/minio/tree/master) running at localhost:9000. `scripts/docker_minio.sh` can be used
-  to start a minio instance.
+- `minIO` (https://github.com/minio/minio/tree/master) running at localhost:9000.
+  `scripts/docker_minio.sh` can be used to start a minio instance.
 
 ### Build
 
@@ -272,8 +296,8 @@ The following command starts a local test network that will not persist state.
 
 ### Connect with Polkadot-JS Developer Admin Front-End
 
-After you start the network locally, you can interact with it using the hosted version of
-the [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944).
+After you start the network locally, you can interact with it using the hosted version of the
+[Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944).
 
-You can also find the source code and instructions for hosting your own instance on
-the [polkadot-js/apps](https://github.com/polkadot-js/apps) repository.
+You can also find the source code and instructions for hosting your own instance on the
+[polkadot-js/apps](https://github.com/polkadot-js/apps) repository.
