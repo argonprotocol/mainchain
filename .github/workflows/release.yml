@@ -77,16 +77,12 @@ jobs:
       matrix:
         include:
           - target: aarch64-unknown-linux-gnu
-            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
             os: ubuntu-22.04-arm
           - target: x86_64-unknown-linux-gnu
-            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: aarch64-apple-darwin
             os: macos-latest
-            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - target: x86_64-apple-darwin
             os: macos-latest
-            bins: argon-node,argon-notary,argon-localchain,argon-bitcoin-cli,argon-oracle
           - os: windows-latest
             target: x86_64-pc-windows-msvc
 
@@ -166,7 +162,7 @@ jobs:
           ref: refs/tags/${{ github.ref_name }}
 
       - uses: taiki-e/upload-rust-binary-action@v1
-        if: (matrix.target == 'x86_64-unknown-linux-gnu')
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-oracle
           # TODO: deactivate building in this feature when we have price liquidity
