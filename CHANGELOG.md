@@ -1,8 +1,22 @@
 # Changelog
 
-## [v1.3.1](https://github.com/argonprotocol/mainchain/compare/v1.3.0...5dabcb3c49438ea2dd397193176783b0a48ddda6) (2025-07-06)
+## [v1.3.2](https://github.com/argonprotocol/mainchain/compare/v1.3.1...b9f173ea1d88168258dc9688f376c12f2da21edf) (2025-07-07)
+
+### Features
+
+* **bitcoin/nodejs:** expose bitcoinjs primitives
+([8730f84](https://github.com/argonprotocol/mainchain/commit/8730f84afd6effda4b845f552684cb674479c085))
 
 ### Fixes
+
+* **node:** backwards compatiblity.
+([6579d52](https://github.com/argonprotocol/mainchain/commit/6579d52847c27729d80788dffbb6eca3a180c374))
+* **node:** enable rocks db in node
+([5a02820](https://github.com/argonprotocol/mainchain/commit/5a028208b676d779cb03ddb69a50891bee7d356a))
+
+### [v1.3.1](https://github.com/argonprotocol/mainchain/compare/v1.3.0...v1.3.1) (2025-07-06)
+
+#### Fixes
 
 * **consensus:** log prehash for compute
 ([c229516](https://github.com/argonprotocol/mainchain/commit/c2295164102e7df997a6a4f10016b231548daea0))
