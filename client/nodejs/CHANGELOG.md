@@ -1,6 +1,8 @@
 # Changelog
 
-## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...1fb31f9715ab016afece1f636a7f0af7cad5e5da) (2025-07-04)
+## [v1.3.1](https://github.com/argonprotocol/mainchain/compare/v1.3.0...5dabcb3c49438ea2dd397193176783b0a48ddda6) (2025-07-06)
+
+## [v1.3.0](https://github.com/argonprotocol/mainchain/compare/v1.2.0...v1.3.0) (2025-07-04)
 
 ### Features
 
