@@ -3,7 +3,7 @@ use crate::{
 	fork_power::ForkPower, notary::SignedHeaderBytes, tick::TickDigest,
 };
 use alloc::{vec, vec::Vec};
-use codec::{Codec, Decode, Encode, MaxEncodedLen};
+use codec::{Codec, Decode, Encode, EncodeLike, MaxEncodedLen};
 use frame_support_procedural::DefaultNoBound;
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedVec, *};
 use scale_info::TypeInfo;
@@ -30,10 +30,54 @@ pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = *b"pkey";
 /// Fork Power
 pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
 	Vote { seal_strength: U256, signature: BlockSealAuthoritySignature, xor_distance: Option<U256> },
 	Compute { nonce: U256 },
+}
+
+impl Encode for BlockSealDigest {
+	fn encode(&self) -> Vec<u8> {
+		let mut encoded = Vec::new();
+		match self {
+			BlockSealDigest::Vote { seal_strength, signature, xor_distance } => {
+				encoded.push(0u8);
+				encoded.extend_from_slice(&seal_strength.encode());
+				encoded.extend_from_slice(&signature.encode());
+				if xor_distance.is_some() {
+					encoded.extend_from_slice(&xor_distance.encode());
+				}
+			},
+			BlockSealDigest::Compute { nonce } => {
+				encoded.push(1u8);
+				encoded.extend_from_slice(&nonce.encode());
+			},
+		};
+		encoded
+	}
+}
+impl EncodeLike for BlockSealDigest {}
+impl Decode for BlockSealDigest {
+	fn decode<I: codec::Input>(input: &mut I) -> Result<Self, codec::Error> {
+		let variant = input.read_byte()?;
+		match variant {
+			0 => {
+				let seal_strength = U256::decode(input)?;
+				let signature = BlockSealAuthoritySignature::decode(input)?;
+				let xor_distance = match input.remaining_len()? {
+					Some(0) | None => None,
+					Some(_) => Option::<U256>::decode(input)?,
+				};
+
+				Ok(BlockSealDigest::Vote { seal_strength, signature, xor_distance })
+			},
+			1 => {
+				let nonce = U256::decode(input)?;
+				Ok(BlockSealDigest::Compute { nonce })
+			},
+			_ => Err(codec::Error::from("Unknown BlockSealDigest variant")),
+		}
+	}
 }
 
 impl TryFrom<DigestItem> for TickDigest {

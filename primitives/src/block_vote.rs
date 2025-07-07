@@ -4,7 +4,7 @@ use polkadot_sdk::*;
 
 use crate::{AccountId, BlockVotingPower, MerkleProof, NotaryId, NotebookNumber, tick::Tick};
 use alloc::vec::Vec;
-use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use codec::{Codec, Compact, Decode, DecodeWithMemTracking, Encode, EncodeLike, MaxEncodedLen};
 use polkadot_sdk::sp_runtime::Permill;
 use serde::{Deserialize, Serialize};
 use sp_core::{H256, U256};
@@ -162,7 +162,7 @@ struct BlockVoteProofHashMessage {
 	pub voting_key: H256,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
 	/// The seal strength (a smallest u256)
@@ -177,6 +177,74 @@ pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
 	pub closest_miner: (AccountId, Authority),
 	/// The XOR distance of the closest miner to the vote, and the percentile of the seal strength
 	pub miner_xor_distance: Option<(U256, Permill)>,
+}
+
+impl<AccountId, Authority> Encode for BestBlockVoteSeal<AccountId, Authority>
+where
+	AccountId: Codec,
+	Authority: Codec,
+{
+	fn encode(&self) -> Vec<u8> {
+		let mut encoded = Vec::new();
+		self.seal_strength.encode_to(&mut encoded);
+		Compact::from(self.notary_id).encode_to(&mut encoded);
+		self.block_vote_bytes.encode_to(&mut encoded);
+		Compact::from(self.source_notebook_number).encode_to(&mut encoded);
+		self.source_notebook_proof.encode_to(&mut encoded);
+		self.closest_miner.encode_to(&mut encoded);
+		if self.miner_xor_distance.is_some() {
+			encoded.extend(self.miner_xor_distance.encode());
+		}
+		encoded
+	}
+
+	fn size_hint(&self) -> usize {
+		self.seal_strength.size_hint() +
+			Compact::from(self.notary_id).size_hint() +
+			self.block_vote_bytes.size_hint() +
+			Compact::from(self.source_notebook_number).size_hint() +
+			self.source_notebook_proof.size_hint() +
+			self.closest_miner.size_hint() +
+			self.miner_xor_distance
+				.as_ref()
+				.map_or(0, |(distance, percentile)| distance.size_hint() + percentile.size_hint())
+	}
+}
+
+impl<AccountId, Authority> EncodeLike for BestBlockVoteSeal<AccountId, Authority>
+where
+	AccountId: Codec,
+	Authority: Codec,
+{
+}
+
+impl<AccountId, Authority> Decode for BestBlockVoteSeal<AccountId, Authority>
+where
+	AccountId: Codec,
+	Authority: Codec,
+{
+	fn decode<I: codec::Input>(value: &mut I) -> Result<Self, codec::Error> {
+		let seal_strength = U256::decode(value)?;
+		let notary_id = Compact::<NotaryId>::decode(value)?.0;
+		let block_vote_bytes = Vec::<u8>::decode(value)?;
+		let source_notebook_number = Compact::<NotebookNumber>::decode(value)?.0;
+		let source_notebook_proof = MerkleProof::decode(value)?;
+		let closest_miner = <(AccountId, Authority)>::decode(value)?;
+		let miner_xor_distance = match value.remaining_len()? {
+			Some(0) | None => None,
+			Some(_) => Option::<(U256, Permill)>::decode(value)?,
+		};
+
+		Ok(Self {
+			seal_strength,
+			notary_id,
+			block_vote_bytes,
+			source_notebook_number,
+			source_notebook_proof,
+			closest_miner,
+			miner_xor_distance,
+		})
+	}
 }
 
 /// This struct exists mostly because the mental model of the voting is so difficult to
