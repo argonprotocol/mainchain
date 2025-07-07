@@ -1,7 +1,11 @@
 import { address, networks } from 'bitcoinjs-lib';
-import BIP32Factory, { BIP32Interface } from 'bip32';
+import BIP32Factory, { BIP32API, BIP32Interface } from 'bip32';
 import * as ecc from 'tiny-secp256k1';
 import * as bip39 from 'bip39';
+
+export function getBip32Factory(): BIP32API {
+  return BIP32Factory(ecc);
+}
 
 export function getChildXpriv(
   bip39Seed: Buffer,

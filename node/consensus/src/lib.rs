@@ -341,7 +341,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			}
 
 			if *notary_client.pause_queue_processing.read().await {
-				info!(?best_hash, ?best_number, "Activating sync.");
+				info!(?best_hash, ?best_number, "Activating notary sync.");
 				*notary_client.pause_queue_processing.write().await = false;
 			}
 

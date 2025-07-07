@@ -162,10 +162,8 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.run_node_until_exit(|config| async move {
 				let mining_config = MiningConfig::new(&cli);
 
-				let is_lipb2p = matches!(
-					config.network.network_backend.unwrap_or_default(),
-					NetworkBackendType::Libp2p
-				);
+				let is_lipb2p =
+					matches!(config.network.network_backend, NetworkBackendType::Libp2p);
 				if config.chain_spec.is_canary() {
 					run_node_with_runtime::<CanaryRuntimeApi>(config, mining_config, is_lipb2p)
 				} else {
