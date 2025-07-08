@@ -170,6 +170,10 @@ the total Ownership Tokens in circulation. And you can (optionally) put yourself
 else on the list by bidding more Argons than they have. You will be refunded if you lose out on a
 slot.
 
+Mining seats will dynamically adjust for each frame based on the average bid price vs the target.
+The number can range from 10-1000 seats per frame. You can look up the target price for a frame
+using constants `miningSlot.targetPricePerSeat`.
+
 Your bids will go into a bid "pool" for your slot and into the Slot Liquidity Pool. This pool helps
 grant liquidity to Bitcoin holders when minting is delayed. Vaults are able to crowd-source funds to
 this liquidity pool and earn profits via its distribution.
