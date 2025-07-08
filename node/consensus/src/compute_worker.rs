@@ -184,11 +184,20 @@ where
 		}
 	}
 
-	pub fn submit(&self, nonce: U256) {
+	pub fn submit(&self, nonce: U256, version: Version) {
 		let Some(build) = self.solving_block.lock().take() else {
 			trace!("Unable to submit mined block in compute worker: internal build does not exist",);
 			return;
 		};
+
+		if self.version() != version {
+			trace!(
+				"Unable to submit mined block in compute worker: version mismatch. Expected {}, got {}",
+				self.version(),
+				version
+			);
+			return;
+		}
 
 		self.increment_version();
 
@@ -320,8 +329,10 @@ pub fn run_compute_solver_threads<B, Proof, C>(
 				};
 
 				counter += 1;
+				// grab before solving
+				let version = solver.version;
 				match solver.check_next() {
-					Ok(Some(nonce)) => worker.submit(nonce.nonce),
+					Ok(Some(nonce)) => worker.submit(nonce.nonce, version),
 					Err(err) => {
 						warn!("Mining failed: {:?}", err);
 						if matches!(err, RandomXError::CreationError(_)) {
