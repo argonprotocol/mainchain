@@ -315,7 +315,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						}
 					}
 				},
-				_on_delay = time::sleep(idle_delay.min(notebook_ticks_recheck.get_next_check_delay())) => {},
+				_on_delay = time::sleep(notebook_ticks_recheck.get_next_check_delay().unwrap_or(idle_delay)) => {},
 			}
 
 			// don't try to check for blocks during a sync
@@ -335,7 +335,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				debug!(
 					?best_hash,
 					?state_status,
-					"Best block state not available (yet?). Not starting compute."
+					"Best block state not available (yet?). Not starting mining."
 				);
 				continue;
 			}
@@ -412,28 +412,28 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 }
 
 pub(crate) struct NotebookTickChecker {
-	to_check: Vec<(Tick, Instant)>,
+	ticks_to_recheck: Vec<(Tick, Instant)>,
 }
 
 impl NotebookTickChecker {
 	pub fn new() -> Self {
-		Self { to_check: vec![] }
+		Self { ticks_to_recheck: vec![] }
 	}
 
 	pub fn add(&mut self, tick: Tick, at_time: Instant) {
-		if !self.to_check.iter().any(|(t, _)| *t == tick) {
-			self.to_check.push((tick, at_time));
+		if !self.ticks_to_recheck.iter().any(|(t, _)| *t == tick) {
+			self.ticks_to_recheck.push((tick, at_time));
 		}
 	}
 
-	pub fn get_next_check_delay(&self) -> Duration {
-		if let Some(min_time) = self.to_check.iter().map(|(_, at_time)| *at_time).min() {
+	pub fn get_next_check_delay(&self) -> Option<Duration> {
+		if let Some(check_at) = self.ticks_to_recheck.iter().map(|(_, at_time)| *at_time).min() {
 			let now = Instant::now();
-			if min_time > now {
-				return min_time.saturating_duration_since(now);
+			if check_at > now {
+				return Some(check_at.saturating_duration_since(now));
 			}
 		}
-		Duration::from_secs(0)
+		None
 	}
 
 	pub(crate) fn should_delay_block_attempt(
@@ -466,7 +466,7 @@ impl NotebookTickChecker {
 
 	pub fn get_ready(&mut self) -> HashSet<Tick> {
 		let mut notebooks_to_check = HashSet::new();
-		self.to_check.retain(|(tick, at_time)| {
+		self.ticks_to_recheck.retain(|(tick, at_time)| {
 			if at_time <= &Instant::now() {
 				info!(notebook_tick = tick, "Re-checking beatable blocks at notebook tick");
 				notebooks_to_check.insert(*tick);
@@ -528,9 +528,9 @@ mod test {
 		checker.add(tick_2, now - Duration::from_secs(5));
 
 		assert_eq!(checker.get_ready(), [tick_2].into_iter().collect::<HashSet<_>>());
-		assert_eq!(checker.get_next_check_delay().as_secs(), 9);
+		assert_eq!(checker.get_next_check_delay().unwrap().as_secs(), 9);
 
-		assert_eq!(checker.to_check.len(), 1);
+		assert_eq!(checker.ticks_to_recheck.len(), 1);
 	}
 
 	#[test]

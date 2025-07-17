@@ -6,14 +6,10 @@ use argon_primitives::{
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
-	prelude::{sc_network::NetworkSyncForkRequest, sp_arithmetic::traits::Zero},
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::{Codec, Encode};
-use futures::StreamExt;
 use polkadot_sdk::{
-	sc_client_api::BlockchainEvents,
-	sc_consensus::ImportedAux,
 	sp_core::{H256, blake2_256},
 	*,
 };
@@ -24,6 +20,7 @@ use sc_consensus::{
 };
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
+use sp_arithmetic::traits::Zero;
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
@@ -32,8 +29,8 @@ use sp_runtime::{
 	Justification,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
-use tracing::{error, warn};
+use std::{marker::PhantomData, sync::Arc};
+use tracing::error;
 
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
@@ -41,11 +38,6 @@ pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
 	import_lock: Arc<tokio::sync::Mutex<()>>,
-	/// children that arrived with `ExecuteIfPossible` while the parent’s
-	/// state was still pruned. Key = parent_hash.
-	#[allow(clippy::type_complexity)]
-	pending_children:
-		Arc<tokio::sync::Mutex<HashMap<<B as BlockT>::Hash, Vec<BlockImportParams<B>>>>>,
 	_phantom: PhantomData<AC>,
 }
 
@@ -54,7 +46,6 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 		Self {
 			inner: self.inner.clone(),
 			client: self.client.clone(),
-			pending_children: self.pending_children.clone(),
 			aux_client: self.aux_client.clone(),
 			import_lock: self.import_lock.clone(),
 			_phantom: PhantomData,
@@ -86,7 +77,8 @@ where
 	///   - `import_lock` serialises every import so `client.info()` and aux writes remain atomic.
 	///
 	/// EARLY EXITS
-	///   - Parent state missing + `ExecuteIfPossible` → `ImportResult::MissingState`
+	///   - Parent state missing + `ExecuteIfPossible` (detected *here*, not in `Verifier::verify`)
+	///     → `ImportResult::MissingState` so `BasicQueue` can retry after parent state sync.
 	///   - Header already in DB AND no new body/state → `ImportResult::AlreadyInChain`
 	///
 	/// FORK‑CHOICE
@@ -140,7 +132,7 @@ where
 		mut block: BlockImportParams<B>,
 	) -> Result<ImportResult, Self::Error> {
 		// single thread the import queue to ensure we don't have multiple imports
-		let import_lock = self.import_lock.lock().await;
+		let _import_lock = self.import_lock.lock().await;
 		let block_hash = block.post_hash();
 		let block_number = *block.header.number();
 		let parent_hash = *block.header.parent_hash();
@@ -175,25 +167,8 @@ where
 		if matches!(block.state_action, StateAction::ExecuteIfPossible) &&
 			parent_block_state != BlockStatus::InChainWithState
 		{
-			tracing::debug!(?block_hash, ?block_number, "parent state missing – header only");
-
-			let mut header_only = BlockImportParams::new(block.origin, block.header.clone());
-			header_only.state_action = StateAction::Skip;
-			header_only.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-			header_only.post_digests = block.post_digests.clone();
-			header_only.post_hash = block.post_hash;
-			header_only.create_gap = false;
-			let _ = self.inner.import_block(header_only).await.map_err(Into::into)?;
-
-			self.pending_children.lock().await.entry(parent_hash).or_default().push(block);
-
-			return Ok(ImportResult::Imported(ImportedAux {
-				header_only: true,
-				clear_justification_requests: false,
-				needs_justification: false,
-				bad_justification: false,
-				is_new_best: false,
-			}));
+			tracing::debug!(?block_hash, ?block_number, parent=?parent_hash, "Parent state missing; returning missing state action");
+			return Ok(ImportResult::MissingState);
 		}
 
 		let is_finalized_descendent = is_on_finalized_chain(
@@ -307,27 +282,7 @@ where
 				true,
 			)?;
 		}
-		let result = self.inner.import_block(block).await.map_err(Into::into)?;
-
-		// if we actually wrote state (or executed), flush any queued children
-		if has_state_or_block {
-			// make this two lines so it doesn't hold the lock
-			let children = self.pending_children.lock().await.remove(&block_hash);
-			if let Some(children) = children {
-				drop(import_lock); // release the lock before we import any more blocks
-				tracing::debug!(
-					?block_hash,
-					?block_number,
-					"Importing {} children that arrived with ExecuteIfPossible. Parent state now available.",
-					children.len()
-				);
-				for child in children {
-					// re-import with the original state_action
-					let _ = self.import_block(child).await;
-				}
-			}
-		}
-		Ok(result)
+		Ok(self.inner.import_block(block).await.map_err(Into::into)?)
 	}
 }
 
@@ -440,33 +395,25 @@ where
 		block_params.header = header;
 		block_params.post_digests.push(raw_seal_digest);
 		block_params.post_hash = Some(post_hash);
+		if block_params.body.is_some() &&
+			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
+				BlockStatus::InChainWithState
+		{
+			// Parent state is *not* available yet (pruned or unknown).
+			//
+			// IMPORTANT: The `Verifier` trait cannot signal `MissingState` (it returns only
+			// `Result<BlockImportParams<B>, String>`). We therefore:
+			//   * skip heavy runtime verification (since we cannot execute),
+			//   * leave `block_params.state_action` unchanged (e.g. `ExecuteIfPossible`),
+			//   * return the params so that `ArgonBlockImport::import_block` can detect the missing
+			//     parent state and return `ImportResult::MissingState`, which `BasicQueue`
+			//     understands and will retry once the parent’s state becomes available.
+			return Ok(block_params);
+		}
 
 		// The import queue can import headers and also blocks. Sometimes these blocks come in and
 		// the parent state isn't yet available
 		if let Some(inner_body) = block_params.body.clone() {
-			if self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
-				BlockStatus::InChainWithState
-			{
-				// Parent state is still pruned.  Do *not* reject the block outright;
-				// let the importer store the header once as `InChainPruned` and wait
-				// for the real body/state on a later re‑broadcast.
-				warn!(
-					block_hash = ?post_hash,
-					?block_number,
-					?parent_hash,
-					origin = ?block_params.origin,
-					"Parent state missing – downgrade to header‑only; importer will retry later"
-				);
-
-				if matches!(block_params.state_action, StateAction::ExecuteIfPossible) {
-					// Downgrade so the importer treats this as a gap header.
-					block_params.state_action = StateAction::Skip;
-					block_params.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-				}
-				// Return the modified params; importer will handle storage/back‑off.
-				return Ok(block_params);
-			}
-
 			let runtime_api = self.client.runtime_api();
 
 			let digest = block_params.header.digest();
@@ -605,7 +552,6 @@ where
 		client: client.clone(),
 		aux_client,
 		import_lock: Default::default(),
-		pending_children: Default::default(),
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
@@ -626,68 +572,6 @@ where
 		),
 		importer,
 	)
-}
-
-pub fn ensure_best_block_state_task<B, C, S>(
-	client: Arc<C>,
-	sync_service: Arc<S>,
-) -> Result<impl futures::Future<Output = ()> + Send, Error>
-where
-	B: BlockT,
-	C: ProvideRuntimeApi<B>
-		+ HeaderBackend<B>
-		+ BlockBackend<B>
-		+ BlockchainEvents<B>
-		+ Send
-		+ Sync
-		+ AuxStore
-		+ 'static,
-	S: NetworkSyncForkRequest<B::Hash, NumberFor<B>> + Send + Sync + 'static,
-{
-	// ──────────────────────────────────────────────────────────────────────────
-	// 📦  Boot‑time check: if the stored head has no state, start warp sync
-	// ──────────────────────────────────────────────────────────────────────────
-	{
-		let info = client.info();
-		if matches!(
-			client.block_status(info.best_hash).unwrap_or(BlockStatus::Unknown),
-			BlockStatus::InChainPruned
-		) {
-			tracing::warn!(
-				best_hash = ?info.best_hash,
-				best_number = ?info.best_number,
-				"DB head lacks state – starting warp‑sync"
-			);
-			sync_service.set_sync_fork_request(Vec::new(), info.best_hash, info.best_number);
-		}
-	}
-
-	// ──────────────────────────────────────────────────────────────────────────
-	// 🛰  Runtime watcher: re‑enter warp sync whenever the canonical head
-	//     switches to a block whose state is still pruned.
-	// ──────────────────────────────────────────────────────────────────────────
-
-	let client_for_task = client.clone();
-	let sync_for_task = sync_service.clone();
-	Ok(async move {
-		let mut notifs = client_for_task.import_notification_stream();
-		while let Some(n) = notifs.next().await {
-			if !n.is_new_best {
-				continue;
-			}
-			if matches!(
-				client_for_task.block_status(n.hash).unwrap_or(BlockStatus::Unknown),
-				BlockStatus::InChainPruned
-			) {
-				tracing::info!(
-					hash = ?n.hash,
-					number = ?n.header.number(),
-					"New best is pruned – starting warp sync"
-				);
-				sync_for_task.set_sync_fork_request(Vec::new(), n.hash, *n.header.number());
-			}
-		}
-	})
 }
 
 #[cfg(test)]
@@ -1021,7 +905,6 @@ mod test {
 			client: db_arc.clone(),
 			aux_client: ArgonAux::new(db_arc.clone()),
 			import_lock: Default::default(),
-			pending_children: Default::default(),
 			_phantom: PhantomData,
 		};
 		(importer, client)
@@ -1154,59 +1037,6 @@ mod test {
 		);
 		importer.import_block(state).await.unwrap();
 		assert!(has_state(&client, hash));
-	}
-
-	#[tokio::test]
-	async fn parent_state_inserts_header_only_and_queues() {
-		let (importer, client) = new_importer();
-
-		// insert parent header (#1) without state
-		let (parent_hdr, _) =
-			create_header(1, client.info().best_hash, 1, None, AccountId::from([0u8; 32]));
-		client.insert(parent_hdr.clone());
-
-		// child header (#2) with body, ExecuteIfPossible
-		let child_params = create_params(
-			2,
-			parent_hdr.hash(),
-			2,
-			None,
-			BlockOrigin::NetworkBroadcast,
-			StateAction::ExecuteIfPossible,
-			None,
-		);
-		let child_block_hash = child_params.post_hash();
-		let parent_block_hash = parent_hdr.hash();
-
-		let res = importer.import_block(child_params).await.unwrap();
-		assert!(matches!(res, ImportResult::Imported(_)));
-		// should insert a header only
-		let ImportResult::Imported(ImportedAux { header_only, .. }) = res else {
-			panic!("Expected ImportResult::Imported");
-		};
-		assert!(header_only);
-		assert_eq!(importer.pending_children.lock().await.len(), 1);
-		assert!(importer.pending_children.lock().await.contains_key(&parent_block_hash));
-
-		// now test that when we import the parent state, the child is reimported
-		let state = create_params(
-			1,
-			parent_hdr.parent_hash,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
-				block: H256::zero(),
-				state: KeyValueStates(Vec::new()),
-			})),
-			Some(AccountId::from([0u8; 32])),
-		);
-		let res = importer.import_block(state).await.unwrap();
-		assert!(matches!(res, ImportResult::Imported(_)));
-		assert!(has_state(&client, parent_hdr.hash()));
-
-		// should reimport the child
-		assert!(has_state(&client, child_block_hash));
 	}
 
 	#[tokio::test]
