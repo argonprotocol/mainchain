@@ -785,6 +785,39 @@ fn it_will_order_bids() {
 }
 
 #[test]
+fn it_handles_cleaning_up_xor_keys() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(2);
+	ExistentialDeposit::set(100_000);
+
+	new_test_ext().execute_with(|| {
+		ElapsedTicks::set(1);
+		CurrentTick::set(1);
+		System::set_block_number(1);
+		SlotBiddingStartAfterTicks::set(0);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		for i in 1..20 {
+			set_ownership(i, 100_000u32.into());
+			set_argons(i, 5_000_000u32.into());
+			MiningSlots::on_initialize(i);
+			MiningSlots::on_finalize(i);
+			CurrentTick::set(1 + (i * TicksBetweenSlots::get()));
+			ElapsedTicks::set(i * TicksBetweenSlots::get());
+			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 0, 1.into(), None));
+			System::set_block_number(i);
+			System::initialize(&(i), &System::parent_hash(), &Default::default());
+		}
+		assert_eq!(
+			MinersByCohort::<Test>::iter_keys().collect::<Vec<_>>().len(),
+			10,
+			"Should have 10 cohorts"
+		);
+		assert_eq!(MinerXorKeysByCohort::<Test>::get().len(), 10, "Should have 10 xor key cohorts");
+	});
+}
+
+#[test]
 fn handles_a_max_of_bids_per_block() {
 	TicksBetweenSlots::set(1);
 	FramesPerMiningTerm::set(2);

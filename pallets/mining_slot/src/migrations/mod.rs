@@ -39,6 +39,7 @@ mod old_storage {
 		pub active_miners_by_index: Vec<(MinerIndex, Registration<T>)>,
 		pub xor_keys: Vec<(MinerIndex, U256)>,
 		pub account_index_lookup: Vec<(T::AccountId, MinerIndex)>,
+		pub next_cohort_id: FrameId,
 	}
 
 	#[derive(
@@ -109,7 +110,7 @@ mod old_storage {
 	>;
 
 	#[storage_alias]
-	pub(super) type NextFrameId<T: Config> = StorageValue<crate::Pallet<T>, FrameId, ValueQuery>;
+	pub(super) type NextCohortId<T: Config> = StorageValue<crate::Pallet<T>, FrameId, ValueQuery>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -121,6 +122,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		// Access the old value using the `storage_alias` type
 		let next_cohort = old_storage::NextSlotCohort::<T>::get().into_iter().collect::<Vec<_>>();
+		let next_cohort_id = old_storage::NextCohortId::<T>::get();
 		let active_miners_by_index =
 			old_storage::ActiveMinersByIndex::<T>::iter().collect::<Vec<_>>();
 		let xor_keys = old_storage::MinerXorKeyByIndex::<T>::get().into_iter().collect::<Vec<_>>();
@@ -131,6 +133,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			active_miners_by_index,
 			xor_keys,
 			account_index_lookup,
+			next_cohort_id,
 		}
 		.encode())
 	}
@@ -189,7 +192,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		log::info!("{} mining registrations migrated", count);
 
-		let frame_id = old_storage::NextFrameId::<T>::take();
+		let frame_id = old_storage::NextCohortId::<T>::take();
 		NextFrameId::<T>::set(frame_id);
 		count += 1;
 
@@ -239,6 +242,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			old_account_index_lookup.len() == new_account_index_lookup.len(),
 			"New account index lookup value not set correctly"
 		);
+
+		let next_frame_id = NextFrameId::<T>::get();
+		ensure!(next_frame_id == old.next_cohort_id, "Next cohort id not set correctly");
 
 		Ok(())
 	}
