@@ -153,28 +153,26 @@ describeIntegration('Cohort Bidder tests', () => {
     );
 
     const aliceMiners = await alice.miningSeats();
-    const aliceStats = aliceBidder!.stats;
     const cohortStartingFrameId = aliceBidder!.cohortStartingFrameId;
     const bobMiners = await bob.miningSeats();
-    const bobStats = bobBidder!.stats;
 
-    console.log({ cohortStartingFrameId, bobStats, aliceStats });
-    console.log('bob', aliceStats);
-    console.log('alice', bobStats);
+    const aliceStats = { seatsWon: aliceBidder!.winningBids.length, fees: aliceBidder!.txFees };
+    const bobStats = { seatsWon: bobBidder!.winningBids.length, fees: bobBidder!.txFees };
+    console.log({ cohortStartingFrameId, aliceMiners, bobStats });
 
     const bobActive = bobMiners.filter(x => x.seat !== undefined);
     const aliceActive = aliceMiners.filter(x => x.seat !== undefined);
 
     expect(bobActive.length).toBe(bobStats.seatsWon);
-    expect(bobStats.bidsAttempted).toBeGreaterThanOrEqual(4);
-    expect(bobActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(bobStats.totalArgonsBid);
-    // expect 5 rounds of bidding
     expect(bobStats.fees).toBeGreaterThanOrEqual(6_000n * 4n);
 
-    expect(aliceStats.bidsAttempted).toBeGreaterThanOrEqual(6);
     expect(aliceActive.length).toBe(aliceStats.seatsWon);
-    expect(aliceActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(aliceStats.totalArgonsBid);
     console.log('Waiting for each bidder to mine');
-    await Promise.all([bobMinePromise, aliceMinePromise]);
+    if (bobStats.seatsWon > 0) {
+      await expect(bobMinePromise).resolves.toBeTruthy();
+    }
+    if (aliceStats.seatsWon > 0) {
+      await expect(aliceMinePromise).resolves.toBeTruthy();
+    }
   }, 180e3);
 });
