@@ -4010,9 +4010,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				60u8, 20u8, 122u8, 212u8, 155u8, 48u8, 41u8, 52u8, 253u8, 49u8, 90u8, 227u8, 153u8,
-				211u8, 254u8, 161u8, 1u8, 50u8, 218u8, 28u8, 170u8, 123u8, 52u8, 46u8, 171u8,
-				248u8, 146u8, 232u8, 235u8, 192u8, 237u8, 190u8,
+				70u8, 32u8, 21u8, 51u8, 226u8, 53u8, 98u8, 102u8, 34u8, 163u8, 189u8, 4u8, 83u8,
+				52u8, 194u8, 221u8, 206u8, 126u8, 166u8, 123u8, 102u8, 192u8, 82u8, 227u8, 125u8,
+				77u8, 181u8, 247u8, 97u8, 34u8, 146u8, 107u8,
 			]
 	}
 	pub mod system {
@@ -5193,10 +5193,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							4u8, 66u8, 150u8, 99u8, 95u8, 105u8, 218u8, 81u8, 141u8, 94u8, 153u8,
-							159u8, 85u8, 18u8, 146u8, 249u8, 103u8, 137u8, 47u8, 191u8, 223u8,
-							248u8, 28u8, 137u8, 137u8, 25u8, 196u8, 168u8, 172u8, 18u8, 212u8,
-							165u8,
+							38u8, 113u8, 93u8, 134u8, 6u8, 175u8, 126u8, 156u8, 66u8, 69u8, 235u8,
+							52u8, 216u8, 158u8, 9u8, 203u8, 83u8, 80u8, 3u8, 79u8, 226u8, 115u8,
+							154u8, 75u8, 28u8, 56u8, 69u8, 245u8, 54u8, 13u8, 51u8, 13u8,
 						],
 					)
 				}
@@ -10264,6 +10263,7 @@ pub mod api {
 				pub locker: funds_locked::Locker,
 				pub amount: funds_locked::Amount,
 				pub is_ratchet: funds_locked::IsRatchet,
+				pub fee_revenue: funds_locked::FeeRevenue,
 			}
 			pub mod funds_locked {
 				use super::runtime_types;
@@ -10271,6 +10271,7 @@ pub mod api {
 				pub type Locker = crate::types::AccountId32;
 				pub type Amount = ::core::primitive::u128;
 				pub type IsRatchet = ::core::primitive::bool;
+				pub type FeeRevenue = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FundsLocked {
 				const PALLET: &'static str = "Vaults";
@@ -11095,6 +11096,7 @@ pub mod api {
 				pub vault_id: bitcoin_lock_created::VaultId,
 				pub lock_price: bitcoin_lock_created::LockPrice,
 				pub account_id: bitcoin_lock_created::AccountId,
+				pub security_fee: bitcoin_lock_created::SecurityFee,
 			}
 			pub mod bitcoin_lock_created {
 				use super::runtime_types;
@@ -11102,6 +11104,7 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type LockPrice = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
+				pub type SecurityFee = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockCreated {
 				const PALLET: &'static str = "BitcoinLocks";
@@ -28263,6 +28266,7 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						lock_price: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
+						security_fee: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
 					BitcoinLockRatcheted {
@@ -32683,6 +32687,7 @@ pub mod api {
 						locker: crate::types::AccountId32,
 						amount: ::core::primitive::u128,
 						is_ratchet: ::core::primitive::bool,
+						fee_revenue: ::core::primitive::u128,
 					},
 					#[codec(index = 7)]
 					FundLockCanceled {

@@ -80,7 +80,7 @@ export function stringifyExt(obj: any): any {
       if (typeof value === 'bigint') {
         return value.toString() + 'n'; // Append 'n' to indicate bigint
       }
-      if (Buffer.isBuffer(value)) {
+      if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
         return `0x${Buffer.from(value).toString('hex')}`; // Convert Buffer to hex string
       }
       return value;

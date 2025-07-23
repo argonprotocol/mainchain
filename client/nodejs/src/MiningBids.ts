@@ -22,7 +22,7 @@ export class MiningBids {
 
   public async maxCohortSize(): Promise<number> {
     const client = await this.client;
-    return client.consts.miningSlot.maxCohortSize.toNumber();
+    return client.query.miningSlot.nextCohortSize().then(x => x.toNumber());
   }
 
   public async onCohortChange(options: {

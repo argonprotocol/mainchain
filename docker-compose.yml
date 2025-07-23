@@ -6,6 +6,7 @@ x-oracle-config: &oracle
     dockerfile: dev.Dockerfile
     target: oracle
   restart: on-failure
+  pull_policy: always
 x-notary-config: &notary
   image: ghcr.io/argonprotocol/argon-notary:${VERSION:-latest}
   build:
@@ -13,6 +14,7 @@ x-notary-config: &notary
     dockerfile: dev.Dockerfile
     target: argon-notary
   restart: on-failure
+  pull_policy: always
 x-node-config: &node
   image: ghcr.io/argonprotocol/argon-node:${VERSION:-latest}
   build:
@@ -20,14 +22,24 @@ x-node-config: &node
     dockerfile: dev.Dockerfile
     target: argon-node
   restart: on-failure
+  pull_policy: always
 x-bitcoin-config: &bitcoin
   image: ghcr.io/argonprotocol/bitcoin-unverified-node:latest
   build:
     context: .
     dockerfile: docker/bitcoin.Dockerfile
   restart: on-failure
+  pull_policy: always
   volumes:
     - bitcoin-data:/bitcoin
+x-cli-config: &cli
+  image: node:20
+  build:
+    context: .
+    dockerfile: docker/nodejs.Dockerfile
+  working_dir: /app
+  restart: on-failure
+  pull_policy: always
 
 services:
   minio:
@@ -91,19 +103,26 @@ services:
     command: >
       sh -c '
         set -e
-        echo "[regtest]" > /bitcoin/bitcoin.conf
-        echo "rpcuser=bitcoin" >> /bitcoin/bitcoin.conf
-        echo "rpcpassword=bitcoin" >> /bitcoin/bitcoin.conf
-        echo "rpcconnect=bitcoin" >> /bitcoin/bitcoin.conf
-        echo "rpcport=18444" >> /bitcoin/bitcoin.conf
-        echo "txindex=1" >> /bitcoin/bitcoin.conf
-        echo "blockfilterindex=1" >> /bitcoin/bitcoin.conf
-        echo "wallet=default" >> /bitcoin/bitcoin.conf
-
+        # if the conf file does not exist, create it
+        if [ ! -f /bitcoin/bitcoin.conf ]; then
+          mkdir -p /bitcoin
+          echo "[regtest]" > /bitcoin/bitcoin.conf
+          echo "rpcuser=bitcoin" >> /bitcoin/bitcoin.conf
+          echo "rpcpassword=bitcoin" >> /bitcoin/bitcoin.conf
+          echo "rpcconnect=bitcoin" >> /bitcoin/bitcoin.conf
+          echo "rpcport=18444" >> /bitcoin/bitcoin.conf
+          echo "txindex=1" >> /bitcoin/bitcoin.conf
+          echo "blockfilterindex=1" >> /bitcoin/bitcoin.conf
+          echo "wallet=default" >> /bitcoin/bitcoin.conf
+        fi
+        echo "Bitcoin conf created at /bitcoin/bitcoin.conf"
+        echo $(bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf getwalletinfo)
         if ! bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf getwalletinfo >/dev/null 2>&1; then
+          echo "Creating Bitcoin wallet..."
           bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf createwallet default 2>/dev/null \
           || bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf loadwallet default
         fi
+        echo "Bitcoin wallet initialized"
       '
     depends_on:
       bitcoin:
@@ -111,15 +130,41 @@ services:
 
   bitcoin-init:
     <<: *bitcoin
-    command: ./init-bitcoin.sh
+    command: /scripts/bitcoin-init.sh
     environment:
       BITCOIN_CLI_ARGS: >-
         -regtest
         -datadir=/bitcoin
         -conf=/bitcoin/bitcoin.conf
     depends_on:
-      bitcoin:
-        condition: service_healthy
+      bitcoin-wallet-init:
+        condition: service_completed_successfully
+
+  bitcoin-miner:
+    <<: *bitcoin
+    command: /scripts/bitcoin-mine.sh
+    environment:
+      BITCOIN_CLI_ARGS: >-
+        -regtest
+        -datadir=/bitcoin
+        -conf=/bitcoin/bitcoin.conf
+    depends_on:
+      bitcoin-init:
+        condition: service_completed_successfully
+
+  # send 2 BTC to an arbitrary address
+  # docker compose --profile tooling run --rm btc-cli sendtoaddress bcrt1q... 2.0
+  #
+  ## mine 15 blocks to the given address
+  # docker compose --profile tooling run --rm btc-cli generatetoaddress 15 bcrt1q...
+  btc-cli:
+    <<: *bitcoin
+    entrypoint:
+      - bitcoin-cli
+      - -regtest
+      - -datadir=/bitcoin
+      - -conf=/bitcoin/bitcoin.conf
+    profiles: [tooling]   # keeps it out of the default `up`
 
   archive-node:
     <<: *node
@@ -139,6 +184,7 @@ services:
       --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
+      --network-backend=libp2p
       --no-telemetry
       --detailed-log-output
       --rpc-cors=all
@@ -154,10 +200,16 @@ services:
     environment:
       RUST_LOG: info,argon=info,pallet=trace
     healthcheck:
-      test: >
-        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+      test:
+        - CMD-SHELL
+        - >
+          curl -fsS -H 'Content-Type: application/json' \
+            -d '{"id":1,"jsonrpc":"2.0","method":"system_health","params":[]}' \
+            http://127.0.0.1:9944 > /dev/null || exit 1
       interval: 5s
-      retries: 10
+      timeout: 5s
+      start_period: 30s
+      retries: 12
 
   miner-1:
     <<: *node
@@ -174,13 +226,13 @@ services:
       --port=30335
       --rpc-port=9944
       --node-key=f1425b14b3333b7e20bead4d3c3bcc35c908609c843194bb9753e2af6374a87f
-      --public-addr=/dns/miner-1/tcp/30335/p2p/12D3KooWL2HqeruEZvKCDxgb9zEQgx74R2pHWV2FzctCSvtvT7zu
       --base-path=/data
       --bootnodes=/dns/archive-node/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn
       --chain=local
       --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
+      --network-backend=libp2p
       --no-telemetry
       --detailed-log-output
       --rpc-cors=all
@@ -197,12 +249,48 @@ services:
       RUST_LOG: info,argon=info,pallet=trace
     healthcheck:
       test:
-        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+        - CMD-SHELL
+        - >
+          curl -fsS -H 'Content-Type: application/json' \
+            -d '{"id":1,"jsonrpc":"2.0","method":"system_health","params":[]}' \
+            http://127.0.0.1:9944 | jq -e '.result.peers > 0' > /dev/null || exit 1
       interval: 5s
-      retries: 10
+      timeout: 3s
+      start_period: 30s   # allow sync & libp2p dial time
+      retries: 12
     profiles:
       - miners
       - bob
+      - all
+
+  miner-1-bidder:
+    <<: *cli
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        cd client/nodejs || true
+        if [ -f lib/cli.js ]; then
+          echo "Using local CLI"
+          CLI="node lib/cli.js"
+        else
+          echo "Using npx CLI"
+          CLI="npx --yes @argonprotocol/mainchain"
+        fi
+        set -x
+        $$CLI accounts create --path=/accounts/bob.json --register-keys-to=http://miner-1:9944 --account-suri=//Bob -s=0-49
+        exec $$CLI mining bid --env=/accounts/bob.json --max-bid=0.5 --run-continuous
+    environment:
+      - MAINCHAIN_URL=ws://archive-node:9944
+    depends_on:
+      miner-1:
+        condition: service_healthy
+    restart: on-failure
+    volumes:
+      - miner1-data:/accounts
+    profiles:
+      - miners
       - all
 
   miner-2:
@@ -227,6 +315,7 @@ services:
       --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
+      --network-backend=libp2p
       --no-telemetry
       --detailed-log-output
       --rpc-cors=all
@@ -243,12 +332,47 @@ services:
       RUST_LOG: info,argon=info,pallet=trace
     healthcheck:
       test:
-        curl -s http://127.0.0.1:9944/health | grep -q "\"isSyncing\":false"
+        - CMD-SHELL
+        - >
+          curl -fsS -H 'Content-Type: application/json' \
+            -d '{"id":1,"jsonrpc":"2.0","method":"system_health","params":[]}' \
+            http://127.0.0.1:9944 | jq -e '.result.peers > 0' > /dev/null || exit 1
       interval: 5s
-      retries: 10
+      timeout: 3s
+      start_period: 30s   # allow sync & libp2p dial time
+      retries: 12
     profiles:
       - miners
       - dave
+      - all
+
+  miner-2-bidder:
+    <<: *cli
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        cd client/nodejs || true
+        if [ -f lib/cli.js ]; then
+          echo "Using local CLI"
+          CLI="node lib/cli.js"
+        else
+          echo "Using npx CLI"
+          CLI="npx --yes @argonprotocol/mainchain"
+        fi
+        set -x
+        $$CLI accounts create --path=/accounts/dave.json --register-keys-to=http://miner-2:9944 --account-suri=//Dave -s=0-49
+        exec $$CLI mining bid --env=/accounts/dave.json --max-bid=2 --max-seats=1 --bid-delay=2 --run-continuous
+    environment:
+      - MAINCHAIN_URL=ws://archive-node:9944
+    depends_on:
+      miner-2:
+        condition: service_healthy
+    volumes:
+      - miner2-data:/accounts
+    profiles:
+      - miners
       - all
 
   notary-insert-key:

@@ -23,7 +23,7 @@ RUN  <<END
     rm -rf /opt/bitcoin-${VERSION}/bin/bitcoin-qt
 END
 
-COPY ./docker/init-bitcoin.sh init-bitcoin.sh
-RUN chmod +x ./init-bitcoin.sh
+COPY ./docker/bitcoin-*.sh /scripts/
+RUN chmod +x /scripts/*.sh
 
 CMD [ "/usr/local/bin/bitcoind"]

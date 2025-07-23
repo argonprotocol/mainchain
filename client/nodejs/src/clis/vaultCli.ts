@@ -5,6 +5,7 @@ import { Vault } from '../Vault';
 import { BitcoinLocks } from '../BitcoinLocks';
 import { accountsetFromCli } from './index';
 import { MICROGONS_PER_ARGON } from '../utils';
+import { hexToU8a } from '@polkadot/util';
 
 export default function vaultCli() {
   const program = new Command('vaults').description('Monitor vaults and manage securitization');
@@ -128,7 +129,7 @@ export default function vaultCli() {
         vault,
         argonKeyring: accountset.txSubmitterPair,
         satoshis,
-        ownerBitcoinPubkey: Buffer.from(pubkey, 'hex'),
+        ownerBitcoinPubkey: hexToU8a(pubkey),
         tip: resolvedTip,
         reducedBalanceBy: argonsNeeded + vaultTxFee + resolvedTip,
       });

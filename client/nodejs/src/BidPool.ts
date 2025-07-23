@@ -6,15 +6,13 @@ import {
   type ArgonClient,
   type ArgonPrimitivesBlockSealMiningRegistration,
   type KeyringPair,
+  type PalletLiquidityPoolsLiquidityPool,
+  type PalletLiquidityPoolsLiquidityPoolCapital,
   type u32,
   type u64,
   type Vec,
 } from './index';
 import { Vault } from './Vault';
-import {
-  type PalletLiquidityPoolsLiquidityPool,
-  type PalletLiquidityPoolsLiquidityPoolCapital,
-} from '@polkadot/types/lookup';
 import { TxResult, TxSubmitter } from './TxSubmitter';
 import { AccountRegistry } from './AccountRegistry';
 
@@ -112,7 +110,7 @@ export class BidPool {
 
   public async loadAt(blockHash?: Uint8Array) {
     const client = await this.client;
-    blockHash ??= Buffer.from((await client.rpc.chain.getHeader()).hash);
+    blockHash ??= new Uint8Array((await client.rpc.chain.getHeader()).hash);
     const api = await client.at(blockHash);
     const rawVaultIds = await api.query.vaults.vaultsById.keys();
     const vaultIds = rawVaultIds.map(x => x.args[0].toNumber());

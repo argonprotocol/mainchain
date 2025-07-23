@@ -723,14 +723,14 @@ impl<T: Config> Pallet<T> {
 		if frame_id >= frames_per_term {
 			let retiring_frame_id = frame_id - frames_per_term;
 			let rotating_out = MinersByCohort::<T>::take(retiring_frame_id);
-			MinerXorKeysByCohort::<T>::mutate(|a| a.remove(&retiring_frame_id));
 			for miner in rotating_out {
 				let account_id = miner.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
 				active_miners -= 1;
 				let _ = released_miners_by_account_id.try_insert(account_id.clone(), miner.clone());
 				removed_miners.push((account_id, miner.authority_keys.clone()));
-				Self::release_mining_seat_argonots(&miner, false);
+				let is_in_next = slot_cohort.iter().any(|x| x.account_id == miner.account_id);
+				Self::release_mining_seat_argonots(&miner, is_in_next);
 			}
 		}
 
@@ -739,6 +739,7 @@ impl<T: Config> Pallet<T> {
 		MinersByCohort::<T>::insert(frame_id, slot_cohort.clone());
 
 		let mut total_price_per_seat = T::Balance::zero();
+		let mut xor = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
@@ -748,15 +749,16 @@ impl<T: Config> Pallet<T> {
 				MinerXor::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
 					.using_encoded(blake2_256);
 
-			MinerXorKeysByCohort::<T>::mutate(|a| {
-				if !a.contains_key(&frame_id) {
-					let _ = a.try_insert(frame_id, BoundedVec::default());
-				}
-				let a = a.get_mut(&frame_id).expect("should exist, just checked");
-				a.try_push(U256::from_big_endian(&hash))
-					.expect("should not fail, just checked size")
-			});
+			xor.push(U256::from_big_endian(&hash));
 		}
+
+		MinerXorKeysByCohort::<T>::mutate(|a| {
+			if frame_id >= frames_per_term {
+				a.retain(|t, _v| *t > frame_id - frames_per_term);
+			}
+			a.try_insert(frame_id, BoundedVec::truncate_from(xor))
+				.expect("Should be valid since we removed from this map previously");
+		});
 		let average_price_per_seat = total_price_per_seat
 			.checked_div(&T::Balance::from(slot_cohort.len() as u32))
 			.unwrap_or_default();

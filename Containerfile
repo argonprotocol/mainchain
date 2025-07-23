@@ -8,7 +8,7 @@ ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-		ca-certificates && \
+		ca-certificates curl jq && \
 # apt cleanup
 	apt-get autoremove -y && \
 	apt-get clean && \

@@ -2,11 +2,11 @@ import { type ArgonClient, getClient, Keyring, type KeyringPair } from './index'
 import { dispatchErrorToString, formatArgons } from './utils';
 import { logExtrinsicResult, TxSubmitter } from './TxSubmitter';
 import { AccountRegistry } from './AccountRegistry';
-import * as process from 'node:process';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import { AccountMiners } from './AccountMiners';
 import { ApiDecoration } from '@polkadot/api/types';
-import { Bool } from '@polkadot/types-codec';
+import { getConfig } from './config';
+import { u8aToHex } from '@polkadot/util';
 
 export type SubaccountRange = readonly number[];
 
@@ -15,16 +15,12 @@ export type IAddressNames = Map<string, string>;
 export interface ISubaccountMiner {
   address: string;
   subaccountIndex: number;
-  seat?: {
-    frameId: number;
-    index: number;
-    bidAmount: bigint;
-  };
+  seat?: IMiningIndex;
   isLastDay: boolean;
 }
 
 export interface IMiningIndex {
-  frameId: number;
+  startingFrameId: number;
   index: number;
   bidAmount: bigint;
 }
@@ -188,7 +184,7 @@ export class Accountset {
       const index = indexRaw.toNumber();
       const bidAmount = bidAmountsByFrame[frameId]?.[index];
       addressToMiningIndex[address] = {
-        frameId,
+        startingFrameId: frameId,
         index,
         bidAmount: bidAmount ?? 0n,
       };
@@ -199,7 +195,7 @@ export class Accountset {
       const cohort = addressToMiningIndex[address];
       let isLastDay = false;
       if (cohort !== undefined) {
-        isLastDay = nextFrameId.toNumber() - cohort.frameId === 10;
+        isLastDay = nextFrameId.toNumber() - cohort.startingFrameId === 10;
       }
       return {
         address,
@@ -362,11 +358,9 @@ export class Accountset {
     gran: { privateKey: string; publicKey: string; rawPublicKey: Uint8Array };
     seal: { privateKey: string; publicKey: string; rawPublicKey: Uint8Array };
   } {
-    let version = keysVersion ?? 0;
-    if (process.env.KEYS_VERSION) {
-      version = parseInt(process.env.KEYS_VERSION) ?? 0;
-    }
-    const seedMnemonic = this.sessionKeyMnemonic ?? process.env.KEYS_MNEMONIC;
+    const config = getConfig();
+    let version = keysVersion ?? config.keysVersion ?? 0;
+    const seedMnemonic = this.sessionKeyMnemonic ?? config.keysMnemonic;
     if (!seedMnemonic) {
       throw new Error('KEYS_MNEMONIC environment variable not set. Cannot derive keys.');
     }
@@ -381,12 +375,12 @@ export class Accountset {
     return {
       seal: {
         privateKey: blockSealKey,
-        publicKey: `0x${Buffer.from(blockSealAccount.publicKey).toString('hex')}`,
+        publicKey: u8aToHex(blockSealAccount.publicKey),
         rawPublicKey: blockSealAccount.publicKey,
       },
       gran: {
         privateKey: granKey,
-        publicKey: `0x${Buffer.from(grandpaAccount.publicKey).toString('hex')}`,
+        publicKey: u8aToHex(grandpaAccount.publicKey),
         rawPublicKey: grandpaAccount.publicKey,
       },
     };
@@ -520,10 +514,11 @@ export class Accountset {
 
 export function getDefaultSubaccountRange(): number[] {
   try {
-    return parseSubaccountRange(process.env.SUBACCOUNT_RANGE ?? '0-9')!;
+    const config = getConfig();
+    return parseSubaccountRange(config.subaccountRange ?? '0-9')!;
   } catch {
     console.error(
-      'Failed to parse SUBACCOUNT_RANGE environment variable. Defaulting to 0-9. Please check the format of the SUBACCOUNT_RANGE variable.',
+      'Failed to parse SUBACCOUNT_RANGE configuration. Defaulting to 0-9. Please check the format of the subaccountRange config value.',
     );
     return Array.from({ length: 10 }, (_, i) => i);
   }
@@ -565,10 +560,7 @@ interface IAccountStatus {
   address: string;
   argons: string;
   argonots: string;
-  seat?: {
-    frameId: number;
-    index: number;
-  };
+  seat?: IMiningIndex;
   bidPlace?: number;
   bidAmount?: bigint;
   isWorkingOn?: boolean;

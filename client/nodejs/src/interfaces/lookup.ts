@@ -457,6 +457,7 @@ export default {
         locker: 'AccountId32',
         amount: 'u128',
         isRatchet: 'bool',
+        feeRevenue: 'u128',
       },
       FundLockCanceled: {
         vaultId: 'u32',
@@ -493,6 +494,7 @@ export default {
         vaultId: 'u32',
         lockPrice: 'u128',
         accountId: 'AccountId32',
+        securityFee: 'u128',
       },
       BitcoinLockRatcheted: {
         utxoId: 'u64',

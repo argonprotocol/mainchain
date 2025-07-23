@@ -1,4 +1,4 @@
-import { Accountset } from './Accountset';
+import { Accountset, IMiningIndex, ISubaccountMiner } from './Accountset';
 import { Header } from '@polkadot/types/interfaces/runtime';
 import { GenericEvent } from '@polkadot/types';
 import { BlockWatch } from './BlockWatch';
@@ -39,18 +39,14 @@ export class AccountMiners {
 
   constructor(
     private accountset: Accountset,
-    registeredMiners: {
-      startingFrameId: number;
-      address: string;
-      subaccountIndex: number;
-    }[],
+    registeredMiners: (ISubaccountMiner & { seat: IMiningIndex })[],
     private options: { shouldLog: boolean } = { shouldLog: false },
   ) {
     this.frameCalculator = new FrameCalculator();
-    for (const seat of registeredMiners) {
-      this.trackedAccountsByAddress[seat.address] = {
-        startingFrameId: seat.startingFrameId,
-        subaccountIndex: seat.subaccountIndex,
+    for (const miner of registeredMiners) {
+      this.trackedAccountsByAddress[miner.address] = {
+        startingFrameId: miner.seat.startingFrameId,
+        subaccountIndex: miner.subaccountIndex,
       };
     }
   }

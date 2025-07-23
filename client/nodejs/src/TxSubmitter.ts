@@ -5,12 +5,14 @@ import {
   ExtrinsicError,
   GenericEvent,
   KeyringPair,
+  waitForLoad,
 } from './index';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import type { SignerOptions } from '@polkadot/api/types';
+import { getConfig } from './config';
 
 export function logExtrinsicResult(result: ISubmittableResult) {
-  if (process.env.DEBUG) {
+  if (getConfig().debug) {
     const json = result.status.toJSON() as any;
     const status = Object.keys(json)[0];
     console.debug('Transaction update: "%s"', status, json[status]);
@@ -56,10 +58,13 @@ export class TxSubmitter {
       logResults?: boolean;
       waitForBlock?: boolean;
       useLatestNonce?: boolean;
+      onResultCallback?: (result: ISubmittableResult) => void;
     } = {},
   ): Promise<TxResult> {
-    const { logResults } = options;
+    const { logResults, waitForBlock, useLatestNonce, ...apiOptions } = options;
+    await waitForLoad();
     const result = new TxResult(this.client, logResults);
+    result.onResultCallback = options.onResultCallback;
     let toHuman = (this.tx.toHuman() as any).method as any;
     let txString = [];
     let api = formatCall(toHuman);
@@ -77,13 +82,13 @@ export class TxSubmitter {
       args.push(toHuman.args);
     }
     args.unshift(txString.join('->'));
-    if (options.useLatestNonce && !options.nonce) {
-      options.nonce = await this.client.rpc.system.accountNextIndex(this.pair.address);
+    if (useLatestNonce && !apiOptions.nonce) {
+      apiOptions.nonce = await this.client.rpc.system.accountNextIndex(this.pair.address);
     }
 
-    console.log('Submitting transaction:', ...args);
-    await this.tx.signAndSend(this.pair, options, result.onResult.bind(result));
-    if (options.waitForBlock) {
+    console.log('Submitting transaction from %s:', this.pair.address, ...args);
+    await this.tx.signAndSend(this.pair, apiOptions, result.onResult.bind(result));
+    if (waitForBlock) {
       await result.inBlockPromise;
     }
     return result;
@@ -114,6 +119,8 @@ export class TxResult {
    */
   public finalFeeTip?: bigint;
 
+  public onResultCallback?: (result: ISubmittableResult) => void;
+
   private inBlockResolve!: (blockHash: Uint8Array) => void;
   private inBlockReject!: (error: ExtrinsicError) => void;
   private finalizedResolve!: (blockHash: Uint8Array) => void;
@@ -143,7 +150,7 @@ export class TxResult {
     }
     const { events, status, dispatchError, isFinalized } = result;
     if (status.isInBlock) {
-      this.includedInBlock = Buffer.from(status.asInBlock);
+      this.includedInBlock = new Uint8Array(status.asInBlock);
       let encounteredError = dispatchError;
       let batchErrorIndex: number | undefined;
       for (const event of events) {
@@ -164,12 +171,13 @@ export class TxResult {
         const error = dispatchErrorToExtrinsicError(this.client, encounteredError, batchErrorIndex);
         this.reject(error);
       } else {
-        this.inBlockResolve(Buffer.from(status.asInBlock));
+        this.inBlockResolve(new Uint8Array(status.asInBlock));
       }
     }
     if (isFinalized) {
       this.finalizedResolve(status.asFinalized);
     }
+    this.onResultCallback?.(result);
   }
 
   private reject(error: ExtrinsicError) {
