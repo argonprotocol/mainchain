@@ -180,6 +180,7 @@ pub mod pallet {
 			locker: T::AccountId,
 			amount: T::Balance,
 			is_ratchet: bool,
+			fee_revenue: T::Balance,
 		},
 		FundLockCanceled {
 			vault_id: VaultId,
@@ -853,6 +854,7 @@ pub mod pallet {
 				vault_id,
 				locker: account_id.clone(),
 				amount: lock_price,
+				fee_revenue: total_fee,
 				is_ratchet,
 			});
 			VaultsById::<T>::insert(vault_id, vault);

@@ -261,6 +261,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			lock_price: T::Balance,
 			account_id: T::AccountId,
+			security_fee: T::Balance,
 		},
 		BitcoinLockRatcheted {
 			utxo_id: UtxoId,
@@ -467,7 +468,7 @@ pub mod pallet {
 			let lock_price = T::PriceProvider::get_bitcoin_argon_price(satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-			let _fee = T::VaultProvider::lock(vault_id, &account_id, lock_price, satoshis, None)
+			let fee = T::VaultProvider::lock(vault_id, &account_id, lock_price, satoshis, None)
 				.map_err(Error::<T>::from)?;
 
 			let (vault_xpub, vault_claim_xpub, script_pubkey) =
@@ -531,6 +532,7 @@ pub mod pallet {
 				vault_id,
 				lock_price,
 				account_id,
+				security_fee: fee,
 			});
 
 			Ok(())

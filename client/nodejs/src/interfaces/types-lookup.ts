@@ -590,6 +590,7 @@ declare module '@polkadot/types/lookup' {
       readonly locker: AccountId32;
       readonly amount: u128;
       readonly isRatchet: bool;
+      readonly feeRevenue: u128;
     } & Struct;
     readonly isFundLockCanceled: boolean;
     readonly asFundLockCanceled: {
@@ -642,6 +643,7 @@ declare module '@polkadot/types/lookup' {
       readonly vaultId: u32;
       readonly lockPrice: u128;
       readonly accountId: AccountId32;
+      readonly securityFee: u128;
     } & Struct;
     readonly isBitcoinLockRatcheted: boolean;
     readonly asBitcoinLockRatcheted: {

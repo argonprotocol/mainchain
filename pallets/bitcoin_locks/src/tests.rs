@@ -50,6 +50,7 @@ fn can_lock_a_bitcoin_utxo() {
 				vault_id: 1,
 				lock_price,
 				account_id: 2,
+				security_fee: lock_price / 10,
 			}
 			.into(),
 		);
