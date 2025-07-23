@@ -341,6 +341,7 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	let _ = fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
+	let mut max_blocks = 100;
 	let mut block_sub = test_node.client.live.blocks().subscribe_finalized().await.unwrap();
 	while let Some(next) = block_sub.next().await {
 		let utxo_lock = test_node
@@ -354,6 +355,10 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 			break;
 		}
 		println!("Waiting for utxo lock to be verified in block {:?}", next.unwrap().hash());
+		max_blocks -= 1;
+		if max_blocks == 0 {
+			panic!("No utxo lock verified after 100 blocks");
+		}
 	}
 
 	println!("Submitting new bitcoin price");
