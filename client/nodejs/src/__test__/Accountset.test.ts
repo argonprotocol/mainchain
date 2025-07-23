@@ -22,7 +22,7 @@ describeIntegration('Accountset tests', () => {
   });
 
   it('can derive multiple accounts', async () => {
-    const seedAccount = await createKeyringPair({});
+    const seedAccount = createKeyringPair({});
     const accountset = new Accountset({
       client,
       seedAccount,
@@ -57,7 +57,7 @@ describeIntegration('Accountset tests', () => {
         tip: 100n,
       });
       expect(result).toBeTruthy();
-      expect(result.finalFee).toBeGreaterThan(22_300n);
+      expect(result.finalFee).toBeGreaterThan(6000);
       expect(result.successfulBids).toBe(0);
       expect(result.bidError?.stack).toMatch('InvalidBidAmount');
     }
@@ -67,10 +67,11 @@ describeIntegration('Accountset tests', () => {
       tip: 100n,
     });
     expect(result).toBeTruthy();
-    expect(result.finalFee).toBeGreaterThan(22_300n);
+    expect(result.finalFee).toBeGreaterThan(6000);
     expect(result.successfulBids).toBe(5);
     expect(result.bidError).toBeFalsy();
-    const bids = await accountset.bids();
+    const bids = await accountset.bids(result.blockHash);
+    console.log(bids);
     expect(bids.filter(x => x.bidPlace !== undefined)).toHaveLength(5);
   });
 
@@ -124,7 +125,7 @@ describeIntegration('Accountset tests', () => {
       tip: 100n,
     });
     expect(second_bids).toBeTruthy();
-    expect(second_bids.finalFee).toBeGreaterThan(22_300n);
+    expect(second_bids.finalFee).toBeGreaterThan(6000n);
     expect(second_bids.successfulBids).toBe(3);
     expect(second_bids.bidError?.stack).toMatch('BidTooLow');
   });

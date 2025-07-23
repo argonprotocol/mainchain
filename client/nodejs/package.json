@@ -23,7 +23,8 @@
     "test:ci": "vitest --run --retry=1"
   },
   "files": [
-    "lib/"
+    "lib/",
+    "browser/"
   ],
   "type": "module",
   "bin": "./lib/cli.js",
@@ -32,6 +33,10 @@
   "exports": {
     ".": {
       "types": "./lib/index.d.ts",
+      "browser": {
+        "types": "./browser/index.d.ts",
+        "default": "./browser/index.js"
+      },
       "import": "./lib/index.js",
       "require": {
         "types": "./lib/index.d.cts",

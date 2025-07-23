@@ -20,5 +20,5 @@
   },
 
   "include": ["ts"],
-  "exclude": ["src", "node_modules", "lib", "target", "wasm"]
+  "exclude": ["src", "node_modules", "lib", "browser", "target", "wasm"]
 }

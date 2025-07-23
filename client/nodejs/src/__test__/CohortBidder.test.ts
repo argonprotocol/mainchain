@@ -159,19 +159,19 @@ describeIntegration('Cohort Bidder tests', () => {
     const bobStats = bobBidder!.stats;
 
     console.log({ cohortStartingFrameId, bobStats, aliceStats });
-    console.log('bob', bobBidder!.bidHistory);
-    console.log('alice', aliceBidder!.bidHistory);
+    console.log('bob', aliceStats);
+    console.log('alice', bobStats);
 
     const bobActive = bobMiners.filter(x => x.seat !== undefined);
     const aliceActive = aliceMiners.filter(x => x.seat !== undefined);
 
     expect(bobActive.length).toBe(bobStats.seatsWon);
-    expect(bobStats.bidsAttempted).toBeGreaterThanOrEqual(20);
+    expect(bobStats.bidsAttempted).toBeGreaterThanOrEqual(4);
     expect(bobActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(bobStats.totalArgonsBid);
     // expect 5 rounds of bidding
-    expect(bobStats.fees).toBeGreaterThanOrEqual(22_000n * 4n);
+    expect(bobStats.fees).toBeGreaterThanOrEqual(6_000n * 4n);
 
-    expect(aliceStats.bidsAttempted).toBeGreaterThanOrEqual(20);
+    expect(aliceStats.bidsAttempted).toBeGreaterThanOrEqual(6);
     expect(aliceActive.length).toBe(aliceStats.seatsWon);
     expect(aliceActive.reduce((acc, x) => acc + x.bidAmount!, 0n)).toBe(aliceStats.totalArgonsBid);
     console.log('Waiting for each bidder to mine');

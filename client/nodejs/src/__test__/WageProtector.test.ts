@@ -7,7 +7,7 @@ it('adjusts the price of a wage for inflation', async () => {
     argonUsdTargetPrice: 1_010_000_000_000_000_000n,
     argonUsdPrice: 1_000_000_000_000_000_000n,
     tick: 1n,
-    finalizedBlock: Buffer.from([]),
+    finalizedBlock: new Uint8Array([]),
   });
 
   // if price of argon is below the target price, we have argon inflation, which means we need to increase the wage
@@ -21,7 +21,7 @@ it('adjusts the price of a wage for deflation', async () => {
     argonUsdTargetPrice: 1_000_000_000_000_000_000n,
     argonUsdPrice: 1_010_000_000_000_000_000n,
     tick: 1n,
-    finalizedBlock: Buffer.from([]),
+    finalizedBlock: new Uint8Array([]),
   });
 
   // if price of argon is below the target price, we have argon deflation, which means we need to decrease the wages to

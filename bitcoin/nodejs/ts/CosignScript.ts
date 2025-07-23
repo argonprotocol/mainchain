@@ -1,9 +1,12 @@
-import { BIP32Interface } from 'bip32';
-import { networks, payments, Psbt, Transaction } from 'bitcoinjs-lib';
+import { HDKey } from '@scure/bip32';
+import { p2pkh, p2sh, p2wpkh, p2wsh, Transaction } from '@scure/btc-signer';
 import {
   ArgonPrimitivesBitcoinBitcoinNetwork,
+  hexToU8a,
   IBitcoinLock,
   IReleaseRequest,
+  u8aEq,
+  u8aToHex,
 } from '@argonprotocol/mainchain';
 import {
   BitcoinNetwork,
@@ -13,33 +16,22 @@ import {
   signPsbt,
   signPsbtDerived,
 } from './wasm/bitcoin_bindings.js';
-import { addressBytesHex, keyToBuffer } from './KeysHelper';
+import { addressBytesHex, getScureNetwork, keyToU8a } from './KeysHelper';
 
 export class CosignScript {
-  private readonly network: networks.Network;
   constructor(
     readonly lock: IBitcoinLock,
-    network: networks.Network | ArgonPrimitivesBitcoinBitcoinNetwork,
-  ) {
-    if (
-      network === networks.bitcoin ||
-      network === networks.testnet ||
-      network === networks.regtest
-    ) {
-      this.network = network as networks.Network;
-    } else {
-      this.network = CosignScript.getBitcoinJsNetwork(
-        network as ArgonPrimitivesBitcoinBitcoinNetwork,
-      );
-    }
-  }
+    private network: BitcoinNetwork,
+  ) {}
 
-  public getFundingPsbt(): Psbt {
+  public getFundingPsbt(): Uint8Array {
     const { lock, network } = this;
-    return new Psbt({ network }).addOutput({
-      script: keyToBuffer(lock.p2wshScriptHashHex),
-      value: Number(lock.satoshis),
+    const tx = new Transaction();
+    tx.addOutput({
+      script: keyToU8a(lock.p2wshScriptHashHex),
+      amount: lock.satoshis,
     });
+    return tx.toPSBT(0);
   }
 
   public calculateFee(feeRatePerSatVb: bigint, toScriptPubkey: string): bigint {
@@ -52,7 +44,7 @@ export class CosignScript {
       BigInt(lock.vaultClaimHeight),
       BigInt(lock.openClaimHeight),
       BigInt(lock.createdAtHeight),
-      toBitcoinNetwork(network),
+      network,
       feeRatePerSatVb,
       toScriptPubkey,
     );
@@ -67,7 +59,7 @@ export class CosignScript {
       BigInt(lock.vaultClaimHeight),
       BigInt(lock.openClaimHeight),
       BigInt(lock.createdAtHeight),
-      toBitcoinNetwork(network),
+      network,
     );
   }
 
@@ -90,22 +82,23 @@ export class CosignScript {
       BigInt(lock.vaultClaimHeight),
       BigInt(lock.openClaimHeight),
       BigInt(lock.createdAtHeight),
-      toBitcoinNetwork(network),
+      network,
       releaseRequest.toScriptPubkey,
       releaseRequest.bitcoinNetworkFee,
     );
     return this.psbtFromHex(psbtStr);
   }
 
-  psbtFromHex(psbtHex: string): Psbt {
-    const psbt = Psbt.fromHex(psbtHex.replace(/^0x(.+)/, '$1'), { network: this.network });
-    if (psbt.data.inputs.length === 0) {
+  psbtFromHex(psbtHex: string): Transaction {
+    const psbtBytes = hexToU8a(psbtHex);
+    const tx = Transaction.fromPSBT(psbtBytes);
+    if (tx.inputsLength === 0) {
       throw new Error('PSBT has no inputs');
     }
-    if (psbt.data.outputs.length === 0) {
+    if (tx.outputsLength === 0) {
       throw new Error('PSBT has no outputs');
     }
-    return psbt;
+    return tx;
   }
 
   /**
@@ -114,23 +107,35 @@ export class CosignScript {
    * @param lock - The Bitcoin lock containing the vault information.
    * @param vaultXpriv - The vault's extended private key of which the xpub was used to create the vault.
    */
-  public vaultCosignPsbt(psbt: Psbt, lock: IBitcoinLock, vaultXpriv: BIP32Interface): Psbt {
-    const parentFingerprint = Buffer.from(lock.vaultXpubSources.parentFingerprint);
-    if (!parentFingerprint.equals(vaultXpriv.fingerprint)) {
+  public vaultCosignPsbt(psbt: Transaction, lock: IBitcoinLock, vaultXpriv: HDKey): Transaction {
+    const parentFingerprint = lock.vaultXpubSources.parentFingerprint;
+    const vaultFingerprint = vaultXpriv.identifier?.slice(0, 4);
+    if (!vaultFingerprint) {
+      throw new Error('Could not get vault fingerprint from HDKey');
+    }
+    if (!u8aEq(parentFingerprint, vaultFingerprint)) {
       throw new Error(
-        `Vault xpub fingerprint ${parentFingerprint.toString('hex')} does not match the vault xpriv fingerprint ${vaultXpriv.fingerprint.toString('hex')}`,
+        `Vault xpub fingerprint ${u8aToHex(parentFingerprint)} does not match the vault xpriv fingerprint ${u8aToHex(vaultFingerprint)}`,
       );
     }
 
     const childPath = `${lock.vaultXpubSources.cosignHdIndex}`;
-    const pubkey = vaultXpriv.derivePath(childPath).publicKey;
-    const vaultPubkey = keyToBuffer(lock.vaultPubkey);
-    if (!vaultPubkey.equals(pubkey)) {
+    const pubkey = vaultXpriv.deriveChild(lock.vaultXpubSources.cosignHdIndex).publicKey;
+    if (!pubkey) {
+      throw new Error(`Failed to derive public key for path ${childPath}`);
+    }
+    const vaultPubkey = keyToU8a(lock.vaultPubkey);
+    if (!u8aEq(vaultPubkey, pubkey)) {
       throw new Error(
-        `Vault pubkey ${vaultPubkey.toString('hex')} does not match the derived pubkey ${pubkey.toString('hex')} using path ${childPath}`,
+        `Vault pubkey ${u8aToHex(vaultPubkey)} does not match the derived pubkey ${u8aToHex(pubkey)} using path ${childPath}`,
       );
     }
-    const signedPsbt = signPsbtDerived(psbt.toHex(), vaultXpriv.toBase58(), childPath, false);
+    const signedPsbt = signPsbtDerived(
+      u8aToHex(psbt.toPSBT()),
+      vaultXpriv.privateExtendedKey,
+      childPath,
+      false,
+    );
     psbt = this.psbtFromHex(signedPsbt);
 
     return psbt;
@@ -143,7 +148,7 @@ export class CosignScript {
     releaseRequest: IReleaseRequest;
     vaultCosignature: Uint8Array;
     utxoRef: { txid: string; vout: number };
-    ownerXpriv: BIP32Interface;
+    ownerXpriv: HDKey;
     ownerXprivChildHdPath?: string;
     addTx?: string;
   }): Transaction {
@@ -153,72 +158,62 @@ export class CosignScript {
 
     // add the vault signature to the PSBT
     psbt.updateInput(0, {
-      partialSig: [
-        {
-          pubkey: keyToBuffer(lock.vaultPubkey),
-          signature: Buffer.from(vaultCosignature),
-        },
-      ],
+      partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignature]],
     });
     const derivePubkey = ownerXpriv.publicKey;
-    const ownerPubkey = keyToBuffer(lock.ownerPubkey);
-    if (!ownerPubkey.equals(derivePubkey)) {
+    if (!derivePubkey) {
+      throw new Error('Failed to derive owner public key');
+    }
+    const ownerPubkey = keyToU8a(lock.ownerPubkey);
+    if (!u8aEq(ownerPubkey, derivePubkey)) {
       throw new Error(
-        `Owner pubkey ${ownerPubkey.toString('hex')} does not match the derived pubkey ${derivePubkey.toString('hex')}`,
+        `Owner pubkey ${u8aToHex(ownerPubkey)} does not match the derived pubkey ${u8aToHex(derivePubkey)}`,
       );
     }
 
     if (addTx) {
-      const tx = Transaction.fromHex(addTx.replace(/^0x(.+)/, '$1'));
-      for (let i = 0; i < tx.outs.length; i++) {
-        const output = tx.outs[i];
+      const addTxBytes = hexToU8a(addTx);
+      const tx = Transaction.fromPSBT(addTxBytes);
+      for (let i = 0; i < tx.outputsLength; i++) {
+        const output = tx.getOutput(i);
+        const network = getScureNetwork(this.network);
         const scripts = [
-          payments.p2wpkh({ pubkey: ownerPubkey }).output,
-          payments.p2sh({ redeem: payments.p2wpkh({ pubkey: ownerPubkey }) }).output,
-          payments.p2pkh({ pubkey: ownerPubkey }).output,
+          p2wpkh(ownerPubkey, network).script,
+          p2wsh(p2wpkh(ownerPubkey, network), network).script,
+          p2sh(p2pkh(ownerPubkey, network), network).script,
+          p2pkh(ownerPubkey, network).script,
         ];
 
-        if (scripts.some(x => x && output.script.equals(x))) {
+        if (scripts.some(x => x && output.script && u8aEq(output.script, x))) {
           psbt.addInput({
-            hash: tx.getId(),
+            txid: tx.id,
             index: i,
             witnessUtxo: {
-              script: output.script,
-              value: output.value,
+              script: output.script!,
+              amount: output.amount!,
             },
           });
         }
       }
     }
 
+    const psbtBytes = u8aToHex(psbt.toPSBT());
     const signedPsbt = ownerXprivChildHdPath
-      ? signPsbtDerived(psbt.toHex(), ownerXpriv.toBase58(), ownerXprivChildHdPath, true)
-      : signPsbt(
-          psbt.toHex(),
-          toBitcoinNetwork(this.network),
-          ownerXpriv.privateKey!.toString('hex'),
-          true,
-        );
+      ? signPsbtDerived(psbtBytes, ownerXpriv.privateExtendedKey, ownerXprivChildHdPath, true)
+      : signPsbt(psbtBytes, this.network, u8aToHex(ownerXpriv.privateKey, undefined, false), true);
 
-    const finalPsbt = this.psbtFromHex(signedPsbt);
-
-    return finalPsbt.extractTransaction();
-  }
-
-  public static getBitcoinJsNetwork(network: ArgonPrimitivesBitcoinBitcoinNetwork) {
-    if (network.isBitcoin) return networks.bitcoin;
-    if (network.isTestnet || network.isSignet) return networks.testnet;
-    if (network.isRegtest) return networks.regtest;
-    throw new Error('Unsupported network: ' + network);
+    return this.psbtFromHex(signedPsbt);
   }
 }
 
-function toBitcoinNetwork(network: networks.Network): BitcoinNetwork {
-  if (network === networks.bitcoin) {
+export function getBitcoinNetworkFromApi(
+  network: ArgonPrimitivesBitcoinBitcoinNetwork,
+): BitcoinNetwork {
+  if (network.isBitcoin) {
     return BitcoinNetwork.Bitcoin;
-  } else if (network === networks.testnet) {
+  } else if (network.isTestnet) {
     return BitcoinNetwork.Testnet;
-  } else if (network === networks.regtest) {
+  } else if (network.isRegtest) {
     return BitcoinNetwork.Regtest;
   }
   throw new Error('Unsupported network: ' + network);

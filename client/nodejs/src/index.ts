@@ -10,7 +10,7 @@ import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 
 export { WageProtector } from './WageProtector';
 export { TxSubmitter } from './TxSubmitter';
-export { Accountset } from './Accountset';
+export { Accountset, type ISubaccountMiner, type IMiningIndex } from './Accountset';
 export { MiningBids } from './MiningBids';
 export { AccountMiners } from './AccountMiners';
 export { FrameCalculator } from './FrameCalculator';
@@ -20,16 +20,54 @@ export { AccountRegistry } from './AccountRegistry';
 export { Vault } from './Vault';
 export { VaultMonitor } from './VaultMonitor';
 export { CohortBidder } from './CohortBidder';
-export { CohortBidderHistory } from './CohortBidderHistory';
 export { BidPool } from './BidPool';
 export * from './BitcoinLocks';
 export * from './keyringUtils';
 export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
+export { setConfig, getConfig, type ArgonClientConfig } from './config';
 
-export * from '@polkadot/types';
+export { u8aToHex, hexToU8a, u8aEq } from '@polkadot/util';
+
 export * from '@polkadot/types/lookup';
-export * from '@polkadot/types/interfaces';
-export * from '@polkadot/types-codec/types';
+export { GenericEvent, GenericBlock, GenericAddress } from '@polkadot/types/generic';
+export {
+  BTreeMap,
+  Bytes,
+  Compact,
+  Enum,
+  Null,
+  Option,
+  Result,
+  Bool,
+  Tuple,
+  Range,
+  Struct,
+  Text,
+  U256,
+  U8aFixed,
+  Vec,
+  bool,
+  i128,
+  u128,
+  u16,
+  u32,
+  u64,
+  u8,
+} from '@polkadot/types-codec';
+export { type ITuple, type Codec } from '@polkadot/types-codec/types';
+export {
+  type AccountId32,
+  type Call,
+  type H160,
+  type H256,
+  type MultiAddress,
+  type Permill,
+  type AccountId,
+  type Header,
+  type Block,
+} from '@polkadot/types/interfaces/runtime';
+export type { ExtrinsicOrHash, ExtrinsicStatus } from '@polkadot/types/interfaces/author';
+export { type BlockHash } from '@polkadot/types/interfaces/chain';
 export { InterfaceTypes as interfaces };
 
 export type ArgonClient = ApiPromise;

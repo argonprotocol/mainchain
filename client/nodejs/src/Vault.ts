@@ -1,6 +1,6 @@
 import {
   ArgonClient,
-  ArgonPrimitivesVault,
+  type ArgonPrimitivesVault,
   formatArgons,
   KeyringPair,
   toFixedNumber,
@@ -9,18 +9,21 @@ import {
 import BigNumber, * as BN from 'bignumber.js';
 import { convertFixedU128ToBigNumber, convertPermillToBigNumber } from './utils';
 import bs58check from 'bs58check';
+import { hexToU8a } from '@polkadot/util';
+import { TxResult } from './TxSubmitter';
+import { ExtrinsicStatus } from '@polkadot/types/interfaces';
 
 const { ROUND_FLOOR } = BN;
 
 export class Vault {
-  public securitization: bigint;
-  public securitizationRatio: BigNumber;
-  public argonsLocked: bigint;
-  public argonsPendingActivation: bigint;
+  public securitization!: bigint;
+  public securitizationRatio!: BigNumber;
+  public argonsLocked!: bigint;
+  public argonsPendingActivation!: bigint;
   public argonsScheduledForRelease: Map<number, bigint> = new Map();
-  public terms: ITerms;
-  public operatorAccountId: string;
-  public isClosed: boolean;
+  public terms!: ITerms;
+  public operatorAccountId!: string;
+  public isClosed!: boolean;
   public vaultId: number;
   public pendingTerms?: ITerms;
   public pendingTermsChangeTick?: number;
@@ -32,6 +35,13 @@ export class Vault {
     vault: ArgonPrimitivesVault,
     private tickDuration: number,
   ) {
+    this.vaultId = id;
+    this.load(vault);
+    this.openedTick = vault.openedTick.toNumber();
+    this.openedDate = new Date(this.openedTick * this.tickDuration);
+  }
+
+  public load(vault: ArgonPrimitivesVault) {
     this.securitization = vault.securitization.toBigInt();
     this.securitizationRatio = convertFixedU128ToBigNumber(vault.securitizationRatio.toBigInt());
     this.argonsLocked = vault.argonsLocked.toBigInt();
@@ -54,7 +64,6 @@ export class Vault {
 
     this.operatorAccountId = vault.operatorAccountId.toString();
     this.isClosed = vault.isClosed.valueOf();
-    this.vaultId = id;
     if (vault.pendingTerms.isSome) {
       const [tickApply, terms] = vault.pendingTerms.value;
       this.pendingTermsChangeTick = tickApply.toNumber();
@@ -68,8 +77,6 @@ export class Vault {
         ),
       };
     }
-    this.openedTick = vault.openedTick.toNumber();
-    this.openedDate = new Date(this.openedTick * tickDuration);
   }
 
   public availableBitcoinSpace(): bigint {
@@ -123,14 +130,18 @@ export class Vault {
     return BigInt(fee.toString()) + this.terms.bitcoinBaseFee;
   }
 
-  public static async get(client: ArgonClient, vaultId: number): Promise<Vault> {
+  public static async get(
+    client: ArgonClient,
+    vaultId: number,
+    tickDurationMillis?: number,
+  ): Promise<Vault> {
     const rawVault = await client.query.vaults.vaultsById(vaultId);
     if (rawVault.isNone) {
       throw new Error(`Vault with id ${vaultId} not found`);
     }
-    const tickDuration = (await client.query.ticks
-      .genesisTicker()
-      .then(x => x.tickDurationMillis.toNumber()))!;
+    const tickDuration =
+      tickDurationMillis ??
+      (await client.query.ticks.genesisTicker().then(x => x.tickDurationMillis.toNumber()))!;
     return new Vault(vaultId, rawVault.unwrap(), tickDuration);
   }
 
@@ -145,12 +156,22 @@ export class Vault {
       bitcoinXpub: string;
       liquidityPoolProfitSharing: number;
       tip?: bigint;
+      doNotExceedBalance?: bigint;
+      progressCallback?: (progressPct: number, status: ExtrinsicStatus) => void;
     },
     config: { tickDurationMillis?: number } = {},
-  ): Promise<Vault> {
-    const { securitization, securitizationRatio, annualPercentRate, baseFee, bitcoinXpub, tip } =
-      args;
-    let xpubBytes = Buffer.from(bitcoinXpub, 'hex');
+  ): Promise<{ vault: Vault; txResult: TxResult }> {
+    const {
+      securitization,
+      securitizationRatio,
+      annualPercentRate,
+      baseFee,
+      bitcoinXpub,
+      tip,
+      doNotExceedBalance,
+      progressCallback,
+    } = args;
+    let xpubBytes = hexToU8a(bitcoinXpub);
     if (xpubBytes.length !== 78) {
       if (
         bitcoinXpub.startsWith('xpub') ||
@@ -161,31 +182,63 @@ export class Vault {
         if (bytes.length !== 78) {
           throw new Error('Invalid Bitcoin xpub key length, must be 78 bytes');
         }
-        xpubBytes = Buffer.from(bytes);
+        xpubBytes = bytes;
       }
     }
-    const tx = new TxSubmitter(
-      client,
-      client.tx.vaults.create({
-        terms: {
-          // convert to fixed u128
-          bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, 18),
-          bitcoinBaseFee: BigInt(baseFee),
-          liquidityPoolProfitSharing: toFixedNumber(args.liquidityPoolProfitSharing, 6),
-        },
-        securitizationRatio: toFixedNumber(securitizationRatio, 18),
-        securitization: BigInt(securitization),
-        bitcoinXpubkey: xpubBytes,
-      }),
-      keypair,
-    );
+    let vaultParams = {
+      terms: {
+        // convert to fixed u128
+        bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, 18),
+        bitcoinBaseFee: BigInt(baseFee),
+        liquidityPoolProfitSharing: toFixedNumber(args.liquidityPoolProfitSharing, 6),
+      },
+      securitizationRatio: toFixedNumber(securitizationRatio, 18),
+      securitization: BigInt(securitization),
+      bitcoinXpubkey: xpubBytes,
+    };
+    let tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), keypair);
+    if (doNotExceedBalance) {
+      const finalTip = tip ?? 0n;
+      let txFee = await tx.feeEstimate(finalTip);
+      while (txFee + finalTip + vaultParams.securitization > doNotExceedBalance) {
+        vaultParams.securitization = doNotExceedBalance - txFee - finalTip;
+        tx.tx = client.tx.vaults.create(vaultParams);
+        txFee = await tx.feeEstimate(finalTip);
+      }
+    }
     const canAfford = await tx.canAfford({ tip, unavailableBalance: BigInt(securitization) });
     if (!canAfford.canAfford) {
       throw new Error(
         `Insufficient balance to create vault. Required: ${formatArgons(securitization)}, Available: ${formatArgons(canAfford.availableBalance)}`,
       );
     }
-    const result = await tx.submit({ waitForBlock: true, tip });
+
+    const result = await tx.submit({
+      tip,
+      useLatestNonce: true,
+      waitForBlock: true,
+      onResultCallback(result) {
+        let percent = 0;
+        if (
+          result.status.isInvalid ||
+          result.status.isDropped ||
+          result.status.isUsurped ||
+          result.status.isRetracted
+        ) {
+          percent = 1;
+        } else if (result.status.isReady) {
+          percent = 0;
+        } else if (result.status.isBroadcast) {
+          percent = 0.5;
+        } else if (result.status.isInBlock) {
+          percent = 1;
+        } else if (result.status.isFinalized) {
+          percent = 1.1;
+        }
+        progressCallback?.(percent, result.status);
+      },
+    });
+    await result.inBlockPromise;
     let vaultId: number | undefined;
     for (const event of result.events) {
       if (client.events.vaults.VaultCreated.is(event)) {
@@ -203,7 +256,8 @@ export class Vault {
     const tickDuration =
       config.tickDurationMillis ??
       (await client.query.ticks.genesisTicker().then(x => x.tickDurationMillis.toNumber()))!;
-    return new Vault(vaultId, rawVault.unwrap(), tickDuration);
+    const vault = new Vault(vaultId, rawVault.unwrap(), tickDuration);
+    return { vault, txResult: result };
   }
 }
 

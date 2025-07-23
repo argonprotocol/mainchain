@@ -2,6 +2,7 @@ import BigNumber, * as BN from 'bignumber.js';
 import type { ArgonClient, GenericEvent } from './index';
 import type { DispatchError } from '@polkadot/types/interfaces';
 import { EventRecord } from '@polkadot/types/interfaces/system';
+import { hexToU8a } from '@polkadot/util';
 
 const { ROUND_FLOOR } = BN;
 
@@ -67,11 +68,15 @@ export async function gettersToObject<T>(obj: T): Promise<T> {
   return result;
 }
 
-export function toFixedNumber(value: number, base: number): bigint {
-  const decimalFactor = new BigNumber(10).pow(base);
-  const rawValue = new BigNumber(value.toString()); // Parse the number value into BN
-  // Convert the value to fixed-point
-  return BigInt(rawValue.times(decimalFactor).toFixed(0, ROUND_FLOOR));
+export function toFixedNumber(
+  value: string | number | BigNumber, // accept string to avoid early precision loss
+  decimals: number,
+): bigint {
+  const factor = new BigNumber(10).pow(decimals);
+  const bn = new BigNumber(value);
+  // truncate toward 0; use ROUND_FLOOR if you really need floor for positives
+  const int = bn.times(factor).integerValue(BigNumber.ROUND_DOWN);
+  return BigInt(int.toFixed(0));
 }
 
 export function convertNumberToFixedU128(value: number): bigint {
@@ -187,9 +192,12 @@ export class JsonExt {
         if (typeof v === 'bigint') {
           return `${v}n`; // Append 'n' to indicate BigInt
         }
-        // convert Buffer objects to a JSON representation
-        if (Buffer.isBuffer(v)) {
-          return Buffer.from(v).toJSON();
+        // convert Uint8Array objects to a JSON representation
+        if (v instanceof Uint8Array) {
+          return {
+            type: 'Buffer',
+            data: Array.from(v), // Convert Uint8Array to an array of numbers
+          };
         }
         return v;
       },
@@ -202,9 +210,9 @@ export class JsonExt {
       if (typeof v === 'string' && v.match(/^\d+n$/)) {
         return BigInt(v.slice(0, -1));
       }
-      // rehydrate buffer objects
+      // rehydrate Uint8Array objects
       if (typeof v === 'object' && v !== null && v.type === 'Buffer' && Array.isArray(v.data)) {
-        return Buffer.from(v.data);
+        return hexToU8a(v.data);
       }
       return v;
     });

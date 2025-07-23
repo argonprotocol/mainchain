@@ -50,7 +50,7 @@ export class WageProtector {
         new WageProtector({
           argonUsdTargetPrice: cpi.value.argonUsdTargetPrice.toBigInt(),
           argonUsdPrice: cpi.value.argonUsdPrice.toBigInt(),
-          finalizedBlock: Buffer.from(finalizedBlock),
+          finalizedBlock: new Uint8Array(finalizedBlock),
           tick: cpi.value.tick.toBigInt(),
         }),
       );

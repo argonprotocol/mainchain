@@ -1,7 +1,7 @@
 import {
   Accountset,
   type ArgonClient,
-  ArgonPrimitivesBitcoinBitcoinNetwork,
+  type ArgonPrimitivesBitcoinBitcoinNetwork,
   type KeyringPair,
   TxSubmitter,
   VaultMonitor,
@@ -10,6 +10,7 @@ import { formatArgons } from './utils';
 import { Vault } from './Vault';
 import { GenericEvent } from '@polkadot/types';
 import { TxResult } from './TxSubmitter';
+import { hexToU8a, u8aToHex } from '@polkadot/util';
 
 export const SATS_PER_BTC = 100_000_000n;
 
@@ -83,7 +84,7 @@ export class BitcoinLocks {
   ): Promise<{ txid: string; vout: number; bitcoinTxid: string } | undefined> {
     let client = await this.client;
     if (atHeight !== undefined) {
-      const blockHash = await client.query.system.blockHash(atHeight);
+      const blockHash = await client.rpc.chain.getBlockHash(atHeight);
       client = (await client.at(blockHash)) as ArgonClient;
     }
     const refRaw = await client.query.bitcoinUtxos.utxoIdToRef(utxoId);
@@ -92,10 +93,10 @@ export class BitcoinLocks {
     }
     const ref = refRaw.unwrap();
 
-    const txid = Buffer.from(ref.txid).toString('hex');
-    const btcTxid = Buffer.from(ref.txid.reverse()).toString('hex');
+    const txid = u8aToHex(ref.txid);
+    const bitcoinTxid = u8aToHex(ref.txid.reverse());
     const vout = ref.outputIndex.toNumber();
-    return { txid: `0x${txid}`, vout, bitcoinTxid: `0x${btcTxid}` };
+    return { txid, vout, bitcoinTxid };
   }
 
   async getReleaseRequest(
@@ -104,7 +105,7 @@ export class BitcoinLocks {
   ): Promise<IReleaseRequestDetails | undefined> {
     let client = await this.client;
     if (atHeight !== undefined) {
-      const blockHash = await client.query.system.blockHash(atHeight);
+      const blockHash = await client.rpc.chain.getBlockHash(atHeight);
       client = (await client.at(blockHash)) as ArgonClient;
     }
     const locksPendingRelease = await client.query.bitcoinLocks.locksPendingReleaseByUtxoId();
@@ -125,20 +126,21 @@ export class BitcoinLocks {
 
   async submitVaultSignature(args: {
     utxoId: number;
-    vaultSignature: Buffer;
+    vaultSignature: Uint8Array;
     argonKeyring: KeyringPair;
   }): Promise<TxResult> {
     const { utxoId, vaultSignature, argonKeyring } = args;
     const client = await this.client;
-    if (!vaultSignature || vaultSignature.byteLength < 71 || vaultSignature.byteLength > 73) {
+    if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
       throw new Error(
-        `Invalid vault signature length: ${vaultSignature.byteLength}. Must be 71-73 bytes.`,
+        `Invalid vault signature length: ${vaultSignature.byteLength}. Must be 70-73 bytes.`,
       );
     }
-    const signature = `0x${vaultSignature.toString('hex')}`;
+    const signature = u8aToHex(vaultSignature);
     const tx = client.tx.bitcoinLocks.cosignRelease(utxoId, signature);
     const submitter = new TxSubmitter(client, tx, argonKeyring);
-    return await submitter.submit({ waitForBlock: true });
+
+    return await submitter.submit();
   }
 
   async getBitcoinLock(utxoId: number): Promise<IBitcoinLock | undefined> {
@@ -160,7 +162,7 @@ export class BitcoinLocks {
     const ownerPubkey = utxo.ownerPubkey.toHex();
     const [fingerprint, cosign_hd_index, claim_hd_index] = utxo.vaultXpubSources;
     const vaultXpubSources = {
-      parentFingerprint: Buffer.from(fingerprint),
+      parentFingerprint: new Uint8Array(fingerprint),
       cosignHdIndex: cosign_hd_index.toNumber(),
       claimHdIndex: claim_hd_index.toNumber(),
     };
@@ -254,7 +256,7 @@ export class BitcoinLocks {
         await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1 second before retrying
         continue;
       }
-      const hash = await client.query.system.blockHash(atHeight).then(x => x.toHex());
+      const hash = await client.rpc.chain.getBlockHash(atHeight).then(x => x.toHex());
       if (hash === '0x0000000000000000000000000000000000000000000000000000000000000000') {
         console.warn(`Block hash not found for height ${atHeight}. Retrying...`);
         await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1 second before retrying
@@ -279,7 +281,7 @@ export class BitcoinLocks {
       if (client.events.bitcoinLocks.BitcoinUtxoCosigned.is(event.event)) {
         const { utxoId: id, signature } = event.event.data;
         if (id.toNumber() === utxoId) {
-          return Buffer.from(signature);
+          return new Uint8Array(signature);
         }
       }
     }
@@ -300,7 +302,7 @@ export class BitcoinLocks {
 
   async createInitializeLockTx(args: {
     vault: Vault;
-    ownerBitcoinPubkey: Buffer;
+    ownerBitcoinPubkey: Uint8Array;
     satoshis: bigint;
     argonKeyring: KeyringPair;
     reducedBalanceBy?: bigint;
@@ -338,7 +340,7 @@ export class BitcoinLocks {
 
   async initializeLock(args: {
     vault: Vault;
-    ownerBitcoinPubkey: Buffer;
+    ownerBitcoinPubkey: Uint8Array;
     argonKeyring: KeyringPair;
     satoshis: bigint;
     tip?: bigint;
@@ -559,7 +561,7 @@ export class BitcoinLocks {
     const vaults = new VaultMonitor(accountset, {
       bitcoinSpaceAvailable: argonAmount,
     });
-    const bitcoinXpubBuffer = Buffer.from(bitcoinXpub.replace(/^0x(.+)/, '$1'), 'hex');
+    const bitcoinXpubBuffer = hexToU8a(bitcoinXpub);
 
     return new Promise(async (resolve, reject) => {
       vaults.events.on('bitcoin-space-above', async (vaultId, amount) => {

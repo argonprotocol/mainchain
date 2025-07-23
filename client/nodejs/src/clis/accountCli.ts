@@ -1,5 +1,5 @@
 import { Command } from '@commander-js/extra-typings';
-import { mnemonicGenerate } from '../index';
+import { filterUndefined, mnemonicGenerate } from '../index';
 import { printTable } from 'console-table-printer';
 import { cryptoWaitReady } from '@polkadot/util-crypto';
 import { writeFileSync } from 'node:fs';
@@ -73,13 +73,13 @@ export default function accountCli() {
         await accountset.registerKeys(registerKeysTo);
         console.log('Keys registered to', registerKeysTo);
       }
-      const envData = <Env>{
+      const envData = filterUndefined<Env>({
         ACCOUNT_JSON_PATH: accountFilePath,
         ACCOUNT_SURI: accountSuri,
         ACCOUNT_PASSPHRASE: accountPassphrase,
         KEYS_MNEMONIC: process.env.KEYS_MNEMONIC,
         SUBACCOUNT_RANGE: '0-49',
-      };
+      });
       let envfile = '';
       for (const [key, value] of Object.entries(envData)) {
         if (key) {
