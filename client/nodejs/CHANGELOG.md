@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.3.2](https://github.com/argonprotocol/mainchain/compare/v1.3.1...b9f173ea1d88168258dc9688f376c12f2da21edf) (2025-07-07)
+## [v1.3.3](https://github.com/argonprotocol/mainchain/compare/v1.3.2...4c6edc9c1505c0820117169e8575ce0504f8c0a9) (2025-07-23)
+
+### Features
+
+* **client:** make nodejs libs browser friendly
+([3d2df95](https://github.com/argonprotocol/mainchain/commit/3d2df95b5766b9a4729d3440f2307a2404c19ba8))
+
+### [v1.3.2](https://github.com/argonprotocol/mainchain/compare/v1.3.1...v1.3.2) (2025-07-07)
 
 ### [v1.3.1](https://github.com/argonprotocol/mainchain/compare/v1.3.0...v1.3.1) (2025-07-06)
 
