@@ -1,14 +1,32 @@
 # Changelog
 
-## [v1.3.2](https://github.com/argonprotocol/mainchain/compare/v1.3.1...b9f173ea1d88168258dc9688f376c12f2da21edf) (2025-07-07)
+## [v1.3.3](https://github.com/argonprotocol/mainchain/compare/v1.3.2...4c6edc9c1505c0820117169e8575ce0504f8c0a9) (2025-07-23)
 
 ### Features
+
+* **docker:** add voting cli and bitcoin mining
+([3c580c6](https://github.com/argonprotocol/mainchain/commit/3c580c637918d89703e1ff7b1697db83ff4b0b7d))
+* **client:** make nodejs libs browser friendly
+([3d2df95](https://github.com/argonprotocol/mainchain/commit/3d2df95b5766b9a4729d3440f2307a2404c19ba8))
+
+### Fixes
+
+* **mining_slot:** migration bug for next frame
+([dc3ead1](https://github.com/argonprotocol/mainchain/commit/dc3ead15481b2a8b2f8b1a3d4c881feaf1dcd610))
+* **node:** remove best block sync service check
+([7dd7909](https://github.com/argonprotocol/mainchain/commit/7dd790988d16f38e77bbea2a51f3ddc7522e4809))
+
+### [v1.3.2](https://github.com/argonprotocol/mainchain/compare/v1.3.1...v1.3.2) (2025-07-07)
+
+#### Features
 
 * **bitcoin/nodejs:** expose bitcoinjs primitives
 ([8730f84](https://github.com/argonprotocol/mainchain/commit/8730f84afd6effda4b845f552684cb674479c085))
 
-### Fixes
+#### Fixes
 
+* **compute:** ensure solver version matches
+([699dd3f](https://github.com/argonprotocol/mainchain/commit/699dd3ffa567afa8c9fec898d53ebdb6e373b2d0))
 * **node:** backwards compatiblity.
 ([6579d52](https://github.com/argonprotocol/mainchain/commit/6579d52847c27729d80788dffbb6eca3a180c374))
 * **node:** enable rocks db in node

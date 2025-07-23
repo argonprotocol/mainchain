@@ -2,7 +2,6 @@ import type { Accountset } from './Accountset';
 import {
   ArgonClient,
   type ArgonPrimitivesBlockSealMiningRegistration,
-  convertFixedU128ToBigNumber,
   ExtrinsicError,
 } from './index';
 import { formatArgons } from './utils';
@@ -14,28 +13,8 @@ export class CohortBidder {
     return this.accountset.client;
   }
 
-  public stats = {
-    // number of seats won
-    seatsWon: 0,
-    // sum of argons bid in successful bids
-    totalArgonsBid: 0n,
-    // total number of bids placed (includes 1 per seat)
-    bidsAttempted: 0,
-    // fees including the tip
-    fees: 0n,
-    // Max bid per seat
-    maxBidPerSeat: 0n,
-    // The cost in argonots of each seat
-    argonotsPerSeat: 0n,
-    // The argonot price in USD for cost basis
-    argonotUsdPrice: 0.0,
-    // The cohort expected argons per block
-    cohortArgonsPerBlock: 0n,
-    // The last block that bids are synced to
-    lastBlockNumber: 0,
-    // next cohort size
-    nextCohortSize: 0,
-  };
+  public txFees = 0n;
+  public winningBids: { address: string; bid: bigint }[] = [];
 
   private unsubscribe?: () => void;
   private pendingRequest: Promise<any> | undefined;
@@ -45,6 +24,9 @@ export class CohortBidder {
   private lastBidTime = 0;
 
   private millisPerTick?: number;
+  private minIncrement = 10_000n;
+  private nextCohortSize?: number;
+  private lastBidBlockNumber: number = 0;
 
   private readonly myAddresses = new Set<string>();
 
@@ -77,29 +59,17 @@ export class CohortBidder {
     });
 
     const client = await this.client;
-    const argonotPrice = await client.query.priceIndex.current();
-    if (argonotPrice.isSome) {
-      this.stats.argonotUsdPrice = convertFixedU128ToBigNumber(
-        argonotPrice.unwrap().argonotUsdPrice.toBigInt(),
-      ).toNumber();
-    }
 
-    this.stats.nextCohortSize = await client.query.miningSlot
-      .nextCohortSize()
-      .then(x => x.toNumber());
-    this.stats.argonotsPerSeat = await client.query.miningSlot
-      .argonotsPerMiningSeat()
-      .then(x => x.toBigInt());
-    this.stats.cohortArgonsPerBlock = await client.query.blockRewards
-      .argonsPerBlock()
-      .then(x => x.toBigInt());
-    if (this.subaccounts.length > this.stats.nextCohortSize) {
+    this.minIncrement = client.consts.miningSlot.bidIncrements.toBigInt();
+
+    this.nextCohortSize = await client.query.miningSlot.nextCohortSize().then(x => x.toNumber());
+    if (this.subaccounts.length > this.nextCohortSize) {
       console.info(
-        `Cohort size ${this.stats.nextCohortSize} is less than provided subaccounts ${this.subaccounts.length}.`,
+        `Cohort size ${this.nextCohortSize} is less than provided subaccounts ${this.subaccounts.length}.`,
       );
-      this.subaccounts.length = this.stats.nextCohortSize;
+      this.subaccounts.length = this.nextCohortSize;
     }
-    this.millisPerTick ??= await client.query.ticks
+    this.millisPerTick = await client.query.ticks
       .genesisTicker()
       .then(x => x.tickDurationMillis.toNumber());
 
@@ -118,8 +88,8 @@ export class CohortBidder {
     );
   }
 
-  public async stop(): Promise<CohortBidder['stats']> {
-    if (this.isStopped) return this.stats;
+  public async stop(): Promise<CohortBidder['winningBids']> {
+    if (this.isStopped) return this.winningBids;
     this.isStopped = true;
     console.log('Stopping bidder for cohort', this.cohortStartingFrameId);
     clearTimeout(this.retryTimeout);
@@ -147,61 +117,55 @@ export class CohortBidder {
 
     // go back to last block with this cohort
     let header = await client.rpc.chain.getHeader();
+    let api = await client.at(header.hash);
     while (true) {
-      const api = await client.at(header.hash);
       const cohortStartingFrameId = await api.query.miningSlot.nextFrameId();
       if (cohortStartingFrameId.toNumber() === this.cohortStartingFrameId) {
         break;
       }
       header = await client.rpc.chain.getHeader(header.parentHash);
+      api = await client.at(header.hash);
     }
-    const api = await client.at(header.hash);
-    const tick = await api.query.ticks.currentTick().then(x => x.toNumber());
     const bids = await api.query.miningSlot.bidsForNextSlotCohort();
 
-    this.updateSeatsWon(bids, header.number.toNumber());
+    this.updateSeatsWon(bids);
     console.log('Bidder stopped', {
       cohortStartingFrameId: this.cohortStartingFrameId,
       blockNumber: header.number.toNumber(),
-      tick,
-      bids: bids.map(x => ({
-        address: x.accountId.toHuman(),
-        bid: x.bid.toBigInt(),
-      })),
+      bids: this.winningBids,
     });
 
-    return this.stats;
+    return this.winningBids;
   }
 
   private async checkWinningBids(bids: ArgonPrimitivesBlockSealMiningRegistration[]) {
     if (this.isStopped) return;
     clearTimeout(this.retryTimeout);
 
+    this.updateSeatsWon(bids);
+    const winningBids = this.winningBids.length;
+    this.needsRebid = winningBids < this.subaccounts.length;
+
     const client = await this.client;
     const bestBlock = await client.rpc.chain.getBlockHash();
     const api = await client.at(bestBlock);
     const blockNumber = await api.query.system.number().then(x => x.toNumber());
-    if (this.stats.lastBlockNumber >= blockNumber) {
-      return;
-    }
-    this.updateSeatsWon(bids, blockNumber);
 
+    if (this.lastBidBlockNumber >= blockNumber) return;
     if (this.pendingRequest) return;
 
     const ticksSinceLastBid = Math.floor((Date.now() - this.lastBidTime) / this.millisPerTick!);
-    if (ticksSinceLastBid < this.options.bidDelay) {
+    if (ticksSinceLastBid < this.options.bidDelay && this.needsRebid) {
       this.retryTimeout = setTimeout(() => void this.checkCurrentSeats(), this.millisPerTick!);
       return;
     }
+    if (!this.needsRebid) return;
+
     console.log(
       'Checking bids for cohort',
       this.cohortStartingFrameId,
       this.subaccounts.map(x => x.index),
     );
-
-    const winningBids = this.stats.seatsWon;
-    this.needsRebid = winningBids < this.subaccounts.length;
-    if (!this.needsRebid) return;
 
     const winningAddresses = new Set(bids.map(x => x.accountId.toHuman()));
     let lowestBid = -this.options.bidIncrement;
@@ -214,7 +178,6 @@ export class CohortBidder {
         }
       }
     }
-    const MIN_INCREMENT = 10_000n;
 
     // 1. determine next bid based on current bids and settings
     let nextBid = lowestBid + this.options.bidIncrement;
@@ -254,7 +217,7 @@ export class CohortBidder {
       return;
     }
 
-    if (nextBid - lowestBid < MIN_INCREMENT) {
+    if (nextBid - lowestBid < Number(this.minIncrement)) {
       console.log(
         `Can't make any more bids for ${this.cohortStartingFrameId} with given constraints.`,
         {
@@ -318,13 +281,9 @@ export class CohortBidder {
 
       const successfulBids = txResult.batchInterruptedIndex ?? subaccounts.length;
 
-      this.stats.fees += txResult.finalFee ?? 0n;
-      this.stats.bidsAttempted += subaccounts.length;
-      if (bidPerSeat > this.stats.maxBidPerSeat) {
-        this.stats.maxBidPerSeat = bidPerSeat;
-      }
+      this.txFees += txResult.finalFee ?? 0n;
       if (blockNumber !== undefined) {
-        this.stats.lastBlockNumber = Math.max(blockNumber, this.stats.lastBlockNumber);
+        this.lastBidBlockNumber = Math.max(blockNumber, this.lastBidBlockNumber);
       }
 
       console.log('Done creating bids for cohort', {
@@ -348,23 +307,15 @@ export class CohortBidder {
     }
   }
 
-  private updateSeatsWon(
-    next: { accountId: AccountId; bid: u128 | Compact<u128> }[],
-    blockNumber: number,
-  ): void {
-    let winningBids = 0;
-    let totalArgonsBid = 0n;
+  private updateSeatsWon(next: { accountId: AccountId; bid: u128 | Compact<u128> }[]): void {
+    this.winningBids.length = 0;
     for (const x of next) {
       const bid = x.bid.toBigInt();
       const address = x.accountId.toHuman();
       if (this.myAddresses.has(address)) {
-        winningBids++;
-        totalArgonsBid += bid;
+        this.winningBids.push({ address, bid });
       }
     }
-    this.stats.seatsWon = winningBids;
-    this.stats.totalArgonsBid = totalArgonsBid;
-    this.stats.lastBlockNumber = Math.max(blockNumber, this.stats.lastBlockNumber);
   }
 
   private async checkCurrentSeats() {
