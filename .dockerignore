@@ -5,7 +5,6 @@
 **/*.rs.bk
 
 .DS_Store
-target
 
 # direnv files
 .envrc
