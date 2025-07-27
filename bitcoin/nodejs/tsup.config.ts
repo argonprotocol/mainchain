@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup';
+import { wasmLoader } from 'esbuild-plugin-wasm';
+import * as trace_events from 'node:trace_events';
 
 export default defineConfig([
   // Node.js build
@@ -12,9 +14,11 @@ export default defineConfig([
     platform: 'node',
     skipNodeModulesBundle: true,
     shims: false,
-    loader: {
-      '.wasm': 'file',
-    },
+    esbuildPlugins: [
+      wasmLoader({
+        mode: 'deferred',
+      }),
+    ],
   },
 
   // Browser build with polyfills
@@ -24,13 +28,15 @@ export default defineConfig([
     outDir: 'browser',
     dts: true,
     platform: 'browser',
-    target: 'es2020',
+    target: 'esnext',
     sourcemap: true,
     clean: true,
     splitting: false,
     treeshake: true,
-    loader: {
-      '.wasm': 'file',
-    },
+    esbuildPlugins: [
+      wasmLoader({
+        mode: 'embedded',
+      }),
+    ],
   },
 ]);

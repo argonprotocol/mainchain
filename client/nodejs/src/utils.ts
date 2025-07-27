@@ -212,7 +212,7 @@ export class JsonExt {
       }
       // rehydrate Uint8Array objects
       if (typeof v === 'object' && v !== null && v.type === 'Buffer' && Array.isArray(v.data)) {
-        return hexToU8a(v.data);
+        return Uint8Array.from(v.data);
       }
       return v;
     });

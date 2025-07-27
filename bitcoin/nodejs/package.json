@@ -13,14 +13,15 @@
   },
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "wasm-pack": "wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack --no-opt && node clean-wasm.js",
+    "wasm-pack": "wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack",
     "prebuild": "yarn workspace @argonprotocol/mainchain run build",
     "build": "yarn wasm-pack && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
     "tsc": "yarn pretsc && tsup",
     "test": "yarn build && vitest --run --typecheck --disableConsoleIntercept",
     "test:ci": "yarn tsc && vitest --run --disableConsoleIntercept",
-    "tsup": "yarn tsc"
+    "tsup": "yarn tsc",
+    "watch": "yarn pretsc && tsup --watch"
   },
   "files": [
     "lib/",
@@ -37,8 +38,17 @@
         "types": "./browser/index.d.ts",
         "default": "./browser/index.js"
       }
+    },
+    "./browser": {
+      "types": "./browser/index.d.ts",
+      "default": "./browser/index.js"
     }
   },
+  "sideEffects": [
+    "./ts/wasm/bitcoin_bindings.js",
+    "./lib/index.js",
+    "./browser/index.js"
+  ],
   "dependencies": {
     "@argonprotocol/mainchain": "1.3.3",
     "@noble/secp256k1": "^2.3.0",
@@ -50,6 +60,7 @@
   "devDependencies": {
     "@argonprotocol/testing": "1.3.3",
     "@types/node": "22.16.3",
+    "esbuild-plugin-wasm": "^1.1.0",
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",

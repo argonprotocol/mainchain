@@ -17,6 +17,7 @@ __metadata:
     "@scure/btc-signer": "npm:^1.8.1"
     "@types/node": "npm:22.16.3"
     bignumber.js: "npm:^9.1.2"
+    esbuild-plugin-wasm: "npm:^1.1.0"
     tsup: "npm:^8.4.0"
     tsx: "npm:^4.19.2"
     typescript: "npm:^5.8.3"
@@ -4037,6 +4038,13 @@ __metadata:
     has-tostringtag: "npm:^1.0.2"
     hasown: "npm:^2.0.2"
   checksum: 10c0/ef2ca9ce49afe3931cb32e35da4dcb6d86ab02592cfc2ce3e49ced199d9d0bb5085fc7e73e06312213765f5efa47cc1df553a6a5154584b21448e9fb8355b1af
+  languageName: node
+  linkType: hard
+
+"esbuild-plugin-wasm@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "esbuild-plugin-wasm@npm:1.1.0"
+  checksum: 10c0/b5e199773f42b8192194c2cb0440900ec152c193aa4ffe4802a81c02240f17603a070ca5e7a27257fbb205c5f4465d3a71f06913a2fecb9a3313a80eddcb9f53
   languageName: node
   linkType: hard
 

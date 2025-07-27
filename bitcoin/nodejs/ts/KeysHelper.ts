@@ -61,7 +61,7 @@ export function getBech32Prefix(network: BitcoinNetwork): string {
 
 export function p2wshScriptHexToAddress(scriptPubKeyHex: string, network: BitcoinNetwork): string {
   const script = hexToU8a(scriptPubKeyHex);
-  if (Buffer.byteLength(script) !== 34 || script[0] !== 0x00 || script[1] !== 0x20) {
+  if (script.byteLength !== 34 || script[0] !== 0x00 || script[1] !== 0x20) {
     throw new Error('Invalid P2WSH scriptPubKey');
   }
 
