@@ -1,15 +1,33 @@
 # Changelog
 
-## [v1.3.3](https://github.com/argonprotocol/mainchain/compare/v1.3.2...4c6edc9c1505c0820117169e8575ce0504f8c0a9) (2025-07-23)
+## [v1.3.4](https://github.com/argonprotocol/mainchain/compare/v1.3.3...4009f953d01a44711f7fba9f16a8a4d98c67a6f5) (2025-07-27)
 
 ### Features
+
+* **client/nodejs:** add progress callback to transaction submission
+([cdc7d12](https://github.com/argonprotocol/mainchain/commit/cdc7d12f11cb83f86f90d120dbfa685fc6bdda8a))
+
+### Fixes
+
+* **docker:** use correct image and user
+([4009f95](https://github.com/argonprotocol/mainchain/commit/4009f953d01a44711f7fba9f16a8a4d98c67a6f5))
+* **bitcoin/nodejs:** signing without derive issues
+([f2e3831](https://github.com/argonprotocol/mainchain/commit/f2e3831af7ac17d13d94fdc3575c6107c9a5aa43))
+* **bitcoin/nodejs:** fix browser compat
+([69e364e](https://github.com/argonprotocol/mainchain/commit/69e364e9502c758051b36db87b514dbbcfa7e1de))
+* **tests:** don’t loop forever in bitcoin test
+([5860e89](https://github.com/argonprotocol/mainchain/commit/5860e8935dc0f87ffdb035efd56bcb9f5061fe06))
+
+### [v1.3.3](https://github.com/argonprotocol/mainchain/compare/v1.3.2...v1.3.3) (2025-07-23)
+
+#### Features
 
 * **docker:** add voting cli and bitcoin mining
 ([3c580c6](https://github.com/argonprotocol/mainchain/commit/3c580c637918d89703e1ff7b1697db83ff4b0b7d))
 * **client:** make nodejs libs browser friendly
 ([3d2df95](https://github.com/argonprotocol/mainchain/commit/3d2df95b5766b9a4729d3440f2307a2404c19ba8))
 
-### Fixes
+#### Fixes
 
 * **mining_slot:** migration bug for next frame
 ([dc3ead1](https://github.com/argonprotocol/mainchain/commit/dc3ead15481b2a8b2f8b1a3d4c881feaf1dcd610))
