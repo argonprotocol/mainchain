@@ -128,9 +128,9 @@ pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKe
 		signatures.push((pubkey, signature));
 	}
 	let mut result = None;
-	for (pubkey, signature) in signatures {
-		psbt.inputs[0].partial_sigs.insert(pubkey, signature);
-		if result.is_none() {
+	for (i, (pubkey, signature)) in signatures.into_iter().enumerate() {
+		psbt.inputs[i].partial_sigs.insert(pubkey, signature);
+		if i == 0 {
 			result = Some((signature, pubkey));
 		}
 	}

@@ -16,7 +16,7 @@ import {
   signPsbt,
   signPsbtDerived,
 } from './wasm/bitcoin_bindings.js';
-import { addressBytesHex, getScureNetwork, keyToU8a } from './KeysHelper';
+import { addressBytesHex, getChildXpriv, getScureNetwork, keyToU8a } from './KeysHelper';
 
 export class CosignScript {
   constructor(
@@ -160,7 +160,9 @@ export class CosignScript {
     psbt.updateInput(0, {
       partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignature]],
     });
-    const derivePubkey = ownerXpriv.publicKey;
+    const derivePubkey = ownerXprivChildHdPath
+      ? ownerXpriv.derive(ownerXprivChildHdPath).publicKey
+      : ownerXpriv.publicKey;
     if (!derivePubkey) {
       throw new Error('Failed to derive owner public key');
     }
@@ -201,7 +203,6 @@ export class CosignScript {
     const signedPsbt = ownerXprivChildHdPath
       ? signPsbtDerived(psbtBytes, ownerXpriv.privateExtendedKey, ownerXprivChildHdPath, true)
       : signPsbt(psbtBytes, this.network, u8aToHex(ownerXpriv.privateKey, undefined, false), true);
-
     return this.psbtFromHex(signedPsbt);
   }
 }

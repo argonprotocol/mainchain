@@ -120,7 +120,7 @@ export default function vaultCli() {
       const account = await client.query.system.account(accountset.seedAddress);
       const freeBalance = account.data.free.toBigInt();
       let satoshis = await bitcoinLocks.requiredSatoshisForArgonLiquidity(argonsAvailable);
-      satoshis -= 100n; // keep some wiggle room since price can change
+      satoshis -= 20n; // keep some wiggle room since price can change
       const {
         tx: lockTx,
         securityFee: btcFee,
