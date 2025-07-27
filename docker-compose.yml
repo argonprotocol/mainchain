@@ -1,45 +1,42 @@
 ## Shared configs
 x-oracle-config: &oracle
   image: ghcr.io/argonprotocol/argon-oracle:${VERSION:-latest}
+  user: root
   build:
     context: .
     dockerfile: dev.Dockerfile
     target: oracle
   restart: on-failure
-  pull_policy: always
 x-notary-config: &notary
   image: ghcr.io/argonprotocol/argon-notary:${VERSION:-latest}
+  user: root
   build:
     context: .
     dockerfile: dev.Dockerfile
     target: argon-notary
   restart: on-failure
-  pull_policy: always
 x-node-config: &node
-  image: ghcr.io/argonprotocol/argon-node:${VERSION:-latest}
+  image: ghcr.io/argonprotocol/argon-miner:${VERSION:-latest}
   build:
     context: .
     dockerfile: dev.Dockerfile
     target: argon-node
   restart: on-failure
-  pull_policy: always
 x-bitcoin-config: &bitcoin
   image: ghcr.io/argonprotocol/bitcoin-unverified-node:latest
   build:
     context: .
     dockerfile: docker/bitcoin.Dockerfile
   restart: on-failure
-  pull_policy: always
   volumes:
     - bitcoin-data:/bitcoin
 x-cli-config: &cli
-  image: node:20
+  image: node:20-slim
   build:
     context: .
     dockerfile: docker/nodejs.Dockerfile
   working_dir: /app
   restart: on-failure
-  pull_policy: always
 
 services:
   minio:
@@ -427,7 +424,7 @@ services:
     command:
       - insert-key
       - --keystore-path=/keystore
-      - --suri=//Dave
+      - --suri=//Dave//oracle
       - --crypto-type=sr25519
     volumes:
       - oracle-btc-keystore:/keystore
@@ -443,7 +440,7 @@ services:
       - bitcoin
       - --keystore-path=/keystore
       - --signer-crypto=sr25519
-      - --signer-address=5DAAnrj7VHTznn2AWBemMuyBwZWs6FNFjdyVXUeYum3PTXFy
+      - --signer-address=5HKyaEJY4P4yAixU7pBDsnacNBNSmRGR7hkqgRnC9msvxecj
       - --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
     volumes:
       - oracle-btc-keystore:/keystore
@@ -455,7 +452,7 @@ services:
     command:
       - insert-key
       - --keystore-path=/keystore
-      - --suri=//Eve
+      - --suri=//Eve//oracle
       - --crypto-type=sr25519
     volumes:
       - oracle-price-keystore:/keystore
@@ -474,11 +471,11 @@ services:
       - price-index
       - --keystore-path=/keystore
       - --signer-crypto=sr25519
-      - --signer-address=5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw
+      - --signer-address=5Hn1p9jNYatcvcyugRc3TRyfC6zvFGTAX4qe14RhqBYcfrkE
       - --simulate-prices
     volumes:
       - oracle-price-keystore:/keystore
-      - /tmp/oracle/data/US_CPI_State.json:/tmp/oracle/data/US_CPI_State.json
+      - /tmp/oracle/data/:/tmp/oracle/data/
     environment:
       - TRUSTED_RPC_URL=ws://archive-node:9944
       - ARGON_TOKEN_ADDRESS=${ARGON_TOKEN_ADDRESS:-6b175474e89094c44da98b954eedeac495271d0f}
