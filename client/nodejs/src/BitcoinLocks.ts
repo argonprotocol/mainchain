@@ -2,6 +2,7 @@ import {
   Accountset,
   type ArgonClient,
   type ArgonPrimitivesBitcoinBitcoinNetwork,
+  ITxProgressCallback,
   type KeyringPair,
   TxSubmitter,
   VaultMonitor,
@@ -55,6 +56,8 @@ export class BitcoinLocks {
     return {
       releaseExpirationBlocks:
         client.consts.bitcoinLocks.lockReleaseCosignDeadlineBlocks.toNumber(),
+      pendingConfirmationExpirationBlocks:
+        client.consts.bitcoinUtxos.maxPendingConfirmationBlocks.toNumber(),
       tickDurationMillis: await client.query.ticks
         .genesisTicker()
         .then(x => x.tickDurationMillis.toNumber()),
@@ -128,8 +131,9 @@ export class BitcoinLocks {
     utxoId: number;
     vaultSignature: Uint8Array;
     argonKeyring: KeyringPair;
+    txProgressCallback?: ITxProgressCallback;
   }): Promise<TxResult> {
-    const { utxoId, vaultSignature, argonKeyring } = args;
+    const { utxoId, vaultSignature, argonKeyring, txProgressCallback } = args;
     const client = await this.client;
     if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
       throw new Error(
@@ -140,7 +144,7 @@ export class BitcoinLocks {
     const tx = client.tx.bitcoinLocks.cosignRelease(utxoId, signature);
     const submitter = new TxSubmitter(client, tx, argonKeyring);
 
-    return await submitter.submit();
+    return await submitter.submit({ txProgressCallback });
   }
 
   async getBitcoinLock(utxoId: number): Promise<IBitcoinLock | undefined> {
@@ -344,18 +348,24 @@ export class BitcoinLocks {
     argonKeyring: KeyringPair;
     satoshis: bigint;
     tip?: bigint;
+    txProgressCallback?: ITxProgressCallback;
   }): Promise<{
     lock: IBitcoinLock;
     createdAtHeight: number;
     txResult: TxResult;
     securityFee: bigint;
   }> {
-    const { argonKeyring, tip = 0n } = args;
+    const { argonKeyring, tip = 0n, txProgressCallback } = args;
     const client = await this.client;
 
     const { tx, securityFee } = await this.createInitializeLockTx(args);
     const submitter = new TxSubmitter(client, tx, argonKeyring);
-    const txResult = await submitter.submit({ waitForBlock: true, logResults: true, tip });
+    const txResult = await submitter.submit({
+      waitForBlock: true,
+      logResults: true,
+      tip,
+      txProgressCallback,
+    });
     const blockHash = await txResult.inBlockPromise;
     const blockHeight = await client
       .at(blockHash)
@@ -386,6 +396,7 @@ export class BitcoinLocks {
     releaseRequest: IReleaseRequest;
     argonKeyring: KeyringPair;
     tip?: bigint;
+    txProgressCallback?: ITxProgressCallback;
   }): Promise<{ blockHash: Uint8Array; blockHeight: number }> {
     const client = await this.client;
     const {
@@ -393,6 +404,7 @@ export class BitcoinLocks {
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
       argonKeyring,
       tip,
+      txProgressCallback,
     } = args;
 
     if (!toScriptPubkey.startsWith('0x')) {
@@ -420,7 +432,12 @@ export class BitcoinLocks {
         `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionPrice)}`,
       );
     }
-    const txResult = await submitter.submit({ waitForBlock: true, logResults: true, tip });
+    const txResult = await submitter.submit({
+      waitForBlock: true,
+      logResults: true,
+      tip,
+      txProgressCallback,
+    });
     const blockHash = await txResult.inBlockPromise;
     const blockHeight = await client
       .at(blockHash)
@@ -477,6 +494,7 @@ export class BitcoinLocks {
     argonKeyring: KeyringPair;
     tip?: bigint;
     vault: Vault;
+    txProgressCallback?: ITxProgressCallback;
   }): Promise<{
     securityFee: bigint;
     txFee: bigint;
@@ -486,7 +504,7 @@ export class BitcoinLocks {
     blockHeight: number;
     bitcoinBlockHeight: number;
   }> {
-    const { lock, argonKeyring, tip = 0n, vault } = args;
+    const { lock, argonKeyring, tip = 0n, vault, txProgressCallback } = args;
     const client = await this.client;
 
     const ratchetPrice = await this.getRatchetPrice(lock, vault);
@@ -510,6 +528,7 @@ export class BitcoinLocks {
     const submission = await txSubmitter.submit({
       waitForBlock: true,
       tip,
+      txProgressCallback,
     });
     const ratchetEvent = submission.events.find(x =>
       client.events.bitcoinLocks.BitcoinLockRatcheted.is(x),
@@ -612,6 +631,7 @@ export class BitcoinLocks {
 
 export interface IBitcoinLockConfig {
   releaseExpirationBlocks: number;
+  pendingConfirmationExpirationBlocks: number;
   tickDurationMillis: number;
   bitcoinNetwork: ArgonPrimitivesBitcoinBitcoinNetwork;
 }

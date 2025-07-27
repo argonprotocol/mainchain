@@ -41,6 +41,7 @@ export class TxSubmitter {
     const { tip, unavailableBalance } = options;
     const account = await this.client.query.system.account(this.pair.address);
     let availableBalance = account.data.free.toBigInt();
+    const userBalance = availableBalance;
     if (unavailableBalance) {
       availableBalance -= unavailableBalance;
     }
@@ -49,8 +50,8 @@ export class TxSubmitter {
       : 0n;
     const fees = await this.feeEstimate(tip);
     const totalCharge = fees + (tip ?? 0n);
-    const canAfford = availableBalance > totalCharge + existentialDeposit;
-    return { canAfford, availableBalance, txFee: fees };
+    const canAfford = availableBalance >= totalCharge + existentialDeposit;
+    return { canAfford, availableBalance: userBalance, txFee: fees };
   }
 
   public async submit(
@@ -58,13 +59,13 @@ export class TxSubmitter {
       logResults?: boolean;
       waitForBlock?: boolean;
       useLatestNonce?: boolean;
-      onResultCallback?: (result: ISubmittableResult) => void;
+      txProgressCallback?: ITxProgressCallback;
     } = {},
   ): Promise<TxResult> {
     const { logResults, waitForBlock, useLatestNonce, ...apiOptions } = options;
     await waitForLoad();
     const result = new TxResult(this.client, logResults);
-    result.onResultCallback = options.onResultCallback;
+    result.txProgressCallback = options.txProgressCallback;
     let toHuman = (this.tx.toHuman() as any).method as any;
     let txString = [];
     let api = formatCall(toHuman);
@@ -99,6 +100,7 @@ function formatCall(call: any): string {
   return `${call.section}.${call.method}`;
 }
 
+export type ITxProgressCallback = (progressToInBlock: number, result: TxResult) => void;
 export class TxResult {
   public inBlockPromise: Promise<Uint8Array>;
   public finalizedPromise: Promise<Uint8Array>;
@@ -119,7 +121,7 @@ export class TxResult {
    */
   public finalFeeTip?: bigint;
 
-  public onResultCallback?: (result: ISubmittableResult) => void;
+  public txProgressCallback?: ITxProgressCallback;
 
   private inBlockResolve!: (blockHash: Uint8Array) => void;
   private inBlockReject!: (error: ExtrinsicError) => void;
@@ -177,7 +179,15 @@ export class TxResult {
     if (isFinalized) {
       this.finalizedResolve(status.asFinalized);
     }
-    this.onResultCallback?.(result);
+    if (this.txProgressCallback) {
+      let percent = 0;
+      if (result.status.isBroadcast) {
+        percent = 50;
+      } else if (result.status.isInBlock) {
+        percent = 100;
+      }
+      this.txProgressCallback(percent, this);
+    }
   }
 
   private reject(error: ExtrinsicError) {

@@ -108,7 +108,7 @@ export class VaultMonitor {
         id: vaultId,
         btcSpace: `${formatArgons(vault.availableBitcoinSpace())} (${formatArgons(vault.argonsPendingActivation)} pending)`,
         btcDeal: `${formatArgons(vault.terms.bitcoinBaseFee)} + ${formatPercent(vault.terms.bitcoinAnnualPercentRate)}`,
-        securitization: `${formatArgons(vault.securitization)} at ${vault.securitizationRatio.toFormat(1)}x`,
+        securitization: `${formatArgons(vault.securitization)} at ${vault.securitizationRatio}x`,
         securActivated: `${formatArgons(vault.activatedSecuritizationPerSlot())}/slot`,
         liquidPoolDeal: `${formatPercent(vault.terms.liquidityPoolProfitSharing)} sharing`,
         operator: `${this.accountset.namedAccounts.has(vault.operatorAccountId) ? ` (${this.accountset.namedAccounts.get(vault.operatorAccountId)})` : vault.operatorAccountId}`,

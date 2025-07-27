@@ -9,7 +9,7 @@ import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 
 export { WageProtector } from './WageProtector';
-export { TxSubmitter } from './TxSubmitter';
+export { TxSubmitter, TxResult, ITxProgressCallback } from './TxSubmitter';
 export { Accountset, type ISubaccountMiner, type IMiningIndex } from './Accountset';
 export { MiningBids } from './MiningBids';
 export { AccountMiners } from './AccountMiners';
@@ -54,6 +54,13 @@ export {
   u64,
   u8,
 } from '@polkadot/types-codec';
+export type {
+  ISubmittableResult,
+  IExtrinsic,
+  SignerResult,
+  Signer,
+  ISignerPayload,
+} from '@polkadot/types/types/extrinsic';
 export { type ITuple, type Codec } from '@polkadot/types-codec/types';
 export {
   type AccountId32,

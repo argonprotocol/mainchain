@@ -2,6 +2,7 @@ import {
   ArgonClient,
   type ArgonPrimitivesVault,
   formatArgons,
+  ITxProgressCallback,
   KeyringPair,
   toFixedNumber,
   TxSubmitter,
@@ -11,16 +12,14 @@ import { convertFixedU128ToBigNumber, convertPermillToBigNumber } from './utils'
 import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxSubmitter';
-import { ExtrinsicStatus } from '@polkadot/types/interfaces';
 
 const { ROUND_FLOOR } = BN;
 
 export class Vault {
   public securitization!: bigint;
-  public securitizationRatio!: BigNumber;
   public argonsLocked!: bigint;
   public argonsPendingActivation!: bigint;
-  public argonsScheduledForRelease: Map<number, bigint> = new Map();
+  public argonsScheduledForRelease: Map<number, bigint>;
   public terms!: ITerms;
   public operatorAccountId!: string;
   public isClosed!: boolean;
@@ -29,21 +28,25 @@ export class Vault {
   public pendingTermsChangeTick?: number;
   public openedDate: Date;
   public openedTick: number;
+  public securitizationRatio!: number;
 
   constructor(
     id: number,
     vault: ArgonPrimitivesVault,
-    private tickDuration: number,
+    public tickDuration: number,
   ) {
     this.vaultId = id;
-    this.load(vault);
     this.openedTick = vault.openedTick.toNumber();
     this.openedDate = new Date(this.openedTick * this.tickDuration);
+    this.argonsScheduledForRelease = new Map();
+    this.load(vault);
   }
 
   public load(vault: ArgonPrimitivesVault) {
     this.securitization = vault.securitization.toBigInt();
-    this.securitizationRatio = convertFixedU128ToBigNumber(vault.securitizationRatio.toBigInt());
+    this.securitizationRatio = convertFixedU128ToBigNumber(
+      vault.securitizationRatio.toBigInt(),
+    ).toNumber();
     this.argonsLocked = vault.argonsLocked.toBigInt();
     this.argonsPendingActivation = vault.argonsPendingActivation.toBigInt();
     if (vault.argonsScheduledForRelease.size > 0) {
@@ -89,8 +92,12 @@ export class Vault {
     return [...this.argonsScheduledForRelease.values()].reduce((acc, val) => acc + val, 0n);
   }
 
+  public securitizationRatioBN(): BigNumber {
+    return new BigNumber(this.securitizationRatio);
+  }
+
   public recoverySecuritization(): bigint {
-    const reserved = new BigNumber(1).div(this.securitizationRatio);
+    const reserved = new BigNumber(1).div(this.securitizationRatioBN());
     return (
       this.securitization -
       BigInt(reserved.multipliedBy(this.securitization.toString()).toFixed(0, ROUND_FLOOR))
@@ -99,7 +106,7 @@ export class Vault {
 
   public minimumSecuritization(): bigint {
     return BigInt(
-      this.securitizationRatio
+      this.securitizationRatioBN()
         .multipliedBy(this.argonsLocked.toString())
         .decimalPlaces(0, BigNumber.ROUND_CEIL)
         .toString(),
@@ -108,10 +115,8 @@ export class Vault {
 
   public activatedSecuritization(): bigint {
     const activated = this.argonsLocked - this.argonsPendingActivation;
-    let maxRatio = this.securitizationRatio;
-    if (this.securitizationRatio.toNumber() > 2) {
-      maxRatio = BigNumber(2);
-    }
+    const maxRatio = BigNumber(Math.min(this.securitizationRatio, 2));
+
     return BigInt(maxRatio.multipliedBy(activated.toString()).toFixed(0, ROUND_FLOOR));
   }
 
@@ -157,7 +162,7 @@ export class Vault {
       liquidityPoolProfitSharing: number;
       tip?: bigint;
       doNotExceedBalance?: bigint;
-      progressCallback?: (progressPct: number, status: ExtrinsicStatus) => void;
+      txProgressCallback?: ITxProgressCallback;
     },
     config: { tickDurationMillis?: number } = {},
   ): Promise<{ vault: Vault; txResult: TxResult }> {
@@ -169,7 +174,7 @@ export class Vault {
       bitcoinXpub,
       tip,
       doNotExceedBalance,
-      progressCallback,
+      txProgressCallback,
     } = args;
     let xpubBytes = hexToU8a(bitcoinXpub);
     if (xpubBytes.length !== 78) {
@@ -217,26 +222,7 @@ export class Vault {
       tip,
       useLatestNonce: true,
       waitForBlock: true,
-      onResultCallback(result) {
-        let percent = 0;
-        if (
-          result.status.isInvalid ||
-          result.status.isDropped ||
-          result.status.isUsurped ||
-          result.status.isRetracted
-        ) {
-          percent = 1;
-        } else if (result.status.isReady) {
-          percent = 0;
-        } else if (result.status.isBroadcast) {
-          percent = 0.5;
-        } else if (result.status.isInBlock) {
-          percent = 1;
-        } else if (result.status.isFinalized) {
-          percent = 1.1;
-        }
-        progressCallback?.(percent, result.status);
-      },
+      txProgressCallback,
     });
     await result.inBlockPromise;
     let vaultId: number | undefined;
