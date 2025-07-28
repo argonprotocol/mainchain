@@ -216,6 +216,8 @@ export function getBitcoinNetworkFromApi(
     return BitcoinNetwork.Testnet;
   } else if (network.isRegtest) {
     return BitcoinNetwork.Regtest;
+  } else if (network.isSignet) {
+    return BitcoinNetwork.Signet;
   }
   throw new Error('Unsupported network: ' + network);
 }
