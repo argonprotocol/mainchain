@@ -2,16 +2,18 @@ import BigNumber, * as BN from 'bignumber.js';
 import type { ArgonClient, GenericEvent } from './index';
 import type { DispatchError } from '@polkadot/types/interfaces';
 import { EventRecord } from '@polkadot/types/interfaces/system';
-import { hexToU8a } from '@polkadot/util';
 
 const { ROUND_FLOOR } = BN;
 
 export const MICROGONS_PER_ARGON = 1_000_000;
 
-export function formatArgons(x: bigint | number): string {
-  if (x === undefined || x === null) return 'na';
-  const isNegative = x < 0;
-  let format = BigNumber(x.toString()).abs().div(MICROGONS_PER_ARGON).toFormat(2, ROUND_FLOOR);
+export function formatArgons(microgons: bigint | number): string {
+  if (microgons === undefined || microgons === null) return 'na';
+  const isNegative = microgons < 0;
+  let format = BigNumber(microgons.toString())
+    .abs()
+    .div(MICROGONS_PER_ARGON)
+    .toFormat(2, ROUND_FLOOR);
   if (format.endsWith('.00')) {
     format = format.slice(0, -3);
   }

@@ -86,7 +86,7 @@ services:
       - --datadir=/bitcoin
       - --blockfilterindex
       - --txindex
-      - --wallet=1
+      - --wallet=mining
     ports:
       - "0:18444"
     healthcheck:
@@ -110,14 +110,14 @@ services:
           echo "rpcport=18444" >> /bitcoin/bitcoin.conf
           echo "txindex=1" >> /bitcoin/bitcoin.conf
           echo "blockfilterindex=1" >> /bitcoin/bitcoin.conf
-          echo "wallet=default" >> /bitcoin/bitcoin.conf
+          echo "wallet=mining" >> /bitcoin/bitcoin.conf
         fi
         echo "Bitcoin conf created at /bitcoin/bitcoin.conf"
         echo $(bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf getwalletinfo)
         if ! bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf getwalletinfo >/dev/null 2>&1; then
           echo "Creating Bitcoin wallet..."
-          bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf createwallet default 2>/dev/null \
-          || bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf loadwallet default
+          bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf createwallet mining 2>/dev/null \
+          || bitcoin-cli -regtest -datadir=/bitcoin -conf=/bitcoin/bitcoin.conf loadwallet mining
         fi
         echo "Bitcoin wallet initialized"
       '
@@ -133,6 +133,7 @@ services:
         -regtest
         -datadir=/bitcoin
         -conf=/bitcoin/bitcoin.conf
+        -rpcwallet=mining
     depends_on:
       bitcoin-wallet-init:
         condition: service_completed_successfully
@@ -145,6 +146,7 @@ services:
         -regtest
         -datadir=/bitcoin
         -conf=/bitcoin/bitcoin.conf
+        -rpcwallet=mining
     depends_on:
       bitcoin-init:
         condition: service_completed_successfully
@@ -478,8 +480,8 @@ services:
       - /tmp/oracle/data/:/tmp/oracle/data/
     environment:
       - TRUSTED_RPC_URL=ws://archive-node:9944
-      - ARGON_TOKEN_ADDRESS=${ARGON_TOKEN_ADDRESS:-6b175474e89094c44da98b954eedeac495271d0f}
-      - ARGONOT_TOKEN_ADDRESS=${ARGONOT_TOKEN_ADDRESS:-6b175474e89094c44da98b954eedeac495271d0f}
+      - ARGON_TOKEN_ADDRESS=${ARGON_TOKEN_ADDRESS:-3e622317f8C93f7328350cF0B56d9eD4C620C5d6}
+      - ARGONOT_TOKEN_ADDRESS=${ARGONOT_TOKEN_ADDRESS:-3e622317f8C93f7328350cF0B56d9eD4C620C5d6}
       - BLS_API_KEY=${BLS_API_KEY}
       - INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
       - ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json

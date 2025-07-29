@@ -9,6 +9,7 @@ use crate::aux_client::AuxKey;
 
 #[derive(Clone)]
 pub struct AuxData<T, C> {
+	pub aux_key: AuxKey,
 	client: Arc<C>,
 	data: Arc<RwLock<T>>,
 	key: Vec<u8>,
@@ -19,9 +20,10 @@ where
 	T: Encode + Decode + Sync + Send + Clone + Default,
 {
 	pub fn new(client: Arc<C>, key: AuxKey) -> Self {
+		let aux_key = key.clone();
 		let key = key.encode();
 		let start_data = Self::get_static(&key, &client);
-		AuxData { client, key, data: Arc::new(RwLock::new(start_data)) }
+		AuxData { aux_key, client, key, data: Arc::new(RwLock::new(start_data)) }
 	}
 
 	fn get_static(encoded_key: &[u8], client: &Arc<C>) -> T {
@@ -49,6 +51,24 @@ where
 				// roll back the data and throw
 				*self.data.write() = start_data;
 			})?;
+
+		Ok(result)
+	}
+
+	pub fn write_changes<F, R>(
+		&self,
+		f: F,
+		aux_changes: &mut Vec<(Vec<u8>, Option<Vec<u8>>)>,
+	) -> Result<R, sp_blockchain::Error>
+	where
+		F: FnOnce(&mut T) -> R,
+	{
+		let (result, encoded) = {
+			let mut data = self.data.write();
+			let result = f(&mut data);
+			(result, data.encode())
+		};
+		aux_changes.push((self.key.clone(), Some(encoded)));
 
 		Ok(result)
 	}
