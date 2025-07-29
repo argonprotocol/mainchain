@@ -1,13 +1,24 @@
 # Changelog
 
-## [v1.3.4](https://github.com/argonprotocol/mainchain/compare/v1.3.3...4009f953d01a44711f7fba9f16a8a4d98c67a6f5) (2025-07-27)
+## [v1.3.5](https://github.com/argonprotocol/mainchain/compare/v1.3.4...2b5f999e88019ce9219239e945ac7f0a5c72d05a) (2025-07-28)
 
-### Features
+### Fixes
+
+* **docker:** use a named wallet to avoid conflict
+([d1f9d89](https://github.com/argonprotocol/mainchain/commit/d1f9d897f84011aa84cfe4f7f824872b35562764))
+* **node:** migration broke notebooks
+([2c07ca0](https://github.com/argonprotocol/mainchain/commit/2c07ca022f31e65fecb190924b3dbad781def42c))
+* **bitcoin/nodejs:** enable signet
+([75d6857](https://github.com/argonprotocol/mainchain/commit/75d6857755bd7456716260f1d8d3ac7d3ca20053))
+
+### [v1.3.4](https://github.com/argonprotocol/mainchain/compare/v1.3.3...v1.3.4) (2025-07-27)
+
+#### Features
 
 * **client/nodejs:** add progress callback to transaction submission
 ([cdc7d12](https://github.com/argonprotocol/mainchain/commit/cdc7d12f11cb83f86f90d120dbfa685fc6bdda8a))
 
-### Fixes
+#### Fixes
 
 * **docker:** use correct image and user
 ([4009f95](https://github.com/argonprotocol/mainchain/commit/4009f953d01a44711f7fba9f16a8a4d98c67a6f5))
