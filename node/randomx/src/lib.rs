@@ -66,7 +66,6 @@ pub mod full_vm {
 				*entry = Some((*key_hash, vm));
 			} else {
 				let new_vm = data.new_vm()?;
-				info!(target:"argon-randomx", "Created new Randomx VM for key: {:?}", hex::encode(key_hash));
 				*entry = Some((*key_hash, new_vm));
 			};
 
@@ -94,7 +93,9 @@ pub mod full_vm {
 		let data: Arc<VMData> = if let Some(data) = shared_caches.get_mut(key_hash) {
 			data.clone()
 		} else if shared_caches.len() < shared_caches.capacity() || !global_config().large_pages {
-			Arc::new(VMData::new(&key_hash[..], &global_config(), true)?)
+			let vm_data = VMData::new(&key_hash[..], &global_config(), true)?;
+			info!(target:"argon-randomx", "Created new Randomx VMData for key: {:?}", hex::encode(key_hash));
+			Arc::new(vm_data)
 		} else {
 			// last case is using large pages
 			// replace the entry with a single entry
