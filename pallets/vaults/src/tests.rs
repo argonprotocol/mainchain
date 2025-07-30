@@ -409,6 +409,42 @@ fn it_can_lock_funds() {
 }
 
 #[test]
+fn it_doesnt_charge_lock_fees_to_operator() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::from_float(0.01));
+		terms.bitcoin_base_fee = 1000;
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms,
+				bitcoin_xpubkey: keys(),
+				securitization: 500_000,
+				securitization_ratio: FixedU128::one(),
+			}
+		));
+		assert_eq!(Balances::free_balance(1), 500_000);
+
+		let fee = Vaults::lock(1, &1, 500_000, 500, None).expect("bonding failed");
+
+		assert_eq!(Balances::free_balance(1), 500_000);
+		assert_eq!(fee, 0);
+
+		let current_frame_id = CurrentFrameId::get();
+		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
+		assert_eq!(vault_revenue[0].fee_revenue, fee);
+		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
+	});
+}
+
+#[test]
 fn it_handles_overflowing_metrics() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited

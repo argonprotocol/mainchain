@@ -803,22 +803,26 @@ pub mod pallet {
 			);
 
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
-
 			ensure!(vault.available_for_lock() >= lock_price, VaultError::InsufficientVaultFunds);
 
-			let apr = vault.terms.bitcoin_annual_percent_rate;
-			let base_fee = vault.terms.bitcoin_base_fee;
-			let is_ratchet = extension.is_some();
-			let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
+			let mut total_fee = {
+				let apr = vault.terms.bitcoin_annual_percent_rate;
+				let base_fee = vault.terms.bitcoin_base_fee;
+				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
 
-			let total_fee =
-				apr.saturating_mul(term).saturating_mul_int(lock_price).saturating_add(base_fee);
+				apr.saturating_mul(term).saturating_mul_int(lock_price).saturating_add(base_fee)
+			};
+			if vault.operator_account_id == *account_id {
+				// if the operator is locking, they don't pay a fee
+				total_fee = T::Balance::zero();
+			}
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
 				lock_price,
 				total_fee
 			);
 
+			let is_ratchet = extension.is_some();
 			Self::update_vault_metrics(VaultMetricUpdate {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
@@ -830,16 +834,18 @@ pub mod pallet {
 			})?;
 
 			// do this second so the 'provider' is already on the account
-			T::Currency::transfer(
-				account_id,
-				&vault.operator_account_id,
-				total_fee,
-				Preservation::Expendable,
-			)
-			.map_err(|e| match e {
-				Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
-				_ => VaultError::InsufficientFunds,
-			})?;
+			if total_fee > T::Balance::zero() {
+				T::Currency::transfer(
+					account_id,
+					&vault.operator_account_id,
+					total_fee,
+					Preservation::Expendable,
+				)
+				.map_err(|e| match e {
+					Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
+					_ => VaultError::InsufficientFunds,
+				})?;
+			}
 
 			if let Some((_, extension)) = extension {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
