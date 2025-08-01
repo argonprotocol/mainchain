@@ -236,7 +236,7 @@ import type {
   PalletVaultsEvent,
   PalletVaultsHoldReason,
   PalletVaultsVaultConfig,
-  PalletVaultsVaultFrameFeeRevenue,
+  PalletVaultsVaultFrameRevenue,
   SpArithmeticArithmeticError,
   SpConsensusGrandpaAppPublic,
   SpConsensusGrandpaAppSignature,
@@ -490,7 +490,7 @@ declare module '@polkadot/types/types/registry' {
     PalletVaultsEvent: PalletVaultsEvent;
     PalletVaultsHoldReason: PalletVaultsHoldReason;
     PalletVaultsVaultConfig: PalletVaultsVaultConfig;
-    PalletVaultsVaultFrameFeeRevenue: PalletVaultsVaultFrameFeeRevenue;
+    PalletVaultsVaultFrameRevenue: PalletVaultsVaultFrameRevenue;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;
     SpConsensusGrandpaAppPublic: SpConsensusGrandpaAppPublic;
     SpConsensusGrandpaAppSignature: SpConsensusGrandpaAppSignature;

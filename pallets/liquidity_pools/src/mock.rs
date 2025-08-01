@@ -1,7 +1,10 @@
 use crate as pallet_liquidity_pools;
 use argon_primitives::vault::LiquidityPoolVaultProvider;
 use frame_support::traits::Currency;
-use pallet_prelude::*;
+use pallet_prelude::{
+	argon_primitives::vault::{MiningBidPoolProvider, VaultLiquidityPoolFrameEarnings},
+	*,
+};
 use std::collections::HashMap;
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -68,6 +71,8 @@ parameter_types! {
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
+
+	pub static LastVaultProfits: Vec<VaultLiquidityPoolFrameEarnings<Balance, u64>> = vec![];
 }
 
 #[derive(Clone)]
@@ -103,6 +108,20 @@ impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
 
 	fn is_vault_open(vault_id: VaultId) -> bool {
 		VaultsById::get().get(&vault_id).map(|a| !a.is_closed).unwrap_or_default()
+	}
+
+	fn record_vault_frame_earnings(
+		_source_account_id: &Self::AccountId,
+		profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+	) {
+		let _ = Balances::burn_from(
+			&LiquidityPools::get_bid_pool_account(),
+			profit.earnings_for_vault,
+			Preservation::Expendable,
+			Precision::Exact,
+			Fortitude::Force,
+		);
+		LastVaultProfits::mutate(|a| a.push(profit));
 	}
 }
 

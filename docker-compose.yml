@@ -95,6 +95,26 @@ services:
       interval: 5s
       retries: 10
 
+  bitcoin-electrs:
+    image: getumbrel/electrs:v0.10.9
+    restart: on-failure
+    ports:
+      - "50001:50001"  # Electrum server protocol
+      - "3002:3002" # Esplora HTTP API
+    command: >
+      electrs
+      --network regtest
+      --daemon-dir /bitcoin
+      --db-dir /bitcoin/electrs
+      --cookie bitcoin:bitcoin
+      --electrum-rpc-addr 0.0.0.0:50001
+      --http-addr 0.0.0.0:3002
+    volumes:
+      - bitcoin-data:/bitcoin
+    depends_on:
+      bitcoin-miner:
+        condition: service_started
+
   bitcoin-wallet-init:
     <<: *bitcoin
     command: >
@@ -147,6 +167,7 @@ services:
         -datadir=/bitcoin
         -conf=/bitcoin/bitcoin.conf
         -rpcwallet=mining
+      INTERVAL_SECONDS: 20 # needs to be 10 ticks, which are 2 seconds in regtest
     depends_on:
       bitcoin-init:
         condition: service_completed_successfully
@@ -163,6 +184,7 @@ services:
       - -regtest
       - -datadir=/bitcoin
       - -conf=/bitcoin/bitcoin.conf
+        -rpcwallet=mining
     profiles: [tooling]   # keeps it out of the default `up`
 
   archive-node:

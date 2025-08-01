@@ -2040,6 +2040,10 @@ declare module '@polkadot/api-base/types/submittable' {
         (vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u32]
       >;
+      collect: AugmentedSubmittable<
+        (vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [u32]
+      >;
       create: AugmentedSubmittable<
         (
           vaultConfig:

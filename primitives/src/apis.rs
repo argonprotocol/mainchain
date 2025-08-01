@@ -61,6 +61,7 @@ sp_api::decl_runtime_apis! {
 		fn current_tick() -> Tick;
 		fn ticker() -> Ticker;
 		fn blocks_at_tick(tick: Tick) -> Vec<Block::Hash>;
+		fn tick_for_frame(frame_id: FrameId) -> Tick;
 	}
 }
 

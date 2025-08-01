@@ -293,6 +293,9 @@ macro_rules! inject_common_apis {
             fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
                 Ticks::blocks_at_tick(tick)
             }
+            fn tick_for_frame(frame_id: FrameId) -> Tick {
+                MiningSlot::tick_for_frame(frame_id)
+            }
         }
 
         impl argon_primitives::BitcoinApis<Block,Balance> for Runtime {

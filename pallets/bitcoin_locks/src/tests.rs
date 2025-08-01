@@ -7,7 +7,10 @@ use pallet_prelude::*;
 use crate::{
 	Error, Event, HoldReason, LockReleaseRequest,
 	mock::*,
-	pallet::{LockReleaseCosignHeightById, LocksByUtxoId, LocksPendingReleaseByUtxoId},
+	pallet::{
+		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
+		LocksByUtxoId,
+	},
 };
 use argon_primitives::{
 	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider,
@@ -69,7 +72,6 @@ fn cleans_up_a_rejected_bitcoin() {
 		let who = 1;
 		set_argons(who, 2_000_000);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		CurrentTick::set(1);
 
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(who),
@@ -99,7 +101,6 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		let rng = &mut bitcoin::secp256k1::rand::thread_rng();
 		let keypair = bitcoin::secp256k1::SecretKey::new(rng);
 		let pubkey = keypair.public_key(&secp).serialize();
-		CurrentTick::set(1);
 
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(who),
@@ -123,18 +124,17 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 			1000
 		));
 
+		let cosign_due = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
 		assert_eq!(
-			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
-			Some(LockReleaseRequest {
+			LockReleaseRequestsByUtxoId::<Test>::get(1).unwrap(),
+			LockReleaseRequest {
 				utxo_id: 1,
 				vault_id: 1,
-				cosign_due_block: BitcoinBlockHeightChange::get().1 +
-					LockReleaseCosignDeadlineBlocks::get(),
+				cosign_due_frame: cosign_due,
 				redemption_price: 0,
 				to_script_pubkey: release_script_pubkey,
 				bitcoin_network_fee: 1000
-			})
-			.as_ref()
+			}
 		);
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 		System::assert_last_event(
@@ -149,7 +149,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
 		assert_eq!(LastReleaseEvent::get(), Some((1, false, 0)));
-		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
+		assert!(!LockCosignDueByFrame::<Test>::get(cosign_due).contains(&1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().argons_locked, 0);
 	});
@@ -252,7 +252,6 @@ fn burns_a_spent_bitcoin() {
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
 		let allocated = DefaultVault::get().securitization;
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62000)));
-		CurrentTick::set(1);
 
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(who),
@@ -346,6 +345,8 @@ fn can_release_a_bitcoin() {
 		// now the user goes to release
 		// 1. We would create a psbt and output address
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		let ticks_per_bitcoin_block = TicksPerBitcoinBlock::get();
+		let cosign_due_ticks = LockReleaseCosignDeadlineFrames::get() * ArgonTicksPerDay::get();
 		// must be the right user!
 		assert_err!(
 			BitcoinLocks::request_release(
@@ -367,7 +368,7 @@ fn can_release_a_bitcoin() {
 			),
 			Error::<Test>::BitcoinReleaseInitiationDeadlinePassed
 		);
-		set_bitcoin_height(expiration_block - LockReleaseCosignDeadlineBlocks::get() - 1);
+		set_bitcoin_height(expiration_block - (cosign_due_ticks / ticks_per_bitcoin_block) - 1);
 		assert_ok!(BitcoinLocks::request_release(
 			RuntimeOrigin::signed(who),
 			1,
@@ -380,18 +381,23 @@ fn can_release_a_bitcoin() {
 		assert!(redemption_price > lock.lock_price);
 		// redemption price should be the lock price since current redemption price is above
 		assert_eq!(
-			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
-			Some(LockReleaseRequest {
+			LockReleaseRequestsByUtxoId::<Test>::get(1).unwrap(),
+			LockReleaseRequest {
 				utxo_id: 1,
 				vault_id: 1,
-				cosign_due_block: BitcoinBlockHeightChange::get().1 +
-					LockReleaseCosignDeadlineBlocks::get(),
+				cosign_due_frame: CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get(),
 				redemption_price: lock.lock_price,
 				to_script_pubkey: release_script_pubkey,
 				bitcoin_network_fee: 1000
-			})
-			.as_ref()
+			}
 		);
+		assert!(
+			LockCosignDueByFrame::<Test>::get(
+				CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get()
+			)
+			.contains(&1)
+		);
+		assert!(VaultViewOfCosignPendingLocks::get().contains_key(&1));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 		System::assert_last_event(
 			Event::<Test>::BitcoinUtxoCosignRequested { vault_id: 1, utxo_id: 1 }.into(),
@@ -446,28 +452,32 @@ fn penalizes_vault_if_not_release_countersigned() {
 
 		let redemption_price =
 			BitcoinLocks::get_redemption_price(&satoshis, None).expect("should have price");
-		let cosign_due = BitcoinBlockHeightChange::get().1 + LockReleaseCosignDeadlineBlocks::get();
+		let cosign_due = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
 		assert_eq!(
-			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
+			LockReleaseRequestsByUtxoId::<Test>::get(1),
 			Some(LockReleaseRequest {
 				utxo_id: 1,
 				vault_id: 1,
-				cosign_due_block: cosign_due,
+				cosign_due_frame: cosign_due,
 				redemption_price,
 				to_script_pubkey: release_script_pubkey,
 				bitcoin_network_fee: 2000
 			})
-			.as_ref()
 		);
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due).contains(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().contains_key(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&1));
 
-		set_bitcoin_height(cosign_due);
+		CurrentFrameId::set(cosign_due);
 		System::set_block_number(2);
 		BitcoinLocks::on_initialize(2);
 
 		// should pay back at market price (not the discounted rate)
 		let market_price =
 			StaticPriceProvider::get_bitcoin_argon_price(satoshis).expect("should have price");
-		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
+		assert_eq!(LockReleaseRequestsByUtxoId::<Test>::get(1), None);
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due).is_empty());
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		System::assert_last_event(
 			Event::<Test>::BitcoinCosignPastDue {
@@ -521,20 +531,22 @@ fn clears_released_bitcoins() {
 
 		let redemption_price =
 			BitcoinLocks::get_redemption_price(&satoshis, None).expect("should have price");
-		let cosign_due_block =
-			BitcoinBlockHeightChange::get().1 + LockReleaseCosignDeadlineBlocks::get();
+		let cosign_due_frame = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
 		assert_eq!(
-			LocksPendingReleaseByUtxoId::<Test>::get().get(&1),
+			LockReleaseRequestsByUtxoId::<Test>::get(1),
 			Some(LockReleaseRequest {
 				utxo_id: 1,
 				vault_id: 1,
-				cosign_due_block,
+				cosign_due_frame,
 				redemption_price,
 				to_script_pubkey: release_script_pubkey,
 				bitcoin_network_fee: 11
 			})
-			.as_ref()
 		);
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).contains(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().contains_key(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&1));
+
 		assert_err!(
 			BitcoinLocks::cosign_release(
 				RuntimeOrigin::signed(2),
@@ -551,7 +563,9 @@ fn clears_released_bitcoins() {
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
 		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_price)));
-		assert_eq!(LocksPendingReleaseByUtxoId::<Test>::get().get(&1), None);
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
+		assert!(LockReleaseRequestsByUtxoId::<Test>::get(1).is_none());
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(DefaultVault::get().argons_locked, lock.lock_price);
 		assert_eq!(DefaultVault::get().securitization, vault.securitization);
@@ -648,6 +662,7 @@ fn it_should_allow_a_ratchet_up() {
 
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		let expiration_block = lock.vault_claim_height;
+		assert_eq!(lock.security_fees, 1000 + 620);
 		let middle_block = (current_block + (expiration_block - current_block) / 2) + 1;
 		BitcoinBlockHeightChange::set((middle_block, middle_block));
 
@@ -676,6 +691,7 @@ fn it_should_allow_a_ratchet_up() {
 			lock.fund_hold_extensions.into_iter().collect::<Vec<_>>(),
 			vec![(extension.day(), 3_000 * MICROGONS_PER_ARGON)]
 		);
+		assert_eq!(lock.security_fees, 1000 + 620 + (1000 + apr / 2));
 		System::assert_last_event(
 			Event::<Test>::BitcoinLockRatcheted {
 				vault_id: 1,
@@ -684,6 +700,7 @@ fn it_should_allow_a_ratchet_up() {
 				new_lock_price: 65_000 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
+				security_fee: 1000 + apr / 2,
 			}
 			.into(),
 		)

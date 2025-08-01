@@ -6,7 +6,7 @@ use crate::{
 };
 use argon_primitives::{OnNewSlot, vault::MiningBidPoolProvider};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
-use pallet_prelude::*;
+use pallet_prelude::{argon_primitives::vault::VaultLiquidityPoolFrameEarnings, *};
 use sp_core::bounded_vec;
 use sp_runtime::Permill;
 
@@ -364,11 +364,13 @@ fn it_can_distribute_bid_pool_capital() {
 
 		set_argons(LiquidityPools::get_bid_pool_account(), 1_000_000_002);
 
+		set_argons(10, 100_000_000);
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(10), 1, 100_000_000,));
 		set_argons(2, 500_000_000);
-		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 220_000_000));
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 120_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &2),
-			220_000_000
+			120_000_000
 		);
 		set_argons(3, 500_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(3), 1, 280_000_000));
@@ -393,7 +395,7 @@ fn it_can_distribute_bid_pool_capital() {
 		let bond_funds = VaultPoolsByFrame::<Test>::get(3);
 		assert_eq!(
 			bond_funds.get(&1).unwrap().contributor_balances.clone().into_inner(),
-			vec![(3, 280_000_000), (2, 220_000_000),]
+			vec![(3, 280_000_000), (2, 120_000_000), (10, 100_000_000)]
 		);
 		assert_eq!(
 			bond_funds.get(&2).unwrap().contributor_balances.clone().into_inner(),
@@ -444,32 +446,56 @@ fn it_can_distribute_bid_pool_capital() {
 			.into(),
 		);
 
+		let profits = LastVaultProfits::get();
+		assert_eq!(profits.len(), 2, "should have 2 vault profits recorded");
+		let vault_1_profits = profits.iter().find(|p| p.vault_id == 1).unwrap();
 		assert_eq!(
-			Balances::free_balance(10),
-			200_000_000,
+			vault_1_profits,
+			&VaultLiquidityPoolFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: 10,
+				earnings: 400_000_000 + 1, // 50% of the 800 + 1 extra penny
+				earnings_for_vault: (400_000_000.0 * 0.5) as u128 + (100.0/500.0 * 400_000_000.0 * 0.5) as u128 + 1, // 50% of the 400 + 50% * 100 of 500 contributed argons * 400) + 1 extra penny
+				capital_contributed_by_vault: 100_000_000,
+				frame_id: 3,
+				capital_contributed: 500_000_000,
+			},
 			"First vault gets half of the 400 for their side"
 		);
+		let vault_2_profits = profits.iter().find(|p| p.vault_id == 2).unwrap();
 		assert_eq!(
-			Balances::free_balance(11),
-			(400_000_000.0 * 0.4) as u128,
+			vault_2_profits,
+			&VaultLiquidityPoolFrameEarnings {
+				vault_id: 2,
+				vault_operator_account_id: 11,
+				earnings: 400_000_000,
+				earnings_for_vault: (400_000_000.0 * 0.4) as u128,
+				capital_contributed_by_vault: 0,
+				frame_id: 3,
+				capital_contributed: 500_000_000,
+			},
 			"Second vault gets 40% of the 400 for their side"
 		);
 		assert_eq!(Balances::free_balance(LiquidityPools::get_bid_pool_account()), 0);
 
 		// fund 1 came first, so gets the extra penny
 		let contributor_funds_balance_1 = 200_000_000;
-		let extra_microgon = 1;
+
 		let vault_1_contributors = vec![
 			(
 				3,
 				280_000_000 +
-					extra_microgon + Permill::from_rational(280, 500u64)
-					.mul_floor(contributor_funds_balance_1),
+					Permill::from_rational(280, 500u64).mul_floor(contributor_funds_balance_1),
 			),
 			(
 				2,
-				220_000_000 +
-					Permill::from_rational(220, 500u64).mul_floor(contributor_funds_balance_1),
+				120_000_000 +
+					Permill::from_rational(120, 500u64).mul_floor(contributor_funds_balance_1),
+			),
+			(
+				10,
+				100_000_000 +
+					Permill::from_rational(100, 500u64).mul_floor(contributor_funds_balance_1),
 			),
 		];
 		assert_eq!(
@@ -480,14 +506,28 @@ fn it_can_distribute_bid_pool_capital() {
 		assert_eq!(bond_funds.get(&1).unwrap().distributed_profits, Some(400_000_001));
 
 		for (account, amount) in vault_1_contributors {
-			assert_eq!(
-				Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &account),
-				amount
-			);
+			if account == 10 {
+				// vault operator gets the full amount
+				assert_eq!(
+					Balances::free_balance(account),
+					0,
+					"vault operator must collect earnings"
+				);
+			} else {
+				// contributors get their share on hold
+				assert_eq!(
+					Balances::balance_on_hold(
+						&HoldReason::ContributedToLiquidityPool.into(),
+						&account
+					),
+					amount,
+					"contributor {} should have their funds on hold",
+					account
+				);
+			}
 		}
 		let contributor_funds_balance_2 = 400_000_000 - (400_000_000.0 * 0.4) as u128;
 		let vault_2_contributors = vec![
-			// This one gets the extra penny floating around (first in order of contributions)
 			(5, 250_000_000 + contributor_funds_balance_2 / 2),
 			(4, 250_000_000 + contributor_funds_balance_2 / 2),
 		];

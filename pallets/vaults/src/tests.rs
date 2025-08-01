@@ -1,9 +1,9 @@
 use crate::{
-	Error, Event, HoldReason, VaultConfig,
+	Error, Event, HoldReason, LastCollectFrameByVaultId, PendingCosignByVaultId, VaultConfig,
 	mock::{Vaults, *},
 	pallet::{
-		NextVaultId, PendingTermsModificationsByTick, PerFrameFeeRevenueByVault,
-		VaultFundsReleasingByHeight, VaultMetricUpdate, VaultXPubById, VaultsById,
+		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick, RevenuePerFrameByVault,
+		VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
 	},
 };
 use argon_primitives::{
@@ -15,7 +15,13 @@ use bitcoin::{
 	key::Secp256k1,
 };
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
-use pallet_prelude::{argon_primitives::vault::LockExtension, *};
+use pallet_prelude::{
+	argon_primitives::{
+		OnNewSlot,
+		vault::{LiquidityPoolVaultProvider, LockExtension, VaultLiquidityPoolFrameEarnings},
+	},
+	*,
+};
 
 const TEN_PCT: FixedU128 = FixedU128::from_rational(110, 100);
 
@@ -351,7 +357,8 @@ fn it_can_close_a_vault() {
 			}
 			.into(),
 		);
-		assert_eq!(Balances::free_balance(1), vault_owner_balance - 80_000 + fee);
+		assert_eq!(Balances::free_balance(1), vault_owner_balance - 80_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
 		// set to full fee block
@@ -359,7 +366,8 @@ fn it_can_close_a_vault() {
 		// now when we cancel, it should return the funds to the vault
 		assert_ok!(Vaults::cancel(1, amount));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
-		assert_eq!(Balances::free_balance(1), vault_owner_balance + fee);
+		assert_eq!(Balances::free_balance(1), vault_owner_balance);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 100_000 - fee);
 		assert_err!(Vaults::lock(1, &2, 1000, 500, None), VaultError::VaultClosed);
 	});
@@ -391,17 +399,19 @@ fn it_can_lock_funds() {
 		let apr_fee = (0.01f64 * 500_000f64) as u128;
 		assert_eq!(fee, apr_fee + 1000);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
-		assert_eq!(Balances::free_balance(1), 500_000 + fee);
+		assert_eq!(Balances::free_balance(1), 500_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		// if we cancel the lock, the fee won't be returned
 		assert_ok!(Vaults::cancel(1, 500_000));
-		assert_eq!(Balances::free_balance(1), 500_000 + fee);
+		assert_eq!(Balances::free_balance(1), 500_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
 
 		let current_frame_id = CurrentFrameId::get();
-		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
-		assert_eq!(vault_revenue[0].fee_revenue, fee);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
 		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
 		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
@@ -434,10 +444,10 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 		assert_eq!(fee, 0);
 
 		let current_frame_id = CurrentFrameId::get();
-		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
-		assert_eq!(vault_revenue[0].fee_revenue, fee);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
 		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
 		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
@@ -449,11 +459,34 @@ fn it_handles_overflowing_metrics() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(5);
+		for i in 1..=10 {
+			let account_id = i as u64;
+			let vault = VaultConfig {
+				terms: default_terms(TEN_PCT),
+				bitcoin_xpubkey: keys(),
+				securitization: 10_000 + (i * 1000) as Balance,
+				securitization_ratio: FixedU128::one(),
+			};
+			set_argons(account_id, 100_000_000);
+			assert_ok!(Vaults::create(RuntimeOrigin::signed(account_id), vault.clone()));
+			Balances::set_on_hold(&HoldReason::PendingCollect.into(), &account_id, 10_000_000)
+				.map_err(|_| VaultError::UnrecoverableHold)
+				.unwrap();
+		}
 		for frame_id in 1..50 {
 			CurrentFrameId::set(frame_id);
-			for vault_id in 0..10 {
+			Vaults::on_frame_start(frame_id);
+			if frame_id == 42 {
+				VaultsById::<Test>::mutate(2, |vault| {
+					if let Some(v) = vault {
+						v.argons_locked = 1_000_000;
+						v.securitization = 1_000_000;
+					}
+				});
+			}
+			for vault_id in 1..=10 {
 				for _ in 0..100 {
-					Vaults::update_vault_metrics(VaultMetricUpdate {
+					Vaults::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 						vault_id,
 						total_fee: 1000,
 						locks_created: 1,
@@ -466,18 +499,34 @@ fn it_handles_overflowing_metrics() {
 				}
 			}
 		}
-		let vault_revenue = PerFrameFeeRevenueByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 10);
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 11);
 		assert_eq!(vault_revenue[0].frame_id, 49);
-		assert_eq!(vault_revenue[0].fee_revenue, 1000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, 1000 * 100);
 		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 10_000 * 100);
 		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 1000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_locks_created, 100);
+		assert_eq!(vault_revenue[0].securitization, 11000);
 
 		assert_eq!(vault_revenue[9].frame_id, 40);
-		assert_eq!(vault_revenue[9].fee_revenue, 1000 * 100);
+		assert_eq!(vault_revenue[9].bitcoin_lock_fee_revenue, 1000 * 100);
 		assert_eq!(vault_revenue[9].bitcoin_locks_market_value, 10_000 * 100);
 
-		assert_eq!(PerFrameFeeRevenueByVault::<Test>::get(9).len(), 10);
+		let vault_revenue_2 = RevenuePerFrameByVault::<Test>::get(2).to_vec();
+		assert_eq!(vault_revenue_2.len(), 11);
+		assert_eq!(vault_revenue_2[0].frame_id, 49);
+		assert_eq!(vault_revenue_2[0].securitization, 1_000_000);
+		assert_eq!(vault_revenue_2[0].securitization_activated, 1_000_000);
+
+		assert_eq!(vault_revenue_2[8].frame_id, 41);
+		assert_eq!(vault_revenue_2[8].securitization, 12_000);
+		assert_eq!(vault_revenue_2[8].securitization_activated, 0); // only set manually in this test
+
+		assert_eq!(vault_revenue_2[7].frame_id, 42);
+		assert_eq!(vault_revenue_2[7].securitization, 1_000_000);
+		assert_eq!(vault_revenue_2[7].securitization_activated, 1_000_000);
+
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(10).len(), 11);
 	})
 }
 
@@ -947,5 +996,218 @@ fn it_can_reuse_locked_argons() {
 			VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release[&432],
 			2_500_000
 		);
+	});
+}
+
+#[test]
+fn vaults_can_collect_revenue() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		CurrentFrameId::set(1);
+
+		set_argons(1, 1_000_000);
+		let mut terms = default_terms(FixedU128::from_float(0.01));
+		terms.bitcoin_base_fee = 1000;
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms,
+				bitcoin_xpubkey: keys(),
+				securitization: 500_000,
+				securitization_ratio: FixedU128::one(),
+			}
+		));
+		assert_eq!(Balances::free_balance(1), 500_000);
+
+		CurrentFrameId::set(2);
+		Vaults::on_frame_start(2);
+		RevenuePerFrameByVault::<Test>::get(1);
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).len(), 0);
+
+		set_argons(2, 6_000);
+		let fee = Vaults::lock(1, &2, 500_000, 500, None).expect("bonding failed");
+
+		let current_frame_id = CurrentFrameId::get();
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
+		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
+		assert_eq!(vault_revenue[0].uncollected_revenue, fee);
+		assert_eq!(vault_revenue[0].securitization, 500_000);
+		assert_eq!(vault_revenue[0].securitization_activated, 0); // funds are still pending
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
+
+		// set up a mining bid pallet account. 10k is "already distributed"
+		let vault_lp_earnings = 40_000;
+		set_argons(100, vault_lp_earnings);
+		Vaults::record_vault_frame_earnings(
+			&100,
+			VaultLiquidityPoolFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: 1,
+				frame_id: current_frame_id,
+				earnings: 50_000,
+				capital_contributed: 100_000,
+				earnings_for_vault: vault_lp_earnings,
+				capital_contributed_by_vault: 10_000,
+			},
+		);
+		assert_eq!(Balances::free_balance(100), 0);
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1),
+			fee + vault_lp_earnings
+		);
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
+		assert_eq!(vault_revenue[0].liquidity_pool_vault_earnings, vault_lp_earnings);
+		assert_eq!(vault_revenue[0].liquidity_pool_total_earnings, 50_000);
+		assert_eq!(vault_revenue[0].liquidity_pool_vault_capital, 10_000);
+		assert_eq!(vault_revenue[0].liquidity_pool_external_capital, 90_000);
+		assert_eq!(vault_revenue[0].uncollected_revenue, fee + vault_lp_earnings);
+
+		assert!(LastCollectFrameByVaultId::<Test>::get(1).is_none());
+		assert_err!(Vaults::collect(RuntimeOrigin::signed(2), 1), Error::<Test>::NoPermissions);
+		// test that you can only collect if you have no pending cosigns
+		PendingCosignByVaultId::<Test>::mutate(1, |a| a.try_insert(1).unwrap());
+		assert_err!(
+			Vaults::collect(RuntimeOrigin::signed(1), 1),
+			Error::<Test>::PendingCosignsBeforeCollect
+		);
+		PendingCosignByVaultId::<Test>::mutate(1, |a| a.remove(&1));
+
+		assert_ok!(Vaults::collect(RuntimeOrigin::signed(1), 1));
+		assert_eq!(Balances::free_balance(1), 1_000_000 - 500_000 + fee + vault_lp_earnings);
+		assert_eq!(Balances::free_balance(100), 0);
+		assert_eq!(LastCollectFrameByVaultId::<Test>::get(1), Some(CurrentFrameId::get()));
+
+		VaultsById::<Test>::mutate(1, |v| {
+			if let Some(v) = v {
+				v.argons_pending_activation = 0;
+			}
+		});
+		CurrentFrameId::set(3);
+		Vaults::on_frame_start(3);
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(vault_revenue[0].frame_id, 2);
+		assert_eq!(vault_revenue[0].uncollected_revenue, 0);
+		assert_eq!(vault_revenue[0].securitization_activated, 500_000);
+
+		// make sure order is correct if we get another entry
+
+		let vault_lp_earnings = 20_000;
+		set_argons(100, vault_lp_earnings);
+		assert_eq!(CurrentFrameId::get(), 3);
+		Vaults::record_vault_frame_earnings(
+			&100,
+			VaultLiquidityPoolFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: 1,
+				frame_id: CurrentFrameId::get(),
+				earnings: 50_000,
+				capital_contributed: 100_000,
+				earnings_for_vault: vault_lp_earnings,
+				capital_contributed_by_vault: 10_000,
+			},
+		);
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 2);
+		assert_eq!(vault_revenue[0].frame_id, 3);
+		assert_eq!(vault_revenue[0].uncollected_revenue, vault_lp_earnings);
+		assert_eq!(vault_revenue[1].frame_id, 2);
+		assert_eq!(vault_revenue[1].uncollected_revenue, 0);
+	});
+}
+
+#[test]
+fn it_burns_uncollected_revenue() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		set_argons(1, 1_000_000);
+		let terms = default_terms(FixedU128::from_float(0.01));
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms,
+				bitcoin_xpubkey: keys(),
+				securitization: 500_000,
+				securitization_ratio: FixedU128::one(),
+			}
+		));
+		let bid_pool_account = 100;
+		set_argons(bid_pool_account, 1_100_000);
+		for i in 1..=10 {
+			// Go past genesis block so events get deposited
+			System::set_block_number(5 + i);
+			CurrentFrameId::set(i);
+			// Go past the frame start so revenue gets recorded
+			Vaults::on_frame_start(i);
+
+			Vaults::record_vault_frame_earnings(
+				&bid_pool_account,
+				VaultLiquidityPoolFrameEarnings {
+					vault_id: 1,
+					vault_operator_account_id: 1,
+					frame_id: i,
+					earnings: 100_000,
+					capital_contributed: 100_000,
+					earnings_for_vault: 100_000,
+					capital_contributed_by_vault: 100_000,
+				},
+			);
+		}
+		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
+		assert_eq!(pending_revenue.len(), 10);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 1_000_000);
+		assert_eq!(pending_revenue[0].uncollected_revenue, 100_000);
+		assert_eq!(pending_revenue[0].frame_id, 10);
+		assert_eq!(pending_revenue[9].frame_id, 1);
+		System::reset_events();
+		CurrentFrameId::set(11);
+		Vaults::on_frame_start(11);
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1),
+			900_000,
+			"should burn 100k"
+		);
+		System::assert_has_event(
+			Event::<Test>::VaultRevenueUncollected { vault_id: 1, amount: 100_000, frame_id: 1 }
+				.into(),
+		);
+	})
+}
+
+#[test]
+fn it_tracks_pending_cosign_utxos_for_vaults() {
+	new_test_ext().execute_with(|| {
+		// Go past genesis block so events get deposited
+		System::set_block_number(5);
+
+		assert_ok!(Vaults::update_pending_cosign_list(1, 1, false));
+		assert_ok!(Vaults::update_pending_cosign_list(1, 2, false));
+		assert_ok!(Vaults::update_pending_cosign_list(2, 3, false));
+		assert_ok!(Vaults::update_pending_cosign_list(2, 4, false));
+		assert_eq!(
+			PendingCosignByVaultId::<Test>::get(1).into_iter().collect::<Vec<_>>(),
+			vec![1, 2]
+		);
+		assert_eq!(
+			PendingCosignByVaultId::<Test>::get(2).into_iter().collect::<Vec<_>>(),
+			vec![3, 4]
+		);
+
+		assert_ok!(Vaults::update_pending_cosign_list(1, 1, true));
+		assert_eq!(PendingCosignByVaultId::<Test>::get(1).into_iter().collect::<Vec<_>>(), vec![2]);
+
+		assert_ok!(Vaults::update_pending_cosign_list(2, 4, true));
+		assert_eq!(PendingCosignByVaultId::<Test>::get(2).into_iter().collect::<Vec<_>>(), vec![3]);
 	});
 }

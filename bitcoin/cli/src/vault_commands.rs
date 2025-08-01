@@ -143,8 +143,9 @@ impl VaultCommands {
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
 					.context("Failed to connect to argon node")?;
-				let call = storage().bitcoin_locks().locks_pending_release_by_utxo_id();
-				let Some(pending) = client.fetch_storage(&call, FetchAt::Finalized).await? else {
+				let call = storage().vaults().pending_cosign_by_vault_id(vault_id);
+				let Some(pending_ids) = client.fetch_storage(&call, FetchAt::Finalized).await?
+				else {
 					println!("No pending cosign requests found");
 					return Ok(());
 				};
@@ -154,14 +155,19 @@ impl VaultCommands {
 					.load_preset(UTF8_FULL)
 					.apply_modifier(UTF8_ROUND_CORNERS)
 					.set_content_arrangement(ContentArrangement::Dynamic)
-					.set_header(vec!["Utxo Id", "Cosign Due Block", "Type", "Redemption Price"]);
-				for (utxo_id, pending) in pending.0.iter() {
-					if pending.vault_id != vault_id {
+					.set_header(vec!["Utxo Id", "Cosign Due Frame", "Type", "Redemption Price"]);
+				for utxo_id in pending_ids.0.iter() {
+					let pending_info =
+						storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id);
+					let Some(pending) =
+						client.fetch_storage(&pending_info, FetchAt::Finalized).await?
+					else {
 						continue;
-					}
+					};
+
 					table.add_row(vec![
 						utxo_id.to_string(),
-						pending.cosign_due_block.to_string(),
+						pending.cosign_due_frame.to_string(),
 						"Cosign Request".to_string(),
 						ArgonFormatter(pending.redemption_price).to_string(),
 					]);

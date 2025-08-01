@@ -33,7 +33,8 @@ use tokio::{
 use tracing::{info, log::debug, warn};
 
 use argon_primitives::{
-	AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule, tick::Tick,
+	AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule, prelude::FrameId,
+	tick::Tick,
 };
 pub use spec::api;
 
@@ -298,6 +299,14 @@ impl MainchainClient {
 			.fetch_storage(&storage().system().block_hash(height), FetchAt::Block(best_block))
 			.await?;
 		Ok(block_hash.map(|a| a.into()))
+	}
+
+	pub async fn current_frame_id(&self) -> anyhow::Result<FrameId> {
+		let frame_id = self
+			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Finalized)
+			.await?
+			.ok_or_else(|| anyhow!("No current frame ID found"))?;
+		Ok(frame_id.saturating_sub(1)) // Subtract 1 to get the current frame ID
 	}
 
 	pub async fn block_number(

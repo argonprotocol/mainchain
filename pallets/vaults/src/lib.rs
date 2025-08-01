@@ -27,7 +27,7 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeSet;
-	use argon_bitcoin::{CosignScript, CosignScriptArgs};
+	use argon_bitcoin::{CosignScript, CosignScriptArgs, primitives::UtxoId};
 	use argon_primitives::{
 		MiningSlotProvider, TickProvider,
 		bitcoin::{
@@ -37,9 +37,12 @@ pub mod pallet {
 		vault::{BitcoinVaultProvider, LiquidityPoolVaultProvider, Vault, VaultError, VaultTerms},
 	};
 	use frame_support::traits::Incrementable;
-	use pallet_prelude::argon_primitives::vault::LockExtension;
+	use pallet_prelude::argon_primitives::{
+		OnNewSlot,
+		vault::{LockExtension, VaultLiquidityPoolFrameEarnings},
+	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -89,6 +92,14 @@ pub mod pallet {
 		/// The max number of vaults that can be created
 		#[pallet::constant]
 		type MaxVaults: Get<u32>;
+
+		/// Max concurrent cosigns pending per vault
+		#[pallet::constant]
+		type MaxPendingCosignsPerVault: Get<u32>;
+
+		/// The number of frames within which revenue must be collected
+		#[pallet::constant]
+		type RevenueCollectionExpirationFrames: Get<FrameId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -97,6 +108,8 @@ pub mod pallet {
 		EnterVault,
 		#[deprecated]
 		ObligationFee,
+		/// Fund are pending the vault operator running "collect"
+		PendingCollect,
 	}
 
 	#[pallet::storage]
@@ -112,6 +125,11 @@ pub mod pallet {
 	pub type VaultXPubById<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, (BitcoinXPub, u32), OptionQuery>;
 
+	/// The last collect frame of each vault
+	#[pallet::storage]
+	pub type LastCollectFrameByVaultId<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, FrameId, OptionQuery>;
+
 	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
 	/// change away)
 	#[pallet::storage]
@@ -120,6 +138,16 @@ pub mod pallet {
 		Twox64Concat,
 		Tick,
 		BoundedVec<VaultId, T::MaxPendingTermModificationsPerTick>,
+		ValueQuery,
+	>;
+
+	/// Bitcoin Locks pending cosign by vault id
+	#[pallet::storage]
+	pub type PendingCosignByVaultId<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		BoundedBTreeSet<UtxoId, T::MaxPendingCosignsPerVault>,
 		ValueQuery,
 	>;
 
@@ -133,15 +161,15 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Tracks fee revenue from Bitcoin Locks for the last 10 Frames for each vault (a frame is a
-	/// "mining day" in Argon). The total revenue for a vault includes Liquidity Pools, of which the
-	/// associated data can be found in that pallet.
+	/// Tracks revenue from Bitcoin Locks and Liquidity Pools for the trailing frames for each vault
+	/// (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
+	/// collect expiration window (`RevenueCollectionExpirationFrames`).
 	#[pallet::storage]
-	pub type PerFrameFeeRevenueByVault<T: Config> = StorageMap<
+	pub type RevenuePerFrameByVault<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		VaultId,
-		BoundedVec<VaultFrameFeeRevenue<T>, ConstU32<10>>,
+		BoundedVec<VaultFrameRevenue<T>, ConstU32<12>>,
 		ValueQuery,
 	>;
 
@@ -175,6 +203,17 @@ pub mod pallet {
 		VaultBitcoinXpubChange {
 			vault_id: VaultId,
 		},
+		/// Vault revenue was not collected within the required window, so has been burned
+		VaultRevenueUncollected {
+			vault_id: VaultId,
+			frame_id: FrameId,
+			amount: T::Balance,
+		},
+		/// The vault collected revenue and cosigned all pending bitcoin locks
+		VaultCollected {
+			vault_id: VaultId,
+			revenue: T::Balance,
+		},
 		FundsLocked {
 			vault_id: VaultId,
 			locker: T::AccountId,
@@ -203,6 +242,12 @@ pub mod pallet {
 		},
 		FundsReleasedError {
 			vault_id: VaultId,
+			error: DispatchError,
+		},
+		LiquidityPoolRecordingError {
+			vault_id: VaultId,
+			frame_id: FrameId,
+			vault_earnings: T::Balance,
 			error: DispatchError,
 		},
 	}
@@ -258,6 +303,8 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
+		/// A vault must clear out all pending cosigns before it can collect
+		PendingCosignsBeforeCollect,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -567,6 +614,34 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::collect())]
+		pub fn collect(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let vault =
+				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+
+			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
+			let pending_cosigns = PendingCosignByVaultId::<T>::get(vault_id);
+			ensure!(pending_cosigns.is_empty(), Error::<T>::PendingCosignsBeforeCollect);
+
+			LastCollectFrameByVaultId::<T>::insert(vault_id, T::CurrentFrameId::get());
+			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |a| {
+				let mut amount_to_collect = T::Balance::zero();
+				for frame in a {
+					amount_to_collect.saturating_accrue(frame.collect());
+				}
+				if amount_to_collect > T::Balance::zero() {
+					Self::release_hold(&who, amount_to_collect, HoldReason::PendingCollect)?;
+					Self::deposit_event(Event::VaultCollected {
+						vault_id,
+						revenue: amount_to_collect,
+					});
+				}
+				Ok(())
+			})
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -668,10 +743,35 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub(crate) fn update_vault_metrics(
-			metrics: VaultMetricUpdate<T>,
+		pub(crate) fn mutate_frame_revenue(
+			vault_id: VaultId,
+			frame_id: FrameId,
+			callback: impl FnOnce(&mut VaultFrameRevenue<T>) -> Result<(), VaultError>,
 		) -> Result<(), VaultError> {
-			let VaultMetricUpdate {
+			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |x| {
+				let vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+				let current_frame_id = T::CurrentFrameId::get();
+				let found = x.iter_mut().find(|x| x.frame_id == frame_id);
+				if let Some(entry) = found {
+					entry.update_securitization(&vault, current_frame_id);
+					callback(entry)
+				} else {
+					let mut entry = VaultFrameRevenue::new(frame_id);
+					entry.update_securitization(&vault, current_frame_id);
+					callback(&mut entry)?;
+					let new_pos = x.iter().position(|x| frame_id > x.frame_id).unwrap_or(0);
+					x.try_insert(new_pos, entry).map_err(|_| {
+						tracing::error!("Unable to push new vault revenue");
+						VaultError::InternalError
+					})
+				}
+			})
+		}
+
+		pub(crate) fn update_vault_bitcoin_metrics(
+			metrics: BitcoinLockUpdate<T>,
+		) -> Result<(), VaultError> {
+			let BitcoinLockUpdate {
 				vault_id,
 				locks_created,
 				total_fee,
@@ -681,42 +781,13 @@ pub mod pallet {
 				..
 			} = metrics;
 			let current_frame_id = T::CurrentFrameId::get();
-			PerFrameFeeRevenueByVault::<T>::mutate(vault_id, |x| {
-				let mut needs_insert = false;
-				if let Some(existing) = x.first() {
-					if existing.frame_id != current_frame_id {
-						if x.is_full() {
-							x.pop();
-						}
-						needs_insert = true;
-					}
-				} else {
-					needs_insert = true;
-				}
-				if needs_insert {
-					x.try_insert(
-						0,
-						VaultFrameFeeRevenue {
-							frame_id: current_frame_id,
-							fee_revenue: Zero::zero(),
-							bitcoin_locks_created: 0,
-							bitcoin_locks_total_satoshis: 0,
-							bitcoin_locks_market_value: 0u32.into(),
-							satoshis_released: 0,
-						},
-					)
-					.map_err(|_| {
-						tracing::error!("Unable to push new vault revenue");
-						VaultError::InternalError
-					})?;
-				}
-				if let Some(existing) = x.get_mut(0) {
-					existing.fee_revenue.saturating_accrue(total_fee);
-					existing.bitcoin_locks_created += locks_created;
-					existing.bitcoin_locks_total_satoshis.saturating_accrue(satoshis_locked);
-					existing.bitcoin_locks_market_value.saturating_accrue(securitization_locked);
-					existing.satoshis_released.saturating_accrue(satoshis_released);
-				}
+			Self::mutate_frame_revenue(vault_id, current_frame_id, |revenue| {
+				revenue.bitcoin_lock_fee_revenue.saturating_accrue(total_fee);
+				revenue.uncollected_revenue.saturating_accrue(total_fee);
+				revenue.bitcoin_locks_created.saturating_accrue(locks_created);
+				revenue.bitcoin_locks_total_satoshis.saturating_accrue(satoshis_locked);
+				revenue.bitcoin_locks_market_value.saturating_accrue(securitization_locked);
+				revenue.satoshis_released.saturating_accrue(satoshis_released);
 				Ok(())
 			})
 		}
@@ -742,8 +813,75 @@ pub mod pallet {
 		}
 	}
 
+	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
+		type Key = BlockSealAuthorityId;
+		fn on_frame_start(frame_id: FrameId) {
+			let ended_frame_id = frame_id.saturating_sub(1);
+			let collect_expired_frame =
+				frame_id.saturating_sub(T::RevenueCollectionExpirationFrames::get());
+			let vaults = RevenuePerFrameByVault::<T>::iter_keys().collect::<Vec<_>>();
+			for vault_id in vaults {
+				let mut is_empty = false;
+				let _ = RevenuePerFrameByVault::<T>::try_mutate(vault_id, |frame_revenue| {
+					for revenue in frame_revenue.iter_mut() {
+						if revenue.frame_id == ended_frame_id {
+							// gather activation and securitization for the ending frame
+							let vault =
+								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+							revenue.securitization_activated = vault.get_activated_securitization();
+							revenue.securitization = vault.securitization;
+						}
+						if revenue.frame_id <= collect_expired_frame &&
+							revenue.uncollected_revenue > T::Balance::zero()
+						{
+							let vault =
+								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+							if let Err(e) = T::Currency::burn_held(
+								&HoldReason::PendingCollect.into(),
+								&vault.operator_account_id,
+								revenue.uncollected_revenue,
+								Precision::Exact,
+								Fortitude::Force,
+							) {
+								log::error!(
+									"Error burning uncollected funds for vault {}, frame {}: {:?}",
+									vault_id,
+									frame_id,
+									e
+								);
+								continue;
+							}
+							log::info!(
+								"Burning uncollected revenue for vault {}, frame {}: {:?}",
+								vault_id,
+								frame_id,
+								revenue.uncollected_revenue
+							);
+							Self::deposit_event(Event::VaultRevenueUncollected {
+								vault_id,
+								frame_id: revenue.frame_id,
+								amount: revenue.uncollected_revenue,
+							});
+						}
+					}
+					frame_revenue.retain(|a| a.frame_id >= collect_expired_frame);
+					if frame_revenue.is_empty() {
+						is_empty = true;
+					}
+					Ok(())
+				})
+				.inspect_err(|err: &VaultError| {
+					log::error!("Error processing frame revenue for vault {}: {:?}", vault_id, err);
+				});
+				if is_empty {
+					RevenuePerFrameByVault::<T>::remove(vault_id);
+				}
+			}
+		}
+	}
+
 	#[allow(dead_code)]
-	pub(crate) struct VaultMetricUpdate<T: Config> {
+	pub(crate) struct BitcoinLockUpdate<T: Config> {
 		pub vault_id: VaultId,
 		pub locks_created: u32,
 		pub total_fee: T::Balance,
@@ -773,6 +911,50 @@ pub mod pallet {
 
 		fn is_vault_open(vault_id: VaultId) -> bool {
 			VaultsById::<T>::get(vault_id).map(|a| !a.is_closed).unwrap_or_default()
+		}
+
+		fn record_vault_frame_earnings(
+			source_account_id: &Self::AccountId,
+			profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+		) {
+			let VaultLiquidityPoolFrameEarnings {
+				vault_id,
+				vault_operator_account_id,
+				frame_id,
+				earnings_for_vault,
+				capital_contributed,
+				capital_contributed_by_vault,
+				earnings,
+			} = profit;
+
+			if let Err(e) = Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
+				revenue.liquidity_pool_total_earnings = earnings;
+				revenue.liquidity_pool_vault_earnings = earnings_for_vault;
+				revenue.liquidity_pool_external_capital =
+					capital_contributed.saturating_sub(capital_contributed_by_vault);
+				revenue.liquidity_pool_vault_capital = capital_contributed_by_vault;
+				revenue.uncollected_revenue.saturating_accrue(earnings_for_vault);
+				T::Currency::transfer_and_hold(
+					&HoldReason::PendingCollect.into(),
+					source_account_id,
+					&vault_operator_account_id,
+					earnings_for_vault,
+					Precision::Exact,
+					Preservation::Expendable,
+					Fortitude::Force,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+				Ok(())
+			}) {
+				log::error!("Unable to record vault frame profits for vault {}: {:?}", vault_id, e);
+				let error: Error<T> = e.into();
+				Self::deposit_event(Event::LiquidityPoolRecordingError {
+					vault_id,
+					frame_id,
+					vault_earnings: earnings_for_vault,
+					error: error.into(),
+				});
+			}
 		}
 	}
 
@@ -823,7 +1005,7 @@ pub mod pallet {
 			);
 
 			let is_ratchet = extension.is_some();
-			Self::update_vault_metrics(VaultMetricUpdate {
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
@@ -835,11 +1017,14 @@ pub mod pallet {
 
 			// do this second so the 'provider' is already on the account
 			if total_fee > T::Balance::zero() {
-				T::Currency::transfer(
+				T::Currency::transfer_and_hold(
+					&HoldReason::PendingCollect.into(),
 					account_id,
 					&vault.operator_account_id,
 					total_fee,
+					Precision::Exact,
 					Preservation::Expendable,
+					Fortitude::Force,
 				)
 				.map_err(|e| match e {
 					Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
@@ -873,7 +1058,7 @@ pub mod pallet {
 			satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<(), VaultError> {
-			Self::update_vault_metrics(VaultMetricUpdate {
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
 				locks_created: 0,
 				total_fee: 0u32.into(),
@@ -1054,6 +1239,21 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		fn update_pending_cosign_list(
+			vault_id: VaultId,
+			utxo_id: UtxoId,
+			should_remove: bool,
+		) -> Result<(), VaultError> {
+			PendingCosignByVaultId::<T>::try_mutate(vault_id, |pending| {
+				if should_remove {
+					pending.remove(&utxo_id);
+				} else {
+					pending.try_insert(utxo_id).map_err(|_| VaultError::InternalError)?;
+				}
+				Ok(())
+			})
+		}
 	}
 
 	fn balance_to_i128<T: Config>(balance: T::Balance) -> i128 {
@@ -1073,13 +1273,13 @@ pub mod pallet {
 		MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
-	pub struct VaultFrameFeeRevenue<T: Config> {
+	pub struct VaultFrameRevenue<T: Config> {
 		/// The frame id in question
 		#[codec(compact)]
 		pub frame_id: FrameId,
-		/// The fee revenue for the value
+		/// The bitcoin lock fe for the value
 		#[codec(compact)]
-		pub fee_revenue: T::Balance,
+		pub bitcoin_lock_fee_revenue: T::Balance,
 		/// The number of bitcoin locks created
 		#[codec(compact)]
 		pub bitcoin_locks_created: u32,
@@ -1092,5 +1292,63 @@ pub mod pallet {
 		/// The number of satoshis released during this period
 		#[codec(compact)]
 		pub satoshis_released: Satoshis,
+		/// The amount of securitization activated at the end of this frame
+		#[codec(compact)]
+		pub securitization_activated: T::Balance,
+		/// The securitization committed at the end of this frame
+		#[codec(compact)]
+		pub securitization: T::Balance,
+		/// The vault liquidity pool profits for this frame
+		#[codec(compact)]
+		pub liquidity_pool_vault_earnings: T::Balance,
+		/// The liquidity pool aggregate profit
+		#[codec(compact)]
+		pub liquidity_pool_total_earnings: T::Balance,
+		/// Vault liquidity pool capital capital
+		#[codec(compact)]
+		pub liquidity_pool_vault_capital: T::Balance,
+		/// External capital contributed
+		#[codec(compact)]
+		pub liquidity_pool_external_capital: T::Balance,
+		/// The amount of revenue still to be collected
+		#[codec(compact)]
+		pub uncollected_revenue: T::Balance,
+	}
+
+	impl<T: Config> VaultFrameRevenue<T> {
+		pub fn new(frame_id: FrameId) -> Self {
+			Self {
+				frame_id,
+				bitcoin_lock_fee_revenue: T::Balance::zero(),
+				bitcoin_locks_created: 0,
+				bitcoin_locks_market_value: T::Balance::zero(),
+				bitcoin_locks_total_satoshis: 0,
+				satoshis_released: 0,
+				securitization: T::Balance::zero(),
+				securitization_activated: T::Balance::zero(),
+				liquidity_pool_vault_earnings: T::Balance::zero(),
+				liquidity_pool_total_earnings: T::Balance::zero(),
+				liquidity_pool_vault_capital: T::Balance::zero(),
+				liquidity_pool_external_capital: T::Balance::zero(),
+				uncollected_revenue: T::Balance::zero(),
+			}
+		}
+
+		pub fn collect(&mut self) -> T::Balance {
+			let collected = self.uncollected_revenue;
+			self.uncollected_revenue = T::Balance::zero();
+			collected
+		}
+
+		pub fn update_securitization(
+			&mut self,
+			vault: &Vault<T::AccountId, T::Balance>,
+			current_frame_id: FrameId,
+		) {
+			if current_frame_id >= self.frame_id {
+				self.securitization = vault.securitization;
+				self.securitization_activated = vault.get_activated_securitization();
+			}
+		}
 	}
 }

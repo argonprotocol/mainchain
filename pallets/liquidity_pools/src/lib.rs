@@ -61,7 +61,9 @@ pub mod pallet {
 	use alloc::collections::BTreeMap;
 	use argon_primitives::{
 		OnNewSlot,
-		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
+		vault::{
+			LiquidityPoolVaultProvider, MiningBidPoolProvider, VaultLiquidityPoolFrameEarnings,
+		},
 	};
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::warn;
@@ -449,6 +451,9 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Once the frame is complete, this fn distributes the bid pool to each vault based on
+		/// their prorata funds raised. Then within each vault, profits are distributed to any
+		/// contributors besides the vault operator, who must collect theirs.
 		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
 			let bid_pool_account = Self::get_bid_pool_account();
 			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
@@ -487,61 +492,45 @@ pub mod pallet {
 				else {
 					continue;
 				};
-				let mut bond_fund_share =
+				let mut earnings =
 					Perbill::from_rational(entrant.activated_capital, total_bid_pool_capital)
 						.mul_floor(total_bid_pool_amount);
-				remaining_bid_pool.saturating_reduce(bond_fund_share);
+				remaining_bid_pool.saturating_reduce(earnings);
 				if i == bid_pool_capital.len() - 1 {
-					bond_fund_share.saturating_accrue(remaining_bid_pool);
+					earnings.saturating_accrue(remaining_bid_pool);
 					remaining_bid_pool = T::Balance::zero();
 				}
-				vault_fund.distributed_profits = Some(bond_fund_share);
+				vault_fund.distributed_profits = Some(earnings);
 
-				let vault_share = Permill::one()
+				let mut vault_share = Permill::one()
 					.saturating_sub(vault_fund.vault_sharing_percent)
-					.mul_floor(bond_fund_share);
+					.mul_floor(earnings);
 
-				// pay vault
-				{
-					if let Err(e) = T::Currency::transfer(
-						&bid_pool_account,
-						&vault_account_id,
-						vault_share,
-						Preservation::Expendable,
-					) {
-						Self::deposit_event(Event::<T>::CouldNotDistributeBidPool {
-							account_id: vault_account_id.clone(),
-							frame_id,
-							vault_id: entrant.vault_id,
-							amount: vault_share,
-							dispatch_error: e,
-							is_for_vault: true,
-						});
-					}
-				}
-
-				let contributor_amount = bond_fund_share.saturating_sub(vault_share);
+				let contributor_amount = earnings.saturating_sub(vault_share);
 				let contributor_funds = entrant.activated_capital;
-				let mut total_distributed = T::Balance::zero();
+				let mut contributor_distribution_remaining = contributor_amount;
 				let mut distributions = BTreeMap::<T::AccountId, T::Balance>::new();
 
+				let mut vault_contributed_capital = T::Balance::zero();
 				for (account, contrib) in vault_fund.contributor_balances.iter_mut() {
+					if *account == vault_account_id {
+						vault_contributed_capital = *contrib;
+					}
 					let prorata = Permill::from_rational(*contrib, contributor_funds)
 						.mul_floor(contributor_amount);
 					contrib.saturating_accrue(prorata);
-					total_distributed.saturating_accrue(prorata);
+					contributor_distribution_remaining.saturating_reduce(prorata);
 					distributions.entry(account.clone()).or_default().saturating_accrue(prorata);
 				}
-				// items are sorted by highest bid first, so the last one is the lowest
-				if total_distributed < contributor_amount {
-					let change = contributor_amount.saturating_sub(total_distributed);
-					if let Some((account, amount)) = vault_fund.contributor_balances.get_mut(0) {
-						amount.saturating_accrue(change);
-						distributions.entry(account.clone()).or_default().saturating_accrue(change);
-					}
-				}
+				// add remaining back to vault share
+				vault_share.saturating_accrue(contributor_distribution_remaining);
+
+				// give change to vault
+				let mut earnings_for_vault = vault_share;
 				for (account, amount) in distributions {
-					if amount == T::Balance::zero() {
+					// the vault must collect earnings
+					if account == vault_account_id {
+						earnings_for_vault.saturating_accrue(amount);
 						continue;
 					}
 					if let Err(e) = T::Currency::transfer_and_hold(
@@ -563,6 +552,18 @@ pub mod pallet {
 						});
 					}
 				}
+				T::LiquidityPoolVaultProvider::record_vault_frame_earnings(
+					&bid_pool_account,
+					VaultLiquidityPoolFrameEarnings {
+						vault_id: entrant.vault_id,
+						vault_operator_account_id: vault_account_id,
+						frame_id,
+						earnings_for_vault,
+						earnings,
+						capital_contributed: contributor_funds,
+						capital_contributed_by_vault: vault_contributed_capital,
+					},
+				);
 			}
 			VaultPoolsByFrame::<T>::insert(frame_id, liquidity_pools_by_vault);
 
@@ -609,6 +610,7 @@ pub mod pallet {
 						Self::refund_fund_capital(frame_id, vault_id, &account, to_refund);
 						total_to_refund.saturating_reduce(to_refund);
 						let final_amount = amount.saturating_sub(to_refund);
+						// if we have some left, we need to re-add the contributor
 						if final_amount > T::Balance::zero() {
 							vault_fund.contributor_balances.try_push((account, final_amount)).ok();
 						}

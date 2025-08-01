@@ -255,6 +255,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64,
           vaultId: u32,
           originalLockPrice: u128,
+          securityFee: u128,
           newLockPrice: u128,
           amountBurned: u128,
           accountId: AccountId32,
@@ -263,6 +264,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64;
           vaultId: u32;
           originalLockPrice: u128;
+          securityFee: u128;
           newLockPrice: u128;
           amountBurned: u128;
           accountId: AccountId32;
@@ -1496,6 +1498,11 @@ declare module '@polkadot/api-base/types/events' {
         [vaultId: u32, amount: u128, releaseHeight: u64],
         { vaultId: u32; amount: u128; releaseHeight: u64 }
       >;
+      LiquidityPoolRecordingError: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, frameId: u64, vaultEarnings: u128, error: SpRuntimeDispatchError],
+        { vaultId: u32; frameId: u64; vaultEarnings: u128; error: SpRuntimeDispatchError }
+      >;
       LostBitcoinCompensated: AugmentedEvent<
         ApiType,
         [vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128],
@@ -1506,6 +1513,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [vaultId: u32, securitizationRemaining: u128, securitizationReleased: u128],
         { vaultId: u32; securitizationRemaining: u128; securitizationReleased: u128 }
+      >;
+      /**
+       * The vault collected revenue and cosigned all pending bitcoin locks
+       **/
+      VaultCollected: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, revenue: u128],
+        { vaultId: u32; revenue: u128 }
       >;
       VaultCreated: AugmentedEvent<
         ApiType,
@@ -1528,6 +1543,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [vaultId: u32, securitization: u128, securitizationRatio: u128],
         { vaultId: u32; securitization: u128; securitizationRatio: u128 }
+      >;
+      /**
+       * Vault revenue was not collected within the required window, so has been burned
+       **/
+      VaultRevenueUncollected: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, frameId: u64, amount: u128],
+        { vaultId: u32; frameId: u64; amount: u128 }
       >;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
       VaultTermsChangeScheduled: AugmentedEvent<

@@ -80,7 +80,7 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
-  PalletVaultsVaultFrameFeeRevenue,
+  PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
   SpWeightsWeightV2Weight,
@@ -182,6 +182,14 @@ declare module '@polkadot/api-base/types/storage' {
     };
     bitcoinLocks: {
       /**
+       * Utxos that have been requested to be cosigned for releasing
+       **/
+      lockCosignDueByFrame: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
+        [u64]
+      >;
+      /**
        * Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
        * unlock it
        **/
@@ -198,6 +206,13 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
         [u64]
       >;
+      lockReleaseRequestsByUtxoId: AugmentedQuery<
+        ApiType,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletBitcoinLocksLockReleaseRequest>>,
+        [u64]
+      >;
       /**
        * Stores bitcoin utxos that have requested to be released
        **/
@@ -205,14 +220,6 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksLockedBitcoin>>,
         [u64]
-      >;
-      /**
-       * Utxos that have been requested to be cosigned for releasing
-       **/
-      locksPendingReleaseByUtxoId: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u64, PalletBitcoinLocksLockReleaseRequest>>,
-        []
       >;
       /**
        * The minimum number of satoshis that can be locked
@@ -1309,7 +1316,23 @@ declare module '@polkadot/api-base/types/storage' {
       >;
     };
     vaults: {
+      /**
+       * The last collect frame of each vault
+       **/
+      lastCollectFrameByVaultId: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u64>>,
+        [u32]
+      >;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Bitcoin Locks pending cosign by vault id
+       **/
+      pendingCosignByVaultId: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
+        [u32]
+      >;
       /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)
@@ -1320,13 +1343,13 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * Tracks fee revenue from Bitcoin Locks for the last 10 Frames for each vault (a frame is a
-       * "mining day" in Argon). The total revenue for a vault includes Liquidity Pools, of which the
-       * associated data can be found in that pallet.
+       * Tracks revenue from Bitcoin Locks and Liquidity Pools for the trailing frames for each vault
+       * (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
+       * collect expiration window (`RevenueCollectionExpirationFrames`).
        **/
-      perFrameFeeRevenueByVault: AugmentedQuery<
+      revenuePerFrameByVault: AugmentedQuery<
         ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsVaultFrameFeeRevenue>>,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsVaultFrameRevenue>>,
         [u32]
       >;
       /**

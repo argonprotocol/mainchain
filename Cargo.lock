@@ -1260,6 +1260,7 @@ name = "argon-runtime"
 version = "1.3.5"
 dependencies = [
  "anyhow",
+ "argon-bitcoin",
  "argon-primitives",
  "argon-runtime-common",
  "frame-benchmarking",
@@ -1282,6 +1283,7 @@ dependencies = [
  "pallet-mint",
  "pallet-notaries",
  "pallet-notebook",
+ "pallet-prelude",
  "pallet-price-index",
  "pallet-ticks",
  "pallet-token-gateway",
@@ -12372,6 +12374,7 @@ dependencies = [
  "bip32",
  "bitcoin",
  "k256",
+ "pallet-liquidity-pools",
  "pallet-prelude",
  "parity-scale-codec",
  "polkadot-sdk 2503.0.1",

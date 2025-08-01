@@ -24,6 +24,7 @@ polkadot-sdk.workspace = true
 
 polkadot-sdk.features = [
     "frame-support",
+	"frame-support-procedural",
     "frame-system",
     "frame-executive",
     "sp-api",
@@ -38,7 +39,7 @@ polkadot-sdk.features = [
     "sp-version",
     "sp-genesis-builder",
     "sp-consensus-grandpa",
-    "frame-system-rpc-runtime-api",
+	"frame-system-rpc-runtime-api",
     "frame-metadata-hash-extension",
     "pallet-authorship",
     "pallet-balances",
@@ -85,6 +86,8 @@ pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
 argon-primitives = { workspace = true }
 argon-runtime-common = { workspace = true, default-features = false }
+argon-bitcoin = { workspace = true, default-features = false }
+pallet-prelude = { workspace = true, default-features = false }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -96,6 +99,7 @@ polkadot-sdk = { workspace = true, features = ["sp-io", "sp-arithmetic", "sp-run
 default = [ "std" ]
 std = [
 	"anyhow/std",
+	"argon-bitcoin/std",
 	"argon-primitives/std",
 	"argon-runtime-common/std",
 	"codec/std",
@@ -119,6 +123,7 @@ std = [
 	"pallet-mint/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
+	"pallet-prelude/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
 	"pallet-token-gateway/std",
@@ -149,6 +154,7 @@ runtime-benchmarks = [
 	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",

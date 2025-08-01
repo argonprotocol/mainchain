@@ -54,8 +54,8 @@ export class BitcoinLocks {
     const client = await this.client;
     const bitcoinNetwork = await client.query.bitcoinUtxos.bitcoinNetwork();
     return {
-      releaseExpirationBlocks:
-        client.consts.bitcoinLocks.lockReleaseCosignDeadlineBlocks.toNumber(),
+      lockReleaseCosignDeadlineFrames:
+        client.consts.bitcoinLocks.lockReleaseCosignDeadlineFrames.toNumber(),
       pendingConfirmationExpirationBlocks:
         client.consts.bitcoinUtxos.maxPendingConfirmationBlocks.toNumber(),
       tickDurationMillis: await client.query.ticks
@@ -111,20 +111,18 @@ export class BitcoinLocks {
       const blockHash = await client.rpc.chain.getBlockHash(atHeight);
       client = (await client.at(blockHash)) as ArgonClient;
     }
-    const locksPendingRelease = await client.query.bitcoinLocks.locksPendingReleaseByUtxoId();
-
-    for (const [id, request] of locksPendingRelease.entries()) {
-      if (id.toNumber() === utxoId) {
-        return {
-          toScriptPubkey: request.toScriptPubkey.toHex(),
-          bitcoinNetworkFee: request.bitcoinNetworkFee.toBigInt(),
-          dueBlockHeight: request.cosignDueBlock.toNumber(),
-          vaultId: request.vaultId.toNumber(),
-          redemptionPrice: request.redemptionPrice.toBigInt(),
-        };
-      }
+    const requestMaybe = await client.query.bitcoinLocks.lockReleaseRequestsByUtxoId(utxoId);
+    if (!requestMaybe.isSome) {
+      return undefined;
     }
-    return undefined;
+    const request = requestMaybe.unwrap();
+    return {
+      toScriptPubkey: request.toScriptPubkey.toHex(),
+      bitcoinNetworkFee: request.bitcoinNetworkFee.toBigInt(),
+      dueFrame: request.cosignDueFrame.toNumber(),
+      vaultId: request.vaultId.toNumber(),
+      redemptionPrice: request.redemptionPrice.toBigInt(),
+    };
   }
 
   async submitVaultSignature(args: {
@@ -630,7 +628,7 @@ export class BitcoinLocks {
 }
 
 export interface IBitcoinLockConfig {
-  releaseExpirationBlocks: number;
+  lockReleaseCosignDeadlineFrames: number;
   pendingConfirmationExpirationBlocks: number;
   tickDurationMillis: number;
   bitcoinNetwork: ArgonPrimitivesBitcoinBitcoinNetwork;
@@ -641,7 +639,7 @@ export interface IReleaseRequest {
 }
 
 export interface IReleaseRequestDetails extends IReleaseRequest {
-  dueBlockHeight: number;
+  dueFrame: number;
   vaultId: number;
   redemptionPrice: bigint;
 }

@@ -950,6 +950,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
       /**
+       * A vault must clear out all pending cosigns before it can collect
+       **/
+      PendingCosignsBeforeCollect: AugmentedError<ApiType>;
+      /**
        * The vault bitcoin xpubkey has already been used
        **/
       ReusedVaultBitcoinXpub: AugmentedError<ApiType>;
