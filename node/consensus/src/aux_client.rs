@@ -210,25 +210,46 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		Ok(())
 	}
 
-	pub fn check_duplicate_block_at_tick<AC: Codec>(
+	pub fn is_duplicated_block_key_for_author(
 		&self,
-		author: AC,
+		account_id: &AccountId,
+		block_key: H256,
+		tick: Tick,
+	) -> bool {
+		let _lock = self.lock.write();
+		let Ok(block_authors) = self.block_authors() else {
+			return false;
+		};
+		let authors = block_authors.get();
+		if let Some(authors_at_height) = authors.get(&tick) {
+			if let Some(authors_for_key) = authors_at_height.get(&block_key) {
+				return authors_for_key.contains(account_id)
+			}
+		}
+		false
+	}
+
+	pub fn record_imported_block_key(
+		&self,
+		account_id: AccountId,
 		block_key: H256,
 		tick: Tick,
 		is_vote: bool,
 	) -> Result<(), Error> {
 		let _lock = self.lock.write();
 		self.block_authors()?.mutate(|authors| {
-			let account_id = AccountId::decode(&mut &author.encode()[..])
-				.map_err(|e| Error::StringError(format!("Failed to decode author: {:?}", e)))?;
 			let authors_at_height = authors.entry(tick).or_default();
-			if !authors_at_height.entry(block_key).or_default().insert(account_id.clone()) {
+			let block_keys = authors_at_height.entry(block_key).or_default();
+			if !block_keys.insert(account_id.clone()) {
 				let block_type = if is_vote { "vote" } else { "compute" };
-				return Err(Error::DuplicateAuthoredBlock(account_id, block_type.to_string()));
+				return Err(Error::DuplicateAuthoredBlock(
+					account_id,
+					block_type.to_string(),
+					block_key.to_string(),
+				));
 			}
 			Ok::<(), Error>(())
 		})??;
-
 		Ok(())
 	}
 
