@@ -146,6 +146,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type ArgonsPerBlock<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
+	#[pallet::storage]
+	pub type BlockFees<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -181,6 +184,7 @@ pub mod pallet {
 			// Unlock any rewards
 			let cleanup_block = n.saturating_sub(T::PayoutHistoryBlocks::get().into());
 			<PayoutsByBlock<T>>::take(cleanup_block);
+			BlockFees::<T>::set(0u128.into());
 
 			T::DbWeight::get().reads_writes(1, 1)
 		}
@@ -295,6 +299,22 @@ pub mod pallet {
 		pub fn block_payouts() -> Vec<BlockPayout<T::AccountId, T::Balance>> {
 			let n = <frame_system::Pallet<T>>::block_number();
 			<PayoutsByBlock<T>>::get(n).to_vec()
+		}
+
+		pub fn fees_account() -> T::AccountId {
+			let block_author_account_id =
+				T::BlockSealerProvider::get_sealer_info().block_author_account_id;
+			if let Some((account, _)) =
+				T::BlockRewardAccountsProvider::get_block_rewards_account(&block_author_account_id)
+			{
+				account
+			} else {
+				block_author_account_id
+			}
+		}
+
+		pub fn track_fee(amount: T::Balance) {
+			BlockFees::<T>::mutate(|f| f.saturating_accrue(amount))
 		}
 
 		pub fn mint<C: Mutate<T::AccountId, Balance = T::Balance> + 'static>(

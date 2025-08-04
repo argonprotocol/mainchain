@@ -312,6 +312,7 @@ declare module '@polkadot/api-base/types/storage' {
        * target
        **/
       argonsPerBlock: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      blockFees: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
        * The cohort block rewards by mining cohort (ie, with the same starting frame id)
        **/
