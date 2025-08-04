@@ -166,7 +166,8 @@ pub async fn price_index_loop(
 		{
 			let client = reconnecting_client.get().await?;
 			let nonce = client.get_account_nonce(&account_id).await?;
-			let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
+			let params =
+				MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
 			let progress = client
 				.live
 				.tx()
