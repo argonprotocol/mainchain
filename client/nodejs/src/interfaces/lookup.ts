@@ -1350,7 +1350,7 @@ export default {
       VaultOperatorPrebond: {
         vaultId: 'u32',
         accountId: 'AccountId32',
-        amount: 'u128',
+        amountPerFrame: 'u128',
       },
     },
   },
@@ -2572,7 +2572,6 @@ export default {
       },
       vault_operator_prebond: {
         vaultId: 'u32',
-        amount: 'u128',
         maxAmountPerFrame: 'u128',
       },
     },

@@ -765,8 +765,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       VaultOperatorPrebond: AugmentedEvent<
         ApiType,
-        [vaultId: u32, accountId: AccountId32, amount: u128],
-        { vaultId: u32; accountId: AccountId32; amount: u128 }
+        [vaultId: u32, accountId: AccountId32, amountPerFrame: u128],
+        { vaultId: u32; accountId: AccountId32; amountPerFrame: u128 }
       >;
     };
     miningSlot: {

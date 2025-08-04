@@ -650,71 +650,84 @@ fn test_prebonded_argons() {
 		);
 
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(2),
-				1,
-				100_000_000,
-				10_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(2), 1, 10_000_000),
 			Error::<Test>::NotAVaultOperator
 		);
 
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(1),
-				1,
-				100_000_000,
-				10_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 10_000_000),
 			DispatchError::Token(TokenError::FundsUnavailable)
 		);
 
 		set_argons(1, 200_000_000);
-		assert_ok!(LiquidityPools::vault_operator_prebond(
-			RuntimeOrigin::signed(1),
-			1,
-			100_000_000,
-			10_000_000
-		));
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 10_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
 			100_000_000
 		);
-		assert_eq!(
-			PrebondedByVaultId::<Test>::get(1).unwrap().bonded_by_start_offset.to_vec(),
-			vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-		);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().starting_frame_id, 1);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 100_000_000);
 		System::assert_last_event(
-			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 100_000_000 }
-				.into(),
+			Event::<Test>::VaultOperatorPrebond {
+				vault_id: 1,
+				account_id: 1,
+				amount_per_frame: 10_000_000,
+			}
+			.into(),
 		);
 
 		// if we add more funds, it should be additive
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(1),
-				1,
-				50_000_000,
-				14_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 9_000_000),
 			Error::<Test>::MaxAmountBelowMinimum //	"cant reduce the max amount"
 		);
-		assert_ok!(LiquidityPools::vault_operator_prebond(
-			RuntimeOrigin::signed(1),
-			1,
-			50_000_000,
-			15_000_000
-		));
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 15_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
 			150_000_000
 		);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 150_000_000);
 		System::assert_last_event(
-			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 50_000_000 }
-				.into(),
+			Event::<Test>::VaultOperatorPrebond {
+				vault_id: 1,
+				account_id: 1,
+				amount_per_frame: 15_000_000,
+			}
+			.into(),
+		);
+
+		CurrentFrameId::set(10);
+
+		// now test that it properly accounts for already allocated funds
+		for frame in 2..12 {
+			VaultPoolsByFrame::<Test>::mutate(frame, |pools| {
+				if !pools.contains_key(&1) {
+					pools
+						.try_insert(1, LiquidityPool::<Test>::new(1))
+						.expect("Should be able to create a pool");
+				}
+				let pool = pools.get_mut(&1).unwrap();
+				let amount = PrebondedByVaultId::<Test>::mutate(1, |a| {
+					if let Some(a) = a { a.take_unbonded(frame, 5_000_000, 0) } else { 0 }
+				});
+				println!("Frame {}: Adding {} to pool 1", frame, amount);
+				pool.contributor_balances.try_push((1, amount)).unwrap();
+			});
+		}
+		// It should be able to add up the prebond and actual to know it's already full
+		assert_err!(
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 15_000_000),
+			Error::<Test>::MaxAmountBelowMinimum
+		);
+		// should have allocated 5_000_000 per frame
+		assert_eq!(
+			PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded,
+			150_000_000 - 5_000_000 * 10
+		);
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 16_000_000));
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
+			160_000_000
 		);
 	});
 }
@@ -781,7 +794,6 @@ fn test_capital_raise_with_prebonded() {
 		assert_ok!(LiquidityPools::vault_operator_prebond(
 			RuntimeOrigin::signed(1),
 			1,
-			5_000_000_000,
 			500_000_000
 		));
 
@@ -829,7 +841,6 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		assert_ok!(LiquidityPools::vault_operator_prebond(
 			RuntimeOrigin::signed(1),
 			1,
-			5_000_000_000,
 			500_000_000
 		));
 
@@ -887,29 +898,19 @@ fn test_prebonded_argons_struct() {
 		);
 		CurrentFrameId::set(1);
 		let mut prebonded = PrebondedArgons::<Test>::new(1, 1, 5_000_000, 500_000);
-		assert_eq!(prebonded.bonded_by_start_offset.len(), 10);
-		assert_eq!(prebonded.bonded_by_start_offset.to_vec(), vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 		assert_eq!(prebonded.starting_frame_id, 1);
 
-		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 500_000);
-		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 0, 0, 0, 0, 0, 0, 0, 0]
-		);
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000, 0), 500_000);
 		assert_eq!(prebonded.starting_frame_id, 1);
 
-		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 0, "already maxed out");
-		assert_eq!(prebonded.take_unbonded(12, 1_000_000), 0, "next pass also maxed out");
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000, 500_000), 0, "already maxed out");
+		assert_eq!(prebonded.take_unbonded(12, 1_000_000, 500_000), 0, "next pass also maxed out");
 
-		assert_eq!(prebonded.take_unbonded(3, 300_000), 300_000, "takes max available");
+		assert_eq!(prebonded.take_unbonded(3, 300_000, 0), 300_000, "takes max available");
 		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 300_000, 0, 0, 0, 0, 0, 0, 0]
-		);
-		assert_eq!(prebonded.take_unbonded(13, 300_000), 200_000, "caps out at 500k on next pass");
-		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 500_000, 0, 0, 0, 0, 0, 0, 0]
+			prebonded.take_unbonded(13, 300_000, 300_000),
+			200_000,
+			"caps out at 500k on next pass"
 		);
 	});
 }

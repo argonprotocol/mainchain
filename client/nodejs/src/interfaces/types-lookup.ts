@@ -1695,7 +1695,7 @@ declare module '@polkadot/types/lookup' {
     readonly asVaultOperatorPrebond: {
       readonly vaultId: u32;
       readonly accountId: AccountId32;
-      readonly amount: u128;
+      readonly amountPerFrame: u128;
     } & Struct;
     readonly type:
       | 'CouldNotDistributeBidPool'
@@ -2976,7 +2976,6 @@ declare module '@polkadot/types/lookup' {
     readonly isVaultOperatorPrebond: boolean;
     readonly asVaultOperatorPrebond: {
       readonly vaultId: u32;
-      readonly amount: u128;
       readonly maxAmountPerFrame: u128;
     } & Struct;
     readonly type: 'BondArgons' | 'UnbondArgons' | 'VaultOperatorPrebond';

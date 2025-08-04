@@ -100,7 +100,7 @@ function formatCall(call: any): string {
   return `${call.section}.${call.method}`;
 }
 
-export type ITxProgressCallback = (progressToInBlock: number, result: TxResult) => void;
+export type ITxProgressCallback = (progressToInBlock: number, result?: TxResult) => void;
 export class TxResult {
   public inBlockPromise: Promise<Uint8Array>;
   public finalizedPromise: Promise<Uint8Array>;

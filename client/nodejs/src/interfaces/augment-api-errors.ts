@@ -462,8 +462,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
-       * The maximum amount per frame would result in funds never used (below 1/10th of the
-       * amount)
+       * The prebond amount cannot be reduced and this takes it below the previous allocation
        **/
       MaxAmountBelowMinimum: AugmentedError<ApiType>;
       /**

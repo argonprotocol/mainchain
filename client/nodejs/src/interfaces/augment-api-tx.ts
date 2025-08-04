@@ -652,20 +652,18 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * Set the prebonded argons for a vault. This is used by the vault operator to
-       * pre-register funding for each frame. The allocation can be capped per frame using the
-       * `max_amount_per_frame` parameter. This can be desirable to get an even spread across all
-       * frames. This amount cannot be less than the total amount / 10 or it will never be
-       * depleted.
+       * pre-register funding for each frame. The total allocation will be capped per frame using
+       * the `max_amount_per_frame` parameter.
        *
-       * NOTE: a second call is additive
+       * NOTE: calling this a second time will ensure your max_amount_per_frame is updated.
+       * However, it will not reduce your allocation
        **/
       vaultOperatorPrebond: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
-          amount: u128 | AnyNumber | Uint8Array,
           maxAmountPerFrame: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128, u128]
+        [u32, u128]
       >;
     };
     miningSlot: {
