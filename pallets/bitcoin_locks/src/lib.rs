@@ -63,8 +63,8 @@ pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
-		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, TickProvider,
-		UtxoLockEvents, VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, UtxoLockEvents,
+		VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
 			BitcoinSignature, CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId,
@@ -73,7 +73,7 @@ pub mod pallet {
 		vault::{BitcoinVaultProvider, LockExtension, VaultError},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -122,7 +122,7 @@ pub mod pallet {
 
 		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
 
-		/// Argon blocks per day
+		/// Argon tick per day
 		#[pallet::constant]
 		type ArgonTicksPerDay: Get<Tick>;
 
@@ -139,15 +139,21 @@ pub mod pallet {
 		#[pallet::constant]
 		type LockReclamationBlocks: Get<BitcoinHeight>;
 
-		/// Number of bitcoin blocks a vault has to counter-sign a bitcoin release
+		/// Number of frames a vault has to counter-sign a bitcoin release
 		#[pallet::constant]
-		type LockReleaseCosignDeadlineBlocks: Get<BitcoinHeight>;
+		type LockReleaseCosignDeadlineFrames: Get<FrameId>;
 
-		type TickProvider: TickProvider<Self::Block>;
+		/// Getter for the current frame id
+		type CurrentFrameId: Get<FrameId>;
+
 		/// Pallet storage requires bounds, so we have to set a maximum number that can expire in a
 		/// single block
 		#[pallet::constant]
 		type MaxConcurrentlyExpiringLocks: Get<u32>;
+
+		/// Number of ticks per bitcoin block
+		#[pallet::constant]
+		type TicksPerBitcoinBlock: Get<Tick>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -169,15 +175,21 @@ pub mod pallet {
 	pub type LockReleaseCosignHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
 
+	#[pallet::storage]
+	pub type LockReleaseRequestsByUtxoId<T: Config> =
+		StorageMap<_, Twox64Concat, UtxoId, LockReleaseRequest<T::Balance>, OptionQuery>;
+
 	/// The minimum number of satoshis that can be locked
 	#[pallet::storage]
 	pub type MinimumSatoshis<T: Config> = StorageValue<_, Satoshis, ValueQuery>;
 
 	/// Utxos that have been requested to be cosigned for releasing
 	#[pallet::storage]
-	pub type LocksPendingReleaseByUtxoId<T: Config> = StorageValue<
+	pub type LockCosignDueByFrame<T: Config> = StorageMap<
 		_,
-		BoundedBTreeMap<UtxoId, LockReleaseRequest<T::Balance>, T::MaxConcurrentlyReleasingLocks>,
+		Twox64Concat,
+		FrameId,
+		BoundedBTreeSet<UtxoId, T::MaxConcurrentlyReleasingLocks>,
 		ValueQuery,
 	>;
 
@@ -199,6 +211,8 @@ pub mod pallet {
 		pub vault_id: VaultId,
 		pub lock_price: T::Balance,
 		pub owner_account: T::AccountId,
+		/// Sum of all lock fees (initial plus any ratcheting)
+		pub security_fees: T::Balance,
 		#[codec(compact)]
 		pub satoshis: Satoshis,
 		pub vault_pubkey: CompressedBitcoinPubkey,
@@ -247,7 +261,7 @@ pub mod pallet {
 		#[codec(compact)]
 		pub bitcoin_network_fee: Satoshis,
 		#[codec(compact)]
-		pub cosign_due_block: BitcoinHeight,
+		pub cosign_due_frame: FrameId,
 		pub to_script_pubkey: BitcoinScriptPubkey,
 		#[codec(compact)]
 		pub redemption_price: Balance,
@@ -267,6 +281,7 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
 			original_lock_price: T::Balance,
+			security_fee: T::Balance,
 			new_lock_price: T::Balance,
 			amount_burned: T::Balance,
 			account_id: T::AccountId,
@@ -412,22 +427,16 @@ pub mod pallet {
 				}
 			}
 
-			let mut overdue = vec![];
-			LocksPendingReleaseByUtxoId::<T>::mutate(|pending| {
-				pending.retain(|id, x| {
-					if x.cosign_due_block > bitcoin_block_height {
-						return true;
-					}
-					overdue.push((*id, x.redemption_price));
-					false
-				});
-			});
+			let overdue = LockCosignDueByFrame::<T>::take(T::CurrentFrameId::get());
 
-			for (utxo_id, redemption_amount) in overdue {
-				let res =
-					with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id, redemption_amount));
+			for utxo_id in overdue {
+				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
 				if let Err(e) = res {
-					log::error!("Bitcoin lock id {:?} failed to `cosign` {:?}", utxo_id, e);
+					log::error!(
+						"Bitcoin lock id {:?} failed to handle overdue `cosign` {:?}",
+						utxo_id,
+						e
+					);
 					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
 				}
 			}
@@ -513,6 +522,7 @@ pub mod pallet {
 					owner_account: account_id.clone(),
 					vault_id,
 					lock_price,
+					security_fees: fee,
 					satoshis,
 					vault_pubkey,
 					vault_claim_pubkey,
@@ -554,19 +564,31 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			let vault_id = lock.vault_id;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
-			let release_due_date = lock
-				.vault_claim_height
-				.saturating_sub(T::LockReleaseCosignDeadlineBlocks::get());
-			ensure!(
-				T::BitcoinBlockHeightChange::get().1 <= release_due_date,
-				Error::<T>::BitcoinReleaseInitiationDeadlinePassed
-			);
+
 			// if no refund is needed, we can just cancel the lock
 			if !lock.is_verified && !lock.is_rejected_needs_release {
 				Self::cancel_lock(utxo_id)?;
 				return Ok(());
 			}
+
+			// The user must request a co-sign 10 days before the vault can claim on bitcoin to give
+			// them enough time to react. At the time of claim height, the utxo is claimable on the
+			// bitcoin network, so this time frame must be "inside" the claim height
+			// NOTE: we are losing a little cosign time here since we are rounding up to 10 entire
+			// frames
+			let ticks_until_cosign_overdue =
+				T::LockReleaseCosignDeadlineFrames::get() * T::ArgonTicksPerDay::get();
+
+			let safe_bitcoin_blocks_remaining =
+				lock.vault_claim_height.saturating_sub(T::BitcoinBlockHeightChange::get().1);
+			let ticks_until_vault_claim =
+				safe_bitcoin_blocks_remaining.saturating_mul(T::TicksPerBitcoinBlock::get());
+			ensure!(
+				ticks_until_cosign_overdue < ticks_until_vault_claim,
+				Error::<T>::BitcoinReleaseInitiationDeadlinePassed
+			);
 
 			let mut redemption_price = T::Balance::zero();
 
@@ -591,28 +613,26 @@ pub mod pallet {
 				})?;
 			}
 
-			let cosign_due_block =
-				T::LockReleaseCosignDeadlineBlocks::get() + T::BitcoinBlockHeightChange::get().1;
-
-			LocksPendingReleaseByUtxoId::<T>::try_mutate(|a| {
-				a.try_insert(
-					utxo_id,
-					LockReleaseRequest {
-						utxo_id,
-						vault_id: lock.vault_id,
-						bitcoin_network_fee,
-						cosign_due_block,
-						to_script_pubkey,
-						redemption_price,
-					},
-				)
-			})
-			.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
-
-			Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested {
+			let cosign_due_frame =
+				T::LockReleaseCosignDeadlineFrames::get() + T::CurrentFrameId::get();
+			LockReleaseRequestsByUtxoId::<T>::insert(
 				utxo_id,
-				vault_id: lock.vault_id,
-			});
+				LockReleaseRequest {
+					utxo_id,
+					vault_id,
+					bitcoin_network_fee,
+					cosign_due_frame,
+					to_script_pubkey,
+					redemption_price,
+				},
+			);
+
+			LockCosignDueByFrame::<T>::try_mutate(cosign_due_frame, |a| a.try_insert(utxo_id))
+				.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
+			T::VaultProvider::update_pending_cosign_list(vault_id, utxo_id, false)
+				.map_err(Error::<T>::from)?;
+
+			Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested { utxo_id, vault_id });
 			Ok(())
 		}
 
@@ -658,8 +678,7 @@ pub mod pallet {
 			} = lock;
 
 			ensure!(T::VaultProvider::is_owner(vault_id, &who), Error::<T>::NoPermissions);
-			let request = LocksPendingReleaseByUtxoId::<T>::mutate(|a| a.remove(&utxo_id))
-				.ok_or(Error::<T>::RedemptionNotLocked)?;
+			let request = Self::take_release_request(utxo_id)?;
 
 			let utxo_ref =
 				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
@@ -747,7 +766,7 @@ pub mod pallet {
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
 			ensure!(lock.is_verified, Error::<T>::UnverifiedLock);
 			ensure!(
-				!LocksPendingReleaseByUtxoId::<T>::get().contains_key(&utxo_id),
+				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
 				Error::<T>::LockInProcessOfRelease
 			);
 
@@ -800,7 +819,7 @@ pub mod pallet {
 			}
 
 			let mut lock_extension = lock.get_lock_extension();
-			T::VaultProvider::lock(
+			let fee = T::VaultProvider::lock(
 				vault_id,
 				&who,
 				to_mint,
@@ -809,6 +828,7 @@ pub mod pallet {
 			)
 			.map_err(Error::<T>::from)?;
 
+			lock.security_fees.saturating_accrue(fee);
 			lock.fund_hold_extensions = lock_extension.extended_expiration_funds.clone();
 			lock.lock_price = new_lock_price;
 			T::LockEvents::utxo_locked(utxo_id, &who, to_mint)?;
@@ -816,6 +836,7 @@ pub mod pallet {
 			Self::deposit_event(Event::BitcoinLockRatcheted {
 				utxo_id,
 				vault_id: lock.vault_id,
+				security_fee: fee,
 				original_lock_price,
 				new_lock_price,
 				amount_burned,
@@ -886,7 +907,6 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
-			LockReleaseCosignHeightById::<T>::remove(utxo_id);
 
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
@@ -922,13 +942,26 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Call made during the on_initialize to implement cosign overdue penalties.
-		pub(crate) fn cosign_bitcoin_overdue(
+		fn take_release_request(
 			utxo_id: UtxoId,
-			redemption_amount_held: T::Balance,
-		) -> DispatchResult {
+		) -> Result<LockReleaseRequest<T::Balance>, Error<T>> {
+			let request = LockReleaseRequestsByUtxoId::<T>::take(utxo_id)
+				.ok_or(Error::<T>::RedemptionNotLocked)?;
+
+			LockCosignDueByFrame::<T>::mutate(request.cosign_due_frame, |a| {
+				a.remove(&utxo_id);
+			});
+			T::VaultProvider::update_pending_cosign_list(request.vault_id, utxo_id, true)?;
+			Ok(request)
+		}
+
+		/// Call made during the on_initialize to implement cosign overdue penalties.
+		pub(crate) fn cosign_bitcoin_overdue(utxo_id: UtxoId) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
 			let vault_id = lock.vault_id;
+			let entry = Self::take_release_request(utxo_id)?;
+
+			let redemption_amount_held = entry.redemption_price;
 
 			// need to compensate with market price, not the redemption price
 			let market_price = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
@@ -949,7 +982,7 @@ pub mod pallet {
 			.map_err(Error::<T>::from)?;
 
 			// we return this amount to the bitcoin holder
-			if redemption_amount_held > 0u128.into() {
+			if redemption_amount_held > T::Balance::zero() {
 				T::Currency::release(
 					&HoldReason::ReleaseBitcoinLock.into(),
 					&lock.owner_account,
@@ -970,7 +1003,6 @@ pub mod pallet {
 				compensated_account_id: lock.owner_account.clone(),
 			});
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
-			LockReleaseCosignHeightById::<T>::remove(utxo_id);
 
 			Ok(())
 		}
@@ -1041,7 +1073,6 @@ pub mod pallet {
 				T::VaultProvider::cancel(lock.vault_id, lock.lock_price)
 					.map_err(Error::<T>::from)?;
 			}
-			LockReleaseCosignHeightById::<T>::remove(utxo_id);
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Ok(())

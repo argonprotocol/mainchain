@@ -53,7 +53,7 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bitcoinLocks: {
       /**
-       * Argon blocks per day
+       * Argon tick per day
        **/
       argonTicksPerDay: u64 & AugmentedConst<ApiType>;
       /**
@@ -66,9 +66,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       lockReclamationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * Number of bitcoin blocks a vault has to counter-sign a bitcoin release
+       * Number of frames a vault has to counter-sign a bitcoin release
        **/
-      lockReleaseCosignDeadlineBlocks: u64 & AugmentedConst<ApiType>;
+      lockReleaseCosignDeadlineFrames: u64 & AugmentedConst<ApiType>;
       /**
        * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
        * single block
@@ -78,6 +78,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Maximum releasing utxos at a time
        **/
       maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * Number of ticks per bitcoin block
+       **/
+      ticksPerBitcoinBlock: u64 & AugmentedConst<ApiType>;
     };
     bitcoinUtxos: {
       /**
@@ -462,6 +466,10 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
+       * Max concurrent cosigns pending per vault
+       **/
+      maxPendingCosignsPerVault: u32 & AugmentedConst<ApiType>;
+      /**
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerTick: u32 & AugmentedConst<ApiType>;
@@ -469,6 +477,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The max number of vaults that can be created
        **/
       maxVaults: u32 & AugmentedConst<ApiType>;
+      /**
+       * The number of frames within which revenue must be collected
+       **/
+      revenueCollectionExpirationFrames: u64 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

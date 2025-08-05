@@ -61,7 +61,9 @@ pub mod pallet {
 	use alloc::collections::BTreeMap;
 	use argon_primitives::{
 		OnNewSlot,
-		vault::{LiquidityPoolVaultProvider, MiningBidPoolProvider},
+		vault::{
+			LiquidityPoolVaultProvider, MiningBidPoolProvider, VaultLiquidityPoolFrameEarnings,
+		},
 	};
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::warn;
@@ -216,7 +218,7 @@ pub mod pallet {
 			/// The vault id that the operator is pre-bonding for
 			vault_id: VaultId,
 			account_id: T::AccountId,
-			amount: T::Balance,
+			amount_per_frame: T::Balance,
 		},
 	}
 
@@ -244,8 +246,7 @@ pub mod pallet {
 		AlreadyRenewed,
 		/// Vault operator only
 		NotAVaultOperator,
-		/// The maximum amount per frame would result in funds never used (below 1/10th of the
-		/// amount)
+		/// The prebond amount cannot be reduced and this takes it below the previous allocation
 		MaxAmountBelowMinimum,
 	}
 
@@ -365,18 +366,16 @@ pub mod pallet {
 		}
 
 		/// Set the prebonded argons for a vault. This is used by the vault operator to
-		/// pre-register funding for each frame. The allocation can be capped per frame using the
-		/// `max_amount_per_frame` parameter. This can be desirable to get an even spread across all
-		/// frames. This amount cannot be less than the total amount / 10 or it will never be
-		/// depleted.
+		/// pre-register funding for each frame. The total allocation will be capped per frame using
+		/// the `max_amount_per_frame` parameter.
 		///
-		/// NOTE: a second call is additive
+		/// NOTE: calling this a second time will ensure your max_amount_per_frame is updated.
+		/// However, it will not reduce your allocation
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::vault_operator_prebond())]
 		pub fn vault_operator_prebond(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
-			amount: T::Balance,
 			max_amount_per_frame: T::Balance,
 		) -> DispatchResult {
 			let account = ensure_signed(origin)?;
@@ -387,35 +386,53 @@ pub mod pallet {
 			let operator = T::LiquidityPoolVaultProvider::get_vault_operator(vault_id)
 				.ok_or(Error::<T>::CouldNotFindLiquidityPool)?;
 			ensure!(account == operator, Error::<T>::NotAVaultOperator);
-			Self::create_hold(&account, amount)?;
+			let amount_to_distribute: T::Balance = max_amount_per_frame * 10u128.into();
+			let mut amount_already_distributed: T::Balance = T::Balance::zero();
+
+			if let Some(prebond) = PrebondedByVaultId::<T>::get(vault_id) {
+				amount_already_distributed = prebond.amount_unbonded;
+			}
+
+			// We can safely go through the existing liquidity pools for the last 10 frames to see
+			// what has already been allocated. The vault operator won't be automatically rolled
+			// over, so we can just subtract off anything allocated
+			let raising_frame_id = T::GetCurrentFrameId::get() + 2;
+			for frame_id in raising_frame_id.saturating_sub(10)..=raising_frame_id {
+				let frame_pools = VaultPoolsByFrame::<T>::get(frame_id);
+				let Some(vault_pool) = frame_pools.get(&vault_id) else {
+					continue;
+				};
+				for (account_id, amount) in &vault_pool.contributor_balances {
+					if *account_id == operator {
+						amount_already_distributed.saturating_accrue(*amount);
+					}
+				}
+			}
+
+			if amount_to_distribute <= amount_already_distributed {
+				return Err(Error::<T>::MaxAmountBelowMinimum.into());
+			}
+
+			let amount_needed = amount_to_distribute.saturating_sub(amount_already_distributed);
+			Self::create_hold(&account, amount_needed)?;
 			PrebondedByVaultId::<T>::mutate(vault_id, |e| {
 				if let Some(prebond) = e {
-					prebond.amount_unbonded.saturating_accrue(amount);
-					ensure!(
-						max_amount_per_frame >= prebond.amount_unbonded / 10u128.into(),
-						Error::<T>::MaxAmountBelowMinimum
-					);
+					prebond.amount_unbonded.saturating_accrue(amount_needed);
 					prebond.max_amount_per_frame = max_amount_per_frame;
 				} else {
-					ensure!(
-						max_amount_per_frame >= amount / 10u128.into(),
-						Error::<T>::MaxAmountBelowMinimum
-					);
-					ensure!(amount > T::Balance::zero(), Error::<T>::ContributionTooLow);
-					let prebond = PrebondedArgons::new(
+					*e = Some(PrebondedArgons::new(
 						vault_id,
 						account.clone(),
-						amount,
+						amount_needed,
 						max_amount_per_frame,
-					);
-					*e = Some(prebond);
+					));
 				}
 				Ok::<(), Error<T>>(())
 			})?;
 			Self::deposit_event(Event::<T>::VaultOperatorPrebond {
 				vault_id,
 				account_id: account.clone(),
-				amount,
+				amount_per_frame: max_amount_per_frame,
 			});
 			Ok(())
 		}
@@ -449,6 +466,9 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Once the frame is complete, this fn distributes the bid pool to each vault based on
+		/// their prorata funds raised. Then within each vault, profits are distributed to any
+		/// contributors besides the vault operator, who must collect theirs.
 		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
 			let bid_pool_account = Self::get_bid_pool_account();
 			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
@@ -487,61 +507,45 @@ pub mod pallet {
 				else {
 					continue;
 				};
-				let mut bond_fund_share =
+				let mut earnings =
 					Perbill::from_rational(entrant.activated_capital, total_bid_pool_capital)
 						.mul_floor(total_bid_pool_amount);
-				remaining_bid_pool.saturating_reduce(bond_fund_share);
+				remaining_bid_pool.saturating_reduce(earnings);
 				if i == bid_pool_capital.len() - 1 {
-					bond_fund_share.saturating_accrue(remaining_bid_pool);
+					earnings.saturating_accrue(remaining_bid_pool);
 					remaining_bid_pool = T::Balance::zero();
 				}
-				vault_fund.distributed_profits = Some(bond_fund_share);
+				vault_fund.distributed_profits = Some(earnings);
 
-				let vault_share = Permill::one()
+				let mut vault_share = Permill::one()
 					.saturating_sub(vault_fund.vault_sharing_percent)
-					.mul_floor(bond_fund_share);
+					.mul_floor(earnings);
 
-				// pay vault
-				{
-					if let Err(e) = T::Currency::transfer(
-						&bid_pool_account,
-						&vault_account_id,
-						vault_share,
-						Preservation::Expendable,
-					) {
-						Self::deposit_event(Event::<T>::CouldNotDistributeBidPool {
-							account_id: vault_account_id.clone(),
-							frame_id,
-							vault_id: entrant.vault_id,
-							amount: vault_share,
-							dispatch_error: e,
-							is_for_vault: true,
-						});
-					}
-				}
-
-				let contributor_amount = bond_fund_share.saturating_sub(vault_share);
+				let contributor_amount = earnings.saturating_sub(vault_share);
 				let contributor_funds = entrant.activated_capital;
-				let mut total_distributed = T::Balance::zero();
+				let mut contributor_distribution_remaining = contributor_amount;
 				let mut distributions = BTreeMap::<T::AccountId, T::Balance>::new();
 
+				let mut vault_contributed_capital = T::Balance::zero();
 				for (account, contrib) in vault_fund.contributor_balances.iter_mut() {
+					if *account == vault_account_id {
+						vault_contributed_capital = *contrib;
+					}
 					let prorata = Permill::from_rational(*contrib, contributor_funds)
 						.mul_floor(contributor_amount);
 					contrib.saturating_accrue(prorata);
-					total_distributed.saturating_accrue(prorata);
+					contributor_distribution_remaining.saturating_reduce(prorata);
 					distributions.entry(account.clone()).or_default().saturating_accrue(prorata);
 				}
-				// items are sorted by highest bid first, so the last one is the lowest
-				if total_distributed < contributor_amount {
-					let change = contributor_amount.saturating_sub(total_distributed);
-					if let Some((account, amount)) = vault_fund.contributor_balances.get_mut(0) {
-						amount.saturating_accrue(change);
-						distributions.entry(account.clone()).or_default().saturating_accrue(change);
-					}
-				}
+				// add remaining back to vault share
+				vault_share.saturating_accrue(contributor_distribution_remaining);
+
+				// give change to vault
+				let mut earnings_for_vault = vault_share;
 				for (account, amount) in distributions {
-					if amount == T::Balance::zero() {
+					// the vault must collect earnings
+					if account == vault_account_id {
+						earnings_for_vault.saturating_accrue(amount);
 						continue;
 					}
 					if let Err(e) = T::Currency::transfer_and_hold(
@@ -563,6 +567,18 @@ pub mod pallet {
 						});
 					}
 				}
+				T::LiquidityPoolVaultProvider::record_vault_frame_earnings(
+					&bid_pool_account,
+					VaultLiquidityPoolFrameEarnings {
+						vault_id: entrant.vault_id,
+						vault_operator_account_id: vault_account_id,
+						frame_id,
+						earnings_for_vault,
+						earnings,
+						capital_contributed: contributor_funds,
+						capital_contributed_by_vault: vault_contributed_capital,
+					},
+				);
 			}
 			VaultPoolsByFrame::<T>::insert(frame_id, liquidity_pools_by_vault);
 
@@ -609,6 +625,7 @@ pub mod pallet {
 						Self::refund_fund_capital(frame_id, vault_id, &account, to_refund);
 						total_to_refund.saturating_reduce(to_refund);
 						let final_amount = amount.saturating_sub(to_refund);
+						// if we have some left, we need to re-add the contributor
 						if final_amount > T::Balance::zero() {
 							vault_fund.contributor_balances.try_push((account, final_amount)).ok();
 						}
@@ -639,7 +656,17 @@ pub mod pallet {
 
 					let amount_available =
 						activated_securitization.saturating_sub(bid_pool_capital.activated_capital);
-					let to_bond = prebond.take_unbonded(frame_id, amount_available);
+					let already_allocated =
+						vault_fund
+							.contributor_balances
+							.iter()
+							.find_map(|(account, amount)| {
+								if account == &prebond.account_id { Some(*amount) } else { None }
+							})
+							.unwrap_or_default();
+
+					let to_bond =
+						prebond.take_unbonded(frame_id, amount_available, already_allocated);
 
 					if to_bond > T::Balance::zero() {
 						bid_pool_capital.activated_capital.saturating_accrue(to_bond);
@@ -901,6 +928,7 @@ pub mod pallet {
 		#[codec(compact)]
 		pub starting_frame_id: FrameId,
 		/// The amount bonded by offset since the starting frame (eg, frame - starting_frame % 10)
+		#[deprecated(since = "1.3.6", note = "Use amounts allocated to liquidity pools instead")]
 		pub bonded_by_start_offset: BoundedVec<T::Balance, ConstU32<10>>,
 		/// The max amount of argons that can be bonded per frame offset
 		#[codec(compact)]
@@ -914,33 +942,32 @@ pub mod pallet {
 			amount: T::Balance,
 			max_amount_per_frame: T::Balance,
 		) -> Self {
-			let bonded_by_start_offset = BoundedVec::truncate_from(
-				(0u128..10u128).map(|_| 0u128.into()).collect::<Vec<_>>(),
-			);
+			#[allow(deprecated)]
 			Self {
 				vault_id,
 				account_id,
 				amount_unbonded: amount,
 				starting_frame_id: T::GetCurrentFrameId::get(),
-				bonded_by_start_offset,
+				bonded_by_start_offset: Default::default(),
 				max_amount_per_frame,
 			}
 		}
 
-		pub fn take_unbonded(&mut self, frame_id: FrameId, max_amount: T::Balance) -> T::Balance {
+		pub fn take_unbonded(
+			&mut self,
+			frame_id: FrameId,
+			max_amount: T::Balance,
+			already_allocated: T::Balance,
+		) -> T::Balance {
 			if frame_id < self.starting_frame_id {
 				// We can't bond for a frame before the starting frame
 				return T::Balance::zero();
 			}
-			let frame_offset = ((frame_id - self.starting_frame_id) % 10) as usize;
 			let available_to_use = self.amount_unbonded.min(max_amount);
-			let bonded_by_offset = self.bonded_by_start_offset[frame_offset];
-			let max_bondable_for_frame = self.max_amount_per_frame.saturating_sub(bonded_by_offset);
+			let max_bondable_for_frame =
+				self.max_amount_per_frame.saturating_sub(already_allocated);
 			let to_bond = available_to_use.min(max_bondable_for_frame);
-			if to_bond > T::Balance::zero() {
-				self.bonded_by_start_offset[frame_offset].saturating_accrue(to_bond);
-				self.amount_unbonded.saturating_reduce(to_bond);
-			}
+			self.amount_unbonded.saturating_reduce(to_bond);
 			to_bond
 		}
 	}

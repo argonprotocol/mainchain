@@ -113,7 +113,7 @@ primarily from liquidity pool participation in mining bid distributions.
   - `cosign_release()` - Vault operator co-signs Bitcoin transaction
 - **Key Storage**:
   - `LocksById` - Individual lock details and state
-  - `LocksPendingReleaseByUtxoId` - Tracks release requests awaiting co-signature
+  - `LockReleaseRequestsByUtxoId` - Tracks release requests awaiting co-signature
 
 #### 3. **Bitcoin UTXOs Pallet** (`pallets/bitcoin_utxos`)
 
@@ -193,7 +193,7 @@ fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
 
     // 3. Lock must NOT be in release process
     ensure!(
-        !LocksPendingReleaseByUtxoId::<T>::get().contains_key(&utxo_id),
+        !LockReleaseRequestsByUtxoId::<T>::contains_key(&utxo_id),
         Error::<T>::LockInProcessOfRelease  // <-- THIS IS WHY BENCHMARKS FAILED
     );
 
@@ -247,7 +247,7 @@ fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
 **Critical**: Ratchet can only happen when lock is in **stable verified state**:
 
 - ✅ Lock exists and is verified
-- ✅ NOT in pending release state (checked via `LocksPendingReleaseByUtxoId` storage)
+- ✅ NOT in pending release state (checked via `LockReleaseRequestsByUtxoId` storage)
 - ✅ Price has changed
 
 **This explains the benchmark failures**:

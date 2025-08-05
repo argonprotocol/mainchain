@@ -287,6 +287,8 @@ impl pallet_vaults::Config for Runtime {
 	type TickProvider = Ticks;
 	type CurrentFrameId = GetCurrentFrameId;
 	type MaxVaults = MaxVaults;
+	type MaxPendingCosignsPerVault = MaxPendingCosignsPerVault;
+	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 }
 
 pub struct BitcoinSignatureVerifier;
@@ -308,8 +310,9 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
-	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
-	type TickProvider = Ticks;
+	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
+	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
+	type CurrentFrameId = GetCurrentFrameId;
 	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
 }
 
@@ -387,7 +390,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = LiquidityPools;
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, LiquidityPools);
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards, LiquidityPools, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

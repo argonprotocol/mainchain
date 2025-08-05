@@ -1,5 +1,5 @@
 #![allow(clippy::inconsistent_digit_grouping)]
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use bitcoin::PublicKey;
 use pallet_prelude::*;
@@ -8,13 +8,12 @@ use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
-	BitcoinUtxoTracker, PriceProvider, TickProvider, UtxoLockEvents, VotingSchedule,
+	BitcoinUtxoTracker, PriceProvider, UtxoLockEvents,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	ensure,
-	tick::Ticker,
 	vault::{BitcoinVaultProvider, LockExtension, Vault, VaultError, VaultTerms},
 };
 use frame_support::traits::Currency;
@@ -71,7 +70,7 @@ parameter_types! {
 	pub static ArgonPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
 	pub static ArgonTargetPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
-	pub static LockReleaseCosignDeadlineBlocks: BitcoinHeight = 5;
+	pub static LockReleaseCosignDeadlineFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
@@ -106,13 +105,16 @@ parameter_types! {
 	pub static DefaultVaultBitcoinPubkey: PublicKey = "02e3af28965693b9ce1228f9d468149b831d6a0540b25e8a9900f71372c11fb277".parse::<PublicKey>().unwrap();
 	pub static DefaultVaultReclaimBitcoinPubkey: PublicKey = "026c468be64d22761c30cd2f12cbc7de255d592d7904b1bab07236897cc4c2e766".parse::<PublicKey>().unwrap();
 
-	pub static CurrentTick: Tick = 2;
-	pub static PreviousTick: Tick = 1;
-	pub static ElapsedTicks: Tick = 0;
+	pub static CurrentFrameId: FrameId = 1;
 
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
 	pub static ChargeFee: bool = false;
+
+	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
+
+	pub const TicksPerBitcoinBlock: u64 = 10;
+	pub const ArgonTicksPerDay: u64 = 1440;
 }
 
 pub struct EventHandler;
@@ -280,6 +282,22 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		});
 		Ok(())
 	}
+
+	fn update_pending_cosign_list(
+		vault_id: VaultId,
+		utxo_id: UtxoId,
+		should_remove: bool,
+	) -> Result<(), VaultError> {
+		VaultViewOfCosignPendingLocks::mutate(|l| {
+			let list = l.entry(vault_id).or_default();
+			if should_remove {
+				list.remove(&utxo_id);
+			} else {
+				list.insert(utxo_id);
+			}
+		});
+		Ok(())
+	}
 }
 
 pub struct StaticBitcoinVerifier;
@@ -318,28 +336,6 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	}
 }
 
-pub struct StaticTickProvider;
-impl TickProvider<Block> for StaticTickProvider {
-	fn previous_tick() -> Tick {
-		PreviousTick::get()
-	}
-	fn current_tick() -> Tick {
-		CurrentTick::get()
-	}
-	fn elapsed_ticks() -> Tick {
-		ElapsedTicks::get()
-	}
-	fn voting_schedule() -> VotingSchedule {
-		todo!()
-	}
-	fn ticker() -> Ticker {
-		Ticker::new(1, 2)
-	}
-	fn blocks_at_tick(_: Tick) -> Vec<H256> {
-		todo!()
-	}
-}
-
 pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 	BitcoinBlockHeightChange::set((height, height));
 }
@@ -356,14 +352,15 @@ impl pallet_bitcoin_locks::Config for Test {
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type VaultProvider = StaticVaultProvider;
-	type ArgonTicksPerDay = ConstU64<1440>;
+	type ArgonTicksPerDay = ArgonTicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
-	type LockReleaseCosignDeadlineBlocks = LockReleaseCosignDeadlineBlocks;
-	type TickProvider = StaticTickProvider;
+	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type BitcoinBlockHeightChange = BitcoinBlockHeightChange;
 	type MaxConcurrentlyExpiringLocks = ConstU32<100>;
+	type CurrentFrameId = CurrentFrameId;
+	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 }
 
 // Build genesis storage according to the mock runtime.

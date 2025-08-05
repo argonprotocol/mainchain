@@ -101,7 +101,7 @@ fn calculate_frame_id() {
 		MiningSlots::on_finalize(3);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1);
-		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1);
+		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1);
 		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
 		assert_eq!(MiningSlots::calculated_frame_id(), 0);
 		assert_eq!(
@@ -123,7 +123,7 @@ fn calculate_frame_id() {
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
 		);
-		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1440);
+		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1440);
 	});
 }
 
@@ -218,7 +218,7 @@ fn extends_bidding_if_mining_slot_extends() {
 			MiningSlots::get_next_slot_era(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
 		);
-		assert_eq!(MiningSlots::get_next_slot_tick(), current_tick + 1440);
+		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1440);
 	});
 }
 

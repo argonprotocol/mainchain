@@ -27,6 +27,7 @@ x-bitcoin-config: &bitcoin
   build:
     context: .
     dockerfile: docker/bitcoin.Dockerfile
+  user: "0:0"
   restart: on-failure
   volumes:
     - bitcoin-data:/bitcoin
@@ -76,24 +77,48 @@ services:
     entrypoint: ["bitcoind"]
     command:
       - --chain=regtest
-      - --rpcport=18444
-      - --rpcuser=bitcoin
-      - --rpcpassword=bitcoin
+      - --rpcport=18443
+      - --rpcauth=bitcoin:7042dd0e1fd98669067098457a9f0859$95bc3e06d791b3c56e5fa17665cb341e35f1e48a7b5f43ad88a39d5b211327b5
       - --rpcbind=0.0.0.0
       - --rpcallowip=0.0.0.0/0
+      - --port=18444
+      - --listen=1
       - --fallbackfee=0.0001
-      - --listen=0
       - --datadir=/bitcoin
       - --blockfilterindex
       - --txindex
       - --wallet=mining
     ports:
+      - "0:18443"
       - "0:18444"
     healthcheck:
       test: >
-        echo '{"jsonrpc":"1.0","id":"curltest","method":"getblockchaininfo","params":[]}' | curl --fail -s --user bitcoin:bitcoin -H "content-type: text/plain;" --data-binary @- http://localhost:18444/
+        echo '{"jsonrpc":"1.0","id":"curltest","method":"getblockchaininfo","params":[]}' | curl --fail -s --user bitcoin:bitcoin -H "content-type: text/plain;" --data-binary @- http://localhost:18443/
       interval: 5s
       retries: 10
+
+  bitcoin-electrs:
+    image: mempool/electrs:v3.2.0
+    restart: on-failure
+    user: "0:0"
+    ports:
+      - "50001:50001"  # Electrum server protocol
+      - "3002:3002" # Esplora HTTP API
+    volumes:
+      - bitcoin-data:/bitcoin
+      - electrs-data:/electrs
+    command: |
+      --network regtest
+      --db-dir /electrs
+      --daemon-dir /bitcoin
+      --daemon-rpc-addr bitcoin:18443
+      --cookie bitcoin:bitcoin
+      --electrum-rpc-addr 0.0.0.0:50001
+      --http-addr 0.0.0.0:3002
+      --cors "*"
+    depends_on:
+      bitcoin-miner:
+        condition: service_started
 
   bitcoin-wallet-init:
     <<: *bitcoin
@@ -107,7 +132,7 @@ services:
           echo "rpcuser=bitcoin" >> /bitcoin/bitcoin.conf
           echo "rpcpassword=bitcoin" >> /bitcoin/bitcoin.conf
           echo "rpcconnect=bitcoin" >> /bitcoin/bitcoin.conf
-          echo "rpcport=18444" >> /bitcoin/bitcoin.conf
+          echo "rpcport=18443" >> /bitcoin/bitcoin.conf
           echo "txindex=1" >> /bitcoin/bitcoin.conf
           echo "blockfilterindex=1" >> /bitcoin/bitcoin.conf
           echo "wallet=mining" >> /bitcoin/bitcoin.conf
@@ -147,6 +172,7 @@ services:
         -datadir=/bitcoin
         -conf=/bitcoin/bitcoin.conf
         -rpcwallet=mining
+      INTERVAL_SECONDS: 20 # needs to be 10 ticks, which are 2 seconds in regtest
     depends_on:
       bitcoin-init:
         condition: service_completed_successfully
@@ -163,6 +189,7 @@ services:
       - -regtest
       - -datadir=/bitcoin
       - -conf=/bitcoin/bitcoin.conf
+      - -rpcwallet=mining
     profiles: [tooling]   # keeps it out of the default `up`
 
   archive-node:
@@ -180,7 +207,7 @@ services:
       --node-key=16ec4f460237d066d15d09a44959a7d49ea6405e98429826f1c28b9087bd60ea
       --base-path=/data
       --chain=local
-      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18443
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
       --network-backend=libp2p
@@ -228,7 +255,7 @@ services:
       --base-path=/data
       --bootnodes=/dns/archive-node/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn
       --chain=local
-      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18443
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
       --network-backend=libp2p
@@ -278,7 +305,7 @@ services:
           CLI="npx --yes @argonprotocol/mainchain"
         fi
         set -x
-        $$CLI accounts create --path=/accounts/bob.json --register-keys-to=http://miner-1:9944 --account-suri=//Bob -s=0-49
+        $$CLI accounts create --path=/accounts/bob.json --register-keys-to=http://miner-1:9944 --account-suri=//Bob -s=0-99
         exec $$CLI mining bid --env=/accounts/bob.json --max-bid=0.5 --run-continuous
     environment:
       - MAINCHAIN_URL=ws://archive-node:9944
@@ -311,7 +338,7 @@ services:
       --base-path=/data
       --bootnodes=/dns/archive-node/tcp/30334/p2p/12D3KooWMdmKGEuFPVvwSd92jCQJgX9aFCp45E8vV2X284HQjwnn
       --chain=local
-      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18443
       --notebook-archive-hosts=http://minio:9000
       --no-mdns
       --network-backend=libp2p
@@ -362,7 +389,7 @@ services:
         fi
         set -x
         $$CLI accounts create --path=/accounts/dave.json --register-keys-to=http://miner-2:9944 --account-suri=//Dave -s=0-49
-        exec $$CLI mining bid --env=/accounts/dave.json --max-bid=2 --max-seats=1 --bid-delay=2 --run-continuous
+        exec $$CLI mining bid --env=/accounts/dave.json --max-bid=2 --max-seats=5 --bid-delay=2 --run-continuous
     environment:
       - MAINCHAIN_URL=ws://archive-node:9944
     depends_on:
@@ -443,7 +470,7 @@ services:
       - --keystore-path=/keystore
       - --signer-crypto=sr25519
       - --signer-address=5HKyaEJY4P4yAixU7pBDsnacNBNSmRGR7hkqgRnC9msvxecj
-      - --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18444
+      - --bitcoin-rpc-url=http://bitcoin:bitcoin@bitcoin:18443
     volumes:
       - oracle-btc-keystore:/keystore
     environment:
@@ -493,6 +520,7 @@ volumes:
   minio-data:
   pgdata:
   bitcoin-data:
+  electrs-data:
   archive-data:
   miner1-data:
   miner2-data:

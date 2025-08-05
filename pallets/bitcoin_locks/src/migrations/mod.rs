@@ -1,13 +1,12 @@
 use crate::{
-	Config, LockReleaseRequest,
-	pallet::{LockExpirationsByBitcoinHeight, LocksByUtxoId, LocksPendingReleaseByUtxoId},
+	Config, LockCosignDueByFrame, LockReleaseRequest, LockReleaseRequestsByUtxoId,
+	pallet::LocksByUtxoId,
 };
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::*;
 
 mod old_storage {
-	use super::*;
-	use crate::Config;
+	use crate::{Config, Pallet};
 	use argon_primitives::{
 		VaultId,
 		bitcoin::{
@@ -16,17 +15,15 @@ mod old_storage {
 		},
 	};
 	use frame_support::storage_alias;
-	pub type ObligationId = u64;
+	use pallet_prelude::*;
 
-	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LockedBitcoin<T: Config> {
 		#[codec(compact)]
-		pub obligation_id: ObligationId,
-		#[codec(compact)]
 		pub vault_id: VaultId,
-		pub lock_price: <T as Config>::Balance,
-		pub owner_account: <T as frame_system::Config>::AccountId,
+		pub lock_price: T::Balance,
+		pub owner_account: T::AccountId,
 		#[codec(compact)]
 		pub satoshis: Satoshis,
 		pub vault_pubkey: CompressedBitcoinPubkey,
@@ -43,6 +40,33 @@ mod old_storage {
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		pub is_verified: bool,
 		pub is_rejected_needs_release: bool,
+		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
+	}
+
+	#[derive(
+		Decode,
+		Encode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct LockReleaseRequest<
+		Balance: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
+	> {
+		#[codec(compact)]
+		pub utxo_id: UtxoId,
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		#[codec(compact)]
+		pub bitcoin_network_fee: Satoshis,
+		#[codec(compact)]
+		pub cosign_due_block: BitcoinHeight,
+		pub to_script_pubkey: BitcoinScriptPubkey,
+		#[codec(compact)]
+		pub redemption_price: Balance,
 	}
 
 	impl<T: Config> From<LockedBitcoin<T>> for crate::LockedBitcoin<T> {
@@ -62,7 +86,8 @@ mod old_storage {
 				utxo_script_pubkey: val.utxo_script_pubkey,
 				is_verified: val.is_verified,
 				is_rejected_needs_release: val.is_rejected_needs_release,
-				fund_hold_extensions: Default::default(),
+				fund_hold_extensions: val.fund_hold_extensions,
+				security_fees: Default::default(),
 			}
 		}
 	}
@@ -70,7 +95,7 @@ mod old_storage {
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
 		pub locked_utxos: Vec<(UtxoId, LockedBitcoin<T>)>,
-		pub locks_pending_release: Vec<(UtxoId, LockReleaseRequest<T::Balance>)>,
+		pub locks_pending_release: LocksPendingRelease<T>,
 	}
 
 	pub type LocksPendingRelease<T> = BoundedBTreeMap<
@@ -78,41 +103,13 @@ mod old_storage {
 		LockReleaseRequest<<T as Config>::Balance>,
 		<T as Config>::MaxConcurrentlyReleasingLocks,
 	>;
-	#[derive(Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, RuntimeDebug, TypeInfo)]
-	pub struct LockReleaseRequest<Balance: Clone + Eq + PartialEq + TypeInfo + Codec> {
-		#[codec(compact)]
-		pub utxo_id: UtxoId,
-		#[codec(compact)]
-		pub obligation_id: ObligationId,
-		#[codec(compact)]
-		pub vault_id: VaultId,
-		#[codec(compact)]
-		pub bitcoin_network_fee: Satoshis,
-		#[codec(compact)]
-		pub cosign_due_block: BitcoinHeight,
-		pub to_script_pubkey: BitcoinScriptPubkey,
-		#[codec(compact)]
-		pub redemption_price: Balance,
-	}
 
 	#[storage_alias]
-	pub(super) type OwedUtxoAggrieved<T: Config> = StorageMap<
-		crate::Pallet<T>,
-		Twox64Concat,
-		UtxoId,
-		(<T as frame_system::Config>::AccountId, VaultId, <T as Config>::Balance, LockedBitcoin<T>),
-		OptionQuery,
-	>;
-	#[storage_alias]
-	pub(super) type LocksPendingReleaseByUtxoId<T: Config> =
-		StorageValue<crate::Pallet<T>, LocksPendingRelease<T>, ValueQuery>;
+	pub type LocksPendingReleaseByUtxoId<T: Config> =
+		StorageValue<Pallet<T>, LocksPendingRelease<T>>;
 	#[storage_alias]
 	pub(super) type LocksByUtxoId<T: Config> =
 		StorageMap<crate::Pallet<T>, Twox64Concat, UtxoId, LockedBitcoin<T>, OptionQuery>;
-
-	#[storage_alias]
-	pub(super) type ObligationIdToUtxoId<T: Config> =
-		StorageMap<crate::Pallet<T>, Twox64Concat, ObligationId, UtxoId, OptionQuery>;
 }
 
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -123,9 +120,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		use codec::Encode;
 
 		let locked_utxos = old_storage::LocksByUtxoId::<T>::iter().collect::<Vec<_>>();
-		let locks_pending_release = old_storage::LocksPendingReleaseByUtxoId::<T>::get()
-			.into_iter()
-			.collect::<Vec<_>>();
+		let locks_pending_release =
+			old_storage::LocksPendingReleaseByUtxoId::<T>::get().unwrap_or_default();
 
 		Ok(<old_storage::Model<T>>::encode(&old_storage::Model {
 			locked_utxos,
@@ -137,45 +133,35 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let mut count = 0;
 		log::info!("Migrating Bitcoin locks");
 
-		let ob_ids = old_storage::ObligationIdToUtxoId::<T>::drain().collect::<Vec<_>>();
-		count += ob_ids.len() as u64;
-
-		let drained_owed = old_storage::OwedUtxoAggrieved::<T>::drain().collect::<Vec<_>>();
-		count += drained_owed.len() as u64;
-
-		LocksByUtxoId::<T>::translate::<old_storage::LockedBitcoin<T>, _>(|utxo_id, old| {
+		LocksByUtxoId::<T>::translate::<old_storage::LockedBitcoin<T>, _>(|_utxo_id, old| {
 			count += 1;
-			LockExpirationsByBitcoinHeight::<T>::mutate(old.vault_claim_height, |v| {
-				let _ = v.try_insert(utxo_id);
-			});
 			Some(old.into())
 		});
 
-		LocksPendingReleaseByUtxoId::<T>::translate::<old_storage::LocksPendingRelease<T>, _>(
-			|a| {
-				if let Some(a) = a {
-					let mut new_map = BoundedBTreeMap::new();
-					for (utxo_id, old) in a {
-						let _ = new_map.try_insert(
-							utxo_id,
-							LockReleaseRequest {
-								utxo_id,
-								vault_id: old.vault_id,
-								bitcoin_network_fee: old.bitcoin_network_fee,
-								cosign_due_block: old.cosign_due_block,
-								to_script_pubkey: old.to_script_pubkey,
-								redemption_price: old.redemption_price,
-							},
-						);
-					}
-					Some(new_map)
-				} else {
-					None
-				}
-			},
-		)
-		.expect("Failed to migrate LocksPendingReleaseByUtxoId");
-		count += 1;
+		let current_frame = T::CurrentFrameId::get();
+		let locks_pending_release =
+			old_storage::LocksPendingReleaseByUtxoId::<T>::take().unwrap_or_default();
+		for (utxo_id, lock) in locks_pending_release {
+			// just default to 10 frames out
+			let cosign_due_frame = current_frame + T::LockReleaseCosignDeadlineFrames::get();
+			LockCosignDueByFrame::<T>::mutate(cosign_due_frame, |a| {
+				a.try_insert(utxo_id)
+					.expect("Failed to push UTXO ID to LockCosignDueByBitcoinHeight");
+			});
+
+			LockReleaseRequestsByUtxoId::<T>::insert(
+				utxo_id,
+				LockReleaseRequest {
+					utxo_id,
+					vault_id: lock.vault_id,
+					bitcoin_network_fee: lock.bitcoin_network_fee,
+					cosign_due_frame,
+					to_script_pubkey: lock.to_script_pubkey,
+					redemption_price: lock.redemption_price,
+				},
+			);
+			count += 2;
+		}
 
 		T::DbWeight::get().reads_writes(count, count)
 	}
@@ -192,19 +178,26 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let new = LocksByUtxoId::<T>::iter().collect::<Vec<_>>();
 		ensure!(old.locked_utxos.len() == new.len(), "locked_utxos length mismatch",);
 
-		let new = LocksPendingReleaseByUtxoId::<T>::get();
-		ensure!(
-			old.locks_pending_release.len() == new.len(),
-			"locks_pending_release length mismatch"
-		);
+		for (utxo_id, old_lock) in old.locks_pending_release {
+			let lock =
+				LockReleaseRequestsByUtxoId::<T>::get(utxo_id).expect("Should be able to get");
+			assert_eq!(lock.bitcoin_network_fee, old_lock.bitcoin_network_fee);
+			let should_be_in_expirations =
+				LockCosignDueByFrame::<T>::get(&lock.cosign_due_frame).contains(&utxo_id);
+			assert!(
+				should_be_in_expirations,
+				"UTXO ID {:?} should be in LockCosignDueByBitcoinHeight",
+				utxo_id
+			);
+		}
 
 		Ok(())
 	}
 }
 
-pub type RatchetMigration<T> = frame_support::migrations::VersionedMigration<
-	1,
+pub type ReleaseRequestMigration<T> = frame_support::migrations::VersionedMigration<
 	2,
+	3,
 	InnerMigrate<T>,
 	crate::pallet::Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
@@ -213,8 +206,10 @@ pub type RatchetMigration<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{Test, new_test_ext};
-	use argon_primitives::bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey};
+	use crate::mock::{CurrentFrameId, LockReleaseCosignDeadlineFrames, Test, new_test_ext};
+	use argon_primitives::bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinScriptPubkey, CompressedBitcoinPubkey,
+	};
 	use frame_support::assert_ok;
 	use sp_core::H256;
 
@@ -222,7 +217,6 @@ mod test {
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
 			let utxo_1 = old_storage::LockedBitcoin {
-				obligation_id: 1,
 				vault_id: 1,
 				lock_price: 1,
 				owner_account: 1,
@@ -239,52 +233,40 @@ mod test {
 				},
 				is_verified: true,
 				is_rejected_needs_release: false,
-			};
-			let utxo_2 = old_storage::LockedBitcoin {
-				obligation_id: 2,
-				vault_id: 2,
-				lock_price: 2,
-				owner_account: 2,
-				satoshis: 2,
-				vault_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_claim_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_xpub_sources: Default::default(),
-				owner_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_claim_height: 2,
-				open_claim_height: 2,
-				created_at_height: 2,
-				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
-					wscript_hash: H256::from([0u8; 32]),
-				},
-				is_verified: true,
-				is_rejected_needs_release: false,
-			};
-			let utxo_3 = old_storage::LockedBitcoin {
-				obligation_id: 3,
-				vault_id: 3,
-				lock_price: 3,
-				owner_account: 3,
-				satoshis: 3,
-				vault_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_claim_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_xpub_sources: Default::default(),
-				owner_pubkey: CompressedBitcoinPubkey([1u8; 33]),
-				vault_claim_height: 3,
-				open_claim_height: 3,
-				created_at_height: 3,
-				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
-					wscript_hash: H256::from([0u8; 32]),
-				},
-				is_verified: true,
-				is_rejected_needs_release: false,
+				fund_hold_extensions: Default::default(),
 			};
 			old_storage::LocksByUtxoId::<Test>::insert(1, utxo_1.clone());
-			old_storage::LocksByUtxoId::<Test>::insert(2, utxo_2.clone());
-			old_storage::LocksByUtxoId::<Test>::insert(3, utxo_2.clone());
-			old_storage::OwedUtxoAggrieved::<Test>::insert(1, (1, 1, 1, utxo_3.clone()));
-			old_storage::ObligationIdToUtxoId::<Test>::insert(1, 1);
-			old_storage::ObligationIdToUtxoId::<Test>::insert(2, 2);
-			old_storage::ObligationIdToUtxoId::<Test>::insert(3, 3);
+			old_storage::LocksPendingReleaseByUtxoId::<Test>::mutate(|a| {
+				let a = a.get_or_insert_with(Default::default);
+				let _ = a.try_insert(
+					1,
+					old_storage::LockReleaseRequest {
+						cosign_due_block: 1500,
+						vault_id: 1,
+						redemption_price: 10,
+						to_script_pubkey: BitcoinScriptPubkey(BoundedVec::truncate_from(vec![
+							0u8;
+							33
+						])),
+						bitcoin_network_fee: 1,
+						utxo_id: 1,
+					},
+				);
+				let _ = a.try_insert(
+					2,
+					old_storage::LockReleaseRequest {
+						cosign_due_block: 1000,
+						vault_id: 1,
+						redemption_price: 20,
+						to_script_pubkey: BitcoinScriptPubkey(BoundedVec::truncate_from(vec![
+							0u8;
+							33
+						])),
+						bitcoin_network_fee: 2,
+						utxo_id: 2,
+					},
+				);
+			});
 
 			// Get the pre_upgrade bytes
 			let bytes = match InnerMigrate::<Test>::pre_upgrade() {
@@ -299,30 +281,30 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(8, 8));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(5, 5));
 
 			// check locks
 			let mut locks = LocksByUtxoId::<Test>::iter().collect::<Vec<_>>();
 			locks.sort_by(|a, b| a.0.cmp(&b.0));
-			assert_eq!(locks.len(), 3);
+			assert_eq!(locks.len(), 1);
 			assert_eq!(locks[0].1.lock_price, 1);
-			assert_eq!(locks[1].1.lock_price, 2);
-			assert_eq!(
-				LockExpirationsByBitcoinHeight::<Test>::get(utxo_1.vault_claim_height)
-					.into_iter()
-					.collect::<Vec<_>>(),
-				vec![1]
-			);
-			assert_eq!(
-				LockExpirationsByBitcoinHeight::<Test>::get(utxo_2.vault_claim_height)
-					.into_iter()
-					.collect::<Vec<_>>(),
-				vec![2, 3]
-			);
 
+			let current_frame = CurrentFrameId::get();
 			assert_eq!(
-				old_storage::ObligationIdToUtxoId::<Test>::iter_keys().collect::<Vec<_>>().len(),
-				0
+				LockReleaseRequestsByUtxoId::<Test>::get(&1).unwrap().cosign_due_frame,
+				current_frame + LockReleaseCosignDeadlineFrames::get()
+			);
+			assert_eq!(
+				LockReleaseRequestsByUtxoId::<Test>::get(&2).unwrap().cosign_due_frame,
+				current_frame + LockReleaseCosignDeadlineFrames::get()
+			);
+			assert_eq!(
+				LockCosignDueByFrame::<Test>::get(
+					LockReleaseCosignDeadlineFrames::get() + CurrentFrameId::get()
+				)
+				.into_iter()
+				.collect::<Vec<_>>(),
+				vec![1, 2]
 			);
 		});
 	}

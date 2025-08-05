@@ -109,11 +109,13 @@ parameter_types! {
 	pub const TicksPerDay: Tick = 1440;
 	pub const TicksPerYear: Tick = 1440 * 365;
 	pub const MaxVaults: u32 = 10_000;
+	pub const MaxPendingCosignsPerVault: u32 = 100;
 
 	const BitcoinBlocksPerDay: BitcoinHeight = 6 * 24;
 	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
 	pub const BitcoinLockReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
-	pub const LockReleaseCosignDeadlineBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 5; // 5 days
+	pub const LockReleaseCosignDeadlineFrames: FrameId = 10;
+	pub const TicksPerBitcoinBlock: Tick = 10;
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
 

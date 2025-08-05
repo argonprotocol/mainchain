@@ -893,7 +893,7 @@ impl<T: Config> Pallet<T> {
 	/// NOTE: seal_strength should not be used as it is a non-uniform distributed value (must be
 	/// seal_proof)
 	pub(crate) fn check_for_bidding_close(vote_seal_proof: U256) -> bool {
-		let next_slot_tick = Self::get_next_slot_tick();
+		let next_slot_tick = Self::get_next_frame_tick();
 		let current_tick = T::TickProvider::current_tick();
 		let mining_config = MiningConfig::<T>::get();
 
@@ -932,7 +932,7 @@ impl<T: Config> Pallet<T> {
 		T::TickProvider::current_tick().saturating_sub(Self::slot_1_tick())
 	}
 
-	pub(crate) fn get_next_slot_tick() -> Tick {
+	pub(crate) fn get_next_frame_tick() -> Tick {
 		Self::tick_for_frame(Self::next_frame_id())
 	}
 
@@ -941,7 +941,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn get_next_slot_era() -> (Tick, Tick) {
-		let start_tick = Self::get_next_slot_tick();
+		let start_tick = Self::get_next_frame_tick();
 		(start_tick, start_tick + Self::get_mining_window_ticks())
 	}
 
@@ -1150,7 +1150,7 @@ pub struct MinerXor<T: Config> {
 
 impl<T: Config> MiningSlotProvider for Pallet<T> {
 	fn get_next_slot_tick() -> Tick {
-		Self::get_next_slot_tick()
+		Self::get_next_frame_tick()
 	}
 
 	fn mining_window_ticks() -> Tick {

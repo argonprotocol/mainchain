@@ -462,8 +462,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
-       * The maximum amount per frame would result in funds never used (below 1/10th of the
-       * amount)
+       * The prebond amount cannot be reduced and this takes it below the previous allocation
        **/
       MaxAmountBelowMinimum: AugmentedError<ApiType>;
       /**
@@ -949,6 +948,10 @@ declare module '@polkadot/api-base/types/errors' {
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * A vault must clear out all pending cosigns before it can collect
+       **/
+      PendingCosignsBeforeCollect: AugmentedError<ApiType>;
       /**
        * The vault bitcoin xpubkey has already been used
        **/

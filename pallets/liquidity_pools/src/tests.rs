@@ -6,7 +6,7 @@ use crate::{
 };
 use argon_primitives::{OnNewSlot, vault::MiningBidPoolProvider};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
-use pallet_prelude::*;
+use pallet_prelude::{argon_primitives::vault::VaultLiquidityPoolFrameEarnings, *};
 use sp_core::bounded_vec;
 use sp_runtime::Permill;
 
@@ -364,11 +364,13 @@ fn it_can_distribute_bid_pool_capital() {
 
 		set_argons(LiquidityPools::get_bid_pool_account(), 1_000_000_002);
 
+		set_argons(10, 100_000_000);
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(10), 1, 100_000_000,));
 		set_argons(2, 500_000_000);
-		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 220_000_000));
+		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(2), 1, 120_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &2),
-			220_000_000
+			120_000_000
 		);
 		set_argons(3, 500_000_000);
 		assert_ok!(LiquidityPools::bond_argons(RuntimeOrigin::signed(3), 1, 280_000_000));
@@ -393,7 +395,7 @@ fn it_can_distribute_bid_pool_capital() {
 		let bond_funds = VaultPoolsByFrame::<Test>::get(3);
 		assert_eq!(
 			bond_funds.get(&1).unwrap().contributor_balances.clone().into_inner(),
-			vec![(3, 280_000_000), (2, 220_000_000),]
+			vec![(3, 280_000_000), (2, 120_000_000), (10, 100_000_000)]
 		);
 		assert_eq!(
 			bond_funds.get(&2).unwrap().contributor_balances.clone().into_inner(),
@@ -444,32 +446,56 @@ fn it_can_distribute_bid_pool_capital() {
 			.into(),
 		);
 
+		let profits = LastVaultProfits::get();
+		assert_eq!(profits.len(), 2, "should have 2 vault profits recorded");
+		let vault_1_profits = profits.iter().find(|p| p.vault_id == 1).unwrap();
 		assert_eq!(
-			Balances::free_balance(10),
-			200_000_000,
+			vault_1_profits,
+			&VaultLiquidityPoolFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: 10,
+				earnings: 400_000_000 + 1, // 50% of the 800 + 1 extra penny
+				earnings_for_vault: (400_000_000.0 * 0.5) as u128 + (100.0/500.0 * 400_000_000.0 * 0.5) as u128 + 1, // 50% of the 400 + 50% * 100 of 500 contributed argons * 400) + 1 extra penny
+				capital_contributed_by_vault: 100_000_000,
+				frame_id: 3,
+				capital_contributed: 500_000_000,
+			},
 			"First vault gets half of the 400 for their side"
 		);
+		let vault_2_profits = profits.iter().find(|p| p.vault_id == 2).unwrap();
 		assert_eq!(
-			Balances::free_balance(11),
-			(400_000_000.0 * 0.4) as u128,
+			vault_2_profits,
+			&VaultLiquidityPoolFrameEarnings {
+				vault_id: 2,
+				vault_operator_account_id: 11,
+				earnings: 400_000_000,
+				earnings_for_vault: (400_000_000.0 * 0.4) as u128,
+				capital_contributed_by_vault: 0,
+				frame_id: 3,
+				capital_contributed: 500_000_000,
+			},
 			"Second vault gets 40% of the 400 for their side"
 		);
 		assert_eq!(Balances::free_balance(LiquidityPools::get_bid_pool_account()), 0);
 
 		// fund 1 came first, so gets the extra penny
 		let contributor_funds_balance_1 = 200_000_000;
-		let extra_microgon = 1;
+
 		let vault_1_contributors = vec![
 			(
 				3,
 				280_000_000 +
-					extra_microgon + Permill::from_rational(280, 500u64)
-					.mul_floor(contributor_funds_balance_1),
+					Permill::from_rational(280, 500u64).mul_floor(contributor_funds_balance_1),
 			),
 			(
 				2,
-				220_000_000 +
-					Permill::from_rational(220, 500u64).mul_floor(contributor_funds_balance_1),
+				120_000_000 +
+					Permill::from_rational(120, 500u64).mul_floor(contributor_funds_balance_1),
+			),
+			(
+				10,
+				100_000_000 +
+					Permill::from_rational(100, 500u64).mul_floor(contributor_funds_balance_1),
 			),
 		];
 		assert_eq!(
@@ -480,14 +506,28 @@ fn it_can_distribute_bid_pool_capital() {
 		assert_eq!(bond_funds.get(&1).unwrap().distributed_profits, Some(400_000_001));
 
 		for (account, amount) in vault_1_contributors {
-			assert_eq!(
-				Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &account),
-				amount
-			);
+			if account == 10 {
+				// vault operator gets the full amount
+				assert_eq!(
+					Balances::free_balance(account),
+					0,
+					"vault operator must collect earnings"
+				);
+			} else {
+				// contributors get their share on hold
+				assert_eq!(
+					Balances::balance_on_hold(
+						&HoldReason::ContributedToLiquidityPool.into(),
+						&account
+					),
+					amount,
+					"contributor {} should have their funds on hold",
+					account
+				);
+			}
 		}
 		let contributor_funds_balance_2 = 400_000_000 - (400_000_000.0 * 0.4) as u128;
 		let vault_2_contributors = vec![
-			// This one gets the extra penny floating around (first in order of contributions)
 			(5, 250_000_000 + contributor_funds_balance_2 / 2),
 			(4, 250_000_000 + contributor_funds_balance_2 / 2),
 		];
@@ -610,71 +650,84 @@ fn test_prebonded_argons() {
 		);
 
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(2),
-				1,
-				100_000_000,
-				10_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(2), 1, 10_000_000),
 			Error::<Test>::NotAVaultOperator
 		);
 
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(1),
-				1,
-				100_000_000,
-				10_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 10_000_000),
 			DispatchError::Token(TokenError::FundsUnavailable)
 		);
 
 		set_argons(1, 200_000_000);
-		assert_ok!(LiquidityPools::vault_operator_prebond(
-			RuntimeOrigin::signed(1),
-			1,
-			100_000_000,
-			10_000_000
-		));
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 10_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
 			100_000_000
 		);
-		assert_eq!(
-			PrebondedByVaultId::<Test>::get(1).unwrap().bonded_by_start_offset.to_vec(),
-			vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-		);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().starting_frame_id, 1);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 100_000_000);
 		System::assert_last_event(
-			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 100_000_000 }
-				.into(),
+			Event::<Test>::VaultOperatorPrebond {
+				vault_id: 1,
+				account_id: 1,
+				amount_per_frame: 10_000_000,
+			}
+			.into(),
 		);
 
 		// if we add more funds, it should be additive
 		assert_err!(
-			LiquidityPools::vault_operator_prebond(
-				RuntimeOrigin::signed(1),
-				1,
-				50_000_000,
-				14_000_000
-			),
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 9_000_000),
 			Error::<Test>::MaxAmountBelowMinimum //	"cant reduce the max amount"
 		);
-		assert_ok!(LiquidityPools::vault_operator_prebond(
-			RuntimeOrigin::signed(1),
-			1,
-			50_000_000,
-			15_000_000
-		));
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 15_000_000));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
 			150_000_000
 		);
 		assert_eq!(PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded, 150_000_000);
 		System::assert_last_event(
-			Event::<Test>::VaultOperatorPrebond { vault_id: 1, account_id: 1, amount: 50_000_000 }
-				.into(),
+			Event::<Test>::VaultOperatorPrebond {
+				vault_id: 1,
+				account_id: 1,
+				amount_per_frame: 15_000_000,
+			}
+			.into(),
+		);
+
+		CurrentFrameId::set(10);
+
+		// now test that it properly accounts for already allocated funds
+		for frame in 2..12 {
+			VaultPoolsByFrame::<Test>::mutate(frame, |pools| {
+				if !pools.contains_key(&1) {
+					pools
+						.try_insert(1, LiquidityPool::<Test>::new(1))
+						.expect("Should be able to create a pool");
+				}
+				let pool = pools.get_mut(&1).unwrap();
+				let amount = PrebondedByVaultId::<Test>::mutate(1, |a| {
+					if let Some(a) = a { a.take_unbonded(frame, 5_000_000, 0) } else { 0 }
+				});
+				println!("Frame {}: Adding {} to pool 1", frame, amount);
+				pool.contributor_balances.try_push((1, amount)).unwrap();
+			});
+		}
+		// It should be able to add up the prebond and actual to know it's already full
+		assert_err!(
+			LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 15_000_000),
+			Error::<Test>::MaxAmountBelowMinimum
+		);
+		// should have allocated 5_000_000 per frame
+		assert_eq!(
+			PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded,
+			150_000_000 - 5_000_000 * 10
+		);
+		assert_ok!(LiquidityPools::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 16_000_000));
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ContributedToLiquidityPool.into(), &1),
+			160_000_000
 		);
 	});
 }
@@ -741,7 +794,6 @@ fn test_capital_raise_with_prebonded() {
 		assert_ok!(LiquidityPools::vault_operator_prebond(
 			RuntimeOrigin::signed(1),
 			1,
-			5_000_000_000,
 			500_000_000
 		));
 
@@ -789,7 +841,6 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		assert_ok!(LiquidityPools::vault_operator_prebond(
 			RuntimeOrigin::signed(1),
 			1,
-			5_000_000_000,
 			500_000_000
 		));
 
@@ -847,29 +898,19 @@ fn test_prebonded_argons_struct() {
 		);
 		CurrentFrameId::set(1);
 		let mut prebonded = PrebondedArgons::<Test>::new(1, 1, 5_000_000, 500_000);
-		assert_eq!(prebonded.bonded_by_start_offset.len(), 10);
-		assert_eq!(prebonded.bonded_by_start_offset.to_vec(), vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 		assert_eq!(prebonded.starting_frame_id, 1);
 
-		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 500_000);
-		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 0, 0, 0, 0, 0, 0, 0, 0]
-		);
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000, 0), 500_000);
 		assert_eq!(prebonded.starting_frame_id, 1);
 
-		assert_eq!(prebonded.take_unbonded(2, 1_000_000), 0, "already maxed out");
-		assert_eq!(prebonded.take_unbonded(12, 1_000_000), 0, "next pass also maxed out");
+		assert_eq!(prebonded.take_unbonded(2, 1_000_000, 500_000), 0, "already maxed out");
+		assert_eq!(prebonded.take_unbonded(12, 1_000_000, 500_000), 0, "next pass also maxed out");
 
-		assert_eq!(prebonded.take_unbonded(3, 300_000), 300_000, "takes max available");
+		assert_eq!(prebonded.take_unbonded(3, 300_000, 0), 300_000, "takes max available");
 		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 300_000, 0, 0, 0, 0, 0, 0, 0]
-		);
-		assert_eq!(prebonded.take_unbonded(13, 300_000), 200_000, "caps out at 500k on next pass");
-		assert_eq!(
-			prebonded.bonded_by_start_offset.to_vec(),
-			vec![0, 500_000, 500_000, 0, 0, 0, 0, 0, 0, 0]
+			prebonded.take_unbonded(13, 300_000, 300_000),
+			200_000,
+			"caps out at 500k on next pass"
 		);
 	});
 }

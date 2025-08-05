@@ -339,7 +339,7 @@ impl LockCommands {
 				if let Some(ref request) = release_request {
 					rows.push(vec![
 						"Release Requested".into(),
-						format!("due at block {}", request.cosign_due_block),
+						format!("due at frame {}", request.cosign_due_frame),
 					])
 				}
 
@@ -537,9 +537,9 @@ impl LockCommands {
 						}
 					} else {
 						bail!(
-							"This lock release request hasn't been processed yet. It is due by block {} (current={})",
-							pending_release.cosign_due_block,
-							client.latest_finalized_block().await?
+							"This lock release request hasn't been processed yet. It is due by frame {} (current={})",
+							pending_release.cosign_due_frame,
+							client.current_frame_id().await?
 						)
 					}
 				};
@@ -782,17 +782,11 @@ async fn find_release_request(
 	utxo_id: UtxoId,
 ) -> anyhow::Result<Option<LockReleaseRequest<u128>>> {
 	let release_request = client
-		.fetch_storage(&storage().bitcoin_locks().locks_pending_release_by_utxo_id(), at_block)
-		.await?
-		.map(|a| a.0)
-		.unwrap_or_default()
-		.into_iter()
-		.find_map(|(a, unlock)| {
-			if a == utxo_id {
-				return Some(unlock);
-			}
-			None
-		});
+		.fetch_storage(
+			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id),
+			at_block,
+		)
+		.await?;
 	Ok(release_request)
 }
 async fn get_bitcoin_lock_from_utxo_id(

@@ -1,8 +1,8 @@
 use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
 use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
-	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	NotaryApis, NotebookApis, TickApis,
+	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
+	BlockSealDigest, NotaryApis, NotebookApis, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
@@ -213,7 +213,7 @@ where
 
 		let mut set_to_best = false;
 		let digest = block.header.digest();
-		let block_author: AC = digest
+		let block_author: AccountId = digest
 			.convert_first(|a| a.as_author())
 			.ok_or(Error::UnableToDecodeDigest("author".to_string()))?;
 		let tick = digest
@@ -230,18 +230,6 @@ where
 			if set_to_best && fork_power.eq_weight(&best_block_power) {
 				// if fork power is equal, choose a deterministic option to set the best block
 				set_to_best = info.best_hash > block_hash;
-				// check if this is a "duplicate" block from the same author at the same tick
-				// eg - a block with the same fork power, which we should reject so that we
-				// don't fill up the max quota of blocks at a height. this can happen when
-				// nodes try to ensure everyone knows their best block, but we have already
-				// imported it as non-best, and will keep filling it in
-				let fork_power_hash = blake2_256(&fork_power.encode());
-				self.aux_client.check_duplicate_block_at_tick(
-					block_author.clone(),
-					H256::from(fork_power_hash),
-					tick,
-					false,
-				)?;
 				if !set_to_best {
 					// this flag forces us to revalidate the block
 					block.import_existing = true;
@@ -262,27 +250,60 @@ where
 			self.aux_client.clean_state_history(&mut block.auxiliary, tick)?;
 		}
 
-		if !is_block_gap && !is_block_already_imported && fork_power.is_latest_vote {
-			let voting_key = digest
-				.convert_first(|a| a.as_parent_voting_key())
-				.ok_or(Error::UnableToDecodeDigest("voting key".to_string()))?
-				.parent_voting_key;
+		let mut record_block_key_on_import = None;
 
+		let is_vote_block = fork_power.is_latest_vote;
+		let block_type = if is_vote_block { "vote block" } else { "compute block" }.to_string();
+		if !is_block_gap && !is_block_already_imported {
 			// Block abuse prevention. Do not allow a block author to submit more than one vote
-			// block per tick pertaining to the same voting key.
-			//
-			// The "next_voting_key" represents a combination of the notebooks that were
-			// includedA at a given tick. No voting key means there are no notebooks at
-			// tick.
-			let next_voting_key = voting_key.unwrap_or(H256::zero());
-			self.aux_client.check_duplicate_block_at_tick(
+			// block per tick pertaining to the same voting key or more than one compute block with
+			// the same voting power.
+			let block_key = if is_vote_block {
+				digest
+					.convert_first(|a| a.as_parent_voting_key())
+					.ok_or(Error::UnableToDecodeDigest("voting key".to_string()))?
+					.parent_voting_key
+					.unwrap_or(H256::zero())
+			} else {
+				H256::from(blake2_256(&fork_power.encode()))
+			};
+			record_block_key_on_import = Some(block_key);
+
+			if self
+				.aux_client
+				.is_duplicated_block_key_for_author(&block_author, block_key, tick)
+			{
+				error!(
+					?block_number,
+					block_hash=?block_hash,
+					?parent_hash,
+					origin = ?block.origin,
+					fork_power = ?fork_power,
+					voting_key = ?block_key,
+					"Author produced a duplicate block"
+				);
+				return Err(Error::DuplicateAuthoredBlock(
+					block_author,
+					block_type,
+					block_key.to_string(),
+				)
+				.into());
+			}
+		}
+
+		let res = self.inner.import_block(block).await.map_err(Into::into)?;
+		if let Some(block_key) = record_block_key_on_import {
+			// Record the block key on import, so that we can detect duplicate blocks
+			// at a later time.
+			self.aux_client.record_imported_block_key(
 				block_author,
-				next_voting_key,
+				block_key,
 				tick,
-				true,
+				is_vote_block,
 			)?;
 		}
-		Ok(self.inner.import_block(block).await.map_err(Into::into)?)
+
+		Ok(res)
 	}
 }
 
@@ -1198,11 +1219,12 @@ mod test {
 			StateAction::Execute,
 			Some(AccountId::from([1u8; 32])),
 		);
+		let h_winner = winner.post_hash();
 		importer.import_block(winner).await.unwrap();
 
 		// First loser from author X
 		let author = AccountId::from([2u8; 32]);
-		let loser1 = create_params(
+		let mut loser1 = create_params(
 			1,
 			parent,
 			1,
@@ -1211,6 +1233,10 @@ mod test {
 			StateAction::Execute,
 			Some(author.clone()),
 		);
+		loser1.header.extrinsics_root = H256::random();
+		loser1.header.state_root = H256::random();
+		loser1.post_hash = Some(loser1.header.hash()); // refresh the cached
+		assert_ne!(loser1.post_hash(), h_winner, "loser1 should differ from winner");
 		importer.import_block(loser1).await.unwrap(); // ok
 
 		// Second loser, same author, same fork-power, same tick ⇒ Err

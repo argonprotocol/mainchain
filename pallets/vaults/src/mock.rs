@@ -16,6 +16,7 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		Vaults: pallet_vaults,
+		LiquidityPools: pallet_liquidity_pools,
 	}
 );
 
@@ -68,6 +69,17 @@ parameter_types! {
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 	pub static IsSlotBiddingStarted: bool = false;
 
+	pub const BidPoolAccountId: u64 = 10000;
+
+	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
+
+	pub static MaxLiquidityPoolContributors: u32 = 10;
+	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
+	pub static MaxBidPoolVaultParticipants: u32 = 100;
+	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
+
+	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+
 }
 pub struct StaticMiningSlotProvider;
 impl MiningSlotProvider for StaticMiningSlotProvider {
@@ -118,6 +130,23 @@ impl pallet_vaults::Config for Test {
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
 	type TickProvider = StaticTickProvider;
 	type MaxVaults = ConstU32<100>;
+	type MaxPendingCosignsPerVault = ConstU32<100>;
+	type RevenueCollectionExpirationFrames = ConstU64<10>;
+}
+
+impl pallet_liquidity_pools::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	type Balance = Balance;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type LiquidityPoolVaultProvider = Vaults;
+	type MaxLiquidityPoolContributors = MaxLiquidityPoolContributors;
+	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
+	type PalletId = VaultPalletId;
+	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type GetCurrentFrameId = CurrentFrameId;
 }
 
 pub fn new_test_ext() -> TestState {

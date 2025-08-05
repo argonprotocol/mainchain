@@ -11,9 +11,10 @@ use crate::{
 	VaultId,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
-		get_rounded_up_bitcoin_day_height,
+		UtxoId, get_rounded_up_bitcoin_day_height,
 	},
 	ensure,
+	prelude::FrameId,
 	tick::Tick,
 };
 
@@ -23,6 +24,21 @@ pub trait MiningBidPoolProvider {
 
 	/// Transfer funds to the bid pool and hold
 	fn get_bid_pool_account() -> Self::AccountId;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VaultLiquidityPoolFrameEarnings<Balance, AccountId> {
+	pub vault_id: VaultId,
+	pub vault_operator_account_id: AccountId,
+	pub frame_id: FrameId,
+	/// Frame earnings for all contributors
+	pub earnings: Balance,
+	/// Contributed capital by all contributors
+	pub capital_contributed: Balance,
+	/// Vault earnings from the frame
+	pub earnings_for_vault: Balance,
+	/// Contributed capital by the vault
+	pub capital_contributed_by_vault: Balance,
 }
 
 pub trait LiquidityPoolVaultProvider {
@@ -38,6 +54,12 @@ pub trait LiquidityPoolVaultProvider {
 
 	/// Ensure a vault is open
 	fn is_vault_open(vault_id: VaultId) -> bool;
+
+	/// Records the earnings for a vault frame
+	fn record_vault_frame_earnings(
+		source_account_id: &Self::AccountId,
+		profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+	);
 }
 
 pub struct LockExtension<Balance> {
@@ -133,6 +155,13 @@ pub trait BitcoinVaultProvider {
 
 	/// Argons no longer in a "pending state" - eg, verified bitcoin or canceled
 	fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError>;
+
+	/// Track a pending cosign for a UTXO. This is used to ensure that the vault does not
+	fn update_pending_cosign_list(
+		vault_id: VaultId,
+		utxo_id: UtxoId,
+		should_remove: bool,
+	) -> Result<(), VaultError>;
 }
 
 #[derive(

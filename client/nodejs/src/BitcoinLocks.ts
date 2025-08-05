@@ -54,8 +54,8 @@ export class BitcoinLocks {
     const client = await this.client;
     const bitcoinNetwork = await client.query.bitcoinUtxos.bitcoinNetwork();
     return {
-      releaseExpirationBlocks:
-        client.consts.bitcoinLocks.lockReleaseCosignDeadlineBlocks.toNumber(),
+      lockReleaseCosignDeadlineFrames:
+        client.consts.bitcoinLocks.lockReleaseCosignDeadlineFrames.toNumber(),
       pendingConfirmationExpirationBlocks:
         client.consts.bitcoinUtxos.maxPendingConfirmationBlocks.toNumber(),
       tickDurationMillis: await client.query.ticks
@@ -111,20 +111,18 @@ export class BitcoinLocks {
       const blockHash = await client.rpc.chain.getBlockHash(atHeight);
       client = (await client.at(blockHash)) as ArgonClient;
     }
-    const locksPendingRelease = await client.query.bitcoinLocks.locksPendingReleaseByUtxoId();
-
-    for (const [id, request] of locksPendingRelease.entries()) {
-      if (id.toNumber() === utxoId) {
-        return {
-          toScriptPubkey: request.toScriptPubkey.toHex(),
-          bitcoinNetworkFee: request.bitcoinNetworkFee.toBigInt(),
-          dueBlockHeight: request.cosignDueBlock.toNumber(),
-          vaultId: request.vaultId.toNumber(),
-          redemptionPrice: request.redemptionPrice.toBigInt(),
-        };
-      }
+    const requestMaybe = await client.query.bitcoinLocks.lockReleaseRequestsByUtxoId(utxoId);
+    if (!requestMaybe.isSome) {
+      return undefined;
     }
-    return undefined;
+    const request = requestMaybe.unwrap();
+    return {
+      toScriptPubkey: request.toScriptPubkey.toHex(),
+      bitcoinNetworkFee: request.bitcoinNetworkFee.toBigInt(),
+      dueFrame: request.cosignDueFrame.toNumber(),
+      vaultId: request.vaultId.toNumber(),
+      redemptionPrice: request.redemptionPrice.toBigInt(),
+    };
   }
 
   async submitVaultSignature(args: {
@@ -327,7 +325,8 @@ export class BitcoinLocks {
       argonKeyring,
     );
     const marketPrice = await this.getMarketRate(BigInt(satoshis));
-    const securityFee = vault.calculateBitcoinFee(marketPrice);
+    const isVaultOwner = argonKeyring.address === vault.operatorAccountId;
+    const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(marketPrice);
 
     const { canAfford, availableBalance, txFee } = await submitter.canAfford({
       tip,
@@ -340,6 +339,28 @@ export class BitcoinLocks {
       );
     }
     return { tx, securityFee, txFee };
+  }
+
+  async getBitcoinLockFromTxResult(txResult: TxResult): Promise<{
+    lock: IBitcoinLock;
+    createdAtHeight: number;
+    txResult: TxResult;
+  }> {
+    const client = await this.client;
+    const blockHash = await txResult.inBlockPromise;
+    const blockHeight = await client
+      .at(blockHash)
+      .then(x => x.query.system.number())
+      .then(x => x.toNumber());
+    const utxoId = (await this.getUtxoIdFromEvents(txResult.events)) ?? 0;
+    if (utxoId === 0) {
+      throw new Error('Bitcoin lock creation failed, no UTXO ID found in transaction events');
+    }
+    const lock = await this.getBitcoinLock(utxoId);
+    if (!lock) {
+      throw new Error(`Lock with ID ${utxoId} not found after initialization`);
+    }
+    return { lock, createdAtHeight: blockHeight, txResult };
   }
 
   async initializeLock(args: {
@@ -366,20 +387,14 @@ export class BitcoinLocks {
       tip,
       txProgressCallback,
     });
-    const blockHash = await txResult.inBlockPromise;
-    const blockHeight = await client
-      .at(blockHash)
-      .then(x => x.query.system.number())
-      .then(x => x.toNumber());
-    const utxoId = (await this.getUtxoIdFromEvents(txResult.events)) ?? 0;
-    if (utxoId === 0) {
-      throw new Error('Bitcoin lock creation failed, no UTXO ID found in transaction events');
-    }
-    const lock = await this.getBitcoinLock(utxoId);
-    if (!lock) {
-      throw new Error(`Lock with ID ${utxoId} not found after initialization`);
-    }
-    return { lock, createdAtHeight: blockHeight, txResult, securityFee };
+
+    const { lock, createdAtHeight } = await this.getBitcoinLockFromTxResult(txResult);
+    return {
+      lock,
+      createdAtHeight,
+      txResult,
+      securityFee,
+    };
   }
 
   async requiredSatoshisForArgonLiquidity(argonAmount: bigint): Promise<bigint> {
@@ -630,7 +645,7 @@ export class BitcoinLocks {
 }
 
 export interface IBitcoinLockConfig {
-  releaseExpirationBlocks: number;
+  lockReleaseCosignDeadlineFrames: number;
   pendingConfirmationExpirationBlocks: number;
   tickDurationMillis: number;
   bitcoinNetwork: ArgonPrimitivesBitcoinBitcoinNetwork;
@@ -641,7 +656,7 @@ export interface IReleaseRequest {
 }
 
 export interface IReleaseRequestDetails extends IReleaseRequest {
-  dueBlockHeight: number;
+  dueFrame: number;
   vaultId: number;
   redemptionPrice: bigint;
 }
