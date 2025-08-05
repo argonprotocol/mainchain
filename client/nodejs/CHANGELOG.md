@@ -1,8 +1,24 @@
 # Changelog
 
-## [v1.3.5](https://github.com/argonprotocol/mainchain/compare/v1.3.4...2b5f999e88019ce9219239e945ac7f0a5c72d05a) (2025-07-28)
+## [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...9fc4e7c4a9d37d621eed83b6e0e037c381a1a2a3) (2025-08-05)
+
+### Features
+
+* **client/nodejs:** cohort bidder callbacks
+([7d017bd](https://github.com/argonprotocol/mainchain/commit/7d017bd7f592d40277bc138c18059ac9497878df))
+* **liquidity_pool:** simplify prebond amount
+([f4242c4](https://github.com/argonprotocol/mainchain/commit/f4242c4c6d079dc86982cfa8b9f20b4c5db522c3))
+* **vaults:** earnings must be collected
+([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))
 
 ### Fixes
+
+* **block_rewards:** grant fees to rewards account
+([5bb00c5](https://github.com/argonprotocol/mainchain/commit/5bb00c5158be1340bf4107627d3d367a80832476))
+
+### [v1.3.5](https://github.com/argonprotocol/mainchain/compare/v1.3.4...v1.3.5) (2025-07-28)
+
+#### Fixes
 
 * **bitcoin/nodejs:** enable signet
 ([75d6857](https://github.com/argonprotocol/mainchain/commit/75d6857755bd7456716260f1d8d3ac7d3ca20053))

@@ -1,6 +1,15 @@
 # Changelog
 
-## [v1.3.5](https://github.com/argonprotocol/mainchain/compare/v1.3.4...2b5f999e88019ce9219239e945ac7f0a5c72d05a) (2025-07-28)
+## [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...9fc4e7c4a9d37d621eed83b6e0e037c381a1a2a3) (2025-08-05)
+
+### Features
+
+* **liquidity_pool:** simplify prebond amount
+([f4242c4](https://github.com/argonprotocol/mainchain/commit/f4242c4c6d079dc86982cfa8b9f20b4c5db522c3))
+* **vaults:** earnings must be collected
+([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))
+
+### [v1.3.5](https://github.com/argonprotocol/mainchain/compare/v1.3.4...v1.3.5) (2025-07-28)
 
 ### [v1.3.4](https://github.com/argonprotocol/mainchain/compare/v1.3.3...v1.3.4) (2025-07-27)
 
