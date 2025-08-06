@@ -516,6 +516,10 @@ services:
       - price-oracle
       - all
 
+networks:
+  default:
+    name: argon-net
+
 volumes:
   minio-data:
   pgdata:

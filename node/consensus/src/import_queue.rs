@@ -235,14 +235,15 @@ where
 					block.import_existing = true;
 				}
 			}
-			tracing::info!(
-				number=?block_number,
-				block_hash = ?block_hash,
-				can_finalize = is_finalized_descendent,
-				finalized = block.finalized,
-				set_to_best,
-				"New best fork imported"
-			);
+			if set_to_best {
+				tracing::info!(
+					number=?block_number,
+					block_hash = ?block_hash,
+					is_finalized_descendent,
+					finalized = block.finalized,
+					"New best block imported"
+				);
+			}
 		}
 		block.fork_choice = Some(ForkChoiceStrategy::Custom(set_to_best));
 
@@ -253,8 +254,10 @@ where
 		let mut record_block_key_on_import = None;
 
 		let is_vote_block = fork_power.is_latest_vote;
-		let block_type = if is_vote_block { "vote block" } else { "compute block" }.to_string();
-		if !is_block_gap && !is_block_already_imported {
+		if !is_block_gap &&
+			!is_block_already_imported &&
+			block.origin != BlockOrigin::NetworkInitialSync
+		{
 			// Block abuse prevention. Do not allow a block author to submit more than one vote
 			// block per tick pertaining to the same voting key or more than one compute block with
 			// the same voting power.
@@ -282,6 +285,8 @@ where
 					voting_key = ?block_key,
 					"Author produced a duplicate block"
 				);
+				let block_type =
+					if is_vote_block { "vote block" } else { "compute block" }.to_string();
 				return Err(Error::DuplicateAuthoredBlock(
 					block_author,
 					block_type,
