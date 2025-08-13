@@ -42,7 +42,7 @@ describeIntegration(
         client: Promise.resolve(aliceClient),
         seedAccount: sudo(),
         subaccountRange: parseSubaccountRange('0-49'),
-        sessionKeyMnemonic: mnemonicGenerate(),
+        sessionKeySeedOrMnemonic: mnemonicGenerate(),
       });
     });
 
@@ -111,7 +111,7 @@ describeIntegration(
       const bobaccount = new Accountset({
         seedAccount: new Keyring({ type: 'sr25519' }).addFromUri('//Bob'),
         client: Promise.resolve(aliceClient),
-        sessionKeyMnemonic: mnemonicGenerate(),
+        sessionKeySeedOrMnemonic: mnemonicGenerate(),
       });
       const result = await BitcoinLocks.waitForSpace(bobaccount, {
         argonAmount: 10_000_000n,

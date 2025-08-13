@@ -177,7 +177,8 @@ export class CohortBidder {
     } else {
       blockNumber = await client.query.system.number().then(x => x.toNumber());
     }
-    const blockHash = await client.query.system.blockHash(blockNumber);
+
+    const blockHash = await client.rpc.chain.getBlockHash(blockNumber);
     const api = await client.at(blockHash);
     const rawBids = await api.query.miningSlot.bidsForNextSlotCohort();
     const currentTick = await api.query.ticks.currentTick().then(x => x.toNumber());
@@ -406,6 +407,7 @@ export class CohortBidder {
   }
 
   private scheduleEvaluation() {
+    if (this.isStopped) return;
     const millisPerTick = this.millisPerTick!;
     const delayTicks = Math.max(this.options.bidDelay, 1);
     const delay = delayTicks * millisPerTick;
