@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { promises as fs } from 'node:fs';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -12,4 +13,7 @@ export default defineConfig({
   sourcemap: true,
   skipNodeModulesBundle: true,
   shims: true,
+  onSuccess: async () => {
+    await fs.copyFile('../../docker-compose.yml', 'lib/docker-compose.yml');
+  },
 });

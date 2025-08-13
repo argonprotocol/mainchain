@@ -1,6 +1,5 @@
 import { defineConfig } from 'tsup';
 import { wasmLoader } from 'esbuild-plugin-wasm';
-import * as trace_events from 'node:trace_events';
 
 export default defineConfig([
   // Node.js build
