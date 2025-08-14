@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...9fc4e7c4a9d37d621eed83b6e0e037c381a1a2a3) (2025-08-05)
+## [v1.3.7](https://github.com/argonprotocol/mainchain/compare/v1.3.6...c00345c8c3e1e937845aecf6e8f17b7792833a41) (2025-08-14)
 
 ### Features
+
+* **client/nodejs:** add account minisecret
+([d21d36a](https://github.com/argonprotocol/mainchain/commit/d21d36a82cc7139c3a5c42c0d367673691259b14))
+
+### [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...v1.3.6) (2025-08-05)
+
+#### Features
 
 * **client/nodejs:** cohort bidder callbacks
 ([7d017bd](https://github.com/argonprotocol/mainchain/commit/7d017bd7f592d40277bc138c18059ac9497878df))
@@ -11,7 +18,7 @@
 * **vaults:** earnings must be collected
 ([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))
 
-### Fixes
+#### Fixes
 
 * **block_rewards:** grant fees to rewards account
 ([5bb00c5](https://github.com/argonprotocol/mainchain/commit/5bb00c5158be1340bf4107627d3d367a80832476))

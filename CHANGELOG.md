@@ -1,8 +1,20 @@
 # Changelog
 
-## [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...9fc4e7c4a9d37d621eed83b6e0e037c381a1a2a3) (2025-08-05)
+## [v1.3.7](https://github.com/argonprotocol/mainchain/compare/v1.3.6...c00345c8c3e1e937845aecf6e8f17b7792833a41) (2025-08-14)
 
 ### Features
+
+* **client/nodejs:** add account minisecret
+([d21d36a](https://github.com/argonprotocol/mainchain/commit/d21d36a82cc7139c3a5c42c0d367673691259b14))
+
+### Fixes
+
+* **node:** improve fast sync speed
+([b6ef61f](https://github.com/argonprotocol/mainchain/commit/b6ef61f9d1ad6bb81dedb65ffee3f8e019a83740))
+
+### [v1.3.6](https://github.com/argonprotocol/mainchain/compare/v1.3.5...v1.3.6) (2025-08-05)
+
+#### Features
 
 * **client/nodejs:** cohort bidder callbacks
 ([7d017bd](https://github.com/argonprotocol/mainchain/commit/7d017bd7f592d40277bc138c18059ac9497878df))
@@ -13,7 +25,7 @@
 * **vaults:** don’t charge operator for bitcoin
 ([88262ba](https://github.com/argonprotocol/mainchain/commit/88262baa62ea9fbd498e60c6250fadb940bf3817))
 
-### Fixes
+#### Fixes
 
 * **docker:** use mempool electrs
 ([19fddbe](https://github.com/argonprotocol/mainchain/commit/19fddbe93f5f26a5b20a7f3ea84bdd81c43f95d6))
