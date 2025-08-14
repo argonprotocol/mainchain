@@ -29,3 +29,4 @@ node_modules
 /build.log
 .env*.local
 **/nodejs/browser
+/.yarn/install-state.gz

@@ -40,18 +40,18 @@
     "detect-port": "^2.1.0",
     "docker-compose": "^1.2.0",
     "http-proxy": "^1.18.1",
-    "nanoid": "^3.3.7",
-    "pg": "^8.11.3",
+    "nanoid": "^3.3.11",
+    "pg": "^8.16.3",
     "proper-lockfile": "^4.1.2",
-    "vitest": "^3.1.1"
+    "vitest": "^3.2.4"
   },
   "devDependencies": {
     "@types/http-proxy": "^1.17.16",
-    "@types/node": "^18.19.6",
-    "@types/pg": "^8.11.3",
+    "@types/node": "^18.19.122",
+    "@types/pg": "^8.15.5",
     "@types/proper-lockfile": "^4.1.4",
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.3"
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
   },
   "packageManager": "yarn@4.1.0"
 }

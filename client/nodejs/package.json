@@ -54,31 +54,31 @@
   },
   "dependencies": {
     "@commander-js/extra-typings": "^13.1.0",
-    "@polkadot/api": "^16.2.1",
-    "@polkadot/api-base": "^16.2.1",
-    "@polkadot/keyring": "^13.5.1",
-    "@polkadot/rpc-core": "^16.2.1",
-    "@polkadot/rpc-provider": "^16.2.1",
-    "@polkadot/types": "^16.2.1",
-    "@polkadot/types-codec": "^16.2.1",
-    "@polkadot/util": "^13.5.1",
-    "@polkadot/util-crypto": "^13.5.1",
-    "bignumber.js": "^9.3.0",
+    "@polkadot/api": "^16.4.4",
+    "@polkadot/api-base": "^16.4.4",
+    "@polkadot/keyring": "^13.5.5",
+    "@polkadot/rpc-core": "^16.4.4",
+    "@polkadot/rpc-provider": "^16.4.4",
+    "@polkadot/types": "^16.4.4",
+    "@polkadot/types-codec": "^16.4.4",
+    "@polkadot/util": "^13.5.5",
+    "@polkadot/util-crypto": "^13.5.5",
+    "bignumber.js": "^9.3.1",
     "bs58check": "^4.0.0",
     "commander": "^13.1.0",
     "console-table-printer": "^2.12.1",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
     "@argonprotocol/testing": "1.3.6",
-    "@polkadot/typegen": "^16.2.1",
+    "@polkadot/typegen": "^16.4.4",
     "@substrate/ss58-registry": "^1.51.0",
-    "@types/node": "^18.19.6",
+    "@types/node": "^18.19.122",
     "shx": "^0.4.0",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.8.3",
-    "vitest": "^3.1.1"
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "packageManager": "yarn@4.1.0"
 }
