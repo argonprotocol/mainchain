@@ -35,7 +35,7 @@ describeIntegration('Cohort Bidder tests', () => {
       client: aliceClientPromise,
       seedAccount: sudo(),
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
       name: 'alice',
     });
     await alice.registerKeys(alicechain.address);
@@ -50,7 +50,7 @@ describeIntegration('Cohort Bidder tests', () => {
       client: bobchain.client(),
       seedAccount: new Keyring({ type: 'sr25519' }).addFromUri('//Bob'),
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
       name: 'bob',
     });
     await bob.registerKeys(bobchain.address);

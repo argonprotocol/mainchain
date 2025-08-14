@@ -1,7 +1,7 @@
 export interface ArgonClientConfig {
   debug?: boolean;
   keysVersion?: number;
-  keysMnemonic?: string;
+  keySeedOrMnemonic?: string;
   subaccountRange?: string;
 }
 
@@ -25,7 +25,7 @@ export function getConfig(): ArgonClientConfig {
     keysVersion:
       config.keysVersion ??
       (getEnvVar('KEYS_VERSION') ? parseInt(getEnvVar('KEYS_VERSION')!) : undefined),
-    keysMnemonic: config.keysMnemonic ?? getEnvVar('KEYS_MNEMONIC'),
+    keySeedOrMnemonic: config.keySeedOrMnemonic ?? getEnvVar('KEYS_MNEMONIC'),
     subaccountRange: config.subaccountRange ?? getEnvVar('SUBACCOUNT_RANGE') ?? '0-9',
   };
 }

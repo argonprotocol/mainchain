@@ -8,7 +8,7 @@ they charge for this service.
 ## Locked Bitcoins
 
 A LockedBitcoin is a one-year commitment to lock up the market value of Bitcoin in Argons. These
-funds are not at risk as long as a Vault performs the following two functions:
+funds are not at risk as long as a Vault performs the following three functions:
 
 1. A Vault acts as a co-signer for a Bitcoin UTXO that is locked in Argon. The Vault must respond to
    requests to co-sign LockedBitcoin Release Requests within 10 days, or they will forfeit funds.
@@ -18,6 +18,9 @@ funds are not at risk as long as a Vault performs the following two functions:
 2. A Vault must never move a Bitcoin on the Bitcoin network without releasing the lock first on
    Argon (ie, collude with the Bitcoin holder to bypass Argon). If they do so, they will forfeit
    funds.
+3. A vault must "collect" revenue to make it a freely spendable balance. A "collect" can only be
+   called when there are not pending LockedBitcoin Release Requests. Uncollected revenue is burned
+   after 10 days. (NOTE: this also includes any liquidity pool revenue).
 
 ### Variables for LockedBitcoins
 
@@ -49,6 +52,10 @@ by the securitization ratio. In other words, it's the capital locked into use.
 To bond argons to a `Liquidity Pool`, any account can submit argons to a given cohort's bid pool
 using the `LiquidityPools` pallet. The vault can control how much of the liquidity pool earnings are
 shared with those contributing capital.
+
+> A vault operator can pre-bond argons to the liquidity pool, which gives them first priority to
+> capitalize on activated securitization. This is fully optional. The prebond api is
+> `liquidyPool.vault_operator_prebond`
 
 ### Variables for Liquidity Pools
 
@@ -274,6 +281,8 @@ The following are a few rules around how and when you can add funding to a vault
   forfeit the market value of the Bitcoins
 - Vaults must cosign any BitcoinLock which has a mismatch making it unable to be locked into Argon,
   but which make it stuck in bitcoin without further action.
+- Vaults must claim revenue every 10 days after emptying all pending LockedBitcoin Release Requests.
+  If they do not, the revenue will be burned.
 - Vaults must maintain or exceed the promised additional securitization percentage for the duration
   of any LockedBitcoins
 - Vault terms will take effect in the next Mining Slot (every day at noon EST). This also applies to

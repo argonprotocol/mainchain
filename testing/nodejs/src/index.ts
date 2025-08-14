@@ -11,9 +11,9 @@ import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
 import TestBitcoinCli from './TestBitcoinCli';
 import TestOracle from './TestOracle';
-import * as util from 'node:util';
+import { startNetwork } from './TestNetwork';
 
-export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle };
+export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle, startNetwork };
 
 export interface ITeardownable {
   teardown(): Promise<void>;

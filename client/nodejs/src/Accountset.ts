@@ -43,14 +43,14 @@ export class Accountset {
     return this.accountRegistry.namedAccounts;
   }
 
-  private readonly sessionKeyMnemonic: string | undefined;
+  private readonly sessionKeySeed: string | undefined;
 
   constructor(
     options: {
       client: Promise<ArgonClient>;
       accountRegistry?: AccountRegistry;
       subaccountRange?: SubaccountRange;
-      sessionKeyMnemonic?: string;
+      sessionKeySeedOrMnemonic?: string;
       name?: string;
     } & (
       | { seedAccount: KeyringPair }
@@ -70,7 +70,7 @@ export class Accountset {
       this.txSubmitterPair = options.txSubmitter;
       this.seedAddress = options.seedAddress;
     }
-    this.sessionKeyMnemonic = options.sessionKeyMnemonic;
+    this.sessionKeySeed = options.sessionKeySeedOrMnemonic;
     this.accountRegistry = options.accountRegistry ?? AccountRegistry.factory(options.name);
     this.client = options.client;
     const defaultRange = options.subaccountRange ?? getDefaultSubaccountRange();
@@ -167,7 +167,6 @@ export class Accountset {
     ];
     const bidAmountsByFrame: { [frameId: number]: bigint[] } = {};
     if (frameIds.length) {
-      console.log('Looking up cohorts for frames', frameIds);
       const cohorts = await api.query.miningSlot.minersByCohort.multi(frameIds);
       for (let i = 0; i < frameIds.length; i++) {
         const cohort = cohorts[i];
@@ -360,12 +359,12 @@ export class Accountset {
   } {
     const config = getConfig();
     let version = keysVersion ?? config.keysVersion ?? 0;
-    const seedMnemonic = this.sessionKeyMnemonic ?? config.keysMnemonic;
-    if (!seedMnemonic) {
+    const seed = this.sessionKeySeed ?? config.keySeedOrMnemonic;
+    if (!seed) {
       throw new Error('KEYS_MNEMONIC environment variable not set. Cannot derive keys.');
     }
-    const blockSealKey = `${seedMnemonic}//block-seal//${version}`;
-    const granKey = `${seedMnemonic}//grandpa//${version}`;
+    const blockSealKey = `${seed}//block-seal//${version}`;
+    const granKey = `${seed}//grandpa//${version}`;
     const blockSealAccount = new Keyring().createFromUri(blockSealKey, {
       type: 'ed25519',
     });

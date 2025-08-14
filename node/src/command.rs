@@ -48,6 +48,7 @@ impl SubstrateCli for Cli {
 		Ok(match id {
 			"dev" => Box::new(chain_spec::development_config()?),
 			"meta" => Box::new(chain_spec::metadata_config()?),
+			"dev-docker" => Box::new(chain_spec::docker_dev_config()?),
 			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
 			// This creates a whole new, incompatible genesis, so label it as such
 			"gen-testnet" => Box::new(chain_spec::testnet_config()?),

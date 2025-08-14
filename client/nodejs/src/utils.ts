@@ -2,10 +2,22 @@ import BigNumber, * as BN from 'bignumber.js';
 import type { ArgonClient, GenericEvent } from './index';
 import type { DispatchError } from '@polkadot/types/interfaces';
 import { EventRecord } from '@polkadot/types/interfaces/system';
+import { ed25519DeriveHard, keyExtractSuri, mnemonicToMiniSecret } from '@polkadot/util-crypto';
+import { u8aToHex } from '@polkadot/util';
 
 const { ROUND_FLOOR } = BN;
 
 export const MICROGONS_PER_ARGON = 1_000_000;
+
+export function miniSecretFromUri(uri: string, password?: string): string {
+  const { phrase, path } = keyExtractSuri(uri);
+  let mini = mnemonicToMiniSecret(phrase, password); // base 32B
+  for (const j of path) {
+    if (!j.isHard) throw new Error('ed25519 soft derivation not supported');
+    mini = ed25519DeriveHard(mini, j.chainCode);
+  }
+  return u8aToHex(mini);
+}
 
 export function formatArgons(microgons: bigint | number): string {
   if (microgons === undefined || microgons === null) return 'na';

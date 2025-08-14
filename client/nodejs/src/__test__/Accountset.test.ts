@@ -5,6 +5,7 @@ import {
   getClient,
   TxSubmitter,
   mnemonicGenerate,
+  miniSecretFromUri,
 } from '../index';
 import { describeIntegration, sudo, teardown, TestMainchain } from '@argonprotocol/testing';
 import { parseSubaccountRange } from '../Accountset';
@@ -15,9 +16,10 @@ afterAll(teardown);
 describeIntegration('Accountset tests', () => {
   let mainchain: TestMainchain;
   let client: Promise<ArgonClient>;
+  let mainchainUrl: string;
   beforeAll(async () => {
     mainchain = new TestMainchain();
-    const mainchainUrl = await mainchain.launch();
+    mainchainUrl = await mainchain.launch();
     client = getClient(mainchainUrl);
   });
 
@@ -27,7 +29,7 @@ describeIntegration('Accountset tests', () => {
       client,
       seedAccount,
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
     });
 
     expect(Object.keys(accountset.subAccountsByAddress).length).toBe(50);
@@ -37,13 +39,37 @@ describeIntegration('Accountset tests', () => {
     }
   });
 
+  it('can register keys from a mnemonic', async () => {
+    const seedAccount = sudo();
+    const accountset = new Accountset({
+      client,
+      seedAccount,
+      subaccountRange: parseSubaccountRange('0-49'),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
+    });
+
+    await expect(accountset.registerKeys(mainchainUrl)).resolves.toBeUndefined();
+  });
+
+  it.only('can register keys from a seed', async () => {
+    const seedAccount = sudo();
+    const accountset = new Accountset({
+      client,
+      seedAccount,
+      subaccountRange: parseSubaccountRange('0-49'),
+      sessionKeySeedOrMnemonic: miniSecretFromUri(`${mnemonicGenerate()}//grandpa//0`),
+    });
+
+    await expect(accountset.registerKeys(mainchainUrl)).resolves.toBeUndefined();
+  });
+
   it('can submit bids', async () => {
     const seedAccount = sudo();
     const accountset = new Accountset({
       client,
       seedAccount,
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
     });
 
     const nextSeats = await accountset.getAvailableMinerAccounts(5);
@@ -104,7 +130,7 @@ describeIntegration('Accountset tests', () => {
       client,
       seedAccount: alice,
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
     });
     const subaccounts = await account.getAvailableMinerAccounts(7);
     const alice_result = await account.createMiningBids({
@@ -118,7 +144,7 @@ describeIntegration('Accountset tests', () => {
       client,
       seedAccount: secondAccount,
       subaccountRange: parseSubaccountRange('0-49'),
-      sessionKeyMnemonic: mnemonicGenerate(),
+      sessionKeySeedOrMnemonic: mnemonicGenerate(),
     }).createMiningBids({
       bidAmount: 500_000n,
       subaccountRange: [0, 1, 2, 3, 4],

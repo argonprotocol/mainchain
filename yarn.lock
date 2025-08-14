@@ -125,6 +125,7 @@ __metadata:
     "@types/proper-lockfile": "npm:^4.1.4"
     bitcoin-core: "npm:^5.0.0"
     detect-port: "npm:^2.1.0"
+    docker-compose: "npm:^1.2.0"
     http-proxy: "npm:^1.18.1"
     nanoid: "npm:^3.3.7"
     pg: "npm:^8.11.3"
@@ -3861,6 +3862,15 @@ __metadata:
     detect: dist/commonjs/bin/detect-port.js
     detect-port: dist/commonjs/bin/detect-port.js
   checksum: 10c0/06236ff1197ffea038d4a1c0ab60200ece1ac234eb00a507f93e986483c06989b9efd424cc2bbb8e9556c3984ce906e8a663799797e415626eefb26f040bd5d8
+  languageName: node
+  linkType: hard
+
+"docker-compose@npm:^1.2.0":
+  version: 1.2.0
+  resolution: "docker-compose@npm:1.2.0"
+  dependencies:
+    yaml: "npm:^2.2.2"
+  checksum: 10c0/0bc4ef187904dba55b76b3450b7b2d65b7ee19afdff0d74ffc6ccb573d7ae63de329f13ad01ffc76ddf702a12060a848287b3ff76477014d5e9b63e0958146dd
   languageName: node
   linkType: hard
 
@@ -8323,6 +8333,15 @@ __metadata:
   bin:
     yaml: bin.mjs
   checksum: 10c0/886a7d2abbd70704b79f1d2d05fe9fb0aa63aefb86e1cb9991837dced65193d300f5554747a872b4b10ae9a12bc5d5327e4d04205f70336e863e35e89d8f4ea9
+  languageName: node
+  linkType: hard
+
+"yaml@npm:^2.2.2":
+  version: 2.8.1
+  resolution: "yaml@npm:2.8.1"
+  bin:
+    yaml: bin.mjs
+  checksum: 10c0/7c587be00d9303d2ae1566e03bc5bc7fe978ba0d9bf39cc418c3139d37929dfcb93a230d9749f2cb578b6aa5d9ebebc322415e4b653cb83acd8bc0bc321707f3
   languageName: node
   linkType: hard
 
