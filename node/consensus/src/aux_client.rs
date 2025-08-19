@@ -119,7 +119,7 @@ impl<B: BlockT, C: AuxStore> ArgonAux<B, C> {
 	pub fn new(client: Arc<C>) -> Self {
 		Self {
 			client,
-			state: Arc::new(RwLock::new(LruMap::new(ByLength::new(500)))),
+			state: Arc::new(RwLock::new(LruMap::new(ByLength::new(10)))),
 			lock: Default::default(),
 			_block: Default::default(),
 		}
@@ -273,19 +273,20 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		self.state.write().remove(&notebook_tick_state.aux_key);
 
 		// cleanup old votes (None deletes)
-		let last_cleanup_tick = self.vote_cleanup_height()?.get();
-		if last_cleanup_tick > 0 {
-			// clean back to the last cleanup
-			let cleanup_to = best_block_tick.saturating_sub(OLDEST_VOTES_TO_KEEP);
-			for tick in last_cleanup_tick..=cleanup_to {
-				let key = AuxKey::VotesAtTick(tick);
-				auxiliary_changes.push((key.encode(), None));
-				self.state.write().remove(&key);
-			}
-			let cleanup_key = AuxKey::VoteCleanupTick;
-			auxiliary_changes.push((cleanup_key.encode(), Some(cleanup_to.encode())));
-			self.state.write().remove(&cleanup_key);
+		let mut last_cleanup_tick = self.vote_cleanup_height()?.get();
+		// clean back to the last cleanup
+		let cleanup_to = best_block_tick.saturating_sub(OLDEST_VOTES_TO_KEEP);
+		if last_cleanup_tick == 0 {
+			last_cleanup_tick = cleanup_to.saturating_sub(OLDEST_VOTES_TO_KEEP);
 		}
+		for tick in last_cleanup_tick..=cleanup_to {
+			let key = AuxKey::VotesAtTick(tick);
+			auxiliary_changes.push((key.encode(), None));
+			self.state.write().remove(&key);
+		}
+		let cleanup_key = AuxKey::VoteCleanupTick;
+		auxiliary_changes.push((cleanup_key.encode(), Some(cleanup_to.encode())));
+		self.state.write().remove(&cleanup_key);
 
 		Ok(())
 	}

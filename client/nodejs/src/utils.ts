@@ -221,7 +221,7 @@ export class JsonExt {
 
   public static parse<T = any>(str: string): T {
     return JSON.parse(str, (_, v) => {
-      if (typeof v === 'string' && v.match(/^\d+n$/)) {
+      if (typeof v === 'string' && v.match(/^-?\d+n$/)) {
         return BigInt(v.slice(0, -1));
       }
       // rehydrate Uint8Array objects
