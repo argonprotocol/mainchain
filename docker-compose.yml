@@ -518,7 +518,7 @@ services:
 
 networks:
   default:
-    name: argon-net
+    name: ${COMPOSE_PROJECT_NAME:-argon}-net
 
 volumes:
   minio-data:
