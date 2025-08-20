@@ -19,7 +19,6 @@ Miners pay bids → Mining bid pool → 20% burned → 80% distributed to vault 
 ### How Miners Participate
 
 1. **Slot Bidding Process**:
-
    - Miners submit Argon bids for future mining slots in "cohorts" (groups of miners per frame)
    - **Mining terms**: Winners mine for 10 frames, creating overlapping cohorts
    - **Overlapping operation**: 10 different cohorts operate simultaneously, each at different
@@ -35,7 +34,6 @@ Miners pay bids → Mining bid pool → 20% burned → 80% distributed to vault 
    - **Found in**: `ArgonotSeatCost` storage item, configured in runtime
 
 2. **Bid Competition:**
-
    - Miners submit bids in 10 milligon increments
    - Bids sorted by amount (highest first)
    - Top N bidders win slots for that cohort
