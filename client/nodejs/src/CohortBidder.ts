@@ -3,9 +3,10 @@ import {
   ArgonClient,
   type ArgonPrimitivesBlockSealMiningRegistration,
   ExtrinsicError,
+  getTickFromHeader,
 } from './index';
 import { formatArgons } from './utils';
-import { Bool, u32, u64, Vec } from '@polkadot/types-codec';
+import { Bool, u64, Vec } from '@polkadot/types-codec';
 
 interface IBidDetail {
   address: string;
@@ -45,6 +46,7 @@ export class CohortBidder {
   private nextCohortSize?: number;
 
   private lastBidTick: number = 0;
+  private latestBlockNumber: number = 0;
 
   private evaluateInterval?: NodeJS.Timeout;
 
@@ -117,28 +119,36 @@ export class CohortBidder {
       .genesisTicker()
       .then(x => x.tickDurationMillis.toNumber());
 
+    const bidsForNextSlotCohortKey = client.query.miningSlot.bidsForNextSlotCohort.key();
     let didStart = false;
-    this.unsubscribe = await client.queryMulti<
-      [Vec<ArgonPrimitivesBlockSealMiningRegistration>, u64, u64, u32]
-    >(
-      [
-        client.query.miningSlot.bidsForNextSlotCohort as any,
-        client.query.miningSlot.nextFrameId as any,
-        client.query.ticks.currentTick as any,
-        client.query.system.number as any,
-      ],
-      async ([rawBids, nextFrameId, currentTick, blockNumber]) => {
-        if (nextFrameId.toNumber() === this.cohortStartingFrameId) {
-          this.updateBidList(rawBids, blockNumber.toNumber(), currentTick.toNumber());
-          if (!didStart) {
-            didStart = true;
-            // reset schedule to the tick changes
-            this.scheduleEvaluation();
-            void this.checkWinningBids();
-          }
+    let lastBidsHash: string | undefined;
+    this.unsubscribe = await client.rpc.chain.subscribeNewHeads(async header => {
+      if (this.isStopped) return;
+      // check if the header is for the next frame
+      const clientAt = await client.at(header.hash);
+      const nextFrameId = await clientAt.query.miningSlot.nextFrameId();
+      const blockNumber = header.number.toNumber();
+      this.latestBlockNumber = blockNumber;
+
+      if (nextFrameId.toNumber() === this.cohortStartingFrameId) {
+        const tick = getTickFromHeader(client, header);
+        // check if it changed first
+        const latestHash = await client.rpc.state
+          .getStorageHash(bidsForNextSlotCohortKey)
+          .then(x => x.toHex());
+        if (lastBidsHash !== latestHash) {
+          lastBidsHash = latestHash;
+          const rawBids = await clientAt.query.miningSlot.bidsForNextSlotCohort();
+          this.updateBidList(rawBids, blockNumber, tick!);
         }
-      },
-    );
+        if (!didStart) {
+          didStart = true;
+          // reset schedule to the tick changes
+          this.scheduleEvaluation();
+          void this.checkWinningBids();
+        }
+      }
+    });
   }
 
   public async stop(): Promise<CohortBidder['winningBids']> {
@@ -198,7 +208,9 @@ export class CohortBidder {
 
     // don't process two bids at the same time
     if (this.pendingRequest) {
-      console.log('Current bid is still in progress, skipping this check');
+      console.log(
+        `Current bid is still in progress at block #${this.latestBlockNumber}, skipping this check`,
+      );
       return;
     }
 
@@ -207,6 +219,7 @@ export class CohortBidder {
       console.log(`Waiting for bids more recent than our last attempt.`, {
         ownAttemptedBidTick: this.lastBidTick,
         liveBidsTick: this.currentBids.mostRecentBidTick,
+        latestBlockNumber: this.latestBlockNumber,
       });
       return;
     }
@@ -215,12 +228,14 @@ export class CohortBidder {
     const blockNumber = this.currentBids.atBlockNumber;
     const winningBids = bids.filter(x => this.myAddresses.has(x.address));
     if (winningBids.length >= this.subaccounts.length) {
-      console.log(`No updates needed. Winning all remaining seats (${winningBids.length}).`);
+      console.log(
+        `No updates needed at block #${blockNumber}. Winning all remaining seats (${winningBids.length}).`,
+      );
       return;
     }
 
     console.log(
-      `Checking bids for cohort ${this.cohortStartingFrameId}, Still trying for seats: ${this.subaccounts.length}`,
+      `Checking bids for cohort ${this.cohortStartingFrameId} at block ${this.latestBlockNumber}, Still trying for seats: ${this.subaccounts.length}`,
     );
 
     const winningAddresses = new Set(winningBids.map(x => x.address));
@@ -380,6 +395,7 @@ export class CohortBidder {
         bidsPlaced: subaccounts.length,
         bidPerSeat: formatArgons(microgonsPerSeat),
         bidAtTick,
+        bidAtBlockNumber: blockNumber,
       });
 
       if (bidError) {
@@ -410,7 +426,8 @@ export class CohortBidder {
     if (this.isStopped) return;
     const millisPerTick = this.millisPerTick!;
     const delayTicks = Math.max(this.options.bidDelay, 1);
-    const delay = delayTicks * millisPerTick;
+    const randomDelay = Math.floor(Math.random() * millisPerTick);
+    const delay = delayTicks * millisPerTick + randomDelay;
 
     if (this.evaluateInterval) clearInterval(this.evaluateInterval);
     console.log(`Scheduling next evaluation in ${delay}ms`);
@@ -434,10 +451,8 @@ export class CohortBidder {
         }
         const address = rawBid.accountId.toHuman();
         const bidMicrogons = rawBid.bid.toBigInt();
-        if (!hasDiffs) {
-          const existing = this.currentBids.bids[i];
-          hasDiffs = existing?.address !== address || existing?.bidMicrogons !== bidMicrogons;
-        }
+        const existing = this.currentBids.bids[i];
+        hasDiffs ||= existing?.address !== address || existing?.bidMicrogons !== bidMicrogons;
         bids.push({
           address,
           bidMicrogons,
@@ -445,13 +460,13 @@ export class CohortBidder {
         });
       }
 
-      if (blockNumber > this.currentBids.atBlockNumber && hasDiffs) {
-        this.currentBids.bids = bids;
-        this.currentBids.mostRecentBidTick = mostRecentBidTick;
-        this.currentBids.atTick = tick;
-        this.currentBids.atBlockNumber = blockNumber;
-        this.winningBids = bids.filter(x => this.myAddresses.has(x.address));
-        console.log('Now winning bids:', this.winningBids.length);
+      this.currentBids.bids = bids;
+      this.currentBids.mostRecentBidTick = mostRecentBidTick;
+      this.currentBids.atTick = tick;
+      this.currentBids.atBlockNumber = blockNumber;
+      this.winningBids = bids.filter(x => this.myAddresses.has(x.address));
+      if (hasDiffs) {
+        console.log(`Now winning ${this.winningBids.length} bids at block #${blockNumber}`);
         if (this.callbacks?.onBidsUpdated) {
           this.callbacks.onBidsUpdated({
             bids: this.winningBids,
