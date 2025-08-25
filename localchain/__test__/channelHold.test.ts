@@ -33,7 +33,7 @@ afterAll(teardown);
 
 describeIntegration('ChannelHold integration', () => {
   it('can create a zone record type', async () => {
-    let mainchain = new TestMainchain();
+    const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const mainchainClient = await getClient(mainchainUrl);
     disconnectOnTeardown(mainchainClient);
@@ -54,7 +54,7 @@ describeIntegration('ChannelHold integration', () => {
   }, 120e3);
 
   it('can create an channelHold from a domain registration', async () => {
-    let mainchain = new TestMainchain();
+    const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
     const notary = new TestNotary();
     await notary.start({ uuid: mainchain.uuid, mainchainUrl });
@@ -86,6 +86,7 @@ describeIntegration('ChannelHold integration', () => {
     );
 
     const ferdiechain = await createLocalchain(mainchainUrl);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     await ferdiechain.keystore.useExternal(ferdiekeys.address, ferdiekeys.sign, ferdiekeys.derive);
 
     const domain = {
@@ -105,7 +106,7 @@ describeIntegration('ChannelHold integration', () => {
         ),
       ]);
       await ferdieChange.notarization.leaseDomain('example.Analytics', ferdiekeys.address);
-      let [ferdieTracker] = await Promise.all([
+      const [ferdieTracker] = await Promise.all([
         bobChange.notarization.notarizeAndWaitForNotebook(),
         ferdieChange.notarization.notarizeAndWaitForNotebook(),
       ]);

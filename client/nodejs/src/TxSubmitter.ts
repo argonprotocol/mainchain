@@ -9,14 +9,11 @@ import {
 } from './index';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import type { SignerOptions } from '@polkadot/api/types';
-import { getConfig } from './config';
 
 export function logExtrinsicResult(result: ISubmittableResult) {
-  if (getConfig().debug) {
-    const json = result.status.toJSON() as any;
-    const status = Object.keys(json)[0];
-    console.debug('Transaction update: "%s"', status, json[status]);
-  }
+  const json = result.status.toJSON() as any;
+  const status = Object.keys(json)[0];
+  console.debug('Transaction update: "%s"', status, json[status]);
 }
 
 export class TxSubmitter {
@@ -66,8 +63,8 @@ export class TxSubmitter {
     await waitForLoad();
     const result = new TxResult(this.client, logResults);
     result.txProgressCallback = options.txProgressCallback;
-    let toHuman = (this.tx.toHuman() as any).method as any;
-    let txString = [];
+    let toHuman = (this.tx.toHuman() as any).method;
+    const txString = [];
     let api = formatCall(toHuman);
     const args: any[] = [];
     if (api === 'proxy.proxy') {
@@ -76,6 +73,7 @@ export class TxSubmitter {
       api = formatCall(toHuman);
     }
     if (api.startsWith('utility.batch')) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       const calls = toHuman.args.calls.map(formatCall).join(', ');
       txString.push(`Batch[${calls}]`);
     } else {
@@ -141,8 +139,8 @@ export class TxResult {
       this.finalizedReject = reject;
     });
     // drown unhandled
-    this.inBlockPromise.catch(() => {});
-    this.finalizedPromise.catch(() => {});
+    this.inBlockPromise.catch(() => null);
+    this.finalizedPromise.catch(() => null);
   }
 
   public onResult(result: ISubmittableResult) {

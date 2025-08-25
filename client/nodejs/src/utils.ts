@@ -1,23 +1,11 @@
 import BigNumber, * as BN from 'bignumber.js';
-import type { ArgonClient, GenericEvent } from './index';
+import type { ArgonClient } from './index';
 import type { DispatchError } from '@polkadot/types/interfaces';
 import { EventRecord } from '@polkadot/types/interfaces/system';
-import { ed25519DeriveHard, keyExtractSuri, mnemonicToMiniSecret } from '@polkadot/util-crypto';
-import { u8aToHex } from '@polkadot/util';
 
 const { ROUND_FLOOR } = BN;
 
 export const MICROGONS_PER_ARGON = 1_000_000;
-
-export function miniSecretFromUri(uri: string, password?: string): string {
-  const { phrase, path } = keyExtractSuri(uri);
-  let mini = mnemonicToMiniSecret(phrase, password); // base 32B
-  for (const j of path) {
-    if (!j.isHard) throw new Error('ed25519 soft derivation not supported');
-    mini = ed25519DeriveHard(mini, j.chainCode);
-  }
-  return u8aToHex(mini);
-}
 
 export function formatArgons(microgons: bigint | number): string {
   if (microgons === undefined || microgons === null) return 'na';
@@ -32,39 +20,22 @@ export function formatArgons(microgons: bigint | number): string {
   return `${isNegative ? '-' : ''}₳${format}`;
 }
 
-export function formatPercent(x: BigNumber | undefined): string {
-  if (!x) return 'na';
-  return `${x.times(100).decimalPlaces(3)}%`;
-}
-
-type NonNullableProps<T> = {
-  [K in keyof T]-?: Exclude<T[K], undefined | null>;
-};
-
-export function filterUndefined<T extends Record<string, any>>(
-  obj: Partial<T>,
-): NonNullableProps<T> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, value]) => value !== undefined && value !== null),
-  ) as NonNullableProps<T>;
-}
-
 export async function gettersToObject<T>(obj: T): Promise<T> {
   if (obj === null || obj === undefined || typeof obj !== 'object') return obj;
 
   const keys = [];
-  // eslint-disable-next-line guard-for-in
+
   for (const key in obj) {
     keys.push(key);
   }
 
   if (Symbol.iterator in obj) {
     const iterableToArray = [];
-    // @ts-ignore
+    // @ts-expect-error - it should iterate by virtue of Symbol.iterator
     for (const item of obj) {
       iterableToArray.push(await gettersToObject(item));
     }
-    return iterableToArray as any;
+    return iterableToArray as T;
   }
 
   const result = {} as any;
@@ -79,49 +50,7 @@ export async function gettersToObject<T>(obj: T): Promise<T> {
 
     result[key] = await gettersToObject(value);
   }
-  return result;
-}
-
-export function toFixedNumber(
-  value: string | number | BigNumber, // accept string to avoid early precision loss
-  decimals: number,
-): bigint {
-  const factor = new BigNumber(10).pow(decimals);
-  const bn = new BigNumber(value);
-  // truncate toward 0; use ROUND_FLOOR if you really need floor for positives
-  const int = bn.times(factor).integerValue(BigNumber.ROUND_DOWN);
-  return BigInt(int.toFixed(0));
-}
-
-export function convertNumberToFixedU128(value: number): bigint {
-  return toFixedNumber(value, 18);
-}
-
-export function convertFixedU128ToBigNumber(fixedU128: bigint): BigNumber {
-  const decimalFactor = new BigNumber(10).pow(new BigNumber(18)); // Fixed point precision (18 decimals)
-  const rawValue = new BigNumber(fixedU128.toString()); // Parse the u128 string value into BN
-  // Convert the value to fixed-point
-  return rawValue.div(decimalFactor);
-}
-
-export function convertPermillToBigNumber(permill: bigint): BigNumber {
-  const decimalFactor = new BigNumber(1_000_000);
-  const rawValue = new BigNumber(permill.toString()); // Parse the u128 string value into BN
-  // Convert the value to fixed-point
-  return rawValue.div(decimalFactor);
-}
-
-export function convertNumberToPermill(value: number): bigint {
-  return toFixedNumber(value, 6);
-}
-
-export function eventDataToJson(event: GenericEvent): any {
-  const obj = {} as any;
-  event.data.forEach((data, index) => {
-    const name = event.data.names?.[index];
-    obj[name ?? `${index}`] = data.toJSON();
-  });
-  return obj;
+  return result as T;
 }
 
 export function dispatchErrorToString(client: ArgonClient, error: DispatchError) {
@@ -193,71 +122,4 @@ export function checkForExtrinsicSuccess(
       }
     }
   });
-}
-
-/**
- * JSON with support for BigInt in JSON.stringify and JSON.parse
- */
-export class JsonExt {
-  public static stringify(obj: any, space?: number): string {
-    return JSON.stringify(
-      obj,
-      (_, v) => {
-        if (typeof v === 'bigint') {
-          return `${v}n`; // Append 'n' to indicate BigInt
-        }
-        // convert Uint8Array objects to a JSON representation
-        if (v instanceof Uint8Array) {
-          return {
-            type: 'Buffer',
-            data: Array.from(v), // Convert Uint8Array to an array of numbers
-          };
-        }
-        return v;
-      },
-      space,
-    );
-  }
-
-  public static parse<T = any>(str: string): T {
-    return JSON.parse(str, (_, v) => {
-      if (typeof v === 'string' && v.match(/^-?\d+n$/)) {
-        return BigInt(v.slice(0, -1));
-      }
-      // rehydrate Uint8Array objects
-      if (typeof v === 'object' && v !== null && v.type === 'Buffer' && Array.isArray(v.data)) {
-        return Uint8Array.from(v.data);
-      }
-      return v;
-    });
-  }
-}
-
-export function createNanoEvents<Events extends EventsMap = DefaultEvents>(): TypedEmitter<Events> {
-  return new TypedEmitter<Events>();
-}
-
-export class TypedEmitter<Events extends EventsMap = DefaultEvents> {
-  private events: Partial<{ [E in keyof Events]: Events[E][] }> = {};
-
-  emit<K extends keyof Events>(this: this, event: K, ...args: Parameters<Events[K]>): void {
-    for (const cb of this.events[event] || []) {
-      cb(...args);
-    }
-  }
-
-  on<K extends keyof Events>(this: this, event: K, cb: Events[K]): () => void {
-    (this.events[event] ||= []).push(cb);
-    return () => {
-      this.events[event] = this.events[event]?.filter(i => cb !== i);
-    };
-  }
-}
-
-interface EventsMap {
-  [event: string]: any;
-}
-
-interface DefaultEvents extends EventsMap {
-  [event: string]: (...args: any) => void;
 }

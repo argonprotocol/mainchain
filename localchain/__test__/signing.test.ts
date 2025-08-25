@@ -12,6 +12,7 @@ it('can sign a message from javscript', async () => {
   });
   closeOnTeardown(bobchain);
   const bob = await KeyringSigner.load('//Bob');
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   await bobchain.keystore.useExternal(bob.address, bob.sign, bob.derive);
   const notarization = bobchain.beginChange();
   const balanceChange = await notarization.defaultDepositAccount();

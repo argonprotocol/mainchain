@@ -146,9 +146,9 @@ export default class TestMainchain implements ITeardownable {
 
       const int2 = readline.createInterface({ input: this.#process!.stderr! }).on('line', line => {
         console.log('Main >> %s', line);
-        let match = line.match(/Running JSON-RPC server: addr=([\d.:]+)/);
+        const match = line.match(/Running JSON-RPC server: addr=([\d.:]+)/);
         if (match) {
-          let ipv4 = match[1].split(',').at(0);
+          const ipv4 = match[1].split(',').at(0);
           resolve(ipv4!.split(':').pop()!);
         }
       });

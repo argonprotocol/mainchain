@@ -30,7 +30,8 @@
     "src",
     "src/interfaces/**/*.ts",
     // if you have augment-api.ts etc.
-    "node_modules/@polkadot/**/*.d.ts"
+    "node_modules/@polkadot/**/*.d.ts",
+    "__test__"
   ],
   "exclude": ["lib", "browser", "**/localchain", "build/**/*", "node_modules", "target"]
 }

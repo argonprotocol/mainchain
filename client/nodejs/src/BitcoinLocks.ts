@@ -1,27 +1,25 @@
 import {
-  Accountset,
   type ArgonClient,
   type ArgonPrimitivesBitcoinBitcoinNetwork,
+  formatArgons,
   ITxProgressCallback,
   type KeyringPair,
   TxSubmitter,
-  VaultMonitor,
+  Vault,
 } from './index';
-import { formatArgons } from './utils';
-import { Vault } from './Vault';
 import { GenericEvent } from '@polkadot/types';
 import { TxResult } from './TxSubmitter';
-import { hexToU8a, u8aToHex } from '@polkadot/util';
+import { u8aToHex } from '@polkadot/util';
+import { ApiDecoration } from '@polkadot/api/types';
 
 export const SATS_PER_BTC = 100_000_000n;
 
 export class BitcoinLocks {
-  constructor(readonly client: Promise<ArgonClient>) {}
+  constructor(readonly client: ArgonClient) {}
 
   async getUtxoIdFromEvents(events: GenericEvent[]) {
-    const client = await this.client;
     for (const event of events) {
-      if (client.events.bitcoinLocks.BitcoinLockCreated.is(event)) {
+      if (this.client.events.bitcoinLocks.BitcoinLockCreated.is(event)) {
         return event.data.utxoId.toNumber();
       }
     }
@@ -29,7 +27,7 @@ export class BitcoinLocks {
   }
 
   async getMarketRate(satoshis: bigint): Promise<bigint> {
-    const client = await this.client;
+    const client = this.client;
     const sats = client.createType('U64', satoshis.toString());
     const marketRate = await client.rpc.state.call('BitcoinApis_market_rate', sats.toHex(true));
     const rate = client.createType('Option<U128>', marketRate);
@@ -40,7 +38,7 @@ export class BitcoinLocks {
   }
 
   async getRedemptionRate(satoshis: bigint): Promise<bigint> {
-    const client = await this.client;
+    const client = this.client;
     const sats = client.createType('U64', satoshis.toString());
     const marketRate = await client.rpc.state.call('BitcoinApis_redemption_rate', sats.toHex(true));
     const rate = client.createType('Option<U128>', marketRate);
@@ -51,7 +49,7 @@ export class BitcoinLocks {
   }
 
   async getConfig(): Promise<IBitcoinLockConfig> {
-    const client = await this.client;
+    const client = this.client;
     const bitcoinNetwork = await client.query.bitcoinUtxos.bitcoinNetwork();
     return {
       lockReleaseCosignDeadlineFrames:
@@ -66,8 +64,7 @@ export class BitcoinLocks {
   }
 
   async getBitcoinConfirmedBlockHeight(): Promise<number> {
-    const client = await this.client;
-    return await client.query.bitcoinUtxos
+    return await this.client.query.bitcoinUtxos
       .confirmedBitcoinBlockTip()
       .then(x => x.value?.blockHeight.toNumber() ?? 0);
   }
@@ -75,7 +72,7 @@ export class BitcoinLocks {
   /**
    * Gets the UTXO reference by ID.
    * @param utxoId - The UTXO ID to look up.
-   * @param atHeight - Optional block height to query the UTXO reference at a specific point in time.
+   * @param clientAtHeight - Optional client at the block height to query the UTXO reference at a specific point in time.
    * @return An object containing the transaction ID and output index, or undefined if not found.
    * @return.txid - The Bitcoin transaction ID of the UTXO.
    * @return.vout - The output index of the UTXO in the transaction.
@@ -83,13 +80,9 @@ export class BitcoinLocks {
    */
   async getUtxoRef(
     utxoId: number,
-    atHeight?: number,
+    clientAtHeight?: ApiDecoration<'promise'>,
   ): Promise<{ txid: string; vout: number; bitcoinTxid: string } | undefined> {
-    let client = await this.client;
-    if (atHeight !== undefined) {
-      const blockHash = await client.rpc.chain.getBlockHash(atHeight);
-      client = (await client.at(blockHash)) as ArgonClient;
-    }
+    const client = clientAtHeight ?? this.client;
     const refRaw = await client.query.bitcoinUtxos.utxoIdToRef(utxoId);
     if (!refRaw) {
       return;
@@ -104,13 +97,9 @@ export class BitcoinLocks {
 
   async getReleaseRequest(
     utxoId: number,
-    atHeight?: number,
+    clientAtHeight?: ApiDecoration<'promise'>,
   ): Promise<IReleaseRequestDetails | undefined> {
-    let client = await this.client;
-    if (atHeight !== undefined) {
-      const blockHash = await client.rpc.chain.getBlockHash(atHeight);
-      client = (await client.at(blockHash)) as ArgonClient;
-    }
+    const client = clientAtHeight ?? this.client;
     const requestMaybe = await client.query.bitcoinLocks.lockReleaseRequestsByUtxoId(utxoId);
     if (!requestMaybe.isSome) {
       return undefined;
@@ -132,7 +121,7 @@ export class BitcoinLocks {
     txProgressCallback?: ITxProgressCallback;
   }): Promise<TxResult> {
     const { utxoId, vaultSignature, argonKeyring, txProgressCallback } = args;
-    const client = await this.client;
+    const client = this.client;
     if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
       throw new Error(
         `Invalid vault signature length: ${vaultSignature.byteLength}. Must be 70-73 bytes.`,
@@ -146,8 +135,7 @@ export class BitcoinLocks {
   }
 
   async getBitcoinLock(utxoId: number): Promise<IBitcoinLock | undefined> {
-    const client = await this.client;
-    const utxoRaw = await client.query.bitcoinLocks.locksByUtxoId(utxoId);
+    const utxoRaw = await this.client.query.bitcoinLocks.locksByUtxoId(utxoId);
     if (!utxoRaw.isSome) {
       return;
     }
@@ -207,7 +195,7 @@ export class BitcoinLocks {
     utxoId: number,
     waitForSignatureMillis?: number,
   ): Promise<{ blockHeight: number; signature: Uint8Array } | undefined> {
-    const client = await this.client;
+    const client = this.client;
     const releaseHeight = await client.query.bitcoinLocks.lockReleaseCosignHeightById(utxoId);
     if (releaseHeight.isSome) {
       const releaseHeightValue = releaseHeight.unwrap().toNumber();
@@ -247,7 +235,7 @@ export class BitcoinLocks {
   }
 
   async blockHashAtHeight(atHeight: number): Promise<string | undefined> {
-    const client = await this.client;
+    const client = this.client;
 
     for (let i = 0; i < 10; i++) {
       const currentHeight = await client.query.system.number().then(x => x.toNumber());
@@ -270,7 +258,7 @@ export class BitcoinLocks {
   }
 
   async getVaultCosignSignature(utxoId: number, atHeight: number): Promise<Uint8Array | undefined> {
-    const client = await this.client;
+    const client = this.client;
 
     const blockHash = await this.blockHashAtHeight(atHeight);
     if (!blockHash) {
@@ -291,8 +279,7 @@ export class BitcoinLocks {
   }
 
   async findPendingMints(utxoId: number): Promise<bigint[]> {
-    const client = await this.client;
-    const pendingMint = await client.query.mint.pendingMintUtxos();
+    const pendingMint = await this.client.query.mint.pendingMintUtxos();
     const mintsPending: bigint[] = [];
     for (const [utxoIdRaw, _accountId, mintAmountRaw] of pendingMint) {
       if (utxoIdRaw.toNumber() === utxoId) {
@@ -311,7 +298,7 @@ export class BitcoinLocks {
     tip?: bigint;
   }) {
     const { vault, argonKeyring, satoshis, tip = 0n, ownerBitcoinPubkey } = args;
-    const client = await this.client;
+    const client = this.client;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
         `Invalid Bitcoin key length: ${ownerBitcoinPubkey.length}. Must be a compressed pukey (33 bytes).`,
@@ -346,7 +333,7 @@ export class BitcoinLocks {
     createdAtHeight: number;
     txResult: TxResult;
   }> {
-    const client = await this.client;
+    const client = this.client;
     const blockHash = await txResult.inBlockPromise;
     const blockHeight = await client
       .at(blockHash)
@@ -377,7 +364,7 @@ export class BitcoinLocks {
     securityFee: bigint;
   }> {
     const { argonKeyring, tip = 0n, txProgressCallback } = args;
-    const client = await this.client;
+    const client = this.client;
 
     const { tx, securityFee } = await this.createInitializeLockTx(args);
     const submitter = new TxSubmitter(client, tx, argonKeyring);
@@ -413,7 +400,7 @@ export class BitcoinLocks {
     tip?: bigint;
     txProgressCallback?: ITxProgressCallback;
   }): Promise<{ blockHash: Uint8Array; blockHeight: number }> {
-    const client = await this.client;
+    const client = this.client;
     const {
       lock,
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
@@ -465,7 +452,6 @@ export class BitcoinLocks {
   }
 
   async releasePrice(satoshis: bigint, lockPrice: bigint): Promise<bigint> {
-    const client = await this.client;
     const redemptionRate = await this.getRedemptionRate(satoshis);
     if (redemptionRate > lockPrice) {
       return redemptionRate;
@@ -478,7 +464,7 @@ export class BitcoinLocks {
     vault: Vault,
   ): Promise<{ burnAmount: bigint; ratchetingFee: bigint; marketRate: bigint }> {
     const { createdAtHeight, vaultClaimHeight, lockPrice, satoshis } = lock;
-    const client = await this.client;
+    const client = this.client;
     const marketRate = await this.getMarketRate(BigInt(satoshis));
 
     let ratchetingFee = vault.terms.bitcoinBaseFee;
@@ -520,7 +506,7 @@ export class BitcoinLocks {
     bitcoinBlockHeight: number;
   }> {
     const { lock, argonKeyring, tip = 0n, vault, txProgressCallback } = args;
-    const client = await this.client;
+    const client = this.client;
 
     const ratchetPrice = await this.getRatchetPrice(lock, vault);
     const txSubmitter = new TxSubmitter(
@@ -571,76 +557,6 @@ export class BitcoinLocks {
       blockHeight,
       bitcoinBlockHeight,
     };
-  }
-
-  static async waitForSpace(
-    accountset: Accountset,
-    options: {
-      argonAmount: bigint;
-      bitcoinXpub: string;
-      maxLockFee?: bigint;
-      tip?: bigint;
-      satoshiWiggleRoomForDynamicPrice?: bigint;
-    },
-  ): Promise<{
-    satoshis: bigint;
-    argons: bigint;
-    vaultId: number;
-    txFee: bigint;
-    securityFee: bigint;
-    utxoId: number;
-    finalizedPromise: Promise<Uint8Array>;
-  }> {
-    const { argonAmount, bitcoinXpub, maxLockFee, tip = 0n } = options;
-    const vaults = new VaultMonitor(accountset, {
-      bitcoinSpaceAvailable: argonAmount,
-    });
-    const bitcoinXpubBuffer = hexToU8a(bitcoinXpub);
-
-    return new Promise(async (resolve, reject) => {
-      vaults.events.on('bitcoin-space-above', async (vaultId, amount) => {
-        const vault = vaults.vaultsById[vaultId];
-        const fee = vault.calculateBitcoinFee(amount);
-        console.log(
-          `Vault ${vaultId} has ${formatArgons(amount)} argons available for bitcoin. Lock fee is ${formatArgons(fee)}`,
-        );
-        if (maxLockFee !== undefined && fee > maxLockFee) {
-          console.log(
-            `Skipping vault ${vaultId} due to high lock fee: ${formatArgons(maxLockFee)}`,
-          );
-          return;
-        }
-
-        try {
-          const bitcoinLock = new BitcoinLocks(accountset.client);
-          let satoshis = await bitcoinLock.requiredSatoshisForArgonLiquidity(amount);
-          satoshis -= options.satoshiWiggleRoomForDynamicPrice ?? 500n;
-          const { txResult, lock, securityFee } = await bitcoinLock.initializeLock({
-            vault,
-            satoshis,
-            argonKeyring: accountset.txSubmitterPair,
-            ownerBitcoinPubkey: bitcoinXpubBuffer,
-            tip,
-          });
-
-          resolve({
-            satoshis,
-            argons: argonAmount,
-            vaultId,
-            securityFee,
-            txFee: txResult.finalFee!,
-            finalizedPromise: txResult.finalizedPromise,
-            utxoId: lock.utxoId,
-          });
-        } catch (err) {
-          console.error('Error submitting bitcoin lock tx:', err);
-          reject(err);
-        } finally {
-          vaults.stop();
-        }
-      });
-      await vaults.monitor();
-    });
   }
 }
 

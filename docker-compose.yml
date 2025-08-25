@@ -31,13 +31,6 @@ x-bitcoin-config: &bitcoin
   restart: on-failure
   volumes:
     - bitcoin-data:/bitcoin
-x-cli-config: &cli
-  image: node:20-slim
-  build:
-    context: .
-    dockerfile: docker/nodejs.Dockerfile
-  working_dir: /app
-  restart: on-failure
 
 services:
   minio:
@@ -289,36 +282,6 @@ services:
       - bob
       - all
 
-  miner-1-bidder:
-    <<: *cli
-    command:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        cd client/nodejs || true
-        if [ -f lib/cli.js ]; then
-          echo "Using local CLI"
-          CLI="node lib/cli.js"
-        else
-          echo "Using npx CLI"
-          CLI="npx --yes @argonprotocol/mainchain"
-        fi
-        set -x
-        $$CLI accounts create --path=/accounts/bob.json --register-keys-to=http://miner-1:9944 --account-suri=//Bob -s=0-99
-        exec $$CLI mining bid --env=/accounts/bob.json --max-bid=0.5 --run-continuous
-    environment:
-      - MAINCHAIN_URL=ws://archive-node:9944
-    depends_on:
-      miner-1:
-        condition: service_healthy
-    restart: on-failure
-    volumes:
-      - miner1-data:/accounts
-    profiles:
-      - miners
-      - all
-
   miner-2:
     <<: *node
     depends_on:
@@ -370,35 +333,6 @@ services:
     profiles:
       - miners
       - dave
-      - all
-
-  miner-2-bidder:
-    <<: *cli
-    command:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        cd client/nodejs || true
-        if [ -f lib/cli.js ]; then
-          echo "Using local CLI"
-          CLI="node lib/cli.js"
-        else
-          echo "Using npx CLI"
-          CLI="npx --yes @argonprotocol/mainchain"
-        fi
-        set -x
-        $$CLI accounts create --path=/accounts/dave.json --register-keys-to=http://miner-2:9944 --account-suri=//Dave -s=0-49
-        exec $$CLI mining bid --env=/accounts/dave.json --max-bid=2 --max-seats=5 --bid-delay=2 --run-continuous
-    environment:
-      - MAINCHAIN_URL=ws://archive-node:9944
-    depends_on:
-      miner-2:
-        condition: service_healthy
-    volumes:
-      - miner2-data:/accounts
-    profiles:
-      - miners
       - all
 
   notary-insert-key:

@@ -7,24 +7,17 @@ import { cryptoWaitReady, decodeAddress, mnemonicGenerate } from '@polkadot/util
 import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
+import type { ApiOptions } from '@polkadot/api/types';
 
 export { WageProtector } from './WageProtector';
 export { TxSubmitter, TxResult, ITxProgressCallback } from './TxSubmitter';
-export { Accountset, type ISubaccountMiner, type IMiningIndex } from './Accountset';
-export { MiningBids } from './MiningBids';
-export { AccountMiners } from './AccountMiners';
-export { FrameCalculator } from './FrameCalculator';
-export { BlockWatch, getAuthorFromHeader, getTickFromHeader } from './BlockWatch';
 export * from './utils';
-export { AccountRegistry } from './AccountRegistry';
-export { Vault } from './Vault';
-export { VaultMonitor } from './VaultMonitor';
-export { CohortBidder } from './CohortBidder';
-export { BidPool } from './BidPool';
-export * from './BitcoinLocks';
 export * from './keyringUtils';
+export * from './header';
+export * from './Vault';
+export * from './convert';
+export * from './BitcoinLocks';
 export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
-export { setConfig, getConfig, type ArgonClientConfig } from './config';
 
 export { u8aToHex, hexToU8a, u8aEq } from '@polkadot/util';
 
@@ -91,12 +84,12 @@ export async function waitForLoad(): Promise<void> {
  * @param host The host to connect to
  * @returns The client
  */
-export async function getClient(host: string): Promise<ArgonClient> {
+export async function getClient(host: string, options?: ApiOptions): Promise<ArgonClient> {
   let provider: ProviderInterface;
   if (host.startsWith('http')) {
     provider = new HttpProvider(host);
   } else {
     provider = new WsProvider(host);
   }
-  return await ApiPromise.create({ provider, noInitWarn: true });
+  return await ApiPromise.create({ provider, noInitWarn: true, ...(options ?? {}) });
 }

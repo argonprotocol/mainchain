@@ -1,6 +1,6 @@
 import { customAlphabet } from 'nanoid';
-import pg from 'pg';
 import type { Client } from 'pg';
+import pg from 'pg';
 import * as child_process from 'node:child_process';
 import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
 import * as fs from 'node:fs';
@@ -101,7 +101,7 @@ export default class TestNotary implements ITeardownable {
       await client.end();
     }
 
-    let result = child_process.execSync(
+    const result = child_process.execSync(
       `${notaryPath} migrate --db-url ${this.#dbConnectionString}/${this.#dbName}`,
       {
         encoding: 'utf-8',
@@ -149,7 +149,7 @@ export default class TestNotary implements ITeardownable {
       this.#childProcess!.once('error', onProcessError);
       this.#childProcess!.stderr.on('data', data => {
         console.warn('Notary >> %s', data);
-        if (data.startsWith('WARNING')) return;
+        if (typeof data === 'string' && data.startsWith('WARNING')) return;
         this.#childProcess!.off('error', onProcessError);
         reject(data);
       });
@@ -157,7 +157,7 @@ export default class TestNotary implements ITeardownable {
         .createInterface({ input: this.#childProcess!.stdout })
         .on('line', line => {
           console.log('Notary >> %s', line);
-          let match = line.match(/Listening on ([ws:/\d.]+)/);
+          const match = line.match(/Listening on ([ws:/\d.]+)/);
           if (match?.length ?? 0 > 0) {
             resolve(match![1].split(':').pop()!);
           }
@@ -175,7 +175,7 @@ export default class TestNotary implements ITeardownable {
   }
 
   public async register(client: ArgonClient): Promise<void> {
-    let address = new URL(this.address);
+    const address = new URL(this.address);
     await new TxSubmitter(
       client,
       client.tx.notaries.propose({

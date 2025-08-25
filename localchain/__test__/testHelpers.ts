@@ -78,7 +78,7 @@ export async function transferToLocalchain(
             .then(() => {
               for (const { event } of events) {
                 if (client.events.chainTransfer.TransferToLocalchain.is(event)) {
-                  let transferId = event.data.transferId.toPrimitive() as number;
+                  const transferId = event.data.transferId.toPrimitive() as number;
                   resolve(transferId);
                 }
               }
