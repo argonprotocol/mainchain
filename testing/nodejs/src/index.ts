@@ -83,6 +83,7 @@ export function stringifyExt(obj: any): any {
       if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
         return `0x${Buffer.from(value).toString('hex')}`; // Convert Buffer to hex string
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     },
     2,

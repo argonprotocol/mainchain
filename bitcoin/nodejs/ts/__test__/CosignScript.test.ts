@@ -7,12 +7,12 @@ import {
   TestOracle,
 } from '@argonprotocol/testing';
 import {
-  Accountset,
   ArgonClient,
   BitcoinLocks,
   IBitcoinLock,
   IBitcoinLockConfig,
   Keyring,
+  KeyringPair,
   SATS_PER_BTC,
   toFixedNumber,
   TxSubmitter,
@@ -43,9 +43,9 @@ describeIntegration(
   () => {
     let vaulterchain: TestMainchain;
     let vaulterClient: ArgonClient;
-    let vaulter: Accountset;
+    let vaulter: KeyringPair;
     let lock: IBitcoinLock;
-    let bitcoinLocker: Accountset;
+    let bitcoinLocker: KeyringPair;
     const vaulterMnemonic = generateMnemonic(english);
     const bitcoinMnemonic = generateMnemonic(english);
     const devSeed = mnemonicToSeedSync(vaulterMnemonic);
@@ -74,17 +74,9 @@ describeIntegration(
         bitcoinRpcUrl: `http://bitcoin:bitcoin@localhost:${vaulterchain.bitcoinPort!}`,
       });
 
-      vaulter = new Accountset({
-        client: Promise.resolve(vaulterClient),
-        seedAccount: sudo(),
-        sessionKeyMnemonic: generateMnemonic(english),
-      });
-      bitcoinLocker = new Accountset({
-        seedAccount: new Keyring({ type: 'sr25519' }).addFromUri('//Bob'),
-        client: Promise.resolve(vaulterClient),
-        sessionKeyMnemonic: generateMnemonic(english),
-      });
-      bitcoinLocks = new BitcoinLocks(Promise.resolve(vaulterClient));
+      vaulter = sudo();
+      bitcoinLocker = new Keyring({ type: 'sr25519' }).addFromUri('//Bob');
+      bitcoinLocks = new BitcoinLocks(vaulterClient);
       config = await bitcoinLocks.getConfig();
       console.log('Bitcoin Locks config:', stringifyExt(config));
       bitcoinNetwork = getBitcoinNetworkFromApi(config.bitcoinNetwork);
@@ -121,13 +113,13 @@ describeIntegration(
       await new Promise(resolve => setTimeout(resolve, 0));
       const priceIndex = await vaulterClient.query.priceIndex.current();
       expect(priceIndex.isSome).toBe(true);
-      const bitcoinLocks = new BitcoinLocks(Promise.resolve(vaulterClient));
+      const bitcoinLocks = new BitcoinLocks(vaulterClient);
       await expect(bitcoinLocks.getMarketRate(100n)).resolves.toStrictEqual(60_000n);
       await expect(bitcoinLocks.getRedemptionRate(100n)).resolves.toStrictEqual(60_000n);
     });
 
     test.sequential('it can lock a bitcoin', async () => {
-      const vaultResult = await Vault.create(vaulterClient, vaulter.txSubmitterPair, {
+      const vaultResult = await Vault.create(vaulterClient, vaulter, {
         securitization: 10_000_000n,
         securitizationRatio: 1,
         annualPercentRate: 0.05,
@@ -155,7 +147,7 @@ describeIntegration(
         vault,
         satoshis: 2000n,
         ownerBitcoinPubkey,
-        argonKeyring: bitcoinLocker.txSubmitterPair,
+        argonKeyring: bitcoinLocker,
       });
       console.log('Locked bitcoin', result.lock);
       lock = result.lock;
@@ -201,7 +193,7 @@ describeIntegration(
       if (finalizedPsbt.txid) {
         console.log('Finalized TXID (from finalizepsbt):', finalizedPsbt.txid);
       }
-      const txid = await btcClient.command('sendrawtransaction', finalizedPsbt.hex);
+      const txid: string = await btcClient.command('sendrawtransaction', finalizedPsbt.hex);
       console.log('Broadcast TXID (from sendrawtransaction):', txid);
       console.log('TXID normalized:', txid.split('').reverse().join(''));
       // Fetch decoded transaction and log its TXID
@@ -255,7 +247,7 @@ describeIntegration(
       const result = await bitcoinLocks.requestRelease({
         lock,
         releaseRequest: { bitcoinNetworkFee: networkFee, toScriptPubkey },
-        argonKeyring: bitcoinLocker.txSubmitterPair,
+        argonKeyring: bitcoinLocker,
       });
       console.log('Release request result:', result);
       expect(result.blockHeight).toBeGreaterThan(1);
@@ -288,7 +280,7 @@ describeIntegration(
       const tx = await bitcoinLocks.submitVaultSignature({
         utxoId: lock.utxoId,
         vaultSignature: signature,
-        argonKeyring: vaulter.txSubmitterPair,
+        argonKeyring: vaulter,
       });
       await tx.inBlockPromise;
       expect(tx.includedInBlock).toBeTruthy();
@@ -316,11 +308,11 @@ describeIntegration(
 
       const dataStillAvailableHeight = cosign.blockHeight - 1;
 
-      const releaseRequest = await bitcoinLocks.getReleaseRequest(
-        lock.utxoId,
-        dataStillAvailableHeight,
-      );
-      const utxoRef = await bitcoinLocks.getUtxoRef(lock.utxoId, dataStillAvailableHeight);
+      const blockHash = await vaulterClient.rpc.chain.getBlockHash(dataStillAvailableHeight);
+      const clientAtHeight = await vaulterClient.at(blockHash);
+
+      const releaseRequest = await bitcoinLocks.getReleaseRequest(lock.utxoId, clientAtHeight);
+      const utxoRef = await bitcoinLocks.getUtxoRef(lock.utxoId, clientAtHeight);
       expect(utxoRef).toBeTruthy();
       console.log('Got release request:', releaseRequest, utxoRef, cosign);
       const cosignedTx = cosignScript.cosignAndGenerateTx({

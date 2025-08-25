@@ -53,11 +53,11 @@ export default class TestOracle implements ITeardownable {
     });
     this.#childProcess.stdout.setEncoding('utf8');
     this.#childProcess.stderr.setEncoding('utf8');
-    this.#childProcess!.stderr.on('data', data => {
+    this.#childProcess.stderr.on('data', data => {
       console.warn('%sOracle >> %s', service, data);
     });
     this.#stdioInterface = readline
-      .createInterface({ input: this.#childProcess!.stdout })
+      .createInterface({ input: this.#childProcess.stdout })
       .on('line', line => {
         console.log('%sOracle >> %s', service, line);
       });

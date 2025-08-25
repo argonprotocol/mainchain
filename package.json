@@ -6,6 +6,7 @@
     "build": "yarn workspaces foreach --all run build && yarn lint",
     "pretest": "yarn workspace @argonprotocol/localchain pretest",
     "lint": "yarn prettier --write \"**/*.{ts,js,json,md}\"",
+    "eslint": "eslint . --ext .ts --cache --fix",
     "test": "yarn pretest && yarn workspaces foreach --all run test",
     "test:ci": "yarn pretest && yarn workspaces foreach --all run test:ci",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
@@ -23,7 +24,13 @@
   ],
   "devDependencies": {
     "@lerna-lite/version": "^3.12.3",
-    "prettier": "^3.6.2"
+    "eslint": "9.33.0",
+    "eslint-config-prettier": "10.1.8",
+    "jiti": "^2.5.1",
+    "prettier": "^3.6.2",
+    "prettier-eslint-cli": "8.0.1",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.39.1"
   },
   "resolutions": {
     "axios": "^0.30.1",

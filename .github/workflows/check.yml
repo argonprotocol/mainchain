@@ -59,7 +59,7 @@ jobs:
       - name: Free Disk Space
         uses: ./.github/templates/clear-space
 
-      - uses: ikalnytskyi/action-setup-postgres@v6
+      - uses: ikalnytskyi/action-setup-postgres@v7
       - uses: ./.github/templates/minio
 
       - name: Install linux dependencies

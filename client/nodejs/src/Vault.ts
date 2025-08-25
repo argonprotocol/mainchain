@@ -1,14 +1,16 @@
 import {
   ArgonClient,
   type ArgonPrimitivesVault,
+  FIXED_U128_DECIMALS,
   formatArgons,
+  fromFixedNumber,
   ITxProgressCallback,
   KeyringPair,
+  PERMILL_DECIMALS,
   toFixedNumber,
   TxSubmitter,
 } from './index';
 import BigNumber, * as BN from 'bignumber.js';
-import { convertFixedU128ToBigNumber, convertPermillToBigNumber } from './utils';
 import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxSubmitter';
@@ -44,8 +46,9 @@ export class Vault {
 
   public load(vault: ArgonPrimitivesVault) {
     this.securitization = vault.securitization.toBigInt();
-    this.securitizationRatio = convertFixedU128ToBigNumber(
+    this.securitizationRatio = fromFixedNumber(
       vault.securitizationRatio.toBigInt(),
+      FIXED_U128_DECIMALS,
     ).toNumber();
     this.argonsLocked = vault.argonsLocked.toBigInt();
     this.argonsPendingActivation = vault.argonsPendingActivation.toBigInt();
@@ -56,12 +59,14 @@ export class Vault {
       }
     }
     this.terms = {
-      bitcoinAnnualPercentRate: convertFixedU128ToBigNumber(
+      bitcoinAnnualPercentRate: fromFixedNumber(
         vault.terms.bitcoinAnnualPercentRate.toBigInt(),
+        FIXED_U128_DECIMALS,
       ),
       bitcoinBaseFee: vault.terms.bitcoinBaseFee.toBigInt(),
-      liquidityPoolProfitSharing: convertPermillToBigNumber(
+      liquidityPoolProfitSharing: fromFixedNumber(
         vault.terms.liquidityPoolProfitSharing.toBigInt(),
+        PERMILL_DECIMALS,
       ),
     };
 
@@ -71,12 +76,14 @@ export class Vault {
       const [tickApply, terms] = vault.pendingTerms.value;
       this.pendingTermsChangeTick = tickApply.toNumber();
       this.pendingTerms = {
-        bitcoinAnnualPercentRate: convertFixedU128ToBigNumber(
+        bitcoinAnnualPercentRate: fromFixedNumber(
           terms.bitcoinAnnualPercentRate.toBigInt(),
+          FIXED_U128_DECIMALS,
         ),
         bitcoinBaseFee: terms.bitcoinBaseFee.toBigInt(),
-        liquidityPoolProfitSharing: convertPermillToBigNumber(
+        liquidityPoolProfitSharing: fromFixedNumber(
           vault.terms.liquidityPoolProfitSharing.toBigInt(),
+          PERMILL_DECIMALS,
         ),
       };
     }
@@ -190,18 +197,21 @@ export class Vault {
         xpubBytes = bytes;
       }
     }
-    let vaultParams = {
+    const vaultParams = {
       terms: {
         // convert to fixed u128
-        bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, 18),
+        bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, FIXED_U128_DECIMALS),
         bitcoinBaseFee: BigInt(baseFee),
-        liquidityPoolProfitSharing: toFixedNumber(args.liquidityPoolProfitSharing, 6),
+        liquidityPoolProfitSharing: toFixedNumber(
+          args.liquidityPoolProfitSharing,
+          PERMILL_DECIMALS,
+        ),
       },
-      securitizationRatio: toFixedNumber(securitizationRatio, 18),
+      securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
       bitcoinXpubkey: xpubBytes,
     };
-    let tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), keypair);
+    const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), keypair);
     if (doNotExceedBalance) {
       const finalTip = tip ?? 0n;
       let txFee = await tx.feeEstimate(finalTip);
@@ -251,9 +261,4 @@ export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
   readonly liquidityPoolProfitSharing: BigNumber;
-}
-
-export interface IBondedArgons {
-  readonly allocated: bigint;
-  readonly reserved: bigint;
 }
