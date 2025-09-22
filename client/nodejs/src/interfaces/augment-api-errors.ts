@@ -197,8 +197,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UtxoNotLocked: AugmentedError<ApiType>;
     };
-    blockRewards: {
-    };
+    blockRewards: {};
     blockSeal: {
       /**
        * A block seal authority could not be properly decoded
@@ -414,8 +413,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       TooSoon: AugmentedError<ApiType>;
     };
-    hyperbridge: {
-    };
+    hyperbridge: {};
     ismp: {
       /**
        * Couldn't update challenge period
@@ -441,56 +439,6 @@ declare module '@polkadot/api-base/types/errors' {
        * Couldn't update unbonding period
        **/
       UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
-    };
-    liquidityPools: {
-      /**
-       * The added amount would exceed the activated securitization
-       **/
-      ActivatedSecuritizationExceeded: AugmentedError<ApiType>;
-      /**
-       * This fund has already been renewed
-       **/
-      AlreadyRenewed: AugmentedError<ApiType>;
-      /**
-       * Below the minimum amount of argons per contributor
-       **/
-      BelowMinimum: AugmentedError<ApiType>;
-      /**
-       * The contributed amount would not make this account a contributor
-       **/
-      ContributionTooLow: AugmentedError<ApiType>;
-      /**
-       * Unable to update the vault fund
-       **/
-      CouldNotFindLiquidityPool: AugmentedError<ApiType>;
-      /**
-       * An internal error occurred (like an overflow)
-       **/
-      InternalError: AugmentedError<ApiType>;
-      /**
-       * The prebond amount cannot be reduced and this takes it below the previous allocation
-       **/
-      MaxAmountBelowMinimum: AugmentedError<ApiType>;
-      /**
-       * Max contributors for a fund exceeded
-       **/
-      MaxContributorsExceeded: AugmentedError<ApiType>;
-      /**
-       * Max Vaults exceeded
-       **/
-      MaxVaultsExceeded: AugmentedError<ApiType>;
-      /**
-       * This account is not an active mining fund contributor
-       **/
-      NotAFundContributor: AugmentedError<ApiType>;
-      /**
-       * Vault operator only
-       **/
-      NotAVaultOperator: AugmentedError<ApiType>;
-      /**
-       * The given vault is not accepting mining bonds
-       **/
-      VaultNotAcceptingMiningBonds: AugmentedError<ApiType>;
     };
     miningSlot: {
       /**
@@ -842,8 +790,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       Unauthorized: AugmentedError<ApiType>;
     };
-    ticks: {
-    };
+    ticks: {};
     tokenGateway: {
       /**
        * Asset Id creation failed
@@ -881,6 +828,56 @@ declare module '@polkadot/api-base/types/errors' {
        * A asset that has not been registered
        **/
       UnregisteredAsset: AugmentedError<ApiType>;
+    };
+    treasury: {
+      /**
+       * The added amount would exceed the activated securitization
+       **/
+      ActivatedSecuritizationExceeded: AugmentedError<ApiType>;
+      /**
+       * This fund has already been renewed
+       **/
+      AlreadyRenewed: AugmentedError<ApiType>;
+      /**
+       * Below the minimum amount of argons per contributor
+       **/
+      BelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The contributed amount would not make this account a contributor
+       **/
+      ContributionTooLow: AugmentedError<ApiType>;
+      /**
+       * Unable to update the vault fund
+       **/
+      CouldNotFindTreasury: AugmentedError<ApiType>;
+      /**
+       * An internal error occurred (like an overflow)
+       **/
+      InternalError: AugmentedError<ApiType>;
+      /**
+       * The prebond amount cannot be reduced and this takes it below the previous allocation
+       **/
+      MaxAmountBelowMinimum: AugmentedError<ApiType>;
+      /**
+       * Max contributors for a fund exceeded
+       **/
+      MaxContributorsExceeded: AugmentedError<ApiType>;
+      /**
+       * Max Vaults exceeded
+       **/
+      MaxVaultsExceeded: AugmentedError<ApiType>;
+      /**
+       * This account is not an active mining fund contributor
+       **/
+      NotAFundContributor: AugmentedError<ApiType>;
+      /**
+       * Vault operator only
+       **/
+      NotAVaultOperator: AugmentedError<ApiType>;
+      /**
+       * The given vault is not accepting mining bonds
+       **/
+      VaultNotAcceptingMiningBonds: AugmentedError<ApiType>;
     };
     txPause: {
       /**

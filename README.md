@@ -65,7 +65,7 @@ zero-trust, decentralized bridge. Fees are payable in Argons when going Argon ->
 Ethereum/Base/Binance Chain/etc, and the native token of a source chain when transferring into
 Argon.
 
-A Uniswap liquidity pool with USDC is used to create a price-point for the Argon. The main Uniswap
+A Uniswap treasury pool with USDC is used to create a price-point for the Argon. The main Uniswap
 contract initially in use is on Ethereum.
 
 The Localchain is a Rust library that can be run in a standalone cli, within Node.js via bindings
@@ -118,9 +118,8 @@ mainchain. It uses a PostgresSQL database to keep track of its history and users
   - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel
     holds with ip routing akin to a dns lookup. They're prominently used for
     [Ulixee Datastores](https://ulixee.org/docs/datastore).
-  - `liquidity_pools`: Allows users to bond argons into a vault's liquidity pool. The liquidity
-    pools offer early liquidity to locked bitcoins and earn participants a share of the mining bid
-    pool.
+  - `treasury`: Allows users to bond argons into a vault's treasury pool. The treasury offers early
+    liquidity to locked bitcoins and earn participants a share of the mining bid pool.
   - `mining_slot`: Allows users to register for mining slots. Mining slots are used to determine who
     is eligible to mine blocks created by the notebook commit reveal scheme.
   - `mint`: Mints Argons to locked bitcoins and miners when the Argon price is above target
@@ -131,7 +130,7 @@ mainchain. It uses a PostgresSQL database to keep track of its history and users
     price given CPI inflation since the starting time.
   - `ticks`: Tracks system-wide "ticks" or minutes since genesis as whole units.
   - `vaults`: Register and manage vaults that offer LockedBitcoins to bitcoin holders and create
-    LiquidityPools.
+    Treasury.
 - `primitives`: Shared models and types for the Argon mainchain, localchain and notaries.
 
 ## Runtime Pallets

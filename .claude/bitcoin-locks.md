@@ -15,12 +15,12 @@ A bitcoin lock is essentially a **Bitcoin-backed minting mechanism**:
 3. **If user spends Bitcoin outside the system** → They've double-spent (got Argons + spent Bitcoin)
 
 The system is backed by **vaults** - entities that provide securitization capacity and earn revenue
-primarily from liquidity pool participation in mining bid distributions.
+primarily from treasury pool participation in mining bid distributions.
 
 ### Key Players
 
 - **Bitcoin Holder**: Wants to unlock liquidity from their Bitcoin without selling it
-- **Vault Operator**: Provides securitization capacity, earns liquidity pool revenue from mining bid
+- **Vault Operator**: Provides securitization capacity, earns treasury pool revenue from mining bid
   distributions
 - **Network**: Monitors Bitcoin network to detect if users spend their locked Bitcoin elsewhere
 
@@ -353,7 +353,7 @@ price = (bitcoin_market_price / r) * (0.576r + 0.4)  // Note: 0.576 = 576/1000
 
 **Vault Revenue Sources**:
 
-1. **Liquidity pool revenue** (80% of mining bid distributions) - Primary revenue
+1. **Treasury pool revenue** (80% of mining bid distributions) - Primary revenue
 2. **Bitcoin lock fees** - Annual rate + base fees
 3. **Ratcheting fees** - Proportional fees on additional locks
 
@@ -388,8 +388,8 @@ price = (bitcoin_market_price / r) * (0.576r + 0.4)  // Note: 0.576 = 576/1000
 
 **How vaults make money:**
 
-1. **Liquidity pool revenue** (biggest source) - Share of mining bid distributions based on
-   activated securitization
+1. **Treasury pool revenue** (biggest source) - Share of mining bid distributions based on activated
+   securitization
 2. **Bitcoin lock fees** - Direct fees from users who lock Bitcoin
 3. **Faster capital cycling** - Can reuse securitization immediately when users redeem early
 
@@ -428,11 +428,11 @@ The system is secure because users face a **liquidity vs ownership trade-off**:
 
 ### How Vaults Actually Make Money
 
-**Primary revenue: Liquidity pool revenue** (from mining bid distributions)
+**Primary revenue: Treasury pool revenue** (from mining bid distributions)
 
-- Miners bid for mining slots, vault liquidity pools get 80% of winning bids
+- Miners bid for mining slots, vault treasury pools get 80% of winning bids
 - Vault's share depends on their activated securitization (more activated Bitcoin locks = more
-  liquidity pool revenue)
+  treasury pool revenue)
 - This is where vaults make most of their money
 
 **Secondary revenue: Bitcoin lock fees**
@@ -440,20 +440,20 @@ The system is secure because users face a **liquidity vs ownership trade-off**:
 - Initialization fees and annual rates from users
 - Much smaller than mining revenue but still meaningful
 
-**Key insight: Bitcoin locks enable liquidity pool revenue**
+**Key insight: Bitcoin locks enable treasury pool revenue**
 
 - Each activated Bitcoin lock increases vault's capacity to earn from mining bid distributions
-- More activated securitization = larger share of liquidity pool revenue
+- More activated securitization = larger share of treasury pool revenue
 - Creates strong incentive for vaults to facilitate Bitcoin locks
 
 **When users redeem early:**
 
 - **Redemption payment is burned** (deflationary, not paid to vault)
 - Vault gets their original securitization back for immediate reuse
-- Doesn't lose liquidity pool revenue capacity
+- Doesn't lose treasury pool revenue capacity
 - Benefits from faster capital cycling only
 
-**See**: [Mining and Liquidity Pool Economics](./MINING_LIQUIDITY_FLOW.md) for complete details.
+**See**: [Mining and Treasury Pool Economics](./MINING_LIQUIDITY_FLOW.md) for complete details.
 
 ## Redemption Pricing: The Economic Incentives
 
@@ -637,6 +637,6 @@ Bitcoin currently backing the Argon supply.
 **Integration Points:**
 
 - **Vault Operations**: Securitization, funding, and revenue distribution
-- **Mining Revenue**: Liquidity pool participation and bid pool distribution
+- **Mining Revenue**: Treasury pool participation and bid pool distribution
 - **UTXO Tracking**: Cross-pallet event coordination and Bitcoin network integration
 - **L2 Scaling**: Notebook system for high-frequency transaction processing

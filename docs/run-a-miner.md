@@ -174,9 +174,9 @@ Mining seats will dynamically adjust for each frame based on the average bid pri
 The number can range from 10-1000 seats per frame. You can look up the target price for a frame
 using constants `miningSlot.targetPricePerSeat`.
 
-Your bids will go into a bid "pool" for your slot and into the Slot Liquidity Pool. This pool helps
+Your bids will go into a bid "pool" for your slot and into the Slot Treasury Pool. This pool helps
 grant liquidity to Bitcoin holders when minting is delayed. Vaults are able to crowd-source funds to
-this liquidity pool and earn profits via its distribution.
+this treasury pool and earn profits via its distribution.
 
 You need to set up an account and acquire Argons to bid for a mining slot.
 

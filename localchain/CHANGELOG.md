@@ -8,7 +8,7 @@
 
 #### Features
 
-* **liquidity_pool:** simplify prebond amount
+* **treasury:** simplify prebond amount
 ([f4242c4](https://github.com/argonprotocol/mainchain/commit/f4242c4c6d079dc86982cfa8b9f20b4c5db522c3))
 * **vaults:** earnings must be collected
 ([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))

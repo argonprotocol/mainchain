@@ -21,4 +21,4 @@ XPUB=$(./argon-bitcoin-cli xpriv derive-xpub --xpriv-path=/tmp/argon/xpriv_maste
 ./argon-bitcoin-cli vault create \
   --argons=₳50 --securitization-ratio=1x \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50  \
-  --liquidity-pool-profit-sharing=50% --bitcoin-xpub=$XPUB
+  --treasury-profit-sharing=50% --bitcoin-xpub=$XPUB

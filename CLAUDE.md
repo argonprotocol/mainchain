@@ -221,7 +221,7 @@ cargo build --release --features=runtime-benchmarks --bin argon-node
 
 ### Cross-Pallet Dependencies
 
-- **Understand the architecture**: Vaults ↔ Bitcoin Locks ↔ Mining Slots ↔ Liquidity Pools
+- **Understand the architecture**: Vaults ↔ Bitcoin Locks ↔ Mining Slots ↔ Treasury Pools
 - **Check runtime configuration**: `runtime/argon/src/lib.rs` for pallet relationships
 - **Follow provider trait patterns**: See existing implementations for cross-pallet communication
 

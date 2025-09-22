@@ -123,7 +123,7 @@ mod runtime {
 	pub type TokenGateway = pallet_token_gateway;
 
 	#[runtime::pallet_index(31)]
-	pub type LiquidityPools = pallet_liquidity_pools;
+	pub type Treasury = pallet_treasury;
 	#[runtime::pallet_index(32)]
 	pub type FeelessTransaction = pallet_skip_feeless_payment;
 }
@@ -352,15 +352,15 @@ parameter_types! {
 	pub const MinimumArgonsPerContributor: Balance = 100 * ARGON; // 100 argons minimum
 }
 
-impl pallet_liquidity_pools::Config for Runtime {
+impl pallet_treasury::Config for Runtime {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LiquidityPoolVaultProvider = Vaults;
-	type MaxLiquidityPoolContributors = MaxLiquidityPoolContributors;
+	type TreasuryVaultProvider = Vaults;
+	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
-	type PalletId = LiquidityPoolsInternalPalletId;
+	type PalletId = TreasuryInternalPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
 	type GetCurrentFrameId = GetCurrentFrameId;
@@ -381,8 +381,8 @@ impl pallet_mining_slot::Config for Runtime {
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BidPoolProvider = LiquidityPools;
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, LiquidityPools, Vaults);
+	type BidPoolProvider = Treasury;
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Treasury, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
@@ -610,7 +610,7 @@ impl pallet_ismp::Config for Runtime {
 		AccountId,
 		Balances,
 		ArgonWeightToFee,
-		LiquidityPoolsInternalPalletId,
+		TreasuryInternalPalletId,
 		false,
 	>;
 }

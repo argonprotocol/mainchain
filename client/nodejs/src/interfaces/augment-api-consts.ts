@@ -9,7 +9,13 @@ import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { Percent } from '@polkadot/types/interfaces/runtime';
-import type { FrameSupportPalletId, FrameSystemLimitsBlockLength, FrameSystemLimitsBlockWeights, SpVersionRuntimeVersion, SpWeightsRuntimeDbWeight } from '@polkadot/types/lookup';
+import type {
+  FrameSupportPalletId,
+  FrameSystemLimitsBlockLength,
+  FrameSystemLimitsBlockWeights,
+  SpVersionRuntimeVersion,
+  SpWeightsRuntimeDbWeight,
+} from '@polkadot/types/lookup';
 
 export type __AugmentedConst<ApiType extends ApiTypes> = AugmentedConst<ApiType>;
 
@@ -162,28 +168,6 @@ declare module '@polkadot/api-base/types/consts' {
        * can be zero.
        **/
       maxSetIdSessionEntries: u64 & AugmentedConst<ApiType>;
-    };
-    liquidityPools: {
-      /**
-       * Bid Pool burn percent
-       **/
-      bidPoolBurnPercent: Percent & AugmentedConst<ApiType>;
-      /**
-       * The number of vaults that can participate in the bid pools. This is a substrate limit.
-       **/
-      maxBidPoolVaultParticipants: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of contributors to a bond fund
-       **/
-      maxLiquidityPoolContributors: u32 & AugmentedConst<ApiType>;
-      /**
-       * The minimum argons per fund contributor
-       **/
-      minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
-      /**
-       * A pallet id that is used to hold the bid pool
-       **/
-      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
     };
     miningSlot: {
       /**
@@ -443,6 +427,28 @@ declare module '@polkadot/api-base/types/consts' {
        * transactions.
        **/
       operationalFeeMultiplier: u8 & AugmentedConst<ApiType>;
+    };
+    treasury: {
+      /**
+       * Bid Pool burn percent
+       **/
+      bidPoolBurnPercent: Percent & AugmentedConst<ApiType>;
+      /**
+       * The number of vaults that can participate in the bid pools. This is a substrate limit.
+       **/
+      maxBidPoolVaultParticipants: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of contributors to a bond fund
+       **/
+      maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
+      /**
+       * The minimum argons per fund contributor
+       **/
+      minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
+      /**
+       * A pallet id that is used to hold the bid pool
+       **/
+      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
     };
     txPause: {
       /**

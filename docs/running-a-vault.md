@@ -20,7 +20,7 @@ funds are not at risk as long as a Vault performs the following three functions:
    funds.
 3. A vault must "collect" revenue to make it a freely spendable balance. A "collect" can only be
    called when there are not pending LockedBitcoin Release Requests. Uncollected revenue is burned
-   after 10 days. (NOTE: this also includes any liquidity pool revenue).
+   after 10 days. (NOTE: this also includes any treasury pool revenue).
 
 ### Variables for LockedBitcoins
 
@@ -35,32 +35,32 @@ funds are not at risk as long as a Vault performs the following three functions:
 - `Securitization`: The number of argons a Vault will lock as Securitization for Bitcoins.
   `1 / securitization ratio` worth of these argons can be used to create LockedBitcoins.
 
-## Liquidity Pools
+## Treasury Pools
 
-Liquidity Pools offer LockedBitcoins upfront liquidity in the case where they will not be minted due
-to a below-target argon price. A liquidity pool for a slot accumulates all mining bid capital on top
+Treasury Pools offer LockedBitcoins upfront liquidity in the case where they will not be minted due
+to a below-target argon price. A treasury pool for a slot accumulates all mining bid capital on top
 of Bonded Argons provided by argon holders in the network. The pool is distributed first to any
-pending Bitcoins, and then to each vault based on the size of its contributed liquidity pool. The
-per-slot liquidity pool is capped at one-tenth of a vault's activated securitization.
+pending Bitcoins, and then to each vault based on the size of its contributed treasury pool. The
+per-slot treasury pool is capped at one-tenth of a vault's activated securitization.
 
-If a liquidity pool is used to fund Bitcoins, it will be the first to be paid out once the argon
+If a treasury pool is used to fund Bitcoins, it will be the first to be paid out once the argon
 price is back at (or above) target.
 
 `Activated securitization` is the amount of securitization currently locked into Bitcoin multiplied
 by the securitization ratio. In other words, it's the capital locked into use.
 
-To bond argons to a `Liquidity Pool`, any account can submit argons to a given cohort's bid pool
-using the `LiquidityPools` pallet. The vault can control how much of the liquidity pool earnings are
-shared with those contributing capital.
+To bond argons to a `Treasury Pool`, any account can submit argons to a given cohort's bid pool
+using the `Treasury` pallet. The vault can control how much of the treasury pool earnings are shared
+with those contributing capital.
 
-> A vault operator can pre-bond argons to the liquidity pool, which gives them first priority to
+> A vault operator can pre-bond argons to the treasury pool, which gives them first priority to
 > capitalize on activated securitization. This is fully optional. The prebond api is
 > `liquidyPool.vault_operator_prebond`
 
-### Variables for Liquidity Pools
+### Variables for Treasury Pools
 
-- `Liquidity Pool Profit Sharing`: The percent of the profit sharing a vault is offering for
-  liquidity pool participants.
+- `Treasury Pool Profit Sharing`: The percent of the profit sharing a vault is offering for treasury
+  pool participants.
 
 ## The Argon Bitcoin CLI
 
@@ -176,7 +176,7 @@ the vault to whatever you'd like to offer.
 ```bash
 $ argon-bitcoin-cli vault create --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \
   --argons=₳100 --securitization-ratio=1x \
-  --liquidity-pool-profit-sharing=50% \
+  --treasury-profit-sharing=50% \
   --bitcoin-apr=0.5% --bitcoin-base-fee=₳0.50 \
   --bitcoin-xpub=tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt
 ```

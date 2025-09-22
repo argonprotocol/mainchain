@@ -15,12 +15,12 @@ pub mod migrations;
 pub mod weights;
 
 /// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
-/// participate in liquidity pools. Vaults can define the number of Argons available for bitcoin
-/// locks and the terms of both bitcoin locks and liquidity pools. However, bonded argons for
-/// LiquidityPool may only be issued up to the amount of locked bitcoin.
+/// participate in treasury pools. Vaults can define the number of Argons available for bitcoin
+/// locks and the terms of both bitcoin locks and treasury pools. However, bonded argons for
+/// Treasury may only be issued up to the amount of locked bitcoin.
 ///
 /// ** Activated Securitization **
-/// A vault can create liquidity pools up to 2x the locked securitization used for Bitcoin. This
+/// A vault can create treasury pools up to 2x the locked securitization used for Bitcoin. This
 /// added securitization is locked up for the duration of the bitcoin locks, and will be taken in
 /// the case of bitcoins not being cosigned on release.
 #[frame_support::pallet]
@@ -34,15 +34,15 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
-		vault::{BitcoinVaultProvider, LiquidityPoolVaultProvider, Vault, VaultError, VaultTerms},
+		vault::{BitcoinVaultProvider, TreasuryVaultProvider, Vault, VaultError, VaultTerms},
 	};
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::{
 		OnNewSlot,
-		vault::{LockExtension, VaultLiquidityPoolFrameEarnings},
+		vault::{LockExtension, VaultTreasuryFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -164,7 +164,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Tracks revenue from Bitcoin Locks and Liquidity Pools for the trailing frames for each vault
+	/// Tracks revenue from Bitcoin Locks and Treasury Pools for the trailing frames for each vault
 	/// (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
 	/// collect expiration window (`RevenueCollectionExpirationFrames`).
 	#[pallet::storage]
@@ -247,7 +247,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			error: DispatchError,
 		},
-		LiquidityPoolRecordingError {
+		TreasuryRecordingError {
 			vault_id: VaultId,
 			frame_id: FrameId,
 			vault_earnings: T::Balance,
@@ -901,7 +901,7 @@ pub mod pallet {
 		pub satoshis_released: Satoshis,
 	}
 
-	impl<T: Config> LiquidityPoolVaultProvider for Pallet<T> {
+	impl<T: Config> TreasuryVaultProvider for Pallet<T> {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
@@ -916,7 +916,7 @@ pub mod pallet {
 		}
 
 		fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
-			VaultsById::<T>::get(vault_id).map(|a| a.terms.liquidity_pool_profit_sharing)
+			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_profit_sharing)
 		}
 
 		fn is_vault_open(vault_id: VaultId) -> bool {
@@ -925,9 +925,9 @@ pub mod pallet {
 
 		fn record_vault_frame_earnings(
 			source_account_id: &Self::AccountId,
-			profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+			profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 		) {
-			let VaultLiquidityPoolFrameEarnings {
+			let VaultTreasuryFrameEarnings {
 				vault_id,
 				vault_operator_account_id,
 				frame_id,
@@ -938,11 +938,11 @@ pub mod pallet {
 			} = profit;
 
 			if let Err(e) = Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
-				revenue.liquidity_pool_total_earnings = earnings;
-				revenue.liquidity_pool_vault_earnings = earnings_for_vault;
-				revenue.liquidity_pool_external_capital =
+				revenue.treasury_total_earnings = earnings;
+				revenue.treasury_vault_earnings = earnings_for_vault;
+				revenue.treasury_external_capital =
 					capital_contributed.saturating_sub(capital_contributed_by_vault);
-				revenue.liquidity_pool_vault_capital = capital_contributed_by_vault;
+				revenue.treasury_vault_capital = capital_contributed_by_vault;
 				revenue.uncollected_revenue.saturating_accrue(earnings_for_vault);
 				T::Currency::transfer_and_hold(
 					&HoldReason::PendingCollect.into(),
@@ -958,7 +958,7 @@ pub mod pallet {
 			}) {
 				log::error!("Unable to record vault frame profits for vault {}: {:?}", vault_id, e);
 				let error: Error<T> = e.into();
-				Self::deposit_event(Event::LiquidityPoolRecordingError {
+				Self::deposit_event(Event::TreasuryRecordingError {
 					vault_id,
 					frame_id,
 					vault_earnings: earnings_for_vault,
@@ -1310,18 +1310,18 @@ pub mod pallet {
 		/// The securitization committed at the end of this frame
 		#[codec(compact)]
 		pub securitization: T::Balance,
-		/// The vault liquidity pool profits for this frame
+		/// The vault treasury pool profits for this frame
 		#[codec(compact)]
-		pub liquidity_pool_vault_earnings: T::Balance,
-		/// The liquidity pool aggregate profit
+		pub treasury_vault_earnings: T::Balance,
+		/// The treasury pool aggregate profit
 		#[codec(compact)]
-		pub liquidity_pool_total_earnings: T::Balance,
-		/// Vault liquidity pool capital capital
+		pub treasury_total_earnings: T::Balance,
+		/// Vault treasury pool capital capital
 		#[codec(compact)]
-		pub liquidity_pool_vault_capital: T::Balance,
+		pub treasury_vault_capital: T::Balance,
 		/// External capital contributed
 		#[codec(compact)]
-		pub liquidity_pool_external_capital: T::Balance,
+		pub treasury_external_capital: T::Balance,
 		/// The amount of revenue still to be collected
 		#[codec(compact)]
 		pub uncollected_revenue: T::Balance,
@@ -1338,10 +1338,10 @@ pub mod pallet {
 				satoshis_released: 0,
 				securitization: T::Balance::zero(),
 				securitization_activated: T::Balance::zero(),
-				liquidity_pool_vault_earnings: T::Balance::zero(),
-				liquidity_pool_total_earnings: T::Balance::zero(),
-				liquidity_pool_vault_capital: T::Balance::zero(),
-				liquidity_pool_external_capital: T::Balance::zero(),
+				treasury_vault_earnings: T::Balance::zero(),
+				treasury_total_earnings: T::Balance::zero(),
+				treasury_vault_capital: T::Balance::zero(),
+				treasury_external_capital: T::Balance::zero(),
 				uncollected_revenue: T::Balance::zero(),
 			}
 		}

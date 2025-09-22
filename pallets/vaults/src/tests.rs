@@ -19,7 +19,7 @@ use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_prelude::{
 	argon_primitives::{
 		OnNewSlot,
-		vault::{LiquidityPoolVaultProvider, LockExtension, VaultLiquidityPoolFrameEarnings},
+		vault::{LockExtension, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	},
 	*,
 };
@@ -45,7 +45,7 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 	VaultTerms {
 		bitcoin_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
-		liquidity_pool_profit_sharing: Permill::zero(),
+		treasury_profit_sharing: Permill::zero(),
 	}
 }
 
@@ -553,7 +553,7 @@ fn it_accounts_for_pending_bitcoins() {
 				terms: VaultTerms {
 					bitcoin_annual_percent_rate: FixedU128::from_float(0.0),
 					bitcoin_base_fee: 0,
-					liquidity_pool_profit_sharing: Permill::zero(),
+					treasury_profit_sharing: Permill::zero(),
 				},
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -644,7 +644,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 				terms: VaultTerms {
 					bitcoin_annual_percent_rate: FixedU128::zero(),
 					bitcoin_base_fee: 0,
-					liquidity_pool_profit_sharing: Permill::zero(),
+					treasury_profit_sharing: Permill::zero(),
 				},
 				bitcoin_xpubkey: keys(),
 				securitization,
@@ -1031,7 +1031,7 @@ fn vaults_can_collect_revenue() {
 		set_argons(100, vault_lp_earnings);
 		Vaults::record_vault_frame_earnings(
 			&100,
-			VaultLiquidityPoolFrameEarnings {
+			VaultTreasuryFrameEarnings {
 				vault_id: 1,
 				vault_operator_account_id: 1,
 				frame_id: current_frame_id,
@@ -1049,10 +1049,10 @@ fn vaults_can_collect_revenue() {
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
-		assert_eq!(vault_revenue[0].liquidity_pool_vault_earnings, vault_lp_earnings);
-		assert_eq!(vault_revenue[0].liquidity_pool_total_earnings, 50_000);
-		assert_eq!(vault_revenue[0].liquidity_pool_vault_capital, 10_000);
-		assert_eq!(vault_revenue[0].liquidity_pool_external_capital, 90_000);
+		assert_eq!(vault_revenue[0].treasury_vault_earnings, vault_lp_earnings);
+		assert_eq!(vault_revenue[0].treasury_total_earnings, 50_000);
+		assert_eq!(vault_revenue[0].treasury_vault_capital, 10_000);
+		assert_eq!(vault_revenue[0].treasury_external_capital, 90_000);
 		assert_eq!(vault_revenue[0].uncollected_revenue, fee + vault_lp_earnings);
 
 		assert!(LastCollectFrameByVaultId::<Test>::get(1).is_none());
@@ -1090,7 +1090,7 @@ fn vaults_can_collect_revenue() {
 		assert_eq!(CurrentFrameId::get(), 3);
 		Vaults::record_vault_frame_earnings(
 			&100,
-			VaultLiquidityPoolFrameEarnings {
+			VaultTreasuryFrameEarnings {
 				vault_id: 1,
 				vault_operator_account_id: 1,
 				frame_id: CurrentFrameId::get(),
@@ -1137,7 +1137,7 @@ fn it_burns_uncollected_revenue() {
 
 			Vaults::record_vault_frame_earnings(
 				&bid_pool_account,
-				VaultLiquidityPoolFrameEarnings {
+				VaultTreasuryFrameEarnings {
 					vault_id: 1,
 					vault_operator_account_id: 1,
 					frame_id: i,

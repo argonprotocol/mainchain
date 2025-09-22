@@ -1,43 +1,148 @@
-use crate::{Config, VaultIdByOperator, pallet::VaultsById};
+use crate::{Config, pallet::VaultsById};
+
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
-use pallet_prelude::*;
+use pallet_prelude::{
+	argon_primitives::vault::{Vault, VaultTerms},
+	*,
+};
 
 mod old_storage {
 	use crate::Config;
-	use alloc::collections::BTreeMap;
+	use argon_bitcoin::primitives::BitcoinHeight;
+	use frame_support::storage_alias;
 	use pallet_prelude::*;
+
+	#[derive(
+		Clone,
+		PartialEq,
+		Eq,
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct Vault<AccountId, Balance>
+	where
+		AccountId: Codec,
+		Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+	{
+		/// The account assigned to operate this vault
+		pub operator_account_id: AccountId,
+		/// The securitization in the vault
+		#[codec(compact)]
+		pub securitization: Balance,
+		/// The argons locked for bitcoin
+		#[codec(compact)]
+		pub argons_locked: Balance,
+		/// Argons for bitcoin pending verification (this is "out of" the bitcoin_locked, not in
+		/// addition to)
+		#[codec(compact)]
+		pub argons_pending_activation: Balance,
+		/// Argons that will be released at the given block height (NOTE: these are grouped by next
+		/// day of bitcoin blocks). These argons can be re-locked
+		pub argons_scheduled_for_release: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
+		/// The securitization ratio of "total securitization" to "available for locked bitcoin"
+		#[codec(compact)]
+		pub securitization_ratio: FixedU128,
+		/// If the vault is closed, no new bitcoin locks can be issued
+		pub is_closed: bool,
+		/// The terms for locked bitcoin
+		pub terms: VaultTerms<Balance>,
+		/// The terms that are pending to be applied to this vault at the given tick
+		pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
+		/// A tick at which this vault is active
+		#[codec(compact)]
+		pub opened_tick: Tick,
+	}
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct VaultTerms<Balance>
+	where
+		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
+	{
+		/// The annual percent rate per argon vaulted for bitcoin locks
+		#[codec(compact)]
+		pub bitcoin_annual_percent_rate: FixedU128,
+		/// The base fee for a bitcoin lock
+		#[codec(compact)]
+		pub bitcoin_base_fee: Balance,
+		/// The percent of mining bonds taken by the vault
+		#[codec(compact)]
+		pub liquidity_pool_profit_sharing: Permill,
+	}
+
+	#[storage_alias]
+	pub(super) type VaultsById<T: Config> = StorageMap<
+		crate::Pallet<T>,
+		Twox64Concat,
+		VaultId,
+		Vault<AccountId, <T as Config>::Balance>,
+		OptionQuery,
+	>;
 
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
-		pub vault_owners: BTreeMap<T::AccountId, VaultId>,
+		pub vaults: Vec<(VaultId, Vault<AccountId, T::Balance>)>,
 	}
 }
-pub struct InnerMigrate<T: crate::Config + pallet_liquidity_pools::Config>(
-	core::marker::PhantomData<T>,
-);
+pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
 
-impl<T: Config + pallet_liquidity_pools::Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
+impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
-		use alloc::collections::BTreeMap;
 		use codec::Encode;
 
-		// Access the old value using the `storage_alias` type
-		let vault_owners = VaultsById::<T>::iter()
-			.map(|a| (a.1.operator_account_id, a.0))
-			.collect::<BTreeMap<_, _>>();
+		let vaults = old_storage::VaultsById::<T>::iter().collect::<Vec<_>>();
 
-		Ok(old_storage::Model::<T> { vault_owners }.encode())
+		Ok(old_storage::Model::<T> { vaults }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
 		log::info!("Migrating vaults");
 
-		for (vault_id, vault) in VaultsById::<T>::iter() {
-			count += 1;
-			VaultIdByOperator::<T>::insert(vault.operator_account_id, vault_id);
-		}
+		VaultsById::<T>::translate::<old_storage::Vault<T::AccountId, T::Balance>, _>(
+			|_id, vault| {
+				count += 1;
+				Some(Vault {
+					operator_account_id: vault.operator_account_id.clone(),
+					securitization: vault.securitization,
+					argons_scheduled_for_release: vault.argons_scheduled_for_release.clone(),
+					argons_locked: vault.argons_locked,
+					argons_pending_activation: vault.argons_pending_activation,
+					securitization_ratio: vault.securitization_ratio,
+					is_closed: vault.is_closed,
+					terms: VaultTerms {
+						bitcoin_annual_percent_rate: vault.terms.bitcoin_annual_percent_rate,
+						bitcoin_base_fee: vault.terms.bitcoin_base_fee,
+						treasury_profit_sharing: vault.terms.liquidity_pool_profit_sharing,
+					},
+					pending_terms: vault.pending_terms.map(|x| {
+						(
+							x.0,
+							VaultTerms {
+								bitcoin_annual_percent_rate: x.1.bitcoin_annual_percent_rate,
+								bitcoin_base_fee: x.1.bitcoin_base_fee,
+								treasury_profit_sharing: x.1.liquidity_pool_profit_sharing,
+							},
+						)
+					}),
+					opened_tick: vault.opened_tick,
+				})
+			},
+		);
 
 		T::DbWeight::get().reads_writes((count) as u64, count as u64)
 	}
@@ -51,16 +156,23 @@ impl<T: Config + pallet_liquidity_pools::Config> UncheckedOnRuntimeUpgrade for I
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
 
-		let new_vault_owners = VaultIdByOperator::<T>::iter().collect::<BTreeMap<_, _>>();
-		ensure!(old.vault_owners == new_vault_owners, "Vault owner data mismatch");
+		let new_vaults = VaultsById::<T>::iter().collect::<BTreeMap<_, _>>();
+		assert_eq!(old.vaults.len(), new_vaults.len(), "Mismatch in number of vaults");
+		for (vault_id, _new_vault) in old.vaults {
+			assert!(
+				new_vaults.contains_key(&vault_id),
+				"Vault ID {} missing in new storage",
+				vault_id
+			);
+		}
 
 		Ok(())
 	}
 }
 
-pub type SingleVaultOwenr<T> = frame_support::migrations::VersionedMigration<
-	7,
+pub type TreasuryPool<T> = frame_support::migrations::VersionedMigration<
 	8,
+	9,
 	InnerMigrate<T>,
 	crate::Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
@@ -71,14 +183,13 @@ mod test {
 	use super::*;
 	use crate::mock::{Test, new_test_ext};
 	use frame_support::assert_ok;
-	use pallet_prelude::argon_primitives::vault::{Vault, VaultTerms};
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
-			VaultsById::<Test>::insert(
+			old_storage::VaultsById::<Test>::insert(
 				1,
-				Vault {
+				old_storage::Vault {
 					operator_account_id: 1,
 					securitization: 100,
 					argons_scheduled_for_release: Default::default(),
@@ -86,7 +197,7 @@ mod test {
 					argons_pending_activation: 0,
 					securitization_ratio: FixedU128::one(),
 					is_closed: false,
-					terms: VaultTerms {
+					terms: old_storage::VaultTerms {
 						bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 						bitcoin_base_fee: 0,
 						liquidity_pool_profit_sharing: Permill::from_percent(10),
@@ -95,9 +206,9 @@ mod test {
 					opened_tick: 0,
 				},
 			);
-			VaultsById::<Test>::insert(
+			old_storage::VaultsById::<Test>::insert(
 				2,
-				Vault {
+				old_storage::Vault {
 					operator_account_id: 2,
 					securitization: 200,
 					argons_scheduled_for_release: Default::default(),
@@ -105,10 +216,10 @@ mod test {
 					argons_pending_activation: 0,
 					securitization_ratio: FixedU128::one(),
 					is_closed: false,
-					terms: VaultTerms {
+					terms: old_storage::VaultTerms {
 						bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 						bitcoin_base_fee: 0,
-						liquidity_pool_profit_sharing: Permill::from_percent(10),
+						liquidity_pool_profit_sharing: Permill::from_percent(20),
 					},
 					pending_terms: None,
 					opened_tick: 0,
@@ -129,8 +240,13 @@ mod test {
 			// value.
 			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(2, 2));
 
-			assert_eq!(VaultIdByOperator::<Test>::get(1), Some(1));
-			assert_eq!(VaultIdByOperator::<Test>::get(2), Some(2));
+			// Verify the new storage has the expected values
+			let new_value_1 = VaultsById::<Test>::get(1).unwrap();
+			let new_value_2 = VaultsById::<Test>::get(2).unwrap();
+			assert_eq!(new_value_1.operator_account_id, 1);
+			assert_eq!(new_value_2.operator_account_id, 2);
+			assert_eq!(new_value_1.terms.treasury_profit_sharing, Permill::from_percent(10));
+			assert_eq!(new_value_2.terms.treasury_profit_sharing, Permill::from_percent(20));
 		});
 	}
 }

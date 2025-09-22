@@ -644,7 +644,7 @@ async fn create_vault(
 			"1.0",
 			"--bitcoin-base-fee",
 			"0",
-			"--liquidity-pool-profit-sharing",
+			"--treasury-profit-sharing",
 			"50",
 		],
 	)

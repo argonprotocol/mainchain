@@ -1,17 +1,17 @@
-# Mining and Liquidity Pool Economics
+# Mining and Treasury Pool Economics
 
 This document explains how the Argon protocol's mining consensus mechanism generates revenue for
-vaults through liquidity pools, creating the primary economic incentive for vault operators.
+vaults through treasury pools, creating the primary economic incentive for vault operators.
 
 ## Overview: Mining Revenue Distribution
 
 The Argon protocol uses a unique consensus mechanism where **miners bid for slots**, and those bid
-payments are distributed to **vault liquidity pools** as the primary revenue source for the network.
+payments are distributed to **vault treasury pools** as the primary revenue source for the network.
 
 ### Key Economic Flow
 
 ```
-Miners pay bids → Mining bid pool → 20% burned → 80% distributed to vault liquidity pools → Vaults earn based on participation
+Miners pay bids → Mining bid pool → 20% burned → 80% distributed to vault treasury pools → Vaults earn based on participation
 ```
 
 ## Mining Slot Mechanism (`pallets/mining_slot`)
@@ -48,11 +48,11 @@ Miners pay bids → Mining bid pool → 20% burned → 80% distributed to vault 
    - **Cost**: Must pay upfront bids for the right to mine
    - **Found in**: Block rewards pallet configuration, `MinerPayoutPercent = 75%`
 
-## Liquidity Pool Mechanics (`pallets/liquidity_pools`)
+## Treasury Pool Mechanics (`pallets/treasury`)
 
 ### Vault Participation Requirements
 
-Each vault can participate in liquidity pools based on their **activated securitization**:
+Each vault can participate in treasury pools based on their **activated securitization**:
 
 **Activated securitization:** A vault can only participate in mining revenue based on how much
 Bitcoin backing they actually have verified and working. A securitization ratio can be up to 2x,
@@ -60,10 +60,10 @@ which allows a multiplier on the activated securitization. If a vault has 1M Arg
 securitization and a 2x ratio, but only 200k Argons worth of verified Bitcoin locks, they can only
 use up to 400k Argons (2x the Bitcoin) for mining revenue eligibility, not their full 1M.
 
-**Liquidity pool capacity per frame:** Each frame, a vault can only allocate up to 10% of their
-total activated securitization into the liquidity pool. This amount must exist in the form of
-liquidity pool contributed funds. So if they have 400k activated securitization, up to 40k can be
-contributed to compete for that frame's mining bid revenue.
+**Treasury pool capacity per frame:** Each frame, a vault can only allocate up to 10% of their total
+activated securitization into the treasury pool. This amount must exist in the form of treasury pool
+contributed funds. So if they have 400k activated securitization, up to 40k can be contributed to
+compete for that frame's mining bid revenue.
 
 **Implementation**: `Vault::get_activated_securitization()` in `primitives/src/vault.rs`
 
@@ -71,14 +71,14 @@ contributed to compete for that frame's mining bid revenue.
 
 **How mining revenue gets distributed:**
 
-1. **Pool-level:** When miners pay bids, 20% gets burned and 80% gets split among all vault
-   liquidity pools based on how much each vault contributed to the total pool.
+1. **Pool-level:** When miners pay bids, 20% gets burned and 80% gets split among all vault treasury
+   pools based on how much each vault contributed to the total pool.
 
 2. **Within each vault:** The vault operator sets a profit sharing percentage that determines what
    portion goes to liquidity providers (with the operator keeping the remainder). Liquidity
    providers then split their portion based on how much each person contributed.
 
-**Implementation**: `distribute_bid_pool()` in `pallets/liquidity_pools/src/lib.rs`
+**Implementation**: `distribute_bid_pool()` in `pallets/treasury/src/lib.rs`
 
 ## Economic Incentive Structure
 
@@ -86,14 +86,14 @@ contributed to compete for that frame's mining bid revenue.
 
 **Revenue Sources:**
 
-1. **Mining bid revenue** (primary) - Share of 80% of mining bids via liquidity pool participation
+1. **Mining bid revenue** (primary) - Share of 80% of mining bids via treasury pool participation
 2. **Bitcoin lock fees** - Direct fees from users locking Bitcoin
 3. **Annual percentage rates** - Ongoing fees on locked Bitcoin
 
 **Revenue Amplification:**
 
-- More Bitcoin locks → Higher activated securitization → Higher liquidity pool capacity → More
-  mining revenue
+- More Bitcoin locks → Higher activated securitization → Higher treasury pool capacity → More mining
+  revenue
 - This creates a **virtuous cycle** where bitcoin lock success drives mining revenue capacity
 
 ### For Liquidity Providers
@@ -122,9 +122,9 @@ contributed to compete for that frame's mining bid revenue.
 ### Why Bitcoin Locks Matter for Vault Revenue
 
 1. **Securitization Capacity**: More bitcoin locks = higher activated securitization
-2. **Liquidity Pool Eligibility**: Activated securitization determines maximum liquidity pool
+2. **Treasury Pool Eligibility**: Activated securitization determines maximum treasury pool
    participation
-3. **Mining Revenue Access**: Liquidity pool participation = share of mining bid revenue
+3. **Mining Revenue Access**: Treasury pool participation = share of mining bid revenue
 
 ### Economic Balance
 
@@ -132,7 +132,7 @@ contributed to compete for that frame's mining bid revenue.
 
 - If user defaults: Vault loses Argons but gains Bitcoin claim
 - Bitcoin value ≈ Argon value (by design)
-- **Real business**: Mining revenue via liquidity pools, not Bitcoin speculation
+- **Real business**: Mining revenue via treasury pools, not Bitcoin speculation
 
 ## Consensus Security Model
 
@@ -148,14 +148,14 @@ revenue capacity → Self-reinforcing growth
 ### Key Pallets Integration
 
 1. **`mining_slot`** - Manages bidding, slot allocation, bid pool accumulation
-2. **`liquidity_pools`** - Manages vault participation, revenue distribution
+2. **`treasury`** - Manages vault participation, revenue distribution
 3. **`vaults`** - Tracks securitization, activated capital calculations
 4. **`bitcoin_locks`** - Drives securitization activation through lock activity
 
 ### Cross-Pallet Dependencies
 
-**Data Flow**: `mining_slot` accumulates bids → `liquidity_pools` distributes 80% → `vaults` track
-capacity → `bitcoin_locks` drive activation
+**Data Flow**: `mining_slot` accumulates bids → `treasury` distributes 80% → `vaults` track capacity
+→ `bitcoin_locks` drive activation
 
 **Key Calculation**: `vault_revenue = (vault_pool_capital / total_pools) * mining_bid_pool_80%`
 
@@ -176,7 +176,7 @@ infrastructure.
 
 **Cross-Pallet Operations:**
 
-1. **Argon Transfer**: `send_argons_to_pool()` transfers bids to liquidity pools account
+1. **Argon Transfer**: `send_argons_to_pool()` transfers bids to treasury pools account
 2. **Argonot Hold**: `hold_argonots()` places ownership tokens on hold as collateral
 3. **Tick Query**: Current blockchain tick retrieved for bid timestamping
 
@@ -246,12 +246,12 @@ authorities and distribute mining revenue.
 ### Cross-Pallet Event Cascade
 
 **SlotEvents Trait**: Tuple-based notification system
-`(GrandpaSlotRotation, BlockRewards, LiquidityPools)`
+`(GrandpaSlotRotation, BlockRewards, Treasury)`
 
-**Liquidity Pools Frame Operations** (triggered by `on_frame_start`):
+**Treasury Pools Frame Operations** (triggered by `on_frame_start`):
 
 1. **`release_rolling_contributors()`**: Release holds for contributors who opted out
-2. **`distribute_bid_pool()`**: Distribute 80% of mining bids to vault liquidity pools
+2. **`distribute_bid_pool()`**: Distribute 80% of mining bids to vault treasury pools
 3. **`end_pool_capital_raise()`**: Lock in capital for next frame, refund excess
 4. **`rollover_contributors()`**: Automatically renew profitable contributors
 
@@ -296,13 +296,13 @@ randomly close bidding based on the block's VRF proof.
 **Purpose**: Prevents last-minute bid sniping. With ~3.3% chance per block in the final 30 minutes,
 bidding likely closes before the very end, encouraging earlier bid submission.
 
-## Liquidity Pool Three-Phase Capital Management
+## Treasury Pool Three-Phase Capital Management
 
 ### Phase System Overview
 
 **Raising Phase (Frame N+2)**:
 
-- Contributors bond Argons for future liquidity pools (minimum 100 Argons mainnet)
+- Contributors bond Argons for future treasury pools (minimum 100 Argons mainnet)
 - Storage: `CapitalRaising<T>`
 - **Automatic refunds**: If vault capacity exceeded, smallest contributors refunded
 - Sorts contributors by amount (largest first), max 100 per vault
@@ -330,7 +330,7 @@ bidding likely closes before the very end, encouraging earlier bid submission.
 3. **Contributor displacement**: Max 100 contributors; new higher contributions displace smallest
    existing ones
 
-**Hold System**: Uses `HoldReason::ContributedToLiquidityPool` for capital security **Sorting**:
+**Hold System**: Uses `HoldReason::ContributedToTreasury` for capital security **Sorting**:
 Contributors ranked by amount (highest first) using binary search insertion
 
 ### Automatic Rollover System
