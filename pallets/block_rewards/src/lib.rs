@@ -350,7 +350,7 @@ pub mod pallet {
 				return RewardAmounts {
 					ownership: final_starting_amount.saturating_div(halvings + 1).into(),
 					argons: final_starting_amount.into(),
-				}
+				};
 			}
 
 			let start_block_argons = T::StartingArgonsPerBlock::get().into();

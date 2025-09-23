@@ -104,7 +104,7 @@ async fn process_block(
 	info!("Processing block {} ({})", block.hash(), block.number());
 	if BlocksStore::has_block(&mut *db, block.hash()).await? {
 		info!("Duplicated block {} ({})", block.hash(), block.number());
-		return Ok(())
+		return Ok(());
 	}
 
 	let notebooks_header = block.header().digest.logs.iter().find_map(|log| match log {

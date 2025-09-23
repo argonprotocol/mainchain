@@ -165,7 +165,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
 		if vault_id == 1 {
-			return DefaultVault::get().operator_account_id == *account_id
+			return DefaultVault::get().operator_account_id == *account_id;
 		}
 		false
 	}

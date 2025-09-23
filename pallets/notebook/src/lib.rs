@@ -455,12 +455,12 @@ pub mod pallet {
 			if let Some((notebook_number, at_tick, failed_audit_reason)) =
 				<NotariesLockedForFailedAudit<T>>::get(notary_id)
 			{
-				return NotaryState::Locked { notebook_number, at_tick, failed_audit_reason }
+				return NotaryState::Locked { notebook_number, at_tick, failed_audit_reason };
 			}
 			if let Some(reprocess_notebook_number) =
 				LockedNotaryReadyForReprocess::<T>::get(notary_id)
 			{
-				return NotaryState::Reactivated { reprocess_notebook_number }
+				return NotaryState::Reactivated { reprocess_notebook_number };
 			}
 
 			NotaryState::Active

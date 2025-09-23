@@ -77,8 +77,9 @@ pub enum AuxKey {
 impl AuxKey {
 	pub fn default_state<C: AuxStore>(&self, client: Arc<C>) -> AuxState<C> {
 		match self {
-			AuxKey::NotaryStateAtTick(_) | AuxKey::AuthorsAtTick(_) =>
-				panic!("Deprecated key, use `NotaryState` or `Authors` instead"),
+			AuxKey::NotaryStateAtTick(_) | AuxKey::AuthorsAtTick(_) => {
+				panic!("Deprecated key, use `NotaryState` or `Authors` instead")
+			},
 			AuxKey::NotaryNotebooks(_) =>
 				AuxState::NotaryNotebooks(AuxData::new(client, self.clone()).into()),
 			AuxKey::VotesAtTick(_) =>
@@ -223,7 +224,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let authors = block_authors.get();
 		if let Some(authors_at_height) = authors.get(&tick) {
 			if let Some(authors_for_key) = authors_at_height.get(&block_key) {
-				return authors_for_key.contains(account_id)
+				return authors_for_key.contains(account_id);
 			}
 		}
 		false

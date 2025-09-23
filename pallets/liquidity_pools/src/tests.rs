@@ -455,7 +455,9 @@ fn it_can_distribute_bid_pool_capital() {
 				vault_id: 1,
 				vault_operator_account_id: 10,
 				earnings: 400_000_000 + 1, // 50% of the 800 + 1 extra penny
-				earnings_for_vault: (400_000_000.0 * 0.5) as u128 + (100.0/500.0 * 400_000_000.0 * 0.5) as u128 + 1, // 50% of the 400 + 50% * 100 of 500 contributed argons * 400) + 1 extra penny
+				earnings_for_vault: (400_000_000.0 * 0.5) as u128
+					+ (100.0 / 500.0 * 400_000_000.0 * 0.5) as u128
+					+ 1, // 50% of the 400 + 50% * 100 of 500 contributed argons * 400) + 1 extra penny
 				capital_contributed_by_vault: 100_000_000,
 				frame_id: 3,
 				capital_contributed: 500_000_000,

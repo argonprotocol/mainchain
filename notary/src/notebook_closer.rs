@@ -58,7 +58,9 @@ impl FinalizedNotebookHeaderListener {
 		let header = match notification.payload().parse() {
 			Ok(notebook_number) =>
 				NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?,
-			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
+			Err(e) => {
+				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e));
+			},
 		};
 		let hash = header.header.hash();
 
