@@ -27,7 +27,7 @@ pub fn finalize(psbt: &Psbt) -> Result<Psbt, Error> {
 pub fn extract_tx(psbt: &mut Psbt) -> Result<Transaction, Error> {
 	let tx = {
 		let finalized_psbt = finalize(psbt)?;
-		finalized_psbt.extract_tx().map_err(Error::ExtractTxError)?
+		finalized_psbt.extract_tx().map_err(Error::from)?
 	};
 
 	// Clear all the data fields as per the spec.
@@ -122,7 +122,7 @@ pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKe
 	let secp = Secp256k1::new();
 	let pubkey = privkey.public_key(&secp);
 	for i in 0..psbt.inputs.len() {
-		let (msg, ecdsa_type) = psbt.sighash_ecdsa(i, &mut cache).map_err(Error::SignError)?;
+		let (msg, ecdsa_type) = psbt.sighash_ecdsa(i, &mut cache).map_err(Error::from)?;
 		let sig = secp.sign_ecdsa(&msg, &privkey.inner);
 		let signature = Signature { signature: sig, sighash_type: ecdsa_type };
 		signatures.push((pubkey, signature));
@@ -143,7 +143,7 @@ pub fn sign_derived(
 	hd_path: DerivationPath,
 ) -> Result<(Signature, PublicKey), Error> {
 	let secp = Secp256k1::new();
-	let child_xpriv = master_xpriv.derive_priv(&secp, &hd_path).map_err(Error::Bip32Error)?;
+	let child_xpriv = master_xpriv.derive_priv(&secp, &hd_path).map_err(Error::from)?;
 	let master_xpub = Xpub::from_priv(&Secp256k1::new(), &master_xpriv);
 	let mut signatures = vec![];
 
@@ -156,9 +156,7 @@ pub fn sign_derived(
 
 		trace!("Signing with derived key: {}", pubkey);
 
-		let _ = psbt
-			.sign(&master_xpriv, &secp)
-			.map_err(|(_, errs)| Error::SigningErrors(errs))?;
+		let _ = psbt.sign(&master_xpriv, &secp).map_err(|(_, errs)| Error::from(errs))?;
 
 		ensure!(!psbt.inputs[i].partial_sigs.is_empty(), Error::SignatureExpected);
 

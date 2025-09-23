@@ -81,6 +81,7 @@ import type {
   FrameSystemError,
   FrameSystemEvent,
   FrameSystemEventRecord,
+  FrameSystemExtensionsAuthorizeCall,
   FrameSystemExtensionsCheckGenesis,
   FrameSystemExtensionsCheckNonZeroSender,
   FrameSystemExtensionsCheckNonce,
@@ -335,6 +336,7 @@ declare module '@polkadot/types/types/registry' {
     FrameSystemError: FrameSystemError;
     FrameSystemEvent: FrameSystemEvent;
     FrameSystemEventRecord: FrameSystemEventRecord;
+    FrameSystemExtensionsAuthorizeCall: FrameSystemExtensionsAuthorizeCall;
     FrameSystemExtensionsCheckGenesis: FrameSystemExtensionsCheckGenesis;
     FrameSystemExtensionsCheckNonZeroSender: FrameSystemExtensionsCheckNonZeroSender;
     FrameSystemExtensionsCheckNonce: FrameSystemExtensionsCheckNonce;

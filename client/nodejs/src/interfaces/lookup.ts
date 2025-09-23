@@ -265,6 +265,12 @@ export default {
         proxyType: 'ArgonRuntimeProxyType',
         disambiguationIndex: 'u16',
       },
+      PureKilled: {
+        pure: 'AccountId32',
+        spawner: 'AccountId32',
+        proxyType: 'ArgonRuntimeProxyType',
+        disambiguationIndex: 'u16',
+      },
       Announced: {
         real: 'AccountId32',
         proxy: 'AccountId32',
@@ -1256,10 +1262,6 @@ export default {
         amount: 'u128',
         account: 'AccountId32',
       },
-      ProtocolRevenueWithdrawn: {
-        amount: 'u128',
-        account: 'AccountId32',
-      },
     },
   },
   /**
@@ -1302,6 +1304,10 @@ export default {
       },
       ERC6160AssetRegistrationDispatched: {
         commitment: 'H256',
+      },
+      AssetRegisteredLocally: {
+        localId: 'u32',
+        assetId: 'H256',
       },
     },
   },
@@ -1380,6 +1386,7 @@ export default {
       Root: 'Null',
       Signed: 'AccountId32',
       None: 'Null',
+      Authorized: 'Null',
     },
   },
   /**
@@ -2506,6 +2513,9 @@ export default {
       update_asset_precision: {
         update: 'PalletTokenGatewayPrecisionUpdate',
       },
+      register_asset_locally: {
+        asset: 'PalletTokenGatewayAssetRegistration',
+      },
     },
   },
   /**
@@ -3285,6 +3295,7 @@ export default {
       'ConsensusClientCreationFailed',
       'UnbondingPeriodUpdateFailed',
       'ChallengePeriodUpdateFailed',
+      'ErrorChargingFee',
     ],
   },
   /**
@@ -3356,51 +3367,55 @@ export default {
     ],
   },
   /**
-   * Lookup499: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup499: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   **/
+  FrameSystemExtensionsAuthorizeCall: 'Null',
+  /**
+   * Lookup500: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup500: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup501: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup501: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup502: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup502: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup503: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup505: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup506: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup506: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup507: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup507: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup508: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup508: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup509: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup509: frame_metadata_hash_extension::Mode
+   * Lookup510: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup510: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup511: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup512: argon_runtime::Runtime
+   * Lookup513: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

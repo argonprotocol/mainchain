@@ -57,7 +57,6 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 impl pallet_notaries::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxActiveNotaries = MaxActiveNotaries;

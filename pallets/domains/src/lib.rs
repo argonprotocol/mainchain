@@ -33,8 +33,6 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
-		type RuntimeEvent: From<Event<Self>>
-			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 
 		/// The number of blocks after which a domain will expire if not renewed.

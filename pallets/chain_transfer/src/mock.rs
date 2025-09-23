@@ -101,7 +101,6 @@ impl pallet_timestamp::Config for Test {
 }
 
 impl pallet_chain_transfer::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;

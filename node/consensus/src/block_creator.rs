@@ -17,7 +17,7 @@ use codec::{Codec, MaxEncodedLen};
 use frame_support::CloneNoBound;
 use log::*;
 use polkadot_sdk::*;
-use sc_client_api::AuxStore;
+use sc_client_api::{AuxStore, TrieCacheContext};
 use sc_consensus::{BlockImport, BlockImportParams, ImportResult, StateAction, StorageChanges};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
@@ -223,7 +223,7 @@ where
 			StateAction::ApplyChanges(StorageChanges::Changes(proposal.storage_changes));
 		let post_hash = block_import_params.post_hash();
 
-		if let Err(e) = self.backend.state_at(parent_hash) {
+		if let Err(e) = self.backend.state_at(parent_hash, TrieCacheContext::Untrusted) {
 			tracing::warn!(
 				err = ?e,
 				"🚽 Parent block not found in state at {}. Likely dumped. Skipping block submission.",

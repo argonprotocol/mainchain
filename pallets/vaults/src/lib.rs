@@ -51,8 +51,6 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
-		type RuntimeEvent: From<Event<Self>>
-			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
@@ -535,7 +533,7 @@ pub mod pallet {
 			let terms_change_tick = Self::get_terms_active_tick();
 
 			PendingTermsModificationsByTick::<T>::mutate(terms_change_tick, |a| {
-				if !a.iter().any(|x| *x == vault_id) {
+				if !a.contains(&vault_id) {
 					return a.try_push(vault_id);
 				}
 				Ok(())

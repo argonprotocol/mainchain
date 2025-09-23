@@ -158,7 +158,7 @@ impl VaultCommands {
 					.set_header(vec!["Utxo Id", "Cosign Due Frame", "Type", "Redemption Price"]);
 				for utxo_id in pending_ids.0.iter() {
 					let pending_info =
-						storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id);
+						storage().bitcoin_locks().lock_release_requests_by_utxo_id(*utxo_id);
 					let Some(pending) =
 						client.fetch_storage(&pending_info, FetchAt::Finalized).await?
 					else {

@@ -72,8 +72,7 @@ pub struct CosignScript {
 
 impl CosignScript {
 	pub fn new(cosign_script_args: CosignScriptArgs, network: Network) -> Result<Self, Error> {
-		let policy =
-			Self::create_policy(&cosign_script_args).map_err(Error::TimelockScriptError)?;
+		let policy = Self::create_policy(&cosign_script_args).map_err(Error::from)?;
 		let descriptor = Self::build_descriptor(&cosign_script_args, &policy)?;
 		let script = descriptor.script_code().map_err(|_| BitcoinError::InvalidPolicy)?;
 		let address = descriptor.address(network).map_err(|_| Error::AddressError)?;

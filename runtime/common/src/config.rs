@@ -204,8 +204,8 @@ parameter_types! {
 /// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
 ///   - Setting it to `0` will essentially disable the weight fee.
 ///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
-pub struct WeightToFee;
-impl WeightToFeePolynomial for WeightToFee {
+pub struct ArgonWeightToFee;
+impl WeightToFeePolynomial for ArgonWeightToFee {
 	type Balance = Balance;
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
 		let p = ARGON; // microgons

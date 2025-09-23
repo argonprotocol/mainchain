@@ -46,7 +46,7 @@ pub mod prelude {
 			},
 		},
 		weights::{
-			IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
+			IdentityFee, Weight, WeightToFee, WeightToFeeCoefficient, WeightToFeeCoefficients,
 			WeightToFeePolynomial,
 			constants::{
 				BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight,
@@ -111,6 +111,7 @@ macro_rules! inject_runtime_vars {
 		pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 		/// The `TransactionExtension` to the basic transaction logic.
 		pub type TxExtension = (
+			frame_system::AuthorizeCall<Runtime>,
 			frame_system::CheckNonZeroSender<Runtime>,
 			frame_system::CheckSpecVersion<Runtime>,
 			frame_system::CheckTxVersion<Runtime>,

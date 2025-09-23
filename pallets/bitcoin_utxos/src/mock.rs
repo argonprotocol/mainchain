@@ -51,7 +51,6 @@ impl BitcoinUtxoEvents for StaticEventHandler {
 }
 
 impl pallet_bitcoin_utxos::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;

@@ -29,8 +29,6 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-
 	type CurrentTick = CurrentTick;
 	type WeightInfo = ();
 	type Balance = u128;

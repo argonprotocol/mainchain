@@ -163,7 +163,6 @@ impl NotebookEventHandler for OnNotebook {
 }
 
 impl pallet_notebook::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 
 	type NotaryProvider = NotaryProviderImpl;

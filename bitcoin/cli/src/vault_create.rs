@@ -321,7 +321,7 @@ impl VaultConfig {
 struct TextField<'a> {
 	existing_value: Option<String>,
 	default: String,
-	text: Text<'a>,
+	text: Text<'a, 'a>,
 }
 
 impl<'a> TextField<'a> {

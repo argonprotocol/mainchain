@@ -1305,7 +1305,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * `pure` with corresponding parameters.
        *
        * - `spawner`: The account that originally called `pure` to create this account.
-       * - `index`: The disambiguation index originally passed to `pure`. Probably `0`.
+       * - `index`: The disambiguation index originally passed to `create_pure`. Probably `0`.
        * - `proxy_type`: The proxy type originally passed to `pure`.
        * - `height`: The height of the chain when the call to `pure` was processed.
        * - `ext_index`: The extrinsic index in which the call to `pure` was processed.
@@ -1757,6 +1757,21 @@ declare module '@polkadot/api-base/types/submittable' {
        * `native` should be true if this asset originates from this chain
        **/
       createErc6160Asset: AugmentedSubmittable<
+        (
+          asset:
+            | PalletTokenGatewayAssetRegistration
+            | { localId?: any; reg?: any; native?: any; precision?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletTokenGatewayAssetRegistration]
+      >;
+      /**
+       * Registers a multi-chain ERC6160 asset without sending any dispatch request.
+       * You should use register_asset_locally when you want to enable token gateway transfers
+       * for an asset that already exists on an external chain.
+       **/
+      registerAssetLocally: AugmentedSubmittable<
         (
           asset:
             | PalletTokenGatewayAssetRegistration

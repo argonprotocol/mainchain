@@ -196,7 +196,6 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 impl pallet_mining_slot::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;

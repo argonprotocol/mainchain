@@ -29,7 +29,6 @@ parameter_types! {
 }
 
 impl pallet_domains::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type NotebookTick = NotebookTick;
 	type DomainExpirationTicks = DomainExpirationTicks;

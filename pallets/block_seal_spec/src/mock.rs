@@ -123,7 +123,6 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 impl pallet_block_seal_spec::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
 	type AuthorityProvider = StaticAuthorityProvider;

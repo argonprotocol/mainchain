@@ -1,14 +1,13 @@
 extern crate core;
 
 use anyhow::anyhow;
-use codec::Encode;
 use jsonrpsee::{
 	client_transport::ws::{Url, WsTransportClientBuilder},
 	core::client::ClientBuilder,
 	ws_client::{PingConfig, WsClient},
 };
 pub(crate) use polkadot_sdk::*;
-use sp_core::{H256, blake2_256, crypto::AccountId32};
+use sp_core::{H256, crypto::AccountId32};
 use sp_runtime::{MultiAddress, MultiSignature};
 use std::{fmt::Debug, io::Write, sync::Arc};
 use subxt::{
@@ -16,7 +15,8 @@ use subxt::{
 	backend::{BackendExt, BlockRef, legacy::LegacyRpcMethods, rpc::RpcClient},
 	blocks::ExtrinsicEvents,
 	config::{
-		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, Hasher,
+		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, HashFor,
+		substrate::BlakeTwo256,
 	},
 	error::{Error, RpcError},
 	events::EventDetails,
@@ -52,18 +52,7 @@ pub enum ArgonConfig {}
 
 pub type ArgonOnlineClient = OnlineClient<ArgonConfig>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode)]
-pub struct BlakeTwo256;
-
-impl Hasher for BlakeTwo256 {
-	type Output = sp_core::H256;
-	fn hash(s: &[u8]) -> Self::Output {
-		sp_core::H256(blake2_256(s))
-	}
-}
-
 impl Config for ArgonConfig {
-	type Hash = sp_core::H256;
 	type AccountId = AccountId;
 	type Address = MultiAddress<Self::AccountId, ()>;
 	type Signature = MultiSignature;
@@ -261,7 +250,7 @@ impl MainchainClient {
 	) -> anyhow::Result<system::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let info = self
-			.fetch_storage(&storage().system().account(&account_id), FetchAt::Finalized)
+			.fetch_storage(&storage().system().account(account_id.clone()), FetchAt::Finalized)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(info)
@@ -282,7 +271,7 @@ impl MainchainClient {
 	) -> anyhow::Result<ownership::storage::types::account::Account> {
 		let account_id = self.api_account(account_id);
 		let balance = self
-			.fetch_storage(&storage().ownership().account(&account_id), at_block)
+			.fetch_storage(&storage().ownership().account(account_id.clone()), at_block)
 			.await?
 			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
 		Ok(balance)
@@ -309,10 +298,7 @@ impl MainchainClient {
 		Ok(frame_id.saturating_sub(1)) // Subtract 1 to get the current frame ID
 	}
 
-	pub async fn block_number(
-		&self,
-		hash: <ArgonConfig as Config>::Hash,
-	) -> anyhow::Result<BlockNumber> {
+	pub async fn block_number(&self, hash: HashFor<ArgonConfig>) -> anyhow::Result<BlockNumber> {
 		self.live
 			.backend()
 			.block_header(hash)
