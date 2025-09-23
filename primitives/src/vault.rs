@@ -400,7 +400,7 @@ impl<
 		self.argons_scheduled_for_release.retain(|height, released_amount| {
 			if *height <= block_height {
 				amount.saturating_accrue(*released_amount);
-				return false
+				return false;
 			}
 			true
 		});

@@ -84,7 +84,7 @@ impl ArgonNodeStartArgs {
 		let node_log = "info";
 
 		let rust_log = format!(
-			"{},node={},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info",//,grandpa=trace,runtime::grandpa=trace",
+			"{},node={},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info", //,grandpa=trace,runtime::grandpa=trace",
 			overall_log, node_log,
 		);
 

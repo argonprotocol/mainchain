@@ -625,7 +625,7 @@ where
 			let mut queue_range: Range<NotebookNumber> = 0..0;
 			while let Some(queue) = queues.get_mut(&notary_id) {
 				if queue.is_empty() {
-					return None
+					return None;
 				}
 				queue_range = Range { start: queue[0].0, end: queue[queue.len() - 1].0 };
 
@@ -1526,7 +1526,7 @@ mod test {
 			let block_chain = self.block_chain.lock();
 			if let Some(pos) = block_chain.iter().position(|h| h == hash) {
 				if pos > 0 {
-					return Ok(block_chain[pos - 1])
+					return Ok(block_chain[pos - 1]);
 				}
 			}
 			Ok(H256::from_slice(&[3; 32]))

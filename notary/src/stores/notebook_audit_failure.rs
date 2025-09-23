@@ -32,7 +32,9 @@ impl AuditFailureListener {
 		let notification = &self.listener.recv().await?;
 		let notebook_number = match notification.payload().parse() {
 			Ok(notebook_number) => notebook_number,
-			Err(e) => return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e)),
+			Err(e) => {
+				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e));
+			},
 		};
 
 		self.failed_audits_notification.notify(|| Ok(notebook_number)).map_err(

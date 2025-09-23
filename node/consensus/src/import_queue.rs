@@ -136,6 +136,8 @@ where
 		let block_hash = block.post_hash();
 		let block_number = *block.header.number();
 		let parent_hash = *block.header.parent_hash();
+		// prematurely set fork choice = false to avoid any chance of setting best block
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
 
 		let info = self.client.info();
 		let is_block_gap =
@@ -161,6 +163,7 @@ where
 			origin=?block.origin,
 			parent_block_state=?parent_block_state,
 			block_status=?block_status,
+			finalized=block.finalized,
 			"Begin import."
 		);
 
@@ -395,21 +398,6 @@ where
 			.info()
 			.block_gap
 			.is_some_and(|gap| gap.start <= block_number && block_number <= gap.end);
-		// Skip checks that include execution, if being told so, or when importing only state.
-		//
-		// This is done for example when gap syncing and it is expected that the block after the gap
-		// was checked/chosen properly, e.g. by warp syncing to this block using a finality proof.
-		if is_gap_sync ||
-			block_params.state_action.skip_execution_checks() ||
-			block_params.with_state()
-		{
-			// When we are importing only the state of a block or its from network sync, it will be
-			// the best block.
-			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(
-				block_params.with_state() || block_params.origin == BlockOrigin::NetworkInitialSync,
-			));
-			return Ok(block_params);
-		}
 
 		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
@@ -421,6 +409,21 @@ where
 		block_params.header = header;
 		block_params.post_digests.push(raw_seal_digest);
 		block_params.post_hash = Some(post_hash);
+		// Skip checks that include execution, if being told so, or when importing only state. Runs
+		// after post hash to preserve that logic across imports.
+		//
+		// This is done, for example, when gap syncing, and it's expected that the block after the
+		// gap was checked/chosen properly, e.g. by warp syncing to this block using a finality
+		// proof.
+		if is_gap_sync ||
+			block_params.state_action.skip_execution_checks() ||
+			(block_params.with_state() && block_params.body.is_none())
+		{
+			// In the verifier, we don't want to set a best block yet. Wait for state to import
+			block_params.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+			return Ok(block_params);
+		}
+
 		if block_params.body.is_some() &&
 			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
 				BlockStatus::InChainWithState

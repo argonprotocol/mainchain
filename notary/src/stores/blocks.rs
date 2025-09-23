@@ -168,7 +168,7 @@ impl BlocksStore {
 				const UNIQUE_VIOLATION: &str = "23505"; // PostgreSQL error code for unique_violation
 
 				if pg_err.code() == UNIQUE_VIOLATION {
-					return Ok(())
+					return Ok(());
 				}
 
 				Err(Error::Database(db_err.to_string()))

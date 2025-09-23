@@ -91,11 +91,11 @@ where
 			Ok(Some(x)) => x,
 			Ok(None) => {
 				tracing::warn!("Parent header not found {:?}", parent_hash);
-				return None
+				return None;
 			},
 			Err(err) => {
 				tracing::error!(?err, ?parent_hash, "Error while fetching parent header");
-				return None
+				return None;
 			},
 		};
 
