@@ -14,6 +14,7 @@ use frame_system::EnsureSignedBy;
 use ismp::{Error, module::IsmpModule, router::IsmpRouter};
 pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
+use polkadot_sdk::*;
 
 pub use argon_runtime_common::config::NotaryRecordT;
 use argon_runtime_common::prelude::*;
@@ -181,7 +182,6 @@ impl pallet_tx_pause::Config for Runtime {
 }
 
 impl pallet_block_seal_spec::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type AuthorityProvider = MiningSlot;
 	type MaxActiveNotaries = MaxActiveNotaries;
@@ -203,7 +203,6 @@ impl Get<Tick> for NotebookTickProvider {
 }
 
 impl pallet_block_rewards::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
@@ -229,7 +228,6 @@ impl pallet_block_rewards::Config for Runtime {
 }
 
 impl pallet_domains::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type DomainExpirationTicks = DomainExpirationTicks;
 	type NotebookTick = NotebookTickProvider;
@@ -242,7 +240,6 @@ impl pallet_authorship::Config for Runtime {
 }
 
 impl pallet_digests::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type NotebookVerifyError = NotebookVerifyError;
 }
@@ -275,7 +272,6 @@ impl Get<FrameId> for GetCurrentFrameId {
 }
 
 impl pallet_vaults::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
@@ -294,7 +290,6 @@ impl pallet_vaults::Config for Runtime {
 pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bitcoin_locks::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
@@ -359,7 +354,6 @@ parameter_types! {
 }
 
 impl pallet_liquidity_pools::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
@@ -374,7 +368,6 @@ impl pallet_liquidity_pools::Config for Runtime {
 }
 
 impl pallet_mining_slot::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
@@ -421,7 +414,6 @@ impl pallet_grandpa::Config for Runtime {
 }
 
 impl pallet_chain_transfer::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;
@@ -434,7 +426,6 @@ impl pallet_chain_transfer::Config for Runtime {
 }
 
 impl pallet_notebook::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
 	type NotaryProvider = Notaries;
@@ -445,7 +436,6 @@ impl pallet_notebook::Config for Runtime {
 }
 
 impl pallet_notaries::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
@@ -502,8 +492,6 @@ impl pallet_proxy::Config for Runtime {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-
 	type WeightInfo = ();
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
@@ -514,7 +502,6 @@ impl pallet_price_index::Config for Runtime {
 }
 
 impl pallet_bitcoin_utxos::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type EventHandler = BitcoinLocks;
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
@@ -522,7 +509,6 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 }
 
 impl pallet_mint::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type PriceProvider = PriceIndex;
@@ -573,14 +559,13 @@ impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = ConstU8<5>;
-	type WeightToFee = WeightToFee;
+	type WeightToFee = ArgonWeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
 	type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_token_gateway::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	// Configured as Pallet Ismp
 	type Dispatcher = Ismp;
 	// Configured as Pallet balances
@@ -600,7 +585,6 @@ impl pallet_token_gateway::Config for Runtime {
 
 impl pallet_ismp::Config for Runtime {
 	// configure the runtime event
-	type RuntimeEvent = RuntimeEvent;
 	// Permissioned origin who can create or update consensus clients
 	type AdminOrigin = EnsureRoot<AccountId>;
 	// The pallet_timestamp pallet
@@ -623,18 +607,22 @@ impl pallet_ismp::Config for Runtime {
 	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
 	// You most likely don't need it, just use the `NoOpMmrTree`
 	type OffchainDB = ();
-	type FeeHandler = pallet_ismp::fee_handler::WeightFeeHandler<()>;
+	type FeeHandler = pallet_ismp::fee_handler::WeightFeeHandler<
+		AccountId,
+		Balances,
+		ArgonWeightToFee,
+		LiquidityPoolsInternalPalletId,
+		false,
+	>;
 }
 
 impl ismp_grandpa::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type IsmpHost = Ismp;
 	type WeightInfo = weights::ismp_grandpa::WeightInfo<Runtime>;
 	type RootOrigin = EnsureRoot<AccountId>;
 }
 
 impl pallet_hyperbridge::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
 	type IsmpHost = Ismp;
 }
 

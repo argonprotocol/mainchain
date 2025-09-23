@@ -31,6 +31,11 @@ while IFS= read -r line; do
 done <"$PIPE"
 set -x
 
+# Install subxt if not already installed
+if ! command -v subxt &> /dev/null; then
+    cargo install -f subxt-cli
+fi
+
 subxt codegen  --derive Clone \
   --derive-for-type bounded_collections::bounded_vec::BoundedVec=serde::Serialize \
   --attributes-for-type bounded_collections::bounded_vec::BoundedVec="#[serde(transparent)]" \

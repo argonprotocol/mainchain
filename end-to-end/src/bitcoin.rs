@@ -612,14 +612,11 @@ async fn create_vault(
 	// wait for alice to have enough argons
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let vault_account = client.api_account(vault_owner_account_id32);
+	let lookup = storage().system().account(vault_account);
 	while let Some(block) = finalized_sub.next().await {
 		println!("Waiting for Alice to have enough argons");
-		if let Some(alice_balance) = client
-			.fetch_storage(
-				&storage().system().account(&vault_account),
-				FetchAt::Block(block.unwrap().hash()),
-			)
-			.await?
+		if let Some(alice_balance) =
+			client.fetch_storage(&lookup, FetchAt::Block(block.unwrap().hash())).await?
 		{
 			println!("Alice argon balance {:#?}", alice_balance.data.free);
 			if alice_balance.data.free > 100_001_000_000 {
@@ -747,7 +744,7 @@ async fn confirm_lock(
 			.await?;
 
 	let lock_api = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(*utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("should be able to retrieve");
 	assert_eq!(lock_api.vault_id, vault_id);
@@ -833,7 +830,7 @@ async fn wait_for_mint(
 		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(*utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("utxo");
 	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());

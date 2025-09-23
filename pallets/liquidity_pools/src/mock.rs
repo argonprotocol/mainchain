@@ -126,7 +126,6 @@ impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
 }
 
 impl pallet_liquidity_pools::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;

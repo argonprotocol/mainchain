@@ -1,11 +1,10 @@
-use polkadot_sdk::*;
-use sp_core::Pair;
-use sp_keyring::Sr25519Keyring::{Alice, Bob};
-use subxt::{Config, OnlineClient, tx::TxStatus};
-
 use argon_client::{
 	ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient, api, signer::Sr25519Signer,
 };
+use polkadot_sdk::{sp_runtime::AccountId32, *};
+use sp_core::Pair;
+use sp_keyring::Sr25519Keyring::{Alice, Bob};
+use subxt::{OnlineClient, config::HashFor, tx::TxStatus};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,10 +14,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let bob = Bob.pair();
 	let bob_signer = Sr25519Signer::new(bob.clone());
 
-	let account = bob.public().into();
+	let account: AccountId32 = bob.public().into();
 
 	// NOTE: argon balances are stored in system.. not the pallet itself
-	let balance_query = api::storage().system().account(&account);
+	let balance_query = api::storage().system().account(account.clone().into());
 	let result = client.storage().at_latest().await?.fetch(&balance_query).await?;
 	println!("Bob has free balance: {:?}, {}", result.unwrap().data.free, account);
 
@@ -73,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn get_block_number(
 	client: OnlineClient<ArgonConfig>,
-	hash: <ArgonConfig as Config>::Hash,
+	hash: HashFor<ArgonConfig>,
 ) -> Result<u32, subxt::Error> {
 	client
 		.backend()

@@ -4,6 +4,7 @@ use sp_core::crypto::{DeriveError, SecretStringError};
 
 use argon_notary_audit::VerifyError;
 use argon_primitives::Notarization;
+use std::boxed::Box;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -20,7 +21,7 @@ pub enum Error {
   Database(#[from] sqlx::Error),
 
   #[error("Mainchain API Error: {0}")]
-  MainchainApiError(#[from] subxt::Error),
+  MainchainApiError(Box<subxt::Error>),
 
   #[error(transparent)]
   ParseIntError(#[from] std::num::ParseIntError),
@@ -89,6 +90,12 @@ pub trait NapiOk<T> {
 impl<T> NapiOk<T> for Result<T, Error> {
   fn napi_ok(self) -> Result<T, napi::Error> {
     self.map_err(|e| napi::Error::from_reason(format!("{:#?}", e)))
+  }
+}
+
+impl From<subxt::Error> for Error {
+  fn from(e: subxt::Error) -> Self {
+    Error::MainchainApiError(Box::new(e))
   }
 }
 

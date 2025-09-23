@@ -82,10 +82,6 @@ pub mod pallet {
 	/// The pallet's configuration trait.
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
-		/// The overarching event type.
-		type RuntimeEvent: From<Event<Self>>
-			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
-
 		/// Weight information for the extrinsics in this module.
 		type WeightInfo: WeightInfo;
 

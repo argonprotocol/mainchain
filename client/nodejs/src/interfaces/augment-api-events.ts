@@ -546,14 +546,6 @@ declare module '@polkadot/api-base/types/events' {
         { old: PalletHyperbridgeVersionedHostParams; new_: PalletHyperbridgeVersionedHostParams }
       >;
       /**
-       * Hyperbridge has withdrawn it's protocol revenue
-       **/
-      ProtocolRevenueWithdrawn: AugmentedEvent<
-        ApiType,
-        [amount: u128, account: AccountId32],
-        { amount: u128; account: AccountId32 }
-      >;
-      /**
        * A relayer has withdrawn some fees
        **/
       RelayerFeeWithdrawn: AugmentedEvent<
@@ -1273,6 +1265,24 @@ declare module '@polkadot/api-base/types/events' {
           disambiguationIndex: u16;
         }
       >;
+      /**
+       * A pure proxy was killed by its spawner.
+       **/
+      PureKilled: AugmentedEvent<
+        ApiType,
+        [
+          pure: AccountId32,
+          spawner: AccountId32,
+          proxyType: ArgonRuntimeProxyType,
+          disambiguationIndex: u16,
+        ],
+        {
+          pure: AccountId32;
+          spawner: AccountId32;
+          proxyType: ArgonRuntimeProxyType;
+          disambiguationIndex: u16;
+        }
+      >;
     };
     sudo: {
       /**
@@ -1374,6 +1384,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [beneficiary: AccountId32, amount: u128, source: IsmpHostStateMachine],
         { beneficiary: AccountId32; amount: u128; source: IsmpHostStateMachine }
+      >;
+      /**
+       * An asset has been registered locally
+       **/
+      AssetRegisteredLocally: AugmentedEvent<
+        ApiType,
+        [localId: u32, assetId: H256],
+        { localId: u32; assetId: H256 }
       >;
       /**
        * An asset has been teleported

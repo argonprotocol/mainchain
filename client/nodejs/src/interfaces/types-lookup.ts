@@ -348,6 +348,13 @@ declare module '@polkadot/types/lookup' {
       readonly proxyType: ArgonRuntimeProxyType;
       readonly disambiguationIndex: u16;
     } & Struct;
+    readonly isPureKilled: boolean;
+    readonly asPureKilled: {
+      readonly pure: AccountId32;
+      readonly spawner: AccountId32;
+      readonly proxyType: ArgonRuntimeProxyType;
+      readonly disambiguationIndex: u16;
+    } & Struct;
     readonly isAnnounced: boolean;
     readonly asAnnounced: {
       readonly real: AccountId32;
@@ -378,6 +385,7 @@ declare module '@polkadot/types/lookup' {
     readonly type:
       | 'ProxyExecuted'
       | 'PureCreated'
+      | 'PureKilled'
       | 'Announced'
       | 'ProxyAdded'
       | 'ProxyRemoved'
@@ -1591,12 +1599,7 @@ declare module '@polkadot/types/lookup' {
       readonly amount: u128;
       readonly account: AccountId32;
     } & Struct;
-    readonly isProtocolRevenueWithdrawn: boolean;
-    readonly asProtocolRevenueWithdrawn: {
-      readonly amount: u128;
-      readonly account: AccountId32;
-    } & Struct;
-    readonly type: 'HostParamsUpdated' | 'RelayerFeeWithdrawn' | 'ProtocolRevenueWithdrawn';
+    readonly type: 'HostParamsUpdated' | 'RelayerFeeWithdrawn';
   }
 
   /** @name PalletHyperbridgeVersionedHostParams (126) */
@@ -1639,11 +1642,17 @@ declare module '@polkadot/types/lookup' {
     readonly asErc6160AssetRegistrationDispatched: {
       readonly commitment: H256;
     } & Struct;
+    readonly isAssetRegisteredLocally: boolean;
+    readonly asAssetRegisteredLocally: {
+      readonly localId: u32;
+      readonly assetId: H256;
+    } & Struct;
     readonly type:
       | 'AssetTeleported'
       | 'AssetReceived'
       | 'AssetRefunded'
-      | 'Erc6160AssetRegistrationDispatched';
+      | 'Erc6160AssetRegistrationDispatched'
+      | 'AssetRegisteredLocally';
   }
 
   /** @name PalletLiquidityPoolsEvent (132) */
@@ -1729,7 +1738,8 @@ declare module '@polkadot/types/lookup' {
     readonly isSigned: boolean;
     readonly asSigned: AccountId32;
     readonly isNone: boolean;
-    readonly type: 'Root' | 'Signed' | 'None';
+    readonly isAuthorized: boolean;
+    readonly type: 'Root' | 'Signed' | 'None' | 'Authorized';
   }
 
   /** @name FrameSystemPhase (136) */
@@ -2910,12 +2920,17 @@ declare module '@polkadot/types/lookup' {
     readonly asUpdateAssetPrecision: {
       readonly update: PalletTokenGatewayPrecisionUpdate;
     } & Struct;
+    readonly isRegisterAssetLocally: boolean;
+    readonly asRegisterAssetLocally: {
+      readonly asset: PalletTokenGatewayAssetRegistration;
+    } & Struct;
     readonly type:
       | 'Teleport'
       | 'SetTokenGatewayAddresses'
       | 'CreateErc6160Asset'
       | 'UpdateErc6160Asset'
-      | 'UpdateAssetPrecision';
+      | 'UpdateAssetPrecision'
+      | 'RegisterAssetLocally';
   }
 
   /** @name PalletTokenGatewayTeleportParams (302) */
@@ -3791,12 +3806,14 @@ declare module '@polkadot/types/lookup' {
     readonly isConsensusClientCreationFailed: boolean;
     readonly isUnbondingPeriodUpdateFailed: boolean;
     readonly isChallengePeriodUpdateFailed: boolean;
+    readonly isErrorChargingFee: boolean;
     readonly type:
       | 'InvalidMessage'
       | 'MessageNotFound'
       | 'ConsensusClientCreationFailed'
       | 'UnbondingPeriodUpdateFailed'
-      | 'ChallengePeriodUpdateFailed';
+      | 'ChallengePeriodUpdateFailed'
+      | 'ErrorChargingFee';
   }
 
   /** @name PalletHyperbridgeError (480) */
@@ -3880,42 +3897,45 @@ declare module '@polkadot/types/lookup' {
       | 'MaxAmountBelowMinimum';
   }
 
-  /** @name FrameSystemExtensionsCheckNonZeroSender (499) */
+  /** @name FrameSystemExtensionsAuthorizeCall (499) */
+  type FrameSystemExtensionsAuthorizeCall = Null;
+
+  /** @name FrameSystemExtensionsCheckNonZeroSender (500) */
   type FrameSystemExtensionsCheckNonZeroSender = Null;
 
-  /** @name FrameSystemExtensionsCheckSpecVersion (500) */
+  /** @name FrameSystemExtensionsCheckSpecVersion (501) */
   type FrameSystemExtensionsCheckSpecVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckTxVersion (501) */
+  /** @name FrameSystemExtensionsCheckTxVersion (502) */
   type FrameSystemExtensionsCheckTxVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckGenesis (502) */
+  /** @name FrameSystemExtensionsCheckGenesis (503) */
   type FrameSystemExtensionsCheckGenesis = Null;
 
-  /** @name FrameSystemExtensionsCheckNonce (505) */
+  /** @name FrameSystemExtensionsCheckNonce (506) */
   interface FrameSystemExtensionsCheckNonce extends Compact<u32> {}
 
-  /** @name FrameSystemExtensionsCheckWeight (506) */
+  /** @name FrameSystemExtensionsCheckWeight (507) */
   type FrameSystemExtensionsCheckWeight = Null;
 
-  /** @name PalletTransactionPaymentChargeTransactionPayment (507) */
+  /** @name PalletTransactionPaymentChargeTransactionPayment (508) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name FrameMetadataHashExtensionCheckMetadataHash (508) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (509) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
     readonly mode: FrameMetadataHashExtensionMode;
   }
 
-  /** @name FrameMetadataHashExtensionMode (509) */
+  /** @name FrameMetadataHashExtensionMode (510) */
   interface FrameMetadataHashExtensionMode extends Enum {
     readonly isDisabled: boolean;
     readonly isEnabled: boolean;
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name FrameSystemExtensionsWeightReclaim (510) */
+  /** @name FrameSystemExtensionsWeightReclaim (511) */
   type FrameSystemExtensionsWeightReclaim = Null;
 
-  /** @name ArgonRuntimeRuntime (512) */
+  /** @name ArgonRuntimeRuntime (513) */
   type ArgonRuntimeRuntime = Null;
 } // declare module

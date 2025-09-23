@@ -30,7 +30,6 @@ parameter_types! {
 }
 
 impl pallet_digests::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type NotebookVerifyError = VerifyError;
 }

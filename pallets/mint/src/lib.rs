@@ -32,8 +32,6 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
-		type RuntimeEvent: From<Event<Self>>
-			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
 		type WeightInfo: WeightInfo;
 		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>;
 		type PriceProvider: PriceProvider<Self::Balance>;

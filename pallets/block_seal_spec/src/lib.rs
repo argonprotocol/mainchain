@@ -58,10 +58,6 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: pallet_timestamp::Config + polkadot_sdk::frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type RuntimeEvent: From<Event<Self>>
-			+ IsType<<Self as polkadot_sdk::frame_system::Config>::RuntimeEvent>;
-
 		/// The desired percent of the default block time to use for compute
 		type TargetComputeBlockPercent: Get<FixedU128>;
 

@@ -341,7 +341,6 @@ pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 }
 
 impl pallet_bitcoin_locks::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;

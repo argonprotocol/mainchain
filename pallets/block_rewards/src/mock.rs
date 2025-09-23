@@ -213,7 +213,6 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 }
 
 impl pallet_block_rewards::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;

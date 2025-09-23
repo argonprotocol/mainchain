@@ -118,7 +118,6 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 impl pallet_vaults::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
@@ -135,7 +134,6 @@ impl pallet_vaults::Config for Test {
 }
 
 impl pallet_liquidity_pools::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;

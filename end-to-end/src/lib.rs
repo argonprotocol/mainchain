@@ -165,13 +165,9 @@ pub(crate) mod utils {
 			.await?
 			.unwrap_or_default();
 		// wait for next cohort to start
+		let lookup = storage().mining_slot().account_index_lookup(first_account);
 		loop {
-			let account_index = client
-				.fetch_storage(
-					&storage().mining_slot().account_index_lookup(&first_account),
-					FetchAt::Best,
-				)
-				.await?;
+			let account_index = client.fetch_storage(&lookup, FetchAt::Best).await?;
 			if let Some((frame_id, index)) = account_index {
 				println!("Miner 1 registered at frame {}, index {}", frame_id, index);
 				break;

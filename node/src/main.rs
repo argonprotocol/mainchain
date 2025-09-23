@@ -1,5 +1,7 @@
 //! Argon node implementation.
 #![warn(missing_docs)]
+// the sc cli has large enum variants
+#![allow(clippy::result_large_err)]
 
 mod chain_spec;
 #[macro_use]

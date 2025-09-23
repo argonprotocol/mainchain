@@ -86,7 +86,6 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 }
 
 impl pallet_mint::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;

@@ -367,16 +367,21 @@ impl MainchainClient {
 
     let account_id = AccountId32::from_str(&address).map_err(|e| anyhow!(e))?;
     let account_bytes: [u8; 32] = account_id.clone().into();
+    let current_block = client.best_block_hash().await?;
+    let current_block_number = client.block_number(current_block).await?;
+    let params = || {
+      ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
+        .nonce(current_nonce as u64)
+        .mortal_from_unchecked(mortality, current_block_number as u64, current_block)
+        .build()
+    };
+    let send_tx = tx().chain_transfer().send_to_localchain(amount, notary_id);
 
     let payload = {
-      let params = ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
-        .nonce(current_nonce as u64)
-        .mortal(mortality)
-        .build();
-      let tx_tmp = client.live.tx().create_partial_offline(
-        &tx().chain_transfer().send_to_localchain(amount, notary_id),
-        params,
-      )?;
+      let tx_tmp = client
+        .live
+        .tx()
+        .create_partial_offline(&send_tx, params())?;
       tx_tmp.signer_payload()
     };
 
@@ -389,13 +394,7 @@ impl MainchainClient {
       client
         .live
         .tx()
-        .create_partial_offline(
-          &tx().chain_transfer().send_to_localchain(amount, notary_id),
-          ArgonExtrinsicParamsBuilder::<ArgonConfig>::new()
-            .nonce(current_nonce as u64)
-            .mortal(mortality)
-            .build(),
-        )?
+        .create_partial_offline(&send_tx, params())?
         .sign_with_account_and_signature(&account_id, &multi_signature)
     };
 

@@ -53,7 +53,7 @@ impl CosignReleaser {
 			}],
 		};
 
-		let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).map_err(Error::PsbtError)?;
+		let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).map_err(Error::from)?;
 
 		psbt.inputs[0] = Input {
 			witness_utxo: Some(TxOut {

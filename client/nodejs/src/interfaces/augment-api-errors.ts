@@ -424,6 +424,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ConsensusClientCreationFailed: AugmentedError<ApiType>;
       /**
+       * Error charging fee
+       **/
+      ErrorChargingFee: AugmentedError<ApiType>;
+      /**
        * Invalid ISMP message
        **/
       InvalidMessage: AugmentedError<ApiType>;
