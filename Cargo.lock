@@ -1051,6 +1051,7 @@ dependencies = [
  "argon-primitives",
  "console_error_panic_hook",
  "hex",
+ "sp-io",
  "wasm-bindgen",
 ]
 
@@ -1363,6 +1364,7 @@ dependencies = [
  "serde_json",
  "sp-application-crypto",
  "sp-debug-derive",
+ "sp-runtime",
  "thiserror 2.0.16",
  "tokio",
  "uniffi",

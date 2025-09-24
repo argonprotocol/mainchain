@@ -25,6 +25,7 @@ console_error_panic_hook = { workspace = true, default-features = false }
 argon-bitcoin = { workspace = true, default-features = false }
 hex = { workspace = true, default-features = false }
 argon-primitives = { workspace = true, default-features = false, features = ["wasm"] }
+sp-io = { workspace = true, default-features = false}
 
 [features]
 default = []
@@ -34,4 +35,7 @@ std = [
 	"argon-primitives/std",
 	"hex/std",
 	"wasm-bindgen/std",
+]
+build = [
+	"sp-io/disable_oom", "sp-io/disable_allocator", "sp-io/disable_panic_handler"
 ]

@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "wasm-pack": "wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack",
+    "wasm-pack": "RUSTFLAGS=\"--cfg substrate_runtime\" wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack -- --features=build",
     "prebuild": "yarn workspace @argonprotocol/mainchain run build",
     "build": "yarn wasm-pack && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
