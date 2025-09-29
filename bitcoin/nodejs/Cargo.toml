@@ -34,8 +34,11 @@ std = [
 	"argon-bitcoin/std",
 	"argon-primitives/std",
 	"hex/std",
+	"sp-io/std",
 	"wasm-bindgen/std",
 ]
 build = [
-	"sp-io/disable_oom", "sp-io/disable_allocator", "sp-io/disable_panic_handler"
+	"sp-io/disable_allocator",
+	"sp-io/disable_oom",
+	"sp-io/disable_panic_handler",
 ]

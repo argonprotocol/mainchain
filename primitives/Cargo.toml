@@ -81,11 +81,15 @@ std = [
 	"sp-application-crypto/std",
 	"sp-debug-derive/force-debug",
 	"sp-debug-derive/std",
+	"sp-runtime/std",
 	"thiserror/std",
-	"wasm-bindgen?/std"
+	"wasm-bindgen?/std",
 ]
 wasm = [ "wasm-bindgen" ]
 napi = [ "napi-derive/type-def", "napi/napi9", "napi/serde-json" ]
 uniffi = [ "dep:uniffi" ]
 bitcoin = [ "base58", "bip32", "dep:bitcoin" ]
-runtime-benchmarks = [ "polkadot-sdk/runtime-benchmarks" ]
+runtime-benchmarks = [
+	"polkadot-sdk/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]
