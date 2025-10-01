@@ -74,9 +74,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: localchain-${{ matrix.target }}-cargo
 
-      - name: Install dependencies
-        run: yarn install
-
       - name: Set HOME_DIR for Linux builds
         if: startsWith(matrix.os, 'ubuntu')
         run: echo "TARGET_BASEDIR=/mnt" >> "$GITHUB_ENV"
@@ -292,7 +289,6 @@ jobs:
 
       - name: Test bindings
         run: yarn test:ci
-        working-directory: ./localchain
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -300,27 +296,6 @@ jobs:
           RUSTFLAGS: "-C link-args=-Wl,--warn-unresolved-symbols"
           RUST_LOG: debug,sqlx=info
           SKIP_WASM_BUILD: 1
-
-      - name: Test bitcoin
-        run: yarn test:ci
-        working-directory: ./bitcoin/nodejs
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: 'false'
-          target: ${{ matrix.target }}
-
-      - name: Test client
-        run: yarn test:ci
-        working-directory: ./client/nodejs
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AWS_S3_ENDPOINT: http://localhost:9000
 
       - name: Cleanup minio
         if: always()
