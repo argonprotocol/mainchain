@@ -1,5 +1,6 @@
 use crate::{
 	Error, Event, HoldReason, LastCollectFrameByVaultId, PendingCosignByVaultId, VaultConfig,
+	VaultIdByOperator,
 	mock::{Vaults, *},
 	pallet::{
 		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick, RevenuePerFrameByVault,
@@ -89,6 +90,14 @@ fn it_can_create_a_vault() {
 
 		assert_eq!(NextVaultId::<Test>::get(), Some(2u32));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().operator_account_id, 1);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 50_000);
+		assert_eq!(VaultIdByOperator::<Test>::get(1), Some(1u32));
+
+		// user can't create a second vault
+		assert_err!(
+			Vaults::create(RuntimeOrigin::signed(1), default_vault()),
+			Error::<Test>::AccountAlreadyHasVault
+		);
 	});
 }
 

@@ -3852,9 +3852,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				153u8, 7u8, 163u8, 23u8, 158u8, 197u8, 181u8, 78u8, 44u8, 223u8, 15u8, 217u8,
-				123u8, 44u8, 101u8, 37u8, 188u8, 31u8, 21u8, 50u8, 75u8, 112u8, 29u8, 83u8, 90u8,
-				40u8, 235u8, 91u8, 109u8, 61u8, 204u8, 171u8,
+				116u8, 247u8, 60u8, 69u8, 215u8, 214u8, 178u8, 220u8, 54u8, 174u8, 88u8, 87u8, 4u8,
+				12u8, 57u8, 106u8, 210u8, 128u8, 26u8, 179u8, 157u8, 117u8, 85u8, 156u8, 56u8,
+				37u8, 166u8, 50u8, 70u8, 200u8, 150u8, 65u8,
 			]
 	}
 	pub mod system {
@@ -10216,6 +10216,11 @@ pub mod api {
 					>;
 					pub type Param0 = ::core::primitive::u32;
 				}
+				pub mod vault_id_by_operator {
+					use super::runtime_types;
+					pub type VaultIdByOperator = ::core::primitive::u32;
+					pub type Param0 = crate::types::AccountId32;
+				}
 				pub mod vault_x_pub_by_id {
 					use super::runtime_types;
 					pub type VaultXPubById = (
@@ -10327,6 +10332,51 @@ pub mod api {
 							85u8, 171u8, 183u8, 6u8, 245u8, 112u8, 248u8, 104u8, 33u8, 69u8, 50u8,
 							24u8, 65u8, 234u8, 143u8, 4u8, 154u8, 218u8, 47u8, 201u8, 44u8, 102u8,
 							235u8, 152u8, 6u8, 38u8, 245u8, 63u8, 165u8, 246u8, 126u8, 146u8,
+						],
+					)
+				}
+				#[doc = " Vaults by owner"]
+				pub fn vault_id_by_operator_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::vault_id_by_operator::VaultIdByOperator,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"VaultIdByOperator",
+						(),
+						[
+							200u8, 216u8, 141u8, 239u8, 129u8, 65u8, 190u8, 151u8, 223u8, 79u8,
+							233u8, 236u8, 210u8, 92u8, 69u8, 246u8, 27u8, 6u8, 46u8, 70u8, 76u8,
+							140u8, 230u8, 244u8, 106u8, 71u8, 38u8, 3u8, 24u8, 163u8, 127u8, 235u8,
+						],
+					)
+				}
+				#[doc = " Vaults by owner"]
+				pub fn vault_id_by_operator(
+					&self,
+					_0: types::vault_id_by_operator::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::vault_id_by_operator::Param0,
+					>,
+					types::vault_id_by_operator::VaultIdByOperator,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"VaultIdByOperator",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							200u8, 216u8, 141u8, 239u8, 129u8, 65u8, 190u8, 151u8, 223u8, 79u8,
+							233u8, 236u8, 210u8, 92u8, 69u8, 246u8, 27u8, 6u8, 46u8, 70u8, 76u8,
+							140u8, 230u8, 244u8, 106u8, 71u8, 38u8, 3u8, 24u8, 163u8, 127u8, 235u8,
 						],
 					)
 				}
@@ -31247,6 +31297,9 @@ pub mod api {
 					#[codec(index = 26)]
 					#[doc = "A vault must clear out all pending cosigns before it can collect"]
 					PendingCosignsBeforeCollect,
+					#[codec(index = 27)]
+					#[doc = "An account may only be associated with a single vault"]
+					AccountAlreadyHasVault,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
