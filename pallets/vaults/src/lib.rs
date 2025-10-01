@@ -42,7 +42,7 @@ pub mod pallet {
 		vault::{LockExtension, VaultLiquidityPoolFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -117,6 +117,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type VaultsById<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, Vault<T::AccountId, T::Balance>, OptionQuery>;
+
+	/// Vaults by owner
+	#[pallet::storage]
+	pub type VaultIdByOperator<T: Config> =
+		StorageMap<_, Twox64Concat, T::AccountId, VaultId, OptionQuery>;
 
 	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
@@ -303,6 +308,8 @@ pub mod pallet {
 		FundingChangeAlreadyScheduled,
 		/// A vault must clear out all pending cosigns before it can collect
 		PendingCosignsBeforeCollect,
+		/// An account may only be associated with a single vault
+		AccountAlreadyHasVault,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -416,11 +423,16 @@ pub mod pallet {
 				xpub.matches_network(T::GetBitcoinNetwork::get()),
 				Error::<T>::WrongXpubNetwork
 			);
+			ensure!(
+				!VaultIdByOperator::<T>::contains_key(&who),
+				Error::<T>::AccountAlreadyHasVault
+			);
 			// make sure we can derive
 			let _xpub =
 				xpub.derive_pubkey(0).map_err(|_| Error::<T>::UnableToDeriveVaultXpubChild)?;
 
 			let vault_id = NextVaultId::<T>::get().unwrap_or(1);
+			VaultIdByOperator::<T>::insert(&who, vault_id);
 			let next_vault_id = vault_id.increment().ok_or(Error::<T>::NoMoreVaultIds)?;
 			NextVaultId::<T>::set(Some(next_vault_id));
 

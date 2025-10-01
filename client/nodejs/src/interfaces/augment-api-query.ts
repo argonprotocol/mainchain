@@ -6,85 +6,10 @@
 import '@polkadot/api-base/types/storage';
 
 import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/api-base/types';
-import type {
-  BTreeMap,
-  BTreeSet,
-  Bytes,
-  Null,
-  Option,
-  U256,
-  U8aFixed,
-  Vec,
-  bool,
-  u128,
-  u16,
-  u32,
-  u64,
-  u8,
-} from '@polkadot/types-codec';
+import type { BTreeMap, BTreeSet, Bytes, Null, Option, U256, U8aFixed, Vec, bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type {
-  ArgonNotaryAuditErrorVerifyError,
-  ArgonPrimitivesBalanceChangeAccountOrigin,
-  ArgonPrimitivesBitcoinBitcoinBlock,
-  ArgonPrimitivesBitcoinBitcoinNetwork,
-  ArgonPrimitivesBitcoinBitcoinXPub,
-  ArgonPrimitivesBitcoinUtxoRef,
-  ArgonPrimitivesBitcoinUtxoValue,
-  ArgonPrimitivesBlockSealBlockPayout,
-  ArgonPrimitivesBlockSealMiningBidStats,
-  ArgonPrimitivesBlockSealMiningRegistration,
-  ArgonPrimitivesBlockSealMiningSlotConfig,
-  ArgonPrimitivesDigestsBlockVoteDigest,
-  ArgonPrimitivesDigestsDigestset,
-  ArgonPrimitivesDigestsNotebookDigest,
-  ArgonPrimitivesDomainZoneRecord,
-  ArgonPrimitivesForkPower,
-  ArgonPrimitivesInherentsBlockSealInherent,
-  ArgonPrimitivesNotaryNotaryMeta,
-  ArgonPrimitivesNotaryNotaryNotebookKeyDetails,
-  ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails,
-  ArgonPrimitivesNotaryNotaryRecord,
-  ArgonPrimitivesProvidersBlockSealerInfo,
-  ArgonPrimitivesTickTicker,
-  ArgonPrimitivesVault,
-  FrameSupportDispatchPerDispatchClassWeight,
-  FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
-  FrameSupportTokensMiscIdAmountRuntimeHoldReason,
-  FrameSystemAccountInfo,
-  FrameSystemCodeUpgradeAuthorization,
-  FrameSystemEventRecord,
-  FrameSystemLastRuntimeUpgradeInfo,
-  FrameSystemPhase,
-  IsmpConsensusStateCommitment,
-  IsmpConsensusStateMachineHeight,
-  IsmpConsensusStateMachineId,
-  IsmpHostStateMachine,
-  PalletBalancesAccountData,
-  PalletBalancesBalanceLock,
-  PalletBalancesReserveData,
-  PalletBitcoinLocksLockReleaseRequest,
-  PalletBitcoinLocksLockedBitcoin,
-  PalletChainTransferQueuedTransferOut,
-  PalletDomainsDomainRegistration,
-  PalletGrandpaStoredPendingChange,
-  PalletGrandpaStoredState,
-  PalletHyperbridgeVersionedHostParams,
-  PalletLiquidityPoolsLiquidityPool,
-  PalletLiquidityPoolsLiquidityPoolCapital,
-  PalletLiquidityPoolsPrebondedArgons,
-  PalletMintMintAction,
-  PalletMultisigMultisig,
-  PalletPriceIndexPriceIndex,
-  PalletProxyAnnouncement,
-  PalletProxyProxyDefinition,
-  PalletTransactionPaymentReleases,
-  PalletVaultsVaultFrameRevenue,
-  SpConsensusGrandpaAppPublic,
-  SpRuntimeDigest,
-  SpWeightsWeightV2Weight,
-} from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBalanceChangeAccountOrigin, ArgonPrimitivesBitcoinBitcoinBlock, ArgonPrimitivesBitcoinBitcoinNetwork, ArgonPrimitivesBitcoinBitcoinXPub, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBitcoinUtxoValue, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningBidStats, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesBlockSealMiningSlotConfig, ArgonPrimitivesDigestsBlockVoteDigest, ArgonPrimitivesDigestsDigestset, ArgonPrimitivesDigestsNotebookDigest, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesForkPower, ArgonPrimitivesInherentsBlockSealInherent, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryNotebookKeyDetails, ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersBlockSealerInfo, ArgonPrimitivesTickTicker, ArgonPrimitivesVault, FrameSupportDispatchPerDispatchClassWeight, FrameSupportTokensMiscIdAmountRuntimeFreezeReason, FrameSupportTokensMiscIdAmountRuntimeHoldReason, FrameSystemAccountInfo, FrameSystemCodeUpgradeAuthorization, FrameSystemEventRecord, FrameSystemLastRuntimeUpgradeInfo, FrameSystemPhase, IsmpConsensusStateCommitment, IsmpConsensusStateMachineHeight, IsmpConsensusStateMachineId, IsmpHostStateMachine, PalletBalancesAccountData, PalletBalancesBalanceLock, PalletBalancesReserveData, PalletBitcoinLocksLockReleaseRequest, PalletBitcoinLocksLockedBitcoin, PalletChainTransferQueuedTransferOut, PalletDomainsDomainRegistration, PalletGrandpaStoredPendingChange, PalletGrandpaStoredState, PalletHyperbridgeVersionedHostParams, PalletLiquidityPoolsLiquidityPool, PalletLiquidityPoolsLiquidityPoolCapital, PalletLiquidityPoolsPrebondedArgons, PalletMintMintAction, PalletMultisigMultisig, PalletPriceIndexPriceIndex, PalletProxyAnnouncement, PalletProxyProxyDefinition, PalletTransactionPaymentReleases, PalletVaultsVaultFrameRevenue, SpConsensusGrandpaAppPublic, SpRuntimeDigest, SpWeightsWeightV2Weight } from '@polkadot/types/lookup';
 import type { Observable } from '@polkadot/types/types';
 
 export type __AugmentedQuery<ApiType extends ApiTypes> = AugmentedQuery<ApiType, () => unknown>;
@@ -125,31 +50,15 @@ declare module '@polkadot/api-base/types/storage' {
        * `Balances` pallet, which uses a `StorageMap` to store balances data only.
        * NOTE: This is only used in the case that this pallet is used to store balances.
        **/
-      account: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<PalletBalancesAccountData>,
-        [AccountId32]
-      >;
+      account: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<PalletBalancesAccountData>, [AccountId32]>;
       /**
        * Freeze locks on account balances.
        **/
-      freezes: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeFreezeReason>>,
-        [AccountId32]
-      >;
+      freezes: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeFreezeReason>>, [AccountId32]>;
       /**
        * Holds on account balances.
        **/
-      holds: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeHoldReason>>,
-        [AccountId32]
-      >;
+      holds: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeHoldReason>>, [AccountId32]>;
       /**
        * The total units of outstanding deactivated balance in the system.
        **/
@@ -160,21 +69,13 @@ declare module '@polkadot/api-base/types/storage' {
        *
        * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
-      locks: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesBalanceLock>>,
-        [AccountId32]
-      >;
+      locks: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesBalanceLock>>, [AccountId32]>;
       /**
        * Named reserves on some account balances.
        *
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
-      reserves: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesReserveData>>,
-        [AccountId32]
-      >;
+      reserves: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesReserveData>>, [AccountId32]>;
       /**
        * The total units issued in the system.
        **/
@@ -184,43 +85,21 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Utxos that have been requested to be cosigned for releasing
        **/
-      lockCosignDueByFrame: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
-        [u64]
-      >;
+      lockCosignDueByFrame: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>, [u64]>;
       /**
        * Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
        * unlock it
        **/
-      lockExpirationsByBitcoinHeight: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
-        [u64]
-      >;
+      lockExpirationsByBitcoinHeight: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>, [u64]>;
       /**
        * Stores the block number where the lock was released
        **/
-      lockReleaseCosignHeightById: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
-        [u64]
-      >;
-      lockReleaseRequestsByUtxoId: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Option<PalletBitcoinLocksLockReleaseRequest>>,
-        [u64]
-      >;
+      lockReleaseCosignHeightById: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u64]>;
+      lockReleaseRequestsByUtxoId: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksLockReleaseRequest>>, [u64]>;
       /**
        * Stores bitcoin utxos that have requested to be released
        **/
-      locksByUtxoId: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksLockedBitcoin>>,
-        [u64]
-      >;
+      locksByUtxoId: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksLockedBitcoin>>, [u64]>;
       /**
        * The minimum number of satoshis that can be locked
        **/
@@ -231,19 +110,11 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The genesis set bitcoin network that this chain is tied to
        **/
-      bitcoinNetwork: AugmentedQuery<
-        ApiType,
-        () => Observable<ArgonPrimitivesBitcoinBitcoinNetwork>,
-        []
-      >;
+      bitcoinNetwork: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesBitcoinBitcoinNetwork>, []>;
       /**
        * An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
        **/
-      confirmedBitcoinBlockTip: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>,
-        []
-      >;
+      confirmedBitcoinBlockTip: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
       /**
        * Check if the inherent was included
        **/
@@ -251,60 +122,30 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Expiration date as a day since unix timestamp mapped to Bitcoin UTXOs
        **/
-      lockedUtxoExpirationsByBlock: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBitcoinUtxoRef>>,
-        [u64]
-      >;
+      lockedUtxoExpirationsByBlock: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBitcoinUtxoRef>>, [u64]>;
       /**
        * Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
        * the expiration block, the funds are burned and the UTXO is unlocked.
        **/
-      lockedUtxos: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | ArgonPrimitivesBitcoinUtxoRef
-            | { txid?: any; outputIndex?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<ArgonPrimitivesBitcoinUtxoValue>>,
-        [ArgonPrimitivesBitcoinUtxoRef]
-      >;
+      lockedUtxos: AugmentedQuery<ApiType, (arg: ArgonPrimitivesBitcoinUtxoRef | { txid?: any; outputIndex?: any } | string | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoValue>>, [ArgonPrimitivesBitcoinUtxoRef]>;
       /**
        * Bitcoin Oracle Operator Account
        **/
       oracleOperatorAccount: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
-      previousBitcoinBlockTip: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>,
-        []
-      >;
+      previousBitcoinBlockTip: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
       /**
        * The last synched bitcoin block
        **/
-      synchedBitcoinBlock: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>,
-        []
-      >;
+      synchedBitcoinBlock: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesBitcoinBitcoinBlock>>, []>;
       /**
        * Stores if parent block had a confirmed bitcoin block
        **/
       tempParentHasSyncState: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      utxoIdToRef: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
-        [u64]
-      >;
+      utxoIdToRef: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>, [u64]>;
       /**
        * Bitcoin UTXOs that have been submitted for ownership confirmation
        **/
-      utxosPendingConfirmation: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
-        []
-      >;
+      utxosPendingConfirmation: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>, []>;
     };
     blockRewards: {
       /**
@@ -324,11 +165,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Historical payouts by block number
        **/
-      payoutsByBlock: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBlockSealBlockPayout>>,
-        [u32]
-      >;
+      payoutsByBlock: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBlockSealBlockPayout>>, [u32]>;
     };
     blockSeal: {
       /**
@@ -340,11 +177,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Is the block from a vote seal?
        **/
       isBlockFromVoteSeal: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      lastBlockSealerInfo: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesProvidersBlockSealerInfo>>,
-        []
-      >;
+      lastBlockSealerInfo: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesProvidersBlockSealerInfo>>, []>;
       lastTickWithVoteSeal: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The calculated parent voting key for a block. Refers to the Notebook BlockVote Revealed
@@ -354,11 +187,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Ensures only a single inherent is applied
        **/
-      tempSealInherent: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesInherentsBlockSealInherent>>,
-        []
-      >;
+      tempSealInherent: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesInherentsBlockSealInherent>>, []>;
       /**
        * The count of votes in the last 3 ticks
        **/
@@ -393,84 +222,39 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Temporary store the vote digest
        **/
-      tempBlockVoteDigest: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesDigestsBlockVoteDigest>>,
-        []
-      >;
+      tempBlockVoteDigest: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsBlockVoteDigest>>, []>;
       /**
        * Temporary store of any current tick notebooks included in this block (vs tick)
        **/
-      tempCurrentTickNotebooksInBlock: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails>>,
-        []
-      >;
+      tempCurrentTickNotebooksInBlock: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails>>, []>;
       /**
        * Keeps the last 3 vote minimums. The first one applies to the current block.
        **/
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
     };
     chainTransfer: {
-      expiringTransfersOutByNotary: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Vec<u32>>,
-        [u32, u64]
-      >;
+      expiringTransfersOutByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u32, u64]>;
       /**
        * The admin of the hyperbridge token gateway
        **/
       hyperbridgeTokenAdmin: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      pendingTransfersOut: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<PalletChainTransferQueuedTransferOut>>,
-        [u32]
-      >;
-      transfersUsedInBlockNotebooks: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>,
-        [u32]
-      >;
+      pendingTransfersOut: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletChainTransferQueuedTransferOut>>, [u32]>;
+      transfersUsedInBlockNotebooks: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>, [u32]>;
     };
     digests: {
-      tempDigests: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<ArgonPrimitivesDigestsDigestset>>,
-        []
-      >;
+      tempDigests: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesDigestsDigestset>>, []>;
     };
     domains: {
-      expiringDomainsByBlock: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>,
-        [u64]
-      >;
-      registeredDomains: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<Option<PalletDomainsDomainRegistration>>,
-        [H256]
-      >;
-      zoneRecordsByDomain: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDomainZoneRecord>>,
-        [H256]
-      >;
+      expiringDomainsByBlock: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u64]>;
+      registeredDomains: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<PalletDomainsDomainRegistration>>, [H256]>;
+      zoneRecordsByDomain: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDomainZoneRecord>>, [H256]>;
     };
     grandpa: {
       /**
        * The current list of authorities.
        **/
-      authorities: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>>>,
-        []
-      >;
+      authorities: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>>>, []>;
       /**
        * The number of changes (both in terms of keys and underlying economic responsibilities)
        * in the "set" of Grandpa validators from genesis.
@@ -483,11 +267,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Pending change: (signaled at, scheduled change).
        **/
-      pendingChange: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<PalletGrandpaStoredPendingChange>>,
-        []
-      >;
+      pendingChange: AugmentedQuery<ApiType, () => Observable<Option<PalletGrandpaStoredPendingChange>>, []>;
       /**
        * A mapping from grandpa set ID to the index of the *most recent* session for which its
        * members were responsible.
@@ -500,11 +280,7 @@ declare module '@polkadot/api-base/types/storage' {
        *
        * TWOX-NOTE: `SetId` is not under user control.
        **/
-      setIdSession: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
-        [u64]
-      >;
+      setIdSession: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u64]>;
       /**
        * `true` if we are currently stalled.
        **/
@@ -518,27 +294,13 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The host parameters of the pallet-hyperbridge.
        **/
-      hostParams: AugmentedQuery<
-        ApiType,
-        () => Observable<PalletHyperbridgeVersionedHostParams>,
-        []
-      >;
+      hostParams: AugmentedQuery<ApiType, () => Observable<PalletHyperbridgeVersionedHostParams>, []>;
     };
     ismp: {
       /**
        * A mapping of state machine Ids to their challenge periods
        **/
-      challengePeriod: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
+      challengePeriod: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineId | { stateId?: any; consensusStateId?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineId]>;
       /**
        * The child trie root of messages
        **/
@@ -547,50 +309,24 @@ declare module '@polkadot/api-base/types/storage' {
        * Holds the timestamp at which a consensus client was recently updated.
        * Used in ensuring that the configured challenge period elapses.
        **/
-      consensusClientUpdateTime: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
-        [U8aFixed]
-      >;
+      consensusClientUpdateTime: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>, [U8aFixed]>;
       /**
        * A mapping of consensus state identifier to it's associated consensus client identifier
        **/
-      consensusStateClient: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<U8aFixed>>,
-        [U8aFixed]
-      >;
+      consensusStateClient: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<U8aFixed>>, [U8aFixed]>;
       /**
        * Holds a map of consensus state identifiers to their consensus state.
        **/
-      consensusStates: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<Bytes>>,
-        [U8aFixed]
-      >;
+      consensusStates: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<Bytes>>, [U8aFixed]>;
       /**
        * Holds a map of consensus clients frozen due to byzantine
        * behaviour
        **/
-      frozenConsensusClients: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<bool>,
-        [U8aFixed]
-      >;
+      frozenConsensusClients: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<bool>, [U8aFixed]>;
       /**
        * The latest verified height for a state machine
        **/
-      latestStateMachineHeight: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
+      latestStateMachineHeight: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineId | { stateId?: any; consensusStateId?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineId]>;
       /**
        * Latest nonce for messages sent from this chain
        **/
@@ -598,128 +334,59 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The previous verified height for a state machine
        **/
-      previousStateMachineHeight: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
+      previousStateMachineHeight: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineId | { stateId?: any; consensusStateId?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineId]>;
       /**
        * Tracks requests that have been responded to
        * The key is the request commitment
        **/
-      responded: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<bool>,
-        [H256]
-      >;
+      responded: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<bool>, [H256]>;
       /**
        * Holds a map of state machine heights to their verified state commitments. These state
        * commitments end up here after they are successfully verified by a `ConsensusClient`
        **/
-      stateCommitments: AugmentedQuery<
-        ApiType,
-        (
-          arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array,
-        ) => Observable<Option<IsmpConsensusStateCommitment>>,
-        [IsmpConsensusStateMachineHeight]
-      >;
+      stateCommitments: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array) => Observable<Option<IsmpConsensusStateCommitment>>, [IsmpConsensusStateMachineHeight]>;
       /**
        * Holds the timestamp at which a state machine height was updated.
        * Used in ensuring that the configured challenge period elapses.
        **/
-      stateMachineUpdateTime: AugmentedQuery<
-        ApiType,
-        (
-          arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineHeight]
-      >;
+      stateMachineUpdateTime: AugmentedQuery<ApiType, (arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpConsensusStateMachineHeight]>;
       /**
        * A mapping of consensus state identifiers to their unbonding periods
        **/
-      unbondingPeriod: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
-        [U8aFixed]
-      >;
+      unbondingPeriod: AugmentedQuery<ApiType, (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>, [U8aFixed]>;
     };
     ismpGrandpa: {
       /**
        * Registered state machines for the grandpa consensus client
        **/
-      supportedStateMachines: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpHostStateMachine]
-      >;
+      supportedStateMachines: AugmentedQuery<ApiType, (arg: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | { Relay: any } | string | Uint8Array) => Observable<Option<u64>>, [IsmpHostStateMachine]>;
     };
     liquidityPools: {
       /**
        * The liquidity pool for the current frame. This correlates with the bids coming in for the
        * current frame. Sorted with the biggest share last. (current frame + 1)
        **/
-      capitalActive: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
-        []
-      >;
+      capitalActive: AugmentedQuery<ApiType, () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>, []>;
       /**
        * The liquidity pool still raising capital. (current frame + 2)
        **/
-      capitalRaising: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>,
-        []
-      >;
+      capitalRaising: AugmentedQuery<ApiType, () => Observable<Vec<PalletLiquidityPoolsLiquidityPoolCapital>>, []>;
       /**
        * Any vaults that have been pre-registered for bonding argons. This is used by the vault
        * operator to allocate argons to be bonded once bitcoins are securitized in their vault.
        **/
-      prebondedByVaultId: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<PalletLiquidityPoolsPrebondedArgons>>,
-        [u32]
-      >;
+      prebondedByVaultId: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletLiquidityPoolsPrebondedArgons>>, [u32]>;
       /**
        * The currently earning contributors for the current epoch's bond funds. Sorted by highest
        * bids first
        **/
-      vaultPoolsByFrame: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<BTreeMap<u32, PalletLiquidityPoolsLiquidityPool>>,
-        [u64]
-      >;
+      vaultPoolsByFrame: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeMap<u32, PalletLiquidityPoolsLiquidityPool>>, [u64]>;
     };
     miningSlot: {
       /**
        * Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
        **/
-      accountIndexLookup: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Option<ITuple<[u64, u32]>>>,
-        [AccountId32]
-      >;
+      accountIndexLookup: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ITuple<[u64, u32]>>>, [AccountId32]>;
       activeMinersCount: AugmentedQuery<ApiType, () => Observable<u16>, []>;
       /**
        * Argonots that must be locked to take a Miner role
@@ -733,11 +400,7 @@ declare module '@polkadot/api-base/types/storage' {
        * The cohort set to go into effect in the next slot. The Vec has all
        * registrants with their bid amount
        **/
-      bidsForNextSlotCohort: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
-        []
-      >;
+      bidsForNextSlotCohort: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>, []>;
       /**
        * Did this block activate a new frame
        **/
@@ -750,11 +413,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The number of bids per slot for the last 10 slots (newest first)
        **/
-      historicalBidsPerSlot: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesBlockSealMiningBidStats>>,
-        []
-      >;
+      historicalBidsPerSlot: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesBlockSealMiningBidStats>>, []>;
       /**
        * Is the next slot still open for bids
        **/
@@ -762,13 +421,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Miners that are active in the current block (post initialize) by their starting frame
        **/
-      minersByCohort: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
-        [u64]
-      >;
+      minersByCohort: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>, [u64]>;
       /**
        * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
        * id and the block hash at time of activation.
@@ -777,11 +430,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The mining slot configuration set in genesis
        **/
-      miningConfig: AugmentedQuery<
-        ApiType,
-        () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>,
-        []
-      >;
+      miningConfig: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesBlockSealMiningSlotConfig>, []>;
       /**
        * The number of allow miners to bid for the next mining cohort
        **/
@@ -794,18 +443,10 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The miners released in the last block (only kept for a single block)
        **/
-      releasedMinersByAccountId: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>>,
-        []
-      >;
+      releasedMinersByAccountId: AugmentedQuery<ApiType, () => Observable<BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>>, []>;
     };
     mint: {
-      blockMintAction: AugmentedQuery<
-        ApiType,
-        () => Observable<ITuple<[u32, PalletMintMintAction]>>,
-        []
-      >;
+      blockMintAction: AugmentedQuery<ApiType, () => Observable<ITuple<[u32, PalletMintMintAction]>>, []>;
       /**
        * The amount of argons minted per mining cohort (ie, grouped by starting frame id)
        **/
@@ -823,59 +464,24 @@ declare module '@polkadot/api-base/types/storage' {
        * a) CPI >= 0 and
        * b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining
        **/
-      pendingMintUtxos: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ITuple<[u64, AccountId32, u128]>>>,
-        []
-      >;
+      pendingMintUtxos: AugmentedQuery<ApiType, () => Observable<Vec<ITuple<[u64, AccountId32, u128]>>>, []>;
     };
     multisig: {
       /**
        * The set of open multisig operations.
        **/
-      multisigs: AugmentedQuery<
-        ApiType,
-        (
-          arg1: AccountId32 | string | Uint8Array,
-          arg2: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<PalletMultisigMultisig>>,
-        [AccountId32, U8aFixed]
-      >;
+      multisigs: AugmentedQuery<ApiType, (arg1: AccountId32 | string | Uint8Array, arg2: U8aFixed | string | Uint8Array) => Observable<Option<PalletMultisigMultisig>>, [AccountId32, U8aFixed]>;
     };
     notaries: {
-      activeNotaries: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesNotaryNotaryRecord>>,
-        []
-      >;
-      expiringProposals: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>,
-        [u32]
-      >;
+      activeNotaries: AugmentedQuery<ApiType, () => Observable<Vec<ArgonPrimitivesNotaryNotaryRecord>>, []>;
+      expiringProposals: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>, [u32]>;
       nextNotaryId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      notaryKeyHistory: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[u64, U8aFixed]>>>,
-        [u32]
-      >;
-      proposedNotaries: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<Option<ITuple<[ArgonPrimitivesNotaryNotaryMeta, u32]>>>,
-        [AccountId32]
-      >;
+      notaryKeyHistory: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[u64, U8aFixed]>>>, [u32]>;
+      proposedNotaries: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<ITuple<[ArgonPrimitivesNotaryNotaryMeta, u32]>>>, [AccountId32]>;
       /**
        * Metadata changes to be activated at the given tick
        **/
-      queuedNotaryMetaChanges: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<BTreeMap<u32, ArgonPrimitivesNotaryNotaryMeta>>,
-        [u64]
-      >;
+      queuedNotaryMetaChanges: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeMap<u32, ArgonPrimitivesNotaryNotaryMeta>>, [u64]>;
     };
     notebook: {
       /**
@@ -883,26 +489,11 @@ declare module '@polkadot/api-base/types/storage' {
        * notebook containing this account in the changed accounts merkle root
        * (NotebookChangedAccountsRootByNotary)
        **/
-      accountOriginLastChangedNotebookByNotary: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2:
-            | ArgonPrimitivesBalanceChangeAccountOrigin
-            | { notebookNumber?: any; accountUid?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u32>>,
-        [u32, ArgonPrimitivesBalanceChangeAccountOrigin]
-      >;
+      accountOriginLastChangedNotebookByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: ArgonPrimitivesBalanceChangeAccountOrigin | { notebookNumber?: any; accountUid?: any } | string | Uint8Array) => Observable<Option<u32>>, [u32, ArgonPrimitivesBalanceChangeAccountOrigin]>;
       /**
        * The notebooks included in this block
        **/
-      blockNotebooks: AugmentedQuery<
-        ApiType,
-        () => Observable<ArgonPrimitivesDigestsNotebookDigest>,
-        []
-      >;
+      blockNotebooks: AugmentedQuery<ApiType, () => Observable<ArgonPrimitivesDigestsNotebookDigest>, []>;
       /**
        * Check if the inherent was included
        **/
@@ -911,42 +502,19 @@ declare module '@polkadot/api-base/types/storage' {
        * List of last few notebook details by notary. The bool is whether the notebook is eligible
        * for votes (received at correct tick and audit passed)
        **/
-      lastNotebookDetailsByNotary: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Vec<ITuple<[ArgonPrimitivesNotaryNotaryNotebookKeyDetails, bool]>>>,
-        [u32]
-      >;
+      lastNotebookDetailsByNotary: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[ArgonPrimitivesNotaryNotaryNotebookKeyDetails, bool]>>>, [u32]>;
       /**
        * Notaries ready to start reprocessing at a given notebook number
        **/
-      lockedNotaryReadyForReprocess: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
-        [u32]
-      >;
+      lockedNotaryReadyForReprocess: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u32>>, [u32]>;
       /**
        * Notaries locked for failing audits
        **/
-      notariesLockedForFailedAudit: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<ITuple<[u32, u64, ArgonNotaryAuditErrorVerifyError]>>>,
-        [u32]
-      >;
+      notariesLockedForFailedAudit: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[u32, u64, ArgonNotaryAuditErrorVerifyError]>>>, [u32]>;
       /**
        * Double storage map of notary id + notebook # to the change root
        **/
-      notebookChangedAccountsRootByNotary: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<H256>>,
-        [u32, u32]
-      >;
+      notebookChangedAccountsRootByNotary: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: u32 | AnyNumber | Uint8Array) => Observable<Option<H256>>, [u32, u32]>;
     };
     ownership: {
       /**
@@ -975,31 +543,15 @@ declare module '@polkadot/api-base/types/storage' {
        * `Balances` pallet, which uses a `StorageMap` to store balances data only.
        * NOTE: This is only used in the case that this pallet is used to store balances.
        **/
-      account: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<PalletBalancesAccountData>,
-        [AccountId32]
-      >;
+      account: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<PalletBalancesAccountData>, [AccountId32]>;
       /**
        * Freeze locks on account balances.
        **/
-      freezes: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeFreezeReason>>,
-        [AccountId32]
-      >;
+      freezes: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeFreezeReason>>, [AccountId32]>;
       /**
        * Holds on account balances.
        **/
-      holds: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeHoldReason>>,
-        [AccountId32]
-      >;
+      holds: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<FrameSupportTokensMiscIdAmountRuntimeHoldReason>>, [AccountId32]>;
       /**
        * The total units of outstanding deactivated balance in the system.
        **/
@@ -1010,21 +562,13 @@ declare module '@polkadot/api-base/types/storage' {
        *
        * Use of locks is deprecated in favour of freezes. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
-      locks: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesBalanceLock>>,
-        [AccountId32]
-      >;
+      locks: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesBalanceLock>>, [AccountId32]>;
       /**
        * Named reserves on some account balances.
        *
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
-      reserves: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesReserveData>>,
-        [AccountId32]
-      >;
+      reserves: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Vec<PalletBalancesReserveData>>, [AccountId32]>;
       /**
        * The total units issued in the system.
        **/
@@ -1044,24 +588,12 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The announcements made by the proxy (key).
        **/
-      announcements: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<ITuple<[Vec<PalletProxyAnnouncement>, u128]>>,
-        [AccountId32]
-      >;
+      announcements: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyAnnouncement>, u128]>>, [AccountId32]>;
       /**
        * The set of account proxies. Maps the account which has delegated to the accounts
        * which are being delegated to, together with the amount held on deposit.
        **/
-      proxies: AugmentedQuery<
-        ApiType,
-        (
-          arg: AccountId32 | string | Uint8Array,
-        ) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>,
-        [AccountId32]
-      >;
+      proxies: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>, [AccountId32]>;
     };
     sudo: {
       /**
@@ -1073,11 +605,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The full account information for a particular account ID.
        **/
-      account: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<FrameSystemAccountInfo>,
-        [AccountId32]
-      >;
+      account: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<FrameSystemAccountInfo>, [AccountId32]>;
       /**
        * Total length (in bytes) for all extrinsics put together, for the current block.
        **/
@@ -1085,27 +613,15 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * `Some` if a code upgrade has been authorized.
        **/
-      authorizedUpgrade: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<FrameSystemCodeUpgradeAuthorization>>,
-        []
-      >;
+      authorizedUpgrade: AugmentedQuery<ApiType, () => Observable<Option<FrameSystemCodeUpgradeAuthorization>>, []>;
       /**
        * Map of block numbers to block hashes.
        **/
-      blockHash: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
-        [u32]
-      >;
+      blockHash: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>, [u32]>;
       /**
        * The current weight for the block.
        **/
-      blockWeight: AugmentedQuery<
-        ApiType,
-        () => Observable<FrameSupportDispatchPerDispatchClassWeight>,
-        []
-      >;
+      blockWeight: AugmentedQuery<ApiType, () => Observable<FrameSupportDispatchPerDispatchClassWeight>, []>;
       /**
        * Digest of the current block, also part of the block header.
        **/
@@ -1136,11 +652,7 @@ declare module '@polkadot/api-base/types/storage' {
        * the `EventIndex` then in case if the topic has the same contents on the next block
        * no notification will be triggered thus the event might be lost.
        **/
-      eventTopics: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<Vec<ITuple<[u32, u32]>>>,
-        [H256]
-      >;
+      eventTopics: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Vec<ITuple<[u32, u32]>>>, [H256]>;
       /**
        * The execution phase of the block.
        **/
@@ -1152,11 +664,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Extrinsics data for the current block (maps an extrinsic's index to its data).
        **/
-      extrinsicData: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Bytes>,
-        [u32]
-      >;
+      extrinsicData: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Bytes>, [u32]>;
       /**
        * The weight reclaimed for the extrinsic.
        *
@@ -1166,11 +674,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Logic doing some post dispatch weight reduction must update this storage to avoid duplicate
        * reduction.
        **/
-      extrinsicWeightReclaimed: AugmentedQuery<
-        ApiType,
-        () => Observable<SpWeightsWeightV2Weight>,
-        []
-      >;
+      extrinsicWeightReclaimed: AugmentedQuery<ApiType, () => Observable<SpWeightsWeightV2Weight>, []>;
       /**
        * Whether all inherents have been applied.
        **/
@@ -1178,11 +682,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Stores the `spec_version` and `spec_name` of when the last runtime upgrade happened.
        **/
-      lastRuntimeUpgrade: AugmentedQuery<
-        ApiType,
-        () => Observable<Option<FrameSystemLastRuntimeUpgradeInfo>>,
-        []
-      >;
+      lastRuntimeUpgrade: AugmentedQuery<ApiType, () => Observable<Option<FrameSystemLastRuntimeUpgradeInfo>>, []>;
       /**
        * The current block number being processed. Set by `execute_block`.
        **/
@@ -1210,11 +710,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Blocks from the last 100 ticks. Trimmed in on_initialize.
        * NOTE: cannot include the current block hash until next block
        **/
-      recentBlocksAtTicks: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>,
-        [u64]
-      >;
+      recentBlocksAtTicks: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<H256>>, [u64]>;
     };
     timestamp: {
       /**
@@ -1234,151 +730,72 @@ declare module '@polkadot/api-base/types/storage' {
        * Assets supported by this instance of token gateway
        * A map of the token gateway asset id to the local asset id
        **/
-      localAssets: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<Option<u32>>,
-        [H256]
-      >;
+      localAssets: AugmentedQuery<ApiType, (arg: H256 | string | Uint8Array) => Observable<Option<u32>>, [H256]>;
       /**
        * Assets that originate from this chain
        **/
-      nativeAssets: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<bool>,
-        [u32]
-      >;
+      nativeAssets: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<bool>, [u32]>;
       /**
        * The decimals used by the EVM counterpart of this asset
        **/
-      precisions: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u8>>,
-        [u32, IsmpHostStateMachine]
-      >;
+      precisions: AugmentedQuery<ApiType, (arg1: u32 | AnyNumber | Uint8Array, arg2: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | { Relay: any } | string | Uint8Array) => Observable<Option<u8>>, [u32, IsmpHostStateMachine]>;
       /**
        * Assets supported by this instance of token gateway
        * A map of the local asset id to the token gateway asset id
        **/
-      supportedAssets: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<H256>>,
-        [u32]
-      >;
+      supportedAssets: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<H256>>, [u32]>;
       /**
        * The token gateway adresses on different chains
        **/
-      tokenGatewayAddresses: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<Bytes>>,
-        [IsmpHostStateMachine]
-      >;
+      tokenGatewayAddresses: AugmentedQuery<ApiType, (arg: IsmpHostStateMachine | { Evm: any } | { Polkadot: any } | { Kusama: any } | { Substrate: any } | { Tendermint: any } | { Relay: any } | string | Uint8Array) => Observable<Option<Bytes>>, [IsmpHostStateMachine]>;
     };
     transactionPayment: {
       nextFeeMultiplier: AugmentedQuery<ApiType, () => Observable<u128>, []>;
-      storageVersion: AugmentedQuery<
-        ApiType,
-        () => Observable<PalletTransactionPaymentReleases>,
-        []
-      >;
+      storageVersion: AugmentedQuery<ApiType, () => Observable<PalletTransactionPaymentReleases>, []>;
     };
     txPause: {
       /**
        * The set of calls that are explicitly paused.
        **/
-      pausedCalls: AugmentedQuery<
-        ApiType,
-        (
-          arg: ITuple<[Bytes, Bytes]> | [Bytes | string | Uint8Array, Bytes | string | Uint8Array],
-        ) => Observable<Option<Null>>,
-        [ITuple<[Bytes, Bytes]>]
-      >;
+      pausedCalls: AugmentedQuery<ApiType, (arg: ITuple<[Bytes, Bytes]> | [Bytes | string | Uint8Array, Bytes | string | Uint8Array]) => Observable<Option<Null>>, [ITuple<[Bytes, Bytes]>]>;
     };
     vaults: {
       /**
        * The last collect frame of each vault
        **/
-      lastCollectFrameByVaultId: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u64>>,
-        [u32]
-      >;
+      lastCollectFrameByVaultId: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<u64>>, [u32]>;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
        * Bitcoin Locks pending cosign by vault id
        **/
-      pendingCosignByVaultId: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
-        [u32]
-      >;
+      pendingCosignByVaultId: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>, [u32]>;
       /**
        * Pending terms that will be committed at the given block number (must be a minimum of 1 slot
        * change away)
        **/
-      pendingTermsModificationsByTick: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>,
-        [u64]
-      >;
+      pendingTermsModificationsByTick: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>, [u64]>;
       /**
        * Tracks revenue from Bitcoin Locks and Liquidity Pools for the trailing frames for each vault
        * (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
        * collect expiration window (`RevenueCollectionExpirationFrames`).
        **/
-      revenuePerFrameByVault: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsVaultFrameRevenue>>,
-        [u32]
-      >;
+      revenuePerFrameByVault: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsVaultFrameRevenue>>, [u32]>;
       /**
        * The vaults that have funds releasing at a given bitcoin height
        **/
-      vaultFundsReleasingByHeight: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u32>>,
-        [u64]
-      >;
+      vaultFundsReleasingByHeight: AugmentedQuery<ApiType, (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u32>>, [u64]>;
+      /**
+       * Vaults by owner
+       **/
+      vaultIdByOperator: AugmentedQuery<ApiType, (arg: AccountId32 | string | Uint8Array) => Observable<Option<u32>>, [AccountId32]>;
       /**
        * Vaults by id
        **/
-      vaultsById: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVault>>,
-        [u32]
-      >;
+      vaultsById: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVault>>, [u32]>;
       /**
        * Vault Bitcoin Xpub and current child counter by VaultId
        **/
-      vaultXPubById: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<ITuple<[ArgonPrimitivesBitcoinBitcoinXPub, u32]>>>,
-        [u32]
-      >;
+      vaultXPubById: AugmentedQuery<ApiType, (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ITuple<[ArgonPrimitivesBitcoinBitcoinXPub, u32]>>>, [u32]>;
     };
   } // AugmentedQueries
 } // declare module
