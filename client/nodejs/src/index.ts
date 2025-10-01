@@ -7,8 +7,10 @@ import { cryptoWaitReady, decodeAddress, mnemonicGenerate } from '@polkadot/util
 import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
-import type { ApiOptions } from '@polkadot/api/types';
+import type { ApiDecoration, ApiOptions } from '@polkadot/api/types';
 
+export type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
+export { ApiDecoration };
 export { WageProtector } from './WageProtector';
 export { TxSubmitter, TxResult, ITxProgressCallback } from './TxSubmitter';
 export * from './utils';
@@ -65,6 +67,7 @@ export {
   type AccountId,
   type Header,
   type Block,
+  type SignedBlock,
 } from '@polkadot/types/interfaces/runtime';
 export type { ExtrinsicOrHash, ExtrinsicStatus } from '@polkadot/types/interfaces/author';
 export { type BlockHash } from '@polkadot/types/interfaces/chain';
@@ -82,6 +85,7 @@ export async function waitForLoad(): Promise<void> {
 /**
  * Get a client for the given host
  * @param host The host to connect to
+ * @param options Additional options for the API
  * @returns The client
  */
 export async function getClient(host: string, options?: ApiOptions): Promise<ArgonClient> {

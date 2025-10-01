@@ -30,3 +30,4 @@ node_modules
 .env*.local
 **/nodejs/browser
 /.yarn/install-state.gz
+/.port-lock
