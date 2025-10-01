@@ -4,11 +4,12 @@
   "scripts": {
     "tsc": "yarn workspaces foreach --all run tsup",
     "build": "yarn workspaces foreach --all run build && yarn lint",
-    "pretest": "yarn workspace @argonprotocol/localchain pretest",
+    "pretest": "yarn workspaces foreach --all run pretest",
+    "pretest:ci": "yarn workspaces foreach --all run pretest:ci",
     "lint": "yarn prettier --write \"**/*.{ts,js,json,md}\"",
     "eslint": "eslint . --ext .ts --cache --fix",
-    "test": "yarn pretest && yarn workspaces foreach --all run test",
-    "test:ci": "yarn pretest && yarn workspaces foreach --all run test:ci",
+    "test": "yarn pretest && vitest --run --typecheck",
+    "test:ci": "yarn pretest:ci && vitest --run",
     "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
   },
   "private": true,
@@ -24,13 +25,18 @@
   ],
   "devDependencies": {
     "@lerna-lite/version": "^3.12.3",
+    "@types/node": "22.17.1",
+    "@vitest/ui": "3.2.4",
     "eslint": "9.33.0",
     "eslint-config-prettier": "10.1.8",
     "jiti": "^2.5.1",
     "prettier": "^3.6.2",
     "prettier-eslint-cli": "8.0.1",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.39.1"
+    "typescript-eslint": "^8.39.1",
+    "vite": "^7",
+    "vite-plugin-wasm": "^3.5.0",
+    "vitest": "3.2.4"
   },
   "resolutions": {
     "axios": "^1.12.0",

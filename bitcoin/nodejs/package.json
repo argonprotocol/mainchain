@@ -18,10 +18,10 @@
     "build": "yarn wasm-pack && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
     "tsc": "yarn pretsc && tsup",
-    "test": "yarn build && vitest --run --typecheck --disableConsoleIntercept",
-    "test:ci": "yarn tsc && vitest --run --disableConsoleIntercept",
     "tsup": "yarn tsc",
-    "watch": "yarn pretsc && tsup --watch"
+    "watch": "yarn pretsc && tsup --watch",
+    "pretest": "yarn build",
+    "pretest:ci": "yarn tsc"
   },
   "files": [
     "lib/",
@@ -64,8 +64,6 @@
     "tsup": "^8.5.0",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2",
-    "vite-plugin-wasm": "^3.5.0",
-    "vitest": "^3.2.4",
     "wasm-pack": "^0.13.1"
   },
   "packageManager": "yarn@4.1.0"
