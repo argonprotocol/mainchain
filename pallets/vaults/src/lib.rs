@@ -1064,7 +1064,7 @@ pub mod pallet {
 
 		fn schedule_for_release(
 			vault_id: VaultId,
-			locked_argons: T::Balance,
+			liquidity_value: T::Balance,
 			satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<(), VaultError> {
@@ -1073,18 +1073,18 @@ pub mod pallet {
 				locks_created: 0,
 				total_fee: 0u32.into(),
 				securitization_locked: 0u32.into(),
-				securitization_released: locked_argons,
+				securitization_released: liquidity_value,
 				satoshis_locked: 0,
 				satoshis_released: satoshis,
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			let release_heights = vault.schedule_for_release(locked_argons, lock_extension)?;
+			let release_heights = vault.schedule_for_release(liquidity_value, lock_extension)?;
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
-				amount: locked_argons,
+				amount: liquidity_value,
 				release_height: lock_extension.lock_expiration,
 			});
 
@@ -1151,13 +1151,13 @@ pub mod pallet {
 		/// Burn the funds from the vault.
 		fn burn(
 			vault_id: VaultId,
-			lock_amount: T::Balance,
+			liquidity_value: T::Balance,
 			market_rate: T::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result = vault.burn(lock_amount, market_rate, lock_extension)?;
+			let burn_result = vault.burn(liquidity_value, market_rate, lock_extension)?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
