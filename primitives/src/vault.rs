@@ -103,7 +103,7 @@ pub trait BitcoinVaultProvider {
 	fn lock(
 		vault_id: VaultId,
 		locker: &Self::AccountId,
-		locked_argons: Self::Balance,
+		liquidity_value: Self::Balance,
 		satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
 	) -> Result<Self::Balance, VaultError>;
@@ -111,7 +111,7 @@ pub trait BitcoinVaultProvider {
 	/// Release the lock and move into holding, eligible for relock
 	fn schedule_for_release(
 		vault_id: VaultId,
-		locked_argons: Self::Balance,
+		liquidity_value: Self::Balance,
 		satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<(), VaultError>;
@@ -125,7 +125,7 @@ pub trait BitcoinVaultProvider {
 	/// Returns the amount of argons that were burned
 	fn burn(
 		vault_id: VaultId,
-		lock_amount: Self::Balance,
+		liquidity_value: Self::Balance,
 		redemption_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError>;
@@ -140,7 +140,7 @@ pub trait BitcoinVaultProvider {
 	fn compensate_lost_bitcoin(
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
-		lock_amount: Self::Balance,
+		liquidity_value: Self::Balance,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError>;

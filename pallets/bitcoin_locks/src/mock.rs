@@ -8,7 +8,7 @@ use crate as pallet_bitcoin_locks;
 use crate::BitcoinVerifier;
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
-	BitcoinUtxoTracker, PriceProvider, UtxoLockEvents,
+	ArgonCPI, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
@@ -68,7 +68,6 @@ parameter_types! {
 	pub static MaxConcurrentlyReleasingLocks: u32 = 10;
 	pub static BitcoinPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(62_000_00, 100));
 	pub static ArgonPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
-	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(0.1));
 	pub static ArgonTargetPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static LockReleaseCosignDeadlineFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
@@ -146,14 +145,16 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPriceInUsd::get()
 	}
-	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
-		ArgonCPI::get()
+	fn get_argon_cpi() -> Option<ArgonCPI> {
+		let ratio = ArgonTargetPriceInUsd::get()? / ArgonPriceInUsd::get()?;
+		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);
+		Some(ratio_as_cpi - One::one())
 	}
 	fn get_argon_pool_liquidity() -> Option<Balance> {
 		todo!()
 	}
 	fn get_redemption_r_value() -> Option<FixedU128> {
-		ArgonPriceInUsd::get()?.checked_div(&ArgonTargetPriceInUsd::get().unwrap())
+		Some(ArgonPriceInUsd::get()? / ArgonTargetPriceInUsd::get()?)
 	}
 }
 
@@ -218,33 +219,34 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn schedule_for_release(
 		_vault_id: VaultId,
-		locked_argons: Self::Balance,
+		liquidity_value: Self::Balance,
 		_satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|a| a.schedule_for_release(locked_argons, lock_extensions))?;
+		DefaultVault::mutate(|a| a.schedule_for_release(liquidity_value, lock_extensions))?;
 		Ok(())
 	}
 
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		lock_amount: Self::Balance,
+		liquidity_value: Self::Balance,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
-		let result = DefaultVault::mutate(|a| a.burn(lock_amount, market_rate, lock_extension))?;
+		let result =
+			DefaultVault::mutate(|a| a.burn(liquidity_value, market_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		lock_amount: Self::Balance,
+		liquidity_value: Self::Balance,
 		redemption_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(lock_amount, redemption_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(liquidity_value, redemption_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 

@@ -246,14 +246,29 @@ declare module '@polkadot/api-base/types/events' {
       >;
       BitcoinLockCreated: AugmentedEvent<
         ApiType,
-        [utxoId: u64, vaultId: u32, lockPrice: u128, accountId: AccountId32, securityFee: u128],
-        { utxoId: u64; vaultId: u32; lockPrice: u128; accountId: AccountId32; securityFee: u128 }
+        [
+          utxoId: u64,
+          vaultId: u32,
+          liquidityValue: u128,
+          lockPrice: u128,
+          accountId: AccountId32,
+          securityFee: u128,
+        ],
+        {
+          utxoId: u64;
+          vaultId: u32;
+          liquidityValue: u128;
+          lockPrice: u128;
+          accountId: AccountId32;
+          securityFee: u128;
+        }
       >;
       BitcoinLockRatcheted: AugmentedEvent<
         ApiType,
         [
           utxoId: u64,
           vaultId: u32,
+          liquidityValue: u128,
           originalLockPrice: u128,
           securityFee: u128,
           newLockPrice: u128,
@@ -263,6 +278,7 @@ declare module '@polkadot/api-base/types/events' {
         {
           utxoId: u64;
           vaultId: u32;
+          liquidityValue: u128;
           originalLockPrice: u128;
           securityFee: u128;
           newLockPrice: u128;
