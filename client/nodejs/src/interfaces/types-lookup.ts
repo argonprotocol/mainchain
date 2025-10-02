@@ -548,7 +548,8 @@ declare module '@polkadot/types/lookup' {
     readonly asBitcoinLockCreated: {
       readonly utxoId: u64;
       readonly vaultId: u32;
-      readonly lockPrice: u128;
+      readonly liquidityPromised: u128;
+      readonly peggedPrice: u128;
       readonly accountId: AccountId32;
       readonly securityFee: u128;
     } & Struct;
@@ -556,9 +557,10 @@ declare module '@polkadot/types/lookup' {
     readonly asBitcoinLockRatcheted: {
       readonly utxoId: u64;
       readonly vaultId: u32;
-      readonly originalLockPrice: u128;
+      readonly liquidityPromised: u128;
+      readonly originalPeggedPrice: u128;
       readonly securityFee: u128;
-      readonly newLockPrice: u128;
+      readonly newPeggedPrice: u128;
       readonly amountBurned: u128;
       readonly accountId: AccountId32;
     } & Struct;
@@ -2855,7 +2857,8 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletBitcoinLocksLockedBitcoin (386) */
   interface PalletBitcoinLocksLockedBitcoin extends Struct {
     readonly vaultId: Compact<u32>;
-    readonly lockPrice: u128;
+    readonly liquidityPromised: u128;
+    readonly peggedPrice: u128;
     readonly ownerAccount: AccountId32;
     readonly securityFees: u128;
     readonly satoshis: Compact<u64>;

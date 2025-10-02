@@ -232,8 +232,8 @@ describeIntegration(
       lock = lookup;
       expect(lock.isVerified).toBe(true);
 
-      await expect(bitcoinLocks.releasePrice(lock.satoshis, lock.lockPrice)).resolves.toEqual(
-        lock.lockPrice,
+      await expect(bitcoinLocks.releasePrice(lock.satoshis, lock.peggedPrice)).resolves.toEqual(
+        lock.peggedPrice,
       );
 
       const btcClient = vaulterchain.getBitcoinClient();

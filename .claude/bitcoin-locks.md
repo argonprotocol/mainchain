@@ -198,9 +198,9 @@ fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
     );
 
     // 4. Price must have changed
-    let new_lock_price = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
+    let new_pegged_price = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
         .ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
-    ensure!(original_lock_price != new_lock_price, Error::<T>::NoRatchetingAvailable);
+    ensure!(original_pegged_price != new_pegged_price, Error::<T>::NoRatchetingAvailable);
 }
 ```
 
@@ -330,7 +330,7 @@ target price:
 let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
 
 // Case 1: r ≥ 1.0 (Argon at/above target) → No penalty
-price = bitcoin_market_price.min(original_lock_price)
+price = bitcoin_market_price.min(original_pegged_price)
 
 // Case 2: 0.90 ≤ r < 1.0 (Mild deviation) → Quadratic penalty
 price = bitcoin_market_price * (20r² - 38r + 19)

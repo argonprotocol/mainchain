@@ -110,8 +110,8 @@ declare module '@polkadot/api-base/types/events' {
     bitcoinLocks: {
       BitcoinCosignPastDue: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32], { utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32 }>;
       BitcoinLockBurned: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, wasUtxoSpent: bool], { utxoId: u64, vaultId: u32, wasUtxoSpent: bool }>;
-      BitcoinLockCreated: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, lockPrice: u128, accountId: AccountId32, securityFee: u128], { utxoId: u64, vaultId: u32, lockPrice: u128, accountId: AccountId32, securityFee: u128 }>;
-      BitcoinLockRatcheted: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, originalLockPrice: u128, securityFee: u128, newLockPrice: u128, amountBurned: u128, accountId: AccountId32], { utxoId: u64, vaultId: u32, originalLockPrice: u128, securityFee: u128, newLockPrice: u128, amountBurned: u128, accountId: AccountId32 }>;
+      BitcoinLockCreated: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, liquidityPromised: u128, peggedPrice: u128, accountId: AccountId32, securityFee: u128], { utxoId: u64, vaultId: u32, liquidityPromised: u128, peggedPrice: u128, accountId: AccountId32, securityFee: u128 }>;
+      BitcoinLockRatcheted: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, liquidityPromised: u128, originalPeggedPrice: u128, securityFee: u128, newPeggedPrice: u128, amountBurned: u128, accountId: AccountId32], { utxoId: u64, vaultId: u32, liquidityPromised: u128, originalPeggedPrice: u128, securityFee: u128, newPeggedPrice: u128, amountBurned: u128, accountId: AccountId32 }>;
       BitcoinUtxoCosigned: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, signature: Bytes], { utxoId: u64, vaultId: u32, signature: Bytes }>;
       BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32], { utxoId: u64, vaultId: u32 }>;
       /**

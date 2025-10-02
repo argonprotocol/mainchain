@@ -610,7 +610,7 @@ fn it_can_burn_funds() {
 struct VaultScenario {
 	pub securitization: Balance,
 	pub securitization_ratio: f32,
-	pub lock_price: Balance,
+	pub pegged_price: Balance,
 	pub release_price: Balance,
 	pub user_should_get: Balance,
 	pub vault_should_lose: Balance,
@@ -620,7 +620,7 @@ struct VaultScenario {
 fn vault_equilibrium_scenario(scenario: VaultScenario) {
 	let VaultScenario {
 		release_price,
-		lock_price,
+		pegged_price,
 		securitization,
 		securitization_ratio,
 		user_should_get,
@@ -666,7 +666,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 		Vaults::lock(
 			1,
 			&bitcoin_locker,
-			lock_price,
+			pegged_price,
 			500,
 			Some((FixedU128::one(), &mut lock_extensions)),
 		)
@@ -676,7 +676,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			Vaults::compensate_lost_bitcoin(
 				1,
 				&bitcoin_locker,
-				lock_price,
+				pegged_price,
 				release_price,
 				&lock_extensions,
 			)
@@ -704,11 +704,11 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 }
 
 #[test]
-fn it_compensates_1x_securitization_when_over_lock_price() {
+fn it_compensates_1x_securitization_when_over_pegged_price() {
 	vault_equilibrium_scenario(VaultScenario {
 		securitization: 200_000,
 		securitization_ratio: 1.0,
-		lock_price: 100_000,
+		pegged_price: 100_000,
 		release_price: 200_000,
 		user_should_get: 0,
 		vault_should_lose: 100_000,
@@ -716,11 +716,11 @@ fn it_compensates_1x_securitization_when_over_lock_price() {
 	});
 }
 #[test]
-fn it_compensates_1x_securitization_when_under_lock_price() {
+fn it_compensates_1x_securitization_when_under_pegged_price() {
 	vault_equilibrium_scenario(VaultScenario {
 		securitization: 200_000,
 		securitization_ratio: 1.0,
-		lock_price: 100_000,
+		pegged_price: 100_000,
 		release_price: 50_000,
 		user_should_get: 0,
 		vault_should_lose: 50_000,
@@ -728,11 +728,11 @@ fn it_compensates_1x_securitization_when_under_lock_price() {
 	});
 }
 #[test]
-fn it_compensates_2x_securitization_when_over_lock_price() {
+fn it_compensates_2x_securitization_when_over_pegged_price() {
 	vault_equilibrium_scenario(VaultScenario {
 		securitization: 200_000,
 		securitization_ratio: 2.0,
-		lock_price: 100_000,
+		pegged_price: 100_000,
 		release_price: 200_000,
 		user_should_get: 100_000,
 		vault_should_lose: 200_000,
@@ -744,7 +744,7 @@ fn it_compensates_2x_securitization_when_under_securitized_amount() {
 	vault_equilibrium_scenario(VaultScenario {
 		securitization: 200_000,
 		securitization_ratio: 2.0,
-		lock_price: 100_000,
+		pegged_price: 100_000,
 		release_price: 250_000,
 		user_should_get: 100_000,
 		vault_should_lose: 200_000,

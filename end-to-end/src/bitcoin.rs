@@ -786,17 +786,17 @@ async fn confirm_lock(
 			.lines()
 			.find(|line| line.contains("Minted Argons"))
 			.unwrap()
-			.contains(&format!("₳0 of {}", format_argons(lock_api.lock_price)))
+			.contains(&format!("₳0 of {}", format_argons(lock_api.liquidity_promised)))
 	);
-	let lock_amount = lock_api.lock_price;
-	Ok((lock_api.utxo_script_pubkey.into(), lock_amount))
+	let liquidity_promised = lock_api.liquidity_promised;
+	Ok((lock_api.utxo_script_pubkey.into(), liquidity_promised))
 }
 
 async fn wait_for_mint(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	utxo_id: &UtxoId,
-	lock_amount: Balance,
+	liquidity_promised: Balance,
 	txid: Txid,
 	vout: u32,
 ) -> anyhow::Result<()> {
@@ -844,17 +844,17 @@ async fn wait_for_mint(
 	let owner_account_id32: AccountId32 = bitcoin_owner.clone().public().into();
 	let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 	if pending_mint.0.is_empty() {
-		assert!(balance.free >= lock_amount);
+		assert!(balance.free >= liquidity_promised);
 	} else {
 		assert_eq!(pending_mint.0.len(), 1);
 		assert_eq!(pending_mint.0[0].1, owner_account_id32.into());
 		// should have minted some amount
-		assert!(pending_mint.0[0].2 < lock_amount);
+		assert!(pending_mint.0[0].2 < liquidity_promised);
 		println!(
 			"Owner mint pending remaining = {} (balance={})",
 			pending_mint.0[0].2, balance.free
 		);
-		assert!(balance.free > (lock_amount - pending_mint.0[0].2));
+		assert!(balance.free > (liquidity_promised - pending_mint.0[0].2));
 
 		// 4. Wait for the full payout
 		let mut counter = 0;

@@ -487,16 +487,18 @@ export default {
       BitcoinLockCreated: {
         utxoId: 'u64',
         vaultId: 'u32',
-        lockPrice: 'u128',
+        liquidityPromised: 'u128',
+        peggedPrice: 'u128',
         accountId: 'AccountId32',
         securityFee: 'u128',
       },
       BitcoinLockRatcheted: {
         utxoId: 'u64',
         vaultId: 'u32',
-        originalLockPrice: 'u128',
+        liquidityPromised: 'u128',
+        originalPeggedPrice: 'u128',
         securityFee: 'u128',
-        newLockPrice: 'u128',
+        newPeggedPrice: 'u128',
         amountBurned: 'u128',
         accountId: 'AccountId32',
       },
@@ -2686,7 +2688,8 @@ export default {
    **/
   PalletBitcoinLocksLockedBitcoin: {
     vaultId: 'Compact<u32>',
-    lockPrice: 'u128',
+    liquidityPromised: 'u128',
+    peggedPrice: 'u128',
     ownerAccount: 'AccountId32',
     securityFees: 'u128',
     satoshis: 'Compact<u64>',

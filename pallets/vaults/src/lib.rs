@@ -982,7 +982,7 @@ pub mod pallet {
 		fn lock(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			lock_price: T::Balance,
+			pegged_price: T::Balance,
 			satoshis: Satoshis,
 			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
 		) -> Result<T::Balance, VaultError> {
@@ -995,14 +995,16 @@ pub mod pallet {
 			);
 
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
-			ensure!(vault.available_for_lock() >= lock_price, VaultError::InsufficientVaultFunds);
+			ensure!(vault.available_for_lock() >= pegged_price, VaultError::InsufficientVaultFunds);
 
 			let mut total_fee = {
 				let apr = vault.terms.bitcoin_annual_percent_rate;
 				let base_fee = vault.terms.bitcoin_base_fee;
 				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
 
-				apr.saturating_mul(term).saturating_mul_int(lock_price).saturating_add(base_fee)
+				apr.saturating_mul(term)
+					.saturating_mul_int(pegged_price)
+					.saturating_add(base_fee)
 			};
 			if vault.operator_account_id == *account_id {
 				// if the operator is locking, they don't pay a fee
@@ -1010,7 +1012,7 @@ pub mod pallet {
 			}
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
-				lock_price,
+				pegged_price,
 				total_fee
 			);
 
@@ -1019,7 +1021,7 @@ pub mod pallet {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
-				securitization_locked: lock_price,
+				securitization_locked: pegged_price,
 				securitization_released: 0u32.into(),
 				satoshis_locked: satoshis,
 				satoshis_released: 0,
@@ -1046,15 +1048,15 @@ pub mod pallet {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
 				// locked funds, they must be getting a new expiration of > 1 year from their
 				// original date
-				vault.extend_lock(lock_price, extension)?;
+				vault.extend_lock(pegged_price, extension)?;
 			} else {
-				vault.lock(lock_price)?;
+				vault.lock(pegged_price)?;
 			}
 
 			Self::deposit_event(Event::FundsLocked {
 				vault_id,
 				locker: account_id.clone(),
-				amount: lock_price,
+				amount: pegged_price,
 				fee_revenue: total_fee,
 				is_ratchet,
 			});
@@ -1064,7 +1066,7 @@ pub mod pallet {
 
 		fn schedule_for_release(
 			vault_id: VaultId,
-			locked_argons: T::Balance,
+			liquidity_promised: T::Balance,
 			satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<(), VaultError> {
@@ -1073,18 +1075,18 @@ pub mod pallet {
 				locks_created: 0,
 				total_fee: 0u32.into(),
 				securitization_locked: 0u32.into(),
-				securitization_released: locked_argons,
+				securitization_released: liquidity_promised,
 				satoshis_locked: 0,
 				satoshis_released: satoshis,
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			let release_heights = vault.schedule_for_release(locked_argons, lock_extension)?;
+			let release_heights = vault.schedule_for_release(liquidity_promised, lock_extension)?;
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
-				amount: locked_argons,
+				amount: liquidity_promised,
 				release_height: lock_extension.lock_expiration,
 			});
 
@@ -1151,13 +1153,13 @@ pub mod pallet {
 		/// Burn the funds from the vault.
 		fn burn(
 			vault_id: VaultId,
-			lock_amount: T::Balance,
+			liquidity_promised: T::Balance,
 			market_rate: T::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result = vault.burn(lock_amount, market_rate, lock_extension)?;
+			let burn_result = vault.burn(liquidity_promised, market_rate, lock_extension)?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
