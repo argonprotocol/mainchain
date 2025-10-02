@@ -72,8 +72,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			count += 1;
 			Some(crate::LockedBitcoin {
 				vault_id: old.vault_id,
-				lock_price: old.lock_price,
-				liquidity_value: old.lock_price,
+				pegged_price: old.lock_price,
+				liquidity_promised: old.lock_price,
 				owner_account: old.owner_account,
 				satoshis: old.satoshis,
 				vault_pubkey: old.vault_pubkey,
@@ -170,8 +170,8 @@ mod test {
 			let mut locks = LocksByUtxoId::<Test>::iter().collect::<Vec<_>>();
 			locks.sort_by(|a, b| a.0.cmp(&b.0));
 			assert_eq!(locks.len(), 1);
-			assert_eq!(locks[0].1.lock_price, 1);
-			assert_eq!(locks[0].1.liquidity_value, 1);
+			assert_eq!(locks[0].1.pegged_price, 1);
+			assert_eq!(locks[0].1.liquidity_promised, 1);
 		});
 	}
 }

@@ -293,7 +293,7 @@ impl LockCommands {
 					client.call(redemption_price_query, Some(at_block)).await?.unwrap_or_default()
 				};
 
-				let minted = if lock.is_verified { lock.liquidity_value - remaining } else { 0 };
+				let minted = if lock.is_verified { lock.liquidity_promised - remaining } else { 0 };
 				let utxo_ref_str = utxo_ref
 					.map(|a| {
 						let utxo_txid: Txid = H256Le(a.txid.0).into();
@@ -318,7 +318,7 @@ impl LockCommands {
 						format!(
 							"{} of {}",
 							ArgonFormatter(minted),
-							ArgonFormatter(lock.liquidity_value)
+							ArgonFormatter(lock.liquidity_promised)
 						),
 					],
 					vec!["Status".into(), status.into()],

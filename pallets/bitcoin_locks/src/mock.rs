@@ -219,34 +219,34 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn schedule_for_release(
 		_vault_id: VaultId,
-		liquidity_value: Self::Balance,
+		liquidity_promised: Self::Balance,
 		_satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|a| a.schedule_for_release(liquidity_value, lock_extensions))?;
+		DefaultVault::mutate(|a| a.schedule_for_release(liquidity_promised, lock_extensions))?;
 		Ok(())
 	}
 
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		liquidity_value: Self::Balance,
+		liquidity_promised: Self::Balance,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(liquidity_value, market_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(liquidity_promised, market_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		liquidity_value: Self::Balance,
+		liquidity_promised: Self::Balance,
 		redemption_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(liquidity_value, redemption_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(liquidity_promised, redemption_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 

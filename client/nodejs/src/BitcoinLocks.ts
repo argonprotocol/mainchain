@@ -144,7 +144,8 @@ export class BitcoinLocks {
     const wscriptHash = utxo.utxoScriptPubkey.asP2wsh.wscriptHash.toHex().replace('0x', '');
     const p2wshScriptHashHex = `0x${p2shBytesPrefix}${wscriptHash}`;
     const vaultId = utxo.vaultId.toNumber();
-    const lockPrice = utxo.lockPrice.toBigInt();
+    const peggedPrice = utxo.peggedPrice.toBigInt();
+    const liquidityPromised = utxo.liquidityPromised.toBigInt();
     const ownerAccount = utxo.ownerAccount.toHuman();
     const satoshis = utxo.satoshis.toBigInt();
     const vaultPubkey = utxo.vaultPubkey.toHex();
@@ -170,7 +171,8 @@ export class BitcoinLocks {
       utxoId,
       p2wshScriptHashHex,
       vaultId,
-      lockPrice,
+      peggedPrice,
+      liquidityPromised,
       ownerAccount,
       satoshis,
       vaultPubkey,
@@ -420,8 +422,8 @@ export class BitcoinLocks {
     );
 
     let redemptionPrice = await this.getRedemptionRate(lock.satoshis);
-    if (redemptionPrice > lock.lockPrice) {
-      redemptionPrice = lock.lockPrice;
+    if (redemptionPrice > lock.peggedPrice) {
+      redemptionPrice = lock.peggedPrice;
     }
 
     const canAfford = await submitter.canAfford({
@@ -451,26 +453,26 @@ export class BitcoinLocks {
     };
   }
 
-  async releasePrice(satoshis: bigint, lockPrice: bigint): Promise<bigint> {
+  async releasePrice(satoshis: bigint, peggedPrice: bigint): Promise<bigint> {
     const redemptionRate = await this.getRedemptionRate(satoshis);
-    if (redemptionRate > lockPrice) {
+    if (redemptionRate > peggedPrice) {
       return redemptionRate;
     }
-    return lockPrice;
+    return peggedPrice;
   }
 
   async getRatchetPrice(
     lock: IBitcoinLock,
     vault: Vault,
   ): Promise<{ burnAmount: bigint; ratchetingFee: bigint; marketRate: bigint }> {
-    const { createdAtHeight, vaultClaimHeight, lockPrice, satoshis } = lock;
+    const { createdAtHeight, vaultClaimHeight, peggedPrice, satoshis } = lock;
     const client = this.client;
     const marketRate = await this.getMarketRate(BigInt(satoshis));
 
     let ratchetingFee = vault.terms.bitcoinBaseFee;
     let burnAmount = 0n;
     // ratchet up
-    if (marketRate > lockPrice) {
+    if (marketRate > peggedPrice) {
       const lockFee = vault.calculateBitcoinFee(marketRate);
       const currentBitcoinHeight = await client.query.bitcoinUtxos
         .confirmedBitcoinBlockTip()
@@ -480,7 +482,7 @@ export class BitcoinLocks {
       const remainingDuration = 1 - elapsed;
       ratchetingFee = BigInt(remainingDuration * Number(lockFee));
     } else {
-      burnAmount = await this.releasePrice(lock.satoshis, lockPrice);
+      burnAmount = await this.releasePrice(lock.satoshis, peggedPrice);
     }
 
     return {
@@ -499,7 +501,7 @@ export class BitcoinLocks {
   }): Promise<{
     securityFee: bigint;
     txFee: bigint;
-    newLockPrice: bigint;
+    newPeggedPrice: bigint;
     pendingMint: bigint;
     burned: bigint;
     blockHeight: number;
@@ -543,16 +545,16 @@ export class BitcoinLocks {
     const bitcoinBlockHeight = await api.query.bitcoinUtxos
       .confirmedBitcoinBlockTip()
       .then(x => x.unwrap().blockHeight.toNumber());
-    const { amountBurned, newLockPrice, originalLockPrice } = ratchetEvent.data;
-    let mintAmount = newLockPrice.toBigInt();
-    if (newLockPrice > originalLockPrice) {
-      mintAmount -= originalLockPrice.toBigInt();
+    const { amountBurned, newPeggedPrice, originalPeggedPrice } = ratchetEvent.data;
+    let mintAmount = newPeggedPrice.toBigInt();
+    if (newPeggedPrice > originalPeggedPrice) {
+      mintAmount -= originalPeggedPrice.toBigInt();
     }
     return {
       txFee: submission.finalFee ?? 0n,
       securityFee: ratchetPrice.ratchetingFee,
       pendingMint: mintAmount,
-      newLockPrice: newLockPrice.toBigInt(),
+      newPeggedPrice: newPeggedPrice.toBigInt(),
       burned: amountBurned.toBigInt(),
       blockHeight,
       bitcoinBlockHeight,
@@ -581,7 +583,8 @@ export interface IBitcoinLock {
   utxoId: number;
   p2wshScriptHashHex: string;
   vaultId: number;
-  lockPrice: bigint;
+  peggedPrice: bigint;
+  liquidityPromised: bigint;
   ownerAccount: string;
   satoshis: bigint;
   vaultPubkey: string;

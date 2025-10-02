@@ -16,7 +16,8 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": "./",
     "rootDir": "./ts",
-    "outDir": "./lib"
+    "outDir": "./lib",
+    "types": ["vitest/globals", "node"]
   },
 
   "include": ["ts"],
