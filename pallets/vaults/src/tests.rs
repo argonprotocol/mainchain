@@ -799,31 +799,6 @@ fn it_should_allow_vaults_to_rotate_xpubs() {
 }
 
 #[test]
-fn it_should_allow_multiple_vaults_per_account() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		let terms = default_terms(TEN_PCT);
-		let config = VaultConfig {
-			terms,
-			bitcoin_xpubkey: keys(),
-			securitization: 100_000,
-			securitization_ratio: FixedU128::one(),
-		};
-		set_argons(1, 1_000_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config.clone()));
-		assert_eq!(Balances::free_balance(1), 900_000);
-
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
-		assert_eq!(Balances::free_balance(1), 800_000);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 200_000);
-
-		assert_eq!(NextVaultId::<Test>::get(), Some(3u32));
-	});
-}
-
-#[test]
 fn it_can_schedule_term_changes() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);

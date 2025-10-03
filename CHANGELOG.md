@@ -1,14 +1,36 @@
 # Changelog
 
-## [v1.3.7](https://github.com/argonprotocol/mainchain/compare/v1.3.6...c00345c8c3e1e937845aecf6e8f17b7792833a41) (2025-08-14)
+## [v1.3.8](https://github.com/argonprotocol/mainchain/compare/v1.3.7...c1c5deb0b7569c9769222baa7dd0e32bc486a8a6) (2025-10-02)
 
 ### Features
+
+* **bitcoin:** track locked liquidity value
+([2149d7f](https://github.com/argonprotocol/mainchain/commit/2149d7fb8895754c40a9a9c42c64ce5271519665))
+
+### Fixes
+
+* **vaults:** only allow a single vault per account
+([b567081](https://github.com/argonprotocol/mainchain/commit/b56708170eb912983261fe260a59a2c86e8f26e8))
+* **runtime:** remove 1 second minimum time
+([87891be](https://github.com/argonprotocol/mainchain/commit/87891be737d029b084c23b065beec3ad7ca829c2))
+* bitcoin wasm builds broken
+([6411c57](https://github.com/argonprotocol/mainchain/commit/6411c571c4b7abdd1aa5bb826d647ec2cd1aebc5))
+* **node:** don’t set best block in verifier
+([03d3289](https://github.com/argonprotocol/mainchain/commit/03d32890cc079708dbe2a0f74814b5ed3d0878f0))
+* **nodejs:** cohort bidder subscriptions broken
+([dee6c33](https://github.com/argonprotocol/mainchain/commit/dee6c33d9a3524f77e2f31aa56b93c4a41b4587f))
+
+### [v1.3.7](https://github.com/argonprotocol/mainchain/compare/v1.3.6...v1.3.7) (2025-08-14)
+
+#### Features
 
 * **client/nodejs:** add account minisecret
 ([d21d36a](https://github.com/argonprotocol/mainchain/commit/d21d36a82cc7139c3a5c42c0d367673691259b14))
 
-### Fixes
+#### Fixes
 
+* **client/nodejs:** handle negative bigints
+([1688fe4](https://github.com/argonprotocol/mainchain/commit/1688fe429e740fbc69709754af60d67c6b772324))
 * **node:** improve fast sync speed
 ([b6ef61f](https://github.com/argonprotocol/mainchain/commit/b6ef61f9d1ad6bb81dedb65ffee3f8e019a83740))
 
