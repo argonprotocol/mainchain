@@ -502,6 +502,7 @@ export class BitcoinLocks {
     securityFee: bigint;
     txFee: bigint;
     newPeggedPrice: bigint;
+    liquidityPromised: bigint;
     pendingMint: bigint;
     burned: bigint;
     blockHeight: number;
@@ -545,15 +546,22 @@ export class BitcoinLocks {
     const bitcoinBlockHeight = await api.query.bitcoinUtxos
       .confirmedBitcoinBlockTip()
       .then(x => x.unwrap().blockHeight.toNumber());
-    const { amountBurned, newPeggedPrice, originalPeggedPrice } = ratchetEvent.data;
-    let mintAmount = newPeggedPrice.toBigInt();
-    if (newPeggedPrice > originalPeggedPrice) {
+    const {
+      amountBurned,
+      liquidityPromised: liquidityPromisedRaw,
+      newPeggedPrice,
+      originalPeggedPrice,
+    } = ratchetEvent.data;
+    const liquidityPromised = liquidityPromisedRaw.toBigInt();
+    let mintAmount = liquidityPromised;
+    if (liquidityPromised > originalPeggedPrice.toBigInt()) {
       mintAmount -= originalPeggedPrice.toBigInt();
     }
     return {
       txFee: submission.finalFee ?? 0n,
       securityFee: ratchetPrice.ratchetingFee,
       pendingMint: mintAmount,
+      liquidityPromised,
       newPeggedPrice: newPeggedPrice.toBigInt(),
       burned: amountBurned.toBigInt(),
       blockHeight,
