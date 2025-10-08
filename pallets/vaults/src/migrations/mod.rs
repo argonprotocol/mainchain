@@ -115,12 +115,62 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		log::info!("Migrating vaults");
 
 		VaultsById::<T>::translate::<old_storage::Vault<T::AccountId, T::Balance>, _>(
-			|_id, vault| {
+			|id, vault| {
 				count += 1;
+
+				// We had a bad migration on 5/23/2025 that inserted all existing bitcoin locks into
+				// the "argons_scheduled_for_release", which should only be populated once bitcoins
+				// are released. It's meant to track argons on hold for a year, but re-lendable.
+				// In testnet, this was not an issue, but in mainnet, this has duplicated the amount
+				// of argons "in vaults". The only vault with valid data in this field is vault
+				// ID 7, which was opened after the faulty migration. So we will clear this
+				// field for all vaults
+				let mut argons_scheduled_for_release = vault.argons_scheduled_for_release;
+
+				// check that this has the two known entries for vault ID 7
+				// if so, we will restore them, otherwise we will clear the field
+				if id == 7 &&
+					argons_scheduled_for_release.get(&937728) ==
+						Some(&(209_920_128u128 * 2u128).into())
+				{
+					log::info!(
+						"Fixing argons_scheduled_for_release for vault ID 7 during migration"
+					);
+					argons_scheduled_for_release.clear();
+					// utxoid 4 =
+					//	 	vaultId: 7
+					// 	 	lockPrice: 209,920,128
+					// 		ownerAccount: 5EbtpegDiogFpFS9PTRvcXn166c7PbwgADm6bwc92bcDCh3U
+					// 		securityFees: 0
+					// 		satoshis: 219,090
+					// 		vaultClaimHeight: 937,611
+					// rounded up bitcoin "day" height = 937,728
+					argons_scheduled_for_release
+						.try_insert(937728, 209_920_128u128.into())
+						.unwrap();
+
+					// utxoid 8 =
+					//	 	vaultId: 7
+					// 	 	lockPrice: 3,389,887,723
+					// 		ownerAccount: 5EbtpegDiogFpFS9PTRvcXn166c7PbwgADm6bwc92bcDCh3U
+					// 		securityFees: 0
+					//   	satoshis: 3,691,035
+					// 		vaultClaimHeight: 937,749
+					argons_scheduled_for_release
+						.try_insert(937872, 3_389_887_723u128.into())
+						.unwrap();
+				} else {
+					argons_scheduled_for_release.clear();
+					log::warn!(
+						"Clearing argons_scheduled_for_release for vault ID {} during migration",
+						id
+					);
+				}
+
 				Some(Vault {
 					operator_account_id: vault.operator_account_id.clone(),
 					securitization: vault.securitization,
-					argons_scheduled_for_release: vault.argons_scheduled_for_release.clone(),
+					argons_scheduled_for_release,
 					argons_locked: vault.argons_locked,
 					argons_pending_activation: vault.argons_pending_activation,
 					securitization_ratio: vault.securitization_ratio,
@@ -165,6 +215,21 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				"Vault ID {} missing in new storage",
 				vault_id
 			);
+			if vault_id != 7 {
+				// For vault ID 7, we restored the two known entries in
+				// argons_scheduled_for_release, so we skip this check
+				assert!(
+					new_vaults[&vault_id].argons_scheduled_for_release.is_empty(),
+					"argons_scheduled_for_release not cleared for vault ID {}",
+					vault_id
+				);
+			} else {
+				assert_eq!(
+					new_vaults[&vault_id].argons_scheduled_for_release.len(),
+					2,
+					"argons_scheduled_for_release should have 2 entries for vault ID 7"
+				);
+			}
 		}
 
 		Ok(())
