@@ -1,4 +1,4 @@
-use crate::{Config, pallet::VaultsById};
+use crate::{Config, RevenuePerFrameByVault, VaultFrameRevenue, pallet::VaultsById};
 
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::{
@@ -8,7 +8,7 @@ use pallet_prelude::{
 
 mod old_storage {
 	use crate::Config;
-	use argon_bitcoin::primitives::BitcoinHeight;
+	use argon_bitcoin::primitives::{BitcoinHeight, Satoshis};
 	use frame_support::storage_alias;
 	use pallet_prelude::*;
 
@@ -91,11 +91,77 @@ mod old_storage {
 		Vault<<T as frame_system::Config>::AccountId, <T as Config>::Balance>,
 		OptionQuery,
 	>;
+	#[storage_alias]
+	pub type RevenuePerFrameByVault<T: Config> = StorageMap<
+		crate::Pallet<T>,
+		Twox64Concat,
+		VaultId,
+		BoundedVec<crate::VaultFrameRevenue<T>, ConstU32<12>>,
+		ValueQuery,
+	>;
+
+	/// Tracks the fee revenue for a Vault for a single Frame (mining day). Includes the associated
+	/// amount of bitcoin locked up in Satoshi and Argon values.
+	#[derive(
+		Encode,
+		Decode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct VaultFrameRevenue<T: Config> {
+		/// The frame id in question
+		#[codec(compact)]
+		pub frame_id: FrameId,
+		/// The bitcoin lock fe for the value
+		#[codec(compact)]
+		pub bitcoin_lock_fee_revenue: T::Balance,
+		/// The number of bitcoin locks created
+		#[codec(compact)]
+		pub bitcoin_locks_created: u32,
+		/// The argon market value of the locked satoshis
+		#[codec(compact)]
+		pub bitcoin_locks_market_value: T::Balance,
+		/// The number of satoshis locked into the vault
+		#[codec(compact)]
+		pub bitcoin_locks_total_satoshis: Satoshis,
+		/// The number of satoshis released during this period
+		#[codec(compact)]
+		pub satoshis_released: Satoshis,
+		/// The amount of securitization activated at the end of this frame
+		#[codec(compact)]
+		pub securitization_activated: T::Balance,
+		/// The securitization committed at the end of this frame
+		#[codec(compact)]
+		pub securitization: T::Balance,
+		/// The vault treasury pool profits for this frame
+		#[codec(compact)]
+		pub liquidity_pool_vault_earnings: T::Balance,
+		/// The treasury pool aggregate profit
+		#[codec(compact)]
+		pub liquidity_pool_total_earnings: T::Balance,
+		/// Vault treasury pool capital capital
+		#[codec(compact)]
+		pub liquidity_pool_vault_capital: T::Balance,
+		/// External capital contributed
+		#[codec(compact)]
+		pub liquidity_pool_external_capital: T::Balance,
+		/// The amount of revenue still to be collected
+		#[codec(compact)]
+		pub uncollected_revenue: T::Balance,
+	}
 
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
 		#[allow(clippy::type_complexity)]
 		pub vaults: Vec<(VaultId, Vault<<T as frame_system::Config>::AccountId, T::Balance>)>,
+		#[allow(clippy::type_complexity)]
+		pub revenue_per_frame:
+			Vec<(VaultId, BoundedVec<crate::VaultFrameRevenue<T>, ConstU32<12>>)>,
 	}
 }
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -106,8 +172,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		use codec::Encode;
 
 		let vaults = old_storage::VaultsById::<T>::iter().collect::<Vec<_>>();
+		let revenue_per_frame =
+			old_storage::RevenuePerFrameByVault::<T>::iter().collect::<Vec<_>>();
 
-		Ok(old_storage::Model::<T> { vaults }.encode())
+		Ok(old_storage::Model::<T> { vaults, revenue_per_frame }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
@@ -195,6 +263,32 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			},
 		);
 
+		RevenuePerFrameByVault::<T>::translate::<
+			BoundedVec<old_storage::VaultFrameRevenue<T>, ConstU32<12>>,
+			_,
+		>(|_id, vec| {
+			count += 1;
+			let new = vec
+				.into_iter()
+				.map(|v| VaultFrameRevenue {
+					frame_id: v.frame_id,
+					bitcoin_lock_fee_revenue: v.bitcoin_lock_fee_revenue,
+					bitcoin_locks_created: v.bitcoin_locks_created,
+					bitcoin_locks_market_value: v.bitcoin_locks_market_value,
+					bitcoin_locks_total_satoshis: v.bitcoin_locks_total_satoshis,
+					satoshis_released: v.satoshis_released,
+					securitization_activated: v.securitization_activated,
+					securitization: v.securitization,
+					treasury_vault_earnings: v.liquidity_pool_vault_earnings,
+					treasury_total_earnings: v.liquidity_pool_total_earnings,
+					treasury_vault_capital: v.liquidity_pool_vault_capital,
+					treasury_external_capital: v.liquidity_pool_external_capital,
+					uncollected_revenue: v.uncollected_revenue,
+				})
+				.collect::<Vec<_>>();
+			Some(BoundedVec::truncate_from(new))
+		});
+
 		T::DbWeight::get().reads_writes((count) as u64, count as u64)
 	}
 
@@ -230,6 +324,21 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					"argons_scheduled_for_release should have 2 entries for vault ID 7"
 				);
 			}
+		}
+
+		let new_revenue = RevenuePerFrameByVault::<T>::iter().collect::<BTreeMap<_, _>>();
+		assert_eq!(
+			old.revenue_per_frame.len(),
+			new_revenue.len(),
+			"Mismatch in number of revenue_per_frame entries"
+		);
+		for (vault_id, _old_vec) in old.revenue_per_frame {
+			assert_eq!(
+				new_revenue.get(&vault_id).map(|x| x.len()),
+				Some(_old_vec.len()),
+				"Vault ID {} missing in new revenue_per_frame storage",
+				vault_id
+			);
 		}
 
 		Ok(())
