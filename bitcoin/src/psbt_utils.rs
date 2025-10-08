@@ -42,6 +42,12 @@ pub fn extract_tx(psbt: &mut Psbt) -> Result<Transaction, Error> {
 	Ok(tx)
 }
 
+#[cfg(feature = "std")]
+pub fn get_tx_hex(tx: &Transaction) -> Result<String, Error> {
+	use bitcoincore_rpc::RawTx;
+	Ok(tx.raw_hex())
+}
+
 /// Broadcasts the transaction to a Bitcoin node. NOTE: You must return `true` from the
 /// `on_status` callback to break the loop and return from this function.
 ///
