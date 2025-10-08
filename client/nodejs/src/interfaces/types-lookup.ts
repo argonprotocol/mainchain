@@ -3849,7 +3849,7 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryTreasuryPool (484) */
   interface PalletTreasuryTreasuryPool extends Struct {
-    readonly contributorBalances: Vec<ITuple<[AccountId32, u128]>>;
+    readonly bondHolders: Vec<ITuple<[AccountId32, u128]>>;
     readonly doNotRenew: Vec<AccountId32>;
     readonly isRolledOver: bool;
     readonly distributedProfits: Option<u128>;

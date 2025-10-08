@@ -1266,7 +1266,7 @@ declare module '@polkadot/api-base/types/storage' {
     treasury: {
       /**
        * The treasury pool for the current frame. This correlates with the bids coming in for the
-       * current frame. Sorted with the biggest share last. (current frame + 1)
+       * current frame. Sorted with the biggest share last. (current frame)
        **/
       capitalActive: AugmentedQuery<
         ApiType,
@@ -1274,7 +1274,7 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The treasury pool still raising capital. (current frame + 2)
+       * The treasury pool still raising capital. (current frame + 1)
        **/
       capitalRaising: AugmentedQuery<
         ApiType,

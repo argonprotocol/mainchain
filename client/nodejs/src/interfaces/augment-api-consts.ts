@@ -434,13 +434,13 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       bidPoolBurnPercent: Percent & AugmentedConst<ApiType>;
       /**
-       * The number of vaults that can participate in the bid pools. This is a substrate limit.
-       **/
-      maxBidPoolVaultParticipants: u32 & AugmentedConst<ApiType>;
-      /**
        * The maximum number of contributors to a bond fund
        **/
       maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
+      /**
+       * The number of vaults that can participate in each bond. This is a substrate limit.
+       **/
+      maxVaultsPerPool: u32 & AugmentedConst<ApiType>;
       /**
        * The minimum argons per fund contributor
        **/

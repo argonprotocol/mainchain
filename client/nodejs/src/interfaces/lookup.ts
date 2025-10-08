@@ -3326,7 +3326,7 @@ export default {
    * Lookup484: pallet_treasury::pallet::TreasuryPool<T>
    **/
   PalletTreasuryTreasuryPool: {
-    contributorBalances: 'Vec<(AccountId32,u128)>',
+    bondHolders: 'Vec<(AccountId32,u128)>',
     doNotRenew: 'Vec<AccountId32>',
     isRolledOver: 'bool',
     distributedProfits: 'Option<u128>',

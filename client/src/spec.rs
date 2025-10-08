@@ -3854,9 +3854,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				254u8, 82u8, 144u8, 41u8, 205u8, 170u8, 77u8, 91u8, 8u8, 244u8, 135u8, 39u8, 158u8,
-				26u8, 228u8, 74u8, 73u8, 251u8, 104u8, 159u8, 93u8, 242u8, 72u8, 196u8, 101u8,
-				241u8, 1u8, 125u8, 83u8, 109u8, 161u8, 149u8,
+				58u8, 156u8, 7u8, 101u8, 154u8, 88u8, 19u8, 39u8, 61u8, 20u8, 179u8, 80u8, 133u8,
+				47u8, 112u8, 25u8, 248u8, 214u8, 115u8, 83u8, 203u8, 14u8, 204u8, 28u8, 60u8, 61u8,
+				251u8, 225u8, 77u8, 47u8, 186u8, 222u8,
 			]
 	}
 	pub mod system {
@@ -23157,9 +23157,10 @@ pub mod api {
 						"VaultPoolsByFrame",
 						(),
 						[
-							203u8, 187u8, 201u8, 93u8, 48u8, 33u8, 238u8, 6u8, 132u8, 11u8, 18u8,
-							121u8, 21u8, 95u8, 251u8, 73u8, 164u8, 238u8, 214u8, 44u8, 87u8, 10u8,
-							50u8, 45u8, 217u8, 228u8, 119u8, 206u8, 221u8, 201u8, 92u8, 175u8,
+							156u8, 136u8, 183u8, 145u8, 219u8, 138u8, 155u8, 39u8, 141u8, 62u8,
+							47u8, 130u8, 129u8, 123u8, 111u8, 63u8, 83u8, 116u8, 155u8, 178u8,
+							152u8, 36u8, 168u8, 220u8, 82u8, 202u8, 252u8, 52u8, 129u8, 175u8,
+							18u8, 204u8,
 						],
 					)
 				}
@@ -23182,14 +23183,15 @@ pub mod api {
 						"VaultPoolsByFrame",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							203u8, 187u8, 201u8, 93u8, 48u8, 33u8, 238u8, 6u8, 132u8, 11u8, 18u8,
-							121u8, 21u8, 95u8, 251u8, 73u8, 164u8, 238u8, 214u8, 44u8, 87u8, 10u8,
-							50u8, 45u8, 217u8, 228u8, 119u8, 206u8, 221u8, 201u8, 92u8, 175u8,
+							156u8, 136u8, 183u8, 145u8, 219u8, 138u8, 155u8, 39u8, 141u8, 62u8,
+							47u8, 130u8, 129u8, 123u8, 111u8, 63u8, 83u8, 116u8, 155u8, 178u8,
+							152u8, 36u8, 168u8, 220u8, 82u8, 202u8, 252u8, 52u8, 129u8, 175u8,
+							18u8, 204u8,
 						],
 					)
 				}
 				#[doc = " The treasury pool for the current frame. This correlates with the bids coming in for the"]
-				#[doc = " current frame. Sorted with the biggest share last. (current frame + 1)"]
+				#[doc = " current frame. Sorted with the biggest share last. (current frame)"]
 				pub fn capital_active(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -23211,7 +23213,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The treasury pool still raising capital. (current frame + 2)"]
+				#[doc = " The treasury pool still raising capital. (current frame + 1)"]
 				pub fn capital_raising(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -23351,15 +23353,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The number of vaults that can participate in the bid pools. This is a substrate limit."]
-				pub fn max_bid_pool_vault_participants(
+				#[doc = " The number of vaults that can participate in each bond. This is a substrate limit."]
+				pub fn max_vaults_per_pool(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
-						"MaxBidPoolVaultParticipants",
+						"MaxVaultsPerPool",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -30777,11 +30779,9 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct TreasuryPool {
-					pub contributor_balances:
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							crate::types::AccountId32,
-							::core::primitive::u128,
-						)>,
+					pub bond_holders: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						(crate::types::AccountId32, ::core::primitive::u128),
+					>,
 					pub do_not_renew: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						crate::types::AccountId32,
 					>,

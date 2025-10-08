@@ -1,15 +1,15 @@
-use crate::{Config, Pallet};
-#[cfg(feature = "try-runtime")]
+use crate::{Config, Pallet, VaultPoolsByFrame};
 use alloc::collections::BTreeMap;
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
 use pallet_prelude::{storage::migration, *};
 
-mod old_storage {
+mod liquidity_pool_storage {
 	use crate::{Config, TreasuryPool};
-	use alloc::collections::BTreeMap;
 	use core::marker::PhantomData;
-	use pallet_prelude::{BoundedBTreeMap, FrameId, StorageMap, Twox64Concat, ValueQuery, VaultId};
-	use polkadot_sdk::frame_support;
+	use pallet_prelude::{
+		BoundedBTreeMap, FrameId, StorageMap, Twox64Concat, ValueQuery, VaultId, frame_support,
+	};
+
 	#[allow(dead_code)]
 	pub struct LiquidityPoolPrefix<T>(PhantomData<T>);
 
@@ -25,16 +25,63 @@ mod old_storage {
 		LiquidityPoolPrefix<T>,
 		Twox64Concat,
 		FrameId,
-		BoundedBTreeMap<VaultId, TreasuryPool<T>, <T as Config>::MaxBidPoolVaultParticipants>,
+		BoundedBTreeMap<VaultId, TreasuryPool<T>, <T as Config>::MaxVaultsPerPool>,
+		ValueQuery,
+	>;
+}
+
+mod old_storage {
+	use crate::Config;
+	use alloc::collections::BTreeMap;
+	use frame_support::storage_alias;
+	use pallet_prelude::*;
+	use polkadot_sdk::frame_support;
+
+	#[derive(
+		Encode,
+		Decode,
+		Clone,
+		PartialEqNoBound,
+		Eq,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		DefaultNoBound,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct TreasuryPool<T: Config> {
+		/// The amount of argons per account. Sorted with largest first. After bid pool is
+		/// distributed, profits are added to this balance
+		pub contributor_balances:
+			BoundedVec<(T::AccountId, T::Balance), T::MaxTreasuryContributors>,
+
+		/// Accounts not wishing to be re-upped
+		pub do_not_renew: BoundedVec<T::AccountId, T::MaxTreasuryContributors>,
+
+		/// Did this fund already roll over?
+		pub is_rolled_over: bool,
+
+		/// The amount of argons that have been distributed to the fund (vault + contributors)
+		pub distributed_profits: Option<T::Balance>,
+
+		/// The vault percent of profits shared
+		#[codec(compact)]
+		pub vault_sharing_percent: Permill,
+	}
+
+	#[storage_alias]
+	pub type VaultPoolsByFrame<T: Config> = StorageMap<
+		crate::Pallet<T>,
+		Twox64Concat,
+		FrameId,
+		BoundedBTreeMap<VaultId, TreasuryPool<T>, <T as Config>::MaxVaultsPerPool>,
 		ValueQuery,
 	>;
 
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
-		pub vault_pools_by_frame: BTreeMap<
-			FrameId,
-			BoundedBTreeMap<VaultId, TreasuryPool<T>, T::MaxBidPoolVaultParticipants>,
-		>,
+		pub vault_pools_by_frame:
+			BTreeMap<FrameId, BoundedBTreeMap<VaultId, TreasuryPool<T>, T::MaxVaultsPerPool>>,
 	}
 }
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -53,6 +100,29 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 
 		migration::move_pallet(b"LiquidityPools", Pallet::<T>::storage_metadata().prefix.as_ref());
 
+		VaultPoolsByFrame::<T>::translate::<
+			BoundedBTreeMap<VaultId, old_storage::TreasuryPool<T>, T::MaxVaultsPerPool>,
+			_,
+		>(|_frame_id, pool_by_frame| {
+			let new_pool_by_frame = pool_by_frame
+				.into_iter()
+				.map(|(vault_id, old_pool)| {
+					let new_pool = crate::TreasuryPool {
+						bond_holders: old_pool.contributor_balances,
+						do_not_renew: old_pool.do_not_renew,
+						is_rolled_over: old_pool.is_rolled_over,
+						distributed_profits: old_pool.distributed_profits,
+						vault_sharing_percent: old_pool.vault_sharing_percent,
+					};
+					(vault_id, new_pool)
+				})
+				.collect::<BTreeMap<_, _>>();
+			Some(
+				BoundedBTreeMap::try_from(new_pool_by_frame)
+					.expect("Treasury pools should be valid"),
+			)
+		});
+
 		T::DbWeight::get().reads_writes(count as u64, count as u64)
 	}
 
@@ -68,7 +138,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			.vault_pools_by_frame;
 
 		let new = VaultPoolsByFrame::<T>::iter().collect::<BTreeMap<_, _>>();
-		assert_eq!(old, new, "Storage values do not match after migration");
+		assert_eq!(old.len(), new.len(), "Storage values do not match after migration");
 		for (frame_id, pools) in new {
 			log::info!("Frame ID: {}, Pools: {:?}", frame_id, pools);
 			let old_pools = old.get(&frame_id).expect("Vault pools not found");
@@ -77,7 +147,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				let old_pool = old_pools.get(&vault_id).ok_or_else(|| {
 					sp_runtime::TryRuntimeError::Other("Missing vault ID in old storage")
 				})?;
-				assert_eq!(pool, *old_pool, "Mismatch in pool data for vault ID {}", vault_id);
+				assert_eq!(
+					pool.bond_holders, *old_pool.contributor_balances,
+					"Mismatch in pool data for vault ID {}",
+					vault_id
+				);
 			}
 		}
 
@@ -108,7 +182,7 @@ mod test {
 			old_storage::VaultPoolsByFrame::<Test>::mutate(1, |a| {
 				a.try_insert(
 					42,
-					crate::TreasuryPool {
+					old_storage::TreasuryPool {
 						contributor_balances: BoundedVec::truncate_from(vec![
 							(1u64.into(), 1_000u128.into()),
 							(2, 2_000),
@@ -124,7 +198,7 @@ mod test {
 			old_storage::VaultPoolsByFrame::<Test>::mutate(2, |a| {
 				a.try_insert(
 					43,
-					crate::TreasuryPool {
+					old_storage::TreasuryPool {
 						contributor_balances: BoundedVec::truncate_from(vec![
 							(3u64.into(), 3_000u128.into()),
 							(4, 4_000),
@@ -154,8 +228,8 @@ mod test {
 			let new_value_2 = VaultPoolsByFrame::<Test>::get(2);
 			assert_eq!(new_value_1.len(), 1);
 			assert_eq!(new_value_2.len(), 1);
-			assert_eq!(new_value_1.get(&42).unwrap().contributor_balances.len(), 2);
-			assert_eq!(new_value_2.get(&43).unwrap().contributor_balances.len(), 2);
+			assert_eq!(new_value_1.get(&42).unwrap().bond_holders.len(), 2);
+			assert_eq!(new_value_2.get(&43).unwrap().bond_holders.len(), 2);
 		});
 	}
 }

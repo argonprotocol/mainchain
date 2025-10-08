@@ -88,13 +88,14 @@ mod old_storage {
 		crate::Pallet<T>,
 		Twox64Concat,
 		VaultId,
-		Vault<AccountId, <T as Config>::Balance>,
+		Vault<<T as frame_system::Config>::AccountId, <T as Config>::Balance>,
 		OptionQuery,
 	>;
 
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
-		pub vaults: Vec<(VaultId, Vault<AccountId, T::Balance>)>,
+		#[allow(clippy::type_complexity)]
+		pub vaults: Vec<(VaultId, Vault<<T as frame_system::Config>::AccountId, T::Balance>)>,
 	}
 }
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);

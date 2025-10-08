@@ -143,7 +143,7 @@ impl pallet_treasury::Config for Test {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
-	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type MaxVaultsPerPool = MaxBidPoolVaultParticipants;
 	type GetCurrentFrameId = CurrentFrameId;
 }
 
