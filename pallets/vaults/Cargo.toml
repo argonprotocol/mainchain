@@ -17,7 +17,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
-pallet-liquidity-pools = { workspace = true, default-features = false }
+pallet-treasury = { workspace = true, default-features = false }
 argon-bitcoin = { workspace = true, default-features = false }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
@@ -37,19 +37,16 @@ std = [
 	"bip32/std",
 	"codec/std",
 	"k256/std",
-	"pallet-liquidity-pools/std",
 	"pallet-prelude/std",
+	"pallet-treasury/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 	"tracing/std",
 ]
 runtime-benchmarks = [
-	"pallet-liquidity-pools/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
+	"pallet-treasury/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [
-	"pallet-liquidity-pools/try-runtime",
-	"polkadot-sdk/try-runtime",
-]
+try-runtime = [ "pallet-treasury/try-runtime", "polkadot-sdk/try-runtime" ]

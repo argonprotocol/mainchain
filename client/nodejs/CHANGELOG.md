@@ -32,7 +32,7 @@
 
 * **client/nodejs:** cohort bidder callbacks
 ([7d017bd](https://github.com/argonprotocol/mainchain/commit/7d017bd7f592d40277bc138c18059ac9497878df))
-* **liquidity_pool:** simplify prebond amount
+* **treasury:** simplify prebond amount
 ([f4242c4](https://github.com/argonprotocol/mainchain/commit/f4242c4c6d079dc86982cfa8b9f20b4c5db522c3))
 * **vaults:** earnings must be collected
 ([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))
@@ -78,7 +78,7 @@
 
 ### Features
 
-* **liquidity_pools:** vault operator prebonding
+* **treasury:** vault operator prebonding
 ([e6066fe](https://github.com/argonprotocol/mainchain/commit/e6066febe05897393c648afca2bce75d5cba6772))
 * **node:** allow multiple miners to submit a vote
 ([b98e8fa](https://github.com/argonprotocol/mainchain/commit/b98e8fa81e8982f7879601c048f19514886bfaa0))

@@ -64,8 +64,8 @@ export class Vault {
         FIXED_U128_DECIMALS,
       ),
       bitcoinBaseFee: vault.terms.bitcoinBaseFee.toBigInt(),
-      liquidityPoolProfitSharing: fromFixedNumber(
-        vault.terms.liquidityPoolProfitSharing.toBigInt(),
+      treasuryProfitSharing: fromFixedNumber(
+        vault.terms.treasuryProfitSharing.toBigInt(),
         PERMILL_DECIMALS,
       ),
     };
@@ -81,8 +81,8 @@ export class Vault {
           FIXED_U128_DECIMALS,
         ),
         bitcoinBaseFee: terms.bitcoinBaseFee.toBigInt(),
-        liquidityPoolProfitSharing: fromFixedNumber(
-          vault.terms.liquidityPoolProfitSharing.toBigInt(),
+        treasuryProfitSharing: fromFixedNumber(
+          vault.terms.treasuryProfitSharing.toBigInt(),
           PERMILL_DECIMALS,
         ),
       };
@@ -128,7 +128,7 @@ export class Vault {
   }
 
   /**
-   * Returns the amount of Argons available to match per liquidity pool
+   * Returns the amount of Argons available to match per treasury pool
    */
   public activatedSecuritizationPerSlot(): bigint {
     const activated = this.activatedSecuritization();
@@ -166,7 +166,7 @@ export class Vault {
       annualPercentRate: number;
       baseFee: bigint | number;
       bitcoinXpub: string;
-      liquidityPoolProfitSharing: number;
+      treasuryProfitSharing: number;
       tip?: bigint;
       doNotExceedBalance?: bigint;
       txProgressCallback?: ITxProgressCallback;
@@ -202,10 +202,7 @@ export class Vault {
         // convert to fixed u128
         bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, FIXED_U128_DECIMALS),
         bitcoinBaseFee: BigInt(baseFee),
-        liquidityPoolProfitSharing: toFixedNumber(
-          args.liquidityPoolProfitSharing,
-          PERMILL_DECIMALS,
-        ),
+        treasuryProfitSharing: toFixedNumber(args.treasuryProfitSharing, PERMILL_DECIMALS),
       },
       securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
@@ -260,5 +257,5 @@ export class Vault {
 export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
-  readonly liquidityPoolProfitSharing: BigNumber;
+  readonly treasuryProfitSharing: BigNumber;
 }

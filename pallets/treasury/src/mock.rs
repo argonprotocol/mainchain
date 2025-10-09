@@ -1,8 +1,8 @@
-use crate as pallet_liquidity_pools;
-use argon_primitives::vault::LiquidityPoolVaultProvider;
+use crate as pallet_treasury;
+use argon_primitives::vault::TreasuryVaultProvider;
 use frame_support::traits::Currency;
 use pallet_prelude::{
-	argon_primitives::vault::{MiningBidPoolProvider, VaultLiquidityPoolFrameEarnings},
+	argon_primitives::vault::{MiningBidPoolProvider, VaultTreasuryFrameEarnings},
 	*,
 };
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		LiquidityPools: pallet_liquidity_pools,
+		Treasury: pallet_treasury,
 		Balances: pallet_balances,
 	}
 );
@@ -62,7 +62,7 @@ parameter_types! {
 
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
-	pub static MaxLiquidityPoolContributors: u32 = 10;
+	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxBidPoolVaultParticipants: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
@@ -72,7 +72,7 @@ parameter_types! {
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
 
-	pub static LastVaultProfits: Vec<VaultLiquidityPoolFrameEarnings<Balance, u64>> = vec![];
+	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
 }
 
 #[derive(Clone)]
@@ -89,8 +89,8 @@ pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	});
 }
 
-pub struct StaticLiquidityPoolVaultProvider;
-impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
+pub struct StaticTreasuryVaultProvider;
+impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
@@ -112,10 +112,10 @@ impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
 
 	fn record_vault_frame_earnings(
 		_source_account_id: &Self::AccountId,
-		profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) {
 		let _ = Balances::burn_from(
-			&LiquidityPools::get_bid_pool_account(),
+			&Treasury::get_bid_pool_account(),
 			profit.earnings_for_vault,
 			Preservation::Expendable,
 			Precision::Exact,
@@ -125,17 +125,17 @@ impl LiquidityPoolVaultProvider for StaticLiquidityPoolVaultProvider {
 	}
 }
 
-impl pallet_liquidity_pools::Config for Test {
+impl pallet_treasury::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LiquidityPoolVaultProvider = StaticLiquidityPoolVaultProvider;
-	type MaxLiquidityPoolContributors = MaxLiquidityPoolContributors;
+	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
+	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
-	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type MaxVaultsPerPool = MaxBidPoolVaultParticipants;
 	type GetCurrentFrameId = CurrentFrameId;
 }
 

@@ -44,9 +44,9 @@ pub struct VaultConfig {
 	#[clap(long, value_parser=parse_number)]
 	bitcoin_apr: Option<f32>,
 
-	/// The vault sharing percent for liquidity pool profits
+	/// The vault sharing percent for treasury pool profits
 	#[clap(long, value_parser=parse_number)]
-	liquidity_pool_profit_sharing: Option<f32>,
+	treasury_profit_sharing: Option<f32>,
 }
 
 const FIELD_TO_LABEL: [(&str, &str); 6] = [
@@ -55,7 +55,7 @@ const FIELD_TO_LABEL: [(&str, &str); 6] = [
 	("bitcoin_xpub", "Bitcoin XPub"),
 	("bitcoin_base_fee", "Bitcoin Base Fee Argons"),
 	("bitcoin_apr", "Bitcoin APR"),
-	("liquidity_pool_profit_sharing", "Liquidity Pool Profit Sharing %"),
+	("treasury_profit_sharing", "Treasury Pool Profit Sharing %"),
 ];
 
 fn label(field: &str) -> &str {
@@ -90,8 +90,8 @@ impl VaultConfig {
 				bitcoin_annual_percent_rate: to_api_fixed_u128(read_percent_to_fixed_128(
 					self.bitcoin_apr.unwrap_or(0.0),
 				)),
-				liquidity_pool_profit_sharing: to_api_per_mill(Permill::from_float(
-					(self.liquidity_pool_profit_sharing.unwrap_or(0.0) / 100.0) as f64,
+				treasury_profit_sharing: to_api_per_mill(Permill::from_float(
+					(self.treasury_profit_sharing.unwrap_or(0.0) / 100.0) as f64,
 				)),
 			},
 			securitization_ratio: to_api_fixed_u128(FixedU128::from_float(
@@ -151,7 +151,7 @@ impl VaultConfig {
 				"bitcoin_xpub" => self.prompt_bitcoin_xpub()?,
 				"bitcoin_base_fee" => self.prompt_bitcoin_base_fee()?,
 				"bitcoin_apr" => self.prompt_bitcoin_apr()?,
-				"liquidity_pool_profit_sharing" => self.prompt_liquidity_pool_profit_sharing()?,
+				"treasury_profit_sharing" => self.prompt_treasury_profit_sharing()?,
 				"securitization_ratio" => self.prompt_securitization()?,
 				_ => unreachable!(),
 			}
@@ -206,9 +206,9 @@ impl VaultConfig {
 		Ok(())
 	}
 
-	fn prompt_liquidity_pool_profit_sharing(&mut self) -> Result<(), String> {
-		self.liquidity_pool_profit_sharing = Some(
-			self.text_field("liquidity_pool_profit_sharing", "0.00")
+	fn prompt_treasury_profit_sharing(&mut self) -> Result<(), String> {
+		self.treasury_profit_sharing = Some(
+			self.text_field("treasury_profit_sharing", "0.00")
 				.with_min_f32(0.0)
 				.prompt_with_f32()?,
 		);
@@ -236,9 +236,9 @@ impl VaultConfig {
 				self.argons = None;
 			}
 		}
-		if let Some(val) = self.liquidity_pool_profit_sharing {
+		if let Some(val) = self.treasury_profit_sharing {
 			if val < 0.0 {
-				self.liquidity_pool_profit_sharing = None;
+				self.treasury_profit_sharing = None;
 			}
 		}
 		if let Some(val) = self.securitization_ratio {
@@ -277,8 +277,7 @@ impl VaultConfig {
 			"bitcoin_xpub" => self.bitcoin_xpub.clone(),
 			"bitcoin_base_fee" => self.format_type(field, &self.bitcoin_base_fee),
 			"bitcoin_apr" => self.format_type(field, &self.bitcoin_apr),
-			"liquidity_pool_profit_sharing" =>
-				self.format_type(field, &self.liquidity_pool_profit_sharing),
+			"treasury_profit_sharing" => self.format_type(field, &self.treasury_profit_sharing),
 			"securitization_ratio" => self.format_type(field, &self.securitization_ratio),
 			_ => None,
 		}
@@ -296,7 +295,7 @@ impl VaultConfig {
 				let argons = parse_number(&value).unwrap();
 				Some(Argons(argons).to_string())
 			},
-			"bitcoin_apr" | "liquidity_pool_profit_sharing" => {
+			"bitcoin_apr" | "treasury_profit_sharing" => {
 				let pct = parse_number(&value).unwrap();
 				Some(Pct(pct).to_string())
 			},

@@ -18,7 +18,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_notaries, Notaries]
 	[pallet_notebook, Notebook]
 	[pallet_vaults, Vaults]
-	[pallet_liquidity_pools, LiquidityPools]
+	[pallet_treasury, Treasury]
 	[pallet_chain_transfer, ChainTransfer]
 	[pallet_price_index, PriceIndex]
 	[pallet_token_gateway, TokenGateway]

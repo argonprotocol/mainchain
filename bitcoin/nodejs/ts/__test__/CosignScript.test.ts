@@ -125,7 +125,7 @@ describeIntegration(
         annualPercentRate: 0.05,
         baseFee: 500_000n,
         bitcoinXpub: vaultMasterXpub,
-        liquidityPoolProfitSharing: 0.5,
+        treasuryProfitSharing: 0.5,
       });
       vault = vaultResult.vault;
 

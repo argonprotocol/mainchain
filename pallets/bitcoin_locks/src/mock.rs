@@ -80,7 +80,7 @@ parameter_types! {
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
-			liquidity_pool_profit_sharing: Permill::from_float(0.0),
+			treasury_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
 		operator_account_id: 1,

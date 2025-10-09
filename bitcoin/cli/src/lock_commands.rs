@@ -4,7 +4,10 @@ use crate::{
 	xpriv_file::{XprivFile, secret_string_from_str},
 };
 use anyhow::{Context, anyhow, bail};
-use argon_bitcoin::{Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep};
+use argon_bitcoin::{
+	Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep,
+	psbt_utils::{finalize, get_tx_hex},
+};
 use argon_client::{
 	FetchAt, MainchainClient, api,
 	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::LockReleaseRequest, storage, tx},
@@ -290,7 +293,11 @@ impl LockCommands {
 				} else {
 					let redemption_price_query =
 						apis().bitcoin_apis().redemption_rate(lock.satoshis);
-					client.call(redemption_price_query, Some(at_block)).await?.unwrap_or_default()
+					client
+						.call(redemption_price_query, Some(at_block))
+						.await?
+						.unwrap_or_default()
+						.min(lock.pegged_price)
 				};
 
 				let minted = if lock.is_verified { lock.liquidity_promised - remaining } else { 0 };
@@ -369,13 +376,16 @@ impl LockCommands {
 				let redemption_price_query = apis().bitcoin_apis().redemption_rate(lock.satoshis);
 
 				let latest_block = client.latest_finalized_block_hash().await?;
-				let redemption_price = client
+				let mut redemption_price = client
 					.live
 					.runtime_api()
 					.at(latest_block)
 					.call(redemption_price_query)
 					.await?
 					.unwrap_or_default();
+				if redemption_price > lock.pegged_price {
+					redemption_price = lock.pegged_price;
+				}
 
 				let bitcoin_dest_pubkey = Address::from_str(&dest_pubkey)
 					.map_err(|e| anyhow!("Unable to parse bitcoin destination pubkey: {e:?}"))?
@@ -607,6 +617,18 @@ impl LockCommands {
 						.sign_derived(xpriv, hd_path)
 						.context("Signing partially signed bitcoin transaction (psbt)")?;
 					did_sign = true;
+				}
+
+				if did_sign && bitcoin_rpc_url.is_none() {
+					let finalized = finalize(&releaser.psbt)?;
+					let psbt_bytes = general_purpose::STANDARD.encode(&finalized.serialize()[..]);
+					if let Ok(tx) = get_tx_hex(&finalized.extract_tx()?) {
+						println!(
+							"Broadcast this transaction to the network:\n\n{}\n\nTo view the finalized psbt, you can load this\n\n{}",
+							tx, psbt_bytes
+						);
+						return Ok(());
+					}
 				}
 
 				if !did_sign || bitcoin_rpc_url.is_none() {

@@ -27,7 +27,7 @@ pub trait MiningBidPoolProvider {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct VaultLiquidityPoolFrameEarnings<Balance, AccountId> {
+pub struct VaultTreasuryFrameEarnings<Balance, AccountId> {
 	pub vault_id: VaultId,
 	pub vault_operator_account_id: AccountId,
 	pub frame_id: FrameId,
@@ -41,7 +41,7 @@ pub struct VaultLiquidityPoolFrameEarnings<Balance, AccountId> {
 	pub capital_contributed_by_vault: Balance,
 }
 
-pub trait LiquidityPoolVaultProvider {
+pub trait TreasuryVaultProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
@@ -58,7 +58,7 @@ pub trait LiquidityPoolVaultProvider {
 	/// Records the earnings for a vault frame
 	fn record_vault_frame_earnings(
 		source_account_id: &Self::AccountId,
-		profit: VaultLiquidityPoolFrameEarnings<Self::Balance, Self::AccountId>,
+		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	);
 }
 
@@ -256,7 +256,7 @@ where
 	pub bitcoin_base_fee: Balance,
 	/// The percent of mining bonds taken by the vault
 	#[codec(compact)]
-	pub liquidity_pool_profit_sharing: Permill,
+	pub treasury_profit_sharing: Permill,
 }
 
 pub struct BurnResult<Balance> {
@@ -667,7 +667,7 @@ mod test {
 			terms: VaultTerms {
 				bitcoin_annual_percent_rate: 0.into(),
 				bitcoin_base_fee: 0,
-				liquidity_pool_profit_sharing: Default::default(),
+				treasury_profit_sharing: Default::default(),
 			},
 			pending_terms: None,
 			opened_tick: 0,

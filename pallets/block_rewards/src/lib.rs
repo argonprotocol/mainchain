@@ -366,6 +366,7 @@ pub mod pallet {
 			let liquidity_change =
 				T::PriceProvider::get_liquidity_change_needed().unwrap_or_default();
 			let mut block_argons = ArgonsPerBlock::<T>::get();
+			let start_block_argons = block_argons;
 
 			let mining_window = T::SlotWindowTicks::get();
 			let rewards_change = T::PerBlockArgonReducerPercent::get().saturating_mul_int(
@@ -377,8 +378,9 @@ pub mod pallet {
 			} else {
 				block_argons = block_argons.saturating_add(change_amount);
 			}
+			block_argons = block_argons.max(argon_minimum);
 
-			if !rewards_change.is_zero() {
+			if block_argons != start_block_argons {
 				log::trace!(
 					"Argons per block adjusted to {:?} (change: {:?})",
 					block_argons,
@@ -386,7 +388,7 @@ pub mod pallet {
 				);
 			}
 
-			ArgonsPerBlock::<T>::put(block_argons.max(argon_minimum));
+			ArgonsPerBlock::<T>::put(block_argons);
 		}
 
 		pub(crate) fn calculate_reward_amounts(

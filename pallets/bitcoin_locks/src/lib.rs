@@ -191,7 +191,7 @@ pub mod pallet {
 	>;
 
 	/// Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
-	/// unlock it
+	/// unlock it. Bitcoin will go to vault
 	#[pallet::storage]
 	pub type LockExpirationsByBitcoinHeight<T: Config> = StorageMap<
 		_,
@@ -815,6 +815,7 @@ pub mod pallet {
 					Precision::Exact,
 					Fortitude::Force,
 				)?;
+				// add liquidity back to the vault by scheduling this for release
 				T::VaultProvider::schedule_for_release(
 					vault_id,
 					lock.liquidity_promised,

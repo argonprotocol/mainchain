@@ -16,7 +16,7 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		Vaults: pallet_vaults,
-		LiquidityPools: pallet_liquidity_pools,
+		Treasury: pallet_treasury,
 	}
 );
 
@@ -73,7 +73,7 @@ parameter_types! {
 
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
-	pub static MaxLiquidityPoolContributors: u32 = 10;
+	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxBidPoolVaultParticipants: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
@@ -133,17 +133,17 @@ impl pallet_vaults::Config for Test {
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 }
 
-impl pallet_liquidity_pools::Config for Test {
+impl pallet_treasury::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LiquidityPoolVaultProvider = Vaults;
-	type MaxLiquidityPoolContributors = MaxLiquidityPoolContributors;
+	type TreasuryVaultProvider = Vaults;
+	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
-	type MaxBidPoolVaultParticipants = MaxBidPoolVaultParticipants;
+	type MaxVaultsPerPool = MaxBidPoolVaultParticipants;
 	type GetCurrentFrameId = CurrentFrameId;
 }
 

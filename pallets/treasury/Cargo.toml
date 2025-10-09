@@ -1,5 +1,5 @@
 [package]
-name = "pallet-liquidity-pools"
+name = "pallet-treasury"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
