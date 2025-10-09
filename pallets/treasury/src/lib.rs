@@ -63,6 +63,7 @@ pub mod pallet {
 		OnNewSlot,
 		vault::{MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
+	use core::cmp::Ordering;
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::warn;
 
@@ -265,7 +266,7 @@ pub mod pallet {
 		///
 		/// - `origin`: The account that is joining the fund
 		/// - `vault_id`: The vault id that the account would like to join a fund for
-		/// - `amount`: The amount of argons to contribute to the fund. If you change this amount,
+		/// - `amount`: The amount of argons to contribute to the fund. If you increase this amount,
 		///   it will just add the incremental amount
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bond_argons())]
@@ -284,47 +285,26 @@ pub mod pallet {
 			// the "next" frame is the one we are adding capital to
 			let raising_frame_id = T::GetCurrentFrameId::get() + 1;
 			VaultPoolsByFrame::<T>::try_mutate(raising_frame_id, |a| -> DispatchResult {
-				let activated_securitization = Self::get_vault_activated_funds_per_slot(vault_id);
-
-				CapitalRaising::<T>::try_mutate(|list| {
-					if let Some(entry) = list.iter_mut().find(|x| x.vault_id == vault_id) {
-						ensure!(
-							entry.activated_capital.saturating_add(amount) <=
-								activated_securitization,
-							Error::<T>::ActivatedSecuritizationExceeded
-						);
-						entry.activated_capital.saturating_accrue(amount);
-					} else {
-						ensure!(
-							amount <= activated_securitization,
-							Error::<T>::ActivatedSecuritizationExceeded
-						);
-						let entry = TreasuryCapital {
-							vault_id,
-							activated_capital: amount,
-							frame_id: raising_frame_id,
-						};
-						list.try_push(entry).map_err(|_| Error::<T>::MaxVaultsExceeded)?;
-					}
-					list.sort_by(|a, b| b.activated_capital.cmp(&a.activated_capital));
-					Ok::<_, Error<T>>(())
-				})?;
-
-				let mut mining_fund = a.remove(&vault_id);
-				if mining_fund.is_none() {
-					mining_fund = Some(TreasuryPool::new(vault_id));
+				// TODO: if we exceed the limit, we should remove and refund the lowest entry
+				if !a.contains_key(&vault_id) {
+					// we can only add a new vault if we have room
+					a.try_insert(vault_id, TreasuryPool::new(vault_id))
+						.map_err(|_| Error::<T>::MaxVaultsExceeded)?;
 				}
-				let mut mining_fund = mining_fund.ok_or(Error::<T>::CouldNotFindTreasury)?;
+				let pool = a.get_mut(&vault_id).ok_or(Error::<T>::CouldNotFindTreasury)?;
+				let vault_operator = T::TreasuryVaultProvider::get_vault_operator(vault_id)
+					.ok_or(Error::<T>::CouldNotFindTreasury)?;
+				let are_earnings_in_pool = who != vault_operator;
 
 				let InsertContributorResponse { hold_amount, needs_refund } =
-					mining_fund.try_insert_contributor(who.clone(), amount)?;
-				if let Some((lowest_account, balance)) = needs_refund {
-					Self::release_hold(&lowest_account, balance)?;
+					pool.try_insert_bond_holder(who.clone(), amount, are_earnings_in_pool)?;
+				if let Some((lowest_account, holder)) = needs_refund {
+					Self::release_hold(&lowest_account, holder.pool_managed_balance())?;
 				}
-
-				a.try_insert(vault_id, mining_fund).map_err(|_| Error::<T>::MaxVaultsExceeded)?;
-
 				Self::create_hold(&who, hold_amount)?;
+				let pool_capital = pool.raised_capital();
+				Self::adjust_capital_raised(vault_id, pool_capital, raising_frame_id)?;
+
 				Ok(())
 			})?;
 
@@ -395,9 +375,9 @@ pub mod pallet {
 				let Some(vault_pool) = frame_pools.get(&vault_id) else {
 					continue;
 				};
-				for (account_id, amount) in &vault_pool.bond_holders {
+				for (account_id, holder) in &vault_pool.bond_holders {
 					if *account_id == operator {
-						amount_already_distributed.saturating_accrue(*amount);
+						amount_already_distributed.saturating_accrue(holder.starting_balance);
 					}
 				}
 			}
@@ -508,7 +488,7 @@ pub mod pallet {
 					earnings.saturating_accrue(remaining_bid_pool);
 					remaining_bid_pool = T::Balance::zero();
 				}
-				vault_fund.distributed_profits = Some(earnings);
+				vault_fund.distributed_earnings = Some(earnings);
 
 				let mut vault_share = Permill::one()
 					.saturating_sub(vault_fund.vault_sharing_percent)
@@ -520,13 +500,14 @@ pub mod pallet {
 				let mut distributions = BTreeMap::<T::AccountId, T::Balance>::new();
 
 				let mut vault_contributed_capital = T::Balance::zero();
-				for (account, contrib) in vault_fund.bond_holders.iter_mut() {
+				for (account, holder) in vault_fund.bond_holders.iter_mut() {
 					if *account == vault_account_id {
-						vault_contributed_capital = *contrib;
+						vault_contributed_capital = holder.starting_balance;
 					}
-					let prorata = Permill::from_rational(*contrib, contributor_funds)
-						.mul_floor(contributor_amount);
-					contrib.saturating_accrue(prorata);
+					let prorata =
+						Permill::from_rational(holder.starting_balance, contributor_funds)
+							.mul_floor(contributor_amount);
+					holder.earnings.saturating_accrue(prorata);
 					contributor_distribution_remaining.saturating_reduce(prorata);
 					distributions.entry(account.clone()).or_default().saturating_accrue(prorata);
 				}
@@ -611,16 +592,16 @@ pub mod pallet {
 
 					while total_to_refund > T::Balance::zero() {
 						// take smallest (last entry)
-						let Some((account, amount)) = vault_fund.bond_holders.pop() else {
+						let Some((account, mut holder)) = vault_fund.bond_holders.pop() else {
 							continue;
 						};
-						let to_refund = total_to_refund.min(amount);
+						let to_refund = total_to_refund.min(holder.starting_balance);
 						Self::refund_fund_capital(frame_id, vault_id, &account, to_refund);
 						total_to_refund.saturating_reduce(to_refund);
-						let final_amount = amount.saturating_sub(to_refund);
+						holder.starting_balance.saturating_reduce(to_refund);
 						// if we have some left, we need to re-add the contributor
-						if final_amount > T::Balance::zero() {
-							vault_fund.bond_holders.try_push((account, final_amount)).ok();
+						if holder.starting_balance > T::Balance::zero() {
+							vault_fund.bond_holders.try_push((account, holder)).ok();
 						}
 					}
 				}
@@ -638,33 +619,41 @@ pub mod pallet {
 						continue;
 					}
 
-					let vault_fund = frame_funds
+					let vault_pool = frame_funds
 						.get_mut(&vault_id)
 						.expect("we just inserted this entry above; qed");
 
-					if !vault_fund.can_add_contributor(&prebond.account_id) {
+					if !vault_pool.can_add_bond_holder(&prebond.account_id) {
 						// we can't add a new contributor if the list is full
 						continue;
 					}
 
 					let amount_available =
 						activated_securitization.saturating_sub(bid_pool_capital.activated_capital);
-					let already_allocated =
-						vault_fund
-							.bond_holders
-							.iter()
-							.find_map(|(account, amount)| {
-								if account == &prebond.account_id { Some(*amount) } else { None }
-							})
-							.unwrap_or_default();
+					let already_allocated = vault_pool
+						.bond_holders
+						.iter()
+						.find_map(|(account, holder)| {
+							// use starting balance because we don't auto-roll profits
+							if account == &prebond.account_id {
+								Some(holder.starting_balance)
+							} else {
+								None
+							}
+						})
+						.unwrap_or_default();
 
 					let to_bond =
 						prebond.take_unbonded(frame_id, amount_available, already_allocated);
-
 					if to_bond > T::Balance::zero() {
-						bid_pool_capital.activated_capital.saturating_accrue(to_bond);
-						vault_fund
-							.try_insert_contributor(prebond.account_id.clone(), to_bond)
+						// we don't need the refund amount because we already checked if this was
+						// full
+						vault_pool
+							.try_insert_bond_holder(
+								prebond.account_id.clone(),
+								already_allocated.saturating_add(to_bond),
+								false,
+							)
 							.expect(
 								"already checked if this was full, so shouldn't be possible to fail",
 							);
@@ -674,6 +663,7 @@ pub mod pallet {
 						} else {
 							PrebondedByVaultId::<T>::insert(vault_id, prebond);
 						}
+						bid_pool_capital.activated_capital = vault_pool.raised_capital();
 					}
 				}
 			}
@@ -710,11 +700,12 @@ pub mod pallet {
 								.unwrap_or_default();
 
 						let mut participants = vec![];
-						for (account, amount) in &rolling_pool.bond_holders {
+						for (account, holder) in &rolling_pool.bond_holders {
 							if rolling_pool.do_not_renew.contains(account) {
 								continue;
 							}
-							if *amount < T::MinimumArgonsPerContributor::get() {
+							let rollable_balance = holder.pool_managed_balance();
+							if rollable_balance < T::MinimumArgonsPerContributor::get() {
 								rolling_pool.do_not_renew.try_push(account.clone()).ok();
 								continue;
 							}
@@ -722,8 +713,16 @@ pub mod pallet {
 								rolling_pool.do_not_renew.try_push(account.clone()).ok();
 								continue;
 							}
-							participants.push((account.clone(), *amount));
-							total.saturating_accrue(*amount);
+
+							participants.push((
+								account.clone(),
+								BondHolder {
+									starting_balance: rollable_balance,
+									earnings: T::Balance::zero(),
+									keep_earnings_in_pool: holder.keep_earnings_in_pool,
+								},
+							));
+							total.saturating_accrue(rollable_balance);
 						}
 						rolling_pool.is_rolled_over = true;
 						if !participants.is_empty() {
@@ -752,12 +751,43 @@ pub mod pallet {
 			}
 			let release_frame_id = current_frame_id - 10;
 			for (vault_id, fund) in VaultPoolsByFrame::<T>::take(release_frame_id) {
-				for (account, amount) in fund.bond_holders {
+				for (account, holder) in fund.bond_holders {
 					if fund.do_not_renew.contains(&account) {
-						Self::refund_fund_capital(release_frame_id, vault_id, &account, amount);
+						Self::refund_fund_capital(
+							release_frame_id,
+							vault_id,
+							&account,
+							holder.pool_managed_balance(),
+						);
 					}
 				}
 			}
+		}
+
+		fn adjust_capital_raised(
+			vault_id: VaultId,
+			activated_capital: T::Balance,
+			raising_frame_id: FrameId,
+		) -> Result<(), Error<T>> {
+			let activated_securitization = Self::get_vault_activated_funds_per_slot(vault_id);
+			ensure!(
+				activated_capital <= activated_securitization,
+				Error::<T>::ActivatedSecuritizationExceeded
+			);
+			CapitalRaising::<T>::try_mutate(|list| {
+				if let Some(entry) = list.iter_mut().find(|x| x.vault_id == vault_id) {
+					entry.activated_capital = activated_capital;
+				} else {
+					list.try_push(TreasuryCapital {
+						vault_id,
+						activated_capital,
+						frame_id: raising_frame_id,
+					})
+					.map_err(|_| Error::<T>::MaxVaultsExceeded)?;
+				}
+				list.sort_by(|a, b| b.activated_capital.cmp(&a.activated_capital));
+				Ok::<_, Error<T>>(())
+			})
 		}
 
 		fn refund_fund_capital(
@@ -836,7 +866,7 @@ pub mod pallet {
 	pub struct TreasuryPool<T: Config> {
 		/// The amount of argons per bond holder. Sorted with largest first. After bid pool is
 		/// distributed, profits are added to this balance
-		pub bond_holders: BoundedVec<(T::AccountId, T::Balance), T::MaxTreasuryContributors>,
+		pub bond_holders: BoundedVec<(T::AccountId, BondHolder<T>), T::MaxTreasuryContributors>,
 
 		/// Accounts not wishing to be re-upped
 		pub do_not_renew: BoundedVec<T::AccountId, T::MaxTreasuryContributors>,
@@ -845,7 +875,7 @@ pub mod pallet {
 		pub is_rolled_over: bool,
 
 		/// The amount of argons that have been distributed to the fund (vault + contributors)
-		pub distributed_profits: Option<T::Balance>,
+		pub distributed_earnings: Option<T::Balance>,
 
 		/// The vault percent of profits shared
 		#[codec(compact)]
@@ -855,7 +885,41 @@ pub mod pallet {
 	#[derive(EqNoBound, PartialEqNoBound, DebugNoBound)]
 	pub struct InsertContributorResponse<T: Config> {
 		pub(crate) hold_amount: T::Balance,
-		pub(crate) needs_refund: Option<(T::AccountId, T::Balance)>,
+		pub(crate) needs_refund: Option<(T::AccountId, BondHolder<T>)>,
+	}
+
+	#[derive(
+		Encode,
+		Decode,
+		Clone,
+		PartialEqNoBound,
+		Eq,
+		RuntimeDebugNoBound,
+		TypeInfo,
+		DefaultNoBound,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct BondHolder<T: Config> {
+		/// The starting balance of the bond holder
+		#[codec(compact)]
+		pub starting_balance: T::Balance,
+		/// The profits earned by the bond holder
+		#[codec(compact)]
+		pub earnings: T::Balance,
+		/// Are the earnings maintained in this pool? For some holders (like vault operators),
+		/// earnings are exported to other places (eg, the Vault Pallet). Vaults must collect their
+		/// earnings there.
+		pub keep_earnings_in_pool: bool,
+	}
+
+	impl<T: Config> BondHolder<T> {
+		pub fn pool_managed_balance(&self) -> T::Balance {
+			if !self.keep_earnings_in_pool {
+				return self.starting_balance;
+			}
+			self.starting_balance.saturating_add(self.earnings)
+		}
 	}
 
 	impl<T: Config> TreasuryPool<T> {
@@ -865,25 +929,43 @@ pub mod pallet {
 			Self { vault_sharing_percent: sharing, ..Default::default() }
 		}
 
-		pub fn can_add_contributor(&self, account_id: &T::AccountId) -> bool {
+		pub fn can_add_bond_holder(&self, account_id: &T::AccountId) -> bool {
 			self.bond_holders.iter().any(|(a, _)| *a == *account_id) || !self.bond_holders.is_full()
 		}
 
-		pub fn try_insert_contributor(
+		pub fn raised_capital(&self) -> T::Balance {
+			self.bond_holders
+				.iter()
+				.fold(T::Balance::zero(), |acc, (_, b)| acc.saturating_add(b.starting_balance))
+		}
+
+		/// returns any bond holder that needs to be refunded due to being the lowest and the
+		/// list being full
+		pub fn try_insert_bond_holder(
 			&mut self,
 			account: T::AccountId,
-			amount: T::Balance,
+			total_amount: T::Balance,
+			keep_earnings_in_pool: bool,
 		) -> Result<InsertContributorResponse<T>, Error<T>> {
 			let existing_pos = self.bond_holders.iter().position(|(a, _)| *a == account);
-			let mut hold_amount = amount;
+
+			let mut hold_amount = total_amount;
+
 			if let Some(pos) = existing_pos {
-				let (_, balance) = self.bond_holders.remove(pos);
-				hold_amount = amount.saturating_sub(balance);
+				let (_, holder) = self.bond_holders.remove(pos);
+				hold_amount.saturating_reduce(holder.starting_balance);
 			}
 
 			let insert_pos = self
 				.bond_holders
-				.binary_search_by(|a| a.1.cmp(&amount).reverse())
+				.binary_search_by(|(_, holder)| {
+					let comp = total_amount.cmp(&holder.starting_balance);
+					match comp {
+						Ordering::Equal => Ordering::Less,
+						Ordering::Greater => Ordering::Greater,
+						Ordering::Less => Ordering::Less,
+					}
+				})
 				.unwrap_or_else(|x| x);
 
 			let mut needs_refund = None;
@@ -893,7 +975,17 @@ pub mod pallet {
 			}
 
 			self.bond_holders
-				.try_insert(insert_pos, (account, amount))
+				.try_insert(
+					insert_pos,
+					(
+						account,
+						BondHolder {
+							starting_balance: total_amount,
+							earnings: T::Balance::zero(),
+							keep_earnings_in_pool,
+						},
+					),
+				)
 				.map_err(|_| Error::<T>::MaxContributorsExceeded)?;
 			Ok(InsertContributorResponse { hold_amount, needs_refund })
 		}

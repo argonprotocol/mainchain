@@ -64,7 +64,7 @@ parameter_types! {
 
 	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
-	pub static MaxBidPoolVaultParticipants: u32 = 100;
+	pub static MaxVaultsPerPool: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
@@ -135,7 +135,7 @@ impl pallet_treasury::Config for Test {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
-	type MaxVaultsPerPool = MaxBidPoolVaultParticipants;
+	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type GetCurrentFrameId = CurrentFrameId;
 }
 

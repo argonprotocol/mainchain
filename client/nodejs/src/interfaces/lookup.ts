@@ -3326,14 +3326,22 @@ export default {
    * Lookup484: pallet_treasury::pallet::TreasuryPool<T>
    **/
   PalletTreasuryTreasuryPool: {
-    bondHolders: 'Vec<(AccountId32,u128)>',
+    bondHolders: 'Vec<(AccountId32,PalletTreasuryBondHolder)>',
     doNotRenew: 'Vec<AccountId32>',
     isRolledOver: 'bool',
-    distributedProfits: 'Option<u128>',
+    distributedEarnings: 'Option<u128>',
     vaultSharingPercent: 'Compact<Permill>',
   },
   /**
-   * Lookup493: pallet_treasury::pallet::TreasuryCapital<T>
+   * Lookup487: pallet_treasury::pallet::BondHolder<T>
+   **/
+  PalletTreasuryBondHolder: {
+    startingBalance: 'Compact<u128>',
+    earnings: 'Compact<u128>',
+    keepEarningsInPool: 'bool',
+  },
+  /**
+   * Lookup494: pallet_treasury::pallet::TreasuryCapital<T>
    **/
   PalletTreasuryTreasuryCapital: {
     vaultId: 'Compact<u32>',
@@ -3341,7 +3349,7 @@ export default {
     frameId: 'Compact<u64>',
   },
   /**
-   * Lookup495: pallet_treasury::pallet::PrebondedArgons<T>
+   * Lookup496: pallet_treasury::pallet::PrebondedArgons<T>
    **/
   PalletTreasuryPrebondedArgons: {
     vaultId: 'Compact<u32>',
@@ -3352,7 +3360,7 @@ export default {
     maxAmountPerFrame: 'Compact<u128>',
   },
   /**
-   * Lookup496: pallet_treasury::pallet::Error<T>
+   * Lookup497: pallet_treasury::pallet::Error<T>
    **/
   PalletTreasuryError: {
     _enum: [
@@ -3371,55 +3379,55 @@ export default {
     ],
   },
   /**
-   * Lookup499: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup500: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup500: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup501: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup501: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup502: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup502: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup503: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup503: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup504: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup506: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup507: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup507: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup508: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup508: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup509: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup509: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup510: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup510: frame_metadata_hash_extension::Mode
+   * Lookup511: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup511: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup512: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup513: argon_runtime::Runtime
+   * Lookup514: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

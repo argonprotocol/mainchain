@@ -191,7 +191,7 @@ declare module '@polkadot/api-base/types/storage' {
       >;
       /**
        * Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not
-       * unlock it
+       * unlock it. Bitcoin will go to vault
        **/
       lockExpirationsByBitcoinHeight: AugmentedQuery<
         ApiType,

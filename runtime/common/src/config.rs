@@ -88,7 +88,7 @@ parameter_types! {
 
 	// ### pallet_treasury
 	pub const MaxTreasuryContributors: u32 = 100;
-	pub const MaxBidPoolVaultParticipants: u32 = 100;
+	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
