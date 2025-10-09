@@ -318,6 +318,10 @@ To launch in Signet:
   `open -a Electrum.app --args --oneserver --signet --server=electrs.testnet.argonprotocol.org:50002:s`
   ***
   ![Electrum signet.png](images/electrum-testnet.png)
+- [Sparrow](https://sparrowwallet.com/): Create a new wallet and select Signet as the network. Add a
+  server: `electrs.testnet.argonprotocol.org:50002` and mark it as secure.
+  ***
+  ![Sparrow menu.png](images/sparrow-menu.png) ![Sparrow Signet.png](images/sparrow-signet.png)
 
 #### Get Faucet BTC
 

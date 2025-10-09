@@ -41,8 +41,8 @@ dependencies = ["zepter", "fmt"]
 [tasks.docker]
 description = "Build docker image"
 script = [
-    "docker buildx build -t ghcr.io/argonprotocol/argon-miner:dev . -f dev.Dockerfile --target argon-node",
-    "docker buildx build -t ghcr.io/argonprotocol/argon-notary:dev . -f dev.Dockerfile --target argon-notary",
+    "docker buildx build -t ghcr.io/argonprotocol/argon-miner:dev . -f dev.Dockerfile --target argon-node --load",
+    "docker buildx build -t ghcr.io/argonprotocol/argon-notary:dev . -f dev.Dockerfile --target argon-notary --load",
 ]
 
 [tasks.sqlx-setup]

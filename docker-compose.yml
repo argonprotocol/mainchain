@@ -430,12 +430,12 @@ services:
         condition: service_completed_successfully
       archive-node:
         condition: service_healthy
-    command:
-      - price-index
-      - --keystore-path=/keystore
-      - --signer-crypto=sr25519
-      - --signer-address=5Hn1p9jNYatcvcyugRc3TRyfC6zvFGTAX4qe14RhqBYcfrkE
-      - --simulate-prices
+    command: >
+      price-index
+       --keystore-path=/keystore
+       --signer-crypto=sr25519
+       --signer-address=5Hn1p9jNYatcvcyugRc3TRyfC6zvFGTAX4qe14RhqBYcfrkE
+      ${SIMULATE_PRICES:+--simulate-prices}
     volumes:
       - oracle-price-keystore:/keystore
       - /tmp/oracle/data/:/tmp/oracle/data/
@@ -446,6 +446,7 @@ services:
       - BLS_API_KEY=${BLS_API_KEY}
       - INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
       - ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json
+      - SIMULATE_PRICES=${SIMULATE_PRICES:-false}
     profiles:
       - price-oracle
       - all
