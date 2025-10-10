@@ -219,6 +219,7 @@ import type {
   PalletTransactionPaymentChargeTransactionPayment,
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
+  PalletTreasuryBondHolder,
   PalletTreasuryCall,
   PalletTreasuryError,
   PalletTreasuryEvent,
@@ -474,6 +475,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTransactionPaymentChargeTransactionPayment: PalletTransactionPaymentChargeTransactionPayment;
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
+    PalletTreasuryBondHolder: PalletTreasuryBondHolder;
     PalletTreasuryCall: PalletTreasuryCall;
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;

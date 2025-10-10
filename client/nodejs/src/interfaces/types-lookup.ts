@@ -3849,21 +3849,28 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryTreasuryPool (484) */
   interface PalletTreasuryTreasuryPool extends Struct {
-    readonly bondHolders: Vec<ITuple<[AccountId32, u128]>>;
+    readonly bondHolders: Vec<ITuple<[AccountId32, PalletTreasuryBondHolder]>>;
     readonly doNotRenew: Vec<AccountId32>;
     readonly isRolledOver: bool;
-    readonly distributedProfits: Option<u128>;
+    readonly distributedEarnings: Option<u128>;
     readonly vaultSharingPercent: Compact<Permill>;
   }
 
-  /** @name PalletTreasuryTreasuryCapital (493) */
+  /** @name PalletTreasuryBondHolder (487) */
+  interface PalletTreasuryBondHolder extends Struct {
+    readonly startingBalance: Compact<u128>;
+    readonly earnings: Compact<u128>;
+    readonly keepEarningsInPool: bool;
+  }
+
+  /** @name PalletTreasuryTreasuryCapital (494) */
   interface PalletTreasuryTreasuryCapital extends Struct {
     readonly vaultId: Compact<u32>;
     readonly activatedCapital: Compact<u128>;
     readonly frameId: Compact<u64>;
   }
 
-  /** @name PalletTreasuryPrebondedArgons (495) */
+  /** @name PalletTreasuryPrebondedArgons (496) */
   interface PalletTreasuryPrebondedArgons extends Struct {
     readonly vaultId: Compact<u32>;
     readonly accountId: AccountId32;
@@ -3873,7 +3880,7 @@ declare module '@polkadot/types/lookup' {
     readonly maxAmountPerFrame: Compact<u128>;
   }
 
-  /** @name PalletTreasuryError (496) */
+  /** @name PalletTreasuryError (497) */
   interface PalletTreasuryError extends Enum {
     readonly isContributionTooLow: boolean;
     readonly isVaultNotAcceptingMiningBonds: boolean;
@@ -3902,45 +3909,45 @@ declare module '@polkadot/types/lookup' {
       | 'MaxAmountBelowMinimum';
   }
 
-  /** @name FrameSystemExtensionsAuthorizeCall (499) */
+  /** @name FrameSystemExtensionsAuthorizeCall (500) */
   type FrameSystemExtensionsAuthorizeCall = Null;
 
-  /** @name FrameSystemExtensionsCheckNonZeroSender (500) */
+  /** @name FrameSystemExtensionsCheckNonZeroSender (501) */
   type FrameSystemExtensionsCheckNonZeroSender = Null;
 
-  /** @name FrameSystemExtensionsCheckSpecVersion (501) */
+  /** @name FrameSystemExtensionsCheckSpecVersion (502) */
   type FrameSystemExtensionsCheckSpecVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckTxVersion (502) */
+  /** @name FrameSystemExtensionsCheckTxVersion (503) */
   type FrameSystemExtensionsCheckTxVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckGenesis (503) */
+  /** @name FrameSystemExtensionsCheckGenesis (504) */
   type FrameSystemExtensionsCheckGenesis = Null;
 
-  /** @name FrameSystemExtensionsCheckNonce (506) */
+  /** @name FrameSystemExtensionsCheckNonce (507) */
   interface FrameSystemExtensionsCheckNonce extends Compact<u32> {}
 
-  /** @name FrameSystemExtensionsCheckWeight (507) */
+  /** @name FrameSystemExtensionsCheckWeight (508) */
   type FrameSystemExtensionsCheckWeight = Null;
 
-  /** @name PalletTransactionPaymentChargeTransactionPayment (508) */
+  /** @name PalletTransactionPaymentChargeTransactionPayment (509) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name FrameMetadataHashExtensionCheckMetadataHash (509) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (510) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
     readonly mode: FrameMetadataHashExtensionMode;
   }
 
-  /** @name FrameMetadataHashExtensionMode (510) */
+  /** @name FrameMetadataHashExtensionMode (511) */
   interface FrameMetadataHashExtensionMode extends Enum {
     readonly isDisabled: boolean;
     readonly isEnabled: boolean;
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name FrameSystemExtensionsWeightReclaim (511) */
+  /** @name FrameSystemExtensionsWeightReclaim (512) */
   type FrameSystemExtensionsWeightReclaim = Null;
 
-  /** @name ArgonRuntimeRuntime (513) */
+  /** @name ArgonRuntimeRuntime (514) */
   type ArgonRuntimeRuntime = Null;
 } // declare module

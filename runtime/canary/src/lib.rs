@@ -363,7 +363,7 @@ impl pallet_treasury::Config for Runtime {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
-	type MaxVaultsPerPool = MaxBidPoolVaultParticipants;
+	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type GetCurrentFrameId = GetCurrentFrameId;
 }
 

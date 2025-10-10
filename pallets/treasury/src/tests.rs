@@ -1,5 +1,6 @@
 use crate::{
-	Error, Event, HoldReason, PrebondedArgons, PrebondedByVaultId, TreasuryCapital, TreasuryPool,
+	BondHolder, Error, Event, HoldReason, PrebondedArgons, PrebondedByVaultId, TreasuryCapital,
+	TreasuryPool,
 	mock::{Treasury, *},
 	pallet::{CapitalActive, CapitalRaising, InsertContributorResponse, VaultPoolsByFrame},
 };
@@ -10,7 +11,7 @@ use sp_core::bounded_vec;
 use sp_runtime::Permill;
 
 #[test]
-fn it_can_add_pool_capital() {
+fn test_can_add_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(1);
@@ -41,7 +42,7 @@ fn it_can_add_pool_capital() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(2, 200_000_000)]
+			vec![(2, bond_holder(200_000_000, false))]
 		);
 		assert_eq!(Balances::balance_on_hold(&hold_reason.into(), &2), 200_000_000);
 
@@ -55,7 +56,7 @@ fn it_can_add_pool_capital() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(3, 300_000_000), (2, 200_000_000)]
+			vec![(3, bond_holder(300_000_000, false)), (2, bond_holder(200_000_000, false))]
 		);
 		assert_eq!(Balances::balance_on_hold(&hold_reason.into(), &3), 300_000_000);
 
@@ -69,7 +70,11 @@ fn it_can_add_pool_capital() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(3, 300_000_000), (4, 250_000_000), (2, 200_000_000)]
+			vec![
+				(3, bond_holder(300_000_000, false)),
+				(4, bond_holder(250_000_000, false)),
+				(2, bond_holder(200_000_000, false))
+			]
 		);
 		assert_eq!(Balances::balance_on_hold(&hold_reason.into(), &4), 250_000_000);
 
@@ -82,14 +87,18 @@ fn it_can_add_pool_capital() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(3, 300_000_000), (2, 251_000_000), (4, 250_000_000)]
+			vec![
+				(3, bond_holder(300_000_000, false)),
+				(2, bond_holder(251_000_000, false)),
+				(4, bond_holder(250_000_000, false))
+			]
 		);
 		assert_eq!(Balances::balance_on_hold(&hold_reason.into(), &2), 251_000_000);
 	});
 }
 
 #[test]
-fn it_refunds_a_bounced_out_contributor() {
+fn test_refunds_a_bounced_out_contributor() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		insert_vault(
@@ -120,7 +129,7 @@ fn it_refunds_a_bounced_out_contributor() {
 }
 
 #[test]
-fn it_can_lock_next_pool_capital() {
+fn test_can_lock_next_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(1);
@@ -177,7 +186,7 @@ fn it_can_lock_next_pool_capital() {
 }
 
 #[test]
-fn it_refunds_non_activated_funds_on_lock() {
+fn test_refunds_non_activated_funds_on_lock() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(1);
@@ -227,7 +236,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(3, 280_000_000), (2, 220_000_000)]
+			vec![(3, bond_holder(280_000_000, false)), (2, bond_holder(220_000_000, false))]
 		);
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(2)
@@ -236,7 +245,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 				.bond_holders
 				.clone()
 				.into_inner(),
-			vec![(4, 250_000_000), (5, 200_000_000),]
+			vec![(4, bond_holder(250_000_000, false)), (5, bond_holder(200_000_000, false)),]
 		);
 		// now reduce activated
 		VaultsById::mutate(|a| {
@@ -257,11 +266,11 @@ fn it_refunds_non_activated_funds_on_lock() {
 		let fund_capital = VaultPoolsByFrame::<Test>::get(2);
 		assert_eq!(
 			fund_capital.get(&1).unwrap().bond_holders.clone().into_inner(),
-			vec![(3, 280_000_000), (2, 20_000_000)]
+			vec![(3, bond_holder(280_000_000, false)), (2, bond_holder(20_000_000, false))]
 		);
 		assert_eq!(
 			fund_capital.get(&2).unwrap().bond_holders.clone().into_inner(),
-			vec![(4, 250_000_000), (5, 150_000_000),]
+			vec![(4, bond_holder(250_000_000, false)), (5, bond_holder(150_000_000, false)),]
 		);
 
 		// should return funds to the accounts in order
@@ -314,7 +323,7 @@ fn it_refunds_non_activated_funds_on_lock() {
 }
 
 #[test]
-fn it_can_distribute_bid_pool_capital() {
+fn test_can_distribute_bid_pool_capital() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(1);
@@ -370,11 +379,15 @@ fn it_can_distribute_bid_pool_capital() {
 		let bond_funds = VaultPoolsByFrame::<Test>::get(2);
 		assert_eq!(
 			bond_funds.get(&1).unwrap().bond_holders.clone().into_inner(),
-			vec![(3, 280_000_000), (2, 120_000_000), (10, 100_000_000)]
+			vec![
+				(3, bond_holder(280_000_000, false)),
+				(2, bond_holder(120_000_000, false)),
+				(10, bond_holder(100_000_000, true)) // 10 is vault operator
+			]
 		);
 		assert_eq!(
 			bond_funds.get(&2).unwrap().bond_holders.clone().into_inner(),
-			vec![(5, 250_000_000), (4, 250_000_000),]
+			vec![(4, bond_holder(250_000_000, false)), (5, bond_holder(250_000_000, false)),]
 		);
 		assert_eq!(
 			CapitalRaising::<Test>::get().into_inner(),
@@ -445,18 +458,27 @@ fn it_can_distribute_bid_pool_capital() {
 		let vault_1_contributors = vec![
 			(
 				3,
-				280_000_000 +
+				bond_holder_with_earnings(
+					280_000_000,
 					Permill::from_rational(280, 500u64).mul_floor(contributor_funds_balance_1),
+					false,
+				),
 			),
 			(
 				2,
-				120_000_000 +
+				bond_holder_with_earnings(
+					120_000_000,
 					Permill::from_rational(120, 500u64).mul_floor(contributor_funds_balance_1),
+					false,
+				),
 			),
 			(
 				10,
-				100_000_000 +
+				bond_holder_with_earnings(
+					100_000_000,
 					Permill::from_rational(100, 500u64).mul_floor(contributor_funds_balance_1),
+					true,
+				),
 			),
 		];
 		assert_eq!(
@@ -464,9 +486,9 @@ fn it_can_distribute_bid_pool_capital() {
 			vault_1_contributors
 		);
 		// vault 1 = 200_000_000, contributors = 400_000_000, change = 1
-		assert_eq!(bond_funds.get(&1).unwrap().distributed_profits, Some(400_000_001));
+		assert_eq!(bond_funds.get(&1).unwrap().distributed_earnings, Some(400_000_001));
 
-		for (account, amount) in vault_1_contributors {
+		for (account, holder) in vault_1_contributors {
 			if account == 10 {
 				// vault operator gets the full amount
 				assert_eq!(
@@ -478,7 +500,7 @@ fn it_can_distribute_bid_pool_capital() {
 				// contributors get their share on hold
 				assert_eq!(
 					Balances::balance_on_hold(&HoldReason::ContributedToTreasury.into(), &account),
-					amount,
+					holder.pool_managed_balance(),
 					"contributor {} should have their funds on hold",
 					account
 				);
@@ -486,26 +508,146 @@ fn it_can_distribute_bid_pool_capital() {
 		}
 		let contributor_funds_balance_2 = 400_000_000 - (400_000_000.0 * 0.4) as u128;
 		let vault_2_contributors = vec![
-			(5, 250_000_000 + contributor_funds_balance_2 / 2),
-			(4, 250_000_000 + contributor_funds_balance_2 / 2),
+			(4, bond_holder_with_earnings(250_000_000, contributor_funds_balance_2 / 2, false)),
+			(5, bond_holder_with_earnings(250_000_000, contributor_funds_balance_2 / 2, false)),
 		];
 		assert_eq!(
 			bond_funds.get(&2).unwrap().bond_holders.clone().into_inner(),
 			vault_2_contributors
 		);
 		// 400 for vault 2, split as 40% to vault 2, 60% to contributors
-		assert_eq!(bond_funds.get(&2).unwrap().distributed_profits, Some(400_000_000));
-		for (account, amount) in vault_2_contributors {
+		assert_eq!(bond_funds.get(&2).unwrap().distributed_earnings, Some(400_000_000));
+		for (account, holder) in vault_2_contributors {
 			assert_eq!(
 				Balances::balance_on_hold(&HoldReason::ContributedToTreasury.into(), &account),
-				amount
+				holder.pool_managed_balance()
 			);
 		}
 	});
 }
 
 #[test]
-fn it_can_exit_auto_renew() {
+fn test_rolling_over_contributors() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 5_000_000_000,
+				sharing_percent: Permill::from_percent(50),
+				is_closed: false,
+			},
+		);
+
+		set_argons(2, 500_000_000);
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(2), 1, 100_000_000));
+		set_argons(3, 500_000_000);
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(3), 1, 200_000_000));
+		set_argons(1, 500_000_000);
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(1), 1, 100_000_000));
+
+		// we're bonding for frame 2
+		assert_eq!(
+			VaultPoolsByFrame::<Test>::get(2)
+				.get(&1)
+				.unwrap()
+				.bond_holders
+				.clone()
+				.into_inner(),
+			vec![
+				(3, bond_holder(200_000_000, false)),
+				(2, bond_holder(100_000_000, false)),
+				(1, bond_holder(100_000_000, true))
+			]
+		);
+		CurrentFrameId::set(2);
+		Treasury::on_frame_start(2);
+		// now these are the active bond holders
+		assert_eq!(CapitalActive::<Test>::get()[0].activated_capital, 400_000_000);
+		assert_eq!(CapitalActive::<Test>::get()[0].vault_id, 1);
+
+		let bid_pool_account = Treasury::get_bid_pool_account();
+		set_argons(bid_pool_account, 1_000_000_000);
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(1), 1, 100_000_000));
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(2), 1, 100_000_000));
+		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(3), 1, 100_000_000));
+		// payout the bid pool for frame 2
+		CurrentFrameId::set(3);
+		Treasury::on_frame_start(3);
+		// check frame 2 earnings
+
+		let vault_pools_frame_2 = VaultPoolsByFrame::<Test>::get(2);
+		let vault_pool_2 = vault_pools_frame_2.get(&1).unwrap();
+		assert_eq!(vault_pool_2.distributed_earnings, Some(800_000_000));
+		let amount_for_bond_holders =
+			vault_pool_2.vault_sharing_percent.mul_ceil(800_000_000u128) as f64;
+		assert_eq!(
+			vault_pool_2.bond_holders.clone().into_inner(),
+			vec![
+				(
+					3,
+					bond_holder_with_earnings(
+						200_000_000,
+						((200.0 / 400.0) * amount_for_bond_holders) as u128,
+						false
+					)
+				),
+				(
+					2,
+					bond_holder_with_earnings(
+						100_000_000,
+						((100.0 / 400.0) * amount_for_bond_holders) as u128,
+						false
+					)
+				),
+				(
+					1,
+					bond_holder_with_earnings(
+						100_000_000,
+						((100.0 / 400.0) * amount_for_bond_holders) as u128,
+						true
+					)
+				)
+			]
+		);
+
+		CurrentFrameId::set(11);
+		Treasury::on_frame_start(11);
+		assert_eq!(
+			VaultPoolsByFrame::<Test>::get(2).get(&1).unwrap(),
+			&TreasuryPool {
+				bond_holders: bounded_vec![
+					(3, bond_holder_with_earnings(200_000_000, 200_000_000, false)),
+					(2, bond_holder_with_earnings(100_000_000, 100_000_000, false)),
+					(1, bond_holder_with_earnings(100_000_000, 100_000_000, true))
+				],
+				do_not_renew: Default::default(),
+				is_rolled_over: true,
+				distributed_earnings: Some(800_000_000),
+				vault_sharing_percent: Permill::from_percent(50),
+			}
+		);
+		assert_eq!(
+			VaultPoolsByFrame::<Test>::get(12).get(&1).unwrap(),
+			&TreasuryPool {
+				bond_holders: bounded_vec![
+					(3, bond_holder(400_000_000, false)),
+					(2, bond_holder(200_000_000, false)),
+					(1, bond_holder(100_000_000, true)) // does not carry over earnings
+				],
+				do_not_renew: Default::default(),
+				is_rolled_over: false,
+				distributed_earnings: None,
+				vault_sharing_percent: Permill::from_percent(50),
+			}
+		);
+	})
+}
+
+#[test]
+fn test_can_exit_auto_renew() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(0);
@@ -529,7 +671,7 @@ fn it_can_exit_auto_renew() {
 		assert!(VaultPoolsByFrame::<Test>::contains_key(1));
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(1).get(&1).unwrap().bond_holders.to_vec(),
-			vec![(3, 220_000_000), (2, 200_000_000)]
+			vec![(3, bond_holder(220_000_000, false)), (2, bond_holder(200_000_000, false))]
 		);
 		// funds now wait on hold for 1 slot on_frame_start(2)
 		// 3, 4. 5. 6, 7, 8, 9, 10, 11
@@ -545,20 +687,23 @@ fn it_can_exit_auto_renew() {
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(11).get(&1).unwrap(),
 			&TreasuryPool {
-				bond_holders: bounded_vec![(3, 220_000_000)],
+				bond_holders: bounded_vec![(3, bond_holder(220_000_000, false))],
 				do_not_renew: Default::default(),
 				is_rolled_over: false,
-				distributed_profits: None,
+				distributed_earnings: None,
 				vault_sharing_percent: Permill::from_percent(50),
 			}
 		);
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(1).get(&1).unwrap(),
 			&TreasuryPool {
-				bond_holders: bounded_vec![(3, 220_000_000), (2, 200_000_000)],
+				bond_holders: bounded_vec![
+					(3, bond_holder(220_000_000, false)),
+					(2, bond_holder(200_000_000, false))
+				],
 				do_not_renew: bounded_vec![2],
 				is_rolled_over: true,
-				distributed_profits: None,
+				distributed_earnings: None,
 				vault_sharing_percent: Permill::from_percent(50),
 			}
 		);
@@ -662,7 +807,7 @@ fn test_prebonded_argons() {
 					if let Some(a) = a { a.take_unbonded(frame, 5_000_000, 0) } else { 0 }
 				});
 				println!("Frame {}: Adding {} to pool 1", frame, amount);
-				pool.bond_holders.try_push((1, amount)).unwrap();
+				pool.bond_holders.try_push((1, bond_holder(amount, true))).unwrap();
 			});
 		}
 		// It should be able to add up the prebond and actual to know it's already full
@@ -699,30 +844,39 @@ fn test_treasury_struct() {
 
 		let mut pool = TreasuryPool::<Test>::new(1);
 		assert_eq!(pool.vault_sharing_percent, Permill::from_percent(10));
-		assert!(pool.can_add_contributor(&1));
+		assert!(pool.can_add_bond_holder(&1));
 		assert_eq!(
-			pool.try_insert_contributor(1, 50).ok(),
+			pool.try_insert_bond_holder(1, 50, false).ok(),
 			Some(InsertContributorResponse { hold_amount: 50, needs_refund: None })
 		);
 		assert_eq!(pool.bond_holders.len(), 1);
 		assert_eq!(
-			pool.try_insert_contributor(2, 500).ok(),
+			pool.try_insert_bond_holder(2, 500, true).ok(),
 			Some(InsertContributorResponse { hold_amount: 500, needs_refund: None })
 		);
 		assert_eq!(pool.bond_holders.len(), 2);
 		assert_eq!(
-			pool.try_insert_contributor(3, 1000).ok(),
-			Some(InsertContributorResponse { hold_amount: 1000, needs_refund: Some((1, 50)) }),
+			pool.try_insert_bond_holder(3, 1000, true).ok(),
+			Some(InsertContributorResponse {
+				hold_amount: 1000,
+				needs_refund: Some((1, bond_holder(50, true)))
+			}),
 			"should remove the first contributor"
 		);
-		assert_eq!(pool.bond_holders.to_vec(), vec![(3, 1000), (2, 500)]);
-		assert!(pool.can_add_contributor(&2), "should be able to move contributor 2 to the front");
 		assert_eq!(
-			pool.try_insert_contributor(2, 2000).ok(),
+			pool.bond_holders.to_vec(),
+			vec![(3, bond_holder(1000, false)), (2, bond_holder(500, false))]
+		);
+		assert!(pool.can_add_bond_holder(&2), "should be able to move contributor 2 to the front");
+		assert_eq!(
+			pool.try_insert_bond_holder(2, 2000, true).ok(),
 			Some(InsertContributorResponse { hold_amount: 2000 - 500, needs_refund: None }),
 			"should update the second contributor"
 		);
-		assert_eq!(pool.bond_holders.to_vec(), vec![(2, 2000), (3, 1000),]);
+		assert_eq!(
+			pool.bond_holders.to_vec(),
+			vec![(2, bond_holder(2000, false)), (3, bond_holder(1000, false)),]
+		);
 	});
 }
 
@@ -751,7 +905,7 @@ fn test_capital_raise_with_prebonded() {
 
 		assert_eq!(
 			vault_1_frame_1.bond_holders.to_vec(),
-			vec![(1, 500_000_000)],
+			vec![(1, bond_holder(500_000_000, true))],
 			"should add if space"
 		);
 		assert_eq!(
@@ -781,7 +935,7 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(2), 1, 500_000_000));
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(2).get(&1).unwrap().bond_holders.to_vec(),
-			vec![(2, 500_000_000)]
+			vec![(2, bond_holder(500_000_000, false))]
 		);
 
 		set_argons(1, 5_000_000_000);
@@ -794,7 +948,7 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		let vault_1_frame_3 = frame_3_pools.get(&1).unwrap();
 		assert_eq!(
 			vault_1_frame_3.bond_holders.to_vec(),
-			vec![(2, 500_000_000)],
+			vec![(2, bond_holder(500_000_000, false))],
 			"should not add if no space"
 		);
 		assert_eq!(
@@ -807,7 +961,7 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		assert_ok!(Treasury::bond_argons(RuntimeOrigin::signed(2), 1, 400_000_000));
 		assert_eq!(
 			VaultPoolsByFrame::<Test>::get(3).get(&1).unwrap().bond_holders.to_vec(),
-			vec![(2, 400_000_000)]
+			vec![(2, bond_holder(400_000_000, false))]
 		);
 
 		Treasury::end_pool_capital_raise(3);
@@ -817,7 +971,24 @@ fn test_capital_raise_with_prebonded_when_no_space() {
 		let vault_1_frame_4 = frame_4_pools.get(&1).unwrap();
 		assert_eq!(
 			vault_1_frame_4.bond_holders.to_vec(),
-			vec![(2, 400_000_000), (1, 100_000_000)],
+			vec![
+				(
+					2,
+					BondHolder {
+						starting_balance: 400_000_000,
+						earnings: 0,
+						keep_earnings_in_pool: true
+					}
+				),
+				(
+					1,
+					BondHolder {
+						starting_balance: 100_000_000,
+						earnings: 0,
+						keep_earnings_in_pool: false
+					}
+				)
+			],
 			"should have the prebonded funds added as there is space now"
 		);
 		assert_eq!(
@@ -856,4 +1027,16 @@ fn test_prebonded_argons_struct() {
 			"caps out at 500k on next pass"
 		);
 	});
+}
+
+fn bond_holder(starting_balance: u128, is_vault_operator: bool) -> BondHolder<Test> {
+	BondHolder { starting_balance, earnings: 0, keep_earnings_in_pool: !is_vault_operator }
+}
+
+fn bond_holder_with_earnings(
+	starting_balance: u128,
+	earnings: u128,
+	is_vault_operator: bool,
+) -> BondHolder<Test> {
+	BondHolder { starting_balance, earnings, keep_earnings_in_pool: !is_vault_operator }
 }

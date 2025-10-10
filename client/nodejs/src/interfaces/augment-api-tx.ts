@@ -1805,7 +1805,7 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * - `origin`: The account that is joining the fund
        * - `vault_id`: The vault id that the account would like to join a fund for
-       * - `amount`: The amount of argons to contribute to the fund. If you change this amount,
+       * - `amount`: The amount of argons to contribute to the fund. If you increase this amount,
        * it will just add the incremental amount
        **/
       bondArgons: AugmentedSubmittable<

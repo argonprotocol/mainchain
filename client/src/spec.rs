@@ -3854,9 +3854,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				58u8, 156u8, 7u8, 101u8, 154u8, 88u8, 19u8, 39u8, 61u8, 20u8, 179u8, 80u8, 133u8,
-				47u8, 112u8, 25u8, 248u8, 214u8, 115u8, 83u8, 203u8, 14u8, 204u8, 28u8, 60u8, 61u8,
-				251u8, 225u8, 77u8, 47u8, 186u8, 222u8,
+				197u8, 242u8, 160u8, 57u8, 27u8, 147u8, 164u8, 47u8, 141u8, 81u8, 59u8, 194u8,
+				59u8, 108u8, 34u8, 204u8, 74u8, 8u8, 172u8, 149u8, 67u8, 185u8, 154u8, 58u8, 225u8,
+				172u8, 213u8, 155u8, 148u8, 148u8, 15u8, 228u8,
 			]
 	}
 	pub mod system {
@@ -11524,7 +11524,7 @@ pub mod api {
 					)
 				}
 				#[doc = " Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not"]
-				#[doc = " unlock it"]
+				#[doc = " unlock it. Bitcoin will go to vault"]
 				pub fn lock_expirations_by_bitcoin_height_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -11546,7 +11546,7 @@ pub mod api {
 					)
 				}
 				#[doc = " Expiration of bitcoin locks by bitcoin height. Funds are burned since the user did not"]
-				#[doc = " unlock it"]
+				#[doc = " unlock it. Bitcoin will go to vault"]
 				pub fn lock_expirations_by_bitcoin_height(
 					&self,
 					_0: types::lock_expirations_by_bitcoin_height::Param0,
@@ -22769,7 +22769,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "- `origin`: The account that is joining the fund"]
 				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
 				#[doc = "  it will just add the incremental amount"]
 				pub struct BondArgons {
 					pub vault_id: bond_argons::VaultId,
@@ -22854,7 +22854,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "- `origin`: The account that is joining the fund"]
 				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
 				#[doc = "  it will just add the incremental amount"]
 				pub fn bond_argons(
 					&self,
@@ -23157,10 +23157,10 @@ pub mod api {
 						"VaultPoolsByFrame",
 						(),
 						[
-							156u8, 136u8, 183u8, 145u8, 219u8, 138u8, 155u8, 39u8, 141u8, 62u8,
-							47u8, 130u8, 129u8, 123u8, 111u8, 63u8, 83u8, 116u8, 155u8, 178u8,
-							152u8, 36u8, 168u8, 220u8, 82u8, 202u8, 252u8, 52u8, 129u8, 175u8,
-							18u8, 204u8,
+							186u8, 178u8, 4u8, 244u8, 224u8, 244u8, 236u8, 81u8, 51u8, 120u8,
+							255u8, 184u8, 99u8, 202u8, 51u8, 127u8, 164u8, 216u8, 93u8, 83u8,
+							207u8, 29u8, 183u8, 155u8, 76u8, 105u8, 213u8, 46u8, 177u8, 55u8,
+							105u8, 31u8,
 						],
 					)
 				}
@@ -23183,10 +23183,10 @@ pub mod api {
 						"VaultPoolsByFrame",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							156u8, 136u8, 183u8, 145u8, 219u8, 138u8, 155u8, 39u8, 141u8, 62u8,
-							47u8, 130u8, 129u8, 123u8, 111u8, 63u8, 83u8, 116u8, 155u8, 178u8,
-							152u8, 36u8, 168u8, 220u8, 82u8, 202u8, 252u8, 52u8, 129u8, 175u8,
-							18u8, 204u8,
+							186u8, 178u8, 4u8, 244u8, 224u8, 244u8, 236u8, 81u8, 51u8, 120u8,
+							255u8, 184u8, 99u8, 202u8, 51u8, 127u8, 164u8, 216u8, 93u8, 83u8,
+							207u8, 29u8, 183u8, 155u8, 76u8, 105u8, 213u8, 46u8, 177u8, 55u8,
+							105u8, 31u8,
 						],
 					)
 				}
@@ -30543,6 +30543,25 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct BondHolder {
+					#[codec(compact)]
+					pub starting_balance: ::core::primitive::u128,
+					#[codec(compact)]
+					pub earnings: ::core::primitive::u128,
+					pub keep_earnings_in_pool: ::core::primitive::bool,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
@@ -30555,7 +30574,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "- `origin`: The account that is joining the fund"]
 					#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-					#[doc = "- `amount`: The amount of argons to contribute to the fund. If you change this amount,"]
+					#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
 					#[doc = "  it will just add the incremental amount"]
 					bond_argons {
 						vault_id: ::core::primitive::u32,
@@ -30779,14 +30798,16 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct TreasuryPool {
-					pub bond_holders: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						(crate::types::AccountId32, ::core::primitive::u128),
-					>,
+					pub bond_holders:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+							crate::types::AccountId32,
+							runtime_types::pallet_treasury::pallet::BondHolder,
+						)>,
 					pub do_not_renew: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						crate::types::AccountId32,
 					>,
 					pub is_rolled_over: ::core::primitive::bool,
-					pub distributed_profits: ::core::option::Option<::core::primitive::u128>,
+					pub distributed_earnings: ::core::option::Option<::core::primitive::u128>,
 					#[codec(compact)]
 					pub vault_sharing_percent: runtime_types::sp_arithmetic::per_things::Permill,
 				}

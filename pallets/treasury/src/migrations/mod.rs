@@ -1,7 +1,7 @@
-use crate::{Config, Pallet, VaultPoolsByFrame};
+use crate::{BondHolder, Config, Pallet, VaultPoolsByFrame};
 use alloc::collections::BTreeMap;
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
-use pallet_prelude::{storage::migration, *};
+use pallet_prelude::{argon_primitives::vault::TreasuryVaultProvider, storage::migration, *};
 
 mod liquidity_pool_storage {
 	use crate::{Config, TreasuryPool};
@@ -107,11 +107,30 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			let new_pool_by_frame = pool_by_frame
 				.into_iter()
 				.map(|(vault_id, old_pool)| {
+					let operator =
+						<T as Config>::TreasuryVaultProvider::get_vault_operator(vault_id)
+							.expect("Vault ID is valid; qed");
 					let new_pool = crate::TreasuryPool {
-						bond_holders: old_pool.contributor_balances,
+						bond_holders: BoundedVec::truncate_from(
+							old_pool
+								.contributor_balances
+								.into_iter()
+								.map(|(account, balance)| {
+									let keep_earnings_in_pool = operator != account;
+									(
+										account,
+										BondHolder {
+											starting_balance: balance,
+											earnings: 0u128.into(),
+											keep_earnings_in_pool,
+										},
+									)
+								})
+								.collect::<Vec<_>>(),
+						),
 						do_not_renew: old_pool.do_not_renew,
 						is_rolled_over: old_pool.is_rolled_over,
-						distributed_profits: old_pool.distributed_profits,
+						distributed_earnings: old_pool.distributed_profits,
 						vault_sharing_percent: old_pool.vault_sharing_percent,
 					};
 					(vault_id, new_pool)
