@@ -1,13 +1,24 @@
 # Changelog
 
-## [v1.3.8](https://github.com/argonprotocol/mainchain/compare/v1.3.7...c1c5deb0b7569c9769222baa7dd0e32bc486a8a6) (2025-10-02)
+## [v1.3.9](https://github.com/argonprotocol/mainchain/compare/v1.3.8...102b12756543730e0ef297340a4e0a8f16f97774) (2025-10-10)
 
-### Features
+### Fixes
+
+* **treasury:** don’t roll vault earnings
+([3f6cbb9](https://github.com/argonprotocol/mainchain/commit/3f6cbb9c5c79ff19819008f348b2ca62a25aa916))
+* **treasury:** change frame for bonds
+([b311295](https://github.com/argonprotocol/mainchain/commit/b31129544d50ddea503ddff19a3790dda1f9a65c))
+* **client:** bitcoin locks liquidity promised
+([d9b2594](https://github.com/argonprotocol/mainchain/commit/d9b25943fe9dcdbd992bf8b8ee67227364ab65c7))
+
+### [v1.3.8](https://github.com/argonprotocol/mainchain/compare/v1.3.7...v1.3.8) (2025-10-02)
+
+#### Features
 
 * **bitcoin:** track locked liquidity value
 ([2149d7f](https://github.com/argonprotocol/mainchain/commit/2149d7fb8895754c40a9a9c42c64ce5271519665))
 
-### Fixes
+#### Fixes
 
 * **vaults:** only allow a single vault per account
 ([b567081](https://github.com/argonprotocol/mainchain/commit/b56708170eb912983261fe260a59a2c86e8f26e8))
@@ -32,7 +43,7 @@
 
 * **client/nodejs:** cohort bidder callbacks
 ([7d017bd](https://github.com/argonprotocol/mainchain/commit/7d017bd7f592d40277bc138c18059ac9497878df))
-* **treasury:** simplify prebond amount
+* **liquidity_pool:** simplify prebond amount
 ([f4242c4](https://github.com/argonprotocol/mainchain/commit/f4242c4c6d079dc86982cfa8b9f20b4c5db522c3))
 * **vaults:** earnings must be collected
 ([ab688ce](https://github.com/argonprotocol/mainchain/commit/ab688cebc6354ec66b8dfe4a488ad1f1f13ad028))
@@ -78,7 +89,7 @@
 
 ### Features
 
-* **treasury:** vault operator prebonding
+* **liquidity_pools:** vault operator prebonding
 ([e6066fe](https://github.com/argonprotocol/mainchain/commit/e6066febe05897393c648afca2bce75d5cba6772))
 * **node:** allow multiple miners to submit a vote
 ([b98e8fa](https://github.com/argonprotocol/mainchain/commit/b98e8fa81e8982f7879601c048f19514886bfaa0))
