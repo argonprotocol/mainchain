@@ -19,6 +19,7 @@ export * from './header';
 export * from './Vault';
 export * from './convert';
 export * from './BitcoinLocks';
+export * from './PriceIndex';
 export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
 
 export { u8aToHex, hexToU8a, u8aEq } from '@polkadot/util';
