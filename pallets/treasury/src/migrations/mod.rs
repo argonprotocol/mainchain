@@ -1,10 +1,13 @@
 use crate::{BondHolder, Config, Pallet, VaultPoolsByFrame};
 use alloc::collections::BTreeMap;
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
-use pallet_prelude::{argon_primitives::vault::TreasuryVaultProvider, storage::migration, *};
+use pallet_prelude::{
+	argon_primitives::vault::TreasuryVaultProvider, frame_support::traits::StorageInstance,
+	log::info, storage::migration, *,
+};
 
-mod liquidity_pool_storage {
-	use crate::{Config, TreasuryPool};
+pub mod liquidity_pool_storage {
+	use crate::Config;
 	use core::marker::PhantomData;
 	use pallet_prelude::{
 		BoundedBTreeMap, FrameId, StorageMap, Twox64Concat, ValueQuery, VaultId, frame_support,
@@ -25,7 +28,11 @@ mod liquidity_pool_storage {
 		LiquidityPoolPrefix<T>,
 		Twox64Concat,
 		FrameId,
-		BoundedBTreeMap<VaultId, TreasuryPool<T>, <T as Config>::MaxVaultsPerPool>,
+		BoundedBTreeMap<
+			VaultId,
+			super::old_storage::TreasuryPool<T>,
+			<T as Config>::MaxVaultsPerPool,
+		>,
 		ValueQuery,
 	>;
 }
@@ -91,19 +98,25 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
 		use pallet_prelude::Encode;
 		let vault_pools_by_frame =
-			old_storage::VaultPoolsByFrame::<T>::iter().collect::<BTreeMap<_, _>>();
+			liquidity_pool_storage::VaultPoolsByFrame::<T>::iter().collect::<BTreeMap<_, _>>();
 		Ok(old_storage::Model { vault_pools_by_frame }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let count = 1;
 
-		migration::move_pallet(b"LiquidityPools", Pallet::<T>::storage_metadata().prefix.as_ref());
+		info!("Migrating LiquidityPools->Treasury");
+		let new_pallet = <Pallet<T> as PalletInfoAccess>::name();
+		migration::move_pallet(
+			liquidity_pool_storage::LiquidityPoolPrefix::<T>::pallet_prefix().as_bytes(),
+			new_pallet.as_bytes(),
+		);
 
 		VaultPoolsByFrame::<T>::translate::<
 			BoundedBTreeMap<VaultId, old_storage::TreasuryPool<T>, T::MaxVaultsPerPool>,
 			_,
 		>(|_frame_id, pool_by_frame| {
+			info!("Migrating treasury pool for frame {_frame_id:?}");
 			let new_pool_by_frame = pool_by_frame
 				.into_iter()
 				.map(|(vault_id, old_pool)| {
