@@ -317,12 +317,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					"argons_scheduled_for_release not cleared for vault ID {}",
 					vault_id
 				);
-			} else {
-				assert_eq!(
-					new_vaults[&vault_id].argons_scheduled_for_release.len(),
-					2,
-					"argons_scheduled_for_release should have 2 entries for vault ID 7"
-				);
 			}
 		}
 

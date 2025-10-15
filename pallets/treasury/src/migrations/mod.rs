@@ -107,9 +107,11 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			let new_pool_by_frame = pool_by_frame
 				.into_iter()
 				.map(|(vault_id, old_pool)| {
-					let operator =
+					let Some(operator) =
 						<T as Config>::TreasuryVaultProvider::get_vault_operator(vault_id)
-							.expect("Vault ID is valid; qed");
+					else {
+						panic!("Vault ID {vault_id} is valid; qed")
+					};
 					let new_pool = crate::TreasuryPool {
 						bond_holders: BoundedVec::truncate_from(
 							old_pool
@@ -166,11 +168,17 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				let old_pool = old_pools.get(&vault_id).ok_or_else(|| {
 					sp_runtime::TryRuntimeError::Other("Missing vault ID in old storage")
 				})?;
-				assert_eq!(
-					pool.bond_holders, *old_pool.contributor_balances,
-					"Mismatch in pool data for vault ID {}",
-					vault_id
-				);
+				for (account, balance) in &old_pool.contributor_balances {
+					let bond_holder =
+						pool.bond_holders.iter().find(|(a, _)| a == account).ok_or_else(|| {
+							sp_runtime::TryRuntimeError::Other("Missing account in bond holders")
+						})?;
+					assert_eq!(
+						bond_holder.1.starting_balance, *balance,
+						"Mismatch in starting balance for account {:?} in vault ID {}",
+						account, vault_id
+					);
+				}
 			}
 		}
 
@@ -191,13 +199,31 @@ mod test {
 	use super::*;
 	use crate::{
 		VaultPoolsByFrame,
-		mock::{Test, new_test_ext},
+		mock::{Test, TestVault, insert_vault, new_test_ext},
 	};
 	use frame_support::assert_ok;
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
+			insert_vault(
+				42,
+				TestVault {
+					account_id: 42,
+					activated: 100_000_000,
+					is_closed: false,
+					sharing_percent: Permill::from_percent(10),
+				},
+			);
+			insert_vault(
+				43,
+				TestVault {
+					account_id: 2,
+					activated: 100_000_000,
+					is_closed: false,
+					sharing_percent: Permill::from_percent(10),
+				},
+			);
 			old_storage::VaultPoolsByFrame::<Test>::mutate(1, |a| {
 				a.try_insert(
 					42,

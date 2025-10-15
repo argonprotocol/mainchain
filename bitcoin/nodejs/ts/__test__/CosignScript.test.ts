@@ -13,6 +13,7 @@ import {
   IBitcoinLockConfig,
   Keyring,
   KeyringPair,
+  PriceIndex,
   SATS_PER_BTC,
   toFixedNumber,
   TxSubmitter,
@@ -111,11 +112,17 @@ describeIntegration(
         new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
       ).submit({ waitForBlock: true });
       await new Promise(resolve => setTimeout(resolve, 0));
-      const priceIndex = await vaulterClient.query.priceIndex.current();
-      expect(priceIndex.isSome).toBe(true);
+      const priceIndex = new PriceIndex();
+      await priceIndex.load(vaulterClient);
+      expect(priceIndex.argonotUsdPrice).toBeDefined();
       const bitcoinLocks = new BitcoinLocks(vaulterClient);
-      await expect(bitcoinLocks.getMarketRate(100n)).resolves.toStrictEqual(60_000n);
-      await expect(bitcoinLocks.getRedemptionRate(100n)).resolves.toStrictEqual(60_000n);
+      await expect(bitcoinLocks.getMarketRate(priceIndex, 100n)).resolves.toStrictEqual(60_000n);
+      await expect(
+        bitcoinLocks.getRedemptionRate(priceIndex, { peggedPrice: 60_000n, satoshis: 100n }),
+      ).resolves.toStrictEqual(60_000n);
+      await expect(
+        bitcoinLocks.getRedemptionRate(priceIndex, { peggedPrice: 50_000n, satoshis: 100n }),
+      ).resolves.toStrictEqual(50_000n);
     });
 
     test.sequential('it can lock a bitcoin', async () => {
@@ -143,8 +150,11 @@ describeIntegration(
       );
       const ownerBitcoinPubkey = getCompressedPubkey(ownerBitcoinXpriv.publicKey!);
       console.log('Owner Bitcoin Pubkey:', u8aToHex(ownerBitcoinPubkey), ownerBitcoinPubkey.length);
+      const priceIndex = new PriceIndex();
+      await priceIndex.load(vaulterClient);
       const result = await bitcoinLocks.initializeLock({
         vault,
+        priceIndex,
         satoshis: 2000n,
         ownerBitcoinPubkey,
         argonKeyring: bitcoinLocker,
@@ -231,10 +241,10 @@ describeIntegration(
       }
       lock = lookup;
       expect(lock.isVerified).toBe(true);
+      const priceIndex = new PriceIndex();
+      await priceIndex.load(vaulterClient);
 
-      await expect(bitcoinLocks.releasePrice(lock.satoshis, lock.peggedPrice)).resolves.toEqual(
-        lock.peggedPrice,
-      );
+      await expect(bitcoinLocks.releasePrice(priceIndex, lock)).resolves.toEqual(lock.peggedPrice);
 
       const btcClient = vaulterchain.getBitcoinClient();
       const nextAddress = await btcClient.command('getnewaddress');
@@ -245,6 +255,7 @@ describeIntegration(
       expect(networkFee).toBeGreaterThan(5n);
       console.log(`Network fee for release: ${networkFee} satoshis, next address: ${nextAddress}`);
       const result = await bitcoinLocks.requestRelease({
+        priceIndex,
         lock,
         releaseRequest: { bitcoinNetworkFee: networkFee, toScriptPubkey },
         argonKeyring: bitcoinLocker,

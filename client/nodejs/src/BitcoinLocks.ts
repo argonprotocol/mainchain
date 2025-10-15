@@ -4,6 +4,7 @@ import {
   formatArgons,
   ITxProgressCallback,
   type KeyringPair,
+  MICROGONS_PER_ARGON,
   TxSubmitter,
   Vault,
 } from './index';
@@ -11,6 +12,7 @@ import { GenericEvent } from '@polkadot/types';
 import { TxResult } from './TxSubmitter';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
+import { PriceIndex } from './PriceIndex';
 
 export const SATS_PER_BTC = 100_000_000n;
 
@@ -26,7 +28,49 @@ export class BitcoinLocks {
     return undefined;
   }
 
-  async getMarketRate(satoshis: bigint): Promise<bigint> {
+  async getMarketRate(priceIndex: PriceIndex, satoshis: number | bigint): Promise<bigint> {
+    return priceIndex.getBtcMicrogonPrice(satoshis);
+  }
+
+  async getRedemptionRate(
+    priceIndex: PriceIndex,
+    details: { satoshis: bigint; peggedPrice?: bigint },
+  ): Promise<bigint> {
+    const { satoshis, peggedPrice } = details;
+    // scale inputs
+    const satsPerArgon = Number(SATS_PER_BTC) / MICROGONS_PER_ARGON;
+    let price = Number(priceIndex.btcUsdPrice);
+    price = (price / satsPerArgon) * Number(satoshis);
+
+    if (peggedPrice !== undefined && peggedPrice < price) {
+      price = Number(peggedPrice);
+    }
+
+    const r = Number(priceIndex.rValue);
+
+    let multiplier: number;
+
+    if (r >= 1) {
+      // Case 1: no penalty
+      multiplier = 1;
+    } else if (r >= 0.9) {
+      // Case 2: quadratic curve
+      // Formula: 20r² - 38r + 19
+      multiplier = 20 * (r * r) - 38 * r + 19;
+    } else if (r >= 0.01) {
+      // Case 3: rational linear formula
+      // Formula: (0.5618r + 0.3944) / r
+      multiplier = (0.5618 * r + 0.3944) / r;
+    } else {
+      // Case 4: extreme deviation
+      // Formula: (1 / r) * (0.576r + 0.4)
+      multiplier = (1 / r) * (0.576 * r + 0.4);
+    }
+
+    return BigInt(Math.floor(price * multiplier));
+  }
+
+  async getMarketRateApi(satoshis: bigint): Promise<bigint> {
     const client = this.client;
     const sats = client.createType('U64', satoshis.toString());
     const marketRate = await client.rpc.state.call('BitcoinApis_market_rate', sats.toHex(true));
@@ -37,7 +81,7 @@ export class BitcoinLocks {
     return rate.value.toBigInt();
   }
 
-  async getRedemptionRate(satoshis: bigint): Promise<bigint> {
+  async getRedemptionRateApi(satoshis: bigint): Promise<bigint> {
     const client = this.client;
     const sats = client.createType('U64', satoshis.toString());
     const marketRate = await client.rpc.state.call('BitcoinApis_redemption_rate', sats.toHex(true));
@@ -158,6 +202,7 @@ export class BitcoinLocks {
       claimHdIndex: claim_hd_index.toNumber(),
     };
 
+    const securityFees = utxo.securityFees.toBigInt();
     const vaultClaimHeight = utxo.vaultClaimHeight.toNumber();
     const openClaimHeight = utxo.openClaimHeight.toNumber();
     const createdAtHeight = utxo.createdAtHeight.toNumber();
@@ -182,6 +227,7 @@ export class BitcoinLocks {
       vaultClaimHeight,
       openClaimHeight,
       createdAtHeight,
+      securityFees,
       isVerified,
       isRejectedNeedsRelease,
       fundHoldExtensionsByBitcoinExpirationHeight,
@@ -293,13 +339,14 @@ export class BitcoinLocks {
 
   async createInitializeLockTx(args: {
     vault: Vault;
+    priceIndex: PriceIndex;
     ownerBitcoinPubkey: Uint8Array;
     satoshis: bigint;
     argonKeyring: KeyringPair;
     reducedBalanceBy?: bigint;
     tip?: bigint;
   }) {
-    const { vault, argonKeyring, satoshis, tip = 0n, ownerBitcoinPubkey } = args;
+    const { vault, priceIndex, argonKeyring, satoshis, tip = 0n, ownerBitcoinPubkey } = args;
     const client = this.client;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -313,7 +360,7 @@ export class BitcoinLocks {
       client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey),
       argonKeyring,
     );
-    const marketPrice = await this.getMarketRate(BigInt(satoshis));
+    const marketPrice = await this.getMarketRate(priceIndex, satoshis);
     const isVaultOwner = argonKeyring.address === vault.operatorAccountId;
     const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(marketPrice);
 
@@ -354,6 +401,7 @@ export class BitcoinLocks {
 
   async initializeLock(args: {
     vault: Vault;
+    priceIndex: PriceIndex;
     ownerBitcoinPubkey: Uint8Array;
     argonKeyring: KeyringPair;
     satoshis: bigint;
@@ -386,17 +434,21 @@ export class BitcoinLocks {
     };
   }
 
-  async requiredSatoshisForArgonLiquidity(argonAmount: bigint): Promise<bigint> {
+  async requiredSatoshisForArgonLiquidity(
+    priceIndex: PriceIndex,
+    argonAmount: bigint,
+  ): Promise<bigint> {
     /**
      * If 1_000_000 microgons are available, and the market rate is 100 microgons per satoshi, then
      * 1_000_000 / 100 = 10_000 satoshis needed
      */
-    const marketRatePerBitcoin = await this.getMarketRate(SATS_PER_BTC);
+    const marketRatePerBitcoin = priceIndex.getBtcMicrogonPrice(SATS_PER_BTC);
     return (argonAmount * SATS_PER_BTC) / marketRatePerBitcoin;
   }
 
   async requestRelease(args: {
     lock: IBitcoinLock;
+    priceIndex: PriceIndex;
     releaseRequest: IReleaseRequest;
     argonKeyring: KeyringPair;
     tip?: bigint;
@@ -405,6 +457,7 @@ export class BitcoinLocks {
     const client = this.client;
     const {
       lock,
+      priceIndex,
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
       argonKeyring,
       tip,
@@ -421,10 +474,7 @@ export class BitcoinLocks {
       argonKeyring,
     );
 
-    let redemptionPrice = await this.getRedemptionRate(lock.satoshis);
-    if (redemptionPrice > lock.peggedPrice) {
-      redemptionPrice = lock.peggedPrice;
-    }
+    const redemptionPrice = await this.getRedemptionRate(priceIndex, lock);
 
     const canAfford = await submitter.canAfford({
       tip,
@@ -453,21 +503,21 @@ export class BitcoinLocks {
     };
   }
 
-  async releasePrice(satoshis: bigint, peggedPrice: bigint): Promise<bigint> {
-    const redemptionRate = await this.getRedemptionRate(satoshis);
-    if (redemptionRate > peggedPrice) {
-      return redemptionRate;
-    }
-    return peggedPrice;
+  async releasePrice(
+    priceIndex: PriceIndex,
+    lock: { satoshis: bigint; peggedPrice: bigint },
+  ): Promise<bigint> {
+    return await this.getRedemptionRate(priceIndex, lock);
   }
 
   async getRatchetPrice(
     lock: IBitcoinLock,
+    priceIndex: PriceIndex,
     vault: Vault,
   ): Promise<{ burnAmount: bigint; ratchetingFee: bigint; marketRate: bigint }> {
     const { createdAtHeight, vaultClaimHeight, peggedPrice, satoshis } = lock;
     const client = this.client;
-    const marketRate = await this.getMarketRate(BigInt(satoshis));
+    const marketRate = await this.getMarketRate(priceIndex, BigInt(satoshis));
 
     let ratchetingFee = vault.terms.bitcoinBaseFee;
     let burnAmount = 0n;
@@ -482,7 +532,7 @@ export class BitcoinLocks {
       const remainingDuration = 1 - elapsed;
       ratchetingFee = BigInt(remainingDuration * Number(lockFee));
     } else {
-      burnAmount = await this.releasePrice(lock.satoshis, peggedPrice);
+      burnAmount = await this.releasePrice(priceIndex, lock);
     }
 
     return {
@@ -494,6 +544,7 @@ export class BitcoinLocks {
 
   async ratchet(args: {
     lock: IBitcoinLock;
+    priceIndex: PriceIndex;
     argonKeyring: KeyringPair;
     tip?: bigint;
     vault: Vault;
@@ -508,10 +559,10 @@ export class BitcoinLocks {
     blockHeight: number;
     bitcoinBlockHeight: number;
   }> {
-    const { lock, argonKeyring, tip = 0n, vault, txProgressCallback } = args;
+    const { lock, priceIndex, argonKeyring, tip = 0n, vault, txProgressCallback } = args;
     const client = this.client;
 
-    const ratchetPrice = await this.getRatchetPrice(lock, vault);
+    const ratchetPrice = await this.getRatchetPrice(lock, priceIndex, vault);
     const txSubmitter = new TxSubmitter(
       client,
       client.tx.bitcoinLocks.ratchet(lock.utxoId),
@@ -596,6 +647,7 @@ export interface IBitcoinLock {
   ownerAccount: string;
   satoshis: bigint;
   vaultPubkey: string;
+  securityFees: bigint;
   vaultClaimPubkey: string;
   ownerPubkey: string;
   vaultXpubSources: {
