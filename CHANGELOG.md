@@ -1,9 +1,13 @@
 # Changelog
 
-## [v1.3.9](https://github.com/argonprotocol/mainchain/compare/v1.3.8...102b12756543730e0ef297340a4e0a8f16f97774) (2025-10-10)
+## [v1.3.10](https://github.com/argonprotocol/mainchain/compare/v1.3.9...46fa8f76f9191aff12cd56fa7db727db07857115) (2025-10-15)
 
-### Fixes
+### [v1.3.9](https://github.com/argonprotocol/mainchain/compare/v1.3.8...v1.3.9) (2025-10-12)
 
+#### Fixes
+
+* **migration:** fix comparison in migration
+([f0c2efd](https://github.com/argonprotocol/mainchain/commit/f0c2efd7123b34db0f412c0d2d4fe470b8f67582))
 * **treasury:** don’t roll vault earnings
 ([3f6cbb9](https://github.com/argonprotocol/mainchain/commit/3f6cbb9c5c79ff19819008f348b2ca62a25aa916))
 * add revenue migration
