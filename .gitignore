@@ -31,3 +31,4 @@ node_modules
 **/nodejs/browser
 /.yarn/install-state.gz
 /.port-lock
+/state.raw
