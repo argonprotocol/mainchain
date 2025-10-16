@@ -65,7 +65,7 @@ pub mod pallet {
 	};
 	use core::cmp::Ordering;
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
-	use tracing::warn;
+	use tracing::{info, warn};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
@@ -247,10 +247,12 @@ pub mod pallet {
 				return;
 			}
 			let payout_frame = frame_id - 1;
+			info!(
+				"Starting next treasury pool for frame {frame_id}. Distributing frame {payout_frame}."
+			);
 			Self::release_rolling_contributors(payout_frame);
 			Self::distribute_bid_pool(payout_frame);
 			Self::end_pool_capital_raise(frame_id);
-
 			Self::rollover_contributors(frame_id);
 		}
 	}
@@ -591,9 +593,20 @@ pub mod pallet {
 					};
 
 					while total_to_refund > T::Balance::zero() {
+						info!(vault_id,
+							?activated_securitization,
+							bid_pool_capital = ?bid_pool_capital.activated_capital,
+							"Refunding due to overcapitalization."
+						);
 						// take smallest (last entry)
 						let Some((account, mut holder)) = vault_fund.bond_holders.pop() else {
-							continue;
+							warn!(
+								vault_id,
+								?total_to_refund,
+								"No more contributors to refund, but still have excess capital to refund. Setting activated capital to empty."
+							);
+							bid_pool_capital.activated_capital = T::Balance::zero();
+							break;
 						};
 						let to_refund = total_to_refund.min(holder.starting_balance);
 						Self::refund_fund_capital(frame_id, vault_id, &account, to_refund);

@@ -1,6 +1,18 @@
 # Changelog
 
-## [v1.3.10](https://github.com/argonprotocol/mainchain/compare/v1.3.9...46fa8f76f9191aff12cd56fa7db727db07857115) (2025-10-15)
+## [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...4ee4f7cce4918c57b0c60c76f78bd10b54615ad1) (2025-10-15)
+
+### Fixes
+
+* **treasury:** remove infinite loop
+([4ee4f7c](https://github.com/argonprotocol/mainchain/commit/4ee4f7cce4918c57b0c60c76f78bd10b54615ad1))
+
+### [v1.3.10](https://github.com/argonprotocol/mainchain/compare/v1.3.9...v1.3.10) (2025-10-15)
+
+#### Fixes
+
+* **treasury:** migrations broke
+([da22ef6](https://github.com/argonprotocol/mainchain/commit/da22ef68dc585973a528fba2890ef442d17f03ca))
 
 ### [v1.3.9](https://github.com/argonprotocol/mainchain/compare/v1.3.8...v1.3.9) (2025-10-12)
 
