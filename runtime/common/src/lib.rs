@@ -129,11 +129,7 @@ macro_rules! inject_runtime_vars {
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = (
-			FixTreasuryVersionIfEmpty<Runtime>,
-			pallet_treasury::migrations::PalletMigrate<Runtime>,
-			pallet_vaults::migrations::TreasuryPool<Runtime>,
-		);
+		type Migrations = (pallet_vaults::migrations::RevenueStatsUpdate<Runtime>,);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =
@@ -149,35 +145,5 @@ macro_rules! inject_runtime_vars {
 			AllPalletsWithSystem,
 			Migrations,
 		>;
-
-
-		pub struct FixTreasuryVersionIfEmpty<T>(sp_std::marker::PhantomData<T>);
-
-		impl<T: pallet_treasury::Config> frame_support::traits::OnRuntimeUpgrade for FixTreasuryVersionIfEmpty<T> {
-			fn on_runtime_upgrade() -> frame_support::weights::Weight {
-				let on_chain = pallet_treasury::Pallet::<T>::on_chain_storage_version();
-				let code = pallet_treasury::Pallet::<T>::in_code_storage_version();
-				log::info!(
-					target: "runtime::migrations",
-					"FixTreasuryVersionIfEmpty: on-chain={:?}, code={:?}",
-					on_chain,
-					code
-				);
-
-				// Only consider adjusting if it’s already version 1 but has no data.
-				if on_chain == StorageVersion::new(1)
-					&& pallet_treasury::migrations::liquidity_pool_storage::VaultPoolsByFrame::<T>::iter_keys().next().is_some()
-				{
-					log::warn!(
-						target: "runtime::migrations",
-						"FixTreasuryVersionIfEmpty: resetting on-chain version to 0 so migration can re-run"
-					);
-					StorageVersion::new(0).put::<pallet_treasury::Pallet<T>>();
-				}
-
-				// Return a minimal fixed weight cost.
-				T::DbWeight::get().reads_writes(2, 1)
-			}
-		}
 	};
 }

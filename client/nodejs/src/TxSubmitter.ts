@@ -168,7 +168,12 @@ export class TxResult {
       }
 
       if (encounteredError) {
-        const error = dispatchErrorToExtrinsicError(this.client, encounteredError, batchErrorIndex);
+        const error = dispatchErrorToExtrinsicError(
+          this.client,
+          encounteredError,
+          batchErrorIndex,
+          this.finalFee,
+        );
         this.reject(error);
       } else {
         this.inBlockResolve(new Uint8Array(status.asInBlock));

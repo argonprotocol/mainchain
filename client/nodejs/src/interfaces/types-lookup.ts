@@ -3205,10 +3205,12 @@ declare module '@polkadot/types/lookup' {
     readonly frameId: Compact<u64>;
     readonly bitcoinLockFeeRevenue: Compact<u128>;
     readonly bitcoinLocksCreated: Compact<u32>;
-    readonly bitcoinLocksMarketValue: Compact<u128>;
-    readonly bitcoinLocksTotalSatoshis: Compact<u64>;
-    readonly satoshisReleased: Compact<u64>;
+    readonly bitcoinLocksNewLiquidityPromised: Compact<u128>;
+    readonly bitcoinLocksReleasedLiquidity: Compact<u128>;
+    readonly bitcoinLocksAddedSatoshis: Compact<u64>;
+    readonly bitcoinLocksReleasedSatoshis: Compact<u64>;
     readonly securitizationActivated: Compact<u128>;
+    readonly securitizationRelockable: Compact<u128>;
     readonly securitization: Compact<u128>;
     readonly treasuryVaultEarnings: Compact<u128>;
     readonly treasuryTotalEarnings: Compact<u128>;

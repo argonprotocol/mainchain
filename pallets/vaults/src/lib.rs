@@ -42,7 +42,7 @@ pub mod pallet {
 		vault::{LockExtension, VaultTreasuryFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -788,6 +788,7 @@ pub mod pallet {
 				securitization_locked,
 				satoshis_locked,
 				satoshis_released,
+				securitization_released,
 				..
 			} = metrics;
 			let current_frame_id = T::CurrentFrameId::get();
@@ -795,9 +796,14 @@ pub mod pallet {
 				revenue.bitcoin_lock_fee_revenue.saturating_accrue(total_fee);
 				revenue.uncollected_revenue.saturating_accrue(total_fee);
 				revenue.bitcoin_locks_created.saturating_accrue(locks_created);
-				revenue.bitcoin_locks_total_satoshis.saturating_accrue(satoshis_locked);
-				revenue.bitcoin_locks_market_value.saturating_accrue(securitization_locked);
-				revenue.satoshis_released.saturating_accrue(satoshis_released);
+				revenue.bitcoin_locks_added_satoshis.saturating_accrue(satoshis_locked);
+				revenue
+					.bitcoin_locks_new_liquidity_promised
+					.saturating_accrue(securitization_locked);
+				revenue
+					.bitcoin_locks_released_liquidity
+					.saturating_accrue(securitization_released);
+				revenue.bitcoin_locks_released_satoshis.saturating_accrue(satoshis_released);
 				Ok(())
 			})
 		}
@@ -838,8 +844,7 @@ pub mod pallet {
 							// gather activation and securitization for the ending frame
 							let vault =
 								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-							revenue.securitization_activated = vault.get_activated_securitization();
-							revenue.securitization = vault.securitization;
+							revenue.update_securitization(&vault, ended_frame_id);
 						}
 						if revenue.frame_id <= collect_expired_frame &&
 							revenue.uncollected_revenue > T::Balance::zero()
@@ -874,7 +879,7 @@ pub mod pallet {
 							});
 						}
 					}
-					frame_revenue.retain(|a| a.frame_id >= collect_expired_frame);
+					frame_revenue.retain(|a| a.frame_id > collect_expired_frame);
 					if frame_revenue.is_empty() {
 						is_empty = true;
 					}
@@ -982,7 +987,7 @@ pub mod pallet {
 		fn lock(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			pegged_price: T::Balance,
+			liquidity_promised: T::Balance,
 			satoshis: Satoshis,
 			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
 		) -> Result<T::Balance, VaultError> {
@@ -995,7 +1000,10 @@ pub mod pallet {
 			);
 
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
-			ensure!(vault.available_for_lock() >= pegged_price, VaultError::InsufficientVaultFunds);
+			ensure!(
+				vault.available_for_lock() >= liquidity_promised,
+				VaultError::InsufficientVaultFunds
+			);
 
 			let mut total_fee = {
 				let apr = vault.terms.bitcoin_annual_percent_rate;
@@ -1003,7 +1011,7 @@ pub mod pallet {
 				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
 
 				apr.saturating_mul(term)
-					.saturating_mul_int(pegged_price)
+					.saturating_mul_int(liquidity_promised)
 					.saturating_add(base_fee)
 			};
 			if vault.operator_account_id == *account_id {
@@ -1012,7 +1020,7 @@ pub mod pallet {
 			}
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
-				pegged_price,
+				liquidity_promised,
 				total_fee
 			);
 
@@ -1021,7 +1029,7 @@ pub mod pallet {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
-				securitization_locked: pegged_price,
+				securitization_locked: liquidity_promised,
 				securitization_released: 0u32.into(),
 				satoshis_locked: satoshis,
 				satoshis_released: 0,
@@ -1048,15 +1056,15 @@ pub mod pallet {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
 				// locked funds, they must be getting a new expiration of > 1 year from their
 				// original date
-				vault.extend_lock(pegged_price, extension)?;
+				vault.extend_lock(liquidity_promised, extension)?;
 			} else {
-				vault.lock(pegged_price)?;
+				vault.lock(liquidity_promised)?;
 			}
 
 			Self::deposit_event(Event::FundsLocked {
 				vault_id,
 				locker: account_id.clone(),
-				amount: pegged_price,
+				amount: liquidity_promised,
 				fee_revenue: total_fee,
 				is_ratchet,
 			});
@@ -1295,18 +1303,24 @@ pub mod pallet {
 		/// The number of bitcoin locks created
 		#[codec(compact)]
 		pub bitcoin_locks_created: u32,
-		/// The argon market value of the locked satoshis
+		/// The argon market value of the locked satoshis added
 		#[codec(compact)]
-		pub bitcoin_locks_market_value: T::Balance,
-		/// The number of satoshis locked into the vault
+		pub bitcoin_locks_new_liquidity_promised: T::Balance,
+		/// The amount of securitization released
 		#[codec(compact)]
-		pub bitcoin_locks_total_satoshis: Satoshis,
+		pub bitcoin_locks_released_liquidity: T::Balance,
+		/// The number of satoshis locked into the vault during this period
+		#[codec(compact)]
+		pub bitcoin_locks_added_satoshis: Satoshis,
 		/// The number of satoshis released during this period
 		#[codec(compact)]
-		pub satoshis_released: Satoshis,
+		pub bitcoin_locks_released_satoshis: Satoshis,
 		/// The amount of securitization activated at the end of this frame
 		#[codec(compact)]
 		pub securitization_activated: T::Balance,
+		/// The amount of securitization that can be relocked from this frame
+		#[codec(compact)]
+		pub securitization_relockable: T::Balance,
 		/// The securitization committed at the end of this frame
 		#[codec(compact)]
 		pub securitization: T::Balance,
@@ -1333,11 +1347,13 @@ pub mod pallet {
 				frame_id,
 				bitcoin_lock_fee_revenue: T::Balance::zero(),
 				bitcoin_locks_created: 0,
-				bitcoin_locks_market_value: T::Balance::zero(),
-				bitcoin_locks_total_satoshis: 0,
-				satoshis_released: 0,
-				securitization: T::Balance::zero(),
+				bitcoin_locks_new_liquidity_promised: T::Balance::zero(),
+				bitcoin_locks_released_liquidity: T::Balance::zero(),
+				bitcoin_locks_added_satoshis: 0,
+				bitcoin_locks_released_satoshis: 0,
+				securitization_relockable: T::Balance::zero(),
 				securitization_activated: T::Balance::zero(),
+				securitization: T::Balance::zero(),
 				treasury_vault_earnings: T::Balance::zero(),
 				treasury_total_earnings: T::Balance::zero(),
 				treasury_vault_capital: T::Balance::zero(),
@@ -1360,6 +1376,8 @@ pub mod pallet {
 			if current_frame_id >= self.frame_id {
 				self.securitization = vault.securitization;
 				self.securitization_activated = vault.get_activated_securitization();
+				self.securitization_relockable =
+					vault.securitization_ratio.saturating_mul_int(vault.get_relock_capacity());
 			}
 		}
 	}

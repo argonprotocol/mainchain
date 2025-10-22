@@ -369,12 +369,7 @@ export class BitcoinLocks {
       unavailableBalance: securityFee + (args.reducedBalanceBy ?? 0n),
       includeExistentialDeposit: true,
     });
-    if (!canAfford) {
-      throw new Error(
-        `Insufficient funds to initialize lock. Available: ${formatArgons(availableBalance)}, Required: ${satoshis}`,
-      );
-    }
-    return { tx, securityFee, txFee };
+    return { tx, securityFee, txFee, canAfford, availableBalance, txFeePlusTip: txFee + tip };
   }
 
   async getBitcoinLockFromTxResult(txResult: TxResult): Promise<{
@@ -416,7 +411,12 @@ export class BitcoinLocks {
     const { argonKeyring, tip = 0n, txProgressCallback } = args;
     const client = this.client;
 
-    const { tx, securityFee } = await this.createInitializeLockTx(args);
+    const { tx, securityFee, canAfford, txFeePlusTip } = await this.createInitializeLockTx(args);
+    if (!canAfford) {
+      throw new Error(
+        `Insufficient funds to initialize bitcoin lock. Required security fee: ${formatArgons(securityFee)}, Tx fee plus tip: ${formatArgons(txFeePlusTip)}`,
+      );
+    }
     const submitter = new TxSubmitter(client, tx, argonKeyring);
     const txResult = await submitter.submit({
       waitForBlock: true,
