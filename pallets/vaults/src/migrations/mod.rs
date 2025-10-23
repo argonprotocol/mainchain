@@ -1,102 +1,20 @@
-use crate::{Config, RevenuePerFrameByVault, VaultFrameRevenue, pallet::VaultsById};
+use crate::{Config, RevenuePerFrameByVault, VaultFrameRevenue};
 
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
-use pallet_prelude::{
-	argon_primitives::vault::{Vault, VaultTerms},
-	*,
-};
+use pallet_prelude::*;
 
 mod old_storage {
 	use crate::Config;
-	use argon_bitcoin::primitives::{BitcoinHeight, Satoshis};
+	use argon_bitcoin::primitives::Satoshis;
 	use frame_support::storage_alias;
 	use pallet_prelude::*;
 
-	#[derive(
-		Clone,
-		PartialEq,
-		Eq,
-		Encode,
-		Decode,
-		DecodeWithMemTracking,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
-	)]
-	pub struct Vault<AccountId, Balance>
-	where
-		AccountId: Codec,
-		Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
-	{
-		/// The account assigned to operate this vault
-		pub operator_account_id: AccountId,
-		/// The securitization in the vault
-		#[codec(compact)]
-		pub securitization: Balance,
-		/// The argons locked for bitcoin
-		#[codec(compact)]
-		pub argons_locked: Balance,
-		/// Argons for bitcoin pending verification (this is "out of" the bitcoin_locked, not in
-		/// addition to)
-		#[codec(compact)]
-		pub argons_pending_activation: Balance,
-		/// Argons that will be released at the given block height (NOTE: these are grouped by next
-		/// day of bitcoin blocks). These argons can be re-locked
-		pub argons_scheduled_for_release: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
-		/// The securitization ratio of "total securitization" to "available for locked bitcoin"
-		#[codec(compact)]
-		pub securitization_ratio: FixedU128,
-		/// If the vault is closed, no new bitcoin locks can be issued
-		pub is_closed: bool,
-		/// The terms for locked bitcoin
-		pub terms: VaultTerms<Balance>,
-		/// The terms that are pending to be applied to this vault at the given tick
-		pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
-		/// A tick at which this vault is active
-		#[codec(compact)]
-		pub opened_tick: Tick,
-	}
-
-	#[derive(
-		Encode,
-		Decode,
-		DecodeWithMemTracking,
-		Clone,
-		PartialEq,
-		Eq,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
-	)]
-	pub struct VaultTerms<Balance>
-	where
-		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq,
-	{
-		/// The annual percent rate per argon vaulted for bitcoin locks
-		#[codec(compact)]
-		pub bitcoin_annual_percent_rate: FixedU128,
-		/// The base fee for a bitcoin lock
-		#[codec(compact)]
-		pub bitcoin_base_fee: Balance,
-		/// The percent of mining bonds taken by the vault
-		#[codec(compact)]
-		pub liquidity_pool_profit_sharing: Permill,
-	}
-
-	#[storage_alias]
-	pub(super) type VaultsById<T: Config> = StorageMap<
-		crate::Pallet<T>,
-		Twox64Concat,
-		VaultId,
-		Vault<<T as frame_system::Config>::AccountId, <T as Config>::Balance>,
-		OptionQuery,
-	>;
 	#[storage_alias]
 	pub type RevenuePerFrameByVault<T: Config> = StorageMap<
 		crate::Pallet<T>,
 		Twox64Concat,
 		VaultId,
-		BoundedVec<crate::VaultFrameRevenue<T>, ConstU32<12>>,
+		BoundedVec<VaultFrameRevenue<T>, ConstU32<12>>,
 		ValueQuery,
 	>;
 
@@ -126,7 +44,7 @@ mod old_storage {
 		/// The argon market value of the locked satoshis
 		#[codec(compact)]
 		pub bitcoin_locks_market_value: T::Balance,
-		/// The number of satoshis locked into the vault
+		/// The number of satoshis locked into the vault during this period
 		#[codec(compact)]
 		pub bitcoin_locks_total_satoshis: Satoshis,
 		/// The number of satoshis released during this period
@@ -140,16 +58,16 @@ mod old_storage {
 		pub securitization: T::Balance,
 		/// The vault treasury pool profits for this frame
 		#[codec(compact)]
-		pub liquidity_pool_vault_earnings: T::Balance,
+		pub treasury_vault_earnings: T::Balance,
 		/// The treasury pool aggregate profit
 		#[codec(compact)]
-		pub liquidity_pool_total_earnings: T::Balance,
+		pub treasury_total_earnings: T::Balance,
 		/// Vault treasury pool capital capital
 		#[codec(compact)]
-		pub liquidity_pool_vault_capital: T::Balance,
+		pub treasury_vault_capital: T::Balance,
 		/// External capital contributed
 		#[codec(compact)]
-		pub liquidity_pool_external_capital: T::Balance,
+		pub treasury_external_capital: T::Balance,
 		/// The amount of revenue still to be collected
 		#[codec(compact)]
 		pub uncollected_revenue: T::Balance,
@@ -158,10 +76,7 @@ mod old_storage {
 	#[derive(codec::Encode, codec::Decode)]
 	pub struct Model<T: Config> {
 		#[allow(clippy::type_complexity)]
-		pub vaults: Vec<(VaultId, Vault<<T as frame_system::Config>::AccountId, T::Balance>)>,
-		#[allow(clippy::type_complexity)]
-		pub revenue_per_frame:
-			Vec<(VaultId, BoundedVec<crate::VaultFrameRevenue<T>, ConstU32<12>>)>,
+		pub revenue_per_frame: Vec<(VaultId, BoundedVec<VaultFrameRevenue<T>, ConstU32<12>>)>,
 	}
 }
 pub struct InnerMigrate<T: crate::Config>(core::marker::PhantomData<T>);
@@ -171,97 +86,15 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
 		use codec::Encode;
 
-		let vaults = old_storage::VaultsById::<T>::iter().collect::<Vec<_>>();
 		let revenue_per_frame =
 			old_storage::RevenuePerFrameByVault::<T>::iter().collect::<Vec<_>>();
 
-		Ok(old_storage::Model::<T> { vaults, revenue_per_frame }.encode())
+		Ok(old_storage::Model::<T> { revenue_per_frame }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0;
 		log::info!("Migrating vaults");
-
-		VaultsById::<T>::translate::<old_storage::Vault<T::AccountId, T::Balance>, _>(
-			|id, vault| {
-				count += 1;
-
-				// We had a bad migration on 5/23/2025 that inserted all existing bitcoin locks into
-				// the "argons_scheduled_for_release", which should only be populated once bitcoins
-				// are released. It's meant to track argons on hold for a year, but re-lendable.
-				// In testnet, this was not an issue, but in mainnet, this has duplicated the amount
-				// of argons "in vaults". The only vault with valid data in this field is vault
-				// ID 7, which was opened after the faulty migration. So we will clear this
-				// field for all vaults
-				let mut argons_scheduled_for_release = vault.argons_scheduled_for_release;
-
-				// check that this has the two known entries for vault ID 7
-				// if so, we will restore them, otherwise we will clear the field
-				if id == 7 &&
-					argons_scheduled_for_release.get(&937728) ==
-						Some(&(209_920_128u128 * 2u128).into())
-				{
-					log::info!(
-						"Fixing argons_scheduled_for_release for vault ID 7 during migration"
-					);
-					argons_scheduled_for_release.clear();
-					// utxoid 4 =
-					//	 	vaultId: 7
-					// 	 	lockPrice: 209,920,128
-					// 		ownerAccount: 5EbtpegDiogFpFS9PTRvcXn166c7PbwgADm6bwc92bcDCh3U
-					// 		securityFees: 0
-					// 		satoshis: 219,090
-					// 		vaultClaimHeight: 937,611
-					// rounded up bitcoin "day" height = 937,728
-					argons_scheduled_for_release
-						.try_insert(937728, 209_920_128u128.into())
-						.unwrap();
-
-					// utxoid 8 =
-					//	 	vaultId: 7
-					// 	 	lockPrice: 3,389,887,723
-					// 		ownerAccount: 5EbtpegDiogFpFS9PTRvcXn166c7PbwgADm6bwc92bcDCh3U
-					// 		securityFees: 0
-					//   	satoshis: 3,691,035
-					// 		vaultClaimHeight: 937,749
-					argons_scheduled_for_release
-						.try_insert(937872, 3_389_887_723u128.into())
-						.unwrap();
-				} else {
-					argons_scheduled_for_release.clear();
-					log::warn!(
-						"Clearing argons_scheduled_for_release for vault ID {} during migration",
-						id
-					);
-				}
-
-				Some(Vault {
-					operator_account_id: vault.operator_account_id.clone(),
-					securitization: vault.securitization,
-					argons_scheduled_for_release,
-					argons_locked: vault.argons_locked,
-					argons_pending_activation: vault.argons_pending_activation,
-					securitization_ratio: vault.securitization_ratio,
-					is_closed: vault.is_closed,
-					terms: VaultTerms {
-						bitcoin_annual_percent_rate: vault.terms.bitcoin_annual_percent_rate,
-						bitcoin_base_fee: vault.terms.bitcoin_base_fee,
-						treasury_profit_sharing: vault.terms.liquidity_pool_profit_sharing,
-					},
-					pending_terms: vault.pending_terms.map(|x| {
-						(
-							x.0,
-							VaultTerms {
-								bitcoin_annual_percent_rate: x.1.bitcoin_annual_percent_rate,
-								bitcoin_base_fee: x.1.bitcoin_base_fee,
-								treasury_profit_sharing: x.1.liquidity_pool_profit_sharing,
-							},
-						)
-					}),
-					opened_tick: vault.opened_tick,
-				})
-			},
-		);
 
 		RevenuePerFrameByVault::<T>::translate::<
 			BoundedVec<old_storage::VaultFrameRevenue<T>, ConstU32<12>>,
@@ -274,15 +107,17 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 					frame_id: v.frame_id,
 					bitcoin_lock_fee_revenue: v.bitcoin_lock_fee_revenue,
 					bitcoin_locks_created: v.bitcoin_locks_created,
-					bitcoin_locks_market_value: v.bitcoin_locks_market_value,
-					bitcoin_locks_total_satoshis: v.bitcoin_locks_total_satoshis,
-					satoshis_released: v.satoshis_released,
+					bitcoin_locks_new_liquidity_promised: v.bitcoin_locks_market_value,
+					bitcoin_locks_released_liquidity: T::Balance::zero(),
+					bitcoin_locks_added_satoshis: v.bitcoin_locks_total_satoshis,
+					bitcoin_locks_released_satoshis: v.satoshis_released,
+					securitization_relockable: T::Balance::zero(),
 					securitization_activated: v.securitization_activated,
 					securitization: v.securitization,
-					treasury_vault_earnings: v.liquidity_pool_vault_earnings,
-					treasury_total_earnings: v.liquidity_pool_total_earnings,
-					treasury_vault_capital: v.liquidity_pool_vault_capital,
-					treasury_external_capital: v.liquidity_pool_external_capital,
+					treasury_vault_earnings: v.treasury_vault_earnings,
+					treasury_total_earnings: v.treasury_total_earnings,
+					treasury_vault_capital: v.treasury_vault_capital,
+					treasury_external_capital: v.treasury_external_capital,
 					uncollected_revenue: v.uncollected_revenue,
 				})
 				.collect::<Vec<_>>();
@@ -300,25 +135,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		let old = <old_storage::Model<T>>::decode(&mut &state[..]).map_err(|_| {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
-
-		let new_vaults = VaultsById::<T>::iter().collect::<BTreeMap<_, _>>();
-		assert_eq!(old.vaults.len(), new_vaults.len(), "Mismatch in number of vaults");
-		for (vault_id, _new_vault) in old.vaults {
-			assert!(
-				new_vaults.contains_key(&vault_id),
-				"Vault ID {} missing in new storage",
-				vault_id
-			);
-			if vault_id != 7 {
-				// For vault ID 7, we restored the two known entries in
-				// argons_scheduled_for_release, so we skip this check
-				assert!(
-					new_vaults[&vault_id].argons_scheduled_for_release.is_empty(),
-					"argons_scheduled_for_release not cleared for vault ID {}",
-					vault_id
-				);
-			}
-		}
 
 		let new_revenue = RevenuePerFrameByVault::<T>::iter().collect::<BTreeMap<_, _>>();
 		assert_eq!(
@@ -339,9 +155,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 	}
 }
 
-pub type TreasuryPool<T> = frame_support::migrations::VersionedMigration<
-	8,
+pub type RevenueStatsUpdate<T> = frame_support::migrations::VersionedMigration<
 	9,
+	10,
 	InnerMigrate<T>,
 	crate::Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
@@ -350,50 +166,57 @@ pub type TreasuryPool<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use self::InnerMigrate;
 	use super::*;
-	use crate::mock::{Test, new_test_ext};
+	use crate::{
+		Error,
+		mock::{Test, new_test_ext},
+	};
 	use frame_support::assert_ok;
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
-			old_storage::VaultsById::<Test>::insert(
-				1,
-				old_storage::Vault {
-					operator_account_id: 1,
-					securitization: 100,
-					argons_scheduled_for_release: Default::default(),
-					argons_locked: 100,
-					argons_pending_activation: 0,
-					securitization_ratio: FixedU128::one(),
-					is_closed: false,
-					terms: old_storage::VaultTerms {
-						bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
-						bitcoin_base_fee: 0,
-						liquidity_pool_profit_sharing: Permill::from_percent(10),
-					},
-					pending_terms: None,
-					opened_tick: 0,
-				},
-			);
-			old_storage::VaultsById::<Test>::insert(
-				2,
-				old_storage::Vault {
-					operator_account_id: 2,
-					securitization: 200,
-					argons_scheduled_for_release: Default::default(),
-					argons_locked: 100,
-					argons_pending_activation: 0,
-					securitization_ratio: FixedU128::one(),
-					is_closed: false,
-					terms: old_storage::VaultTerms {
-						bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
-						bitcoin_base_fee: 0,
-						liquidity_pool_profit_sharing: Permill::from_percent(20),
-					},
-					pending_terms: None,
-					opened_tick: 0,
-				},
-			);
+			old_storage::RevenuePerFrameByVault::<Test>::try_mutate(1u32, |v| {
+				v.try_push(old_storage::VaultFrameRevenue {
+					frame_id: 42,
+					bitcoin_lock_fee_revenue: 100u32.into(),
+					bitcoin_locks_created: 2,
+					bitcoin_locks_market_value: 500u32.into(),
+					bitcoin_locks_total_satoshis: 10_000,
+					satoshis_released: 1_000,
+					securitization_activated: 200u32.into(),
+					securitization: 300u32.into(),
+					treasury_vault_earnings: 50u32.into(),
+					treasury_total_earnings: 150u32.into(),
+					treasury_vault_capital: 1_000u32.into(),
+					treasury_external_capital: 2_000u32.into(),
+					uncollected_revenue: 25u32.into(),
+				})
+				.expect("Inserting old storage value should work");
+				Ok::<(), Error<Test>>(())
+			})
+			.expect("Inserting old storage value should work");
+
+			old_storage::RevenuePerFrameByVault::<Test>::try_mutate(2u32, |v| {
+				v.try_push(old_storage::VaultFrameRevenue {
+					frame_id: 43,
+					bitcoin_lock_fee_revenue: 200u32.into(),
+					bitcoin_locks_created: 3,
+					bitcoin_locks_market_value: 600u32.into(),
+					bitcoin_locks_total_satoshis: 20_000,
+					satoshis_released: 2_000,
+					securitization_activated: 300u32.into(),
+					securitization: 400u32.into(),
+					treasury_vault_earnings: 60u32.into(),
+					treasury_total_earnings: 160u32.into(),
+					treasury_vault_capital: 1_500u32.into(),
+					treasury_external_capital: 2_500u32.into(),
+					uncollected_revenue: 35u32.into(),
+				})
+				.expect("Inserting old storage value should work");
+				Ok::<(), Error<Test>>(())
+			})
+			.expect("Inserting old storage value should work");
+
 			// Get the pre_upgrade bytes
 			let bytes = match InnerMigrate::<Test>::pre_upgrade() {
 				Ok(bytes) => bytes,
@@ -409,13 +232,37 @@ mod test {
 			// value.
 			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(2, 2));
 
-			// Verify the new storage has the expected values
-			let new_value_1 = VaultsById::<Test>::get(1).unwrap();
-			let new_value_2 = VaultsById::<Test>::get(2).unwrap();
-			assert_eq!(new_value_1.operator_account_id, 1);
-			assert_eq!(new_value_2.operator_account_id, 2);
-			assert_eq!(new_value_1.terms.treasury_profit_sharing, Permill::from_percent(10));
-			assert_eq!(new_value_2.terms.treasury_profit_sharing, Permill::from_percent(20));
+			let new_value_1 = RevenuePerFrameByVault::<Test>::get(1u32);
+			assert_eq!(new_value_1.len(), 1);
+			let rev_1 = &new_value_1[0];
+			assert_eq!(rev_1.frame_id, 42);
+			assert_eq!(rev_1.bitcoin_lock_fee_revenue, 100u32.into());
+			assert_eq!(rev_1.bitcoin_locks_created, 2);
+			assert_eq!(rev_1.bitcoin_locks_new_liquidity_promised, 500u32.into());
+			assert_eq!(rev_1.bitcoin_locks_released_liquidity, 0u32.into());
+			assert_eq!(rev_1.bitcoin_locks_added_satoshis, 10_000);
+			assert_eq!(rev_1.bitcoin_locks_released_satoshis, 1_000);
+			assert_eq!(rev_1.securitization_activated, 200u32.into());
+			assert_eq!(rev_1.securitization, 300u32.into());
+			assert_eq!(rev_1.treasury_vault_earnings, 50u32.into());
+			assert_eq!(rev_1.treasury_total_earnings, 150u32.into());
+			assert_eq!(rev_1.treasury_vault_capital, 1_000u32.into());
+			assert_eq!(rev_1.treasury_external_capital, 2_000u32.into());
+
+			let rev_2 = &RevenuePerFrameByVault::<Test>::get(2u32)[0];
+			assert_eq!(rev_2.frame_id, 43);
+			assert_eq!(rev_2.bitcoin_lock_fee_revenue, 200u32.into());
+			assert_eq!(rev_2.bitcoin_locks_created, 3);
+			assert_eq!(rev_2.bitcoin_locks_new_liquidity_promised, 600u32.into());
+			assert_eq!(rev_2.bitcoin_locks_released_liquidity, 0u32.into());
+			assert_eq!(rev_2.bitcoin_locks_added_satoshis, 20_000);
+			assert_eq!(rev_2.bitcoin_locks_released_satoshis, 2_000);
+			assert_eq!(rev_2.securitization_activated, 300u32.into());
+			assert_eq!(rev_2.securitization, 400u32.into());
+			assert_eq!(rev_2.treasury_vault_earnings, 60u32.into());
+			assert_eq!(rev_2.treasury_total_earnings, 160u32.into());
+			assert_eq!(rev_2.treasury_vault_capital, 1_500u32.into());
+			assert_eq!(rev_2.treasury_external_capital, 2_500u32.into());
 		});
 	}
 }

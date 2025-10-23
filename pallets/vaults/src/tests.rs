@@ -421,8 +421,8 @@ fn it_can_lock_funds() {
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
-		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
-		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
 	});
 }
@@ -457,8 +457,8 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
-		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
-		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
 	});
 }
@@ -509,20 +509,20 @@ fn it_handles_overflowing_metrics() {
 			}
 		}
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 11);
+		assert_eq!(vault_revenue.len(), 10);
 		assert_eq!(vault_revenue[0].frame_id, 49);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, 1000 * 100);
-		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 10_000 * 100);
-		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 1000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 10_000 * 100);
+		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 1000 * 100);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 100);
 		assert_eq!(vault_revenue[0].securitization, 11000);
 
 		assert_eq!(vault_revenue[9].frame_id, 40);
 		assert_eq!(vault_revenue[9].bitcoin_lock_fee_revenue, 1000 * 100);
-		assert_eq!(vault_revenue[9].bitcoin_locks_market_value, 10_000 * 100);
+		assert_eq!(vault_revenue[9].bitcoin_locks_new_liquidity_promised, 10_000 * 100);
 
 		let vault_revenue_2 = RevenuePerFrameByVault::<Test>::get(2).to_vec();
-		assert_eq!(vault_revenue_2.len(), 11);
+		assert_eq!(vault_revenue_2.len(), 10);
 		assert_eq!(vault_revenue_2[0].frame_id, 49);
 		assert_eq!(vault_revenue_2[0].securitization, 1_000_000);
 		assert_eq!(vault_revenue_2[0].securitization_activated, 1_000_000);
@@ -535,7 +535,7 @@ fn it_handles_overflowing_metrics() {
 		assert_eq!(vault_revenue_2[7].securitization, 1_000_000);
 		assert_eq!(vault_revenue_2[7].securitization_activated, 1_000_000);
 
-		assert_eq!(RevenuePerFrameByVault::<Test>::get(10).len(), 11);
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(10).len(), 10);
 	})
 }
 
@@ -911,6 +911,8 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 1_000_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 0);
 
+		CurrentFrameId::set(2);
+
 		assert_ok!(Vaults::schedule_for_release(1, amount, 500, &LockExtension::new(365)));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 1_000_000_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 1_000_000);
@@ -921,6 +923,13 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).len(), 1);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).first().unwrap(), &1);
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
+		assert_eq!(vault_revenue.len(), 2);
+		assert_eq!(vault_revenue[0].frame_id, 2);
+		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 0);
+		assert_eq!(vault_revenue[0].bitcoin_locks_released_liquidity, 1_000_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_created, 0);
+		assert_eq!(vault_revenue[0].uncollected_revenue, 0);
 
 		// expire it
 		System::set_block_number(10);
@@ -1018,8 +1027,8 @@ fn vaults_can_collect_revenue() {
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
-		assert_eq!(vault_revenue[0].bitcoin_locks_market_value, 500_000);
-		assert_eq!(vault_revenue[0].bitcoin_locks_total_satoshis, 500);
+		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
 		assert_eq!(vault_revenue[0].uncollected_revenue, fee);
 		assert_eq!(vault_revenue[0].securitization, 500_000);
@@ -1166,6 +1175,9 @@ fn it_burns_uncollected_revenue() {
 			Event::<Test>::VaultRevenueUncollected { vault_id: 1, amount: 100_000, frame_id: 1 }
 				.into(),
 		);
+		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
+		assert_eq!(pending_revenue.len(), 9);
+		assert!(!pending_revenue.iter().any(|a| a.frame_id == 1));
 	})
 }
 

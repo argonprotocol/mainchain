@@ -69,6 +69,7 @@ export class ExtrinsicError extends Error {
     public readonly errorCode: string,
     public readonly details?: string,
     public readonly batchInterruptedIndex?: number,
+    public readonly txFee: bigint = 0n,
   ) {
     super(errorCode);
   }
@@ -85,13 +86,14 @@ export function dispatchErrorToExtrinsicError(
   client: ArgonClient,
   error: DispatchError,
   batchInterruptedIndex?: number,
+  txFee?: bigint,
 ) {
   if (error.isModule) {
     const decoded = client.registry.findMetaError(error.asModule);
     const { docs, name, section } = decoded;
-    return new ExtrinsicError(`${section}.${name}`, docs.join(' '), batchInterruptedIndex);
+    return new ExtrinsicError(`${section}.${name}`, docs.join(' '), batchInterruptedIndex, txFee);
   }
-  return new ExtrinsicError(error.toString(), undefined, batchInterruptedIndex);
+  return new ExtrinsicError(error.toString(), undefined, batchInterruptedIndex, txFee);
 }
 
 /**

@@ -3854,9 +3854,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				197u8, 242u8, 160u8, 57u8, 27u8, 147u8, 164u8, 47u8, 141u8, 81u8, 59u8, 194u8,
-				59u8, 108u8, 34u8, 204u8, 74u8, 8u8, 172u8, 149u8, 67u8, 185u8, 154u8, 58u8, 225u8,
-				172u8, 213u8, 155u8, 148u8, 148u8, 15u8, 228u8,
+				114u8, 206u8, 83u8, 24u8, 2u8, 82u8, 252u8, 50u8, 104u8, 206u8, 3u8, 230u8, 189u8,
+				155u8, 170u8, 208u8, 91u8, 130u8, 68u8, 26u8, 203u8, 255u8, 19u8, 8u8, 72u8, 36u8,
+				151u8, 65u8, 133u8, 205u8, 15u8, 141u8,
 			]
 	}
 	pub mod system {
@@ -10637,10 +10637,10 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						(),
 						[
-							172u8, 159u8, 116u8, 103u8, 160u8, 54u8, 223u8, 3u8, 230u8, 189u8,
-							52u8, 78u8, 123u8, 25u8, 125u8, 105u8, 84u8, 103u8, 155u8, 46u8, 226u8,
-							203u8, 202u8, 189u8, 156u8, 64u8, 176u8, 169u8, 144u8, 255u8, 57u8,
-							78u8,
+							19u8, 22u8, 17u8, 127u8, 129u8, 221u8, 243u8, 222u8, 210u8, 198u8,
+							148u8, 185u8, 113u8, 61u8, 106u8, 66u8, 142u8, 2u8, 122u8, 249u8,
+							215u8, 58u8, 127u8, 187u8, 58u8, 253u8, 7u8, 30u8, 181u8, 5u8, 86u8,
+							155u8,
 						],
 					)
 				}
@@ -10664,10 +10664,10 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							172u8, 159u8, 116u8, 103u8, 160u8, 54u8, 223u8, 3u8, 230u8, 189u8,
-							52u8, 78u8, 123u8, 25u8, 125u8, 105u8, 84u8, 103u8, 155u8, 46u8, 226u8,
-							203u8, 202u8, 189u8, 156u8, 64u8, 176u8, 169u8, 144u8, 255u8, 57u8,
-							78u8,
+							19u8, 22u8, 17u8, 127u8, 129u8, 221u8, 243u8, 222u8, 210u8, 198u8,
+							148u8, 185u8, 113u8, 61u8, 106u8, 66u8, 142u8, 2u8, 122u8, 249u8,
+							215u8, 58u8, 127u8, 187u8, 58u8, 253u8, 7u8, 30u8, 181u8, 5u8, 86u8,
+							155u8,
 						],
 					)
 				}
@@ -31489,13 +31489,17 @@ pub mod api {
 					#[codec(compact)]
 					pub bitcoin_locks_created: ::core::primitive::u32,
 					#[codec(compact)]
-					pub bitcoin_locks_market_value: ::core::primitive::u128,
+					pub bitcoin_locks_new_liquidity_promised: ::core::primitive::u128,
 					#[codec(compact)]
-					pub bitcoin_locks_total_satoshis: ::core::primitive::u64,
+					pub bitcoin_locks_released_liquidity: ::core::primitive::u128,
 					#[codec(compact)]
-					pub satoshis_released: ::core::primitive::u64,
+					pub bitcoin_locks_added_satoshis: ::core::primitive::u64,
+					#[codec(compact)]
+					pub bitcoin_locks_released_satoshis: ::core::primitive::u64,
 					#[codec(compact)]
 					pub securitization_activated: ::core::primitive::u128,
+					#[codec(compact)]
+					pub securitization_relockable: ::core::primitive::u128,
 					#[codec(compact)]
 					pub securitization: ::core::primitive::u128,
 					#[codec(compact)]
