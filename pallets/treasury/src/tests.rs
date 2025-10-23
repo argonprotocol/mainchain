@@ -829,6 +829,50 @@ fn test_prebonded_argons() {
 }
 
 #[test]
+fn test_prebond_modifies_aggregate_funds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				activated: 4_900_000_000,
+				sharing_percent: Permill::from_percent(10),
+				is_closed: false,
+			},
+		);
+
+		Treasury::on_frame_start(1);
+		set_argons(1, 6_000_000_000);
+		assert_ok!(Treasury::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 500_000_000));
+		for frame in 2..=12 {
+			CurrentFrameId::set(frame);
+			Treasury::on_frame_start(frame);
+			assert_eq!(
+				CapitalActive::<Test>::get().to_vec(),
+				vec![TreasuryCapital {
+					vault_id: 1,
+					activated_capital: 490_000_000,
+					frame_id: frame
+				}]
+			);
+		}
+		assert_eq!(
+			PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded,
+			5_000_000_000 - 490_000_000 * 10
+		);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_ok!(Treasury::vault_operator_prebond(RuntimeOrigin::signed(1), 1, 510_000_000));
+		assert_eq!(
+			PrebondedByVaultId::<Test>::get(1).unwrap().amount_unbonded,
+			5_100_000_000 - 490_000_000 * 10
+		);
+		assert_eq!(Balances::free_balance(1), 900_000_000);
+	});
+}
+
+#[test]
 fn test_treasury_struct() {
 	MaxTreasuryContributors::set(2);
 	new_test_ext().execute_with(|| {
