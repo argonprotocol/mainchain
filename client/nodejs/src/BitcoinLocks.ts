@@ -460,7 +460,7 @@ export class BitcoinLocks {
       priceIndex,
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
       argonKeyring,
-      tip,
+      tip = 0n,
       txProgressCallback,
     } = args;
 
@@ -483,7 +483,7 @@ export class BitcoinLocks {
 
     if (!canAfford.canAfford) {
       throw new Error(
-        `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionPrice)}`,
+        `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionPrice + canAfford.txFee + tip)}`,
       );
     }
     const txResult = await submitter.submit({

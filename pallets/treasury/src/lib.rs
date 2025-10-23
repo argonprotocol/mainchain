@@ -372,7 +372,19 @@ pub mod pallet {
 			// what has already been allocated. The vault operator won't be automatically rolled
 			// over, so we can just subtract off anything allocated
 			let raising_frame_id = T::GetCurrentFrameId::get() + 1;
-			for frame_id in raising_frame_id.saturating_sub(10)..=raising_frame_id {
+			let mut oldest_frame_id = raising_frame_id.saturating_sub(10);
+			// check if the raising frame has prebond already
+			let raising_frame = VaultPoolsByFrame::<T>::get(raising_frame_id);
+			if let Some(vault_pool) = raising_frame.get(&vault_id) {
+				for (account_id, holder) in &vault_pool.bond_holders {
+					if *account_id == operator {
+						amount_already_distributed.saturating_accrue(holder.starting_balance);
+						oldest_frame_id += 1;
+						break;
+					}
+				}
+			}
+			for frame_id in oldest_frame_id..raising_frame_id {
 				let frame_pools = VaultPoolsByFrame::<T>::get(frame_id);
 				let Some(vault_pool) = frame_pools.get(&vault_id) else {
 					continue;
@@ -380,6 +392,7 @@ pub mod pallet {
 				for (account_id, holder) in &vault_pool.bond_holders {
 					if *account_id == operator {
 						amount_already_distributed.saturating_accrue(holder.starting_balance);
+						break;
 					}
 				}
 			}
