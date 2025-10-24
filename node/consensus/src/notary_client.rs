@@ -307,7 +307,6 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	notebook_downloader: NotebookDownloader,
 	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
 	pub pause_queue_processing: Arc<RwLock<bool>>,
-	pub import_queue_pause_processing_bypass: Arc<RwLock<bool>>,
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
@@ -341,7 +340,6 @@ where
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
 			pause_queue_processing: Default::default(),
-			import_queue_pause_processing_bypass: Default::default(),
 			aux_client,
 			notebook_downloader,
 			metrics,
@@ -512,18 +510,18 @@ where
 
 	pub async fn process_queues(
 		self: &Arc<Self>,
-		evaluate_at_hash: Option<B::Hash>,
+		importing_with_parent_hash: Option<B::Hash>,
 	) -> Result<bool, Error> {
-		if *self.pause_queue_processing.read().await &&
-			!*self.import_queue_pause_processing_bypass.read().await
-		{
+		// Only respect pause flag when running under normal sync.
+		// When importing a specific block (e.g. during verification), always allow processing.
+		if *self.pause_queue_processing.read().await && importing_with_parent_hash.is_none() {
 			return Ok(true);
 		}
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
 		let finalized_hash = self.client.finalized_hash();
-		let best_hash = evaluate_at_hash.unwrap_or(self.client.best_hash());
+		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
 		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
 			return Ok(true);
 		}
@@ -980,12 +978,7 @@ where
 			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
 
 			// if we're importing a specific block, then network syncing should be off
-			loop {
-				*self.import_queue_pause_processing_bypass.write().await = true;
-				let res = self.process_queues(Some(*parent_hash)).await;
-				*self.import_queue_pause_processing_bypass.write().await = false;
-
-				let has_more_to_process = res?;
+			while self.process_queues(Some(*parent_hash)).await? {
 				tokio::time::sleep(Duration::from_millis(30)).await;
 				let mut has_more_work = false;
 				for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
@@ -995,7 +988,7 @@ where
 						has_more_work = true;
 					}
 				}
-				if !has_more_work || !has_more_to_process {
+				if !has_more_work {
 					break;
 				}
 				if start.elapsed() > Duration::from_secs(wait_time as u64) {
