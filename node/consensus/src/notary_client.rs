@@ -268,7 +268,7 @@ where
 		let notary_client = notary_client_clone;
 		loop {
 			let has_more_work = notary_client
-				.process_queues()
+				.process_queues(None)
 				.await
 				.inspect_err(|err| {
 					warn!("Error while processing notary queues: {:?}", err);
@@ -307,6 +307,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	notebook_downloader: NotebookDownloader,
 	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
 	pub pause_queue_processing: Arc<RwLock<bool>>,
+	pub import_queue_pause_processing_bypass: Arc<RwLock<bool>>,
 	ticker: Ticker,
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
@@ -340,6 +341,7 @@ where
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
 			pause_queue_processing: Default::default(),
+			import_queue_pause_processing_bypass: Default::default(),
 			aux_client,
 			notebook_downloader,
 			metrics,
@@ -508,15 +510,20 @@ where
 		None
 	}
 
-	pub async fn process_queues(self: &Arc<Self>) -> Result<bool, Error> {
-		if *self.pause_queue_processing.read().await {
+	pub async fn process_queues(
+		self: &Arc<Self>,
+		evaluate_at_hash: Option<B::Hash>,
+	) -> Result<bool, Error> {
+		if *self.pause_queue_processing.read().await &&
+			!*self.import_queue_pause_processing_bypass.read().await
+		{
 			return Ok(true);
 		}
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
 		let finalized_hash = self.client.finalized_hash();
-		let best_hash = self.client.best_hash();
+		let best_hash = evaluate_at_hash.unwrap_or(self.client.best_hash());
 		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
 			return Ok(true);
 		}
@@ -973,8 +980,12 @@ where
 			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
 
 			// if we're importing a specific block, then network syncing should be off
-			*self.pause_queue_processing.write().await = false;
-			while self.process_queues().await? {
+			loop {
+				*self.import_queue_pause_processing_bypass.write().await = true;
+				let res = self.process_queues(Some(*parent_hash)).await;
+				*self.import_queue_pause_processing_bypass.write().await = false;
+
+				let has_more_to_process = res?;
 				tokio::time::sleep(Duration::from_millis(30)).await;
 				let mut has_more_work = false;
 				for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
@@ -984,7 +995,7 @@ where
 						has_more_work = true;
 					}
 				}
-				if !has_more_work {
+				if !has_more_work || !has_more_to_process {
 					break;
 				}
 				if start.elapsed() > Duration::from_secs(wait_time as u64) {
@@ -994,7 +1005,6 @@ where
 						wait_time
 					)));
 				}
-				*self.pause_queue_processing.write().await = false;
 			}
 		}
 		Err(Error::InvalidNotebookDigest(
@@ -1777,7 +1787,7 @@ mod test {
 		assert!(result.to_string().contains("#9..9"));
 
 		for _ in 0..9 {
-			notary_client.process_queues().await.expect("Could not process queues");
+			notary_client.process_queues(None).await.expect("Could not process queues");
 		}
 		assert_eq!(
 			notary_client
@@ -1793,7 +1803,7 @@ mod test {
 		);
 		for _ in 0..10 {
 			test_notary.create_notebook_header(vec![]).await;
-			notary_client.process_queues().await.expect("Could not process queues");
+			notary_client.process_queues(None).await.expect("Could not process queues");
 		}
 		let mut rx = notary_client.tick_voting_power_receiver.lock().await;
 		let next_rx = rx.next().await.expect("Could not receive");
@@ -1824,7 +1834,7 @@ mod test {
 		notary_client.next_subscription(Duration::from_millis(500)).await;
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 		assert!(notary_client.notebook_queue_by_id.read().await.get(&2).is_none());
-		notary_client.process_queues().await.expect("Could not process queues");
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 0);
 		assert!(notary_client.notebook_queue_by_id.read().await.get(&2).is_none());
 
@@ -1861,7 +1871,7 @@ mod test {
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&2).unwrap().len(), 2);
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&2).unwrap()[0].0, 1);
 		// should process one from each notary
-		notary_client.process_queues().await.expect("Could not process queues");
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 0);
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&2).unwrap().len(), 1);
 	}
@@ -1893,8 +1903,8 @@ mod test {
 			.expect("Could not get next");
 		assert_eq!(notary_client.queue_depth(1).await, 3);
 
-		notary_client.process_queues().await.expect("Could not process queues");
-		notary_client.process_queues().await.expect("Could not process queues");
+		notary_client.process_queues(None).await.expect("Could not process queues");
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 
 		*client.current_tick.lock() = 2;
@@ -1902,7 +1912,7 @@ mod test {
 			.audit_failure
 			.lock()
 			.replace(NotebookVerifyError::InvalidChainTransfersList);
-		notary_client.process_queues().await.expect("Could not process queues");
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 	}
 
