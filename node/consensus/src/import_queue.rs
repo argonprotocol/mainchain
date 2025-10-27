@@ -206,7 +206,7 @@ where
 			.expect("Best header should always be available")
 			.expect("Best header should always exist");
 
-		let best_block_power = if info.best_number.is_zero() {
+		let best_block_power = if best_header.number().is_zero() {
 			ForkPower::default()
 		} else {
 			ForkPower::try_from(best_header.digest()).map_err(|e| {
@@ -239,13 +239,26 @@ where
 				}
 			}
 			if set_to_best {
-				tracing::info!(
-					number=?block_number,
-					block_hash = ?block_hash,
-					is_finalized_descendent,
-					finalized = block.finalized,
-					"New best block imported"
-				);
+				if *best_header.number() == block_number {
+					tracing::info!(
+						number=?block_number,
+						beat_best_hash=?best_header.hash(),
+						is_equal_weight=fork_power.eq_weight(&best_block_power),
+						block_hash=?block_hash,
+						is_finalized_descendent,
+						finalized=block.finalized,
+						"Replacing best block at number"
+					);
+				} else {
+					tracing::info!(
+						number=?block_number,
+						prev_best_hash=?best_header.hash(),
+						block_hash=?block_hash,
+						is_finalized_descendent,
+						finalized=block.finalized,
+						"New best block imported"
+					);
+				}
 			}
 		}
 		block.fork_choice = Some(ForkChoiceStrategy::Custom(set_to_best));

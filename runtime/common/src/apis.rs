@@ -168,14 +168,6 @@ macro_rules! inject_common_apis {
                 BlockSealSpec::create_block_vote_digest(notebook_tick, included_notebooks)
             }
 
-            fn find_vote_block_seals(
-                votes: Vec<NotaryNotebookRawVotes>,
-                with_better_strength: U256,
-                expected_notebook_tick: Tick,
-            ) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>{
-                Ok(BlockSeal::find_vote_block_seals(votes,with_better_strength, expected_notebook_tick)?)
-            }
-
             fn find_better_vote_block_seal(
                 notebook_votes: Vec<NotaryNotebookRawVotes>,
                 best_strength: U256,
@@ -255,19 +247,6 @@ macro_rules! inject_common_apis {
                 notebook_number: NotebookNumber,
                 notebook_tick: Tick,
                 header_hash: H256,
-                bytes: &Vec<u8>,
-                audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
-            ) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {
-                Notebook::audit_notebook(version, notary_id, notebook_number, notebook_tick, header_hash, bytes, audit_dependency_summaries)
-            }
-
-            fn audit_notebook_and_get_votes(
-                version: u32,
-                notary_id: NotaryId,
-                notebook_number: NotebookNumber,
-                notebook_tick: Tick,
-                header_hash: H256,
-                _vote_minimums: &BTreeMap<<Block as BlockT>::Hash, VoteMinimum>,
                 bytes: &Vec<u8>,
                 audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
             ) -> Result<NotaryNotebookRawVotes, NotebookVerifyError> {

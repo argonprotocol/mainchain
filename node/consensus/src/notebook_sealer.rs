@@ -2,12 +2,11 @@ use crate::{
 	NotebookTickChecker, aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error,
 };
 use argon_primitives::{
-	AccountId, BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealDigest, BlockVote, TickApis, VotingSchedule,
+	BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	BlockVote, TickApis, VotingSchedule,
 	block_seal::{BLOCK_SEAL_CRYPTO_ID, BLOCK_SEAL_KEY_TYPE},
 	fork_power::ForkPower,
 	notary::NotaryNotebookRawVotes,
-	prelude::sp_api::{Core, RuntimeApiInfo},
 	tick::{Tick, Ticker},
 };
 use argon_runtime::NotebookVerifyError;
@@ -164,27 +163,12 @@ where
 			"Building vote seal on block",
 		);
 
-		let api_version = self.client.runtime_api().version(block_hash)?;
-		let block_seal_version = api_version
-			.api_version(&<dyn BlockSealApis<B, AccountId, BlockSealAuthorityId>>::ID)
-			.unwrap_or_default();
+		let seal = self
+			.check_v2_seals(&block_votes, keys, block_hash, seal_strength, xor_distance, votes_tick)
+			.await?;
 
-		// TODO: remove v1 once we have safely migrated to v2 (July 2025)
-		let seal = if block_seal_version == 1 {
-			self.check_v1_seals(&block_votes, block_hash, seal_strength, votes_tick).await?
-		} else {
-			self.check_v2_seals(
-				&block_votes,
-				keys,
-				block_hash,
-				seal_strength,
-				xor_distance,
-				votes_tick,
-			)
-			.await?
-		};
 		if let Some(vote_seal) = seal {
-			tracing::trace!(block = ?block_hash, strength = ?vote_seal.seal_strength, miner_xor_distance = ?vote_seal.miner_xor_distance,
+			tracing::trace!(build_on_block = ?block_hash, strength = ?vote_seal.seal_strength, miner_xor_distance = ?vote_seal.miner_xor_distance,
 				"Found vote-eligible block");
 			let block_tick = voting_schedule.block_tick();
 			if let Some(recheck_at) = NotebookTickChecker::should_delay_block_attempt(
@@ -254,43 +238,6 @@ where
 			}
 		}
 		Ok(best_block_vote_seal)
-	}
-
-	async fn check_v1_seals(
-		&self,
-		block_votes: &[NotaryNotebookRawVotes],
-		block_hash: B::Hash,
-		best_seal_strength: U256,
-		votes_tick: Tick,
-	) -> Result<Option<BestBlockVoteSeal<AC, BlockSealAuthorityId>>, Error> {
-		let stronger_seals = self
-			.client
-			.runtime_api()
-			.find_vote_block_seals(
-				block_hash,
-				block_votes.to_owned(),
-				best_seal_strength,
-				votes_tick,
-			)
-			.inspect_err(|e| {
-				tracing::error!(err = ?e, block=?block_hash, "Unable to call vote block seals");
-			})?
-			.inspect_err(|e| {
-				tracing::error!(err = ?e, block=?block_hash, "Unable to lookup vote block seals");
-			})
-			.unwrap_or_default();
-
-		for vote in stronger_seals.into_iter() {
-			let raw_authority = vote.closest_miner.1.to_raw_vec();
-			if !self.keystore.has_keys(&[(raw_authority, BLOCK_SEAL_KEY_TYPE)]) {
-				tracing::trace!(block = ?block_hash, strength = ?vote.seal_strength,
-					"Could not sign vote for block",
-				);
-				continue;
-			}
-			return Ok(Some(vote));
-		}
-		Ok(None)
 	}
 
 	async fn get_best_block_at_parent(

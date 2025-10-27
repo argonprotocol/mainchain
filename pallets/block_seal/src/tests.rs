@@ -572,147 +572,6 @@ fn it_skips_ineligible_voting_roots() {
 }
 
 #[test]
-fn it_can_find_best_vote_seals_v1() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		let mut parent_hash = System::parent_hash();
-
-		assert_eq!(
-			BlockSeal::find_vote_block_seals(vec![], U256::MAX, 0).unwrap().to_vec(),
-			vec![]
-		);
-		let mut first_vote = BlockVoteT {
-			account_id: Bob.public().into(),
-			index: 0,
-			tick: 1,
-			block_hash: parent_hash,
-			power: 500,
-			block_rewards_account_id: Alice.to_account_id(),
-			signature: empty_vote_signature(),
-		};
-		XorClosest::set(Some((
-			MiningAuthority {
-				account_id: Alice.into(),
-				authority_id: default_authority(),
-				authority_index: (1, 0),
-			},
-			U256::from(100),
-		)));
-		AuthorityList::set(vec![(Alice.into(), default_authority())]);
-
-		let mut vote = NotaryNotebookRawVotes {
-			notary_id: 1,
-			notebook_number: 1,
-			raw_votes: vec![(first_vote.encode(), 500)],
-		};
-		assert_eq!(
-			BlockSeal::find_vote_block_seals(vec![vote.clone()], U256::MAX, 0)
-				.unwrap()
-				.to_vec(),
-			vec![],
-			"there's not a valid grandpa block or voting key yet"
-		);
-
-		for i in 1..=5 {
-			System::reset_events();
-			System::initialize(&i, &parent_hash, &Default::default());
-
-			let header = System::finalize();
-			parent_hash = header.hash();
-			System::set_block_number(*header.number());
-		}
-		CurrentTick::set(5);
-		// This api assumes you are building the next block, so the runtime tick will already be -1
-		let voting_schedule = VotingSchedule::when_evaluating_runtime_votes(5);
-		BlocksAtTick::mutate(|a| {
-			for i in 1..5 {
-				a.insert(i as Tick, vec![System::block_hash(i)]);
-			}
-		});
-
-		first_vote.block_hash = System::block_hash(voting_schedule.eligible_votes_tick());
-
-		vote.raw_votes = vec![(first_vote.encode(), 500)];
-
-		ParentVotingKey::<Test>::put(Some(H256::random()));
-		assert!(!first_vote.is_proxy_vote());
-
-		assert_eq!(
-			BlockSeal::find_vote_block_seals(
-				vec![vote.clone()],
-				U256::MAX,
-				voting_schedule.notebook_tick()
-			)
-			.unwrap()
-			.into_inner(),
-			vec![],
-			"vote is for grandparent, but should be for great grandparent"
-		);
-
-		first_vote.block_hash = System::block_hash(voting_schedule.grandparent_votes_tick());
-		vote.raw_votes = vec![(first_vote.encode(), 500)];
-		let best = BlockSeal::find_vote_block_seals(
-			vec![vote.clone()],
-			U256::MAX,
-			voting_schedule.notebook_tick(),
-		)
-		.expect("should return");
-		assert_eq!(best.len(), 1);
-		assert_eq!(best[0].block_vote_bytes, first_vote.encode());
-
-		let mut votes = vec![];
-		// insert 200 votes
-		for i in 2..200 {
-			let mut vote = first_vote.clone();
-			vote.index = i;
-			votes.push(NotaryNotebookRawVotes {
-				notary_id: i,
-				notebook_number: 1,
-				raw_votes: vec![(vote.encode(), 500)],
-			});
-		}
-		let best = BlockSeal::find_vote_block_seals(
-			votes.clone(),
-			U256::MAX,
-			voting_schedule.notebook_tick(),
-		)
-		.expect("should return");
-		assert_eq!(best.len(), 2);
-		let strongest = best[0].seal_strength;
-		assert_eq!(best[0].closest_miner, (Alice.into(), default_authority()));
-		let voting_key = ParentVotingKey::<Test>::get().unwrap();
-		for notebook_vote in &votes {
-			for (vote, _) in &notebook_vote.raw_votes {
-				let block_vote = BlockVoteT::<H256>::decode(&mut vote.as_slice()).unwrap();
-				assert!(
-					block_vote.get_seal_strength(notebook_vote.notary_id, voting_key) >= strongest
-				);
-			}
-		}
-		assert_eq!(
-			BlockSeal::find_vote_block_seals(
-				votes.clone(),
-				strongest,
-				voting_schedule.notebook_tick()
-			)
-			.expect("")
-			.len(),
-			0
-		);
-		assert_eq!(
-			BlockSeal::find_vote_block_seals(
-				votes.clone(),
-				best[1].seal_strength,
-				voting_schedule.notebook_tick()
-			)
-			.expect("")
-			.len(),
-			1
-		);
-	})
-}
-
-#[test]
 fn it_can_find_best_vote_seal_v2() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -889,15 +748,17 @@ fn it_allows_any_block_with_default_votes() {
 		// Go past genesis block so events get deposited
 		let mut parent_hash = System::parent_hash();
 
+		let authority = default_authority();
+
 		XorClosest::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
-				authority_id: default_authority(),
+				authority_id: authority.clone(),
 				authority_index: (1, 0),
 			},
 			U256::from(100),
 		)));
-		AuthorityList::set(vec![(Alice.into(), default_authority())]);
+		AuthorityList::set(vec![(Alice.into(), authority.clone())]);
 
 		for i in 1..=5 {
 			System::reset_events();
@@ -922,18 +783,20 @@ fn it_allows_any_block_with_default_votes() {
 
 		ParentVotingKey::<Test>::put(Some(H256::random()));
 
-		let best = BlockSeal::find_vote_block_seals(
+		let best = BlockSeal::find_better_vote_block_seal(
 			vec![NotaryNotebookRawVotes {
 				notary_id: 1,
 				notebook_number: 1,
 				raw_votes: vec![(first_vote.encode(), 0)],
 			}],
 			U256::MAX,
+			U256::MAX,
+			authority.clone(),
 			voting_schedule.notebook_tick(),
 		)
 		.expect("should return");
-		assert_eq!(best.len(), 1);
-		assert_eq!(best[0].block_vote_bytes, first_vote.encode());
+		assert!(best.is_some());
+		assert_eq!(best.unwrap().block_vote_bytes, first_vote.encode());
 	})
 }
 

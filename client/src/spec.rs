@@ -1498,30 +1498,6 @@ pub mod api {
 						],
 					)
 				}
-				pub fn find_vote_block_seals(
-					&self,
-					votes: types::find_vote_block_seals::Votes,
-					with_better_strength: types::find_vote_block_seals::WithBetterStrength,
-					expected_notebook_tick: types::find_vote_block_seals::ExpectedNotebookTick,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::FindVoteBlockSeals,
-					types::find_vote_block_seals::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"BlockSealApis",
-						"find_vote_block_seals",
-						types::FindVoteBlockSeals {
-							votes,
-							with_better_strength,
-							expected_notebook_tick,
-						},
-						[
-							141u8, 212u8, 51u8, 206u8, 235u8, 153u8, 182u8, 160u8, 99u8, 12u8,
-							182u8, 142u8, 64u8, 108u8, 18u8, 94u8, 234u8, 72u8, 205u8, 149u8, 98u8,
-							25u8, 141u8, 124u8, 63u8, 106u8, 180u8, 218u8, 43u8, 122u8, 5u8, 240u8,
-						],
-					)
-				}
 				pub fn find_better_vote_block_seal(
 					&self,
 					notebook_votes: types::find_better_vote_block_seal::NotebookVotes,
@@ -1674,43 +1650,6 @@ pub mod api {
 				pub struct CreateVoteDigest {
 					pub notebook_tick: create_vote_digest::NotebookTick,
 					pub included_notebooks: create_vote_digest::IncludedNotebooks,
-				}
-				pub mod find_vote_block_seals {
-					use super::runtime_types;
-					pub type Votes = ::subxt::ext::subxt_core::alloc::vec::Vec<
-						runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
-					>;
-					pub type WithBetterStrength = runtime_types::primitive_types::U256;
-					pub type ExpectedNotebookTick = ::core::primitive::u64;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::core::result::Result<
-							runtime_types::bounded_collections::bounded_vec::BoundedVec<
-								runtime_types::argon_primitives::block_vote::BestBlockVoteSeal<
-									crate::types::AccountId32,
-									runtime_types::argon_primitives::block_seal::app::Public,
-								>,
-							>,
-							runtime_types::sp_runtime::DispatchError,
-						>;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct FindVoteBlockSeals {
-					pub votes: find_vote_block_seals::Votes,
-					pub with_better_strength: find_vote_block_seals::WithBetterStrength,
-					pub expected_notebook_tick: find_vote_block_seals::ExpectedNotebookTick,
 				}
 				pub mod find_better_vote_block_seal {
 					use super::runtime_types;
@@ -2153,40 +2092,6 @@ pub mod api {
 						],
 					)
 				}
-				pub fn audit_notebook_and_get_votes(
-					&self,
-					version: types::audit_notebook_and_get_votes::Version,
-					notary_id: types::audit_notebook_and_get_votes::NotaryId,
-					notebook_number: types::audit_notebook_and_get_votes::NotebookNumber,
-					notebook_tick: types::audit_notebook_and_get_votes::NotebookTick,
-					header_hash: types::audit_notebook_and_get_votes::HeaderHash,
-					vote_minimums: types::audit_notebook_and_get_votes::VoteMinimums,
-					bytes: types::audit_notebook_and_get_votes::Bytes,
-					raw_audit_dependency_summaries : types :: audit_notebook_and_get_votes :: RawAuditDependencySummaries,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::AuditNotebookAndGetVotes,
-					types::audit_notebook_and_get_votes::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"NotebookApis",
-						"audit_notebook_and_get_votes",
-						types::AuditNotebookAndGetVotes {
-							version,
-							notary_id,
-							notebook_number,
-							notebook_tick,
-							header_hash,
-							vote_minimums,
-							bytes,
-							raw_audit_dependency_summaries,
-						},
-						[
-							225u8, 174u8, 123u8, 237u8, 30u8, 245u8, 37u8, 0u8, 232u8, 93u8, 96u8,
-							2u8, 72u8, 245u8, 180u8, 1u8, 209u8, 254u8, 63u8, 196u8, 184u8, 51u8,
-							58u8, 68u8, 87u8, 208u8, 133u8, 208u8, 202u8, 210u8, 134u8, 24u8,
-						],
-					)
-				}
 				pub fn decode_signed_raw_notebook_header(
 					&self,
 					raw_header: types::decode_signed_raw_notebook_header::RawHeader,
@@ -2267,54 +2172,6 @@ pub mod api {
 					pub bytes: audit_notebook_and_get_votes_v2::Bytes,
 					pub raw_audit_dependency_summaries:
 						audit_notebook_and_get_votes_v2::RawAuditDependencySummaries,
-				}
-				pub mod audit_notebook_and_get_votes {
-					use super::runtime_types;
-					pub type Version = ::core::primitive::u32;
-					pub type NotaryId = ::core::primitive::u32;
-					pub type NotebookNumber = ::core::primitive::u32;
-					pub type NotebookTick = ::core::primitive::u64;
-					pub type HeaderHash = crate::types::H256;
-					pub type VoteMinimums = ::subxt::ext::subxt_core::utils::KeyedVec<
-						crate::types::H256,
-						::core::primitive::u128,
-					>;
-					pub type Bytes =
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
-					pub type RawAuditDependencySummaries =
-						::subxt::ext::subxt_core::alloc::vec::Vec<
-							runtime_types::argon_primitives::notary::NotaryNotebookAuditSummary,
-						>;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::core::result::Result<
-							runtime_types::argon_primitives::notary::NotaryNotebookRawVotes,
-							runtime_types::argon_notary_audit::error::VerifyError,
-						>;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct AuditNotebookAndGetVotes {
-					pub version: audit_notebook_and_get_votes::Version,
-					pub notary_id: audit_notebook_and_get_votes::NotaryId,
-					pub notebook_number: audit_notebook_and_get_votes::NotebookNumber,
-					pub notebook_tick: audit_notebook_and_get_votes::NotebookTick,
-					pub header_hash: audit_notebook_and_get_votes::HeaderHash,
-					pub vote_minimums: audit_notebook_and_get_votes::VoteMinimums,
-					pub bytes: audit_notebook_and_get_votes::Bytes,
-					pub raw_audit_dependency_summaries:
-						audit_notebook_and_get_votes::RawAuditDependencySummaries,
 				}
 				pub mod decode_signed_raw_notebook_header {
 					use super::runtime_types;
@@ -3854,9 +3711,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				114u8, 206u8, 83u8, 24u8, 2u8, 82u8, 252u8, 50u8, 104u8, 206u8, 3u8, 230u8, 189u8,
-				155u8, 170u8, 208u8, 91u8, 130u8, 68u8, 26u8, 203u8, 255u8, 19u8, 8u8, 72u8, 36u8,
-				151u8, 65u8, 133u8, 205u8, 15u8, 141u8,
+				18u8, 143u8, 108u8, 22u8, 220u8, 75u8, 156u8, 15u8, 23u8, 177u8, 116u8, 193u8,
+				233u8, 125u8, 218u8, 80u8, 108u8, 72u8, 22u8, 8u8, 23u8, 66u8, 206u8, 169u8, 241u8,
+				169u8, 90u8, 42u8, 140u8, 54u8, 38u8, 73u8,
 			]
 	}
 	pub mod system {

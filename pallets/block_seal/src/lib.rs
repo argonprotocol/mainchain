@@ -106,14 +106,6 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type IsBlockFromVoteSeal<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	type FindBlockVoteSealResult<T> = BoundedVec<
-		BestBlockVoteSeal<
-			<T as frame_system::Config>::AccountId,
-			<T as pallet::Config>::AuthorityId,
-		>,
-		ConstU32<2>,
-	>;
-
 	#[pallet::error]
 	pub enum Error<T> {
 		/// The strength of the given seal did not match calculations
@@ -642,66 +634,6 @@ pub mod pallet {
 				}));
 			}
 			Ok(None)
-		}
-
-		/// Finds 0 or more block vote seals that are eligible for the current block.
-		///
-		/// This is the v1 of this api. In v1, only one miner was eligible for each vote.
-		pub fn find_vote_block_seals(
-			notebook_votes: Vec<NotaryNotebookRawVotes>,
-			with_better_strength: U256,
-			expected_notebook_tick: Tick,
-		) -> Result<FindBlockVoteSealResult<T>, Error<T>> {
-			let mut result = BoundedVec::new();
-			let TopVotes { best_votes, leafs_by_notary, grandparent_tick_blocks } =
-				Self::find_top_votes(
-					notebook_votes,
-					// in v1, we don't use the xor distance. we only want votes stronger than the
-					// current best
-					with_better_strength.saturating_sub(U256::one()),
-					expected_notebook_tick,
-				)?;
-			for (seal_strength, seal_proof, notary_id, source_notebook_number, index) in
-				best_votes.into_iter()
-			{
-				let leafs = leafs_by_notary.get(&notary_id).expect("just created");
-
-				let proof = merkle_proof::<BlakeTwo256, _, _>(leafs, index as u32);
-
-				let vote =
-					BlockVoteT::<<T::Block as BlockT>::Hash>::decode(&mut leafs[index].as_slice())
-						.map_err(|_| Error::<T>::CouldNotDecodeVote)?;
-
-				// proxy votes can use any block
-				if !vote.is_proxy_vote() && !grandparent_tick_blocks.contains(&vote.block_hash) {
-					log::info!(
-						"Cant use vote for grandparent tick {:?} - voted for {:?}",
-						grandparent_tick_blocks,
-						vote.block_hash
-					);
-					continue;
-				}
-
-				let closest_authority = T::AuthorityProvider::xor_closest_authority(seal_proof)
-					.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
-				let best_nonce = BestBlockVoteSeal {
-					notary_id,
-					seal_strength,
-					block_vote_bytes: leafs[index].clone(),
-					source_notebook_number,
-					source_notebook_proof: MerkleProof {
-						proof: BoundedVec::truncate_from(proof.proof),
-						leaf_index: proof.leaf_index,
-						number_of_leaves: proof.number_of_leaves,
-					},
-					closest_miner: (closest_authority.account_id, closest_authority.authority_id),
-					miner_xor_distance: None,
-				};
-				if result.try_push(best_nonce).is_err() {
-					break;
-				}
-			}
-			Ok(result)
 		}
 	}
 

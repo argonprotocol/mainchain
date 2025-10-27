@@ -17,20 +17,13 @@ use crate::{
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::Codec;
 use polkadot_sdk::*;
-use sp_core::{ConstU32, H256, U256};
-use sp_runtime::{BoundedVec, Digest, DispatchError};
-
+use sp_core::{H256, U256};
 sp_api::decl_runtime_apis! {
 	#[api_version(2)]
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
 		fn vote_minimum() -> VoteMinimum;
 		fn compute_puzzle() -> ComputePuzzle<Block>;
 		fn create_vote_digest(notebook_tick: Tick, included_notebooks: Vec<NotaryNotebookVoteDigestDetails>) -> BlockVoteDigest;
-		fn find_vote_block_seals(
-			votes: Vec<NotaryNotebookRawVotes>,
-			with_better_strength: U256,
-			expected_notebook_tick: Tick,
-		) -> Result<BoundedVec<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>, ConstU32<2>>, DispatchError>;
 		#[api_version(2)]
 		fn find_better_vote_block_seal(
 			notebook_votes: Vec<NotaryNotebookRawVotes>,
@@ -44,6 +37,8 @@ sp_api::decl_runtime_apis! {
 		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
 	}
 }
+
+use sp_runtime::{Digest, DispatchError};
 
 sp_api::decl_runtime_apis!(
 	pub trait BlockCreatorApis<AccountId: Codec, VerifyError: Codec> {
@@ -93,18 +88,6 @@ sp_api::decl_runtime_apis! {
 			bytes: &Vec<u8>,
 			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
 		) -> Result<NotaryNotebookRawVotes, VerifyError>;
-
-		fn audit_notebook_and_get_votes(
-			version: u32,
-			notary_id: NotaryId,
-			notebook_number: NotebookNumber,
-			notebook_tick: Tick,
-			header_hash: H256,
-			vote_minimums: &BTreeMap<Block::Hash, VoteMinimum>,
-			bytes: &Vec<u8>,
-			raw_audit_dependency_summaries: Vec<NotaryNotebookAuditSummary>,
-		) -> Result<NotaryNotebookRawVotes, VerifyError>;
-
 
 		fn decode_signed_raw_notebook_header(raw_header: Vec<u8>) -> Result<NotaryNotebookDetails<Block::Hash>, DispatchError>;
 
