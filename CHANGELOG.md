@@ -1,9 +1,26 @@
 # Changelog
 
-## [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...4ee4f7cce4918c57b0c60c76f78bd10b54615ad1) (2025-10-15)
+## [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...393d37935fa1f0a0a894520c6a584238dbf769b0) (2025-10-27)
 
 ### Fixes
 
+* remove unneeded var per copilot feedback
+([8887c64](https://github.com/argonprotocol/mainchain/commit/8887c6487be7ed20f67eb00320bf6d84ad8666bf))
+* **node:** hanging sync for notary
+([7c4fcb4](https://github.com/argonprotocol/mainchain/commit/7c4fcb4ea7486a3e93cf8d43d2876032264063e1))
+* **client/nodejs:** add fee to btc release cost
+([168fade](https://github.com/argonprotocol/mainchain/commit/168fade5c63a182cc28ff1818b884cd077591ba3))
+* **treasury:** prebond not adding existing correct
+([c7f3092](https://github.com/argonprotocol/mainchain/commit/c7f3092f77f33fbf57a1403314f83fdee68aa99f))
+* **treasury:** fix double burn of uncollected
+([071bb24](https://github.com/argonprotocol/mainchain/commit/071bb24308c51b4d8ff2dac3322266623656b008))
+
+### [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...v1.3.11) (2025-10-15)
+
+#### Fixes
+
+* increment spec
+([d7a7cff](https://github.com/argonprotocol/mainchain/commit/d7a7cffe5e5e5185dafed8314065e76b49d9c0e1))
 * **treasury:** remove infinite loop
 ([4ee4f7c](https://github.com/argonprotocol/mainchain/commit/4ee4f7cce4918c57b0c60c76f78bd10b54615ad1))
 
