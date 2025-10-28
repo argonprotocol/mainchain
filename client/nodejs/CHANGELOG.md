@@ -1,6 +1,15 @@
 # Changelog
 
-## [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...4ee4f7cce4918c57b0c60c76f78bd10b54615ad1) (2025-10-15)
+## [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...393d37935fa1f0a0a894520c6a584238dbf769b0) (2025-10-27)
+
+### Fixes
+
+* **client/nodejs:** add fee to btc release cost
+([168fade](https://github.com/argonprotocol/mainchain/commit/168fade5c63a182cc28ff1818b884cd077591ba3))
+* **treasury:** fix double burn of uncollected
+([071bb24](https://github.com/argonprotocol/mainchain/commit/071bb24308c51b4d8ff2dac3322266623656b008))
+
+### [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...v1.3.11) (2025-10-15)
 
 ### [v1.3.10](https://github.com/argonprotocol/mainchain/compare/v1.3.9...v1.3.10) (2025-10-15)
 
