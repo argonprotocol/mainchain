@@ -13,7 +13,8 @@ import {
 import BigNumber, * as BN from 'bignumber.js';
 import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
-import { TxResult } from './TxSubmitter';
+import { TxResult } from './TxResult';
+import { ISubmittableOptions } from './TxSubmitter';
 
 const { ROUND_FLOOR } = BN;
 
@@ -167,12 +168,10 @@ export class Vault {
       baseFee: bigint | number;
       bitcoinXpub: string;
       treasuryProfitSharing: number;
-      tip?: bigint;
       doNotExceedBalance?: bigint;
-      txProgressCallback?: ITxProgressCallback;
-    },
+    } & ISubmittableOptions,
     config: { tickDurationMillis?: number } = {},
-  ): Promise<{ vault: Vault; txResult: TxResult }> {
+  ): Promise<{ getVault(): Promise<Vault>; txResult: TxResult }> {
     const {
       securitization,
       securitizationRatio,
@@ -226,31 +225,32 @@ export class Vault {
     }
 
     const result = await tx.submit({
-      tip,
+      ...args,
       useLatestNonce: true,
-      waitForBlock: true,
-      txProgressCallback,
     });
-    await result.inBlockPromise;
-    let vaultId: number | undefined;
-    for (const event of result.events) {
-      if (client.events.vaults.VaultCreated.is(event)) {
-        vaultId = event.data.vaultId.toNumber();
-        break;
-      }
-    }
-    if (vaultId === undefined) {
-      throw new Error('Vault creation failed, no VaultCreated event found');
-    }
-    const rawVault = await client.query.vaults.vaultsById(vaultId);
-    if (rawVault.isNone) {
-      throw new Error('Vault creation failed, vault not found');
-    }
     const tickDuration =
       config.tickDurationMillis ??
       (await client.query.ticks.genesisTicker().then(x => x.tickDurationMillis.toNumber()))!;
-    const vault = new Vault(vaultId, rawVault.unwrap(), tickDuration);
-    return { vault, txResult: result };
+
+    async function getVault(): Promise<Vault> {
+      await result.waitForFinalizedBlock;
+      let vaultId: number | undefined;
+      for (const event of result.events) {
+        if (client.events.vaults.VaultCreated.is(event)) {
+          vaultId = event.data.vaultId.toNumber();
+          break;
+        }
+      }
+      if (vaultId === undefined) {
+        throw new Error('Vault creation failed, no VaultCreated event found');
+      }
+      const rawVault = await client.query.vaults.vaultsById(vaultId);
+      if (rawVault.isNone) {
+        throw new Error('Vault creation failed, vault not found');
+      }
+      return new Vault(vaultId, rawVault.unwrap(), tickDuration);
+    }
+    return { getVault, txResult: result };
   }
 }
 

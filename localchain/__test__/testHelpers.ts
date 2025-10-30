@@ -10,8 +10,8 @@ import { Localchain } from '../index';
 import { closeOnTeardown } from '@argonprotocol/testing';
 
 export {
+  SKIP_E2E,
   activateNotary,
-  describeIntegration,
   disconnectOnTeardown,
   TestNotary,
   closeOnTeardown,

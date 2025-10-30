@@ -176,7 +176,7 @@ export default class TestNotary implements ITeardownable {
 
   public async register(client: ArgonClient): Promise<void> {
     const address = new URL(this.address);
-    await new TxSubmitter(
+    const result = await new TxSubmitter(
       client,
       client.tx.notaries.propose({
         public: this.registeredPublicKey,
@@ -184,7 +184,8 @@ export default class TestNotary implements ITeardownable {
         name: 'Test Notary',
       }),
       this.operator!,
-    ).submit({ waitForBlock: true });
+    ).submit();
+    await result.waitForInFirstBlock;
   }
 
   public async teardown(): Promise<void> {

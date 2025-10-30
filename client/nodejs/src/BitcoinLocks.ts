@@ -2,14 +2,14 @@ import {
   type ArgonClient,
   type ArgonPrimitivesBitcoinBitcoinNetwork,
   formatArgons,
-  ITxProgressCallback,
   type KeyringPair,
   MICROGONS_PER_ARGON,
   TxSubmitter,
   Vault,
 } from './index';
 import { GenericEvent } from '@polkadot/types';
-import { TxResult } from './TxSubmitter';
+import { ISubmittableOptions } from './TxSubmitter';
+import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
@@ -158,12 +158,13 @@ export class BitcoinLocks {
     };
   }
 
-  async submitVaultSignature(args: {
-    utxoId: number;
-    vaultSignature: Uint8Array;
-    argonKeyring: KeyringPair;
-    txProgressCallback?: ITxProgressCallback;
-  }): Promise<TxResult> {
+  async submitVaultSignature(
+    args: {
+      utxoId: number;
+      vaultSignature: Uint8Array;
+      argonKeyring: KeyringPair;
+    } & ISubmittableOptions,
+  ): Promise<TxResult> {
     const { utxoId, vaultSignature, argonKeyring, txProgressCallback } = args;
     const client = this.client;
     if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
@@ -175,7 +176,7 @@ export class BitcoinLocks {
     const tx = client.tx.bitcoinLocks.cosignRelease(utxoId, signature);
     const submitter = new TxSubmitter(client, tx, argonKeyring);
 
-    return await submitter.submit({ txProgressCallback });
+    return await submitter.submit(args);
   }
 
   async getBitcoinLock(utxoId: number): Promise<IBitcoinLock | undefined> {
@@ -377,12 +378,8 @@ export class BitcoinLocks {
     createdAtHeight: number;
     txResult: TxResult;
   }> {
-    const client = this.client;
-    const blockHash = await txResult.inBlockPromise;
-    const blockHeight = await client
-      .at(blockHash)
-      .then(x => x.query.system.number())
-      .then(x => x.toNumber());
+    await txResult.waitForFinalizedBlock;
+    const blockHeight = txResult.blockNumber!;
     const utxoId = (await this.getUtxoIdFromEvents(txResult.events)) ?? 0;
     if (utxoId === 0) {
       throw new Error('Bitcoin lock creation failed, no UTXO ID found in transaction events');
@@ -394,21 +391,20 @@ export class BitcoinLocks {
     return { lock, createdAtHeight: blockHeight, txResult };
   }
 
-  async initializeLock(args: {
-    vault: Vault;
-    priceIndex: PriceIndex;
-    ownerBitcoinPubkey: Uint8Array;
-    argonKeyring: KeyringPair;
-    satoshis: bigint;
-    tip?: bigint;
-    txProgressCallback?: ITxProgressCallback;
-  }): Promise<{
-    lock: IBitcoinLock;
-    createdAtHeight: number;
+  async initializeLock(
+    args: {
+      vault: Vault;
+      priceIndex: PriceIndex;
+      ownerBitcoinPubkey: Uint8Array;
+      argonKeyring: KeyringPair;
+      satoshis: bigint;
+    } & ISubmittableOptions,
+  ): Promise<{
+    getLock(): Promise<{ lock: IBitcoinLock; createdAtHeight: number }>;
     txResult: TxResult;
     securityFee: bigint;
   }> {
-    const { argonKeyring, tip = 0n, txProgressCallback } = args;
+    const { argonKeyring } = args;
     const client = this.client;
 
     const { tx, securityFee, canAfford, txFeePlusTip } = await this.createInitializeLockTx(args);
@@ -418,17 +414,10 @@ export class BitcoinLocks {
       );
     }
     const submitter = new TxSubmitter(client, tx, argonKeyring);
-    const txResult = await submitter.submit({
-      waitForBlock: true,
-      logResults: true,
-      tip,
-      txProgressCallback,
-    });
+    const txResult = await submitter.submit({ logResults: true, ...args });
 
-    const { lock, createdAtHeight } = await this.getBitcoinLockFromTxResult(txResult);
     return {
-      lock,
-      createdAtHeight,
+      getLock: () => this.getBitcoinLockFromTxResult(txResult),
       txResult,
       securityFee,
     };
@@ -446,14 +435,14 @@ export class BitcoinLocks {
     return (argonAmount * SATS_PER_BTC) / marketRatePerBitcoin;
   }
 
-  async requestRelease(args: {
-    lock: IBitcoinLock;
-    priceIndex: PriceIndex;
-    releaseRequest: IReleaseRequest;
-    argonKeyring: KeyringPair;
-    tip?: bigint;
-    txProgressCallback?: ITxProgressCallback;
-  }): Promise<{ blockHash: Uint8Array; blockHeight: number }> {
+  async requestRelease(
+    args: {
+      lock: IBitcoinLock;
+      priceIndex: PriceIndex;
+      releaseRequest: IReleaseRequest;
+      argonKeyring: KeyringPair;
+    } & ISubmittableOptions,
+  ): Promise<TxResult> {
     const client = this.client;
     const {
       lock,
@@ -461,7 +450,6 @@ export class BitcoinLocks {
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
       argonKeyring,
       tip = 0n,
-      txProgressCallback,
     } = args;
 
     if (!toScriptPubkey.startsWith('0x')) {
@@ -486,21 +474,10 @@ export class BitcoinLocks {
         `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionPrice + canAfford.txFee + tip)}`,
       );
     }
-    const txResult = await submitter.submit({
-      waitForBlock: true,
+    return submitter.submit({
       logResults: true,
-      tip,
-      txProgressCallback,
+      ...args,
     });
-    const blockHash = await txResult.inBlockPromise;
-    const blockHeight = await client
-      .at(blockHash)
-      .then(x => x.query.system.number())
-      .then(x => x.toNumber());
-    return {
-      blockHash,
-      blockHeight,
-    };
   }
 
   async releasePrice(
@@ -542,22 +519,25 @@ export class BitcoinLocks {
     };
   }
 
-  async ratchet(args: {
-    lock: IBitcoinLock;
-    priceIndex: PriceIndex;
-    argonKeyring: KeyringPair;
-    tip?: bigint;
-    vault: Vault;
-    txProgressCallback?: ITxProgressCallback;
-  }): Promise<{
-    securityFee: bigint;
-    txFee: bigint;
-    newPeggedPrice: bigint;
-    liquidityPromised: bigint;
-    pendingMint: bigint;
-    burned: bigint;
-    blockHeight: number;
-    bitcoinBlockHeight: number;
+  async ratchet(
+    args: {
+      lock: IBitcoinLock;
+      priceIndex: PriceIndex;
+      argonKeyring: KeyringPair;
+      vault: Vault;
+    } & ISubmittableOptions,
+  ): Promise<{
+    txResult: TxResult;
+    getRatchetResult: () => Promise<{
+      securityFee: bigint;
+      txFee: bigint;
+      newPeggedPrice: bigint;
+      liquidityPromised: bigint;
+      pendingMint: bigint;
+      burned: bigint;
+      blockHeight: number;
+      bitcoinBlockHeight: number;
+    }>;
   }> {
     const { lock, priceIndex, argonKeyring, tip = 0n, vault, txProgressCallback } = args;
     const client = this.client;
@@ -580,43 +560,45 @@ export class BitcoinLocks {
       );
     }
 
-    const submission = await txSubmitter.submit({
-      waitForBlock: true,
-      tip,
-      txProgressCallback,
-    });
-    const ratchetEvent = submission.events.find(x =>
-      client.events.bitcoinLocks.BitcoinLockRatcheted.is(x),
-    );
-    if (!ratchetEvent) {
-      throw new Error(`Ratchet event not found in transaction events`);
-    }
-    const blockHash = await submission.inBlockPromise;
-    const api = await client.at(blockHash);
-    const blockHeight = await api.query.system.number().then(x => x.toNumber());
-    const bitcoinBlockHeight = await api.query.bitcoinUtxos
-      .confirmedBitcoinBlockTip()
-      .then(x => x.unwrap().blockHeight.toNumber());
-    const {
-      amountBurned,
-      liquidityPromised: liquidityPromisedRaw,
-      newPeggedPrice,
-      originalPeggedPrice,
-    } = ratchetEvent.data;
-    const liquidityPromised = liquidityPromisedRaw.toBigInt();
-    let mintAmount = liquidityPromised;
-    if (liquidityPromised > originalPeggedPrice.toBigInt()) {
-      mintAmount -= originalPeggedPrice.toBigInt();
-    }
+    const txResult = await txSubmitter.submit(args);
+    const getRatchetResult = async () => {
+      const blockHash = await txResult.waitForFinalizedBlock;
+      const ratchetEvent = txResult.events.find(x =>
+        client.events.bitcoinLocks.BitcoinLockRatcheted.is(x),
+      );
+      if (!ratchetEvent) {
+        throw new Error(`Ratchet event not found in transaction events`);
+      }
+      const api = await client.at(blockHash);
+      const bitcoinBlockHeight = await api.query.bitcoinUtxos
+        .confirmedBitcoinBlockTip()
+        .then(x => x.unwrap().blockHeight.toNumber());
+      const {
+        amountBurned,
+        liquidityPromised: liquidityPromisedRaw,
+        newPeggedPrice,
+        originalPeggedPrice,
+        securityFee,
+      } = ratchetEvent.data;
+      const liquidityPromised = liquidityPromisedRaw.toBigInt();
+      let mintAmount = liquidityPromised;
+      if (liquidityPromised > originalPeggedPrice.toBigInt()) {
+        mintAmount -= originalPeggedPrice.toBigInt();
+      }
+      return {
+        txFee: txResult.finalFee ?? 0n,
+        blockHeight: txResult.blockNumber!,
+        bitcoinBlockHeight,
+        pendingMint: mintAmount,
+        liquidityPromised,
+        newPeggedPrice: newPeggedPrice.toBigInt(),
+        burned: amountBurned.toBigInt(),
+        securityFee: securityFee.toBigInt(),
+      };
+    };
     return {
-      txFee: submission.finalFee ?? 0n,
-      securityFee: ratchetPrice.ratchetingFee,
-      pendingMint: mintAmount,
-      liquidityPromised,
-      newPeggedPrice: newPeggedPrice.toBigInt(),
-      burned: amountBurned.toBigInt(),
-      blockHeight,
-      bitcoinBlockHeight,
+      txResult,
+      getRatchetResult,
     };
   }
 }

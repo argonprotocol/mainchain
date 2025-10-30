@@ -3,21 +3,21 @@ import { getClient, Keyring } from '@argonprotocol/mainchain';
 import {
   activateNotary,
   createLocalchain,
-  describeIntegration,
   disconnectOnTeardown,
   getMainchainBalance,
-  TestMainchain,
-  TestNotary,
   KeyringSigner,
   teardown,
+  TestMainchain,
+  TestNotary,
   transferToLocalchain,
 } from './testHelpers';
-import { afterAll, afterEach, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { SKIP_E2E } from '@argonprotocol/testing';
 
 afterEach(teardown);
 afterAll(teardown);
 
-describeIntegration('Transfer Localchain <-> Mainchain', () => {
+describe.skipIf(SKIP_E2E)('Transfer Localchain <-> Mainchain', {}, () => {
   it('can transfer from mainchain to local', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
