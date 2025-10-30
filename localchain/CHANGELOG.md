@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...393d37935fa1f0a0a894520c6a584238dbf769b0) (2025-10-27)
+## [v1.3.13](https://github.com/argonprotocol/mainchain/compare/v1.3.12...99e5a6ba6349f601d1ca277650dd069afbe20042) (2025-10-30)
+
+### Features
+
+* **client/nodejs:** allow external progress
+([5a99c96](https://github.com/argonprotocol/mainchain/commit/5a99c962ec04e4d35517f05711ec21bd9faf37e5))
+
+### [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...v1.3.12) (2025-10-27)
 
 ### [v1.3.11](https://github.com/argonprotocol/mainchain/compare/v1.3.10...v1.3.11) (2025-10-15)
 
