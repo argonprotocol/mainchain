@@ -1,5 +1,4 @@
 import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
-import { describe, SuiteAPI } from 'vitest';
 import * as process from 'node:process';
 import HttpProxy from 'http-proxy';
 import * as child_process from 'node:child_process';
@@ -23,11 +22,8 @@ const toTeardown: ITeardownable[] = [];
 
 let proxy: HttpProxy | null = null;
 let proxyServer: http.Server | null = null;
-export let describeIntegration: SuiteAPI = describe;
 
-if (process.env.SKIP_E2E === 'true' || process.env.SKIP_E2E === '1') {
-  describeIntegration = describe.skip as any;
-}
+export const SKIP_E2E = process.env.SKIP_E2E === 'true' || process.env.SKIP_E2E === '1';
 
 export async function getProxy() {
   if (!proxy) {
@@ -160,9 +156,10 @@ export function sudo(): KeyringPair {
 
 export async function activateNotary(sudo: KeyringPair, client: ArgonClient, notary: TestNotary) {
   await notary.register(client);
-  await new TxSubmitter(
+  const txResult = await new TxSubmitter(
     client,
     client.tx.sudo.sudo(client.tx.notaries.activate(notary.operator!.publicKey)),
     sudo,
-  ).submit({ waitForBlock: true });
+  ).submit();
+  await txResult.waitForInFirstBlock;
 }

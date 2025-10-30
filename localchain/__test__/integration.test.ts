@@ -1,13 +1,13 @@
 import { AccountType, MainchainClient, NotaryClient } from '../index';
 import { Keyring } from '@argonprotocol/mainchain';
-import { describeIntegration, teardown, TestMainchain, TestNotary } from './testHelpers';
+import { SKIP_E2E, teardown, TestMainchain, TestNotary } from './testHelpers';
 
-import { afterAll, afterEach, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 afterEach(teardown);
 afterAll(teardown);
 
-describeIntegration('Integration tests', () => {
+describe.skipIf(SKIP_E2E)('Integration tests', {}, () => {
   it('can start a mainchain', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();
