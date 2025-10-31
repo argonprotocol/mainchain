@@ -146,8 +146,8 @@ pub mod pallet {
 		BlockSealDecodeError,
 		/// Compute blocks cant be added in the same tick as a vote
 		InvalidComputeBlockTick,
-		/// The xor distance supplied is invalid
-		InvalidMinerXorDistance,
+		/// The nonce score distance supplied is invalid
+		InvalidMinerNonceScore,
 	}
 
 	#[pallet::hooks]
@@ -293,7 +293,7 @@ pub mod pallet {
 					notary_id,
 					ref source_notebook_proof,
 					source_notebook_number,
-					xor_distance,
+					miner_nonce_score,
 				} => {
 					let voting_schedule =
 						VotingSchedule::when_evaluating_runtime_seals(current_tick);
@@ -310,6 +310,9 @@ pub mod pallet {
 						Error::<T>::InvalidVoteSealStrength
 					);
 					let seal_proof = block_vote.get_seal_proof(notary_id, parent_voting_key);
+					// no longer accept a missing nonce score
+					let miner_nonce_score =
+						miner_nonce_score.ok_or(Error::<T>::InvalidMinerNonceScore)?;
 
 					vote_seal_proof = Some(seal_proof);
 					Self::verify_block_vote(
@@ -317,7 +320,7 @@ pub mod pallet {
 						block_vote,
 						&block_author,
 						&voting_schedule,
-						xor_distance,
+						miner_nonce_score,
 					)?;
 					Self::verify_vote_source(
 						notary_id,
@@ -332,7 +335,7 @@ pub mod pallet {
 							vote_digest.voting_power,
 							notebooks,
 							seal_strength,
-							xor_distance,
+							Some(miner_nonce_score),
 						);
 					});
 				},
@@ -374,7 +377,7 @@ pub mod pallet {
 			block_vote: &BlockVote,
 			block_author: &T::AccountId,
 			voting_schedule: &VotingSchedule,
-			xor_distance: Option<U256>,
+			miner_nonce_score: U256,
 		) -> DispatchResult {
 			if !block_vote.is_proxy_vote() {
 				let grandpa_tick_block =
@@ -405,25 +408,20 @@ pub mod pallet {
 			let authority_id = T::AuthorityProvider::get_authority(block_author.clone())
 				.ok_or(Error::<T>::UnregisteredBlockAuthor)?;
 
-			if let Some(distance) = xor_distance {
-				// in v2, any miner can submit a seal, but we'll only take the closest one
-				// ensure the xor distance is correct
-				let expected_distance = T::AuthorityProvider::get_authority_distance(
-					seal_proof,
-					&authority_id,
-					block_author,
-				)
-				.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
+			// in v2, any miner can submit a seal, the runtime will only verify that the seal proof
+			// is correct
+			let previous_block =
+				<frame_system::Pallet<T>>::block_number().saturating_sub(1u32.into());
 
-				ensure!(expected_distance == distance, Error::<T>::InvalidMinerXorDistance);
-			} else {
-				// in v1, only the closest miner could submit a seal
-				// ensure this miner is eligible to submit this tax proof
-				let block_peer = T::AuthorityProvider::xor_closest_authority(seal_proof)
-					.ok_or(Error::<T>::InvalidSubmitter)?;
+			let expected_nonce_score = T::AuthorityProvider::get_authority_score(
+				seal_proof,
+				&authority_id,
+				block_author,
+				previous_block,
+			)
+			.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
 
-				ensure!(block_peer.authority_id == authority_id, Error::<T>::InvalidSubmitter);
-			}
+			ensure!(expected_nonce_score == miner_nonce_score, Error::<T>::InvalidMinerNonceScore);
 
 			<LastBlockSealerInfo<T>>::put(BlockSealerInfo {
 				block_author_account_id: block_author.clone(),
@@ -577,7 +575,7 @@ pub mod pallet {
 		pub fn find_better_vote_block_seal(
 			notebook_votes: Vec<NotaryNotebookRawVotes>,
 			best_strength: U256,
-			closest_xor_distance: U256,
+			closest_miner_nonce_score: U256,
 			with_managed_key: T::AuthorityId,
 			expected_notebook_tick: Tick,
 		) -> Result<Option<BestBlockVoteSeal<T::AccountId, T::AuthorityId>>, Error<T>> {
@@ -586,14 +584,17 @@ pub mod pallet {
 			for (seal_strength, seal_proof, notary_id, source_notebook_number, index) in
 				best_votes.into_iter()
 			{
-				let better_distance =
-					if best_strength == seal_strength { Some(closest_xor_distance) } else { None };
+				let better_distance = if best_strength == seal_strength {
+					Some(closest_miner_nonce_score)
+				} else {
+					None
+				};
 
 				let Some((closer_authority, distance, percentile)) =
-					T::AuthorityProvider::xor_closest_managed_authority(
+					T::AuthorityProvider::get_winning_managed_authority(
 						seal_proof, /* NOTE: use seal_proof since strength is modified by
 						             * funding and breaks xor distance */
-						&with_managed_key,
+						Some(with_managed_key.clone()),
 						better_distance,
 					)
 				else {
@@ -630,7 +631,7 @@ pub mod pallet {
 						number_of_leaves: proof.number_of_leaves,
 					},
 					closest_miner: (closer_authority.account_id, closer_authority.authority_id),
-					miner_xor_distance: Some((distance, percentile)),
+					miner_nonce_score: Some((distance, percentile)),
 				}));
 			}
 			Ok(None)

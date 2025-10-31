@@ -171,14 +171,14 @@ macro_rules! inject_common_apis {
             fn find_better_vote_block_seal(
                 notebook_votes: Vec<NotaryNotebookRawVotes>,
                 best_strength: U256,
-                closest_xor_distance: U256,
+                closest_miner_nonce_score: U256,
                 with_signing_key: BlockSealAuthorityId,
                 expected_notebook_tick: Tick,
             ) -> Result<Option<BestBlockVoteSeal<AccountId, BlockSealAuthorityId>>, DispatchError> {
                 Ok(BlockSeal::find_better_vote_block_seal(
                     notebook_votes,
                     best_strength,
-                    closest_xor_distance,
+                    closest_miner_nonce_score,
                     with_signing_key,
                     expected_notebook_tick,
                 )?)

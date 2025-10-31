@@ -61,7 +61,7 @@ fn it_should_check_vote_seal_inherents() {
 			digest: Some(BlockSealDigest::Vote {
 				seal_strength: U256::from(1),
 				signature: empty_signature(),
-				xor_distance: Some(U256::one()),
+				miner_nonce_score: Some(U256::one()),
 			}),
 		};
 		let mut inherent_data = InherentData::new();
@@ -151,7 +151,7 @@ fn it_requires_the_nonce_to_match() {
 					seal_strength,
 					source_notebook_proof: Default::default(),
 					source_notebook_number: 1,
-					xor_distance: Some(U256::one())
+					miner_nonce_score: Some(U256::one())
 				}
 			),
 			Error::<Test>::InvalidVoteSealStrength
@@ -177,7 +177,7 @@ fn it_can_validate_miner_signatures() {
 				&BlockSealDigest::Vote {
 					seal_strength: 1.into(),
 					signature,
-					xor_distance: Some(U256::one())
+					miner_nonce_score: Some(U256::one())
 				},
 				&Digest { logs: vec![] }
 			));
@@ -192,7 +192,7 @@ fn it_can_validate_miner_signatures() {
 			&BlockSealDigest::Vote {
 				seal_strength: 1.into(),
 				signature,
-				xor_distance: Some(U256::one())
+				miner_nonce_score: Some(U256::one())
 			},
 			&Digest { logs: vec![] }
 		));
@@ -207,7 +207,7 @@ fn it_should_be_able_to_submit_a_seal() {
 		System::set_block_number(6);
 		System::reset_events();
 		AuthorityList::set(vec![(Bob.into(), default_authority())]);
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: default_authority(),
@@ -254,7 +254,7 @@ fn it_should_be_able_to_submit_a_seal() {
 				leaf_index: 0,
 			},
 			source_notebook_number: 1,
-			xor_distance: Some(U256::from(100)),
+			miner_nonce_score: Some(U256::from(100)),
 		};
 
 		BlockSeal::on_initialize(4);
@@ -383,7 +383,7 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 				&vote,
 				&Alice.into(),
 				&voting_schedule,
-				None
+				U256::one()
 			),
 			Error::<Test>::InvalidVoteGrandparentHash
 		);
@@ -397,7 +397,7 @@ fn it_checks_that_votes_are_for_great_grandpa_tick() {
 				&vote,
 				&Alice.into(),
 				&voting_schedule,
-				None
+				U256::one()
 			),
 			Error::<Test>::BlockVoteInvalidSignature
 		);
@@ -598,7 +598,7 @@ fn it_can_find_best_vote_seal_v2() {
 			block_rewards_account_id: Alice.to_account_id(),
 			signature: empty_vote_signature(),
 		};
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: authority.clone(),
@@ -696,7 +696,7 @@ fn it_can_find_best_vote_seal_v2() {
 		.expect("should return");
 		assert!(best.is_some());
 		let strongest = best.clone().unwrap().seal_strength;
-		let xor_distance = best.clone().unwrap().miner_xor_distance;
+		let miner_nonce_score = best.clone().unwrap().miner_nonce_score;
 		assert_eq!(best.clone().unwrap().closest_miner.0, Alice.into());
 		assert_eq!(best.clone().unwrap().closest_miner.1, authority);
 		let voting_key = ParentVotingKey::<Test>::get().unwrap();
@@ -715,21 +715,21 @@ fn it_can_find_best_vote_seal_v2() {
 			BlockSeal::find_better_vote_block_seal(
 				votes.clone(),
 				strongest,
-				xor_distance.unwrap().0.add(U256::one()),
+				miner_nonce_score.unwrap().0.add(U256::one()),
 				authority.clone(),
 				voting_schedule.notebook_tick()
 			)
 			.expect("")
 			.unwrap()
-			.miner_xor_distance,
-			xor_distance,
+			.miner_nonce_score,
+			miner_nonce_score,
 			"should return a better xor at current best"
 		);
 		assert_eq!(
 			BlockSeal::find_better_vote_block_seal(
 				votes.clone(),
 				strongest.add(U256::one()),
-				xor_distance.unwrap().0,
+				miner_nonce_score.unwrap().0,
 				authority.clone(),
 				voting_schedule.notebook_tick()
 			)
@@ -750,7 +750,7 @@ fn it_allows_any_block_with_default_votes() {
 
 		let authority = default_authority();
 
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: authority.clone(),
@@ -801,71 +801,6 @@ fn it_allows_any_block_with_default_votes() {
 }
 
 #[test]
-fn it_checks_v1_tax_votes() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		setup_blocks(2);
-		System::set_block_number(4);
-		let mut vote = BlockVote {
-			block_hash: System::block_hash(System::block_number().saturating_sub(4)),
-			account_id: Keyring::Alice.into(),
-			tick: 1,
-			index: 1,
-			power: 500,
-			block_rewards_account_id: Ferdie.to_account_id(),
-			signature: empty_vote_signature(),
-		};
-
-		let default_authority = default_authority();
-		let author = Alice.to_account_id();
-		let tick = 6;
-		CurrentTick::set(tick);
-		let voting_schedule = VotingSchedule::when_evaluating_runtime_seals(tick);
-
-		BlocksAtTick::mutate(|a| {
-			a.insert(voting_schedule.grandparent_votes_tick(), vec![vote.block_hash]);
-		});
-		GrandpaVoteMinimum::set(Some(501));
-		let seal_strength = vote.get_seal_strength(1, H256::random());
-		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
-			Error::<Test>::InsufficientVotingPower
-		);
-		GrandpaVoteMinimum::set(Some(500));
-		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
-			Error::<Test>::BlockVoteInvalidSignature
-		);
-		vote.sign(Alice.pair());
-
-		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
-			Error::<Test>::UnregisteredBlockAuthor
-		);
-		AuthorityList::mutate(|a| a.push((Alice.into(), default_authority.clone())));
-		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
-			Error::<Test>::InvalidSubmitter
-		);
-		XorClosest::set(Some((
-			MiningAuthority {
-				account_id: Alice.into(),
-				authority_id: default_authority.clone(),
-				authority_index: (1, 0),
-			},
-			U256::from(100),
-		)));
-
-		assert_ok!(BlockSeal::verify_block_vote(
-			seal_strength,
-			&vote,
-			&author,
-			&voting_schedule,
-			None
-		),);
-	});
-}
-#[test]
 fn it_checks_v2_tax_votes() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -892,14 +827,14 @@ fn it_checks_v2_tax_votes() {
 		});
 		GrandpaVoteMinimum::set(Some(501));
 		let seal_strength = vote.get_seal_strength(1, H256::random());
-		let xor_distance = U256::from(100);
+		let miner_nonce_score = U256::from(100);
 		assert_err!(
 			BlockSeal::verify_block_vote(
 				seal_strength,
 				&vote,
 				&author,
 				&voting_schedule,
-				Some(xor_distance)
+				miner_nonce_score
 			),
 			Error::<Test>::InsufficientVotingPower
 		);
@@ -910,7 +845,7 @@ fn it_checks_v2_tax_votes() {
 				&vote,
 				&author,
 				&voting_schedule,
-				Some(xor_distance)
+				miner_nonce_score
 			),
 			Error::<Test>::BlockVoteInvalidSignature
 		);
@@ -922,7 +857,7 @@ fn it_checks_v2_tax_votes() {
 				&vote,
 				&author,
 				&voting_schedule,
-				Some(xor_distance)
+				miner_nonce_score
 			),
 			Error::<Test>::UnregisteredBlockAuthor
 		);
@@ -933,11 +868,11 @@ fn it_checks_v2_tax_votes() {
 				&vote,
 				&author,
 				&voting_schedule,
-				Some(xor_distance)
+				miner_nonce_score
 			),
 			Error::<Test>::NoClosestMinerFoundForVote
 		);
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: default_authority.clone(),
@@ -951,25 +886,25 @@ fn it_checks_v2_tax_votes() {
 				&vote,
 				&author,
 				&voting_schedule,
-				Some(xor_distance)
+				miner_nonce_score
 			),
-			Error::<Test>::InvalidMinerXorDistance
+			Error::<Test>::InvalidMinerNonceScore
 		);
 
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: default_authority.clone(),
 				authority_index: (1, 0),
 			},
-			xor_distance,
+			miner_nonce_score,
 		)));
 		assert_ok!(BlockSeal::verify_block_vote(
 			seal_strength,
 			&vote,
 			&author,
 			&voting_schedule,
-			Some(xor_distance)
+			miner_nonce_score
 		),);
 	});
 }
@@ -992,15 +927,17 @@ fn it_checks_default_votes() {
 		let seal_strength = vote.get_seal_strength(1, H256::random());
 		// first thing default votes check is the block authority
 		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
+			BlockSeal::verify_block_vote(
+				seal_strength,
+				&vote,
+				&author,
+				&voting_schedule,
+				U256::one()
+			),
 			Error::<Test>::UnregisteredBlockAuthor
 		);
 		AuthorityList::mutate(|a| a.push((Alice.into(), default_authority.clone())));
-		assert_err!(
-			BlockSeal::verify_block_vote(seal_strength, &vote, &author, &voting_schedule, None),
-			Error::<Test>::InvalidSubmitter
-		);
-		XorClosest::set(Some((
+		BestMinerNonce::set(Some((
 			MiningAuthority {
 				account_id: Alice.into(),
 				authority_id: default_authority.clone(),
@@ -1014,7 +951,7 @@ fn it_checks_default_votes() {
 			&vote,
 			&author,
 			&voting_schedule,
-			Some(U256::from(100))
+			U256::from(100)
 		),);
 	});
 }
