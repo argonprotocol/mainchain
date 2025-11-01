@@ -723,7 +723,7 @@ fn it_can_find_best_vote_seal_v2() {
 			.unwrap()
 			.miner_nonce_score,
 			miner_nonce_score,
-			"should return a better xor at current best"
+			"should return a better nonce score at current best"
 		);
 		assert_eq!(
 			BlockSeal::find_better_vote_block_seal(

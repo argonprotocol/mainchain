@@ -1185,16 +1185,18 @@ impl<T: Config> ClosestMiner<T> {
 	}
 
 	fn get_score(&self, block_number: BlockNumberFor<T>) -> U256 {
-		// 1. Fold full 256-bit hash into 64 bits to preserve entropy
+		// 1. Create a full U256 from the concatenation of the seal_proof and the miner_nonce
 		let hash_bytes = self.using_encoded(blake2_256);
 		let mut base_score = U256::from_big_endian(&hash_bytes);
+		// If this miner has won blocks within last 95% of active miners, apply a penalty to the score
 		const PERCENT_VARIATION: Percent = Percent::from_percent(95);
 
+		// 2. Adjust the score based on blocks won recently
 		if let Some(last_win) = self.scoring.last_win_block {
 			let since_last =
 				UniqueSaturatedInto::<u64>::unique_saturated_into(block_number - last_win);
 			if since_last <= PERCENT_VARIATION.mul_ceil(ActiveMinersCount::<T>::get() as u64) {
-				base_score = base_score.saturating_mul(U256::from(1u32) << 16);
+				base_score = base_score.saturating_mul(U256::from(1000));
 			}
 		}
 		base_score

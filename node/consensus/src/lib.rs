@@ -447,7 +447,7 @@ impl NotebookTickChecker {
 	) -> Option<Instant> {
 		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
-			// offset the block creation by the miner's percentile of xor distance
+			// offset the block creation by the miner's percentile of nonce score
 			// it must account for the current delay into the tick duration
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);

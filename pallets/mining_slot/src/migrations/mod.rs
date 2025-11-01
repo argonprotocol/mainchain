@@ -27,7 +27,7 @@ impl<T: Config + pallet_treasury::Config> UncheckedOnRuntimeUpgrade for InnerMig
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
-		log::info!("Migrating vaults");
+		log::info!("Migrating mining slots");
 		let mut modify_count = 0;
 		let xor_keys = MinerXorKeysByCohort::<T>::take();
 		let mut oldest_frame: Option<FrameId> = None;

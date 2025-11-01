@@ -1109,8 +1109,8 @@ fn it_distributes_seals_evenly() {
 				max_diff = diff_percent;
 			}
 			assert!(
-				diff_percent.abs() < 0.3,
-				"Account {:?} had {} wins which is more than 30% different from expected {}",
+				diff_percent.abs() <= 0.04,
+				"Account {:?} had {} wins which is more than 4% different from expected {}",
 				account,
 				wins,
 				expected_wins_per_miner
