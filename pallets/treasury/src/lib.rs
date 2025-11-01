@@ -816,7 +816,7 @@ pub mod pallet {
 			})
 		}
 
-		fn refund_fund_capital(
+		pub fn refund_fund_capital(
 			frame_id: FrameId,
 			vault_id: VaultId,
 			account: &T::AccountId,

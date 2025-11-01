@@ -20,7 +20,7 @@ use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
 use sp_core::{H256, RuntimeDebug, U256};
 use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys},
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
 };
 
 pub trait NotebookProvider {
@@ -214,16 +214,16 @@ where
 {
 	fn authority_count() -> u32;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn xor_closest_authority(seal_proof: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
-	fn xor_closest_managed_authority(
+	fn get_winning_managed_authority(
 		seal_proof: U256,
-		signing_key: &AuthorityId,
-		xor_distance: Option<U256>,
+		signing_key: Option<AuthorityId>,
+		best_miner_nonce_score: Option<U256>,
 	) -> Option<(MiningAuthority<AuthorityId, AccountId>, U256, Permill)>;
-	fn get_authority_distance(
+	fn get_authority_score(
 		seal_proof: U256,
 		authority_id: &AuthorityId,
 		account: &AccountId,
+		for_block_number: NumberFor<Block>,
 	) -> Option<U256>;
 }
 

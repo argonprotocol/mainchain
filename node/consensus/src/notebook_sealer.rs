@@ -148,7 +148,7 @@ where
 			return Ok(result);
 		}
 
-		let Some((block_hash, seal_strength, xor_distance)) =
+		let Some((block_hash, seal_strength, miner_nonce_score)) =
 			self.get_best_block_at_parent(&voting_schedule).await?
 		else {
 			trace!("No parent block to build on for tick {}", votes_tick);
@@ -159,22 +159,29 @@ where
 			votes_count,
 			block_hash = ?block_hash,
 			seal_strength = ?seal_strength,
-			xor_distance = ?xor_distance,
+			miner_nonce_score = ?miner_nonce_score,
 			"Building vote seal on block",
 		);
 
 		let seal = self
-			.check_v2_seals(&block_votes, keys, block_hash, seal_strength, xor_distance, votes_tick)
+			.check_v2_seals(
+				&block_votes,
+				keys,
+				block_hash,
+				seal_strength,
+				miner_nonce_score,
+				votes_tick,
+			)
 			.await?;
 
 		if let Some(vote_seal) = seal {
-			tracing::trace!(build_on_block = ?block_hash, strength = ?vote_seal.seal_strength, miner_xor_distance = ?vote_seal.miner_xor_distance,
+			tracing::trace!(build_on_block = ?block_hash, strength = ?vote_seal.seal_strength, miner_nonce_score = ?vote_seal.miner_nonce_score,
 				"Found vote-eligible block");
 			let block_tick = voting_schedule.block_tick();
 			if let Some(recheck_at) = NotebookTickChecker::should_delay_block_attempt(
 				block_tick,
 				&self.ticker,
-				vote_seal.miner_xor_distance,
+				vote_seal.miner_nonce_score,
 			) {
 				result.recheck_notebook_tick_time = Some(recheck_at);
 				return Ok(result);
@@ -197,7 +204,7 @@ where
 		}
 
 		tracing::trace!(
-			block_hash = ?block_hash, notebook_tick, votes_tick, best_seal_strength = ?seal_strength, best_xor = ?xor_distance,
+			block_hash = ?block_hash, notebook_tick, votes_tick, best_seal_strength = ?seal_strength, miner_nonce_score = ?miner_nonce_score,
 			"Could not find any stronger seals for block",
 		);
 		Ok(result)
@@ -209,7 +216,7 @@ where
 		keys: Vec<BlockSealAuthorityId>,
 		block_hash: B::Hash,
 		mut best_seal_strength: U256,
-		mut best_xor_distance: Option<U256>,
+		mut best_miner_nonce_score: Option<U256>,
 		votes_tick: Tick,
 	) -> Result<Option<BestBlockVoteSeal<AC, BlockSealAuthorityId>>, Error> {
 		let mut best_block_vote_seal = None;
@@ -219,13 +226,13 @@ where
 				block_hash,
 				block_votes.to_owned(),
 				best_seal_strength,
-				best_xor_distance.unwrap_or(U256::MAX),
+				best_miner_nonce_score.unwrap_or(U256::MAX),
 				key,
 				votes_tick,
 			) {
 				Ok(Ok(Some(strongest))) => {
 					best_seal_strength = strongest.seal_strength;
-					best_xor_distance = strongest.miner_xor_distance.map(|(d, _)| d);
+					best_miner_nonce_score = strongest.miner_nonce_score.map(|(d, _)| d);
 					best_block_vote_seal = Some(strongest.clone());
 				},
 				Err(e) => {
@@ -303,13 +310,13 @@ where
 			}
 		}
 
-		let (best_peer_seal_strength, best_peer_xor_distance) = if let Some(power) = &best_child {
-			(power.seal_strength, power.miner_vote_xor_distance)
+		let (best_peer_seal_strength, best_miner_nonce_score) = if let Some(power) = &best_child {
+			(power.seal_strength, power.miner_nonce_score)
 		} else {
 			(U256::MAX, None)
 		};
 
-		Ok(Some((best_parent_hash, best_peer_seal_strength, best_peer_xor_distance)))
+		Ok(Some((best_parent_hash, best_peer_seal_strength, best_miner_nonce_score)))
 	}
 
 	fn get_block_ancestor_with_tick(&self, hash: B::Hash, tick: Tick) -> Option<B::Hash> {
@@ -341,7 +348,7 @@ pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 	pre_hash: &Hash,
 	vote_authority: &BlockSealAuthorityId,
 	seal_strength: U256,
-	xor_distance: Option<U256>,
+	miner_nonce_score: Option<U256>,
 ) -> Result<BlockSealDigest, Error> {
 	let message = BlockVote::seal_signature_message(pre_hash);
 	let signature = keystore
@@ -358,7 +365,7 @@ pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 		.clone()
 		.try_into()
 		.map_err(|_| ConsensusError::InvalidSignature(signature, vote_authority.to_raw_vec()))?;
-	Ok(BlockSealDigest::Vote { seal_strength, signature, xor_distance })
+	Ok(BlockSealDigest::Vote { seal_strength, signature, miner_nonce_score })
 }
 
 #[cfg(test)]

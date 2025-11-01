@@ -1569,7 +1569,7 @@ export default {
     sealStrength: 'U256',
     totalComputeDifficulty: 'U256',
     voteCreatedBlocks: 'Compact<u128>',
-    minerVoteXorDistance: 'Option<U256>',
+    minerNonceScore: 'Option<U256>',
   },
   /**
    * Lookup170: argon_primitives::digests::NotebookDigest<argon_notary_audit::error::VerifyError>
@@ -2083,7 +2083,7 @@ export default {
         sourceNotebookNumber: 'Compact<u32>',
         sourceNotebookProof: 'ArgonPrimitivesBalanceChangeMerkleProof',
         blockVote: 'ArgonPrimitivesBlockVoteBlockVoteT',
-        xorDistance: 'Option<U256>',
+        minerNonceScore: 'Option<U256>',
       },
       Compute: 'Null',
     },

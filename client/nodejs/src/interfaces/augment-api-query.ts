@@ -672,7 +672,7 @@ declare module '@polkadot/api-base/types/storage' {
     };
     miningSlot: {
       /**
-       * Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
+       * Lookup by account id to the corresponding index in MinersByCohort and MinerNoncesByCohort
        **/
       accountIndexLookup: AugmentedQuery<
         ApiType,
@@ -719,6 +719,11 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
+       * This is a lookup of each miner's nonce to use when picking a best authority to submit a block.
+       * It's a blake2 256 hash of the miner account id and the block hash at time of activation.
+       **/
+      minerNoncesByCohort: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, Vec<U256>>>, []>;
+      /**
        * Miners that are active in the current block (post initialize) by their starting frame
        **/
       minersByCohort: AugmentedQuery<
@@ -728,11 +733,6 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
         [u64]
       >;
-      /**
-       * This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
-       * id and the block hash at time of activation.
-       **/
-      minerXorKeysByCohort: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, Vec<U256>>>, []>;
       /**
        * The mining slot configuration set in genesis
        **/

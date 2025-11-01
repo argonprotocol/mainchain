@@ -1930,7 +1930,7 @@ declare module '@polkadot/types/lookup' {
     readonly sealStrength: U256;
     readonly totalComputeDifficulty: U256;
     readonly voteCreatedBlocks: Compact<u128>;
-    readonly minerVoteXorDistance: Option<U256>;
+    readonly minerNonceScore: Option<U256>;
   }
 
   /** @name ArgonPrimitivesDigestsNotebookDigest (170) */
@@ -2471,7 +2471,7 @@ declare module '@polkadot/types/lookup' {
       readonly sourceNotebookNumber: Compact<u32>;
       readonly sourceNotebookProof: ArgonPrimitivesBalanceChangeMerkleProof;
       readonly blockVote: ArgonPrimitivesBlockVoteBlockVoteT;
-      readonly xorDistance: Option<U256>;
+      readonly minerNonceScore: Option<U256>;
     } & Struct;
     readonly isCompute: boolean;
     readonly type: 'Vote' | 'Compute';

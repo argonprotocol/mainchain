@@ -191,7 +191,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						let vote = command.vote;
 						let seal_strength = vote.seal_strength;
 						let author = vote.closest_miner.0.clone();
-						let xor_distance = vote.miner_xor_distance.map(|(distance, _)| distance);
+						let miner_nonce_score = vote.miner_nonce_score.map(|(distance, _)| distance);
 						let authority = vote.closest_miner.1.clone();
 
 						let Some(proposal) =  creator
@@ -211,7 +211,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 							&pre_hash,
 							&authority,
 							seal_strength,
-							xor_distance,
+							miner_nonce_score,
 						) {
 							Ok(x) => x,
 							Err(err) => {
@@ -443,11 +443,11 @@ impl NotebookTickChecker {
 	pub(crate) fn should_delay_block_attempt(
 		block_tick: Tick,
 		ticker: &Ticker,
-		miner_xor_distance: Option<(U256, Permill)>,
+		miner_nonce_score: Option<(U256, Permill)>,
 	) -> Option<Instant> {
-		let (_, percentile) = miner_xor_distance?;
+		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
-			// offset the block creation by the miner's percentile of xor distance
+			// offset the block creation by the miner's percentile of nonce score
 			// it must account for the current delay into the tick duration
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
@@ -540,13 +540,13 @@ mod test {
 	#[test]
 	fn test_notebook_tick_checker_should_delay_block_attempt() {
 		let ticker = Ticker::start(Duration::from_secs(2), 2);
-		let miner_xor_distance = Some((U256::from(100), Permill::from_percent(50)));
+		let miner_nonce_score = Some((U256::from(100), Permill::from_percent(50)));
 		let now = Instant::now();
 		// we can't guarantee when this will run, so we just check it if it does
 		if let Some(delay) = NotebookTickChecker::should_delay_block_attempt(
 			ticker.current(),
 			&ticker,
-			miner_xor_distance,
+			miner_nonce_score,
 		) {
 			assert_eq!(delay.duration_since(now).as_secs(), 1);
 		}

@@ -913,7 +913,7 @@ mod test {
 				1,
 				BlockSealDigest::Vote {
 					seal_strength: U256::one(),
-					xor_distance: Some(U256::one()),
+					miner_nonce_score: Some(U256::one()),
 					signature: BlockSealAuthoritySignature::from_slice(&[0u8; 64])
 						.expect("serialization of block seal strength failed"),
 				},

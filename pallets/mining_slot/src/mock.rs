@@ -1,9 +1,8 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
-	BlockNumber, TickProvider, VotingSchedule, block_seal::MiningSlotConfig, providers::OnNewSlot,
-	tick::Ticker, vault::MiningBidPoolProvider,
+	BlockNumber, BlockSealerInfo, BlockSealerProvider, TickProvider, VotingSchedule,
+	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, vault::MiningBidPoolProvider,
 };
-
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::*;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId};
@@ -117,6 +116,12 @@ parameter_types! {
 	pub const BidPoolAccountId: u64 = 10000;
 
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
+	pub static BlockSealer: BlockSealerInfo<u64> = BlockSealerInfo {
+		block_seal_authority: None,
+		block_vote_rewards_account: Some(1),
+		block_author_account_id: 1,
+	};
+	pub static IsBlockVoteSeal: bool = false;
 }
 
 pub struct StaticBondProvider;
@@ -195,6 +200,16 @@ impl TickProvider<Block> for StaticTickProvider {
 	}
 }
 
+pub struct StaticBlockSealerProvider;
+impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
+	fn get_sealer_info() -> BlockSealerInfo<u64> {
+		BlockSealer::get()
+	}
+	fn is_block_vote_seal() -> bool {
+		IsBlockVoteSeal::get()
+	}
+}
+
 impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
@@ -217,6 +232,7 @@ impl pallet_mining_slot::Config for Test {
 	type Keys = MockSessionKeys;
 	type TickProvider = StaticTickProvider;
 	type BidIncrements = BidIncrements;
+	type SealerInfo = StaticBlockSealerProvider;
 }
 
 pub fn new_test_ext() -> TestState {
