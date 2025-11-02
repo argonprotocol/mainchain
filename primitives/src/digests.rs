@@ -32,20 +32,26 @@ pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
 
 #[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
-	Vote { seal_strength: U256, signature: BlockSealAuthoritySignature, xor_distance: Option<U256> },
-	Compute { nonce: U256 },
+	Vote {
+		seal_strength: U256,
+		signature: BlockSealAuthoritySignature,
+		miner_nonce_score: Option<U256>,
+	},
+	Compute {
+		nonce: U256,
+	},
 }
 
 impl Encode for BlockSealDigest {
 	fn encode(&self) -> Vec<u8> {
 		let mut encoded = Vec::new();
 		match self {
-			BlockSealDigest::Vote { seal_strength, signature, xor_distance } => {
+			BlockSealDigest::Vote { seal_strength, signature, miner_nonce_score } => {
 				encoded.push(0u8);
 				encoded.extend_from_slice(&seal_strength.encode());
 				encoded.extend_from_slice(&signature.encode());
-				if xor_distance.is_some() {
-					encoded.extend_from_slice(&xor_distance.encode());
+				if miner_nonce_score.is_some() {
+					encoded.extend_from_slice(&miner_nonce_score.encode());
 				}
 			},
 			BlockSealDigest::Compute { nonce } => {
@@ -64,12 +70,12 @@ impl Decode for BlockSealDigest {
 			0 => {
 				let seal_strength = U256::decode(input)?;
 				let signature = BlockSealAuthoritySignature::decode(input)?;
-				let xor_distance = match input.remaining_len()? {
+				let miner_nonce_score = match input.remaining_len()? {
 					Some(0) | None => None,
 					Some(_) => Option::<U256>::decode(input)?,
 				};
 
-				Ok(BlockSealDigest::Vote { seal_strength, signature, xor_distance })
+				Ok(BlockSealDigest::Vote { seal_strength, signature, miner_nonce_score })
 			},
 			1 => {
 				let nonce = U256::decode(input)?;

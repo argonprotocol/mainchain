@@ -176,7 +176,7 @@ pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
 	pub source_notebook_proof: MerkleProof,
 	pub closest_miner: (AccountId, Authority),
 	/// The XOR distance of the closest miner to the vote, and the percentile of the seal strength
-	pub miner_xor_distance: Option<(U256, Permill)>,
+	pub miner_nonce_score: Option<(U256, Permill)>,
 }
 
 impl<AccountId, Authority> Encode for BestBlockVoteSeal<AccountId, Authority>
@@ -192,8 +192,8 @@ where
 		Compact::from(self.source_notebook_number).encode_to(&mut encoded);
 		self.source_notebook_proof.encode_to(&mut encoded);
 		self.closest_miner.encode_to(&mut encoded);
-		if self.miner_xor_distance.is_some() {
-			encoded.extend(self.miner_xor_distance.encode());
+		if self.miner_nonce_score.is_some() {
+			encoded.extend(self.miner_nonce_score.encode());
 		}
 		encoded
 	}
@@ -205,7 +205,7 @@ where
 			Compact::from(self.source_notebook_number).size_hint() +
 			self.source_notebook_proof.size_hint() +
 			self.closest_miner.size_hint() +
-			self.miner_xor_distance
+			self.miner_nonce_score
 				.as_ref()
 				.map_or(0, |(distance, percentile)| distance.size_hint() + percentile.size_hint())
 	}
@@ -230,7 +230,7 @@ where
 		let source_notebook_number = Compact::<NotebookNumber>::decode(value)?.0;
 		let source_notebook_proof = MerkleProof::decode(value)?;
 		let closest_miner = <(AccountId, Authority)>::decode(value)?;
-		let miner_xor_distance = match value.remaining_len()? {
+		let miner_nonce_score = match value.remaining_len()? {
 			Some(0) | None => None,
 			Some(_) => Option::<(U256, Permill)>::decode(value)?,
 		};
@@ -242,7 +242,7 @@ where
 			source_notebook_number,
 			source_notebook_proof,
 			closest_miner,
-			miner_xor_distance,
+			miner_nonce_score,
 		})
 	}
 }
