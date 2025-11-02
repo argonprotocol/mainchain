@@ -1,8 +1,17 @@
 # Changelog
 
-## [v1.3.13](https://github.com/argonprotocol/mainchain/compare/v1.3.12...99e5a6ba6349f601d1ca277650dd069afbe20042) (2025-10-30)
+## [v1.3.14](https://github.com/argonprotocol/mainchain/compare/v1.3.13...4be866bd0b56dcf2d3bf54acd5f235306d4d25e3) (2025-11-02)
 
-### Features
+### Fixes
+
+* adjust some comments per feedback
+([56363f4](https://github.com/argonprotocol/mainchain/commit/56363f4c50c5db7cc1aac194c4b9ac4b060d6947))
+* update distribution of miners chosen
+([7a771a6](https://github.com/argonprotocol/mainchain/commit/7a771a6fd8990033587865d3188980f42086bc47))
+
+### [v1.3.13](https://github.com/argonprotocol/mainchain/compare/v1.3.12...v1.3.13) (2025-10-30)
+
+#### Features
 
 * **client/nodejs:** allow external progress
 ([5a99c96](https://github.com/argonprotocol/mainchain/commit/5a99c962ec04e4d35517f05711ec21bd9faf37e5))
