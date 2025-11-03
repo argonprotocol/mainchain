@@ -1,8 +1,23 @@
 # Changelog
 
-## [v1.3.14](https://github.com/argonprotocol/mainchain/compare/v1.3.13...4be866bd0b56dcf2d3bf54acd5f235306d4d25e3) (2025-11-02)
+## [v1.3.15](https://github.com/argonprotocol/mainchain/compare/v1.3.14...87d4ad0e3056f50a1d0378c50aa533cdc3e1be9a) (2025-11-03)
 
 ### Fixes
+
+* use safe math
+([87d4ad0](https://github.com/argonprotocol/mainchain/commit/87d4ad0e3056f50a1d0378c50aa533cdc3e1be9a))
+* change mining slot max miners per cohort
+([e7a0b00](https://github.com/argonprotocol/mainchain/commit/e7a0b00b932e730f8298c6b34479722f3a156a8f))
+* **mining_slot:** adjust distribution over time
+([fe02942](https://github.com/argonprotocol/mainchain/commit/fe029426b0adadb3948a2b284c2e230e33974ab4))
+* **mining_slot:** fix ties in miner nonce scores
+([34a242d](https://github.com/argonprotocol/mainchain/commit/34a242d8e0ca50655f5593635d55f7337088677c))
+* **mining_slot:** fix ties in miner nonce scores
+([aff9c54](https://github.com/argonprotocol/mainchain/commit/aff9c54d058d5c638cfc11329647e1a3811399ce))
+
+### [v1.3.14](https://github.com/argonprotocol/mainchain/compare/v1.3.13...v1.3.14) (2025-11-02)
+
+#### Fixes
 
 * adjust some comments per feedback
 ([56363f4](https://github.com/argonprotocol/mainchain/commit/56363f4c50c5db7cc1aac194c4b9ac4b060d6947))
