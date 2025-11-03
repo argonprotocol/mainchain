@@ -1203,15 +1203,15 @@ impl<T: Config> ClosestMiner<T> {
 			})
 			.unwrap_or(u16::MAX);
 
-		let recency = ActiveMinersCount::<T>::get().saturating_sub(since_last_blocks) as u32;
+		let active = ActiveMinersCount::<T>::get() as u32;
+		let freshness_penalty = active.saturating_sub(since_last_blocks.min(active as u16) as u32);
 		let wins = self.scoring.blocks_won;
 
-		let penalty = wins.saturating_add(recency);
+		let penalty = wins.saturating_add(freshness_penalty);
 
-		// multiply penalty by 2^7 to leave space for rand in low 7 bits
-		// this allows us to have a random tie-breaker for same-priority miners
-		// key32 layout: [penalty: upper 25 bits][rand: lower 7 bits]
-		let key32 = (penalty << 7) | (rand as u32 & 0x7F);
+		// Combine penalty (high bits) and random jitter (low bits).
+		// Lower scores win; randomness provides small tie-breaking variation.
+		let key32 = (penalty << 7) | (rand as u32);
 
 		// Re-embed into U256 (high bits) purely for compatibility
 		let mut res = U256::from(key32) << (256 - 32);
