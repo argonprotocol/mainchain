@@ -1210,8 +1210,8 @@ impl<T: Config> ClosestMiner<T> {
 
 		// multiply penalty by 2^7 to leave space for rand in low 7 bits
 		// this allows us to have a random tie-breaker for same-priority miners
-		// (since priority is unbounded, we just take the low 26 bits)
-		let key32 = (penalty << 7) | (rand as u32);
+		// key32 layout: [penalty: upper 25 bits][rand: lower 7 bits]
+		let key32 = (penalty << 7) | (rand as u32 & 0x7F);
 
 		// Re-embed into U256 (high bits) purely for compatibility
 		let mut res = U256::from(key32) << (256 - 32);
