@@ -95,7 +95,7 @@ parameter_types! {
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;
 	pub const MinCohortSize: u32 = 10;
-	pub const MaxCohortSize: u32 = 1000;
+	pub const MaxCohortSize: u32 = 144;
 	pub const MaxGrandpas: u32 = 1000;
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetPricePerSeat: Balance = 1000 * ARGON;

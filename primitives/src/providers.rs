@@ -20,7 +20,7 @@ use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
 use sp_core::{H256, RuntimeDebug, U256};
 use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys},
 };
 
 pub trait NotebookProvider {
@@ -181,15 +181,15 @@ pub trait BlockSealSpecProvider<Block: BlockT> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
-pub struct BlockSealerInfo<AccountId: FullCodec> {
+pub struct BlockSealerInfo<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
 	pub block_author_account_id: AccountId,
 	/// The voting account, if a block seal
 	pub block_vote_rewards_account: Option<AccountId>,
-	pub block_seal_authority: Option<BlockSealAuthorityId>,
+	pub block_seal_authority: Option<AuthorityId>,
 }
 
-pub trait BlockSealerProvider<AccountId: FullCodec> {
-	fn get_sealer_info() -> BlockSealerInfo<AccountId>;
+pub trait BlockSealerProvider<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
+	fn get_sealer_info() -> BlockSealerInfo<AccountId, AuthorityId>;
 	fn is_block_vote_seal() -> bool;
 }
 
@@ -223,7 +223,7 @@ where
 		seal_proof: U256,
 		authority_id: &AuthorityId,
 		account: &AccountId,
-		for_block_number: NumberFor<Block>,
+		at_tick: Tick,
 	) -> Option<U256>;
 }
 

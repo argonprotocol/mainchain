@@ -60,7 +60,7 @@ pub mod pallet {
 		SlotEvents, TickProvider, block_seal::MiningRegistration, vault::MiningBidPoolProvider,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -161,7 +161,7 @@ pub mod pallet {
 		type BidIncrements: Get<Self::Balance>;
 
 		// Find the author of a block
-		type SealerInfo: BlockSealerProvider<Self::AccountId>;
+		type SealerInfo: BlockSealerProvider<Self::AccountId, Self::MiningAuthorityId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -603,10 +603,18 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let mut best = None;
 		let mut scores = vec![];
 
-		let block_number = frame_system::Pallet::<T>::block_number();
+		let tick = T::TickProvider::current_tick();
+		let frame_start_tick = Self::tick_for_frame(Self::current_frame_id());
+		let ticks_since_frame_start = tick.saturating_sub(frame_start_tick);
+		let active_miners = ActiveMinersCount::<T>::get();
+		if active_miners == 0 {
+			return None;
+		}
+		let expected_per_miner = ticks_since_frame_start.saturating_div(active_miners as u64);
 		for (frame_id, cohort) in nonces {
 			for (i, miner_scoring) in cohort.into_iter().enumerate() {
-				let score = ClosestMiner::new(seal_proof, miner_scoring).get_score(block_number);
+				let score = ClosestMiner::new(seal_proof, miner_scoring)
+					.get_score(expected_per_miner as u16);
 				scores.push(score);
 				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
@@ -634,7 +642,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		seal_proof: U256,
 		authority_id: &T::MiningAuthorityId,
 		account_id: &T::AccountId,
-		for_block_number: BlockNumberFor<T>,
+		at_tick: Tick,
 	) -> Option<U256> {
 		let miner_index = AccountIndexLookup::<T>::get(account_id)?;
 		let authority = Self::get_mining_authority_by_index(miner_index)?;
@@ -644,8 +652,12 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let nonces = MinerNonceScoringByCohort::<T>::get();
 		let scoring_for_frame = nonces.get(&miner_index.0)?;
 		let miner_scoring = scoring_for_frame.get(miner_index.1 as usize)?;
-		let score =
-			ClosestMiner::new(seal_proof, miner_scoring.clone()).get_score(for_block_number);
+		let frame_start_tick = Self::tick_for_frame(Self::current_frame_id());
+		let ticks_since_frame_start = at_tick.saturating_sub(frame_start_tick);
+		let expected_per_miner =
+			ticks_since_frame_start.saturating_div(ActiveMinersCount::<T>::get() as u64);
+		let score = ClosestMiner::new(seal_proof, miner_scoring.clone())
+			.get_score(expected_per_miner.unique_saturated_into());
 		Some(score)
 	}
 }
@@ -656,7 +668,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn is_registered_mining_active() -> bool {
-		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
+		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0u16
 	}
 
 	pub fn get_mining_authority(
@@ -693,13 +705,13 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn record_block_author(author: T::AccountId) {
-		let Some(miner_index) = <AccountIndexLookup<T>>::get(author) else {
+		let Some(miner_index) = <AccountIndexLookup<T>>::get(&author) else {
 			return;
 		};
 		MinerNonceScoringByCohort::<T>::mutate(|a| {
 			if let Some(cohort_nonces) = a.get_mut(&miner_index.0) {
 				if let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize) {
-					miner_scoring.blocks_won = miner_scoring.blocks_won.saturating_add(1);
+					miner_scoring.blocks_won_in_frame.saturating_accrue(1);
 					miner_scoring.last_win_block = Some(frame_system::Pallet::<T>::block_number());
 				}
 			}
@@ -718,6 +730,7 @@ impl<T: Config> Pallet<T> {
 
 		IsNextSlotBiddingOpen::<T>::put(true);
 
+		Self::reset_miner_nonce_scoring();
 		let mut active_miners = ActiveMinersCount::<T>::get();
 		let mut added_miners = vec![];
 		let mut removed_miners = vec![];
@@ -755,7 +768,12 @@ impl<T: Config> Pallet<T> {
 			let nonce =
 				MinerNonce::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
 					.generate();
-			let scoring = MinerNonceScoring { nonce, blocks_won: 0, last_win_block: None };
+			let scoring = MinerNonceScoring {
+				nonce,
+				blocks_won_in_frame: 0,
+				last_win_block: None,
+				frame_start_blocks_won_surplus: 0,
+			};
 
 			miner_scoring.push(scoring);
 		}
@@ -796,6 +814,30 @@ impl<T: Config> Pallet<T> {
 
 		T::SlotEvents::rotate_grandpas(frame_id, removed_miners, added_miners);
 		T::SlotEvents::on_frame_start(frame_id);
+	}
+
+	pub(crate) fn reset_miner_nonce_scoring() {
+		let starting_miners = ActiveMinersCount::<T>::get();
+		if starting_miners == 0 {
+			return;
+		}
+		MinerNonceScoringByCohort::<T>::mutate(|a| {
+			let mut total_block_mined = 0;
+			for (_frame_id, miners) in a.iter() {
+				for miner in miners.iter() {
+					total_block_mined += miner.blocks_won_in_frame;
+				}
+			}
+			let expected_blocks =
+				FixedU128::from_rational(total_block_mined as u128, starting_miners as u128);
+			for (_frame_id, miners) in a.iter_mut() {
+				for miner in miners.iter_mut() {
+					miner.frame_start_blocks_won_surplus += miner.blocks_won_in_frame as i16 -
+						expected_blocks.round().saturating_mul_int(1i16);
+					miner.blocks_won_in_frame = 0;
+				}
+			}
+		});
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10-frame average of bids.
@@ -1155,7 +1197,10 @@ impl<T: Config> Pallet<T> {
 pub struct MinerNonceScoring<T: Config> {
 	pub nonce: U256,
 	pub last_win_block: Option<BlockNumberFor<T>>,
-	pub blocks_won: u32,
+	/// Number of blocks won in the current frame
+	pub blocks_won_in_frame: u16,
+	/// Number of blocks off target set at start of each frame
+	pub frame_start_blocks_won_surplus: i16,
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound)]
@@ -1184,22 +1229,30 @@ impl<T: Config> ClosestMiner<T> {
 		Self { seal_proof, miner_nonce: scoring.nonce, scoring }
 	}
 
-	fn get_score(&self, block_number: BlockNumberFor<T>) -> U256 {
+	fn get_score(&self, expected_wins_at_tick: u16) -> U256 {
 		// 1. Create a full U256 from the concatenation of the seal_proof and the miner_nonce
 		let hash_bytes = self.using_encoded(blake2_256);
-		let mut base_score = U256::from_big_endian(&hash_bytes);
-		// If this miner has won blocks within last 95% of active miners, apply a penalty to the score
-		const PERCENT_VARIATION: Percent = Percent::from_percent(95);
 
-		// 2. Adjust the score based on blocks won recently
-		if let Some(last_win) = self.scoring.last_win_block {
-			let since_last =
-				UniqueSaturatedInto::<u64>::unique_saturated_into(block_number - last_win);
-			if since_last <= PERCENT_VARIATION.mul_ceil(ActiveMinersCount::<T>::get() as u64) {
-				base_score = base_score.saturating_mul(U256::from(1000));
-			}
+		let mut r2 = [0u8; 2];
+		for (i, b) in hash_bytes.iter().enumerate() {
+			r2[i & 1] ^= *b;
 		}
-		base_score
+		let random_base_score = u16::from_le_bytes(r2);
+
+		let wins_against_expected = (self.scoring.blocks_won_in_frame as i16) -
+			expected_wins_at_tick as i16 +
+			self.scoring.frame_start_blocks_won_surplus;
+
+		// Apply a bounded, *additive* correction based on deviation. Do not scale by
+		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
+		// which collapses the distribution. We keep the jitter (`random_base_score`)
+		// independent and nudge it by a fixed gain per win delta.
+		let multiplier = (wins_against_expected.abs() as i64) << 8;
+		let score_adjustment = (wins_against_expected as i64) * multiplier;
+
+		let final_score = (random_base_score as i64) + score_adjustment;
+		let final_clamped = final_score.clamp(0, u32::MAX as i64);
+		U256::from(final_clamped)
 	}
 }
 

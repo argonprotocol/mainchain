@@ -410,14 +410,12 @@ pub mod pallet {
 
 			// in v2, any miner can submit a seal, the runtime will only verify that the seal proof
 			// is correct
-			let previous_block =
-				<frame_system::Pallet<T>>::block_number().saturating_sub(1u32.into());
-
 			let expected_nonce_score = T::AuthorityProvider::get_authority_score(
 				seal_proof,
 				&authority_id,
 				block_author,
-				previous_block,
+				// the current tick hasn't changed yet
+				T::TickProvider::current_tick(),
 			)
 			.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
 
