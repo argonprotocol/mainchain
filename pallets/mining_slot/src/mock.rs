@@ -116,7 +116,7 @@ parameter_types! {
 	pub const BidPoolAccountId: u64 = 10000;
 
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
-	pub static BlockSealer: BlockSealerInfo<u64> = BlockSealerInfo {
+	pub static BlockSealer: BlockSealerInfo<u64, UintAuthorityId> = BlockSealerInfo {
 		block_seal_authority: None,
 		block_vote_rewards_account: Some(1),
 		block_author_account_id: 1,
@@ -201,8 +201,8 @@ impl TickProvider<Block> for StaticTickProvider {
 }
 
 pub struct StaticBlockSealerProvider;
-impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
-	fn get_sealer_info() -> BlockSealerInfo<u64> {
+impl BlockSealerProvider<u64, UintAuthorityId> for StaticBlockSealerProvider {
+	fn get_sealer_info() -> BlockSealerInfo<u64, UintAuthorityId> {
 		BlockSealer::get()
 	}
 	fn is_block_vote_seal() -> bool {

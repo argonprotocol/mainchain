@@ -268,8 +268,9 @@ fn it_adds_new_cohorts_on_block() {
 								block_hash: System::parent_hash(),
 							}
 							.generate(),
-							blocks_won: 0,
+							blocks_won_in_frame: 0,
 							last_win_block: None,
+							frame_start_blocks_won_surplus: 0,
 						},
 					)
 				})
@@ -1083,6 +1084,8 @@ fn it_distributes_seals_evenly() {
 				&System::parent_hash(),
 				&Default::default(),
 			);
+			CurrentTick::set(current_tick);
+			ElapsedTicks::set(current_tick);
 
 			let vote = BlockVote::create_default_vote(notary_account.clone(), current_tick);
 			let vote_bytes = vote.encode();
@@ -1091,18 +1094,21 @@ fn it_distributes_seals_evenly() {
 			if let Some((closest, _, _)) = closest_miner {
 				*winners_by_id.entry(closest.account_id).or_insert(0) += 1;
 				MiningSlots::record_block_author(closest.account_id);
+			} else {
+				panic!("Should have found a closest miner");
+			}
+			if MiningSlots::calculated_frame_id() >= MiningSlots::next_frame_id() {
+				NextFrameId::<Test>::mutate(|a| *a += 1);
+
+				MiningSlots::reset_miner_nonce_scoring();
 			}
 		}
 		println!("{:#?}", winners_by_id);
 		assert_eq!(winners_by_id.len(), 100, "Should have 100 unique winning miners");
 		let expected_wins_per_miner = 10_000f64 / 100f64;
 		let mut max_diff = 0f64;
-		let recorded_wins = MinerNonceScoringByCohort::<Test>::get();
+		let mut sum = 0;
 		for (account, wins) in winners_by_id.iter() {
-			let index = AccountIndexLookup::<Test>::get(account).expect("Account must have index");
-			let frame_miner_scores =
-				recorded_wins.get(&index.0).expect("Should have winning miner");
-			assert_eq!(frame_miner_scores[index.1 as usize].blocks_won as u16, *wins);
 			let diff = (*wins as f64 - expected_wins_per_miner).abs();
 			let diff_percent = diff / expected_wins_per_miner;
 			if diff_percent.abs() > max_diff.abs() {
@@ -1115,8 +1121,10 @@ fn it_distributes_seals_evenly() {
 				wins,
 				expected_wins_per_miner
 			);
+			sum += wins;
 		}
 		println!("Max difference from expected wins: {}%", max_diff * 100f64);
+		assert_eq!(sum, 10_000, "Should have 10,000 total wins recorded");
 	});
 }
 
@@ -1171,18 +1179,21 @@ fn it_should_allow_a_tie() {
 				bounded_vec![
 					MinerNonceScoring {
 						nonce: U256::from(100u32),
-						blocks_won: 1,
-						last_win_block: Some(10)
+						blocks_won_in_frame: 1,
+						last_win_block: Some(10),
+						frame_start_blocks_won_surplus: 0
 					},
 					MinerNonceScoring {
 						nonce: U256::from(101u32),
-						blocks_won: 1,
-						last_win_block: Some(11)
+						blocks_won_in_frame: 1,
+						last_win_block: Some(11),
+						frame_start_blocks_won_surplus: 0
 					},
 					MinerNonceScoring {
 						nonce: U256::from(102u32),
-						blocks_won: 1,
-						last_win_block: Some(12)
+						blocks_won_in_frame: 1,
+						last_win_block: Some(12),
+						frame_start_blocks_won_surplus: 0
 					},
 				],
 			);
@@ -1303,7 +1314,7 @@ fn it_tracks_the_block_rewards() {
 		MiningSlots::on_finalize(12);
 
 		let nonce_scoring = MinerNonceScoringByCohort::<Test>::get();
-		assert_eq!(nonce_scoring.get(&2).unwrap()[0].blocks_won, 1);
+		assert_eq!(nonce_scoring.get(&2).unwrap()[0].blocks_won_in_frame, 1);
 	});
 }
 
