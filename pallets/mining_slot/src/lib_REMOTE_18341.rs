@@ -12,6 +12,7 @@ use argon_primitives::{
 pub use pallet::*;
 use pallet_prelude::*;
 use sp_runtime::{RuntimeAppPublic, traits::OpaqueKeys};
+use std::u64;
 pub use weights::*;
 
 #[cfg(test)]
@@ -1240,8 +1241,8 @@ impl<T: Config> ClosestMiner<T> {
 		let random_base_score = u16::from_le_bytes(r2);
 
 		let wins_against_expected = (self.scoring.blocks_won_in_frame as i16)
-			.saturating_sub(expected_wins_at_tick as i16)
-			.saturating_add(self.scoring.frame_start_blocks_won_surplus);
+			.saturating_sub(expected_wins_at_tick.into())
+			.saturating_sub(self.scoring.frame_start_blocks_won_surplus);
 
 		// Apply a bounded, *additive* correction based on deviation. Do not scale by
 		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
