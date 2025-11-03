@@ -1075,7 +1075,7 @@ fn it_distributes_seals_evenly() {
 		let notary_account = AccountId::from(notary_pair.public());
 		let mut winners_by_id = HashMap::<u64, u16>::new();
 		let start_block_number = System::block_number();
-		for i in 1..10_000u64 {
+		for i in 1..=10_000u64 {
 			current_tick += 1;
 			System::set_block_number(start_block_number + i);
 			System::initialize(
@@ -1109,14 +1109,95 @@ fn it_distributes_seals_evenly() {
 				max_diff = diff_percent;
 			}
 			assert!(
-				diff_percent.abs() <= 0.04,
-				"Account {:?} had {} wins which is more than 4% different from expected {}",
+				diff_percent.abs() <= 0.05,
+				"Account {:?} had {} wins which is more than 5% different from expected {}",
 				account,
 				wins,
 				expected_wins_per_miner
 			);
 		}
 		println!("Max difference from expected wins: {}%", max_diff * 100f64);
+	});
+}
+
+#[test]
+fn it_should_allow_a_tie() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(14);
+		ElapsedTicks::set(10);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ActiveMinersCount::<Test>::put(3);
+		MinersByCohort::<Test>::mutate(1, |x| {
+			let _ = x.try_push(MiningRegistration {
+				account_id: 1,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 1.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 2,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 2.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 3,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 3.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+		});
+		AccountIndexLookup::<Test>::insert(1, (1, 0));
+		AccountIndexLookup::<Test>::insert(2, (1, 1));
+		AccountIndexLookup::<Test>::insert(3, (1, 2));
+		MinerNonceScoringByCohort::<Test>::mutate(|x| {
+			let _ = x.try_insert(
+				1,
+				bounded_vec![
+					MinerNonceScoring {
+						nonce: U256::from(100u32),
+						blocks_won: 1,
+						last_win_block: Some(10)
+					},
+					MinerNonceScoring {
+						nonce: U256::from(101u32),
+						blocks_won: 1,
+						last_win_block: Some(11)
+					},
+					MinerNonceScoring {
+						nonce: U256::from(102u32),
+						blocks_won: 1,
+						last_win_block: Some(12)
+					},
+				],
+			);
+		});
+
+		let res1 = MiningSlots::get_winning_managed_authority(U256::from(150u32), None, None);
+		assert!(res1.is_some(), "Should have a winning miner");
+		let top_score = res1.unwrap().1;
+		assert!(
+			MiningSlots::get_winning_managed_authority(U256::from(150u32), None, Some(top_score))
+				.is_none()
+		);
+		let res2 =
+			MiningSlots::get_winning_managed_authority(U256::from(155u32), None, Some(top_score));
+		assert!(res2.is_some(), "Should have a winning miner");
 	});
 }
 

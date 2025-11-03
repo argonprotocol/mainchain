@@ -656,7 +656,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn is_registered_mining_active() -> bool {
-		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
+		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0u16
 	}
 
 	pub fn get_mining_authority(
@@ -1187,19 +1187,38 @@ impl<T: Config> ClosestMiner<T> {
 	fn get_score(&self, block_number: BlockNumberFor<T>) -> U256 {
 		// 1. Create a full U256 from the concatenation of the seal_proof and the miner_nonce
 		let hash_bytes = self.using_encoded(blake2_256);
-		let mut base_score = U256::from_big_endian(&hash_bytes);
-		// If this miner has won blocks within last 95% of active miners, apply a penalty to the score
-		const PERCENT_VARIATION: Percent = Percent::from_percent(95);
 
-		// 2. Adjust the score based on blocks won recently
-		if let Some(last_win) = self.scoring.last_win_block {
-			let since_last =
-				UniqueSaturatedInto::<u64>::unique_saturated_into(block_number - last_win);
-			if since_last <= PERCENT_VARIATION.mul_ceil(ActiveMinersCount::<T>::get() as u64) {
-				base_score = base_score.saturating_mul(U256::from(1000));
-			}
+		let mut r2 = [0u8; 2];
+		for (i, b) in hash_bytes.iter().enumerate() {
+			r2[i & 1] ^= *b;
 		}
-		base_score
+		let rand = u16::from_le_bytes(r2);
+
+		// Signals (small, bounded, integer)
+		let since_last_blocks: u16 = self
+			.scoring
+			.last_win_block
+			.map(|b| {
+				UniqueSaturatedInto::<u16>::unique_saturated_into(block_number.saturating_sub(b))
+			})
+			.unwrap_or(u16::MAX);
+
+		let recency = ActiveMinersCount::<T>::get().saturating_sub(since_last_blocks) as u32;
+		let wins = self.scoring.blocks_won;
+
+		let penalty = wins.saturating_add(recency);
+
+		// multiply penalty by 2^7 to leave space for rand in low 7 bits
+		// this allows us to have a random tie-breaker for same-priority miners
+		// (since priority is unbounded, we just take the low 26 bits)
+		let key32 = (penalty << 7) | (rand as u32);
+
+		// Re-embed into U256 (high bits) purely for compatibility
+		let mut res = U256::from(key32) << (256 - 32);
+		if res == U256::MAX {
+			res = res.saturating_sub(U256::one());
+		}
+		res
 	}
 }
 
