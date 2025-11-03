@@ -1247,7 +1247,7 @@ impl<T: Config> ClosestMiner<T> {
 		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
 		// which collapses the distribution. We keep the jitter (`random_base_score`)
 		// independent and nudge it by a fixed gain per win delta.
-		let multiplier = (wins_against_expected.abs() << 8) as i64;
+		let multiplier = (wins_against_expected.abs() as i64) << 8;
 		let score_adjustment = (wins_against_expected as i64) * multiplier;
 
 		let final_score = (random_base_score as i64) + score_adjustment;
