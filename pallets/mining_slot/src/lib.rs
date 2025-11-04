@@ -603,18 +603,11 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let mut best = None;
 		let mut scores = vec![];
 
-		let tick = T::TickProvider::current_tick();
-		let frame_start_tick = Self::tick_for_frame(Self::current_frame_id());
-		let ticks_since_frame_start = tick.saturating_sub(frame_start_tick);
-		let active_miners = ActiveMinersCount::<T>::get();
-		if active_miners == 0 {
-			return None;
-		}
-		let expected_per_miner = ticks_since_frame_start.saturating_div(active_miners as u64);
+		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
 		for (frame_id, cohort) in nonces {
 			for (i, miner_scoring) in cohort.into_iter().enumerate() {
-				let score = ClosestMiner::new(seal_proof, miner_scoring)
-					.get_score(expected_per_miner as u16);
+				let score =
+					ClosestMiner::new(seal_proof, miner_scoring).get_score(expected_per_miner);
 				scores.push(score);
 				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
@@ -642,7 +635,6 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		seal_proof: U256,
 		authority_id: &T::MiningAuthorityId,
 		account_id: &T::AccountId,
-		at_tick: Tick,
 	) -> Option<U256> {
 		let miner_index = AccountIndexLookup::<T>::get(account_id)?;
 		let authority = Self::get_mining_authority_by_index(miner_index)?;
@@ -652,12 +644,9 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let nonces = MinerNonceScoringByCohort::<T>::get();
 		let scoring_for_frame = nonces.get(&miner_index.0)?;
 		let miner_scoring = scoring_for_frame.get(miner_index.1 as usize)?;
-		let frame_start_tick = Self::tick_for_frame(Self::current_frame_id());
-		let ticks_since_frame_start = at_tick.saturating_sub(frame_start_tick);
-		let expected_per_miner =
-			ticks_since_frame_start.saturating_div(ActiveMinersCount::<T>::get() as u64);
-		let score = ClosestMiner::new(seal_proof, miner_scoring.clone())
-			.get_score(expected_per_miner.unique_saturated_into());
+		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
+		let score =
+			ClosestMiner::new(seal_proof, miner_scoring.clone()).get_score(expected_per_miner);
 		Some(score)
 	}
 }
@@ -816,24 +805,33 @@ impl<T: Config> Pallet<T> {
 		T::SlotEvents::on_frame_start(frame_id);
 	}
 
+	pub(crate) fn get_average_vote_blocks_won_per_miner() -> u16 {
+		let starting_miners = ActiveMinersCount::<T>::get();
+		if starting_miners == 0 {
+			return 0;
+		}
+		let mut total_block_mined = 0;
+		for (_, miners) in MinerNonceScoringByCohort::<T>::get() {
+			for miner in miners {
+				total_block_mined += miner.blocks_won_in_frame;
+			}
+		}
+		let expected_blocks =
+			FixedU128::from_rational(total_block_mined as u128, starting_miners as u128);
+		expected_blocks.round().saturating_mul_int(1u16)
+	}
+
 	pub(crate) fn reset_miner_nonce_scoring() {
 		let starting_miners = ActiveMinersCount::<T>::get();
 		if starting_miners == 0 {
 			return;
 		}
 		MinerNonceScoringByCohort::<T>::mutate(|a| {
-			let mut total_block_mined = 0;
-			for (_frame_id, miners) in a.iter() {
-				for miner in miners.iter() {
-					total_block_mined += miner.blocks_won_in_frame;
-				}
-			}
-			let expected_blocks =
-				FixedU128::from_rational(total_block_mined as u128, starting_miners as u128);
+			let expected_blocks = Self::get_average_vote_blocks_won_per_miner();
 			for (_frame_id, miners) in a.iter_mut() {
 				for miner in miners.iter_mut() {
-					miner.frame_start_blocks_won_surplus += miner.blocks_won_in_frame as i16 -
-						expected_blocks.round().saturating_mul_int(1i16);
+					miner.frame_start_blocks_won_surplus +=
+						miner.blocks_won_in_frame as i16 - expected_blocks as i16;
 					miner.blocks_won_in_frame = 0;
 				}
 			}
@@ -1251,8 +1249,8 @@ impl<T: Config> ClosestMiner<T> {
 		let score_adjustment = (wins_against_expected as i64).saturating_mul(multiplier);
 
 		let final_score = (random_base_score as i64).saturating_add(score_adjustment);
-		let final_clamped = final_score.max(0);
-		U256::from(final_clamped)
+		let shifted = final_score.saturating_add(i64::MAX / 2); // move negative region upward
+		U256::from(shifted as u64)
 	}
 }
 

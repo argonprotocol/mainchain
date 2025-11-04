@@ -101,7 +101,6 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthori
 		_seal_proof: U256,
 		authority_id: &BlockSealAuthorityId,
 		account: &AccountId,
-		_at_tick: Tick,
 	) -> Option<U256> {
 		if let Some((authority, distance)) = BestMinerNonce::get() {
 			if authority.authority_id == *authority_id || authority.account_id == *account {

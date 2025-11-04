@@ -1129,6 +1129,84 @@ fn it_distributes_seals_evenly() {
 }
 
 #[test]
+fn it_should_yield_results_when_highly_negative() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(14);
+		ElapsedTicks::set(10);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ActiveMinersCount::<Test>::put(3);
+		MinersByCohort::<Test>::mutate(1, |x| {
+			let _ = x.try_push(MiningRegistration {
+				account_id: 1,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 1.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 2,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 2.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 3,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 3.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+		});
+		AccountIndexLookup::<Test>::insert(1, (1, 0));
+		AccountIndexLookup::<Test>::insert(2, (1, 1));
+		AccountIndexLookup::<Test>::insert(3, (1, 2));
+		MinerNonceScoringByCohort::<Test>::mutate(|x| {
+			let _ = x.try_insert(
+				1,
+				bounded_vec![
+					MinerNonceScoring {
+						nonce: U256::from(100u32),
+						blocks_won_in_frame: 20,
+						last_win_block: Some(10),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(101u32),
+						blocks_won_in_frame: 100,
+						last_win_block: Some(11),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(102u32),
+						blocks_won_in_frame: 1,
+						last_win_block: Some(12),
+						frame_start_blocks_won_surplus: 0
+					},
+				],
+			);
+		});
+
+		let res1 = MiningSlots::get_winning_managed_authority(U256::from(150u32), None, None);
+		assert!(res1.is_some(), "Should have a winning miner");
+		assert_ne!(res1.clone().unwrap().1, U256::zero());
+		assert_eq!(res1.unwrap().0.account_id, 3);
+	});
+}
+
+#[test]
 fn it_should_allow_a_tie() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
