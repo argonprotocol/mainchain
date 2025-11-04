@@ -1,16 +1,18 @@
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_primitives::{Address, U160, address, aliases::I56};
-use alloy_provider::RootProvider;
-use alloy_transport::BoxTransport;
+use alloy_primitives::{U160, address, aliases::I56};
+use alloy_provider::{RootProvider, network::Ethereum};
 use anyhow::{Result, anyhow};
-use argon_primitives::Balance;
+use argon_primitives::{
+	Balance,
+	prelude::{frame_support::pallet_prelude::Zero, sp_arithmetic::FixedPointNumber},
+};
 use polkadot_sdk::*;
-use sp_runtime::{FixedPointNumber, FixedU128};
+use sdk_core::prelude::*;
+use sp_runtime::FixedU128;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::{error, trace};
+use tracing::{trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
-use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
 
 pub fn get_infura_url(use_sepolia: bool, project_id: String) -> String {
@@ -27,7 +29,7 @@ pub const SEPOLIA_FACTORY_ADDRESS: Address = address!("0227628f3F023bb0B980b67D5
 
 #[cfg(test)]
 lazy_static::lazy_static! {
-	static ref MOCK_PRICES: Arc<parking_lot::Mutex<HashMap<Address, Vec<PriceAndLiquidity>>>> = Default::default();
+	pub static ref MOCK_PRICES: Arc<parking_lot::Mutex<HashMap<Address, Vec<PriceAndLiquidity>>>> = Default::default();
 }
 
 #[cfg(test)]
@@ -36,13 +38,12 @@ pub(crate) fn use_mock_uniswap_prices(token_address: Address, mut prices: Vec<Pr
 }
 
 pub struct UniswapOracle {
-	provider: Arc<RootProvider<BoxTransport>>,
+	provider: Arc<RootProvider<Ethereum>>,
 	factory_address: Address,
 	usd_token: Token,
 	lookup_token: Token,
 	fee_tiers: Vec<FeeAmount>,
-	pool_cache_by_fee:
-		Mutex<HashMap<FeeAmount, IUniswapV3PoolInstance<BoxTransport, RootProvider<BoxTransport>>>>, /* Fee -> Pool Contract */
+	pool_cache_by_fee: Mutex<HashMap<FeeAmount, IUniswapV3PoolInstance<RootProvider<Ethereum>>>>, /* Fee -> Pool Contract */
 }
 
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Default)]
@@ -61,7 +62,7 @@ impl UniswapOracle {
 			FACTORY_ADDRESS
 		};
 		let url = get_infura_url(use_sepolia, project_id);
-		let provider = RootProvider::connect_builtin(&url).await?;
+		let provider = RootProvider::connect(&url).await?;
 
 		Ok(Self {
 			provider: Arc::new(provider),
@@ -78,7 +79,7 @@ impl UniswapOracle {
 	pub async fn get_current_price(&self) -> Result<PriceAndLiquidity> {
 		#[cfg(test)]
 		{
-			if let Some(mock_tokens) = MOCK_PRICES.lock().get_mut(&self.lookup_token.address) {
+			if let Some(mock_tokens) = MOCK_PRICES.lock().get_mut(&self.lookup_token.address()) {
 				if let Some(price) = mock_tokens.pop() {
 					return Ok(price);
 				}
@@ -89,10 +90,12 @@ impl UniswapOracle {
 			.await?
 			.ok_or(anyhow!("Failed to get price, using default"))?;
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
-		let float = scaled_numerator.to_u128().ok_or(anyhow!("Failed to convert to u128"))?;
+		let float = scaled_numerator.to_u128().map_err(|_| anyhow!("Failed to convert to u128"))?;
+
 		Ok(PriceAndLiquidity {
 			price: FixedU128::from_inner(float),
-			liquidity: liquidity.to_u128().unwrap(),
+			liquidity: Balance::try_from(liquidity)
+				.map_err(|e| anyhow!("Failed to convert liquidity  {:?}", e))?,
 		})
 	}
 
@@ -116,7 +119,7 @@ impl UniswapOracle {
 			.await
 			.inspect_err(|e| {
 				if !format!("{:?}", e).contains("AbiError(SolTypes(Overrun))") {
-					error!(?fee, ?e, "Error calling observe {:?}", e.to_string());
+					warn!(?fee, ?e, "Error calling observe {:?}", e.to_string());
 				}
 			})?;
 		let tick_cumulatives = result.tickCumulatives;
@@ -139,7 +142,7 @@ impl UniswapOracle {
 		let average_liquidity = {
 			let seconds_between_x128: BigInt = BigInt::from(seconds_ago) << 128;
 			let liquidity_diff = liquidity_diff.to_big_int();
-			seconds_between_x128.checked_div(&liquidity_diff).unwrap_or_default()
+			seconds_between_x128.checked_div(liquidity_diff).unwrap_or_default()
 		};
 		// Uniswap's oracle treats our lookup token (Argon) as having 18 decimals (per erc20
 		// standard), even though on our mainchain Argon is actually represented with 6 decimals.
@@ -176,8 +179,8 @@ impl UniswapOracle {
 		for &fee in &self.fee_tiers {
 			if let Ok((price, average_liquidity)) = self.get_twap_and_twal(fee, seconds_ago).await {
 				trace!(?price, ?average_liquidity, "Got twap/twal for {:?}", fee);
-				total_liquidity += average_liquidity.clone();
-				total_numerator += price.numerator * average_liquidity.clone();
+				total_liquidity += average_liquidity;
+				total_numerator += price.numerator * average_liquidity;
 				total_denominator += price.denominator * average_liquidity;
 			}
 		}
@@ -202,7 +205,7 @@ impl UniswapOracle {
 	async fn get_cached_pool_contract(
 		&self,
 		fee: FeeAmount,
-	) -> Result<IUniswapV3PoolInstance<BoxTransport, RootProvider<BoxTransport>>> {
+	) -> Result<IUniswapV3PoolInstance<RootProvider<Ethereum>>> {
 		let mut cache = self.pool_cache_by_fee.lock().await;
 
 		if let Some(pool) = cache.get(&fee) {
@@ -254,7 +257,7 @@ mod test {
 		let oracle = UniswapOracle::new(
 			project_id,
 			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
-			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "DAI"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
 		)
 		.await
 		.expect("Failed to create oracle");
