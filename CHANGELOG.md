@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.3.16](https://github.com/argonprotocol/mainchain/compare/v1.3.15...1ea2ca3907c16ac2b3c65b1823870cd714b58ef5) (2025-11-04)
+## [v1.3.17](https://github.com/argonprotocol/mainchain/compare/v1.3.16...9fc14d022b64f5e4c0b02762fa97be9c0ce1a5d3) (2025-11-04)
 
 ### Fixes
+
+* **mining_slot:** handle large negatives
+([b8d14fd](https://github.com/argonprotocol/mainchain/commit/b8d14fd3a5120f47899b2e3147d39a5d5cb4beb9))
+
+### [v1.3.16](https://github.com/argonprotocol/mainchain/compare/v1.3.15...v1.3.16) (2025-11-04)
+
+#### Fixes
 
 * miner nonce for wrong tick
 ([1ea2ca3](https://github.com/argonprotocol/mainchain/commit/1ea2ca3907c16ac2b3c65b1823870cd714b58ef5))
