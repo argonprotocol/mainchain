@@ -73,7 +73,6 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 		_seal_proof: U256,
 		_authority_id: &BlockSealAuthorityId,
 		_account: &u64,
-		_at_tick: Tick,
 	) -> Option<U256> {
 		todo!()
 	}

@@ -223,7 +223,6 @@ where
 		seal_proof: U256,
 		authority_id: &AuthorityId,
 		account: &AccountId,
-		at_tick: Tick,
 	) -> Option<U256>;
 }
 
