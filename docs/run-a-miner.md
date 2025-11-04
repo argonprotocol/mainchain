@@ -161,7 +161,7 @@ author_rotateKeys"}' http://localhost:9944/
 
 Mining requires you to have two tokens: Argons and Argonots (Ownership Tokens). There are initially
 100 mining slots available in Argon, each lasting 10 days. So every day, you are bidding for 1 of 10
-available slots. This will grow to 10,000 slots as the network grows. Bidding will continue until a
+available slots. This will grow to 1,440 slots as the network grows. Bidding will continue until a
 random block less than or equal to 200 ticks before the next slot begins (slots start every 1440
 ticks).
 
@@ -171,8 +171,8 @@ else on the list by bidding more Argons than they have. You will be refunded if 
 slot.
 
 Mining seats will dynamically adjust for each frame based on the average bid price vs the target.
-The number can range from 10-1000 seats per frame. You can look up the target price for a frame
-using constants `miningSlot.targetPricePerSeat`.
+The number can range from 10-144 seats per frame. You can look up the target price for a frame using
+constants `miningSlot.targetPricePerSeat`.
 
 Your bids will go into a bid "pool" for your slot and into the Slot Treasury Pool. This pool helps
 grant liquidity to Bitcoin holders when minting is delayed. Vaults are able to crowd-source funds to
@@ -213,7 +213,7 @@ slot. You're bidding for a 10- day period starting at the next block that is div
 There are initially 10 mining positions available every "slot", and 100 total miners at genesis.
 Each slot will last 10 days, so at any given time, there are 10 overlapping cohorts of miners. Each
 day, 1/10th will rotate out and 1/10th will rotate in. Over time, the number of miners will increase
-to 10,000.
+to 1,440.
 
 You are bidding for a slot, and can be outbid at any time by someone who bids more Argons than you.
 You can monitor if you currently have a winning slot by looking at the

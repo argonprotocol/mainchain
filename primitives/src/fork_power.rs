@@ -16,7 +16,7 @@ pub struct ForkPower {
 	#[codec(compact)]
 	pub vote_created_blocks: u128,
 	/// The XOR distance of the miner to the vote
-	pub miner_vote_xor_distance: Option<U256>,
+	pub miner_nonce_score: Option<U256>,
 }
 
 /// Implement Decode and Encode for backwards compatibility with older versions of the ForkPower
@@ -30,8 +30,8 @@ impl Decode for ForkPower {
 		let total_compute_difficulty = U256::decode(input)?;
 		let vote_created_blocks = Compact::<u128>::decode(input)?.0;
 		// Allow for backwards compatibility with older versions of the fork power struct that did
-		// not include the miner_vote_xor_distance field.
-		let miner_vote_xor_distance = match input.remaining_len()? {
+		// not include the miner_nonce_score field.
+		let miner_nonce_score = match input.remaining_len()? {
 			Some(0) | None => None,
 			Some(_) => Option::<U256>::decode(input)?,
 		};
@@ -43,7 +43,7 @@ impl Decode for ForkPower {
 			seal_strength,
 			total_compute_difficulty,
 			vote_created_blocks,
-			miner_vote_xor_distance,
+			miner_nonce_score,
 		})
 	}
 }
@@ -58,7 +58,7 @@ impl Encode for ForkPower {
 			self.seal_strength.size_hint() +
 			self.total_compute_difficulty.size_hint() +
 			Compact::from(self.vote_created_blocks).size_hint() +
-			self.miner_vote_xor_distance.as_ref().map_or(0, |x| x.size_hint())
+			self.miner_nonce_score.as_ref().map_or(0, |x| x.size_hint())
 	}
 
 	fn encode_to<T: codec::Output + ?Sized>(&self, dest: &mut T) {
@@ -68,8 +68,8 @@ impl Encode for ForkPower {
 		self.seal_strength.encode_to(dest);
 		self.total_compute_difficulty.encode_to(dest);
 		Compact::from(self.vote_created_blocks).encode_to(dest);
-		if self.miner_vote_xor_distance.is_some() {
-			self.miner_vote_xor_distance.encode_to(dest);
+		if self.miner_nonce_score.is_some() {
+			self.miner_nonce_score.encode_to(dest);
 		}
 	}
 }
@@ -99,14 +99,14 @@ impl ForkPower {
 		block_voting_power: BlockVotingPower,
 		notebooks: u32,
 		seal_strength: U256,
-		xor_distance: Option<U256>,
+		miner_nonce_score: Option<U256>,
 	) {
 		self.voting_power = self.voting_power.saturating_add(U256::from(block_voting_power));
 		self.notebooks = self.notebooks.saturating_add(notebooks as u64);
 		self.seal_strength = seal_strength;
 		self.vote_created_blocks = self.vote_created_blocks.saturating_add(1);
 		self.is_latest_vote = true;
-		self.miner_vote_xor_distance = xor_distance;
+		self.miner_nonce_score = miner_nonce_score;
 	}
 
 	pub fn add_compute(
@@ -121,7 +121,7 @@ impl ForkPower {
 			self.total_compute_difficulty.saturating_add(compute_difficulty.into());
 		self.is_latest_vote = false;
 		self.seal_strength = U256::MAX; // Compute blocks have no seal strength
-		self.miner_vote_xor_distance = None;
+		self.miner_nonce_score = None;
 	}
 
 	pub fn eq_weight(&self, other: &Self) -> bool {
@@ -138,7 +138,7 @@ impl Default for ForkPower {
 			seal_strength: U256::MAX,
 			total_compute_difficulty: U256::zero(),
 			vote_created_blocks: 0,
-			miner_vote_xor_distance: None,
+			miner_nonce_score: None,
 		}
 	}
 }
@@ -184,11 +184,11 @@ impl PartialOrd for ForkPower {
 				cmp = other.seal_strength.cmp(&self.seal_strength)
 			}
 			if cmp == Ordering::Equal {
-				let self_xor_distance = self.miner_vote_xor_distance.as_ref().unwrap_or(&U256::MAX);
-				let other_xor_distance =
-					other.miner_vote_xor_distance.as_ref().unwrap_or(&U256::MAX);
+				let self_miner_nonce_score = self.miner_nonce_score.as_ref().unwrap_or(&U256::MAX);
+				let other_miner_nonce_score =
+					other.miner_nonce_score.as_ref().unwrap_or(&U256::MAX);
 				// smaller xor distance is better
-				cmp = other_xor_distance.cmp(self_xor_distance);
+				cmp = other_miner_nonce_score.cmp(self_miner_nonce_score);
 			}
 		}
 
@@ -260,11 +260,11 @@ mod test {
 		let mut fork_power = ForkPower::decode(&mut &bytes[..]).unwrap();
 		assert!(fork_power.is_latest_vote);
 		assert_eq!(fork_power.notebooks, 235452);
-		assert_eq!(fork_power.miner_vote_xor_distance, None);
+		assert_eq!(fork_power.miner_nonce_score, None);
 
 		assert_ok!(ForkPowerV0::decode(&mut &bytes[..]));
 
-		fork_power.miner_vote_xor_distance = Some(U256::zero());
+		fork_power.miner_nonce_score = Some(U256::zero());
 		let new_encoded = fork_power.encode();
 
 		let fork_power_v0 = ForkPowerV0::decode(&mut &new_encoded[..]).unwrap();

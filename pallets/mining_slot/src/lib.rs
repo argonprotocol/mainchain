@@ -60,7 +60,7 @@ pub mod pallet {
 		SlotEvents, TickProvider, block_seal::MiningRegistration, vault::MiningBidPoolProvider,
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -159,6 +159,9 @@ pub mod pallet {
 		/// The increment that bids can be on (for instance, one cent increments)
 		#[pallet::constant]
 		type BidIncrements: Get<Self::Balance>;
+
+		// Find the author of a block
+		type SealerInfo: BlockSealerProvider<Self::AccountId, Self::MiningAuthorityId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -184,12 +187,17 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type ActiveMinersCount<T: Config> = StorageValue<_, u16, ValueQuery>;
 
-	/// This is a lookup of each miner's XOR key to use. It's a blake2 256 hash of the miner account
-	/// id and the block hash at time of activation.
+	/// This is a lookup of each miner's nonce to use when picking a best authority to submit a
+	/// block. It's a blake2 256 hash of the miner account id and the block hash at time of
+	/// activation.
 	#[pallet::storage]
-	pub type MinerXorKeysByCohort<T: Config> = StorageValue<
+	pub type MinerNonceScoringByCohort<T: Config> = StorageValue<
 		_,
-		BoundedBTreeMap<FrameId, BoundedVec<U256, T::MaxCohortSize>, T::FramesPerMiningTerm>,
+		BoundedBTreeMap<
+			FrameId,
+			BoundedVec<MinerNonceScoring<T>, T::MaxCohortSize>,
+			T::FramesPerMiningTerm,
+		>,
 		ValueQuery,
 	>;
 
@@ -197,7 +205,7 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type ArgonotsPerMiningSeat<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
-	/// Lookup by account id to the corresponding index in MinersByCohort and MinerXorKeysByCohort
+	/// Lookup by account id to the corresponding index in MinersByCohort and MinerNoncesByCohort
 	#[pallet::storage]
 	pub type AccountIndexLookup<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, MinerIndex, OptionQuery>;
@@ -354,6 +362,10 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
+			if T::SealerInfo::is_block_vote_seal() {
+				let author = T::SealerInfo::get_sealer_info().block_author_account_id;
+				Self::record_block_author(author);
+			}
 			let next_frame_id = NextFrameId::<T>::get();
 			let calculated_frame_id = Self::calculated_frame_id();
 			// if it's time for the cohort to start, do it
@@ -581,63 +593,45 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		Self::get_mining_authority(&author).map(|x| x.authority_id)
 	}
 
-	fn xor_closest_authority(
+	fn get_winning_managed_authority(
 		seal_proof: U256,
-	) -> Option<MiningAuthority<T::MiningAuthorityId, T::AccountId>> {
-		let xor_keys = <MinerXorKeysByCohort<T>>::get();
-		let mut closest_distance: U256 = U256::MAX;
-		let mut closest = None;
-		for (frame_id, cohort) in xor_keys {
-			for (i, peer_hash) in cohort.into_iter().enumerate() {
-				let distance = seal_proof ^ peer_hash;
-				if distance < closest_distance {
-					closest_distance = distance;
-					closest = Some((frame_id, i as u32));
-				}
-			}
-		}
-
-		Self::get_mining_authority_by_index(closest?)
-	}
-
-	fn xor_closest_managed_authority(
-		seal_proof: U256,
-		signing_key: &T::MiningAuthorityId,
-		xor_distance: Option<U256>,
+		signing_key: Option<T::MiningAuthorityId>,
+		best_score: Option<U256>,
 	) -> Option<(MiningAuthority<T::MiningAuthorityId, T::AccountId>, U256, Permill)> {
-		let xor_keys = <MinerXorKeysByCohort<T>>::get();
-		let mut closest_distance = xor_distance.unwrap_or(U256::MAX);
-		let mut closest = None;
-		let mut distances = vec![];
+		let nonces = <MinerNonceScoringByCohort<T>>::get();
+		let mut best_score = best_score.unwrap_or(U256::MAX);
+		let mut best = None;
+		let mut scores = vec![];
 
-		for (frame_id, cohort) in xor_keys {
-			for (i, peer_hash) in cohort.into_iter().enumerate() {
-				let distance = seal_proof ^ peer_hash;
-				distances.push(distance);
-				if distance < closest_distance {
+		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
+		for (frame_id, cohort) in nonces {
+			for (i, miner_scoring) in cohort.into_iter().enumerate() {
+				let score =
+					ClosestMiner::new(seal_proof, miner_scoring).get_score(expected_per_miner);
+				scores.push(score);
+				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
-					if &authority.authority_id == signing_key {
-						closest_distance = distance;
-						closest = Some(authority);
+					if let Some(ref limit_to_authority) = signing_key {
+						if &authority.authority_id != limit_to_authority {
+							continue;
+						}
 					}
+					best_score = score;
+					best = Some(authority);
 				}
 			}
 		}
-		let closest = closest?;
+		let closest = best?;
 
-		distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
-		let index = distances
+		scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+		let index = scores
 			.iter()
-			.position(|&x| x == closest_distance)
+			.position(|&x| x == best_score)
 			.expect("should exist, just checked");
-		Some((
-			closest,
-			closest_distance,
-			Permill::from_rational(index as u32, distances.len() as u32),
-		))
+		Some((closest, best_score, Permill::from_rational(index as u32, scores.len() as u32)))
 	}
 
-	fn get_authority_distance(
+	fn get_authority_score(
 		seal_proof: U256,
 		authority_id: &T::MiningAuthorityId,
 		account_id: &T::AccountId,
@@ -647,10 +641,13 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		if authority.authority_id != *authority_id {
 			return None;
 		}
-		let xor_keys = MinerXorKeysByCohort::<T>::get();
-		let peer_hash = xor_keys.get(&miner_index.0)?.get(miner_index.1 as usize)?;
-		let distance = seal_proof ^ (*peer_hash);
-		Some(distance)
+		let nonces = MinerNonceScoringByCohort::<T>::get();
+		let scoring_for_frame = nonces.get(&miner_index.0)?;
+		let miner_scoring = scoring_for_frame.get(miner_index.1 as usize)?;
+		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
+		let score =
+			ClosestMiner::new(seal_proof, miner_scoring.clone()).get_score(expected_per_miner);
+		Some(score)
 	}
 }
 
@@ -660,7 +657,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn is_registered_mining_active() -> bool {
-		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0
+		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0u16
 	}
 
 	pub fn get_mining_authority(
@@ -696,6 +693,20 @@ impl<T: Config> Pallet<T> {
 		None
 	}
 
+	pub(crate) fn record_block_author(author: T::AccountId) {
+		let Some(miner_index) = <AccountIndexLookup<T>>::get(&author) else {
+			return;
+		};
+		MinerNonceScoringByCohort::<T>::mutate(|a| {
+			if let Some(cohort_nonces) = a.get_mut(&miner_index.0) {
+				if let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize) {
+					miner_scoring.blocks_won_in_frame.saturating_accrue(1);
+					miner_scoring.last_win_block = Some(frame_system::Pallet::<T>::block_number());
+				}
+			}
+		});
+	}
+
 	pub(crate) fn start_new_frame(frame_id: FrameId) {
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
 			if bids.is_full() {
@@ -708,6 +719,7 @@ impl<T: Config> Pallet<T> {
 
 		IsNextSlotBiddingOpen::<T>::put(true);
 
+		Self::reset_miner_nonce_scoring();
 		let mut active_miners = ActiveMinersCount::<T>::get();
 		let mut added_miners = vec![];
 		let mut removed_miners = vec![];
@@ -736,24 +748,30 @@ impl<T: Config> Pallet<T> {
 		MinersByCohort::<T>::insert(frame_id, slot_cohort.clone());
 
 		let mut total_price_per_seat = T::Balance::zero();
-		let mut xor = vec![];
+		let mut miner_scoring = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
 			total_price_per_seat += entry.bid;
-			let hash =
-				MinerXor::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
-					.using_encoded(blake2_256);
+			let nonce =
+				MinerNonce::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
+					.generate();
+			let scoring = MinerNonceScoring {
+				nonce,
+				blocks_won_in_frame: 0,
+				last_win_block: None,
+				frame_start_blocks_won_surplus: 0,
+			};
 
-			xor.push(U256::from_big_endian(&hash));
+			miner_scoring.push(scoring);
 		}
 
-		MinerXorKeysByCohort::<T>::mutate(|a| {
+		MinerNonceScoringByCohort::<T>::mutate(|a| {
 			if frame_id >= frames_per_term {
 				a.retain(|t, _v| *t > frame_id - frames_per_term);
 			}
-			a.try_insert(frame_id, BoundedVec::truncate_from(xor))
+			a.try_insert(frame_id, BoundedVec::truncate_from(miner_scoring))
 				.expect("Should be valid since we removed from this map previously");
 		});
 		let average_price_per_seat = total_price_per_seat
@@ -785,6 +803,39 @@ impl<T: Config> Pallet<T> {
 
 		T::SlotEvents::rotate_grandpas(frame_id, removed_miners, added_miners);
 		T::SlotEvents::on_frame_start(frame_id);
+	}
+
+	pub(crate) fn get_average_vote_blocks_won_per_miner() -> u16 {
+		let starting_miners = ActiveMinersCount::<T>::get();
+		if starting_miners == 0 {
+			return 0;
+		}
+		let mut total_block_mined = 0;
+		for (_, miners) in MinerNonceScoringByCohort::<T>::get() {
+			for miner in miners {
+				total_block_mined += miner.blocks_won_in_frame;
+			}
+		}
+		let expected_blocks =
+			FixedU128::from_rational(total_block_mined as u128, starting_miners as u128);
+		expected_blocks.round().saturating_mul_int(1u16)
+	}
+
+	pub(crate) fn reset_miner_nonce_scoring() {
+		let starting_miners = ActiveMinersCount::<T>::get();
+		if starting_miners == 0 {
+			return;
+		}
+		MinerNonceScoringByCohort::<T>::mutate(|a| {
+			let expected_blocks = Self::get_average_vote_blocks_won_per_miner();
+			for (_frame_id, miners) in a.iter_mut() {
+				for miner in miners.iter_mut() {
+					miner.frame_start_blocks_won_surplus +=
+						miner.blocks_won_in_frame as i16 - expected_blocks as i16;
+					miner.blocks_won_in_frame = 0;
+				}
+			}
+		});
 	}
 
 	/// Adjust the argonots per seat amount based on a rolling 10-frame average of bids.
@@ -1139,10 +1190,68 @@ impl<T: Config> Pallet<T> {
 	}
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
-pub struct MinerXor<T: Config> {
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen)]
+#[scale_info(skip_type_params(T))]
+pub struct MinerNonceScoring<T: Config> {
+	pub nonce: U256,
+	pub last_win_block: Option<BlockNumberFor<T>>,
+	/// Number of blocks won in the current frame
+	pub blocks_won_in_frame: u16,
+	/// Number of blocks off target set at start of each frame
+	pub frame_start_blocks_won_surplus: i16,
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound)]
+pub struct MinerNonce<T: Config> {
 	pub account_id: T::AccountId,
 	pub block_hash: T::Hash,
+}
+
+impl<T: Config> MinerNonce<T> {
+	pub fn generate(&self) -> U256 {
+		let hash = self.using_encoded(blake2_256);
+		U256::from_big_endian(&hash)
+	}
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+pub struct ClosestMiner<T: Config> {
+	pub seal_proof: U256,
+	pub miner_nonce: U256,
+	#[codec(skip)]
+	pub scoring: MinerNonceScoring<T>,
+}
+
+impl<T: Config> ClosestMiner<T> {
+	fn new(seal_proof: U256, scoring: MinerNonceScoring<T>) -> Self {
+		Self { seal_proof, miner_nonce: scoring.nonce, scoring }
+	}
+
+	fn get_score(&self, expected_wins_at_tick: u16) -> U256 {
+		// 1. Create a full U256 from the concatenation of the seal_proof and the miner_nonce
+		let hash_bytes = self.using_encoded(blake2_256);
+
+		let mut r2 = [0u8; 2];
+		for (i, b) in hash_bytes.iter().enumerate() {
+			r2[i & 1] ^= *b;
+		}
+		let random_base_score = u16::from_le_bytes(r2);
+
+		let wins_against_expected = (self.scoring.blocks_won_in_frame as i16)
+			.saturating_sub(expected_wins_at_tick as i16)
+			.saturating_add(self.scoring.frame_start_blocks_won_surplus);
+
+		// Apply a bounded, *additive* correction based on deviation. Do not scale by
+		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
+		// which collapses the distribution. We keep the jitter (`random_base_score`)
+		// independent and nudge it by a fixed gain per win delta.
+		let multiplier = (wins_against_expected.abs() as i64) << 8;
+		let score_adjustment = (wins_against_expected as i64).saturating_mul(multiplier);
+
+		let final_score = (random_base_score as i64).saturating_add(score_adjustment);
+		let shifted = final_score.saturating_add(i64::MAX / 2); // move negative region upward
+		U256::from(shifted as u64)
+	}
 }
 
 impl<T: Config> MiningSlotProvider for Pallet<T> {

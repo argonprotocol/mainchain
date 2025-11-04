@@ -1,8 +1,53 @@
 # Changelog
 
-## [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...393d37935fa1f0a0a894520c6a584238dbf769b0) (2025-10-27)
+## [v1.3.17](https://github.com/argonprotocol/mainchain/compare/v1.3.16...9fc14d022b64f5e4c0b02762fa97be9c0ce1a5d3) (2025-11-04)
 
 ### Fixes
+
+* **mining_slot:** handle large negatives
+([b8d14fd](https://github.com/argonprotocol/mainchain/commit/b8d14fd3a5120f47899b2e3147d39a5d5cb4beb9))
+
+### [v1.3.16](https://github.com/argonprotocol/mainchain/compare/v1.3.15...v1.3.16) (2025-11-04)
+
+#### Fixes
+
+* miner nonce for wrong tick
+([1ea2ca3](https://github.com/argonprotocol/mainchain/commit/1ea2ca3907c16ac2b3c65b1823870cd714b58ef5))
+
+### [v1.3.15](https://github.com/argonprotocol/mainchain/compare/v1.3.14...v1.3.15) (2025-11-03)
+
+#### Fixes
+
+* use safe math
+([87d4ad0](https://github.com/argonprotocol/mainchain/commit/87d4ad0e3056f50a1d0378c50aa533cdc3e1be9a))
+* change mining slot max miners per cohort
+([e7a0b00](https://github.com/argonprotocol/mainchain/commit/e7a0b00b932e730f8298c6b34479722f3a156a8f))
+* **mining_slot:** adjust distribution over time
+([fe02942](https://github.com/argonprotocol/mainchain/commit/fe029426b0adadb3948a2b284c2e230e33974ab4))
+* **mining_slot:** fix ties in miner nonce scores
+([34a242d](https://github.com/argonprotocol/mainchain/commit/34a242d8e0ca50655f5593635d55f7337088677c))
+* **mining_slot:** fix ties in miner nonce scores
+([aff9c54](https://github.com/argonprotocol/mainchain/commit/aff9c54d058d5c638cfc11329647e1a3811399ce))
+
+### [v1.3.14](https://github.com/argonprotocol/mainchain/compare/v1.3.13...v1.3.14) (2025-11-02)
+
+#### Fixes
+
+* adjust some comments per feedback
+([56363f4](https://github.com/argonprotocol/mainchain/commit/56363f4c50c5db7cc1aac194c4b9ac4b060d6947))
+* update distribution of miners chosen
+([7a771a6](https://github.com/argonprotocol/mainchain/commit/7a771a6fd8990033587865d3188980f42086bc47))
+
+### [v1.3.13](https://github.com/argonprotocol/mainchain/compare/v1.3.12...v1.3.13) (2025-10-30)
+
+#### Features
+
+* **client/nodejs:** allow external progress
+([5a99c96](https://github.com/argonprotocol/mainchain/commit/5a99c962ec04e4d35517f05711ec21bd9faf37e5))
+
+### [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...v1.3.12) (2025-10-27)
+
+#### Fixes
 
 * remove unneeded var per copilot feedback
 ([8887c64](https://github.com/argonprotocol/mainchain/commit/8887c6487be7ed20f67eb00320bf6d84ad8666bf))

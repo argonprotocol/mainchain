@@ -1,8 +1,28 @@
 # Changelog
 
-## [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...393d37935fa1f0a0a894520c6a584238dbf769b0) (2025-10-27)
+## [v1.3.17](https://github.com/argonprotocol/mainchain/compare/v1.3.16...9fc14d022b64f5e4c0b02762fa97be9c0ce1a5d3) (2025-11-04)
 
-### Fixes
+### [v1.3.16](https://github.com/argonprotocol/mainchain/compare/v1.3.15...v1.3.16) (2025-11-04)
+
+### [v1.3.15](https://github.com/argonprotocol/mainchain/compare/v1.3.14...v1.3.15) (2025-11-03)
+
+### [v1.3.14](https://github.com/argonprotocol/mainchain/compare/v1.3.13...v1.3.14) (2025-11-02)
+
+#### Fixes
+
+* update distribution of miners chosen
+([7a771a6](https://github.com/argonprotocol/mainchain/commit/7a771a6fd8990033587865d3188980f42086bc47))
+
+### [v1.3.13](https://github.com/argonprotocol/mainchain/compare/v1.3.12...v1.3.13) (2025-10-30)
+
+#### Features
+
+* **client/nodejs:** allow external progress
+([5a99c96](https://github.com/argonprotocol/mainchain/commit/5a99c962ec04e4d35517f05711ec21bd9faf37e5))
+
+### [v1.3.12](https://github.com/argonprotocol/mainchain/compare/v1.3.11...v1.3.12) (2025-10-27)
+
+#### Fixes
 
 * **client/nodejs:** add fee to btc release cost
 ([168fade](https://github.com/argonprotocol/mainchain/commit/168fade5c63a182cc28ff1818b884cd077591ba3))

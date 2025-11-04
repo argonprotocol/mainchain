@@ -181,15 +181,15 @@ pub trait BlockSealSpecProvider<Block: BlockT> {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
-pub struct BlockSealerInfo<AccountId: FullCodec> {
+pub struct BlockSealerInfo<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
 	pub block_author_account_id: AccountId,
 	/// The voting account, if a block seal
 	pub block_vote_rewards_account: Option<AccountId>,
-	pub block_seal_authority: Option<BlockSealAuthorityId>,
+	pub block_seal_authority: Option<AuthorityId>,
 }
 
-pub trait BlockSealerProvider<AccountId: FullCodec> {
-	fn get_sealer_info() -> BlockSealerInfo<AccountId>;
+pub trait BlockSealerProvider<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
+	fn get_sealer_info() -> BlockSealerInfo<AccountId, AuthorityId>;
 	fn is_block_vote_seal() -> bool;
 }
 
@@ -214,13 +214,12 @@ where
 {
 	fn authority_count() -> u32;
 	fn get_authority(author: AccountId) -> Option<AuthorityId>;
-	fn xor_closest_authority(seal_proof: U256) -> Option<MiningAuthority<AuthorityId, AccountId>>;
-	fn xor_closest_managed_authority(
+	fn get_winning_managed_authority(
 		seal_proof: U256,
-		signing_key: &AuthorityId,
-		xor_distance: Option<U256>,
+		signing_key: Option<AuthorityId>,
+		best_miner_nonce_score: Option<U256>,
 	) -> Option<(MiningAuthority<AuthorityId, AccountId>, U256, Permill)>;
-	fn get_authority_distance(
+	fn get_authority_score(
 		seal_proof: U256,
 		authority_id: &AuthorityId,
 		account: &AccountId,

@@ -17,21 +17,21 @@ import {
 import {
   activateNotary,
   createLocalchain,
-  describeIntegration,
   disconnectOnTeardown,
   KeyringSigner,
+  SKIP_E2E,
   teardown,
   TestMainchain,
   TestNotary,
   transferToLocalchain,
 } from './testHelpers';
 import * as Crypto from 'node:crypto';
-import { afterAll, afterEach, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 afterEach(teardown);
 afterAll(teardown);
 
-describeIntegration('ChannelHold integration', () => {
+describe.skipIf(SKIP_E2E)('ChannelHold integration', {}, () => {
   it('can create a zone record type', async () => {
     const mainchain = new TestMainchain();
     const mainchainUrl = await mainchain.launch();

@@ -389,6 +389,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type Keys = SessionKeys;
 	type TickProvider = Ticks;
 	type BidIncrements = MiningSlotBidIncrement;
+	type SealerInfo = BlockSeal;
 }
 
 impl pallet_block_seal::Config for Runtime {

@@ -36,7 +36,7 @@ impl frame_system::Config for Test {
 parameter_types! {
 	pub const TargetBlockVotes: u64 = 100;
 	pub static AuthorityList: Vec<(u64, BlockSealAuthorityId)> = vec![];
-	pub static XorClosest: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
+	pub static BestMinerNonce: Option<MiningAuthority<BlockSealAuthorityId, u64>> = None;
 	pub static VotingRoots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)> = BTreeMap::new();
 	pub static ParentVotingKey: Option<H256> = None;
 	pub static MinerZero: Option<(u64, MiningAuthority<BlockSealAuthorityId, u64>)> = None;
@@ -61,17 +61,15 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 			.iter()
 			.find_map(|(account, id)| if *account == author { Some(id.clone()) } else { None })
 	}
-	fn xor_closest_authority(_: U256) -> Option<MiningAuthority<BlockSealAuthorityId, u64>> {
-		XorClosest::get().clone()
-	}
-	fn xor_closest_managed_authority(
+
+	fn get_winning_managed_authority(
 		_seal_proof: U256,
-		_signing_key: &BlockSealAuthorityId,
-		_xor_distance: Option<U256>,
+		_signing_key: Option<BlockSealAuthorityId>,
+		_miner_nonce_score: Option<U256>,
 	) -> Option<(MiningAuthority<BlockSealAuthorityId, u64>, U256, Permill)> {
 		todo!()
 	}
-	fn get_authority_distance(
+	fn get_authority_score(
 		_seal_proof: U256,
 		_authority_id: &BlockSealAuthorityId,
 		_account: &u64,

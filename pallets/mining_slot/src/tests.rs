@@ -1,23 +1,22 @@
 use crate::{
-	Error, Event, HoldReason, Registration,
+	Error, Event, HoldReason, MinerNonce, MinerNonceScoring, Registration,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
 		BidsForNextSlotCohort, FrameStartBlockNumbers, HistoricalBidsPerSlot,
-		IsNextSlotBiddingOpen, MinerXorKeysByCohort, MinersByCohort, MiningConfig, NextCohortSize,
-		NextFrameId,
+		IsNextSlotBiddingOpen, MinerNonceScoringByCohort, MinersByCohort, MiningConfig,
+		NextCohortSize, NextFrameId,
 	},
 };
 use argon_primitives::{
 	AuthorityProvider,
-	block_seal::{MiningAuthority, MiningBidStats, MiningRegistration},
+	block_seal::{MiningBidStats, MiningRegistration},
 };
 use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
-use pallet_prelude::*;
+use pallet_prelude::{sp_core::Pair, *};
 use sp_core::bounded_vec;
-use sp_runtime::testing::UintAuthorityId;
 use std::{collections::HashMap, env};
 
 #[test]
@@ -257,12 +256,23 @@ fn it_adds_new_cohorts_on_block() {
 						.ok();
 				});
 				AccountIndexLookup::<Test>::insert(account_id, (frame_id, index as u32));
-				MinerXorKeysByCohort::<Test>::try_mutate(|x| {
-					let hash = blake2_256(&account_id.to_le_bytes());
+				MinerNonceScoringByCohort::<Test>::try_mutate(|x| {
 					if !x.contains_key(&frame_id) {
 						x.try_insert(frame_id, BoundedVec::default()).unwrap();
 					}
-					x.get_mut(&frame_id).unwrap().try_insert(index, U256::from_big_endian(&hash))
+					x.get_mut(&frame_id).unwrap().try_insert(
+						index,
+						MinerNonceScoring {
+							nonce: MinerNonce::<Test> {
+								account_id,
+								block_hash: System::parent_hash(),
+							}
+							.generate(),
+							blocks_won_in_frame: 0,
+							last_win_block: None,
+							frame_start_blocks_won_surplus: 0,
+						},
+					)
 				})
 				.unwrap();
 			}
@@ -297,7 +307,7 @@ fn it_adds_new_cohorts_on_block() {
 			"Should have 3 validators still after insertion"
 		);
 		let miners = MinersByCohort::<Test>::iter().collect::<HashMap<_, _>>();
-		let authority_hash_frames = MinerXorKeysByCohort::<Test>::get().into_inner();
+		let authority_hash_frames = MinerNonceScoringByCohort::<Test>::get().into_inner();
 		assert_eq!(
 			BidsForNextSlotCohort::<Test>::get().len(),
 			0,
@@ -312,7 +322,7 @@ fn it_adds_new_cohorts_on_block() {
 		let authority_hashes = authority_hash_frames
 			.iter()
 			.flat_map(|(frame_id, hashes)| {
-				hashes.iter().enumerate().map(move |(i, hash)| ((frame_id, i), *hash))
+				hashes.iter().enumerate().map(move |(i, hash)| ((frame_id, i), hash.nonce))
 			})
 			.collect::<Vec<_>>();
 		assert_eq!(authority_hashes.len(), 3, "Should have 3 authority hashes after insertion");
@@ -785,7 +795,7 @@ fn it_will_order_bids() {
 }
 
 #[test]
-fn it_handles_cleaning_up_xor_keys() {
+fn it_handles_cleaning_up_miner_nonces() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
 	MinCohortSize::set(2);
@@ -813,7 +823,11 @@ fn it_handles_cleaning_up_xor_keys() {
 			10,
 			"Should have 10 cohorts"
 		);
-		assert_eq!(MinerXorKeysByCohort::<Test>::get().len(), 10, "Should have 10 xor key cohorts");
+		assert_eq!(
+			MinerNonceScoringByCohort::<Test>::get().len(),
+			10,
+			"Should have 10 xor key cohorts"
+		);
 	});
 }
 
@@ -970,56 +984,6 @@ fn it_handles_null_authority() {
 }
 
 #[test]
-fn it_can_get_closest_authority() {
-	MinCohortSize::set(100);
-	MaxCohortSize::set(100);
-	FramesPerMiningTerm::set(10);
-	new_test_ext().execute_with(|| {
-		System::set_block_number(8);
-		ElapsedTicks::set(8);
-
-		for frame_id in 1..=10u64 {
-			for i in 0..10u32 {
-				let account_id: u64 = (((frame_id - 1) * 10) as u32 + i).into();
-				MinersByCohort::<Test>::mutate(frame_id, |x| {
-					x.try_insert(
-						i as usize,
-						MiningRegistration {
-							account_id,
-							argonots: 0,
-							bid: 0,
-							authority_keys: account_id.into(),
-							starting_frame_id: frame_id,
-							external_funding_account: None,
-							bid_at_tick: 1,
-						},
-					)
-					.unwrap();
-				});
-				AccountIndexLookup::<Test>::insert(account_id, (frame_id, i));
-				MinerXorKeysByCohort::<Test>::try_mutate(|a| {
-					if !a.contains_key(&frame_id) {
-						a.try_insert(frame_id, Default::default()).ok();
-					}
-					let hash = U256::from(account_id);
-					a.get_mut(&frame_id).unwrap().try_insert(i as usize, hash)
-				})
-				.expect("Didn't insert authorities");
-			}
-		}
-
-		assert_eq!(
-			MiningSlots::xor_closest_authority(U256::from(100)),
-			Some(MiningAuthority {
-				account_id: 96,
-				authority_id: UintAuthorityId(96),
-				authority_index: (10, 6),
-			})
-		);
-	});
-}
-
-#[test]
 fn it_will_end_auctions_if_a_seal_qualifies() {
 	TicksBetweenSlots::set(100);
 	FramesPerMiningTerm::set(3);
@@ -1070,6 +1034,260 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 			println!("Valid seals: {:?}", valid_seals);
 		}
 	})
+}
+
+#[test]
+fn it_distributes_seals_evenly() {
+	TicksBetweenSlots::set(100);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(100);
+	BlocksBeforeBidEndForVrfClose::set(0);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		let mut current_tick = 1;
+		CurrentTick::set(current_tick);
+
+		for i in 1..=10 {
+			System::set_block_number(i);
+			System::initialize(&i, &System::parent_hash(), &Default::default());
+			for x in 1..=10u64 {
+				let id = (10 * i) + x;
+				set_argons(id, 5_000_000);
+				set_ownership(id, 100_000u32.into());
+				assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(id), 1_000_000, 1.into(), None));
+			}
+			current_tick += TicksBetweenSlots::get();
+			CurrentTick::set(current_tick);
+			ElapsedTicks::set(current_tick);
+			MiningSlots::on_initialize(i);
+			MiningSlots::on_finalize(i);
+		}
+
+		let miner_nonces = MinerNonceScoringByCohort::<Test>::get();
+		let all_nonces: Vec<U256> = miner_nonces
+			.iter()
+			.flat_map(|(_, keys)| keys.iter().map(|key| key.nonce).collect::<Vec<U256>>())
+			.collect();
+		assert_eq!(all_nonces.len(), 100);
+
+		let (notary_pair, _) = sp_core::sr25519::Pair::generate();
+		let notary_account = AccountId::from(notary_pair.public());
+		let mut winners_by_id = HashMap::<u64, u16>::new();
+		let start_block_number = System::block_number();
+		for i in 1..=10_000u64 {
+			current_tick += 1;
+			System::set_block_number(start_block_number + i);
+			System::initialize(
+				&(start_block_number + i),
+				&System::parent_hash(),
+				&Default::default(),
+			);
+			CurrentTick::set(current_tick);
+			ElapsedTicks::set(current_tick);
+
+			let vote = BlockVote::create_default_vote(notary_account.clone(), current_tick);
+			let vote_bytes = vote.encode();
+			let seal_proof = BlockVote::calculate_seal_proof(vote_bytes.clone(), 1, H256::random());
+			let closest_miner = MiningSlots::get_winning_managed_authority(seal_proof, None, None);
+			if let Some((closest, _, _)) = closest_miner {
+				*winners_by_id.entry(closest.account_id).or_insert(0) += 1;
+				MiningSlots::record_block_author(closest.account_id);
+			} else {
+				panic!("Should have found a closest miner");
+			}
+			if MiningSlots::calculated_frame_id() >= MiningSlots::next_frame_id() {
+				NextFrameId::<Test>::mutate(|a| *a += 1);
+
+				MiningSlots::reset_miner_nonce_scoring();
+			}
+		}
+		println!("{:#?}", winners_by_id);
+		assert_eq!(winners_by_id.len(), 100, "Should have 100 unique winning miners");
+		let expected_wins_per_miner = 10_000f64 / 100f64;
+		let mut max_diff = 0f64;
+		let mut sum = 0;
+		for (account, wins) in winners_by_id.iter() {
+			let diff = (*wins as f64 - expected_wins_per_miner).abs();
+			let diff_percent = diff / expected_wins_per_miner;
+			if diff_percent.abs() > max_diff.abs() {
+				max_diff = diff_percent;
+			}
+			assert!(
+				diff_percent.abs() <= 0.05,
+				"Account {:?} had {} wins which is more than 5% different from expected {}",
+				account,
+				wins,
+				expected_wins_per_miner
+			);
+			sum += wins;
+		}
+		println!("Max difference from expected wins: {}%", max_diff * 100f64);
+		assert_eq!(sum, 10_000, "Should have 10,000 total wins recorded");
+	});
+}
+
+#[test]
+fn it_should_yield_results_when_highly_negative() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(14);
+		ElapsedTicks::set(10);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ActiveMinersCount::<Test>::put(3);
+		MinersByCohort::<Test>::mutate(1, |x| {
+			let _ = x.try_push(MiningRegistration {
+				account_id: 1,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 1.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 2,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 2.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 3,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 3.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+		});
+		AccountIndexLookup::<Test>::insert(1, (1, 0));
+		AccountIndexLookup::<Test>::insert(2, (1, 1));
+		AccountIndexLookup::<Test>::insert(3, (1, 2));
+		MinerNonceScoringByCohort::<Test>::mutate(|x| {
+			let _ = x.try_insert(
+				1,
+				bounded_vec![
+					MinerNonceScoring {
+						nonce: U256::from(100u32),
+						blocks_won_in_frame: 20,
+						last_win_block: Some(10),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(101u32),
+						blocks_won_in_frame: 100,
+						last_win_block: Some(11),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(102u32),
+						blocks_won_in_frame: 1,
+						last_win_block: Some(12),
+						frame_start_blocks_won_surplus: 0
+					},
+				],
+			);
+		});
+
+		let res1 = MiningSlots::get_winning_managed_authority(U256::from(150u32), None, None);
+		assert!(res1.is_some(), "Should have a winning miner");
+		assert_ne!(res1.clone().unwrap().1, U256::zero());
+		assert_eq!(res1.unwrap().0.account_id, 3);
+	});
+}
+
+#[test]
+fn it_should_allow_a_tie() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(14);
+		ElapsedTicks::set(10);
+
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ActiveMinersCount::<Test>::put(3);
+		MinersByCohort::<Test>::mutate(1, |x| {
+			let _ = x.try_push(MiningRegistration {
+				account_id: 1,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 1.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 2,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 2.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+			let _ = x.try_push(MiningRegistration {
+				account_id: 3,
+				argonots: 100_000,
+				bid: 1_000_000u32.into(),
+				authority_keys: 3.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 10,
+			});
+		});
+		AccountIndexLookup::<Test>::insert(1, (1, 0));
+		AccountIndexLookup::<Test>::insert(2, (1, 1));
+		AccountIndexLookup::<Test>::insert(3, (1, 2));
+		MinerNonceScoringByCohort::<Test>::mutate(|x| {
+			let _ = x.try_insert(
+				1,
+				bounded_vec![
+					MinerNonceScoring {
+						nonce: U256::from(100u32),
+						blocks_won_in_frame: 1,
+						last_win_block: Some(10),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(101u32),
+						blocks_won_in_frame: 1,
+						last_win_block: Some(11),
+						frame_start_blocks_won_surplus: 0
+					},
+					MinerNonceScoring {
+						nonce: U256::from(102u32),
+						blocks_won_in_frame: 1,
+						last_win_block: Some(12),
+						frame_start_blocks_won_surplus: 0
+					},
+				],
+			);
+		});
+
+		let res1 = MiningSlots::get_winning_managed_authority(U256::from(150u32), None, None);
+		assert!(res1.is_some(), "Should have a winning miner");
+		let top_score = res1.unwrap().1;
+		assert!(
+			MiningSlots::get_winning_managed_authority(U256::from(150u32), None, Some(top_score))
+				.is_none()
+		);
+		let res2 =
+			MiningSlots::get_winning_managed_authority(U256::from(155u32), None, Some(top_score));
+		assert!(res2.is_some(), "Should have a winning miner");
+	});
 }
 
 fn bid_stats(count: u32, amount: Balance) -> MiningBidStats {
@@ -1143,6 +1361,38 @@ fn it_adjusts_locked_argonots() {
 
 		// max increase is to a set amount of the total issuance
 		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), (500_000.0 * 0.8) as u128);
+	});
+}
+
+#[test]
+fn it_tracks_the_block_rewards() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		NextFrameId::<Test>::set(2);
+		ElapsedTicks::set(1);
+		CurrentTick::set(1);
+		System::set_block_number(10);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		// submit 10 bids
+		set_ownership(1, 100_000);
+		set_argons(1, 111_000_000);
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 110 * 1_000_000, 1.into(), None));
+		ElapsedTicks::set(20);
+		CurrentTick::set(20);
+		MiningSlots::on_initialize(11);
+		MiningSlots::on_finalize(11);
+		assert_eq!(NextFrameId::<Test>::get(), 3);
+
+		IsBlockVoteSeal::set(true);
+		MiningSlots::on_initialize(12);
+		MiningSlots::on_finalize(12);
+
+		let nonce_scoring = MinerNonceScoringByCohort::<Test>::get();
+		assert_eq!(nonce_scoring.get(&2).unwrap()[0].blocks_won_in_frame, 1);
 	});
 }
 
