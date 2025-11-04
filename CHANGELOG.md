@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.3.15](https://github.com/argonprotocol/mainchain/compare/v1.3.14...87d4ad0e3056f50a1d0378c50aa533cdc3e1be9a) (2025-11-03)
+## [v1.3.16](https://github.com/argonprotocol/mainchain/compare/v1.3.15...1ea2ca3907c16ac2b3c65b1823870cd714b58ef5) (2025-11-04)
 
 ### Fixes
+
+* miner nonce for wrong tick
+([1ea2ca3](https://github.com/argonprotocol/mainchain/commit/1ea2ca3907c16ac2b3c65b1823870cd714b58ef5))
+
+### [v1.3.15](https://github.com/argonprotocol/mainchain/compare/v1.3.14...v1.3.15) (2025-11-03)
+
+#### Fixes
 
 * use safe math
 ([87d4ad0](https://github.com/argonprotocol/mainchain/commit/87d4ad0e3056f50a1d0378c50aa533cdc3e1be9a))
