@@ -12,6 +12,7 @@ use argon_primitives::{
 pub use pallet::*;
 use pallet_prelude::*;
 use sp_runtime::{RuntimeAppPublic, traits::OpaqueKeys};
+use std::u64;
 pub use weights::*;
 
 #[cfg(test)]
@@ -1240,15 +1241,19 @@ impl<T: Config> ClosestMiner<T> {
 		let random_base_score = u16::from_le_bytes(r2);
 
 		let wins_against_expected = (self.scoring.blocks_won_in_frame as i16)
-			.saturating_sub(expected_wins_at_tick as i16)
-			.saturating_add(self.scoring.frame_start_blocks_won_surplus);
+			.saturating_sub(expected_wins_at_tick.into())
+			.saturating_sub(self.scoring.frame_start_blocks_won_surplus);
 
 		// Apply a bounded, *additive* correction based on deviation. Do not scale by
 		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
 		// which collapses the distribution. We keep the jitter (`random_base_score`)
 		// independent and nudge it by a fixed gain per win delta.
 		let multiplier = (wins_against_expected.abs() as i64) << 8;
+<<<<<<< HEAD
+		let score_adjustment = (wins_against_expected as i64) * multiplier;
+=======
 		let score_adjustment = (wins_against_expected as i64).saturating_mul(multiplier);
+>>>>>>> 626f1b3e (fix: change mining slot max miners per cohort)
 
 		let final_score = (random_base_score as i64).saturating_add(score_adjustment);
 		let final_clamped = final_score.max(0);
