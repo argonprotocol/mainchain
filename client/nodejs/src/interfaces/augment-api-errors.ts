@@ -216,6 +216,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       DuplicateBlockSealProvided: AugmentedError<ApiType>;
       /**
+       * Duplicate vote block
+       **/
+      DuplicateVoteBlockAtTick: AugmentedError<ApiType>;
+      /**
        * The notebook for this vote was not eligible to vote
        **/
       IneligibleNotebookUsed: AugmentedError<ApiType>;
@@ -236,9 +240,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidForkPowerParent: AugmentedError<ApiType>;
       /**
-       * The xor distance supplied is invalid
+       * The nonce score distance supplied is invalid
        **/
-      InvalidMinerXorDistance: AugmentedError<ApiType>;
+      InvalidMinerNonceScore: AugmentedError<ApiType>;
       /**
        * Vote not submitted by the right miner
        **/

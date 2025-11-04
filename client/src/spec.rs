@@ -3712,9 +3712,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				27u8, 226u8, 225u8, 101u8, 195u8, 164u8, 239u8, 163u8, 173u8, 50u8, 222u8, 162u8,
-				130u8, 115u8, 162u8, 206u8, 72u8, 79u8, 100u8, 29u8, 86u8, 211u8, 169u8, 187u8,
-				149u8, 173u8, 248u8, 46u8, 143u8, 98u8, 45u8, 129u8,
+				65u8, 161u8, 212u8, 123u8, 18u8, 154u8, 16u8, 195u8, 58u8, 140u8, 190u8, 26u8,
+				80u8, 233u8, 52u8, 63u8, 107u8, 236u8, 91u8, 170u8, 69u8, 226u8, 126u8, 75u8, 5u8,
+				130u8, 203u8, 179u8, 169u8, 226u8, 200u8, 144u8,
 			]
 	}
 	pub mod system {
@@ -8023,13 +8023,13 @@ pub mod api {
 					use super::runtime_types;
 					pub type ActiveMinersCount = ::core::primitive::u16;
 				}
-				pub mod miner_nonces_by_cohort {
+				pub mod miner_nonce_scoring_by_cohort {
 					use super::runtime_types;
-					pub type MinerNoncesByCohort =
+					pub type MinerNonceScoringByCohort =
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
 							::core::primitive::u64,
 							runtime_types::bounded_collections::bounded_vec::BoundedVec<
-								runtime_types::primitive_types::U256,
+								runtime_types::pallet_mining_slot::MinerNonceScoring,
 							>,
 						>;
 				}
@@ -8198,26 +8198,27 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " This is a lookup of each miner's nonce to use when picking a best authority to submit a block."]
-				#[doc = " It's a blake2 256 hash of the miner account id and the block hash at time of activation."]
-				pub fn miner_nonces_by_cohort(
+				#[doc = " This is a lookup of each miner's nonce to use when picking a best authority to submit a"]
+				#[doc = " block. It's a blake2 256 hash of the miner account id and the block hash at time of"]
+				#[doc = " activation."]
+				pub fn miner_nonce_scoring_by_cohort(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::miner_nonces_by_cohort::MinerNoncesByCohort,
+					types::miner_nonce_scoring_by_cohort::MinerNonceScoringByCohort,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MinerNoncesByCohort",
+						"MinerNonceScoringByCohort",
 						(),
 						[
-							68u8, 150u8, 131u8, 225u8, 170u8, 151u8, 32u8, 53u8, 60u8, 117u8,
-							100u8, 214u8, 237u8, 52u8, 82u8, 100u8, 6u8, 43u8, 133u8, 88u8, 228u8,
-							149u8, 156u8, 106u8, 234u8, 240u8, 221u8, 55u8, 246u8, 196u8, 6u8,
-							216u8,
+							31u8, 0u8, 88u8, 232u8, 90u8, 214u8, 243u8, 134u8, 18u8, 47u8, 148u8,
+							247u8, 192u8, 121u8, 29u8, 57u8, 142u8, 209u8, 153u8, 230u8, 41u8,
+							173u8, 213u8, 146u8, 198u8, 194u8, 69u8, 182u8, 51u8, 18u8, 135u8,
+							142u8,
 						],
 					)
 				}
@@ -15036,6 +15037,7 @@ pub mod api {
 					pub type LastBlockSealerInfo =
 						runtime_types::argon_primitives::providers::BlockSealerInfo<
 							crate::types::AccountId32,
+							runtime_types::argon_primitives::block_seal::app::Public,
 						>;
 				}
 				pub mod parent_voting_key {
@@ -24645,12 +24647,10 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BlockSealerInfo<_0> {
+				pub struct BlockSealerInfo<_0, _1> {
 					pub block_author_account_id: _0,
 					pub block_vote_rewards_account: ::core::option::Option<_0>,
-					pub block_seal_authority: ::core::option::Option<
-						runtime_types::argon_primitives::block_seal::app::Public,
-					>,
+					pub block_seal_authority: ::core::option::Option<_1>,
 				}
 			}
 			pub mod tick {
@@ -27564,8 +27564,11 @@ pub mod api {
 					#[doc = "Compute blocks cant be added in the same tick as a vote"]
 					InvalidComputeBlockTick,
 					#[codec(index = 19)]
-					#[doc = "The xor distance supplied is invalid"]
-					InvalidMinerXorDistance,
+					#[doc = "The nonce score distance supplied is invalid"]
+					InvalidMinerNonceScore,
+					#[codec(index = 20)]
+					#[doc = "Duplicate vote block"]
+					DuplicateVoteBlockAtTick,
 				}
 			}
 		}
@@ -28656,6 +28659,20 @@ pub mod api {
 					#[codec(index = 0)]
 					RegisterAsMiner,
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct MinerNonceScoring {
+				pub nonce: runtime_types::primitive_types::U256,
+				pub last_win_block: ::core::option::Option<::core::primitive::u32>,
+				pub blocks_won_in_frame: ::core::primitive::u16,
+				pub frame_start_blocks_won_surplus: ::core::primitive::i16,
 			}
 		}
 		pub mod pallet_mint {

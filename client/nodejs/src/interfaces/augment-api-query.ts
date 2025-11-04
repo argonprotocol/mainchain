@@ -71,6 +71,7 @@ import type {
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletHyperbridgeVersionedHostParams,
+  PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMultisigMultisig,
   PalletPriceIndexPriceIndex,
@@ -719,10 +720,15 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * This is a lookup of each miner's nonce to use when picking a best authority to submit a block.
-       * It's a blake2 256 hash of the miner account id and the block hash at time of activation.
+       * This is a lookup of each miner's nonce to use when picking a best authority to submit a
+       * block. It's a blake2 256 hash of the miner account id and the block hash at time of
+       * activation.
        **/
-      minerNoncesByCohort: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, Vec<U256>>>, []>;
+      minerNonceScoringByCohort: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, Vec<PalletMiningSlotMinerNonceScoring>>>,
+        []
+      >;
       /**
        * Miners that are active in the current block (post initialize) by their starting frame
        **/

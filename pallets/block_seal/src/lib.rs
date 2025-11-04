@@ -148,6 +148,8 @@ pub mod pallet {
 		InvalidComputeBlockTick,
 		/// The nonce score distance supplied is invalid
 		InvalidMinerNonceScore,
+		/// Duplicate vote block
+		DuplicateVoteBlockAtTick,
 	}
 
 	#[pallet::hooks]
@@ -297,6 +299,11 @@ pub mod pallet {
 				} => {
 					let voting_schedule =
 						VotingSchedule::when_evaluating_runtime_seals(current_tick);
+					// a compute block cannot be stacked on top of a vote in the same tick
+					ensure!(
+						LastTickWithVoteSeal::<T>::get() != current_tick,
+						Error::<T>::DuplicateVoteBlockAtTick
+					);
 					LastTickWithVoteSeal::<T>::put(current_tick);
 					IsBlockFromVoteSeal::<T>::put(true);
 
@@ -415,7 +422,7 @@ pub mod pallet {
 				&authority_id,
 				block_author,
 				// the current tick hasn't changed yet
-				T::TickProvider::current_tick(),
+				T::TickProvider::current_tick().saturating_sub(1),
 			)
 			.ok_or(Error::<T>::NoClosestMinerFoundForVote)?;
 
