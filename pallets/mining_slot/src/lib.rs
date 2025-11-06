@@ -832,6 +832,9 @@ impl<T: Config> Pallet<T> {
 				for miner in miners.iter_mut() {
 					miner.frame_start_blocks_won_surplus +=
 						miner.blocks_won_in_frame as i16 - expected_blocks as i16;
+					miner.frame_start_blocks_won_surplus = miner
+						.frame_start_blocks_won_surplus
+						.clamp(-MAX_BLOCK_OFFSET, MAX_BLOCK_OFFSET);
 					miner.blocks_won_in_frame = 0;
 				}
 			}
@@ -1214,6 +1217,12 @@ impl<T: Config> MinerNonce<T> {
 	}
 }
 
+/// The maximum allowed deviation (offset) from the expected number of block wins for a miner in a
+/// frame. This limit helps ensure fairness by allowing minor statistical fluctuations, but prevents
+/// significant deviations that could indicate manipulation or unfair advantage. The value 5 was
+/// chosen given that normal usage stays within a 3-4% threshold and the max miners is 144.
+const MAX_BLOCK_OFFSET: i16 = 5;
+
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub struct ClosestMiner<T: Config> {
 	pub seal_proof: U256,
@@ -1241,12 +1250,30 @@ impl<T: Config> ClosestMiner<T> {
 			.saturating_sub(expected_wins_at_tick as i16)
 			.saturating_add(self.scoring.frame_start_blocks_won_surplus);
 
+		// Apply a penalty to recently closed blocks to prevent miners turning off until the end of
+		// a mining term and then turning back on to gain an advantage. Between the cap and this
+		// penalty for recency, it should continue to distribute evenly in normal cases, but avoid
+		// late-frame monopolization.
+		let mut recent_block_penalty = 0i16;
+		if let Some(last_win_block) = self.scoring.last_win_block {
+			let current_block = frame_system::Pallet::<T>::block_number();
+			let miners = ActiveMinersCount::<T>::get();
+			let ten_percent_of_miners = Percent::from_percent(10).mul_floor(miners as u32);
+			if current_block - last_win_block <= ten_percent_of_miners.into() {
+				recent_block_penalty = 2i16;
+			}
+		}
+
+		let fairness_baseline = wins_against_expected.saturating_add(recent_block_penalty) as i64;
+		let fairness_score =
+			fairness_baseline.clamp(-(MAX_BLOCK_OFFSET as i64), MAX_BLOCK_OFFSET as i64);
+
 		// Apply a bounded, *additive* correction based on deviation. Do not scale by
 		// `random_base_score` or we risk R + R*multiplier == 0 (or negative wrap),
 		// which collapses the distribution. We keep the jitter (`random_base_score`)
 		// independent and nudge it by a fixed gain per win delta.
-		let multiplier = (wins_against_expected.abs() as i64) << 8;
-		let score_adjustment = (wins_against_expected as i64).saturating_mul(multiplier);
+		let multiplier = fairness_score.abs() << 10;
+		let score_adjustment = fairness_score.saturating_mul(multiplier);
 
 		let final_score = (random_base_score as i64).saturating_add(score_adjustment);
 		let shifted = final_score.saturating_add(i64::MAX / 2); // move negative region upward
