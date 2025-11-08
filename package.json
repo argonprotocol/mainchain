@@ -3,6 +3,7 @@
   "version": "0.0.3",
   "scripts": {
     "tsc": "yarn workspaces foreach --all run tsup",
+    "typecheck": "yarn workspaces foreach --all run typecheck",
     "build": "yarn workspaces foreach --all run build && yarn lint",
     "pretest": "yarn workspaces foreach --all run pretest",
     "pretest:ci": "yarn workspaces foreach --all run pretest:ci",

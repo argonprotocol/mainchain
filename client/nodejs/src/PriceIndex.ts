@@ -6,6 +6,7 @@ import {
   SATS_PER_BTC,
 } from './index';
 import BigNumber from 'bignumber.js';
+import { ApiDecoration } from '@polkadot/api/types';
 
 export class PriceIndex {
   btcUsdPrice?: BigNumber;
@@ -15,7 +16,7 @@ export class PriceIndex {
   argonTimeWeightedAverageLiquidity?: BigNumber;
   lastUpdatedTick?: number;
 
-  async load(client: ArgonClient): Promise<this> {
+  async load(client: ArgonClient | ApiDecoration<'promise'>): Promise<this> {
     const current = await client.query.priceIndex.current();
     if (!current.isSome) {
       this.argonUsdPrice = undefined;

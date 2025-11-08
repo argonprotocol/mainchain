@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/mainchain",
-  "version": "1.3.18",
+  "version": "1.3.19",
   "description": "A client for accessing the Argon mainchain apis.",
   "repository": {
     "type": "git",
@@ -18,7 +18,7 @@
     "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
     "tsc": "tsup",
     "watch": "tsup --watch",
-    "typecheck": "tsc -w --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "lib/",
@@ -63,7 +63,7 @@
     "bs58check": "^4.0.0"
   },
   "devDependencies": {
-    "@argonprotocol/testing": "1.3.18",
+    "@argonprotocol/testing": "1.3.19",
     "@polkadot/typegen": "^16.4.4",
     "@substrate/ss58-registry": "^1.51.0",
     "@types/node": "^20",

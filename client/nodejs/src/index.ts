@@ -19,7 +19,7 @@ export * from './keyringUtils';
 export * from './header';
 export * from './Vault';
 export * from './convert';
-export * from './BitcoinLocks';
+export * from './BitcoinLock';
 export * from './PriceIndex';
 export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
 

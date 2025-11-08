@@ -1,6 +1,6 @@
 {
   "name": "@argonprotocol/bitcoin",
-  "version": "1.3.18",
+  "version": "1.3.19",
   "description": "A client for interop with bitcoin in nodejs.",
   "repository": {
     "type": "git",
@@ -18,6 +18,7 @@
     "build": "yarn wasm-pack && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
     "tsc": "yarn pretsc && tsup",
+    "typecheck": "tsc --noEmit",
     "tsup": "yarn tsc",
     "watch": "yarn pretsc && tsup --watch",
     "pretest": "yarn build",
@@ -50,7 +51,7 @@
     "./browser/index.js"
   ],
   "dependencies": {
-    "@argonprotocol/mainchain": "1.3.18",
+    "@argonprotocol/mainchain": "1.3.19",
     "@noble/secp256k1": "^2.3.0",
     "@scure/bip32": "^1.7.0",
     "@scure/bip39": "^1.6.0",
@@ -58,7 +59,7 @@
     "bignumber.js": "^9.3.1"
   },
   "devDependencies": {
-    "@argonprotocol/testing": "1.3.18",
+    "@argonprotocol/testing": "1.3.19",
     "@types/node": "22.17.1",
     "esbuild-plugin-wasm": "^1.1.0",
     "tsup": "^8.5.0",
