@@ -17,7 +17,8 @@
     "build:debug": "napi build --platform --no-const-enum --features=napi -p argon-localchain",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "npm run build:debug",
-    "version": "napi version"
+    "version": "napi version",
+    "typecheck": "tsc --noEmit"
   },
   "license": "MIT",
   "main": "index.js",

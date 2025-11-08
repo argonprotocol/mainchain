@@ -18,6 +18,7 @@
     "build": "yarn wasm-pack && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
     "tsc": "yarn pretsc && tsup",
+    "typecheck": "tsc --noEmit",
     "tsup": "yarn tsc",
     "watch": "yarn pretsc && tsup --watch",
     "pretest": "yarn build",

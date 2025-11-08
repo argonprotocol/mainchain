@@ -15,6 +15,8 @@ import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxResult';
 import { ISubmittableOptions } from './TxSubmitter';
+import { ApiPromise } from '@polkadot/api';
+import { ApiDecoration } from '@polkadot/api/types';
 
 const { ROUND_FLOOR } = BN;
 
@@ -144,7 +146,7 @@ export class Vault {
   }
 
   public static async get(
-    client: ArgonClient,
+    client: ArgonClient | ApiDecoration<'promise'>,
     vaultId: number,
     tickDurationMillis?: number,
   ): Promise<Vault> {
@@ -180,7 +182,6 @@ export class Vault {
       bitcoinXpub,
       tip,
       doNotExceedBalance,
-      txProgressCallback,
     } = args;
     let xpubBytes = hexToU8a(bitcoinXpub);
     if (xpubBytes.length !== 78) {
@@ -228,9 +229,6 @@ export class Vault {
       ...args,
       useLatestNonce: true,
     });
-    const tickDuration =
-      config.tickDurationMillis ??
-      (await client.query.ticks.genesisTicker().then(x => x.tickDurationMillis.toNumber()))!;
 
     async function getVault(): Promise<Vault> {
       await result.waitForFinalizedBlock;
@@ -244,11 +242,7 @@ export class Vault {
       if (vaultId === undefined) {
         throw new Error('Vault creation failed, no VaultCreated event found');
       }
-      const rawVault = await client.query.vaults.vaultsById(vaultId);
-      if (rawVault.isNone) {
-        throw new Error('Vault creation failed, vault not found');
-      }
-      return new Vault(vaultId, rawVault.unwrap(), tickDuration);
+      return Vault.get(client, vaultId, config.tickDurationMillis);
     }
     return { getVault, txResult: result };
   }

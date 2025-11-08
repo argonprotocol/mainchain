@@ -18,7 +18,7 @@
     "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
     "tsc": "tsup",
     "watch": "tsup --watch",
-    "typecheck": "tsc -w --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "lib/",

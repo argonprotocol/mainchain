@@ -16,7 +16,7 @@
     "build": "tsup",
     "tsc": "tsup",
     "watch": "tsup --watch",
-    "typecheck": "tsc -w --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "lib/"
@@ -40,7 +40,7 @@
     "detect-port": "^2.1.0",
     "docker-compose": "^1.2.0",
     "http-proxy": "^1.18.1",
-    "nanoid": "^3.3.11",
+    "nanoid": "^5.1.6",
     "pg": "^8.16.3",
     "proper-lockfile": "^4.1.2",
     "vitest": "^4.0.5"
