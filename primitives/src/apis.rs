@@ -50,6 +50,12 @@ sp_api::decl_runtime_apis!(
 		) -> Result<Vec<NotebookAuditResult<VerifyError>>, DispatchError>;
 	}
 );
+sp_api::decl_runtime_apis!(
+	pub trait BlockImportApis {
+		fn has_new_bitcoin_tip() -> bool;
+		fn has_new_price_index() -> bool;
+	}
+);
 
 sp_api::decl_runtime_apis! {
 	pub trait TickApis {

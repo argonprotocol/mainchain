@@ -1001,6 +1001,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
       /**
+       * Stores the last valid price index
+       **/
+      lastValid: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
+      /**
        * The price index operator account
        **/
       operator: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;

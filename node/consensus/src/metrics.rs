@@ -1,6 +1,7 @@
 use crate::{aux_client::AuxKey, aux_data::AuxData, block_creator::ProposalMeta};
 use argon_primitives::{
 	Balance, NotaryId,
+	prelude::sp_runtime::Saturating,
 	tick::{Tick, Ticker},
 };
 use codec::{Decode, Encode};
@@ -309,10 +310,9 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 
 		self.aux_data
 			.mutate(|data| {
-				data.finalized_blocks_created = data.finalized_blocks_created.saturating_add(1);
-				data.mined_ownership_tokens_total =
-					ownership_tokens.saturating_add(data.mined_ownership_tokens_total);
-				data.mined_argons_total = argons.saturating_sub(data.mined_argons_total);
+				data.finalized_blocks_created.saturating_accrue(1);
+				data.mined_ownership_tokens_total.saturating_accrue(ownership_tokens);
+				data.mined_argons_total.saturating_accrue(argons);
 			})
 			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))
 			.ok();
