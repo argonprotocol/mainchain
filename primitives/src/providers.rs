@@ -20,7 +20,7 @@ use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
 use sp_core::{H256, RuntimeDebug, U256};
 use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, OpaqueKeys},
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
 };
 
 pub trait NotebookProvider {
@@ -223,6 +223,7 @@ where
 		seal_proof: U256,
 		authority_id: &AuthorityId,
 		account: &AccountId,
+		ref_block_number: NumberFor<Block>,
 	) -> Option<U256>;
 }
 

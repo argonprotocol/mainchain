@@ -143,6 +143,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type Current<T: Config> = StorageValue<_, PriceIndex>;
 
+	/// Stores the last valid price index
+	#[pallet::storage]
+	pub type LastValid<T: Config> = StorageValue<_, PriceIndex>;
+
 	/// The price index operator account
 	#[pallet::storage]
 	pub type Operator<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
@@ -165,7 +169,10 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			T::DbWeight::get().reads_writes(3, 3)
+			if let Some(current) = Current::<T>::get() {
+				LastValid::<T>::put(current);
+			}
+			T::DbWeight::get().reads_writes(3, 2)
 		}
 
 		fn on_finalize(_: BlockNumberFor<T>) {
@@ -208,6 +215,7 @@ pub mod pallet {
 					return Ok(());
 				}
 				Self::clamp_argon_prices(&current, &mut index);
+				<LastValid<T>>::put(current);
 			}
 
 			<Current<T>>::put(index);
@@ -237,6 +245,16 @@ pub mod pallet {
 				return None;
 			}
 			Some(price)
+		}
+
+		pub fn has_new_price_index() -> bool {
+			let Some(current) = <Current<T>>::get() else {
+				return false;
+			};
+			let Some(last) = <LastValid<T>>::get() else {
+				return true;
+			};
+			current.tick > last.tick
 		}
 
 		pub(crate) fn clamp_argon_prices(current: &PriceIndex, next: &mut PriceIndex) {

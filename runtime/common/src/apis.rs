@@ -143,6 +143,16 @@ macro_rules! inject_common_apis {
             }
         }
 
+        impl argon_primitives::BlockImportApis<Block> for Runtime {
+            fn has_new_bitcoin_tip() -> bool {
+                BitcoinUtxos::has_new_bitcoin_tip()
+            }
+
+            fn has_new_price_index() -> bool {
+                PriceIndex::has_new_price_index()
+            }
+        }
+
         impl argon_primitives::MiningApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
             fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority< BlockSealAuthorityId, AccountId>> {
                 MiningSlot::get_mining_authority(account_id)

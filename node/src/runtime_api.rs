@@ -1,6 +1,6 @@
 use argon_primitives::{
-	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
-	MiningApis, Nonce, NotaryApis, NotebookApis, TickApis, prelude::*,
+	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
+	BlockSealAuthorityId, MiningApis, Nonce, NotaryApis, NotebookApis, TickApis, prelude::*,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi;
@@ -47,6 +47,7 @@ pub trait BaseHostRuntimeApis:
 	+ NotebookApis<opaque::Block, NotebookVerifyError>
 	+ BlockSealApis<opaque::Block, AccountId, BlockSealAuthorityId>
 	+ BlockCreatorApis<opaque::Block, AccountId, NotebookVerifyError>
+	+ BlockImportApis<opaque::Block>
 	+ BitcoinApis<opaque::Block, Balance>
 	+ NotaryApis<opaque::Block, NotaryRecordT>
 	+ MiningApis<opaque::Block, AccountId, BlockSealAuthorityId>
@@ -67,6 +68,7 @@ impl<Api> BaseHostRuntimeApis for Api where
 		+ NotebookApis<opaque::Block, NotebookVerifyError>
 		+ BlockSealApis<opaque::Block, AccountId, BlockSealAuthorityId>
 		+ BlockCreatorApis<opaque::Block, AccountId, NotebookVerifyError>
+		+ BlockImportApis<opaque::Block>
 		+ BitcoinApis<opaque::Block, Balance>
 		+ NotaryApis<opaque::Block, NotaryRecordT>
 		+ MiningApis<opaque::Block, AccountId, BlockSealAuthorityId>
