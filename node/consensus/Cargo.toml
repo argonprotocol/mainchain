@@ -78,6 +78,7 @@ polkadot-sdk.features = [
     "sc-network-types",
     "sc-utils",
     "sp-keyring",
+    "sp-state-machine"
 ]
 finality-grandpa = { workspace = true }
 argon-notary = { workspace = true }

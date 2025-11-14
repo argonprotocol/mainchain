@@ -604,10 +604,11 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let mut scores = vec![];
 
 		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
+		let current_block = frame_system::Pallet::<T>::block_number();
 		for (frame_id, cohort) in nonces {
 			for (i, miner_scoring) in cohort.into_iter().enumerate() {
-				let score =
-					ClosestMiner::new(seal_proof, miner_scoring).get_score(expected_per_miner);
+				let score = ClosestMiner::new(seal_proof, miner_scoring)
+					.get_score(expected_per_miner, current_block);
 				scores.push(score);
 				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
@@ -635,6 +636,7 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		seal_proof: U256,
 		authority_id: &T::MiningAuthorityId,
 		account_id: &T::AccountId,
+		ref_block_number: BlockNumberFor<T>,
 	) -> Option<U256> {
 		let miner_index = AccountIndexLookup::<T>::get(account_id)?;
 		let authority = Self::get_mining_authority_by_index(miner_index)?;
@@ -645,8 +647,8 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 		let scoring_for_frame = nonces.get(&miner_index.0)?;
 		let miner_scoring = scoring_for_frame.get(miner_index.1 as usize)?;
 		let expected_per_miner = Self::get_average_vote_blocks_won_per_miner();
-		let score =
-			ClosestMiner::new(seal_proof, miner_scoring.clone()).get_score(expected_per_miner);
+		let score = ClosestMiner::new(seal_proof, miner_scoring.clone())
+			.get_score(expected_per_miner, ref_block_number);
 		Some(score)
 	}
 }
@@ -1236,7 +1238,7 @@ impl<T: Config> ClosestMiner<T> {
 		Self { seal_proof, miner_nonce: scoring.nonce, scoring }
 	}
 
-	fn get_score(&self, expected_wins_at_tick: u16) -> U256 {
+	fn get_score(&self, expected_wins_at_tick: u16, ref_block_number: BlockNumberFor<T>) -> U256 {
 		// 1. Create a full U256 from the concatenation of the seal_proof and the miner_nonce
 		let hash_bytes = self.using_encoded(blake2_256);
 
@@ -1256,10 +1258,9 @@ impl<T: Config> ClosestMiner<T> {
 		// late-frame monopolization.
 		let mut recent_block_penalty = 0i16;
 		if let Some(last_win_block) = self.scoring.last_win_block {
-			let current_block = frame_system::Pallet::<T>::block_number();
 			let miners = ActiveMinersCount::<T>::get();
 			let ten_percent_of_miners = Percent::from_percent(10).mul_floor(miners as u32);
-			if current_block - last_win_block <= ten_percent_of_miners.into() {
+			if ref_block_number - last_win_block <= ten_percent_of_miners.into() {
 				recent_block_penalty = 2i16;
 			}
 		}

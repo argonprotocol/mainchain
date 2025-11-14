@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.3.19](https://github.com/argonprotocol/mainchain/compare/v1.3.18...e4cbeeb6417ce49087293f11814757e06695daf0) (2025-11-08)
+## [v1.3.20](https://github.com/argonprotocol/mainchain/compare/v1.3.19...0966a33009ff0360e59f9ce732334284778b1389) (2025-11-13)
+
+### Fixes
+
+* **mining_slot:** fix mining nonce score history
+([ce9d920](https://github.com/argonprotocol/mainchain/commit/ce9d920515bb345ab0a88fd3d2758bf830ba8768))
+
+### [v1.3.19](https://github.com/argonprotocol/mainchain/compare/v1.3.18...v1.3.19) (2025-11-08)
 
 ### [v1.3.18](https://github.com/argonprotocol/mainchain/compare/v1.3.17...v1.3.18) (2025-11-06)
 

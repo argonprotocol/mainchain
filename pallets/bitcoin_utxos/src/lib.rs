@@ -386,6 +386,16 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn has_new_bitcoin_tip() -> bool {
+			let Some(current) = ConfirmedBitcoinBlockTip::<T>::get() else {
+				return false;
+			};
+			let Some(previous) = PreviousBitcoinBlockTip::<T>::get() else {
+				return true;
+			};
+			previous.block_hash != current.block_hash
+		}
+
 		pub fn get_sync_status() -> Option<BitcoinSyncStatus> {
 			let confirmed_block = ConfirmedBitcoinBlockTip::<T>::get()?;
 			let synched_block = SynchedBitcoinBlock::<T>::get();

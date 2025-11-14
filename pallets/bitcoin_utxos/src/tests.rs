@@ -27,6 +27,7 @@ fn only_an_operator_can_submit_oracle_block() {
 	new_test_ext().execute_with(|| {
 		let who = 1;
 		System::set_block_number(1);
+		assert!(!BitcoinUtxos::has_new_bitcoin_tip());
 		assert_noop!(
 			BitcoinUtxos::set_confirmed_block(RuntimeOrigin::signed(who), 1, H256Le([0; 32])),
 			Error::<Test>::NoPermissions
@@ -38,10 +39,21 @@ fn only_an_operator_can_submit_oracle_block() {
 			1,
 			H256Le([0; 32])
 		),);
+		assert!(BitcoinUtxos::has_new_bitcoin_tip());
 		assert_eq!(
 			ConfirmedBitcoinBlockTip::<Test>::get(),
 			Some(BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) })
 		);
+		BitcoinUtxos::on_finalize(1);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
+		BitcoinUtxos::on_initialize(2);
+		assert!(!BitcoinUtxos::has_new_bitcoin_tip());
+		assert_ok!(BitcoinUtxos::set_confirmed_block(
+			RuntimeOrigin::signed(who),
+			2,
+			H256Le([2; 32])
+		),);
+		assert!(BitcoinUtxos::has_new_bitcoin_tip());
 	});
 }
 

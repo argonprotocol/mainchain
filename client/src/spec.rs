@@ -41,7 +41,7 @@ pub mod api {
 		"Treasury",
 		"FeelessTransaction",
 	];
-	pub static RUNTIME_APIS: [&str; 22usize] = [
+	pub static RUNTIME_APIS: [&str; 23usize] = [
 		"Core",
 		"Metadata",
 		"RuntimeViewFunction",
@@ -52,6 +52,7 @@ pub mod api {
 		"SessionKeys",
 		"TransactionPaymentApi",
 		"TransactionPaymentCallApi",
+		"BlockImportApis",
 		"MiningApis",
 		"BlockSealApis",
 		"BlockCreatorApis",
@@ -125,6 +126,9 @@ pub mod api {
 				&self,
 			) -> transaction_payment_call_api::TransactionPaymentCallApi {
 				transaction_payment_call_api::TransactionPaymentCallApi
+			}
+			pub fn block_import_apis(&self) -> block_import_apis::BlockImportApis {
+				block_import_apis::BlockImportApis
 			}
 			pub fn mining_apis(&self) -> mining_apis::MiningApis {
 				mining_apis::MiningApis
@@ -1340,6 +1344,90 @@ pub mod api {
 				pub struct QueryLengthToFee {
 					pub length: query_length_to_fee::Length,
 				}
+			}
+		}
+		pub mod block_import_apis {
+			use super::{root_mod, runtime_types};
+			pub struct BlockImportApis;
+			impl BlockImportApis {
+				pub fn has_new_bitcoin_tip(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::HasNewBitcoinTip,
+					types::has_new_bitcoin_tip::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BlockImportApis",
+						"has_new_bitcoin_tip",
+						types::HasNewBitcoinTip {},
+						[
+							164u8, 19u8, 232u8, 121u8, 1u8, 115u8, 114u8, 52u8, 214u8, 165u8,
+							219u8, 92u8, 210u8, 37u8, 221u8, 10u8, 139u8, 202u8, 68u8, 98u8, 99u8,
+							90u8, 220u8, 225u8, 187u8, 250u8, 243u8, 44u8, 57u8, 1u8, 79u8, 129u8,
+						],
+					)
+				}
+				pub fn has_new_price_index(
+					&self,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::HasNewPriceIndex,
+					types::has_new_price_index::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BlockImportApis",
+						"has_new_price_index",
+						types::HasNewPriceIndex {},
+						[
+							186u8, 63u8, 180u8, 199u8, 57u8, 134u8, 221u8, 76u8, 22u8, 99u8, 110u8,
+							3u8, 96u8, 131u8, 131u8, 225u8, 185u8, 170u8, 86u8, 171u8, 200u8,
+							105u8, 138u8, 239u8, 87u8, 191u8, 126u8, 45u8, 239u8, 226u8, 178u8,
+							51u8,
+						],
+					)
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				pub mod has_new_bitcoin_tip {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::primitive::bool;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct HasNewBitcoinTip {}
+				pub mod has_new_price_index {
+					use super::runtime_types;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::primitive::bool;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct HasNewPriceIndex {}
 			}
 		}
 		pub mod mining_apis {
@@ -3712,9 +3800,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				65u8, 161u8, 212u8, 123u8, 18u8, 154u8, 16u8, 195u8, 58u8, 140u8, 190u8, 26u8,
-				80u8, 233u8, 52u8, 63u8, 107u8, 236u8, 91u8, 170u8, 69u8, 226u8, 126u8, 75u8, 5u8,
-				130u8, 203u8, 179u8, 169u8, 226u8, 200u8, 144u8,
+				47u8, 93u8, 111u8, 128u8, 32u8, 249u8, 82u8, 234u8, 75u8, 55u8, 13u8, 239u8, 57u8,
+				94u8, 79u8, 231u8, 8u8, 58u8, 229u8, 15u8, 238u8, 44u8, 3u8, 91u8, 242u8, 21u8,
+				180u8, 191u8, 234u8, 55u8, 179u8, 177u8,
 			]
 	}
 	pub mod system {
@@ -14237,6 +14325,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type Current = runtime_types::pallet_price_index::PriceIndex;
 				}
+				pub mod last_valid {
+					use super::runtime_types;
+					pub type LastValid = runtime_types::pallet_price_index::PriceIndex;
+				}
 				pub mod operator {
 					use super::runtime_types;
 					pub type Operator = crate::types::AccountId32;
@@ -14263,6 +14355,27 @@ pub mod api {
 							234u8, 248u8, 104u8, 161u8, 19u8, 211u8, 253u8, 122u8, 125u8, 117u8,
 							50u8, 36u8, 222u8, 202u8, 213u8, 161u8, 46u8, 123u8, 169u8, 204u8,
 							18u8,
+						],
+					)
+				}
+				#[doc = " Stores the last valid price index"]
+				pub fn last_valid(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::last_valid::LastValid,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"PriceIndex",
+						"LastValid",
+						(),
+						[
+							242u8, 240u8, 169u8, 4u8, 157u8, 155u8, 110u8, 26u8, 92u8, 191u8, 64u8,
+							215u8, 37u8, 10u8, 85u8, 227u8, 236u8, 101u8, 178u8, 10u8, 216u8,
+							218u8, 250u8, 238u8, 119u8, 64u8, 83u8, 87u8, 213u8, 29u8, 30u8, 33u8,
 						],
 					)
 				}

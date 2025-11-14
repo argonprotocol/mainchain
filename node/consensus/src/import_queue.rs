@@ -1,16 +1,18 @@
 use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
 use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
-	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId,
-	BlockSealDigest, NotaryApis, NotebookApis, TickApis,
+	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
+	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
+	prelude::substrate_prometheus_endpoint::{CounterVec, Opts, Registry, U64, register},
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::{Codec, Encode};
 use polkadot_sdk::{
 	sp_core::{H256, blake2_256},
+	substrate_prometheus_endpoint::PrometheusError,
 	*,
 };
 use sc_client_api::{self, BlockBackend, backend::AuxStore};
@@ -32,12 +34,80 @@ use sp_runtime::{
 use std::{marker::PhantomData, sync::Arc};
 use tracing::error;
 
+#[derive(Clone)]
+pub struct ImportMetrics {
+	/// Import a block with a vote seal
+	imported_vote_sealed_blocks_total: CounterVec<U64>,
+	/// Imported block with bitcoin block inherent
+	imported_block_with_new_bitcoin_tip: CounterVec<U64>,
+	/// Imported block with new price index inherent
+	imported_block_with_new_price_index: CounterVec<U64>,
+}
+
+impl ImportMetrics {
+	pub fn new(metrics_registry: &Registry) -> Result<Self, PrometheusError> {
+		Ok(Self {
+			imported_block_with_new_bitcoin_tip: register(
+				CounterVec::new(
+					Opts::new(
+						"argon_imported_block_with_new_bitcoin_tip",
+						"Total imported blocks with bitcoin block tip advanced",
+					),
+					&[],
+				)?,
+				metrics_registry,
+			)?,
+			imported_vote_sealed_blocks_total: register(
+				CounterVec::new(
+					Opts::new(
+						"argon_imported_vote_sealed_blocks_total",
+						"Total imported blocks with vote seals",
+					),
+					&[],
+				)?,
+				metrics_registry,
+			)?,
+			imported_block_with_new_price_index: register(
+				CounterVec::new(
+					Opts::new(
+						"argon_imported_block_with_new_price_index",
+						"Total imported blocks with new price index",
+					),
+					&[],
+				)?,
+				metrics_registry,
+			)?,
+		})
+	}
+}
+
+pub trait ImportApisExt<B: BlockT>: HeaderBackend<B> + BlockBackend<B> {
+	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool;
+	fn has_new_price_index(&self, hash: B::Hash) -> bool;
+}
+
+impl<B: BlockT, C> ImportApisExt<B> for C
+where
+	B: BlockT,
+	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B>,
+	C::Api: BlockImportApis<B>,
+{
+	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool {
+		self.runtime_api().has_new_bitcoin_tip(hash).unwrap_or(false)
+	}
+
+	fn has_new_price_index(&self, hash: B::Hash) -> bool {
+		self.runtime_api().has_new_price_index(hash).unwrap_or(false)
+	}
+}
+
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
 	client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
 	import_lock: Arc<tokio::sync::Mutex<()>>,
+	metrics: Arc<Option<ImportMetrics>>,
 	_phantom: PhantomData<AC>,
 }
 
@@ -48,6 +118,7 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 			client: self.client.clone(),
 			aux_client: self.aux_client.clone(),
 			import_lock: self.import_lock.clone(),
+			metrics: self.metrics.clone(),
 			_phantom: PhantomData,
 		}
 	}
@@ -59,7 +130,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: HeaderBackend<B> + BlockBackend<B> + AuxStore + Send + Sync + 'static,
+	C: ImportApisExt<B> + AuxStore + Send + Sync + 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
@@ -144,7 +215,7 @@ where
 			info.block_gap.is_some_and(|a| a.start <= block_number && block_number <= a.end);
 		let parent_block_state =
 			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
-		let block_status =
+		let block_header_status =
 			self.client.status(block_hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
 		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
 		// imported. Various sync strategies will access this path without state set yet
@@ -162,7 +233,7 @@ where
 			},
 			origin=?block.origin,
 			parent_block_state=?parent_block_state,
-			block_status=?block_status,
+			block_header_status=?block_header_status,
 			finalized=block.finalized,
 			"Begin import."
 		);
@@ -186,11 +257,12 @@ where
 			block.origin == BlockOrigin::NetworkInitialSync ||
 			block.finalized;
 
-		let is_block_already_imported = block_status == sp_blockchain::BlockStatus::InChain;
+		let is_block_header_already_imported =
+			block_header_status == sp_blockchain::BlockStatus::InChain;
 		let has_state_or_block = !block.state_action.skip_execution_checks();
 		// If the header is already in the DB we usually short‑circuit unless the
 		// new import carries *something* we still need (state/body *or* finality).
-		if is_block_already_imported && !has_state_or_block && !block.finalized {
+		if is_block_header_already_imported && !has_state_or_block && !block.finalized {
 			tracing::debug!(
 				?block_hash,
 				?block_number,
@@ -271,7 +343,7 @@ where
 
 		let is_vote_block = fork_power.is_latest_vote;
 		if !is_block_gap &&
-			!is_block_already_imported &&
+			!is_block_header_already_imported &&
 			block.origin != BlockOrigin::NetworkInitialSync
 		{
 			// Block abuse prevention. Do not allow a block author to submit more than one vote
@@ -322,6 +394,21 @@ where
 				tick,
 				is_vote_block,
 			)?;
+			if let Some(metrics) = &*self.metrics {
+				// only try to read data if we have state or a block, and still have it flexible if
+				// so
+				if has_state_or_block && !is_block_header_already_imported {
+					if is_vote_block {
+						metrics.imported_vote_sealed_blocks_total.with_label_values(&[]).inc();
+					}
+					if self.client.has_new_bitcoin_tip(block_hash) {
+						metrics.imported_block_with_new_bitcoin_tip.with_label_values(&[]).inc();
+					}
+					if self.client.has_new_price_index(block_hash) {
+						metrics.imported_block_with_new_price_index.with_label_values(&[]).inc();
+					}
+				}
+			}
 		}
 
 		Ok(res)
@@ -581,6 +668,7 @@ where
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B> + Send + Sync + AuxStore + 'static,
 	C::Api: BlockBuilderApi<B>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>
+		+ BlockImportApis<B>
 		+ BitcoinApis<B, Balance>
 		+ BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ NotebookApis<B, NotebookVerifyError>
@@ -589,11 +677,15 @@ where
 	AC: Codec + Clone + Send + Sync + 'static,
 	I: BlockImport<B, Error = ConsensusError> + Send + Sync + 'static,
 {
+	let metrics = registry.and_then(|r| ImportMetrics::new(r).ok());
+	let metrics = Arc::new(metrics);
+
 	let importer = ArgonBlockImport {
 		inner: block_import,
 		client: client.clone(),
 		aux_client,
 		import_lock: Default::default(),
+		metrics,
 		_phantom: PhantomData,
 	};
 	let verifier = Verifier::<B, C, AC> {
@@ -728,6 +820,16 @@ mod test {
 				.values()
 				.find(|h| *h.number() == number)
 				.map(|h| h.hash()))
+		}
+	}
+
+	impl ImportApisExt<Block> for MemChain {
+		fn has_new_bitcoin_tip(&self, _hash: BlockHash) -> bool {
+			false
+		}
+
+		fn has_new_price_index(&self, _hash: BlockHash) -> bool {
+			false
 		}
 	}
 
@@ -947,6 +1049,7 @@ mod test {
 			client: db_arc.clone(),
 			aux_client: ArgonAux::new(db_arc.clone()),
 			import_lock: Default::default(),
+			metrics: Default::default(),
 			_phantom: PhantomData,
 		};
 		(importer, client)

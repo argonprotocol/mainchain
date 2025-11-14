@@ -34,8 +34,9 @@ pub use sp_runtime::{
 	FixedPointNumber, RuntimeDebug, TokenError,
 	traits::{
 		AtLeast32BitUnsigned, BlakeTwo256, Block as BlockT, Bounded, CheckedDiv, DispatchInfoOf,
-		Dispatchable, Hash, Header as HeaderT, Member, One, SaturatedConversion, Saturating,
-		StaticLookup, TrailingZeroInput, UniqueSaturatedInto, Zero,
+		Dispatchable, Hash, HashingFor, Header as HeaderT, Member, NumberFor, One,
+		SaturatedConversion, Saturating, StaticLookup, TrailingZeroInput, UniqueSaturatedInto,
+		Zero,
 	},
 };
 
