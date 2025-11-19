@@ -27,6 +27,7 @@ pub mod prelude {
 	};
 	pub use frame_support::{
 		PalletId, StorageValue, construct_runtime, derive_impl,
+		dispatch::*,
 		genesis_builder_helper::{build_state, get_preset},
 		pallet_prelude::*,
 		parameter_types,
@@ -66,8 +67,13 @@ pub mod prelude {
 	pub use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityList, AuthorityWeight};
 	pub use sp_core::{Get, H256, OpaqueMetadata, U256};
 	pub use sp_runtime::{
-		ApplyExtrinsicResult, Digest, DigestItem, KeyTypeId, generic,
-		traits::{BlakeTwo256, Block as BlockT, Header as HeaderT, NumberFor},
+		ApplyExtrinsicResult, Digest, DigestItem, KeyTypeId, MultiAddress, generic,
+		impl_tx_ext_default,
+		traits::{
+			BlakeTwo256, Block as BlockT, DispatchInfoOf, DispatchOriginOf, Dispatchable,
+			Header as HeaderT, NumberFor, PostDispatchInfoOf, Saturating, TransactionExtension,
+			UniqueSaturatedInto,
+		},
 	};
 	pub use sp_version::RuntimeVersion;
 }
@@ -87,7 +93,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 139,
+			spec_version: 140,
 			impl_version: 9,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 4,
@@ -125,6 +131,7 @@ macro_rules! inject_runtime_vars {
 			>,
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 			frame_system::WeightReclaim<Runtime>,
+			ProxyFeeRefund<Runtime>,
 		);
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
