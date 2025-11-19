@@ -1,13 +1,13 @@
-use polkadot_sdk::*;
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
-
 use anyhow::anyhow;
+use polkadot_sdk::*;
 use sp_core::Decode;
 use sp_core::crypto::AccountId32;
 use sp_core::{ByteArray, H256};
 use sp_runtime::MultiSignature;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use subxt::runtime_api::Payload as RuntimeApiPayload;
 use subxt::storage::Address as StorageAddress;
 use subxt::utils::Yes;
@@ -37,8 +37,9 @@ use crate::{Result, bail};
 #[derive(Clone)]
 pub struct MainchainClient {
   client: Arc<RwLock<Option<InnerMainchainClient>>>,
+  connect_id: Arc<AtomicUsize>,
   pub host: String,
-  join_handles: Arc<Mutex<Option<(tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>)>>>,
+  join_handles: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 #[cfg(test)]
@@ -46,6 +47,7 @@ impl MainchainClient {
   pub fn mock() -> Self {
     Self {
       host: "mock".to_string(),
+      connect_id: Arc::new(AtomicUsize::new(0)),
       client: Arc::new(RwLock::new(None)),
       join_handles: Arc::new(Mutex::new(None)),
     }
@@ -63,53 +65,56 @@ impl MainchainClient {
   }
 
   async fn ensure_connected(&self, timeout_millis: i64) -> Result<()> {
-    if self.client.read().await.is_some() {
-      return Ok(());
+    if let Some(c) = self.client.read().await.as_ref() {
+      if c.ws_client.is_connected() {
+        return Ok(());
+      }
     }
+    // hold lock while we swap out the client
+    let mut write_lock = self.client.write().await;
 
-    if let Some((handle1, handle2)) = (*self.join_handles.lock().await).take() {
-      handle1.abort();
-      handle2.abort();
+    if let Some(handle) = (*self.join_handles.lock().await).take() {
+      handle.abort();
     }
 
     let mut client =
       InnerMainchainClient::try_until_connected(self.host.as_str(), 5_000, timeout_millis as u64)
         .await?;
+
     let mut on_error = client.subscribe_client_error();
     let ws_client = client.ws_client.clone();
+    let connect_id_number = self.connect_id.fetch_add(1, Ordering::SeqCst);
+    write_lock.replace(client);
 
-    self.client.write().await.replace(client);
+    let client_lock = self.client.clone();
+    let url = self.host.clone();
+    let connect_id = self.connect_id.clone();
 
-    let client_lock_1 = self.client.clone();
-    let client_lock_2 = self.client.clone();
-    let url_1 = self.host.clone();
-    let url_2 = self.host.clone();
-
-    let handle1 = tokio::spawn(async move {
-      let url = url_1.clone();
-      let err = on_error.recv().await.unwrap_or_default();
-
-      warn!("Disconnected from mainchain at {url} with error {err}",);
-      client_lock_1.write().await.take();
+    let new_handle = tokio::spawn(async move {
+      tokio::select! {
+        _ = ws_client.on_disconnect() => {
+          warn!("Disconnected from mainchain at {}", url);
+          if connect_id_number == connect_id.load(Ordering::SeqCst) {
+            client_lock.write().await.take();
+          }
+        },
+        err = on_error.recv() => {
+          warn!("Disconnected from mainchain at {url} with error {err:?}",);
+          if connect_id_number == connect_id.load(Ordering::SeqCst) {
+            client_lock.write().await.take();
+          }
+        }
+      }
     });
 
-    let handle2 = tokio::spawn(async move {
-      let url = url_2.clone();
-      let _ = ws_client.on_disconnect().await;
-
-      warn!("Disconnected from mainchain at {url}",);
-      client_lock_2.write().await.take();
-    });
-
-    *self.join_handles.lock().await = Some((handle1, handle2));
+    *self.join_handles.lock().await = Some(new_handle);
 
     Ok(())
   }
 
   pub async fn close(&self) -> Result<()> {
-    if let Some((handle1, handle2)) = (*self.join_handles.lock().await).take() {
-      handle1.abort();
-      handle2.abort();
+    if let Some(handle) = (*self.join_handles.lock().await).take() {
+      handle.abort();
     }
     let mut client_lock = self.client.write().await;
     if let Some(client) = (*client_lock).take() {
@@ -121,6 +126,7 @@ impl MainchainClient {
   pub async fn connect(host: String, timeout_millis: i64) -> Result<Self> {
     let instance = Self {
       host,
+      connect_id: Arc::new(AtomicUsize::new(0)),
       client: Arc::new(RwLock::new(None)),
       join_handles: Arc::new(Mutex::new(None)),
     };
