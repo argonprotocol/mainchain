@@ -251,6 +251,12 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
 
+	/// The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule
+	/// change during a frame.
+	#[pallet::storage]
+	pub type ScheduledCohortSizeChangeByFrame<T: Config> =
+		StorageValue<_, BoundedBTreeMap<FrameId, u32, ConstU32<11>>, ValueQuery>;
+
 	/// Did this block activate a new frame
 	#[pallet::storage]
 	pub type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
@@ -793,6 +799,13 @@ impl<T: Config> Pallet<T> {
 			frame_id,
 		});
 
+		ScheduledCohortSizeChangeByFrame::<T>::mutate(|x| {
+			if let Some(size) = x.remove(&frame_id) {
+				NextCohortSize::<T>::put(size);
+			}
+			x.retain(|f, _| *f > frame_id);
+		});
+
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
 		DidStartNewCohort::<T>::put(true);
 		NextFrameId::<T>::put(frame_id + 1);
@@ -916,15 +929,30 @@ impl<T: Config> Pallet<T> {
 		if adjustment_percent == FixedU128::one() {
 			return;
 		}
-		let mut next_cohort_size =
-			adjustment_percent.saturating_mul_int(NextCohortSize::<T>::get());
+
+		let last_planned_cohort_size: u32 = ScheduledCohortSizeChangeByFrame::<T>::get()
+			.into_iter()
+			.last()
+			.map(|(_, size)| size)
+			.unwrap_or(NextCohortSize::<T>::get());
+		let mut next_cohort_size = adjustment_percent.saturating_mul_int(last_planned_cohort_size);
 		if next_cohort_size < min_cohort_size {
 			next_cohort_size = min_cohort_size;
 		} else if next_cohort_size > max_cohort_size {
 			next_cohort_size = max_cohort_size;
 		}
 
-		NextCohortSize::<T>::put(next_cohort_size);
+		let frame_id = NextFrameId::<T>::get() + 10;
+		ScheduledCohortSizeChangeByFrame::<T>::mutate(|x| {
+			if let Err(e) = x.try_insert(frame_id, next_cohort_size) {
+				log::error!(
+					"Unable to schedule cohort size change to {} at frame {}: {:?}",
+					next_cohort_size,
+					frame_id,
+					e
+				);
+			}
+		});
 	}
 
 	/// Check if the current block is in the closing window for the next slot
@@ -1260,7 +1288,7 @@ impl<T: Config> ClosestMiner<T> {
 		if let Some(last_win_block) = self.scoring.last_win_block {
 			let miners = ActiveMinersCount::<T>::get();
 			let ten_percent_of_miners = Percent::from_percent(10).mul_floor(miners as u32);
-			if ref_block_number - last_win_block <= ten_percent_of_miners.into() {
+			if ref_block_number.saturating_sub(last_win_block) <= ten_percent_of_miners.into() {
 				recent_block_penalty = 2i16;
 			}
 		}

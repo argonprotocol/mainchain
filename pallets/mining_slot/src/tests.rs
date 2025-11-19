@@ -1,5 +1,6 @@
 use crate::{
 	Error, Event, HoldReason, MinerNonce, MinerNonceScoring, Registration,
+	ScheduledCohortSizeChangeByFrame,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
@@ -16,6 +17,7 @@ use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use pallet_prelude::{sp_core::Pair, *};
+use polkadot_sdk::sp_core::bounded_btree_map;
 use sp_core::bounded_vec;
 use std::{collections::HashMap, env};
 
@@ -1603,7 +1605,10 @@ fn it_adjusts_mining_seats() {
 		MiningSlots::on_finalize(11);
 		assert_eq!(NextFrameId::<Test>::get(), 2);
 		assert_eq!(AveragePricePerSeat::<Test>::get().to_vec(), vec![110 * 1_000_000]);
-		assert_eq!(NextCohortSize::<Test>::get(), 11);
+		assert_eq!(NextCohortSize::<Test>::get(), 10);
+		let expected_schedule: BoundedBTreeMap<FrameId, u32, ConstU32<11>> =
+			bounded_btree_map! { 12u32.into() => 11 };
+		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get(), expected_schedule);
 
 		for frame in 1..=11 {
 			for i in 0..10 {
@@ -1623,7 +1628,15 @@ fn it_adjusts_mining_seats() {
 			MiningSlots::on_finalize(20 + frame * 10);
 			assert_eq!(NextFrameId::<Test>::get(), frame + 2);
 		}
-		assert_eq!(NextCohortSize::<Test>::get(), 11 + 13);
+		// should have applied a single change now
+		assert_eq!(NextFrameId::<Test>::get(), 13);
+		assert_eq!(NextCohortSize::<Test>::get(), 11);
+		assert!(!ScheduledCohortSizeChangeByFrame::<Test>::get().contains_key(&12));
+		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().len(), 11);
+		assert_eq!(
+			ScheduledCohortSizeChangeByFrame::<Test>::get().into_iter().last(),
+			Some((23u32.into(), 11 + 13))
+		);
 		assert_eq!(AveragePricePerSeat::<Test>::get().len(), 10);
 	});
 }
