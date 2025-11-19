@@ -11,7 +11,7 @@ use sdk_core::prelude::*;
 use sp_runtime::FixedU128;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::{trace, warn};
+use tracing::{error, trace};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
 
@@ -111,17 +111,30 @@ impl UniswapOracle {
 		let block_id = BlockId::Number(BlockNumberOrTag::Latest);
 		let pool_contract = self.get_cached_pool_contract(fee).await?;
 
+		let mut window = seconds_ago;
+		// never let it be 0 here; you already rejected seconds_ago == 0
+		if window == 0 {
+			return Err(anyhow!("Pool too young: no observations yet for fee tier {:?}", fee));
+		}
+
 		// Fetch tick_cumulatives and liquidity_cumulatives
-		let result = pool_contract
-			.observe(vec![seconds_ago, 0])
-			.block(block_id)
-			.call()
-			.await
-			.inspect_err(|e| {
-				if !format!("{:?}", e).contains("AbiError(SolTypes(Overrun))") {
-					warn!(?fee, ?e, "Error calling observe {:?}", e.to_string());
-				}
-			})?;
+		let result = loop {
+			match pool_contract.observe(vec![window, 0]).block(block_id).call().await {
+				Ok(res) => break res,
+				Err(e) => {
+					let error_msg = format!("{:?}", e);
+					if error_msg.contains("ZeroData") {
+						return Err(anyhow!("No data for fee tier {:?}: {:?}", fee, e));
+					}
+					if window > 1 && error_msg.contains("execution reverted: OLD") {
+						window /= 2;
+						continue;
+					}
+					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
+					return Err(anyhow!("Error calling observe: {:?}", e));
+				},
+			}
+		};
 		let tick_cumulatives = result.tickCumulatives;
 		let liquidity_cumulatives = result.secondsPerLiquidityCumulativeX128s;
 
@@ -130,7 +143,7 @@ impl UniswapOracle {
 
 		// Calculate time-weighted average tick (fixed-point division)
 		let tick_twap = {
-			let seconds_as_i56 = I56::try_from(seconds_ago)?;
+			let seconds_as_i56 = I56::try_from(window)?;
 			(tick_diff / seconds_as_i56).to_i24()
 		};
 
@@ -140,7 +153,7 @@ impl UniswapOracle {
 		// Compute average liquidity
 		let liquidity_diff: U160 = liquidity_cumulatives[1] - liquidity_cumulatives[0];
 		let average_liquidity = {
-			let seconds_between_x128: BigInt = BigInt::from(seconds_ago) << 128;
+			let seconds_between_x128: BigInt = BigInt::from(window) << 128;
 			let liquidity_diff = liquidity_diff.to_big_int();
 			seconds_between_x128.checked_div(liquidity_diff).unwrap_or_default()
 		};
@@ -251,8 +264,8 @@ mod test {
 			return;
 		}
 
-		const _DAI_ADDRESS: &str = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
 		const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";
+		const _ARGONOT_ADDRESS: &str = "0x64cbd3aa07d427e385cb55330406508718e55f01";
 
 		let oracle = UniswapOracle::new(
 			project_id,
@@ -261,7 +274,13 @@ mod test {
 		)
 		.await
 		.expect("Failed to create oracle");
-		let price = oracle.get_current_price().await.unwrap();
+		let price = oracle
+			.get_current_price()
+			.await
+			.inspect_err(|e| {
+				error!("Error getting price: {:?}", e);
+			})
+			.expect("Failed to get price");
 		println!("Price: {:?}", price);
 		// should be around 1.0
 		assert!((price.price.to_float() - 1.0).abs() < 0.1);

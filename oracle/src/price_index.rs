@@ -19,6 +19,7 @@ use argon_client::{
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
 };
+use argon_primitives::prelude::sp_arithmetic::FixedPointNumber;
 
 pub async fn price_index_loop(
 	trusted_rpc_url: String,
@@ -150,18 +151,27 @@ pub async fn price_index_loop(
 				FixedU128::zero()
 			});
 
+		let argon_liquidity = argon_usd_price.liquidity;
+		let argon_usd_price = trunc_fixed_u128(argon_usd_price.price, 3);
+		let argonot_usd_price = trunc_fixed_u128(argonot_price_lookup, 3);
+		let argon_usd_target_price = trunc_fixed_u128(target_price, 3);
+		let bitcoin_usd_price = trunc_fixed_u128(usd_price_lookup.bitcoin, 3);
+
 		info!(
-			"Current target price: {:?}, argon price {:?} at tick {:?}",
-			target_price, argon_usd_price, tick
+			"Current target price: {:?} vs price {:?}, liquidity {:?}, at tick {:?}",
+			argon_usd_target_price.to_float(),
+			argon_usd_price.to_float(),
+			argon_liquidity,
+			tick
 		);
 
 		let price_index = tx().price_index().submit(Index {
-			argon_usd_target_price: to_api_fixed_u128(target_price),
+			argon_usd_target_price: to_api_fixed_u128(argon_usd_target_price),
 			tick,
-			argon_usd_price: to_api_fixed_u128(argon_usd_price.price),
-			argon_time_weighted_average_liquidity: argon_usd_price.liquidity,
-			argonot_usd_price: to_api_fixed_u128(argonot_price_lookup),
-			btc_usd_price: to_api_fixed_u128(usd_price_lookup.bitcoin),
+			argon_usd_price: to_api_fixed_u128(argon_usd_price),
+			argon_time_weighted_average_liquidity: argon_liquidity,
+			argonot_usd_price: to_api_fixed_u128(argonot_usd_price),
+			btc_usd_price: to_api_fixed_u128(bitcoin_usd_price),
 		});
 		{
 			let client = reconnecting_client.get().await?;
@@ -186,6 +196,11 @@ pub async fn price_index_loop(
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
 	}
+}
+
+fn trunc_fixed_u128(value: FixedU128, decimals: u16) -> FixedU128 {
+	let drop = FixedU128::accuracy() / (10u128.pow(decimals as u32)); // 10^(18-3)
+	FixedU128::from_inner((value.into_inner() / drop) * drop)
 }
 
 #[cfg(test)]
