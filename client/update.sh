@@ -45,6 +45,9 @@ subxt codegen  --derive Clone \
 
 curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getMetadata", "params":[]}' http://localhost:9944 > "$BASEDIR/nodejs/metadata.json"
 
+# get runtime spec version
+curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method": "state_getRuntimeVersion", "params":[]}' http://localhost:9944 | jq -r '.result' > "$BASEDIR/nodejs/runtime_version.json"
+
 (cd "$BASEDIR" && yarn)
 (cd "$BASEDIR/nodejs" && yarn build)
 (cd "$BASEDIR" && yarn lint)

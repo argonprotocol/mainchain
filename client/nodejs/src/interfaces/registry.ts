@@ -53,6 +53,7 @@ import type {
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
+  ArgonRuntimeProxyFeeRefund,
   ArgonRuntimeProxyType,
   ArgonRuntimeRuntime,
   ArgonRuntimeRuntimeFreezeReason,
@@ -310,6 +311,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
+    ArgonRuntimeProxyFeeRefund: ArgonRuntimeProxyFeeRefund;
     ArgonRuntimeProxyType: ArgonRuntimeProxyType;
     ArgonRuntimeRuntime: ArgonRuntimeRuntime;
     ArgonRuntimeRuntimeFreezeReason: ArgonRuntimeRuntimeFreezeReason;
