@@ -95,6 +95,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Free Disk Space
+        if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
+        uses: ./.github/templates/clear-space
+
       - name: Install linux dependencies
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         run: |
