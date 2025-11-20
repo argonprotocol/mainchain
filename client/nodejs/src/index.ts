@@ -8,6 +8,11 @@ import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
 import type { ApiDecoration, ApiOptions } from '@polkadot/api/types';
+import { Metadata, TypeRegistry } from '@polkadot/types';
+import { result as metadataBytes } from '../metadata.json';
+import { specVersion } from '../runtime_version.json';
+import Genesis from '../genesis.json';
+import { HexString } from '@polkadot/util/types';
 
 export type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 export { ApiDecoration };
@@ -97,5 +102,23 @@ export async function getClient(host: string, options?: ApiOptions): Promise<Arg
   } else {
     provider = new WsProvider(host);
   }
-  return await ApiPromise.create({ provider, noInitWarn: true, ...(options ?? {}) });
+
+  options ??= {};
+  options.metadata ??= {};
+
+  for (const genesisHash of Object.values(Genesis)) {
+    options.metadata[`${genesisHash}-${specVersion}`] = metadataBytes as HexString;
+  }
+  return await ApiPromise.create({ provider, noInitWarn: true, ...options });
+}
+
+export function getOfflineRegistry() {
+  const registry = new TypeRegistry();
+  registry.setMetadata(
+    new Metadata(registry, metadataBytes as HexString),
+    undefined,
+    undefined,
+    true,
+  );
+  return registry;
 }

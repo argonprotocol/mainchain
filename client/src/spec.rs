@@ -253,7 +253,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -587,7 +587,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod apply_extrinsic {
 					use super::runtime_types;
-					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < :: core :: result :: Result < () , runtime_types :: sp_runtime :: DispatchError > , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -635,7 +635,7 @@ pub mod api {
 					pub type Inherent = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
 					}
 				}
 				#[derive(
@@ -655,7 +655,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -722,7 +722,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
-					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
 					pub type BlockHash = crate::types::H256;
 					pub mod output {
 						use super::runtime_types;
@@ -1051,7 +1051,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_info {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1080,7 +1080,7 @@ pub mod api {
 				}
 				pub mod query_fee_details {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1172,10 +1172,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							160u8, 168u8, 107u8, 156u8, 67u8, 34u8, 190u8, 184u8, 94u8, 134u8,
-							196u8, 174u8, 86u8, 223u8, 222u8, 96u8, 200u8, 242u8, 141u8, 201u8,
-							150u8, 45u8, 62u8, 62u8, 174u8, 44u8, 87u8, 66u8, 129u8, 14u8, 236u8,
-							17u8,
+							11u8, 141u8, 229u8, 89u8, 77u8, 97u8, 43u8, 220u8, 68u8, 30u8, 41u8,
+							116u8, 51u8, 216u8, 16u8, 37u8, 128u8, 5u8, 174u8, 149u8, 46u8, 228u8,
+							53u8, 238u8, 238u8, 158u8, 107u8, 5u8, 155u8, 87u8, 6u8, 212u8,
 						],
 					)
 				}
@@ -1193,10 +1192,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							13u8, 165u8, 57u8, 150u8, 252u8, 187u8, 171u8, 79u8, 230u8, 85u8,
-							199u8, 157u8, 143u8, 50u8, 135u8, 62u8, 246u8, 118u8, 83u8, 112u8,
-							187u8, 24u8, 230u8, 186u8, 78u8, 240u8, 42u8, 25u8, 167u8, 190u8, 44u8,
-							114u8,
+							217u8, 220u8, 209u8, 22u8, 196u8, 8u8, 142u8, 102u8, 239u8, 89u8, 98u8,
+							198u8, 230u8, 71u8, 93u8, 28u8, 0u8, 107u8, 101u8, 230u8, 20u8, 210u8,
+							194u8, 62u8, 143u8, 61u8, 184u8, 50u8, 174u8, 12u8, 251u8, 57u8,
 						],
 					)
 				}
@@ -1696,7 +1694,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > > ;
+						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > > ;
 					}
 				}
 				#[derive(
@@ -3800,9 +3798,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				47u8, 93u8, 111u8, 128u8, 32u8, 249u8, 82u8, 234u8, 75u8, 55u8, 13u8, 239u8, 57u8,
-				94u8, 79u8, 231u8, 8u8, 58u8, 229u8, 15u8, 238u8, 44u8, 3u8, 91u8, 242u8, 21u8,
-				180u8, 191u8, 234u8, 55u8, 179u8, 177u8,
+				205u8, 38u8, 76u8, 76u8, 211u8, 202u8, 122u8, 211u8, 169u8, 44u8, 175u8, 70u8,
+				121u8, 26u8, 156u8, 134u8, 111u8, 1u8, 136u8, 43u8, 46u8, 194u8, 118u8, 96u8,
+				143u8, 78u8, 120u8, 221u8, 120u8, 215u8, 35u8, 70u8,
 			]
 	}
 	pub mod system {
@@ -4920,9 +4918,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							151u8, 19u8, 163u8, 223u8, 84u8, 41u8, 59u8, 146u8, 50u8, 222u8, 150u8,
-							220u8, 223u8, 120u8, 148u8, 47u8, 61u8, 177u8, 85u8, 248u8, 248u8,
-							249u8, 121u8, 20u8, 121u8, 248u8, 72u8, 88u8, 205u8, 124u8, 68u8, 85u8,
+							243u8, 239u8, 114u8, 137u8, 221u8, 125u8, 96u8, 238u8, 185u8, 164u8,
+							36u8, 23u8, 118u8, 240u8, 163u8, 141u8, 234u8, 236u8, 76u8, 148u8,
+							174u8, 203u8, 189u8, 252u8, 252u8, 167u8, 41u8, 28u8, 210u8, 82u8,
+							81u8, 26u8,
 						],
 					)
 				}
@@ -5797,10 +5796,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							178u8, 190u8, 181u8, 98u8, 96u8, 203u8, 186u8, 170u8, 61u8, 166u8,
-							135u8, 107u8, 87u8, 125u8, 241u8, 84u8, 208u8, 88u8, 252u8, 137u8,
-							99u8, 45u8, 116u8, 188u8, 175u8, 36u8, 200u8, 189u8, 43u8, 91u8, 70u8,
-							232u8,
+							65u8, 101u8, 225u8, 5u8, 201u8, 252u8, 163u8, 231u8, 129u8, 253u8,
+							60u8, 68u8, 225u8, 220u8, 13u8, 139u8, 215u8, 234u8, 4u8, 71u8, 61u8,
+							229u8, 226u8, 4u8, 34u8, 48u8, 0u8, 136u8, 18u8, 13u8, 40u8, 239u8,
 						],
 					)
 				}
@@ -5862,9 +5860,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							44u8, 32u8, 230u8, 11u8, 123u8, 225u8, 62u8, 28u8, 142u8, 109u8, 38u8,
-							140u8, 118u8, 197u8, 4u8, 150u8, 160u8, 48u8, 233u8, 175u8, 41u8, 98u8,
-							88u8, 252u8, 238u8, 244u8, 133u8, 163u8, 88u8, 237u8, 68u8, 43u8,
+							222u8, 63u8, 153u8, 213u8, 156u8, 128u8, 101u8, 223u8, 28u8, 203u8,
+							149u8, 14u8, 59u8, 27u8, 44u8, 57u8, 104u8, 108u8, 123u8, 161u8, 141u8,
+							17u8, 14u8, 246u8, 0u8, 169u8, 230u8, 92u8, 50u8, 137u8, 185u8, 36u8,
 						],
 					)
 				}
@@ -6761,10 +6759,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							50u8, 44u8, 135u8, 114u8, 205u8, 188u8, 216u8, 52u8, 113u8, 113u8,
-							180u8, 149u8, 188u8, 208u8, 121u8, 151u8, 179u8, 192u8, 81u8, 98u8,
-							53u8, 194u8, 79u8, 39u8, 199u8, 169u8, 245u8, 2u8, 42u8, 53u8, 54u8,
-							157u8,
+							90u8, 57u8, 106u8, 62u8, 223u8, 116u8, 86u8, 89u8, 140u8, 65u8, 169u8,
+							126u8, 46u8, 8u8, 130u8, 209u8, 78u8, 111u8, 96u8, 187u8, 47u8, 253u8,
+							173u8, 131u8, 39u8, 204u8, 76u8, 121u8, 117u8, 51u8, 245u8, 9u8,
 						],
 					)
 				}
@@ -6788,10 +6785,10 @@ pub mod api {
 						"add_proxy",
 						types::AddProxy { delegate, proxy_type, delay },
 						[
-							94u8, 216u8, 27u8, 58u8, 216u8, 231u8, 151u8, 20u8, 210u8, 236u8,
-							166u8, 245u8, 87u8, 97u8, 151u8, 240u8, 29u8, 194u8, 164u8, 178u8,
-							124u8, 119u8, 224u8, 214u8, 225u8, 132u8, 109u8, 138u8, 34u8, 64u8,
-							243u8, 150u8,
+							8u8, 201u8, 55u8, 197u8, 186u8, 187u8, 168u8, 182u8, 79u8, 182u8,
+							250u8, 183u8, 196u8, 23u8, 12u8, 129u8, 225u8, 125u8, 227u8, 112u8,
+							57u8, 65u8, 89u8, 80u8, 90u8, 241u8, 219u8, 4u8, 46u8, 25u8, 166u8,
+							29u8,
 						],
 					)
 				}
@@ -6813,10 +6810,9 @@ pub mod api {
 						"remove_proxy",
 						types::RemoveProxy { delegate, proxy_type, delay },
 						[
-							126u8, 61u8, 184u8, 153u8, 116u8, 176u8, 110u8, 72u8, 184u8, 150u8,
-							85u8, 162u8, 40u8, 45u8, 169u8, 152u8, 46u8, 101u8, 95u8, 179u8, 158u8,
-							205u8, 22u8, 244u8, 198u8, 117u8, 222u8, 139u8, 116u8, 72u8, 223u8,
-							213u8,
+							34u8, 24u8, 167u8, 5u8, 72u8, 178u8, 87u8, 247u8, 214u8, 91u8, 186u8,
+							19u8, 80u8, 62u8, 173u8, 40u8, 80u8, 181u8, 53u8, 132u8, 201u8, 236u8,
+							48u8, 226u8, 190u8, 176u8, 175u8, 5u8, 62u8, 83u8, 164u8, 213u8,
 						],
 					)
 				}
@@ -6871,9 +6867,9 @@ pub mod api {
 						"create_pure",
 						types::CreatePure { proxy_type, delay, index },
 						[
-							208u8, 117u8, 177u8, 31u8, 157u8, 52u8, 97u8, 98u8, 22u8, 117u8, 116u8,
-							77u8, 78u8, 35u8, 49u8, 173u8, 34u8, 138u8, 53u8, 76u8, 123u8, 92u8,
-							38u8, 170u8, 96u8, 178u8, 203u8, 13u8, 115u8, 137u8, 6u8, 7u8,
+							175u8, 87u8, 198u8, 50u8, 71u8, 184u8, 242u8, 134u8, 209u8, 11u8,
+							140u8, 93u8, 4u8, 119u8, 224u8, 114u8, 33u8, 16u8, 146u8, 236u8, 233u8,
+							213u8, 116u8, 50u8, 205u8, 113u8, 68u8, 134u8, 61u8, 169u8, 242u8, 7u8,
 						],
 					)
 				}
@@ -6906,9 +6902,9 @@ pub mod api {
 						"kill_pure",
 						types::KillPure { spawner, proxy_type, index, height, ext_index },
 						[
-							208u8, 8u8, 186u8, 87u8, 35u8, 220u8, 230u8, 151u8, 18u8, 142u8, 1u8,
-							29u8, 38u8, 159u8, 125u8, 101u8, 97u8, 251u8, 204u8, 7u8, 112u8, 235u8,
-							116u8, 183u8, 144u8, 57u8, 105u8, 127u8, 200u8, 57u8, 88u8, 217u8,
+							172u8, 85u8, 157u8, 64u8, 161u8, 33u8, 130u8, 151u8, 190u8, 223u8,
+							49u8, 2u8, 142u8, 34u8, 92u8, 13u8, 11u8, 175u8, 33u8, 110u8, 212u8,
+							176u8, 9u8, 19u8, 61u8, 160u8, 173u8, 98u8, 53u8, 34u8, 41u8, 105u8,
 						],
 					)
 				}
@@ -7027,9 +7023,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							229u8, 73u8, 166u8, 98u8, 140u8, 167u8, 39u8, 80u8, 181u8, 104u8, 69u8,
-							52u8, 149u8, 36u8, 96u8, 44u8, 164u8, 61u8, 101u8, 66u8, 68u8, 168u8,
-							52u8, 195u8, 22u8, 172u8, 75u8, 198u8, 132u8, 185u8, 189u8, 108u8,
+							181u8, 43u8, 96u8, 166u8, 16u8, 177u8, 150u8, 31u8, 178u8, 48u8, 183u8,
+							221u8, 118u8, 22u8, 234u8, 36u8, 76u8, 81u8, 50u8, 23u8, 158u8, 106u8,
+							140u8, 128u8, 28u8, 205u8, 94u8, 83u8, 117u8, 14u8, 4u8, 224u8,
 						],
 					)
 				}
@@ -7078,10 +7074,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							99u8, 178u8, 221u8, 121u8, 188u8, 215u8, 167u8, 174u8, 157u8, 14u8,
-							242u8, 70u8, 37u8, 230u8, 227u8, 201u8, 137u8, 252u8, 176u8, 73u8,
-							141u8, 122u8, 192u8, 19u8, 88u8, 120u8, 93u8, 84u8, 140u8, 252u8,
-							157u8, 226u8,
+							0u8, 142u8, 0u8, 241u8, 148u8, 142u8, 159u8, 107u8, 246u8, 60u8, 83u8,
+							22u8, 17u8, 6u8, 38u8, 120u8, 123u8, 240u8, 25u8, 77u8, 85u8, 128u8,
+							178u8, 69u8, 112u8, 58u8, 169u8, 194u8, 67u8, 3u8, 92u8, 188u8,
 						],
 					)
 				}
@@ -7102,9 +7097,9 @@ pub mod api {
 						],
 						is_superset::Input { to_check, against },
 						[
-							76u8, 113u8, 8u8, 106u8, 23u8, 138u8, 67u8, 219u8, 154u8, 202u8, 26u8,
-							248u8, 179u8, 9u8, 242u8, 238u8, 169u8, 13u8, 15u8, 137u8, 134u8,
-							102u8, 145u8, 162u8, 0u8, 190u8, 82u8, 210u8, 26u8, 223u8, 140u8, 89u8,
+							85u8, 26u8, 48u8, 33u8, 9u8, 150u8, 140u8, 214u8, 39u8, 14u8, 73u8,
+							125u8, 223u8, 89u8, 13u8, 17u8, 77u8, 152u8, 22u8, 119u8, 30u8, 44u8,
+							73u8, 138u8, 233u8, 72u8, 190u8, 28u8, 42u8, 28u8, 212u8, 233u8,
 						],
 					)
 				}
@@ -7392,9 +7387,9 @@ pub mod api {
 						"Proxies",
 						(),
 						[
-							33u8, 193u8, 248u8, 71u8, 56u8, 1u8, 168u8, 231u8, 169u8, 171u8, 121u8,
-							31u8, 224u8, 105u8, 171u8, 78u8, 225u8, 147u8, 242u8, 12u8, 255u8,
-							69u8, 12u8, 143u8, 94u8, 28u8, 192u8, 42u8, 73u8, 197u8, 7u8, 118u8,
+							79u8, 147u8, 32u8, 170u8, 164u8, 97u8, 123u8, 252u8, 247u8, 29u8, 17u8,
+							173u8, 158u8, 17u8, 42u8, 232u8, 52u8, 226u8, 204u8, 231u8, 193u8,
+							37u8, 154u8, 25u8, 81u8, 8u8, 232u8, 139u8, 236u8, 174u8, 114u8, 112u8,
 						],
 					)
 				}
@@ -7417,9 +7412,9 @@ pub mod api {
 						"Proxies",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							33u8, 193u8, 248u8, 71u8, 56u8, 1u8, 168u8, 231u8, 169u8, 171u8, 121u8,
-							31u8, 224u8, 105u8, 171u8, 78u8, 225u8, 147u8, 242u8, 12u8, 255u8,
-							69u8, 12u8, 143u8, 94u8, 28u8, 192u8, 42u8, 73u8, 197u8, 7u8, 118u8,
+							79u8, 147u8, 32u8, 170u8, 164u8, 97u8, 123u8, 252u8, 247u8, 29u8, 17u8,
+							173u8, 158u8, 17u8, 42u8, 232u8, 52u8, 226u8, 204u8, 231u8, 193u8,
+							37u8, 154u8, 25u8, 81u8, 8u8, 232u8, 139u8, 236u8, 174u8, 114u8, 112u8,
 						],
 					)
 				}
@@ -8184,6 +8179,14 @@ pub mod api {
 					use super::runtime_types;
 					pub type NextCohortSize = ::core::primitive::u32;
 				}
+				pub mod scheduled_cohort_size_change_by_frame {
+					use super::runtime_types;
+					pub type ScheduledCohortSizeChangeByFrame =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+							::core::primitive::u64,
+							::core::primitive::u32,
+						>;
+				}
 				pub mod did_start_new_cohort {
 					use super::runtime_types;
 					pub type DidStartNewCohort = ::core::primitive::bool;
@@ -8548,6 +8551,29 @@ pub mod api {
 							62u8, 42u8, 200u8, 212u8, 209u8, 190u8, 54u8, 46u8, 243u8, 177u8,
 							158u8, 110u8, 109u8, 200u8, 237u8, 218u8, 163u8, 64u8, 163u8, 210u8,
 							102u8, 114u8,
+						],
+					)
+				}
+				#[doc = " The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule"]
+				#[doc = " change during a frame."]
+				pub fn scheduled_cohort_size_change_by_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::scheduled_cohort_size_change_by_frame::ScheduledCohortSizeChangeByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"ScheduledCohortSizeChangeByFrame",
+						(),
+						[
+							115u8, 101u8, 234u8, 167u8, 137u8, 89u8, 164u8, 10u8, 156u8, 126u8,
+							159u8, 228u8, 227u8, 252u8, 136u8, 127u8, 175u8, 50u8, 227u8, 119u8,
+							226u8, 146u8, 57u8, 250u8, 196u8, 14u8, 47u8, 23u8, 156u8, 41u8, 70u8,
+							145u8,
 						],
 					)
 				}
@@ -19776,9 +19802,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							245u8, 104u8, 77u8, 139u8, 192u8, 14u8, 226u8, 254u8, 199u8, 89u8, 4u8,
-							95u8, 27u8, 107u8, 247u8, 118u8, 230u8, 134u8, 104u8, 4u8, 249u8,
-							234u8, 134u8, 108u8, 172u8, 19u8, 232u8, 36u8, 38u8, 100u8, 36u8, 65u8,
+							167u8, 186u8, 221u8, 60u8, 227u8, 102u8, 151u8, 225u8, 186u8, 218u8,
+							57u8, 65u8, 56u8, 143u8, 208u8, 214u8, 25u8, 155u8, 139u8, 168u8,
+							255u8, 156u8, 134u8, 36u8, 193u8, 26u8, 105u8, 46u8, 228u8, 118u8, 4u8,
+							44u8,
 						],
 					)
 				}
@@ -19808,10 +19835,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							51u8, 89u8, 116u8, 118u8, 36u8, 128u8, 175u8, 190u8, 175u8, 124u8,
-							89u8, 182u8, 217u8, 195u8, 60u8, 231u8, 5u8, 67u8, 206u8, 224u8, 112u8,
-							207u8, 241u8, 33u8, 155u8, 113u8, 86u8, 185u8, 239u8, 66u8, 248u8,
-							61u8,
+							163u8, 119u8, 253u8, 129u8, 96u8, 183u8, 74u8, 44u8, 210u8, 68u8,
+							239u8, 156u8, 54u8, 168u8, 32u8, 92u8, 33u8, 76u8, 254u8, 88u8, 66u8,
+							86u8, 220u8, 14u8, 98u8, 161u8, 115u8, 145u8, 186u8, 76u8, 80u8, 153u8,
 						],
 					)
 				}
@@ -19837,9 +19863,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							65u8, 244u8, 167u8, 66u8, 76u8, 206u8, 64u8, 121u8, 86u8, 101u8, 150u8,
-							208u8, 158u8, 186u8, 184u8, 63u8, 46u8, 82u8, 91u8, 207u8, 241u8, 64u8,
-							194u8, 117u8, 233u8, 242u8, 3u8, 223u8, 58u8, 6u8, 92u8, 90u8,
+							121u8, 185u8, 150u8, 228u8, 44u8, 55u8, 159u8, 166u8, 18u8, 148u8,
+							252u8, 110u8, 78u8, 65u8, 138u8, 20u8, 79u8, 211u8, 229u8, 63u8, 194u8,
+							215u8, 89u8, 98u8, 246u8, 16u8, 129u8, 78u8, 216u8, 187u8, 150u8,
+							117u8,
 						],
 					)
 				}
@@ -19862,9 +19889,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							57u8, 114u8, 3u8, 81u8, 183u8, 123u8, 87u8, 10u8, 31u8, 92u8, 103u8,
-							13u8, 245u8, 34u8, 203u8, 235u8, 123u8, 76u8, 141u8, 163u8, 43u8,
-							156u8, 229u8, 24u8, 25u8, 97u8, 62u8, 244u8, 86u8, 102u8, 156u8, 126u8,
+							68u8, 202u8, 58u8, 70u8, 248u8, 190u8, 143u8, 128u8, 42u8, 39u8, 122u8,
+							72u8, 113u8, 19u8, 142u8, 102u8, 138u8, 193u8, 176u8, 208u8, 237u8,
+							246u8, 159u8, 111u8, 198u8, 224u8, 98u8, 24u8, 22u8, 75u8, 148u8, 34u8,
 						],
 					)
 				}
@@ -19890,10 +19917,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							149u8, 127u8, 0u8, 116u8, 4u8, 208u8, 41u8, 89u8, 115u8, 170u8, 47u8,
-							17u8, 165u8, 79u8, 209u8, 116u8, 54u8, 174u8, 124u8, 210u8, 179u8,
-							154u8, 246u8, 78u8, 236u8, 226u8, 22u8, 60u8, 197u8, 145u8, 204u8,
-							124u8,
+							195u8, 169u8, 27u8, 190u8, 43u8, 239u8, 163u8, 41u8, 20u8, 83u8, 113u8,
+							6u8, 207u8, 95u8, 196u8, 28u8, 105u8, 163u8, 72u8, 33u8, 98u8, 80u8,
+							83u8, 136u8, 11u8, 126u8, 55u8, 103u8, 33u8, 208u8, 213u8, 116u8,
 						],
 					)
 				}
@@ -19916,10 +19942,9 @@ pub mod api {
 							weight,
 						},
 						[
-							185u8, 133u8, 90u8, 227u8, 185u8, 102u8, 173u8, 8u8, 186u8, 222u8,
-							192u8, 244u8, 24u8, 73u8, 13u8, 207u8, 129u8, 76u8, 119u8, 188u8, 15u8,
-							37u8, 159u8, 62u8, 234u8, 230u8, 33u8, 231u8, 171u8, 54u8, 158u8,
-							145u8,
+							12u8, 145u8, 135u8, 71u8, 40u8, 142u8, 74u8, 183u8, 116u8, 195u8, 36u8,
+							108u8, 230u8, 84u8, 206u8, 146u8, 124u8, 175u8, 203u8, 67u8, 2u8, 94u8,
+							32u8, 133u8, 116u8, 87u8, 39u8, 205u8, 244u8, 1u8, 37u8, 69u8,
 						],
 					)
 				}
@@ -19959,10 +19984,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							175u8, 170u8, 41u8, 202u8, 189u8, 119u8, 81u8, 135u8, 164u8, 29u8,
-							84u8, 36u8, 195u8, 74u8, 10u8, 224u8, 18u8, 127u8, 161u8, 5u8, 238u8,
-							169u8, 206u8, 239u8, 3u8, 123u8, 130u8, 27u8, 235u8, 130u8, 65u8,
-							252u8,
+							163u8, 185u8, 199u8, 230u8, 85u8, 91u8, 77u8, 116u8, 143u8, 31u8, 13u8,
+							124u8, 152u8, 176u8, 158u8, 225u8, 112u8, 119u8, 189u8, 251u8, 246u8,
+							126u8, 59u8, 118u8, 39u8, 101u8, 7u8, 113u8, 91u8, 28u8, 63u8, 194u8,
 						],
 					)
 				}
@@ -19985,9 +20009,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							89u8, 104u8, 57u8, 16u8, 244u8, 88u8, 243u8, 22u8, 9u8, 190u8, 84u8,
-							101u8, 205u8, 238u8, 162u8, 150u8, 228u8, 215u8, 29u8, 9u8, 153u8,
-							172u8, 84u8, 241u8, 226u8, 212u8, 45u8, 128u8, 32u8, 1u8, 123u8, 134u8,
+							41u8, 209u8, 113u8, 66u8, 89u8, 6u8, 211u8, 147u8, 32u8, 39u8, 83u8,
+							159u8, 23u8, 98u8, 136u8, 220u8, 214u8, 149u8, 144u8, 34u8, 230u8,
+							254u8, 241u8, 205u8, 36u8, 20u8, 240u8, 44u8, 122u8, 77u8, 229u8,
+							207u8,
 						],
 					)
 				}
@@ -20323,10 +20348,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							36u8, 175u8, 124u8, 177u8, 116u8, 0u8, 119u8, 197u8, 27u8, 203u8,
-							149u8, 242u8, 228u8, 184u8, 147u8, 60u8, 106u8, 173u8, 85u8, 204u8,
-							55u8, 19u8, 14u8, 7u8, 61u8, 23u8, 167u8, 51u8, 251u8, 144u8, 5u8,
-							175u8,
+							35u8, 37u8, 175u8, 199u8, 29u8, 16u8, 127u8, 127u8, 142u8, 115u8,
+							186u8, 253u8, 101u8, 244u8, 248u8, 75u8, 116u8, 63u8, 1u8, 110u8,
+							140u8, 195u8, 92u8, 206u8, 246u8, 66u8, 19u8, 167u8, 24u8, 252u8,
+							185u8, 193u8,
 						],
 					)
 				}
@@ -20349,9 +20374,10 @@ pub mod api {
 							weight,
 						},
 						[
-							224u8, 177u8, 196u8, 248u8, 52u8, 109u8, 4u8, 74u8, 13u8, 240u8, 35u8,
-							141u8, 25u8, 33u8, 212u8, 32u8, 220u8, 171u8, 206u8, 171u8, 57u8, 16u8,
-							208u8, 29u8, 217u8, 187u8, 217u8, 21u8, 76u8, 93u8, 213u8, 178u8,
+							25u8, 181u8, 57u8, 255u8, 241u8, 253u8, 174u8, 240u8, 19u8, 58u8,
+							195u8, 246u8, 255u8, 245u8, 56u8, 69u8, 222u8, 253u8, 199u8, 43u8,
+							219u8, 180u8, 174u8, 40u8, 99u8, 113u8, 254u8, 135u8, 153u8, 152u8,
+							174u8, 221u8,
 						],
 					)
 				}
@@ -20389,10 +20415,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							223u8, 91u8, 118u8, 200u8, 174u8, 204u8, 120u8, 110u8, 221u8, 114u8,
-							68u8, 72u8, 234u8, 192u8, 171u8, 240u8, 42u8, 216u8, 109u8, 94u8,
-							247u8, 99u8, 0u8, 181u8, 53u8, 77u8, 9u8, 26u8, 31u8, 10u8, 129u8,
-							191u8,
+							121u8, 239u8, 43u8, 22u8, 191u8, 254u8, 252u8, 113u8, 35u8, 176u8,
+							82u8, 37u8, 83u8, 196u8, 36u8, 228u8, 26u8, 53u8, 137u8, 170u8, 231u8,
+							196u8, 199u8, 91u8, 194u8, 193u8, 229u8, 144u8, 186u8, 106u8, 120u8,
+							178u8,
 						],
 					)
 				}
@@ -24923,6 +24949,15 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct ProxyFeeRefund;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub enum ProxyType {
 				#[codec(index = 0)]
 				Any,
@@ -24933,8 +24968,10 @@ pub mod api {
 				#[codec(index = 3)]
 				MiningBid,
 				#[codec(index = 4)]
-				BitcoinCosign,
+				MiningBidRealPaysFee,
 				#[codec(index = 5)]
+				Bitcoin,
+				#[codec(index = 6)]
 				VaultAdmin,
 			}
 			#[derive(

@@ -128,10 +128,10 @@ mod runtime {
 	pub type FeelessTransaction = pallet_skip_feeless_payment;
 }
 
-argon_runtime_common::inject_runtime_vars!();
-argon_runtime_common::inject_common_apis!();
 argon_runtime_common::call_filters!();
 argon_runtime_common::deal_with_fees!();
+argon_runtime_common::inject_runtime_vars!();
+argon_runtime_common::inject_common_apis!();
 
 parameter_types! {
 	// The hyperbridge parachain on Polkadot

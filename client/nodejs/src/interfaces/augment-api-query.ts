@@ -764,6 +764,15 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
+      /**
+       * The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule
+       * change during a frame.
+       **/
+      scheduledCohortSizeChangeByFrame: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, u32>>,
+        []
+      >;
     };
     mint: {
       blockMintAction: AugmentedQuery<

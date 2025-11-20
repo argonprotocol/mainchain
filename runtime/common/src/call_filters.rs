@@ -45,7 +45,8 @@ macro_rules! call_filters {
 			NonTransfer,
 			PriceIndex,
 			MiningBid,
-			BitcoinCosign,
+			MiningBidRealPaysFee,
+			Bitcoin,
 			VaultAdmin,
 		}
 		impl Default for ProxyType {
@@ -64,7 +65,7 @@ macro_rules! call_filters {
 							RuntimeCall::ChainTransfer(..) |
 							RuntimeCall::TokenGateway(..)
 					),
-					ProxyType::MiningBid => match c {
+					ProxyType::MiningBidRealPaysFee | ProxyType::MiningBid => match c {
 						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. }) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
@@ -77,8 +78,19 @@ macro_rules! call_filters {
 						_ => false,
 					},
 					ProxyType::PriceIndex => matches!(c, RuntimeCall::PriceIndex(..)),
-					ProxyType::BitcoinCosign => match c {
-						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::cosign_release {
+					ProxyType::Bitcoin => match c {
+						RuntimeCall::BitcoinLocks(..) => true,
+						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+							calls.iter().all(|sc| matches!(sc, RuntimeCall::BitcoinLocks(..))),
+						_ => false,
+					},
+					ProxyType::VaultAdmin => match c {
+						RuntimeCall::Vaults(..) |
+						RuntimeCall::Treasury(pallet_treasury::Call::vault_operator_prebond {
+							..
+						}) |
+						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize {
 							..
 						}) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
@@ -86,15 +98,16 @@ macro_rules! call_filters {
 							calls.iter().all(|sc| {
 								matches!(
 									sc,
-									RuntimeCall::BitcoinLocks(
-										pallet_bitcoin_locks::Call::cosign_release { .. }
+									RuntimeCall::Vaults(..) |
+										RuntimeCall::Treasury(
+											pallet_treasury::Call::vault_operator_prebond { .. }
+										) | RuntimeCall::BitcoinLocks(
+										pallet_bitcoin_locks::Call::initialize { .. }
 									)
 								)
 							}),
 						_ => false,
 					},
-					ProxyType::VaultAdmin =>
-						matches!(c, RuntimeCall::Vaults(..)) || ProxyType::BitcoinCosign.filter(c),
 				}
 			}
 			fn is_superset(&self, o: &Self) -> bool {
@@ -102,7 +115,6 @@ macro_rules! call_filters {
 					(x, y) if x == y => true,
 					(ProxyType::Any, _) => true,
 					(_, ProxyType::Any) => false,
-					(ProxyType::VaultAdmin, ProxyType::BitcoinCosign) => true,
 					(ProxyType::NonTransfer, _) => true,
 					_ => false,
 				}

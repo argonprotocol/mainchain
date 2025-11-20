@@ -1170,7 +1170,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number
             | Uint8Array,
@@ -1238,7 +1239,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number
             | Uint8Array,
@@ -1282,7 +1284,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number
             | Uint8Array,
@@ -1334,7 +1337,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
@@ -1383,7 +1387,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number,
           call: Call | IMethod | string | Uint8Array,
@@ -1479,7 +1484,8 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'NonTransfer'
             | 'PriceIndex'
             | 'MiningBid'
-            | 'BitcoinCosign'
+            | 'MiningBidRealPaysFee'
+            | 'Bitcoin'
             | 'VaultAdmin'
             | number
             | Uint8Array,

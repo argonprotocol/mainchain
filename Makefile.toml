@@ -43,6 +43,7 @@ description = "Build docker image"
 script = [
     "docker buildx build -t ghcr.io/argonprotocol/argon-miner:dev . -f dev.Dockerfile --target argon-node --load",
     "docker buildx build -t ghcr.io/argonprotocol/argon-notary:dev . -f dev.Dockerfile --target argon-notary --load",
+    "docker buildx build -t ghcr.io/argonprotocol/argon-oracle:dev . -f dev.Dockerfile --target oracle --load",
 ]
 
 [tasks.sqlx-setup]
