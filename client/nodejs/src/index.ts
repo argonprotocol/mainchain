@@ -104,10 +104,10 @@ export async function getClient(host: string, options?: ApiOptions): Promise<Arg
   }
 
   options ??= {};
+  options.metadata ??= {};
+
   for (const genesisHash of Object.values(Genesis)) {
-    options.metadata = {
-      [`${genesisHash}-${specVersion}`]: metadataBytes as HexString,
-    };
+    options.metadata[`${genesisHash}-${specVersion}`] = metadataBytes as HexString;
   }
   return await ApiPromise.create({ provider, noInitWarn: true, ...options });
 }

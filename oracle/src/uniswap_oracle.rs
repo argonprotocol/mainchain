@@ -111,23 +111,25 @@ impl UniswapOracle {
 		let block_id = BlockId::Number(BlockNumberOrTag::Latest);
 		let pool_contract = self.get_cached_pool_contract(fee).await?;
 
-		let mut window = seconds_ago;
-		// never let it be 0 here; you already rejected seconds_ago == 0
-		if window == 0 {
-			return Err(anyhow!("Pool too young: no observations yet for fee tier {:?}", fee));
-		}
+		let mut time_window_seconds = seconds_ago;
 
 		// Fetch tick_cumulatives and liquidity_cumulatives
+		let mut max_tries = 5;
 		let result = loop {
-			match pool_contract.observe(vec![window, 0]).block(block_id).call().await {
+			match pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await {
 				Ok(res) => break res,
 				Err(e) => {
 					let error_msg = format!("{:?}", e);
 					if error_msg.contains("ZeroData") {
 						return Err(anyhow!("No data for fee tier {:?}: {:?}", fee, e));
 					}
-					if window > 1 && error_msg.contains("execution reverted: OLD") {
-						window /= 2;
+					if time_window_seconds > 1 && error_msg.contains("execution reverted: OLD") {
+						max_tries -= 1;
+						if max_tries == 0 {
+							error!(fee = ?fee, "Max retries reached when calling observe, returning error");
+							return Err(anyhow!("Error calling observe: {:?}", e));
+						}
+						time_window_seconds /= 2;
 						continue;
 					}
 					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
@@ -143,7 +145,7 @@ impl UniswapOracle {
 
 		// Calculate time-weighted average tick (fixed-point division)
 		let tick_twap = {
-			let seconds_as_i56 = I56::try_from(window)?;
+			let seconds_as_i56 = I56::try_from(time_window_seconds)?;
 			(tick_diff / seconds_as_i56).to_i24()
 		};
 
@@ -153,7 +155,7 @@ impl UniswapOracle {
 		// Compute average liquidity
 		let liquidity_diff: U160 = liquidity_cumulatives[1] - liquidity_cumulatives[0];
 		let average_liquidity = {
-			let seconds_between_x128: BigInt = BigInt::from(window) << 128;
+			let seconds_between_x128: BigInt = BigInt::from(time_window_seconds) << 128;
 			let liquidity_diff = liquidity_diff.to_big_int();
 			seconds_between_x128.checked_div(liquidity_diff).unwrap_or_default()
 		};

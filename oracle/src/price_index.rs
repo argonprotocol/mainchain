@@ -198,6 +198,8 @@ pub async fn price_index_loop(
 	}
 }
 
+/// Truncates a FixedU128 value to the specified number of decimal places.
+/// For example, trunc_fixed_u128(value, 3) will truncate to 3 decimal places.
 fn trunc_fixed_u128(value: FixedU128, decimals: u16) -> FixedU128 {
 	let drop = FixedU128::accuracy() / (10u128.pow(decimals as u32)); // 10^(18-3)
 	FixedU128::from_inner((value.into_inner() / drop) * drop)

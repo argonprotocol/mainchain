@@ -37,7 +37,7 @@ macro_rules! deal_with_fees {
 		#[derive(
 			Encode, Decode, DecodeWithMemTracking, scale_info::TypeInfo, Clone, Eq, PartialEq, Default, RuntimeDebugNoBound,
 		)]
-        #[scale_info(skip_type_params(T))]
+		#[scale_info(skip_type_params(T))]
 		pub struct ProxyFeeRefund<T>(PhantomData<T>);
 
 		impl<T: frame_system::Config<AccountId = AccountId, RuntimeCall = RuntimeCall> + Send + Sync> TransactionExtension<T::RuntimeCall> for ProxyFeeRefund<T> where

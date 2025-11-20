@@ -251,8 +251,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-	/// The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule
-	/// change during a frame.
+	/// The upcoming changes scheduled for cohort size by frame.
+	/// Capacity of 11 allows for 10 frames worth of scheduled changes plus one working slot
+	/// to schedule a new change during frame finalization.
 	#[pallet::storage]
 	pub type ScheduledCohortSizeChangeByFrame<T: Config> =
 		StorageValue<_, BoundedBTreeMap<FrameId, u32, ConstU32<11>>, ValueQuery>;
@@ -932,7 +933,7 @@ impl<T: Config> Pallet<T> {
 
 		let last_planned_cohort_size: u32 = ScheduledCohortSizeChangeByFrame::<T>::get()
 			.into_iter()
-			.last()
+			.next_back()
 			.map(|(_, size)| size)
 			.unwrap_or(NextCohortSize::<T>::get());
 		let mut next_cohort_size = adjustment_percent.saturating_mul_int(last_planned_cohort_size);
@@ -944,12 +945,11 @@ impl<T: Config> Pallet<T> {
 
 		let frame_id = NextFrameId::<T>::get() + 10;
 		ScheduledCohortSizeChangeByFrame::<T>::mutate(|x| {
-			if let Err(e) = x.try_insert(frame_id, next_cohort_size) {
+			if x.try_insert(frame_id, next_cohort_size).is_err() {
 				log::error!(
-					"Unable to schedule cohort size change to {} at frame {}: {:?}",
+					"Unable to schedule cohort size change to {} at frame {}",
 					next_cohort_size,
 					frame_id,
-					e
 				);
 			}
 		});

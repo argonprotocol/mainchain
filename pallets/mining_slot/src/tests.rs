@@ -1606,8 +1606,9 @@ fn it_adjusts_mining_seats() {
 		assert_eq!(NextFrameId::<Test>::get(), 2);
 		assert_eq!(AveragePricePerSeat::<Test>::get().to_vec(), vec![110 * 1_000_000]);
 		assert_eq!(NextCohortSize::<Test>::get(), 10);
+		let expected_frame: FrameId = NextFrameId::<Test>::get() as FrameId + 10u64;
 		let expected_schedule: BoundedBTreeMap<FrameId, u32, ConstU32<11>> =
-			bounded_btree_map! { 12u32.into() => 11 };
+			bounded_btree_map! { expected_frame => 11 };
 		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get(), expected_schedule);
 
 		for frame in 1..=11 {
@@ -1631,10 +1632,10 @@ fn it_adjusts_mining_seats() {
 		// should have applied a single change now
 		assert_eq!(NextFrameId::<Test>::get(), 13);
 		assert_eq!(NextCohortSize::<Test>::get(), 11);
-		assert!(!ScheduledCohortSizeChangeByFrame::<Test>::get().contains_key(&12));
+		assert!(!ScheduledCohortSizeChangeByFrame::<Test>::get().contains_key(&expected_frame));
 		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().len(), 11);
 		assert_eq!(
-			ScheduledCohortSizeChangeByFrame::<Test>::get().into_iter().last(),
+			ScheduledCohortSizeChangeByFrame::<Test>::get().into_iter().next_back(),
 			Some((23u32.into(), 11 + 13))
 		);
 		assert_eq!(AveragePricePerSeat::<Test>::get().len(), 10);
