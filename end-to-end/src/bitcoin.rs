@@ -189,9 +189,18 @@ async fn test_bitcoin_minting_e2e() {
 		.await
 		.unwrap();
 
-	wait_for_mint(&bitcoin_owner_pair, &client, &utxo_id, lock_amount, txid, vout)
-		.await
-		.unwrap();
+	wait_for_mint(
+		&bitcoin_owner_pair,
+		&client,
+		&utxo_id,
+		lock_amount,
+		txid,
+		vout,
+		&ticker,
+		&price_index_operator,
+	)
+	.await
+	.unwrap();
 
 	let _ = run_bitcoin_cli(&test_node, vec!["lock", "status", "--utxo-id", &utxo_id.to_string()])
 		.await
@@ -799,6 +808,8 @@ async fn wait_for_mint(
 	liquidity_promised: Balance,
 	txid: Txid,
 	vout: u32,
+	ticker: &Ticker,
+	price_index_operator: &sr25519::Pair,
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let pending_utxos = client
@@ -868,6 +879,8 @@ async fn wait_for_mint(
 				break;
 			}
 			counter += 1;
+
+			submit_price(&ticker, &client, &price_index_operator).await;
 			if counter >= 30 {
 				panic!("Timed out waiting for remaining mint. Last mint was {:?}", pending_mint.0);
 			}

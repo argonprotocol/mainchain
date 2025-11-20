@@ -1,8 +1,28 @@
 # Changelog
 
-## [v1.3.20](https://github.com/argonprotocol/mainchain/compare/v1.3.19...0966a33009ff0360e59f9ce732334284778b1389) (2025-11-13)
+## [v1.3.21](https://github.com/argonprotocol/mainchain/compare/v1.3.20...1230111a5de228018c5fa06e1c2193f45e760124) (2025-11-19)
+
+### Features
+
+* **proxy:** add a refunding fee type of proxy
+([5520d31](https://github.com/argonprotocol/mainchain/commit/5520d31eecf09133ee92d7cd18d11cd0672fea7d))
+* **client/nodejs:** preregister metadata
+([c57a919](https://github.com/argonprotocol/mainchain/commit/c57a9198af68557811dbe417aa89aa6ed80bafb3))
 
 ### Fixes
+
+* copilot fixes
+([025ad0a](https://github.com/argonprotocol/mainchain/commit/025ad0a17af9292cc93ea9b035c2de00bc6952f3))
+* **oracle:** handle timeframe mismatches for price
+([ca37e67](https://github.com/argonprotocol/mainchain/commit/ca37e678fce1c38dab123a599712431f9bad2627))
+* **localchain:** handle unreconnecting client
+([6039592](https://github.com/argonprotocol/mainchain/commit/60395923190f7a306fe0ee3a4804c499944eccb8))
+* **mining_slot:** schedule cohort size changes
+([1c2458e](https://github.com/argonprotocol/mainchain/commit/1c2458e26986d773e2f88b54699249444588c077))
+
+### [v1.3.20](https://github.com/argonprotocol/mainchain/compare/v1.3.19...v1.3.20) (2025-11-13)
+
+#### Fixes
 
 * **mining_slot:** fix mining nonce score history
 ([ce9d920](https://github.com/argonprotocol/mainchain/commit/ce9d920515bb345ab0a88fd3d2758bf830ba8768))
