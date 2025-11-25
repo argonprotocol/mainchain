@@ -832,7 +832,7 @@ mod tests {
 						payment_account: account.public().into(),
 						notary_id: 1,
 						versions:
-							runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap(
+							runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1(
 								subxt::utils::KeyedVec::new(),
 							),
 					},

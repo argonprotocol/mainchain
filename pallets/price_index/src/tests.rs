@@ -2,7 +2,10 @@ use pallet_prelude::*;
 
 use argon_primitives::{ArgonCPI, PriceProvider, bitcoin::SATOSHIS_PER_BITCOIN};
 
-use crate::{Current, Operator, PriceIndex as PriceIndexEntry, mock::*};
+use crate::{
+	CpiMeasurementBucket, Current, HistoricArgonCPI, Operator, PriceIndex as PriceIndexEntry,
+	mock::*,
+};
 
 type Event = crate::Event<Test>;
 type Error = crate::Error<Test>;
@@ -18,6 +21,19 @@ fn should_require_an_operator_to_submit() {
 
 		assert!(System::events().is_empty());
 	});
+}
+
+#[test]
+fn it_should_keep_trailing_averages() {
+	new_test_ext(None).execute_with(|| {
+		// test out that buckets fall inside the range
+		let mut cpi = CpiMeasurementBucket::default();
+		cpi.record(ArgonCPI::from_float(0.5));
+		assert_eq!(cpi.average(), ArgonCPI::from_float(0.5));
+		cpi.record(ArgonCPI::from_float(1.0));
+		cpi.record(ArgonCPI::from_float(1.5));
+		assert_eq!(cpi.average(), ArgonCPI::from_float(1.0));
+	})
 }
 
 #[test]
@@ -70,6 +86,88 @@ fn uses_latest_as_current() {
 		entry_backwards.tick = 2;
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards),);
 		assert_eq!(Current::<Test>::get(), Some(entry2));
+	});
+}
+
+#[test]
+fn stores_history_grouped() {
+	new_test_ext(Some(1)).execute_with(|| {
+		System::set_block_number(1);
+
+		CurrentTick::set(181);
+		let mut entry = create_index();
+		entry.tick = 181;
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry),);
+		assert_eq!(Current::<Test>::get(), Some(entry));
+		System::assert_last_event(Event::NewIndex.into());
+		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 1);
+		assert!(
+			HistoricArgonCPI::<Test>::get()
+				.iter()
+				.any(|a| a.tick_range.0 == 180 && a.tick_range.1 == 240)
+		);
+
+		let mut entry2 = entry;
+		entry2.argon_usd_target_price = FixedU128::from_float(1.01);
+		entry2.tick = 183;
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2),);
+		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 1);
+		assert_eq!(HistoricArgonCPI::<Test>::get()[0].measurements_count, 2);
+		assert_eq!(HistoricArgonCPI::<Test>::get()[0].tick_range.0, 180);
+
+		let mut entry_backwards = entry;
+		entry_backwards.argon_usd_target_price = FixedU128::from_float(1.02);
+		entry_backwards.tick = 241;
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards),);
+
+		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 2);
+		assert_eq!(
+			HistoricArgonCPI::<Test>::get()
+				.iter()
+				.find(|a| a.tick_range.0 == 240)
+				.unwrap()
+				.measurements_count,
+			1
+		);
+		assert_eq!(HistoricArgonCPI::<Test>::get()[0].tick_range.0, 240, "should be newest first");
+	});
+}
+
+#[test]
+fn can_find_a_range() {
+	new_test_ext(Some(1)).execute_with(|| {
+		HistoricArgonCPI::<Test>::put(BoundedVec::truncate_from(vec![
+			CpiMeasurementBucket {
+				tick_range: (80, 140),
+				total_cpi: ArgonCPI::from_float(1.0),
+				measurements_count: 1,
+			},
+			CpiMeasurementBucket {
+				tick_range: (140, 200),
+				total_cpi: ArgonCPI::from_float(2.0),
+				measurements_count: 1,
+			},
+			CpiMeasurementBucket {
+				tick_range: (200, 260),
+				total_cpi: ArgonCPI::from_float(3.0),
+				measurements_count: 1,
+			},
+			CpiMeasurementBucket {
+				tick_range: (260, 320),
+				total_cpi: ArgonCPI::from_float(4.0),
+				measurements_count: 1,
+			},
+		]));
+
+		assert_eq!(
+			PriceIndex::get_average_cpi_for_ticks((80, 320)),
+			ArgonCPI::from_float(10.0 / 4.0)
+		);
+		assert_eq!(
+			PriceIndex::get_average_cpi_for_ticks((120, 320)),
+			ArgonCPI::from_float(9.0 / 3.0)
+		);
+		assert_eq!(PriceIndex::get_average_cpi_for_ticks((200, 280)), ArgonCPI::from_float(3.0));
 	});
 }
 

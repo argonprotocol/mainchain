@@ -12,7 +12,7 @@ use crate::{
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 };
-use codec::{Codec, Decode, Encode, FullCodec, MaxEncodedLen};
+use codec::{Codec, Decode, Encode, FullCodec, HasCompact, MaxEncodedLen};
 use polkadot_sdk::sp_runtime::Permill;
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
@@ -38,7 +38,10 @@ pub trait NotebookProvider {
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
 
-pub trait PriceProvider<Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128>> {
+pub trait PriceProvider<
+	Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
+>
+{
 	/// Price of the given satoshis in argon microgons
 	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
@@ -63,29 +66,23 @@ pub trait PriceProvider<Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128
 	/// Prices of a single argon in USD
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128>;
 
-	/// Get argon liquidity in the pool
-	fn get_argon_pool_liquidity() -> Option<Balance>;
-
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
 	fn get_argon_cpi() -> Option<ArgonCPI>;
+
+	/// The average argon CPI over a tick range (NOTE: ticks are grouped in increments of 60)
+	fn get_average_cpi_for_ticks(tick_range: (Tick, Tick)) -> ArgonCPI;
+
+	fn get_circulation() -> Balance;
 
 	fn get_liquidity_change_needed() -> Option<i128> {
 		let argon_cpi = Self::get_argon_cpi()?;
 		if argon_cpi.is_zero() {
 			return None;
 		}
-		let circulation: u128 = Self::get_argon_pool_liquidity()?.into();
 
-		// divide mint over an hour
-		const MINT_TIME_SPREAD: i128 = 60;
-
+		let circulation: u128 = Self::get_circulation().into();
 		// flip price to get liquidity change needed
-		Some(
-			argon_cpi
-				.mul(FixedI128::from(-1))
-				.saturating_mul_int(circulation as i128)
-				.saturating_div(MINT_TIME_SPREAD),
-		)
+		Some(argon_cpi.mul(FixedI128::from(-1)).saturating_mul_int(circulation as i128))
 	}
 
 	fn get_redemption_r_value() -> Option<FixedU128>;
@@ -201,10 +198,11 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
 
-pub trait MiningSlotProvider {
-	fn get_next_slot_tick() -> Tick;
-	fn mining_window_ticks() -> Tick;
-	fn is_slot_bidding_started() -> bool;
+pub trait MiningFrameProvider {
+	fn get_next_frame_tick() -> Tick;
+	fn is_seat_bidding_started() -> bool;
+	fn is_new_frame_started() -> Option<FrameId>;
+	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)>;
 }
 
 pub trait AuthorityProvider<AuthorityId, Block, AccountId>

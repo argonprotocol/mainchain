@@ -68,6 +68,7 @@ pub(crate) mod utils {
 					operator_account,
 				},
 			),
+			false,
 		)
 		.await?;
 		println!("Sudo approved notary");
@@ -96,13 +97,14 @@ pub(crate) mod utils {
 	pub(crate) async fn sudo(
 		test_node: &ArgonTestNode,
 		call: types::sudo::Call,
+		wait_for_finalized: bool,
 	) -> anyhow::Result<TxInBlockWithEvents> {
 		let from = Sr25519Signer::new(Alice.pair());
 		let client = test_node.client.clone();
 		let params = client.params_with_best_nonce(&from.account_id()).await?.build();
 		test_node
 			.client
-			.submit_tx(&tx().sudo().sudo(call), &from, Some(params), false)
+			.submit_tx(&tx().sudo().sudo(call), &from, Some(params), wait_for_finalized)
 			.await
 	}
 

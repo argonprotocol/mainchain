@@ -376,7 +376,7 @@ fn it_should_modify_block_rewards() {
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		UniswapLiquidity::set(1000);
+		Circulation::set(1000);
 		ArgonsPerBlock::<Test>::set(11_000);
 		// negative cpi means price is growing, need to mint
 		ArgonCPI::set(FixedI128::from_float(-0.01));
@@ -386,20 +386,19 @@ fn it_should_modify_block_rewards() {
 
 		// test the reducer separately
 		BlockRewardsDampener::set(FixedU128::one());
-		// first change at 0.01^ is 14400 * 60 * 100
-		let minimum_change: Balance = 14400 * 60 * 100; // 86.4 argons
-		UniswapLiquidity::set(minimum_change);
+		// first change at 0.01^ is 14400 * 100
+		let minimum_change: Balance = 14400 * 100; // 86.4 argons
+		Circulation::set(minimum_change);
 		BlockRewards::adjust_block_argons(10_000);
 		// won't add anything until we get to this
 		assert_eq!(ArgonsPerBlock::<Test>::get(), 11_001);
 
 		ArgonCPI::set(FixedI128::from_float(1.0));
-		BlockRewards::adjust_block_argons(10_000);
 
 		let minus_pct = 10_901;
-		assert_eq!(ArgonsPerBlock::<Test>::get(), minus_pct);
 
 		BlockRewards::on_frame_start(2);
+		assert_eq!(ArgonsPerBlock::<Test>::get(), minus_pct);
 		// it sets rewards for the next cohort
 		assert_eq!(
 			BlockRewardsByCohort::<Test>::get().into_iter().collect::<Vec<_>>(),
@@ -436,16 +435,16 @@ fn it_should_dampen_block_rewards() {
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		UniswapLiquidity::set(1000);
+		Circulation::set(1000);
 
 		ArgonsPerBlock::<Test>::set(25_000);
 		// test the reducer separately
 		BlockRewardsDampener::set(FixedU128::from_rational(75, 100));
-		UniswapLiquidity::set(14_400_000_000);
+		Circulation::set(14_400_000_000);
 		ArgonCPI::set(FixedI128::from_float(-0.1));
 		BlockRewards::adjust_block_argons(10_000);
 		// 10% of 14_400_000 is 1_440_000, divided by 14_400 blocks is 100_000
-		let incr = 100_000 / 60;
+		let incr = 100_000;
 		let incr_dampened = (incr as f64 * 0.75) as Balance;
 		assert_eq!(ArgonsPerBlock::<Test>::get(), 25_000 + incr_dampened);
 

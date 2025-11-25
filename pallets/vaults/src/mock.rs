@@ -1,6 +1,6 @@
 use crate as pallet_vaults;
 use argon_primitives::{
-	MiningSlotProvider, TickProvider, VotingSchedule,
+	MiningFrameProvider, TickProvider, VotingSchedule,
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
 };
@@ -81,17 +81,20 @@ parameter_types! {
 	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
 
 }
-pub struct StaticMiningSlotProvider;
-impl MiningSlotProvider for StaticMiningSlotProvider {
-	fn get_next_slot_tick() -> Tick {
+pub struct StaticMiningFrameProvider;
+impl MiningFrameProvider for StaticMiningFrameProvider {
+	fn get_next_frame_tick() -> Tick {
 		NextSlot::get()
 	}
 
-	fn mining_window_ticks() -> Tick {
-		MiningWindowBlocks::get()
+	fn is_new_frame_started() -> Option<FrameId> {
+		Some(CurrentFrameId::get())
 	}
-	fn is_slot_bidding_started() -> bool {
+	fn is_seat_bidding_started() -> bool {
 		IsSlotBiddingStarted::get()
+	}
+	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
+		todo!()
 	}
 }
 
@@ -124,7 +127,7 @@ impl pallet_vaults::Config for Test {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
 	type CurrentFrameId = CurrentFrameId;
-	type MiningSlotProvider = StaticMiningSlotProvider;
+	type MiningFrameProvider = StaticMiningFrameProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
 	type TickProvider = StaticTickProvider;

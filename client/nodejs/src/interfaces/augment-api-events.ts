@@ -11,7 +11,6 @@ import type {
   Null,
   Option,
   Result,
-  U256,
   U8aFixed,
   Vec,
   bool,
@@ -754,13 +753,13 @@ declare module '@polkadot/api-base/types/events' {
         { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
       >;
       /**
-       * The amount of argons minted for mining. NOTE: accounts below Existential Deposit will
+       * The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will
        * not be able to mint
        **/
       MiningMint: AugmentedEvent<
         ApiType,
-        [amount: U256, perMiner: u128, argonCpi: i128, liquidity: u128],
-        { amount: U256; perMiner: u128; argonCpi: i128; liquidity: u128 }
+        [amount: u128, perMiner: u128, argonCpi: i128, liquidity: u128],
+        { amount: u128; perMiner: u128; argonCpi: i128; liquidity: u128 }
       >;
       /**
        * Errors encountered while minting. Most often due to mint amount still below Existential

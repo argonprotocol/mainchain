@@ -223,6 +223,7 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of UTXOs that can be waiting for minting
        **/
       maxPendingMintUtxos: u32 & AugmentedConst<ApiType>;
+      maxPossibleMiners: u32 & AugmentedConst<ApiType>;
     };
     multisig: {
       /**

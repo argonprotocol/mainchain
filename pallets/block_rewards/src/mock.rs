@@ -189,7 +189,7 @@ parameter_types! {
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: argon_primitives::ArgonCPI = FixedI128::from_float(0.00);
 	pub static ActiveCohorts: u32 = 10;
-	pub static UniswapLiquidity: Balance = 1_000_000;
+	pub static Circulation: Balance = 1_000_000;
 	pub static BlockRewardsDampener: FixedU128 = FixedU128::from_float(0.8);
 }
 
@@ -204,11 +204,14 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}
-	fn get_argon_pool_liquidity() -> Option<Balance> {
-		Some(UniswapLiquidity::get())
-	}
 	fn get_redemption_r_value() -> Option<FixedU128> {
 		None
+	}
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> argon_primitives::ArgonCPI {
+		ArgonCPI::get()
+	}
+	fn get_circulation() -> Balance {
+		Circulation::get()
 	}
 }
 
@@ -233,7 +236,7 @@ impl pallet_block_rewards::Config for Test {
 	type PriceProvider = StaticPriceProvider;
 	type CohortBlockRewardsToKeep = ActiveCohorts;
 	type PayoutHistoryBlocks = ConstU32<5>;
-	type SlotWindowTicks = ConstU64<14_400>;
+	type EpochTicks = ConstU64<14_400>;
 	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 

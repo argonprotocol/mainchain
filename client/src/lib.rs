@@ -48,6 +48,8 @@ pub mod signer;
 mod spec;
 pub mod types;
 
+pub use subxt::error as subxt_error;
+
 pub enum ArgonConfig {}
 
 pub type ArgonOnlineClient = OnlineClient<ArgonConfig>;
@@ -391,9 +393,7 @@ impl MainchainClient {
 					let events = tx_in_block.wait_for_success().await?;
 					return Ok(TxInBlockWithEvents::new(tx_in_block, events, true));
 				},
-				TxStatus::Error { message } |
-				TxStatus::Invalid { message } |
-				TxStatus::Dropped { message } => {
+				TxStatus::Error { message } | TxStatus::Invalid { message } => {
 					// Handle any errors:
 					return Err(Error::from(format!(
 						"Error submitting transaction to block: {message}"

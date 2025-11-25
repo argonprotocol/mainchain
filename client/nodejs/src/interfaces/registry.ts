@@ -196,6 +196,7 @@ import type {
   PalletNotebookError,
   PalletNotebookEvent,
   PalletPriceIndexCall,
+  PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexError,
   PalletPriceIndexEvent,
   PalletPriceIndexPriceIndex,
@@ -454,6 +455,7 @@ declare module '@polkadot/types/types/registry' {
     PalletNotebookError: PalletNotebookError;
     PalletNotebookEvent: PalletNotebookEvent;
     PalletPriceIndexCall: PalletPriceIndexCall;
+    PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;
     PalletPriceIndexError: PalletPriceIndexError;
     PalletPriceIndexEvent: PalletPriceIndexEvent;
     PalletPriceIndexPriceIndex: PalletPriceIndexPriceIndex;

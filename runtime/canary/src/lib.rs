@@ -98,6 +98,7 @@ mod runtime {
 	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
 	#[runtime::pallet_index(19)]
 	pub type BlockRewards = pallet_block_rewards;
+	// NOTE: must come after MiningSlot finalize
 	#[runtime::pallet_index(20)]
 	pub type Mint = pallet_mint;
 	#[runtime::pallet_index(21)]
@@ -223,7 +224,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type PayoutHistoryBlocks = PayoutHistoryBlocks;
 	type PriceProvider = PriceIndex;
 	type CohortBlockRewardsToKeep = BlockRewardsCohortHistoryToKeep;
-	type SlotWindowTicks = SlotWindowTicks;
+	type EpochTicks = EpochTicks;
 	type PerBlockArgonReducerPercent = BlockRewardsDampener;
 }
 
@@ -277,7 +278,7 @@ impl pallet_vaults::Config for Runtime {
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
-	type MiningSlotProvider = MiningSlot;
+	type MiningFrameProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type TickProvider = Ticks;
@@ -494,6 +495,7 @@ impl pallet_proxy::Config for Runtime {
 
 impl pallet_price_index::Config for Runtime {
 	type WeightInfo = ();
+	type Currency = Balances;
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
@@ -517,6 +519,8 @@ impl pallet_mint::Config for Runtime {
 	type MaxPendingMintUtxos = MaxPendingMintUtxos;
 	type BlockRewardAccountsProvider = MiningSlot;
 	type MaxMintHistoryToMaintain = MaxMintHistoryToMaintain;
+	type MaxPossibleMiners = MaxPossibleMiners;
+	type MiningFrameProvider = MiningSlot;
 }
 
 pub(crate) type OwnershipToken = pallet_balances::Instance2;

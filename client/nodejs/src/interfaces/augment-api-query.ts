@@ -12,7 +12,6 @@ import type {
   Bytes,
   Null,
   Option,
-  U256,
   U8aFixed,
   Vec,
   bool,
@@ -74,6 +73,7 @@ import type {
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMultisigMultisig,
+  PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
@@ -699,13 +699,17 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Did this block activate a new frame
+       * The number of reward ticks remaining in the frame
        **/
-      didStartNewCohort: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      frameRewardTicksRemaining: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * The previous 10 frame start block numbers
        **/
       frameStartBlockNumbers: AugmentedQuery<ApiType, () => Observable<Vec<u32>>, []>;
+      /**
+       * The previous 10 frame start ticks
+       **/
+      frameStartTicks: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, u64>>, []>;
       hasAddedGrandpaRotation: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
        * The number of bids per slot for the last 10 slots (newest first)
@@ -748,6 +752,10 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Is a new frame started in this block
+       **/
+      newlyStartedFrameId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
+      /**
        * The number of allow miners to bid for the next mining cohort
        **/
       nextCohortSize: AugmentedQuery<ApiType, () => Observable<u32>, []>;
@@ -765,8 +773,9 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule
-       * change during a frame.
+       * The upcoming changes scheduled for cohort size by frame.
+       * Capacity of 11 allows for 10 frames worth of scheduled changes plus one working slot
+       * to schedule a new change during frame finalization.
        **/
       scheduledCohortSizeChangeByFrame: AugmentedQuery<
         ApiType,
@@ -785,17 +794,17 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       miningMintPerCohort: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, u128>>, []>;
       /**
-       * The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
+       * The total amount of Bitcoin microgons minted. Cannot exceed `MintedMiningMicrogons`.
        **/
-      mintedBitcoinArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
+      mintedBitcoinMicrogons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
-       * The total amount of argons minted for mining
+       * The total amount of microgons minted for mining
        **/
-      mintedMiningArgons: AugmentedQuery<ApiType, () => Observable<U256>, []>;
+      mintedMiningMicrogons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
        * Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
        * a) CPI >= 0 and
-       * b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining
+       * b) the aggregate minted Bitcoins <= the aggregate minted microgons from mining
        **/
       pendingMintUtxos: AugmentedQuery<
         ApiType,
@@ -1009,6 +1018,14 @@ declare module '@polkadot/api-base/types/storage' {
        * Stores the active price index
        **/
       current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
+      /**
+       * Tracks the average cpi data every 60 ticks
+       **/
+      historicArgonCPI: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletPriceIndexCpiMeasurementBucket>>,
+        []
+      >;
       /**
        * Stores the last valid price index
        **/

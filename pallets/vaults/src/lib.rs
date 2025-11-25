@@ -29,7 +29,7 @@ pub mod pallet {
 	use alloc::collections::BTreeSet;
 	use argon_bitcoin::{CosignScript, CosignScriptArgs, primitives::UtxoId};
 	use argon_primitives::{
-		MiningSlotProvider, TickProvider,
+		MiningFrameProvider, TickProvider,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
@@ -76,7 +76,7 @@ pub mod pallet {
 		type MaxPendingTermModificationsPerTick: Get<u32>;
 
 		/// A provider of mining slot information
-		type MiningSlotProvider: MiningSlotProvider;
+		type MiningFrameProvider: MiningFrameProvider;
 
 		/// Provides the bitcoin network this blockchain is connected to
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
@@ -656,8 +656,8 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub(crate) fn get_terms_active_tick() -> Tick {
-			if T::MiningSlotProvider::is_slot_bidding_started() {
-				return T::MiningSlotProvider::get_next_slot_tick();
+			if T::MiningFrameProvider::is_seat_bidding_started() {
+				return T::MiningFrameProvider::get_next_frame_tick();
 			}
 			T::TickProvider::current_tick()
 		}
