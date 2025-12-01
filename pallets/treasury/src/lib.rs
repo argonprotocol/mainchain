@@ -724,23 +724,29 @@ pub mod pallet {
 						let vault_sharing =
 							T::TreasuryVaultProvider::get_vault_profit_sharing_percent(vault_id)
 								.unwrap_or_default();
+						let Some(vault_operator) =
+							T::TreasuryVaultProvider::get_vault_operator(vault_id)
+						else {
+							continue;
+						};
 
-						let mut participants = vec![];
+						let mut next_fund_participants = vec![];
 						for (account, holder) in &rolling_pool.bond_holders {
 							if rolling_pool.do_not_renew.contains(account) {
 								continue;
 							}
 							let rollable_balance = holder.pool_managed_balance();
-							if rollable_balance < T::MinimumArgonsPerContributor::get() {
-								rolling_pool.do_not_renew.try_push(account.clone()).ok();
-								continue;
-							}
-							if vault_sharing < rolling_pool.vault_sharing_percent {
+							// if the vault sharing percent decreased from the previous settings, we
+							// need to remove renewal since this was not what the contributor signed
+							// up for
+							if vault_sharing < rolling_pool.vault_sharing_percent &&
+								account != &vault_operator
+							{
 								rolling_pool.do_not_renew.try_push(account.clone()).ok();
 								continue;
 							}
 
-							participants.push((
+							next_fund_participants.push((
 								account.clone(),
 								BondHolder {
 									starting_balance: rollable_balance,
@@ -751,9 +757,10 @@ pub mod pallet {
 							total.saturating_accrue(rollable_balance);
 						}
 						rolling_pool.is_rolled_over = true;
-						if !participants.is_empty() {
+						if !next_fund_participants.is_empty() {
 							let mut new_fund = TreasuryPool::new(vault_id);
-							new_fund.bond_holders = BoundedVec::truncate_from(participants);
+							new_fund.bond_holders =
+								BoundedVec::truncate_from(next_fund_participants);
 							next.try_insert(vault_id, new_fund).ok();
 						}
 						if total > T::Balance::zero() {
