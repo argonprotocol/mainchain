@@ -25,7 +25,8 @@ pub async fn bitcoin_loop(
 	} else {
 		Auth::None
 	};
-	let bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
+	let mut bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
+	bitcoin_client.timeout = Duration::from_secs(60);
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
 	let required_bitcoin_network: BitcoinNetwork = mainchain_client
