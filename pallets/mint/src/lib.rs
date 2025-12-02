@@ -216,8 +216,15 @@ pub mod pallet {
 			};
 			// if there are no miners registered, we can't mint
 			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
-			let argon_cpi = T::PriceProvider::get_average_cpi_for_ticks(tick_range)
-				.min(T::PriceProvider::get_argon_cpi().unwrap_or_default());
+			let mut argon_cpi = T::PriceProvider::get_average_cpi_for_ticks(tick_range);
+			let current_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
+
+			// if cpi is coming back to zero (from average), take the current cpi instead
+			if argon_cpi.is_negative() {
+				argon_cpi = argon_cpi.max(current_cpi);
+			} else {
+				argon_cpi = argon_cpi.min(current_cpi);
+			}
 
 			// only mint when cpi is negative or 0
 			if !argon_cpi.is_negative() {
