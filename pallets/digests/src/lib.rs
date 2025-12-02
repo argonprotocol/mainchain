@@ -65,6 +65,8 @@ pub mod pallet {
 		MissingNotebookDigest,
 		/// Failed to decode digests
 		CouldNotDecodeDigest,
+		/// Duplicate FrameInfo found
+		DuplicateFrameInfoDigest,
 	}
 
 	#[pallet::hooks]
@@ -171,6 +173,7 @@ pub mod pallet {
 					Error::<T>::MissingParentVotingKeyDigest,
 				DecodeDigestError::MissingNotebookDigest => Error::<T>::MissingNotebookDigest,
 				DecodeDigestError::CouldNotDecodeDigest => Error::<T>::CouldNotDecodeDigest,
+				DecodeDigestError::DuplicateFrameInfoDigest => Error::<T>::DuplicateFrameInfoDigest,
 			}
 		}
 	}

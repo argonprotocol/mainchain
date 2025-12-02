@@ -66,6 +66,7 @@ parameter_types! {
 		author: sp_keyring::ed25519::Keyring::Alice.to_account_id(),
 		voting_key: None,
 		tick: TickDigest(2),
+		frame_info: None,
 		fork_power: None,
 		notebooks: NotebookDigest {
 			notebooks: BoundedVec::truncate_from(vec![]),

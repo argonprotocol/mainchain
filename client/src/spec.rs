@@ -3756,9 +3756,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				175u8, 202u8, 224u8, 21u8, 93u8, 147u8, 105u8, 233u8, 162u8, 187u8, 128u8, 200u8,
-				234u8, 25u8, 142u8, 218u8, 145u8, 14u8, 139u8, 171u8, 55u8, 233u8, 25u8, 134u8,
-				82u8, 92u8, 24u8, 4u8, 105u8, 69u8, 97u8, 198u8,
+				228u8, 172u8, 70u8, 133u8, 186u8, 93u8, 179u8, 23u8, 223u8, 144u8, 21u8, 195u8,
+				4u8, 16u8, 187u8, 24u8, 252u8, 175u8, 105u8, 84u8, 174u8, 174u8, 250u8, 144u8,
+				15u8, 204u8, 50u8, 96u8, 126u8, 44u8, 105u8, 160u8,
 			]
 	}
 	pub mod system {
@@ -5251,10 +5251,9 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							64u8, 72u8, 119u8, 157u8, 206u8, 20u8, 122u8, 104u8, 19u8, 16u8, 24u8,
-							58u8, 210u8, 125u8, 73u8, 107u8, 204u8, 112u8, 55u8, 149u8, 25u8,
-							136u8, 162u8, 191u8, 141u8, 154u8, 193u8, 116u8, 251u8, 130u8, 123u8,
-							76u8,
+							167u8, 150u8, 44u8, 37u8, 16u8, 201u8, 97u8, 103u8, 222u8, 95u8, 206u8,
+							206u8, 25u8, 206u8, 150u8, 229u8, 143u8, 251u8, 68u8, 239u8, 201u8,
+							94u8, 2u8, 166u8, 230u8, 1u8, 223u8, 204u8, 71u8, 108u8, 3u8, 96u8,
 						],
 					)
 				}
@@ -8167,6 +8166,11 @@ pub mod api {
 							::core::primitive::u64,
 						>;
 				}
+				pub mod temp_frame_info_digest {
+					use super::runtime_types;
+					pub type TempFrameInfoDigest =
+						runtime_types::argon_primitives::digests::FrameInfo;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -8631,6 +8635,27 @@ pub mod api {
 							38u8, 113u8, 194u8, 23u8, 214u8, 168u8, 51u8, 125u8, 41u8, 250u8,
 							255u8, 110u8, 10u8, 49u8, 47u8, 219u8, 142u8, 158u8, 25u8, 143u8,
 							126u8,
+						],
+					)
+				}
+				#[doc = " Temporary store the frame info digest"]
+				pub fn temp_frame_info_digest(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::temp_frame_info_digest::TempFrameInfoDigest,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"TempFrameInfoDigest",
+						(),
+						[
+							54u8, 254u8, 67u8, 14u8, 48u8, 221u8, 126u8, 167u8, 101u8, 151u8, 22u8,
+							194u8, 233u8, 41u8, 191u8, 59u8, 44u8, 159u8, 80u8, 198u8, 213u8, 34u8,
+							44u8, 151u8, 194u8, 0u8, 119u8, 122u8, 162u8, 138u8, 176u8, 255u8,
 						],
 					)
 				}
@@ -24285,8 +24310,29 @@ pub mod api {
 					pub fork_power: ::core::option::Option<
 						runtime_types::argon_primitives::fork_power::ForkPower,
 					>,
+					pub frame_info:
+						::core::option::Option<runtime_types::argon_primitives::digests::FrameInfo>,
 					pub tick: runtime_types::argon_primitives::tick::TickDigest,
 					pub notebooks: runtime_types::argon_primitives::digests::NotebookDigest<_0>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FrameInfo {
+					#[codec(compact)]
+					pub frame_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub frame_reward_ticks_remaining: ::core::primitive::u32,
+					pub is_new_frame: ::core::primitive::bool,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -28071,6 +28117,9 @@ pub mod api {
 					#[codec(index = 11)]
 					#[doc = "Failed to decode digests"]
 					CouldNotDecodeDigest,
+					#[codec(index = 12)]
+					#[doc = "Duplicate FrameInfo found"]
+					DuplicateFrameInfoDigest,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

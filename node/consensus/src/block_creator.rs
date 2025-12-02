@@ -192,6 +192,7 @@ where
 			block_vote: notebook_header_data.vote_digest,
 			notebooks: notebook_header_data.notebook_digest,
 			// these are from the runtime
+			frame_info: Default::default(),
 			voting_key: Default::default(),
 			fork_power: Default::default(),
 		}

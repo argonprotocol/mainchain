@@ -57,8 +57,10 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		SlotEvents, TickProvider, block_seal::MiningRegistration, vault::MiningBidPoolProvider,
+		ArgonDigests, SlotEvents, TickProvider, block_seal::MiningRegistration, digests::FrameInfo,
+		vault::MiningBidPoolProvider,
 	};
+	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
 
@@ -275,6 +277,10 @@ pub mod pallet {
 	pub type FrameStartTicks<T: Config> =
 		StorageValue<_, BoundedBTreeMap<FrameId, Tick, ConstU32<10>>, ValueQuery>;
 
+	/// Temporary store the frame info digest
+	#[pallet::storage]
+	pub type TempFrameInfoDigest<T: Config> = StorageValue<_, FrameInfo, OptionQuery>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -359,6 +365,18 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			NewlyStartedFrameId::<T>::take();
+			let digest = <frame_system::Pallet<T>>::digest();
+			for log in digest.logs.iter() {
+				if let Some(frame_info) = log.as_frame_info() {
+					assert!(
+						!TempFrameInfoDigest::<T>::exists(),
+						"Frame info digest can only be provided once!"
+					);
+
+					TempFrameInfoDigest::<T>::put(frame_info.clone());
+					break;
+				}
+			}
 
 			let next_frame_id = NextFrameId::<T>::get();
 			if next_frame_id == 1 &&
@@ -400,18 +418,47 @@ pub mod pallet {
 				Self::start_new_frame(activating_frame_id);
 				// we use the current price as part of calculations
 				Self::adjust_number_of_seats();
-				// new slot will rotate grandpas. Return so we don't do it again below
-				return;
+			} else {
+				let rotate_grandpa_blocks = UniqueSaturatedInto::<u32>::unique_saturated_into(
+					T::GrandpaRotationBlocks::get(),
+				);
+				let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
+				// rotate grandpas on off rotations
+				if !HasAddedGrandpaRotation::<T>::get() ||
+					current_block % rotate_grandpa_blocks == 0
+				{
+					let current_frame_id = Self::current_frame_id();
+					T::SlotEvents::rotate_grandpas::<T::Keys>(current_frame_id, vec![], vec![]);
+					HasAddedGrandpaRotation::<T>::put(true);
+				}
 			}
-
-			let rotate_grandpa_blocks =
-				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
-			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-			// rotate grandpas on off rotations
-			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
-				let current_frame_id = Self::current_frame_id();
-				T::SlotEvents::rotate_grandpas::<T::Keys>(current_frame_id, vec![], vec![]);
-				HasAddedGrandpaRotation::<T>::put(true);
+			if let Some(frame_info) = TempFrameInfoDigest::<T>::take() {
+				assert_eq!(
+					frame_info.frame_id,
+					Self::current_frame_id(),
+					"Frame id in digest must match current frame id"
+				);
+				assert_eq!(
+					frame_info.frame_reward_ticks_remaining as Tick,
+					FrameRewardTicksRemaining::<T>::get(),
+					"Frame reward ticks remaining in digest must match storage"
+				);
+				assert_eq!(
+					frame_info.is_new_frame,
+					NewlyStartedFrameId::<T>::get().is_some(),
+					"is_new_frame in digest must match storage"
+				);
+			} else {
+				<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
+					FRAME_INFO_DIGEST,
+					FrameInfo {
+						frame_reward_ticks_remaining: FrameRewardTicksRemaining::<T>::get()
+							.unique_saturated_into(),
+						frame_id: Self::current_frame_id(),
+						is_new_frame: NewlyStartedFrameId::<T>::get().is_some(),
+					}
+					.encode(),
+				));
 			}
 		}
 	}
