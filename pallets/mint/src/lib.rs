@@ -222,8 +222,6 @@ pub mod pallet {
 			// if cpi is coming back to zero (from average), take the current cpi instead
 			if argon_cpi.is_negative() {
 				argon_cpi = argon_cpi.max(current_cpi);
-			} else {
-				argon_cpi = argon_cpi.min(current_cpi);
 			}
 
 			// only mint when cpi is negative or 0
