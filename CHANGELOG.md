@@ -1,16 +1,34 @@
 # Changelog
 
-## [v1.3.21](https://github.com/argonprotocol/mainchain/compare/v1.3.20...1230111a5de228018c5fa06e1c2193f45e760124) (2025-11-19)
+## [v1.3.22](https://github.com/argonprotocol/mainchain/compare/v1.3.21...7bda80b1a5bcece9feb76280ae4604f6e4de35f9) (2025-12-03)
 
 ### Features
+
+* add frame id to digest log
+([50228b3](https://github.com/argonprotocol/mainchain/commit/50228b331236bcc9a45dbb695e9abfbb67ad1015))
+* Mining Frame transition to reward ticks
+([e67bb6d](https://github.com/argonprotocol/mainchain/commit/e67bb6d6cdf56b154f86ea20ce5c9c7f64ec3610))
+
+### Fixes
+
+* **mint:** don’t take min when cpi positive
+([7ab2987](https://github.com/argonprotocol/mainchain/commit/7ab298711eeac627caa92290aac0eb3e634e3f8a))
+* **treasury:** don’t roll off funders under min
+([7839221](https://github.com/argonprotocol/mainchain/commit/78392216c5402ee05de354f88d4a43d46e49ca60))
+
+### [v1.3.21](https://github.com/argonprotocol/mainchain/compare/v1.3.20...v1.3.21) (2025-11-20)
+
+#### Features
 
 * **proxy:** add a refunding fee type of proxy
 ([5520d31](https://github.com/argonprotocol/mainchain/commit/5520d31eecf09133ee92d7cd18d11cd0672fea7d))
 * **client/nodejs:** preregister metadata
 ([c57a919](https://github.com/argonprotocol/mainchain/commit/c57a9198af68557811dbe417aa89aa6ed80bafb3))
 
-### Fixes
+#### Fixes
 
+* handle fees with refunds
+([b9cf0f8](https://github.com/argonprotocol/mainchain/commit/b9cf0f887abdec389469b1b0a8a5cc41622a5585))
 * copilot fixes
 ([025ad0a](https://github.com/argonprotocol/mainchain/commit/025ad0a17af9292cc93ea9b035c2de00bc6952f3))
 * **oracle:** handle timeframe mismatches for price

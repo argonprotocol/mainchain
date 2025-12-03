@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.3.21](https://github.com/argonprotocol/mainchain/compare/v1.3.20...1230111a5de228018c5fa06e1c2193f45e760124) (2025-11-19)
+## [v1.3.22](https://github.com/argonprotocol/mainchain/compare/v1.3.21...7bda80b1a5bcece9feb76280ae4604f6e4de35f9) (2025-12-03)
 
-### Fixes
+### [v1.3.21](https://github.com/argonprotocol/mainchain/compare/v1.3.20...v1.3.21) (2025-11-20)
+
+#### Fixes
 
 * **localchain:** handle unreconnecting client
 ([6039592](https://github.com/argonprotocol/mainchain/commit/60395923190f7a306fe0ee3a4804c499944eccb8))
