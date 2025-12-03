@@ -25,6 +25,7 @@ parameter_types! {
 		block_vote: BlockVoteDigest { voting_power: 500, votes_count: 1 },
 		author: 1,
 		voting_key: None,
+		frame_info: None,
 		tick: TickDigest(2),
 		fork_power: None,
 		notebooks: NotebookDigest {

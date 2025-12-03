@@ -242,8 +242,8 @@ macro_rules! inject_common_apis {
         }
 
         impl pallet_mining_slot::MiningSlotApi<Block, Balance> for Runtime {
-            fn next_slot_era() -> (Tick, Tick) {
-                MiningSlot::get_next_slot_era()
+            fn next_mining_epoch() -> (Tick, Tick) {
+                MiningSlot::get_next_mining_epoch()
             }
             fn bid_pool() -> Balance {
                 MiningSlot::bid_pool_balance()
@@ -281,9 +281,6 @@ macro_rules! inject_common_apis {
             }
             fn blocks_at_tick(tick: Tick) -> Vec<<Block as BlockT>::Hash> {
                 Ticks::blocks_at_tick(tick)
-            }
-            fn tick_for_frame(frame_id: FrameId) -> Tick {
-                MiningSlot::tick_for_frame(frame_id)
             }
         }
 

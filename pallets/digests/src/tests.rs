@@ -28,6 +28,7 @@ fn it_disallows_duplicates() {
 			voting_key: None,
 			tick: TickDigest(2),
 			fork_power: None,
+			frame_info: None,
 			notebooks: NotebookDigest {
 				notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult::<VerifyError> {
 					notary_id: 1,
@@ -55,6 +56,7 @@ fn it_should_read_and_clear_the_digests() {
 			author: 1u64,
 			voting_key: None,
 			fork_power: None,
+			frame_info: None,
 			tick: TickDigest(2),
 			notebooks: NotebookDigest::<VerifyError> {
 				notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult {

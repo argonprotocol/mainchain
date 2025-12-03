@@ -85,6 +85,8 @@ pub mod pallet {
 		/// Weight information for the extrinsics in this module.
 		type WeightInfo: WeightInfo;
 
+		type Currency: Inspect<Self::AccountId, Balance = Self::Balance>;
+
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec
 			+ Member
@@ -147,6 +149,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type LastValid<T: Config> = StorageValue<_, PriceIndex>;
 
+	/// Tracks the average cpi data every 60 ticks
+	#[pallet::storage]
+	pub type HistoricArgonCPI<T> =
+		StorageValue<_, BoundedVec<CpiMeasurementBucket, ConstU32<48>>, ValueQuery>;
+
 	/// The price index operator account
 	#[pallet::storage]
 	pub type Operator<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
@@ -195,12 +202,12 @@ pub mod pallet {
 			let Ok(who) = ensure_signed(origin.clone()) else {
 				return false;
 			};
-			Some(who) == <Operator<T>>::get()
+			Some(who) == Operator::<T>::get()
 		})]
 		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let operator = <Operator<T>>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
+			let operator = Operator::<T>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
 			ensure!(operator == who, Error::<T>::NotAuthorizedOperator);
 
 			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
@@ -210,15 +217,41 @@ pub mod pallet {
 			}
 
 			let mut index = index;
-			if let Some(current) = <Current<T>>::get() {
+			if let Some(current) = Current::<T>::get() {
 				if index.tick <= current.tick {
 					return Ok(());
 				}
 				Self::clamp_argon_prices(&current, &mut index);
-				<LastValid<T>>::put(current);
+				LastValid::<T>::put(current);
 			}
 
-			<Current<T>>::put(index);
+			Current::<T>::put(index);
+
+			// Get the current frame bucket (one per hour)
+			const BUCKET_TICKS: Tick = 60;
+			let tick_bucket_start = index.tick - (index.tick % BUCKET_TICKS);
+			HistoricArgonCPI::<T>::mutate(|history| {
+				for bucket in history.iter_mut() {
+					if bucket.tick_range.0 == tick_bucket_start {
+						bucket.record(index.argon_cpi());
+						return;
+					}
+				}
+				if history.is_full() {
+					history.pop();
+				}
+				history
+					.try_insert(
+						0,
+						CpiMeasurementBucket {
+							tick_range: (tick_bucket_start, tick_bucket_start + BUCKET_TICKS),
+							total_cpi: index.argon_cpi(),
+							measurements_count: 1,
+						},
+					)
+					.ok();
+			});
+
 			Self::deposit_event(Event::<T>::NewIndex);
 
 			Ok(())
@@ -309,16 +342,67 @@ pub mod pallet {
 			Self::get_current().map(|a| a.argon_usd_price)
 		}
 
+		fn get_average_cpi_for_ticks(tick_range: (Tick, Tick)) -> ArgonCPI {
+			let mut measurement = CpiMeasurementBucket::default();
+			for bucket in HistoricArgonCPI::<T>::get().into_iter() {
+				if bucket.tick_range.0 >= tick_range.0 && bucket.tick_range.1 <= tick_range.1 {
+					measurement.accrue(bucket);
+				}
+			}
+			measurement.average()
+		}
+
 		fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.btc_usd_price)
 		}
 
-		fn get_argon_pool_liquidity() -> Option<T::Balance> {
-			Self::get_current().map(|a| a.argon_time_weighted_average_liquidity.into())
-		}
-
 		fn get_redemption_r_value() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.redemption_r_value())
+		}
+
+		fn get_circulation() -> T::Balance {
+			T::Currency::total_issuance()
+		}
+	}
+}
+
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Default,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct CpiMeasurementBucket {
+	/// The tick range this frame represents
+	pub tick_range: (Tick, Tick),
+	/// The sum of all CPIs in this frame
+	pub total_cpi: ArgonCPI,
+	/// The count of measurements in this frame
+	pub measurements_count: u32,
+}
+
+impl CpiMeasurementBucket {
+	pub fn record(&mut self, cpi: ArgonCPI) {
+		self.total_cpi.saturating_accrue(cpi);
+		self.measurements_count.saturating_accrue(1);
+	}
+
+	pub fn accrue(&mut self, other: CpiMeasurementBucket) {
+		self.total_cpi.saturating_accrue(other.total_cpi);
+		self.measurements_count.saturating_accrue(other.measurements_count);
+	}
+
+	pub fn average(&self) -> ArgonCPI {
+		if self.measurements_count == 0 {
+			ArgonCPI::default()
+		} else {
+			self.total_cpi.div(FixedI128::from_u32(self.measurements_count))
 		}
 	}
 }

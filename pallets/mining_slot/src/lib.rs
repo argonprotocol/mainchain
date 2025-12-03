@@ -57,10 +57,12 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		SlotEvents, TickProvider, block_seal::MiningRegistration, vault::MiningBidPoolProvider,
+		ArgonDigests, SlotEvents, TickProvider, block_seal::MiningRegistration, digests::FrameInfo,
+		vault::MiningBidPoolProvider,
 	};
+	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -247,6 +249,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type NextFrameId<T: Config> = StorageValue<_, FrameId, ValueQuery>;
 
+	/// Is a new frame started in this block
+	#[pallet::storage]
+	pub type NewlyStartedFrameId<T: Config> = StorageValue<_, FrameId, OptionQuery>;
+
 	/// The number of allow miners to bid for the next mining cohort
 	#[pallet::storage]
 	pub type NextCohortSize<T: Config> = StorageValue<_, u32, ValueQuery>;
@@ -258,14 +264,22 @@ pub mod pallet {
 	pub type ScheduledCohortSizeChangeByFrame<T: Config> =
 		StorageValue<_, BoundedBTreeMap<FrameId, u32, ConstU32<11>>, ValueQuery>;
 
-	/// Did this block activate a new frame
+	/// The number of reward ticks remaining in the frame
 	#[pallet::storage]
-	pub type DidStartNewCohort<T: Config> = StorageValue<_, bool, ValueQuery>;
+	pub type FrameRewardTicksRemaining<T> = StorageValue<_, Tick, ValueQuery>;
 
 	/// The previous 10 frame start block numbers
 	#[pallet::storage]
 	pub type FrameStartBlockNumbers<T: Config> =
 		StorageValue<_, BoundedVec<BlockNumberFor<T>, ConstU32<10>>, ValueQuery>;
+	/// The previous 10 frame start ticks
+	#[pallet::storage]
+	pub type FrameStartTicks<T: Config> =
+		StorageValue<_, BoundedBTreeMap<FrameId, Tick, ConstU32<10>>, ValueQuery>;
+
+	/// Temporary store the frame info digest
+	#[pallet::storage]
+	pub type TempFrameInfoDigest<T: Config> = StorageValue<_, FrameInfo, OptionQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -282,6 +296,7 @@ pub mod pallet {
 				IsNextSlotBiddingOpen::<T>::put(true);
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
+			FrameRewardTicksRemaining::<T>::put(self.mining_config.ticks_between_slots);
 			ArgonotsPerMiningSeat::<T>::put(T::MinimumArgonotsPerSeat::get());
 			NextFrameId::<T>::put(1);
 			NextCohortSize::<T>::put(T::MinCohortSize::get());
@@ -349,11 +364,24 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			DidStartNewCohort::<T>::take();
+			NewlyStartedFrameId::<T>::take();
+			let digest = <frame_system::Pallet<T>>::digest();
+			for log in digest.logs.iter() {
+				if let Some(frame_info) = log.as_frame_info() {
+					assert!(
+						!TempFrameInfoDigest::<T>::exists(),
+						"Frame info digest can only be provided once!"
+					);
+
+					TempFrameInfoDigest::<T>::put(frame_info.clone());
+					break;
+				}
+			}
+
 			let next_frame_id = NextFrameId::<T>::get();
 			if next_frame_id == 1 &&
 				!IsNextSlotBiddingOpen::<T>::get() &&
-				Self::is_slot_bidding_started()
+				Self::is_seat_bidding_started()
 			{
 				log::trace!(
 					"Opening Slot 1 bidding {}",
@@ -370,29 +398,67 @@ pub mod pallet {
 
 		fn on_finalize(n: BlockNumberFor<T>) {
 			if T::SealerInfo::is_block_vote_seal() {
+				// Sealer info is only available after the block seal inherents (eg, between
+				// initialize and finalize)
 				let author = T::SealerInfo::get_sealer_info().block_author_account_id;
 				Self::record_block_author(author);
 			}
-			let next_frame_id = NextFrameId::<T>::get();
-			let calculated_frame_id = Self::calculated_frame_id();
-			// if it's time for the cohort to start, do it
-			if calculated_frame_id >= next_frame_id {
-				log::trace!("Starting Slot {}", next_frame_id);
-				Self::adjust_argonots_per_seat();
-				Self::start_new_frame(calculated_frame_id);
-				// we use the current price as part of calculations
-				Self::adjust_number_of_seats();
-				// new slot will rotate grandpas. Return so we don't do it again below
-				return;
+			// if this is a vote block OR we've fallen into a zero-registered-miner hole, increment
+			// ticks
+			if T::SealerInfo::is_block_vote_seal() ||
+				(ActiveMinersCount::<T>::get().is_zero() && NextFrameId::<T>::get() > 1)
+			{
+				FrameRewardTicksRemaining::<T>::mutate(|x| x.saturating_reduce(1u64));
 			}
 
-			let rotate_grandpa_blocks =
-				UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
-			let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-			// rotate grandpas on off rotations
-			if !HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0 {
-				T::SlotEvents::rotate_grandpas::<T::Keys>(calculated_frame_id, vec![], vec![]);
-				HasAddedGrandpaRotation::<T>::put(true);
+			// if it's time for the cohort to start, do it
+			if let Some(activating_frame_id) = Self::get_newly_started_frame() {
+				log::info!("Starting Frame {}", activating_frame_id);
+				Self::adjust_argonots_per_seat();
+				Self::start_new_frame(activating_frame_id);
+				// we use the current price as part of calculations
+				Self::adjust_number_of_seats();
+			} else {
+				let rotate_grandpa_blocks = UniqueSaturatedInto::<u32>::unique_saturated_into(
+					T::GrandpaRotationBlocks::get(),
+				);
+				let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
+				// rotate grandpas on off rotations
+				if !HasAddedGrandpaRotation::<T>::get() ||
+					current_block % rotate_grandpa_blocks == 0
+				{
+					let current_frame_id = Self::current_frame_id();
+					T::SlotEvents::rotate_grandpas::<T::Keys>(current_frame_id, vec![], vec![]);
+					HasAddedGrandpaRotation::<T>::put(true);
+				}
+			}
+			if let Some(frame_info) = TempFrameInfoDigest::<T>::take() {
+				assert_eq!(
+					frame_info.frame_id,
+					Self::current_frame_id(),
+					"Frame id in digest must match current frame id"
+				);
+				assert_eq!(
+					frame_info.frame_reward_ticks_remaining as Tick,
+					FrameRewardTicksRemaining::<T>::get(),
+					"Frame reward ticks remaining in digest must match storage"
+				);
+				assert_eq!(
+					frame_info.is_new_frame,
+					NewlyStartedFrameId::<T>::get().is_some(),
+					"is_new_frame in digest must match storage"
+				);
+			} else {
+				<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
+					FRAME_INFO_DIGEST,
+					FrameInfo {
+						frame_reward_ticks_remaining: FrameRewardTicksRemaining::<T>::get()
+							.unique_saturated_into(),
+						frame_id: Self::current_frame_id(),
+						is_new_frame: NewlyStartedFrameId::<T>::get().is_some(),
+					}
+					.encode(),
+				));
 			}
 		}
 	}
@@ -576,11 +642,22 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 
 	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, FrameId)> {
 		let mut result = vec![];
-		for (_, cohort) in <MinersByCohort<T>>::iter() {
+		for (frame_id, cohort) in <MinersByCohort<T>>::iter() {
+			if let Some(just_activated_frame) = Self::get_newly_started_frame() {
+				if frame_id == just_activated_frame {
+					// skip just activated frame
+					continue;
+				}
+			}
 			for registration in cohort {
 				let account = registration.rewards_account();
 				result.push((account, registration.starting_frame_id));
 			}
+		}
+		// ensure we add released miners if they've already been processed
+		for (_, registration) in ReleasedMinersByAccountId::<T>::get() {
+			let account = registration.rewards_account();
+			result.push((account, registration.starting_frame_id));
 		}
 		result
 	}
@@ -665,6 +742,26 @@ impl<T: Config> Pallet<T> {
 		NextFrameId::<T>::get().saturating_sub(1)
 	}
 
+	pub fn get_newly_started_frame() -> Option<FrameId> {
+		if let Some(frame_id) = NewlyStartedFrameId::<T>::get() {
+			return Some(frame_id);
+		}
+		let next_frame_id = NextFrameId::<T>::get();
+		if next_frame_id == 1 {
+			let current_tick = T::TickProvider::current_tick();
+			if current_tick >= Self::frame_1_begins_tick() {
+				NewlyStartedFrameId::<T>::put(next_frame_id);
+				return Some(next_frame_id);
+			}
+		}
+		let remaining_frame_ticks = FrameRewardTicksRemaining::<T>::get();
+		if remaining_frame_ticks.is_zero() {
+			NewlyStartedFrameId::<T>::put(next_frame_id);
+			return Some(next_frame_id);
+		}
+		None
+	}
+
 	pub fn is_registered_mining_active() -> bool {
 		NextFrameId::<T>::get() > 1 && ActiveMinersCount::<T>::get() > 0u16
 	}
@@ -724,6 +821,8 @@ impl<T: Config> Pallet<T> {
 			let _ = bids.try_insert(0, MiningBidStats::default());
 		});
 
+		let config = MiningConfig::<T>::get();
+		FrameRewardTicksRemaining::<T>::put(config.ticks_between_slots);
 		let slot_cohort = BidsForNextSlotCohort::<T>::take();
 
 		IsNextSlotBiddingOpen::<T>::put(true);
@@ -808,13 +907,20 @@ impl<T: Config> Pallet<T> {
 		});
 
 		ReleasedMinersByAccountId::<T>::put(released_miners_by_account_id);
-		DidStartNewCohort::<T>::put(true);
 		NextFrameId::<T>::put(frame_id + 1);
 		FrameStartBlockNumbers::<T>::mutate(|a| {
 			if a.is_full() {
 				a.pop();
 			}
 			let _ = a.try_insert(0, frame_system::Pallet::<T>::block_number());
+		});
+		FrameStartTicks::<T>::mutate(|a| {
+			if a.is_full() {
+				let first_key = *a.keys().next().expect("should have at least one entry");
+				a.remove(&first_key);
+			}
+			let current_tick = T::TickProvider::current_tick();
+			let _ = a.try_insert(frame_id, current_tick);
 		});
 
 		T::SlotEvents::rotate_grandpas(frame_id, removed_miners, added_miners);
@@ -974,18 +1080,14 @@ impl<T: Config> Pallet<T> {
 	/// NOTE: seal_strength should not be used as it is a non-uniform distributed value (must be
 	/// seal_proof)
 	pub(crate) fn check_for_bidding_close(vote_seal_proof: U256) -> bool {
-		let next_slot_tick = Self::get_next_frame_tick();
-		let current_tick = T::TickProvider::current_tick();
 		let mining_config = MiningConfig::<T>::get();
 
+		let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
 		// Are we in the closing eligibility window?
-		if next_slot_tick.saturating_sub(current_tick) >
-			mining_config.ticks_before_bid_end_for_vrf_close
-		{
+		if FrameRewardTicksRemaining::<T>::get() > ticks_before_close {
 			return false;
 		}
 
-		let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
 		// Calculate the threshold for VRF comparison to achieve a probability of 1 in
 		// `MiningConfig.ticks_before_bid_end_for_vrf_close`
 		let threshold = U256::MAX / U256::from(ticks_before_close);
@@ -1000,7 +1102,7 @@ impl<T: Config> Pallet<T> {
 		false
 	}
 
-	pub fn slot_1_tick() -> Tick {
+	pub fn frame_1_begins_tick() -> Tick {
 		let mining_config = MiningConfig::<T>::get();
 		let slot_1_ticks =
 			mining_config.slot_bidding_start_after_ticks + mining_config.ticks_between_slots;
@@ -1009,42 +1111,17 @@ impl<T: Config> Pallet<T> {
 		genesis_tick.saturating_add(slot_1_ticks)
 	}
 
-	pub fn ticks_since_mining_start() -> Tick {
-		T::TickProvider::current_tick().saturating_sub(Self::slot_1_tick())
-	}
-
 	pub(crate) fn get_next_frame_tick() -> Tick {
-		Self::tick_for_frame(Self::next_frame_id())
+		T::TickProvider::current_tick() + FrameRewardTicksRemaining::<T>::get()
 	}
 
 	pub fn next_frame_id() -> FrameId {
 		NextFrameId::<T>::get()
 	}
 
-	pub fn get_next_slot_era() -> (Tick, Tick) {
+	pub fn get_next_mining_epoch() -> (Tick, Tick) {
 		let start_tick = Self::get_next_frame_tick();
 		(start_tick, start_tick + Self::get_mining_window_ticks())
-	}
-
-	pub(crate) fn calculated_frame_id() -> FrameId {
-		let mining_config = MiningConfig::<T>::get();
-		let current_tick = T::TickProvider::current_tick();
-		let genesis_tick = current_tick.saturating_sub(T::TickProvider::elapsed_ticks());
-		let bidding_start_tick =
-			genesis_tick.saturating_add(mining_config.slot_bidding_start_after_ticks);
-
-		let ticks_since_mining_start = current_tick.saturating_sub(bidding_start_tick);
-		ticks_since_mining_start / mining_config.ticks_between_slots
-	}
-
-	pub fn tick_for_frame(frame_id: FrameId) -> Tick {
-		if frame_id == 0 {
-			// return genesis tick for slot 0
-			return T::TickProvider::current_tick().saturating_sub(T::TickProvider::elapsed_ticks());
-		}
-		let slot_1_tick = Self::slot_1_tick();
-		let added_ticks = (frame_id - 1) * Self::ticks_between_slots();
-		slot_1_tick.saturating_add(added_ticks)
 	}
 
 	pub fn get_mining_window_ticks() -> Tick {
@@ -1310,18 +1387,25 @@ impl<T: Config> ClosestMiner<T> {
 	}
 }
 
-impl<T: Config> MiningSlotProvider for Pallet<T> {
-	fn get_next_slot_tick() -> Tick {
+impl<T: Config> MiningFrameProvider for Pallet<T> {
+	fn get_next_frame_tick() -> Tick {
 		Self::get_next_frame_tick()
 	}
 
-	fn mining_window_ticks() -> Tick {
-		Self::get_mining_window_ticks()
-	}
-
-	fn is_slot_bidding_started() -> bool {
+	fn is_seat_bidding_started() -> bool {
 		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks ||
 			IsNextSlotBiddingOpen::<T>::get()
+	}
+
+	fn is_new_frame_started() -> Option<FrameId> {
+		Self::get_newly_started_frame()
+	}
+
+	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
+		let frame_ticks = FrameStartTicks::<T>::get();
+		let starting_tick = frame_ticks.get(&frame_id)?;
+		let ending_tick = frame_ticks.get(&(frame_id + 1))?;
+		Some((*starting_tick, *ending_tick))
 	}
 }
 
@@ -1348,7 +1432,7 @@ impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
 sp_api::decl_runtime_apis! {
 	/// This runtime api allows people to query the upcoming mining_slot
 	pub trait MiningSlotApi<Balance> where Balance: Codec {
-		fn next_slot_era() -> (Tick, Tick);
+		fn next_mining_epoch() -> (Tick, Tick);
 		fn bid_pool() -> Balance;
 	}
 }

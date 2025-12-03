@@ -1027,6 +1027,7 @@ mod test {
 			block_vote: Default::default(),
 			voting_key: None, // runtime digest
 			fork_power: None, // runtime digest
+			frame_info: None, // runtime digest
 			tick: Default::default(),
 			notebooks: NotebookDigest::<NotebookVerifyError> { notebooks: BoundedVec::new() },
 		};

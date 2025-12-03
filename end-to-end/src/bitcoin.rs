@@ -1,11 +1,14 @@
-use crate::utils::{create_active_notary, register_miner_keys, register_miners};
+use crate::utils::{create_active_notary, register_miner_keys, register_miners, sudo};
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
 	ArgonConfig, FetchAt, MainchainClient, api,
 	api::{
 		price_index::calls::types::submit::Index,
-		runtime_types::sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext, storage, tx,
+		runtime_types::{
+			argon_runtime::RuntimeCall, sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext,
+		},
+		storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
 };
@@ -13,6 +16,7 @@ use argon_primitives::{
 	Balance, VaultId,
 	argon_utils::format_argons,
 	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId},
+	prelude::sp_core::Encode,
 	tick::{Tick, Ticker},
 };
 use argon_testing::{
@@ -188,6 +192,22 @@ async fn test_bitcoin_minting_e2e() {
 	register_miners(&test_node, alice_signer, vec![(vote_miner_account.clone(), keys)])
 		.await
 		.unwrap();
+
+	// increase the mining mint so we can match it without waiting
+	sudo(
+		&test_node,
+		RuntimeCall::System(
+			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
+				items: vec![(
+					storage().mint().minted_mining_microgons().to_root_bytes(),
+					Balance::from(100_000_000_000u64).encode(),
+				)],
+			},
+		),
+		false,
+	)
+	.await
+	.unwrap();
 
 	wait_for_mint(
 		&bitcoin_owner_pair,
@@ -801,6 +821,7 @@ async fn confirm_lock(
 	Ok((lock_api.utxo_script_pubkey.into(), liquidity_promised))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn wait_for_mint(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
@@ -880,9 +901,27 @@ async fn wait_for_mint(
 			}
 			counter += 1;
 
-			submit_price(&ticker, &client, &price_index_operator).await;
+			submit_price(ticker, client, price_index_operator).await;
 			if counter >= 30 {
-				panic!("Timed out waiting for remaining mint. Last mint was {:?}", pending_mint.0);
+				let registered_miners = client
+					.fetch_storage(
+						&storage().mining_slot().active_miners_count(),
+						FetchAt::Finalized,
+					)
+					.await?
+					.expect("registered miners");
+				let bitcoin_minted = client
+					.fetch_storage(&storage().mint().minted_bitcoin_microgons(), FetchAt::Finalized)
+					.await?
+					.expect("mining mint");
+				let mining_minted = client
+					.fetch_storage(&storage().mint().minted_mining_microgons(), FetchAt::Finalized)
+					.await?
+					.expect("mining mint");
+				panic!(
+					"Timed out waiting for remaining mint. Last mint was {:?}. Miners registered {:?}. Mining Minted {} microgons, Bitcoin Minted {} microgons",
+					pending_mint.0, registered_miners, mining_minted, bitcoin_minted
+				);
 			}
 		}
 		println!("Owner minted full bitcoin")

@@ -112,8 +112,8 @@ pub mod pallet {
 		/// The number of blocks to keep payouts in history
 		type PayoutHistoryBlocks: Get<u32>;
 
-		/// Slot full duration of a slot
-		type SlotWindowTicks: Get<Tick>;
+		/// Ticks in a full epoch
+		type EpochTicks: Get<Tick>;
 
 		/// A percent reduction in mining argons vs the mint amount
 		type PerBlockArgonReducerPercent: Get<FixedU128>;
@@ -187,12 +187,6 @@ pub mod pallet {
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let elapsed_ticks = T::TickProvider::elapsed_ticks();
-			let minimums = Self::get_minimum_reward_amounts(elapsed_ticks);
-
-			// adjust the block rewards
-			Self::adjust_block_argons(minimums.argons);
-
 			if <BlockRewardsPaused<T>>::get() {
 				return;
 			}
@@ -203,6 +197,9 @@ pub mod pallet {
 				log::info!("Compute block is not eligible for rewards");
 				return;
 			}
+
+			let elapsed_ticks = T::TickProvider::elapsed_ticks();
+			let minimums = Self::get_minimum_reward_amounts(elapsed_ticks);
 
 			let authors = T::BlockSealerProvider::get_sealer_info();
 			let assigned_rewards_account =
@@ -368,9 +365,10 @@ pub mod pallet {
 			let mut block_argons = ArgonsPerBlock::<T>::get();
 			let start_block_argons = block_argons;
 
-			let mining_window = T::SlotWindowTicks::get();
+			// This accounts for the total mined blocks that will occur in an epoch
+			let epoch_ticks = T::EpochTicks::get();
 			let rewards_change = T::PerBlockArgonReducerPercent::get().saturating_mul_int(
-				liquidity_change.saturating_div(mining_window.unique_saturated_into()),
+				liquidity_change.saturating_div(epoch_ticks.unique_saturated_into()),
 			);
 			let change_amount: T::Balance = rewards_change.unsigned_abs().into();
 			if rewards_change.is_negative() {
@@ -433,6 +431,11 @@ pub mod pallet {
 				if rewards.is_full() {
 					rewards.remove(0);
 				}
+				let elapsed_ticks = T::TickProvider::elapsed_ticks();
+				let minimums = Self::get_minimum_reward_amounts(elapsed_ticks);
+
+				// adjust the block rewards
+				Self::adjust_block_argons(minimums.argons);
 				rewards.try_push((frame_id + 1, ArgonsPerBlock::<T>::get()))
 			});
 		}

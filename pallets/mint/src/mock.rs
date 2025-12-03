@@ -3,6 +3,7 @@ use pallet_prelude::*;
 
 use crate as pallet_mint;
 use argon_primitives::{BlockRewardAccountsProvider, PriceProvider};
+use pallet_prelude::argon_primitives::MiningFrameProvider;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -48,10 +49,32 @@ parameter_types! {
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
+	pub static AverageCPI: argon_primitives::ArgonCPI = FixedI128::from_float(-1.00);
 	pub static MinerRewardsAccounts: Vec<(u64, FrameId)> = vec![];
-	pub static UniswapLiquidity: Balance = 100_000;
+	pub static ArgonCirculation: Balance = 100_000;
+	pub static IsNewFrameStart: Option<u64> = None;
+	pub static MaxMiners: u32 = 1000;
+	pub static NextMiningTick: Tick = 10;
+	pub static MiningFrameTicks: (Tick, Tick) = (0, 10);
 }
 
+pub struct StaticMiningFrameProvider;
+impl MiningFrameProvider for StaticMiningFrameProvider {
+	fn get_next_frame_tick() -> Tick {
+		NextMiningTick::get()
+	}
+
+	fn is_new_frame_started() -> Option<FrameId> {
+		IsNewFrameStart::get()
+	}
+
+	fn is_seat_bidding_started() -> bool {
+		true
+	}
+	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
+		Some(MiningFrameTicks::get())
+	}
+}
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
@@ -63,11 +86,14 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}
-	fn get_argon_pool_liquidity() -> Option<Balance> {
-		Some(UniswapLiquidity::get())
-	}
 	fn get_redemption_r_value() -> Option<FixedU128> {
 		None
+	}
+	fn get_circulation() -> Balance {
+		ArgonCirculation::get()
+	}
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> argon_primitives::ArgonCPI {
+		AverageCPI::get()
 	}
 }
 
@@ -93,6 +119,8 @@ impl pallet_mint::Config for Test {
 	type PriceProvider = StaticPriceProvider;
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
 	type MaxMintHistoryToMaintain = ConstU32<10>;
+	type MaxPossibleMiners = MaxMiners;
+	type MiningFrameProvider = StaticMiningFrameProvider;
 }
 
 pub fn new_test_ext() -> TestState {

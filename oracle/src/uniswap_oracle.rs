@@ -1,5 +1,5 @@
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_primitives::{U160, address, aliases::I56};
+use alloy_primitives::{address, aliases::I56};
 use alloy_provider::{RootProvider, network::Ethereum};
 use anyhow::{Result, anyhow};
 use argon_primitives::{
@@ -71,7 +71,7 @@ impl UniswapOracle {
 			lookup_token,
 			// NOTE: taking high tier out since this will be for pricing a stablecoin. High fees are
 			// usually for highly volatile assets
-			fee_tiers: vec![FeeAmount::LOWEST, FeeAmount::LOW, FeeAmount::MEDIUM],
+			fee_tiers: vec![FeeAmount::LOW, FeeAmount::MEDIUM],
 			pool_cache_by_fee: Default::default(),
 		})
 	}
@@ -86,7 +86,7 @@ impl UniswapOracle {
 			}
 		}
 		let (price, liquidity) = self
-			.get_aggregated_twap(60 * 60)
+			.get_aggregated_twap()
 			.await?
 			.ok_or(anyhow!("Failed to get price, using default"))?;
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
@@ -99,22 +99,43 @@ impl UniswapOracle {
 		})
 	}
 
-	/// Calculate TWAP and TWAL for a given fee tier
-	async fn get_twap_and_twal(
+	async fn get_active_liquidity_reserves(&self, fee: FeeAmount) -> Result<(U256, U256)> {
+		let pool = self.get_cached_pool_contract(fee).await?;
+		let slot0 = pool.slot0().call().await?;
+
+		let tick = slot0.tick;
+		let liquidity_u128: u128 = pool.liquidity().call().await?;
+
+		let spacing = fee.tick_spacing();
+		let tick_lower = tick - (tick % spacing);
+		let tick_upper = tick_lower + spacing;
+
+		let sqrt_lower = U256::from(get_sqrt_ratio_at_tick(tick_lower)?);
+		let sqrt_upper = U256::from(get_sqrt_ratio_at_tick(tick_upper)?);
+
+		let token_0_amount = get_amount_0_delta(sqrt_lower, sqrt_upper, liquidity_u128, false)?;
+		let token_1_amount = get_amount_1_delta(sqrt_lower, sqrt_upper, liquidity_u128, false)?;
+
+		// Now convert to token units:
+		// Argon is in base 18 in ethereum, but we need to convert to base 6 (to match mainchain)
+		let argon_tokens = token_0_amount / U256::from(10u128.pow(12));
+		let usdc_tokens = token_1_amount;
+
+		Ok((usdc_tokens, argon_tokens))
+	}
+
+	/// Calculate time weighted average price (twap) and liquidity for a given fee tier
+	async fn get_twap_and_liquidity_basis(
 		&self,
 		fee: FeeAmount,
-		seconds_ago: u32,
 	) -> Result<(Price<Token, Token>, BigInt)> {
-		if seconds_ago == 0 {
-			return Err(anyhow!("seconds_ago must be greater than 0"));
-		}
 		let block_id = BlockId::Number(BlockNumberOrTag::Latest);
 		let pool_contract = self.get_cached_pool_contract(fee).await?;
 
-		let mut time_window_seconds = seconds_ago;
+		let mut backup_second_options = vec![60 * 60, 30 * 60, 10 * 60, 5 * 60, 60];
+		let mut time_window_seconds = backup_second_options.remove(0);
 
 		// Fetch tick_cumulatives and liquidity_cumulatives
-		let mut max_tries = 5;
 		let result = loop {
 			match pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await {
 				Ok(res) => break res,
@@ -123,13 +144,15 @@ impl UniswapOracle {
 					if error_msg.contains("ZeroData") {
 						return Err(anyhow!("No data for fee tier {:?}: {:?}", fee, e));
 					}
-					if time_window_seconds > 1 && error_msg.contains("execution reverted: OLD") {
-						max_tries -= 1;
-						if max_tries == 0 {
-							error!(fee = ?fee, "Max retries reached when calling observe, returning error");
-							return Err(anyhow!("Error calling observe: {:?}", e));
+					if error_msg.contains("execution reverted: OLD") {
+						if backup_second_options.is_empty() {
+							return Err(anyhow!(
+								"All time windows exhausted for fee tier {:?}",
+								fee
+							));
 						}
-						time_window_seconds /= 2;
+						time_window_seconds = backup_second_options.remove(0);
+						trace!(fee = ?fee, new_time_window = ?time_window_seconds, "Reducing time window and retrying observe due to OLD error");
 						continue;
 					}
 					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
@@ -137,10 +160,9 @@ impl UniswapOracle {
 				},
 			}
 		};
-		let tick_cumulatives = result.tickCumulatives;
-		let liquidity_cumulatives = result.secondsPerLiquidityCumulativeX128s;
 
 		// Compute tick cumulative difference
+		let tick_cumulatives = result.tickCumulatives;
 		let tick_diff = tick_cumulatives[1] - tick_cumulatives[0];
 
 		// Calculate time-weighted average tick (fixed-point division)
@@ -152,51 +174,41 @@ impl UniswapOracle {
 		// Convert tick to sqrtPriceX96
 		let price = tick_to_price(self.lookup_token.clone(), self.usd_token.clone(), tick_twap)?;
 
-		// Compute average liquidity
-		let liquidity_diff: U160 = liquidity_cumulatives[1] - liquidity_cumulatives[0];
-		let average_liquidity = {
-			let seconds_between_x128: BigInt = BigInt::from(time_window_seconds) << 128;
-			let liquidity_diff = liquidity_diff.to_big_int();
-			seconds_between_x128.checked_div(liquidity_diff).unwrap_or_default()
+		// Compute real-time reserves and effective liquidity in ARGON units
+		let (usdc_reserve, argon_reserve) = self.get_active_liquidity_reserves(fee).await?;
+
+		let spot_price = price.to_decimal();
+		// spot_price = numerator / denominator  (ARGON per 1 USDC)
+		let usdc_in_argon = if spot_price.is_positive() {
+			U256::from_big_int((usdc_reserve.to_big_decimal() / spot_price).to_big_int())
+		} else {
+			U256::ZERO
 		};
-		// Uniswap's oracle treats our lookup token (Argon) as having 18 decimals (per erc20
-		// standard), even though on our mainchain Argon is actually represented with 6 decimals.
-		// Meanwhile, USDC has 6 decimals.
-		//
-		// The "over-assumption" is 18 - 6 = 12 decimals, meaning Uniswap’s liquidity values
-		// are 10^12 times too high if interpreted directly.
-		// However, because liquidity is expressed relative to USDC’s 6-decimal scale,
-		// we need to adjust this by "re-inflating" by 10^6 to get back to Argon's true scale.
-		// In other words, dividing by 10^12 (to remove the extra decimals) then multiplying by 10^6
-		// yields a net division by 10^(12 - 6) = 10^6.
-		//
-		// Thus, we compute the decimal difference as follows:
-		let usdc_decimal_adjustment = self.lookup_token.decimals() - self.usd_token.decimals();
-		// Now we multiply by 10^6 to get back to argon true decimals. The algebra here can be the
-		// same as just subtracting the existing by 6.
-		let argon_decimals = usdc_decimal_adjustment - 6;
 
-		let scaling_factor = BigInt::from(10).pow(argon_decimals as u32);
-		let average_liquidity = average_liquidity / scaling_factor;
+		// Effective liquidity is the minimum of ARGON reserve and USDC (in ARGON units)
+		let effective_liquidity_argon = argon_reserve.min(usdc_in_argon);
 
-		Ok((price, average_liquidity))
+		Ok((price, effective_liquidity_argon.to_big_int()))
 	}
 
 	/// Aggregate TWAPs across fee tiers, weighted by TWAL
-	async fn get_aggregated_twap(
-		&self,
-		seconds_ago: u32,
-	) -> Result<Option<(Price<Token, Token>, BigInt)>> {
+	async fn get_aggregated_twap(&self) -> Result<Option<(Price<Token, Token>, BigInt)>> {
 		let mut total_numerator = BigInt::zero();
 		let mut total_denominator = BigInt::zero();
 		let mut total_liquidity = BigInt::zero();
 
 		for &fee in &self.fee_tiers {
-			if let Ok((price, average_liquidity)) = self.get_twap_and_twal(fee, seconds_ago).await {
-				trace!(?price, ?average_liquidity, "Got twap/twal for {:?}", fee);
-				total_liquidity += average_liquidity;
-				total_numerator += price.numerator * average_liquidity;
-				total_denominator += price.denominator * average_liquidity;
+			if let Ok((price, current_liquidity)) = self.get_twap_and_liquidity_basis(fee).await {
+				trace!(
+					?current_liquidity,
+					"Got twap for {:?}. Price {:?}, liquidity {:?}",
+					fee,
+					price.to_fixed(3, None),
+					current_liquidity
+				);
+				total_liquidity += current_liquidity;
+				total_numerator += price.numerator * current_liquidity;
+				total_denominator += price.denominator * current_liquidity;
 			}
 		}
 
@@ -251,6 +263,11 @@ mod test {
 	use tracing::warn;
 	use uniswap_sdk_core::token;
 
+	#[allow(dead_code)]
+	const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";
+	#[allow(dead_code)]
+	const ARGONOT_ADDRESS: &str = "0x64cbd3aa07d427e385cb55330406508718e55f01";
+
 	#[tokio::test]
 	#[ignore] // only activate when turned on
 	async fn test_infura_lookup() {
@@ -266,13 +283,12 @@ mod test {
 			return;
 		}
 
-		const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";
-		const _ARGONOT_ADDRESS: &str = "0x64cbd3aa07d427e385cb55330406508718e55f01";
+		const LOOKUP_TOKEN_ADDRESS: &str = ARGONOT_ADDRESS;
 
 		let oracle = UniswapOracle::new(
 			project_id,
 			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
-			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+			token!(ChainId::MAINNET as u64, LOOKUP_TOKEN_ADDRESS, 18, "ARGON"),
 		)
 		.await
 		.expect("Failed to create oracle");

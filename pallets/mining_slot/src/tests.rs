@@ -1,6 +1,6 @@
 use crate::{
-	Error, Event, HoldReason, MinerNonce, MinerNonceScoring, Registration,
-	ScheduledCohortSizeChangeByFrame,
+	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
+	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
@@ -16,10 +16,64 @@ use argon_primitives::{
 use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
-use pallet_prelude::{sp_core::Pair, *};
+use pallet_prelude::{
+	argon_primitives::{FRAME_INFO_DIGEST, FrameInfo},
+	sp_core::Pair,
+	*,
+};
 use polkadot_sdk::sp_core::bounded_btree_map;
 use sp_core::bounded_vec;
 use std::{collections::HashMap, env};
+
+#[test]
+#[should_panic]
+fn it_should_create_and_validate_a_digest() {
+	new_test_ext().execute_with(|| {
+		System::initialize(
+			&1,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::Consensus(
+					FRAME_INFO_DIGEST,
+					FrameInfo { frame_id: 1, is_new_frame: true, frame_reward_ticks_remaining: 10 }
+						.encode(),
+				)],
+			},
+		);
+
+		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
+	});
+}
+
+#[test]
+fn it_should_validate_the_digest() {
+	new_test_ext().execute_with(|| {
+		FrameRewardTicksRemaining::<Test>::set(1);
+		NextFrameId::<Test>::set(2);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ElapsedTicks::set(SlotBiddingStartAfterTicks::get() + TicksBetweenSlots::get());
+		CurrentTick::set(SlotBiddingStartAfterTicks::get() + TicksBetweenSlots::get());
+		System::initialize(
+			&1,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::Consensus(
+					FRAME_INFO_DIGEST,
+					FrameInfo {
+						frame_id: 2,
+						is_new_frame: true,
+						frame_reward_ticks_remaining: TicksBetweenSlots::get() as u32,
+					}
+					.encode(),
+				)],
+			},
+		);
+
+		MiningSlots::on_initialize(1);
+		MiningSlots::on_finalize(1);
+	});
+}
 
 #[test]
 fn it_doesnt_add_cohorts_until_time() {
@@ -66,99 +120,6 @@ fn get_validation_window_blocks() {
 }
 
 #[test]
-fn calculate_frame_id() {
-	MinCohortSize::set(10);
-	MaxCohortSize::set(10);
-	FramesPerMiningTerm::set(10);
-	let ticks_between_slots = 1440;
-	TicksBetweenSlots::set(ticks_between_slots);
-
-	SlotBiddingStartAfterTicks::set(20_000);
-	let mining_window = 14400;
-
-	let genesis = 28_000_000;
-	let mut current_tick = genesis + 19_999;
-	CurrentTick::set(current_tick);
-
-	new_test_ext().execute_with(|| {
-		assert!(!IsNextSlotBiddingOpen::<Test>::get());
-		ElapsedTicks::set(current_tick - genesis);
-		// bidding should open at 20k
-		MiningSlots::on_initialize(1);
-		MiningSlots::on_finalize(1);
-		assert!(!IsNextSlotBiddingOpen::<Test>::get());
-		// now go to 20k
-		current_tick += 1;
-		CurrentTick::set(current_tick);
-		ElapsedTicks::set(current_tick - genesis);
-		MiningSlots::on_initialize(2);
-		MiningSlots::on_finalize(2);
-		assert!(IsNextSlotBiddingOpen::<Test>::get());
-
-		current_tick += ticks_between_slots - 1;
-		CurrentTick::set(current_tick);
-		ElapsedTicks::set(current_tick - genesis);
-		MiningSlots::on_initialize(3);
-		MiningSlots::on_finalize(3);
-		assert!(IsNextSlotBiddingOpen::<Test>::get());
-		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1);
-		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1);
-		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculated_frame_id(), 0);
-		assert_eq!(
-			MiningSlots::get_next_slot_era(),
-			(current_tick + 1, current_tick + 1 + mining_window)
-		);
-
-		current_tick += 1;
-		ElapsedTicks::mutate(|a| *a += 1u64);
-		CurrentTick::set(current_tick);
-		MiningSlots::on_initialize(4);
-		MiningSlots::on_finalize(4);
-		assert!(IsNextSlotBiddingOpen::<Test>::get());
-		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
-		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculated_frame_id(), 1);
-		assert_eq!(NextFrameId::<Test>::get(), 2, "if not set, will show the current era");
-		assert_eq!(
-			MiningSlots::get_next_slot_era(),
-			(current_tick + 1440, current_tick + 1440 + mining_window)
-		);
-		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1440);
-	});
-}
-
-#[test]
-fn it_updates_frame_id_at_right_time() {
-	MinCohortSize::set(10);
-	MaxCohortSize::set(10);
-	FramesPerMiningTerm::set(10);
-	let ticks_between_slots = 1440;
-	TicksBetweenSlots::set(ticks_between_slots);
-
-	SlotBiddingStartAfterTicks::set(55_661);
-
-	let genesis = 28_949_839;
-	let _bidding_start_tick = 29_005_500;
-	let current_tick = 29_118_062;
-	CurrentTick::set(current_tick);
-
-	let _frame_78_tick = 29_117_820; // bidding_start_tick + (1440 * 78);
-
-	new_test_ext().execute_with(|| {
-		NextFrameId::<Test>::set(79);
-		ElapsedTicks::mutate(|a| *a = current_tick - genesis);
-		CurrentTick::set(current_tick);
-		assert_eq!(MiningSlots::calculated_frame_id(), 78);
-		MiningSlots::on_initialize(4);
-		MiningSlots::on_finalize(4);
-		assert_eq!(NextFrameId::<Test>::get(), 79);
-
-		ElapsedTicks::mutate(|a| *a = genesis + SlotBiddingStartAfterTicks::get() - 1440 * 79);
-	});
-}
-
-#[test]
 fn extends_bidding_if_mining_slot_extends() {
 	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
@@ -183,15 +144,18 @@ fn extends_bidding_if_mining_slot_extends() {
 		current_tick += 1;
 		CurrentTick::set(current_tick);
 		ElapsedTicks::set(current_tick - genesis);
+
+		System::initialize(&2, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(2);
 		MiningSlots::on_finalize(2);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 
-		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1440);
+		assert_eq!(MiningSlots::frame_1_begins_tick(), current_tick + 1440);
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		MiningConfig::<Test>::mutate(|a| {
 			a.slot_bidding_start_after_ticks = 21_000;
 		});
+		System::initialize(&3, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(3);
 		MiningSlots::on_finalize(3);
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 2.into(), None));
@@ -199,24 +163,25 @@ fn extends_bidding_if_mining_slot_extends() {
 		current_tick += 1440;
 		ElapsedTicks::set(current_tick - genesis);
 		CurrentTick::set(current_tick);
+		System::initialize(&4, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(4);
 		MiningSlots::on_finalize(4);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		// now it's bumped out
-		assert_eq!(MiningSlots::slot_1_tick(), current_tick + 1000);
-		assert_eq!(MiningSlots::ticks_since_mining_start(), 0);
-		assert_eq!(MiningSlots::calculated_frame_id(), 0);
+		assert_eq!(MiningSlots::frame_1_begins_tick(), current_tick + 1000);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 1440);
 		assert_eq!(NextFrameId::<Test>::get(), 1);
 
 		current_tick += 1000;
 		ElapsedTicks::set(current_tick - genesis);
 		CurrentTick::set(current_tick);
+		System::initialize(&5, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(5);
 		MiningSlots::on_finalize(5);
-		assert_eq!(MiningSlots::slot_1_tick(), current_tick);
+		assert_eq!(MiningSlots::frame_1_begins_tick(), current_tick);
 		assert_eq!(NextFrameId::<Test>::get(), 2,);
 		assert_eq!(
-			MiningSlots::get_next_slot_era(),
+			MiningSlots::get_next_mining_epoch(),
 			(current_tick + 1440, current_tick + 1440 + mining_window)
 		);
 		assert_eq!(MiningSlots::get_next_frame_tick(), current_tick + 1440);
@@ -232,10 +197,9 @@ fn it_adds_new_cohorts_on_block() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(8);
-		ElapsedTicks::set(8);
+
 		CurrentTick::set(8);
-		assert_eq!(MiningSlots::slot_1_tick(), 4);
-		assert_eq!(MiningSlots::calculated_frame_id(), 3);
+		FrameRewardTicksRemaining::<Test>::put(1);
 		NextFrameId::<Test>::put(4);
 
 		for frame_id in [1, 3] {
@@ -295,8 +259,8 @@ fn it_adds_new_cohorts_on_block() {
 		BidsForNextSlotCohort::<Test>::set(cohort.clone());
 
 		CurrentTick::set(10);
-		ElapsedTicks::set(10);
-		assert_eq!(MiningSlots::calculated_frame_id(), 4);
+
+		IsBlockVoteSeal::set(true);
 		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
 		MiningSlots::on_initialize(10);
 		MiningSlots::on_finalize(10);
@@ -372,7 +336,7 @@ fn it_adds_new_cohorts_on_block() {
 }
 
 #[test]
-fn it_releases_argonots_when_a_window_closes() {
+fn it_releases_argonots_when_an_epoch_ends() {
 	TicksBetweenSlots::set(2);
 	FramesPerMiningTerm::set(3);
 	MinCohortSize::set(2);
@@ -381,11 +345,8 @@ fn it_releases_argonots_when_a_window_closes() {
 
 	new_test_ext().execute_with(|| {
 		ArgonotsPerMiningSeat::<Test>::set(1000);
-		NextFrameId::<Test>::put(2);
 		CurrentTick::set(7);
-		ElapsedTicks::set(7);
-		assert_eq!(MiningSlots::slot_1_tick(), 2);
-		assert_eq!(MiningSlots::calculated_frame_id(), 3);
+
 		NextFrameId::<Test>::set(4);
 		System::set_block_number(7);
 
@@ -412,14 +373,13 @@ fn it_releases_argonots_when_a_window_closes() {
 		}
 		ActiveMinersCount::<Test>::put(4);
 		IsNextSlotBiddingOpen::<Test>::set(true);
-		assert_eq!(MiningSlots::get_next_slot_era(), (8, 8 + (2 * 3)));
+		FrameRewardTicksRemaining::<Test>::set(1);
+		assert_eq!(MiningSlots::get_next_mining_epoch(), (8, 8 + (2 * 3)));
 
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
 
 		CurrentTick::set(8);
-		ElapsedTicks::set(8);
-		System::set_block_number(8);
-
+		IsBlockVoteSeal::set(true);
 		MiningSlots::on_initialize(8);
 		MiningSlots::on_finalize(8);
 
@@ -530,6 +490,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		set_ownership(2, 100u32.into());
 		for i in 1..11u64 {
 			System::set_block_number(i);
+			System::initialize(&i, &System::parent_hash(), &Default::default());
 
 			MiningSlots::on_initialize(i);
 			MiningSlots::on_finalize(i);
@@ -542,11 +503,49 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		System::set_block_number(12 + TicksBetweenSlots::get());
 		ElapsedTicks::set(12 + TicksBetweenSlots::get());
 		CurrentTick::set(12 + TicksBetweenSlots::get());
+		System::initialize(
+			&(12 + TicksBetweenSlots::get()),
+			&System::parent_hash(),
+			&Default::default(),
+		);
 		MiningSlots::on_initialize(12 + TicksBetweenSlots::get());
 		MiningSlots::on_finalize(12 + TicksBetweenSlots::get());
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
+	});
+}
+#[test]
+fn it_should_decrement_reward_ticks_for_frames() {
+	TicksBetweenSlots::set(4);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		CurrentTick::set(12);
+		System::set_block_number(12);
+		FrameRewardTicksRemaining::<Test>::set(10);
+		IsBlockVoteSeal::set(false);
+		System::initialize(&12, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(12);
+		MiningSlots::on_finalize(12);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 10);
+
+		IsBlockVoteSeal::set(true);
+		System::initialize(&13, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(13);
+		MiningSlots::on_finalize(13);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 9);
+
+		// if there are no miners registered, we need to move forward with the frame
+		IsBlockVoteSeal::set(false);
+		CurrentTick::set(16);
+		NextFrameId::<Test>::set(2);
+		System::initialize(&16, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(16);
+		MiningSlots::on_finalize(16);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 8);
 	});
 }
 
@@ -558,16 +557,16 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 	SlotBiddingStartAfterTicks::set(0);
 
 	new_test_ext().execute_with(|| {
-		ElapsedTicks::set(12);
 		CurrentTick::set(12);
 		System::set_block_number(12);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
-		NextFrameId::<Test>::put(MiningSlots::calculated_frame_id() + 1);
+		NextFrameId::<Test>::put(4);
 
-		assert_eq!(MiningSlots::get_next_slot_era(), (16, 16 + (4 * 3)));
+		assert_eq!(MiningSlots::get_next_mining_epoch(), (16, 16 + (4 * 3)));
 		set_ownership(2, 100u32.into());
 		set_ownership(1, 100u32.into());
+		System::initialize(&12, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(12);
 		MiningSlots::on_finalize(12);
 
@@ -576,7 +575,9 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		System::set_block_number(16);
 		CurrentTick::set(16);
-		ElapsedTicks::set(16);
+		IsBlockVoteSeal::set(true);
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&16, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(16);
 		MiningSlots::on_finalize(16);
 
@@ -597,14 +598,18 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 			.into(),
 		);
 		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![16]);
-		assert_eq!(MiningSlots::get_next_slot_era(), (20, 20 + (4 * 3)));
+		assert_eq!(FrameStartTicks::<Test>::get().len(), 1);
+		assert_eq!(FrameStartTicks::<Test>::get().get(&4), Some(&16));
+		assert_eq!(MiningSlots::get_next_mining_epoch(), (20, 20 + (4 * 3)));
 
 		CurrentTick::set(20);
-		ElapsedTicks::set(20);
 		System::set_block_number(20);
+
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&20, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(20);
 		MiningSlots::on_finalize(20);
-		assert_eq!(MiningSlots::get_next_slot_era(), (24, 24 + (4 * 3)));
+		assert_eq!(MiningSlots::get_next_mining_epoch(), (24, 24 + (4 * 3)));
 
 		assert_err!(
 			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
@@ -624,7 +629,6 @@ fn it_will_order_bids() {
 	let bid_pool_account_id = BidPoolAccountId::get();
 
 	new_test_ext().execute_with(|| {
-		ElapsedTicks::set(6);
 		CurrentTick::set(6);
 		System::set_block_number(6);
 
@@ -640,6 +644,9 @@ fn it_will_order_bids() {
 		set_ownership(2, 100_500u32.into());
 		set_ownership(3, 100_500u32.into());
 
+		IsBlockVoteSeal::set(true);
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&6, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(6);
 		MiningSlots::on_finalize(6);
 		let share_amount = 500;
@@ -754,8 +761,9 @@ fn it_will_order_bids() {
 		System::reset_events();
 		System::set_block_number(9);
 		CurrentTick::set(9);
-		ElapsedTicks::set(9);
-		System::on_initialize(9);
+
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&9, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(9);
 		MiningSlots::on_finalize(9);
 		assert_eq!(Ownership::free_balance(3), 100_500);
@@ -804,21 +812,21 @@ fn it_handles_cleaning_up_miner_nonces() {
 	ExistentialDeposit::set(100_000);
 
 	new_test_ext().execute_with(|| {
-		ElapsedTicks::set(1);
 		CurrentTick::set(1);
 		System::set_block_number(1);
 		SlotBiddingStartAfterTicks::set(0);
 		IsNextSlotBiddingOpen::<Test>::set(true);
+		IsBlockVoteSeal::set(true);
 		for i in 1..20 {
 			set_ownership(i, 100_000u32.into());
 			set_argons(i, 5_000_000u32.into());
 			MiningSlots::on_initialize(i);
 			MiningSlots::on_finalize(i);
-			CurrentTick::set(1 + (i * TicksBetweenSlots::get()));
-			ElapsedTicks::set(i * TicksBetweenSlots::get());
+
 			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 0, 1.into(), None));
 			System::set_block_number(i);
 			System::initialize(&(i), &System::parent_hash(), &Default::default());
+			FrameRewardTicksRemaining::<Test>::set(1);
 		}
 		assert_eq!(
 			MinersByCohort::<Test>::iter_keys().collect::<Vec<_>>().len(),
@@ -841,8 +849,10 @@ fn handles_a_max_of_bids_per_block() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(4);
-		ElapsedTicks::set(4);
+
 		CurrentTick::set(4);
+		IsBlockVoteSeal::set(true);
+		FrameRewardTicksRemaining::<Test>::set(1);
 		MiningSlots::on_initialize(4);
 		MiningSlots::on_finalize(4);
 		SlotBiddingStartAfterTicks::set(0);
@@ -886,7 +896,6 @@ fn it_allows_bids_from_an_external_funding_account() {
 	let bid_pool_account_id = BidPoolAccountId::get();
 
 	new_test_ext().execute_with(|| {
-		ElapsedTicks::set(6);
 		CurrentTick::set(6);
 		System::set_block_number(6);
 
@@ -966,9 +975,9 @@ fn it_allows_bids_from_an_external_funding_account() {
 
 		// now close the bids and ensure funds go back to the right wallet
 
-		ElapsedTicks::set(8);
 		CurrentTick::set(8);
 		System::set_block_number(8);
+		FrameRewardTicksRemaining::<Test>::set(1);
 		MiningSlots::on_initialize(8);
 		MiningSlots::on_finalize(8);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 4_000_000);
@@ -996,7 +1005,6 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(89);
 		CurrentTick::set(89);
-		ElapsedTicks::set(89);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 
@@ -1010,8 +1018,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 
 		// now we're the right block
 		System::set_block_number(90);
-		ElapsedTicks::set(90);
-		CurrentTick::set(90);
+		FrameRewardTicksRemaining::<Test>::set(10);
 		assert!(MiningSlots::check_for_bidding_close(seal_strength));
 
 		let invalid_strength = U256::from_dec_str(
@@ -1039,6 +1046,69 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 }
 
 #[test]
+fn it_should_allow_each_miner_to_get_full_rewards() {
+	TicksBetweenSlots::set(10);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(100);
+	BlocksBeforeBidEndForVrfClose::set(0);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		let mut current_tick = 1;
+		CurrentTick::set(current_tick);
+		System::set_block_number(1);
+		System::initialize(&1, &System::parent_hash(), &Default::default());
+		set_argons(1, 5_000_000);
+		set_ownership(1, 100_000u32.into());
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
+		current_tick += TicksBetweenSlots::get();
+
+		CurrentTick::set(current_tick);
+		ElapsedTicks::set(current_tick);
+		System::set_block_number(2);
+		System::initialize(&2, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(2);
+		MiningSlots::on_finalize(2);
+		assert_eq!(NextFrameId::<Test>::get(), 2);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+
+		// create 9 vote blocks
+		for i in 1..10 {
+			IsBlockVoteSeal::set(true);
+			current_tick += 1;
+			CurrentTick::set(current_tick);
+
+			System::initialize(&i, &System::parent_hash(), &Default::default());
+			MiningSlots::on_initialize(i);
+			MiningSlots::on_finalize(i);
+		}
+		assert_eq!(NextFrameId::<Test>::get(), 2);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 1);
+
+		// if next vote is not vote block, it should keep vote blocks the same
+		IsBlockVoteSeal::set(false);
+		current_tick += 1;
+		CurrentTick::set(current_tick);
+		System::initialize(&10, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(10);
+		MiningSlots::on_finalize(10);
+		assert_eq!(NextFrameId::<Test>::get(), 2);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 1);
+
+		// now final vote block should move to next frame
+		IsBlockVoteSeal::set(true);
+		current_tick += 1;
+		CurrentTick::set(current_tick);
+		System::initialize(&11, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(11);
+		MiningSlots::on_finalize(11);
+		assert_eq!(NextFrameId::<Test>::get(), 3);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 10);
+	});
+}
+
+#[test]
 fn it_distributes_seals_evenly() {
 	TicksBetweenSlots::set(100);
 	FramesPerMiningTerm::set(10);
@@ -1061,8 +1131,10 @@ fn it_distributes_seals_evenly() {
 				assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(id), 1_000_000, 1.into(), None));
 			}
 			current_tick += TicksBetweenSlots::get();
+			IsBlockVoteSeal::set(true);
+			FrameRewardTicksRemaining::<Test>::set(1);
 			CurrentTick::set(current_tick);
-			ElapsedTicks::set(current_tick);
+
 			MiningSlots::on_initialize(i);
 			MiningSlots::on_finalize(i);
 		}
@@ -1087,7 +1159,8 @@ fn it_distributes_seals_evenly() {
 				&Default::default(),
 			);
 			CurrentTick::set(current_tick);
-			ElapsedTicks::set(current_tick);
+
+			FrameRewardTicksRemaining::<Test>::mutate(|x| x.saturating_reduce(1));
 
 			let vote = BlockVote::create_default_vote(notary_account.clone(), current_tick);
 			let vote_bytes = vote.encode();
@@ -1099,7 +1172,8 @@ fn it_distributes_seals_evenly() {
 			} else {
 				panic!("Should have found a closest miner");
 			}
-			if MiningSlots::calculated_frame_id() >= MiningSlots::next_frame_id() {
+			if FrameRewardTicksRemaining::<Test>::get() == 0 {
+				FrameRewardTicksRemaining::<Test>::set(100);
 				NextFrameId::<Test>::mutate(|a| *a += 1);
 
 				MiningSlots::reset_miner_nonce_scoring();
@@ -1131,6 +1205,38 @@ fn it_distributes_seals_evenly() {
 }
 
 #[test]
+fn it_should_track_latest_10_frame_ticks() {
+	TicksBetweenSlots::set(100);
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(100);
+	BlocksBeforeBidEndForVrfClose::set(0);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		let mut current_tick = 1;
+		CurrentTick::set(current_tick);
+		NextFrameId::<Test>::set(2);
+
+		for i in 1..12 {
+			current_tick += TicksBetweenSlots::get();
+			IsBlockVoteSeal::set(true);
+			FrameRewardTicksRemaining::<Test>::set(1);
+			CurrentTick::set(current_tick);
+
+			System::initialize(&i, &System::parent_hash(), &Default::default());
+			MiningSlots::on_initialize(i);
+			MiningSlots::on_finalize(i);
+		}
+
+		assert_eq!(NextFrameId::<Test>::get(), 13);
+		assert_eq!(FrameStartTicks::<Test>::get().len(), 10);
+		let frame_ids = FrameStartTicks::<Test>::get().keys().copied().collect::<Vec<_>>();
+		assert_eq!(frame_ids, vec![3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+	});
+}
+
+#[test]
 fn it_should_yield_results_when_highly_negative() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
@@ -1139,7 +1245,6 @@ fn it_should_yield_results_when_highly_negative() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(14);
-		ElapsedTicks::set(10);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		ActiveMinersCount::<Test>::put(3);
@@ -1217,7 +1322,6 @@ fn it_should_be_unpredictable_who_wins_next() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(14);
-		ElapsedTicks::set(10);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		ActiveMinersCount::<Test>::put(3);
@@ -1307,7 +1411,6 @@ fn it_should_not_be_able_to_capture_all_blocks_in_mining_deficit() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(14);
-		ElapsedTicks::set(10);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		ActiveMinersCount::<Test>::put(3);
@@ -1398,7 +1501,6 @@ fn it_should_allow_a_tie() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(14);
-		ElapsedTicks::set(10);
 
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		ActiveMinersCount::<Test>::put(3);
@@ -1494,7 +1596,6 @@ fn it_adjusts_locked_argonots() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(10);
-		ElapsedTicks::set(10);
 
 		Ownership::set_total_issuance(500_000 * 100);
 		ArgonotsPerMiningSeat::<Test>::set(120_000);
@@ -1556,7 +1657,6 @@ fn it_tracks_the_block_rewards() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		NextFrameId::<Test>::set(2);
-		ElapsedTicks::set(1);
 		CurrentTick::set(1);
 		System::set_block_number(10);
 		IsNextSlotBiddingOpen::<Test>::set(true);
@@ -1564,13 +1664,16 @@ fn it_tracks_the_block_rewards() {
 		set_ownership(1, 100_000);
 		set_argons(1, 111_000_000);
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 110 * 1_000_000, 1.into(), None));
-		ElapsedTicks::set(20);
+
 		CurrentTick::set(20);
+		IsBlockVoteSeal::set(true);
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&11, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(11);
 		MiningSlots::on_finalize(11);
 		assert_eq!(NextFrameId::<Test>::get(), 3);
-
 		IsBlockVoteSeal::set(true);
+		System::initialize(&12, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(12);
 		MiningSlots::on_finalize(12);
 
@@ -1599,8 +1702,10 @@ fn it_adjusts_mining_seats() {
 			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 110 * 1_000_000, 1.into(), None));
 		}
 
-		ElapsedTicks::set(20);
 		CurrentTick::set(20);
+		IsBlockVoteSeal::set(true);
+		FrameRewardTicksRemaining::<Test>::set(1);
+		System::initialize(&11, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(11);
 		MiningSlots::on_finalize(11);
 		assert_eq!(NextFrameId::<Test>::get(), 2);
@@ -1623,8 +1728,10 @@ fn it_adjusts_mining_seats() {
 					None
 				));
 			}
-			ElapsedTicks::set(20 + frame * 10);
+
 			CurrentTick::set(20 + frame * 10);
+			FrameRewardTicksRemaining::<Test>::set(1);
+			System::initialize(&(20 + frame * 10), &System::parent_hash(), &Default::default());
 			MiningSlots::on_initialize(20 + frame * 10);
 			MiningSlots::on_finalize(20 + frame * 10);
 			assert_eq!(NextFrameId::<Test>::get(), frame + 2);
@@ -1660,13 +1767,14 @@ fn it_doesnt_accept_bids_until_first_slot() {
 
 		System::set_block_number(1);
 		ElapsedTicks::set(12959);
-
+		System::initialize(&1, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(1);
 		MiningSlots::on_finalize(1);
 		assert!(!IsNextSlotBiddingOpen::<Test>::get());
 
 		// bidding will start on the first (block % 1440 == 0)
 		ElapsedTicks::set(12960);
+		System::initialize(&12960, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(12960);
 		MiningSlots::on_finalize(12960);
 		assert_eq!(NextFrameId::<Test>::get(), 1);
@@ -1677,11 +1785,14 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		let next_divisible_period = 12960 + 1440;
 		System::set_block_number(next_divisible_period);
 		ElapsedTicks::set(next_divisible_period);
+
 		CurrentTick::set(next_divisible_period);
+		System::initialize(&next_divisible_period, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(next_divisible_period);
 		MiningSlots::on_finalize(next_divisible_period);
 		assert_eq!(NextFrameId::<Test>::get(), 2);
 		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![next_divisible_period]);
+		assert_eq!(FrameStartTicks::<Test>::get().get(&1), Some(&next_divisible_period));
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
 	});
@@ -1693,7 +1804,7 @@ fn it_can_change_the_compute_mining_block() {
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		ElapsedTicks::set(1);
+
 		MiningSlots::on_initialize(1);
 		MiningSlots::on_finalize(1);
 		let starting_config = MiningConfig::<Test>::get();
@@ -1716,11 +1827,10 @@ fn it_can_change_the_compute_mining_block() {
 
 #[test]
 fn it_should_rotate_grandpas() {
-	SlotBiddingStartAfterTicks::set(12_960 - 1);
+	SlotBiddingStartAfterTicks::set(100);
 	GrandpaRotationFrequency::set(4);
 
 	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
 		ElapsedTicks::set(1);
 		CurrentTick::set(1);
 		NextFrameId::<Test>::set(1);
@@ -1730,19 +1840,23 @@ fn it_should_rotate_grandpas() {
 		// genesis rotate
 		assert_eq!(GrandaRotations::get(), vec![0]);
 
-		System::set_block_number(4);
 		ElapsedTicks::set(4);
 		CurrentTick::set(4);
+		System::initialize(&4, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(4);
 		MiningSlots::on_finalize(4);
 		assert_eq!(GrandaRotations::get(), vec![0, 0]);
 
-		// should auto-increment and rotate
-		System::set_block_number(12_960);
-		ElapsedTicks::set(12_960);
-		CurrentTick::set(12_960);
-		MiningSlots::on_initialize(12_960);
-		MiningSlots::on_finalize(12_960);
+		CurrentTick::set(100);
+		ElapsedTicks::set(100);
+		assert_eq!(MiningSlots::frame_1_begins_tick(), 100 + TicksBetweenSlots::get());
+		assert_eq!(MiningSlots::get_newly_started_frame(), None);
+		CurrentTick::set(100 + TicksBetweenSlots::get());
+		ElapsedTicks::set(100 + TicksBetweenSlots::get());
+		assert_eq!(MiningSlots::get_newly_started_frame(), Some(1));
+		System::initialize(&5, &System::parent_hash(), &Default::default());
+		MiningSlots::on_initialize(5);
+		MiningSlots::on_finalize(5);
 		assert_eq!(GrandaRotations::get(), vec![0, 0, 1]);
 	});
 }

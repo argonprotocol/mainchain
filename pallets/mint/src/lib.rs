@@ -12,29 +12,32 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod migrations;
 pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use pallet_prelude::*;
-
-	use argon_primitives::{BlockRewardsEventHandler, block_seal::BlockPayout};
-	use sp_runtime::FixedPointNumber;
-
 	use super::*;
 	use argon_primitives::{
-		ArgonCPI, BlockRewardAccountsProvider, BurnEventHandler, PriceProvider, UtxoLockEvents,
-		bitcoin::UtxoId, block_seal::FrameId,
+		ArgonCPI, BlockRewardAccountsProvider, BlockRewardsEventHandler, BurnEventHandler,
+		PriceProvider, UtxoLockEvents, bitcoin::UtxoId, block_seal::BlockPayout,
 	};
+	use pallet_prelude::argon_primitives::MiningFrameProvider;
+	use sp_runtime::FixedPointNumber;
+
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
 		type WeightInfo: WeightInfo;
-		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>;
+		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>
+			+ Inspect<Self::AccountId, Balance = Self::Balance>;
 		type PriceProvider: PriceProvider<Self::Balance>;
+		type MiningFrameProvider: MiningFrameProvider;
 
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec
@@ -58,11 +61,14 @@ pub mod pallet {
 		/// The maximum number of mint histories to keep
 		#[pallet::constant]
 		type MaxMintHistoryToMaintain: Get<u32>;
+
+		#[pallet::constant]
+		type MaxPossibleMiners: Get<u32>;
 	}
 
 	/// Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
 	/// a) CPI >= 0 and
-	/// b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining
+	/// b) the aggregate minted Bitcoins <= the aggregate minted microgons from mining
 	#[pallet::storage]
 	pub type PendingMintUtxos<T: Config> = StorageValue<
 		_,
@@ -70,13 +76,13 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// The total amount of argons minted for mining
+	/// The total amount of microgons minted for mining
 	#[pallet::storage]
-	pub type MintedMiningArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+	pub type MintedMiningMicrogons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
-	/// The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`.
+	/// The total amount of Bitcoin microgons minted. Cannot exceed `MintedMiningMicrogons`.
 	#[pallet::storage]
-	pub type MintedBitcoinArgons<T: Config> = StorageValue<_, U256, ValueQuery>;
+	pub type MintedBitcoinMicrogons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	/// The amount of argons minted per mining cohort (ie, grouped by starting frame id)
 	#[pallet::storage]
@@ -95,10 +101,10 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Any bitcoins minted
 		BitcoinMint { account_id: T::AccountId, utxo_id: Option<UtxoId>, amount: T::Balance },
-		/// The amount of argons minted for mining. NOTE: accounts below Existential Deposit will
+		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will
 		/// not be able to mint
 		MiningMint {
-			amount: U256,
+			amount: T::Balance,
 			per_miner: T::Balance,
 			argon_cpi: ArgonCPI,
 			liquidity: T::Balance,
@@ -127,6 +133,8 @@ pub mod pallet {
 	{
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			let mut block_mint_action = <BlockMintAction<T>>::mutate(|(b, data)| {
+				// if this is for a different block, clear it first (this can be set from other
+				// pallets via event handlers)
 				if *b != n {
 					*b = n;
 					*data = Default::default();
@@ -140,91 +148,28 @@ pub mod pallet {
 				return T::DbWeight::get().reads(2);
 			}
 
-			// if there are no miners registered, we can't mint
-			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
-
-			let argons_to_print_per_miner =
-				Self::get_argons_to_print_per_miner(reward_accounts.len() as u128);
-
-			let mut bitcoin_mint = MintedBitcoinArgons::<T>::get();
-			let mut mining_mint = MintedMiningArgons::<T>::get();
-
-			if argons_to_print_per_miner > T::Balance::zero() {
-				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
-				let mut amount_minted = U256::zero();
-				for (miner, starting_frame_id) in reward_accounts {
-					let amount = argons_to_print_per_miner;
-					match T::Currency::mint_into(&miner, amount) {
-						Ok(_) => {
-							mining_mint += U256::from(amount.into());
-							amount_minted += U256::from(amount.into());
-							block_mint_action.argon_minted += amount;
-							if !mining_mint_history.contains_key(&starting_frame_id) &&
-								mining_mint_history.len() >=
-									T::MaxMintHistoryToMaintain::get() as usize
-							{
-								mining_mint_history.pop_first();
-							}
-							mining_mint_history
-								.entry(starting_frame_id)
-								.or_default()
-								.saturating_accrue(amount);
-						},
-						Err(e) => {
-							log::warn!(
-								"Failed to mint {:?} argons for miner {:?}: {:?}",
-								amount,
-								&miner,
-								e
-							);
-							Self::deposit_event(Event::<T>::MintError {
-								mint_type: MintType::Mining,
-								account_id: miner.clone(),
-								utxo_id: None,
-								amount,
-								error: e,
-							});
-						},
-					};
-				}
-
-				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
-					MiningMintPerCohort::<T>::put(result);
-				}
-				MintedMiningArgons::<T>::put(mining_mint);
-
-				if !amount_minted.is_zero() {
-					Self::deposit_event(Event::<T>::MiningMint {
-						amount: amount_minted,
-						per_miner: argons_to_print_per_miner,
-						argon_cpi,
-						liquidity: T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default(),
-					});
-				}
-			}
-
+			let mut bitcoin_mint = MintedBitcoinMicrogons::<T>::get();
+			let mining_mint = MintedMiningMicrogons::<T>::get();
 			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_mint);
-			if available_bitcoin_to_mint > U256::zero() {
+			if available_bitcoin_to_mint > T::Balance::zero() {
 				let updated = <PendingMintUtxos<T>>::get().try_mutate(|pending| {
 					pending.retain_mut(|(utxo_id, account_id, remaining_account_mint)| {
-						if available_bitcoin_to_mint == U256::zero() {
+						if available_bitcoin_to_mint == T::Balance::zero() {
 							return true;
 						}
 
-						let amount_to_mint = if available_bitcoin_to_mint >=
-							U256::from((*remaining_account_mint).into())
+						let amount_to_mint = if available_bitcoin_to_mint >= *remaining_account_mint
 						{
 							*remaining_account_mint
 						} else {
-							// an account can't have more than u128 worth of argons
-							available_bitcoin_to_mint.as_u128().into()
+							available_bitcoin_to_mint
 						};
 
 						match T::Currency::mint_into(account_id, amount_to_mint) {
 							Ok(_) => {
-								available_bitcoin_to_mint -= U256::from(amount_to_mint.into());
+								available_bitcoin_to_mint -= amount_to_mint;
 								*remaining_account_mint -= amount_to_mint;
-								bitcoin_mint += U256::from(amount_to_mint.into());
+								bitcoin_mint += amount_to_mint;
 								block_mint_action.bitcoin_minted += amount_to_mint;
 
 								Self::deposit_event(Event::<T>::BitcoinMint {
@@ -235,7 +180,7 @@ pub mod pallet {
 							},
 							Err(e) => {
 								log::warn!(
-									"Failed to mint {:?} argons for bitcoin UTXO {:?}: {:?}",
+									"Failed to mint {:?} microgons for bitcoin UTXO {:?}: {:?}",
 									amount_to_mint,
 									&utxo_id,
 									e
@@ -254,10 +199,99 @@ pub mod pallet {
 				});
 				PendingMintUtxos::<T>::put(updated.expect("cannot fail, but should be handled"));
 			}
-			MintedBitcoinArgons::<T>::put(bitcoin_mint);
-
+			MintedBitcoinMicrogons::<T>::put(bitcoin_mint);
 			BlockMintAction::<T>::put((n, block_mint_action));
 			T::DbWeight::get().reads_writes(1, 1)
+		}
+
+		fn on_finalize(n: BlockNumberFor<T>) {
+			let Some(frame_id) = T::MiningFrameProvider::is_new_frame_started() else {
+				return;
+			};
+
+			let last_frame = frame_id.saturating_sub(1);
+			let Some(tick_range) = T::MiningFrameProvider::get_tick_range_for_frame(last_frame)
+			else {
+				return;
+			};
+			// if there are no miners registered, we can't mint
+			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
+			let mut argon_cpi = T::PriceProvider::get_average_cpi_for_ticks(tick_range);
+			let current_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
+
+			// if cpi is coming back to zero (from average), take the current cpi instead
+			if argon_cpi.is_negative() {
+				argon_cpi = argon_cpi.max(current_cpi);
+			}
+
+			// only mint when cpi is negative or 0
+			if !argon_cpi.is_negative() {
+				log::trace!("Argon cpi is non-negative. Nothing to mint.");
+				return;
+			}
+
+			let starting_liquidity = T::Currency::total_issuance();
+			let microgons_to_print_per_miner =
+				Self::get_microgons_to_print_per_miner(reward_accounts.len() as u128);
+
+			let mut mining_mint = MintedMiningMicrogons::<T>::get();
+			let mut block_mint_action = BlockMintAction::<T>::get().1;
+			if microgons_to_print_per_miner > T::Balance::zero() {
+				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
+				let mut amount_minted = T::Balance::zero();
+				for (miner, starting_frame_id) in reward_accounts {
+					let amount = microgons_to_print_per_miner;
+					match T::Currency::mint_into(&miner, amount) {
+						Ok(_) => {
+							mining_mint += amount;
+							amount_minted += amount;
+							block_mint_action.argon_minted += amount;
+							if !mining_mint_history.contains_key(&starting_frame_id) &&
+								mining_mint_history.len() >=
+									T::MaxMintHistoryToMaintain::get() as usize
+							{
+								mining_mint_history.pop_first();
+							}
+							mining_mint_history
+								.entry(starting_frame_id)
+								.or_default()
+								.saturating_accrue(amount);
+						},
+						Err(e) => {
+							log::warn!(
+								"Failed to mint {:?} microgons for miner {:?}: {:?}",
+								amount,
+								&miner,
+								e
+							);
+							Self::deposit_event(Event::<T>::MintError {
+								mint_type: MintType::Mining,
+								account_id: miner.clone(),
+								utxo_id: None,
+								amount,
+								error: e,
+							});
+						},
+					};
+				}
+
+				MintedMiningMicrogons::<T>::put(mining_mint);
+
+				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
+					MiningMintPerCohort::<T>::put(result);
+				}
+
+				if !amount_minted.is_zero() {
+					Self::deposit_event(Event::<T>::MiningMint {
+						amount: amount_minted,
+						per_miner: microgons_to_print_per_miner,
+						argon_cpi,
+						liquidity: starting_liquidity,
+					});
+				}
+			}
+
+			BlockMintAction::<T>::put((n, block_mint_action));
 		}
 	}
 
@@ -269,29 +303,18 @@ pub mod pallet {
 		<T as Config>::Balance: Into<u128>,
 		<T as Config>::Balance: From<u128>,
 	{
-		pub fn get_argons_to_print_per_miner(active_miners: u128) -> T::Balance {
-			let argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
-			if !argon_cpi.is_negative() || active_miners == 0 {
+		pub fn get_microgons_to_print_per_miner(active_miners: u128) -> T::Balance {
+			if active_miners == 0 {
 				return T::Balance::zero();
 			}
 
-			let Some(argons_to_print) = T::PriceProvider::get_liquidity_change_needed() else {
-				return T::Balance::zero();
-			};
-			if argons_to_print <= 0 {
+			let microgons_to_print =
+				T::PriceProvider::get_liquidity_change_needed().unwrap_or_default();
+			if microgons_to_print <= 0i128 {
 				return T::Balance::zero();
 			}
-			let argons_to_print = argons_to_print as u128;
 
-			let per_miner = argons_to_print.saturating_div(active_miners);
-			log::trace!(
-				"Minting {} microgons. CPI={:?}, Liquidity = {}. Per miner {}",
-				argons_to_print,
-				T::PriceProvider::get_argon_cpi().unwrap_or_default(),
-				T::PriceProvider::get_argon_pool_liquidity().unwrap_or_default().into(),
-				per_miner
-			);
-
+			let per_miner = microgons_to_print as u128 / active_miners;
 			per_miner.into()
 		}
 
@@ -304,12 +327,11 @@ pub mod pallet {
 				}
 				data.argon_minted += amount;
 			});
-			let amount = U256::from(amount.into());
-			MintedMiningArgons::<T>::mutate(|mint| *mint += amount);
+			MintedMiningMicrogons::<T>::mutate(|mint| *mint += amount);
 		}
 
 		pub fn on_argon_burn(amount: T::Balance) {
-			let bitcoin_utxos = MintedBitcoinArgons::<T>::get();
+			let bitcoin_utxos = MintedBitcoinMicrogons::<T>::get();
 			BlockMintAction::<T>::mutate(|(b, data)| {
 				let block = <frame_system::Pallet<T>>::block_number();
 				if *b != block {
@@ -319,17 +341,16 @@ pub mod pallet {
 				data.argon_burned += amount;
 			});
 
-			let mining_mint = MintedMiningArgons::<T>::get();
+			let mining_mint = MintedMiningMicrogons::<T>::get();
 			let total_minted = mining_mint + bitcoin_utxos;
-			let amount = U256::from(amount.into());
-			let mining_prorata = (amount * mining_mint).checked_div(total_minted);
+			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
 			if let Some(microgons) = mining_prorata {
-				MintedMiningArgons::<T>::mutate(|mint| *mint -= microgons);
+				MintedMiningMicrogons::<T>::mutate(|mint| *mint -= microgons);
 			}
 
-			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(total_minted);
+			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
 			if let Some(microgons) = bitcoin_prorata {
-				MintedBitcoinArgons::<T>::mutate(|mint| *mint -= microgons);
+				MintedBitcoinMicrogons::<T>::mutate(|mint| *mint -= microgons);
 			}
 		}
 	}
@@ -362,11 +383,7 @@ pub mod pallet {
 				});
 			}
 
-			let amount_burned: u128 = amount_burned.into();
-
-			MintedBitcoinArgons::<T>::mutate(|mint| {
-				*mint = mint.saturating_sub(U256::from(amount_burned))
-			});
+			MintedBitcoinMicrogons::<T>::mutate(|mint| *mint = mint.saturating_sub(amount_burned));
 			Ok(())
 		}
 	}
@@ -416,12 +433,12 @@ pub mod pallet {
 		<T as Config>::Balance: From<u128>,
 	{
 		fn rewards_created(payout: &[BlockPayout<T::AccountId, T::Balance>]) {
-			let mut argons = T::Balance::zero();
+			let mut microgons = T::Balance::zero();
 			for reward in payout {
-				argons = argons.saturating_add(reward.argons);
+				microgons = microgons.saturating_add(reward.argons);
 			}
-			if argons != T::Balance::zero() {
-				Self::track_block_mint(argons);
+			if microgons != T::Balance::zero() {
+				Self::track_block_mint(microgons);
 			}
 		}
 	}

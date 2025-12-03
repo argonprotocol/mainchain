@@ -1,6 +1,7 @@
 use crate::{
-	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey, ensure,
-	fork_power::ForkPower, notary::SignedHeaderBytes, tick::TickDigest,
+	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
+	block_seal::FrameId, ensure, fork_power::ForkPower, notary::SignedHeaderBytes,
+	tick::TickDigest,
 };
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, EncodeLike, MaxEncodedLen};
@@ -29,6 +30,8 @@ pub const PARENT_VOTING_KEY_DIGEST: ConsensusEngineId = *b"pkey";
 
 /// Fork Power
 pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
+/// Frame info
+pub const FRAME_INFO_DIGEST: ConsensusEngineId = *b"fram";
 
 #[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum BlockSealDigest {
@@ -133,6 +136,8 @@ pub enum DecodeDigestError {
 	MissingNotebookDigest,
 	#[error("Could not decode digest")]
 	CouldNotDecodeDigest,
+	#[error("Duplicate frame info digest")]
+	DuplicateFrameInfoDigest,
 }
 
 impl<NV, AC> TryFrom<Digest> for Digestset<NV, AC>
@@ -149,6 +154,7 @@ where
 		let mut fork_power = None;
 		let mut tick = None;
 		let mut notebooks = None;
+		let mut frame_info = None;
 
 		for digest_item in value.logs.iter() {
 			if let Some(a) = digest_item.as_author() {
@@ -169,6 +175,9 @@ where
 			} else if let Some(fp) = digest_item.as_fork_power() {
 				ensure!(fork_power.is_none(), DecodeDigestError::DuplicateForkPowerDigest);
 				fork_power = Some(fp);
+			} else if let Some(fr) = digest_item.as_frame_info() {
+				ensure!(frame_info.is_none(), DecodeDigestError::DuplicateFrameInfoDigest);
+				frame_info = Some(fr);
 			}
 		}
 
@@ -177,6 +186,7 @@ where
 			block_vote: block_vote.ok_or(DecodeDigestError::MissingBlockVoteDigest)?,
 			voting_key,
 			fork_power,
+			frame_info,
 			tick: tick.ok_or(DecodeDigestError::MissingTickDigest)?,
 			notebooks: notebooks.ok_or(DecodeDigestError::MissingNotebookDigest)?,
 		})
@@ -192,6 +202,7 @@ pub trait ArgonDigests {
 	) -> Option<NotebookDigest<VerifyError>>;
 	fn as_parent_voting_key(&self) -> Option<ParentVotingKeyDigest>;
 	fn as_fork_power(&self) -> Option<ForkPower>;
+	fn as_frame_info(&self) -> Option<FrameInfo>;
 	fn as_block_seal(&self) -> Option<BlockSealDigest>;
 }
 
@@ -236,6 +247,13 @@ impl ArgonDigests for DigestItem {
 	fn as_fork_power(&self) -> Option<ForkPower> {
 		if let DigestItem::Consensus(FORK_POWER_DIGEST, value) = self {
 			return ForkPower::decode(&mut &value[..]).ok();
+		}
+		None
+	}
+
+	fn as_frame_info(&self) -> Option<FrameInfo> {
+		if let DigestItem::Consensus(FRAME_INFO_DIGEST, value) = self {
+			return FrameInfo::decode(&mut &value[..]).ok();
 		}
 		None
 	}
@@ -343,6 +361,30 @@ pub struct NotebookHeaderData<VerifyError: Codec + MaxEncodedLen> {
 	pub vote_digest: BlockVoteDigest,
 }
 
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+	DefaultNoBound,
+	MaxEncodedLen,
+)]
+pub struct FrameInfo {
+	/// Current frame id
+	#[codec(compact)]
+	pub frame_id: FrameId,
+	/// Number of ticks remaining in the current frame for reward eligibility
+	#[codec(compact)]
+	pub frame_reward_ticks_remaining: u32,
+	/// Is this the first block in a new frame
+	pub is_new_frame: bool,
+}
+
 #[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen)]
 pub struct Digestset<NotebookVerifyError, AccountId>
 where
@@ -357,6 +399,9 @@ where
 	// this is optional because it is generated in the runtime, so will not be available in a newly
 	// created block
 	pub fork_power: Option<ForkPower>,
+	// This is optional because it is generated in the runtime, so will not be available in a newly
+	// created block
+	pub frame_info: Option<FrameInfo>,
 	pub tick: TickDigest,
 	pub notebooks: NotebookDigest<NotebookVerifyError>,
 }

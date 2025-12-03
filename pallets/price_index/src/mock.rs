@@ -8,15 +8,39 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		PriceIndex: pallet_price_index
+		PriceIndex: pallet_price_index,
+		Balances: pallet_balances,
 	}
 );
+
+parameter_types! {
+	pub const BidIncrements: u128 = 10_000; // 1 cent
+
+	pub static ExistentialDeposit: Balance = 1;
+}
+
+impl pallet_balances::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = ();
+	type Balance = Balance;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type ReserveIdentifier = [u8; 8];
+	type FreezeIdentifier = ();
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type MaxFreezes = ();
+	type DoneSlashHandler = ();
+}
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
-	type AccountData = ();
+	type AccountData = pallet_balances::AccountData<Balance>;
 	type DbWeight = RocksDbWeight;
 }
 
@@ -36,6 +60,7 @@ impl pallet_price_index::Config for Test {
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
+	type Currency = Balances;
 }
 
 pub fn new_test_ext(operator: Option<u64>) -> TestState {

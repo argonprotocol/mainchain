@@ -4,6 +4,7 @@ use argon_client::{
 	ArgonConfig, FetchAt, ReconnectingClient,
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
+	subxt_error,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 use bitcoincore_rpc::{Auth, RpcApi};
@@ -24,7 +25,8 @@ pub async fn bitcoin_loop(
 	} else {
 		Auth::None
 	};
-	let bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
+	let mut bitcoin_client = Client::new(&bitcoin_rpc_url, auth)?;
+	bitcoin_client.timeout = Duration::from_secs(60);
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
 	let required_bitcoin_network: BitcoinNetwork = mainchain_client
@@ -70,6 +72,24 @@ pub async fn bitcoin_loop(
 				tracing::info!(bitcoin_confirmed_height, ?bitcoin_tip, "Submitted bitcoin tip",);
 			},
 			Err(e) => {
+				// Try to peel it down to the real transaction error
+				let is_invalid_1010 = e
+					.root_cause()
+					.downcast_ref::<subxt_error::TransactionError>()
+					.and_then(|tx_err| match tx_err {
+						subxt_error::TransactionError::Invalid(ev) => Some(ev),
+						_ => None,
+					})
+					.is_some();
+
+				if is_invalid_1010 {
+					return Err(anyhow::anyhow!(
+						"Failed to submit bitcoin tip due to invalid transaction. \
+						This may be due to insufficient funds in the oracle account or a bad nonce. Throwing to kick off a restart. \
+						Error: {}",
+						e
+					));
+				}
 				tracing::error!(
 					?e,
 					bitcoin_confirmed_height,

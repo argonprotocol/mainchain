@@ -112,13 +112,14 @@ export async function getClient(host: string, options?: ApiOptions): Promise<Arg
   return await ApiPromise.create({ provider, noInitWarn: true, ...options });
 }
 
+const registry = new TypeRegistry();
+registry.setMetadata(
+  new Metadata(registry, metadataBytes as HexString),
+  undefined,
+  undefined,
+  true,
+);
+
 export function getOfflineRegistry() {
-  const registry = new TypeRegistry();
-  registry.setMetadata(
-    new Metadata(registry, metadataBytes as HexString),
-    undefined,
-    undefined,
-    true,
-  );
   return registry;
 }

@@ -150,11 +150,14 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);
 		Some(ratio_as_cpi - One::one())
 	}
-	fn get_argon_pool_liquidity() -> Option<Balance> {
-		todo!()
-	}
 	fn get_redemption_r_value() -> Option<FixedU128> {
 		Some(ArgonPriceInUsd::get()? / ArgonTargetPriceInUsd::get()?)
+	}
+	fn get_circulation() -> Balance {
+		1000
+	}
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
+		Self::get_argon_cpi().unwrap_or_default()
 	}
 }
 

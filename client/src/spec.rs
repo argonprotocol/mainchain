@@ -2062,21 +2062,20 @@ pub mod api {
 			#[doc = " This runtime api allows people to query the upcoming mining_slot"]
 			pub struct MiningSlotApi;
 			impl MiningSlotApi {
-				pub fn next_slot_era(
+				pub fn next_mining_epoch(
 					&self,
 				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::NextSlotEra,
-					types::next_slot_era::output::Output,
+					types::NextMiningEpoch,
+					types::next_mining_epoch::output::Output,
 				> {
 					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
 						"MiningSlotApi",
-						"next_slot_era",
-						types::NextSlotEra {},
+						"next_mining_epoch",
+						types::NextMiningEpoch {},
 						[
-							159u8, 133u8, 37u8, 43u8, 175u8, 113u8, 139u8, 67u8, 82u8, 249u8,
-							125u8, 243u8, 231u8, 166u8, 47u8, 202u8, 162u8, 96u8, 3u8, 139u8,
-							123u8, 157u8, 127u8, 117u8, 159u8, 233u8, 172u8, 98u8, 247u8, 12u8,
-							2u8, 132u8,
+							78u8, 3u8, 116u8, 9u8, 127u8, 130u8, 160u8, 246u8, 43u8, 229u8, 221u8,
+							187u8, 181u8, 48u8, 127u8, 120u8, 243u8, 149u8, 90u8, 27u8, 35u8,
+							210u8, 251u8, 149u8, 9u8, 180u8, 199u8, 220u8, 3u8, 180u8, 218u8, 24u8,
 						],
 					)
 				}
@@ -2101,7 +2100,7 @@ pub mod api {
 			}
 			pub mod types {
 				use super::runtime_types;
-				pub mod next_slot_era {
+				pub mod next_mining_epoch {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
@@ -2120,7 +2119,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct NextSlotEra {}
+				pub struct NextMiningEpoch {}
 				pub mod bid_pool {
 					use super::runtime_types;
 					pub mod output {
@@ -2371,24 +2370,6 @@ pub mod api {
 						],
 					)
 				}
-				pub fn tick_for_frame(
-					&self,
-					frame_id: types::tick_for_frame::FrameId,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::TickForFrame,
-					types::tick_for_frame::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"TickApis",
-						"tick_for_frame",
-						types::TickForFrame { frame_id },
-						[
-							216u8, 3u8, 13u8, 83u8, 237u8, 166u8, 224u8, 190u8, 88u8, 74u8, 32u8,
-							70u8, 243u8, 92u8, 12u8, 25u8, 73u8, 38u8, 196u8, 140u8, 32u8, 173u8,
-							9u8, 221u8, 142u8, 182u8, 98u8, 130u8, 34u8, 100u8, 31u8, 57u8,
-						],
-					)
-				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -2455,29 +2436,6 @@ pub mod api {
 				)]
 				pub struct BlocksAtTick {
 					pub tick: blocks_at_tick::Tick,
-				}
-				pub mod tick_for_frame {
-					use super::runtime_types;
-					pub type FrameId = ::core::primitive::u64;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::core::primitive::u64;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct TickForFrame {
-					pub frame_id: tick_for_frame::FrameId,
 				}
 			}
 		}
@@ -3798,9 +3756,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				205u8, 38u8, 76u8, 76u8, 211u8, 202u8, 122u8, 211u8, 169u8, 44u8, 175u8, 70u8,
-				121u8, 26u8, 156u8, 134u8, 111u8, 1u8, 136u8, 43u8, 46u8, 194u8, 118u8, 96u8,
-				143u8, 78u8, 120u8, 221u8, 120u8, 215u8, 35u8, 70u8,
+				228u8, 172u8, 70u8, 133u8, 186u8, 93u8, 179u8, 23u8, 223u8, 144u8, 21u8, 195u8,
+				4u8, 16u8, 187u8, 24u8, 252u8, 175u8, 105u8, 84u8, 174u8, 174u8, 250u8, 144u8,
+				15u8, 204u8, 50u8, 96u8, 126u8, 44u8, 105u8, 160u8,
 			]
 	}
 	pub mod system {
@@ -4918,10 +4876,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							243u8, 239u8, 114u8, 137u8, 221u8, 125u8, 96u8, 238u8, 185u8, 164u8,
-							36u8, 23u8, 118u8, 240u8, 163u8, 141u8, 234u8, 236u8, 76u8, 148u8,
-							174u8, 203u8, 189u8, 252u8, 252u8, 167u8, 41u8, 28u8, 210u8, 82u8,
-							81u8, 26u8,
+							173u8, 76u8, 82u8, 184u8, 45u8, 94u8, 198u8, 90u8, 1u8, 133u8, 250u8,
+							212u8, 47u8, 53u8, 242u8, 233u8, 167u8, 206u8, 192u8, 163u8, 200u8,
+							143u8, 133u8, 125u8, 175u8, 95u8, 187u8, 69u8, 58u8, 52u8, 152u8, 71u8,
 						],
 					)
 				}
@@ -5294,10 +5251,9 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							64u8, 72u8, 119u8, 157u8, 206u8, 20u8, 122u8, 104u8, 19u8, 16u8, 24u8,
-							58u8, 210u8, 125u8, 73u8, 107u8, 204u8, 112u8, 55u8, 149u8, 25u8,
-							136u8, 162u8, 191u8, 141u8, 154u8, 193u8, 116u8, 251u8, 130u8, 123u8,
-							76u8,
+							167u8, 150u8, 44u8, 37u8, 16u8, 201u8, 97u8, 103u8, 222u8, 95u8, 206u8,
+							206u8, 25u8, 206u8, 150u8, 229u8, 143u8, 251u8, 68u8, 239u8, 201u8,
+							94u8, 2u8, 166u8, 230u8, 1u8, 223u8, 204u8, 71u8, 108u8, 3u8, 96u8,
 						],
 					)
 				}
@@ -8109,7 +8065,7 @@ pub mod api {
 				pub mod miner_nonce_scoring_by_cohort {
 					use super::runtime_types;
 					pub type MinerNonceScoringByCohort =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							runtime_types::bounded_collections::bounded_vec::BoundedVec<
 								runtime_types::pallet_mining_slot::MinerNonceScoring,
@@ -8139,7 +8095,7 @@ pub mod api {
 				pub mod released_miners_by_account_id {
 					use super::runtime_types;
 					pub type ReleasedMinersByAccountId =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							crate::types::AccountId32,
 							runtime_types::argon_primitives::block_seal::MiningRegistration<
 								crate::types::AccountId32,
@@ -8175,6 +8131,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type NextFrameId = ::core::primitive::u64;
 				}
+				pub mod newly_started_frame_id {
+					use super::runtime_types;
+					pub type NewlyStartedFrameId = ::core::primitive::u64;
+				}
 				pub mod next_cohort_size {
 					use super::runtime_types;
 					pub type NextCohortSize = ::core::primitive::u32;
@@ -8182,14 +8142,14 @@ pub mod api {
 				pub mod scheduled_cohort_size_change_by_frame {
 					use super::runtime_types;
 					pub type ScheduledCohortSizeChangeByFrame =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							::core::primitive::u32,
 						>;
 				}
-				pub mod did_start_new_cohort {
+				pub mod frame_reward_ticks_remaining {
 					use super::runtime_types;
-					pub type DidStartNewCohort = ::core::primitive::bool;
+					pub type FrameRewardTicksRemaining = ::core::primitive::u64;
 				}
 				pub mod frame_start_block_numbers {
 					use super::runtime_types;
@@ -8197,6 +8157,19 @@ pub mod api {
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u32,
 						>;
+				}
+				pub mod frame_start_ticks {
+					use super::runtime_types;
+					pub type FrameStartTicks =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap2<
+							::core::primitive::u64,
+							::core::primitive::u64,
+						>;
+				}
+				pub mod temp_frame_info_digest {
+					use super::runtime_types;
+					pub type TempFrameInfoDigest =
+						runtime_types::argon_primitives::digests::FrameInfo;
 				}
 			}
 			pub struct StorageApi;
@@ -8532,6 +8505,28 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Is a new frame started in this block"]
+				pub fn newly_started_frame_id(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::newly_started_frame_id::NewlyStartedFrameId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"NewlyStartedFrameId",
+						(),
+						[
+							34u8, 249u8, 189u8, 164u8, 19u8, 242u8, 234u8, 210u8, 203u8, 246u8,
+							160u8, 182u8, 42u8, 115u8, 109u8, 107u8, 64u8, 156u8, 36u8, 163u8,
+							249u8, 72u8, 31u8, 53u8, 125u8, 109u8, 202u8, 34u8, 74u8, 40u8, 25u8,
+							128u8,
+						],
+					)
+				}
 				#[doc = " The number of allow miners to bid for the next mining cohort"]
 				pub fn next_cohort_size(
 					&self,
@@ -8554,8 +8549,9 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The upcoming changes scheduled for cohort size by frame. One extra slot to add a schedule"]
-				#[doc = " change during a frame."]
+				#[doc = " The upcoming changes scheduled for cohort size by frame."]
+				#[doc = " Capacity of 11 allows for 10 frames worth of scheduled changes plus one working slot"]
+				#[doc = " to schedule a new change during frame finalization."]
 				pub fn scheduled_cohort_size_change_by_frame(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -8577,24 +8573,25 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Did this block activate a new frame"]
-				pub fn did_start_new_cohort(
+				#[doc = " The number of reward ticks remaining in the frame"]
+				pub fn frame_reward_ticks_remaining(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::did_start_new_cohort::DidStartNewCohort,
+					types::frame_reward_ticks_remaining::FrameRewardTicksRemaining,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"MiningSlot",
-						"DidStartNewCohort",
+						"FrameRewardTicksRemaining",
 						(),
 						[
-							199u8, 93u8, 132u8, 26u8, 111u8, 248u8, 239u8, 83u8, 227u8, 95u8,
-							127u8, 171u8, 87u8, 239u8, 51u8, 11u8, 98u8, 186u8, 212u8, 20u8, 249u8,
-							81u8, 74u8, 45u8, 66u8, 101u8, 137u8, 89u8, 198u8, 168u8, 165u8, 130u8,
+							58u8, 239u8, 77u8, 105u8, 185u8, 205u8, 53u8, 217u8, 30u8, 75u8, 127u8,
+							17u8, 140u8, 40u8, 237u8, 160u8, 32u8, 116u8, 213u8, 141u8, 124u8,
+							235u8, 161u8, 11u8, 155u8, 135u8, 151u8, 146u8, 107u8, 72u8, 40u8,
+							143u8,
 						],
 					)
 				}
@@ -8616,6 +8613,49 @@ pub mod api {
 							162u8, 160u8, 254u8, 222u8, 59u8, 160u8, 91u8, 216u8, 180u8, 149u8,
 							167u8, 144u8, 15u8, 39u8, 239u8, 76u8, 231u8, 29u8, 40u8, 111u8, 66u8,
 							114u8, 16u8, 234u8, 97u8, 116u8, 82u8, 16u8, 186u8, 7u8, 102u8, 232u8,
+						],
+					)
+				}
+				#[doc = " The previous 10 frame start ticks"]
+				pub fn frame_start_ticks(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::frame_start_ticks::FrameStartTicks,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"FrameStartTicks",
+						(),
+						[
+							166u8, 178u8, 231u8, 53u8, 8u8, 82u8, 139u8, 37u8, 225u8, 223u8, 8u8,
+							38u8, 113u8, 194u8, 23u8, 214u8, 168u8, 51u8, 125u8, 41u8, 250u8,
+							255u8, 110u8, 10u8, 49u8, 47u8, 219u8, 142u8, 158u8, 25u8, 143u8,
+							126u8,
+						],
+					)
+				}
+				#[doc = " Temporary store the frame info digest"]
+				pub fn temp_frame_info_digest(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::temp_frame_info_digest::TempFrameInfoDigest,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"TempFrameInfoDigest",
+						(),
+						[
+							54u8, 254u8, 67u8, 14u8, 48u8, 221u8, 126u8, 167u8, 101u8, 151u8, 22u8,
+							194u8, 233u8, 41u8, 191u8, 59u8, 44u8, 159u8, 80u8, 198u8, 213u8, 34u8,
+							44u8, 151u8, 194u8, 0u8, 119u8, 122u8, 162u8, 138u8, 176u8, 255u8,
 						],
 					)
 				}
@@ -9139,7 +9179,7 @@ pub mod api {
 				pub mod utxos_pending_confirmation {
 					use super::runtime_types;
 					pub type UtxosPendingConfirmation =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							runtime_types::argon_primitives::bitcoin::UtxoValue,
 						>;
@@ -11985,7 +12025,7 @@ pub mod api {
 				pub mod queued_notary_meta_changes {
 					use super::runtime_types;
 					pub type QueuedNotaryMetaChanges =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u32,
 							runtime_types::argon_primitives::notary::NotaryMeta,
 						>;
@@ -14355,6 +14395,13 @@ pub mod api {
 					use super::runtime_types;
 					pub type LastValid = runtime_types::pallet_price_index::PriceIndex;
 				}
+				pub mod historic_argon_cpi {
+					use super::runtime_types;
+					pub type HistoricArgonCpi =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_price_index::CpiMeasurementBucket,
+						>;
+				}
 				pub mod operator {
 					use super::runtime_types;
 					pub type Operator = crate::types::AccountId32;
@@ -14402,6 +14449,28 @@ pub mod api {
 							242u8, 240u8, 169u8, 4u8, 157u8, 155u8, 110u8, 26u8, 92u8, 191u8, 64u8,
 							215u8, 37u8, 10u8, 85u8, 227u8, 236u8, 101u8, 178u8, 10u8, 216u8,
 							218u8, 250u8, 238u8, 119u8, 64u8, 83u8, 87u8, 213u8, 29u8, 30u8, 33u8,
+						],
+					)
+				}
+				#[doc = " Tracks the average cpi data every 60 ticks"]
+				pub fn historic_argon_cpi(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::historic_argon_cpi::HistoricArgonCpi,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"PriceIndex",
+						"HistoricArgonCPI",
+						(),
+						[
+							5u8, 120u8, 64u8, 244u8, 98u8, 12u8, 152u8, 80u8, 249u8, 49u8, 124u8,
+							17u8, 6u8, 245u8, 178u8, 102u8, 224u8, 202u8, 117u8, 252u8, 201u8,
+							123u8, 129u8, 91u8, 246u8, 28u8, 198u8, 230u8, 246u8, 227u8, 49u8,
+							164u8,
 						],
 					)
 				}
@@ -15805,7 +15874,7 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "The amount of argons minted for mining. NOTE: accounts below Existential Deposit will"]
+			#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will"]
 			#[doc = "not be able to mint"]
 			pub struct MiningMint {
 				pub amount: mining_mint::Amount,
@@ -15815,7 +15884,7 @@ pub mod api {
 			}
 			pub mod mining_mint {
 				use super::runtime_types;
-				pub type Amount = runtime_types::primitive_types::U256;
+				pub type Amount = ::core::primitive::u128;
 				pub type PerMiner = ::core::primitive::u128;
 				pub type ArgonCpi = runtime_types::sp_arithmetic::fixed_point::FixedI128;
 				pub type Liquidity = ::core::primitive::u128;
@@ -15867,18 +15936,18 @@ pub mod api {
 							::core::primitive::u128,
 						)>;
 				}
-				pub mod minted_mining_argons {
+				pub mod minted_mining_microgons {
 					use super::runtime_types;
-					pub type MintedMiningArgons = runtime_types::primitive_types::U256;
+					pub type MintedMiningMicrogons = ::core::primitive::u128;
 				}
-				pub mod minted_bitcoin_argons {
+				pub mod minted_bitcoin_microgons {
 					use super::runtime_types;
-					pub type MintedBitcoinArgons = runtime_types::primitive_types::U256;
+					pub type MintedBitcoinMicrogons = ::core::primitive::u128;
 				}
 				pub mod mining_mint_per_cohort {
 					use super::runtime_types;
 					pub type MiningMintPerCohort =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							::core::primitive::u128,
 						>;
@@ -15895,7 +15964,7 @@ pub mod api {
 			impl StorageApi {
 				#[doc = " Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever"]
 				#[doc = " a) CPI >= 0 and"]
-				#[doc = " b) the aggregate minted Bitcoins <= the aggregate minted Argons from mining"]
+				#[doc = " b) the aggregate minted Bitcoins <= the aggregate minted microgons from mining"]
 				pub fn pending_mint_utxos(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -15917,46 +15986,47 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The total amount of argons minted for mining"]
-				pub fn minted_mining_argons(
+				#[doc = " The total amount of microgons minted for mining"]
+				pub fn minted_mining_microgons(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::minted_mining_argons::MintedMiningArgons,
+					types::minted_mining_microgons::MintedMiningMicrogons,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Mint",
-						"MintedMiningArgons",
+						"MintedMiningMicrogons",
 						(),
 						[
-							124u8, 198u8, 6u8, 10u8, 20u8, 76u8, 75u8, 78u8, 0u8, 136u8, 251u8,
-							78u8, 101u8, 45u8, 220u8, 164u8, 104u8, 102u8, 225u8, 150u8, 114u8,
-							206u8, 213u8, 69u8, 84u8, 100u8, 125u8, 248u8, 147u8, 109u8, 61u8,
-							88u8,
+							192u8, 195u8, 182u8, 101u8, 38u8, 85u8, 122u8, 60u8, 241u8, 194u8,
+							25u8, 213u8, 115u8, 198u8, 83u8, 249u8, 165u8, 112u8, 44u8, 155u8,
+							13u8, 66u8, 202u8, 145u8, 38u8, 18u8, 63u8, 225u8, 222u8, 21u8, 98u8,
+							228u8,
 						],
 					)
 				}
-				#[doc = " The total amount of Bitcoin argons minted. Cannot exceed `MintedMiningArgons`."]
-				pub fn minted_bitcoin_argons(
+				#[doc = " The total amount of Bitcoin microgons minted. Cannot exceed `MintedMiningMicrogons`."]
+				pub fn minted_bitcoin_microgons(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::minted_bitcoin_argons::MintedBitcoinArgons,
+					types::minted_bitcoin_microgons::MintedBitcoinMicrogons,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Mint",
-						"MintedBitcoinArgons",
+						"MintedBitcoinMicrogons",
 						(),
 						[
-							61u8, 61u8, 150u8, 84u8, 160u8, 9u8, 166u8, 80u8, 225u8, 163u8, 15u8,
-							39u8, 218u8, 183u8, 45u8, 230u8, 52u8, 8u8, 53u8, 147u8, 135u8, 79u8,
-							252u8, 128u8, 239u8, 228u8, 199u8, 31u8, 135u8, 58u8, 74u8, 114u8,
+							143u8, 57u8, 127u8, 226u8, 125u8, 249u8, 79u8, 117u8, 102u8, 206u8,
+							247u8, 3u8, 108u8, 254u8, 9u8, 68u8, 184u8, 233u8, 75u8, 119u8, 182u8,
+							133u8, 204u8, 87u8, 190u8, 177u8, 34u8, 125u8, 134u8, 195u8, 228u8,
+							17u8,
 						],
 					)
 				}
@@ -16034,6 +16104,22 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Mint",
 						"MaxMintHistoryToMaintain",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				pub fn max_possible_miners(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Mint",
+						"MaxPossibleMiners",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -23110,7 +23196,7 @@ pub mod api {
 				pub mod vault_pools_by_frame {
 					use super::runtime_types;
 					pub type VaultPoolsByFrame =
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u32,
 							runtime_types::pallet_treasury::pallet::TreasuryPool,
 						>;
@@ -24224,8 +24310,29 @@ pub mod api {
 					pub fork_power: ::core::option::Option<
 						runtime_types::argon_primitives::fork_power::ForkPower,
 					>,
+					pub frame_info:
+						::core::option::Option<runtime_types::argon_primitives::digests::FrameInfo>,
 					pub tick: runtime_types::argon_primitives::tick::TickDigest,
 					pub notebooks: runtime_types::argon_primitives::digests::NotebookDigest<_0>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FrameInfo {
+					#[codec(compact)]
+					pub frame_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub frame_reward_ticks_remaining: ::core::primitive::u32,
+					pub is_new_frame: ::core::primitive::bool,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -24313,7 +24420,7 @@ pub mod api {
 					pub payment_account: _0,
 					pub notary_id: ::core::primitive::u32,
 					pub versions:
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							runtime_types::argon_primitives::domain::Semver,
 							runtime_types::argon_primitives::domain::VersionHost,
 						>,
@@ -24849,7 +24956,7 @@ pub mod api {
 					#[codec(compact)]
 					pub argons_pending_activation: _1,
 					pub argons_scheduled_for_release:
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							_1,
 						>,
@@ -25235,8 +25342,24 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BoundedBTreeMap<_0, _1>(
+				pub struct BoundedBTreeMap1<_0, _1>(
 					pub ::subxt::ext::subxt_core::utils::KeyedVec<_0, _1>,
+				);
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BoundedBTreeMap2<_0, _1>(
+					pub ::subxt::ext::subxt_core::utils::KeyedVec<_0, _0>,
+					#[codec(skip)] pub ::core::marker::PhantomData<_1>,
 				);
 			}
 			pub mod bounded_btree_set {
@@ -27373,7 +27496,7 @@ pub mod api {
 					pub is_verified: ::core::primitive::bool,
 					pub is_rejected_needs_release: ::core::primitive::bool,
 					pub fund_hold_extensions:
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap<
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							::core::primitive::u128,
 						>,
@@ -27994,6 +28117,9 @@ pub mod api {
 					#[codec(index = 11)]
 					#[doc = "Failed to decode digests"]
 					CouldNotDecodeDigest,
+					#[codec(index = 12)]
+					#[doc = "Duplicate FrameInfo found"]
+					DuplicateFrameInfoDigest,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -28882,10 +29008,10 @@ pub mod api {
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
-					#[doc = "The amount of argons minted for mining. NOTE: accounts below Existential Deposit will"]
+					#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will"]
 					#[doc = "not be able to mint"]
 					MiningMint {
-						amount: runtime_types::primitive_types::U256,
+						amount: ::core::primitive::u128,
 						per_miner: ::core::primitive::u128,
 						argon_cpi: runtime_types::sp_arithmetic::fixed_point::FixedI128,
 						liquidity: ::core::primitive::u128,
@@ -29588,6 +29714,19 @@ pub mod api {
 					#[codec(index = 1)]
 					OperatorChanged { operator_id: crate::types::AccountId32 },
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct CpiMeasurementBucket {
+				pub tick_range: (::core::primitive::u64, ::core::primitive::u64),
+				pub total_cpi: runtime_types::sp_arithmetic::fixed_point::FixedI128,
+				pub measurements_count: ::core::primitive::u32,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

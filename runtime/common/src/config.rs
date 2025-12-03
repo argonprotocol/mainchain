@@ -82,7 +82,7 @@ parameter_types! {
 	pub const MinerPayoutPercent: FixedU128 = FixedU128::from_rational(75, 100);
 	pub const DomainExpirationTicks: Tick = 60 * 24 * 365; // 1 year
 	pub const BlockRewardsCohortHistoryToKeep: u32 = FramesPerMiningTerm::get() + 1;
-	pub const SlotWindowTicks: Tick = 10 * 1440; // 10 days
+	pub const EpochTicks: Tick = 10 * 1440; // 10 days
 	pub const PayoutHistoryBlocks: u32 = 5;
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
@@ -166,6 +166,7 @@ parameter_types! {
 	pub const MaxPendingMintUtxos: u32 = 10_000;
 	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
 	pub const MaxMintHistoryToMaintain: u32 = 10; // keep all active sessions + the rollover
+	pub const MaxPossibleMiners: u32 = MaxCohortSize::get() * 10u32;
 
 	pub const MaxDowntimeTicksBeforeReset: Tick = 60; // 1 hour
 	pub const MaxHistoryToKeep: u32 = 24 * 60; // 1 day worth of prices

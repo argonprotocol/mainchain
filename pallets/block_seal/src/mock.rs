@@ -51,6 +51,7 @@ parameter_types! {
 		author: Alice.into(),
 		voting_key: None,
 		fork_power: None,
+		frame_info: None,
 		tick: TickDigest(2),
 		notebooks: NotebookDigest {
 			notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult::<VerifyError> {
