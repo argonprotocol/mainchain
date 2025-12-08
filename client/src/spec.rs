@@ -3756,9 +3756,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				228u8, 172u8, 70u8, 133u8, 186u8, 93u8, 179u8, 23u8, 223u8, 144u8, 21u8, 195u8,
-				4u8, 16u8, 187u8, 24u8, 252u8, 175u8, 105u8, 84u8, 174u8, 174u8, 250u8, 144u8,
-				15u8, 204u8, 50u8, 96u8, 126u8, 44u8, 105u8, 160u8,
+				80u8, 62u8, 201u8, 153u8, 34u8, 177u8, 18u8, 122u8, 102u8, 168u8, 141u8, 2u8,
+				213u8, 255u8, 80u8, 65u8, 97u8, 84u8, 42u8, 45u8, 183u8, 60u8, 120u8, 61u8, 77u8,
+				186u8, 242u8, 115u8, 209u8, 13u8, 20u8, 74u8,
 			]
 	}
 	pub mod system {
@@ -8768,21 +8768,21 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The target number of bids per slot. This will adjust the argonots per seat up or"]
-				#[doc = " down to ensure mining slots are filled."]
-				pub fn target_bids_per_slot(
+				#[doc = " The target percent of bids per auction relative to the max number of seats. This will"]
+				#[doc = " adjust the argonots per seat up or down to ensure mining slots are filled."]
+				pub fn target_bids_per_seat_percent(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
+					runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"TargetBidsPerSlot",
+						"TargetBidsPerSeatPercent",
 						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
+							62u8, 145u8, 102u8, 227u8, 159u8, 92u8, 27u8, 54u8, 159u8, 228u8,
+							193u8, 99u8, 75u8, 196u8, 26u8, 250u8, 229u8, 230u8, 88u8, 109u8,
+							246u8, 100u8, 152u8, 158u8, 14u8, 25u8, 224u8, 173u8, 224u8, 41u8,
+							105u8, 231u8,
 						],
 					)
 				}
@@ -15787,14 +15787,14 @@ pub mod api {
 					)
 				}
 				#[doc = " The tick number at which the halving begins for ownership tokens"]
-				pub fn halving_begin_tick(
+				pub fn halving_begin_ticks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BlockRewards",
-						"HalvingBeginTick",
+						"HalvingBeginTicks",
 						[
 							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,

@@ -96,7 +96,7 @@ pub mod pallet {
 
 		/// The tick number at which the halving begins for ownership tokens
 		#[pallet::constant]
-		type HalvingBeginTick: Get<Tick>;
+		type HalvingBeginTicks: Get<Tick>;
 
 		/// Percent as a number out of 100 of the block reward that goes to the miner.
 		#[pallet::constant]
@@ -336,9 +336,9 @@ pub mod pallet {
 				T::IncrementalGrowth::get();
 
 			let final_starting_amount: u128 = final_starting_amount.into();
-			let halving_begin_tick = T::HalvingBeginTick::get();
-			if elapsed_ticks >= halving_begin_tick {
-				let ticks_after_halving = elapsed_ticks.saturating_sub(halving_begin_tick);
+			let halving_begin_ticks = T::HalvingBeginTicks::get();
+			if elapsed_ticks >= halving_begin_ticks {
+				let ticks_after_halving = elapsed_ticks.saturating_sub(halving_begin_ticks);
 				let halvings: u128 =
 					ticks_after_halving.saturating_div(T::HalvingTicks::get()).into();
 				return RewardAmounts {

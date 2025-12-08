@@ -224,7 +224,7 @@ impl pallet_block_rewards::Config for Test {
 	type Balance = Balance;
 	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingTicks = HalvingBlocks;
-	type HalvingBeginTick = HalvingBeginBlock;
+	type HalvingBeginTicks = HalvingBeginBlock;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type BlockSealerProvider = StaticBlockSealerProvider;
 	type NotaryProvider = TestProvider;

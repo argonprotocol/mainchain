@@ -30,7 +30,7 @@ pub const MICROGONS: Balance = 1;
 
 const FINAL_ARGONS_PER_BLOCK: Balance = 5_000_000;
 const INCREMENTAL_REWARD_AMOUNT: Balance = 1_000;
-const INCREMENT_TICKS: Tick = 118;
+const INCREMENT_TICKS: Tick = 180;
 
 pub type NotaryRecordT =
 	NotaryRecordWithState<AccountId, BlockNumber, MaxNotaryHosts, NotebookVerifyError>;
@@ -101,7 +101,7 @@ parameter_types! {
 	pub const TargetPricePerSeat: Balance = 1000 * ARGON;
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
-	pub const TargetBidsPerSlot: u32 = 20; // Ideally we want 20 bids per slot
+	pub const TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_rational(2, 1); // Ideally we want 2x bids per seat
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 

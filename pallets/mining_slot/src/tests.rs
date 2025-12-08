@@ -1591,7 +1591,7 @@ fn it_adjusts_locked_argonots() {
 	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(10);
-	TargetBidsPerSlot::set(12);
+	TargetBidsPerSeatPercent::set(FixedU128::from_rational(12, 10));
 	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
@@ -1756,7 +1756,7 @@ fn it_doesnt_accept_bids_until_first_slot() {
 	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(12_960);
-	TargetBidsPerSlot::set(12);
+	TargetBidsPerSeatPercent::set(FixedU128::from_rational(12, 10));
 	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
