@@ -268,7 +268,7 @@ little, requirements decrease to encourage more participation.
 - **Target**: 20 bids per slot
 - **Damping**: 20% maximum change per frame
 - **Bounds**: 0.01 argonots minimum to 80% of total network argonots
-- **Found in**: Runtime config `TargetBidsPerSlot = 20`, `MinimumArgonotsPerSeat = 10,000`
+- **Found in**: Runtime config `TargetBidsPerSeatPercent = 20`, `MinimumArgonotsPerSeat = 10,000`
   (micro-units, = 0.01 argonots)
 
 ### Cohort Size Adjustment

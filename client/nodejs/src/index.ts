@@ -3,7 +3,13 @@ import './interfaces/augment-types';
 import './interfaces/types-lookup';
 import type { KeyringPair, KeyringPair$Json } from '@polkadot/keyring/types';
 import { ApiPromise, HttpProvider, Keyring, WsProvider } from '@polkadot/api';
-import { cryptoWaitReady, decodeAddress, mnemonicGenerate } from '@polkadot/util-crypto';
+import {
+  cryptoWaitReady,
+  decodeAddress,
+  encodeAddress,
+  isAddress,
+  mnemonicGenerate,
+} from '@polkadot/util-crypto';
 import type { InterfaceTypes } from '@polkadot/types/types/registry';
 import type { KeypairType } from '@polkadot/util-crypto/types';
 import type { ProviderInterface } from '@polkadot/rpc-provider/types';
@@ -26,7 +32,16 @@ export * from './Vault';
 export * from './convert';
 export * from './BitcoinLock';
 export * from './PriceIndex';
-export { Keyring, KeyringPair, KeyringPair$Json, KeypairType, mnemonicGenerate, decodeAddress };
+export {
+  Keyring,
+  KeyringPair,
+  KeyringPair$Json,
+  KeypairType,
+  mnemonicGenerate,
+  decodeAddress,
+  isAddress,
+  encodeAddress,
+};
 
 export { u8aToHex, hexToU8a, u8aEq } from '@polkadot/util';
 

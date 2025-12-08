@@ -216,7 +216,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type IncrementalGrowth = IncrementalGrowth;
 	type HalvingTicks = HalvingTicks;
-	type HalvingBeginTick = HalvingBeginTick;
+	type HalvingBeginTicks = HalvingBeginTick;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type EventHandler = Mint;
@@ -375,7 +375,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
 	type MinimumArgonotsPerSeat = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
 	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
-	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type TargetBidsPerSeatPercent = TargetBidsPerSeatPercent;
 	type TargetPricePerSeat = TargetPricePerSeat;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type Balance = Balance;

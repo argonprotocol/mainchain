@@ -91,7 +91,7 @@ declare module '@polkadot/api-base/types/consts' {
       /**
        * The tick number at which the halving begins for ownership tokens
        **/
-      halvingBeginTick: u64 & AugmentedConst<ApiType>;
+      halvingBeginTicks: u64 & AugmentedConst<ApiType>;
       /**
        * Number of ticks for halving of ownership share rewards
        **/
@@ -199,10 +199,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       pricePerSeatAdjustmentDamper: u128 & AugmentedConst<ApiType>;
       /**
-       * The target number of bids per slot. This will adjust the argonots per seat up or
-       * down to ensure mining slots are filled.
+       * The target percent of bids per auction relative to the max number of seats. This will
+       * adjust the argonots per seat up or down to ensure mining slots are filled.
        **/
-      targetBidsPerSlot: u32 & AugmentedConst<ApiType>;
+      targetBidsPerSeatPercent: u128 & AugmentedConst<ApiType>;
       /**
        * The target price per seat.
        **/

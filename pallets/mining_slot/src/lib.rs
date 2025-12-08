@@ -37,7 +37,7 @@ pub mod weights;
 /// When a new Slot begins, the Miners from `config.FramesPerMiningTerm` will be retired.
 ///
 /// To be eligible for mining, you must reserve a percentage of the argonot issuance (ownership
-/// tokens). The percentage is configured to aim for `TargetBidsPerSlot`, with a
+/// tokens). The percentage is configured to aim for `TargetBidsPerSeatPercent`, with a
 /// maximum change in ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper`
 /// (NOTE: this percent is the max increase or reduction in the amount of ownership issued).
 ///
@@ -106,10 +106,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaximumArgonotProrataPercent: Get<Percent>;
 
-		/// The target number of bids per slot. This will adjust the argonots per seat up or
-		/// down to ensure mining slots are filled.
+		/// The target percent of bids per auction relative to the max number of seats. This will
+		/// adjust the argonots per seat up or down to ensure mining slots are filled.
 		#[pallet::constant]
-		type TargetBidsPerSlot: Get<u32>;
+		type TargetBidsPerSeatPercent: Get<FixedU128>;
 
 		/// The target price per seat.
 		#[pallet::constant]
@@ -980,8 +980,10 @@ impl<T: Config> Pallet<T> {
 		let historical_bids = HistoricalBidsPerSlot::<T>::get();
 		let total_bids: u32 = historical_bids.iter().map(|a| a.bids_count).sum();
 
-		let slots = historical_bids.len() as u32;
-		let expected_bids_for_period = slots.saturating_mul(T::TargetBidsPerSlot::get());
+		let auctions = historical_bids.len() as u32;
+		let max_seats = NextCohortSize::<T>::get() * auctions;
+		let expected_bids_for_period =
+			T::TargetBidsPerSeatPercent::get().saturating_mul_int(max_seats);
 		if expected_bids_for_period == 0 {
 			return;
 		}

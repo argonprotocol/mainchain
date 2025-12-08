@@ -286,8 +286,7 @@ slot, the account you register as a miner must possess 1/100th of the total Owne
 circulation (this amount moves up and down based on a target number of miners applying for the
 slots). These variables can be found in the mining_slot pallet:
 
-- `TargetBidsPerSlot`: the current number of bids per slot that are targeted (20% more than slots
-  available)
+- `TargetBidsPerSeatPercent`: the target number of bids per auction (2x more than seats available)
 - `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
 - `ArgonotsPerMiningSeat`: the total number of Ownership Tokens (argonots) needed to bid for a slot
 - `BidsForNextSlotCohort`: the current winning bids for miners for the slot starting in the next

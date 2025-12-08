@@ -34,7 +34,7 @@ parameter_types! {
 	pub static FramesPerMiningTerm: u32 = 2;
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
 	pub static SlotBiddingStartAfterTicks: u64 = 3;
-	pub static TargetBidsPerSlot: u32 = 5;
+	pub static TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_u32(5);
 	pub static MinOwnershipBondAmount: Balance = 1;
 	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
@@ -220,7 +220,7 @@ impl pallet_mining_slot::Config for Test {
 	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
 	type MinimumArgonotsPerSeat = MinOwnershipBondAmount;
 	type MaximumArgonotProrataPercent = MaxOwnershipPercent;
-	type TargetBidsPerSlot = TargetBidsPerSlot;
+	type TargetBidsPerSeatPercent = TargetBidsPerSeatPercent;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
