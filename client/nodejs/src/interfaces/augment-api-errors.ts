@@ -197,8 +197,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UtxoNotLocked: AugmentedError<ApiType>;
     };
-    blockRewards: {
-    };
+    blockRewards: {};
     blockSeal: {
       /**
        * A block seal authority could not be properly decoded
@@ -422,8 +421,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       TooSoon: AugmentedError<ApiType>;
     };
-    hyperbridge: {
-    };
+    hyperbridge: {};
     ismp: {
       /**
        * Couldn't update challenge period
@@ -800,8 +798,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       Unauthorized: AugmentedError<ApiType>;
     };
-    ticks: {
-    };
+    ticks: {};
     tokenGateway: {
       /**
        * Asset Id creation failed
