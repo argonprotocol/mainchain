@@ -1,15 +1,22 @@
 # Changelog
 
-## [v1.3.22](https://github.com/argonprotocol/mainchain/compare/v1.3.21...7bda80b1a5bcece9feb76280ae4604f6e4de35f9) (2025-12-03)
+## [v1.3.23](https://github.com/argonprotocol/mainchain/compare/v1.3.22...140a769905abf35dc141ea63f17cf3c1b89a502e) (2025-12-08)
 
 ### Features
+
+* update mining block growth trend
+([ac0be7b](https://github.com/argonprotocol/mainchain/commit/ac0be7ba23032d0367ab39664030ae3f89558678))
+
+### [v1.3.22](https://github.com/argonprotocol/mainchain/compare/v1.3.21...v1.3.22) (2025-12-03)
+
+#### Features
 
 * add frame id to digest log
 ([50228b3](https://github.com/argonprotocol/mainchain/commit/50228b331236bcc9a45dbb695e9abfbb67ad1015))
 * Mining Frame transition to reward ticks
 ([e67bb6d](https://github.com/argonprotocol/mainchain/commit/e67bb6d6cdf56b154f86ea20ce5c9c7f64ec3610))
 
-### Fixes
+#### Fixes
 
 * **mint:** don’t take min when cpi positive
 ([7ab2987](https://github.com/argonprotocol/mainchain/commit/7ab298711eeac627caa92290aac0eb3e634e3f8a))
