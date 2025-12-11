@@ -2,7 +2,7 @@
   "specName": "argon",
   "implName": "argon",
   "authoringVersion": 1,
-  "specVersion": 142,
+  "specVersion": 143,
   "implVersion": 9,
   "apis": [
     ["0xdf6acb689907609b", 5],
