@@ -18,7 +18,7 @@ use argon_primitives::{
 		BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey,
 		H256Le, SATOSHIS_PER_BITCOIN, UtxoRef,
 	},
-	vault::LockExtension,
+	vault::{LockExtension, Securitization},
 };
 
 #[test]
@@ -53,6 +53,7 @@ fn can_lock_a_bitcoin_utxo() {
 				utxo_id: 1,
 				vault_id: 1,
 				liquidity_promised,
+				securitization: liquidity_promised,
 				pegged_price: liquidity_promised,
 				account_id: 2,
 				security_fee: liquidity_promised / 10,
@@ -83,7 +84,7 @@ fn cleans_up_a_rejected_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().argons_locked, price);
+		assert_eq!(DefaultVault::get().securitization_locked, price);
 
 		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
@@ -112,7 +113,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().argons_locked, price);
+		assert_eq!(DefaultVault::get().securitization_locked, price);
 
 		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::SatoshisMismatch));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
@@ -153,7 +154,7 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 		assert_eq!(LastReleaseEvent::get(), Some((1, false, 0)));
 		assert!(!LockCosignDueByFrame::<Test>::get(cosign_due).contains(&1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().argons_locked, 0);
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
 	});
 }
 
@@ -175,7 +176,7 @@ fn marks_a_verified_bitcoin() {
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().argons_locked, price);
+		assert_eq!(DefaultVault::get().securitization_locked, price);
 
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
@@ -265,7 +266,7 @@ fn burns_a_spent_bitcoin() {
 
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
-		assert_eq!(DefaultVault::get().argons_locked, price);
+		assert_eq!(DefaultVault::get().securitization_locked, price);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 
@@ -278,7 +279,8 @@ fn burns_a_spent_bitcoin() {
 		assert_ok!(BitcoinLocks::utxo_spent(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
-		assert_eq!(DefaultVault::get().argons_locked, price - new_price);
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
+		assert_eq!(DefaultVault::get().get_relock_capacity(), price - new_price);
 		assert_eq!(DefaultVault::get().securitization, allocated - new_price);
 
 		System::assert_last_event(
@@ -336,7 +338,7 @@ fn can_release_a_bitcoin() {
 			pubkey
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(DefaultVault::get().argons_locked, lock.liquidity_promised);
+		assert_eq!(DefaultVault::get().securitization_locked, lock.liquidity_promised);
 		let expiration_block = lock.vault_claim_height;
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
@@ -438,7 +440,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
 		let vault = DefaultVault::get();
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(vault.argons_locked, lock.liquidity_promised);
+		assert_eq!(vault.securitization_locked, lock.liquidity_promised);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		// Mint the argons into account
@@ -517,7 +519,7 @@ fn clears_released_bitcoins() {
 		));
 		let vault = DefaultVault::get();
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(vault.argons_locked, lock.liquidity_promised);
+		assert_eq!(vault.securitization_locked, lock.liquidity_promised);
 		// first verify
 		assert_ok!(BitcoinLocks::utxo_verified(1));
 		// Mint the argons into account
@@ -569,7 +571,8 @@ fn clears_released_bitcoins() {
 		assert!(LockReleaseRequestsByUtxoId::<Test>::get(1).is_none());
 		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().argons_locked, lock.liquidity_promised);
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
+		assert_eq!(DefaultVault::get().get_relock_capacity(), lock.liquidity_promised);
 		assert_eq!(DefaultVault::get().securitization, vault.securitization);
 		assert_eq!(LockReleaseCosignHeightById::<Test>::get(1), Some(1));
 
@@ -651,12 +654,13 @@ fn it_should_allow_a_ratchet_up() {
 		let current_block = BitcoinBlockHeightChange::get().1;
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
 		let apr = FixedU128::from_float(0.00000001);
+		let securitization = Securitization::new(8_000 * MICROGONS_PER_ARGON, FixedU128::one());
 		DefaultVault::mutate(|a| {
 			a.securitization = 70_000_000_000;
 			a.terms.bitcoin_base_fee = 1000;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(8_000 * MICROGONS_PER_ARGON).unwrap();
+			a.lock(&securitization).unwrap();
 		});
 		set_argons(who, 5000);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
@@ -679,7 +683,7 @@ fn it_should_allow_a_ratchet_up() {
 		let extension = LockExtension::new(expiration_block + 144);
 		// release funds with an expiration
 		DefaultVault::mutate(|a| {
-			a.schedule_for_release(8_000 * MICROGONS_PER_ARGON, &extension).unwrap();
+			a.schedule_for_release(&securitization, &extension).unwrap();
 		});
 
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1,));
@@ -694,7 +698,7 @@ fn it_should_allow_a_ratchet_up() {
 		assert_eq!(lock.liquidity_promised, 65_000 * MICROGONS_PER_ARGON);
 		assert_eq!(
 			lock.fund_hold_extensions.into_iter().collect::<Vec<_>>(),
-			vec![(extension.day(), 3_000 * MICROGONS_PER_ARGON)]
+			vec![(extension.expiration_day(), 3_000 * MICROGONS_PER_ARGON)]
 		);
 		assert_eq!(lock.security_fees, 1000 + 620 + (1000 + apr / 2));
 		System::assert_last_event(

@@ -478,7 +478,7 @@ export default {
       FundsLocked: {
         vaultId: 'u32',
         locker: 'AccountId32',
-        amount: 'u128',
+        liquidityPromised: 'u128',
         isRatchet: 'bool',
         feeRevenue: 'u128',
       },
@@ -488,7 +488,7 @@ export default {
       },
       FundsScheduledForRelease: {
         vaultId: 'u32',
-        amount: 'u128',
+        securitization: 'u128',
         releaseHeight: 'u64',
       },
       LostBitcoinCompensated: {
@@ -499,7 +499,7 @@ export default {
       },
       FundsReleased: {
         vaultId: 'u32',
-        amount: 'u128',
+        securitization: 'u128',
       },
       FundsReleasedError: {
         vaultId: 'u32',
@@ -522,6 +522,7 @@ export default {
         utxoId: 'u64',
         vaultId: 'u32',
         liquidityPromised: 'u128',
+        securitization: 'u128',
         peggedPrice: 'u128',
         accountId: 'AccountId32',
         securityFee: 'u128',
@@ -2762,9 +2763,9 @@ export default {
   ArgonPrimitivesVault: {
     operatorAccountId: 'AccountId32',
     securitization: 'Compact<u128>',
-    argonsLocked: 'Compact<u128>',
-    argonsPendingActivation: 'Compact<u128>',
-    argonsScheduledForRelease: 'BTreeMap<u64, u128>',
+    securitizationLocked: 'Compact<u128>',
+    securitizationPendingActivation: 'Compact<u128>',
+    securitizationReleaseSchedule: 'BTreeMap<u64, u128>',
     securitizationRatio: 'Compact<u128>',
     isClosed: 'bool',
     terms: 'ArgonPrimitivesVaultVaultTerms',
@@ -2848,10 +2849,11 @@ export default {
    **/
   PalletBitcoinLocksLockedBitcoin: {
     vaultId: 'Compact<u32>',
-    liquidityPromised: 'u128',
-    peggedPrice: 'u128',
+    liquidityPromised: 'Compact<u128>',
+    peggedPrice: 'Compact<u128>',
+    securitizationRatio: 'u128',
     ownerAccount: 'AccountId32',
-    securityFees: 'u128',
+    securityFees: 'Compact<u128>',
     satoshis: 'Compact<u64>',
     vaultPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',
     vaultClaimPubkey: 'ArgonPrimitivesBitcoinCompressedBitcoinPubkey',

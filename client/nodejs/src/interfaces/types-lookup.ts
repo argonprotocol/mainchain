@@ -610,7 +610,7 @@ declare module '@polkadot/types/lookup' {
     readonly asFundsLocked: {
       readonly vaultId: u32;
       readonly locker: AccountId32;
-      readonly amount: u128;
+      readonly liquidityPromised: u128;
       readonly isRatchet: bool;
       readonly feeRevenue: u128;
     } & Struct;
@@ -622,7 +622,7 @@ declare module '@polkadot/types/lookup' {
     readonly isFundsScheduledForRelease: boolean;
     readonly asFundsScheduledForRelease: {
       readonly vaultId: u32;
-      readonly amount: u128;
+      readonly securitization: u128;
       readonly releaseHeight: u64;
     } & Struct;
     readonly isLostBitcoinCompensated: boolean;
@@ -635,7 +635,7 @@ declare module '@polkadot/types/lookup' {
     readonly isFundsReleased: boolean;
     readonly asFundsReleased: {
       readonly vaultId: u32;
-      readonly amount: u128;
+      readonly securitization: u128;
     } & Struct;
     readonly isFundsReleasedError: boolean;
     readonly asFundsReleasedError: {
@@ -674,6 +674,7 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly vaultId: u32;
       readonly liquidityPromised: u128;
+      readonly securitization: u128;
       readonly peggedPrice: u128;
       readonly accountId: AccountId32;
       readonly securityFee: u128;
@@ -3194,9 +3195,9 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesVault extends Struct {
     readonly operatorAccountId: AccountId32;
     readonly securitization: Compact<u128>;
-    readonly argonsLocked: Compact<u128>;
-    readonly argonsPendingActivation: Compact<u128>;
-    readonly argonsScheduledForRelease: BTreeMap<u64, u128>;
+    readonly securitizationLocked: Compact<u128>;
+    readonly securitizationPendingActivation: Compact<u128>;
+    readonly securitizationReleaseSchedule: BTreeMap<u64, u128>;
     readonly securitizationRatio: Compact<u128>;
     readonly isClosed: bool;
     readonly terms: ArgonPrimitivesVaultVaultTerms;
@@ -3304,10 +3305,11 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletBitcoinLocksLockedBitcoin (395) */
   interface PalletBitcoinLocksLockedBitcoin extends Struct {
     readonly vaultId: Compact<u32>;
-    readonly liquidityPromised: u128;
-    readonly peggedPrice: u128;
+    readonly liquidityPromised: Compact<u128>;
+    readonly peggedPrice: Compact<u128>;
+    readonly securitizationRatio: u128;
     readonly ownerAccount: AccountId32;
-    readonly securityFees: u128;
+    readonly securityFees: Compact<u128>;
     readonly satoshis: Compact<u64>;
     readonly vaultPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
     readonly vaultClaimPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
