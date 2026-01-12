@@ -205,6 +205,7 @@ mod tests {
 	}
 
 	#[tokio::test]
+	#[ignore] // Coingecko has rate limits
 	async fn test_get_coingecko_price() {
 		let price_lookups = CoinUsdPriceLookup::new().get_coingecko_price().await.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));

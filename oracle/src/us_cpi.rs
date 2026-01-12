@@ -439,10 +439,10 @@ mod tests {
 	async fn test_ignores_annual() {
 		let response_json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":162,"message":["No Data Available for Series CUUR0000SA0 Year: 2025"],"Results":{
 "series":
-[{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M13","periodName":"Annual","latest":"true","value":"313.689","footnotes":[{}]}]}]
+[{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M13","periodName":"Annual","latest":"true","value":"313.689","footnotes":[{}]},{"year":"2025","period":"M11","periodName":"November","latest":"true","value":"324.122","footnotes":[{}]}]}]
 }}"#;
 		let cpi_values = parse_cpi_results(response_json).unwrap();
-		assert!(cpi_values.is_empty());
+		assert_eq!(cpi_values.len(), 1);
 	}
 
 	#[tokio::test]
