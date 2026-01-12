@@ -50,11 +50,20 @@ pub struct PriceIndex {
 }
 impl PriceIndex {
 	pub fn argon_cpi(&self) -> ArgonCPI {
-		let ratio = self
-			.argon_usd_target_price
-			.checked_div(&self.argon_usd_price)
-			.unwrap_or(FixedU128::one());
-		ArgonCPI::from_inner(ratio.into_inner() as i128) - FixedI128::one()
+		// if the difference is less than 0.001, treat it as normal market slippage/noise
+		let fixed_i_argon_usd_price =
+			FixedI128::from_inner(self.argon_usd_price.into_inner() as i128);
+		let fixed_i_argon_usd_target_price =
+			FixedI128::from_inner(self.argon_usd_target_price.into_inner() as i128);
+		if (fixed_i_argon_usd_price - fixed_i_argon_usd_target_price).saturating_abs() <
+			FixedI128::from_rational(1, 1000)
+		{
+			return ArgonCPI::zero();
+		}
+		let ratio = fixed_i_argon_usd_target_price
+			.checked_div(&fixed_i_argon_usd_price)
+			.unwrap_or(FixedI128::one());
+		ratio - FixedI128::one()
 	}
 
 	pub fn redemption_r_value(&self) -> FixedU128 {
