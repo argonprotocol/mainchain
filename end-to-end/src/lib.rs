@@ -168,22 +168,24 @@ pub(crate) mod utils {
 			.unwrap_or_default();
 		// wait for next cohort to start
 		let lookup = storage().mining_slot().account_index_lookup(first_account);
-		loop {
-			let account_index = client.fetch_storage(&lookup, FetchAt::Best).await?;
+		let mut block_sub = client.live.blocks().subscribe_best().await?;
+		while let Some(Ok(block)) = block_sub.next().await {
+			let fetch_at = FetchAt::Block(block.hash());
+			let account_index = client.fetch_storage(&lookup, fetch_at).await?;
 			if let Some((frame_id, index)) = account_index {
 				println!("Miner 1 registered at frame {}, index {}", frame_id, index);
 				break;
 			}
 			let registered_miners = client
-				.fetch_storage(&storage().mining_slot().active_miners_count(), FetchAt::Best)
+				.fetch_storage(&storage().mining_slot().active_miners_count(), fetch_at)
 				.await?
 				.unwrap_or_default();
 			let bids_for_next_cohort = client
-				.fetch_storage(&storage().mining_slot().bids_for_next_slot_cohort(), FetchAt::Best)
+				.fetch_storage(&storage().mining_slot().bids_for_next_slot_cohort(), fetch_at)
 				.await?
 				.unwrap_or(BoundedVec(vec![]));
 			let next_frame_id = client
-				.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
+				.fetch_storage(&storage().mining_slot().next_frame_id(), fetch_at)
 				.await?
 				.unwrap_or_default();
 			println!(
@@ -201,7 +203,6 @@ pub(crate) mod utils {
 			if next_frame_id > wait_til_past_frame_id {
 				panic!("next frameId changed while waiting for registration");
 			}
-			tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 		}
 		let registered_miners = client
 			.fetch_storage(&storage().mining_slot().active_miners_count(), FetchAt::Best)

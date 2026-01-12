@@ -35,6 +35,7 @@ runs:
           sudo rm -rf target
           sudo ln -s /mnt/target target
           echo "CARGO_TARGET_DIR=/mnt/target" >> $GITHUB_ENV
+          echo "WASM_BUILD_WORKSPACE_HINT=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
         elif [ "$RUNNER_OS" == "macOS" ]; then
           echo "version=macos-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
         elif [ "$RUNNER_OS" == "Windows" ]; then
@@ -55,6 +56,29 @@ runs:
           ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
+    - name: Clean runtime builds
+      run: |
+        set -euo pipefail
+
+        # Default to the standard cargo target dir if CARGO_TARGET_DIR isn't set.
+        CARGO_TARGET_DIR_PATH="${CARGO_TARGET_DIR:-target}"
+
+        echo "Cleaning runtime/WASM build caches under: ${CARGO_TARGET_DIR_PATH}"
+
+        # Substrate's wasm-builder commonly uses a `wbuild/` directory under target.
+        # Stale wasm artifacts here can cause metadata/client incompatibility.
+        rm -rf "${CARGO_TARGET_DIR_PATH}/wbuild" \
+               "${CARGO_TARGET_DIR_PATH}/debug/wbuild" \
+               "${CARGO_TARGET_DIR_PATH}/release/wbuild" || true
+
+        # Clear build-script OUT_DIR outputs for the most likely metadata-sensitive crates.
+        # This keeps most dependency artifacts but forces runtime/node codegen to rerun.
+        rm -rf "${CARGO_TARGET_DIR_PATH}/debug/build"/*argon-* || true
+        rm -rf "${CARGO_TARGET_DIR_PATH}/debug/build"/*argon_* || true
+
+        echo "After cleanup, top-level sizes:"
+        du -sh "${CARGO_TARGET_DIR_PATH}" 2>/dev/null || true
+      shell: bash
     - name: Print space after restore
       run: |
         echo "Disk space after restore:"

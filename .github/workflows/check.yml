@@ -86,7 +86,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache: 'false'
-          target: ${{runner.target}}
+          target: ${{matrix.target}}
 
       - uses: taiki-e/install-action@v2
         with:
@@ -112,7 +112,7 @@ jobs:
         run: df -h
 
       - name: Build
-        run: cargo build --features=simulated-prices --bins
+        run: cargo build --features=simulated-prices --features=ci --features=try-runtime --bins
         env:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,7 +122,7 @@ jobs:
         run: df -h
 
       - name: Run tests
-        run: cargo test --features=ci --no-fail-fast --lib --bins -- --nocapture
+        run: cargo test --features=ci --features=simulated-prices --features=try-runtime --no-fail-fast --lib --bins -- --nocapture
         timeout-minutes: 90
         env:
           CARGO_INCREMENTAL: 0
