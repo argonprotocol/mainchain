@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.3.24](https://github.com/argonprotocol/mainchain/compare/v1.3.23...29310689f681062caa25a8413a44254f5b0a5043) (2025-12-10)
+## [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...7b71f8ad566edf143a514fc94847a61433738ea3) (2026-01-12)
 
 ### Fixes
+
+* oracle should handle - as price from BLS
+([54ee4bf](https://github.com/argonprotocol/mainchain/commit/54ee4bfe47a7d7f02aa77a5a44d53fb61302276f))
+
+### [v1.3.24](https://github.com/argonprotocol/mainchain/compare/v1.3.23...v1.3.24) (2025-12-10)
+
+#### Fixes
 
 * migrate argons per block to min
 ([2931068](https://github.com/argonprotocol/mainchain/commit/29310689f681062caa25a8413a44254f5b0a5043))
