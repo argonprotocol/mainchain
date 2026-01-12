@@ -1,6 +1,6 @@
 use crate::{
 	us_cpi_schedule::{CpiSchedule, load_cpi_schedule},
-	utils::{parse_date, parse_f64, to_fixed_i128},
+	utils::{parse_date, parse_maybe_f64, to_fixed_i128},
 };
 use anyhow::{Result, anyhow, bail, ensure};
 use argon_primitives::tick::{Tick, Ticker};
@@ -292,24 +292,56 @@ async fn get_raw_cpis() -> Result<Vec<RawCpiValue>> {
 	})
 }
 
-fn parse_cpi_results(resp_price: &str) -> Result<Vec<RawCpiValue>> {
-	if resp_price.contains("REQUEST_NOT_PROCESSED") {
+fn parse_cpi_results(response_body: &str) -> Result<Vec<RawCpiValue>> {
+	if response_body.contains("REQUEST_NOT_PROCESSED") {
 		bail!("REQUEST_NOT_PROCESSED");
 	}
-	let resp_price: CpiResult = serde_json::from_str(resp_price)?;
-	ensure!(resp_price.status == "REQUEST_SUCCEEDED", "Failed to get CPI data");
-	let resp_price = resp_price.results.series.first().ok_or(anyhow!("No series data"))?;
-	ensure!(!resp_price.data.is_empty(), "Failed to get CPI data");
+	let cpi_result: CpiResult = serde_json::from_str(response_body)?;
+	ensure!(cpi_result.status == "REQUEST_SUCCEEDED", "Failed to get CPI data");
 
-	let mut cpis = vec![];
-	for data in &resp_price.data {
-		if data.period_name == "Annual" {
-			continue;
-		}
-		let price = FixedU128::from_float(data.value);
-		cpis.push(RawCpiValue { value: price, ref_month: data.parse_period()? });
+	let first_series_entry = cpi_result.results.series.first().ok_or(anyhow!("No series data"))?;
+	ensure!(!first_series_entry.data.is_empty(), "Failed to get CPI data");
+
+	let monthly_entries = first_series_entry
+		.data
+		.iter()
+		.filter(|entry| entry.period_name != "Annual")
+		.collect::<Vec<_>>();
+	ensure!(!monthly_entries.is_empty(), "Failed to get CPI data");
+
+	// BLS data is typically returned newest -> oldest.
+	// Build values in chronological order (oldest -> newest) so "previous month" math is trivial,
+	// then reverse at the end to keep the function's original newest -> oldest output.
+	let mut chronological_cpi_values: Vec<RawCpiValue> = vec![];
+
+	for series_data_entry in monthly_entries.iter().rev() {
+		let value = if let Some(value) = series_data_entry.value {
+			FixedU128::from_float(value)
+		} else {
+			let last_month_value = chronological_cpi_values
+				.last()
+				.map(|entry| entry.value)
+				.ok_or_else(|| anyhow!("Insufficient CPI data"))?;
+
+			let two_months_ago_value = chronological_cpi_values
+				.get(chronological_cpi_values.len().saturating_sub(2))
+				.map(|entry| entry.value);
+			if let Some(two_months_ago_value) = two_months_ago_value {
+				// Backfill by carrying forward the *same percent change* as the last observed
+				// change. Example: Aug -> Sep ratio = Sep/Aug, so backfilled Oct = Sep *
+				// (Sep/Aug).
+				(last_month_value / two_months_ago_value) * last_month_value
+			} else {
+				last_month_value
+			}
+		};
+
+		chronological_cpi_values
+			.push(RawCpiValue { ref_month: series_data_entry.parse_period()?, value });
 	}
-	Ok(cpis)
+
+	chronological_cpi_values.reverse();
+	Ok(chronological_cpi_values)
 }
 
 async fn get_raw_cpi() -> Result<RawCpiValue> {
@@ -356,8 +388,8 @@ pub struct CpiResultSeriesData {
 	pub period: String,
 	#[serde(rename = "periodName")]
 	pub period_name: String, // "January"
-	#[serde(deserialize_with = "parse_f64")]
-	pub value: f64,
+	#[serde(deserialize_with = "parse_maybe_f64")]
+	pub value: Option<f64>,
 }
 
 impl CpiResultSeriesData {
@@ -393,24 +425,39 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_parse_raw_cpis() {
-		let json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":175,"message":[],"Results":{
+		let response_json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":175,"message":[],"Results":{
 "series":
 [{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M05","periodName":"May","latest":"true","value":"314.069","footnotes":[{}]},{"year":"2024","period":"M04","periodName":"April","value":"313.548","footnotes":[{}]},{"year":"2024","period":"M03","periodName":"March","value":"312.332","footnotes":[{}]},{"year":"2024","period":"M02","periodName":"February","value":"310.326","footnotes":[{}]},{"year":"2024","period":"M01","periodName":"January","value":"308.417","footnotes":[{}]},{"year":"2023","period":"M12","periodName":"December","value":"306.746","footnotes":[{}]},{"year":"2023","period":"M11","periodName":"November","value":"307.051","footnotes":[{}]},{"year":"2023","period":"M10","periodName":"October","value":"307.671","footnotes":[{}]},{"year":"2023","period":"M09","periodName":"September","value":"307.789","footnotes":[{}]},{"year":"2023","period":"M08","periodName":"August","value":"307.026","footnotes":[{}]},{"year":"2023","period":"M07","periodName":"July","value":"305.691","footnotes":[{}]},{"year":"2023","period":"M06","periodName":"June","value":"305.109","footnotes":[{}]},{"year":"2023","period":"M05","periodName":"May","value":"304.127","footnotes":[{}]},{"year":"2023","period":"M04","periodName":"April","value":"303.363","footnotes":[{}]},{"year":"2023","period":"M03","periodName":"March","value":"301.836","footnotes":[{}]},{"year":"2023","period":"M02","periodName":"February","value":"300.840","footnotes":[{}]},{"year":"2023","period":"M01","periodName":"January","value":"299.170","footnotes":[{}]},{"year":"2022","period":"M12","periodName":"December","value":"296.797","footnotes":[{}]},{"year":"2022","period":"M11","periodName":"November","value":"297.711","footnotes":[{}]},{"year":"2022","period":"M10","periodName":"October","value":"298.012","footnotes":[{}]},{"year":"2022","period":"M09","periodName":"September","value":"296.808","footnotes":[{}]},{"year":"2022","period":"M08","periodName":"August","value":"296.171","footnotes":[{}]},{"year":"2022","period":"M07","periodName":"July","value":"296.276","footnotes":[{}]},{"year":"2022","period":"M06","periodName":"June","value":"296.311","footnotes":[{}]},{"year":"2022","period":"M05","periodName":"May","value":"292.296","footnotes":[{}]},{"year":"2022","period":"M04","periodName":"April","value":"289.109","footnotes":[{}]},{"year":"2022","period":"M03","periodName":"March","value":"287.504","footnotes":[{}]},{"year":"2022","period":"M02","periodName":"February","value":"283.716","footnotes":[{}]},{"year":"2022","period":"M01","periodName":"January","value":"281.148","footnotes":[{}]}]}]
 }}"#;
-		let cpis = parse_cpi_results(json).unwrap();
-		assert_eq!(cpis.len(), 29);
-		assert!(cpis[0].value >= FixedU128::from_u32(200));
-		assert!(cpis[0].ref_month > cpis[1].ref_month);
+		let cpi_values = parse_cpi_results(response_json).unwrap();
+		assert_eq!(cpi_values.len(), 29);
+		assert!(cpi_values[0].value >= FixedU128::from_u32(200));
+		assert!(cpi_values[0].ref_month > cpi_values[1].ref_month);
 	}
 
 	#[tokio::test]
 	async fn test_ignores_annual() {
-		let json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":162,"message":["No Data Available for Series CUUR0000SA0 Year: 2025"],"Results":{
+		let response_json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":162,"message":["No Data Available for Series CUUR0000SA0 Year: 2025"],"Results":{
 "series":
 [{"seriesID":"CUUR0000SA0","data":[{"year":"2024","period":"M13","periodName":"Annual","latest":"true","value":"313.689","footnotes":[{}]}]}]
 }}"#;
-		let cpis = parse_cpi_results(json).unwrap();
-		assert!(cpis.is_empty());
+		let cpi_values = parse_cpi_results(response_json).unwrap();
+		assert!(cpi_values.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_backfills_missing_months() {
+		let response_json = r#"{"status":"REQUEST_SUCCEEDED","responseTime":1,"message":[],"Results":{"series":[{"seriesID":"CUUR0000SA0","data":[{"year":"2025","period":"M11","periodName":"November","latest":"true","value":"324.122","footnotes":[{}]},{"year":"2025","period":"M10","periodName":"October","value":"-","footnotes":[{"code":"X","text":"Data unavailable due to the 2025 lapse in appropriations"}]},{"year":"2025","period":"M09","periodName":"September","value":"324.800","footnotes":[{}]},{"year":"2025","period":"M08","periodName":"August","value":"324.100","footnotes":[{}]}]}]}}"#;
+		let cpi_values = parse_cpi_results(response_json).unwrap();
+		assert_eq!(cpi_values.len(), 4);
+		assert_eq!(cpi_values[0].value, FixedU128::from_float(324.122));
+		assert_eq!(
+			cpi_values[1].value,
+			(FixedU128::from_float(324.8) / FixedU128::from_float(324.1)) *
+				FixedU128::from_float(324.8)
+		); // backfilled
+		assert_eq!(cpi_values[2].value, FixedU128::from_float(324.800));
+		assert_eq!(cpi_values[3].value, FixedU128::from_float(324.100));
 	}
 
 	#[tokio::test]
