@@ -209,6 +209,10 @@ where
 		});
 
 		let mut best_block = Box::pin(client.every_import_notification_stream());
+		let mut health_tick = time::interval(
+			Duration::from_millis(ticker.tick_duration_millis / 3).max(Duration::from_secs(5)),
+		);
+		health_tick.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
 
 		loop {
 			tokio::select! {
@@ -230,6 +234,13 @@ where
 								e
 							);
 						}
+					}
+				},
+				_ = health_tick.tick() => {
+					let best_hash = client.best_hash();
+					if client.has_block_state(best_hash) {
+						trace!("Running notary health check at {:?}", best_hash);
+						let _ = notary_client_poll.update_notaries(&best_hash).await;
 					}
 				},
 				// Prevent thrashing the polling when nothing is returned

@@ -65,6 +65,8 @@ pub(crate) struct SolvingBlock<B: BlockT, Proof> {
 	pub pre_hash: B::Hash,
 	/// Pre-runtime digest item.
 	pub difficulty: ComputeDifficulty,
+	/// Key block hash.
+	pub key_block_hash: H256,
 }
 
 /// Mining worker that exposes structs to query the current mining build and submit mined blocks.
@@ -136,8 +138,11 @@ where
 		}
 		let difficulty = self.metadata.lock().as_ref().map(|x| x.difficulty).unwrap_or_default();
 		let pre_hash = proposal.proposal.block.header().hash();
+		let key_block_hash =
+			self.metadata.lock().as_ref().map(|x| x.key_block_hash).unwrap_or_default();
 
-		*self.solving_block.lock() = Some(SolvingBlock { pre_hash, difficulty, proposal });
+		*self.solving_block.lock() =
+			Some(SolvingBlock { pre_hash, difficulty, proposal, key_block_hash });
 	}
 
 	pub fn is_valid_solver(&self, solver: &Option<Box<ComputeSolver>>) -> bool {
@@ -184,26 +189,36 @@ where
 		}
 	}
 
-	pub fn submit(&self, nonce: U256, version: Version) {
-		let Some(build) = self.solving_block.lock().take() else {
-			trace!("Unable to submit mined block in compute worker: internal build does not exist",);
+	pub fn submit(&self, nonce: BlockComputeNonce, key_block_hash: &H256) {
+		// Hold the lock for the entire decision so we don't race a new build / best-hash update.
+		let mut guard = self.solving_block.lock();
+		let Some(build) = guard.as_ref() else {
+			trace!("Unable to submit mined block in compute worker: internal build does not exist");
 			return;
 		};
 
-		if self.version() != version {
+		if build.pre_hash.as_ref() != nonce.pre_hash.as_slice() {
 			trace!(
-				"Unable to submit mined block in compute worker: version mismatch. Expected {}, got {}",
-				self.version(),
-				version
+				"Unable to submit mined block in compute worker: pre-hash mismatch. Expected {:?}, got {:?}",
+				build.pre_hash, nonce.pre_hash
+			);
+			return;
+		}
+		if build.key_block_hash != *key_block_hash {
+			trace!(
+				"Unable to submit mined block in compute worker: key block hash mismatch. Expected {:?}, got {:?}",
+				build.key_block_hash, key_block_hash
 			);
 			return;
 		}
 
-		self.increment_version();
+		// Consume the build (first valid submit wins).
+		let build = guard.take().expect("checked Some above");
+		drop(guard);
 
 		let _ = self
 			.block_found_tx
-			.unbounded_send((build, BlockSealDigest::Compute { nonce }))
+			.unbounded_send((build, BlockSealDigest::Compute { nonce: nonce.nonce }))
 			.inspect_err(|e| error!("Error sending block found message: {:?}", e));
 	}
 }
@@ -329,10 +344,9 @@ pub fn run_compute_solver_threads<B, Proof, C>(
 				};
 
 				counter += 1;
-				// grab before solving
-				let version = solver.version;
+				let key_block_hash = solver.key_block_hash;
 				match solver.check_next() {
-					Ok(Some(nonce)) => worker.submit(nonce.nonce, version),
+					Ok(Some(nonce)) => worker.submit(nonce, &key_block_hash),
 					Err(err) => {
 						warn!("Mining failed: {:?}", err);
 						if matches!(err, RandomXError::CreationError(_)) {

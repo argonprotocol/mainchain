@@ -22,7 +22,7 @@ pub mod weights;
 const MAX_ADJUST_UP: u128 = 4; // Represents 4x adjustment
 const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
-const MIN_COMPUTE_DIFFICULTY: u128 = 4;
+const MIN_COMPUTE_DIFFICULTY: u128 = 200;
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
 const MIN_TAX_MINIMUM: u128 = ABSOLUTE_TAX_VOTE_MINIMUM;
 pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
@@ -327,8 +327,20 @@ pub mod pallet {
 				return;
 			}
 
+			let has_vote_block_authorities = T::AuthorityProvider::authority_count() > 0;
 			// only adjust difficulty every `ChangePeriod` blocks
-			if <PastComputeBlockTimes<T>>::get().is_full() {
+
+			// 2026-10-01: Temporarily using fixed compute time
+			// Right now, compute doesn't start until a node knows no vote block will overrule
+			// it (they get precedence). This means compute blocks don't start until they
+			// notice no vote blocks are coming in. Thus, we are measuring the compute time
+			// that occurs AFTER the node knows the no-vote-block period has started. Our
+			// target block period was set to 1/2 of a vote block period, but will always reduce
+			// the difficulty since compute begins after the tick is up. We do not have a good
+			// way to measure the true compute time right now, and given the rarity of
+			// compute blocks in normal operation, we're going to set this to a fixed value
+			// for now.
+			if <PastComputeBlockTimes<T>>::get().is_full() && !has_vote_block_authorities {
 				let mut timestamps = <PastComputeBlockTimes<T>>::take().to_vec();
 				timestamps.sort();
 
@@ -365,7 +377,13 @@ pub mod pallet {
 				.map(UniqueSaturatedInto::<u64>::unique_saturated_into)
 				.unwrap_or(now);
 			let block_period = now.saturating_sub(previous);
-			let _ = <PastComputeBlockTimes<T>>::try_append(block_period);
+			<PastComputeBlockTimes<T>>::mutate(|x| {
+				// might be full if we aren't clearing compute
+				if x.is_full() {
+					x.remove(0);
+				}
+				let _ = x.try_push(block_period);
+			});
 		}
 
 		pub fn create_block_vote_digest(
