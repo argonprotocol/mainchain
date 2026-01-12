@@ -1,10 +1,10 @@
 use crate::{BlockSealDigest, BlockVotingPower, ComputeDifficulty};
-use codec::{Compact, Decode, Encode, EncodeLike, MaxEncodedLen};
+use codec::{Compact, Decode, Encode, MaxEncodedLen};
 use core::cmp::Ordering;
 use polkadot_sdk::sp_core::U256;
 use scale_info::TypeInfo;
 
-#[derive(Clone, Debug, Eq, PartialEq, MaxEncodedLen, TypeInfo)]
+#[derive(Clone, Debug, Eq, PartialEq, Encode, MaxEncodedLen, TypeInfo)]
 pub struct ForkPower {
 	/// True if the fork is a vote block, false if it is a compute block.
 	pub is_latest_vote: bool,
@@ -19,8 +19,8 @@ pub struct ForkPower {
 	pub miner_nonce_score: Option<U256>,
 }
 
-/// Implement Decode and Encode for backwards compatibility with older versions of the ForkPower
-/// struct.
+/// Custom Decode for backwards compatibility: older ForkPower encodings omitted the
+/// `miner_nonce_score` Option field entirely when it was `None`.
 impl Decode for ForkPower {
 	fn decode<I: codec::Input + Sized>(input: &mut I) -> Result<Self, codec::Error> {
 		let is_latest_vote = bool::decode(input)?;
@@ -47,34 +47,6 @@ impl Decode for ForkPower {
 		})
 	}
 }
-
-/// Implement Encode for backwards compatibility with older versions of the ForkPower struct.
-/// Can be removed once we no longer need to support older versions.
-impl Encode for ForkPower {
-	fn size_hint(&self) -> usize {
-		self.is_latest_vote.size_hint() +
-			Compact::from(self.notebooks).size_hint() +
-			self.voting_power.size_hint() +
-			self.seal_strength.size_hint() +
-			self.total_compute_difficulty.size_hint() +
-			Compact::from(self.vote_created_blocks).size_hint() +
-			self.miner_nonce_score.as_ref().map_or(0, |x| x.size_hint())
-	}
-
-	fn encode_to<T: codec::Output + ?Sized>(&self, dest: &mut T) {
-		self.is_latest_vote.encode_to(dest);
-		Compact::from(self.notebooks).encode_to(dest);
-		self.voting_power.encode_to(dest);
-		self.seal_strength.encode_to(dest);
-		self.total_compute_difficulty.encode_to(dest);
-		Compact::from(self.vote_created_blocks).encode_to(dest);
-		if self.miner_nonce_score.is_some() {
-			self.miner_nonce_score.encode_to(dest);
-		}
-	}
-}
-
-impl EncodeLike for ForkPower {}
 
 impl ForkPower {
 	pub fn add(
