@@ -20,6 +20,17 @@ where
 	let s = String::deserialize(deserializer)?;
 	s.parse::<f64>().map_err(serde::de::Error::custom)
 }
+pub fn parse_maybe_f64<'de, D>(deserializer: D) -> anyhow::Result<Option<f64>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	// BLS sometimes returns "-" when data wasn't collected.
+	let s: Option<String> = Option::deserialize(deserializer)?;
+	match s.as_deref().map(str::trim) {
+		None | Some("") | Some("-") => Ok(None),
+		Some(v) => v.parse::<f64>().map(Some).map_err(serde::de::Error::custom),
+	}
+}
 
 pub fn parse_date(date: &str, formats: Vec<&str>) -> anyhow::Result<DateTime<Utc>> {
 	for format in formats {
