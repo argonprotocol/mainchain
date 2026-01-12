@@ -303,6 +303,21 @@ fn price_below_target_means_deflation() {
 }
 
 #[test]
+fn price_within_thousandth_of_target_is_on_target() {
+	let mut price_index = create_index();
+	price_index.argon_usd_price = FixedU128::from_float(1.0995);
+	price_index.argon_usd_target_price = FixedU128::from_float(1.10);
+
+	assert_eq!(price_index.argon_cpi(), ArgonCPI::from_float(0.0));
+
+	price_index.argon_usd_price = FixedU128::from_float(1.10005);
+	assert_eq!(price_index.argon_cpi(), ArgonCPI::from_float(0.0));
+
+	price_index.argon_usd_price = FixedU128::from_float(1.11004);
+	assert_ne!(price_index.argon_cpi(), ArgonCPI::from_float(0.0));
+}
+
+#[test]
 fn price_above_target_means_inflation() {
 	let mut price_index = create_index();
 	price_index.argon_usd_price = FixedU128::from_float(1.15);
