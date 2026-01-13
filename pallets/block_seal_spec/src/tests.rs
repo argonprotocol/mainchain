@@ -1,22 +1,23 @@
 use frame_support::traits::OnTimestampSet;
+use polkadot_sdk::sp_core::ed25519::Public;
 use pallet_prelude::*;
 use sp_core::crypto::AccountId32;
 
 use argon_primitives::{
-	MerkleProof, NotaryId, NotebookEventHandler,
-	digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest},
-	inherents::BlockSealInherent,
-	localchain::BlockVote,
+	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID}, inherents::BlockSealInherent, localchain::BlockVote,
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
+	MerkleProof,
+	NotaryId,
+	NotebookEventHandler,
 };
 
 use crate::{
-	Event, KEY_BLOCK_ROTATION,
-	mock::{BlockSealSpec, System, *},
-	pallet::{
+	mock::{BlockSealSpec, System, *}, pallet::{
 		CurrentComputeKeyBlock, PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp,
 	},
+	Event,
+	KEY_BLOCK_ROTATION,
 };
 
 #[test]
@@ -299,6 +300,33 @@ fn it_doesnt_adjust_difficulty_if_tax_block() {
 
 		assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
 		assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 10);
+	});
+}
+
+#[test]
+fn it_doesnt_adjust_difficulty_if_there_are_registered_miners() {
+	new_test_ext(100, 1000).execute_with(|| {
+		// Go past genesis block so events get deposited
+
+		assert_ok!(PastComputeBlockTimes::<Test>::try_mutate(|a| {
+			a.try_append(&mut vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1])
+		}));
+		AuthorityList::set(vec![(1, BlockSealAuthorityId::from(Public::from_raw([0; 32])))]);
+		let start_difficulty = BlockSealSpec::compute_difficulty();
+		for i in 1..100 {
+			System::set_block_number(i);
+			CurrentSeal::set(BlockSealInherent::Compute);
+
+			BlockSealSpec::on_timestamp_set(i);
+			BlockSealSpec::on_initialize(i);
+			BlockSealSpec::on_finalize(i);
+
+			assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 10);
+			// it should have put new times in, but not adjusted difficulty
+			assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
+			assert_ne!(PastComputeBlockTimes::<Test>::get(), vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1]);
+
+		}
 	});
 }
 
