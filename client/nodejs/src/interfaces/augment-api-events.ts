@@ -249,6 +249,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64,
           vaultId: u32,
           liquidityPromised: u128,
+          securitization: u128,
           peggedPrice: u128,
           accountId: AccountId32,
           securityFee: u128,
@@ -257,6 +258,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64;
           vaultId: u32;
           liquidityPromised: u128;
+          securitization: u128;
           peggedPrice: u128;
           accountId: AccountId32;
           securityFee: u128;
@@ -1513,13 +1515,25 @@ declare module '@polkadot/api-base/types/events' {
       >;
       FundsLocked: AugmentedEvent<
         ApiType,
-        [vaultId: u32, locker: AccountId32, amount: u128, isRatchet: bool, feeRevenue: u128],
-        { vaultId: u32; locker: AccountId32; amount: u128; isRatchet: bool; feeRevenue: u128 }
+        [
+          vaultId: u32,
+          locker: AccountId32,
+          liquidityPromised: u128,
+          isRatchet: bool,
+          feeRevenue: u128,
+        ],
+        {
+          vaultId: u32;
+          locker: AccountId32;
+          liquidityPromised: u128;
+          isRatchet: bool;
+          feeRevenue: u128;
+        }
       >;
       FundsReleased: AugmentedEvent<
         ApiType,
-        [vaultId: u32, amount: u128],
-        { vaultId: u32; amount: u128 }
+        [vaultId: u32, securitization: u128],
+        { vaultId: u32; securitization: u128 }
       >;
       FundsReleasedError: AugmentedEvent<
         ApiType,
@@ -1528,8 +1542,8 @@ declare module '@polkadot/api-base/types/events' {
       >;
       FundsScheduledForRelease: AugmentedEvent<
         ApiType,
-        [vaultId: u32, amount: u128, releaseHeight: u64],
-        { vaultId: u32; amount: u128; releaseHeight: u64 }
+        [vaultId: u32, securitization: u128, releaseHeight: u64],
+        { vaultId: u32; securitization: u128; releaseHeight: u64 }
       >;
       LostBitcoinCompensated: AugmentedEvent<
         ApiType,

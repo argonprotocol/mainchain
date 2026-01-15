@@ -1,23 +1,23 @@
 use frame_support::traits::OnTimestampSet;
-use polkadot_sdk::sp_core::ed25519::Public;
 use pallet_prelude::*;
+use polkadot_sdk::sp_core::ed25519::Public;
 use sp_core::crypto::AccountId32;
 
 use argon_primitives::{
-	digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID}, inherents::BlockSealInherent, localchain::BlockVote,
+	MerkleProof, NotaryId, NotebookEventHandler,
+	digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest},
+	inherents::BlockSealInherent,
+	localchain::BlockVote,
 	notary::NotaryNotebookVoteDigestDetails,
 	notebook::{NotebookHeader, NotebookNumber},
-	MerkleProof,
-	NotaryId,
-	NotebookEventHandler,
 };
 
 use crate::{
-	mock::{BlockSealSpec, System, *}, pallet::{
+	Event, KEY_BLOCK_ROTATION,
+	mock::{BlockSealSpec, System, *},
+	pallet::{
 		CurrentComputeKeyBlock, PastBlockVotes, PastComputeBlockTimes, PreviousBlockTimestamp,
 	},
-	Event,
-	KEY_BLOCK_ROTATION,
 };
 
 #[test]
@@ -324,8 +324,10 @@ fn it_doesnt_adjust_difficulty_if_there_are_registered_miners() {
 			assert_eq!(PastComputeBlockTimes::<Test>::get().len(), 10);
 			// it should have put new times in, but not adjusted difficulty
 			assert_eq!(BlockSealSpec::compute_difficulty(), start_difficulty);
-			assert_ne!(PastComputeBlockTimes::<Test>::get(), vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1]);
-
+			assert_ne!(
+				PastComputeBlockTimes::<Test>::get(),
+				vec![100, 100, 100, 100, 100, 100, 100, 100, 100, 1]
+			);
 		}
 	});
 }

@@ -101,7 +101,7 @@ primarily from treasury pool participation in mining bid distributions.
 - **Fund Management**:
   ```rust
   // Available securitization = total - locked - fees
-  vault.available_for_lock() = securitization - argons_locked
+  vault.available_for_lock() = securitization - securitization_locked
   ```
 
 #### 2. **Bitcoin Locks Pallet** (`pallets/bitcoin_locks`)

@@ -12996,6 +12996,7 @@ dependencies = [
  "bip32",
  "bitcoin",
  "k256",
+ "pallet-bitcoin-locks",
  "pallet-prelude",
  "pallet-treasury 1.3.25",
  "parity-scale-codec",
