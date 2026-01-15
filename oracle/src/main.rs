@@ -14,7 +14,11 @@ use std::env;
 use tracing::{error, info};
 use url::Url;
 
-use crate::{bitcoin_tip::bitcoin_loop, price_index::price_index_loop};
+use crate::{
+	bitcoin_tip::bitcoin_loop,
+	coin_usd_prices::{ALL_PRICE_PROVIDERS, PriceProviderKind},
+	price_index::price_index_loop,
+};
 
 mod argon_price;
 mod argonot_price;
@@ -61,6 +65,10 @@ pub enum Subcommand {
 		#[cfg(feature = "simulated-prices")]
 		#[clap(short, long)]
 		simulate_prices: bool,
+
+		/// Which coin price providers to use for USD prices
+		#[clap(long, env, value_enum, value_delimiter = ',', default_values_t = ALL_PRICE_PROVIDERS)]
+		coin_price_providers: Vec<PriceProviderKind>,
 	},
 	Bitcoin {
 		/// The Bitcoin full node to follow for longest chain. Should be a hosted/trusted
@@ -91,6 +99,7 @@ impl Default for Subcommand {
 		Subcommand::PriceIndex {
 			#[cfg(feature = "simulated-prices")]
 			simulate_prices: false,
+			coin_price_providers: vec![],
 		}
 	}
 }
@@ -197,14 +206,16 @@ async fn main() -> anyhow::Result<()> {
 		Subcommand::PriceIndex {
 			#[cfg(feature = "simulated-prices")]
 			simulate_prices,
+			coin_price_providers,
 		} => {
 			#[cfg(feature = "simulated-prices")]
 			{
-				price_index_loop(trusted_rpc_url, signer, simulate_prices).await?
+				price_index_loop(trusted_rpc_url, signer, simulate_prices, coin_price_providers)
+					.await?
 			}
 			#[cfg(not(feature = "simulated-prices"))]
 			{
-				price_index_loop(trusted_rpc_url, signer, false).await?
+				price_index_loop(trusted_rpc_url, signer, false, coin_price_providers).await?
 			}
 		},
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {
