@@ -10,8 +10,8 @@ use tokio::{join, time::sleep};
 use tracing::info;
 
 use crate::{
-	argon_price, argonot_price, coin_usd_prices, uniswap_oracle::PriceAndLiquidity,
-	us_cpi::UsCpiRetriever,
+	argon_price, argonot_price, coin_usd_prices, coin_usd_prices::PriceProviderKind,
+	uniswap_oracle::PriceAndLiquidity, us_cpi::UsCpiRetriever,
 };
 use argon_client::{
 	FetchAt, MainchainClient, ReconnectingClient,
@@ -25,6 +25,7 @@ pub async fn price_index_loop(
 	trusted_rpc_url: String,
 	signer: KeystoreSigner,
 	use_simulated_schedule: bool,
+	coin_price_providers: Vec<PriceProviderKind>,
 ) -> anyhow::Result<()> {
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
@@ -78,7 +79,8 @@ pub async fn price_index_loop(
 	}
 
 	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
-	let mut usd_price_lookups = coin_usd_prices::CoinUsdPriceLookup::new();
+	let mut usd_price_lookups =
+		coin_usd_prices::CoinUsdPriceLookup::new_with_providers(coin_price_providers);
 
 	let mut argon_price_lookup =
 		argon_price::ArgonPriceLookup::from_env(&ticker, last_price).await?;
@@ -246,7 +248,7 @@ mod tests {
 			env::set_var("INFURA_PROJECT_ID", "test");
 		}
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
-		spawn(price_index_loop(node.client.url.clone(), signer, false));
+		spawn(price_index_loop(node.client.url.clone(), signer, false, vec![]));
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
 		let argon_address = Address::from_str(ARGON_TOKEN_ADDRESS).unwrap();
