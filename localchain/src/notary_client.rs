@@ -259,7 +259,8 @@ impl NotaryClient {
 
     if has_seen_notebook {
       let client = self.client.read().await;
-      let header = download_notebook_header(&client, notebook_number).await?;
+      let header =
+        download_notebook_header(&client, notebook_number, Duration::from_secs(30)).await?;
       if self.auto_verify_header_signatures {
         self.verify_header(&header)?;
       }
@@ -283,7 +284,8 @@ impl NotaryClient {
         });
       if download_info.notebook_number == notebook_number {
         let client = self.client.read().await;
-        let header = download_notebook_header(&client, notebook_number).await?;
+        let header =
+          download_notebook_header(&client, notebook_number, Duration::from_secs(30)).await?;
         if self.auto_verify_header_signatures {
           self.verify_header(&header)?;
         }

@@ -1,4 +1,4 @@
-use crate::chain_spec::{ChainSpec, GenesisSettings, testnet_genesis};
+use crate::chain_spec::{ChainSpec, GenesisSettings, build_genesis_config};
 use argon_primitives::{
 	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, AccountId, Chain, ComputeDifficulty, TOKEN_DECIMALS,
 	bitcoin::BitcoinNetwork,
@@ -76,7 +76,7 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 		.with_boot_nodes(
 			[rpc_bootnode_0, rpc_bootnode_1, bootnode_grandpa_0, bootnode_grandpa_1].concat(),
 		)
-		.with_genesis_config_patch(testnet_genesis(GenesisSettings {
+		.with_genesis_config_patch(build_genesis_config(GenesisSettings {
 			// You have to have an authority to start the chain
 			founding_grandpas: founding_grandpas.into_iter().map(|a| (a, 1)).collect::<Vec<_>>(),
 			sudo_key: sudo_account.clone(),

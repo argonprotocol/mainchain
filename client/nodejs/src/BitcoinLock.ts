@@ -13,6 +13,7 @@ import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
+import { u128 } from '@polkadot/types-codec';
 
 export const SATS_PER_BTC = 100_000_000n;
 
@@ -22,10 +23,11 @@ export class BitcoinLock implements IBitcoinLock {
   public utxoId: number;
   public p2wshScriptHashHex: string;
   public vaultId: number;
-  public peggedPrice: bigint;
+  public lockedMarketRate: bigint;
   public liquidityPromised: bigint;
   public ownerAccount: string;
   public satoshis: bigint;
+  public utxoSatoshis?: bigint;
   public vaultPubkey: string;
   public securityFees: bigint;
   public vaultClaimPubkey: string;
@@ -39,17 +41,18 @@ export class BitcoinLock implements IBitcoinLock {
   public openClaimHeight: number;
   public createdAtHeight: number;
   public isVerified: boolean;
-  public isRejectedNeedsRelease: boolean;
+  public createdAtArgonBlock: number;
   public fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 
   constructor(data: IBitcoinLock) {
     this.utxoId = data.utxoId;
     this.p2wshScriptHashHex = data.p2wshScriptHashHex;
     this.vaultId = data.vaultId;
-    this.peggedPrice = data.peggedPrice;
+    this.lockedMarketRate = data.lockedMarketRate;
     this.liquidityPromised = data.liquidityPromised;
     this.ownerAccount = data.ownerAccount;
     this.satoshis = data.satoshis;
+    this.utxoSatoshis = data.utxoSatoshis;
     this.vaultPubkey = data.vaultPubkey;
     this.securityFees = data.securityFees;
     this.vaultClaimPubkey = data.vaultClaimPubkey;
@@ -59,9 +62,9 @@ export class BitcoinLock implements IBitcoinLock {
     this.openClaimHeight = data.openClaimHeight;
     this.createdAtHeight = data.createdAtHeight;
     this.isVerified = data.isVerified;
-    this.isRejectedNeedsRelease = data.isRejectedNeedsRelease;
     this.fundHoldExtensionsByBitcoinExpirationHeight =
       data.fundHoldExtensionsByBitcoinExpirationHeight;
+    this.createdAtArgonBlock = data.createdAtArgonBlock;
   }
 
   /**
@@ -103,13 +106,13 @@ export class BitcoinLock implements IBitcoinLock {
     priceIndex: PriceIndex,
     vault: Vault,
   ): Promise<{ burnAmount: bigint; ratchetingFee: bigint; marketRate: bigint }> {
-    const { createdAtHeight, vaultClaimHeight, peggedPrice, satoshis } = this;
+    const { createdAtHeight, vaultClaimHeight, lockedMarketRate, satoshis } = this;
     const marketRate = await BitcoinLock.getMarketRate(priceIndex, BigInt(satoshis));
 
     let ratchetingFee = vault.terms.bitcoinBaseFee;
     let burnAmount = 0n;
     // ratchet up
-    if (marketRate > peggedPrice) {
+    if (marketRate > lockedMarketRate) {
       const lockFee = vault.calculateBitcoinFee(marketRate);
       const currentBitcoinHeight = await client.query.bitcoinUtxos
         .confirmedBitcoinBlockTip()
@@ -141,7 +144,7 @@ export class BitcoinLock implements IBitcoinLock {
     getRatchetResult: () => Promise<{
       securityFee: bigint;
       txFee: bigint;
-      newPeggedPrice: bigint;
+      newLockedMarketRate: bigint;
       liquidityPromised: bigint;
       pendingMint: bigint;
       burned: bigint;
@@ -185,14 +188,14 @@ export class BitcoinLock implements IBitcoinLock {
       const {
         amountBurned,
         liquidityPromised: liquidityPromisedRaw,
-        newPeggedPrice,
-        originalPeggedPrice,
+        newLockedMarketRate,
+        originalMarketRate,
         securityFee,
       } = ratchetEvent.data;
       const liquidityPromised = liquidityPromisedRaw.toBigInt();
       let mintAmount = liquidityPromised;
-      if (liquidityPromised > originalPeggedPrice.toBigInt()) {
-        mintAmount -= originalPeggedPrice.toBigInt();
+      if (liquidityPromised > originalMarketRate.toBigInt()) {
+        mintAmount -= originalMarketRate.toBigInt();
       }
       return {
         txFee: txResult.finalFee ?? 0n,
@@ -200,7 +203,7 @@ export class BitcoinLock implements IBitcoinLock {
         bitcoinBlockHeight,
         pendingMint: mintAmount,
         liquidityPromised,
-        newPeggedPrice: newPeggedPrice.toBigInt(),
+        newLockedMarketRate: newLockedMarketRate.toBigInt(),
         burned: amountBurned.toBigInt(),
         securityFee: securityFee.toBigInt(),
       };
@@ -372,16 +375,16 @@ export class BitcoinLock implements IBitcoinLock {
 
   public static async getRedemptionRate(
     priceIndex: PriceIndex,
-    details: { satoshis: bigint; peggedPrice?: bigint },
+    details: { satoshis: bigint; lockedMarketRate?: bigint },
   ): Promise<bigint> {
-    const { satoshis, peggedPrice } = details;
+    const { satoshis, lockedMarketRate } = details;
     // scale inputs
     const satsPerArgon = Number(SATS_PER_BTC) / MICROGONS_PER_ARGON;
     let price = Number(priceIndex.btcUsdPrice);
     price = (price / satsPerArgon) * Number(satoshis);
 
-    if (peggedPrice !== undefined && peggedPrice < price) {
-      price = Number(peggedPrice);
+    if (lockedMarketRate !== undefined && lockedMarketRate < price) {
+      price = Number(lockedMarketRate);
     }
 
     const r = Number(priceIndex.rValue);
@@ -462,10 +465,14 @@ export class BitcoinLock implements IBitcoinLock {
     const wscriptHash = utxo.utxoScriptPubkey.asP2wsh.wscriptHash.toHex().replace('0x', '');
     const p2wshScriptHashHex = `0x${p2shBytesPrefix}${wscriptHash}`;
     const vaultId = utxo.vaultId.toNumber();
-    const peggedPrice = utxo.peggedPrice.toBigInt();
+    const lockedMarketRate =
+      utxo.lockedMarketRate?.toBigInt() ??
+      (utxo as { peggedPrice?: u128 }).peggedPrice?.toBigInt() ??
+      0n;
     const liquidityPromised = utxo.liquidityPromised.toBigInt();
     const ownerAccount = utxo.ownerAccount.toHuman();
     const satoshis = utxo.satoshis.toBigInt();
+    const utxoSatoshis = utxo.utxoSatoshis?.isSome ? utxo.utxoSatoshis.value.toBigInt() : undefined;
     const vaultPubkey = utxo.vaultPubkey.toHex();
     const vaultClaimPubkey = utxo.vaultClaimPubkey.toHex();
     const ownerPubkey = utxo.ownerPubkey.toHex();
@@ -476,12 +483,12 @@ export class BitcoinLock implements IBitcoinLock {
       claimHdIndex: claim_hd_index.toNumber(),
     };
 
+    const createdAtArgonBlock = utxo.createdAtArgonBlock?.toNumber() ?? 0;
     const securityFees = utxo.securityFees.toBigInt();
     const vaultClaimHeight = utxo.vaultClaimHeight.toNumber();
     const openClaimHeight = utxo.openClaimHeight.toNumber();
     const createdAtHeight = utxo.createdAtHeight.toNumber();
     const isVerified = utxo.isVerified.toJSON();
-    const isRejectedNeedsRelease = utxo.isRejectedNeedsRelease.toJSON();
     const fundHoldExtensionsByBitcoinExpirationHeight = Object.fromEntries(
       [...utxo.fundHoldExtensions.entries()].map(([x, y]) => [x.toNumber(), y.toBigInt()]),
     );
@@ -490,10 +497,11 @@ export class BitcoinLock implements IBitcoinLock {
       utxoId,
       p2wshScriptHashHex,
       vaultId,
-      peggedPrice,
+      lockedMarketRate,
       liquidityPromised,
       ownerAccount,
       satoshis,
+      utxoSatoshis,
       vaultPubkey,
       vaultClaimPubkey,
       ownerPubkey,
@@ -503,8 +511,8 @@ export class BitcoinLock implements IBitcoinLock {
       createdAtHeight,
       securityFees,
       isVerified,
-      isRejectedNeedsRelease,
       fundHoldExtensionsByBitcoinExpirationHeight,
+      createdAtArgonBlock,
     });
   }
 
@@ -662,10 +670,11 @@ export interface IBitcoinLock {
   utxoId: number;
   p2wshScriptHashHex: string;
   vaultId: number;
-  peggedPrice: bigint;
+  lockedMarketRate: bigint;
   liquidityPromised: bigint;
   ownerAccount: string;
   satoshis: bigint;
+  utxoSatoshis?: bigint;
   vaultPubkey: string;
   securityFees: bigint;
   vaultClaimPubkey: string;
@@ -679,6 +688,6 @@ export interface IBitcoinLock {
   openClaimHeight: number;
   createdAtHeight: number;
   isVerified: boolean;
-  isRejectedNeedsRelease: boolean;
+  createdAtArgonBlock: number;
   fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 }

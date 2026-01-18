@@ -249,7 +249,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64,
           vaultId: u32,
           liquidityPromised: u128,
-          peggedPrice: u128,
+          lockedMarketRate: u128,
           accountId: AccountId32,
           securityFee: u128,
         ],
@@ -257,7 +257,7 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64;
           vaultId: u32;
           liquidityPromised: u128;
-          peggedPrice: u128;
+          lockedMarketRate: u128;
           accountId: AccountId32;
           securityFee: u128;
         }
@@ -268,9 +268,9 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64,
           vaultId: u32,
           liquidityPromised: u128,
-          originalPeggedPrice: u128,
+          originalMarketRate: u128,
           securityFee: u128,
-          newPeggedPrice: u128,
+          newLockedMarketRate: u128,
           amountBurned: u128,
           accountId: AccountId32,
         ],
@@ -278,9 +278,9 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64;
           vaultId: u32;
           liquidityPromised: u128;
-          originalPeggedPrice: u128;
+          originalMarketRate: u128;
           securityFee: u128;
-          newPeggedPrice: u128;
+          newLockedMarketRate: u128;
           amountBurned: u128;
           accountId: AccountId32;
         }
@@ -311,17 +311,25 @@ declare module '@polkadot/api-base/types/events' {
         [utxoId: u64, error: SpRuntimeDispatchError],
         { utxoId: u64; error: SpRuntimeDispatchError }
       >;
+      OrphanedUtxoCosigned: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, signature: Bytes],
+        { utxoId: u64; utxoRef: ArgonPrimitivesBitcoinUtxoRef; vaultId: u32; signature: Bytes }
+      >;
     };
     bitcoinUtxos: {
-      UtxoExpiredError: AugmentedEvent<
-        ApiType,
-        [utxoRef: ArgonPrimitivesBitcoinUtxoRef, error: SpRuntimeDispatchError],
-        { utxoRef: ArgonPrimitivesBitcoinUtxoRef; error: SpRuntimeDispatchError }
-      >;
       UtxoRejected: AugmentedEvent<
         ApiType,
-        [utxoId: u64, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason],
-        { utxoId: u64; rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason }
+        [
+          utxoId: u64,
+          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason,
+          satoshisReceived: u64,
+        ],
+        {
+          utxoId: u64;
+          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
+          satoshisReceived: u64;
+        }
       >;
       UtxoRejectedError: AugmentedEvent<
         ApiType,
@@ -339,7 +347,11 @@ declare module '@polkadot/api-base/types/events' {
         { utxoId: u64; error: SpRuntimeDispatchError }
       >;
       UtxoUnwatched: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
-      UtxoVerified: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
+      UtxoVerified: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, satoshisReceived: u64],
+        { utxoId: u64; satoshisReceived: u64 }
+      >;
       UtxoVerifiedError: AugmentedEvent<
         ApiType,
         [utxoId: u64, error: SpRuntimeDispatchError],

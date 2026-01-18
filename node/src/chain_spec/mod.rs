@@ -77,7 +77,7 @@ pub struct GenesisSettings {
 
 #[allow(clippy::too_many_arguments)]
 /// Configure initial storage state for FRAME modules.
-pub(crate) fn testnet_genesis(
+pub(crate) fn build_genesis_config(
 	GenesisSettings {
 		founding_grandpas,
 		sudo_key,

@@ -5,7 +5,8 @@
 use pallet_prelude::*;
 
 use crate::{
-	Error, Event, HoldReason, LockReleaseRequest,
+	Error, Event, HoldReason, LockExpirationsByBitcoinHeight, LockReleaseRequest, OrphanedUtxo,
+	OrphanedUtxosByAccount,
 	mock::*,
 	pallet::{
 		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
@@ -15,14 +16,14 @@ use crate::{
 use argon_primitives::{
 	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider,
 	bitcoin::{
-		BitcoinRejectedReason, BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey,
-		H256Le, SATOSHIS_PER_BITCOIN, UtxoRef,
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
+		SATOSHIS_PER_BITCOIN, UtxoRef,
 	},
 	vault::LockExtension,
 };
 
 #[test]
-fn can_lock_a_bitcoin_utxo() {
+fn can_lock_a_bitcoin_utxo_until_expiration() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -53,20 +54,29 @@ fn can_lock_a_bitcoin_utxo() {
 				utxo_id: 1,
 				vault_id: 1,
 				liquidity_promised,
-				pegged_price: liquidity_promised,
+				locked_market_rate: liquidity_promised,
 				account_id: 2,
 				security_fee: liquidity_promised / 10,
 			}
 			.into(),
 		);
+		assert!(LockExpirationsByBitcoinHeight::<Test>::get(lock.vault_claim_height).contains(&1));
+		BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN).unwrap();
 
-		assert_ok!(BitcoinLocks::utxo_expired(1));
+		System::reset_events();
+		BitcoinBlockHeightChange::set((lock.vault_claim_height, lock.vault_claim_height));
+		BitcoinLocks::on_initialize(2);
+		System::assert_has_event(
+			Event::<Test>::BitcoinLockBurned { utxo_id: 1, vault_id: 1, was_utxo_spent: false }
+				.into(),
+		);
+
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 	});
 }
 
 #[test]
-fn cleans_up_a_rejected_bitcoin() {
+fn cleans_up_a_verification_timed_out_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -85,19 +95,57 @@ fn cleans_up_a_rejected_bitcoin() {
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().argons_locked, price);
 
-		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::LookupExpired));
+		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
-		assert_eq!(WatchedUtxosById::get().len(), 0);
 	});
 }
 
 #[test]
-fn allows_users_to_reclaim_mismatched_bitcoins() {
+fn tracks_orphaned_utxos() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 
 		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey
+		));
+		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(DefaultVault::get().argons_locked, price);
+
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::invalid_utxo_received(1, utxo_ref.clone(), 10_000));
+		assert_eq!(
+			OrphanedUtxosByAccount::<Test>::get(1, utxo_ref),
+			Some(OrphanedUtxo {
+				utxo_id: 1,
+				satoshis: 10_000,
+				vault_id: 1,
+				recorded_argon_block_number: 1,
+				cosign_request: None,
+			})
+		);
+		// still waiting for the real funding
+		assert!(LocksByUtxoId::<Test>::get(1).is_some());
+		assert_eq!(WatchedUtxosById::get().len(), 1);
+	});
+}
+
+#[test]
+fn allows_users_to_reclaim_orphaned_bitcoins() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		let vault_id = 1;
 		set_argons(who, 2_000_000);
 		let secp = bitcoin::secp256k1::Secp256k1::new();
 		let rng = &mut bitcoin::secp256k1::rand::thread_rng();
@@ -106,54 +154,50 @@ fn allows_users_to_reclaim_mismatched_bitcoins() {
 
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(who),
-			1,
+			vault_id,
 			SATOSHIS_PER_BITCOIN,
 			pubkey.into()
 		));
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().argons_locked, price);
-
-		assert_ok!(BitcoinLocks::utxo_rejected(1, BitcoinRejectedReason::SatoshisMismatch));
-		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert!(lock.is_rejected_needs_release);
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::invalid_utxo_received(1, utxo_ref.clone(), 10_000));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
 
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
-		assert_ok!(BitcoinLocks::request_release(
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
 			RuntimeOrigin::signed(who),
-			1,
+			utxo_ref.clone(),
 			release_script_pubkey.clone(),
 			1000
 		));
+		assert!(VaultViewOfOrphanCosigns::get().get(&vault_id).unwrap().contains(&who));
 
-		let cosign_due = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
-		assert_eq!(
-			LockReleaseRequestsByUtxoId::<Test>::get(1).unwrap(),
-			LockReleaseRequest {
-				utxo_id: 1,
-				vault_id: 1,
-				cosign_due_frame: cosign_due,
-				redemption_price: 0,
-				to_script_pubkey: release_script_pubkey,
-				bitcoin_network_fee: 1000
-			}
-		);
-		assert!(LocksByUtxoId::<Test>::get(1).is_some());
-		System::assert_last_event(
-			Event::<Test>::BitcoinUtxoCosignRequested { vault_id: 1, utxo_id: 1 }.into(),
-		);
+		let orphaned_utxo = OrphanedUtxosByAccount::<Test>::get(who, utxo_ref.clone()).unwrap();
+		assert!(orphaned_utxo.cosign_request.is_some());
+		let orphan_cosign = orphaned_utxo.cosign_request.unwrap();
+		assert_eq!(orphan_cosign.to_script_pubkey, release_script_pubkey.clone());
+		assert_eq!(orphan_cosign.bitcoin_network_fee, 1000);
+		assert_eq!(orphan_cosign.created_at_argon_block_number, 1);
 
-		GetUtxoRef::set(Some(UtxoRef { txid: H256Le([0; 32]), output_index: 0 }));
-
-		assert_ok!(BitcoinLocks::cosign_release(
+		assert_ok!(BitcoinLocks::cosign_orphaned_utxo_release(
 			RuntimeOrigin::signed(1),
-			1,
+			who,
+			utxo_ref.clone(),
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
-		assert_eq!(LastReleaseEvent::get(), Some((1, false, 0)));
-		assert!(!LockCosignDueByFrame::<Test>::get(cosign_due).contains(&1));
-		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
-		assert_eq!(DefaultVault::get().argons_locked, 0);
+		System::assert_last_event(
+			Event::<Test>::OrphanedUtxoCosigned {
+				utxo_id: orphaned_utxo.utxo_id,
+				vault_id,
+				utxo_ref: utxo_ref.clone(),
+				signature: BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec())),
+			}
+			.into(),
+		);
+		assert_eq!(OrphanedUtxosByAccount::<Test>::get(1, utxo_ref), None);
+		assert_eq!(VaultViewOfOrphanCosigns::get().get(&vault_id).unwrap().len(), 0);
 	});
 }
 
@@ -177,7 +221,7 @@ fn marks_a_verified_bitcoin() {
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().argons_locked, price);
 
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
 		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert_eq!(LastLockEvent::get(), Some((1, who, price)));
@@ -267,7 +311,7 @@ fn burns_a_spent_bitcoin() {
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().argons_locked, price);
 		// first verify
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
 
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(50000)));
 
@@ -275,7 +319,7 @@ fn burns_a_spent_bitcoin() {
 			.expect("should have price");
 		assert_eq!(new_price, 50_000_000_000);
 
-		assert_ok!(BitcoinLocks::utxo_spent(1));
+		assert_ok!(BitcoinLocks::spent(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(WatchedUtxosById::get().len(), 0);
 		assert_eq!(DefaultVault::get().argons_locked, price - new_price);
@@ -312,7 +356,7 @@ fn cancels_an_unverified_spent_bitcoin() {
 		assert!(!LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		// spend before verify
-		assert_ok!(BitcoinLocks::utxo_spent(1));
+		assert_ok!(BitcoinLocks::spent(1));
 
 		assert_eq!(WatchedUtxosById::get().len(), 0);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
@@ -339,7 +383,7 @@ fn can_release_a_bitcoin() {
 		assert_eq!(DefaultVault::get().argons_locked, lock.liquidity_promised);
 		let expiration_block = lock.vault_claim_height;
 		// first verify
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 
@@ -440,7 +484,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(vault.argons_locked, lock.liquidity_promised);
 		// first verify
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -519,7 +563,7 @@ fn clears_released_bitcoins() {
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(vault.argons_locked, lock.liquidity_promised);
 		// first verify
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -591,7 +635,7 @@ fn clears_released_bitcoins() {
 		set_bitcoin_height(lock.vault_claim_height);
 		BitcoinLocks::on_initialize(2);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
-		assert_ok!(BitcoinLocks::utxo_spent(1));
+		assert_ok!(BitcoinLocks::spent(1));
 	});
 }
 
@@ -608,8 +652,8 @@ fn it_should_aggregate_holds_for_a_second_release() {
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_ok!(BitcoinLocks::utxo_verified(1));
-		assert_ok!(BitcoinLocks::utxo_verified(2));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(BitcoinLocks::funding_received(2, satoshis));
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised * 2));
 		let redemption_price =
@@ -660,7 +704,7 @@ fn it_should_allow_a_ratchet_up() {
 		});
 		set_argons(who, 5000);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
 		assert_eq!(LastLockEvent::get(), Some((1, who, 62_000 * MICROGONS_PER_ARGON)));
 		let balance_after_one = 5000 - 1000 - 620; // 3,380
 		assert_eq!(Balances::free_balance(who), balance_after_one); // 3,380
@@ -702,8 +746,8 @@ fn it_should_allow_a_ratchet_up() {
 				vault_id: 1,
 				utxo_id: 1,
 				liquidity_promised: 65_000 * MICROGONS_PER_ARGON,
-				original_pegged_price: 62_000 * MICROGONS_PER_ARGON,
-				new_pegged_price: 65_000 * MICROGONS_PER_ARGON,
+				original_market_rate: 62_000 * MICROGONS_PER_ARGON,
+				new_locked_market_rate: 65_000 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
 				security_fee: 1000 + apr / 2,
@@ -739,7 +783,7 @@ fn it_should_allow_a_ratchet_down() {
 		assert_eq!(Balances::free_balance(who), balance);
 
 		// Mint the argons into account
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 		balance.saturating_accrue(lock.liquidity_promised);
@@ -774,7 +818,54 @@ fn it_should_allow_a_ratchet_down() {
 }
 
 #[test]
-fn it_should_use_the_pegged_price_during_a_ratchet() {
+fn it_should_handle_mismatched_satoshis() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let who = 1;
+		let satoshis = 150_000_000;
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(100)));
+		let apr = FixedU128::from_float(0.00000001);
+		DefaultVault::mutate(|a| {
+			a.securitization = 250_000_000_000;
+			a.terms.bitcoin_base_fee = 1000;
+			a.terms.bitcoin_annual_percent_rate = apr;
+		});
+		set_argons(who, 5000);
+		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey));
+
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.liquidity_promised, 150_000_000);
+		assert_eq!(lock.security_fees, 1000 + 1);
+
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis + 5000));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.liquidity_promised, 150_000_000);
+		assert_eq!(lock.utxo_satoshis, Some(satoshis + 5000));
+		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
+
+		// ensure if we get "less", we reduce the liquidity promised
+		let pubkey2 = CompressedBitcoinPubkey([2; 33]);
+		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, 100_000_000, pubkey2));
+		let lock = LocksByUtxoId::<Test>::get(2).unwrap();
+		assert_eq!(lock.liquidity_promised, 100_000_000);
+		assert_eq!(lock.security_fees, 1000 + 1);
+
+		let actual_sats: Balance = 100_000_000 - 3000;
+		assert_ok!(BitcoinLocks::funding_received(2, actual_sats as u64));
+		let lock = LocksByUtxoId::<Test>::get(2).unwrap();
+		assert_eq!(lock.liquidity_promised, actual_sats);
+		assert_eq!(lock.utxo_satoshis, Some(100_000_000 - 3000));
+		assert_eq!(lock.satoshis, 100_000_000 - 3000);
+		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
+		assert_eq!(lock.locked_market_rate, actual_sats);
+	});
+}
+
+#[test]
+fn it_should_use_the_locked_market_rate_during_a_ratchet() {
 	ChargeFee::set(true);
 	new_test_ext().execute_with(|| {
 		set_bitcoin_height(1);
@@ -798,10 +889,10 @@ fn it_should_use_the_pegged_price_during_a_ratchet() {
 
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.liquidity_promised, 100_000 * MICROGONS_PER_ARGON);
-		assert_eq!(lock.pegged_price, 99_009_900_990); // 100k / 1.01
+		assert_eq!(lock.locked_market_rate, 99_009_900_990); // 100k / 1.01
 
 		// Mint the argons into account
-		assert_ok!(BitcoinLocks::utxo_verified(1));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 
@@ -814,8 +905,8 @@ fn it_should_use_the_pegged_price_during_a_ratchet() {
 				vault_id: 1,
 				utxo_id: 1,
 				liquidity_promised: 101_000 * MICROGONS_PER_ARGON, // 1.01 BTC
-				original_pegged_price: 99_009_900_990,
-				new_pegged_price: 101_000 * MICROGONS_PER_ARGON,
+				original_market_rate: 99_009_900_990,
+				new_locked_market_rate: 101_000 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
 				security_fee: 1000,

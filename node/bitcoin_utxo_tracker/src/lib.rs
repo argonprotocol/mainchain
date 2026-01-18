@@ -6,8 +6,9 @@ use anyhow::ensure;
 use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
 use argon_primitives::{
 	Balance, BitcoinApis,
-	bitcoin::{BitcoinSyncStatus, UtxoRef, UtxoValue},
+	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
+	prelude::sp_api::ApiExt,
 };
 use codec::{Decode, Encode};
 use log::info;
@@ -31,6 +32,14 @@ where
 	C::Api: BitcoinApis<B, Balance>,
 {
 	let api = client.runtime_api();
+	let mut minimum_satoshis: Satoshis = 1000;
+	// if we have version 2 of the api, use that to get minimum satoshis
+	if let Ok(Some(version)) = api.api_version::<dyn BitcoinApis<B, Balance>>(*block_hash) {
+		if version >= 2 {
+			minimum_satoshis = api.get_minimum_satoshis(*block_hash)?;
+		}
+	}
+
 	let Some(sync_status) = api.get_sync_status(*block_hash)? else {
 		return Ok(None);
 	};
@@ -42,7 +51,7 @@ where
 	for (_, utxo) in &utxos {
 		satoshis += utxo.satoshis;
 	}
-	let result = tracker.sync(sync_status, utxos, client)?;
+	let result = tracker.sync(sync_status, utxos, minimum_satoshis, client)?;
 	if let Some(ref metrics) = tracker.metrics {
 		metrics.track(&result, satoshis, utxo_count, start_time);
 	}
@@ -115,11 +124,12 @@ impl UtxoTracker {
 		&self,
 		sync_status: BitcoinSyncStatus,
 		tracked_utxos: Vec<(Option<UtxoRef>, UtxoValue)>,
+		minimum_satoshis: Satoshis,
 		aux_store: &Arc<impl AuxStore>,
 	) -> anyhow::Result<BitcoinUtxoSync> {
 		self.update_filters(&sync_status, aux_store)?;
 
-		self.filter.lock().refresh_utxo_status(tracked_utxos)
+		self.filter.lock().refresh_utxo_status(tracked_utxos, minimum_satoshis)
 	}
 }
 
@@ -135,10 +145,11 @@ mod test {
 	use sc_client_api::backend::AuxStore;
 
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
-	use argon_primitives::bitcoin::{
-		BitcoinBlock, BitcoinRejectedReason, BitcoinSyncStatus, H256Le, UtxoRef, UtxoValue,
+	use argon_primitives::{
+		bitcoin::{BitcoinBlock, BitcoinSyncStatus, H256Le, UtxoRef, UtxoValue},
+		inherents::BitcoinUtxoFunding,
 	};
-	use argon_testing::{add_blocks, add_wallet_address, fund_script_address};
+	use argon_testing::{add_blocks, add_wallet_address, fund_script_address, get_txid_height};
 
 	use super::*;
 
@@ -180,6 +191,10 @@ mod test {
 			&block_address,
 		);
 
+		let tx_height = get_txid_height(&bitcoind, &txid).expect("get tx height");
+
+		let _ = fund_script_address(&bitcoind, &script_address, 999, &block_address);
+
 		add_blocks(&bitcoind, 6, &block_address);
 		let confirmed = bitcoind.client.get_best_block_hash().unwrap();
 		let block_height = bitcoind.client.get_block_count().unwrap();
@@ -208,22 +223,22 @@ mod test {
 			submitted_at_height,
 			watch_for_spent_until_height: 150,
 		};
+		// should only find the 1 BTC UTXO
 		{
-			let result =
-				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
-			assert_eq!(result.verified.len(), 1);
+			let result = tracker
+				.sync(sync_status.clone(), vec![(None, tracked.clone())], 1000, &aux)
+				.unwrap();
+			assert_eq!(result.funded.len(), 1);
 			assert_eq!(
-				result.verified.get(&1),
-				Some(&UtxoRef { txid: txid.into(), output_index: vout })
+				result.funded[0],
+				BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: UtxoRef { txid: txid.into(), output_index: vout },
+					expected_satoshis: Amount::ONE_BTC.to_sat(),
+					satoshis: Amount::ONE_BTC.to_sat(),
+					bitcoin_height: tx_height,
+				}
 			);
-		}
-		{
-			let mut tracked = tracked.clone();
-			tracked.satoshis = Amount::from_int_btc(2).to_sat();
-			let result =
-				tracker.sync(sync_status.clone(), vec![(None, tracked.clone())], &aux).unwrap();
-			assert_eq!(result.verified.len(), 0);
-			assert_eq!(result.invalid.get(&1), Some(&BitcoinRejectedReason::SatoshisMismatch));
 		}
 		drop(bitcoind);
 	}

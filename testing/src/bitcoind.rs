@@ -59,6 +59,19 @@ pub fn read_rpc_url(bitcoind: &BitcoinD) -> anyhow::Result<url::Url> {
 	Ok(url)
 }
 
+pub fn get_txid_height(bitcoind: &BitcoinD, txid: &Txid) -> anyhow::Result<u64> {
+	let tx = bitcoind.client.call::<GetRawTransactionResult>(
+		"getrawtransaction",
+		&[txid.to_string().into(), 1.into()],
+	)?;
+	if let Some(height) = tx.blockhash {
+		let block = bitcoind.client.get_block_info(&height)?;
+		Ok(block.height as u64)
+	} else {
+		Err(anyhow!("Transaction not confirmed yet"))
+	}
+}
+
 pub fn wait_for_txid(
 	bitcoind: &BitcoinD,
 	txid: &Txid,

@@ -239,7 +239,6 @@ where
 				_ = health_tick.tick() => {
 					let best_hash = client.best_hash();
 					if client.has_block_state(best_hash) {
-						trace!("Running notary health check at {:?}", best_hash);
 						let _ = notary_client_poll.update_notaries(&best_hash).await;
 					}
 				},
@@ -1271,6 +1270,8 @@ pub struct NotebookDownloader {
 	pub archive_hosts: Vec<ArchiveHost>,
 }
 
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
+
 impl NotebookDownloader {
 	pub fn new<AR, S>(archive_hosts: AR) -> Result<Self, Error>
 	where
@@ -1292,12 +1293,14 @@ impl NotebookDownloader {
 		download_url: Option<String>,
 	) -> Result<SignedHeaderBytes, Error> {
 		if let Some(url) = download_url {
-			if let Ok(header) = ArchiveHost::download_header_bytes(url).await {
+			if let Ok(header) = ArchiveHost::download_header_bytes(url, DOWNLOAD_TIMEOUT).await {
 				return Ok(header);
 			}
 		}
 		for archive_host in &self.archive_hosts {
-			if let Ok(header) = archive_host.get_header(notary_id, notebook_number).await {
+			if let Ok(header) =
+				archive_host.get_header(notary_id, notebook_number, DOWNLOAD_TIMEOUT).await
+			{
 				return Ok(header);
 			}
 		}
@@ -1312,12 +1315,14 @@ impl NotebookDownloader {
 		download_url: Option<String>,
 	) -> Result<NotebookBytes, Error> {
 		if let Some(url) = download_url {
-			if let Ok(body) = ArchiveHost::download_notebook_bytes(url).await {
+			if let Ok(body) = ArchiveHost::download_notebook_bytes(url, DOWNLOAD_TIMEOUT).await {
 				return Ok(body);
 			}
 		}
 		for archive_host in &self.archive_hosts {
-			if let Ok(body) = archive_host.get_notebook(notary_id, notebook_number).await {
+			if let Ok(body) =
+				archive_host.get_notebook(notary_id, notebook_number, DOWNLOAD_TIMEOUT).await
+			{
 				return Ok(body);
 			}
 		}

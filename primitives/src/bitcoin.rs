@@ -79,7 +79,7 @@ impl From<[u8; 33]> for CompressedBitcoinPubkey {
 	MaxEncodedLen,
 )]
 #[repr(transparent)]
-pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<73>>);
+pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<74>>); // max DER sig size is 73 bytes + 1 byte sighash type
 
 impl TryFrom<Vec<u8>> for BitcoinSignature {
 	type Error = Vec<u8>;
@@ -167,7 +167,9 @@ pub struct BitcoinSighash(pub [u8; 32]);
 	MaxEncodedLen,
 )]
 pub struct UtxoRef {
+	/// The transaction id in bitcoin little-endian format
 	pub txid: H256Le,
+	/// The output index in the transaction
 	#[codec(compact)]
 	pub output_index: u32,
 }
@@ -185,26 +187,31 @@ pub type UtxoId = u64;
 	MaxEncodedLen,
 )]
 pub struct UtxoValue {
+	/// Tracking id for the BitcoinLock used across Bitcoin pallets
 	pub utxo_id: UtxoId,
+	/// The script pubkey of the Lock UTXOs
 	pub script_pubkey: BitcoinCosignScriptPubkey,
+	/// Number of satoshis received
 	#[codec(compact)]
 	pub satoshis: Satoshis,
+	/// The block height at which this UTXO was submitted for tracking
 	#[codec(compact)]
 	pub submitted_at_height: BitcoinHeight,
+	/// The block height until which we should watch for these UTXOs to be spent
 	#[codec(compact)]
 	pub watch_for_spent_until_height: BitcoinHeight,
 }
 
 #[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
 pub enum BitcoinRejectedReason {
-	/// The UTXO has a different number of satoshis than what is in the blockchain
-	SatoshisMismatch,
+	/// The UTXO has satoshis is outside the accepted range
+	SatoshisOutsideAcceptedRange,
 	/// The UTXO has been spent
 	Spent,
-	/// We failed to confirm the utxo before the expiration lookup time
-	LookupExpired,
-	/// This UTXO is already tracked
-	DuplicateUtxo,
+	/// We failed to verify the utxo before the expiration lookup time
+	VerificationExpired,
+	/// This UTXO is already funded/verified under a different utxo
+	AlreadyVerified,
 }
 
 #[derive(Clone, PartialEq, Eq, RuntimeDebug)]

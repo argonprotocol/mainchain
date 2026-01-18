@@ -289,6 +289,10 @@ macro_rules! inject_common_apis {
                 BitcoinUtxos::get_sync_status()
             }
 
+            fn get_minimum_satoshis() -> Satoshis {
+                BitcoinLocks::minimum_satoshis()
+            }
+
             fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>{
                 BitcoinUtxos::active_utxos()
             }

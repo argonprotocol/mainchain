@@ -101,9 +101,12 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
+	#[api_version(2)]
 	pub trait BitcoinApis<Balance: Codec> {
 		fn get_sync_status() -> Option<BitcoinSyncStatus>;
 		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>;
+		#[api_version(2)]
+		fn get_minimum_satoshis() -> Satoshis;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn get_bitcoin_network() -> BitcoinNetwork;

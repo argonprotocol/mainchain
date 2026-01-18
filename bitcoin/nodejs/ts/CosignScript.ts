@@ -29,7 +29,7 @@ export class CosignScript {
     const tx = new Transaction();
     tx.addOutput({
       script: keyToU8a(lock.p2wshScriptHashHex),
-      amount: lock.satoshis,
+      amount: lock.utxoSatoshis ?? lock.satoshis,
     });
     return tx.toPSBT(0);
   }
@@ -75,7 +75,7 @@ export class CosignScript {
     const psbtStr = getCosignPsbt(
       utxoRef.txid,
       utxoRef.vout,
-      lock.satoshis,
+      lock.utxoSatoshis ?? lock.satoshis,
       lock.vaultPubkey,
       lock.vaultClaimPubkey,
       lock.ownerPubkey,

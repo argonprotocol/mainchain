@@ -177,18 +177,6 @@ pub mod pallet {
 		<T as Config>::Balance: From<u128>,
 		<T as Config>::Balance: Into<u128>,
 	{
-		fn on_runtime_upgrade() -> Weight {
-			let version = StorageVersion::get::<Pallet<T>>();
-			if version == STORAGE_VERSION {
-				return T::DbWeight::get().reads(1);
-			}
-			// reset to minimums
-			let minimums = Self::get_minimum_reward_amounts(T::TickProvider::elapsed_ticks());
-			ArgonsPerBlock::<T>::put(minimums.argons);
-			STORAGE_VERSION.put::<Pallet<T>>();
-			T::DbWeight::get().reads_writes(1, 1)
-		}
-
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			// Unlock any rewards
 			let cleanup_block = n.saturating_sub(T::PayoutHistoryBlocks::get().into());

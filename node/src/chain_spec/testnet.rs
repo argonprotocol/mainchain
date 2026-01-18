@@ -1,4 +1,4 @@
-use crate::chain_spec::{ChainSpec, GenesisSettings, testnet_genesis};
+use crate::chain_spec::{ChainSpec, GenesisSettings, build_genesis_config};
 use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
 	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, AccountId, Chain, ComputeDifficulty, TOKEN_DECIMALS,
@@ -54,7 +54,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 		"/dns/bootnode0.testnet.argonprotocol.org/tcp/30333/p2p/12D3KooWHY6UgabjbYJ8xZN4xae3tPHhx6BdwtB6Fh9VjkmErkCF".parse().map_err(|e| format!("Unable to parse multiaddr {e:?}"))?,
 		"/dns/bootnode0.testnet.argonprotocol.org/tcp/30333/ws/p2p/12D3KooWHY6UgabjbYJ8xZN4xae3tPHhx6BdwtB6Fh9VjkmErkCF".parse().map_err(|e| format!("Unable to parse multiaddr {e:?}"))?
 	])
-	.with_genesis_config_patch(testnet_genesis(
+	.with_genesis_config_patch(build_genesis_config(
 		GenesisSettings {
 			// You have to have an authority to start the chain
 			founding_grandpas: vec![(grandpa_key, 10)],
