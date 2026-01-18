@@ -228,6 +228,14 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
+       * History of microgons per btc
+       **/
+      microgonPerBtcHistory: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<ITuple<[u64, u128]>>>,
+        []
+      >;
+      /**
        * The minimum number of satoshis that can be locked
        **/
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;

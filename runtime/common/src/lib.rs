@@ -94,9 +94,9 @@ macro_rules! inject_runtime_vars {
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
 			spec_version: 145,
-			impl_version: 9,
+			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
-			transaction_version: 4,
+			transaction_version: 5,
 			system_version: 1,
 		};
 		parameter_types! {

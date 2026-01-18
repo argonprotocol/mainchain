@@ -312,8 +312,9 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
           bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array,
+          microgonsPerBtc: Option<u128> | null | Uint8Array | u128 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey]
+        [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, Option<u128>]
       >;
       /**
        * Ratcheting allows a user to change the lock price of their bitcoin lock. This is
@@ -332,8 +333,11 @@ declare module '@polkadot/api-base/types/submittable' {
        * queue for the difference in your new lock price vs the previous lock price.
        **/
       ratchet: AugmentedSubmittable<
-        (utxoId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
-        [u64]
+        (
+          utxoId: u64 | AnyNumber | Uint8Array,
+          microgonsPerBtc: Option<u128> | null | Uint8Array | u128 | AnyNumber,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, Option<u128>]
       >;
       requestOrphanedUtxoRelease: AugmentedSubmittable<
         (

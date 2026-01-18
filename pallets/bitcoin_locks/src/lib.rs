@@ -151,6 +151,13 @@ pub mod pallet {
 		/// Number of ticks per bitcoin block
 		#[pallet::constant]
 		type TicksPerBitcoinBlock: Get<Tick>;
+
+		/// Max allowed tick-age of microgon-per-btc prices
+		#[pallet::constant]
+		type MaxBtcPriceTickAge: Get<u32>;
+
+		/// Gets the current tick
+		type CurrentTick: Get<Tick>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -213,6 +220,11 @@ pub mod pallet {
 		BoundedBTreeSet<UtxoId, T::MaxConcurrentlyExpiringLocks>,
 		ValueQuery,
 	>;
+
+	/// History of microgons per btc
+	#[pallet::storage]
+	pub type MicrogonPerBtcHistory<T: Config> =
+		StorageValue<_, BoundedVec<(Tick, T::Balance), T::MaxBtcPriceTickAge>, ValueQuery>;
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
@@ -474,6 +486,8 @@ pub mod pallet {
 		UnverifiedLock,
 		/// An overflow or underflow occurred while calculating the redemption price
 		OverflowError,
+		/// An ineligible microgon rate per btc was requested
+		IneligibleMicrogonRateRequested,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -549,6 +563,26 @@ pub mod pallet {
 
 			T::DbWeight::get().reads_writes(2, 1)
 		}
+
+		fn on_finalize(_n: BlockNumberFor<T>) {
+			let current_tick = T::CurrentTick::get();
+			let oldest_allowed_tick =
+				current_tick.saturating_sub(T::MaxBtcPriceTickAge::get() as Tick);
+			let current_price = T::PriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN);
+
+			MicrogonPerBtcHistory::<T>::mutate(|x| {
+				x.retain(|y| y.0 >= oldest_allowed_tick);
+				if let Some(price) = current_price {
+					let mut should_insert = true;
+					if let Some((_, last)) = x.last() {
+						should_insert = *last != price;
+					}
+					if should_insert {
+						_ = x.try_push((current_tick, price));
+					}
+				}
+			})
+		}
 	}
 
 	#[pallet::call]
@@ -568,6 +602,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			#[pallet::compact] satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
+			microgons_per_btc: Option<T::Balance>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
 
@@ -580,8 +615,12 @@ pub mod pallet {
 			let vault_claim_height = current_bitcoin_height + T::LockDurationBlocks::get();
 			let open_claim_height = vault_claim_height + T::LockReclamationBlocks::get();
 
-			let liquidity_promised = T::PriceProvider::get_bitcoin_argon_price(satoshis)
-				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
+			let liquidity_promised = if let Some(rate) = microgons_per_btc {
+				Self::get_bitcoin_argons_at_rate(satoshis, rate)?
+			} else {
+				T::PriceProvider::get_bitcoin_argon_price(satoshis)
+					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+			};
 			let locked_market_rate = Self::calculate_adjusted_market_rate(liquidity_promised)?;
 
 			let fee =
@@ -869,7 +908,11 @@ pub mod pallet {
 		/// queue for the difference in your new lock price vs the previous lock price.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::ratchet())]
-		pub fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
+		pub fn ratchet(
+			origin: OriginFor<T>,
+			utxo_id: UtxoId,
+			microgons_per_btc: Option<T::Balance>,
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
@@ -879,8 +922,12 @@ pub mod pallet {
 				Error::<T>::LockInProcessOfRelease
 			);
 
-			let new_liquidity_promised = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
-				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
+			let new_liquidity_promised = if let Some(rate) = microgons_per_btc {
+				Self::get_bitcoin_argons_at_rate(lock.satoshis, rate)?
+			} else {
+				T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
+					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+			};
 
 			let original_market_rate = lock.locked_market_rate;
 			ensure!(
@@ -1127,6 +1174,22 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn get_bitcoin_argons_at_rate(
+			satoshis: Satoshis,
+			microgons_per_btc: T::Balance,
+		) -> Result<T::Balance, Error<T>> {
+			let rates = MicrogonPerBtcHistory::<T>::get();
+			if !rates.iter().any(|(_, r)| r == &microgons_per_btc) {
+				return Err(Error::<T>::IneligibleMicrogonRateRequested);
+			}
+			let satoshis = FixedU128::saturating_from_integer(satoshis);
+			let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
+
+			let sat_ratio = satoshis / satoshis_per_bitcoin;
+
+			Ok(sat_ratio.saturating_mul_int(microgons_per_btc))
+		}
+
 		pub fn minimum_satoshis() -> Satoshis {
 			MinimumSatoshis::<T>::get()
 		}

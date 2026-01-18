@@ -3,7 +3,7 @@
   "implName": "argon",
   "authoringVersion": 1,
   "specVersion": 145,
-  "implVersion": 9,
+  "implVersion": 10,
   "apis": [
     ["0xdf6acb689907609b", 5],
     ["0x37e397fc7c91f5e4", 2],
@@ -29,7 +29,7 @@
     ["0x0ebc8fd84ae20ada", 1],
     ["0x888ea501e380d8a1", 1]
   ],
-  "transactionVersion": 4,
+  "transactionVersion": 5,
   "systemVersion": 1,
   "stateVersion": 1
 }
