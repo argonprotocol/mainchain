@@ -85,6 +85,11 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bitcoinUtxos: {
       /**
+       * Maximum number of satoshi difference allowed from expected to consider a UTXO as
+       * "confirmed"
+       **/
+      maximumSatoshiThresholdFromExpected: u64 & AugmentedConst<ApiType>;
+      /**
        * Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
        **/
       maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;

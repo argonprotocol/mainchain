@@ -509,6 +509,7 @@ mod tests {
 	use sp_keyring::{Ed25519Keyring::Bob, Sr25519Keyring::Ferdie};
 	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
 	use sqlx::PgPool;
+	use std::time::Duration;
 
 	use argon_primitives::{
 		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
@@ -630,7 +631,9 @@ mod tests {
 
 		let mut stream = subscription.into_stream();
 		let notebook_number = stream.next().await.unwrap()?.notebook_number;
-		let header = download_notebook_header(&client, notebook_number).await?.header;
+		let header = download_notebook_header(&client, notebook_number, Duration::from_secs(5))
+			.await?
+			.header;
 
 		assert_eq!(header.notebook_number, 1);
 		assert_eq!(header.chain_transfers[0], ChainTransfer::ToLocalchain { transfer_id: 1 });
@@ -719,7 +722,7 @@ mod tests {
 			.expect("Should be able to close notebook");
 		// now we have an audit failure
 
-		let notebook1 = download_notebook(&client, 1)
+		let notebook1 = download_notebook(&client, 1, Duration::from_secs(5))
 			.await
 			.expect("Should be able to download notebook");
 		NotebookAuditFailureStore::record(&mut db, 1, notebook1.hash, "failure".to_string(), 1)

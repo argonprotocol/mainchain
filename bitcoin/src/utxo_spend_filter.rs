@@ -1,15 +1,13 @@
 #![allow(dead_code)]
 
-use std::{collections::BTreeMap, sync::Arc};
-
 use crate::client::Client;
 use anyhow::bail;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinRejectedReason, BitcoinSyncStatus,
-		H256Le, UtxoRef, UtxoValue,
+		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, H256Le, Satoshis, UtxoRef,
+		UtxoValue,
 	},
-	inherents::BitcoinUtxoSync,
+	inherents::{BitcoinUtxoFunding, BitcoinUtxoSync},
 };
 use bitcoin::{bip158, hashes::Hash};
 use bitcoincore_rpc::{Auth, RpcApi};
@@ -17,6 +15,7 @@ use codec::{Decode, Encode};
 use parking_lot::Mutex;
 use polkadot_sdk::*;
 use sp_runtime::RuntimeDebug;
+use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
 pub struct BlockFilter {
@@ -112,19 +111,19 @@ impl UtxoSpendFilter {
 	pub fn refresh_utxo_status(
 		&self,
 		tracked_utxos: Vec<(Option<UtxoRef>, UtxoValue)>,
+		minimum_satoshis: Satoshis,
 	) -> anyhow::Result<BitcoinUtxoSync> {
 		let mut scripts: Vec<Vec<u8>> = vec![];
-		let mut utxos_by_ref = BTreeMap::new();
-		let mut pending_confirmation_by_script = BTreeMap::new();
+		let mut utxo_ref_to_utxo_id = BTreeMap::new();
+		let mut funding_address_to_utxo_value = BTreeMap::new();
 
 		for (utxo_ref, lookup) in tracked_utxos {
-			scripts.push(lookup.script_pubkey.to_script_bytes());
+			let script_bytes = lookup.script_pubkey.to_script_bytes();
+			scripts.push(script_bytes.clone());
 			if let Some(utxo_ref) = utxo_ref {
-				utxos_by_ref.insert(utxo_ref, lookup.clone());
-			} else {
-				pending_confirmation_by_script
-					.insert(lookup.script_pubkey.to_script_bytes(), lookup);
+				utxo_ref_to_utxo_id.insert(utxo_ref, lookup.utxo_id);
 			}
+			funding_address_to_utxo_value.insert(script_bytes, lookup);
 		}
 		let scripts = scripts.into_iter();
 
@@ -134,9 +133,8 @@ impl UtxoSpendFilter {
 		};
 		let mut result = BitcoinUtxoSync {
 			sync_to_block: latest.to_block(),
-			verified: BTreeMap::new(),
-			invalid: BTreeMap::new(),
-			spent: BTreeMap::new(),
+			funded: Default::default(),
+			spent: Default::default(),
 		};
 
 		for filter in &*stored_filters {
@@ -148,32 +146,39 @@ impl UtxoSpendFilter {
 			let block = self.client.get_block(&block_hash)?;
 			let height = filter.block_height;
 			for tx in block.txdata {
-				for input in &tx.input {
-					let utxo_ref = input.previous_output.into();
-					// If we're tracking the UTXO, it has been spent
-					if let Some(value) = utxos_by_ref.get(&utxo_ref) {
-						// TODO: should we figure out who spent it here?
-						result.spent.insert(value.utxo_id, height);
-					}
-				}
-
 				for (idx, output) in tx.output.iter().enumerate() {
-					let Some(pending) =
-						pending_confirmation_by_script.remove(output.script_pubkey.as_bytes())
+					let Some(utxo_value) =
+						funding_address_to_utxo_value.get(output.script_pubkey.as_bytes())
 					else {
 						continue;
 					};
 
-					let utxo_id = pending.utxo_id;
-
-					if output.value.to_sat() != pending.satoshis {
-						result.invalid.insert(utxo_id, BitcoinRejectedReason::SatoshisMismatch);
-					} else {
-						let tx_id = tx.compute_txid().into();
-						result
-							.verified
-							.insert(utxo_id, UtxoRef { txid: tx_id, output_index: idx as u32 });
-					};
+					let sats = output.value.to_sat();
+					// Ignore UTXOs below the minimum. This is a potential DoS vector, where an
+					// attacker tries to fill blocks with micro-utxos, so we'll ignore before they
+					// hit the node
+					if sats < minimum_satoshis {
+						continue;
+					}
+					let txid = tx.compute_txid().into();
+					let utxo_ref = UtxoRef { txid, output_index: idx as u32 };
+					result.funded.push(BitcoinUtxoFunding {
+						utxo_id: utxo_value.utxo_id,
+						utxo_ref: utxo_ref.clone(),
+						satoshis: sats,
+						expected_satoshis: utxo_value.satoshis,
+						bitcoin_height: height,
+					});
+					utxo_ref_to_utxo_id.insert(utxo_ref, utxo_value.utxo_id);
+				}
+				// Check inputs to see if any tracked UTXOs were spent
+				for input in &tx.input {
+					let utxo_ref = input.previous_output.into();
+					// If we're tracking the UTXO, it has been spent
+					if let Some(id) = utxo_ref_to_utxo_id.get(&utxo_ref) {
+						// TODO: should we figure out who spent it here?
+						result.spent.insert(*id, height);
+					}
 				}
 			}
 		}

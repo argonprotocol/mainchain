@@ -111,6 +111,7 @@ parameter_types! {
 	pub static ChargeFee: bool = false;
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
+	pub static VaultViewOfOrphanCosigns: BTreeMap<VaultId,  BTreeSet<u64>> = BTreeMap::new();
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
@@ -299,6 +300,23 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 				list.remove(&utxo_id);
 			} else {
 				list.insert(utxo_id);
+			}
+		});
+		Ok(())
+	}
+
+	fn update_orphaned_cosign_list(
+		vault_id: VaultId,
+		_utxo_id: UtxoId,
+		account_id: &Self::AccountId,
+		should_remove: bool,
+	) -> Result<(), VaultError> {
+		VaultViewOfOrphanCosigns::mutate(|x| {
+			let vault_map = x.entry(vault_id).or_default();
+			if should_remove {
+				vault_map.remove(account_id);
+			} else {
+				vault_map.insert(*account_id);
 			}
 		});
 		Ok(())

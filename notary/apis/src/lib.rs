@@ -11,7 +11,7 @@ use jsonrpsee::{
 	async_client::ClientBuilder,
 	client_transport::ws::{Url, WsTransportClientBuilder},
 };
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::OnceLock, time::Duration};
 use tracing::trace;
 
 pub mod error;
@@ -22,6 +22,20 @@ pub mod system;
 pub use error::Error;
 
 pub type Client = jsonrpsee::core::client::Client;
+
+fn shared_http_client() -> &'static reqwest::Client {
+	static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+	HTTP_CLIENT.get_or_init(|| {
+		// One shared pool avoids creating a new TCP/TLS connection for every download.
+		// Keep timeouts here conservative; per-request timeouts are still applied in `download()`.
+		reqwest::Client::builder()
+			.connect_timeout(Duration::from_secs(5))
+			.pool_idle_timeout(Duration::from_secs(90))
+			.pool_max_idle_per_host(20)
+			.build()
+			.expect("failed to build shared reqwest client")
+	})
+}
 
 #[derive(Debug, Clone)]
 pub struct ArchiveHost {
@@ -49,7 +63,7 @@ pub fn get_header_url(url: &str, notary_id: NotaryId, notebook_number: NotebookN
 
 impl ArchiveHost {
 	pub fn new(url: String) -> anyhow::Result<Self> {
-		Ok(Self { url: Url::parse(&url)?, client: reqwest::Client::new() })
+		Ok(Self { url: Url::parse(&url)?, client: shared_http_client().clone() })
 	}
 
 	pub fn get_header_url(&self, notary_id: NotaryId, notebook_number: NotebookNumber) -> String {
@@ -60,17 +74,23 @@ impl ArchiveHost {
 		get_notebook_url(self.url.as_str(), notary_id, notebook_number)
 	}
 
-	async fn download(url: String) -> anyhow::Result<Vec<u8>> {
-		download(&reqwest::Client::new(), url).await
+	async fn download(url: String, timeout: Duration) -> anyhow::Result<Vec<u8>> {
+		download(shared_http_client(), url, timeout).await
 	}
 
-	pub async fn download_header_bytes(url: String) -> anyhow::Result<SignedHeaderBytes> {
-		let bytes = Self::download(url).await?;
+	pub async fn download_header_bytes(
+		url: String,
+		timeout: Duration,
+	) -> anyhow::Result<SignedHeaderBytes> {
+		let bytes = Self::download(url, timeout).await?;
 		Ok(SignedHeaderBytes(bytes))
 	}
 
-	pub async fn download_notebook_bytes(url: String) -> anyhow::Result<NotebookBytes> {
-		let bytes = Self::download(url).await?;
+	pub async fn download_notebook_bytes(
+		url: String,
+		timeout: Duration,
+	) -> anyhow::Result<NotebookBytes> {
+		let bytes = Self::download(url, timeout).await?;
 		Ok(NotebookBytes(bytes))
 	}
 
@@ -78,9 +98,10 @@ impl ArchiveHost {
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
+		timeout: Duration,
 	) -> anyhow::Result<SignedHeaderBytes> {
 		let url = self.get_header_url(notary_id, notebook_number);
-		let bytes = download(&self.client, url).await?;
+		let bytes = download(&self.client, url, timeout).await?;
 		Ok(SignedHeaderBytes(bytes))
 	}
 
@@ -88,15 +109,20 @@ impl ArchiveHost {
 		&self,
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
+		timeout: Duration,
 	) -> anyhow::Result<NotebookBytes> {
 		let url = self.get_notebook_url(notary_id, notebook_number);
-		let bytes = download(&self.client, url).await?;
+		let bytes = download(&self.client, url, timeout).await?;
 		Ok(NotebookBytes(bytes))
 	}
 }
 
-async fn download(client: &reqwest::Client, url: String) -> anyhow::Result<Vec<u8>> {
-	let result = client.get(url.clone()).send().await?;
+async fn download(
+	client: &reqwest::Client,
+	url: String,
+	timeout: Duration,
+) -> anyhow::Result<Vec<u8>> {
+	let result = client.get(url.clone()).timeout(timeout).send().await?;
 	let status = result.status();
 	if !status.is_success() {
 		return Err(anyhow!("Failed to download: {:?}", &result));
@@ -118,20 +144,22 @@ async fn download(client: &reqwest::Client, url: String) -> anyhow::Result<Vec<u
 }
 
 pub async fn download_notebook_header(
-	client: &Client,
+	notary_client: &Client,
 	notebook_number: NotebookNumber,
+	timeout: Duration,
 ) -> anyhow::Result<SignedNotebookHeader> {
-	let url = client.get_header_download_url(notebook_number).await?;
-	let bytes = ArchiveHost::download(url).await?;
+	let url = notary_client.get_header_download_url(notebook_number).await?;
+	let bytes = ArchiveHost::download(url, timeout).await?;
 	Ok(SignedNotebookHeader::decode(&mut &bytes[..])?)
 }
 
 pub async fn download_notebook(
-	client: &Client,
+	notary_client: &Client,
 	notebook_number: NotebookNumber,
+	timeout: Duration,
 ) -> anyhow::Result<Notebook> {
-	let url = client.get_notebook_download_url(notebook_number).await?;
-	let bytes = ArchiveHost::download(url).await?;
+	let url = notary_client.get_notebook_download_url(notebook_number).await?;
+	let bytes = ArchiveHost::download(url, timeout).await?;
 	Ok(Notebook::decode(&mut &bytes[..])?)
 }
 

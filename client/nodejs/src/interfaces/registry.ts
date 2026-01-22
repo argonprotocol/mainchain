@@ -38,6 +38,7 @@ import type {
   ArgonPrimitivesDomainVersionHost,
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesForkPower,
+  ArgonPrimitivesInherentsBitcoinUtxoFunding,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
@@ -136,6 +137,8 @@ import type {
   PalletBitcoinLocksHoldReason,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
+  PalletBitcoinLocksOrphanedUtxo,
+  PalletBitcoinLocksOrphanedUtxoCosignRequest,
   PalletBitcoinUtxosCall,
   PalletBitcoinUtxosError,
   PalletBitcoinUtxosEvent,
@@ -298,6 +301,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainVersionHost: ArgonPrimitivesDomainVersionHost;
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
+    ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
     ArgonPrimitivesInherentsBitcoinUtxoSync: ArgonPrimitivesInherentsBitcoinUtxoSync;
     ArgonPrimitivesInherentsBlockSealInherent: ArgonPrimitivesInherentsBlockSealInherent;
     ArgonPrimitivesNotaryNotaryMeta: ArgonPrimitivesNotaryNotaryMeta;
@@ -396,6 +400,8 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksHoldReason: PalletBitcoinLocksHoldReason;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
     PalletBitcoinLocksLockedBitcoin: PalletBitcoinLocksLockedBitcoin;
+    PalletBitcoinLocksOrphanedUtxo: PalletBitcoinLocksOrphanedUtxo;
+    PalletBitcoinLocksOrphanedUtxoCosignRequest: PalletBitcoinLocksOrphanedUtxoCosignRequest;
     PalletBitcoinUtxosCall: PalletBitcoinUtxosCall;
     PalletBitcoinUtxosError: PalletBitcoinUtxosError;
     PalletBitcoinUtxosEvent: PalletBitcoinUtxosEvent;

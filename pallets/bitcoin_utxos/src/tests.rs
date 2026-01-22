@@ -1,26 +1,23 @@
-use std::collections::BTreeMap;
-
+use crate::{
+	Error, Event,
+	mock::{System, *},
+	pallet::{
+		ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxos, UtxoIdToRef,
+		UtxosPendingConfirmation,
+	},
+};
 use argon_primitives::{
 	BitcoinUtxoTracker,
 	bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, H256Le,
 		UtxoRef, UtxoValue,
 	},
-	inherents::BitcoinUtxoSync,
+	inherents::{BitcoinUtxoFunding, BitcoinUtxoSync},
 };
 use frame_support::{assert_err, assert_noop, assert_ok, pallet_prelude::Hooks};
 use pallet_prelude::*;
 use sp_core::H256;
 use sp_runtime::DispatchError;
-
-use crate::{
-	Error, Event,
-	mock::{System, *},
-	pallet::{
-		ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxoExpirationsByBlock, LockedUtxos,
-		UtxoIdToRef, UtxosPendingConfirmation,
-	},
-};
 
 #[test]
 fn only_an_operator_can_submit_oracle_block() {
@@ -95,19 +92,12 @@ fn can_watch_utxos() {
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
 			BitcoinUtxoSync {
-				verified: Default::default(),
-				invalid: Default::default(),
+				funded: Default::default(),
 				spent: Default::default(),
 				sync_to_block: BitcoinBlock { block_height: 10, block_hash: H256Le([0; 32]) },
 			},
 		));
-		System::assert_last_event(
-			Event::UtxoRejected {
-				utxo_id: 1,
-				rejected_reason: BitcoinRejectedReason::LookupExpired,
-			}
-			.into(),
-		);
+		System::assert_last_event(Event::UtxoUnwatched { utxo_id: 1 }.into());
 		assert!(UtxosPendingConfirmation::<Test>::get().is_empty());
 	});
 }
@@ -118,8 +108,7 @@ fn it_requires_block_sync_to_be_newer() {
 		System::set_block_number(1);
 
 		let mut utxo_sync = BitcoinUtxoSync {
-			verified: Default::default(),
-			invalid: Default::default(),
+			funded: Default::default(),
 			spent: Default::default(),
 			sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
 		};
@@ -157,7 +146,7 @@ fn it_should_move_utxos_to_lock_once_verified() {
 		System::set_block_number(1);
 
 		let script_pubkey = make_pubkey([0u8; 34]);
-		let satoshis = 100;
+		let satoshis = MinimumSatoshisPerTrackedUtxo::get();
 		let watch_for_spent_until = 10;
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
 			block_height: 2,
@@ -167,13 +156,20 @@ fn it_should_move_utxos_to_lock_once_verified() {
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
 
 		let utxo_sync = BitcoinUtxoSync {
-			verified: BTreeMap::from([(1, utxo_ref.clone())]),
-			invalid: Default::default(),
+			funded: vec![BitcoinUtxoFunding {
+				utxo_id: 1,
+				utxo_ref: utxo_ref.clone(),
+				satoshis,
+				expected_satoshis: satoshis,
+				bitcoin_height: 2,
+			}],
 			spent: Default::default(),
 			sync_to_block: BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) },
 		};
 		assert_ok!(BitcoinUtxos::sync(RuntimeOrigin::none(), utxo_sync),);
-		System::assert_last_event(Event::UtxoVerified { utxo_id: 1 }.into());
+		System::assert_last_event(
+			Event::UtxoVerified { utxo_id: 1, satoshis_received: satoshis }.into(),
+		);
 		assert!(UtxosPendingConfirmation::<Test>::get().is_empty(),);
 		assert_eq!(
 			LockedUtxos::<Test>::get(&utxo_ref),
@@ -185,34 +181,12 @@ fn it_should_move_utxos_to_lock_once_verified() {
 				watch_for_spent_until_height: 10
 			})
 		);
-		assert_eq!(LockedUtxoExpirationsByBlock::<Test>::get(10).to_vec(), vec![utxo_ref.clone()]);
-
-		// test expiring
-		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
-			block_height: 10,
-			block_hash: H256Le([0; 32]),
-		});
-		// simulate next block
-		InherentIncluded::<Test>::set(false);
-		BitcoinUtxos::on_finalize(2);
-		assert_ok!(BitcoinUtxos::sync(
-			RuntimeOrigin::none(),
-			BitcoinUtxoSync {
-				verified: Default::default(),
-				invalid: Default::default(),
-				spent: Default::default(),
-				sync_to_block: BitcoinBlock { block_height: 10, block_hash: H256Le([0; 32]) },
-			},
-		));
-		System::assert_last_event(Event::UtxoUnwatched { utxo_id: 1 }.into());
-		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref), None);
-		assert_eq!(UtxoIdToRef::<Test>::get(1), None);
-		assert_eq!(LockedUtxoExpirationsByBlock::<Test>::get(10).to_vec(), vec![]);
 	});
 }
 
 #[test]
-fn it_should_block_duplicated_utxos() {
+fn it_should_ignore_extra_funding_utxos() {
+	MinimumSatoshisPerTrackedUtxo::set(1000);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
@@ -220,51 +194,81 @@ fn it_should_block_duplicated_utxos() {
 			block_hash: H256Le([0; 32]),
 		});
 
-		assert_ok!(BitcoinUtxos::watch_for_utxo(1, make_pubkey([0u8; 34]), 100, 100),);
-		assert_ok!(BitcoinUtxos::watch_for_utxo(2, make_pubkey([1u8; 34]), 101, 100),);
+		// first one is under minimum
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, make_pubkey([0u8; 34]), 100_000, 100),);
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		let utxo_ref_2 = UtxoRef { txid: H256Le([1; 32]), output_index: 1 };
+		let utxo_ref_3 = UtxoRef { txid: H256Le([2; 32]), output_index: 1 };
+		assert_eq!(UtxosPendingConfirmation::<Test>::get().len(), 1);
 
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
 			BitcoinUtxoSync {
-				verified: BTreeMap::from([(1, utxo_ref.clone()), (2, utxo_ref.clone())]),
-				invalid: Default::default(),
+				funded: vec![
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: utxo_ref.clone(),
+						satoshis: 999,
+						expected_satoshis: 100_000,
+						bitcoin_height: 2,
+					},
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: utxo_ref_2.clone(),
+						satoshis: 89_999, // outside amount threshold,
+						expected_satoshis: 100_000,
+						bitcoin_height: 2,
+					},
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: utxo_ref_3.clone(),
+						satoshis: 110_000,
+						expected_satoshis: 100_000,
+						bitcoin_height: 2,
+					}
+				],
 				spent: Default::default(),
 				sync_to_block: BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) },
 			}
 		),);
-		System::assert_has_event(Event::UtxoVerified { utxo_id: 1 }.into());
+		System::assert_has_event(
+			Event::UtxoVerified { utxo_id: 1, satoshis_received: 110_000 }.into(),
+		);
+		// we will just ignore the < 1000 utxo
 		System::assert_has_event(
 			Event::UtxoRejected {
-				utxo_id: 2,
-				rejected_reason: BitcoinRejectedReason::DuplicateUtxo,
+				utxo_id: 1,
+				satoshis_received: 89_999,
+				rejected_reason: BitcoinRejectedReason::SatoshisOutsideAcceptedRange,
 			}
 			.into(),
 		);
+		assert_eq!(LastInvalidUtxo::get(), Some((1, utxo_ref_2.clone(), 89_999,)));
 		assert!(UtxosPendingConfirmation::<Test>::get().is_empty(),);
+		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref), None);
+		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref_2), None);
 		assert_eq!(
-			LockedUtxos::<Test>::get(&utxo_ref),
+			LockedUtxos::<Test>::get(&utxo_ref_3),
 			Some(UtxoValue {
 				utxo_id: 1,
 				script_pubkey: make_pubkey([0u8; 34]),
-				satoshis: 100,
+				satoshis: 100_000, // doesn't update
 				submitted_at_height: 2,
 				watch_for_spent_until_height: 100,
 			})
 		);
-		assert_eq!(LockedUtxoExpirationsByBlock::<Test>::get(100).to_vec(), vec![utxo_ref.clone()]);
-		assert_eq!(UtxoIdToRef::<Test>::get(1), Some(utxo_ref.clone()));
-		assert_eq!(UtxoIdToRef::<Test>::get(2), None);
+		assert_eq!(UtxoIdToRef::<Test>::get(1), Some(utxo_ref_3.clone()));
 
 		// test cleanup
 		BitcoinUtxos::unwatch(1);
-		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref), None);
+		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref_3), None);
 		assert_eq!(UtxoIdToRef::<Test>::get(1), None);
 	});
 }
 
 #[test]
 fn it_should_preserve_storage_if_one_sync_fails() {
+	MinimumSatoshisPerTrackedUtxo::set(100);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
@@ -276,7 +280,7 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 		assert_ok!(BitcoinUtxos::watch_for_utxo(2, make_pubkey([1u8; 34]), 101, 100),);
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
 		let utxo_ref_2 = UtxoRef { txid: H256Le([1; 32]), output_index: 1 };
-		UtxoVerifiedCallback::set(Some(|id| {
+		UtxoVerifiedCallback::set(Some(|(id, _satoshis)| {
 			if id == 2 {
 				return Err(Error::<Test>::NoPermissions.into());
 			}
@@ -286,13 +290,27 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
 			BitcoinUtxoSync {
-				verified: BTreeMap::from([(1, utxo_ref.clone()), (2, utxo_ref_2.clone())]),
-				invalid: Default::default(),
+				funded: vec![
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: utxo_ref.clone(),
+						satoshis: 100,
+						expected_satoshis: 100,
+						bitcoin_height: 2,
+					},
+					BitcoinUtxoFunding {
+						utxo_id: 2,
+						utxo_ref: utxo_ref_2.clone(),
+						satoshis: 101,
+						expected_satoshis: 101,
+						bitcoin_height: 2,
+					}
+				],
 				spent: Default::default(),
 				sync_to_block: BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) },
 			}
 		),);
-		System::assert_has_event(Event::UtxoVerified { utxo_id: 1 }.into());
+		System::assert_has_event(Event::UtxoVerified { utxo_id: 1, satoshis_received: 100 }.into());
 		let match_error: DispatchError = Error::<Test>::NoPermissions.into();
 		System::assert_has_event(
 			Event::UtxoVerifiedError { utxo_id: 2, error: match_error.stripped() }.into(),
@@ -308,7 +326,6 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 				watch_for_spent_until_height: 100,
 			})
 		);
-		assert_eq!(LockedUtxoExpirationsByBlock::<Test>::get(100).to_vec(), vec![utxo_ref.clone()]);
 		assert_eq!(
 			UtxosPendingConfirmation::<Test>::get().get(&2),
 			Some(&UtxoValue {

@@ -154,6 +154,11 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Orphaned Bitcoin Utxos pending cosign by vault id
+	#[pallet::storage]
+	pub type OrphanedUtxoAccountsByVaultId<T: Config> =
+		StorageDoubleMap<_, Twox64Concat, VaultId, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+
 	/// The vaults that have funds releasing at a given bitcoin height
 	#[pallet::storage]
 	pub type VaultFundsReleasingByHeight<T: Config> = StorageMap<
@@ -1273,6 +1278,26 @@ pub mod pallet {
 				}
 				Ok(())
 			})
+		}
+
+		fn update_orphaned_cosign_list(
+			vault_id: VaultId,
+			_utxo_id: UtxoId,
+			account_id: &Self::AccountId,
+			should_remove: bool,
+		) -> Result<(), VaultError> {
+			let count = OrphanedUtxoAccountsByVaultId::<T>::mutate(vault_id, account_id, |count| {
+				if should_remove {
+					count.saturating_reduce(1);
+				} else {
+					count.saturating_accrue(1);
+				}
+				*count
+			});
+			if count == 0 {
+				OrphanedUtxoAccountsByVaultId::<T>::remove(vault_id, account_id);
+			}
+			Ok(())
 		}
 	}
 

@@ -66,14 +66,14 @@ pub mod pallet {
 		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, UtxoLockEvents,
 		VaultId,
 		bitcoin::{
-			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, BitcoinScriptPubkey,
-			BitcoinSignature, CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId,
+			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey, BitcoinSignature,
+			CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
 			XPubChildNumber, XPubFingerprint,
 		},
 		vault::{BitcoinVaultProvider, LockExtension, VaultError},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -172,9 +172,22 @@ pub mod pallet {
 	pub type LockReleaseCosignHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
 
+	/// Stores bitcoin locks that have requested to be released
 	#[pallet::storage]
 	pub type LockReleaseRequestsByUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, LockReleaseRequest<T::Balance>, OptionQuery>;
+
+	/// Mismatched utxos that were sent with invalid amounts to a locked bitcoin
+	#[pallet::storage]
+	pub type OrphanedUtxosByAccount<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		T::AccountId,
+		Twox64Concat,
+		UtxoRef,
+		OrphanedUtxo<BlockNumberFor<T>>,
+		OptionQuery,
+	>;
 
 	/// The minimum number of satoshis that can be locked
 	#[pallet::storage]
@@ -208,28 +221,45 @@ pub mod pallet {
 		pub vault_id: VaultId,
 		/// The mintable liquidity of this lock, in microgons
 		pub liquidity_promised: T::Balance,
-		/// The lock price in microgons, adjusted for any inflation offset of the argon
-		pub pegged_price: T::Balance,
+		/// The market rate of the satoshis locked, adjusted for any inflation offset of the argon
+		pub locked_market_rate: T::Balance,
+		/// The owner account
 		pub owner_account: T::AccountId,
 		/// Sum of all lock fees (initial plus any ratcheting)
 		pub security_fees: T::Balance,
+		/// The number of satoshis reserved for this lock
 		#[codec(compact)]
 		pub satoshis: Satoshis,
+		/// The number of satoshis in the funding utxo (allowed some variance from the `satoshis`
+		/// field)
+		pub utxo_satoshis: Option<Satoshis>,
+		/// The vault pubkey used in the cosign script to lock (and unlock) the bitcoin
 		pub vault_pubkey: CompressedBitcoinPubkey,
+		/// The vault pubkey used to claim the bitcoin after the lock expiration
 		pub vault_claim_pubkey: CompressedBitcoinPubkey,
 		/// The vault xpub sources. First is the cosign number, second is the claim number
 		pub vault_xpub_sources: (XPubFingerprint, XPubChildNumber, XPubChildNumber),
+		/// The bitcoin pubkey provided by the owner of the bitcoin lock that will be needed to
+		/// spend the bitcoin (owner side of cosign)
 		pub owner_pubkey: CompressedBitcoinPubkey,
+		/// The height where the vault has exclusive rights to claim the bitcoin
 		#[codec(compact)]
 		pub vault_claim_height: BitcoinHeight,
+		/// The height where either owner or vault can claim the bitcoin
 		#[codec(compact)]
 		pub open_claim_height: BitcoinHeight,
+		/// The bitcoin height when this lock was created
 		#[codec(compact)]
 		pub created_at_height: BitcoinHeight,
+		/// The script pubkey where funds are sent to fund this bitcoin lock
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
+		/// Whether this lock has been verified on-bitcoin
 		pub is_verified: bool,
-		pub is_rejected_needs_release: bool,
+		/// Funds used by this bitcoin that will need to be held for extended periods when released
+		/// back to the vault
 		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
+		/// The argon block when this lock was created
+		pub created_at_argon_block: BlockNumberFor<T>,
 	}
 
 	impl<T: Config> LockedBitcoin<T> {
@@ -238,6 +268,9 @@ pub mod pallet {
 				extended_expiration_funds: self.fund_hold_extensions.clone(),
 				lock_expiration: self.vault_claim_height,
 			}
+		}
+		pub fn effective_satoshis(&self) -> Satoshis {
+			self.utxo_satoshis.unwrap_or(self.satoshis)
 		}
 	}
 
@@ -254,17 +287,72 @@ pub mod pallet {
 	pub struct LockReleaseRequest<
 		Balance: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
 	> {
+		/// The utxo id this request is related to
 		#[codec(compact)]
 		pub utxo_id: UtxoId,
+		/// The vault id this request is related to
 		#[codec(compact)]
 		pub vault_id: VaultId,
+		/// The network fee to take out of the bitcoin being released
 		#[codec(compact)]
 		pub bitcoin_network_fee: Satoshis,
+		/// The frame when cosign is due
 		#[codec(compact)]
 		pub cosign_due_frame: FrameId,
+		/// The script pubkey where the bitcoin is to be sent
 		pub to_script_pubkey: BitcoinScriptPubkey,
+		/// The price at which the bitcoin is being released (to be confiscated from vault it not
+		/// cosigned)
 		#[codec(compact)]
 		pub redemption_price: Balance,
+	}
+
+	#[derive(
+		Decode,
+		Encode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct OrphanedUtxo<BlockNumber: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen> {
+		/// The utxo id this request is related to
+		#[codec(compact)]
+		pub utxo_id: UtxoId,
+		/// The vault id this request is related to
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		/// The number of satoshis in the orphaned utxo
+		#[codec(compact)]
+		pub satoshis: Satoshis,
+		/// The block where this was detected
+		#[codec(compact)]
+		pub recorded_argon_block_number: BlockNumber,
+		/// The cosign request to release this utxo, if any
+		pub cosign_request: Option<OrphanedUtxoCosignRequest<BlockNumber>>,
+	}
+
+	#[derive(
+		Decode,
+		Encode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		RuntimeDebug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct OrphanedUtxoCosignRequest<
+		BlockNumber: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
+	> {
+		/// The network fee to take out of the bitcoin being released
+		pub bitcoin_network_fee: Satoshis,
+		/// The script pubkey where the bitcoin is to be sent
+		pub to_script_pubkey: BitcoinScriptPubkey,
+		/// When this was requested to be released
+		pub created_at_argon_block_number: BlockNumber,
 	}
 
 	#[pallet::event]
@@ -274,7 +362,7 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
 			liquidity_promised: T::Balance,
-			pegged_price: T::Balance,
+			locked_market_rate: T::Balance,
 			account_id: T::AccountId,
 			security_fee: T::Balance,
 		},
@@ -282,9 +370,9 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
 			liquidity_promised: T::Balance,
-			original_pegged_price: T::Balance,
+			original_market_rate: T::Balance,
 			security_fee: T::Balance,
-			new_pegged_price: T::Balance,
+			new_locked_market_rate: T::Balance,
 			amount_burned: T::Balance,
 			account_id: T::AccountId,
 		},
@@ -318,6 +406,12 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			error: DispatchError,
 		},
+		OrphanedUtxoCosigned {
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+			vault_id: VaultId,
+			signature: BitcoinSignature,
+		},
 	}
 
 	#[pallet::error]
@@ -326,6 +420,7 @@ pub mod pallet {
 		InsufficientVaultFunds,
 		/// The proposed transaction would take the account below the minimum (existential) balance
 		AccountWouldGoBelowMinimumBalance,
+		/// This vault is closed
 		VaultClosed,
 		/// Funding would result in an overflow of the balance type
 		InvalidVaultAmount,
@@ -335,6 +430,7 @@ pub mod pallet {
 		BitcoinReleaseInitiationDeadlinePassed,
 		/// The fee for this bitcoin release is too high
 		BitcoinFeeTooHigh,
+		/// The Bitcoin Unspect Transaction Output (UTXO) was not found
 		BitcoinUtxoNotFound,
 		/// This bitcoin cosign script couldn't be decoded for release
 		BitcoinUnableToBeDecodedForRelease,
@@ -344,15 +440,23 @@ pub mod pallet {
 		BitcoinPubkeyUnableToBeDecoded,
 		/// The cosign signature is not valid for the bitcoin release
 		BitcoinInvalidCosignature,
+		/// The minimum number of satoshis was not met
 		InsufficientSatoshisLocked,
+		/// The price provider has no bitcoin prices available. This is a temporary error
 		NoBitcoinPricesAvailable,
 		/// The bitcoin script to lock this bitcoin has errors
 		InvalidBitcoinScript,
+		/// The user does not have permissions to perform this action
 		NoPermissions,
+		/// The expected amount of funds to return from hold was not available
 		HoldUnexpectedlyModified,
+		/// The hold on funds could not be recovered
 		UnrecoverableHold,
+		/// The vault was not found
 		VaultNotFound,
+		/// An error ocurred in the vault module
 		GenericVaultError(VaultError),
+		/// The Bitcoin Lock record was not found
 		LockNotFound,
 		/// No Vault public keys are available
 		NoVaultBitcoinPubkeysAvailable,
@@ -478,7 +582,7 @@ pub mod pallet {
 
 			let liquidity_promised = T::PriceProvider::get_bitcoin_argon_price(satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
-			let pegged_price = Self::calculate_pegged_price(liquidity_promised)?;
+			let locked_market_rate = Self::calculate_adjusted_market_rate(liquidity_promised)?;
 
 			let fee =
 				T::VaultProvider::lock(vault_id, &account_id, liquidity_promised, satoshis, None)
@@ -525,9 +629,10 @@ pub mod pallet {
 				LockedBitcoin {
 					owner_account: account_id.clone(),
 					vault_id,
-					pegged_price,
+					locked_market_rate,
 					liquidity_promised,
 					security_fees: fee,
+					utxo_satoshis: None,
 					satoshis,
 					vault_pubkey,
 					vault_claim_pubkey,
@@ -538,15 +643,15 @@ pub mod pallet {
 					created_at_height: current_bitcoin_height,
 					utxo_script_pubkey: script_pubkey,
 					is_verified: false,
-					is_rejected_needs_release: false,
 					fund_hold_extensions: BoundedBTreeMap::default(),
+					created_at_argon_block: <frame_system::Pallet<T>>::block_number(),
 				},
 			);
 			Self::deposit_event(Event::<T>::BitcoinLockCreated {
 				utxo_id,
 				vault_id,
 				liquidity_promised,
-				pegged_price,
+				locked_market_rate,
 				account_id,
 				security_fee: fee,
 			});
@@ -574,8 +679,8 @@ pub mod pallet {
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
 
 			// if no refund is needed, we can just cancel the lock
-			if !lock.is_verified && !lock.is_rejected_needs_release {
-				Self::cancel_lock(utxo_id)?;
+			if !lock.is_verified {
+				Self::cancel_lock(utxo_id, &lock)?;
 				return Ok(());
 			}
 
@@ -600,9 +705,13 @@ pub mod pallet {
 
 			// If this is a confirmed utxo, we require the release price to be paid
 			if lock.is_verified {
-				ensure!(bitcoin_network_fee < lock.satoshis, Error::<T>::BitcoinFeeTooHigh);
+				// we have to take the fee out of the locked satoshis, so this won't work
+				ensure!(
+					bitcoin_network_fee < lock.effective_satoshis(),
+					Error::<T>::BitcoinFeeTooHigh
+				);
 				redemption_price =
-					Self::get_redemption_price(&lock.satoshis, Some(lock.pegged_price))?;
+					Self::get_redemption_price(&lock.satoshis, Some(lock.locked_market_rate))?;
 				// hold funds until the utxo is seen in the chain
 				let balance = T::Currency::balance(&who);
 				ensure!(
@@ -668,6 +777,7 @@ pub mod pallet {
 
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			let lock_extension = lock.get_lock_extension();
+			let utxo_satoshis = lock.effective_satoshis();
 			let LockedBitcoin {
 				liquidity_promised,
 				vault_id,
@@ -678,7 +788,6 @@ pub mod pallet {
 				created_at_height,
 				open_claim_height,
 				owner_account,
-				is_rejected_needs_release,
 				vault_claim_height,
 				..
 			} = lock;
@@ -699,7 +808,7 @@ pub mod pallet {
 			};
 			let releaser = CosignReleaser::new(
 				script_args,
-				satoshis,
+				utxo_satoshis,
 				utxo_ref.txid.into(),
 				utxo_ref.output_index,
 				ReleaseStep::VaultCosign,
@@ -711,31 +820,25 @@ pub mod pallet {
 
 			T::BitcoinSignatureVerifier::verify_signature(releaser, vault_pubkey, &signature)?;
 
-			if is_rejected_needs_release {
-				// NOTE: this isn't strictly needed yet, but maintains some consistency in calling
-				T::LockEvents::utxo_released(utxo_id, false, 0u32.into())?;
-				T::VaultProvider::cancel(vault_id, liquidity_promised).map_err(Error::<T>::from)?;
-			} else {
-				// burn the owner's held funds
-				let burn_amount = request.redemption_price;
-				let _ = T::Currency::burn_held(
-					&HoldReason::ReleaseBitcoinLock.into(),
-					&owner_account,
-					burn_amount,
-					Precision::Exact,
-					Fortitude::Force,
-				)?;
-				frame_system::Pallet::<T>::dec_providers(&owner_account)?;
-				T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+			// burn the owner's held funds
+			let burn_amount = request.redemption_price;
+			let _ = T::Currency::burn_held(
+				&HoldReason::ReleaseBitcoinLock.into(),
+				&owner_account,
+				burn_amount,
+				Precision::Exact,
+				Fortitude::Force,
+			)?;
+			frame_system::Pallet::<T>::dec_providers(&owner_account)?;
+			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
 
-				T::VaultProvider::schedule_for_release(
-					vault_id,
-					liquidity_promised,
-					satoshis,
-					&lock_extension,
-				)
-				.map_err(Error::<T>::from)?;
-			}
+			T::VaultProvider::schedule_for_release(
+				vault_id,
+				liquidity_promised,
+				satoshis,
+				&lock_extension,
+			)
+			.map_err(Error::<T>::from)?;
 
 			LockReleaseCosignHeightById::<T>::insert(
 				utxo_id,
@@ -779,9 +882,9 @@ pub mod pallet {
 			let new_liquidity_promised = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-			let original_pegged_price = lock.pegged_price;
+			let original_market_rate = lock.locked_market_rate;
 			ensure!(
-				original_pegged_price != new_liquidity_promised,
+				original_market_rate != new_liquidity_promised,
 				Error::<T>::NoRatchetingAvailable
 			);
 
@@ -790,8 +893,8 @@ pub mod pallet {
 			let mut amount_burned = T::Balance::zero();
 			let mut to_mint = new_liquidity_promised;
 			let mut duration_for_new_funds = FixedU128::zero();
-			if new_liquidity_promised > original_pegged_price {
-				to_mint = new_liquidity_promised.saturating_sub(original_pegged_price);
+			if new_liquidity_promised > original_market_rate {
+				to_mint = new_liquidity_promised - original_market_rate;
 
 				let start_height = lock.created_at_height;
 				let elapsed_blocks =
@@ -801,7 +904,7 @@ pub mod pallet {
 					FixedU128::from_rational(elapsed_blocks as u128, full_term as u128);
 			} else {
 				let redemption_price =
-					Self::get_redemption_price(&lock.satoshis, Some(original_pegged_price))
+					Self::get_redemption_price(&lock.satoshis, Some(original_market_rate))
 						.map_err(|_| Error::<T>::NoBitcoinPricesAvailable)?;
 				// first we'll burn the redemption price (just like a release)
 				amount_burned = redemption_price;
@@ -823,9 +926,6 @@ pub mod pallet {
 					&lock.get_lock_extension(),
 				)
 				.map_err(Error::<T>::from)?;
-
-				// next we'll add the current market rate as a mint amount with a zero-term duration
-				// (only base fee)
 			}
 
 			let mut lock_extension = lock.get_lock_extension();
@@ -840,8 +940,8 @@ pub mod pallet {
 
 			lock.security_fees.saturating_accrue(fee);
 			lock.fund_hold_extensions = lock_extension.extended_expiration_funds.clone();
-			let new_pegged_price = Self::calculate_pegged_price(new_liquidity_promised)?;
-			lock.pegged_price = new_pegged_price;
+			let new_market_rate = Self::calculate_adjusted_market_rate(new_liquidity_promised)?;
+			lock.locked_market_rate = new_market_rate;
 			lock.liquidity_promised = new_liquidity_promised;
 			T::LockEvents::utxo_locked(utxo_id, &who, to_mint)?;
 
@@ -849,8 +949,8 @@ pub mod pallet {
 				utxo_id,
 				vault_id: lock.vault_id,
 				security_fee: fee,
-				original_pegged_price,
-				new_pegged_price,
+				original_market_rate,
+				new_locked_market_rate: new_market_rate,
 				liquidity_promised: new_liquidity_promised,
 				amount_burned,
 				account_id: who.clone(),
@@ -870,20 +970,115 @@ pub mod pallet {
 			MinimumSatoshis::<T>::put(satoshis);
 			Ok(())
 		}
+
+		#[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::request_orphaned_utxo_release())]
+		pub fn request_orphaned_utxo_release(
+			origin: OriginFor<T>,
+			utxo_ref: UtxoRef,
+			to_script_pubkey: BitcoinScriptPubkey,
+			bitcoin_network_fee: Satoshis,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			OrphanedUtxosByAccount::<T>::mutate(&who, utxo_ref, |entry_maybe| {
+				let Some(entry) = entry_maybe else {
+					return Err(Error::<T>::BitcoinUtxoNotFound);
+				};
+				entry.cosign_request = Some(OrphanedUtxoCosignRequest {
+					bitcoin_network_fee,
+					to_script_pubkey: to_script_pubkey.clone(),
+					created_at_argon_block_number: <frame_system::Pallet<T>>::block_number(),
+				});
+				// send to a queue for vault to know about it
+				T::VaultProvider::update_orphaned_cosign_list(
+					entry.vault_id,
+					entry.utxo_id,
+					&who,
+					false,
+				)?;
+				Ok(())
+			})?;
+
+			Ok(())
+		}
+
+		#[pallet::call_index(6)]
+		#[pallet::weight(T::WeightInfo::cosign_orphaned_utxo_release())]
+		pub fn cosign_orphaned_utxo_release(
+			origin: OriginFor<T>,
+			orphan_owner: T::AccountId,
+			utxo_ref: UtxoRef,
+			signature: BitcoinSignature,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let orphan = OrphanedUtxosByAccount::<T>::take(&orphan_owner, &utxo_ref)
+				.ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+
+			// if not owner, "take" of ref will rollback
+			ensure!(T::VaultProvider::is_owner(orphan.vault_id, &who), Error::<T>::NoPermissions);
+			let vault_has_no_more_owner_orphans =
+				OrphanedUtxosByAccount::<T>::iter_prefix(&orphan_owner)
+					.all(|(_utxo_ref, o)| o.vault_id != orphan.vault_id);
+			if vault_has_no_more_owner_orphans {
+				T::VaultProvider::update_orphaned_cosign_list(
+					orphan.vault_id,
+					orphan.utxo_id,
+					&who,
+					true,
+				)
+				.map_err(Error::<T>::from)?;
+			}
+			Self::deposit_event(Event::OrphanedUtxoCosigned {
+				utxo_id: orphan.utxo_id,
+				vault_id: orphan.vault_id,
+				utxo_ref,
+				signature,
+			});
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> BitcoinUtxoEvents for Pallet<T> {
-		fn utxo_verified(utxo_id: UtxoId) -> DispatchResult {
+		fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {
 				if let Some(lock) = a {
+					if lock.is_verified {
+						log::warn!("Utxo id {:?} already verified", utxo_id);
+						return Ok(());
+					}
 					lock.is_verified = true;
+					T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+						.map_err(Error::<T>::from)?;
+
+					// If we received different amount of sats than expected, we need to adjust
+					// the lock parameters. We will not change the fee.
+					//
+					// NOTE: at time of writing, this is a max of 10k sats ($10), controlled
+					// by which utxos the utxo pallet sends to funding_received vs
+					// invalid_utxo_received.
+					if received_satoshis < lock.satoshis {
+						let ratio = FixedU128::from_rational(
+							received_satoshis as u128,
+							lock.satoshis as u128,
+						);
+						let starting_liquidity = lock.liquidity_promised;
+						lock.locked_market_rate = ratio.saturating_mul_int(lock.locked_market_rate);
+						lock.liquidity_promised = ratio.saturating_mul_int(starting_liquidity);
+						let to_return = starting_liquidity.saturating_sub(lock.liquidity_promised);
+
+						if !to_return.is_zero() {
+							T::VaultProvider::cancel(lock.vault_id, to_return)
+								.map_err(Error::<T>::from)?;
+						}
+						lock.satoshis = received_satoshis;
+					}
+					lock.utxo_satoshis = Some(received_satoshis);
 					T::LockEvents::utxo_locked(
 						utxo_id,
 						&lock.owner_account,
 						lock.liquidity_promised,
 					)?;
-					T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
-						.map_err(Error::<T>::from)?;
 				} else {
 					log::warn!("Verified utxo_id {:?} not found", utxo_id);
 				}
@@ -891,30 +1086,40 @@ pub mod pallet {
 			})
 		}
 
-		fn utxo_rejected(utxo_id: UtxoId, reason: BitcoinRejectedReason) -> DispatchResult {
-			// if the failure is due to a satoshi mismatch, allow a user to reclaim it
-			if matches!(reason, BitcoinRejectedReason::SatoshisMismatch) {
-				LocksByUtxoId::<T>::mutate_extant(utxo_id, |lock| {
-					lock.is_rejected_needs_release = true;
-				});
-				Ok(())
-			} else {
-				Self::cancel_lock(utxo_id)?;
-				Ok::<(), DispatchError>(())
+		fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult {
+			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
+				T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+					.map_err(Error::<T>::from)?;
+				T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+					.map_err(Error::<T>::from)?;
 			}
+			Ok(())
 		}
 
-		fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
+		fn invalid_utxo_received(
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+			satoshis: Satoshis,
+		) -> sp_runtime::DispatchResult {
+			let block_number = frame_system::Pallet::<T>::block_number();
+			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			OrphanedUtxosByAccount::<T>::insert(
+				lock.owner_account.clone(),
+				utxo_ref,
+				OrphanedUtxo {
+					utxo_id,
+					vault_id: lock.vault_id,
+					satoshis,
+					recorded_argon_block_number: block_number,
+					cosign_request: None,
+				},
+			);
+			Ok(())
+		}
+
+		fn spent(utxo_id: UtxoId) -> DispatchResult {
 			if LocksByUtxoId::<T>::contains_key(utxo_id) {
 				Self::burn_bitcoin_lock(utxo_id, true)
-			} else {
-				Ok(())
-			}
-		}
-
-		fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
-			if LocksByUtxoId::<T>::contains_key(utxo_id) {
-				Self::burn_bitcoin_lock(utxo_id, false)
 			} else {
 				Ok(())
 			}
@@ -922,19 +1127,23 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn minimum_satoshis() -> Satoshis {
+			MinimumSatoshis::<T>::get()
+		}
+
 		/// The liquidity price accounts for BTC -> USD and MICROGON -> USD prices, which gives us
 		/// MICROGON -> BTC, but we don't account for how far off target the ARGON is from the CPI
 		/// target price. So, for instance, we might be trading 1-1 with the USD, but in reality,
 		/// there's been 100% inflation, so the lock price should be 2 ARGON per BTC, not 1
 		/// ARGON per BTC.
-		pub(crate) fn calculate_pegged_price(
+		pub(crate) fn calculate_adjusted_market_rate(
 			liquidity_promised: T::Balance,
 		) -> Result<T::Balance, Error<T>> {
 			let target_offset = T::PriceProvider::get_argon_cpi()
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
 				.add(FixedI128::one());
-			// target = 1.5, price = 1.4, offset = 0.1
-			// need to multiply price by 1.1 to get to target
+			// target = 1.5, price = 1.4, offset = 0.1, target_offset = 1.1
+			// need to multiply price by 1.1 to get to pegged price
 			Ok(target_offset.saturating_mul_int(liquidity_promised))
 		}
 
@@ -951,19 +1160,21 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			// burn the current redemption price from the vault
-			let redemption_rate =
-				Self::get_redemption_price(&lock.satoshis, Some(lock.pegged_price))?;
+			// burn the current redemption price from the vault at value of actual satoshis locked
+			let redemption_price = Self::get_redemption_price(
+				&lock.effective_satoshis(),
+				Some(lock.locked_market_rate),
+			)?;
 
 			T::VaultProvider::burn(
 				lock.vault_id,
 				lock.liquidity_promised,
-				redemption_rate,
+				redemption_price,
 				&lock.get_lock_extension(),
 			)
 			.map_err(Error::<T>::from)?;
 
-			let amount_eligible_for_pool = lock.liquidity_promised.min(redemption_rate);
+			let amount_eligible_for_pool = lock.liquidity_promised.min(redemption_price);
 			T::LockEvents::utxo_released(utxo_id, is_externally_spent, amount_eligible_for_pool)?;
 
 			Self::deposit_event(Event::BitcoinLockBurned {
@@ -990,17 +1201,18 @@ pub mod pallet {
 
 		/// Call made during the on_initialize to implement cosign overdue penalties.
 		pub(crate) fn cosign_bitcoin_overdue(utxo_id: UtxoId) -> DispatchResult {
-			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			let vault_id = lock.vault_id;
 			let entry = Self::take_release_request(utxo_id)?;
 
-			let redemption_amount_held = entry.redemption_price;
+			let redemption_price_on_hold = entry.redemption_price;
 
-			// need to compensate with market price, not the redemption price
-			let market_price = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
+			// need to compensate with market price, not the redemption price - use the real
+			// satoshis locked to get the market price
+			let market_price = T::PriceProvider::get_bitcoin_argon_price(lock.effective_satoshis())
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
-			let adjusted_market_rate = market_price.min(redemption_amount_held);
+			let adjusted_market_rate = market_price.min(redemption_price_on_hold);
 
 			// 1. Return funds to user
 			// 2. Any difference from market rate comes from vault, capped by securitization pct
@@ -1015,19 +1227,17 @@ pub mod pallet {
 			.map_err(Error::<T>::from)?;
 
 			// we return this amount to the bitcoin holder
-			if redemption_amount_held > T::Balance::zero() {
+			if redemption_price_on_hold > T::Balance::zero() {
 				T::Currency::release(
 					&HoldReason::ReleaseBitcoinLock.into(),
 					&lock.owner_account,
-					redemption_amount_held,
+					redemption_price_on_hold,
 					Precision::Exact,
 				)?;
 				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
 			}
-			if !lock.is_rejected_needs_release {
-				// count the amount we took from the vault as the burn amount
-				T::LockEvents::utxo_released(utxo_id, false, adjusted_market_rate)?;
-			}
+			// count the amount we took from the vault as the burn amount
+			T::LockEvents::utxo_released(utxo_id, false, adjusted_market_rate)?;
 
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				utxo_id,
@@ -1042,7 +1252,7 @@ pub mod pallet {
 
 		pub fn get_redemption_price(
 			satoshis: &Satoshis,
-			pegged_price: Option<T::Balance>,
+			locked_market_rate: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
 			let satoshis = FixedU128::from_rational(*satoshis as u128, 1);
 			let sats_per_argon =
@@ -1054,8 +1264,8 @@ pub mod pallet {
 				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
 				.saturating_mul(satoshis);
 
-			if let Some(pegged_price) = pegged_price {
-				price = price.min(FixedU128::from_rational(pegged_price.into(), 1u128));
+			if let Some(locked_market_rate) = locked_market_rate {
+				price = price.min(FixedU128::from_rational(locked_market_rate.into(), 1u128));
 			}
 
 			let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
@@ -1097,15 +1307,13 @@ pub mod pallet {
 			Ok(argons)
 		}
 
-		fn cancel_lock(utxo_id: UtxoId) -> Result<(), Error<T>> {
-			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
-				if !lock.is_verified {
-					T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
-						.map_err(Error::<T>::from)?;
-				}
-				T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+		fn cancel_lock(utxo_id: UtxoId, lock: &LockedBitcoin<T>) -> Result<(), Error<T>> {
+			if !lock.is_verified {
+				T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
 					.map_err(Error::<T>::from)?;
 			}
+			T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+				.map_err(Error::<T>::from)?;
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Ok(())

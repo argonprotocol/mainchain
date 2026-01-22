@@ -28,6 +28,10 @@ pub trait WeightInfo {
 
 	// Admin function
 	fn admin_modify_minimum_locked_sats() -> Weight;
+
+	// Orphaned Utxo process
+	fn request_orphaned_utxo_release() -> Weight;
+	fn cosign_orphaned_utxo_release() -> Weight;
 }
 
 
@@ -42,4 +46,6 @@ impl WeightInfo for () {
 	fn ratchet() -> Weight { Weight::zero() }
 	fn on_initialize_with_expirations_and_overdue(_expiring_count: u32, _overdue_count: u32) -> Weight { Weight::zero() }
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
+	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
+	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 }

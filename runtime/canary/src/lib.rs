@@ -22,6 +22,7 @@ use argon_runtime_common::prelude::*;
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use pallet_bitcoin_locks::MinimumSatoshis;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 use sp_runtime::impl_opaque_keys;
@@ -504,11 +505,20 @@ impl pallet_price_index::Config for Runtime {
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
 
+pub struct GetMinimumSatoshisPerLock;
+impl Get<Satoshis> for GetMinimumSatoshisPerLock {
+	fn get() -> Satoshis {
+		MinimumSatoshis::<Runtime>::get()
+	}
+}
+
 impl pallet_bitcoin_utxos::Config for Runtime {
 	type WeightInfo = ();
 	type EventHandler = BitcoinLocks;
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type MinimumSatoshisPerTrackedUtxo = GetMinimumSatoshisPerLock;
+	type MaximumSatoshiThresholdFromExpected = MaximumSatoshiThresholdFromExpected;
 }
 
 impl pallet_mint::Config for Runtime {

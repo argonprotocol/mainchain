@@ -9,7 +9,7 @@ use sp_runtime::RuntimeDebug;
 use crate::{
 	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
 	SignedNotebookHeader,
-	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, UtxoId, UtxoRef},
+	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef},
 	notary::SignedHeaderBytes,
 };
 
@@ -17,7 +17,8 @@ pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"seal_arg";
 pub const SEAL_INHERENT_VOTE_IDENTIFIER: InherentIdentifier = *b"seal_vot";
 pub const SEAL_INHERENT_DIGEST_IDENTIFIER: InherentIdentifier = *b"seal_dig";
 pub const NOTEBOOKS_INHERENT_IDENTIFIER: InherentIdentifier = *b"notebook";
-pub const BITCOIN_INHERENT_IDENTIFIER: InherentIdentifier = *b"bitcoin_";
+pub const BITCOIN_INHERENT_IDENTIFIER_V0: InherentIdentifier = *b"bitcoin_";
+pub const BITCOIN_INHERENT_IDENTIFIER_V1: InherentIdentifier = *b"bitcoin1";
 
 #[allow(clippy::large_enum_variant)]
 #[derive(
@@ -277,27 +278,86 @@ impl IsFatalError for NotebookInherentError {
 /////// BITCOIN INHERENT ///////
 
 pub trait BitcoinInherentData {
+	fn bitcoin_sync_v0(&self) -> Result<Option<BitcoinUtxoSyncV0>, sp_inherents::Error>;
 	fn bitcoin_sync(&self) -> Result<Option<BitcoinUtxoSync>, sp_inherents::Error>;
 }
 
 impl BitcoinInherentData for InherentData {
+	fn bitcoin_sync_v0(&self) -> Result<Option<BitcoinUtxoSyncV0>, sp_inherents::Error> {
+		self.get_data(&BITCOIN_INHERENT_IDENTIFIER_V0)
+	}
+
 	fn bitcoin_sync(&self) -> Result<Option<BitcoinUtxoSync>, sp_inherents::Error> {
-		self.get_data(&BITCOIN_INHERENT_IDENTIFIER)
+		self.get_data(&BITCOIN_INHERENT_IDENTIFIER_V1)
 	}
 }
 
 #[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
-pub struct BitcoinUtxoSync {
+pub struct BitcoinUtxoSyncV0 {
 	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
 	pub verified: BTreeMap<UtxoId, UtxoRef>,
 	pub invalid: BTreeMap<UtxoId, BitcoinRejectedReason>,
 	pub sync_to_block: BitcoinBlock,
 }
 
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+pub struct BitcoinUtxoSync {
+	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
+	pub funded: Vec<BitcoinUtxoFunding>,
+	pub sync_to_block: BitcoinBlock,
+}
+
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+pub struct BitcoinUtxoFunding {
+	#[codec(compact)]
+	pub utxo_id: UtxoId,
+	pub utxo_ref: UtxoRef,
+	#[codec(compact)]
+	pub satoshis: Satoshis,
+	#[codec(compact)]
+	pub expected_satoshis: Satoshis,
+	#[codec(compact)]
+	pub bitcoin_height: BitcoinHeight,
+}
+
 #[cfg(feature = "std")]
 pub struct BitcoinInherentDataProvider {
 	pub bitcoin_utxo_sync: BitcoinUtxoSync,
 }
+
+impl From<BitcoinUtxoSync> for BitcoinUtxoSyncV0 {
+	fn from(value: BitcoinUtxoSync) -> Self {
+		Self {
+			spent: value.spent,
+			verified: value
+				.funded
+				.iter()
+				.filter_map(|funding| {
+					if funding.satoshis != funding.expected_satoshis {
+						return None;
+					}
+					let utxo_id = &funding.utxo_id;
+					let utxo_ref = &funding.utxo_ref;
+					Some((*utxo_id, utxo_ref.clone()))
+				})
+				.collect(),
+			invalid: value
+				.funded
+				.iter()
+				.filter_map(|funding| {
+					if funding.satoshis == funding.expected_satoshis {
+						return None;
+					}
+					let utxo_id = &funding.utxo_id;
+					// zero tolerance in version 0
+					Some((*utxo_id, BitcoinRejectedReason::SatoshisOutsideAcceptedRange))
+				})
+				.collect(),
+			sync_to_block: value.sync_to_block,
+		}
+	}
+}
+
 #[cfg(feature = "std")]
 #[async_trait::async_trait]
 impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
@@ -305,7 +365,9 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 		&self,
 		inherent_data: &mut InherentData,
 	) -> Result<(), sp_inherents::Error> {
-		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER, &self.bitcoin_utxo_sync)?;
+		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER_V1, &self.bitcoin_utxo_sync)?;
+		let v0: BitcoinUtxoSyncV0 = self.bitcoin_utxo_sync.clone().into();
+		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER_V0, &v0)?;
 		Ok(())
 	}
 
@@ -332,7 +394,7 @@ impl BitcoinInherentError {
 	/// Try to create an instance ouf of the given identifier and data.
 	#[cfg(feature = "std")]
 	pub fn try_from(id: &InherentIdentifier, mut data: &[u8]) -> Option<Self> {
-		if id == &BITCOIN_INHERENT_IDENTIFIER {
+		if id == &BITCOIN_INHERENT_IDENTIFIER_V0 || id == &BITCOIN_INHERENT_IDENTIFIER_V1 {
 			<BitcoinInherentError as codec::Decode>::decode(&mut data).ok()
 		} else {
 			None

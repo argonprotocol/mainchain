@@ -1,11 +1,8 @@
 use pallet_prelude::*;
 
-use argon_primitives::{
-	BitcoinUtxoEvents,
-	bitcoin::{BitcoinRejectedReason, UtxoId},
-};
-
 use crate as pallet_bitcoin_utxos;
+use argon_primitives::{BitcoinUtxoEvents, bitcoin::UtxoId};
+use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -23,29 +20,42 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
-	pub const MinBitcoinSatoshiAmount: u64 = 100_000_000; // 1 bitcoin minimum
+	pub static MinimumSatoshisPerTrackedUtxo: u64 = 100_000_000; // 1 bitcoin minimum
 
 	pub const MaxPendingConfirmationUtxos: u32 = 10;
 
 	pub const MaxPendingConfirmationBlocks: u32 = 10;
-	pub static UtxoVerifiedCallback: Option<fn(UtxoId) -> DispatchResult> = None;
+
+	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
+	pub static UtxoVerifiedCallback: Option<fn((UtxoId, Satoshis)) -> DispatchResult> = None;
+	pub static LastInvalidUtxo: Option<(UtxoId, UtxoRef, Satoshis)> = None;
 }
 
 pub struct StaticEventHandler;
 impl BitcoinUtxoEvents for StaticEventHandler {
-	fn utxo_verified(_utxo_id: UtxoId) -> DispatchResult {
-		if let Some(callback) = UtxoVerifiedCallback::get() { callback(_utxo_id) } else { Ok(()) }
+	fn funding_received(
+		utxo_id: UtxoId,
+		received_satoshis: Satoshis,
+	) -> sp_runtime::DispatchResult {
+		if let Some(callback) = UtxoVerifiedCallback::get() {
+			callback((utxo_id, received_satoshis))
+		} else {
+			Ok(())
+		}
 	}
-
-	fn utxo_rejected(_utxo_id: UtxoId, _reason: BitcoinRejectedReason) -> DispatchResult {
+	fn invalid_utxo_received(
+		utxo_id: UtxoId,
+		utxo_ref: UtxoRef,
+		satoshis: Satoshis,
+	) -> sp_runtime::DispatchResult {
+		LastInvalidUtxo::set(Some((utxo_id, utxo_ref, satoshis)));
+		Ok(())
+	}
+	fn spent(_utxo_id: UtxoId) -> DispatchResult {
 		Ok(())
 	}
 
-	fn utxo_spent(_utxo_id: UtxoId) -> DispatchResult {
-		Ok(())
-	}
-
-	fn utxo_expired(_utxo_id: UtxoId) -> DispatchResult {
+	fn timeout_waiting_for_funding(_utxo_id: UtxoId) -> sp_runtime::DispatchResult {
 		Ok(())
 	}
 }
@@ -55,6 +65,8 @@ impl pallet_bitcoin_utxos::Config for Test {
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type EventHandler = StaticEventHandler;
+	type MaximumSatoshiThresholdFromExpected = MaximumSatoshiThresholdFromExpected;
+	type MinimumSatoshisPerTrackedUtxo = MinimumSatoshisPerTrackedUtxo;
 }
 
 pub fn new_test_ext() -> TestState {

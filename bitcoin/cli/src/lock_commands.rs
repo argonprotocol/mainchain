@@ -297,7 +297,7 @@ impl LockCommands {
 						.call(redemption_price_query, Some(at_block))
 						.await?
 						.unwrap_or_default()
-						.min(lock.pegged_price)
+						.min(lock.locked_market_rate)
 				};
 
 				let minted = if lock.is_verified { lock.liquidity_promised - remaining } else { 0 };
@@ -383,8 +383,8 @@ impl LockCommands {
 					.call(redemption_price_query)
 					.await?
 					.unwrap_or_default();
-				if redemption_price > lock.pegged_price {
-					redemption_price = lock.pegged_price;
+				if redemption_price > lock.locked_market_rate {
+					redemption_price = lock.locked_market_rate;
 				}
 
 				let bitcoin_dest_pubkey = Address::from_str(&dest_pubkey)

@@ -90,14 +90,26 @@ declare module '@polkadot/api-base/types/errors' {
        * This bitcoin cosign script couldn't be decoded for release
        **/
       BitcoinUnableToBeDecodedForRelease: AugmentedError<ApiType>;
+      /**
+       * The Bitcoin Unspect Transaction Output (UTXO) was not found
+       **/
       BitcoinUtxoNotFound: AugmentedError<ApiType>;
       /**
        * An overflow occurred recording a lock expiration
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
+      /**
+       * An error ocurred in the vault module
+       **/
       GenericVaultError: AugmentedError<ApiType>;
+      /**
+       * The expected amount of funds to return from hold was not available
+       **/
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * The minimum number of satoshis was not met
+       **/
       InsufficientSatoshisLocked: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
@@ -112,8 +124,17 @@ declare module '@polkadot/api-base/types/errors' {
        * A lock in process of release cannot be ratcheted
        **/
       LockInProcessOfRelease: AugmentedError<ApiType>;
+      /**
+       * The Bitcoin Lock record was not found
+       **/
       LockNotFound: AugmentedError<ApiType>;
+      /**
+       * The price provider has no bitcoin prices available. This is a temporary error
+       **/
       NoBitcoinPricesAvailable: AugmentedError<ApiType>;
+      /**
+       * The user does not have permissions to perform this action
+       **/
       NoPermissions: AugmentedError<ApiType>;
       /**
        * Nothing to ratchet
@@ -135,12 +156,21 @@ declare module '@polkadot/api-base/types/errors' {
        * Unable to generate a new vault public key
        **/
       UnableToGenerateVaultBitcoinPubkey: AugmentedError<ApiType>;
+      /**
+       * The hold on funds could not be recovered
+       **/
       UnrecoverableHold: AugmentedError<ApiType>;
       /**
        * The lock is not verified
        **/
       UnverifiedLock: AugmentedError<ApiType>;
+      /**
+       * This vault is closed
+       **/
       VaultClosed: AugmentedError<ApiType>;
+      /**
+       * The vault was not found
+       **/
       VaultNotFound: AugmentedError<ApiType>;
       /**
        * This vault is not yet active

@@ -30,6 +30,7 @@ import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
   ArgonPrimitivesBitcoinH256Le,
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub,
+  ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
@@ -270,6 +271,18 @@ declare module '@polkadot/api-base/types/submittable' {
         (satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u64]
       >;
+      cosignOrphanedUtxoRelease: AugmentedSubmittable<
+        (
+          orphanOwner: AccountId32 | string | Uint8Array,
+          utxoRef:
+            | ArgonPrimitivesBitcoinUtxoRef
+            | { txid?: any; outputIndex?: any }
+            | string
+            | Uint8Array,
+          signature: Bytes | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, ArgonPrimitivesBitcoinUtxoRef, Bytes]
+      >;
       /**
        * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
        * release fee will be burned, and the lock will be allowed to expire without a penalty.
@@ -322,6 +335,18 @@ declare module '@polkadot/api-base/types/submittable' {
         (utxoId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u64]
       >;
+      requestOrphanedUtxoRelease: AugmentedSubmittable<
+        (
+          utxoRef:
+            | ArgonPrimitivesBitcoinUtxoRef
+            | { txid?: any; outputIndex?: any }
+            | string
+            | Uint8Array,
+          toScriptPubkey: Bytes | string | Uint8Array,
+          bitcoinNetworkFee: u64 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [ArgonPrimitivesBitcoinUtxoRef, Bytes, u64]
+      >;
       /**
        * Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
        * script. A transaction spending the UTXO should be pre-created so that the sighash
@@ -371,7 +396,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           utxoSync:
             | ArgonPrimitivesInherentsBitcoinUtxoSync
-            | { spent?: any; verified?: any; invalid?: any; syncToBlock?: any }
+            | { spent?: any; funded?: any; syncToBlock?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,

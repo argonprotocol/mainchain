@@ -126,7 +126,7 @@ pub trait BitcoinVaultProvider {
 	fn burn(
 		vault_id: VaultId,
 		liquidity_promised: Self::Balance,
-		redemption_rate: Self::Balance,
+		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError>;
 
@@ -156,10 +156,18 @@ pub trait BitcoinVaultProvider {
 	/// Argons no longer in a "pending state" - eg, verified bitcoin or canceled
 	fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError>;
 
-	/// Track a pending cosign for a UTXO. This is used to ensure that the vault does not
+	/// Track a pending cosign for a UTXO.
 	fn update_pending_cosign_list(
 		vault_id: VaultId,
 		utxo_id: UtxoId,
+		should_remove: bool,
+	) -> Result<(), VaultError>;
+
+	/// Track an orphaned cosign request for a UTXO.
+	fn update_orphaned_cosign_list(
+		vault_id: VaultId,
+		utxo_id: UtxoId,
+		account_id: &Self::AccountId,
 		should_remove: bool,
 	) -> Result<(), VaultError>;
 }

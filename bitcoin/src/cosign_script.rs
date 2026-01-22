@@ -711,19 +711,22 @@ mod test {
 			.expect("sync");
 
 		let sync = tracker
-			.refresh_utxo_status(vec![(
-				None,
-				UtxoValue {
-					utxo_id: 1,
-					satoshis: amount,
-					script_pubkey: utxo_script_pubkey,
-					submitted_at_height: block_height,
-					watch_for_spent_until_height: open_claim_height,
-				},
-			)])
+			.refresh_utxo_status(
+				vec![(
+					None,
+					UtxoValue {
+						utxo_id: 1,
+						satoshis: amount,
+						script_pubkey: utxo_script_pubkey,
+						submitted_at_height: block_height,
+						watch_for_spent_until_height: open_claim_height,
+					},
+				)],
+				1000,
+			)
 			.unwrap();
-		assert_eq!(sync.verified.len(), 1);
-		let utxo = sync.verified.get(&1).unwrap();
+		assert_eq!(sync.funded.len(), 1);
+		let utxo = sync.funded[0].utxo_ref.clone();
 		assert_eq!(utxo.txid, txid.into());
 
 		// 4. User submits the out address
@@ -844,8 +847,9 @@ mod test {
 			})
 			.expect("sync");
 
-		let latest =
-			tracker.refresh_utxo_status(vec![(Some(utxo_ref), utxo_value)]).expect("sync 2");
+		let latest = tracker
+			.refresh_utxo_status(vec![(Some(utxo_ref), utxo_value)], 1000)
+			.expect("sync 2");
 		assert_eq!(latest.spent.len(), 1);
 
 		assert_eq!(latest.spent.get(&1), Some(&(tx_block_height as BitcoinHeight)));

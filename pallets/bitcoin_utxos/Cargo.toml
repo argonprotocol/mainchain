@@ -18,6 +18,7 @@ codec = { workspace = true }
 scale-info = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core", "sp-api"] }
 pallet-prelude = { workspace = true, default-features = false }
+tracing = { workspace = true }
 
 [dev-dependencies]
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
@@ -29,6 +30,7 @@ std = [
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
+	"tracing/std",
 ]
 runtime-benchmarks = [
 	"pallet-prelude/runtime-benchmarks",

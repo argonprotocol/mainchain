@@ -5,8 +5,7 @@ use crate::{
 	BlockSealAuthorityId, ComputeDifficulty, MICROGONS_PER_ARGON, NotaryId, NotebookHeader,
 	NotebookNumber, NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, SATOSHIS_PER_BITCOIN,
-		Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
@@ -100,34 +99,39 @@ pub trait BitcoinUtxoTracker {
 }
 
 pub trait BitcoinUtxoEvents {
-	fn utxo_verified(utxo_id: UtxoId) -> DispatchResult;
-
-	fn utxo_rejected(utxo_id: UtxoId, reason: BitcoinRejectedReason) -> DispatchResult;
-
-	fn utxo_spent(utxo_id: UtxoId) -> DispatchResult;
-
-	fn utxo_expired(utxo_id: UtxoId) -> DispatchResult;
+	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult;
+	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult;
+	fn invalid_utxo_received(
+		utxo_id: UtxoId,
+		utxo_ref: UtxoRef,
+		satoshis: Satoshis,
+	) -> DispatchResult;
+	fn spent(utxo_id: UtxoId) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl BitcoinUtxoEvents for Tuple {
-	fn utxo_verified(utxo_id: UtxoId) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_verified(utxo_id)?; )* );
+	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
+		for_tuples!( #( Tuple::funding_received(utxo_id, received_satoshis)?; )* );
 		Ok(())
 	}
 
-	fn utxo_rejected(utxo_id: UtxoId, reason: BitcoinRejectedReason) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_rejected(utxo_id, reason.clone())?; )* );
+	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult {
+		for_tuples!( #( Tuple::timeout_waiting_for_funding(utxo_id)?; )* );
 		Ok(())
 	}
 
-	fn utxo_spent(utxo_id: UtxoId) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_spent(utxo_id)?; )* );
+	fn invalid_utxo_received(
+		utxo_id: UtxoId,
+		utxo_ref: UtxoRef,
+		satoshis: Satoshis,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::invalid_utxo_received(utxo_id, utxo_ref.clone(), satoshis)?; )* );
 		Ok(())
 	}
 
-	fn utxo_expired(utxo_id: UtxoId) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_expired(utxo_id)?; )* );
+	fn spent(utxo_id: UtxoId) -> DispatchResult {
+		for_tuples!( #( Tuple::spent(utxo_id)?; )* );
 		Ok(())
 	}
 }

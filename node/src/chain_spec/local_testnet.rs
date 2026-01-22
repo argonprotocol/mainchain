@@ -4,8 +4,8 @@ use sp_core::sr25519;
 use std::env;
 
 use crate::chain_spec::{
-	ChainSpec, GenesisSettings, authority_keys_from_seed, get_account_id_from_seed, get_from_seed,
-	testnet_genesis,
+	ChainSpec, GenesisSettings, authority_keys_from_seed, build_genesis_config,
+	get_account_id_from_seed, get_from_seed,
 };
 use argon_canary_runtime::WASM_BINARY;
 use argon_primitives::{
@@ -37,7 +37,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 	.with_id("argon-local")
 	.with_chain_type(ChainType::Local)
 	.with_properties(properties)
-	.with_genesis_config_patch(testnet_genesis(GenesisSettings {
+	.with_genesis_config_patch(build_genesis_config(GenesisSettings {
 		// You have to have an authority to start the chain
 		founding_grandpas: vec![(authority_keys_from_seed("Alice").grandpa, 10)],
 		sudo_key: get_account_id_from_seed::<sr25519::Public>("Alice"),

@@ -66,6 +66,7 @@ import type {
   PalletBalancesReserveData,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
+  PalletBitcoinLocksOrphanedUtxo,
   PalletChainTransferQueuedTransferOut,
   PalletDomainsDomainRegistration,
   PalletGrandpaStoredPendingChange,
@@ -208,6 +209,9 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
         [u64]
       >;
+      /**
+       * Stores bitcoin locks that have requested to be released
+       **/
       lockReleaseRequestsByUtxoId: AugmentedQuery<
         ApiType,
         (
@@ -228,6 +232,21 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
+      /**
+       * Mismatched utxos that were sent with invalid amounts to a locked bitcoin
+       **/
+      orphanedUtxosByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2:
+            | ArgonPrimitivesBitcoinUtxoRef
+            | { txid?: any; outputIndex?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<PalletBitcoinLocksOrphanedUtxo>>,
+        [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
+      >;
     };
     bitcoinUtxos: {
       /**
@@ -251,16 +270,9 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * Expiration date as a day since unix timestamp mapped to Bitcoin UTXOs
-       **/
-      lockedUtxoExpirationsByBlock: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<ArgonPrimitivesBitcoinUtxoRef>>,
-        [u64]
-      >;
-      /**
-       * Locked Bitcoin UTXOs that have had ownership confirmed. If a Bitcoin UTXO is moved before
-       * the expiration block, the funds are burned and the UTXO is unlocked.
+       * Locked Bitcoin UTXOs that have had ownership confirmed and amounts within the
+       * MinimumSatoshiThreshold of the expected. If a Bitcoin UTXO is moved before the expiration
+       * block, the funds are burned and the UTXO is unlocked.
        **/
       lockedUtxos: AugmentedQuery<
         ApiType,
@@ -294,13 +306,16 @@ declare module '@polkadot/api-base/types/storage' {
        * Stores if parent block had a confirmed bitcoin block
        **/
       tempParentHasSyncState: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * A mapping of utxo id to the confirmed utxo reference
+       **/
       utxoIdToRef: AugmentedQuery<
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
         [u64]
       >;
       /**
-       * Bitcoin UTXOs that have been submitted for ownership confirmation
+       * Bitcoin locks that are pending full funding on the bitcoin network
        **/
       utxosPendingConfirmation: AugmentedQuery<
         ApiType,
@@ -1369,6 +1384,17 @@ declare module '@polkadot/api-base/types/storage' {
         [u32]
       >;
       nextVaultId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Orphaned Bitcoin Utxos pending cosign by vault id
+       **/
+      orphanedUtxoAccountsByVaultId: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: AccountId32 | string | Uint8Array,
+        ) => Observable<u32>,
+        [u32, AccountId32]
+      >;
       /**
        * Bitcoin Locks pending cosign by vault id
        **/

@@ -72,7 +72,7 @@ impl BitcoinMetrics {
 	) {
 		self.bitcoin_utxos_verified_total
 			.with_label_values(&[])
-			.inc_by(sync_state.verified.len() as u64);
+			.inc_by(sync_state.funded.len() as u64);
 		self.bitcoin_utxos_spent_total
 			.with_label_values(&[])
 			.inc_by(sync_state.spent.len() as u64);
