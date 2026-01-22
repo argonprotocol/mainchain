@@ -99,7 +99,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       /**
-       * An error ocurred in the vault module
+       * The fee coupon already exists
+       **/
+      FeeCouponAlreadyExists: AugmentedError<ApiType>;
+      /**
+       * An error occurred in the vault module
        **/
       GenericVaultError: AugmentedError<ApiType>;
       /**
@@ -121,6 +125,14 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
       /**
+       * The provided fee coupon is already used or invalid
+       **/
+      InvalidFeeCoupon: AugmentedError<ApiType>;
+      /**
+       * The provided fee coupon proof is invalid
+       **/
+      InvalidFeeCouponProof: AugmentedError<ApiType>;
+      /**
        * Funding would result in an overflow of the balance type
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
@@ -132,6 +144,11 @@ declare module '@polkadot/api-base/types/errors' {
        * The Bitcoin Lock record was not found
        **/
       LockNotFound: AugmentedError<ApiType>;
+      /**
+       * This bitcoin lock exceeded the maximum allowed number of satoshis for the provided fee
+       * coupon
+       **/
+      MaxFeeCouponSatoshisExceeded: AugmentedError<ApiType>;
       /**
        * The price provider has no bitcoin prices available. This is a temporary error
        **/
@@ -422,6 +439,12 @@ declare module '@polkadot/api-base/types/errors' {
        * The sender is not the owner of the domain.
        **/
       NotDomainOwner: AugmentedError<ApiType>;
+    };
+    feeControl: {
+      /**
+       * The requested tip + fee is higher than the maximum allowed by the sponsor
+       **/
+      SponsoredFeeTooHigh: AugmentedError<ApiType>;
     };
     grandpa: {
       /**

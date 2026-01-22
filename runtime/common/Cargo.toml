@@ -51,7 +51,6 @@ polkadot-sdk.features = [
     "pallet-tx-pause",
     "pallet-utility",
     "pallet-transaction-payment",
-    "pallet-skip-feeless-payment",
     "pallet-transaction-payment-rpc-runtime-api",
 ]
 sp-debug-derive = { workspace = true, features = ["force-debug"] }
@@ -75,6 +74,7 @@ pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
+pallet-fee-control = { workspace = true }
 pallet-treasury = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
@@ -104,6 +104,7 @@ std = [
 	"pallet-chain-transfer/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
+	"pallet-fee-control/std",
 	"pallet-hyperbridge/std",
 	"pallet-ismp-runtime-api/std",
 	"pallet-ismp/std",
@@ -133,6 +134,7 @@ runtime-benchmarks = [
 	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
+	"pallet-fee-control/runtime-benchmarks",
 	"pallet-ismp/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
@@ -156,6 +158,7 @@ try-runtime = [
 	"pallet-chain-transfer/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
+	"pallet-fee-control/try-runtime",
 	"pallet-hyperbridge/try-runtime",
 	"pallet-ismp/try-runtime",
 	"pallet-mining-slot/try-runtime",

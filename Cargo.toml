@@ -12,6 +12,7 @@ members = [
     "pallets/domains",
     "pallets/digests",
     "pallets/chain_transfer",
+    "pallets/fee_control",
     "pallets/treasury",
     "pallets/mining_slot",
     "pallets/notaries",
@@ -284,6 +285,7 @@ pallet-block-rewards = { path = "pallets/block_rewards", default-features = fals
 pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
 pallet-digests = { path = "pallets/digests", default-features = false }
 pallet-domains = { path = "pallets/domains", default-features = false }
+pallet-fee-control = { path = "pallets/fee_control", default-features = false }
 pallet-treasury = { path = "pallets/treasury", default-features = false }
 pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }

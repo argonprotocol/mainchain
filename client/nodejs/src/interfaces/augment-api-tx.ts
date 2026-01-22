@@ -45,6 +45,7 @@ import type {
   IsmpMessagingCreateConsensusState,
   IsmpMessagingMessage,
   PalletBalancesAdjustmentDirection,
+  PalletBitcoinLocksLockOptions,
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsUpdateConsensusState,
   PalletMultisigTimepoint,
@@ -312,9 +313,42 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
           bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array,
-          microgonsPerBtc: Option<u128> | null | Uint8Array | u128 | AnyNumber,
+          options:
+            | Option<PalletBitcoinLocksLockOptions>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksLockOptions
+            | { V1: any }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, Compact<u64>, ArgonPrimitivesBitcoinCompressedBitcoinPubkey, Option<u128>]
+        [
+          u32,
+          Compact<u64>,
+          ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
+          Option<PalletBitcoinLocksLockOptions>,
+        ]
+      >;
+      initializeFor: AugmentedSubmittable<
+        (
+          accountId: AccountId32 | string | Uint8Array,
+          vaultId: u32 | AnyNumber | Uint8Array,
+          satoshis: Compact<u64> | AnyNumber | Uint8Array,
+          bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array,
+          options:
+            | Option<PalletBitcoinLocksLockOptions>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksLockOptions
+            | { V1: any }
+            | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          AccountId32,
+          u32,
+          Compact<u64>,
+          ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
+          Option<PalletBitcoinLocksLockOptions>,
+        ]
       >;
       /**
        * Ratcheting allows a user to change the lock price of their bitcoin lock. This is
@@ -335,9 +369,23 @@ declare module '@polkadot/api-base/types/submittable' {
       ratchet: AugmentedSubmittable<
         (
           utxoId: u64 | AnyNumber | Uint8Array,
-          microgonsPerBtc: Option<u128> | null | Uint8Array | u128 | AnyNumber,
+          options:
+            | Option<PalletBitcoinLocksLockOptions>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksLockOptions
+            | { V1: any }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [u64, Option<u128>]
+        [u64, Option<PalletBitcoinLocksLockOptions>]
+      >;
+      registerFeeCoupon: AugmentedSubmittable<
+        (
+          public: U8aFixed | string | Uint8Array,
+          maxSatoshis: Compact<u64> | AnyNumber | Uint8Array,
+          maxFeePlusTip: Option<u128> | null | Uint8Array | u128 | AnyNumber,
+        ) => SubmittableExtrinsic<ApiType>,
+        [U8aFixed, Compact<u64>, Option<u128>]
       >;
       requestOrphanedUtxoRelease: AugmentedSubmittable<
         (
@@ -1202,6 +1250,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1271,6 +1320,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1316,6 +1366,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number
             | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
@@ -1369,6 +1420,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1419,6 +1471,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1516,6 +1569,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
+            | 'BitcoinInitializeFor'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,

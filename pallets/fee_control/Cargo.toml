@@ -1,0 +1,37 @@
+[package]
+name = "pallet-fee-control"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "pallet-balances", "pallet-proxy", "pallet-transaction-payment"] }
+pallet-prelude = { workspace = true }
+impl-trait-for-tuples = { workspace = true }
+
+[dev-dependencies]
+polkadot-sdk = { workspace = true, features = ["sp-io"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"codec/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"pallet-prelude/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

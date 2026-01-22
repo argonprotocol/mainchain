@@ -128,7 +128,7 @@ mod runtime {
 	pub type Treasury = pallet_treasury;
 
 	#[runtime::pallet_index(32)]
-	pub type FeelessTransaction = pallet_skip_feeless_payment;
+	pub type FeelessTransaction = pallet_fee_control;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -289,6 +289,13 @@ impl pallet_vaults::Config for Runtime {
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 }
 
+pub struct DidStartNewFrame;
+impl Get<bool> for DidStartNewFrame {
+	fn get() -> bool {
+		MiningSlot::is_new_frame_started().is_some()
+	}
+}
+
 pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bitcoin_locks::Config for Runtime {
@@ -313,6 +320,7 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
 	type CurrentTick = Ticks;
 	type MaxBtcPriceTickAge = MaxBtcPriceTickAge;
+	type DidStartNewFrame = DidStartNewFrame;
 }
 
 pub struct GrandpaSlotRotation;
@@ -643,8 +651,10 @@ impl pallet_hyperbridge::Config for Runtime {
 	type IsmpHost = Ismp;
 }
 
-impl pallet_skip_feeless_payment::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
+impl pallet_fee_control::Config for Runtime {
+	type Balance = Balance;
+	type FeelessCallTxPoolKeyProviders = ();
+	type TransactionSponsorProviders = (BitcoinLocks, ProxyFeeDelegate<Runtime>);
 }
 
 // Add the token gateway pallet to your ISMP router

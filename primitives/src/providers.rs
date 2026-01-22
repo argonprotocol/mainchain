@@ -340,3 +340,65 @@ impl<AId> SlotEvents<AId> for Tuple {
 		)
 	}
 }
+
+/// Provides a mapping from a runtime call to a unique key used to safeguard the transaction pool
+/// against DoS attacks from feeless calls.
+pub trait FeelessCallTxPoolKeyProvider<RuntimeCall> {
+	fn key_for(call: &RuntimeCall) -> Option<Vec<u8>>;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> FeelessCallTxPoolKeyProvider<RuntimeCall> for Tuple {
+	fn key_for(call: &RuntimeCall) -> Option<Vec<u8>> {
+		for_tuples!(
+			#(
+			if let Some(key) = Tuple::key_for(call) {
+				return Some(key);
+			}
+			)*
+		);
+		None
+	}
+}
+
+#[derive(Clone, PartialEq, Eq, RuntimeDebug)]
+pub struct TxSponsor<AccountId, Balance> {
+	/// The account that will pay for the transaction fee
+	pub payer: AccountId,
+	/// The maximum fee (including tip) that the sponsor is willing to pay
+	pub max_fee_with_tip: Option<Balance>,
+	/// A unique key to identify this sponsored transaction in the tx pool to prevent dos
+	/// attacks
+	pub unique_tx_key: Option<Vec<u8>>,
+}
+
+/// A configurable hook that can recognize calls where one account should reimburse another
+/// for the transaction fee after dispatch.
+///
+/// Return a `Some(account_id)` if another account has explicitly authorized to pay the fee for
+/// the `signer` for the given `call`. Otherwise return `None`.
+pub trait TransactionSponsorProvider<AccountId, RuntimeCall, Balance> {
+	fn get_transaction_sponsor(
+		signer: &AccountId,
+		call: &RuntimeCall,
+	) -> Option<TxSponsor<AccountId, Balance>>;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<AccountId, RuntimeCall, Balance> TransactionSponsorProvider<AccountId, RuntimeCall, Balance>
+	for Tuple
+{
+	fn get_transaction_sponsor(
+		signer: &AccountId,
+		call: &RuntimeCall,
+	) -> Option<TxSponsor<AccountId, Balance>> {
+		for_tuples!(
+			#(
+			if let Some(sponsor) = Tuple::get_transaction_sponsor(signer, call) {
+				return Some(sponsor);
+			}
+			)*
+		);
+		None
+	}
+}
