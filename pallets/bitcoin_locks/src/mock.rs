@@ -115,6 +115,7 @@ parameter_types! {
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
+	pub static CurrentTick: Tick = 1;
 }
 
 pub struct EventHandler;
@@ -383,6 +384,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type MaxConcurrentlyExpiringLocks = ConstU32<100>;
 	type CurrentFrameId = CurrentFrameId;
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
+	type CurrentTick = CurrentTick;
+	type MaxBtcPriceTickAge = ConstU32<10>;
 }
 
 // Build genesis storage according to the mock runtime.

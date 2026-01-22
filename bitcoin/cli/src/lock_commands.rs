@@ -215,7 +215,8 @@ impl LockCommands {
 					ArgonFormatter(fee)
 				);
 
-				let call = tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into());
+				let call =
+					tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into(), None);
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Link to complete transaction:\n\t{}", url);
 			},

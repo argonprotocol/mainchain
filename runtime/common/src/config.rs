@@ -161,6 +161,7 @@ parameter_types! {
 	pub const MaxConcurrentlyReleasingLocks: u32 = 1000;
 	/// Max locks that can expire in a single bitcoin block - effectively the max throughput of locks per bitcoin block (10 minutes)
 	pub const MaxConcurrentlyExpiringLocks: u32 = 10_000;
+	pub const MaxBtcPriceTickAge: u32 = 30; // 30 minutes of btc prices allowed for locks
 
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;

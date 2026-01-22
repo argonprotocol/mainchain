@@ -138,6 +138,7 @@ export class BitcoinLock implements IBitcoinLock {
       priceIndex: PriceIndex;
       argonKeyring: KeyringPair;
       vault: Vault;
+      microgonsPerBtc?: bigint;
     } & ISubmittableOptions,
   ): Promise<{
     txResult: TxResult;
@@ -152,14 +153,15 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinBlockHeight: number;
     }>;
   }> {
-    const { priceIndex, argonKeyring, tip = 0n, vault, client } = args;
+    const { priceIndex, argonKeyring, tip = 0n, vault, client, microgonsPerBtc = null } = args;
 
     const ratchetPrice = await this.getRatchetPrice(client, priceIndex, vault);
-    const txSubmitter = new TxSubmitter(
-      client,
-      client.tx.bitcoinLocks.ratchet(this.utxoId),
-      argonKeyring,
-    );
+    const tx =
+      client.tx.bitcoinLocks.ratchet.meta.args.length === 2
+        ? client.tx.bitcoinLocks.ratchet(this.utxoId, microgonsPerBtc)
+        : // @ts-expect-error - legacy overload
+          client.tx.bitcoinLocks.ratchet(this.utxoId);
+    const txSubmitter = new TxSubmitter(client, tx, argonKeyring);
     const canAfford = await txSubmitter.canAfford({
       tip,
       unavailableBalance: BigInt(ratchetPrice.burnAmount + ratchetPrice.ratchetingFee),
@@ -422,6 +424,8 @@ export class BitcoinLock implements IBitcoinLock {
         .genesisTicker()
         .then(x => x.tickDurationMillis.toNumber()),
       bitcoinNetwork,
+      lockSatoshiAllowedVariance:
+        client.consts.bitcoinUtxos.maximumSatoshiThresholdFromExpected?.toNumber() ?? 10_000,
     };
   }
 
@@ -548,6 +552,7 @@ export class BitcoinLock implements IBitcoinLock {
     satoshis: bigint;
     argonKeyring: KeyringPair;
     reducedBalanceBy?: bigint;
+    microgonsPerBtc?: bigint;
     tip?: bigint;
   }) {
     const {
@@ -558,6 +563,7 @@ export class BitcoinLock implements IBitcoinLock {
       tip = 0n,
       ownerBitcoinPubkey,
       client,
+      microgonsPerBtc = null,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -565,12 +571,17 @@ export class BitcoinLock implements IBitcoinLock {
       );
     }
 
-    const tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey);
-    const submitter = new TxSubmitter(
-      client,
-      client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey),
-      argonKeyring,
-    );
+    const tx =
+      client.tx.bitcoinLocks.initialize.meta.args.length === 4
+        ? client.tx.bitcoinLocks.initialize(
+            vault.vaultId,
+            satoshis,
+            ownerBitcoinPubkey,
+            microgonsPerBtc,
+          )
+        : // @ts-expect-error - legacy overload
+          client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey);
+    const submitter = new TxSubmitter(client, tx, argonKeyring);
     const marketPrice = await this.getMarketRate(priceIndex, satoshis);
     const isVaultOwner = argonKeyring.address === vault.operatorAccountId;
     const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(marketPrice);
@@ -654,6 +665,7 @@ export interface IBitcoinLockConfig {
   pendingConfirmationExpirationBlocks: number;
   tickDurationMillis: number;
   bitcoinNetwork: ArgonPrimitivesBitcoinBitcoinNetwork;
+  lockSatoshiAllowedVariance: number;
 }
 export interface IReleaseRequest {
   toScriptPubkey: string;

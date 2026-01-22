@@ -310,6 +310,8 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type CurrentFrameId = GetCurrentFrameId;
 	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
+	type CurrentTick = Ticks;
+	type MaxBtcPriceTickAge = MaxBtcPriceTickAge;
 }
 
 pub struct GrandpaSlotRotation;

@@ -70,6 +70,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       lockReleaseCosignDeadlineFrames: u64 & AugmentedConst<ApiType>;
       /**
+       * Max allowed tick-age of microgon-per-btc prices
+       **/
+      maxBtcPriceTickAge: u32 & AugmentedConst<ApiType>;
+      /**
        * Pallet storage requires bounds, so we have to set a maximum number that can expire in a
        * single block
        **/

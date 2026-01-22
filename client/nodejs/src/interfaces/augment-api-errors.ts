@@ -106,6 +106,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The expected amount of funds to return from hold was not available
        **/
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
+      /**
+       * An ineligible microgon rate per btc was requested
+       **/
+      IneligibleMicrogonRateRequested: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       /**
        * The minimum number of satoshis was not met
