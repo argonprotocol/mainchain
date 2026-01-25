@@ -3796,9 +3796,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				89u8, 39u8, 186u8, 93u8, 36u8, 180u8, 133u8, 228u8, 176u8, 152u8, 146u8, 118u8,
-				197u8, 180u8, 141u8, 143u8, 73u8, 38u8, 208u8, 162u8, 255u8, 197u8, 51u8, 68u8,
-				111u8, 157u8, 203u8, 0u8, 51u8, 12u8, 165u8, 153u8,
+				231u8, 8u8, 15u8, 197u8, 32u8, 79u8, 151u8, 35u8, 157u8, 1u8, 131u8, 227u8, 246u8,
+				29u8, 222u8, 242u8, 198u8, 94u8, 157u8, 12u8, 116u8, 186u8, 84u8, 104u8, 214u8,
+				18u8, 123u8, 181u8, 19u8, 145u8, 69u8, 0u8,
 			]
 	}
 	pub mod system {
@@ -28043,6 +28043,9 @@ pub mod api {
 					#[codec(index = 34)]
 					#[doc = "The fee coupon already exists"]
 					FeeCouponAlreadyExists,
+					#[codec(index = 35)]
+					#[doc = "Initializing a lock for another account requires a fee coupon"]
+					FeeCouponRequired,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

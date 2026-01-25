@@ -105,10 +105,16 @@ macro_rules! deal_with_fees {
 						return None;
 					}
 
+					const MAX_MINING_BID_FEE_WITH_TIP: Balance = 1 * ARGON;
+
 					return Some(TxSponsor {
 						payer: real_account.clone(),
-						max_fee_with_tip: None,
-						unique_tx_key: None,
+						max_fee_with_tip: Some(MAX_MINING_BID_FEE_WITH_TIP),
+						unique_tx_key: Some(
+							(b"mining_slot", real_account)
+								.using_encoded(sp_crypto_hashing::blake2_256)
+								.to_vec(),
+						),
 					});
 				}
 				None

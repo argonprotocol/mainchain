@@ -3470,6 +3470,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidFeeCouponProof: boolean;
     readonly isMaxFeeCouponSatoshisExceeded: boolean;
     readonly isFeeCouponAlreadyExists: boolean;
+    readonly isFeeCouponRequired: boolean;
     readonly type:
       | 'InsufficientFunds'
       | 'InsufficientVaultFunds'
@@ -3505,7 +3506,8 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidFeeCoupon'
       | 'InvalidFeeCouponProof'
       | 'MaxFeeCouponSatoshisExceeded'
-      | 'FeeCouponAlreadyExists';
+      | 'FeeCouponAlreadyExists'
+      | 'FeeCouponRequired';
   }
 
   /** @name ArgonPrimitivesVaultVaultError (407) */

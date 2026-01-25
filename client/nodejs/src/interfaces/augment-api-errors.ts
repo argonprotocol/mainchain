@@ -103,6 +103,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       FeeCouponAlreadyExists: AugmentedError<ApiType>;
       /**
+       * Initializing a lock for another account requires a fee coupon
+       **/
+      FeeCouponRequired: AugmentedError<ApiType>;
+      /**
        * An error occurred in the vault module
        **/
       GenericVaultError: AugmentedError<ApiType>;

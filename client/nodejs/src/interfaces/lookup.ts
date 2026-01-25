@@ -3008,6 +3008,7 @@ export default {
       InvalidFeeCouponProof: 'Null',
       MaxFeeCouponSatoshisExceeded: 'Null',
       FeeCouponAlreadyExists: 'Null',
+      FeeCouponRequired: 'Null',
     },
   },
   /**
