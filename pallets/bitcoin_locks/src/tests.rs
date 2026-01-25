@@ -5,22 +5,24 @@
 use pallet_prelude::*;
 
 use crate::{
-	Error, Event, HoldReason, LockExpirationsByBitcoinHeight, LockReleaseRequest,
-	MicrogonPerBtcHistory, OrphanedUtxo, OrphanedUtxosByAccount,
+	Error, Event, FEE_PROOF_MESSAGE_KEY, FeeCouponProof, FeeCouponsByPublic, HoldReason,
+	LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest, MicrogonPerBtcHistory,
+	MinimumSatoshis, OrphanedUtxo, OrphanedUtxosByAccount,
 	mock::*,
 	pallet::{
-		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
-		LocksByUtxoId,
+		FeeCouponsExpiringByFrame, LockCosignDueByFrame, LockReleaseCosignHeightById,
+		LockReleaseRequestsByUtxoId, LocksByUtxoId,
 	},
 };
 use argon_primitives::{
-	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider,
+	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider, TransactionSponsorProvider, TxSponsor,
 	bitcoin::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
 		SATOSHIS_PER_BITCOIN, UtxoRef,
 	},
 	vault::LockExtension,
 };
+use pallet_prelude::sp_core::Pair;
 
 #[test]
 fn can_lock_a_bitcoin_utxo_until_expiration() {
@@ -95,7 +97,10 @@ fn can_lock_a_bitcoin_utxo_with_a_preset_rate() {
 				1,
 				SATOSHIS_PER_BITCOIN,
 				pubkey,
-				Some(500_000 * MICROGONS_PER_ARGON)
+				Some(LockOptions::V1 {
+					microgons_per_btc: Some(500_000 * MICROGONS_PER_ARGON),
+					fee_coupon_proof: None
+				})
 			),
 			Error::<Test>::IneligibleMicrogonRateRequested
 		);
@@ -111,7 +116,10 @@ fn can_lock_a_bitcoin_utxo_with_a_preset_rate() {
 			1,
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
-			Some(500_000 * MICROGONS_PER_ARGON)
+			Some(LockOptions::V1 {
+				microgons_per_btc: Some(500_000 * MICROGONS_PER_ARGON),
+				fee_coupon_proof: None
+			})
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.owner_account, 2);
@@ -144,6 +152,192 @@ fn cleans_up_a_verification_timed_out_bitcoin() {
 		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 	});
+}
+
+#[test]
+fn can_register_and_expire_coupons() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(2, 2_000_000);
+		let (pair, _seed) = sr25519::sr25519::Pair::generate();
+		let vault_operator = DefaultVault::get().operator_account_id;
+		MinimumSatoshis::<Test>::set(5000);
+		CurrentFrameId::set(1000);
+		assert_err!(
+			BitcoinLocks::register_fee_coupon(RuntimeOrigin::signed(2), pair.public(), 4000, None),
+			Error::<Test>::NoPermissions
+		);
+		assert_err!(
+			BitcoinLocks::register_fee_coupon(
+				RuntimeOrigin::signed(vault_operator),
+				pair.public(),
+				4999,
+				None
+			),
+			Error::<Test>::InsufficientSatoshisLocked
+		);
+		assert_ok!(BitcoinLocks::register_fee_coupon(
+			RuntimeOrigin::signed(vault_operator),
+			pair.public(),
+			5000,
+			Some(100)
+		));
+		let coupon = FeeCouponsByPublic::<Test>::get(pair.public()).unwrap();
+		assert_eq!(coupon.expiration_frame, 1002);
+		assert_eq!(coupon.max_satoshis, 5000);
+		assert_eq!(coupon.max_fee_plus_tip, Some(100));
+
+		let message = (FEE_PROOF_MESSAGE_KEY, pair.public(), 1u64).using_encoded(blake2_256);
+
+		assert_eq!(
+			BitcoinLocks::get_transaction_sponsor(
+				&1,
+				&RuntimeCall::BitcoinLocks(crate::pallet::Call::initialize {
+					vault_id: 1,
+					satoshis: 6000,
+					bitcoin_pubkey: CompressedBitcoinPubkey([0; 33]),
+					options: Some(LockOptions::V1 {
+						microgons_per_btc: None,
+						fee_coupon_proof: Some(FeeCouponProof {
+							public: pair.public(),
+							signature: pair.sign(&[0u8; 64]),
+						}),
+					}),
+				}),
+			),
+			None
+		);
+		assert_eq!(
+			BitcoinLocks::get_transaction_sponsor(
+				&1,
+				&RuntimeCall::BitcoinLocks(crate::pallet::Call::initialize {
+					vault_id: 1,
+					satoshis: 5000,
+					bitcoin_pubkey: CompressedBitcoinPubkey([0; 33]),
+					options: Some(LockOptions::V1 {
+						microgons_per_btc: None,
+						fee_coupon_proof: Some(FeeCouponProof {
+							public: pair.public(),
+							signature: pair.sign(&message),
+						}),
+					}),
+				}),
+			),
+			Some(TxSponsor {
+				payer: vault_operator,
+				max_fee_with_tip: Some(100),
+				unique_tx_key: Some(pair.public().encode()),
+			})
+		);
+
+		assert_eq!(
+			FeeCouponsExpiringByFrame::<Test>::iter_key_prefix(1002)
+				.collect::<Vec<_>>()
+				.len(),
+			1
+		);
+
+		CurrentFrameId::set(1002);
+		BitcoinLocks::on_initialize(10002);
+		BitcoinLocks::on_finalize(10002);
+		assert_eq!(FeeCouponsByPublic::<Test>::get(pair.public()), None);
+		assert_eq!(
+			FeeCouponsExpiringByFrame::<Test>::iter_key_prefix(1002)
+				.collect::<Vec<_>>()
+				.len(),
+			0
+		);
+	})
+}
+
+#[test]
+fn can_lock_a_bitcoin_utxo_with_a_coupon() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(2, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		let (pair, _seed) = sr25519::sr25519::Pair::generate();
+		let vault_operator = DefaultVault::get().operator_account_id;
+		let signature_message =
+			(FEE_PROOF_MESSAGE_KEY, pair.public(), 2u64).using_encoded(blake2_256);
+		MinimumSatoshis::<Test>::set(1000);
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				pubkey,
+				Some(LockOptions::V1 {
+					microgons_per_btc: None,
+					fee_coupon_proof: Some(FeeCouponProof {
+						public: pair.public(),
+						signature: pair.sign(&[0u8; 32]),
+					})
+				})
+			),
+			Error::<Test>::InvalidFeeCoupon
+		);
+		assert_ok!(BitcoinLocks::register_fee_coupon(
+			RuntimeOrigin::signed(vault_operator),
+			pair.public(),
+			SATOSHIS_PER_BITCOIN,
+			None
+		));
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				pubkey,
+				Some(LockOptions::V1 {
+					microgons_per_btc: None,
+					fee_coupon_proof: Some(FeeCouponProof {
+						public: pair.public(),
+						signature: pair.sign(&[0u8; 32]),
+					})
+				})
+			),
+			Error::<Test>::InvalidFeeCouponProof
+		);
+		assert_err!(
+			BitcoinLocks::initialize_for(
+				RuntimeOrigin::signed(3),
+				2,
+				1,
+				SATOSHIS_PER_BITCOIN,
+				pubkey,
+				Some(LockOptions::V1 { microgons_per_btc: None, fee_coupon_proof: None })
+			),
+			Error::<Test>::FeeCouponRequired
+		);
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			Some(LockOptions::V1 {
+				microgons_per_btc: None,
+				fee_coupon_proof: Some(FeeCouponProof {
+					public: pair.public(),
+					signature: pair.sign(&signature_message),
+				})
+			})
+		));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.owner_account, 2);
+		assert!(!lock.is_verified);
+		let liquidity_promised = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+			.expect("should have price");
+		assert_eq!(lock.liquidity_promised, liquidity_promised);
+		assert_eq!(lock.coupon_paid_fees, liquidity_promised / 10);
+
+		assert_eq!(FeeCouponsByPublic::<Test>::get(pair.public()), None);
+	});
+	set_bitcoin_height(12);
 }
 
 #[test]

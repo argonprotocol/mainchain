@@ -98,6 +98,8 @@ pub trait BitcoinVaultProvider {
 	type AccountId: Codec;
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
+	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
 
 	/// Holds the given "liquidity promised" from the vault. Returns the fee amount
 	fn lock(
@@ -106,6 +108,7 @@ pub trait BitcoinVaultProvider {
 		liquidity_promised: Self::Balance,
 		satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
+		has_fee_coupon: bool,
 	) -> Result<Self::Balance, VaultError>;
 
 	/// Release the lock and move into holding, eligible for relock

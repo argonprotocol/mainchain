@@ -535,7 +535,15 @@ declare module '@polkadot/api-base/types/events' {
         { domainHash: H256; zoneRecord: ArgonPrimitivesDomainZoneRecord }
       >;
     };
-    feelessTransaction: {
+    feeControl: {
+      /**
+       * A transaction fee was delegated
+       **/
+      FeeDelegated: AugmentedEvent<
+        ApiType,
+        [origin: ArgonRuntimeOriginCaller, from: AccountId32, to: AccountId32],
+        { origin: ArgonRuntimeOriginCaller; from: AccountId32; to: AccountId32 }
+      >;
       /**
        * A transaction fee was skipped.
        **/
@@ -1525,8 +1533,22 @@ declare module '@polkadot/api-base/types/events' {
       >;
       FundsLocked: AugmentedEvent<
         ApiType,
-        [vaultId: u32, locker: AccountId32, amount: u128, isRatchet: bool, feeRevenue: u128],
-        { vaultId: u32; locker: AccountId32; amount: u128; isRatchet: bool; feeRevenue: u128 }
+        [
+          vaultId: u32,
+          locker: AccountId32,
+          amount: u128,
+          isRatchet: bool,
+          feeRevenue: u128,
+          didUseFeeCoupon: bool,
+        ],
+        {
+          vaultId: u32;
+          locker: AccountId32;
+          amount: u128;
+          isRatchet: bool;
+          feeRevenue: u128;
+          didUseFeeCoupon: bool;
+        }
       >;
       FundsReleased: AugmentedEvent<
         ApiType,

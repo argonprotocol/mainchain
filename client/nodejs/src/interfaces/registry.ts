@@ -55,7 +55,6 @@ import type {
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
-  ArgonRuntimeProxyFeeRefund,
   ArgonRuntimeProxyType,
   ArgonRuntimeRuntime,
   ArgonRuntimeRuntimeFreezeReason,
@@ -134,7 +133,10 @@ import type {
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
+  PalletBitcoinLocksFeeCoupon,
+  PalletBitcoinLocksFeeCouponProof,
   PalletBitcoinLocksHoldReason,
+  PalletBitcoinLocksLockOptions,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
@@ -162,6 +164,8 @@ import type {
   PalletDomainsDomainRegistration,
   PalletDomainsError,
   PalletDomainsEvent,
+  PalletFeeControlError,
+  PalletFeeControlEvent,
   PalletGrandpaCall,
   PalletGrandpaError,
   PalletGrandpaEvent,
@@ -210,7 +214,6 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
-  PalletSkipFeelessPaymentEvent,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -318,7 +321,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
-    ArgonRuntimeProxyFeeRefund: ArgonRuntimeProxyFeeRefund;
     ArgonRuntimeProxyType: ArgonRuntimeProxyType;
     ArgonRuntimeRuntime: ArgonRuntimeRuntime;
     ArgonRuntimeRuntimeFreezeReason: ArgonRuntimeRuntimeFreezeReason;
@@ -397,7 +399,10 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
+    PalletBitcoinLocksFeeCoupon: PalletBitcoinLocksFeeCoupon;
+    PalletBitcoinLocksFeeCouponProof: PalletBitcoinLocksFeeCouponProof;
     PalletBitcoinLocksHoldReason: PalletBitcoinLocksHoldReason;
+    PalletBitcoinLocksLockOptions: PalletBitcoinLocksLockOptions;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
     PalletBitcoinLocksLockedBitcoin: PalletBitcoinLocksLockedBitcoin;
     PalletBitcoinLocksOrphanedUtxo: PalletBitcoinLocksOrphanedUtxo;
@@ -425,6 +430,8 @@ declare module '@polkadot/types/types/registry' {
     PalletDomainsDomainRegistration: PalletDomainsDomainRegistration;
     PalletDomainsError: PalletDomainsError;
     PalletDomainsEvent: PalletDomainsEvent;
+    PalletFeeControlError: PalletFeeControlError;
+    PalletFeeControlEvent: PalletFeeControlEvent;
     PalletGrandpaCall: PalletGrandpaCall;
     PalletGrandpaError: PalletGrandpaError;
     PalletGrandpaEvent: PalletGrandpaEvent;
@@ -473,7 +480,6 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
-    PalletSkipFeelessPaymentEvent: PalletSkipFeelessPaymentEvent;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

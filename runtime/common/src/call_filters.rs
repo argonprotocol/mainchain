@@ -48,6 +48,7 @@ macro_rules! call_filters {
 			MiningBidRealPaysFee,
 			Bitcoin,
 			VaultAdmin,
+			BitcoinInitializeFor,
 		}
 		impl Default for ProxyType {
 			fn default() -> Self {
@@ -68,7 +69,8 @@ macro_rules! call_filters {
 					ProxyType::MiningBidRealPaysFee | ProxyType::MiningBid => match c {
 						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. }) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
-						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
 							calls.iter().all(|sc| {
 								matches!(
 									sc,
@@ -81,7 +83,8 @@ macro_rules! call_filters {
 					ProxyType::Bitcoin => match c {
 						RuntimeCall::BitcoinLocks(..) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
-						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
 							calls.iter().all(|sc| matches!(sc, RuntimeCall::BitcoinLocks(..))),
 						_ => false,
 					},
@@ -94,7 +97,8 @@ macro_rules! call_filters {
 							..
 						}) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
-						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) =>
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
 							calls.iter().all(|sc| {
 								matches!(
 									sc,
@@ -103,6 +107,23 @@ macro_rules! call_filters {
 											pallet_treasury::Call::vault_operator_prebond { .. }
 										) | RuntimeCall::BitcoinLocks(
 										pallet_bitcoin_locks::Call::initialize { .. }
+									)
+								)
+							}),
+						_ => false,
+					},
+					ProxyType::BitcoinInitializeFor => match c {
+						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize_for {
+							..
+						}) => true,
+						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
+						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
+							calls.iter().all(|sc| {
+								matches!(
+									sc,
+									RuntimeCall::BitcoinLocks(
+										pallet_bitcoin_locks::Call::initialize_for { .. }
 									)
 								)
 							}),

@@ -25,6 +25,7 @@ pub mod prelude {
 		providers::{OnNewSlot, *},
 		tick::Ticker,
 	};
+
 	pub use frame_support::{
 		PalletId, StorageValue, construct_runtime, derive_impl,
 		dispatch::*,
@@ -125,13 +126,12 @@ macro_rules! inject_runtime_vars {
 			frame_system::CheckMortality<Runtime>,
 			frame_system::CheckNonce<Runtime>,
 			frame_system::CheckWeight<Runtime>,
-			pallet_skip_feeless_payment::SkipCheckIfFeeless<
+			pallet_fee_control::CheckFeeWrapper<
 				Runtime,
 				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 			>,
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 			frame_system::WeightReclaim<Runtime>,
-			ProxyFeeRefund<Runtime>,
 		);
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
@@ -139,6 +139,7 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
 			pallet_bitcoin_utxos::migrations::BitcoinUtxosMigrate<Runtime>,
 			pallet_bitcoin_locks::migrations::InvalidUtxoRecoveryMigration<Runtime>,
+			pallet_vaults::migrations::RevenueStatsUpdate<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

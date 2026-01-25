@@ -42,7 +42,7 @@ pub mod pallet {
 		vault::{LockExtension, VaultTreasuryFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(11);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -228,6 +228,7 @@ pub mod pallet {
 			amount: T::Balance,
 			is_ratchet: bool,
 			fee_revenue: T::Balance,
+			did_use_fee_coupon: bool,
 		},
 		FundLockCanceled {
 			vault_id: VaultId,
@@ -790,6 +791,7 @@ pub mod pallet {
 				vault_id,
 				locks_created,
 				total_fee,
+				has_fee_coupon,
 				securitization_locked,
 				satoshis_locked,
 				satoshis_released,
@@ -799,6 +801,9 @@ pub mod pallet {
 			let current_frame_id = T::CurrentFrameId::get();
 			Self::mutate_frame_revenue(vault_id, current_frame_id, |revenue| {
 				revenue.bitcoin_lock_fee_revenue.saturating_accrue(total_fee);
+				if has_fee_coupon {
+					revenue.bitcoin_lock_fee_coupon_value_used.saturating_accrue(total_fee);
+				}
 				revenue.uncollected_revenue.saturating_accrue(total_fee);
 				revenue.bitcoin_locks_created.saturating_accrue(locks_created);
 				revenue.bitcoin_locks_added_satoshis.saturating_accrue(satoshis_locked);
@@ -905,6 +910,7 @@ pub mod pallet {
 		pub vault_id: VaultId,
 		pub locks_created: u32,
 		pub total_fee: T::Balance,
+		pub has_fee_coupon: bool,
 		pub securitization_locked: T::Balance,
 		pub securitization_released: T::Balance,
 		pub satoshis_locked: Satoshis,
@@ -989,12 +995,21 @@ pub mod pallet {
 			false
 		}
 
+		fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+			VaultsById::<T>::get(vault_id).map(|a| a.operator_account_id)
+		}
+
+		fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId> {
+			VaultIdByOperator::<T>::get(account_id)
+		}
+
 		fn lock(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
 			liquidity_promised: T::Balance,
 			satoshis: Satoshis,
 			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
+			mut has_fee_coupon: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
@@ -1010,7 +1025,7 @@ pub mod pallet {
 				VaultError::InsufficientVaultFunds
 			);
 
-			let mut total_fee = {
+			let total_fee = {
 				let apr = vault.terms.bitcoin_annual_percent_rate;
 				let base_fee = vault.terms.bitcoin_base_fee;
 				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
@@ -1020,13 +1035,14 @@ pub mod pallet {
 					.saturating_add(base_fee)
 			};
 			if vault.operator_account_id == *account_id {
-				// if the operator is locking, they don't pay a fee
-				total_fee = T::Balance::zero();
+				has_fee_coupon = true;
 			}
+
 			log::trace!(
-				"Vault {vault_id} trying to reserve {:?} for total_fees {:?}",
+				"Vault {vault_id} trying to reserve {:?} for total_fees {:?} (has_fee_coupon: {})",
 				liquidity_promised,
-				total_fee
+				total_fee,
+				has_fee_coupon
 			);
 
 			let is_ratchet = extension.is_some();
@@ -1034,6 +1050,7 @@ pub mod pallet {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
+				has_fee_coupon,
 				securitization_locked: liquidity_promised,
 				securitization_released: 0u32.into(),
 				satoshis_locked: satoshis,
@@ -1041,7 +1058,7 @@ pub mod pallet {
 			})?;
 
 			// do this second so the 'provider' is already on the account
-			if total_fee > T::Balance::zero() {
+			if total_fee > T::Balance::zero() && !has_fee_coupon {
 				T::Currency::transfer_and_hold(
 					&HoldReason::PendingCollect.into(),
 					account_id,
@@ -1071,6 +1088,7 @@ pub mod pallet {
 				locker: account_id.clone(),
 				amount: liquidity_promised,
 				fee_revenue: total_fee,
+				did_use_fee_coupon: has_fee_coupon,
 				is_ratchet,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
@@ -1087,6 +1105,7 @@ pub mod pallet {
 				vault_id,
 				locks_created: 0,
 				total_fee: 0u32.into(),
+				has_fee_coupon: false,
 				securitization_locked: 0u32.into(),
 				securitization_released: liquidity_promised,
 				satoshis_locked: 0,
@@ -1322,9 +1341,12 @@ pub mod pallet {
 		/// The frame id in question
 		#[codec(compact)]
 		pub frame_id: FrameId,
-		/// The bitcoin lock fe for the value
+		/// The bitcoin lock fee revenue (including all redeemed coupons)
 		#[codec(compact)]
 		pub bitcoin_lock_fee_revenue: T::Balance,
+		/// The bitcoin lock fee coupons redeemed during this frame
+		#[codec(compact)]
+		pub bitcoin_lock_fee_coupon_value_used: T::Balance,
 		/// The number of bitcoin locks created
 		#[codec(compact)]
 		pub bitcoin_locks_created: u32,
@@ -1371,6 +1393,7 @@ pub mod pallet {
 			Self {
 				frame_id,
 				bitcoin_lock_fee_revenue: T::Balance::zero(),
+				bitcoin_lock_fee_coupon_value_used: T::Balance::zero(),
 				bitcoin_locks_created: 0,
 				bitcoin_locks_new_liquidity_promised: T::Balance::zero(),
 				bitcoin_locks_released_liquidity: T::Balance::zero(),

@@ -91,6 +91,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				is_verified: old.is_verified,
 				fund_hold_extensions: old.fund_hold_extensions,
 				security_fees: old.security_fees,
+				coupon_paid_fees: old.security_fees,
 				created_at_argon_block: Default::default(),
 			})
 		});

@@ -39,7 +39,7 @@ pub mod api {
 		"Hyperbridge",
 		"TokenGateway",
 		"Treasury",
-		"FeelessTransaction",
+		"FeeControl",
 	];
 	pub static RUNTIME_APIS: [&str; 23usize] = [
 		"Core",
@@ -253,7 +253,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -587,7 +587,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod apply_extrinsic {
 					use super::runtime_types;
-					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
+					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < :: core :: result :: Result < () , runtime_types :: sp_runtime :: DispatchError > , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -635,7 +635,7 @@ pub mod api {
 					pub type Inherent = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
+						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					}
 				}
 				#[derive(
@@ -655,7 +655,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -722,7 +722,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
-					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
+					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type BlockHash = crate::types::H256;
 					pub mod output {
 						use super::runtime_types;
@@ -1051,7 +1051,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_info {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1080,7 +1080,7 @@ pub mod api {
 				}
 				pub mod query_fee_details {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1172,9 +1172,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							160u8, 0u8, 167u8, 39u8, 12u8, 181u8, 253u8, 26u8, 34u8, 208u8, 139u8,
-							146u8, 164u8, 198u8, 143u8, 19u8, 44u8, 196u8, 88u8, 59u8, 32u8, 218u8,
-							94u8, 104u8, 233u8, 188u8, 222u8, 18u8, 166u8, 49u8, 117u8, 21u8,
+							26u8, 99u8, 218u8, 169u8, 66u8, 145u8, 73u8, 231u8, 196u8, 15u8, 187u8,
+							124u8, 105u8, 121u8, 185u8, 63u8, 16u8, 215u8, 80u8, 92u8, 103u8,
+							170u8, 83u8, 221u8, 103u8, 151u8, 185u8, 105u8, 178u8, 117u8, 22u8,
+							90u8,
 						],
 					)
 				}
@@ -1192,10 +1193,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							240u8, 39u8, 193u8, 248u8, 72u8, 88u8, 92u8, 31u8, 181u8, 108u8, 45u8,
-							45u8, 232u8, 50u8, 143u8, 110u8, 40u8, 194u8, 119u8, 110u8, 181u8,
-							146u8, 196u8, 42u8, 95u8, 248u8, 225u8, 119u8, 41u8, 195u8, 132u8,
-							28u8,
+							192u8, 173u8, 181u8, 233u8, 112u8, 137u8, 183u8, 159u8, 153u8, 145u8,
+							157u8, 138u8, 237u8, 104u8, 190u8, 111u8, 157u8, 160u8, 224u8, 217u8,
+							143u8, 90u8, 30u8, 113u8, 188u8, 168u8, 169u8, 231u8, 128u8, 196u8,
+							161u8, 22u8,
 						],
 					)
 				}
@@ -1695,7 +1696,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim , runtime_types :: argon_runtime :: ProxyFeeRefund ,) > > > ;
+						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > > ;
 					}
 				}
 				#[derive(
@@ -3795,9 +3796,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				243u8, 210u8, 177u8, 45u8, 70u8, 125u8, 121u8, 231u8, 98u8, 93u8, 188u8, 15u8,
-				195u8, 57u8, 224u8, 190u8, 116u8, 235u8, 72u8, 238u8, 191u8, 100u8, 125u8, 124u8,
-				92u8, 82u8, 253u8, 243u8, 231u8, 61u8, 181u8, 31u8,
+				231u8, 8u8, 15u8, 197u8, 32u8, 79u8, 151u8, 35u8, 157u8, 1u8, 131u8, 227u8, 246u8,
+				29u8, 222u8, 242u8, 198u8, 94u8, 157u8, 12u8, 116u8, 186u8, 84u8, 104u8, 214u8,
+				18u8, 123u8, 181u8, 19u8, 145u8, 69u8, 0u8,
 			]
 	}
 	pub mod system {
@@ -4915,10 +4916,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							180u8, 157u8, 254u8, 246u8, 150u8, 141u8, 23u8, 114u8, 88u8, 62u8,
-							110u8, 137u8, 217u8, 47u8, 208u8, 118u8, 3u8, 120u8, 94u8, 88u8, 38u8,
-							193u8, 84u8, 41u8, 220u8, 169u8, 241u8, 167u8, 102u8, 112u8, 224u8,
-							0u8,
+							7u8, 177u8, 213u8, 60u8, 27u8, 205u8, 96u8, 20u8, 219u8, 135u8, 219u8,
+							191u8, 127u8, 57u8, 114u8, 216u8, 215u8, 145u8, 99u8, 51u8, 235u8,
+							220u8, 171u8, 188u8, 168u8, 74u8, 114u8, 181u8, 90u8, 19u8, 17u8,
+							172u8,
 						],
 					)
 				}
@@ -5792,10 +5793,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							42u8, 58u8, 207u8, 34u8, 196u8, 237u8, 16u8, 51u8, 108u8, 76u8, 21u8,
-							56u8, 36u8, 196u8, 151u8, 40u8, 181u8, 209u8, 150u8, 202u8, 72u8,
-							187u8, 105u8, 155u8, 140u8, 196u8, 97u8, 179u8, 227u8, 17u8, 134u8,
-							240u8,
+							71u8, 227u8, 194u8, 46u8, 245u8, 226u8, 100u8, 130u8, 125u8, 128u8,
+							2u8, 169u8, 153u8, 163u8, 37u8, 255u8, 250u8, 26u8, 91u8, 0u8, 104u8,
+							134u8, 170u8, 4u8, 107u8, 162u8, 248u8, 31u8, 78u8, 252u8, 38u8, 134u8,
 						],
 					)
 				}
@@ -5857,10 +5857,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							54u8, 221u8, 78u8, 123u8, 56u8, 224u8, 199u8, 202u8, 217u8, 172u8,
-							12u8, 137u8, 45u8, 241u8, 232u8, 104u8, 221u8, 87u8, 63u8, 21u8, 253u8,
-							29u8, 189u8, 193u8, 69u8, 193u8, 227u8, 136u8, 216u8, 135u8, 162u8,
-							3u8,
+							238u8, 238u8, 121u8, 29u8, 3u8, 117u8, 251u8, 145u8, 19u8, 187u8, 32u8,
+							246u8, 204u8, 32u8, 199u8, 77u8, 186u8, 33u8, 85u8, 133u8, 85u8, 225u8,
+							102u8, 22u8, 227u8, 235u8, 18u8, 30u8, 4u8, 253u8, 216u8, 62u8,
 						],
 					)
 				}
@@ -6757,10 +6756,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							145u8, 227u8, 71u8, 224u8, 188u8, 252u8, 252u8, 202u8, 204u8, 220u8,
-							141u8, 165u8, 197u8, 9u8, 94u8, 232u8, 47u8, 186u8, 146u8, 150u8,
-							104u8, 65u8, 195u8, 189u8, 107u8, 245u8, 244u8, 38u8, 237u8, 105u8,
-							38u8, 102u8,
+							83u8, 197u8, 127u8, 255u8, 1u8, 7u8, 139u8, 207u8, 237u8, 211u8, 74u8,
+							248u8, 63u8, 137u8, 172u8, 105u8, 25u8, 55u8, 167u8, 143u8, 37u8,
+							112u8, 143u8, 95u8, 208u8, 60u8, 114u8, 68u8, 135u8, 221u8, 196u8,
+							72u8,
 						],
 					)
 				}
@@ -6784,10 +6783,9 @@ pub mod api {
 						"add_proxy",
 						types::AddProxy { delegate, proxy_type, delay },
 						[
-							8u8, 201u8, 55u8, 197u8, 186u8, 187u8, 168u8, 182u8, 79u8, 182u8,
-							250u8, 183u8, 196u8, 23u8, 12u8, 129u8, 225u8, 125u8, 227u8, 112u8,
-							57u8, 65u8, 89u8, 80u8, 90u8, 241u8, 219u8, 4u8, 46u8, 25u8, 166u8,
-							29u8,
+							211u8, 202u8, 121u8, 168u8, 130u8, 57u8, 157u8, 98u8, 92u8, 246u8,
+							21u8, 161u8, 229u8, 155u8, 29u8, 94u8, 103u8, 184u8, 135u8, 77u8, 80u8,
+							7u8, 129u8, 63u8, 19u8, 175u8, 240u8, 203u8, 112u8, 32u8, 225u8, 116u8,
 						],
 					)
 				}
@@ -6809,9 +6807,9 @@ pub mod api {
 						"remove_proxy",
 						types::RemoveProxy { delegate, proxy_type, delay },
 						[
-							34u8, 24u8, 167u8, 5u8, 72u8, 178u8, 87u8, 247u8, 214u8, 91u8, 186u8,
-							19u8, 80u8, 62u8, 173u8, 40u8, 80u8, 181u8, 53u8, 132u8, 201u8, 236u8,
-							48u8, 226u8, 190u8, 176u8, 175u8, 5u8, 62u8, 83u8, 164u8, 213u8,
+							25u8, 115u8, 242u8, 172u8, 133u8, 76u8, 38u8, 171u8, 90u8, 82u8, 165u8,
+							239u8, 152u8, 157u8, 71u8, 101u8, 79u8, 92u8, 104u8, 237u8, 57u8, 52u8,
+							228u8, 13u8, 131u8, 171u8, 115u8, 223u8, 126u8, 103u8, 218u8, 251u8,
 						],
 					)
 				}
@@ -6866,9 +6864,9 @@ pub mod api {
 						"create_pure",
 						types::CreatePure { proxy_type, delay, index },
 						[
-							175u8, 87u8, 198u8, 50u8, 71u8, 184u8, 242u8, 134u8, 209u8, 11u8,
-							140u8, 93u8, 4u8, 119u8, 224u8, 114u8, 33u8, 16u8, 146u8, 236u8, 233u8,
-							213u8, 116u8, 50u8, 205u8, 113u8, 68u8, 134u8, 61u8, 169u8, 242u8, 7u8,
+							216u8, 40u8, 4u8, 30u8, 33u8, 100u8, 88u8, 195u8, 146u8, 223u8, 223u8,
+							41u8, 78u8, 225u8, 107u8, 20u8, 214u8, 20u8, 139u8, 242u8, 132u8, 14u8,
+							199u8, 112u8, 22u8, 179u8, 244u8, 159u8, 228u8, 62u8, 64u8, 25u8,
 						],
 					)
 				}
@@ -6901,9 +6899,9 @@ pub mod api {
 						"kill_pure",
 						types::KillPure { spawner, proxy_type, index, height, ext_index },
 						[
-							172u8, 85u8, 157u8, 64u8, 161u8, 33u8, 130u8, 151u8, 190u8, 223u8,
-							49u8, 2u8, 142u8, 34u8, 92u8, 13u8, 11u8, 175u8, 33u8, 110u8, 212u8,
-							176u8, 9u8, 19u8, 61u8, 160u8, 173u8, 98u8, 53u8, 34u8, 41u8, 105u8,
+							109u8, 14u8, 165u8, 203u8, 194u8, 129u8, 180u8, 107u8, 120u8, 220u8,
+							37u8, 245u8, 179u8, 131u8, 222u8, 64u8, 93u8, 22u8, 66u8, 208u8, 213u8,
+							220u8, 225u8, 39u8, 2u8, 43u8, 43u8, 126u8, 84u8, 153u8, 90u8, 107u8,
 						],
 					)
 				}
@@ -7022,9 +7020,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							3u8, 66u8, 110u8, 222u8, 38u8, 24u8, 234u8, 82u8, 234u8, 190u8, 97u8,
-							108u8, 132u8, 74u8, 218u8, 66u8, 36u8, 218u8, 243u8, 64u8, 113u8, 60u8,
-							127u8, 57u8, 34u8, 210u8, 69u8, 132u8, 205u8, 156u8, 111u8, 115u8,
+							11u8, 211u8, 231u8, 111u8, 75u8, 103u8, 37u8, 75u8, 176u8, 192u8, 42u8,
+							30u8, 170u8, 237u8, 218u8, 157u8, 224u8, 84u8, 88u8, 200u8, 119u8,
+							34u8, 94u8, 101u8, 235u8, 58u8, 32u8, 233u8, 188u8, 25u8, 224u8, 88u8,
 						],
 					)
 				}
@@ -7073,9 +7071,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							5u8, 225u8, 120u8, 73u8, 188u8, 241u8, 27u8, 198u8, 212u8, 171u8, 0u8,
-							181u8, 66u8, 188u8, 233u8, 184u8, 49u8, 158u8, 208u8, 240u8, 48u8,
-							203u8, 58u8, 87u8, 74u8, 202u8, 68u8, 54u8, 87u8, 125u8, 180u8, 176u8,
+							175u8, 222u8, 86u8, 105u8, 57u8, 200u8, 233u8, 87u8, 11u8, 219u8,
+							160u8, 62u8, 207u8, 126u8, 211u8, 166u8, 170u8, 60u8, 219u8, 187u8,
+							231u8, 38u8, 229u8, 52u8, 86u8, 239u8, 195u8, 96u8, 126u8, 38u8, 139u8,
+							142u8,
 						],
 					)
 				}
@@ -7096,9 +7095,10 @@ pub mod api {
 						],
 						is_superset::Input { to_check, against },
 						[
-							85u8, 26u8, 48u8, 33u8, 9u8, 150u8, 140u8, 214u8, 39u8, 14u8, 73u8,
-							125u8, 223u8, 89u8, 13u8, 17u8, 77u8, 152u8, 22u8, 119u8, 30u8, 44u8,
-							73u8, 138u8, 233u8, 72u8, 190u8, 28u8, 42u8, 28u8, 212u8, 233u8,
+							87u8, 148u8, 200u8, 97u8, 169u8, 240u8, 122u8, 98u8, 97u8, 160u8,
+							201u8, 73u8, 78u8, 17u8, 171u8, 15u8, 40u8, 24u8, 65u8, 78u8, 176u8,
+							126u8, 114u8, 71u8, 107u8, 150u8, 111u8, 72u8, 133u8, 200u8, 225u8,
+							149u8,
 						],
 					)
 				}
@@ -7386,9 +7386,10 @@ pub mod api {
 						"Proxies",
 						(),
 						[
-							79u8, 147u8, 32u8, 170u8, 164u8, 97u8, 123u8, 252u8, 247u8, 29u8, 17u8,
-							173u8, 158u8, 17u8, 42u8, 232u8, 52u8, 226u8, 204u8, 231u8, 193u8,
-							37u8, 154u8, 25u8, 81u8, 8u8, 232u8, 139u8, 236u8, 174u8, 114u8, 112u8,
+							225u8, 150u8, 64u8, 180u8, 63u8, 176u8, 82u8, 244u8, 8u8, 19u8, 51u8,
+							31u8, 163u8, 129u8, 124u8, 105u8, 187u8, 215u8, 20u8, 85u8, 172u8,
+							167u8, 94u8, 193u8, 217u8, 31u8, 235u8, 146u8, 160u8, 129u8, 16u8,
+							21u8,
 						],
 					)
 				}
@@ -7411,9 +7412,10 @@ pub mod api {
 						"Proxies",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							79u8, 147u8, 32u8, 170u8, 164u8, 97u8, 123u8, 252u8, 247u8, 29u8, 17u8,
-							173u8, 158u8, 17u8, 42u8, 232u8, 52u8, 226u8, 204u8, 231u8, 193u8,
-							37u8, 154u8, 25u8, 81u8, 8u8, 232u8, 139u8, 236u8, 174u8, 114u8, 112u8,
+							225u8, 150u8, 64u8, 180u8, 63u8, 176u8, 82u8, 244u8, 8u8, 19u8, 51u8,
+							31u8, 163u8, 129u8, 124u8, 105u8, 187u8, 215u8, 20u8, 85u8, 172u8,
+							167u8, 94u8, 193u8, 217u8, 31u8, 235u8, 146u8, 160u8, 129u8, 16u8,
+							21u8,
 						],
 					)
 				}
@@ -10063,6 +10065,7 @@ pub mod api {
 				pub amount: funds_locked::Amount,
 				pub is_ratchet: funds_locked::IsRatchet,
 				pub fee_revenue: funds_locked::FeeRevenue,
+				pub did_use_fee_coupon: funds_locked::DidUseFeeCoupon,
 			}
 			pub mod funds_locked {
 				use super::runtime_types;
@@ -10071,6 +10074,7 @@ pub mod api {
 				pub type Amount = ::core::primitive::u128;
 				pub type IsRatchet = ::core::primitive::bool;
 				pub type FeeRevenue = ::core::primitive::u128;
+				pub type DidUseFeeCoupon = ::core::primitive::bool;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FundsLocked {
 				const PALLET: &'static str = "Vaults";
@@ -10731,10 +10735,9 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						(),
 						[
-							19u8, 22u8, 17u8, 127u8, 129u8, 221u8, 243u8, 222u8, 210u8, 198u8,
-							148u8, 185u8, 113u8, 61u8, 106u8, 66u8, 142u8, 2u8, 122u8, 249u8,
-							215u8, 58u8, 127u8, 187u8, 58u8, 253u8, 7u8, 30u8, 181u8, 5u8, 86u8,
-							155u8,
+							218u8, 76u8, 104u8, 3u8, 160u8, 121u8, 96u8, 61u8, 159u8, 114u8, 15u8,
+							64u8, 117u8, 224u8, 220u8, 144u8, 174u8, 10u8, 34u8, 8u8, 144u8, 81u8,
+							222u8, 79u8, 242u8, 249u8, 64u8, 36u8, 64u8, 30u8, 195u8, 45u8,
 						],
 					)
 				}
@@ -10758,10 +10761,9 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							19u8, 22u8, 17u8, 127u8, 129u8, 221u8, 243u8, 222u8, 210u8, 198u8,
-							148u8, 185u8, 113u8, 61u8, 106u8, 66u8, 142u8, 2u8, 122u8, 249u8,
-							215u8, 58u8, 127u8, 187u8, 58u8, 253u8, 7u8, 30u8, 181u8, 5u8, 86u8,
-							155u8,
+							218u8, 76u8, 104u8, 3u8, 160u8, 121u8, 96u8, 61u8, 159u8, 114u8, 15u8,
+							64u8, 117u8, 224u8, 220u8, 144u8, 174u8, 10u8, 34u8, 8u8, 144u8, 81u8,
+							222u8, 79u8, 242u8, 249u8, 64u8, 36u8, 64u8, 30u8, 195u8, 45u8,
 						],
 					)
 				}
@@ -10878,7 +10880,7 @@ pub mod api {
 					#[codec(compact)]
 					pub satoshis: initialize::Satoshis,
 					pub bitcoin_pubkey: initialize::BitcoinPubkey,
-					pub microgons_per_btc: initialize::MicrogonsPerBtc,
+					pub options: initialize::Options,
 				}
 				pub mod initialize {
 					use super::runtime_types;
@@ -10886,7 +10888,9 @@ pub mod api {
 					pub type Satoshis = ::core::primitive::u64;
 					pub type BitcoinPubkey =
 						runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey;
-					pub type MicrogonsPerBtc = ::core::option::Option<::core::primitive::u128>;
+					pub type Options = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Initialize {
 					const PALLET: &'static str = "BitcoinLocks";
@@ -10984,12 +10988,14 @@ pub mod api {
 				#[doc = "queue for the difference in your new lock price vs the previous lock price."]
 				pub struct Ratchet {
 					pub utxo_id: ratchet::UtxoId,
-					pub microgons_per_btc: ratchet::MicrogonsPerBtc,
+					pub options: ratchet::Options,
 				}
 				pub mod ratchet {
 					use super::runtime_types;
 					pub type UtxoId = ::core::primitive::u64;
-					pub type MicrogonsPerBtc = ::core::option::Option<::core::primitive::u128>;
+					pub type Options = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Ratchet {
 					const PALLET: &'static str = "BitcoinLocks";
@@ -11073,6 +11079,69 @@ pub mod api {
 					const PALLET: &'static str = "BitcoinLocks";
 					const CALL: &'static str = "cosign_orphaned_utxo_release";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RegisterFeeCoupon {
+					pub public: register_fee_coupon::Public,
+					#[codec(compact)]
+					pub max_satoshis: register_fee_coupon::MaxSatoshis,
+					pub max_fee_plus_tip: register_fee_coupon::MaxFeePlusTip,
+				}
+				pub mod register_fee_coupon {
+					use super::runtime_types;
+					pub type Public = [::core::primitive::u8; 32usize];
+					pub type MaxSatoshis = ::core::primitive::u64;
+					pub type MaxFeePlusTip = ::core::option::Option<::core::primitive::u128>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterFeeCoupon {
+					const PALLET: &'static str = "BitcoinLocks";
+					const CALL: &'static str = "register_fee_coupon";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct InitializeFor {
+					pub account_id: initialize_for::AccountId,
+					pub vault_id: initialize_for::VaultId,
+					#[codec(compact)]
+					pub satoshis: initialize_for::Satoshis,
+					pub bitcoin_pubkey: initialize_for::BitcoinPubkey,
+					pub options: initialize_for::Options,
+				}
+				pub mod initialize_for {
+					use super::runtime_types;
+					pub type AccountId = crate::types::AccountId32;
+					pub type VaultId = ::core::primitive::u32;
+					pub type Satoshis = ::core::primitive::u64;
+					pub type BitcoinPubkey =
+						runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey;
+					pub type Options = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for InitializeFor {
+					const PALLET: &'static str = "BitcoinLocks";
+					const CALL: &'static str = "initialize_for";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -11089,16 +11158,16 @@ pub mod api {
 					vault_id: types::initialize::VaultId,
 					satoshis: types::initialize::Satoshis,
 					bitcoin_pubkey: types::initialize::BitcoinPubkey,
-					microgons_per_btc: types::initialize::MicrogonsPerBtc,
+					options: types::initialize::Options,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Initialize> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinLocks",
 						"initialize",
-						types::Initialize { vault_id, satoshis, bitcoin_pubkey, microgons_per_btc },
+						types::Initialize { vault_id, satoshis, bitcoin_pubkey, options },
 						[
-							212u8, 80u8, 87u8, 18u8, 58u8, 96u8, 175u8, 160u8, 155u8, 0u8, 207u8,
-							103u8, 216u8, 204u8, 91u8, 228u8, 146u8, 251u8, 84u8, 11u8, 39u8, 47u8,
-							174u8, 37u8, 168u8, 246u8, 219u8, 204u8, 148u8, 233u8, 196u8, 205u8,
+							43u8, 252u8, 171u8, 165u8, 16u8, 99u8, 235u8, 45u8, 71u8, 134u8, 24u8,
+							179u8, 197u8, 255u8, 172u8, 172u8, 23u8, 239u8, 126u8, 200u8, 167u8,
+							116u8, 119u8, 50u8, 204u8, 181u8, 6u8, 194u8, 233u8, 40u8, 164u8, 64u8,
 						],
 					)
 				}
@@ -11166,17 +11235,16 @@ pub mod api {
 				pub fn ratchet(
 					&self,
 					utxo_id: types::ratchet::UtxoId,
-					microgons_per_btc: types::ratchet::MicrogonsPerBtc,
+					options: types::ratchet::Options,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Ratchet> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinLocks",
 						"ratchet",
-						types::Ratchet { utxo_id, microgons_per_btc },
+						types::Ratchet { utxo_id, options },
 						[
-							196u8, 176u8, 10u8, 209u8, 154u8, 125u8, 143u8, 72u8, 119u8, 130u8,
-							75u8, 33u8, 182u8, 253u8, 145u8, 56u8, 169u8, 224u8, 51u8, 140u8,
-							205u8, 166u8, 182u8, 134u8, 84u8, 0u8, 13u8, 54u8, 98u8, 118u8, 180u8,
-							144u8,
+							168u8, 231u8, 172u8, 175u8, 84u8, 129u8, 119u8, 122u8, 255u8, 102u8,
+							253u8, 129u8, 37u8, 213u8, 14u8, 187u8, 23u8, 131u8, 234u8, 83u8, 52u8,
+							36u8, 63u8, 97u8, 199u8, 4u8, 179u8, 121u8, 32u8, 141u8, 248u8, 203u8,
 						],
 					)
 				}
@@ -11237,6 +11305,51 @@ pub mod api {
 							137u8, 41u8, 118u8, 211u8, 143u8, 162u8, 49u8, 239u8, 156u8, 68u8,
 							173u8, 152u8, 165u8, 233u8, 94u8, 210u8, 54u8, 108u8, 187u8, 88u8,
 							168u8, 177u8,
+						],
+					)
+				}
+				pub fn register_fee_coupon(
+					&self,
+					public: types::register_fee_coupon::Public,
+					max_satoshis: types::register_fee_coupon::MaxSatoshis,
+					max_fee_plus_tip: types::register_fee_coupon::MaxFeePlusTip,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::RegisterFeeCoupon>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BitcoinLocks",
+						"register_fee_coupon",
+						types::RegisterFeeCoupon { public, max_satoshis, max_fee_plus_tip },
+						[
+							104u8, 190u8, 146u8, 98u8, 52u8, 253u8, 211u8, 249u8, 173u8, 228u8,
+							167u8, 134u8, 62u8, 175u8, 190u8, 226u8, 87u8, 118u8, 184u8, 250u8,
+							100u8, 205u8, 45u8, 107u8, 190u8, 156u8, 222u8, 216u8, 200u8, 134u8,
+							246u8, 250u8,
+						],
+					)
+				}
+				pub fn initialize_for(
+					&self,
+					account_id: types::initialize_for::AccountId,
+					vault_id: types::initialize_for::VaultId,
+					satoshis: types::initialize_for::Satoshis,
+					bitcoin_pubkey: types::initialize_for::BitcoinPubkey,
+					options: types::initialize_for::Options,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::InitializeFor>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BitcoinLocks",
+						"initialize_for",
+						types::InitializeFor {
+							account_id,
+							vault_id,
+							satoshis,
+							bitcoin_pubkey,
+							options,
+						},
+						[
+							102u8, 194u8, 52u8, 22u8, 173u8, 240u8, 48u8, 220u8, 239u8, 183u8,
+							26u8, 10u8, 230u8, 126u8, 57u8, 81u8, 3u8, 57u8, 2u8, 196u8, 196u8,
+							13u8, 153u8, 145u8, 10u8, 182u8, 175u8, 233u8, 9u8, 143u8, 236u8, 66u8,
 						],
 					)
 				}
@@ -11534,6 +11647,20 @@ pub mod api {
 							::core::primitive::u128,
 						)>;
 				}
+				pub mod fee_coupons_by_public {
+					use super::runtime_types;
+					pub type FeeCouponsByPublic =
+						runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon<
+							::core::primitive::u128,
+						>;
+					pub type Param0 = [::core::primitive::u8; 32usize];
+				}
+				pub mod fee_coupons_expiring_by_frame {
+					use super::runtime_types;
+					pub type FeeCouponsExpiringByFrame = ();
+					pub type Param0 = ::core::primitive::u64;
+					pub type Param1 = [::core::primitive::u8; 32usize];
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -11573,10 +11700,9 @@ pub mod api {
 						"LocksByUtxoId",
 						(),
 						[
-							125u8, 151u8, 99u8, 245u8, 161u8, 25u8, 196u8, 116u8, 10u8, 83u8,
-							106u8, 76u8, 187u8, 201u8, 95u8, 32u8, 69u8, 157u8, 164u8, 61u8, 85u8,
-							234u8, 36u8, 119u8, 141u8, 199u8, 177u8, 52u8, 119u8, 215u8, 45u8,
-							192u8,
+							121u8, 55u8, 242u8, 201u8, 200u8, 241u8, 153u8, 37u8, 110u8, 156u8,
+							96u8, 55u8, 144u8, 29u8, 109u8, 110u8, 213u8, 177u8, 3u8, 236u8, 135u8,
+							15u8, 160u8, 110u8, 51u8, 163u8, 166u8, 7u8, 80u8, 195u8, 70u8, 65u8,
 						],
 					)
 				}
@@ -11598,10 +11724,9 @@ pub mod api {
 						"LocksByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							125u8, 151u8, 99u8, 245u8, 161u8, 25u8, 196u8, 116u8, 10u8, 83u8,
-							106u8, 76u8, 187u8, 201u8, 95u8, 32u8, 69u8, 157u8, 164u8, 61u8, 85u8,
-							234u8, 36u8, 119u8, 141u8, 199u8, 177u8, 52u8, 119u8, 215u8, 45u8,
-							192u8,
+							121u8, 55u8, 242u8, 201u8, 200u8, 241u8, 153u8, 37u8, 110u8, 156u8,
+							96u8, 55u8, 144u8, 29u8, 109u8, 110u8, 213u8, 177u8, 3u8, 236u8, 135u8,
+							15u8, 160u8, 110u8, 51u8, 163u8, 166u8, 7u8, 80u8, 195u8, 70u8, 65u8,
 						],
 					)
 				}
@@ -11912,6 +12037,131 @@ pub mod api {
 							121u8, 236u8, 187u8, 124u8, 251u8, 122u8, 143u8, 25u8, 37u8, 187u8,
 							254u8, 106u8, 233u8, 157u8, 23u8, 225u8, 177u8, 198u8, 114u8, 94u8,
 							0u8, 92u8,
+						],
+					)
+				}
+				#[doc = " Fee Coupons"]
+				pub fn fee_coupons_by_public_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fee_coupons_by_public::FeeCouponsByPublic,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"FeeCouponsByPublic",
+						(),
+						[
+							76u8, 122u8, 105u8, 58u8, 153u8, 128u8, 68u8, 56u8, 156u8, 239u8,
+							104u8, 170u8, 147u8, 88u8, 27u8, 228u8, 250u8, 106u8, 40u8, 235u8,
+							201u8, 202u8, 25u8, 66u8, 26u8, 137u8, 147u8, 6u8, 29u8, 235u8, 186u8,
+							77u8,
+						],
+					)
+				}
+				#[doc = " Fee Coupons"]
+				pub fn fee_coupons_by_public(
+					&self,
+					_0: types::fee_coupons_by_public::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::fee_coupons_by_public::Param0,
+					>,
+					types::fee_coupons_by_public::FeeCouponsByPublic,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"FeeCouponsByPublic",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							76u8, 122u8, 105u8, 58u8, 153u8, 128u8, 68u8, 56u8, 156u8, 239u8,
+							104u8, 170u8, 147u8, 88u8, 27u8, 228u8, 250u8, 106u8, 40u8, 235u8,
+							201u8, 202u8, 25u8, 66u8, 26u8, 137u8, 147u8, 6u8, 29u8, 235u8, 186u8,
+							77u8,
+						],
+					)
+				}
+				#[doc = " Fee Coupon Expirations"]
+				pub fn fee_coupons_expiring_by_frame_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fee_coupons_expiring_by_frame::FeeCouponsExpiringByFrame,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"FeeCouponsExpiringByFrame",
+						(),
+						[
+							131u8, 200u8, 34u8, 173u8, 3u8, 19u8, 206u8, 26u8, 112u8, 112u8, 253u8,
+							23u8, 247u8, 133u8, 4u8, 244u8, 67u8, 164u8, 78u8, 105u8, 150u8, 134u8,
+							140u8, 202u8, 177u8, 219u8, 149u8, 213u8, 31u8, 177u8, 249u8, 208u8,
+						],
+					)
+				}
+				#[doc = " Fee Coupon Expirations"]
+				pub fn fee_coupons_expiring_by_frame_iter1(
+					&self,
+					_0: types::fee_coupons_expiring_by_frame::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::fee_coupons_expiring_by_frame::Param0,
+					>,
+					types::fee_coupons_expiring_by_frame::FeeCouponsExpiringByFrame,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"FeeCouponsExpiringByFrame",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							131u8, 200u8, 34u8, 173u8, 3u8, 19u8, 206u8, 26u8, 112u8, 112u8, 253u8,
+							23u8, 247u8, 133u8, 4u8, 244u8, 67u8, 164u8, 78u8, 105u8, 150u8, 134u8,
+							140u8, 202u8, 177u8, 219u8, 149u8, 213u8, 31u8, 177u8, 249u8, 208u8,
+						],
+					)
+				}
+				#[doc = " Fee Coupon Expirations"]
+				pub fn fee_coupons_expiring_by_frame(
+					&self,
+					_0: types::fee_coupons_expiring_by_frame::Param0,
+					_1: types::fee_coupons_expiring_by_frame::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fee_coupons_expiring_by_frame::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fee_coupons_expiring_by_frame::Param1,
+						>,
+					),
+					types::fee_coupons_expiring_by_frame::FeeCouponsExpiringByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"FeeCouponsExpiringByFrame",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							131u8, 200u8, 34u8, 173u8, 3u8, 19u8, 206u8, 26u8, 112u8, 112u8, 253u8,
+							23u8, 247u8, 133u8, 4u8, 244u8, 67u8, 164u8, 78u8, 105u8, 150u8, 134u8,
+							140u8, 202u8, 177u8, 219u8, 149u8, 213u8, 31u8, 177u8, 249u8, 208u8,
 						],
 					)
 				}
@@ -20235,10 +20485,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							83u8, 255u8, 80u8, 47u8, 112u8, 123u8, 96u8, 171u8, 219u8, 217u8,
-							220u8, 154u8, 157u8, 193u8, 187u8, 133u8, 204u8, 142u8, 168u8, 43u8,
-							207u8, 132u8, 233u8, 205u8, 24u8, 239u8, 96u8, 185u8, 108u8, 20u8,
-							251u8, 236u8,
+							205u8, 130u8, 92u8, 147u8, 162u8, 117u8, 196u8, 103u8, 237u8, 239u8,
+							122u8, 96u8, 115u8, 166u8, 166u8, 188u8, 109u8, 13u8, 151u8, 191u8,
+							137u8, 215u8, 236u8, 94u8, 233u8, 142u8, 207u8, 140u8, 198u8, 218u8,
+							174u8, 61u8,
 						],
 					)
 				}
@@ -20268,9 +20518,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							250u8, 134u8, 49u8, 120u8, 88u8, 8u8, 200u8, 222u8, 234u8, 164u8, 99u8,
-							240u8, 57u8, 197u8, 208u8, 40u8, 174u8, 110u8, 135u8, 84u8, 87u8, 54u8,
-							16u8, 177u8, 15u8, 211u8, 21u8, 159u8, 248u8, 41u8, 215u8, 172u8,
+							255u8, 98u8, 88u8, 65u8, 32u8, 112u8, 78u8, 228u8, 83u8, 4u8, 124u8,
+							106u8, 33u8, 170u8, 134u8, 63u8, 45u8, 178u8, 17u8, 8u8, 80u8, 130u8,
+							31u8, 2u8, 175u8, 196u8, 148u8, 25u8, 244u8, 2u8, 120u8, 206u8,
 						],
 					)
 				}
@@ -20296,10 +20546,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							20u8, 140u8, 192u8, 79u8, 82u8, 209u8, 219u8, 223u8, 51u8, 88u8, 39u8,
-							130u8, 193u8, 227u8, 82u8, 85u8, 170u8, 206u8, 200u8, 212u8, 145u8,
-							204u8, 47u8, 199u8, 33u8, 131u8, 12u8, 98u8, 110u8, 119u8, 161u8,
-							149u8,
+							186u8, 17u8, 108u8, 34u8, 81u8, 248u8, 157u8, 167u8, 178u8, 220u8,
+							36u8, 249u8, 220u8, 195u8, 161u8, 106u8, 37u8, 138u8, 184u8, 3u8,
+							178u8, 81u8, 87u8, 17u8, 122u8, 206u8, 192u8, 47u8, 240u8, 30u8, 75u8,
+							108u8,
 						],
 					)
 				}
@@ -20322,9 +20572,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							203u8, 146u8, 219u8, 140u8, 220u8, 157u8, 205u8, 143u8, 117u8, 53u8,
-							101u8, 25u8, 73u8, 209u8, 13u8, 98u8, 124u8, 230u8, 178u8, 119u8, 58u8,
-							132u8, 11u8, 9u8, 12u8, 107u8, 107u8, 20u8, 81u8, 8u8, 125u8, 139u8,
+							186u8, 253u8, 181u8, 123u8, 31u8, 15u8, 90u8, 154u8, 49u8, 160u8,
+							102u8, 61u8, 48u8, 83u8, 34u8, 180u8, 253u8, 11u8, 98u8, 101u8, 69u8,
+							108u8, 233u8, 191u8, 96u8, 134u8, 113u8, 125u8, 205u8, 156u8, 203u8,
+							79u8,
 						],
 					)
 				}
@@ -20350,10 +20601,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							33u8, 200u8, 4u8, 63u8, 246u8, 230u8, 216u8, 44u8, 131u8, 93u8, 77u8,
-							47u8, 118u8, 91u8, 129u8, 131u8, 109u8, 31u8, 85u8, 195u8, 130u8,
-							146u8, 180u8, 147u8, 255u8, 52u8, 106u8, 50u8, 185u8, 163u8, 62u8,
-							20u8,
+							178u8, 134u8, 148u8, 192u8, 184u8, 102u8, 101u8, 132u8, 43u8, 127u8,
+							154u8, 2u8, 113u8, 78u8, 31u8, 225u8, 247u8, 155u8, 46u8, 237u8, 117u8,
+							241u8, 144u8, 100u8, 204u8, 237u8, 32u8, 30u8, 189u8, 234u8, 32u8,
+							115u8,
 						],
 					)
 				}
@@ -20376,9 +20627,10 @@ pub mod api {
 							weight,
 						},
 						[
-							228u8, 26u8, 187u8, 115u8, 65u8, 56u8, 21u8, 5u8, 10u8, 87u8, 3u8,
-							183u8, 93u8, 107u8, 77u8, 28u8, 84u8, 166u8, 210u8, 169u8, 233u8,
-							164u8, 200u8, 248u8, 7u8, 253u8, 3u8, 191u8, 208u8, 36u8, 67u8, 244u8,
+							90u8, 196u8, 105u8, 77u8, 133u8, 133u8, 253u8, 58u8, 84u8, 251u8,
+							117u8, 44u8, 119u8, 220u8, 187u8, 100u8, 52u8, 121u8, 39u8, 205u8,
+							127u8, 223u8, 117u8, 122u8, 244u8, 155u8, 199u8, 72u8, 172u8, 184u8,
+							75u8, 159u8,
 						],
 					)
 				}
@@ -20418,9 +20670,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							65u8, 166u8, 244u8, 76u8, 160u8, 124u8, 3u8, 6u8, 172u8, 232u8, 241u8,
-							231u8, 170u8, 161u8, 120u8, 190u8, 64u8, 8u8, 118u8, 122u8, 235u8,
-							68u8, 121u8, 193u8, 13u8, 16u8, 204u8, 236u8, 58u8, 14u8, 172u8, 128u8,
+							230u8, 94u8, 207u8, 100u8, 23u8, 195u8, 103u8, 201u8, 220u8, 16u8,
+							194u8, 58u8, 95u8, 219u8, 186u8, 253u8, 242u8, 190u8, 211u8, 147u8,
+							50u8, 112u8, 74u8, 64u8, 143u8, 72u8, 206u8, 38u8, 9u8, 82u8, 60u8,
+							138u8,
 						],
 					)
 				}
@@ -20443,9 +20696,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							208u8, 136u8, 216u8, 63u8, 209u8, 182u8, 101u8, 121u8, 202u8, 252u8,
-							229u8, 17u8, 235u8, 184u8, 227u8, 31u8, 93u8, 243u8, 32u8, 182u8, 15u8,
-							29u8, 57u8, 43u8, 247u8, 39u8, 138u8, 236u8, 135u8, 25u8, 242u8, 125u8,
+							145u8, 67u8, 183u8, 171u8, 239u8, 147u8, 128u8, 230u8, 12u8, 180u8,
+							147u8, 2u8, 9u8, 97u8, 196u8, 45u8, 75u8, 10u8, 218u8, 10u8, 30u8,
+							15u8, 98u8, 141u8, 164u8, 110u8, 207u8, 46u8, 234u8, 17u8, 140u8,
+							187u8,
 						],
 					)
 				}
@@ -20781,10 +21035,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							199u8, 55u8, 182u8, 134u8, 187u8, 40u8, 125u8, 180u8, 179u8, 172u8,
-							191u8, 173u8, 101u8, 224u8, 70u8, 27u8, 101u8, 138u8, 218u8, 56u8,
-							232u8, 109u8, 79u8, 34u8, 153u8, 70u8, 107u8, 192u8, 11u8, 2u8, 202u8,
-							121u8,
+							239u8, 187u8, 172u8, 21u8, 12u8, 1u8, 197u8, 229u8, 32u8, 117u8, 42u8,
+							255u8, 91u8, 79u8, 85u8, 21u8, 210u8, 1u8, 88u8, 167u8, 98u8, 139u8,
+							20u8, 140u8, 85u8, 166u8, 123u8, 112u8, 129u8, 138u8, 83u8, 43u8,
 						],
 					)
 				}
@@ -20807,9 +21060,10 @@ pub mod api {
 							weight,
 						},
 						[
-							57u8, 203u8, 207u8, 34u8, 18u8, 165u8, 130u8, 121u8, 132u8, 217u8,
-							163u8, 152u8, 214u8, 77u8, 39u8, 211u8, 90u8, 95u8, 238u8, 68u8, 79u8,
-							84u8, 234u8, 27u8, 196u8, 134u8, 18u8, 27u8, 49u8, 23u8, 90u8, 46u8,
+							147u8, 202u8, 119u8, 121u8, 121u8, 111u8, 55u8, 5u8, 169u8, 195u8,
+							213u8, 165u8, 58u8, 170u8, 229u8, 11u8, 40u8, 160u8, 183u8, 152u8,
+							149u8, 7u8, 149u8, 250u8, 207u8, 247u8, 45u8, 25u8, 246u8, 96u8, 61u8,
+							106u8,
 						],
 					)
 				}
@@ -20847,10 +21101,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							126u8, 181u8, 235u8, 168u8, 47u8, 189u8, 100u8, 113u8, 109u8, 54u8,
-							252u8, 255u8, 27u8, 248u8, 79u8, 81u8, 191u8, 27u8, 106u8, 110u8,
-							109u8, 89u8, 155u8, 219u8, 74u8, 199u8, 15u8, 202u8, 41u8, 88u8, 203u8,
-							109u8,
+							253u8, 124u8, 78u8, 182u8, 104u8, 52u8, 24u8, 21u8, 234u8, 99u8, 104u8,
+							152u8, 208u8, 227u8, 7u8, 18u8, 45u8, 248u8, 181u8, 49u8, 76u8, 173u8,
+							192u8, 202u8, 198u8, 235u8, 218u8, 107u8, 222u8, 132u8, 108u8, 203u8,
 						],
 					)
 				}
@@ -23803,10 +24056,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod feeless_transaction {
+	pub mod fee_control {
 		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_fee_control::pallet::Error;
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_skip_feeless_payment::pallet::Event;
+		pub type Event = runtime_types::pallet_fee_control::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -23826,8 +24081,32 @@ pub mod api {
 				pub type Origin = runtime_types::argon_runtime::OriginCaller;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FeeSkipped {
-				const PALLET: &'static str = "FeelessTransaction";
+				const PALLET: &'static str = "FeeControl";
 				const EVENT: &'static str = "FeeSkipped";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transaction fee was delegated"]
+			pub struct FeeDelegated {
+				pub origin: fee_delegated::Origin,
+				pub from: fee_delegated::From,
+				pub to: fee_delegated::To,
+			}
+			pub mod fee_delegated {
+				use super::runtime_types;
+				pub type Origin = runtime_types::argon_runtime::OriginCaller;
+				pub type From = crate::types::AccountId32;
+				pub type To = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FeeDelegated {
+				const PALLET: &'static str = "FeeControl";
+				const EVENT: &'static str = "FeeDelegated";
 			}
 		}
 	}
@@ -25420,15 +25699,6 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct ProxyFeeRefund;
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub enum ProxyType {
 				#[codec(index = 0)]
 				Any,
@@ -25444,6 +25714,8 @@ pub mod api {
 				Bitcoin,
 				#[codec(index = 6)]
 				VaultAdmin,
+				#[codec(index = 7)]
+				BitcoinInitializeFor,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -25576,6 +25848,8 @@ pub mod api {
 				TokenGateway(runtime_types::pallet_token_gateway::pallet::Error),
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::Error),
+				#[codec(index = 32)]
+				FeeControl(runtime_types::pallet_fee_control::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -25643,7 +25917,7 @@ pub mod api {
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::Event),
 				#[codec(index = 32)]
-				FeelessTransaction(runtime_types::pallet_skip_feeless_payment::pallet::Event),
+				FeeControl(runtime_types::pallet_fee_control::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -27568,7 +27842,9 @@ pub mod api {
 						satoshis: ::core::primitive::u64,
 						bitcoin_pubkey:
 							runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey,
-						microgons_per_btc: ::core::option::Option<::core::primitive::u128>,
+						options: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+						>,
 					},
 					#[codec(index = 1)]
 					#[doc = "Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign"]
@@ -27610,7 +27886,9 @@ pub mod api {
 					#[doc = "queue for the difference in your new lock price vs the previous lock price."]
 					ratchet {
 						utxo_id: ::core::primitive::u64,
-						microgons_per_btc: ::core::option::Option<::core::primitive::u128>,
+						options: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+						>,
 					},
 					#[codec(index = 4)]
 					admin_modify_minimum_locked_sats { satoshis: ::core::primitive::u64 },
@@ -27626,6 +27904,25 @@ pub mod api {
 						orphan_owner: crate::types::AccountId32,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
+					},
+					#[codec(index = 7)]
+					register_fee_coupon {
+						public: [::core::primitive::u8; 32usize],
+						#[codec(compact)]
+						max_satoshis: ::core::primitive::u64,
+						max_fee_plus_tip: ::core::option::Option<::core::primitive::u128>,
+					},
+					#[codec(index = 8)]
+					initialize_for {
+						account_id: crate::types::AccountId32,
+						vault_id: ::core::primitive::u32,
+						#[codec(compact)]
+						satoshis: ::core::primitive::u64,
+						bitcoin_pubkey:
+							runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey,
+						options: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+						>,
 					},
 				}
 				#[derive(
@@ -27701,7 +27998,7 @@ pub mod api {
 					#[doc = "The vault was not found"]
 					VaultNotFound,
 					#[codec(index = 20)]
-					#[doc = "An error ocurred in the vault module"]
+					#[doc = "An error occurred in the vault module"]
 					GenericVaultError(runtime_types::argon_primitives::vault::VaultError),
 					#[codec(index = 21)]
 					#[doc = "The Bitcoin Lock record was not found"]
@@ -27733,6 +28030,22 @@ pub mod api {
 					#[codec(index = 30)]
 					#[doc = "An ineligible microgon rate per btc was requested"]
 					IneligibleMicrogonRateRequested,
+					#[codec(index = 31)]
+					#[doc = "The provided fee coupon is already used or invalid"]
+					InvalidFeeCoupon,
+					#[codec(index = 32)]
+					#[doc = "The provided fee coupon proof is invalid"]
+					InvalidFeeCouponProof,
+					#[codec(index = 33)]
+					#[doc = "This bitcoin lock exceeded the maximum allowed number of satoshis for the provided fee"]
+					#[doc = "coupon"]
+					MaxFeeCouponSatoshisExceeded,
+					#[codec(index = 34)]
+					#[doc = "The fee coupon already exists"]
+					FeeCouponAlreadyExists,
+					#[codec(index = 35)]
+					#[doc = "Initializing a lock for another account requires a fee coupon"]
+					FeeCouponRequired,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -27824,9 +28137,67 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct FeeCoupon<_0> {
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub max_satoshis: ::core::primitive::u64,
+					#[codec(compact)]
+					pub expiration_frame: ::core::primitive::u64,
+					pub max_fee_plus_tip: ::core::option::Option<_0>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FeeCouponProof {
+					pub public: [::core::primitive::u8; 32usize],
+					pub signature: [::core::primitive::u8; 64usize],
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum HoldReason {
 					#[codec(index = 0)]
 					ReleaseBitcoinLock,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum LockOptions {
+					#[codec(index = 0)]
+					V1 {
+						microgons_per_btc: ::core::option::Option<::core::primitive::u128>,
+						fee_coupon_proof: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::FeeCouponProof,
+						>,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -27873,6 +28244,7 @@ pub mod api {
 					pub locked_market_rate: ::core::primitive::u128,
 					pub owner_account: crate::types::AccountId32,
 					pub security_fees: ::core::primitive::u128,
+					pub coupon_paid_fees: ::core::primitive::u128,
 					#[codec(compact)]
 					pub satoshis: ::core::primitive::u64,
 					pub utxo_satoshis: ::core::option::Option<::core::primitive::u64>,
@@ -28702,6 +29074,55 @@ pub mod api {
 			pub struct DomainRegistration<_0> {
 				pub account_id: _0,
 				pub registered_at_tick: ::core::primitive::u64,
+			}
+		}
+		pub mod pallet_fee_control {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The requested tip + fee is higher than the maximum allowed by the sponsor"]
+					SponsoredFeeTooHigh,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "A transaction fee was skipped."]
+					FeeSkipped { origin: runtime_types::argon_runtime::OriginCaller },
+					#[codec(index = 1)]
+					#[doc = "A transaction fee was delegated"]
+					FeeDelegated {
+						origin: runtime_types::argon_runtime::OriginCaller,
+						from: crate::types::AccountId32,
+						to: crate::types::AccountId32,
+					},
+				}
 			}
 		}
 		pub mod pallet_grandpa {
@@ -30573,30 +30994,6 @@ pub mod api {
 				pub delay: _2,
 			}
 		}
-		pub mod pallet_skip_feeless_payment {
-			use super::runtime_types;
-			pub mod pallet {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "The `Event` enum of this pallet"]
-				pub enum Event {
-					#[codec(index = 0)]
-					#[doc = "A transaction fee was skipped."]
-					FeeSkipped { origin: runtime_types::argon_runtime::OriginCaller },
-				}
-			}
-		}
 		pub mod pallet_sudo {
 			use super::runtime_types;
 			pub mod pallet {
@@ -32000,6 +32397,7 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						is_ratchet: ::core::primitive::bool,
 						fee_revenue: ::core::primitive::u128,
+						did_use_fee_coupon: ::core::primitive::bool,
 					},
 					#[codec(index = 9)]
 					FundLockCanceled {
@@ -32095,6 +32493,8 @@ pub mod api {
 					pub frame_id: ::core::primitive::u64,
 					#[codec(compact)]
 					pub bitcoin_lock_fee_revenue: ::core::primitive::u128,
+					#[codec(compact)]
+					pub bitcoin_lock_fee_coupon_value_used: ::core::primitive::u128,
 					#[codec(compact)]
 					pub bitcoin_locks_created: ::core::primitive::u32,
 					#[codec(compact)]

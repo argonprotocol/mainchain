@@ -116,6 +116,7 @@ parameter_types! {
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
 	pub static CurrentTick: Tick = 1;
+	pub static DidStartNewFrame: bool = true;
 }
 
 pub struct EventHandler;
@@ -176,6 +177,20 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		false
 	}
 
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+		if vault_id == 1 {
+			return Some(DefaultVault::get().operator_account_id);
+		}
+		None
+	}
+
+	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId> {
+		if DefaultVault::get().operator_account_id == *account_id {
+			return Some(1);
+		}
+		None
+	}
+
 	fn cancel(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
 		DefaultVault::mutate(|v| {
 			v.release_locked_funds(amount);
@@ -190,6 +205,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		amount: Self::Balance,
 		_satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
+		_has_fee_coupon: bool,
 	) -> Result<Self::Balance, VaultError> {
 		ensure!(
 			DefaultVault::get().available_for_lock() >= amount,
@@ -386,6 +402,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type CurrentTick = CurrentTick;
 	type MaxBtcPriceTickAge = ConstU32<10>;
+	type DidStartNewFrame = DidStartNewFrame;
 }
 
 // Build genesis storage according to the mock runtime.
