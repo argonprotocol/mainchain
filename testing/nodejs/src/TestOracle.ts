@@ -44,8 +44,6 @@ export default class TestOracle implements ITeardownable {
         throw new Error('Bitcoin RPC URL is required for bitcoin oracle');
       }
       execArgs.push('--bitcoin-rpc-url', bitcoinRpcUrl);
-    } else {
-      execArgs.push('--simulate-prices');
     }
     this.#childProcess = child_process.spawn(binPath, execArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],

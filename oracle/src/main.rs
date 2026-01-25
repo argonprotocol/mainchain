@@ -17,7 +17,7 @@ use url::Url;
 use crate::{
 	bitcoin_tip::bitcoin_loop,
 	coin_usd_prices::{ALL_PRICE_PROVIDERS, PriceProviderKind},
-	price_index::price_index_loop,
+	price_index::{price_index_loop, price_index_loop_from_file},
 };
 
 mod argon_price;
@@ -61,10 +61,9 @@ struct Cli {
 #[allow(clippy::large_enum_variant)]
 pub enum Subcommand {
 	PriceIndex {
-		/// Use a price simulator instead of uniswap
-		#[cfg(feature = "simulated-prices")]
-		#[clap(short, long)]
-		simulate_prices: bool,
+		/// Load simulated prices from a file
+		#[clap(short, long, verbatim_doc_comment, env = "PRICE_INDEX_FILE_PATH")]
+		from_file_path: Option<String>,
 
 		/// Which coin price providers to use for USD prices
 		#[clap(long, env, value_enum, value_delimiter = ',', default_values_t = ALL_PRICE_PROVIDERS)]
@@ -96,11 +95,7 @@ pub enum Subcommand {
 
 impl Default for Subcommand {
 	fn default() -> Self {
-		Subcommand::PriceIndex {
-			#[cfg(feature = "simulated-prices")]
-			simulate_prices: false,
-			coin_price_providers: vec![],
-		}
+		Subcommand::PriceIndex { from_file_path: None, coin_price_providers: vec![] }
 	}
 }
 
@@ -203,21 +198,12 @@ async fn main() -> anyhow::Result<()> {
 	let signer = KeystoreSigner::new(keystore, signer_account, signer_crypto.into());
 
 	match subcommand {
-		Subcommand::PriceIndex {
-			#[cfg(feature = "simulated-prices")]
-			simulate_prices,
-			coin_price_providers,
-		} => {
-			#[cfg(feature = "simulated-prices")]
-			{
-				price_index_loop(trusted_rpc_url, signer, simulate_prices, coin_price_providers)
-					.await?
-			}
-			#[cfg(not(feature = "simulated-prices"))]
-			{
-				price_index_loop(trusted_rpc_url, signer, false, coin_price_providers).await?
-			}
-		},
+		Subcommand::PriceIndex { from_file_path, coin_price_providers } =>
+			if let Some(path) = from_file_path {
+				price_index_loop_from_file(trusted_rpc_url, signer, path).await?
+			} else {
+				price_index_loop(trusted_rpc_url, signer, coin_price_providers).await?
+			},
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {
 			let mut bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
 				anyhow!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e)

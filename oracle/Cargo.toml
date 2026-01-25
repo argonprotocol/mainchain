@@ -49,6 +49,3 @@ argon-testing = { workspace = true }
 
 [build-dependencies]
 argon-primitives = { workspace = true, features = ["std"] }
-
-[features]
-simulated-prices = []
