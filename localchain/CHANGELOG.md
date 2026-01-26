@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...7b71f8ad566edf143a514fc94847a61433738ea3) (2026-01-12)
+## [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...1b1e34ccc5f3edfc79b21a3b63beed6d633e49c8) (2026-01-25)
+
+### Features
+
+* **bitcoin:** allow mismatched satoshis
+([7d62775](https://github.com/argonprotocol/mainchain/commit/7d6277514f8cfe47232acae9d2e12800f55dd92b))
+
+### [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...v1.3.25) (2026-01-13)
 
 ### [v1.3.24](https://github.com/argonprotocol/mainchain/compare/v1.3.23...v1.3.24) (2025-12-10)
 
