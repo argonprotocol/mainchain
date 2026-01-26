@@ -1,14 +1,35 @@
 # Changelog
 
-## [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...7b71f8ad566edf143a514fc94847a61433738ea3) (2026-01-12)
+## [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...1b1e34ccc5f3edfc79b21a3b63beed6d633e49c8) (2026-01-25)
 
 ### Features
+
+* don’t submit default price index prices
+([f75d5c1](https://github.com/argonprotocol/mainchain/commit/f75d5c17d019f9ddc570cd5cf4c49ff94e2a304e))
+* make mining slot argonots cap 40% of circ
+([e20b787](https://github.com/argonprotocol/mainchain/commit/e20b787efaafaa71d99f597df3238e040212fb97))
+* add a default max fee to mining proxy
+([559dcb1](https://github.com/argonprotocol/mainchain/commit/559dcb1599336e999e4ca444a54c855fdcaf686a))
+* add ability to sponsor a transaction
+([92d3161](https://github.com/argonprotocol/mainchain/commit/92d3161ab444b9c9d55a38c27242a49ef495cef3))
+* **bitcoin:** allow mismatched satoshis
+([26a896c](https://github.com/argonprotocol/mainchain/commit/26a896c67260d25b907e84c4d5d8030f59caa59b))
+* **bitcoin:** allow mismatched satoshis
+([7d62775](https://github.com/argonprotocol/mainchain/commit/7d6277514f8cfe47232acae9d2e12800f55dd92b))
+* add more coin providers
+([15f51ae](https://github.com/argonprotocol/mainchain/commit/15f51ae68308304099c4f4b98e1a1b61a28e2605))
+
+### [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...v1.3.25) (2026-01-13)
+
+#### Features
 
 * truncate cpi offsets within 0.001 of target
 ([a622573](https://github.com/argonprotocol/mainchain/commit/a6225735b88becbf14d63aefd86e2624f953ab69))
 
-### Fixes
+#### Fixes
 
+* tests using cached resources
+([930f1f2](https://github.com/argonprotocol/mainchain/commit/930f1f2f97a86a27fae276c500c59453fbfacdd1))
 * oracle tests broken
 ([7b71f8a](https://github.com/argonprotocol/mainchain/commit/7b71f8ad566edf143a514fc94847a61433738ea3))
 * oracle should handle - as price from BLS

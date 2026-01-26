@@ -1,8 +1,21 @@
 # Changelog
 
-## [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...7b71f8ad566edf143a514fc94847a61433738ea3) (2026-01-12)
+## [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...1b1e34ccc5f3edfc79b21a3b63beed6d633e49c8) (2026-01-25)
 
-### Fixes
+### Features
+
+* add a default max fee to mining proxy
+([559dcb1](https://github.com/argonprotocol/mainchain/commit/559dcb1599336e999e4ca444a54c855fdcaf686a))
+* add ability to sponsor a transaction
+([92d3161](https://github.com/argonprotocol/mainchain/commit/92d3161ab444b9c9d55a38c27242a49ef495cef3))
+* **bitcoin:** allow mismatched satoshis
+([26a896c](https://github.com/argonprotocol/mainchain/commit/26a896c67260d25b907e84c4d5d8030f59caa59b))
+* **bitcoin:** allow mismatched satoshis
+([7d62775](https://github.com/argonprotocol/mainchain/commit/7d6277514f8cfe47232acae9d2e12800f55dd92b))
+
+### [v1.3.25](https://github.com/argonprotocol/mainchain/compare/v1.3.24...v1.3.25) (2026-01-13)
+
+#### Fixes
 
 * oracle should handle - as price from BLS
 ([54ee4bf](https://github.com/argonprotocol/mainchain/commit/54ee4bfe47a7d7f02aa77a5a44d53fb61302276f))
