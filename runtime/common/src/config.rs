@@ -100,7 +100,7 @@ parameter_types! {
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetPricePerSeat: Balance = 1000 * ARGON;
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
-	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(80);
+	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(40);
 	pub const TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_rational(2, 1); // Ideally we want 2x bids per seat
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;

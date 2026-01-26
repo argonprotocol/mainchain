@@ -36,7 +36,7 @@ parameter_types! {
 	pub static SlotBiddingStartAfterTicks: u64 = 3;
 	pub static TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_u32(5);
 	pub static MinOwnershipBondAmount: Balance = 1;
-	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.8);
+	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.4);
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub static TargetPricePerSeat: Balance = 10 * 1_000_000; // 10 Argons

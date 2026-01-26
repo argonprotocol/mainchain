@@ -1636,7 +1636,7 @@ fn it_adjusts_locked_argonots() {
 			]);
 			MiningSlots::adjust_argonots_per_seat();
 			let next = ArgonotsPerMiningSeat::<Test>::get();
-			if next == 400_000 {
+			if next == 200_000 {
 				break;
 			}
 			assert_eq!(next, (last as f64 * 1.2) as u128);
@@ -1644,7 +1644,7 @@ fn it_adjusts_locked_argonots() {
 		}
 
 		// max increase is to a set amount of the total issuance
-		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), (500_000.0 * 0.8) as u128);
+		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), (500_000.0 * 0.4) as u128);
 	});
 }
 
