@@ -4,27 +4,43 @@ import {
   FIXED_U128_DECIMALS,
   formatArgons,
   fromFixedNumber,
-  ITxProgressCallback,
   KeyringPair,
   PERMILL_DECIMALS,
   toFixedNumber,
   TxSubmitter,
 } from './index';
-import BigNumber, * as BN from 'bignumber.js';
+import BigNumber from 'bignumber.js';
 import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxResult';
 import { ISubmittableOptions } from './TxSubmitter';
-import { ApiPromise } from '@polkadot/api';
 import { ApiDecoration } from '@polkadot/api/types';
+import type { bool, BTreeMap, Compact, Option, Struct, u128, u64 } from '@polkadot/types-codec';
+import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
+import type { ITuple } from '@polkadot/types-codec/types';
+import { ArgonPrimitivesVaultVaultTerms } from '@polkadot/types/lookup';
 
-const { ROUND_FLOOR } = BN;
+interface ArgonPrimitivesVaultV144 extends Struct {
+  readonly operatorAccountId: AccountId32;
+  readonly securitization: Compact<u128>;
+  readonly argonsLocked: Compact<u128>;
+  readonly argonsPendingActivation: Compact<u128>;
+  readonly argonsScheduledForRelease: BTreeMap<u64, u128>;
+  readonly securitizationRatio: Compact<u128>;
+  readonly isClosed: bool;
+  readonly terms: ArgonPrimitivesVaultVaultTerms;
+  readonly pendingTerms: Option<ITuple<[u64, ArgonPrimitivesVaultVaultTerms]>>;
+  readonly openedTick: Compact<u64>;
+}
 
 export class Vault {
   public securitization!: bigint;
-  public argonsLocked!: bigint;
-  public argonsPendingActivation!: bigint;
-  public argonsScheduledForRelease: Map<number, bigint>;
+  public securitizationLocked!: bigint;
+  public securitizationPendingActivation!: bigint;
+  /**
+   * Map of bitcoin height to amount of securitization released at that height
+   */
+  public securitizationReleaseSchedule: Map<number, bigint>;
   public terms!: ITerms;
   public operatorAccountId!: string;
   public isClosed!: boolean;
@@ -43,22 +59,31 @@ export class Vault {
     this.vaultId = id;
     this.openedTick = vault.openedTick.toNumber();
     this.openedDate = new Date(this.openedTick * this.tickDuration);
-    this.argonsScheduledForRelease = new Map();
+    this.securitizationReleaseSchedule = new Map();
     this.load(vault);
   }
 
-  public load(vault: ArgonPrimitivesVault) {
+  public load(vault: ArgonPrimitivesVault | ArgonPrimitivesVaultV144): void {
     this.securitization = vault.securitization.toBigInt();
     this.securitizationRatio = fromFixedNumber(
       vault.securitizationRatio.toBigInt(),
       FIXED_U128_DECIMALS,
     ).toNumber();
-    this.argonsLocked = vault.argonsLocked.toBigInt();
-    this.argonsPendingActivation = vault.argonsPendingActivation.toBigInt();
-    if (vault.argonsScheduledForRelease.size > 0) {
-      this.argonsScheduledForRelease.clear();
-      for (const [tick, amount] of vault.argonsScheduledForRelease.entries()) {
-        this.argonsScheduledForRelease.set(tick.toNumber(), amount.toBigInt());
+    this.securitizationReleaseSchedule.clear();
+    let schedule: BTreeMap<u64, u128>;
+    if ('argonsLocked' in vault) {
+      // spec 143 compatibility - don't bother with ratio as it was forced to 1:1
+      this.securitizationLocked = vault.argonsLocked.toBigInt();
+      this.securitizationPendingActivation = vault.argonsPendingActivation.toBigInt();
+      schedule = vault.argonsScheduledForRelease;
+    } else {
+      this.securitizationLocked = vault.securitizationLocked.toBigInt();
+      this.securitizationPendingActivation = vault.securitizationPendingActivation.toBigInt();
+      schedule = vault.securitizationReleaseSchedule;
+    }
+    if (schedule.size > 0) {
+      for (const [bitcoinHeight, amount] of schedule.entries()) {
+        this.securitizationReleaseSchedule.set(bitcoinHeight.toNumber(), amount.toBigInt());
       }
     }
     this.terms = {
@@ -93,45 +118,29 @@ export class Vault {
   }
 
   public availableBitcoinSpace(): bigint {
-    const recoverySecuritization = this.recoverySecuritization();
-    const reLockable = this.getRelockCapacity();
-    return this.securitization - recoverySecuritization - this.argonsLocked + reLockable;
+    const availableSecuritization = this.availableSecuritization();
+    const microgons = BigNumber(availableSecuritization).div(this.securitizationRatioBN());
+    return bigNumberToBigInt(microgons);
+  }
+
+  public availableSecuritization(): bigint {
+    return this.securitization - this.securitizationLocked;
   }
 
   public getRelockCapacity(): bigint {
-    return [...this.argonsScheduledForRelease.values()].reduce((acc, val) => acc + val, 0n);
+    return [...this.securitizationReleaseSchedule.values()].reduce((acc, val) => acc + val, 0n);
   }
 
   public securitizationRatioBN(): BigNumber {
     return new BigNumber(this.securitizationRatio);
   }
 
-  public recoverySecuritization(): bigint {
-    const reserved = new BigNumber(1).div(this.securitizationRatioBN());
-    return (
-      this.securitization -
-      BigInt(reserved.multipliedBy(this.securitization.toString()).toFixed(0, ROUND_FLOOR))
-    );
-  }
-
-  public minimumSecuritization(): bigint {
-    return BigInt(
-      this.securitizationRatioBN()
-        .multipliedBy(this.argonsLocked.toString())
-        .decimalPlaces(0, BigNumber.ROUND_CEIL)
-        .toString(),
-    );
-  }
-
   public activatedSecuritization(): bigint {
-    const activated = this.argonsLocked - this.argonsPendingActivation;
-    const maxRatio = BigNumber(Math.min(this.securitizationRatio, 2));
-
-    return BigInt(maxRatio.multipliedBy(activated.toString()).toFixed(0, ROUND_FLOOR));
+    return this.securitizationLocked - this.securitizationPendingActivation;
   }
 
   /**
-   * Returns the amount of Argons available to match per treasury pool
+   * Returns the amount of securitization available to match per treasury pool
    */
   public activatedSecuritizationPerSlot(): bigint {
     const activated = this.activatedSecuritization();
@@ -197,6 +206,9 @@ export class Vault {
         xpubBytes = bytes;
       }
     }
+    if (securitizationRatio < 1 || securitizationRatio > 2) {
+      throw new Error('Securitization ratio must be between 1 and 2');
+    }
     const vaultParams = {
       terms: {
         // convert to fixed u128
@@ -252,4 +264,7 @@ export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
   readonly treasuryProfitSharing: BigNumber;
+}
+function bigNumberToBigInt(bn: BigNumber): bigint {
+  return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());
 }

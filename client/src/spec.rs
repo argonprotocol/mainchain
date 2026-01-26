@@ -3796,9 +3796,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				231u8, 8u8, 15u8, 197u8, 32u8, 79u8, 151u8, 35u8, 157u8, 1u8, 131u8, 227u8, 246u8,
-				29u8, 222u8, 242u8, 198u8, 94u8, 157u8, 12u8, 116u8, 186u8, 84u8, 104u8, 214u8,
-				18u8, 123u8, 181u8, 19u8, 145u8, 69u8, 0u8,
+				6u8, 181u8, 119u8, 85u8, 39u8, 52u8, 196u8, 223u8, 95u8, 132u8, 241u8, 100u8, 11u8,
+				236u8, 208u8, 192u8, 9u8, 254u8, 38u8, 115u8, 21u8, 149u8, 163u8, 162u8, 67u8,
+				29u8, 251u8, 243u8, 86u8, 213u8, 111u8, 103u8,
 			]
 	}
 	pub mod system {
@@ -4916,10 +4916,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							7u8, 177u8, 213u8, 60u8, 27u8, 205u8, 96u8, 20u8, 219u8, 135u8, 219u8,
-							191u8, 127u8, 57u8, 114u8, 216u8, 215u8, 145u8, 99u8, 51u8, 235u8,
-							220u8, 171u8, 188u8, 168u8, 74u8, 114u8, 181u8, 90u8, 19u8, 17u8,
-							172u8,
+							235u8, 11u8, 111u8, 7u8, 203u8, 166u8, 1u8, 49u8, 233u8, 117u8, 76u8,
+							30u8, 122u8, 170u8, 182u8, 134u8, 225u8, 119u8, 227u8, 141u8, 52u8,
+							133u8, 61u8, 10u8, 54u8, 136u8, 19u8, 61u8, 175u8, 49u8, 241u8, 243u8,
 						],
 					)
 				}
@@ -10062,7 +10061,7 @@ pub mod api {
 			pub struct FundsLocked {
 				pub vault_id: funds_locked::VaultId,
 				pub locker: funds_locked::Locker,
-				pub amount: funds_locked::Amount,
+				pub liquidity_promised: funds_locked::LiquidityPromised,
 				pub is_ratchet: funds_locked::IsRatchet,
 				pub fee_revenue: funds_locked::FeeRevenue,
 				pub did_use_fee_coupon: funds_locked::DidUseFeeCoupon,
@@ -10071,7 +10070,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type Locker = crate::types::AccountId32;
-				pub type Amount = ::core::primitive::u128;
+				pub type LiquidityPromised = ::core::primitive::u128;
 				pub type IsRatchet = ::core::primitive::bool;
 				pub type FeeRevenue = ::core::primitive::u128;
 				pub type DidUseFeeCoupon = ::core::primitive::bool;
@@ -10111,13 +10110,13 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct FundsScheduledForRelease {
 				pub vault_id: funds_scheduled_for_release::VaultId,
-				pub amount: funds_scheduled_for_release::Amount,
+				pub securitization: funds_scheduled_for_release::Securitization,
 				pub release_height: funds_scheduled_for_release::ReleaseHeight,
 			}
 			pub mod funds_scheduled_for_release {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type Amount = ::core::primitive::u128;
+				pub type Securitization = ::core::primitive::u128;
 				pub type ReleaseHeight = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FundsScheduledForRelease {
@@ -10159,12 +10158,12 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct FundsReleased {
 				pub vault_id: funds_released::VaultId,
-				pub amount: funds_released::Amount,
+				pub securitization: funds_released::Securitization,
 			}
 			pub mod funds_released {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
-				pub type Amount = ::core::primitive::u128;
+				pub type Securitization = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FundsReleased {
 				const PALLET: &'static str = "Vaults";
@@ -10328,9 +10327,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							86u8, 186u8, 33u8, 144u8, 69u8, 244u8, 166u8, 28u8, 250u8, 129u8,
-							151u8, 163u8, 35u8, 82u8, 190u8, 244u8, 26u8, 25u8, 140u8, 3u8, 155u8,
-							182u8, 179u8, 30u8, 90u8, 138u8, 114u8, 121u8, 94u8, 44u8, 23u8, 48u8,
+							201u8, 242u8, 56u8, 173u8, 214u8, 168u8, 165u8, 114u8, 60u8, 115u8,
+							218u8, 229u8, 156u8, 253u8, 26u8, 56u8, 212u8, 217u8, 168u8, 209u8,
+							141u8, 198u8, 13u8, 176u8, 167u8, 187u8, 39u8, 1u8, 120u8, 250u8,
+							246u8, 212u8,
 						],
 					)
 				}
@@ -10352,9 +10352,10 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							86u8, 186u8, 33u8, 144u8, 69u8, 244u8, 166u8, 28u8, 250u8, 129u8,
-							151u8, 163u8, 35u8, 82u8, 190u8, 244u8, 26u8, 25u8, 140u8, 3u8, 155u8,
-							182u8, 179u8, 30u8, 90u8, 138u8, 114u8, 121u8, 94u8, 44u8, 23u8, 48u8,
+							201u8, 242u8, 56u8, 173u8, 214u8, 168u8, 165u8, 114u8, 60u8, 115u8,
+							218u8, 229u8, 156u8, 253u8, 26u8, 56u8, 212u8, 217u8, 168u8, 209u8,
+							141u8, 198u8, 13u8, 176u8, 167u8, 187u8, 39u8, 1u8, 120u8, 250u8,
+							246u8, 212u8,
 						],
 					)
 				}
@@ -11371,6 +11372,7 @@ pub mod api {
 				pub utxo_id: bitcoin_lock_created::UtxoId,
 				pub vault_id: bitcoin_lock_created::VaultId,
 				pub liquidity_promised: bitcoin_lock_created::LiquidityPromised,
+				pub securitization: bitcoin_lock_created::Securitization,
 				pub locked_market_rate: bitcoin_lock_created::LockedMarketRate,
 				pub account_id: bitcoin_lock_created::AccountId,
 				pub security_fee: bitcoin_lock_created::SecurityFee,
@@ -11380,6 +11382,7 @@ pub mod api {
 				pub type UtxoId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
 				pub type LiquidityPromised = ::core::primitive::u128;
+				pub type Securitization = ::core::primitive::u128;
 				pub type LockedMarketRate = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 				pub type SecurityFee = ::core::primitive::u128;
@@ -11700,9 +11703,10 @@ pub mod api {
 						"LocksByUtxoId",
 						(),
 						[
-							121u8, 55u8, 242u8, 201u8, 200u8, 241u8, 153u8, 37u8, 110u8, 156u8,
-							96u8, 55u8, 144u8, 29u8, 109u8, 110u8, 213u8, 177u8, 3u8, 236u8, 135u8,
-							15u8, 160u8, 110u8, 51u8, 163u8, 166u8, 7u8, 80u8, 195u8, 70u8, 65u8,
+							168u8, 195u8, 44u8, 252u8, 156u8, 236u8, 78u8, 157u8, 113u8, 148u8,
+							118u8, 35u8, 51u8, 90u8, 58u8, 203u8, 159u8, 132u8, 210u8, 216u8,
+							216u8, 248u8, 31u8, 213u8, 241u8, 41u8, 227u8, 14u8, 221u8, 16u8, 60u8,
+							182u8,
 						],
 					)
 				}
@@ -11724,9 +11728,10 @@ pub mod api {
 						"LocksByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							121u8, 55u8, 242u8, 201u8, 200u8, 241u8, 153u8, 37u8, 110u8, 156u8,
-							96u8, 55u8, 144u8, 29u8, 109u8, 110u8, 213u8, 177u8, 3u8, 236u8, 135u8,
-							15u8, 160u8, 110u8, 51u8, 163u8, 166u8, 7u8, 80u8, 195u8, 70u8, 65u8,
+							168u8, 195u8, 44u8, 252u8, 156u8, 236u8, 78u8, 157u8, 113u8, 148u8,
+							118u8, 35u8, 51u8, 90u8, 58u8, 203u8, 159u8, 132u8, 210u8, 216u8,
+							216u8, 248u8, 31u8, 213u8, 241u8, 41u8, 227u8, 14u8, 221u8, 16u8, 60u8,
+							182u8,
 						],
 					)
 				}
@@ -25595,10 +25600,10 @@ pub mod api {
 					#[codec(compact)]
 					pub securitization: _1,
 					#[codec(compact)]
-					pub argons_locked: _1,
+					pub securitization_locked: _1,
 					#[codec(compact)]
-					pub argons_pending_activation: _1,
-					pub argons_scheduled_for_release:
+					pub securitization_pending_activation: _1,
+					pub securitization_release_schedule:
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
 							_1,
@@ -28066,6 +28071,7 @@ pub mod api {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						liquidity_promised: ::core::primitive::u128,
+						securitization: ::core::primitive::u128,
 						locked_market_rate: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 						security_fee: ::core::primitive::u128,
@@ -28240,10 +28246,15 @@ pub mod api {
 				pub struct LockedBitcoin {
 					#[codec(compact)]
 					pub vault_id: ::core::primitive::u32,
+					#[codec(compact)]
 					pub liquidity_promised: ::core::primitive::u128,
+					#[codec(compact)]
 					pub locked_market_rate: ::core::primitive::u128,
 					pub owner_account: crate::types::AccountId32,
+					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					#[codec(compact)]
 					pub security_fees: ::core::primitive::u128,
+					#[codec(compact)]
 					pub coupon_paid_fees: ::core::primitive::u128,
 					#[codec(compact)]
 					pub satoshis: ::core::primitive::u64,
@@ -28273,6 +28284,7 @@ pub mod api {
 							::core::primitive::u64,
 							::core::primitive::u128,
 						>,
+					#[codec(compact)]
 					pub created_at_argon_block: ::core::primitive::u32,
 				}
 				#[derive(
@@ -32394,7 +32406,7 @@ pub mod api {
 					FundsLocked {
 						vault_id: ::core::primitive::u32,
 						locker: crate::types::AccountId32,
-						amount: ::core::primitive::u128,
+						liquidity_promised: ::core::primitive::u128,
 						is_ratchet: ::core::primitive::bool,
 						fee_revenue: ::core::primitive::u128,
 						did_use_fee_coupon: ::core::primitive::bool,
@@ -32407,7 +32419,7 @@ pub mod api {
 					#[codec(index = 10)]
 					FundsScheduledForRelease {
 						vault_id: ::core::primitive::u32,
-						amount: ::core::primitive::u128,
+						securitization: ::core::primitive::u128,
 						release_height: ::core::primitive::u64,
 					},
 					#[codec(index = 11)]
@@ -32420,7 +32432,7 @@ pub mod api {
 					#[codec(index = 12)]
 					FundsReleased {
 						vault_id: ::core::primitive::u32,
-						amount: ::core::primitive::u128,
+						securitization: ::core::primitive::u128,
 					},
 					#[codec(index = 13)]
 					FundsReleasedError {

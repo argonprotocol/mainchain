@@ -36,10 +36,11 @@ pub mod pallet {
 		},
 		vault::{BitcoinVaultProvider, TreasuryVaultProvider, Vault, VaultError, VaultTerms},
 	};
+	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::{
 		OnNewSlot,
-		vault::{LockExtension, VaultTreasuryFrameEarnings},
+		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(11);
@@ -66,7 +67,8 @@ pub mod pallet {
 			+ From<u128>
 			+ TryInto<u128>
 			+ TypeInfo
-			+ MaxEncodedLen;
+			+ MaxEncodedLen
+			+ Sum;
 
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
@@ -225,7 +227,7 @@ pub mod pallet {
 		FundsLocked {
 			vault_id: VaultId,
 			locker: T::AccountId,
-			amount: T::Balance,
+			liquidity_promised: T::Balance,
 			is_ratchet: bool,
 			fee_revenue: T::Balance,
 			did_use_fee_coupon: bool,
@@ -236,7 +238,7 @@ pub mod pallet {
 		},
 		FundsScheduledForRelease {
 			vault_id: VaultId,
-			amount: T::Balance,
+			securitization: T::Balance,
 			release_height: BitcoinHeight,
 		},
 		LostBitcoinCompensated {
@@ -247,7 +249,7 @@ pub mod pallet {
 		},
 		FundsReleased {
 			vault_id: VaultId,
-			amount: T::Balance,
+			securitization: T::Balance,
 		},
 		FundsReleasedError {
 			vault_id: VaultId,
@@ -418,7 +420,11 @@ pub mod pallet {
 			let VaultConfig { securitization_ratio, securitization, terms, bitcoin_xpubkey } =
 				vault_config;
 
-			ensure!(securitization_ratio >= FixedU128::one(), Error::<T>::InvalidSecuritization);
+			ensure!(
+				securitization_ratio >= FixedU128::one() &&
+					securitization_ratio <= FixedU128::from_u32(2),
+				Error::<T>::InvalidSecuritization
+			);
 
 			let xpub: BitcoinXPub = bitcoin_xpubkey.try_into().map_err(|e| {
 				log::error!("Unable to decode xpubkey: {:?}", e);
@@ -449,14 +455,14 @@ pub mod pallet {
 			let vault = Vault {
 				operator_account_id: who.clone(),
 				securitization,
-				argons_locked: 0u32.into(),
+				securitization_locked: 0u32.into(),
 				terms,
 				securitization_ratio,
 				opened_tick,
-				argons_scheduled_for_release: Default::default(),
+				securitization_release_schedule: Default::default(),
 				is_closed: false,
 				pending_terms: None,
-				argons_pending_activation: 0u32.into(),
+				securitization_pending_activation: 0u32.into(),
 			};
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
@@ -496,7 +502,8 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
 			ensure!(
-				securitization_ratio >= vault.securitization_ratio,
+				securitization_ratio >= FixedU128::one() &&
+					securitization_ratio <= FixedU128::from_u32(2),
 				Error::<T>::InvalidSecuritization
 			);
 
@@ -508,19 +515,16 @@ pub mod pallet {
 				Self::hold(&who, (amount_to_hold as u128).into(), HoldReason::EnterVault)
 					.map_err(Error::<T>::from)?;
 			} else if amount_to_hold < 0 {
-				Self::release_hold(
-					&who,
-					amount_to_hold.unsigned_abs().into(),
-					HoldReason::EnterVault,
-				)?;
+				let amount_to_release: T::Balance = (amount_to_hold.unsigned_abs()).into();
+				ensure!(
+					amount_to_release <= vault.uninhibited_securitization(),
+					Error::<T>::VaultReductionBelowSecuritization
+				);
+				Self::release_hold(&who, amount_to_release, HoldReason::EnterVault)?;
 			}
 
 			vault.securitization = securitization;
 			vault.securitization_ratio = securitization_ratio;
-			ensure!(
-				securitization >= vault.get_minimum_securitization_needed(),
-				Error::<T>::VaultReductionBelowSecuritization
-			);
 
 			Self::deposit_event(Event::VaultModified {
 				vault_id,
@@ -728,7 +732,7 @@ pub mod pallet {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
 			let swept = vault.sweep_released(block_height);
-			Self::deposit_event(Event::FundsReleased { vault_id, amount: swept });
+			Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
 			if vault.is_closed {
 				Self::shrink_vault_securitization(&mut vault)?;
 			}
@@ -739,10 +743,9 @@ pub mod pallet {
 		fn shrink_vault_securitization(
 			vault: &mut Vault<T::AccountId, T::Balance>,
 		) -> Result<(), VaultError> {
-			let minimum_securitization = vault.get_minimum_securitization_needed();
-			let free_securitization = vault.securitization.saturating_sub(minimum_securitization);
+			let free_securitization = vault.uninhibited_securitization();
 
-			vault.securitization = minimum_securitization;
+			vault.securitization.saturating_reduce(free_securitization);
 
 			ensure!(
 				T::Currency::balance_on_hold(
@@ -836,7 +839,7 @@ pub mod pallet {
 			}
 			let swept = vault.sweep_released(current_height);
 			if !swept.is_zero() {
-				Self::deposit_event(Event::FundsReleased { vault_id, amount: swept });
+				Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
 			}
 			Ok(())
 		}
@@ -857,7 +860,9 @@ pub mod pallet {
 							// gather activation and securitization for the ending frame
 							let vault =
 								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-							revenue.update_securitization(&vault, ended_frame_id);
+							revenue.securitization_activated = vault.get_activated_securitization();
+							revenue.securitization_relockable = vault.get_relock_capacity();
+							revenue.securitization = vault.securitization;
 						}
 						if revenue.frame_id <= collect_expired_frame &&
 							revenue.uncollected_revenue > T::Balance::zero()
@@ -1006,10 +1011,16 @@ pub mod pallet {
 			VaultIdByOperator::<T>::get(account_id)
 		}
 
+		fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {
+			let vault =
+				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
+			Ok(vault.securitization_ratio)
+		}
+
 		fn lock(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			liquidity_promised: T::Balance,
+			securitization: &Securitization<Self::Balance>,
 			satoshis: Satoshis,
 			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
 			mut has_fee_coupon: bool,
@@ -1024,7 +1035,7 @@ pub mod pallet {
 
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
 			ensure!(
-				vault.available_for_lock() >= liquidity_promised,
+				vault.available_for_lock() >= securitization.collateral_required,
 				VaultError::InsufficientVaultFunds
 			);
 
@@ -1034,7 +1045,7 @@ pub mod pallet {
 				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
 
 				apr.saturating_mul(term)
-					.saturating_mul_int(liquidity_promised)
+					.saturating_mul_int(securitization.liquidity_promised)
 					.saturating_add(base_fee)
 			};
 			if vault.operator_account_id == *account_id {
@@ -1043,7 +1054,7 @@ pub mod pallet {
 
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total_fees {:?} (has_fee_coupon: {})",
-				liquidity_promised,
+				securitization.collateral_required,
 				total_fee,
 				has_fee_coupon
 			);
@@ -1054,7 +1065,7 @@ pub mod pallet {
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
 				has_fee_coupon,
-				securitization_locked: liquidity_promised,
+				securitization_locked: securitization.collateral_required,
 				securitization_released: 0u32.into(),
 				satoshis_locked: satoshis,
 				satoshis_released: 0,
@@ -1081,15 +1092,15 @@ pub mod pallet {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
 				// locked funds, they must be getting a new expiration of > 1 year from their
 				// original date
-				vault.extend_lock(liquidity_promised, extension)?;
+				vault.extend_lock(securitization, extension)?;
 			} else {
-				vault.lock(liquidity_promised)?;
+				vault.lock(securitization)?;
 			}
 
 			Self::deposit_event(Event::FundsLocked {
 				vault_id,
 				locker: account_id.clone(),
-				amount: liquidity_promised,
+				liquidity_promised: securitization.liquidity_promised,
 				fee_revenue: total_fee,
 				did_use_fee_coupon: has_fee_coupon,
 				is_ratchet,
@@ -1100,7 +1111,7 @@ pub mod pallet {
 
 		fn schedule_for_release(
 			vault_id: VaultId,
-			liquidity_promised: T::Balance,
+			securitization: &Securitization<Self::Balance>,
 			satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<(), VaultError> {
@@ -1110,18 +1121,18 @@ pub mod pallet {
 				total_fee: 0u32.into(),
 				has_fee_coupon: false,
 				securitization_locked: 0u32.into(),
-				securitization_released: liquidity_promised,
+				securitization_released: securitization.collateral_required,
 				satoshis_locked: 0,
 				satoshis_released: satoshis,
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			let release_heights = vault.schedule_for_release(liquidity_promised, lock_extension)?;
+			let release_heights = vault.schedule_for_release(securitization, lock_extension)?;
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
-				amount: liquidity_promised,
+				securitization: securitization.collateral_required,
 				release_height: lock_extension.lock_expiration,
 			});
 
@@ -1131,25 +1142,25 @@ pub mod pallet {
 		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
 		/// activity, like not moving cosigned UTXOs in the appropriate timeframe.
 		///
-		/// The compensation is up to the market rate but capped at the securitization rate of the
-		/// vault.
+		/// The compensation is up to the market rate but capped at the securitization of the lock.
 		///
 		/// Returns the amount sent to the beneficiary.
 		fn compensate_lost_bitcoin(
 			vault_id: VaultId,
 			beneficiary: &T::AccountId,
-			original_lock_amount: Self::Balance,
+			securitization: &Securitization<Self::Balance>,
 			market_rate: Self::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<Self::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result = vault.burn(original_lock_amount, market_rate, lock_extension)?;
+			let burn_result = vault.burn(securitization, market_rate, lock_extension)?;
 
 			let securitized_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
-			let to_beneficiary = securitized_amount.saturating_sub(original_lock_amount);
+			let to_beneficiary =
+				securitized_amount.saturating_sub(securitization.liquidity_promised);
 			if !to_beneficiary.is_zero() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::EnterVault.into(),
@@ -1188,13 +1199,13 @@ pub mod pallet {
 		/// Burn the funds from the vault.
 		fn burn(
 			vault_id: VaultId,
-			liquidity_promised: T::Balance,
+			securitization: &Securitization<Self::Balance>,
 			market_rate: T::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result = vault.burn(liquidity_promised, market_rate, lock_extension)?;
+			let burn_result = vault.burn(securitization, market_rate, lock_extension)?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
@@ -1263,18 +1274,24 @@ pub mod pallet {
 			))
 		}
 
-		fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
+		fn remove_pending(
+			vault_id: VaultId,
+			securitization: &Securitization<Self::Balance>,
+		) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.argons_pending_activation.saturating_reduce(amount);
+				vault.did_confirm_pending_activation(securitization);
 				Ok(())
 			})
 		}
 
-		fn cancel(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
+		fn cancel(
+			vault_id: VaultId,
+			securitization: &Securitization<Self::Balance>,
+		) -> Result<(), VaultError> {
 			VaultsById::<T>::mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.release_locked_funds(amount);
+				vault.release_lock(securitization);
 
 				// after reducing the bonded, we can check the minimum securitization needed
 				if vault.is_closed {
@@ -1282,7 +1299,10 @@ pub mod pallet {
 				}
 				Ok::<(), VaultError>(())
 			})?;
-			Self::deposit_event(Event::FundLockCanceled { vault_id, amount });
+			Self::deposit_event(Event::FundLockCanceled {
+				vault_id,
+				amount: securitization.collateral_required,
+			});
 
 			Ok(())
 		}
@@ -1427,8 +1447,7 @@ pub mod pallet {
 			if current_frame_id >= self.frame_id {
 				self.securitization = vault.securitization;
 				self.securitization_activated = vault.get_activated_securitization();
-				self.securitization_relockable =
-					vault.securitization_ratio.saturating_mul_int(vault.get_relock_capacity());
+				self.securitization_relockable = vault.get_relock_capacity();
 			}
 		}
 	}

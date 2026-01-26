@@ -14,7 +14,7 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	ensure,
-	vault::{BitcoinVaultProvider, LockExtension, Vault, VaultError, VaultTerms},
+	vault::{BitcoinVaultProvider, LockExtension, Securitization, Vault, VaultError, VaultTerms},
 };
 use frame_support::traits::Currency;
 
@@ -76,7 +76,7 @@ parameter_types! {
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		securitization:  200_000_000_000,
-		argons_locked: 0,
+		securitization_locked: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
@@ -85,10 +85,10 @@ parameter_types! {
 		opened_tick: 1,
 		operator_account_id: 1,
 		securitization_ratio: FixedU128::from_float(1.0),
-		argons_scheduled_for_release: BoundedBTreeMap::new(),
+		securitization_release_schedule: BoundedBTreeMap::new(),
 		is_closed: false,
 		pending_terms: None,
-		argons_pending_activation: 0,
+		securitization_pending_activation: 0,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
@@ -191,39 +191,42 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		None
 	}
 
-	fn cancel(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
+	fn cancel(
+		vault_id: VaultId,
+		securitization: &Securitization<Balance>,
+	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|v| {
-			v.release_locked_funds(amount);
+			v.release_lock(securitization);
 		});
-		CanceledLocks::mutate(|a| a.push((vault_id, amount)));
+		CanceledLocks::mutate(|a| a.push((vault_id, securitization.liquidity_promised)));
 		Ok(())
 	}
 
 	fn lock(
 		_vault_id: VaultId,
 		locker: &Self::AccountId,
-		amount: Self::Balance,
+		securitization: &Securitization<Balance>,
 		_satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
 		_has_fee_coupon: bool,
 	) -> Result<Self::Balance, VaultError> {
 		ensure!(
-			DefaultVault::get().available_for_lock() >= amount,
+			DefaultVault::get().available_for_lock() >= securitization.collateral_required,
 			VaultError::InsufficientVaultFunds
 		);
 		let term = extension.as_ref().map(|(a, _)| *a).unwrap_or(FixedU128::one());
 		DefaultVault::mutate(|a| {
 			if let Some((_, lock_extension)) = extension {
-				a.extend_lock(amount, lock_extension)
+				a.extend_lock(securitization, lock_extension)
 			} else {
-				a.lock(amount)
+				a.lock(securitization)
 			}
 		})?;
 		let terms = DefaultVault::get().terms.clone();
 		let total_fee = terms
 			.bitcoin_annual_percent_rate
 			.saturating_mul(term)
-			.saturating_mul_int(amount)
+			.saturating_mul_int(securitization.liquidity_promised)
 			.saturating_add(terms.bitcoin_base_fee);
 		if ChargeFee::get() {
 			Balances::burn_from(
@@ -240,34 +243,33 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn schedule_for_release(
 		_vault_id: VaultId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Balance>,
 		_satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|a| a.schedule_for_release(liquidity_promised, lock_extensions))?;
+		DefaultVault::mutate(|a| a.schedule_for_release(securitization, lock_extensions))?;
 		Ok(())
 	}
 
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Balance>,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
-		let result =
-			DefaultVault::mutate(|a| a.burn(liquidity_promised, market_rate, lock_extension))?;
+		let result = DefaultVault::mutate(|a| a.burn(securitization, market_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Balance>,
 		redemption_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(liquidity_promised, redemption_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(securitization, redemption_rate, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 
@@ -299,9 +301,13 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		))
 	}
 
-	fn remove_pending(_vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError> {
+	fn remove_pending(
+		_vault_id: VaultId,
+		securitization: &Securitization<Balance>,
+	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|a| {
-			a.argons_pending_activation.saturating_reduce(amount);
+			a.securitization_pending_activation
+				.saturating_reduce(securitization.collateral_required);
 		});
 		Ok(())
 	}
@@ -337,6 +343,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			}
 		});
 		Ok(())
+	}
+
+	fn get_securitization_ratio(_vault_id: VaultId) -> Result<FixedU128, VaultError> {
+		Ok(DefaultVault::get().securitization_ratio)
 	}
 }
 
