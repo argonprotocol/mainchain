@@ -169,8 +169,6 @@ jobs:
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-oracle
-          # TODO: deactivate building in this feature when we have price liquidity
-          features: simulated-prices
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}

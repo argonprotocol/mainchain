@@ -11,7 +11,7 @@ use sdk_core::prelude::*;
 use sp_runtime::FixedU128;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::{error, trace};
+use tracing::{error, trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
 
@@ -92,9 +92,13 @@ impl UniswapOracle {
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
 		let float = scaled_numerator.to_u128().map_err(|_| anyhow!("Failed to convert to u128"))?;
 
+		// Liquidity basis is computed in raw ARGON units (18 decimals). Scale to mainchain units (6
+		// decimals).
+		let liquidity_mainchain_units = liquidity / BigInt::from(10u128.pow(12));
+
 		Ok(PriceAndLiquidity {
 			price: FixedU128::from_inner(float),
-			liquidity: Balance::try_from(liquidity)
+			liquidity: Balance::try_from(liquidity_mainchain_units)
 				.map_err(|e| anyhow!("Failed to convert liquidity  {:?}", e))?,
 		})
 	}
@@ -116,12 +120,15 @@ impl UniswapOracle {
 		let token_0_amount = get_amount_0_delta(sqrt_lower, sqrt_upper, liquidity_u128, false)?;
 		let token_1_amount = get_amount_1_delta(sqrt_lower, sqrt_upper, liquidity_u128, false)?;
 
-		// Now convert to token units:
-		// Argon is in base 18 in ethereum, but we need to convert to base 6 (to match mainchain)
-		let argon_tokens = token_0_amount / U256::from(10u128.pow(12));
-		let usdc_tokens = token_1_amount;
+		// Keep reserves in raw token units as returned by Uniswap math:
+		// - token0 (ARGON) is 18 decimals
+		// - token1 (USDC) is 6 decimals
+		// Converting ARGON down to 6 decimals here can truncate small in-range amounts to 0,
+		// which then makes our liquidity basis collapse right after swaps.
+		let argon_raw = token_0_amount;
+		let usdc_raw = token_1_amount;
 
-		Ok((usdc_tokens, argon_tokens))
+		Ok((usdc_raw, argon_raw))
 	}
 
 	/// Calculate time weighted average price (twap) and liquidity for a given fee tier
@@ -177,16 +184,19 @@ impl UniswapOracle {
 		// Compute real-time reserves and effective liquidity in ARGON units
 		let (usdc_reserve, argon_reserve) = self.get_active_liquidity_reserves(fee).await?;
 
-		let spot_price = price.to_decimal();
-		// spot_price = numerator / denominator  (ARGON per 1 USDC)
-		let usdc_in_argon = if spot_price.is_positive() {
-			U256::from_big_int((usdc_reserve.to_big_decimal() / spot_price).to_big_int())
+		// Convert USDC reserve (token1) into ARGON units (token0) using the Price fraction.
+		// `price` here is USDC per 1 ARGON (quote/base). So:
+		//   argon_from_usdc_raw = usdc_raw * price.denominator / price.numerator
+		// This avoids decimal rounding and preserves small-but-real in-range liquidity.
+		let usdc_as_big_int = usdc_reserve.to_big_int();
+		let usdc_in_argon_raw = if price.numerator != BigInt::zero() {
+			U256::from_big_int((usdc_as_big_int * price.denominator) / price.numerator)
 		} else {
 			U256::ZERO
 		};
 
-		// Effective liquidity is the minimum of ARGON reserve and USDC (in ARGON units)
-		let effective_liquidity_argon = argon_reserve.min(usdc_in_argon);
+		// Effective liquidity is the minimum of ARGON reserve and USDC (converted into ARGON units)
+		let effective_liquidity_argon = argon_reserve.min(usdc_in_argon_raw);
 
 		Ok((price, effective_liquidity_argon.to_big_int()))
 	}
@@ -198,17 +208,22 @@ impl UniswapOracle {
 		let mut total_liquidity = BigInt::zero();
 
 		for &fee in &self.fee_tiers {
-			if let Ok((price, current_liquidity)) = self.get_twap_and_liquidity_basis(fee).await {
-				trace!(
-					?current_liquidity,
-					"Got twap for {:?}. Price {:?}, liquidity {:?}",
-					fee,
-					price.to_fixed(3, None),
-					current_liquidity
-				);
-				total_liquidity += current_liquidity;
-				total_numerator += price.numerator * current_liquidity;
-				total_denominator += price.denominator * current_liquidity;
+			match self.get_twap_and_liquidity_basis(fee).await {
+				Err(e) => {
+					warn!(fee = ?fee, message = e.to_string(), "Could not get TWAP and liquidity basis for fee tier, skipping");
+					continue;
+				},
+				Ok((price, current_liquidity)) => {
+					trace!(
+						fee = ?fee,
+						price = %price.to_fixed(3, None),
+						current_liquidity = ?current_liquidity,
+						"Got TWAP and liquidity basis"
+					);
+					total_liquidity += current_liquidity;
+					total_numerator += price.numerator * current_liquidity;
+					total_denominator += price.denominator * current_liquidity;
+				},
 			}
 		}
 
@@ -300,8 +315,13 @@ mod test {
 			})
 			.expect("Failed to get price");
 		println!("Price: {:?}", price);
-		// should be around 1.0
-		assert!((price.price.to_float() - 1.0).abs() < 0.1);
-		assert!(price.liquidity > 1000);
+		if LOOKUP_TOKEN_ADDRESS == ARGONOT_ADDRESS {
+			// ARGONOT is a floating coin
+			assert!(price.price.to_float() < 0.1);
+		} else {
+			// should be around 1.0
+			assert!((price.price.to_float() - 1.0).abs() < 0.1);
+			assert!(price.liquidity > 1000);
+		}
 	}
 }

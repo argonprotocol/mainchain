@@ -87,7 +87,7 @@ jobs:
         run: cargo sqlx database setup
 
       - name: Build
-        run: cargo build --target=${{ matrix.target }} --features=simulated-prices --bins
+        run: cargo build --target=${{ matrix.target }} --bins
         env:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

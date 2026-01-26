@@ -435,7 +435,31 @@ services:
        --keystore-path=/keystore
        --signer-crypto=sr25519
        --signer-address=5Hn1p9jNYatcvcyugRc3TRyfC6zvFGTAX4qe14RhqBYcfrkE
-      ${SIMULATE_PRICES:+--simulate-prices}
+       --from-file-path=/price_index.json
+    volumes:
+      - oracle-price-keystore:/keystore
+      - /tmp/oracle/data/:/tmp/oracle/data/
+      - ${PRICE_INDEX_FILE_PATH:-./oracle/test-price-index.json}:/price_index.json:ro
+    environment:
+      - TRUSTED_RPC_URL=ws://archive-node:9944
+    profiles:
+      - price-oracle
+      - all
+
+  # Live price oracle mode (no file override). Use with:
+  #   docker compose --profile price-oracle-live up -d oracle-price-live
+  oracle-price-live:
+    <<: *oracle
+    depends_on:
+      oracle-price-insert-key:
+        condition: service_completed_successfully
+      archive-node:
+        condition: service_healthy
+    command: >
+      price-index
+       --keystore-path=/keystore
+       --signer-crypto=sr25519
+       --signer-address=5Hn1p9jNYatcvcyugRc3TRyfC6zvFGTAX4qe14RhqBYcfrkE
     volumes:
       - oracle-price-keystore:/keystore
       - /tmp/oracle/data/:/tmp/oracle/data/
@@ -446,10 +470,8 @@ services:
       - BLS_API_KEY=${BLS_API_KEY}
       - INFURA_PROJECT_ID=${INFURA_PROJECT_ID}
       - ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json
-      - SIMULATE_PRICES=${SIMULATE_PRICES:-false}
     profiles:
-      - price-oracle
-      - all
+      - price-oracle-live
 
 networks:
   default:

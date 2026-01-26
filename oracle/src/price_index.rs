@@ -1,7 +1,8 @@
-use std::{env, time::Duration};
+use std::{env, fs, time::Duration};
 
 use anyhow::{anyhow, ensure};
 use polkadot_sdk::*;
+use serde::{Deserialize, Deserializer, Serialize};
 use sp_runtime::{
 	FixedU128, Saturating,
 	traits::{One, Zero},
@@ -21,23 +22,40 @@ use argon_client::{
 };
 use argon_primitives::prelude::sp_arithmetic::FixedPointNumber;
 
+fn fixed_u128_from_float<'de, D>(deserializer: D) -> Result<FixedU128, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let value = f64::deserialize(deserializer)?;
+	Ok(FixedU128::from_float(value))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PriceIndex {
+	#[serde(deserialize_with = "fixed_u128_from_float")]
+	pub argon_usd_target_price: FixedU128,
+	#[serde(deserialize_with = "fixed_u128_from_float")]
+	pub argon_usd_price: FixedU128,
+	pub argon_time_weighted_average_liquidity: u128,
+	#[serde(deserialize_with = "fixed_u128_from_float")]
+	pub argonot_usd_price: FixedU128,
+	#[serde(deserialize_with = "fixed_u128_from_float")]
+	pub btc_usd_price: FixedU128,
+}
+
 pub async fn price_index_loop(
 	trusted_rpc_url: String,
 	signer: KeystoreSigner,
-	use_simulated_schedule: bool,
 	coin_price_providers: Vec<PriceProviderKind>,
 ) -> anyhow::Result<()> {
 	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
 	let mainchain_client = reconnecting_client.get().await?;
 
-	if use_simulated_schedule {
-		let chain_info = mainchain_client.methods.system_chain().await?;
-		ensure!(
-			chain_info.contains("Development") || chain_info.contains("Testnet"),
-			"Simulated schedule can only be used on development chain"
-		);
-		#[cfg(not(feature = "simulated-prices"))]
-		panic!("Simulated prices not enabled")
+	let mut is_test = false;
+
+	let chain_info = mainchain_client.methods.system_chain().await?;
+	if chain_info.contains("Development") || chain_info.contains("Testnet") {
+		is_test = true;
 	}
 
 	let mut ticker = mainchain_client.lookup_ticker().await?;
@@ -110,48 +128,44 @@ pub async fn price_index_loop(
 			last_target_price.saturating_sub(max_argon_target_change_per_tick),
 			last_target_price.saturating_add(max_argon_target_change_per_tick),
 		);
-		let price_result = if use_simulated_schedule {
-			#[cfg(not(feature = "simulated-prices"))]
-			{
-				unreachable!("Simulated prices not enabled")
-			}
-			#[cfg(feature = "simulated-prices")]
-			argon_price_lookup
-				.get_simulated_price_and_liquidity(
-					target_price,
-					tick,
-					max_argon_change_per_tick_away_from_target,
-				)
-				.await
-		} else {
-			argon_price_lookup
-				.get_latest_price_and_liquidity(
-					tick,
-					max_argon_change_per_tick_away_from_target,
-					usd_price_lookup.usdc,
-				)
-				.await
-		};
+		let price_result = argon_price_lookup
+			.get_latest_price_and_liquidity(
+				tick,
+				max_argon_change_per_tick_away_from_target,
+				usd_price_lookup.usdc,
+			)
+			.await;
 
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
-			Err(e) => {
-				tracing::warn!(
-					"Couldn't update argon prices. Using target {} {:?}",
-					target_price,
-					e
-				);
-				PriceAndLiquidity { price: target_price, liquidity: 0 }
-			},
+			Err(e) =>
+				if is_test {
+					tracing::warn!(
+						"Couldn't update argon prices. Using target {} {:?}",
+						target_price,
+						e
+					);
+					PriceAndLiquidity { price: target_price, liquidity: 0 }
+				} else {
+					tracing::warn!("Couldn't update argon prices {:?}", e);
+					continue;
+				},
 		};
 
-		let argonot_price_lookup = argonot_price_lookup
+		let argonot_price_lookup = match argonot_price_lookup
 			.get_latest_price(usd_price_lookup.usdc)
 			.await
-			.unwrap_or_else(|e| {
-				tracing::warn!("Couldn't update argonot prices {:?}", e);
-				FixedU128::zero()
-			});
+		{
+			Ok(x) => x,
+			Err(e) =>
+				if is_test {
+					tracing::warn!("Couldn't update argonot prices, using default of 0 {:?}", e);
+					FixedU128::zero()
+				} else {
+					tracing::warn!("Couldn't update argonot prices {:?}", e);
+					continue;
+				},
+		};
 
 		let argon_liquidity = argon_usd_price.liquidity;
 		let argon_usd_price = trunc_fixed_u128(argon_usd_price.price, 3);
@@ -194,6 +208,83 @@ pub async fn price_index_loop(
 				e
 			})?;
 		}
+
+		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
+		sleep(sleep_time).await;
+	}
+}
+
+/// Development feature to load price index data from a file instead of live oracles. Many of the
+/// providers are rate limited, and this is the simplest way to simulate specific scenarios
+pub async fn price_index_loop_from_file(
+	trusted_rpc_url: String,
+	signer: KeystoreSigner,
+	file_path: String,
+) -> anyhow::Result<()> {
+	let mut reconnecting_client = ReconnectingClient::new(vec![trusted_rpc_url.clone()]);
+	let mainchain_client = reconnecting_client.get().await?;
+
+	let chain_info = mainchain_client.methods.system_chain().await?;
+	ensure!(
+		chain_info.contains("Development") || chain_info.contains("Testnet"),
+		"File-based price index can only be used on development chain"
+	);
+
+	let ticker = mainchain_client.lookup_ticker().await?;
+	let last_price = mainchain_client
+		.fetch_storage(&storage().price_index().current(), FetchAt::Best)
+		.await?;
+
+	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
+
+	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
+		.saturating_sub(Duration::from_secs(10))
+		.max(Duration::from_secs(5));
+	if cfg!(test) {
+		min_sleep_duration = Duration::from_millis(50);
+	}
+
+	info!("Oracle Started.");
+	let account_id = signer.account_id();
+
+	loop {
+		let tick = ticker.current();
+		if tick == last_submitted_tick {
+			let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
+			sleep(sleep_time).await;
+			continue;
+		}
+
+		let price_data_raw = fs::read_to_string(&file_path)
+			.map_err(|e| anyhow!("Failed to load price data from file: {:?}", e))?;
+		let price_data: PriceIndex = serde_json::from_str(&price_data_raw).map_err(|e| {
+			anyhow!("Failed to parse price data from file {:?}: {:?}", file_path, e)
+		})?;
+
+		let price_index = tx().price_index().submit(Index {
+			argon_usd_target_price: to_api_fixed_u128(price_data.argon_usd_target_price),
+			tick,
+			argon_usd_price: to_api_fixed_u128(price_data.argon_usd_price),
+			argon_time_weighted_average_liquidity: price_data.argon_time_weighted_average_liquidity,
+			argonot_usd_price: to_api_fixed_u128(price_data.argonot_usd_price),
+			btc_usd_price: to_api_fixed_u128(price_data.btc_usd_price),
+		});
+
+		let client = reconnecting_client.get().await?;
+		let nonce = client.get_account_nonce(&account_id).await?;
+		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
+		let progress = client
+			.live
+			.tx()
+			.sign_and_submit_then_watch(&price_index, &signer, params)
+			.await?;
+		last_submitted_tick = tick;
+
+		info!("Submitted price index with progress: {:?}", progress);
+		MainchainClient::wait_for_ext_in_block(progress, false).await.map_err(|e| {
+			tracing::warn!("Error processing price index!! {:?}", e);
+			e
+		})?;
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
@@ -248,7 +339,7 @@ mod tests {
 			env::set_var("INFURA_PROJECT_ID", "test");
 		}
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
-		spawn(price_index_loop(node.client.url.clone(), signer, false, vec![]));
+		spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
 		let argon_address = Address::from_str(ARGON_TOKEN_ADDRESS).unwrap();

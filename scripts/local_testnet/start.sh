@@ -137,7 +137,7 @@ echo -e "Starting a pricing oracle...\n\n"
 "$BASEDIR/target/debug/argon-oracle" insert-key --crypto-type=sr25519 --keystore-path /tmp/price_keystore  --suri //Eve
 ORACLE_CPI_CACHE_PATH=/tmp/oracle/data/US_CPI_State.json RUST_LOG=info "$BASEDIR/target/debug/argon-oracle" --keystore-path /tmp/price_keystore \
   --signer-crypto=sr25519 --signer-address=5HGjWAeFDfFCWPsjFQdVV2Msvz2XtMktvgocEZcCj68kUMaw \
-  -t ws://127.0.0.1:9944 price-index --simulate-prices   2>&1 | \
+  -t ws://127.0.0.1:9944 price-index --from-file-path=./oracle/test-price-index.json   2>&1 | \
   awk -v name="orclprc" '{printf "%-8s %s\n", name, $0; fflush()}' &
 
 wait

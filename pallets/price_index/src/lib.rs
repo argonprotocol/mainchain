@@ -190,16 +190,6 @@ pub mod pallet {
 			}
 			T::DbWeight::get().reads_writes(3, 2)
 		}
-
-		fn on_finalize(_: BlockNumberFor<T>) {
-			let Some(current) = Current::<T>::get() else {
-				return;
-			};
-			let current_tick = T::CurrentTick::get();
-			if current.tick < current_tick.saturating_sub(T::MaxDowntimeTicksBeforeReset::get()) {
-				Current::<T>::take();
-			}
-		}
 	}
 
 	#[pallet::call]
@@ -283,7 +273,9 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		fn get_current() -> Option<PriceIndex> {
 			let price = <Current<T>>::get()?;
-			if price.tick < T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get()) {
+			if price.tick <
+				T::CurrentTick::get().saturating_sub(T::MaxDowntimeTicksBeforeReset::get())
+			{
 				return None;
 			}
 			Some(price)

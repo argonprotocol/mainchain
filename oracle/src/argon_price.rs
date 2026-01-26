@@ -87,20 +87,6 @@ impl ArgonPriceLookup {
 		Ok(price)
 	}
 
-	#[cfg(feature = "simulated-prices")]
-	pub async fn get_simulated_price_and_liquidity(
-		&mut self,
-		target_price: FixedU128,
-		tick: Tick,
-		max_argon_change_per_tick_away_from_target: FixedU128,
-	) -> Result<PriceAndLiquidity> {
-		let mut price = self.simulate_price_change(target_price, tick);
-		price = self.clamp_price(price, tick, max_argon_change_per_tick_away_from_target);
-		self.last_price = PriceAndLiquidity { price, liquidity: 100_000_000 };
-		self.last_price_tick = tick;
-		Ok(self.last_price)
-	}
-
 	fn clamp_price(
 		&self,
 		price: FixedU128,
@@ -119,105 +105,6 @@ impl ArgonPriceLookup {
 			price.min(start_price.saturating_add(max_change))
 		} else {
 			price.max(start_price.saturating_sub(max_change))
-		}
-	}
-}
-
-#[cfg(feature = "simulated-prices")]
-mod dev {
-	use crate::argon_price::ArgonPriceLookup;
-	use argon_primitives::tick::Tick;
-	use chrono::{TimeZone, Timelike};
-	use polkadot_sdk::*;
-	use rand::Rng;
-	use sp_runtime::{FixedU128, Saturating};
-
-	impl ArgonPriceLookup {
-		pub(crate) fn simulate_price_change(
-			&self,
-			target_price: FixedU128,
-			tick: Tick,
-		) -> FixedU128 {
-			let ticks = if self.last_price_tick == 0 {
-				1
-			} else {
-				tick.saturating_sub(self.last_price_tick) as u64 / self.ticker.tick_duration_millis
-			}
-			.min(10);
-			let mut last_price = self.last_price.price;
-			let tz_offset = chrono::FixedOffset::west_opt(5 * 3600).unwrap();
-
-			let tick_millis = self.ticker.time_for_tick(tick) as i64;
-			let est = tz_offset.timestamp_millis_opt(tick_millis).unwrap();
-			let one_milligon = FixedU128::from_rational(1, 1000);
-			let one_centagon = FixedU128::from_rational(1, 100);
-
-			for _ in 0..ticks {
-				match est.hour() {
-					0..=6 => {
-						// Hold at 1 cent for 15 minutes
-						last_price = one_centagon
-					},
-					7..=8 => {
-						// Increase to 1.99 on the minute
-						if est.second() < 5 || est.second() > 55 {
-							if last_price < FixedU128::from_rational(199, 100) {
-								last_price = last_price.saturating_add(one_centagon);
-							}
-						}
-					},
-					9..=10 => {
-						// Drop back to target
-						if last_price > target_price {
-							last_price = last_price.saturating_sub(one_centagon);
-						}
-					},
-					11..=13 => {
-						match est.minute() {
-							// Fluctuate 5 cents up per hour and hold for 15 minutes
-							15..=20 => {
-								last_price =
-									last_price.saturating_add(FixedU128::from_rational(5, 100));
-							},
-							35..=40 => {
-								last_price =
-									last_price.saturating_sub(FixedU128::from_rational(5, 100));
-							},
-							0 | 59 => last_price = target_price,
-							_ => {},
-						}
-					},
-					14..=15 => {
-						// Randomize price swing for one hour
-						let mut rng = rand::rng();
-						let direction = rng.random_range(-1..=1);
-						match direction {
-							-1 => {
-								last_price =
-									last_price.saturating_sub(FixedU128::from_rational(5, 100));
-							},
-							1 => {
-								last_price =
-									last_price.saturating_add(FixedU128::from_rational(5, 100));
-							},
-							_ => {},
-						}
-					},
-					16..=18 => {
-						// increase 1 milligon per tick
-						last_price = last_price.saturating_sub(one_milligon);
-					},
-					19.. => {
-						// Drop 1 cent per tick to 1 cent
-						if last_price > one_centagon {
-							last_price = last_price.saturating_sub(one_centagon);
-						}
-					},
-				}
-			}
-			let price = last_price.clamp(FixedU128::from_rational(1, 1000), FixedU128::from_u32(2));
-
-			price
 		}
 	}
 }
@@ -256,21 +143,6 @@ mod test {
 		let argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
 		let us_cpi_ratio = FixedI128::from_float(0.1);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio).to_float(), 1.1);
-	}
-
-	#[tokio::test]
-	#[cfg(feature = "simulated-prices")]
-	async fn can_use_simulated_schedule() {
-		before_each();
-		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let mut argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
-
-		argon_price_lookup.last_price =
-			PriceAndLiquidity { price: FixedU128::from_float(1.01), liquidity: 100_000_000 };
-		argon_price_lookup.last_price_tick = ticker.current();
-		let ts = argon_price_lookup.last_price_tick + 1000;
-		let price = argon_price_lookup.simulate_price_change(FixedU128::from_u32(1), ts);
-		assert_ne!(price, FixedU128::from_u32(0));
 	}
 
 	#[tokio::test]

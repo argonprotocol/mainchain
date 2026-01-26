@@ -14,7 +14,7 @@ ENV RUST_BACKTRACE=1 \
 RUN --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
-    cargo build --locked --bin=argon-node --bin=argon-notary --bin=argon-oracle --features=simulated-prices \
+    cargo build --locked --bin=argon-node --bin=argon-notary --bin=argon-oracle \
     # copy artefacts *out of* the ephemeral cache
     && install -Dm755 target/debug/argon-node   /out/argon-node \
     && install -Dm755 target/debug/argon-notary /out/argon-notary \
