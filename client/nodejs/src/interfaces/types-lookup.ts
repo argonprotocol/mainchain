@@ -1718,11 +1718,12 @@ declare module '@polkadot/types/lookup' {
       readonly amount: u128;
       readonly accountId: AccountId32;
     } & Struct;
-    readonly isVaultOperatorPrebond: boolean;
-    readonly asVaultOperatorPrebond: {
+    readonly isVaultFunderAllocation: boolean;
+    readonly asVaultFunderAllocation: {
       readonly vaultId: u32;
       readonly accountId: AccountId32;
-      readonly amountPerFrame: u128;
+      readonly amount: u128;
+      readonly previousAmount: Option<u128>;
     } & Struct;
     readonly type:
       | 'CouldNotDistributeBidPool'
@@ -1731,7 +1732,7 @@ declare module '@polkadot/types/lookup' {
       | 'NextBidPoolCapitalLocked'
       | 'ErrorRefundingTreasuryCapital'
       | 'RefundedTreasuryCapital'
-      | 'VaultOperatorPrebond';
+      | 'VaultFunderAllocation';
   }
 
   /** @name PalletFeeControlEvent (131) */
@@ -3068,22 +3069,12 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryCall (321) */
   interface PalletTreasuryCall extends Enum {
-    readonly isBondArgons: boolean;
-    readonly asBondArgons: {
+    readonly isSetAllocation: boolean;
+    readonly asSetAllocation: {
       readonly vaultId: u32;
       readonly amount: u128;
     } & Struct;
-    readonly isUnbondArgons: boolean;
-    readonly asUnbondArgons: {
-      readonly vaultId: u32;
-      readonly frameId: u64;
-    } & Struct;
-    readonly isVaultOperatorPrebond: boolean;
-    readonly asVaultOperatorPrebond: {
-      readonly vaultId: u32;
-      readonly maxAmountPerFrame: u128;
-    } & Struct;
-    readonly type: 'BondArgons' | 'UnbondArgons' | 'VaultOperatorPrebond';
+    readonly type: 'SetAllocation';
   }
 
   /** @name PalletMultisigError (323) */
@@ -3997,35 +3988,26 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryTreasuryPool (500) */
   interface PalletTreasuryTreasuryPool extends Struct {
-    readonly bondHolders: Vec<ITuple<[AccountId32, PalletTreasuryBondHolder]>>;
-    readonly doNotRenew: Vec<AccountId32>;
-    readonly isRolledOver: bool;
+    readonly bondHolders: Vec<ITuple<[AccountId32, u128]>>;
     readonly distributedEarnings: Option<u128>;
     readonly vaultSharingPercent: Compact<Permill>;
   }
 
-  /** @name PalletTreasuryBondHolder (503) */
-  interface PalletTreasuryBondHolder extends Struct {
-    readonly startingBalance: Compact<u128>;
-    readonly earnings: Compact<u128>;
-    readonly keepEarningsInPool: bool;
+  /** @name PalletTreasuryFunderState (507) */
+  interface PalletTreasuryFunderState extends Struct {
+    readonly targetPrincipal: Compact<u128>;
+    readonly bondedPrincipal: Compact<u128>;
+    readonly heldPrincipal: Compact<u128>;
+    readonly lifetimeCompoundedEarnings: Compact<u128>;
+    readonly lifetimePrincipalDeployed: Compact<u128>;
+    readonly lifetimePrincipalLastBasisFrame: Compact<u64>;
   }
 
-  /** @name PalletTreasuryTreasuryCapital (510) */
+  /** @name PalletTreasuryTreasuryCapital (509) */
   interface PalletTreasuryTreasuryCapital extends Struct {
     readonly vaultId: Compact<u32>;
     readonly activatedCapital: Compact<u128>;
     readonly frameId: Compact<u64>;
-  }
-
-  /** @name PalletTreasuryPrebondedArgons (512) */
-  interface PalletTreasuryPrebondedArgons extends Struct {
-    readonly vaultId: Compact<u32>;
-    readonly accountId: AccountId32;
-    readonly amountUnbonded: Compact<u128>;
-    readonly startingFrameId: Compact<u64>;
-    readonly bondedByStartOffset: Vec<u128>;
-    readonly maxAmountPerFrame: Compact<u128>;
   }
 
   /** @name PalletTreasuryError (513) */
@@ -4041,7 +4023,6 @@ declare module '@polkadot/types/lookup' {
     readonly isMaxVaultsExceeded: boolean;
     readonly isAlreadyRenewed: boolean;
     readonly isNotAVaultOperator: boolean;
-    readonly isMaxAmountBelowMinimum: boolean;
     readonly type:
       | 'ContributionTooLow'
       | 'VaultNotAcceptingMiningBonds'
@@ -4053,8 +4034,7 @@ declare module '@polkadot/types/lookup' {
       | 'ActivatedSecuritizationExceeded'
       | 'MaxVaultsExceeded'
       | 'AlreadyRenewed'
-      | 'NotAVaultOperator'
-      | 'MaxAmountBelowMinimum';
+      | 'NotAVaultOperator';
   }
 
   /** @name PalletFeeControlError (514) */

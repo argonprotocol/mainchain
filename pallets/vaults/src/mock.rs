@@ -14,7 +14,9 @@ use argon_primitives::{
 use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_prelude::{
-	argon_primitives::{ArgonCPI, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents},
+	argon_primitives::{
+		ArgonCPI, BitcoinUtxoTracker, MiningFrameTransitionProvider, PriceProvider, UtxoLockEvents,
+	},
 	*,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -75,6 +77,7 @@ parameter_types! {
 	pub const FundingChangeBlockDelay: BlockNumberFor<Test> = 60;
 
 	pub static CurrentTick: Tick = 1;
+	pub static DidStartNewFrame: bool = false;
 	pub static PreviousTick: Tick = 1;
 	pub static ElapsedTicks: Tick = 4;
 	pub static CurrentFrameId: FrameId = 1;
@@ -95,14 +98,20 @@ parameter_types! {
 
 }
 pub struct StaticMiningFrameProvider;
+impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	fn is_new_frame_started() -> Option<FrameId> {
+		Some(CurrentFrameId::get())
+	}
+	fn get_current_frame_id() -> FrameId {
+		CurrentFrameId::get()
+	}
+}
+
 impl MiningFrameProvider for StaticMiningFrameProvider {
 	fn get_next_frame_tick() -> Tick {
 		NextSlot::get()
 	}
 
-	fn is_new_frame_started() -> Option<FrameId> {
-		Some(CurrentFrameId::get())
-	}
 	fn is_seat_bidding_started() -> bool {
 		IsSlotBiddingStarted::get()
 	}
@@ -160,7 +169,7 @@ impl pallet_treasury::Config for Test {
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
-	type GetCurrentFrameId = CurrentFrameId;
+	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
 }
 
 pub struct StaticBitcoinUtxoTracker;
@@ -215,7 +224,6 @@ parameter_types! {
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
-	pub const DidStartNewFrame: bool = true;
 }
 
 pub struct EventHandler;

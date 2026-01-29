@@ -374,7 +374,7 @@ impl pallet_treasury::Config for Runtime {
 	type PalletId = TreasuryInternalPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
-	type GetCurrentFrameId = GetCurrentFrameId;
+	type MiningFrameTransitionProvider = MiningSlot;
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -393,7 +393,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = Treasury;
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Treasury, Vaults);
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

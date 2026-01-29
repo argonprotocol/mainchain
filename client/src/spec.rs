@@ -1172,10 +1172,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							26u8, 99u8, 218u8, 169u8, 66u8, 145u8, 73u8, 231u8, 196u8, 15u8, 187u8,
-							124u8, 105u8, 121u8, 185u8, 63u8, 16u8, 215u8, 80u8, 92u8, 103u8,
-							170u8, 83u8, 221u8, 103u8, 151u8, 185u8, 105u8, 178u8, 117u8, 22u8,
-							90u8,
+							29u8, 0u8, 163u8, 203u8, 120u8, 21u8, 205u8, 251u8, 230u8, 80u8, 192u8,
+							47u8, 41u8, 96u8, 155u8, 38u8, 86u8, 187u8, 161u8, 35u8, 98u8, 190u8,
+							51u8, 181u8, 212u8, 120u8, 98u8, 181u8, 7u8, 164u8, 199u8, 144u8,
 						],
 					)
 				}
@@ -1193,10 +1192,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							192u8, 173u8, 181u8, 233u8, 112u8, 137u8, 183u8, 159u8, 153u8, 145u8,
-							157u8, 138u8, 237u8, 104u8, 190u8, 111u8, 157u8, 160u8, 224u8, 217u8,
-							143u8, 90u8, 30u8, 113u8, 188u8, 168u8, 169u8, 231u8, 128u8, 196u8,
-							161u8, 22u8,
+							8u8, 5u8, 57u8, 151u8, 145u8, 48u8, 147u8, 89u8, 22u8, 221u8, 157u8,
+							110u8, 49u8, 83u8, 173u8, 53u8, 132u8, 1u8, 149u8, 234u8, 217u8, 15u8,
+							222u8, 66u8, 163u8, 73u8, 29u8, 30u8, 200u8, 160u8, 126u8, 6u8,
 						],
 					)
 				}
@@ -3796,9 +3794,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				18u8, 179u8, 186u8, 107u8, 47u8, 96u8, 28u8, 40u8, 235u8, 15u8, 241u8, 188u8,
-				205u8, 187u8, 132u8, 199u8, 199u8, 46u8, 25u8, 20u8, 203u8, 115u8, 184u8, 32u8,
-				205u8, 165u8, 52u8, 99u8, 250u8, 193u8, 36u8, 200u8,
+				143u8, 246u8, 170u8, 188u8, 247u8, 72u8, 127u8, 172u8, 11u8, 44u8, 108u8, 38u8,
+				180u8, 39u8, 104u8, 148u8, 66u8, 82u8, 136u8, 219u8, 231u8, 215u8, 147u8, 1u8,
+				124u8, 170u8, 126u8, 51u8, 232u8, 37u8, 37u8, 22u8,
 			]
 	}
 	pub mod system {
@@ -4916,10 +4914,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							170u8, 14u8, 184u8, 111u8, 10u8, 160u8, 254u8, 113u8, 11u8, 120u8,
-							197u8, 112u8, 130u8, 3u8, 0u8, 70u8, 4u8, 250u8, 194u8, 25u8, 184u8,
-							48u8, 197u8, 247u8, 144u8, 195u8, 100u8, 185u8, 232u8, 68u8, 203u8,
-							52u8,
+							91u8, 245u8, 226u8, 149u8, 108u8, 80u8, 57u8, 227u8, 210u8, 219u8,
+							225u8, 134u8, 9u8, 230u8, 38u8, 27u8, 219u8, 179u8, 120u8, 147u8,
+							246u8, 30u8, 140u8, 82u8, 17u8, 228u8, 209u8, 55u8, 5u8, 241u8, 197u8,
+							204u8,
 						],
 					)
 				}
@@ -5793,9 +5791,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							71u8, 227u8, 194u8, 46u8, 245u8, 226u8, 100u8, 130u8, 125u8, 128u8,
-							2u8, 169u8, 153u8, 163u8, 37u8, 255u8, 250u8, 26u8, 91u8, 0u8, 104u8,
-							134u8, 170u8, 4u8, 107u8, 162u8, 248u8, 31u8, 78u8, 252u8, 38u8, 134u8,
+							177u8, 143u8, 96u8, 81u8, 151u8, 142u8, 84u8, 121u8, 182u8, 120u8,
+							103u8, 106u8, 13u8, 197u8, 50u8, 147u8, 159u8, 184u8, 144u8, 216u8,
+							149u8, 3u8, 202u8, 230u8, 83u8, 248u8, 0u8, 232u8, 0u8, 189u8, 164u8,
+							212u8,
 						],
 					)
 				}
@@ -5857,9 +5856,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							238u8, 238u8, 121u8, 29u8, 3u8, 117u8, 251u8, 145u8, 19u8, 187u8, 32u8,
-							246u8, 204u8, 32u8, 199u8, 77u8, 186u8, 33u8, 85u8, 133u8, 85u8, 225u8,
-							102u8, 22u8, 227u8, 235u8, 18u8, 30u8, 4u8, 253u8, 216u8, 62u8,
+							229u8, 73u8, 226u8, 242u8, 66u8, 41u8, 77u8, 19u8, 167u8, 76u8, 240u8,
+							73u8, 108u8, 3u8, 160u8, 98u8, 105u8, 15u8, 0u8, 30u8, 121u8, 68u8,
+							148u8, 223u8, 143u8, 155u8, 214u8, 108u8, 115u8, 36u8, 127u8, 210u8,
 						],
 					)
 				}
@@ -6756,10 +6755,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							83u8, 197u8, 127u8, 255u8, 1u8, 7u8, 139u8, 207u8, 237u8, 211u8, 74u8,
-							248u8, 63u8, 137u8, 172u8, 105u8, 25u8, 55u8, 167u8, 143u8, 37u8,
-							112u8, 143u8, 95u8, 208u8, 60u8, 114u8, 68u8, 135u8, 221u8, 196u8,
-							72u8,
+							19u8, 204u8, 69u8, 131u8, 157u8, 15u8, 44u8, 181u8, 209u8, 195u8,
+							166u8, 227u8, 93u8, 100u8, 205u8, 164u8, 216u8, 76u8, 113u8, 97u8,
+							225u8, 144u8, 254u8, 89u8, 53u8, 232u8, 44u8, 96u8, 2u8, 198u8, 26u8,
+							178u8,
 						],
 					)
 				}
@@ -7020,9 +7019,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							11u8, 211u8, 231u8, 111u8, 75u8, 103u8, 37u8, 75u8, 176u8, 192u8, 42u8,
-							30u8, 170u8, 237u8, 218u8, 157u8, 224u8, 84u8, 88u8, 200u8, 119u8,
-							34u8, 94u8, 101u8, 235u8, 58u8, 32u8, 233u8, 188u8, 25u8, 224u8, 88u8,
+							206u8, 180u8, 94u8, 64u8, 143u8, 207u8, 232u8, 223u8, 89u8, 148u8,
+							100u8, 97u8, 226u8, 132u8, 119u8, 141u8, 65u8, 112u8, 149u8, 130u8,
+							11u8, 175u8, 136u8, 198u8, 183u8, 71u8, 97u8, 209u8, 128u8, 43u8,
+							190u8, 40u8,
 						],
 					)
 				}
@@ -7071,10 +7071,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							175u8, 222u8, 86u8, 105u8, 57u8, 200u8, 233u8, 87u8, 11u8, 219u8,
-							160u8, 62u8, 207u8, 126u8, 211u8, 166u8, 170u8, 60u8, 219u8, 187u8,
-							231u8, 38u8, 229u8, 52u8, 86u8, 239u8, 195u8, 96u8, 126u8, 38u8, 139u8,
-							142u8,
+							200u8, 237u8, 39u8, 40u8, 40u8, 163u8, 24u8, 152u8, 122u8, 19u8, 20u8,
+							155u8, 198u8, 85u8, 178u8, 107u8, 195u8, 225u8, 8u8, 159u8, 127u8,
+							47u8, 7u8, 68u8, 96u8, 161u8, 88u8, 194u8, 124u8, 239u8, 233u8, 209u8,
 						],
 					)
 				}
@@ -20491,10 +20490,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							205u8, 130u8, 92u8, 147u8, 162u8, 117u8, 196u8, 103u8, 237u8, 239u8,
-							122u8, 96u8, 115u8, 166u8, 166u8, 188u8, 109u8, 13u8, 151u8, 191u8,
-							137u8, 215u8, 236u8, 94u8, 233u8, 142u8, 207u8, 140u8, 198u8, 218u8,
-							174u8, 61u8,
+							148u8, 168u8, 173u8, 231u8, 232u8, 48u8, 28u8, 251u8, 226u8, 143u8,
+							15u8, 152u8, 225u8, 0u8, 5u8, 79u8, 92u8, 25u8, 216u8, 129u8, 186u8,
+							226u8, 96u8, 13u8, 187u8, 154u8, 212u8, 140u8, 211u8, 42u8, 193u8,
+							136u8,
 						],
 					)
 				}
@@ -20524,9 +20523,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							255u8, 98u8, 88u8, 65u8, 32u8, 112u8, 78u8, 228u8, 83u8, 4u8, 124u8,
-							106u8, 33u8, 170u8, 134u8, 63u8, 45u8, 178u8, 17u8, 8u8, 80u8, 130u8,
-							31u8, 2u8, 175u8, 196u8, 148u8, 25u8, 244u8, 2u8, 120u8, 206u8,
+							69u8, 115u8, 132u8, 230u8, 97u8, 223u8, 184u8, 11u8, 186u8, 176u8,
+							23u8, 163u8, 79u8, 190u8, 169u8, 70u8, 121u8, 180u8, 150u8, 147u8,
+							85u8, 78u8, 215u8, 216u8, 9u8, 233u8, 181u8, 255u8, 157u8, 227u8,
+							223u8, 122u8,
 						],
 					)
 				}
@@ -20552,10 +20552,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							186u8, 17u8, 108u8, 34u8, 81u8, 248u8, 157u8, 167u8, 178u8, 220u8,
-							36u8, 249u8, 220u8, 195u8, 161u8, 106u8, 37u8, 138u8, 184u8, 3u8,
-							178u8, 81u8, 87u8, 17u8, 122u8, 206u8, 192u8, 47u8, 240u8, 30u8, 75u8,
-							108u8,
+							56u8, 183u8, 137u8, 157u8, 16u8, 222u8, 65u8, 227u8, 55u8, 108u8, 95u8,
+							93u8, 144u8, 184u8, 100u8, 127u8, 9u8, 239u8, 58u8, 225u8, 28u8, 196u8,
+							133u8, 7u8, 147u8, 165u8, 92u8, 32u8, 248u8, 71u8, 196u8, 67u8,
 						],
 					)
 				}
@@ -20578,10 +20577,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							186u8, 253u8, 181u8, 123u8, 31u8, 15u8, 90u8, 154u8, 49u8, 160u8,
-							102u8, 61u8, 48u8, 83u8, 34u8, 180u8, 253u8, 11u8, 98u8, 101u8, 69u8,
-							108u8, 233u8, 191u8, 96u8, 134u8, 113u8, 125u8, 205u8, 156u8, 203u8,
-							79u8,
+							79u8, 33u8, 208u8, 244u8, 234u8, 70u8, 70u8, 49u8, 66u8, 196u8, 109u8,
+							202u8, 61u8, 234u8, 175u8, 72u8, 22u8, 26u8, 212u8, 29u8, 245u8, 1u8,
+							186u8, 254u8, 80u8, 52u8, 33u8, 105u8, 21u8, 241u8, 236u8, 212u8,
 						],
 					)
 				}
@@ -20607,10 +20605,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							178u8, 134u8, 148u8, 192u8, 184u8, 102u8, 101u8, 132u8, 43u8, 127u8,
-							154u8, 2u8, 113u8, 78u8, 31u8, 225u8, 247u8, 155u8, 46u8, 237u8, 117u8,
-							241u8, 144u8, 100u8, 204u8, 237u8, 32u8, 30u8, 189u8, 234u8, 32u8,
-							115u8,
+							127u8, 59u8, 225u8, 76u8, 86u8, 120u8, 93u8, 141u8, 65u8, 7u8, 213u8,
+							1u8, 39u8, 120u8, 40u8, 64u8, 176u8, 161u8, 177u8, 75u8, 252u8, 141u8,
+							60u8, 6u8, 86u8, 64u8, 29u8, 204u8, 184u8, 88u8, 85u8, 167u8,
 						],
 					)
 				}
@@ -20633,10 +20630,9 @@ pub mod api {
 							weight,
 						},
 						[
-							90u8, 196u8, 105u8, 77u8, 133u8, 133u8, 253u8, 58u8, 84u8, 251u8,
-							117u8, 44u8, 119u8, 220u8, 187u8, 100u8, 52u8, 121u8, 39u8, 205u8,
-							127u8, 223u8, 117u8, 122u8, 244u8, 155u8, 199u8, 72u8, 172u8, 184u8,
-							75u8, 159u8,
+							86u8, 70u8, 114u8, 239u8, 229u8, 184u8, 134u8, 74u8, 9u8, 32u8, 132u8,
+							163u8, 8u8, 37u8, 223u8, 149u8, 174u8, 142u8, 102u8, 209u8, 34u8, 26u8,
+							199u8, 25u8, 103u8, 195u8, 178u8, 20u8, 221u8, 217u8, 145u8, 20u8,
 						],
 					)
 				}
@@ -20676,10 +20672,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							230u8, 94u8, 207u8, 100u8, 23u8, 195u8, 103u8, 201u8, 220u8, 16u8,
-							194u8, 58u8, 95u8, 219u8, 186u8, 253u8, 242u8, 190u8, 211u8, 147u8,
-							50u8, 112u8, 74u8, 64u8, 143u8, 72u8, 206u8, 38u8, 9u8, 82u8, 60u8,
-							138u8,
+							244u8, 160u8, 10u8, 176u8, 151u8, 124u8, 152u8, 129u8, 250u8, 21u8,
+							236u8, 244u8, 214u8, 248u8, 246u8, 150u8, 140u8, 101u8, 86u8, 4u8,
+							174u8, 11u8, 217u8, 17u8, 150u8, 96u8, 242u8, 212u8, 61u8, 5u8, 182u8,
+							131u8,
 						],
 					)
 				}
@@ -20702,10 +20698,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							145u8, 67u8, 183u8, 171u8, 239u8, 147u8, 128u8, 230u8, 12u8, 180u8,
-							147u8, 2u8, 9u8, 97u8, 196u8, 45u8, 75u8, 10u8, 218u8, 10u8, 30u8,
-							15u8, 98u8, 141u8, 164u8, 110u8, 207u8, 46u8, 234u8, 17u8, 140u8,
-							187u8,
+							139u8, 166u8, 255u8, 105u8, 235u8, 232u8, 243u8, 246u8, 127u8, 21u8,
+							147u8, 173u8, 166u8, 25u8, 146u8, 137u8, 109u8, 213u8, 36u8, 30u8,
+							30u8, 245u8, 126u8, 59u8, 109u8, 54u8, 15u8, 90u8, 3u8, 184u8, 190u8,
+							194u8,
 						],
 					)
 				}
@@ -21041,9 +21037,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							239u8, 187u8, 172u8, 21u8, 12u8, 1u8, 197u8, 229u8, 32u8, 117u8, 42u8,
-							255u8, 91u8, 79u8, 85u8, 21u8, 210u8, 1u8, 88u8, 167u8, 98u8, 139u8,
-							20u8, 140u8, 85u8, 166u8, 123u8, 112u8, 129u8, 138u8, 83u8, 43u8,
+							19u8, 47u8, 63u8, 206u8, 206u8, 65u8, 66u8, 179u8, 163u8, 122u8, 169u8,
+							69u8, 120u8, 101u8, 30u8, 58u8, 21u8, 156u8, 153u8, 9u8, 37u8, 228u8,
+							116u8, 182u8, 126u8, 190u8, 39u8, 43u8, 165u8, 48u8, 199u8, 24u8,
 						],
 					)
 				}
@@ -21066,10 +21062,9 @@ pub mod api {
 							weight,
 						},
 						[
-							147u8, 202u8, 119u8, 121u8, 121u8, 111u8, 55u8, 5u8, 169u8, 195u8,
-							213u8, 165u8, 58u8, 170u8, 229u8, 11u8, 40u8, 160u8, 183u8, 152u8,
-							149u8, 7u8, 149u8, 250u8, 207u8, 247u8, 45u8, 25u8, 246u8, 96u8, 61u8,
-							106u8,
+							160u8, 4u8, 169u8, 94u8, 165u8, 27u8, 158u8, 154u8, 222u8, 244u8, 67u8,
+							216u8, 187u8, 154u8, 231u8, 145u8, 8u8, 237u8, 149u8, 146u8, 136u8,
+							74u8, 78u8, 71u8, 206u8, 116u8, 15u8, 228u8, 244u8, 18u8, 75u8, 11u8,
 						],
 					)
 				}
@@ -21107,9 +21102,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							253u8, 124u8, 78u8, 182u8, 104u8, 52u8, 24u8, 21u8, 234u8, 99u8, 104u8,
-							152u8, 208u8, 227u8, 7u8, 18u8, 45u8, 248u8, 181u8, 49u8, 76u8, 173u8,
-							192u8, 202u8, 198u8, 235u8, 218u8, 107u8, 222u8, 132u8, 108u8, 203u8,
+							123u8, 200u8, 80u8, 56u8, 245u8, 13u8, 13u8, 126u8, 25u8, 81u8, 240u8,
+							69u8, 175u8, 74u8, 252u8, 75u8, 3u8, 78u8, 195u8, 25u8, 126u8, 51u8,
+							170u8, 6u8, 34u8, 11u8, 81u8, 236u8, 103u8, 184u8, 144u8, 72u8,
 						],
 					)
 				}
@@ -23449,158 +23444,38 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Bond argons to a Vault's next treasury pool, tied to the next frame (aka,"]
-				#[doc = "tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot"]
-				#[doc = "exceed 1/10th of the activated securitization for the vault."]
-				#[doc = ""]
-				#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
-				#[doc = "the max securitization activated."]
-				#[doc = ""]
-				#[doc = "- `origin`: The account that is joining the fund"]
-				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
-				#[doc = "  it will just add the incremental amount"]
-				pub struct BondArgons {
-					pub vault_id: bond_argons::VaultId,
-					pub amount: bond_argons::Amount,
+				#[doc = "All funders can set their committed principal for a vault."]
+				pub struct SetAllocation {
+					pub vault_id: set_allocation::VaultId,
+					pub amount: set_allocation::Amount,
 				}
-				pub mod bond_argons {
+				pub mod set_allocation {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
 					pub type Amount = ::core::primitive::u128;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BondArgons {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetAllocation {
 					const PALLET: &'static str = "Treasury";
-					const CALL: &'static str = "bond_argons";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
-				#[doc = "(once epoch starting at bonded frame is complete)."]
-				pub struct UnbondArgons {
-					pub vault_id: unbond_argons::VaultId,
-					pub frame_id: unbond_argons::FrameId,
-				}
-				pub mod unbond_argons {
-					use super::runtime_types;
-					pub type VaultId = ::core::primitive::u32;
-					pub type FrameId = ::core::primitive::u64;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UnbondArgons {
-					const PALLET: &'static str = "Treasury";
-					const CALL: &'static str = "unbond_argons";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Set the prebonded argons for a vault. This is used by the vault operator to"]
-				#[doc = "pre-register funding for each frame. The total allocation will be capped per frame using"]
-				#[doc = "the `max_amount_per_frame` parameter."]
-				#[doc = ""]
-				#[doc = "NOTE: calling this a second time will ensure your max_amount_per_frame is updated."]
-				#[doc = "However, it will not reduce your allocation"]
-				pub struct VaultOperatorPrebond {
-					pub vault_id: vault_operator_prebond::VaultId,
-					pub max_amount_per_frame: vault_operator_prebond::MaxAmountPerFrame,
-				}
-				pub mod vault_operator_prebond {
-					use super::runtime_types;
-					pub type VaultId = ::core::primitive::u32;
-					pub type MaxAmountPerFrame = ::core::primitive::u128;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for VaultOperatorPrebond {
-					const PALLET: &'static str = "Treasury";
-					const CALL: &'static str = "vault_operator_prebond";
+					const CALL: &'static str = "set_allocation";
 				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Bond argons to a Vault's next treasury pool, tied to the next frame (aka,"]
-				#[doc = "tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot"]
-				#[doc = "exceed 1/10th of the activated securitization for the vault."]
-				#[doc = ""]
-				#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
-				#[doc = "the max securitization activated."]
-				#[doc = ""]
-				#[doc = "- `origin`: The account that is joining the fund"]
-				#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-				#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
-				#[doc = "  it will just add the incremental amount"]
-				pub fn bond_argons(
+				#[doc = "All funders can set their committed principal for a vault."]
+				pub fn set_allocation(
 					&self,
-					vault_id: types::bond_argons::VaultId,
-					amount: types::bond_argons::Amount,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::BondArgons> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"Treasury",
-						"bond_argons",
-						types::BondArgons { vault_id, amount },
-						[
-							9u8, 113u8, 229u8, 204u8, 94u8, 125u8, 69u8, 9u8, 123u8, 63u8, 199u8,
-							74u8, 209u8, 138u8, 208u8, 162u8, 82u8, 27u8, 79u8, 189u8, 132u8,
-							195u8, 7u8, 161u8, 62u8, 207u8, 143u8, 178u8, 151u8, 83u8, 173u8,
-							198u8,
-						],
-					)
-				}
-				#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
-				#[doc = "(once epoch starting at bonded frame is complete)."]
-				pub fn unbond_argons(
-					&self,
-					vault_id: types::unbond_argons::VaultId,
-					frame_id: types::unbond_argons::FrameId,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UnbondArgons> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"Treasury",
-						"unbond_argons",
-						types::UnbondArgons { vault_id, frame_id },
-						[
-							59u8, 199u8, 176u8, 43u8, 141u8, 176u8, 131u8, 160u8, 15u8, 18u8, 25u8,
-							121u8, 122u8, 81u8, 13u8, 77u8, 181u8, 152u8, 143u8, 231u8, 242u8,
-							59u8, 0u8, 28u8, 58u8, 101u8, 98u8, 51u8, 209u8, 39u8, 136u8, 112u8,
-						],
-					)
-				}
-				#[doc = "Set the prebonded argons for a vault. This is used by the vault operator to"]
-				#[doc = "pre-register funding for each frame. The total allocation will be capped per frame using"]
-				#[doc = "the `max_amount_per_frame` parameter."]
-				#[doc = ""]
-				#[doc = "NOTE: calling this a second time will ensure your max_amount_per_frame is updated."]
-				#[doc = "However, it will not reduce your allocation"]
-				pub fn vault_operator_prebond(
-					&self,
-					vault_id: types::vault_operator_prebond::VaultId,
-					max_amount_per_frame: types::vault_operator_prebond::MaxAmountPerFrame,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::VaultOperatorPrebond>
+					vault_id: types::set_allocation::VaultId,
+					amount: types::set_allocation::Amount,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetAllocation>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"Treasury",
-						"vault_operator_prebond",
-						types::VaultOperatorPrebond { vault_id, max_amount_per_frame },
+						"set_allocation",
+						types::SetAllocation { vault_id, amount },
 						[
-							110u8, 225u8, 80u8, 16u8, 100u8, 102u8, 128u8, 231u8, 45u8, 53u8,
-							109u8, 195u8, 73u8, 210u8, 36u8, 63u8, 93u8, 199u8, 4u8, 220u8, 143u8,
-							35u8, 206u8, 97u8, 214u8, 101u8, 254u8, 90u8, 68u8, 141u8, 251u8,
-							226u8,
+							211u8, 92u8, 232u8, 89u8, 94u8, 218u8, 158u8, 72u8, 45u8, 183u8, 176u8,
+							57u8, 23u8, 44u8, 245u8, 117u8, 116u8, 155u8, 18u8, 168u8, 218u8,
+							190u8, 12u8, 82u8, 203u8, 89u8, 84u8, 180u8, 35u8, 179u8, 111u8, 32u8,
 						],
 					)
 				}
@@ -23777,21 +23652,23 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "The vault operator pre-registered to bond argons for a vault"]
-			pub struct VaultOperatorPrebond {
-				pub vault_id: vault_operator_prebond::VaultId,
-				pub account_id: vault_operator_prebond::AccountId,
-				pub amount_per_frame: vault_operator_prebond::AmountPerFrame,
+			#[doc = "A funder has set their allocation for a vault"]
+			pub struct VaultFunderAllocation {
+				pub vault_id: vault_funder_allocation::VaultId,
+				pub account_id: vault_funder_allocation::AccountId,
+				pub amount: vault_funder_allocation::Amount,
+				pub previous_amount: vault_funder_allocation::PreviousAmount,
 			}
-			pub mod vault_operator_prebond {
+			pub mod vault_funder_allocation {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type AccountId = crate::types::AccountId32;
-				pub type AmountPerFrame = ::core::primitive::u128;
+				pub type Amount = ::core::primitive::u128;
+				pub type PreviousAmount = ::core::option::Option<::core::primitive::u128>;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultOperatorPrebond {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultFunderAllocation {
 				const PALLET: &'static str = "Treasury";
-				const EVENT: &'static str = "VaultOperatorPrebond";
+				const EVENT: &'static str = "VaultFunderAllocation";
 			}
 		}
 		pub mod storage {
@@ -23807,6 +23684,13 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
+				pub mod funder_state_by_vault_and_account {
+					use super::runtime_types;
+					pub type FunderStateByVaultAndAccount =
+						runtime_types::pallet_treasury::pallet::FunderState;
+					pub type Param0 = ::core::primitive::u32;
+					pub type Param1 = crate::types::AccountId32;
+				}
 				pub mod capital_active {
 					use super::runtime_types;
 					pub type CapitalActive =
@@ -23814,17 +23698,12 @@ pub mod api {
 							runtime_types::pallet_treasury::pallet::TreasuryCapital,
 						>;
 				}
-				pub mod capital_raising {
+				pub mod funders_by_vault_id {
 					use super::runtime_types;
-					pub type CapitalRaising =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_treasury::pallet::TreasuryCapital,
+					pub type FundersByVaultId =
+						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
+							crate::types::AccountId32,
 						>;
-				}
-				pub mod prebonded_by_vault_id {
-					use super::runtime_types;
-					pub type PrebondedByVaultId =
-						runtime_types::pallet_treasury::pallet::PrebondedArgons;
 					pub type Param0 = ::core::primitive::u32;
 				}
 			}
@@ -23846,10 +23725,9 @@ pub mod api {
 						"VaultPoolsByFrame",
 						(),
 						[
-							186u8, 178u8, 4u8, 244u8, 224u8, 244u8, 236u8, 81u8, 51u8, 120u8,
-							255u8, 184u8, 99u8, 202u8, 51u8, 127u8, 164u8, 216u8, 93u8, 83u8,
-							207u8, 29u8, 183u8, 155u8, 76u8, 105u8, 213u8, 46u8, 177u8, 55u8,
-							105u8, 31u8,
+							19u8, 234u8, 99u8, 163u8, 95u8, 111u8, 96u8, 82u8, 146u8, 46u8, 204u8,
+							226u8, 152u8, 77u8, 157u8, 165u8, 206u8, 28u8, 116u8, 212u8, 74u8,
+							213u8, 90u8, 98u8, 53u8, 101u8, 166u8, 92u8, 173u8, 65u8, 12u8, 121u8,
 						],
 					)
 				}
@@ -23872,15 +23750,92 @@ pub mod api {
 						"VaultPoolsByFrame",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							186u8, 178u8, 4u8, 244u8, 224u8, 244u8, 236u8, 81u8, 51u8, 120u8,
-							255u8, 184u8, 99u8, 202u8, 51u8, 127u8, 164u8, 216u8, 93u8, 83u8,
-							207u8, 29u8, 183u8, 155u8, 76u8, 105u8, 213u8, 46u8, 177u8, 55u8,
-							105u8, 31u8,
+							19u8, 234u8, 99u8, 163u8, 95u8, 111u8, 96u8, 82u8, 146u8, 46u8, 204u8,
+							226u8, 152u8, 77u8, 157u8, 165u8, 206u8, 28u8, 116u8, 212u8, 74u8,
+							213u8, 90u8, 98u8, 53u8, 101u8, 166u8, 92u8, 173u8, 65u8, 12u8, 121u8,
+						],
+					)
+				}
+				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				pub fn funder_state_by_vault_and_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::funder_state_by_vault_and_account::FunderStateByVaultAndAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"FunderStateByVaultAndAccount",
+						(),
+						[
+							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
+							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
+							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
+						],
+					)
+				}
+				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				pub fn funder_state_by_vault_and_account_iter1(
+					&self,
+					_0: types::funder_state_by_vault_and_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::funder_state_by_vault_and_account::Param0,
+					>,
+					types::funder_state_by_vault_and_account::FunderStateByVaultAndAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"FunderStateByVaultAndAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
+							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
+							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
+						],
+					)
+				}
+				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				pub fn funder_state_by_vault_and_account(
+					&self,
+					_0: types::funder_state_by_vault_and_account::Param0,
+					_1: types::funder_state_by_vault_and_account::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::funder_state_by_vault_and_account::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::funder_state_by_vault_and_account::Param1,
+						>,
+					),
+					types::funder_state_by_vault_and_account::FunderStateByVaultAndAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"FunderStateByVaultAndAccount",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
+							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
+							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
 						],
 					)
 				}
 				#[doc = " The treasury pool for the current frame. This correlates with the bids coming in for the"]
-				#[doc = " current frame. Sorted with the biggest share last. (current frame)"]
+				#[doc = " current frame. Sorted with the biggest share first. (current frame)"]
 				pub fn capital_active(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -23902,71 +23857,50 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The treasury pool still raising capital. (current frame + 1)"]
-				pub fn capital_raising(
+				#[doc = " Accounts that have a non-zero commitment for a vault. Bounded for predictable weights."]
+				pub fn funders_by_vault_id_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::capital_raising::CapitalRaising,
+					types::funders_by_vault_id::FundersByVaultId,
+					(),
 					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Treasury",
-						"CapitalRaising",
-						(),
-						[
-							215u8, 217u8, 125u8, 160u8, 64u8, 90u8, 239u8, 143u8, 179u8, 154u8,
-							143u8, 11u8, 24u8, 61u8, 124u8, 27u8, 91u8, 30u8, 6u8, 6u8, 62u8,
-							171u8, 4u8, 249u8, 130u8, 57u8, 55u8, 109u8, 52u8, 128u8, 12u8, 21u8,
-						],
-					)
-				}
-				#[doc = " Any vaults that have been pre-registered for bonding argons. This is used by the vault"]
-				#[doc = " operator to allocate argons to be bonded once bitcoins are securitized in their vault."]
-				pub fn prebonded_by_vault_id_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::prebonded_by_vault_id::PrebondedByVaultId,
-					(),
-					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Treasury",
-						"PrebondedByVaultId",
+						"FundersByVaultId",
 						(),
 						[
-							132u8, 24u8, 230u8, 152u8, 210u8, 233u8, 145u8, 146u8, 98u8, 175u8,
-							107u8, 249u8, 126u8, 79u8, 245u8, 71u8, 39u8, 67u8, 191u8, 125u8, 53u8,
-							219u8, 133u8, 158u8, 26u8, 229u8, 63u8, 147u8, 65u8, 164u8, 48u8, 97u8,
+							253u8, 214u8, 27u8, 5u8, 127u8, 251u8, 250u8, 96u8, 207u8, 182u8,
+							212u8, 156u8, 138u8, 253u8, 78u8, 185u8, 9u8, 123u8, 70u8, 132u8,
+							105u8, 116u8, 19u8, 159u8, 244u8, 181u8, 126u8, 22u8, 38u8, 108u8,
+							158u8, 102u8,
 						],
 					)
 				}
-				#[doc = " Any vaults that have been pre-registered for bonding argons. This is used by the vault"]
-				#[doc = " operator to allocate argons to be bonded once bitcoins are securitized in their vault."]
-				pub fn prebonded_by_vault_id(
+				#[doc = " Accounts that have a non-zero commitment for a vault. Bounded for predictable weights."]
+				pub fn funders_by_vault_id(
 					&self,
-					_0: types::prebonded_by_vault_id::Param0,
+					_0: types::funders_by_vault_id::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::prebonded_by_vault_id::Param0,
+						types::funders_by_vault_id::Param0,
 					>,
-					types::prebonded_by_vault_id::PrebondedByVaultId,
+					types::funders_by_vault_id::FundersByVaultId,
 					::subxt::ext::subxt_core::utils::Yes,
-					(),
+					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Treasury",
-						"PrebondedByVaultId",
+						"FundersByVaultId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							132u8, 24u8, 230u8, 152u8, 210u8, 233u8, 145u8, 146u8, 98u8, 175u8,
-							107u8, 249u8, 126u8, 79u8, 245u8, 71u8, 39u8, 67u8, 191u8, 125u8, 53u8,
-							219u8, 133u8, 158u8, 26u8, 229u8, 63u8, 147u8, 65u8, 164u8, 48u8, 97u8,
+							253u8, 214u8, 27u8, 5u8, 127u8, 251u8, 250u8, 96u8, 207u8, 182u8,
+							212u8, 156u8, 138u8, 253u8, 78u8, 185u8, 9u8, 123u8, 70u8, 132u8,
+							105u8, 116u8, 19u8, 159u8, 244u8, 181u8, 126u8, 22u8, 38u8, 108u8,
+							158u8, 102u8,
 						],
 					)
 				}
@@ -31564,60 +31498,13 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BondHolder {
-					#[codec(compact)]
-					pub starting_balance: ::core::primitive::u128,
-					#[codec(compact)]
-					pub earnings: ::core::primitive::u128,
-					pub keep_earnings_in_pool: ::core::primitive::bool,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					#[codec(index = 0)]
-					#[doc = "Bond argons to a Vault's next treasury pool, tied to the next frame (aka,"]
-					#[doc = "tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot"]
-					#[doc = "exceed 1/10th of the activated securitization for the vault."]
-					#[doc = ""]
-					#[doc = "The bonded argons and profits will be automatically rolled over to the next fund up to"]
-					#[doc = "the max securitization activated."]
-					#[doc = ""]
-					#[doc = "- `origin`: The account that is joining the fund"]
-					#[doc = "- `vault_id`: The vault id that the account would like to join a fund for"]
-					#[doc = "- `amount`: The amount of argons to contribute to the fund. If you increase this amount,"]
-					#[doc = "  it will just add the incremental amount"]
-					bond_argons {
+					#[codec(index = 4)]
+					#[doc = "All funders can set their committed principal for a vault."]
+					set_allocation {
 						vault_id: ::core::primitive::u32,
 						amount: ::core::primitive::u128,
-					},
-					#[codec(index = 2)]
-					#[doc = "Allows a user to remove their bonded argons from the fund after the hold is released"]
-					#[doc = "(once epoch starting at bonded frame is complete)."]
-					unbond_argons {
-						vault_id: ::core::primitive::u32,
-						frame_id: ::core::primitive::u64,
-					},
-					#[codec(index = 3)]
-					#[doc = "Set the prebonded argons for a vault. This is used by the vault operator to"]
-					#[doc = "pre-register funding for each frame. The total allocation will be capped per frame using"]
-					#[doc = "the `max_amount_per_frame` parameter."]
-					#[doc = ""]
-					#[doc = "NOTE: calling this a second time will ensure your max_amount_per_frame is updated."]
-					#[doc = "However, it will not reduce your allocation"]
-					vault_operator_prebond {
-						vault_id: ::core::primitive::u32,
-						max_amount_per_frame: ::core::primitive::u128,
 					},
 				}
 				#[derive(
@@ -31667,9 +31554,6 @@ pub mod api {
 					#[codec(index = 10)]
 					#[doc = "Vault operator only"]
 					NotAVaultOperator,
-					#[codec(index = 11)]
-					#[doc = "The prebond amount cannot be reduced and this takes it below the previous allocation"]
-					MaxAmountBelowMinimum,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -31736,12 +31620,39 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 					},
 					#[codec(index = 6)]
-					#[doc = "The vault operator pre-registered to bond argons for a vault"]
-					VaultOperatorPrebond {
+					#[doc = "A funder has set their allocation for a vault"]
+					VaultFunderAllocation {
 						vault_id: ::core::primitive::u32,
 						account_id: crate::types::AccountId32,
-						amount_per_frame: ::core::primitive::u128,
+						amount: ::core::primitive::u128,
+						previous_amount: ::core::option::Option<::core::primitive::u128>,
 					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FunderState {
+					#[codec(compact)]
+					pub target_principal: ::core::primitive::u128,
+					#[codec(compact)]
+					pub bonded_principal: ::core::primitive::u128,
+					#[codec(compact)]
+					pub held_principal: ::core::primitive::u128,
+					#[codec(compact)]
+					pub lifetime_compounded_earnings: ::core::primitive::u128,
+					#[codec(compact)]
+					pub lifetime_principal_deployed: ::core::primitive::u128,
+					#[codec(compact)]
+					pub lifetime_principal_last_basis_frame: ::core::primitive::u64,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -31758,33 +31669,6 @@ pub mod api {
 				pub enum HoldReason {
 					#[codec(index = 0)]
 					ContributedToTreasury,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct PrebondedArgons {
-					#[codec(compact)]
-					pub vault_id: ::core::primitive::u32,
-					pub account_id: crate::types::AccountId32,
-					#[codec(compact)]
-					pub amount_unbonded: ::core::primitive::u128,
-					#[codec(compact)]
-					pub starting_frame_id: ::core::primitive::u64,
-					pub bonded_by_start_offset:
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u128,
-						>,
-					#[codec(compact)]
-					pub max_amount_per_frame: ::core::primitive::u128,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -31819,15 +31703,9 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct TreasuryPool {
-					pub bond_holders:
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							crate::types::AccountId32,
-							runtime_types::pallet_treasury::pallet::BondHolder,
-						)>,
-					pub do_not_renew: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						crate::types::AccountId32,
+					pub bond_holders: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						(crate::types::AccountId32, ::core::primitive::u128),
 					>,
-					pub is_rolled_over: ::core::primitive::bool,
 					pub distributed_earnings: ::core::option::Option<::core::primitive::u128>,
 					#[codec(compact)]
 					pub vault_sharing_percent: runtime_types::sp_arithmetic::per_things::Permill,

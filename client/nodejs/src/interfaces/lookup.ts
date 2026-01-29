@@ -1371,10 +1371,11 @@ export default {
         amount: 'u128',
         accountId: 'AccountId32',
       },
-      VaultOperatorPrebond: {
+      VaultFunderAllocation: {
         vaultId: 'u32',
         accountId: 'AccountId32',
-        amountPerFrame: 'u128',
+        amount: 'u128',
+        previousAmount: 'Option<u128>',
       },
     },
   },
@@ -2655,18 +2656,13 @@ export default {
    **/
   PalletTreasuryCall: {
     _enum: {
-      bond_argons: {
+      __Unused0: 'Null',
+      __Unused1: 'Null',
+      __Unused2: 'Null',
+      __Unused3: 'Null',
+      set_allocation: {
         vaultId: 'u32',
         amount: 'u128',
-      },
-      __Unused1: 'Null',
-      unbond_argons: {
-        vaultId: 'u32',
-        frameId: 'u64',
-      },
-      vault_operator_prebond: {
-        vaultId: 'u32',
-        maxAmountPerFrame: 'u128',
       },
     },
   },
@@ -3466,38 +3462,28 @@ export default {
    * Lookup500: pallet_treasury::pallet::TreasuryPool<T>
    **/
   PalletTreasuryTreasuryPool: {
-    bondHolders: 'Vec<(AccountId32,PalletTreasuryBondHolder)>',
-    doNotRenew: 'Vec<AccountId32>',
-    isRolledOver: 'bool',
+    bondHolders: 'Vec<(AccountId32,u128)>',
     distributedEarnings: 'Option<u128>',
     vaultSharingPercent: 'Compact<Permill>',
   },
   /**
-   * Lookup503: pallet_treasury::pallet::BondHolder<T>
+   * Lookup507: pallet_treasury::pallet::FunderState<T>
    **/
-  PalletTreasuryBondHolder: {
-    startingBalance: 'Compact<u128>',
-    earnings: 'Compact<u128>',
-    keepEarningsInPool: 'bool',
+  PalletTreasuryFunderState: {
+    targetPrincipal: 'Compact<u128>',
+    bondedPrincipal: 'Compact<u128>',
+    heldPrincipal: 'Compact<u128>',
+    lifetimeCompoundedEarnings: 'Compact<u128>',
+    lifetimePrincipalDeployed: 'Compact<u128>',
+    lifetimePrincipalLastBasisFrame: 'Compact<u64>',
   },
   /**
-   * Lookup510: pallet_treasury::pallet::TreasuryCapital<T>
+   * Lookup509: pallet_treasury::pallet::TreasuryCapital<T>
    **/
   PalletTreasuryTreasuryCapital: {
     vaultId: 'Compact<u32>',
     activatedCapital: 'Compact<u128>',
     frameId: 'Compact<u64>',
-  },
-  /**
-   * Lookup512: pallet_treasury::pallet::PrebondedArgons<T>
-   **/
-  PalletTreasuryPrebondedArgons: {
-    vaultId: 'Compact<u32>',
-    accountId: 'AccountId32',
-    amountUnbonded: 'Compact<u128>',
-    startingFrameId: 'Compact<u64>',
-    bondedByStartOffset: 'Vec<u128>',
-    maxAmountPerFrame: 'Compact<u128>',
   },
   /**
    * Lookup513: pallet_treasury::pallet::Error<T>
@@ -3515,7 +3501,6 @@ export default {
       'MaxVaultsExceeded',
       'AlreadyRenewed',
       'NotAVaultOperator',
-      'MaxAmountBelowMinimum',
     ],
   },
   /**

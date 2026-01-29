@@ -22,7 +22,7 @@ pub mod pallet {
 		ArgonCPI, BlockRewardAccountsProvider, BlockRewardsEventHandler, BurnEventHandler,
 		PriceProvider, UtxoLockEvents, bitcoin::UtxoId, block_seal::BlockPayout,
 	};
-	use pallet_prelude::argon_primitives::MiningFrameProvider;
+	use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 	use sp_runtime::FixedPointNumber;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -37,7 +37,7 @@ pub mod pallet {
 		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>
 			+ Inspect<Self::AccountId, Balance = Self::Balance>;
 		type PriceProvider: PriceProvider<Self::Balance>;
-		type MiningFrameProvider: MiningFrameProvider;
+		type MiningFrameProvider: MiningFrameProvider + MiningFrameTransitionProvider;
 
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec

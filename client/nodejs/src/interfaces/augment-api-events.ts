@@ -1450,12 +1450,12 @@ declare module '@polkadot/api-base/types/events' {
         { frameId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }
       >;
       /**
-       * The vault operator pre-registered to bond argons for a vault
+       * A funder has set their allocation for a vault
        **/
-      VaultOperatorPrebond: AugmentedEvent<
+      VaultFunderAllocation: AugmentedEvent<
         ApiType,
-        [vaultId: u32, accountId: AccountId32, amountPerFrame: u128],
-        { vaultId: u32; accountId: AccountId32; amountPerFrame: u128 }
+        [vaultId: u32, accountId: AccountId32, amount: u128, previousAmount: Option<u128>],
+        { vaultId: u32; accountId: AccountId32; amount: u128; previousAmount: Option<u128> }
       >;
     };
     txPause: {

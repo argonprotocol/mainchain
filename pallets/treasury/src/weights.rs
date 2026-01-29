@@ -2,6 +2,7 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn on_frame_transition() -> Weight;
 	// Main extrinsic functions
 	fn bond_argons() -> Weight;
 	fn unbond_argons() -> Weight;
@@ -16,6 +17,9 @@ pub trait WeightInfo {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn on_frame_transition() -> Weight {
+		Weight::zero()
+	}
 	fn bond_argons() -> Weight {
 		Weight::zero()
 	}

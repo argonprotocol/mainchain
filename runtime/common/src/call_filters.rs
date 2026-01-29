@@ -90,9 +90,7 @@ macro_rules! call_filters {
 					},
 					ProxyType::VaultAdmin => match c {
 						RuntimeCall::Vaults(..) |
-						RuntimeCall::Treasury(pallet_treasury::Call::vault_operator_prebond {
-							..
-						}) |
+						RuntimeCall::Treasury(pallet_treasury::Call::set_allocation { .. }) |
 						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize {
 							..
 						}) => true,
@@ -104,7 +102,7 @@ macro_rules! call_filters {
 									sc,
 									RuntimeCall::Vaults(..) |
 										RuntimeCall::Treasury(
-											pallet_treasury::Call::vault_operator_prebond { .. }
+											pallet_treasury::Call::set_allocation { .. }
 										) | RuntimeCall::BitcoinLocks(
 										pallet_bitcoin_locks::Call::initialize { .. }
 									)
