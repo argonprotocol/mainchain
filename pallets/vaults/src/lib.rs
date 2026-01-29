@@ -644,10 +644,12 @@ pub mod pallet {
 
 			LastCollectFrameByVaultId::<T>::insert(vault_id, T::CurrentFrameId::get());
 			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |a| {
-				let mut amount_to_collect = T::Balance::zero();
 				for frame in a {
-					amount_to_collect.saturating_accrue(frame.collect());
+					let _ = frame.collect();
 				}
+				// use true amount on hold
+				let amount_to_collect =
+					T::Currency::balance_on_hold(&HoldReason::PendingCollect.into(), &who);
 				if amount_to_collect > T::Balance::zero() {
 					Self::release_hold(&who, amount_to_collect, HoldReason::PendingCollect)?;
 					Self::deposit_event(Event::VaultCollected {
@@ -803,8 +805,9 @@ pub mod pallet {
 				revenue.bitcoin_lock_fee_revenue.saturating_accrue(total_fee);
 				if has_fee_coupon {
 					revenue.bitcoin_lock_fee_coupon_value_used.saturating_accrue(total_fee);
+				} else {
+					revenue.uncollected_revenue.saturating_accrue(total_fee);
 				}
-				revenue.uncollected_revenue.saturating_accrue(total_fee);
 				revenue.bitcoin_locks_created.saturating_accrue(locks_created);
 				revenue.bitcoin_locks_added_satoshis.saturating_accrue(satoshis_locked);
 				revenue
