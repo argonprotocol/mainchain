@@ -70,14 +70,15 @@ pub mod pallet {
 			CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
 			XPubChildNumber, XPubFingerprint,
 		},
-		vault::{BitcoinVaultProvider, LockExtension, VaultError},
+		vault::{BitcoinVaultProvider, LockExtension, Securitization, VaultError},
 	};
-	use codec::EncodeLike;
+	use codec::{EncodeLike, HasCompact};
+	use core::iter::Sum;
 	use polkadot_sdk::frame_support::traits::IsSubType;
 	use sp_core::sr25519;
 	use sp_runtime::traits::Verify;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -102,7 +103,9 @@ pub mod pallet {
 			+ From<u128>
 			+ Into<u128>
 			+ TypeInfo
-			+ MaxEncodedLen;
+			+ MaxEncodedLen
+			+ Sum
+			+ HasCompact;
 
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
@@ -256,14 +259,20 @@ pub mod pallet {
 		#[codec(compact)]
 		pub vault_id: VaultId,
 		/// The mintable liquidity of this lock, in microgons
+		#[codec(compact)]
 		pub liquidity_promised: T::Balance,
 		/// The market rate of the satoshis locked, adjusted for any inflation offset of the argon
+		#[codec(compact)]
 		pub locked_market_rate: T::Balance,
 		/// The owner account
 		pub owner_account: T::AccountId,
+		/// The guaranteed securitization ratio for this lock
+		pub securitization_ratio: FixedU128,
 		/// Sum of all lock fees (initial plus any ratcheting)
+		#[codec(compact)]
 		pub security_fees: T::Balance,
 		/// Fees paid using coupons for this lock
+		#[codec(compact)]
 		pub coupon_paid_fees: T::Balance,
 		/// The number of satoshis reserved for this lock
 		#[codec(compact)]
@@ -297,6 +306,7 @@ pub mod pallet {
 		/// back to the vault
 		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
 		/// The argon block when this lock was created
+		#[codec(compact)]
 		pub created_at_argon_block: BlockNumberFor<T>,
 	}
 
@@ -309,6 +319,10 @@ pub mod pallet {
 		}
 		pub fn effective_satoshis(&self) -> Satoshis {
 			self.utxo_satoshis.unwrap_or(self.satoshis)
+		}
+
+		pub fn get_securitization(&self) -> Securitization<T::Balance> {
+			Securitization::new(self.liquidity_promised, self.securitization_ratio)
 		}
 	}
 
@@ -453,6 +467,7 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
 			liquidity_promised: T::Balance,
+			securitization: T::Balance,
 			locked_market_rate: T::Balance,
 			account_id: T::AccountId,
 			security_fee: T::Balance,
@@ -859,8 +874,8 @@ pub mod pallet {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			let lock_extension = lock.get_lock_extension();
 			let utxo_satoshis = lock.effective_satoshis();
+			let securitization = lock.get_securitization();
 			let LockedBitcoin {
-				liquidity_promised,
 				vault_id,
 				satoshis,
 				vault_pubkey,
@@ -915,7 +930,7 @@ pub mod pallet {
 
 			T::VaultProvider::schedule_for_release(
 				vault_id,
-				liquidity_promised,
+				&securitization,
 				satoshis,
 				&lock_extension,
 			)
@@ -994,6 +1009,7 @@ pub mod pallet {
 			let expiration_height = lock.vault_claim_height;
 			let mut amount_burned = T::Balance::zero();
 			let mut to_mint = new_liquidity_promised;
+
 			let mut duration_for_new_funds = FixedU128::zero();
 			if new_liquidity_promised > original_market_rate {
 				to_mint = new_liquidity_promised - original_market_rate;
@@ -1023,7 +1039,7 @@ pub mod pallet {
 				// add liquidity back to the vault by scheduling this for release
 				T::VaultProvider::schedule_for_release(
 					vault_id,
-					lock.liquidity_promised,
+					&lock.get_securitization(),
 					0,
 					&lock.get_lock_extension(),
 				)
@@ -1031,10 +1047,11 @@ pub mod pallet {
 			}
 
 			let mut lock_extension = lock.get_lock_extension();
+			let securitization = Securitization::new(to_mint, lock.securitization_ratio);
 			let fee = T::VaultProvider::lock(
 				vault_id,
 				&who,
-				to_mint,
+				&securitization,
 				0,
 				Some((duration_for_new_funds, &mut lock_extension)),
 				has_fee_coupon,
@@ -1250,7 +1267,7 @@ pub mod pallet {
 						return Ok(());
 					}
 					lock.is_verified = true;
-					T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 						.map_err(Error::<T>::from)?;
 
 					// If we received different amount of sats than expected, we need to adjust
@@ -1270,7 +1287,9 @@ pub mod pallet {
 						let to_return = starting_liquidity.saturating_sub(lock.liquidity_promised);
 
 						if !to_return.is_zero() {
-							T::VaultProvider::cancel(lock.vault_id, to_return)
+							let securitization_to_return =
+								Securitization::new(to_return, lock.securitization_ratio);
+							T::VaultProvider::cancel(lock.vault_id, &securitization_to_return)
 								.map_err(Error::<T>::from)?;
 						}
 						lock.satoshis = received_satoshis;
@@ -1281,6 +1300,8 @@ pub mod pallet {
 						&lock.owner_account,
 						lock.liquidity_promised,
 					)?;
+					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
+						.map_err(Error::<T>::from)?;
 				} else {
 					log::warn!("Verified utxo_id {:?} not found", utxo_id);
 				}
@@ -1290,9 +1311,10 @@ pub mod pallet {
 
 		fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult {
 			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
-				T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+				let securitization = lock.get_securitization();
+				T::VaultProvider::remove_pending(lock.vault_id, &securitization)
 					.map_err(Error::<T>::from)?;
-				T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+				T::VaultProvider::cancel(lock.vault_id, &securitization)
 					.map_err(Error::<T>::from)?;
 			}
 			Ok(())
@@ -1368,11 +1390,14 @@ pub mod pallet {
 					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
 			};
 			let locked_market_rate = Self::calculate_adjusted_market_rate(liquidity_promised)?;
+			let securitization_ratio =
+				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
+			let securitization = Securitization::new(liquidity_promised, securitization_ratio);
 
 			let fee = T::VaultProvider::lock(
 				vault_id,
 				account_id,
-				liquidity_promised,
+				&securitization,
 				satoshis,
 				None,
 				has_fee_coupon,
@@ -1423,6 +1448,7 @@ pub mod pallet {
 					locked_market_rate,
 					liquidity_promised,
 					security_fees: fee,
+					securitization_ratio,
 					coupon_paid_fees: if has_fee_coupon { fee } else { T::Balance::zero() },
 					utxo_satoshis: None,
 					satoshis,
@@ -1444,6 +1470,7 @@ pub mod pallet {
 				vault_id,
 				liquidity_promised,
 				locked_market_rate,
+				securitization: securitization.collateral_required,
 				account_id: account_id.clone(),
 				security_fee: fee,
 			});
@@ -1493,9 +1520,9 @@ pub mod pallet {
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			if !lock.is_verified {
-				T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+				T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 					.map_err(Error::<T>::from)?;
-				T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+				T::VaultProvider::cancel(lock.vault_id, &lock.get_securitization())
 					.map_err(Error::<T>::from)?;
 				return Ok(());
 			}
@@ -1508,7 +1535,7 @@ pub mod pallet {
 
 			T::VaultProvider::burn(
 				lock.vault_id,
-				lock.liquidity_promised,
+				&lock.get_securitization(),
 				redemption_price,
 				&lock.get_lock_extension(),
 			)
@@ -1555,12 +1582,12 @@ pub mod pallet {
 			let adjusted_market_rate = market_price.min(redemption_price_on_hold);
 
 			// 1. Return funds to user
-			// 2. Any difference from market rate comes from vault, capped by securitization pct
+			// 2. Any difference from market rate comes from vault, capped by securitization
 			// 3. Everything else up to market is burned from the vault
 			let compensation_amount = T::VaultProvider::compensate_lost_bitcoin(
 				vault_id,
 				&lock.owner_account,
-				lock.liquidity_promised,
+				&lock.get_securitization(),
 				adjusted_market_rate,
 				&lock.get_lock_extension(),
 			)
@@ -1649,10 +1676,10 @@ pub mod pallet {
 
 		fn cancel_lock(utxo_id: UtxoId, lock: &LockedBitcoin<T>) -> Result<(), Error<T>> {
 			if !lock.is_verified {
-				T::VaultProvider::remove_pending(lock.vault_id, lock.liquidity_promised)
+				T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 					.map_err(Error::<T>::from)?;
 			}
-			T::VaultProvider::cancel(lock.vault_id, lock.liquidity_promised)
+			T::VaultProvider::cancel(lock.vault_id, &lock.get_securitization())
 				.map_err(Error::<T>::from)?;
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 

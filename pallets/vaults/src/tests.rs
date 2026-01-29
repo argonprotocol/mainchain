@@ -19,7 +19,7 @@ use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_prelude::{
 	argon_primitives::{
 		OnNewSlot,
-		vault::{LockExtension, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		vault::{LockExtension, Securitization, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	},
 	*,
 };
@@ -47,6 +47,10 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 		bitcoin_base_fee: 0,
 		treasury_profit_sharing: Permill::zero(),
 	}
+}
+
+fn securitization(amount: Balance) -> Securitization<Balance> {
+	Securitization::new(amount, FixedU128::one())
 }
 
 fn default_vault() -> VaultConfig<Balance> {
@@ -129,10 +133,7 @@ fn it_can_set_securitization_ratio_for_a_vault() {
 		assert_eq!(vault.operator_account_id, 1);
 		assert_eq!(vault.securitization_ratio, TEN_PCT);
 		// uses 10% for recovery
-		assert_eq!(
-			vault.available_for_lock(),
-			TEN_PCT.reciprocal().unwrap().saturating_mul_int(50_000)
-		);
+		assert_eq!(vault.available_for_lock(), 50_000);
 	});
 }
 
@@ -189,21 +190,18 @@ fn it_can_modify_a_vault_funds() {
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 500);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 1000);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
 				securitization: 1000,
+				securitization_target: 1000,
 				securitization_ratio: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
 		assert_eq!(Balances::reserved_balance(1), 1000);
 
-		assert_err!(
-			Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 2000, FixedU128::from_float(1.9)),
-			Error::<Test>::InvalidSecuritization
-		);
 		assert_ok!(Vaults::modify_funding(
 			RuntimeOrigin::signed(1),
 			1,
@@ -215,50 +213,6 @@ fn it_can_modify_a_vault_funds() {
 			FixedU128::from_float(2.0)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 2000);
-	});
-}
-
-#[test]
-fn it_can_correctly_calculate_activated_securitization() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(1);
-
-		set_argons(1, 20_000);
-		assert_ok!(Vaults::create(
-			RuntimeOrigin::signed(1),
-			VaultConfig {
-				terms: default_terms(TEN_PCT),
-				bitcoin_xpubkey: keys(),
-				securitization: 1000,
-				securitization_ratio: FixedU128::from_float(1.0),
-			}
-		));
-
-		let mut vault = VaultsById::<Test>::get(1).unwrap();
-
-		assert_eq!(vault.get_activated_securitization(), 0);
-		vault.argons_locked = 500;
-		assert_eq!(vault.get_activated_securitization(), 500);
-		vault.argons_locked = 1000;
-		assert_eq!(vault.get_activated_securitization(), 1000);
-
-		vault.securitization = 1000;
-		vault.argons_locked = 500; // 500 free
-		assert_eq!(vault.get_activated_securitization(), 500);
-
-		vault.securitization = 1000;
-		vault.argons_locked = 500; // 500 free
-		vault.securitization_ratio = FixedU128::from_float(2.0);
-		assert_eq!(vault.get_activated_securitization(), 1000);
-
-		vault.securitization = 2000;
-		vault.argons_locked = 800;
-		// can only 2x the amount bonded
-		assert_eq!(vault.get_activated_securitization(), 1600);
-
-		vault.argons_pending_activation = 600;
-		assert_eq!(vault.get_activated_securitization(), 400);
 	});
 }
 
@@ -282,47 +236,54 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 
 		VaultsById::<Test>::mutate(1, |vault| {
 			if let Some(vault) = vault {
-				vault.argons_locked = 499;
+				vault.securitization_locked = 998;
 			}
 		});
 		// amount eligible for mining is 2x the bitcoin argons (+2x), but capped at the 1000 which
 		// have been securitization
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 499 * 2);
-
-		assert_err!(
-			Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 997, FixedU128::from_float(2.0)),
-			Error::<Test>::VaultReductionBelowSecuritization
-		);
-		// can't reduce the securitization
-		assert_err!(
-			Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 997, FixedU128::from_float(1.5)),
-			Error::<Test>::InvalidSecuritization
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 998);
 
 		assert_ok!(Vaults::modify_funding(
 			RuntimeOrigin::signed(1),
 			1,
-			998,
+			997,
 			FixedU128::from_float(2.0)
 		));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 998);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_target, 997);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_minimum_securitization_needed(), 998);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_recovery_securitization(), 499);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().uninhibited_securitization(), 0);
 
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
 				securitization: 998,
+				securitization_target: 997,
 				securitization_ratio: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
 		// should have returned the difference
 		assert_eq!(Balances::reserved_balance(1), 998);
+
+		// should now return funds once the locked securitization goes down
+		VaultsById::<Test>::mutate(1, |vault| {
+			if let Some(vault) = vault {
+				vault.securitization_locked = 500;
+				let _ = vault.securitization_release_schedule.try_insert(100, 498);
+			}
+		});
+		VaultFundsReleasingByHeight::<Test>::mutate(100, |a| {
+			let _ = a.try_insert(1);
+		});
+		LastBitcoinHeightChange::set((100, 100));
+		Vaults::on_initialize(2);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 997);
+		assert_eq!(Balances::reserved_balance(1), 997, "should shrink the securitization now");
 	});
 }
 
@@ -350,10 +311,11 @@ fn it_can_close_a_vault() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 100_000);
 
 		let amount = 40_000;
-		let fee = Vaults::lock(1, &2, amount, 500, None, false).expect("bonding failed");
+		let fee =
+			Vaults::lock(1, &2, &securitization(amount), 500, None, false).expect("bonding failed");
 		assert_eq!(fee, 401);
 		let vault = VaultsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.argons_locked, 40_000);
+		assert_eq!(vault.securitization_locked, 40_000);
 		assert_eq!(vault.securitization, 100_000);
 
 		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
@@ -361,24 +323,27 @@ fn it_can_close_a_vault() {
 		System::assert_last_event(
 			Event::VaultClosed {
 				vault_id: 1,
-				securitization_remaining: 80_000,
-				securitization_released: 20_000,
+				securitization_remaining: 40_000,
+				securitization_released: 60_000,
 			}
 			.into(),
 		);
-		assert_eq!(Balances::free_balance(1), vault_owner_balance - 80_000);
+		assert_eq!(Balances::free_balance(1), vault_owner_balance - 40_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
 		// set to full fee block
 		CurrentTick::set(1440 * 365 + 1);
 		// now when we cancel, it should return the funds to the vault
-		assert_ok!(Vaults::cancel(1, amount));
+		assert_ok!(Vaults::cancel(1, &securitization(amount)));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
 		assert_eq!(Balances::free_balance(1), vault_owner_balance);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 100_000 - fee);
-		assert_err!(Vaults::lock(1, &2, 1000, 500, None, false), VaultError::VaultClosed);
+		assert_err!(
+			Vaults::lock(1, &2, &securitization(1000), 500, None, false),
+			VaultError::VaultClosed
+		);
 	});
 }
 
@@ -403,7 +368,8 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(1, &2, 500_000, 500, None, false).expect("bonding failed");
+		let fee = Vaults::lock(1, &2, &securitization(500_000), 500, None, false)
+			.expect("bonding failed");
 
 		let apr_fee = (0.01f64 * 500_000f64) as u128;
 		assert_eq!(fee, apr_fee + 1000);
@@ -411,7 +377,7 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		// if we cancel the lock, the fee won't be returned
-		assert_ok!(Vaults::cancel(1, 500_000));
+		assert_ok!(Vaults::cancel(1, &securitization(500_000)));
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
@@ -447,7 +413,8 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 		));
 		assert_eq!(Balances::free_balance(1), 500_000);
 
-		let fee = Vaults::lock(1, &1, 500_000, 500, None, false).expect("bonding failed");
+		let fee = Vaults::lock(1, &1, &securitization(500_000), 500, None, false)
+			.expect("bonding failed");
 
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(fee, 6000);
@@ -489,7 +456,7 @@ fn it_handles_overflowing_metrics() {
 			if frame_id == 42 {
 				VaultsById::<Test>::mutate(2, |vault| {
 					if let Some(v) = vault {
-						v.argons_locked = 1_000_000;
+						v.securitization_locked = 1_000_000;
 						v.securitization = 1_000_000;
 					}
 				});
@@ -563,13 +530,14 @@ fn it_accounts_for_pending_bitcoins() {
 			}
 		));
 		assert_eq!(Balances::free_balance(1), 900_000);
-		let _ = Vaults::lock(1, &2, 100_000, 500, None, false).expect("bonding failed");
+		let _ = Vaults::lock(1, &2, &securitization(100_000), 500, None, false)
+			.expect("bonding failed");
 
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0,);
 
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0);
 
-		Vaults::remove_pending(1, 90_000).unwrap();
+		Vaults::remove_pending(1, &securitization(90_000)).unwrap();
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 90_000);
 	});
 }
@@ -594,17 +562,22 @@ fn it_can_burn_funds() {
 		assert_eq!(Balances::free_balance(1), 900_000);
 
 		set_argons(2, 2_000);
-		let fee = Vaults::lock(1, &2, 100_000, 500, None, false).expect("bonding failed");
+		let fee = Vaults::lock(1, &2, &securitization(100_000), 500, None, false)
+			.expect("bonding failed");
 
 		assert_eq!(fee, 0);
 		assert_eq!(Balances::free_balance(2), 2_000);
-
-		assert_ok!(Vaults::burn(1, 100_000, 100_000, &LockExtension::new(2440)));
+		VaultsById::<Test>::mutate(1, |vault| {
+			if let Some(vault) = vault {
+				vault.securitization_pending_activation = 0;
+			}
+		});
+		assert_ok!(Vaults::burn(1, &securitization(100_000), 100_000, &LockExtension::new(2440)));
 
 		assert_eq!(Balances::free_balance(1), 900_000);
 		assert_eq!(Balances::total_balance(&1), 900_000, "Burned from the vault owner");
 		assert_eq!(Balances::free_balance(2), 2_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
 	});
 }
@@ -660,7 +633,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			securitization
 		);
 		let vault = VaultsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.argons_locked, 0);
+		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.securitization, securitization);
 
 		let mut lock_extensions = LockExtension::new(1440 * 365);
@@ -668,7 +641,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 		Vaults::lock(
 			1,
 			&bitcoin_locker,
-			pegged_price,
+			&Securitization::new(pegged_price, securitization_ratio),
 			500,
 			Some((FixedU128::one(), &mut lock_extensions)),
 			false,
@@ -679,7 +652,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			Vaults::compensate_lost_bitcoin(
 				1,
 				&bitcoin_locker,
-				pegged_price,
+				&Securitization::new(pegged_price, securitization_ratio),
 				release_price,
 				&lock_extensions,
 			)
@@ -700,7 +673,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 		);
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.get_relock_capacity(), vault_should_have_hold, "relock capacity");
-		assert_eq!(vault.argons_locked, vault_should_have_hold, "argons locked");
+		assert_eq!(vault.securitization_locked, 0, "argons locked");
 		assert_eq!(vault.securitization, securitization - vault_should_lose, "securitization");
 		assert_eq!(Balances::free_balance(bitcoin_locker), user_should_get, "locker free balance");
 	});
@@ -727,7 +700,9 @@ fn it_records_use_of_fee_coupons() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(1, &2, 500_000, 500, None, true).expect("bonding failed");
+		let fee =
+			Vaults::lock(1, &2, &Securitization::new(500_000, FixedU128::one()), 500, None, true)
+				.expect("bonding failed");
 
 		let calculated_fee = terms.bitcoin_base_fee + (0.01f64 * 500_000f64) as u128;
 		assert_eq!(fee, calculated_fee);
@@ -942,22 +917,32 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		let amount = 1_000_000;
 
 		CurrentTick::set(1);
-		assert_ok!(Vaults::lock(1, &2, amount, 500, None, false));
+		assert_ok!(Vaults::lock(1, &2, &securitization(amount), 500, None, false));
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().available_for_lock(),
 			1_000_000_000 - 1_000_000
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 1_000_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 0);
-
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 1_000_000);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
+		// assume the bitcoin locks pallet will clean this up
+		VaultsById::<Test>::mutate(1, |vault| {
+			if let Some(vault) = vault {
+				vault.securitization_pending_activation = 0;
+			}
+		});
 		CurrentFrameId::set(2);
 
-		assert_ok!(Vaults::schedule_for_release(1, amount, 500, &LockExtension::new(365)));
+		assert_ok!(Vaults::schedule_for_release(
+			1,
+			&securitization(amount),
+			500,
+			&LockExtension::new(365)
+		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 1_000_000_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 1_000_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 1);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release[&432],
+			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
 			1_000_000
 		);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).len(), 1);
@@ -975,8 +960,8 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		LastBitcoinHeightChange::set((431, 432));
 		Vaults::on_initialize(10);
 
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).len(), 0);
 	});
 }
@@ -1000,32 +985,50 @@ fn it_can_reuse_locked_argons() {
 		let amount = 1_000_000;
 
 		CurrentTick::set(1);
-		assert_ok!(Vaults::lock(1, &2, amount, 500, None, false));
+		assert_ok!(Vaults::lock(1, &2, &securitization(amount), 500, None, false));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 10_000_000 - amount);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, amount);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, amount);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
+		VaultsById::<Test>::mutate(1, |vault| {
+			if let Some(vault) = vault {
+				vault.securitization_pending_activation = 0;
+			}
+		});
 
-		assert_ok!(Vaults::schedule_for_release(1, amount, 500, &LockExtension::new(365)));
+		assert_ok!(Vaults::schedule_for_release(
+			1,
+			&securitization(amount),
+			500,
+			&LockExtension::new(365)
+		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 10_000_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, amount);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 1);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release[&432], amount);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
+			amount
+		);
 
 		set_argons(3, 3_000_000);
-		assert_ok!(Vaults::lock(1, &3, 2_500_000, 2500, None, false));
+		assert_ok!(Vaults::lock(1, &3, &securitization(2_500_000), 2500, None, false));
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().available_for_lock(),
 			10_000_000 - 2_500_000
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 2_500_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 2_500_000);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
 
-		assert_ok!(Vaults::schedule_for_release(1, 2_500_000, 2500, &LockExtension::new(365)));
+		assert_ok!(Vaults::schedule_for_release(
+			1,
+			&securitization(2_500_000),
+			2500,
+			&LockExtension::new(365)
+		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(), 10_000_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_locked, 2_500_000);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release.len(), 1);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().argons_scheduled_for_release[&432],
+			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
 			2_500_000
 		);
 	});
@@ -1059,7 +1062,8 @@ fn vaults_can_collect_revenue() {
 		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).len(), 0);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(1, &2, 500_000, 500, None, false).expect("bonding failed");
+		let fee = Vaults::lock(1, &2, &securitization(500_000), 500, None, false)
+			.expect("bonding failed");
 
 		let current_frame_id = CurrentFrameId::get();
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
@@ -1120,7 +1124,7 @@ fn vaults_can_collect_revenue() {
 
 		VaultsById::<Test>::mutate(1, |v| {
 			if let Some(v) = v {
-				v.argons_pending_activation = 0;
+				v.securitization_pending_activation = 0;
 			}
 		});
 		CurrentFrameId::set(3);

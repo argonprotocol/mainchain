@@ -1,5 +1,6 @@
-use alloc::{collections::BTreeSet, vec};
+use alloc::collections::BTreeSet;
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+use core::iter::Sum;
 use frame_support::PalletError;
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
@@ -72,7 +73,7 @@ impl<Balance: Codec + MaxEncodedLen> LockExtension<Balance> {
 		Self { extended_expiration_funds: Default::default(), lock_expiration }
 	}
 
-	pub fn day(&self) -> BitcoinHeight {
+	pub fn expiration_day(&self) -> BitcoinHeight {
 		get_rounded_up_bitcoin_day_height(self.lock_expiration)
 	}
 
@@ -93,6 +94,24 @@ impl<Balance: Codec + MaxEncodedLen> LockExtension<Balance> {
 	}
 }
 
+pub struct Securitization<Balance> {
+	pub collateral_required: Balance,
+	pub securitization_ratio: FixedU128,
+	pub liquidity_promised: Balance,
+}
+
+impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
+	Securitization<Balance>
+{
+	pub fn new(liquidity_promised: Balance, securitization_ratio: FixedU128) -> Self {
+		Self {
+			collateral_required: securitization_ratio.saturating_mul_int(liquidity_promised),
+			securitization_ratio,
+			liquidity_promised,
+		}
+	}
+}
+
 pub trait BitcoinVaultProvider {
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
@@ -101,11 +120,14 @@ pub trait BitcoinVaultProvider {
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
 
-	/// Holds the given "liquidity promised" from the vault. Returns the fee amount
+	/// Get the securitization ratio offered by this vault
+	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError>;
+
+	/// Holds the given "securitization" from the vault. Returns the fee amount
 	fn lock(
 		vault_id: VaultId,
 		locker: &Self::AccountId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
 		has_fee_coupon: bool,
@@ -114,13 +136,16 @@ pub trait BitcoinVaultProvider {
 	/// Release the lock and move into holding, eligible for relock
 	fn schedule_for_release(
 		vault_id: VaultId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<(), VaultError>;
 
 	/// The lock is complete and remaining funds can be returned to the vault
-	fn cancel(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError>;
+	fn cancel(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+	) -> Result<(), VaultError>;
 
 	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
 	/// the system. It is assumed that the vault is in cahoots with the beneficiary.
@@ -128,7 +153,7 @@ pub trait BitcoinVaultProvider {
 	/// Returns the amount of argons that were burned
 	fn burn(
 		vault_id: VaultId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Self::Balance>,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError>;
@@ -143,7 +168,7 @@ pub trait BitcoinVaultProvider {
 	fn compensate_lost_bitcoin(
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
-		liquidity_promised: Self::Balance,
+		securitization: &Securitization<Self::Balance>,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError>;
@@ -157,7 +182,10 @@ pub trait BitcoinVaultProvider {
 	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError>;
 
 	/// Argons no longer in a "pending state" - eg, verified bitcoin or canceled
-	fn remove_pending(vault_id: VaultId, amount: Self::Balance) -> Result<(), VaultError>;
+	fn remove_pending(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+	) -> Result<(), VaultError>;
 
 	/// Track a pending cosign for a UTXO.
 	fn update_pending_cosign_list(
@@ -220,16 +248,19 @@ where
 	/// The securitization in the vault
 	#[codec(compact)]
 	pub securitization: Balance,
-	/// The argons locked for bitcoin
+	/// The target securitization to have in the vault (in case of reducing)
 	#[codec(compact)]
-	pub argons_locked: Balance,
-	/// Argons for bitcoin pending verification (this is "out of" the bitcoin_locked, not in
-	/// addition to)
+	pub securitization_target: Balance,
+	/// The securitization locked for bitcoin (at the ratio given)
 	#[codec(compact)]
-	pub argons_pending_activation: Balance,
-	/// Argons that will be released at the given block height (NOTE: these are grouped by next day
-	/// of bitcoin blocks). These argons can be re-locked
-	pub argons_scheduled_for_release: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
+	pub securitization_locked: Balance,
+	/// Securitization pending bitcoin verification (this is "out of" the securitization_locked,
+	/// not in addition to)
+	#[codec(compact)]
+	pub securitization_pending_activation: Balance,
+	/// Securitization that will be released at the given block height (NOTE: these are grouped by
+	/// next day of bitcoin blocks). This securitization can be relocked
+	pub securitization_release_schedule: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
 	/// The securitization ratio of "total securitization" to "available for locked bitcoin"
 	#[codec(compact)]
 	pub securitization_ratio: FixedU128,
@@ -288,46 +319,83 @@ impl<
 		+ TypeInfo
 		+ core::fmt::Debug
 		+ PartialEq
-		+ Eq,
+		+ Eq
+		+ Sum,
 > Vault<AccountId, Balance>
 {
+	#[cfg(debug_assertions)]
+	#[inline(always)]
+	pub fn debug_assert_invariants_at(&self, where_: &'static str) {
+		let relock = self.get_relock_capacity();
+		debug_assert!(
+			self.securitization_locked <= self.securitization,
+			"[{where_}] invariant failed: securitization_locked ({:?}) > securitization ({:?})",
+			self.securitization_locked,
+			self.securitization
+		);
+		debug_assert!(
+			relock <= self.securitization,
+			"[{where_}] invariant failed: relock_capacity ({:?}) > securitization ({:?})",
+			relock,
+			self.securitization
+		);
+		debug_assert!(
+			self.securitization_locked.saturating_add(relock) <= self.securitization,
+			"[{where_}] invariant failed: locked+relock ({:?}) > securitization ({:?}); locked={:?} relock={:?} scheduled_keys={:?}",
+			self.securitization_locked.saturating_add(relock),
+			self.securitization,
+			self.securitization_locked,
+			relock,
+			self.securitization_release_schedule.keys().collect::<alloc::vec::Vec<_>>()
+		);
+	}
+
+	#[cfg(debug_assertions)]
+	#[inline(always)]
+	pub fn debug_assert_invariants(&self) {
+		self.debug_assert_invariants_at("Vault");
+	}
+
+	#[cfg(not(debug_assertions))]
+	#[inline(always)]
+	pub fn debug_assert_invariants_at(&self, _where_: &'static str) {
+		// no-op in release builds
+	}
+
+	#[cfg(not(debug_assertions))]
+	#[inline(always)]
+	pub fn debug_assert_invariants(&self) {
+		// no-op in release builds
+	}
+
 	pub fn get_activated_securitization(&self) -> Balance {
-		let activated_securitization =
-			self.argons_locked.saturating_sub(self.argons_pending_activation);
-		// you can increase the max allocation up to an additional 2x over the locked bitcoins
-		let ratio = self.securitization_ratio.min(FixedU128::from_u32(2));
-		ratio.saturating_mul_int(activated_securitization).min(self.securitization)
-	}
-
-	pub fn get_minimum_securitization_needed(&self) -> Balance {
-		self.securitization_ratio.saturating_mul_int(self.argons_locked)
-	}
-
-	pub fn get_recovery_securitization(&self) -> Balance {
-		let reserved = FixedU128::from_u32(1).div(self.securitization_ratio);
-		self.securitization
-			.saturating_sub(reserved.saturating_mul_int(self.securitization))
+		self.securitization_locked
+			.saturating_sub(self.securitization_pending_activation)
 	}
 
 	pub fn burn(
 		&mut self,
-		amount: Balance,
+		securitization: &Securitization<Balance>,
 		market_rate: Balance,
 		lock_extension: &LockExtension<Balance>,
 	) -> Result<BurnResult<Balance>, VaultError> {
-		let burn_amount = self.securitized_amount(amount).min(market_rate);
+		let burn_amount = securitization.collateral_required.min(market_rate);
+		if burn_amount > self.securitization || burn_amount > self.securitization_locked {
+			return Err(VaultError::InsufficientVaultFunds);
+		}
+		self.securitization.saturating_reduce(burn_amount);
+		self.securitization_locked.saturating_reduce(burn_amount);
 
-		self.destroy_securitization(burn_amount)?;
+		let amount_to_future_release =
+			securitization.collateral_required.saturating_sub(burn_amount);
 
-		let lock_to_destroy = amount.min(market_rate);
-		let amount_to_future_release = amount.saturating_sub(lock_to_destroy);
+		let release_height = self.schedule_for_release(
+			&Securitization::new(amount_to_future_release, securitization.securitization_ratio),
+			lock_extension,
+		)?;
 
-		let release_height = self.schedule_for_release(amount_to_future_release, lock_extension)?;
+		self.debug_assert_invariants_at("burn:after");
 
-		self.argons_locked = self
-			.argons_locked
-			.checked_sub(&lock_to_destroy)
-			.ok_or(VaultError::InsufficientVaultFunds)?;
 		Ok(BurnResult {
 			burned_amount: burn_amount,
 			held_for_release: amount_to_future_release,
@@ -336,166 +404,201 @@ impl<
 	}
 
 	/// Lock funds for a full term (assume underlying bitcoin is pending)
-	pub fn lock(&mut self, amount: Balance) -> Result<(), VaultError> {
-		ensure!(amount <= self.available_for_lock(), VaultError::InsufficientVaultFunds);
+	pub fn lock(&mut self, securitization: &Securitization<Balance>) -> Result<(), VaultError> {
+		ensure!(
+			securitization.collateral_required <= self.available_for_lock(),
+			VaultError::InsufficientVaultFunds
+		);
 
-		let remaining = self.use_relockable_argons(amount, None);
-		self.argons_locked.saturating_accrue(remaining);
-		self.argons_pending_activation.saturating_accrue(amount);
+		let remaining = self.use_relockable_securitization(securitization, None);
+		self.securitization_locked.saturating_accrue(remaining);
+		self.securitization_pending_activation
+			.saturating_accrue(securitization.collateral_required);
+		self.debug_assert_invariants_at("lock:after");
+
 		Ok(())
 	}
 
-	/// Extends an existing lock for a given number of argons. This will prioritize using the
-	/// relockable argons that are scheduled for release within the max expiration. If there are
-	/// remaining argons, they will be used from "free" to unlock argons. Lastly, if there are still
-	/// remaining argons, they will be used from argons scheduled for release and the release
-	/// extensions will be returned.
+	/// Extends an existing lock for a given amount of securitization. This will prioritize using:
+	/// 1. relockable securitization scheduled for release within the max expiration.
+	/// 2. available unused + lock-free securitization
+	/// 3. any remaining scheduled for release (recording extensions for heights beyond the max
+	///    expiration)
 	///
-	/// Modifies lock extensions for the argons locked beyond the max expiration
+	/// Modifies lock extensions for the securitization locked beyond the max expiration
 	pub fn extend_lock(
 		&mut self,
-		amount: Balance,
+		securitization: &Securitization<Balance>,
 		lock_extension: &mut LockExtension<Balance>,
 	) -> Result<(), VaultError> {
-		ensure!(amount <= self.available_for_lock(), VaultError::InsufficientVaultFunds);
-
-		// 1. Use the relockable argons within the max expiration
-		let mut remaining =
-			self.use_relockable_argons(amount, Some(lock_extension.lock_expiration));
-
-		let max_lockable = self
-			.securitization
-			.saturating_sub(self.get_recovery_securitization())
-			.saturating_sub(self.argons_locked);
-
-		let amount_to_lock = remaining.min(max_lockable);
-		self.argons_locked.saturating_accrue(amount_to_lock);
 		ensure!(
-			self.securitized_amount(self.argons_locked) <= self.securitization,
+			securitization.collateral_required <= self.available_for_lock(),
 			VaultError::InsufficientVaultFunds
 		);
+
+		// 1. Use the relockable argons within the max expiration
+		let mut remaining = self
+			.use_relockable_securitization(securitization, Some(lock_extension.lock_expiration));
+
+		// 2. Use any available *unlocked* securitization (exclude anything still scheduled for
+		//    release).
+		// `available_securitization()` includes scheduled-for-release amounts, but step (2) must
+		// not consume those, because step (3) handles scheduled funds beyond the max expiration.
+		let uninhibited_securitization = self.uninhibited_securitization();
+		let amount_to_lock = remaining.min(uninhibited_securitization);
+		self.securitization_locked.saturating_accrue(amount_to_lock);
 		remaining.saturating_reduce(amount_to_lock);
 
+		// 3. Use any remaining scheduled for release beyond the max expiration
 		if !remaining.is_zero() {
-			let max_expiration = lock_extension.day();
-			for (height, release_amount) in self.argons_scheduled_for_release.iter_mut() {
+			let max_expiration = lock_extension.expiration_day();
+			for (height, release_amount) in self.securitization_release_schedule.iter_mut() {
 				let amount_to_use = remaining.min(*release_amount);
 				release_amount.saturating_reduce(amount_to_use);
 				remaining.saturating_reduce(amount_to_use);
+				self.securitization_locked.saturating_accrue(amount_to_use);
 
 				if *height > max_expiration {
-					if !lock_extension.extended_expiration_funds.contains_key(height) {
-						lock_extension
-							.extended_expiration_funds
-							.try_insert(*height, Balance::zero())
-							.map_err(|_| VaultError::InternalError)?;
-					}
-					lock_extension
-						.extended_expiration_funds
-						.get_mut(height)
-						.expect("Just inserted this, must exist")
-						.saturating_accrue(amount_to_use);
+					Self::increment_scheduled_expiration(
+						&mut lock_extension.extended_expiration_funds,
+						amount_to_use,
+						height,
+					)?;
 				}
 				if remaining.is_zero() {
 					break;
 				}
 			}
-			self.argons_scheduled_for_release.retain(|_, v| !v.is_zero());
+			if !remaining.is_zero() {
+				return Err(VaultError::InsufficientVaultFunds);
+			}
+			self.securitization_release_schedule.retain(|_, v| !v.is_zero());
 		}
 
+		self.debug_assert_invariants_at("extend_lock:after");
 		Ok(())
 	}
 
 	pub fn sweep_released(&mut self, block_height: BitcoinHeight) -> Balance {
-		let mut amount = Balance::zero();
-		self.argons_scheduled_for_release.retain(|height, released_amount| {
+		let mut released_securitization = Balance::zero();
+		self.securitization_release_schedule.retain(|height, released_amount| {
 			if *height <= block_height {
-				amount.saturating_accrue(*released_amount);
+				released_securitization.saturating_accrue(*released_amount);
 				return false;
 			}
 			true
 		});
-		self.argons_locked.saturating_reduce(amount);
-		amount
+
+		released_securitization
 	}
 
-	pub fn release_locked_funds(&mut self, amount: Balance) {
-		self.argons_locked.saturating_reduce(amount);
+	pub fn did_confirm_pending_activation(&mut self, securitization: &Securitization<Balance>) {
+		self.securitization_pending_activation
+			.saturating_reduce(securitization.collateral_required);
+	}
+
+	pub fn release_lock(&mut self, securitization: &Securitization<Balance>) {
+		self.securitization_locked.saturating_reduce(securitization.collateral_required);
 	}
 
 	pub fn schedule_for_release(
 		&mut self,
-		amount: Balance,
+		securitization: &Securitization<Balance>,
 		lock_extension: &LockExtension<Balance>,
 	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
 		let mut release_heights = BTreeSet::new();
 
-		// reschedule the amounts to be released by any delayed funds first, then any remaining at
-		// the expiration of the lock
-		let mut to_release = vec![];
-		let mut remaining = amount;
-		for (height, release_at_height) in lock_extension.extended_expiration_funds.iter() {
-			let to_use = remaining.min(*release_at_height);
-			remaining.saturating_reduce(to_use);
-			to_release.push((*height, to_use));
-			if remaining.is_zero() {
-				break;
-			}
-		}
-		if remaining > Balance::zero() {
-			to_release.push((lock_extension.day(), remaining));
+		// Reschedule the amounts to be released by any delayed funds first, then any remaining at
+		// the expiration of the lock.
+		// Under the "count once" model, scheduled-for-release funds are no longer counted as
+		// locked, so we must ensure we actually have enough locked collateral to move into the
+		// schedule.
+		ensure!(
+			securitization.collateral_required <= self.securitization_locked,
+			VaultError::InsufficientVaultFunds
+		);
+		self.securitization_locked.saturating_reduce(securitization.collateral_required);
+		let mut amount_in_lock_extension = Balance::zero();
+		for (height, amount) in &lock_extension.extended_expiration_funds {
+			release_heights.insert(*height);
+			amount_in_lock_extension.saturating_accrue(*amount);
+			Self::increment_scheduled_expiration(
+				&mut self.securitization_release_schedule,
+				*amount,
+				height,
+			)?;
 		}
 
-		for (height, amount) in to_release {
-			release_heights.insert(height);
-			if !self.argons_scheduled_for_release.contains_key(&height) {
-				self.argons_scheduled_for_release
-					.try_insert(height, Balance::zero())
-					.map_err(|_| VaultError::InternalError)?;
-			}
-			self.argons_scheduled_for_release
-				.get_mut(&height)
-				.expect("Just inserted this, must exist")
-				.saturating_accrue(amount);
+		let remaining = securitization.collateral_required.saturating_sub(amount_in_lock_extension);
+		if remaining > Balance::zero() {
+			let expiration = lock_extension.expiration_day();
+			release_heights.insert(expiration);
+			Self::increment_scheduled_expiration(
+				&mut self.securitization_release_schedule,
+				remaining,
+				&expiration,
+			)?;
 		}
+
+		self.debug_assert_invariants_at("schedule_for_release:after");
 		Ok(release_heights)
+	}
+
+	pub fn create_securitization_bundle(
+		&self,
+		liquidity_promised: Balance,
+	) -> Securitization<Balance> {
+		Securitization::new(liquidity_promised, self.securitization_ratio)
 	}
 
 	pub fn securitized_amount(&self, amount: Balance) -> Balance {
 		self.securitization_ratio.saturating_mul_int(amount)
 	}
 
-	/// The number of argons that can be re-locked (with expiration extended out)
+	/// The amount of securitization that can be re-locked (with expiration extended out)
 	pub fn get_relock_capacity(&self) -> Balance {
-		let mut total = Balance::zero();
-		for (_height, releasing) in self.argons_scheduled_for_release.iter() {
-			total.saturating_accrue(*releasing);
-		}
-		total
+		self.securitization_release_schedule
+			.iter()
+			.map(|(_h, releasing)| *releasing)
+			.sum()
 	}
 
 	pub fn available_for_lock(&self) -> Balance {
-		self.securitization
-			.saturating_sub(self.get_recovery_securitization())
-			.saturating_sub(self.argons_locked)
-			// relocks should be counted as free balance
-			.saturating_add(self.get_relock_capacity())
+		self.securitization.saturating_sub(self.securitization_locked)
 	}
 
-	fn destroy_securitization(&mut self, amount: Balance) -> Result<(), VaultError> {
-		ensure!(amount <= self.securitization, VaultError::InsufficientVaultFunds);
-		self.securitization.saturating_reduce(amount);
+	pub fn uninhibited_securitization(&self) -> Balance {
+		self.securitization
+			.saturating_sub(self.securitization_locked)
+			.saturating_sub(self.get_relock_capacity())
+	}
+
+	fn increment_scheduled_expiration(
+		release_schedule: &mut BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
+		amount_to_use: Balance,
+		height: &BitcoinHeight,
+	) -> Result<(), VaultError> {
+		if !release_schedule.contains_key(height) {
+			release_schedule
+				.try_insert(*height, Balance::zero())
+				.map_err(|_| VaultError::InternalError)?;
+		}
+
+		let Some(x) = release_schedule.get_mut(height) else {
+			return Err(VaultError::InternalError);
+		};
+		x.saturating_accrue(amount_to_use);
 		Ok(())
 	}
 
-	fn use_relockable_argons(
+	fn use_relockable_securitization(
 		&mut self,
-		amount: Balance,
+		securitization: &Securitization<Balance>,
 		max_expiration: Option<BitcoinHeight>,
 	) -> Balance {
-		let mut remaining = amount;
+		let mut remaining = securitization.collateral_required;
 		let max_expiration = max_expiration.map(get_rounded_up_bitcoin_day_height);
-		for (height, releasing_amount) in self.argons_scheduled_for_release.iter_mut() {
+		for (height, releasing_amount) in self.securitization_release_schedule.iter_mut() {
 			if let Some(max_expiration) = max_expiration {
 				if *height > max_expiration {
 					continue;
@@ -504,11 +607,12 @@ impl<
 			let amount_to_use = remaining.min(*releasing_amount);
 			releasing_amount.saturating_reduce(amount_to_use);
 			remaining.saturating_reduce(amount_to_use);
+			self.securitization_locked.saturating_accrue(amount_to_use);
 			if remaining.is_zero() {
 				break;
 			}
 		}
-		self.argons_scheduled_for_release.retain(|_, v| !v.is_zero());
+		self.securitization_release_schedule.retain(|_, v| !v.is_zero());
 		remaining
 	}
 }
@@ -516,66 +620,75 @@ impl<
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{Balance, prelude::sp_arithmetic::FixedU128};
+	use crate::{
+		Balance,
+		prelude::sp_arithmetic::{FixedU128, traits::One},
+	};
 	use polkadot_sdk::frame_support::assert_err;
 
 	#[test]
 	fn test_locking_and_releasing_funds() {
 		let mut vault = default_vault(100, 1.0);
-		vault.lock(50).unwrap();
-		assert_eq!(vault.argons_locked, 50);
-		assert_eq!(vault.argons_pending_activation, 50);
+		vault.lock(&securitization(50)).unwrap();
+		assert_eq!(vault.securitization_locked, 50);
+		assert_eq!(vault.securitization_pending_activation, 50);
 
-		vault.lock(30).unwrap();
-		assert_eq!(vault.argons_locked, 80);
-		assert_eq!(vault.argons_pending_activation, 80);
+		vault.lock(&securitization(30)).unwrap();
+		assert_eq!(vault.securitization_locked, 80);
+		assert_eq!(vault.securitization_pending_activation, 80);
 
-		vault.release_locked_funds(20);
-		assert_eq!(vault.argons_locked, 60);
+		vault.release_lock(&securitization(20));
+		assert_eq!(vault.securitization_locked, 60);
 	}
 
 	#[test]
 	fn calculates_securitization() {
 		let mut vault = default_vault(100, 2.0);
 		assert_eq!(vault.get_activated_securitization(), 0);
-		assert_eq!(vault.get_minimum_securitization_needed(), 0);
-		assert_eq!(vault.get_recovery_securitization(), 50);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_for_lock(), 50);
+		assert_eq!(vault.available_for_lock(), 100);
 		assert_eq!(vault.securitized_amount(50), 100);
 
-		assert_err!(vault.lock(60), VaultError::InsufficientVaultFunds);
+		assert_err!(
+			vault.lock(&vault.create_securitization_bundle(60)),
+			VaultError::InsufficientVaultFunds
+		);
 
-		vault.lock(50).unwrap();
+		vault.lock(&vault.create_securitization_bundle(50)).unwrap();
 		assert_eq!(vault.get_activated_securitization(), 0);
-		assert_eq!(vault.get_minimum_securitization_needed(), 100);
-		assert_eq!(vault.get_recovery_securitization(), 50);
 		assert_eq!(vault.get_relock_capacity(), 0);
 		assert_eq!(vault.available_for_lock(), 0);
 
-		vault.argons_pending_activation = 0;
+		vault.securitization_pending_activation = 0;
 		assert_eq!(vault.get_activated_securitization(), 100);
 
-		let lock_extensions = &mut LockExtension::new(100);
-		vault.schedule_for_release(100, lock_extensions).unwrap();
+		let lock_extensions = &mut LockExtension::new(106);
+		vault
+			.schedule_for_release(&vault.create_securitization_bundle(50), lock_extensions)
+			.unwrap();
 		assert_eq!(vault.get_relock_capacity(), 100);
-		assert_eq!(vault.get_activated_securitization(), 100);
+		assert_eq!(vault.get_activated_securitization(), 0);
 	}
 
 	#[test]
 	fn can_burn() {
 		let mut vault = default_vault(100, 1.0);
 
-		vault.lock(100).unwrap();
+		vault.lock(&securitization(100)).unwrap();
+		assert_eq!(vault.securitized_amount(50), 50);
+		assert_eq!(vault.get_relock_capacity(), 0);
+		assert_eq!(vault.available_for_lock(), 0);
+		assert_eq!(vault.securitization_locked, 100);
+		vault.securitization_pending_activation = 0;
 
-		let lock_extensions = &mut LockExtension::new(100);
-		let burn_result = vault.burn(100, 50, lock_extensions).unwrap();
+		let lock_extensions = &mut LockExtension::new(365);
+		let burn_result = vault.burn(&securitization(100), 50, lock_extensions).unwrap();
 		assert_eq!(burn_result.burned_amount, 50);
 		assert_eq!(burn_result.held_for_release, 50);
 		assert_eq!(burn_result.release_heights.len(), 1);
-		assert_eq!(vault.argons_locked, 50);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.get(&144).unwrap(), &50);
+		assert_eq!(vault.securitization_locked, 0);
+		assert_eq!(vault.securitization_release_schedule.len(), 1);
+		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &50);
 		assert_eq!(vault.securitization, 50);
 		assert_eq!(vault.available_for_lock(), 50);
 	}
@@ -583,96 +696,121 @@ mod test {
 	#[test]
 	fn handles_schedule_for_release() {
 		let mut vault = default_vault(500, 1.0);
-		vault.lock(100).unwrap();
+		vault.lock(&securitization(100)).unwrap();
+		vault.did_confirm_pending_activation(&securitization(100));
 
 		let lock_extensions = &mut LockExtension::new(100);
-		let release_heights = vault.schedule_for_release(50, lock_extensions).unwrap();
+		let release_heights =
+			vault.schedule_for_release(&securitization(100), lock_extensions).unwrap();
 		assert_eq!(release_heights.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.get(&144).unwrap(), &50);
+		assert_eq!(vault.securitization_release_schedule.len(), 1);
+		assert_eq!(vault.securitization_release_schedule.get(&144).unwrap(), &100);
+		assert_eq!(vault.securitization_locked, 0);
+		assert_eq!(vault.available_for_lock(), 500);
 
 		let lock_extensions = &mut LockExtension::new(100);
-		vault.extend_lock(50, lock_extensions).unwrap();
-		assert_eq!(vault.argons_scheduled_for_release.len(), 0);
-		assert_eq!(vault.argons_locked, 100);
+		vault.extend_lock(&securitization(100), lock_extensions).unwrap();
+		assert_eq!(vault.securitization_release_schedule.len(), 0);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.available_for_lock(), 400);
+		assert_eq!(vault.get_relock_capacity(), 0);
 
-		vault.lock(100).unwrap();
-		assert_eq!(vault.argons_locked, 200);
+		vault.lock(&securitization(100)).unwrap();
+		assert_eq!(vault.securitization_locked, 200);
+		assert_eq!(vault.available_for_lock(), 300);
+		assert_eq!(vault.get_relock_capacity(), 0);
+		vault.did_confirm_pending_activation(&securitization(100));
+
+		// schedule multiple releases
 		let lock_extensions = &mut LockExtension::new(250);
-		let release_heights = vault.schedule_for_release(50, lock_extensions).unwrap();
+		let release_heights =
+			vault.schedule_for_release(&securitization(50), lock_extensions).unwrap();
 		assert_eq!(release_heights.len(), 1);
-		assert_eq!(vault.argons_locked, 200);
+		assert_eq!(vault.securitization_locked, 150);
+		assert_eq!(vault.securitization_release_schedule.len(), 1);
+		assert_eq!(vault.securitization_release_schedule.get(&288).unwrap(), &50);
 		assert_eq!(vault.get_relock_capacity(), 50);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.get(&288).unwrap(), &50);
 
 		let lock_extensions = &mut LockExtension::new(255);
-		let release_heights = vault.schedule_for_release(25, lock_extensions).unwrap();
+		let release_heights =
+			vault.schedule_for_release(&securitization(25), lock_extensions).unwrap();
 		assert_eq!(release_heights.len(), 1);
-		assert_eq!(vault.argons_locked, 200);
+		assert_eq!(vault.securitization_locked, 125);
+		assert_eq!(vault.securitization_release_schedule.len(), 1);
+		assert_eq!(vault.securitization_release_schedule.get(&288).unwrap(), &75);
 		assert_eq!(vault.get_relock_capacity(), 75);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.get(&288).unwrap(), &75);
 
 		let lock_extensions = &mut LockExtension::new(300);
-		let release_heights = vault.schedule_for_release(25, lock_extensions).unwrap();
+		let release_heights =
+			vault.schedule_for_release(&securitization(25), lock_extensions).unwrap();
 		assert_eq!(release_heights.len(), 1);
-		assert_eq!(vault.argons_locked, 200);
-		assert_eq!(vault.get_relock_capacity(), 100);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 2);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.securitization_release_schedule.len(), 2);
 		assert_eq!(
-			vault.argons_scheduled_for_release.get(&288).unwrap(),
+			vault.securitization_release_schedule.get(&288).unwrap(),
 			&75,
 			"shouldn't need to touch this"
 		);
-		assert_eq!(vault.argons_scheduled_for_release.get(&432).unwrap(), &25);
+		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &25);
+		assert_eq!(vault.get_relock_capacity(), 100);
 
-		// if the expiration is within the other expirations, it will prefer the argons locked
+		// if the expiration is within the other expirations, it will prefer the securitization
+		// already scheduled for release
 		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(25, lock_extensions).unwrap();
+		vault.extend_lock(&securitization(25), lock_extensions).unwrap();
 		assert_eq!(lock_extensions.len(), 0);
-		assert_eq!(vault.argons_locked, 225);
-		assert_eq!(vault.get_relock_capacity(), 100);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 2);
+		assert_eq!(vault.securitization_locked, 125);
+		assert_eq!(vault.securitization_release_schedule.len(), 2);
 		assert_eq!(
-			vault.argons_scheduled_for_release.get(&288).unwrap(),
+			vault.securitization_release_schedule.get(&288).unwrap(),
 			&75,
 			"shouldn't need to touch this"
 		);
-		assert_eq!(vault.argons_scheduled_for_release.get(&432).unwrap(), &25);
-		assert_eq!(vault.argons_scheduled_for_release.keys().collect::<Vec<_>>(), vec![&288, &432]);
+		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &25);
+		assert_eq!(
+			vault.securitization_release_schedule.keys().collect::<Vec<_>>(),
+			vec![&288, &432]
+		);
+		assert_eq!(vault.get_relock_capacity(), 100);
 
-		// take more than the argons_locked amount
+		// extend the lock beyond the available unlocked securitization, using scheduled-for-release
+		// funds
 		assert_eq!(vault.available_for_lock(), 375);
+		assert_eq!(vault.securitization_locked, 125);
 		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(370, lock_extensions).unwrap();
+		vault.extend_lock(&securitization(370), lock_extensions).unwrap();
 		assert_eq!(lock_extensions.len(), 2);
 		assert_eq!(lock_extensions.get(&288).unwrap(), &75);
 		assert_eq!(lock_extensions.get(&432).unwrap(), &20);
 		assert_eq!(vault.get_relock_capacity(), 5);
-		assert_eq!(vault.argons_locked, 500);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 1);
-		assert_eq!(vault.argons_scheduled_for_release.get(&432).unwrap(), &5);
+		assert_eq!(vault.securitization_locked, 495);
+		assert_eq!(vault.securitization_release_schedule.len(), 1);
+		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &5);
 
 		// now return the 370
-		let result = vault.schedule_for_release(370, lock_extensions).unwrap();
+		let result = vault.schedule_for_release(&securitization(370), lock_extensions).unwrap();
 		assert_eq!(result.len(), 3);
 		assert_eq!(result.iter().collect::<Vec<_>>(), vec![&144, &288, &432]);
 		assert_eq!(vault.get_relock_capacity(), 375);
-		assert_eq!(vault.argons_locked, 500);
-		assert_eq!(vault.argons_scheduled_for_release.len(), 3);
-		assert_eq!(vault.argons_scheduled_for_release.get(&144).unwrap(), &275);
-		assert_eq!(vault.argons_scheduled_for_release.get(&288).unwrap(), &75);
-		assert_eq!(vault.argons_scheduled_for_release.get(&432).unwrap(), &25);
+		assert_eq!(vault.securitization_locked, 125);
+		assert_eq!(vault.securitization_release_schedule.len(), 3);
+		assert_eq!(vault.securitization_release_schedule.get(&144).unwrap(), &275);
+		assert_eq!(vault.securitization_release_schedule.get(&288).unwrap(), &75);
+		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &25);
+	}
+
+	fn securitization(amount: Balance) -> Securitization<Balance> {
+		Securitization::new(amount, FixedU128::one())
 	}
 
 	fn default_vault(securitization: Balance, ratio: f64) -> Vault<u64, Balance> {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
 			securitization,
-			argons_locked: 0,
-			argons_pending_activation: 0,
-			argons_scheduled_for_release: Default::default(),
+			securitization_target: securitization,
+			securitization_locked: 0,
+			securitization_pending_activation: 0,
+			securitization_release_schedule: Default::default(),
 			securitization_ratio: FixedU128::from_float(ratio),
 			is_closed: false,
 			terms: VaultTerms {
