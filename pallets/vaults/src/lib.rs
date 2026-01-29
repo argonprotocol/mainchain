@@ -195,7 +195,10 @@ pub mod pallet {
 		},
 		VaultModified {
 			vault_id: VaultId,
+			/// The new securitization amount after modification
 			securitization: T::Balance,
+			/// The securitization target amount after modification (this is the long term target)
+			securitization_target: T::Balance,
 			securitization_ratio: FixedU128,
 		},
 		VaultTermsChangeScheduled {
@@ -455,6 +458,7 @@ pub mod pallet {
 			let vault = Vault {
 				operator_account_id: who.clone(),
 				securitization,
+				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
 				terms,
 				securitization_ratio,
@@ -510,25 +514,27 @@ pub mod pallet {
 			let amount_to_hold =
 				balance_to_i128::<T>(securitization) - balance_to_i128::<T>(vault.securitization);
 
-			#[allow(clippy::comparison_chain)]
-			if amount_to_hold > 0 {
-				Self::hold(&who, (amount_to_hold as u128).into(), HoldReason::EnterVault)
-					.map_err(Error::<T>::from)?;
-			} else if amount_to_hold < 0 {
-				let amount_to_release: T::Balance = (amount_to_hold.unsigned_abs()).into();
-				ensure!(
-					amount_to_release <= vault.uninhibited_securitization(),
-					Error::<T>::VaultReductionBelowSecuritization
-				);
-				Self::release_hold(&who, amount_to_release, HoldReason::EnterVault)?;
-			}
-
-			vault.securitization = securitization;
 			vault.securitization_ratio = securitization_ratio;
+			vault.securitization_target = securitization;
+
+			match amount_to_hold {
+				x if x > 0 => {
+					// increasing securitization
+					Self::hold(&who, (x as u128).into(), HoldReason::EnterVault)
+						.map_err(Error::<T>::from)?;
+					vault.securitization = securitization;
+				},
+				x if x < 0 => {
+					// decreasing securitization
+					Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
+				},
+				_ => { /* no change */ },
+			}
 
 			Self::deposit_event(Event::VaultModified {
 				vault_id,
-				securitization,
+				securitization_target: vault.securitization_target,
+				securitization: vault.securitization,
 				securitization_ratio,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
@@ -585,6 +591,7 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
 			vault.is_closed = true;
+			vault.securitization_target = 0u32.into();
 			let start_securitization = vault.securitization;
 			Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
 			let securitization_remaining = vault.securitization;
@@ -733,9 +740,7 @@ pub mod pallet {
 
 			let swept = vault.sweep_released(block_height);
 			Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
-			if vault.is_closed {
-				Self::shrink_vault_securitization(&mut vault)?;
-			}
+			Self::shrink_vault_securitization(&mut vault)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Ok(())
 		}
@@ -743,8 +748,16 @@ pub mod pallet {
 		fn shrink_vault_securitization(
 			vault: &mut Vault<T::AccountId, T::Balance>,
 		) -> Result<(), VaultError> {
-			let free_securitization = vault.uninhibited_securitization();
+			let uninhibited_securitization = vault.uninhibited_securitization();
 
+			if uninhibited_securitization.is_zero() ||
+				vault.securitization <= vault.securitization_target
+			{
+				return Ok(());
+			}
+			let amount_to_release =
+				vault.securitization.saturating_sub(vault.securitization_target);
+			let free_securitization = uninhibited_securitization.min(amount_to_release);
 			vault.securitization.saturating_reduce(free_securitization);
 
 			ensure!(
@@ -1294,9 +1307,7 @@ pub mod pallet {
 				vault.release_lock(securitization);
 
 				// after reducing the bonded, we can check the minimum securitization needed
-				if vault.is_closed {
-					Self::shrink_vault_securitization(vault)?;
-				}
+				Self::shrink_vault_securitization(vault)?;
 				Ok::<(), VaultError>(())
 			})?;
 			Self::deposit_event(Event::FundLockCanceled {

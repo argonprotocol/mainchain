@@ -195,6 +195,7 @@ fn it_can_modify_a_vault_funds() {
 			Event::VaultModified {
 				vault_id: 1,
 				securitization: 1000,
+				securitization_target: 1000,
 				securitization_ratio: FixedU128::from_float(2.0),
 			}
 			.into(),
@@ -242,22 +243,14 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 		// have been securitization
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 998);
 
-		assert_err!(
-			Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 997, FixedU128::from_float(2.0)),
-			Error::<Test>::VaultReductionBelowSecuritization
-		);
-		// can't reduce the securitization
-		assert_err!(
-			Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 997, FixedU128::from_float(1.5)),
-			Error::<Test>::VaultReductionBelowSecuritization
-		);
-
 		assert_ok!(Vaults::modify_funding(
 			RuntimeOrigin::signed(1),
 			1,
-			998,
+			997,
 			FixedU128::from_float(2.0)
 		));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 998);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_target, 997);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
@@ -269,12 +262,28 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 			Event::VaultModified {
 				vault_id: 1,
 				securitization: 998,
+				securitization_target: 997,
 				securitization_ratio: FixedU128::from_float(2.0),
 			}
 			.into(),
 		);
 		// should have returned the difference
 		assert_eq!(Balances::reserved_balance(1), 998);
+
+		// should now return funds once the locked securitization goes down
+		VaultsById::<Test>::mutate(1, |vault| {
+			if let Some(vault) = vault {
+				vault.securitization_locked = 500;
+				let _ = vault.securitization_release_schedule.try_insert(100, 498);
+			}
+		});
+		VaultFundsReleasingByHeight::<Test>::mutate(100, |a| {
+			let _ = a.try_insert(1);
+		});
+		LastBitcoinHeightChange::set((100, 100));
+		Vaults::on_initialize(2);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 997);
+		assert_eq!(Balances::reserved_balance(1), 997, "should shrink the securitization now");
 	});
 }
 

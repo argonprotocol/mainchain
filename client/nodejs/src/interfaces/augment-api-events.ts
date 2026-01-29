@@ -1610,8 +1610,13 @@ declare module '@polkadot/api-base/types/events' {
       >;
       VaultModified: AugmentedEvent<
         ApiType,
-        [vaultId: u32, securitization: u128, securitizationRatio: u128],
-        { vaultId: u32; securitization: u128; securitizationRatio: u128 }
+        [vaultId: u32, securitization: u128, securitizationTarget: u128, securitizationRatio: u128],
+        {
+          vaultId: u32;
+          securitization: u128;
+          securitizationTarget: u128;
+          securitizationRatio: u128;
+        }
       >;
       /**
        * Vault revenue was not collected within the required window, so has been burned

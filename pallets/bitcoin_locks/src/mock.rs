@@ -76,6 +76,7 @@ parameter_types! {
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		securitization:  200_000_000_000,
+		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),

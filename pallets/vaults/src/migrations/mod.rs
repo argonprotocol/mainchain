@@ -104,6 +104,11 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade for Inn
 				Some(Vault {
 					operator_account_id: vault.operator_account_id,
 					securitization: vault.securitization,
+					securitization_target: if vault.is_closed {
+						0u128.into()
+					} else {
+						vault.securitization
+					},
 					securitization_locked: securitization_locked.into(),
 					securitization_pending_activation: securitization_pending_activation.into(),
 					securitization_release_schedule: vault.argons_scheduled_for_release,
@@ -200,6 +205,25 @@ mod test {
 					opened_tick: 0,
 				},
 			);
+			old_storage::VaultsById::<Test>::insert(
+				3,
+				old_storage::Vault {
+					operator_account_id: 2,
+					securitization: 200,
+					argons_scheduled_for_release: Default::default(),
+					argons_locked: 100,
+					argons_pending_activation: 0,
+					securitization_ratio: FixedU128::one(),
+					is_closed: true,
+					terms: VaultTerms {
+						bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
+						bitcoin_base_fee: 0,
+						treasury_profit_sharing: Permill::from_percent(20),
+					},
+					pending_terms: None,
+					opened_tick: 0,
+				},
+			);
 			let utxo_1 = pallet_bitcoin_locks::LockedBitcoin {
 				vault_id: 1,
 				liquidity_promised: 100,
@@ -239,15 +263,21 @@ mod test {
 
 			// The weight used should be 1 read for the old value, and 1 write for the new
 			// value.
-			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(3, 2));
+			assert_eq!(weight, <Test as frame_system::Config>::DbWeight::get().reads_writes(4, 3));
 
 			// Verify the new storage has the expected values
 			let new_value_1 = VaultsById::<Test>::get(1).unwrap();
 			let new_value_2 = VaultsById::<Test>::get(2).unwrap();
+			let new_value_3 = VaultsById::<Test>::get(3).unwrap();
 			assert_eq!(new_value_1.operator_account_id, 1);
 			assert_eq!(new_value_1.securitization_locked, 200);
+			assert_eq!(new_value_1.securitization_target, 100);
 			assert_eq!(new_value_2.operator_account_id, 2);
 			assert_eq!(new_value_2.securitization_locked, 0);
+			assert_eq!(new_value_2.securitization_target, 200);
+			assert_eq!(new_value_3.operator_account_id, 2);
+			assert_eq!(new_value_3.securitization_locked, 100);
+			assert_eq!(new_value_3.securitization_target, 0);
 		});
 	}
 }

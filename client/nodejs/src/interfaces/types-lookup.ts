@@ -567,6 +567,7 @@ declare module '@polkadot/types/lookup' {
     readonly asVaultModified: {
       readonly vaultId: u32;
       readonly securitization: u128;
+      readonly securitizationTarget: u128;
       readonly securitizationRatio: u128;
     } & Struct;
     readonly isVaultTermsChangeScheduled: boolean;
@@ -3268,6 +3269,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesVault extends Struct {
     readonly operatorAccountId: AccountId32;
     readonly securitization: Compact<u128>;
+    readonly securitizationTarget: Compact<u128>;
     readonly securitizationLocked: Compact<u128>;
     readonly securitizationPendingActivation: Compact<u128>;
     readonly securitizationReleaseSchedule: BTreeMap<u64, u128>;

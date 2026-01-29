@@ -3796,9 +3796,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				6u8, 181u8, 119u8, 85u8, 39u8, 52u8, 196u8, 223u8, 95u8, 132u8, 241u8, 100u8, 11u8,
-				236u8, 208u8, 192u8, 9u8, 254u8, 38u8, 115u8, 21u8, 149u8, 163u8, 162u8, 67u8,
-				29u8, 251u8, 243u8, 86u8, 213u8, 111u8, 103u8,
+				18u8, 179u8, 186u8, 107u8, 47u8, 96u8, 28u8, 40u8, 235u8, 15u8, 241u8, 188u8,
+				205u8, 187u8, 132u8, 199u8, 199u8, 46u8, 25u8, 20u8, 203u8, 115u8, 184u8, 32u8,
+				205u8, 165u8, 52u8, 99u8, 250u8, 193u8, 36u8, 200u8,
 			]
 	}
 	pub mod system {
@@ -4916,9 +4916,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							235u8, 11u8, 111u8, 7u8, 203u8, 166u8, 1u8, 49u8, 233u8, 117u8, 76u8,
-							30u8, 122u8, 170u8, 182u8, 134u8, 225u8, 119u8, 227u8, 141u8, 52u8,
-							133u8, 61u8, 10u8, 54u8, 136u8, 19u8, 61u8, 175u8, 49u8, 241u8, 243u8,
+							170u8, 14u8, 184u8, 111u8, 10u8, 160u8, 254u8, 113u8, 11u8, 120u8,
+							197u8, 112u8, 130u8, 3u8, 0u8, 70u8, 4u8, 250u8, 194u8, 25u8, 184u8,
+							48u8, 197u8, 247u8, 144u8, 195u8, 100u8, 185u8, 232u8, 68u8, 203u8,
+							52u8,
 						],
 					)
 				}
@@ -9910,12 +9911,14 @@ pub mod api {
 			pub struct VaultModified {
 				pub vault_id: vault_modified::VaultId,
 				pub securitization: vault_modified::Securitization,
+				pub securitization_target: vault_modified::SecuritizationTarget,
 				pub securitization_ratio: vault_modified::SecuritizationRatio,
 			}
 			pub mod vault_modified {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type Securitization = ::core::primitive::u128;
+				pub type SecuritizationTarget = ::core::primitive::u128;
 				pub type SecuritizationRatio = runtime_types::sp_arithmetic::fixed_point::FixedU128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultModified {
@@ -10327,10 +10330,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							201u8, 242u8, 56u8, 173u8, 214u8, 168u8, 165u8, 114u8, 60u8, 115u8,
-							218u8, 229u8, 156u8, 253u8, 26u8, 56u8, 212u8, 217u8, 168u8, 209u8,
-							141u8, 198u8, 13u8, 176u8, 167u8, 187u8, 39u8, 1u8, 120u8, 250u8,
-							246u8, 212u8,
+							40u8, 150u8, 14u8, 48u8, 100u8, 47u8, 232u8, 219u8, 117u8, 82u8, 53u8,
+							3u8, 184u8, 39u8, 207u8, 185u8, 42u8, 92u8, 245u8, 192u8, 20u8, 65u8,
+							47u8, 11u8, 101u8, 226u8, 105u8, 183u8, 60u8, 229u8, 105u8, 116u8,
 						],
 					)
 				}
@@ -10352,10 +10354,9 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							201u8, 242u8, 56u8, 173u8, 214u8, 168u8, 165u8, 114u8, 60u8, 115u8,
-							218u8, 229u8, 156u8, 253u8, 26u8, 56u8, 212u8, 217u8, 168u8, 209u8,
-							141u8, 198u8, 13u8, 176u8, 167u8, 187u8, 39u8, 1u8, 120u8, 250u8,
-							246u8, 212u8,
+							40u8, 150u8, 14u8, 48u8, 100u8, 47u8, 232u8, 219u8, 117u8, 82u8, 53u8,
+							3u8, 184u8, 39u8, 207u8, 185u8, 42u8, 92u8, 245u8, 192u8, 20u8, 65u8,
+							47u8, 11u8, 101u8, 226u8, 105u8, 183u8, 60u8, 229u8, 105u8, 116u8,
 						],
 					)
 				}
@@ -25600,6 +25601,8 @@ pub mod api {
 					#[codec(compact)]
 					pub securitization: _1,
 					#[codec(compact)]
+					pub securitization_target: _1,
+					#[codec(compact)]
 					pub securitization_locked: _1,
 					#[codec(compact)]
 					pub securitization_pending_activation: _1,
@@ -32372,6 +32375,7 @@ pub mod api {
 					VaultModified {
 						vault_id: ::core::primitive::u32,
 						securitization: ::core::primitive::u128,
+						securitization_target: ::core::primitive::u128,
 						securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]

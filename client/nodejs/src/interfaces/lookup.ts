@@ -437,6 +437,7 @@ export default {
       VaultModified: {
         vaultId: 'u32',
         securitization: 'u128',
+        securitizationTarget: 'u128',
         securitizationRatio: 'u128',
       },
       VaultTermsChangeScheduled: {
@@ -2825,6 +2826,7 @@ export default {
   ArgonPrimitivesVault: {
     operatorAccountId: 'AccountId32',
     securitization: 'Compact<u128>',
+    securitizationTarget: 'Compact<u128>',
     securitizationLocked: 'Compact<u128>',
     securitizationPendingActivation: 'Compact<u128>',
     securitizationReleaseSchedule: 'BTreeMap<u64, u128>',

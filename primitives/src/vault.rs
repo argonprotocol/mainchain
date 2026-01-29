@@ -248,6 +248,9 @@ where
 	/// The securitization in the vault
 	#[codec(compact)]
 	pub securitization: Balance,
+	/// The target securitization to have in the vault (in case of reducing)
+	#[codec(compact)]
+	pub securitization_target: Balance,
 	/// The securitization locked for bitcoin (at the ratio given)
 	#[codec(compact)]
 	pub securitization_locked: Balance,
@@ -804,6 +807,7 @@ mod test {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
 			securitization,
+			securitization_target: securitization,
 			securitization_locked: 0,
 			securitization_pending_activation: 0,
 			securitization_release_schedule: Default::default(),
