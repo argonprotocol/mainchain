@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...1b1e34ccc5f3edfc79b21a3b63beed6d633e49c8) (2026-01-25)
+## [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...e08f5d2a691256dadf398d3a62030f4bffe5c4ee) (2026-01-26)
 
-### Features
+### [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...v1.3.26) (2026-01-25)
+
+#### Features
 
 * add a default max fee to mining proxy
 ([559dcb1](https://github.com/argonprotocol/mainchain/commit/559dcb1599336e999e4ca444a54c855fdcaf686a))
