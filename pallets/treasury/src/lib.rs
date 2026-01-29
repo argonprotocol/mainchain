@@ -866,12 +866,33 @@ pub mod pallet {
 	}
 
 	impl<T: Config> FunderState<T> {
-		/// The per-frame tranche amount for this specific frame (even spread across 10 frames).
+		/// The per-frame tranche amount for this specific frame (evenly spread across 10 frames).
+		///
+		/// Algorithm:
+		/// - We interpret `target_principal` as the total principal to be deployed over a
+		///   rolling 10-frame window.
+		/// - `base` is the floor of an even split across 10 frames.
+		/// - `rem` is the remainder that cannot be evenly divided.
+		/// - We then distribute that remainder deterministically by giving +1 unit of principal
+		///   to the earliest `rem` frame offsets in each 10-frame cycle, where the offset is
+		///   `frame_id % 10`.
+		///
+		/// This scheme ensures:
+		/// - Over any contiguous 10-frame window, the sum of all `tranche_for_frame` values
+		///   equals exactly `target_principal`.
+		/// - The distribution of the remainder is stable and predictable, always biasing toward
+		///   earlier offsets (0, 1, ..., `rem - 1`) within each cycle, which avoids drift and
+		///   keeps the principal deployment as uniform as integer division allows.
 		pub fn tranche_for_frame(&self, frame_id: FrameId) -> T::Balance {
 			let committed_u128: u128 = self.target_principal.into();
+			// Base amount per frame from an even split across 10 frames.
 			let base: u128 = committed_u128 / 10u128;
+			// Remainder that cannot be evenly divided into 10 equal parts.
 			let rem: u128 = committed_u128 % 10u128;
+			// Frame offset within the 10-frame cycle.
 			let offset: u128 = (frame_id % 10) as u128;
+			// Assign one extra unit to the earliest `rem` offsets in the cycle so that
+			// the sum over any 10-frame window matches `target_principal`.
 			let extra: u128 = if offset < rem { 1 } else { 0 };
 			T::Balance::from(base.saturating_add(extra))
 		}
