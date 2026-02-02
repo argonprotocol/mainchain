@@ -72,15 +72,19 @@ pub async fn bitcoin_loop(
 				tracing::info!(bitcoin_confirmed_height, ?bitcoin_tip, "Submitted bitcoin tip",);
 			},
 			Err(e) => {
-				// Try to peel it down to the real transaction error
-				let is_invalid_1010 = e
-					.root_cause()
-					.downcast_ref::<subxt_error::TransactionError>()
-					.and_then(|tx_err| match tx_err {
-						subxt_error::TransactionError::Invalid(ev) => Some(ev),
-						_ => None,
-					})
-					.is_some();
+				// Try to detect the common "Invalid Transaction (1010)" failure mode.
+				// Depending on the RPC stack, this may surface either as a typed `TransactionError`
+				// somewhere in the error chain *or* only as an RPC string message.
+				let is_invalid_1010 = e.chain().any(|cause| {
+					cause
+						.downcast_ref::<subxt_error::TransactionError>()
+						.and_then(|tx_err| match tx_err {
+							subxt_error::TransactionError::Invalid(ev) => Some(ev),
+							_ => None,
+						})
+						.is_some()
+				}) || format!("{:#}", e)
+					.contains("Invalid Transaction (1010)");
 
 				if is_invalid_1010 {
 					return Err(anyhow::anyhow!(
@@ -90,6 +94,7 @@ pub async fn bitcoin_loop(
 						e
 					));
 				}
+
 				tracing::error!(
 					?e,
 					bitcoin_confirmed_height,
