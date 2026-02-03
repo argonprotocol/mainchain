@@ -1382,6 +1382,7 @@ name = "argon-runtime-common"
 version = "1.3.27"
 dependencies = [
  "anyhow",
+ "argon-bitcoin",
  "argon-primitives",
  "frame-benchmarking 41.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ismp",
@@ -11945,8 +11946,8 @@ dependencies = [
 name = "pallet-mining-slot"
 version = "1.3.27"
 dependencies = [
- "impl-trait-for-tuples",
  "pallet-prelude",
+ "pallet-ticks",
  "pallet-treasury 1.3.27",
  "parity-scale-codec",
  "polkadot-sdk",

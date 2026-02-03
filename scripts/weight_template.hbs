@@ -8,7 +8,7 @@
 //! WASM-EXECUTION: `{{cmd.wasm_execution}}`, CHAIN: `{{cmd.chain}}`, DB CACHE: {{cmd.db_cache}}
 
 // Executed Command:
-{{#each cmd.args as |arg|}}
+{{#each args as |arg|}}
 // {{arg}}
 {{/each}}
 
@@ -16,49 +16,53 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 #![allow(missing_docs)]
-#![cfg_attr(not(feature = "runtime-benchmarks"), allow(unused_variables))]
 
-use frame_support::{traits::Get, weights::Weight};
 use polkadot_sdk::*;
+use frame_support::{traits::Get, weights::Weight};
 use core::marker::PhantomData;
 
 /// Weight functions for `{{pallet}}`.
 pub struct WeightInfo<T>(PhantomData<T>);
+{{#if (eq pallet "frame_system_extensions")}}
+impl<T: frame_system::Config> frame_system::ExtensionsWeightInfo for WeightInfo<T> {
+{{else}}
 impl<T: frame_system::Config> {{pallet}}::WeightInfo for WeightInfo<T> {
+{{/if}}
 	{{#each benchmarks as |benchmark|}}
 	{{#each benchmark.comments as |comment|}}
 	/// {{comment}}
 	{{/each}}
-	{{#if (or benchmark.base_weight benchmark.component_weight)}}
-	{{#if benchmark.component_ranges}}
-	/// The range of component `{{benchmark.component_ranges}}` is `{{benchmark.component_ranges}}`.
-	{{/if}}
-	{{/if}}
+	{{#each benchmark.component_ranges as |range|}}
+	/// The range of component `{{range.name}}` is `[{{range.min}}, {{range.max}}]`.
+	{{/each}}
 	fn {{benchmark.name~}}
 	(
 		{{~#each benchmark.components as |c| ~}}
-		{{c.name}}: u32, {{/each~}}
+		{{~#if (not c.is_used)}}_{{/if}}{{c.name}}: u32, {{/each~}}
 	) -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `{{benchmark.base_reads_db}} + {{benchmark.component_reads_db}} * {{benchmark.component_name}}`
-		//  Estimated: `{{benchmark.base_writes_db}} + {{benchmark.component_writes_db}} * {{benchmark.component_name}}`
-		// Minimum execution time: {{benchmark.min_execution_time}}_000 picoseconds.
-		Weight::from_parts({{benchmark.base_weight}}, {{#if benchmark.base_reads_db}}{{benchmark.base_reads_db}}{{else}}0{{/if}})
+		//  Measured:  `{{benchmark.base_recorded_proof_size}}{{#each benchmark.component_recorded_proof_size as |cp|}} + {{cp.name}} * ({{cp.slope}} +/- {{underscore cp.error}}){{/each}}`
+		//  Estimated: `{{benchmark.base_calculated_proof_size}}{{#each benchmark.component_calculated_proof_size as |cp|}} + {{cp.name}} * ({{cp.slope}} +/- {{underscore cp.error}}){{/each}}`
+		// Minimum execution time: {{underscore benchmark.min_execution_time}}_000 picoseconds.
+		Weight::from_parts({{underscore benchmark.base_weight}}, {{benchmark.base_calculated_proof_size}})
 			{{#each benchmark.component_weight as |cw|}}
-			// Standard Error: {{cw.slope_error}}
-			.saturating_add(Weight::from_parts({{cw.slope}}, 0).saturating_mul({{cw.name}}.into()))
+			// Standard Error: {{underscore cw.error}}
+			.saturating_add(Weight::from_parts({{underscore cw.slope}}, 0).saturating_mul({{cw.name}}.into()))
 			{{/each}}
-			{{#if benchmark.base_reads_db}}
-			.saturating_add(T::DbWeight::get().reads({{benchmark.base_reads_db}}))
+			{{#if (ne benchmark.base_reads "0")}}
+			.saturating_add(T::DbWeight::get().reads({{benchmark.base_reads}}))
 			{{/if}}
-			{{#each benchmark.component_reads_db as |cr|}}
+			{{#each benchmark.component_reads as |cr|}}
 			.saturating_add(T::DbWeight::get().reads(({{cr.slope}}_u64).saturating_mul({{cr.name}}.into())))
 			{{/each}}
-			{{#if benchmark.base_writes_db}}
-			.saturating_add(T::DbWeight::get().writes({{benchmark.base_writes_db}}))
+			{{#if (ne benchmark.base_writes "0")}}
+			.saturating_add(T::DbWeight::get().writes({{benchmark.base_writes}}))
 			{{/if}}
-			{{#each benchmark.component_writes_db as |cw|}}
+			{{#each benchmark.component_writes as |cw|}}
 			.saturating_add(T::DbWeight::get().writes(({{cw.slope}}_u64).saturating_mul({{cw.name}}.into())))
+			{{/each}}
+			{{#each benchmark.component_calculated_proof_size as |cp|}}
+			.saturating_add(Weight::from_parts(0, {{cp.slope}}).saturating_mul({{cp.name}}.into()))
 			{{/each}}
 	}
 	{{/each}}

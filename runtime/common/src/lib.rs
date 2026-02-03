@@ -4,6 +4,16 @@
 extern crate alloc;
 
 pub mod apis;
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;
+#[cfg(not(feature = "runtime-benchmarks"))]
+pub mod benchmarking {
+	// Placeholder types so runtimes can reference benchmarking stubs without the feature enabled.
+	pub struct BenchmarkNotaryProvider;
+	pub struct BenchmarkNotebookProvider;
+	pub struct BenchmarkTickProvider;
+	pub struct BenchmarkBitcoinSignatureVerifier;
+}
 mod call_filters;
 pub mod config;
 mod deal_with_fees;
@@ -77,6 +87,27 @@ pub mod prelude {
 		},
 	};
 	pub use sp_version::RuntimeVersion;
+}
+
+pub trait UseUnlessBenchmarkSelector<TBench, TProd> {
+	type Selected;
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+impl<TBench, TProd> UseUnlessBenchmarkSelector<TBench, TProd> for () {
+	type Selected = TBench;
+}
+
+#[cfg(not(feature = "runtime-benchmarks"))]
+impl<TBench, TProd> UseUnlessBenchmarkSelector<TBench, TProd> for () {
+	type Selected = TProd;
+}
+
+#[macro_export]
+macro_rules! use_unless_benchmark {
+	($prod:ty, $bench:ty) => {
+		<() as ::argon_runtime_common::UseUnlessBenchmarkSelector<$bench, $prod>>::Selected
+	};
 }
 
 #[macro_export]

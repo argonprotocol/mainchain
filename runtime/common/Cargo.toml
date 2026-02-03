@@ -82,6 +82,7 @@ pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
 argon-primitives = { workspace = true }
+argon-bitcoin = { workspace = true }
 
 frame-benchmarking = { workspace = true, optional = true }
 
@@ -90,6 +91,7 @@ default = [ "std" ]
 canary = []
 std = [
 	"anyhow/std",
+	"argon-bitcoin/std",
 	"argon-primitives/std",
 	"codec/std",
 	"frame-benchmarking/std",

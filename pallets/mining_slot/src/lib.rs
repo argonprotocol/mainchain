@@ -1430,6 +1430,14 @@ impl<T: Config> BlockSealEventHandler for Pallet<T> {
 			}
 		}
 	}
+
+	fn block_seal_read_weight(seal: &BlockSealInherent) -> Weight {
+		if matches!(seal, BlockSealInherent::Vote { .. }) {
+			T::WeightInfo::block_seal_read_vote()
+		} else {
+			Weight::zero()
+		}
+	}
 }
 
 impl<T: Config> sp_runtime::BoundToRuntimeAppPublic for Pallet<T> {
