@@ -139,6 +139,7 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
 			pallet_bitcoin_locks::migrations::SecuritizationMigration<Runtime>,
 			pallet_vaults::migrations::SecuritizationMigration<Runtime>,
+			pallet_treasury::migrations::PalletMigrate<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

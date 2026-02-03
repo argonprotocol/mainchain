@@ -924,10 +924,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
-       * The prebond amount cannot be reduced and this takes it below the previous allocation
-       **/
-      MaxAmountBelowMinimum: AugmentedError<ApiType>;
-      /**
        * Max contributors for a fund exceeded
        **/
       MaxContributorsExceeded: AugmentedError<ApiType>;

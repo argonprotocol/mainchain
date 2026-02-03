@@ -202,10 +202,14 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
 
+pub trait MiningFrameTransitionProvider {
+	fn is_new_frame_started() -> Option<FrameId>;
+	fn get_current_frame_id() -> FrameId;
+}
+
 pub trait MiningFrameProvider {
 	fn get_next_frame_tick() -> Tick;
 	fn is_seat_bidding_started() -> bool;
-	fn is_new_frame_started() -> Option<FrameId>;
 	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)>;
 }
 

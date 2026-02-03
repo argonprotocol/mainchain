@@ -1885,48 +1885,12 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     treasury: {
       /**
-       * Bond argons to a Vault's next treasury pool, tied to the next frame (aka,
-       * tomorrow noon EDT to day after tomorrow noon). The amount bonded to the pool cannot
-       * exceed 1/10th of the activated securitization for the vault.
-       *
-       * The bonded argons and profits will be automatically rolled over to the next fund up to
-       * the max securitization activated.
-       *
-       * - `origin`: The account that is joining the fund
-       * - `vault_id`: The vault id that the account would like to join a fund for
-       * - `amount`: The amount of argons to contribute to the fund. If you increase this amount,
-       * it will just add the incremental amount
+       * All funders can set their committed principal for a vault.
        **/
-      bondArgons: AugmentedSubmittable<
+      setAllocation: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           amount: u128 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128]
-      >;
-      /**
-       * Allows a user to remove their bonded argons from the fund after the hold is released
-       * (once epoch starting at bonded frame is complete).
-       **/
-      unbondArgons: AugmentedSubmittable<
-        (
-          vaultId: u32 | AnyNumber | Uint8Array,
-          frameId: u64 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u32, u64]
-      >;
-      /**
-       * Set the prebonded argons for a vault. This is used by the vault operator to
-       * pre-register funding for each frame. The total allocation will be capped per frame using
-       * the `max_amount_per_frame` parameter.
-       *
-       * NOTE: calling this a second time will ensure your max_amount_per_frame is updated.
-       * However, it will not reduce your allocation
-       **/
-      vaultOperatorPrebond: AugmentedSubmittable<
-        (
-          vaultId: u32 | AnyNumber | Uint8Array,
-          maxAmountPerFrame: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, u128]
       >;

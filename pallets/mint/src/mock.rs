@@ -3,7 +3,7 @@ use pallet_prelude::*;
 
 use crate as pallet_mint;
 use argon_primitives::{BlockRewardAccountsProvider, PriceProvider};
-use pallet_prelude::argon_primitives::MiningFrameProvider;
+use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -59,13 +59,17 @@ parameter_types! {
 }
 
 pub struct StaticMiningFrameProvider;
+impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	fn is_new_frame_started() -> Option<FrameId> {
+		IsNewFrameStart::get()
+	}
+	fn get_current_frame_id() -> FrameId {
+		IsNewFrameStart::get().unwrap_or_default()
+	}
+}
 impl MiningFrameProvider for StaticMiningFrameProvider {
 	fn get_next_frame_tick() -> Tick {
 		NextMiningTick::get()
-	}
-
-	fn is_new_frame_started() -> Option<FrameId> {
-		IsNewFrameStart::get()
 	}
 
 	fn is_seat_bidding_started() -> bool {

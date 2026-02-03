@@ -81,7 +81,7 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
-  PalletTreasuryPrebondedArgons,
+  PalletTreasuryFunderState,
   PalletTreasuryTreasuryCapital,
   PalletTreasuryTreasuryPool,
   PalletVaultsVaultFrameRevenue,
@@ -1354,7 +1354,7 @@ declare module '@polkadot/api-base/types/storage' {
     treasury: {
       /**
        * The treasury pool for the current frame. This correlates with the bids coming in for the
-       * current frame. Sorted with the biggest share last. (current frame)
+       * current frame. Sorted with the biggest share first. (current frame)
        **/
       capitalActive: AugmentedQuery<
         ApiType,
@@ -1362,21 +1362,23 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The treasury pool still raising capital. (current frame + 1)
+       * Accounts that have a non-zero commitment for a vault. Bounded for predictable weights.
        **/
-      capitalRaising: AugmentedQuery<
+      fundersByVaultId: AugmentedQuery<
         ApiType,
-        () => Observable<Vec<PalletTreasuryTreasuryCapital>>,
-        []
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<BTreeSet<AccountId32>>,
+        [u32]
       >;
       /**
-       * Any vaults that have been pre-registered for bonding argons. This is used by the vault
-       * operator to allocate argons to be bonded once bitcoins are securitized in their vault.
+       * Per-vault per-account commitment and current bonded principal (long-lived source of truth).
        **/
-      prebondedByVaultId: AugmentedQuery<
+      funderStateByVaultAndAccount: AugmentedQuery<
         ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<PalletTreasuryPrebondedArgons>>,
-        [u32]
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletTreasuryFunderState>>,
+        [u32, AccountId32]
       >;
       /**
        * The currently earning contributors for the current epoch's bond funds. Sorted by highest

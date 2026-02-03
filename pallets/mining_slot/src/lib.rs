@@ -1399,15 +1399,20 @@ impl<T: Config> MiningFrameProvider for Pallet<T> {
 			IsNextSlotBiddingOpen::<T>::get()
 	}
 
-	fn is_new_frame_started() -> Option<FrameId> {
-		Self::get_newly_started_frame()
-	}
-
 	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
 		let frame_ticks = FrameStartTicks::<T>::get();
 		let starting_tick = frame_ticks.get(&frame_id)?;
 		let ending_tick = frame_ticks.get(&(frame_id + 1))?;
 		Some((*starting_tick, *ending_tick))
+	}
+}
+
+impl<T: Config> MiningFrameTransitionProvider for Pallet<T> {
+	fn is_new_frame_started() -> Option<FrameId> {
+		Self::get_newly_started_frame()
+	}
+	fn get_current_frame_id() -> FrameId {
+		Self::current_frame_id()
 	}
 }
 

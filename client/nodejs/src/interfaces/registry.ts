@@ -229,12 +229,11 @@ import type {
   PalletTransactionPaymentChargeTransactionPayment,
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
-  PalletTreasuryBondHolder,
   PalletTreasuryCall,
   PalletTreasuryError,
   PalletTreasuryEvent,
+  PalletTreasuryFunderState,
   PalletTreasuryHoldReason,
-  PalletTreasuryPrebondedArgons,
   PalletTreasuryTreasuryCapital,
   PalletTreasuryTreasuryPool,
   PalletTxPauseCall,
@@ -495,12 +494,11 @@ declare module '@polkadot/types/types/registry' {
     PalletTransactionPaymentChargeTransactionPayment: PalletTransactionPaymentChargeTransactionPayment;
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
-    PalletTreasuryBondHolder: PalletTreasuryBondHolder;
     PalletTreasuryCall: PalletTreasuryCall;
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;
+    PalletTreasuryFunderState: PalletTreasuryFunderState;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
-    PalletTreasuryPrebondedArgons: PalletTreasuryPrebondedArgons;
     PalletTreasuryTreasuryCapital: PalletTreasuryTreasuryCapital;
     PalletTreasuryTreasuryPool: PalletTreasuryTreasuryPool;
     PalletTxPauseCall: PalletTxPauseCall;

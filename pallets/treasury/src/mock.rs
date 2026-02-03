@@ -2,7 +2,10 @@ use crate as pallet_treasury;
 use argon_primitives::vault::TreasuryVaultProvider;
 use frame_support::traits::Currency;
 use pallet_prelude::{
-	argon_primitives::vault::{MiningBidPoolProvider, VaultTreasuryFrameEarnings},
+	argon_primitives::{
+		MiningFrameTransitionProvider,
+		vault::{MiningBidPoolProvider, VaultTreasuryFrameEarnings},
+	},
 	*,
 };
 use std::collections::HashMap;
@@ -125,6 +128,17 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	}
 }
 
+pub struct StaticMiningBidPoolProvider;
+impl MiningFrameTransitionProvider for StaticMiningBidPoolProvider {
+	fn get_current_frame_id() -> FrameId {
+		CurrentFrameId::get()
+	}
+
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+}
+
 impl pallet_treasury::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
@@ -136,7 +150,7 @@ impl pallet_treasury::Config for Test {
 	type PalletId = VaultPalletId;
 	type BidPoolBurnPercent = BurnFromBidPoolAmount;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
-	type GetCurrentFrameId = CurrentFrameId;
+	type MiningFrameTransitionProvider = StaticMiningBidPoolProvider;
 }
 
 pub fn new_test_ext() -> TestState {

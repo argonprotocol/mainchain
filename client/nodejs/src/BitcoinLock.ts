@@ -616,6 +616,7 @@ export class BitcoinLock implements IBitcoinLock {
     tip?: bigint;
     initializeForAccountId?: string;
     couponProofKeypair?: KeyringPair;
+    skipCouponProofCheck?: boolean;
   }) {
     const {
       vault,
@@ -628,6 +629,7 @@ export class BitcoinLock implements IBitcoinLock {
       microgonsPerBtc = null,
       initializeForAccountId,
       couponProofKeypair,
+      skipCouponProofCheck,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -638,23 +640,26 @@ export class BitcoinLock implements IBitcoinLock {
     let feeCouponProof = null;
     let prepaidFee = 0n;
     if (this.areFeeCouponsSupported(client) && couponProofKeypair) {
-      const coupon = await client.query.bitcoinLocks.feeCouponsByPublic(
-        couponProofKeypair.publicKey,
-      );
-      if (!coupon.isSome) {
-        throw new Error(`Fee coupon for the provided public key not found on chain.`);
-      }
-      const { maxSatoshis, maxFeePlusTip } = coupon.unwrap();
-      if (satoshis > maxSatoshis.toBigInt()) {
-        throw new Error(
-          `Fee coupon max satoshis exceeded. Coupon max: ${maxSatoshis.toBigInt()}, requested: ${satoshis}`,
+      if (skipCouponProofCheck !== true) {
+        const coupon = await client.query.bitcoinLocks.feeCouponsByPublic(
+          couponProofKeypair.publicKey,
         );
+        if (!coupon.isSome) {
+          throw new Error(`Fee coupon for the provided public key not found on chain.`);
+        }
+        const { maxSatoshis, maxFeePlusTip } = coupon.unwrap();
+        if (satoshis > maxSatoshis.toBigInt()) {
+          throw new Error(
+            `Fee coupon max satoshis exceeded. Coupon max: ${maxSatoshis.toBigInt()}, requested: ${satoshis}`,
+          );
+        }
+        prepaidFee = maxFeePlusTip.isSome
+          ? maxFeePlusTip.value.toBigInt()
+          : BigInt(Number.MAX_SAFE_INTEGER);
+      } else {
+        prepaidFee = BigInt(Number.MAX_SAFE_INTEGER);
       }
-
       feeCouponProof = this.createCouponProof({ couponProofKeypair, argonKeyring });
-      prepaidFee = maxFeePlusTip.isSome
-        ? maxFeePlusTip.value.toBigInt()
-        : BigInt(Number.MAX_SAFE_INTEGER);
     }
     if (
       initializeForAccountId &&
