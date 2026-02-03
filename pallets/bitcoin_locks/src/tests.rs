@@ -14,6 +14,7 @@ use crate::{
 		LockReleaseRequestsByUtxoId, LocksByUtxoId,
 	},
 };
+use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
 	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider, TransactionSponsorProvider, TxSponsor,
 	bitcoin::{
@@ -886,6 +887,91 @@ fn clears_released_bitcoins() {
 		BitcoinLocks::on_initialize(2);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_ok!(BitcoinLocks::spent(1));
+	});
+}
+
+#[test]
+fn cosign_release_rejects_invalid_signature_with_real_verifier() {
+	new_test_ext().execute_with(|| {
+		UseRealBitcoinVerifier::set(true);
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let network = bitcoin::Network::Regtest;
+		let secp = bitcoin::secp256k1::Secp256k1::new();
+
+		let vault_privkey = bitcoin::PrivateKey::generate(network);
+		DefaultVaultBitcoinPubkey::set(vault_privkey.public_key(&secp));
+		DefaultVaultReclaimBitcoinPubkey::set(
+			bitcoin::PrivateKey::generate(network).public_key(&secp),
+		);
+
+		let owner_pubkey: CompressedBitcoinPubkey =
+			bitcoin::PrivateKey::generate(network).public_key(&secp).into();
+		let who = 2;
+		let satoshis = SATOSHIS_PER_BITCOIN + 25_000;
+		set_argons(who, 2_000);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			satoshis,
+			owner_pubkey,
+			None
+		));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.vault_pubkey, vault_privkey.public_key(&secp).into());
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
+
+		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			release_script_pubkey.clone(),
+			11
+		));
+		GetUtxoRef::set(Some(UtxoRef { txid: H256Le([0; 32]), output_index: 0 }));
+
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		let script_args = CosignScriptArgs {
+			vault_pubkey: lock.vault_pubkey,
+			owner_pubkey: lock.owner_pubkey,
+			vault_claim_pubkey: lock.vault_claim_pubkey,
+			created_at_height: lock.created_at_height,
+			open_claim_height: lock.open_claim_height,
+			vault_claim_height: lock.vault_claim_height,
+		};
+		let releaser = CosignReleaser::new(
+			script_args,
+			lock.effective_satoshis(),
+			H256Le([0; 32]).into(),
+			0,
+			ReleaseStep::VaultCosign,
+			Amount::from_sat(11),
+			release_script_pubkey.clone().into(),
+			GetBitcoinNetwork::get().into(),
+		)
+		.expect("should build releaser");
+
+		let mut invalid_releaser = releaser.clone();
+		let (invalid_sig, _) =
+			invalid_releaser.sign(bitcoin::PrivateKey::generate(network)).unwrap();
+		let invalid_sig: BitcoinSignature = invalid_sig.try_into().unwrap();
+
+		assert_err!(
+			BitcoinLocks::cosign_release(RuntimeOrigin::signed(1), 1, invalid_sig),
+			Error::<Test>::BitcoinInvalidCosignature
+		);
+
+		let mut valid_releaser = releaser;
+		let (valid_sig, _) = valid_releaser.sign(vault_privkey).unwrap();
+		let valid_sig: BitcoinSignature = valid_sig.try_into().unwrap();
+		assert!(valid_releaser.verify_signature_raw(lock.vault_pubkey, &valid_sig).unwrap());
+
+		assert_ok!(BitcoinLocks::cosign_release(RuntimeOrigin::signed(1), 1, valid_sig));
+
+		UseRealBitcoinVerifier::set(false);
 	});
 }
 
