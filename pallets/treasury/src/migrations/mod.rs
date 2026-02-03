@@ -324,13 +324,14 @@ mod test {
 	use super::*;
 	use crate::{
 		VaultPoolsByFrame,
-		mock::{Test, TestVault, insert_vault, new_test_ext},
+		mock::{CurrentFrameId, Test, TestVault, insert_vault, new_test_ext},
 	};
 	use frame_support::assert_ok;
 
 	#[test]
 	fn handles_existing_value() {
 		new_test_ext().execute_with(|| {
+			CurrentFrameId::set(2);
 			insert_vault(
 				42,
 				TestVault {

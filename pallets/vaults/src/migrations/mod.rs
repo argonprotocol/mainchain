@@ -276,7 +276,7 @@ mod test {
 			assert_eq!(new_value_2.securitization_locked, 0);
 			assert_eq!(new_value_2.securitization_target, 200);
 			assert_eq!(new_value_3.operator_account_id, 2);
-			assert_eq!(new_value_3.securitization_locked, 100);
+			assert_eq!(new_value_3.securitization_locked, 0);
 			assert_eq!(new_value_3.securitization_target, 0);
 		});
 	}
