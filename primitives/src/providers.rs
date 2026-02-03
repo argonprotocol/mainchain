@@ -12,7 +12,7 @@ use crate::{
 	tick::{Tick, Ticker},
 };
 use codec::{Codec, Decode, Encode, FullCodec, HasCompact, MaxEncodedLen};
-use polkadot_sdk::sp_runtime::Permill;
+use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
@@ -261,12 +261,22 @@ impl NotebookEventHandler for Tuple {
 /// An event handler to listen for submitted block seals
 pub trait BlockSealEventHandler {
 	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>);
+	fn block_seal_read_weight(_seal: &BlockSealInherent) -> Weight {
+		Weight::zero()
+	}
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl BlockSealEventHandler for Tuple {
 	fn block_seal_read(seal: &BlockSealInherent, vote_seal_proof: Option<U256>) {
 		for_tuples!( #( Tuple::block_seal_read(seal, vote_seal_proof); )* );
+	}
+
+	#[allow(clippy::let_and_return)]
+	fn block_seal_read_weight(seal: &BlockSealInherent) -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::block_seal_read_weight(seal)); )* );
+		weight
 	}
 }
 

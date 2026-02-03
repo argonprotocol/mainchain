@@ -16,9 +16,9 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
-impl-trait-for-tuples = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core", "sp-api"] }
 pallet-prelude = { workspace = true }
+pallet-ticks = { workspace = true, default-features = false, optional = true }
 pallet-treasury = { workspace = true }
 
 [dev-dependencies]
@@ -30,14 +30,21 @@ default = [ "std" ]
 std = [
 	"codec/std",
 	"pallet-prelude/std",
+	"pallet-ticks?/std",
 	"pallet-treasury/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 ]
 runtime-benchmarks = [
 	"pallet-prelude/runtime-benchmarks",
+	"pallet-ticks",
+	"pallet-ticks?/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [ "pallet-treasury/try-runtime", "polkadot-sdk/try-runtime" ]
+try-runtime = [
+	"pallet-ticks?/try-runtime",
+	"pallet-treasury/try-runtime",
+	"polkadot-sdk/try-runtime",
+]

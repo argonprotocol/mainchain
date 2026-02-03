@@ -17,7 +17,7 @@ use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 use polkadot_sdk::*;
 
 pub use argon_runtime_common::config::NotaryRecordT;
-use argon_runtime_common::prelude::*;
+use argon_runtime_common::{benchmarking, prelude::*, use_unless_benchmark};
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
@@ -186,8 +186,9 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type TargetComputeBlockPercent = TargetComputeBlockPercent;
 	type AuthorityProvider = MiningSlot;
 	type MaxActiveNotaries = MaxActiveNotaries;
-	type NotebookProvider = Notebook;
-	type TickProvider = Ticks;
+	type NotebookProvider =
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type WeightInfo = ();
 	type TargetBlockVotes = TargetBlockVotes;
 	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
@@ -210,9 +211,10 @@ impl pallet_block_rewards::Config for Runtime {
 	type Balance = Balance;
 	type BlockSealerProvider = BlockSeal;
 	type BlockRewardAccountsProvider = MiningSlot;
-	type NotaryProvider = Notaries;
-	type NotebookProvider = Notebook;
-	type TickProvider = Ticks;
+	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
+	type NotebookProvider =
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
 	type IncrementalGrowth = IncrementalGrowth;
@@ -220,7 +222,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type HalvingBeginTicks = HalvingBeginTick;
 	type MinerPayoutPercent = MinerPayoutPercent;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type EventHandler = Mint;
+	type EventHandler = use_unless_benchmark!(Mint, ());
 	type PayoutHistoryBlocks = PayoutHistoryBlocks;
 	type PriceProvider = PriceIndex;
 	type CohortBlockRewardsToKeep = BlockRewardsCohortHistoryToKeep;
@@ -250,7 +252,7 @@ impl pallet_timestamp::Config for Runtime {
 	type Moment = Moment;
 	type OnTimestampSet = (BlockSealSpec, Ticks);
 	type MinimumPeriod = ConstU64<1>;
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_timestamp::WeightInfo<Runtime>;
 }
 
 pub struct MultiBlockPerTickEnabled;
@@ -281,7 +283,7 @@ impl pallet_vaults::Config for Runtime {
 	type MiningFrameProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
-	type TickProvider = Ticks;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type CurrentFrameId = GetCurrentFrameId;
 	type MaxVaults = MaxVaults;
 	type MaxPendingCosignsPerVault = MaxPendingCosignsPerVault;
@@ -304,7 +306,10 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type LockEvents = (Mint,);
 	type BitcoinUtxoTracker = BitcoinUtxos;
 	type PriceProvider = PriceIndex;
-	type BitcoinSignatureVerifier = BitcoinSignatureVerifier;
+	type BitcoinSignatureVerifier = use_unless_benchmark!(
+		BitcoinSignatureVerifier,
+		benchmarking::BenchmarkBitcoinSignatureVerifier
+	);
 	type BitcoinBlockHeightChange = BitcoinUtxos;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type VaultProvider = Vaults;
@@ -378,7 +383,7 @@ impl pallet_treasury::Config for Runtime {
 }
 
 impl pallet_mining_slot::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_mining_slot::WeightInfo<Runtime>;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
@@ -397,7 +402,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
-	type TickProvider = Ticks;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type BidIncrements = MiningSlotBidIncrement;
 	type SealerInfo = BlockSeal;
 }
@@ -406,11 +411,12 @@ impl pallet_block_seal::Config for Runtime {
 	type AuthorityId = BlockSealAuthorityId;
 	type WeightInfo = ();
 	type AuthorityProvider = MiningSlot;
-	type NotebookProvider = Notebook;
+	type NotebookProvider =
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
 	type BlockSealSpecProvider = BlockSealSpec;
 	type FindAuthor = Digests;
-	type TickProvider = Ticks;
-	type EventHandler = MiningSlot;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
+	type EventHandler = use_unless_benchmark!(MiningSlot, ());
 	type Digests = Digests;
 }
 
@@ -428,9 +434,10 @@ impl pallet_chain_transfer::Config for Runtime {
 	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;
-	type NotebookProvider = Notebook;
+	type NotebookProvider =
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
 	type NotebookTick = NotebookTickProvider;
-	type EventHandler = Mint;
+	type EventHandler = use_unless_benchmark!(Mint, ());
 	type PalletId = ChainTransferPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
@@ -438,11 +445,11 @@ impl pallet_chain_transfer::Config for Runtime {
 
 impl pallet_notebook::Config for Runtime {
 	type WeightInfo = ();
-	type EventHandler = (ChainTransfer, BlockSealSpec, Domains);
-	type NotaryProvider = Notaries;
+	type EventHandler = use_unless_benchmark!((ChainTransfer, BlockSealSpec, Domains), ());
+	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type ChainTransferLookup = ChainTransfer;
 	type BlockSealSpecProvider = BlockSealSpec;
-	type TickProvider = Ticks;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type Digests = Digests;
 }
 
@@ -454,7 +461,7 @@ impl pallet_notaries::Config for Runtime {
 	type MetaChangesTickDelay = MetaChangesTickDelay;
 	type MaxTicksForKeyHistory = MaxTicksForKeyHistory;
 	type MaxNotaryHosts = MaxNotaryHosts;
-	type TickProvider = Ticks;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 }
 pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
 
@@ -463,7 +470,7 @@ impl pallet_balances::Config<ArgonToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_balances_balances::WeightInfo<Runtime>;
 	type Balance = Balance;
 	type DustRemoval = ();
 	type ExistentialDeposit = ConstU128<ARGON_EXISTENTIAL_DEPOSIT>;
@@ -522,7 +529,7 @@ impl Get<Satoshis> for GetMinimumSatoshisPerLock {
 
 impl pallet_bitcoin_utxos::Config for Runtime {
 	type WeightInfo = ();
-	type EventHandler = BitcoinLocks;
+	type EventHandler = use_unless_benchmark!(BitcoinLocks, ());
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type MinimumSatoshisPerTrackedUtxo = GetMinimumSatoshisPerLock;
@@ -546,7 +553,7 @@ impl pallet_balances::Config<OwnershipToken> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_balances_ownership::WeightInfo<Runtime>;
 	/// The type for recording an account's balance.
 	type Balance = Balance;
 	type DustRemoval = ();

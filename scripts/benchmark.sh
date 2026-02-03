@@ -31,6 +31,23 @@ get_pallets_for_runtime() {
         --list=pallets
 }
 
+dedupe_component_ranges() {
+    local file=$1
+    if [ ! -f "$file" ]; then
+        return
+    fi
+
+    # Drop consecutive duplicate component range docs emitted by some benchmarks.
+    local tmp_file
+    tmp_file=$(mktemp)
+    awk '{
+        if ($0 ~ /^\\s*\\/\\/\\/ The range of component/ && $0 == prev) { next }
+        print
+        prev = $0
+    }' "$file" > "$tmp_file"
+    mv "$tmp_file" "$file"
+}
+
 function benchmark_runtime() {
     local runtime_name=$1
     if [ "$runtime_name" = "canary" ]; then
@@ -54,7 +71,7 @@ function benchmark_runtime() {
     # Get dynamic pallet list for this runtime or use specific pallet
     if [ "$SPECIFIC_PALLET" = "all" ]; then
         echo "Getting pallet list for ${runtime_name} runtime..."
-        PALLETS=$(get_pallets_for_runtime "$runtime_path" | tail -n +2 | sort)
+        PALLETS=$(get_pallets_for_runtime "$runtime_path" | tail -n +2 | sort | grep -v '^pallet$' | grep -v '^frame_benchmarking$' | grep -v '^$')
 
         if [ -z "$PALLETS" ]; then
             echo "❌ Failed to get pallet list for $runtime_name runtime"
@@ -72,7 +89,7 @@ function benchmark_runtime() {
 
     # Benchmark each pallet using consistent directory output approach
     echo "$PALLETS" | while read -r pallet; do
-        if [ -z "$pallet" ]; then continue; fi
+        if [ -z "$pallet" ] || [ "$pallet" = "pallet" ] || [ "$pallet" = "frame_benchmarking" ]; then continue; fi
 
         echo "Benchmarking $pallet for ${runtime_name}..."
 
@@ -106,6 +123,10 @@ function benchmark_runtime() {
             if [[ "$pallet" == "pallet_ismp_grandpa" ]]; then
                 sed -i '' 's/pallet_ismp_grandpa::WeightInfo/ismp_grandpa::WeightInfo/g' "$output_dir/$pallet.rs"
             fi
+            while IFS= read -r line; do
+                file=${line#*Created file: }
+                dedupe_component_ranges "$file"
+            done <<< "$CREATED"
         else
             echo "✗ Errors encountered"
             cat "$benchmark_log"

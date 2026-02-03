@@ -7,12 +7,14 @@ pub trait WeightInfo {
 	fn configure_mining_slot_delay() -> Weight;
 
 	// Hooks with variance
-	fn on_finalize_grandpa_rotation(m: u32) -> Weight;
+	fn on_finalize_grandpa_rotation() -> Weight;
 	fn start_new_frame(m: u32) -> Weight;
 
-	// Weight prediction and frame adjustment operations
-	fn on_initialize_with_frame_start() -> Weight;
+	// Frame adjustment operations
 	fn on_finalize_frame_adjustments() -> Weight;
+
+	// Event handlers
+	fn block_seal_read_vote() -> Weight;
 }
 
 // For backwards compatibility and tests.
@@ -25,7 +27,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn on_finalize_grandpa_rotation(_m: u32) -> Weight {
+	fn on_finalize_grandpa_rotation() -> Weight {
 		Weight::zero()
 	}
 
@@ -33,11 +35,11 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn on_initialize_with_frame_start() -> Weight {
+	fn on_finalize_frame_adjustments() -> Weight {
 		Weight::zero()
 	}
 
-	fn on_finalize_frame_adjustments() -> Weight {
+	fn block_seal_read_vote() -> Weight {
 		Weight::zero()
 	}
 }
