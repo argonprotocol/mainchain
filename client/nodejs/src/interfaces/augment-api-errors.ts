@@ -107,6 +107,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       FeeCouponRequired: AugmentedError<ApiType>;
       /**
+       * Cannot request an orphaned release for the funding UTXO
+       **/
+      FundingUtxoCannotBeReleased: AugmentedError<ApiType>;
+      /**
        * An error occurred in the vault module
        **/
       GenericVaultError: AugmentedError<ApiType>;
@@ -149,10 +153,18 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       LockNotFound: AugmentedError<ApiType>;
       /**
+       * The lock funding has not been confirmed on bitcoin
+       **/
+      LockPendingFunding: AugmentedError<ApiType>;
+      /**
        * This bitcoin lock exceeded the maximum allowed number of satoshis for the provided fee
        * coupon
        **/
       MaxFeeCouponSatoshisExceeded: AugmentedError<ApiType>;
+      /**
+       * Too many orphaned utxo release requests for a lock
+       **/
+      MaxOrphanedUtxoReleaseRequestsExceeded: AugmentedError<ApiType>;
       /**
        * The price provider has no bitcoin prices available. This is a temporary error
        **/
@@ -170,6 +182,14 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
       /**
+       * Cannot fund with an orphaned utxo after lock funding is confirmed
+       **/
+      OrphanedUtxoFundingConflict: AugmentedError<ApiType>;
+      /**
+       * Cannot lock an orphaned utxo with a pending release request
+       **/
+      OrphanedUtxoReleaseRequested: AugmentedError<ApiType>;
+      /**
        * An overflow or underflow occurred while calculating the redemption price
        **/
       OverflowError: AugmentedError<ApiType>;
@@ -185,10 +205,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The hold on funds could not be recovered
        **/
       UnrecoverableHold: AugmentedError<ApiType>;
-      /**
-       * The lock is not verified
-       **/
-      UnverifiedLock: AugmentedError<ApiType>;
       /**
        * This vault is closed
        **/
@@ -224,7 +240,15 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBitcoinSyncHeight: AugmentedError<ApiType>;
       /**
-       * Too many UTXOs are being tracked
+       * This Lock already has an attached funding UTXO
+       **/
+      LockAlreadyFunded: AugmentedError<ApiType>;
+      /**
+       * Too many candidate UTXOs are being stored for this lock
+       **/
+      MaxCandidateUtxosExceeded: AugmentedError<ApiType>;
+      /**
+       * Too many UTXOs are being watched
        **/
       MaxUtxosExceeded: AugmentedError<ApiType>;
       /**
@@ -247,6 +271,10 @@ declare module '@polkadot/api-base/types/errors' {
        * ScriptPubKey is already being waited for
        **/
       ScriptPubkeyConflict: AugmentedError<ApiType>;
+      /**
+       * The UTXO reference does not map to a candidate entry
+       **/
+      UtxoNotCandidate: AugmentedError<ApiType>;
       /**
        * Locked Utxo Not Found
        **/
@@ -1025,6 +1053,10 @@ declare module '@polkadot/api-base/types/errors' {
        * A vault must clear out all pending cosigns before it can collect
        **/
       PendingCosignsBeforeCollect: AugmentedError<ApiType>;
+      /**
+       * A vault must clear out all pending orphan cosigns before it can collect
+       **/
+      PendingOrphanedUtxoCosignsBeforeCollect: AugmentedError<ApiType>;
       /**
        * The vault bitcoin xpubkey has already been used
        **/

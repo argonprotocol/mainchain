@@ -259,19 +259,22 @@ impl LockCommands {
 					get_bitcoin_lock_from_utxo_id(&client, utxo_id, fetch_at).await?;
 
 				let utxo_ref = client
-					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), fetch_at)
+					.fetch_storage(
+						&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(utxo_id),
+						fetch_at,
+					)
 					.await?;
 
 				let release_request = find_release_request(&client, fetch_at, utxo_id).await?;
 
-				let status = match lock.is_verified {
+				let status = match lock.is_funded {
 					true =>
 						if release_request.is_some() {
 							"Release Requested"
 						} else {
-							"Verified"
+							"Funded"
 						},
-					false => "Unverified",
+					false => "Pending Funding",
 				};
 				let pending_mint_query = storage().mint().pending_mint_utxos();
 				let pending_mint = client
@@ -301,7 +304,7 @@ impl LockCommands {
 						.min(lock.locked_market_rate)
 				};
 
-				let minted = if lock.is_verified { lock.liquidity_promised - remaining } else { 0 };
+				let minted = if lock.is_funded { lock.liquidity_promised - remaining } else { 0 };
 				let utxo_ref_str = utxo_ref
 					.map(|a| {
 						let utxo_txid: Txid = H256Le(a.txid.0).into();
@@ -667,7 +670,10 @@ impl LockCommands {
 					get_bitcoin_lock_from_utxo_id(&client, utxo_id, at_block).await?;
 
 				let utxo_ref = client
-					.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
+					.fetch_storage(
+						&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(utxo_id),
+						at_block,
+					)
 					.await?
 					.ok_or(anyhow::anyhow!("No utxo ref found for lock"))?;
 				let network = get_bitcoin_network(&client, at_block).await?;
@@ -774,7 +780,7 @@ async fn load_cosign_releaser(
 	at_block: FetchAt,
 ) -> anyhow::Result<CosignReleaser> {
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(utxo_id), at_block)
+		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(utxo_id), at_block)
 		.await?
 		.ok_or(anyhow::anyhow!("No utxo ref found for lock"))?;
 	let release_info = find_release_request(client, at_block, utxo_id)

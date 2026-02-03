@@ -298,6 +298,13 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Bytes]
       >;
+      increaseSecuritization: AugmentedSubmittable<
+        (
+          utxoId: u64 | AnyNumber | Uint8Array,
+          newSatoshis: Compact<u64> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, Compact<u64>]
+      >;
       /**
        * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account
        * and log the Bitcoin Script hash to Events.
@@ -418,6 +425,22 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     bitcoinUtxos: {
       /**
+       * Bind a candidate UTXO ref as the funding UTXO for its lock.
+       * The locks pallet authorizes the promotion; this pallet binds the ref and begins
+       * tracking.
+       **/
+      fundWithUtxoCandidate: AugmentedSubmittable<
+        (
+          utxoId: u64 | AnyNumber | Uint8Array,
+          utxoRef:
+            | ArgonPrimitivesBitcoinUtxoRef
+            | { txid?: any; outputIndex?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, ArgonPrimitivesBitcoinUtxoRef]
+      >;
+      /**
        * Sets the most recent confirmed bitcoin block height (only executable by the Oracle
        * Operator account)
        *
@@ -442,7 +465,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32]
       >;
       /**
-       * Submitted when a bitcoin UTXO has been moved or confirmed
+       * Submitted when a bitcoin UTXO has been moved or confirmed.
        **/
       sync: AugmentedSubmittable<
         (

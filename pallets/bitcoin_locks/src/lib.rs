@@ -4,6 +4,7 @@
 extern crate alloc;
 extern crate core;
 
+use alloc::vec::Vec;
 use pallet_prelude::*;
 
 use argon_bitcoin::CosignReleaser;
@@ -146,6 +147,9 @@ pub mod pallet {
 		/// Number of frames a vault has to counter-sign a bitcoin release
 		#[pallet::constant]
 		type LockReleaseCosignDeadlineFrames: Get<FrameId>;
+		/// Number of frames an orphaned UTXO release request remains valid.
+		#[pallet::constant]
+		type OrphanedUtxoReleaseExpiryFrames: Get<FrameId>;
 
 		/// Getter for the current frame id
 		type CurrentFrameId: Get<FrameId>;
@@ -231,6 +235,19 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Expiration of orphaned utxo refs by user account
+	#[pallet::storage]
+	pub type OrphanedUtxoExpirationByFrame<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		FrameId,
+		BoundedBTreeSet<
+			(<T as frame_system::Config>::AccountId, UtxoRef),
+			T::MaxConcurrentlyExpiringLocks,
+		>,
+		ValueQuery,
+	>;
+
 	/// History of microgons per btc
 	#[pallet::storage]
 	pub type MicrogonPerBtcHistory<T: Config> =
@@ -300,8 +317,8 @@ pub mod pallet {
 		pub created_at_height: BitcoinHeight,
 		/// The script pubkey where funds are sent to fund this bitcoin lock
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
-		/// Whether this lock has been verified on-bitcoin
-		pub is_verified: bool,
+		/// Whether this lock has been funded (confirmed) on-bitcoin
+		pub is_funded: bool,
 		/// Funds used by this bitcoin that will need to be held for extended periods when released
 		/// back to the vault
 		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
@@ -512,11 +529,36 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			error: DispatchError,
 		},
+		OrphanedUtxoReceived {
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+			vault_id: VaultId,
+			satoshis: Satoshis,
+		},
+		OrphanedUtxoReleaseRequested {
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+			vault_id: VaultId,
+			account_id: T::AccountId,
+		},
 		OrphanedUtxoCosigned {
 			utxo_id: UtxoId,
 			utxo_ref: UtxoRef,
 			vault_id: VaultId,
+			account_id: T::AccountId,
 			signature: BitcoinSignature,
+		},
+		UtxoFundedFromCandidate {
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+			vault_id: VaultId,
+			account_id: T::AccountId,
+		},
+		SecuritizationIncreased {
+			utxo_id: UtxoId,
+			vault_id: VaultId,
+			new_satoshis: Satoshis,
+			account_id: T::AccountId,
 		},
 	}
 
@@ -576,8 +618,8 @@ pub mod pallet {
 		NoRatchetingAvailable,
 		/// A lock in process of release cannot be ratcheted
 		LockInProcessOfRelease,
-		/// The lock is not verified
-		UnverifiedLock,
+		/// The lock funding has not been confirmed on bitcoin
+		LockPendingFunding,
 		/// An overflow or underflow occurred while calculating the redemption price
 		OverflowError,
 		/// An ineligible microgon rate per btc was requested
@@ -593,6 +635,14 @@ pub mod pallet {
 		FeeCouponAlreadyExists,
 		/// Initializing a lock for another account requires a fee coupon
 		FeeCouponRequired,
+		/// Cannot fund with an orphaned utxo after lock funding is confirmed
+		OrphanedUtxoFundingConflict,
+		/// Cannot lock an orphaned utxo with a pending release request
+		OrphanedUtxoReleaseRequested,
+		/// Cannot request an orphaned release for the funding UTXO
+		FundingUtxoCannotBeReleased,
+		/// Too many orphaned utxo release requests for a lock
+		MaxOrphanedUtxoReleaseRequestsExceeded,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -653,7 +703,6 @@ pub mod pallet {
 			}
 
 			let overdue = LockCosignDueByFrame::<T>::take(T::CurrentFrameId::get());
-
 			for utxo_id in overdue {
 				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
 				if let Err(e) = res {
@@ -663,6 +712,32 @@ pub mod pallet {
 						e
 					);
 					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
+				}
+			}
+
+			let expiring = OrphanedUtxoExpirationByFrame::<T>::take(T::CurrentFrameId::get());
+			for (account_id, utxo_ref) in expiring {
+				let res: Result<(), DispatchError> = with_storage_layer(|| {
+					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref)
+					{
+						if request.cosign_request.is_some() {
+							T::VaultProvider::update_orphan_cosign_list(
+								request.vault_id,
+								request.utxo_id,
+								&account_id,
+								true,
+							)
+							.map_err(Error::<T>::from)?;
+						}
+					}
+					Ok::<(), DispatchError>(())
+				});
+				if let Err(e) = res {
+					log::error!(
+						"Orphaned bitcoin utxo {:?} failed expiry cleanup {:?}",
+						utxo_ref,
+						e
+					);
 				}
 			}
 
@@ -775,7 +850,7 @@ pub mod pallet {
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
 
 			// if no refund is needed, we can just cancel the lock
-			if !lock.is_verified {
+			if !lock.is_funded {
 				Self::cancel_lock(utxo_id, &lock)?;
 				return Ok(());
 			}
@@ -800,7 +875,7 @@ pub mod pallet {
 			let mut redemption_price = T::Balance::zero();
 
 			// If this is a confirmed utxo, we require the release price to be paid
-			if lock.is_verified {
+			if lock.is_funded {
 				// we have to take the fee out of the locked satoshis, so this won't work
 				ensure!(
 					bitcoin_network_fee < lock.effective_satoshis(),
@@ -875,32 +950,23 @@ pub mod pallet {
 			let lock_extension = lock.get_lock_extension();
 			let utxo_satoshis = lock.effective_satoshis();
 			let securitization = lock.get_securitization();
-			let LockedBitcoin {
-				vault_id,
-				satoshis,
-				vault_pubkey,
-				vault_claim_pubkey,
-				owner_pubkey,
-				created_at_height,
-				open_claim_height,
-				owner_account,
-				vault_claim_height,
-				..
-			} = lock;
+			let vault_id = lock.vault_id;
+			let vault_pubkey = lock.vault_pubkey;
+			let owner_account = lock.owner_account.clone();
 
 			ensure!(T::VaultProvider::is_owner(vault_id, &who), Error::<T>::NoPermissions);
 			let request = Self::take_release_request(utxo_id)?;
 
-			let utxo_ref =
-				T::BitcoinUtxoTracker::get(utxo_id).ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+			let utxo_ref = T::BitcoinUtxoTracker::get_funding_utxo_ref(utxo_id)
+				.ok_or(Error::<T>::BitcoinUtxoNotFound)?;
 
 			let script_args = CosignScriptArgs {
 				vault_pubkey,
-				owner_pubkey,
-				vault_claim_pubkey,
-				created_at_height,
-				vault_claim_height,
-				open_claim_height,
+				owner_pubkey: lock.owner_pubkey,
+				vault_claim_pubkey: lock.vault_claim_pubkey,
+				created_at_height: lock.created_at_height,
+				vault_claim_height: lock.vault_claim_height,
+				open_claim_height: lock.open_claim_height,
 			};
 			let releaser = CosignReleaser::new(
 				script_args,
@@ -933,7 +999,7 @@ pub mod pallet {
 			T::VaultProvider::schedule_for_release(
 				vault_id,
 				&securitization,
-				satoshis,
+				lock.satoshis,
 				&lock_extension,
 			)
 			.map_err(Error::<T>::from)?;
@@ -943,6 +1009,7 @@ pub mod pallet {
 				frame_system::Pallet::<T>::block_number(),
 			);
 
+			Self::schedule_orphans_for_cleanup(utxo_id, &lock);
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Self::deposit_event(Event::BitcoinUtxoCosigned { utxo_id, vault_id, signature });
@@ -975,7 +1042,7 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
-			ensure!(lock.is_verified, Error::<T>::UnverifiedLock);
+			ensure!(lock.is_funded, Error::<T>::LockPendingFunding);
 			ensure!(
 				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
 				Error::<T>::LockInProcessOfRelease
@@ -1102,23 +1169,36 @@ pub mod pallet {
 			bitcoin_network_fee: Satoshis,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			OrphanedUtxosByAccount::<T>::mutate(&who, utxo_ref, |entry_maybe| {
-				let Some(entry) = entry_maybe else {
-					return Err(Error::<T>::BitcoinUtxoNotFound);
-				};
+			OrphanedUtxosByAccount::<T>::try_mutate(&who, utxo_ref.clone(), |entry_maybe| {
+				let entry = entry_maybe.as_mut().ok_or(Error::<T>::BitcoinUtxoNotFound)?;
+				ensure!(
+					T::BitcoinUtxoTracker::get_funding_utxo_ref(entry.utxo_id) !=
+						Some(utxo_ref.clone()),
+					Error::<T>::FundingUtxoCannotBeReleased
+				);
+				ensure!(entry.cosign_request.is_none(), Error::<T>::OrphanedUtxoReleaseRequested);
+
 				entry.cosign_request = Some(OrphanedUtxoCosignRequest {
 					bitcoin_network_fee,
 					to_script_pubkey: to_script_pubkey.clone(),
 					created_at_argon_block_number: <frame_system::Pallet<T>>::block_number(),
 				});
 				// send to a queue for vault to know about it
-				T::VaultProvider::update_orphaned_cosign_list(
+				T::VaultProvider::update_orphan_cosign_list(
 					entry.vault_id,
 					entry.utxo_id,
 					&who,
 					false,
-				)?;
-				Ok(())
+				)
+				.map_err(Error::<T>::from)?;
+
+				Self::deposit_event(Event::OrphanedUtxoReleaseRequested {
+					utxo_id: entry.utxo_id,
+					utxo_ref: utxo_ref.clone(),
+					vault_id: entry.vault_id,
+					account_id: who.clone(),
+				});
+				Ok::<(), Error<T>>(())
 			})?;
 
 			Ok(())
@@ -1135,25 +1215,18 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			let orphan = OrphanedUtxosByAccount::<T>::take(&orphan_owner, &utxo_ref)
 				.ok_or(Error::<T>::BitcoinUtxoNotFound)?;
-
+			let vault_id = orphan.vault_id;
+			let utxo_id = orphan.utxo_id;
 			// if not owner, "take" of ref will rollback
-			ensure!(T::VaultProvider::is_owner(orphan.vault_id, &who), Error::<T>::NoPermissions);
-			let vault_has_no_more_owner_orphans =
-				OrphanedUtxosByAccount::<T>::iter_prefix(&orphan_owner)
-					.all(|(_utxo_ref, o)| o.vault_id != orphan.vault_id);
-			if vault_has_no_more_owner_orphans {
-				T::VaultProvider::update_orphaned_cosign_list(
-					orphan.vault_id,
-					orphan.utxo_id,
-					&who,
-					true,
-				)
+			ensure!(T::VaultProvider::is_owner(vault_id, &who), Error::<T>::NoPermissions);
+			T::VaultProvider::update_orphan_cosign_list(vault_id, utxo_id, &orphan_owner, true)
 				.map_err(Error::<T>::from)?;
-			}
+			T::BitcoinUtxoTracker::unwatch_candidate(utxo_id, &utxo_ref);
 			Self::deposit_event(Event::OrphanedUtxoCosigned {
-				utxo_id: orphan.utxo_id,
-				vault_id: orphan.vault_id,
-				utxo_ref,
+				utxo_id,
+				vault_id,
+				utxo_ref: utxo_ref.clone(),
+				account_id: orphan_owner,
 				signature,
 			});
 
@@ -1208,6 +1281,61 @@ pub mod pallet {
 			Self::create_bitcoin_lock(&account_id, vault_id, satoshis, bitcoin_pubkey, options)?;
 			Ok(())
 		}
+
+		#[pallet::call_index(9)]
+		#[pallet::weight(T::WeightInfo::increase_securitization())]
+		pub fn increase_securitization(
+			origin: OriginFor<T>,
+			utxo_id: UtxoId,
+			#[pallet::compact] new_satoshis: Satoshis,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
+			ensure!(!lock.is_funded, Error::<T>::OrphanedUtxoFundingConflict);
+			ensure!(new_satoshis > lock.satoshis, Error::<T>::InsufficientSatoshisLocked);
+
+			let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
+			let elapsed_blocks = current_bitcoin_height.saturating_sub(lock.created_at_height);
+			let full_term = lock.vault_claim_height.saturating_sub(lock.created_at_height).max(1);
+			let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
+			let duration_for_new_funds =
+				FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
+
+			let ratio = FixedU128::from_rational(new_satoshis as u128, lock.satoshis as u128);
+			let new_liquidity_promised = ratio.saturating_mul_int(lock.liquidity_promised);
+			let additional_liquidity =
+				new_liquidity_promised.saturating_sub(lock.liquidity_promised);
+			if additional_liquidity > T::Balance::zero() {
+				let mut lock_extension = lock.get_lock_extension();
+				let securitization =
+					Securitization::new(additional_liquidity, lock.securitization_ratio);
+				let fee = T::VaultProvider::lock(
+					lock.vault_id,
+					&who,
+					&securitization,
+					new_satoshis.saturating_sub(lock.satoshis),
+					Some((duration_for_new_funds, &mut lock_extension)),
+					false,
+				)
+				.map_err(Error::<T>::from)?;
+
+				lock.security_fees.saturating_accrue(fee);
+				lock.fund_hold_extensions = lock_extension.extended_expiration_funds.clone();
+				lock.liquidity_promised = new_liquidity_promised;
+				lock.locked_market_rate = ratio.saturating_mul_int(lock.locked_market_rate);
+			}
+			lock.satoshis = new_satoshis;
+			let vault_id = lock.vault_id;
+			LocksByUtxoId::<T>::insert(utxo_id, lock);
+			Self::deposit_event(Event::SecuritizationIncreased {
+				utxo_id,
+				vault_id,
+				new_satoshis,
+				account_id: who,
+			});
+			Ok(())
+		}
 	}
 
 	impl<T: Config>
@@ -1260,24 +1388,20 @@ pub mod pallet {
 			}
 		}
 	}
-	impl<T: Config> BitcoinUtxoEvents for Pallet<T> {
+	impl<T: Config> BitcoinUtxoEvents<T::AccountId, BlockNumberFor<T>> for Pallet<T> {
 		fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {
 				if let Some(lock) = a {
-					if lock.is_verified {
-						log::warn!("Utxo id {:?} already verified", utxo_id);
+					if lock.is_funded {
+						log::warn!("Utxo id {:?} already funded", utxo_id);
 						return Ok(());
 					}
-					lock.is_verified = true;
+					lock.is_funded = true;
 					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 						.map_err(Error::<T>::from)?;
 
 					// If we received different amount of sats than expected, we need to adjust
 					// the lock parameters. We will not change the fee.
-					//
-					// NOTE: at time of writing, this is a max of 10k sats ($10), controlled
-					// by which utxos the utxo pallet sends to funding_received vs
-					// invalid_utxo_received.
 					if received_satoshis < lock.satoshis {
 						let ratio = FixedU128::from_rational(
 							received_satoshis as u128,
@@ -1305,14 +1429,23 @@ pub mod pallet {
 					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 						.map_err(Error::<T>::from)?;
 				} else {
-					log::warn!("Verified utxo_id {:?} not found", utxo_id);
+					log::warn!("Funded utxo_id {:?} not found", utxo_id);
 				}
 				Ok::<(), DispatchError>(())
 			})
 		}
 
 		fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult {
+			if let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) {
+				// Funded locks are handled by their own lifecycle; don't cancel due to pending
+				// funding timeouts.
+				if lock.is_funded {
+					return Ok(());
+				}
+			}
+
 			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
+				Self::schedule_orphans_for_cleanup(utxo_id, &lock);
 				let securitization = lock.get_securitization();
 				T::VaultProvider::remove_pending(lock.vault_id, &securitization)
 					.map_err(Error::<T>::from)?;
@@ -1322,24 +1455,63 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn invalid_utxo_received(
+		fn orphaned_utxo_detected(
 			utxo_id: UtxoId,
-			utxo_ref: UtxoRef,
 			satoshis: Satoshis,
-		) -> sp_runtime::DispatchResult {
+			utxo_ref: UtxoRef,
+		) -> DispatchResult {
 			let block_number = frame_system::Pallet::<T>::block_number();
 			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
-			OrphanedUtxosByAccount::<T>::insert(
+			let did_modify = OrphanedUtxosByAccount::<T>::mutate(
 				lock.owner_account.clone(),
-				utxo_ref,
-				OrphanedUtxo {
-					utxo_id,
-					vault_id: lock.vault_id,
-					satoshis,
-					recorded_argon_block_number: block_number,
-					cosign_request: None,
+				&utxo_ref,
+				|entry| {
+					if entry.is_some() {
+						// Avoid overwriting a pending cosign request if the UTXO is re-reported.
+						return false;
+					}
+					*entry = Some(OrphanedUtxo {
+						utxo_id,
+						vault_id: lock.vault_id,
+						satoshis,
+						recorded_argon_block_number: block_number,
+						cosign_request: None,
+					});
+					true
 				},
 			);
+			if did_modify {
+				Self::deposit_event(Event::OrphanedUtxoReceived {
+					utxo_id,
+					utxo_ref,
+					vault_id: lock.vault_id,
+					satoshis,
+				});
+			}
+			Ok(())
+		}
+
+		fn funding_promoted_by_account(
+			utxo_id: UtxoId,
+			received_satoshis: Satoshis,
+			account_id: &T::AccountId,
+			utxo_ref: &UtxoRef,
+		) -> sp_runtime::DispatchResult {
+			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			ensure!(lock.owner_account == *account_id, Error::<T>::NoPermissions);
+			ensure!(!lock.is_funded, Error::<T>::OrphanedUtxoFundingConflict);
+
+			if let Some(orphan) = OrphanedUtxosByAccount::<T>::take(account_id, utxo_ref) {
+				ensure!(orphan.cosign_request.is_none(), Error::<T>::OrphanedUtxoReleaseRequested);
+			};
+
+			Self::funding_received(utxo_id, received_satoshis)?;
+			Self::deposit_event(Event::UtxoFundedFromCandidate {
+				utxo_id,
+				utxo_ref: utxo_ref.clone(),
+				vault_id: lock.vault_id,
+				account_id: account_id.clone(),
+			});
 			Ok(())
 		}
 
@@ -1462,7 +1634,7 @@ pub mod pallet {
 					open_claim_height,
 					created_at_height: current_bitcoin_height,
 					utxo_script_pubkey: script_pubkey,
-					is_verified: false,
+					is_funded: false,
 					fund_hold_extensions: BoundedBTreeMap::default(),
 					created_at_argon_block: <frame_system::Pallet<T>>::block_number(),
 				},
@@ -1518,10 +1690,14 @@ pub mod pallet {
 
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
-
+			if is_externally_spent {
+				Self::clear_orphans_for_lock(utxo_id, &lock)?;
+			} else {
+				Self::schedule_orphans_for_cleanup(utxo_id, &lock);
+			}
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
-			if !lock.is_verified {
+			if !lock.is_funded {
 				T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 					.map_err(Error::<T>::from)?;
 				T::VaultProvider::cancel(lock.vault_id, &lock.get_securitization())
@@ -1614,6 +1790,7 @@ pub mod pallet {
 				compensation_amount,
 				compensated_account_id: lock.owner_account.clone(),
 			});
+			Self::schedule_orphans_for_cleanup(utxo_id, &lock);
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Ok(())
@@ -1676,14 +1853,56 @@ pub mod pallet {
 			Ok(argons)
 		}
 
-		fn cancel_lock(utxo_id: UtxoId, lock: &LockedBitcoin<T>) -> Result<(), Error<T>> {
-			if !lock.is_verified {
+		fn cancel_lock(utxo_id: UtxoId, lock: &LockedBitcoin<T>) -> DispatchResult {
+			if !lock.is_funded {
 				T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 					.map_err(Error::<T>::from)?;
 			}
 			T::VaultProvider::cancel(lock.vault_id, &lock.get_securitization())
 				.map_err(Error::<T>::from)?;
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
+			Self::schedule_orphans_for_cleanup(utxo_id, lock);
+			LocksByUtxoId::<T>::remove(utxo_id);
+
+			Ok(())
+		}
+
+		fn schedule_orphans_for_cleanup(utxo_id: UtxoId, lock: &LockedBitcoin<T>) {
+			let expiry_frame = T::CurrentFrameId::get() + T::OrphanedUtxoReleaseExpiryFrames::get();
+			// Orphans are stored by account, so scan the owner's list for this lock's entries.
+			for (utxo_ref, entrant) in OrphanedUtxosByAccount::<T>::iter_prefix(&lock.owner_account)
+			{
+				if entrant.utxo_id != utxo_id {
+					continue;
+				}
+				OrphanedUtxoExpirationByFrame::<T>::mutate(expiry_frame, |a| {
+					let _ = a.try_insert((lock.owner_account.clone(), utxo_ref.clone()));
+				});
+			}
+		}
+
+		fn clear_orphans_for_lock(utxo_id: UtxoId, lock: &LockedBitcoin<T>) -> DispatchResult {
+			let mut to_remove = Vec::new();
+			for (utxo_ref, orphan) in OrphanedUtxosByAccount::<T>::iter_prefix(&lock.owner_account)
+			{
+				if orphan.utxo_id != utxo_id {
+					continue;
+				}
+				to_remove.push((utxo_ref, orphan.cosign_request.is_some()));
+			}
+
+			for (utxo_ref, had_cosign) in to_remove {
+				OrphanedUtxosByAccount::<T>::remove(&lock.owner_account, &utxo_ref);
+				if had_cosign {
+					T::VaultProvider::update_orphan_cosign_list(
+						lock.vault_id,
+						utxo_id,
+						&lock.owner_account,
+						true,
+					)
+					.map_err(Error::<T>::from)?;
+				}
+			}
 
 			Ok(())
 		}

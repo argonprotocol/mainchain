@@ -83,11 +83,19 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
       /**
+       * Number of frames an orphaned UTXO release request remains valid.
+       **/
+      orphanedUtxoReleaseExpiryFrames: u64 & AugmentedConst<ApiType>;
+      /**
        * Number of ticks per bitcoin block
        **/
       ticksPerBitcoinBlock: u64 & AugmentedConst<ApiType>;
     };
     bitcoinUtxos: {
+      /**
+       * Maximum number of candidate UTXOs stored per lock
+       **/
+      maxCandidateUtxosPerLock: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of satoshi difference allowed from expected to consider a UTXO as
        * "confirmed"
@@ -98,7 +106,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of UTXOs that can be tracked in a block and/or expiring at same block
+       * The maximum number of UTXOs that can be watched in a block and/or expiring at same block
        **/
       maxPendingConfirmationUtxos: u32 & AugmentedConst<ApiType>;
     };

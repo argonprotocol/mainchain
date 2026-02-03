@@ -174,7 +174,7 @@ impl pallet_treasury::Config for Test {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn get(_utxo_id: UtxoId) -> Option<UtxoRef> {
+	fn get_funding_utxo_ref(_utxo_id: UtxoId) -> Option<UtxoRef> {
 		GetUtxoRef::get()
 	}
 
@@ -195,6 +195,11 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 			watched_utxos.remove(&utxo_id);
 		});
 	}
+
+	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
+		let _ = (utxo_id, utxo_ref);
+		None
+	}
 }
 
 parameter_types! {
@@ -203,6 +208,7 @@ parameter_types! {
 	pub static ArgonPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static ArgonTargetPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static LockReleaseCosignDeadlineFrames: FrameId = 5;
+	pub static OrphanedUtxoReleaseExpiryFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
@@ -297,6 +303,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type LockDurationBlocks = LockDurationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
+	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
 	type BitcoinBlockHeightChange = BitcoinBlockHeightChange;
 	type MaxConcurrentlyExpiringLocks = ConstU32<100>;
 	type CurrentFrameId = CurrentFrameId;

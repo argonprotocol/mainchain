@@ -320,6 +320,7 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
+	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type CurrentFrameId = GetCurrentFrameId;
 	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
@@ -533,8 +534,9 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 	type WeightInfo = ();
 	type EventHandler = use_unless_benchmark!(BitcoinLocks, ());
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
-	type MinimumSatoshisPerTrackedUtxo = GetMinimumSatoshisPerLock;
+	type MinimumSatoshisPerCandidateUtxo = GetMinimumSatoshisPerLock;
 	type MaximumSatoshiThresholdFromExpected = MaximumSatoshiThresholdFromExpected;
 }
 

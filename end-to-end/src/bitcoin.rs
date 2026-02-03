@@ -379,14 +379,14 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 			.await
 			.unwrap()
 			.expect("Utxo state should be present");
-		if utxo_lock.is_verified {
-			println!("Utxo lock is verified in block {:?}", next.unwrap().hash());
+		if utxo_lock.is_funded {
+			println!("Utxo lock is funded in block {:?}", next.unwrap().hash());
 			break;
 		}
-		println!("Waiting for utxo lock to be verified in block {:?}", next.unwrap().hash());
+		println!("Waiting for utxo lock to be funded in block {:?}", next.unwrap().hash());
 		max_blocks -= 1;
 		if max_blocks == 0 {
-			panic!("No utxo lock verified after 100 blocks");
+			panic!("No utxo lock funded after 100 blocks");
 		}
 	}
 

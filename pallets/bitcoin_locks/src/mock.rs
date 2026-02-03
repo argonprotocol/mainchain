@@ -70,6 +70,7 @@ parameter_types! {
 	pub static ArgonPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static ArgonTargetPriceInUsd: Option<FixedU128> = Some(FixedU128::from_rational(100, 100));
 	pub static LockReleaseCosignDeadlineFrames: FrameId = 5;
+	pub static OrphanedUtxoReleaseExpiryFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
@@ -96,6 +97,7 @@ parameter_types! {
 	pub static WatchedUtxosById: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)> = BTreeMap::new();
 
 	pub static GetUtxoRef: Option<UtxoRef> = None;
+	pub static CandidateUtxosByRef: BTreeMap<UtxoRef, (UtxoId, Satoshis)> = BTreeMap::new();
 
 	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
 	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance)> = None;
@@ -112,7 +114,7 @@ parameter_types! {
 	pub static ChargeFee: bool = false;
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
-	pub static VaultViewOfOrphanCosigns: BTreeMap<VaultId,  BTreeSet<u64>> = BTreeMap::new();
+	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
@@ -330,18 +332,25 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(())
 	}
 
-	fn update_orphaned_cosign_list(
+	fn update_orphan_cosign_list(
 		vault_id: VaultId,
 		_utxo_id: UtxoId,
 		account_id: &Self::AccountId,
 		should_remove: bool,
 	) -> Result<(), VaultError> {
-		VaultViewOfOrphanCosigns::mutate(|x| {
+		VaultViewOfOrphanedUtxoCosigns::mutate(|x| {
 			let vault_map = x.entry(vault_id).or_default();
+			let count = vault_map.entry(*account_id).or_default();
 			if should_remove {
-				vault_map.remove(account_id);
+				*count = count.saturating_sub(1);
+				if *count == 0 {
+					vault_map.remove(account_id);
+				}
 			} else {
-				vault_map.insert(*account_id);
+				*count = count.saturating_add(1);
+			}
+			if vault_map.is_empty() {
+				x.remove(&vault_id);
 			}
 		});
 		Ok(())
@@ -377,7 +386,7 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn get(_utxo_id: UtxoId) -> Option<UtxoRef> {
+	fn get_funding_utxo_ref(_utxo_id: UtxoId) -> Option<UtxoRef> {
 		GetUtxoRef::get()
 	}
 
@@ -397,7 +406,30 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 		WatchedUtxosById::mutate(|watched_utxos| {
 			watched_utxos.remove(&utxo_id);
 		});
+		CandidateUtxosByRef::mutate(|candidates| {
+			candidates.retain(|_utxo_ref, (id, _)| *id != utxo_id);
+		});
 	}
+
+	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
+		let mut removed = None;
+		CandidateUtxosByRef::mutate(|candidates| {
+			if let Some((id, satoshis)) = candidates.remove(utxo_ref) {
+				if id == utxo_id {
+					removed = Some((utxo_ref.clone(), satoshis));
+				} else {
+					candidates.insert(utxo_ref.clone(), (id, satoshis));
+				}
+			}
+		});
+		removed
+	}
+}
+
+pub(crate) fn insert_candidate_utxo(utxo_ref: UtxoRef, utxo_id: UtxoId, satoshis: Satoshis) {
+	CandidateUtxosByRef::mutate(|candidates| {
+		candidates.insert(utxo_ref, (utxo_id, satoshis));
+	});
 }
 
 pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
@@ -420,6 +452,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type LockDurationBlocks = LockDurationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
+	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
 	type BitcoinBlockHeightChange = BitcoinBlockHeightChange;
 	type MaxConcurrentlyExpiringLocks = ConstU32<100>;
 	type CurrentFrameId = CurrentFrameId;

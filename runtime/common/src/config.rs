@@ -115,6 +115,7 @@ parameter_types! {
 	pub const BitcoinLockDurationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 365; // 1 year
 	pub const BitcoinLockReclamationBlocks: BitcoinHeight = BitcoinBlocksPerDay::get() * 30; // 30 days
 	pub const LockReleaseCosignDeadlineFrames: FrameId = 10;
+	pub const OrphanedUtxoReleaseExpiryFrames: FrameId = 10;
 	pub const TicksPerBitcoinBlock: Tick = 10;
 
 	pub const MaxSetIdSessionEntries: u32 = 2u32;
@@ -165,7 +166,7 @@ parameter_types! {
 
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
 	pub const MaxPendingMintUtxos: u32 = 10_000;
-	pub const MaxTrackedUtxos: u32 = 1_000_000_000;
+	pub const MaxCandidateUtxos: u32 = 1_000_000_000;
 	pub const MaxMintHistoryToMaintain: u32 = 10; // keep all active sessions + the rollover
 	pub const MaxPossibleMiners: u32 = MaxCohortSize::get() * 10u32;
 
@@ -176,8 +177,9 @@ parameter_types! {
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 
 	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 6 * 24; // 1 day of bitcoin blocks
-	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
+	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 1_000;
 	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
+	pub const MaxCandidateUtxosPerLock: u32 = 100;
 
 	// Fees
 	pub FeeMultiplier: Multiplier = Multiplier::one();

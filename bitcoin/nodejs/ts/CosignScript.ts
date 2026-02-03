@@ -66,16 +66,18 @@ export class CosignScript {
   public getCosignPsbt(args: {
     utxoRef: { txid: string; vout: number };
     releaseRequest: IReleaseRequest;
+    // Optional override for orphaned UTXOs that don't match the lock's expected amount.
+    utxoSatoshis?: bigint;
   }) {
     const { lock, network } = this;
-    const { releaseRequest, utxoRef } = args;
+    const { releaseRequest, utxoRef, utxoSatoshis } = args;
 
     releaseRequest.toScriptPubkey = addressBytesHex(releaseRequest.toScriptPubkey, network);
 
     const psbtStr = getCosignPsbt(
       utxoRef.txid,
       utxoRef.vout,
-      lock.utxoSatoshis ?? lock.satoshis,
+      utxoSatoshis ?? lock.utxoSatoshis ?? lock.satoshis,
       lock.vaultPubkey,
       lock.vaultClaimPubkey,
       lock.ownerPubkey,
