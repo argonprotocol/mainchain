@@ -118,6 +118,7 @@ parameter_types! {
 	pub const ArgonTicksPerDay: u64 = 1440;
 	pub static CurrentTick: Tick = 1;
 	pub static DidStartNewFrame: bool = true;
+	pub static UseRealBitcoinVerifier: bool = false;
 }
 
 pub struct EventHandler;
@@ -354,10 +355,22 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 pub struct StaticBitcoinVerifier;
 impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 	fn verify_signature(
-		_utxo_releaseer: CosignReleaser,
-		_pubkey: CompressedBitcoinPubkey,
-		_signature: &BitcoinSignature,
+		utxo_releaseer: CosignReleaser,
+		pubkey: CompressedBitcoinPubkey,
+		signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
+		if UseRealBitcoinVerifier::get() {
+			return utxo_releaseer.verify_signature_raw(pubkey, signature).map_err(|e| {
+				match e {
+					argon_bitcoin::Error::InvalidCompressPubkeyBytes =>
+						pallet_bitcoin_locks::Error::<Test>::BitcoinPubkeyUnableToBeDecoded,
+					argon_bitcoin::Error::InvalidSignatureBytes =>
+						pallet_bitcoin_locks::Error::<Test>::BitcoinSignatureUnableToBeDecoded,
+					_ => pallet_bitcoin_locks::Error::<Test>::BitcoinInvalidCosignature,
+				}
+				.into()
+			});
+		}
 		Ok(true)
 	}
 }

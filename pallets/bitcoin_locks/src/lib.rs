@@ -914,7 +914,9 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForRelease)?;
 
-			T::BitcoinSignatureVerifier::verify_signature(releaser, vault_pubkey, &signature)?;
+			let is_valid =
+				T::BitcoinSignatureVerifier::verify_signature(releaser, vault_pubkey, &signature)?;
+			ensure!(is_valid, Error::<T>::BitcoinInvalidCosignature);
 
 			// burn the owner's held funds
 			let burn_amount = request.redemption_price;

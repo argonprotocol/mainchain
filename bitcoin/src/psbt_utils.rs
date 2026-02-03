@@ -11,7 +11,7 @@ use bitcoin::{
 	key::Secp256k1,
 	sighash::SighashCache,
 };
-use k256::ecdsa::signature::Verifier;
+use k256::ecdsa::signature::hazmat::PrehashVerifier;
 use log::trace;
 use miniscript::psbt::PsbtExt;
 
@@ -119,7 +119,7 @@ pub fn verify_signature_raw(
 	let pubkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey.0)
 		.map_err(|_| Error::InvalidCompressPubkeyBytes)?;
 
-	Ok(pubkey.verify(msg.as_ref(), &signature).is_ok())
+	Ok(pubkey.verify_prehash(msg.as_ref(), &signature).is_ok())
 }
 
 pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKey), Error> {
