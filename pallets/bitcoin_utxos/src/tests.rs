@@ -567,9 +567,64 @@ fn spent_clears_candidates_and_pending() {
 		));
 
 		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
-		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert!(LocksPendingFunding::<Test>::get().contains_key(&1));
 		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
 		assert!(LockedUtxos::<Test>::get(&candidate_ref).is_none());
+	});
+}
+
+/// Spent funding UTXOs clear the lock state.
+#[test]
+fn funded_utxo_spend_clears_lock_state() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let funding_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: funding_ref.clone(),
+					satoshis: expected_satoshis,
+					expected_satoshis,
+					bitcoin_height: 2,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(funding_ref.clone()));
+		assert!(LockedUtxos::<Test>::contains_key(&funding_ref));
+
+		InherentIncluded::<Test>::set(false);
+		System::set_block_number(2);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: vec![BitcoinUtxoSpend {
+					utxo_id: 1,
+					utxo_ref: Some(funding_ref.clone()),
+					bitcoin_height: 2,
+				}],
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
+		assert!(LockedUtxos::<Test>::get(&funding_ref).is_none());
 	});
 }
 

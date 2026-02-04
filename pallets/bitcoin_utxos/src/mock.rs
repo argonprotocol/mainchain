@@ -34,7 +34,7 @@ pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
 }
 
 pub struct StaticEventHandler;
-impl BitcoinUtxoEvents<u64, u64> for StaticEventHandler {
+impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 	fn funding_received(
 		utxo_id: UtxoId,
 		received_satoshis: Satoshis,

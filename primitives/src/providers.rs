@@ -100,7 +100,7 @@ pub trait BitcoinUtxoTracker {
 	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)>;
 }
 
-pub trait BitcoinUtxoEvents<AccountId, BlockNumber> {
+pub trait BitcoinUtxoEvents<AccountId> {
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult;
 	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult;
 	fn funding_promoted_by_account(
@@ -118,7 +118,7 @@ pub trait BitcoinUtxoEvents<AccountId, BlockNumber> {
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
-impl<A, B: Clone> BitcoinUtxoEvents<A, B> for Tuple {
+impl<A> BitcoinUtxoEvents<A> for Tuple {
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 		for_tuples!( #( Tuple::funding_received(utxo_id, received_satoshis)?; )* );
 		Ok(())

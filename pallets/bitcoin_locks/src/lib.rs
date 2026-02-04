@@ -147,7 +147,8 @@ pub mod pallet {
 		/// Number of frames a vault has to counter-sign a bitcoin release
 		#[pallet::constant]
 		type LockReleaseCosignDeadlineFrames: Get<FrameId>;
-		/// Number of frames an orphaned UTXO release request remains valid.
+		/// Number of frames orphaned UTXO release entries are retained after a lock lifecycle
+		/// transition before being cleaned up.
 		#[pallet::constant]
 		type OrphanedUtxoReleaseExpiryFrames: Get<FrameId>;
 
@@ -691,7 +692,9 @@ pub mod pallet {
 			let expirations = (start_bitcoin_height..=bitcoin_block_height)
 				.flat_map(LockExpirationsByBitcoinHeight::<T>::take);
 			// if a lock expires, we need to burn the funds
+			let mut expiring_count: u64 = 0;
 			for utxo_id in expirations {
+				expiring_count = expiring_count.saturating_add(1);
 				let res = with_storage_layer(|| {
 					Self::burn_bitcoin_lock(utxo_id, false)?;
 					Ok(())
@@ -703,6 +706,7 @@ pub mod pallet {
 			}
 
 			let overdue = LockCosignDueByFrame::<T>::take(T::CurrentFrameId::get());
+			let overdue_count = overdue.len() as u64;
 			for utxo_id in overdue {
 				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
 				if let Err(e) = res {
@@ -716,6 +720,7 @@ pub mod pallet {
 			}
 
 			let expiring = OrphanedUtxoExpirationByFrame::<T>::take(T::CurrentFrameId::get());
+			let orphan_expiring_count = expiring.len() as u64;
 			for (account_id, utxo_ref) in expiring {
 				let res: Result<(), DispatchError> = with_storage_layer(|| {
 					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref)
@@ -741,7 +746,12 @@ pub mod pallet {
 				}
 			}
 
-			T::DbWeight::get().reads_writes(2, 1)
+			let extra_items = expiring_count
+				.saturating_add(overdue_count)
+				.saturating_add(orphan_expiring_count);
+			T::DbWeight::get()
+				.reads_writes(2, 1)
+				.saturating_add(T::DbWeight::get().reads_writes(extra_items, extra_items))
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {
@@ -1388,7 +1398,7 @@ pub mod pallet {
 			}
 		}
 	}
-	impl<T: Config> BitcoinUtxoEvents<T::AccountId, BlockNumberFor<T>> for Pallet<T> {
+	impl<T: Config> BitcoinUtxoEvents<T::AccountId> for Pallet<T> {
 		fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {
 				if let Some(lock) = a {
@@ -1870,14 +1880,33 @@ pub mod pallet {
 		fn schedule_orphans_for_cleanup(utxo_id: UtxoId, lock: &LockedBitcoin<T>) {
 			let expiry_frame = T::CurrentFrameId::get() + T::OrphanedUtxoReleaseExpiryFrames::get();
 			// Orphans are stored by account, so scan the owner's list for this lock's entries.
+			let mut to_schedule = Vec::new();
 			for (utxo_ref, entrant) in OrphanedUtxosByAccount::<T>::iter_prefix(&lock.owner_account)
 			{
 				if entrant.utxo_id != utxo_id {
 					continue;
 				}
-				OrphanedUtxoExpirationByFrame::<T>::mutate(expiry_frame, |a| {
-					let _ = a.try_insert((lock.owner_account.clone(), utxo_ref.clone()));
-				});
+				to_schedule.push(utxo_ref);
+			}
+			if to_schedule.is_empty() {
+				return;
+			}
+
+			let owner_account = lock.owner_account.clone();
+			let mut overflowed = false;
+			OrphanedUtxoExpirationByFrame::<T>::mutate(expiry_frame, |a| {
+				for utxo_ref in to_schedule {
+					if a.try_insert((owner_account.clone(), utxo_ref)).is_err() {
+						overflowed = true;
+					}
+				}
+			});
+			if overflowed {
+				log::warn!(
+					"Orphaned UTXO cleanup schedule overflowed for lock {:?} at frame {:?}",
+					utxo_id,
+					expiry_frame
+				);
 			}
 		}
 

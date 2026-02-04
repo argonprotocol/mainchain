@@ -834,7 +834,7 @@ async fn wait_for_mint(
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let pending_utxos = client
-		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_utxos().locks_pending_funding(), FetchAt::Finalized)
 		.await?
 		.unwrap()
 		.0;
@@ -862,7 +862,7 @@ async fn wait_for_mint(
 		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(*utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(*utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("utxo");
 	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());

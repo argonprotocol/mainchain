@@ -41,7 +41,7 @@ pub mod pallet {
 	pub trait Config: polkadot_sdk::frame_system::Config {
 		type WeightInfo: WeightInfo;
 
-		type EventHandler: BitcoinUtxoEvents<Self::AccountId, BlockNumberFor<Self>>;
+		type EventHandler: BitcoinUtxoEvents<Self::AccountId>;
 
 		/// The maximum number of UTXOs that can be watched in a block and/or expiring at same block
 		#[pallet::constant]
@@ -290,8 +290,9 @@ pub mod pallet {
 			// process funding first, so any funded + spent received in the same block are handled
 			// correctly
 			for spend in spent {
-				let err =
-					with_storage_layer(|| Self::utxo_spent(spend.utxo_id, spend.bitcoin_height));
+				let err = with_storage_layer(|| {
+					Self::utxo_spent(spend.utxo_id, spend.utxo_ref, spend.bitcoin_height)
+				});
 				if let Err(e) = err {
 					log::warn!("Failed to mark UTXO {} as spent: {:?}", spend.utxo_id, e);
 					Self::deposit_event(Event::UtxoSpentError { utxo_id: spend.utxo_id, error: e });
@@ -623,7 +624,32 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn utxo_spent(utxo_id: UtxoId, block_height: BitcoinHeight) -> DispatchResult {
+		pub fn utxo_spent(
+			utxo_id: UtxoId,
+			utxo_ref: Option<UtxoRef>,
+			block_height: BitcoinHeight,
+		) -> DispatchResult {
+			if let Some(ref utxo_ref) = utxo_ref {
+				if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::get(utxo_id) {
+					if &locked_ref == utxo_ref {
+						LockedUtxos::<T>::take(locked_ref);
+						UtxoIdToFundingUtxoRef::<T>::remove(utxo_id);
+						LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+						let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
+
+						T::EventHandler::spent(utxo_id)?;
+						Self::deposit_event(Event::UtxoSpent { utxo_id, block_height });
+						return Ok(());
+					}
+				}
+
+				if Self::unwatch_candidate(utxo_id, utxo_ref).is_some() {
+					return Ok(());
+				}
+
+				return Ok(());
+			}
+
 			if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::take(utxo_id) {
 				LockedUtxos::<T>::take(locked_ref);
 			}
