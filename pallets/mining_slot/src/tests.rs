@@ -421,6 +421,41 @@ fn it_releases_argonots_when_an_epoch_ends() {
 }
 
 #[test]
+fn it_releases_excess_argonots_on_renewal() {
+	new_test_ext().execute_with(|| {
+		let account_id = 1u64;
+		set_ownership(account_id, 2_000u32.into());
+
+		let hold_reason = HoldReason::RegisterAsMiner;
+		assert_ok!(Ownership::hold(&hold_reason.into(), &account_id, 1_000u32.into()));
+		assert_eq!(Ownership::balance_on_hold(&hold_reason.into(), &account_id), 1_000u32.into());
+
+		let active = MiningRegistration {
+			account_id,
+			argonots: 1_000u32.into(),
+			bid: 0u32.into(),
+			authority_keys: account_id.into(),
+			starting_frame_id: 1,
+			external_funding_account: None,
+			bid_at_tick: 0,
+		};
+		let next = MiningRegistration {
+			account_id,
+			argonots: 700u32.into(),
+			bid: 0u32.into(),
+			authority_keys: account_id.into(),
+			starting_frame_id: 2,
+			external_funding_account: None,
+			bid_at_tick: 0,
+		};
+
+		MiningSlots::release_mining_seat_argonots(&active, Some(&next));
+
+		assert_eq!(Ownership::balance_on_hold(&hold_reason.into(), &account_id), 700u32.into());
+	});
+}
+
+#[test]
 fn it_holds_ownership_tokens_for_a_slot() {
 	TicksBetweenSlots::set(3);
 	FramesPerMiningTerm::set(3);
@@ -984,6 +1019,42 @@ fn it_allows_bids_from_an_external_funding_account() {
 		assert_eq!(Balances::free_balance(1), 1_100_000);
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 200_000);
 		assert_eq!(Ownership::free_balance(1), 100_000);
+	});
+}
+
+#[test]
+fn it_rejects_funding_account_changes_on_renewal() {
+	TicksBetweenSlots::set(3);
+	FramesPerMiningTerm::set(2);
+	MinCohortSize::set(1);
+	SlotBiddingStartAfterTicks::set(0);
+
+	new_test_ext().execute_with(|| {
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ArgonotsPerMiningSeat::<Test>::set(100u32.into());
+		NextFrameId::<Test>::set(3);
+
+		set_ownership(1, 1000u32.into());
+		set_ownership(2, 1000u32.into());
+		set_ownership(3, 1000u32.into());
+
+		let active = MiningRegistration {
+			account_id: 2,
+			argonots: 100u32.into(),
+			bid: 0u32.into(),
+			authority_keys: 1.into(),
+			starting_frame_id: 1,
+			external_funding_account: Some(1),
+			bid_at_tick: 0,
+		};
+		MinersByCohort::<Test>::insert(1, BoundedVec::truncate_from(vec![active]));
+		AccountIndexLookup::<Test>::insert(2, (1, 0));
+		ActiveMinersCount::<Test>::put(1);
+
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(3), 0, 3.into(), Some(2)),
+			Error::<Test>::CannotChangeFundingAccount
+		);
 	});
 }
 
