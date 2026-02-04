@@ -1059,6 +1059,35 @@ fn it_rejects_funding_account_changes_on_renewal() {
 }
 
 #[test]
+fn it_rejects_funding_account_changes_for_pending_bid() {
+	TicksBetweenSlots::set(3);
+	FramesPerMiningTerm::set(3);
+	MinCohortSize::set(2);
+	SlotBiddingStartAfterTicks::set(0);
+	ExistentialDeposit::set(100_000);
+
+	new_test_ext().execute_with(|| {
+		CurrentTick::set(6);
+		System::set_block_number(6);
+
+		ArgonotsPerMiningSeat::<Test>::set(100_000);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+
+		set_ownership(1, 300_000);
+		set_argons(1, 5_100_000);
+		set_ownership(3, 300_000);
+		set_argons(3, 5_100_000);
+
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), Some(2)));
+
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(3), 2_000_000, 3.into(), Some(2)),
+			Error::<Test>::CannotChangeFundingAccount
+		);
+	});
+}
+
+#[test]
 fn it_handles_null_authority() {
 	new_test_ext().execute_with(|| {
 		assert_eq!(MiningSlots::get_authority(1), None);
