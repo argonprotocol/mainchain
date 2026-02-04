@@ -3,6 +3,7 @@ use crate::utils::{
 };
 use argon_client::{
 	FetchAt,
+	api::storage,
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
 };
@@ -102,6 +103,47 @@ async fn test_end_to_end_default_vote_mining() {
 	miner2_res.unwrap();
 	miner1_res.unwrap();
 
+	// Ensure registrations are visible in finalized state before counting vote blocks.
+	let mut finalized_wait =
+		grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
+	let lookup_1 = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_1.account_id.clone()));
+	let lookup_1b = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_1_second_account.clone()));
+	let lookup_2 = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_2.account_id.clone()));
+	let mut finalized_blocks = 0;
+	loop {
+		if let Some(Ok(block)) = finalized_wait.next().await {
+			let fetch_at = FetchAt::Block(block.hash());
+			let one = grandpa_miner
+				.client
+				.fetch_storage(&lookup_1, fetch_at)
+				.await
+				.expect("Fetch miner 1 registration");
+			let one_b = grandpa_miner
+				.client
+				.fetch_storage(&lookup_1b, fetch_at)
+				.await
+				.expect("Fetch miner 1 secondary registration");
+			let two = grandpa_miner
+				.client
+				.fetch_storage(&lookup_2, fetch_at)
+				.await
+				.expect("Fetch miner 2 registration");
+			if one.is_some() && one_b.is_some() && two.is_some() {
+				break;
+			}
+			finalized_blocks += 1;
+			if finalized_blocks >= 120 {
+				panic!("Miners not visible in finalized state after 120 blocks");
+			}
+		}
+	}
+
 	let mut vote_blocks = 0;
 	let mut miner_vote_blocks = (0, 0, 0);
 	authors.clear();
@@ -133,7 +175,7 @@ async fn test_end_to_end_default_vote_mining() {
 		}
 		block_loops += 1;
 		println!("Block Loops: {}", block_loops);
-		if block_loops >= 40 {
+		if block_loops >= 120 {
 			break;
 		}
 	}

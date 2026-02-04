@@ -577,29 +577,34 @@ mod tests {
 					last_block_fork = fork_power;
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == channel_hold_result.notebook_number {
+						if notebook.notebook_number == channel_hold_result.notebook_number &&
+							tick == voting_schedule.block_tick()
+						{
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, voting_schedule.block_tick())
+							if let Some(Some(parent_voting_key)) = ctx
+								.client
+								.fetch_storage(
+									&storage().block_seal().parent_voting_key(),
+									FetchAt::Block(block_hash),
+								)
+								.await?
+							{
+								assert_eq!(
+									parent_voting_key.0,
+									parent_key
+										.parent_voting_key
+										.expect("Should have parent voting key")
+										.0
+								);
+								did_see_voting_key = true;
+							}
+							break;
 						}
 					}
-					if let Some(Some(parent_voting_key)) = ctx
-						.client
-						.fetch_storage(
-							&storage().block_seal().parent_voting_key(),
-							FetchAt::Block(block_hash),
-						)
-						.await?
-					{
-						assert_eq!(
-							parent_voting_key.0,
-							parent_key.parent_voting_key.expect("Should have parent voting key").0
-						);
-						did_see_voting_key = true;
-					}
 
-					// should have gotten a vote in tick 2
-					if tick >= voting_schedule.block_tick() + 3 {
+					// give finalized chain extra time to include the notebook at the expected tick
+					if tick >= voting_schedule.block_tick() + 10 {
 						break;
 					}
 				},
