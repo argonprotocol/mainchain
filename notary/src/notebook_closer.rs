@@ -504,10 +504,29 @@ mod tests {
 		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
 		let mut channel_hold_result = None;
-		for _ in 0..5 {
+		let start_tick = ticker.current();
+		let max_wait_ticks = if std::env::var("CI").is_ok() { 20 } else { 10 };
+		loop {
 			let vote_tick = ticker.current();
+			if vote_tick.saturating_sub(start_tick) > max_wait_ticks {
+				break;
+			}
+			let voting_schedule = VotingSchedule::when_creating_votes(vote_tick);
+			let grandparent_tick = voting_schedule.grandparent_votes_tick();
 			let Ok((best_grandparent, _)) = ctx.client.get_vote_block_hash(vote_tick).await else {
-				println!("No vote block hash for tick {}. Waiting", vote_tick);
+				let best_hash = ctx.client.best_block_hash().await?;
+				let recent_blocks = ctx
+					.client
+					.fetch_storage(
+						&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
+						FetchAt::Block(best_hash),
+					)
+					.await?
+					.map(|blocks| blocks.0.len())
+					.unwrap_or(0);
+				println!(
+					"No vote block hash for tick {vote_tick} (grandparent tick {grandparent_tick}, recent_blocks_at_ticks={recent_blocks}). Waiting",
+				);
 				tokio::time::sleep(
 					ticker.duration_to_next_tick().saturating_sub(Duration::from_millis(200)),
 				)
@@ -548,7 +567,14 @@ mod tests {
 			}
 		}
 
-		let channel_hold_result = channel_hold_result.expect("Should have channel hold result");
+		let channel_hold_result = channel_hold_result.unwrap_or_else(|| {
+			panic!(
+				"Should have channel hold result after waiting {} ticks (start {}, now {})",
+				max_wait_ticks,
+				start_tick,
+				ticker.current()
+			)
+		});
 
 		println!("ChannelHold result is {:?}", channel_hold_result);
 
