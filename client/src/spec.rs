@@ -30090,14 +30090,14 @@ pub mod api {
 					#[doc = "An account can only have one active registration"]
 					CannotRegisterOverlappingSessions,
 					#[codec(index = 5)]
+					#[doc = "Cannot re-register an account with a different funding account"]
+					CannotChangeFundingAccount,
+					#[codec(index = 6)]
 					#[doc = "The funding account does not have enough funds to cover the bid"]
 					InsufficientFunds,
-					#[codec(index = 6)]
+					#[codec(index = 7)]
 					#[doc = "The mining bid cannot be reduced"]
 					BidCannotBeReduced,
-					#[codec(index = 7)]
-					#[doc = "Cannot change the funding account for an existing bid"]
-					CannotChangeFundingAccount,
 					#[codec(index = 8)]
 					#[doc = "Bids must be in allowed increments"]
 					InvalidBidAmount,

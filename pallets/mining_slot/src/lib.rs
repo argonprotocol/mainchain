@@ -357,8 +357,6 @@ pub mod pallet {
 		InsufficientFunds,
 		/// The mining bid cannot be reduced
 		BidCannotBeReduced,
-		/// Cannot change the funding account for an existing bid
-		CannotChangeFundingAccount,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
 		/// The argonots on hold cannot be released

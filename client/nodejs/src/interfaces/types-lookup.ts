@@ -3236,9 +3236,9 @@ declare module '@polkadot/types/lookup' {
     readonly isInsufficientOwnershipTokens: boolean;
     readonly isBidTooLow: boolean;
     readonly isCannotRegisterOverlappingSessions: boolean;
+    readonly isCannotChangeFundingAccount: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isBidCannotBeReduced: boolean;
-    readonly isCannotChangeFundingAccount: boolean;
     readonly isInvalidBidAmount: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly type:
@@ -3247,9 +3247,9 @@ declare module '@polkadot/types/lookup' {
       | 'InsufficientOwnershipTokens'
       | 'BidTooLow'
       | 'CannotRegisterOverlappingSessions'
+      | 'CannotChangeFundingAccount'
       | 'InsufficientFunds'
       | 'BidCannotBeReduced'
-      | 'CannotChangeFundingAccount'
       | 'InvalidBidAmount'
       | 'UnrecoverableHold';
   }
