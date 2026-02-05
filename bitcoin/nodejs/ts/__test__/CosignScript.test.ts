@@ -9,7 +9,6 @@ import {
 import {
   ArgonClient,
   BitcoinLock,
-  IBitcoinLock,
   IBitcoinLockConfig,
   Keyring,
   KeyringPair,
@@ -114,10 +113,10 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(priceIndex.argonotUsdPrice).toBeDefined();
     await expect(BitcoinLock.getMarketRate(priceIndex, 100n)).resolves.toStrictEqual(60_000n);
     await expect(
-      BitcoinLock.getRedemptionRate(priceIndex, { peggedPrice: 60_000n, satoshis: 100n }),
+      BitcoinLock.getRedemptionRate(priceIndex, { lockedMarketRate: 60_000n, satoshis: 100n }),
     ).resolves.toStrictEqual(60_000n);
     await expect(
-      BitcoinLock.getRedemptionRate(priceIndex, { peggedPrice: 50_000n, satoshis: 100n }),
+      BitcoinLock.getRedemptionRate(priceIndex, { lockedMarketRate: 50_000n, satoshis: 100n }),
     ).resolves.toStrictEqual(50_000n);
   });
 
@@ -214,14 +213,14 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       const unsub = await vaulterClient.query.bitcoinLocks.locksByUtxoId(1, y => {
         if (!y.isSome) reject('No lock found');
         const lock = y.unwrap();
-        if (lock.isVerified.isTrue) {
+        if (lock.isFunded.isTrue) {
           resolve();
           unsub();
         }
       });
     });
 
-    await expect(lock.getUtxoRef(vaulterClient)).resolves.toEqual({
+    await expect(lock.getFundingUtxoRef(vaulterClient)).resolves.toEqual({
       bitcoinTxid: `0x${txid}`, // this is the little-endian representation.
       vout: expect.any(Number),
       txid: expect.any(String),
@@ -237,11 +236,11 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       throw new Error('Lock not found');
     }
     lock = lookup;
-    expect(lock.isVerified).toBe(true);
+    expect(lock.isFunded).toBe(true);
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
 
-    await expect(lock.releasePrice(priceIndex)).resolves.toEqual(lock.peggedPrice);
+    await expect(lock.releasePrice(priceIndex)).resolves.toEqual(lock.lockedMarketRate);
 
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');
@@ -274,7 +273,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     if (!releaseRequest) {
       throw new Error('Release request not found');
     }
-    const utxoRef = await lock.getUtxoRef(vaulterClient);
+    const utxoRef = await lock.getFundingUtxoRef(vaulterClient);
     if (!utxoRef) {
       throw new Error('UTXO reference not found');
     }
@@ -322,7 +321,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const clientAtHeight = await vaulterClient.at(blockHash);
 
     const releaseRequest = await lock.getReleaseRequest(clientAtHeight);
-    const utxoRef = await lock.getUtxoRef(clientAtHeight);
+    const utxoRef = await lock.getFundingUtxoRef(clientAtHeight);
     expect(utxoRef).toBeTruthy();
     console.log('Got release request:', releaseRequest, utxoRef, cosign);
     const cosignedTx = cosignScript.cosignAndGenerateTx({

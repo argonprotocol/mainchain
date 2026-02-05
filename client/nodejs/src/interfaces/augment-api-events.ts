@@ -315,8 +315,50 @@ declare module '@polkadot/api-base/types/events' {
       >;
       OrphanedUtxoCosigned: AugmentedEvent<
         ApiType,
-        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, signature: Bytes],
-        { utxoId: u64; utxoRef: ArgonPrimitivesBitcoinUtxoRef; vaultId: u32; signature: Bytes }
+        [
+          utxoId: u64,
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef,
+          vaultId: u32,
+          accountId: AccountId32,
+          signature: Bytes,
+        ],
+        {
+          utxoId: u64;
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
+          vaultId: u32;
+          accountId: AccountId32;
+          signature: Bytes;
+        }
+      >;
+      OrphanedUtxoReceived: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, satoshis: u64],
+        { utxoId: u64; utxoRef: ArgonPrimitivesBitcoinUtxoRef; vaultId: u32; satoshis: u64 }
+      >;
+      OrphanedUtxoReleaseRequested: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32],
+        {
+          utxoId: u64;
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
+          vaultId: u32;
+          accountId: AccountId32;
+        }
+      >;
+      SecuritizationIncreased: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32],
+        { utxoId: u64; vaultId: u32; newSatoshis: u64; accountId: AccountId32 }
+      >;
+      UtxoFundedFromCandidate: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32],
+        {
+          utxoId: u64;
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
+          vaultId: u32;
+          accountId: AccountId32;
+        }
       >;
     };
     bitcoinUtxos: {
@@ -324,11 +366,13 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           utxoId: u64,
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef,
           rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason,
           satoshisReceived: u64,
         ],
         {
           utxoId: u64;
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
           rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
           satoshisReceived: u64;
         }

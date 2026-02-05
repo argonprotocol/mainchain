@@ -39,6 +39,7 @@ import type {
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
+  ArgonPrimitivesInherentsBitcoinUtxoSpend,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
@@ -304,6 +305,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
+    ArgonPrimitivesInherentsBitcoinUtxoSpend: ArgonPrimitivesInherentsBitcoinUtxoSpend;
     ArgonPrimitivesInherentsBitcoinUtxoSync: ArgonPrimitivesInherentsBitcoinUtxoSync;
     ArgonPrimitivesInherentsBlockSealInherent: ArgonPrimitivesInherentsBlockSealInherent;
     ArgonPrimitivesNotaryNotaryMeta: ArgonPrimitivesNotaryNotaryMeta;

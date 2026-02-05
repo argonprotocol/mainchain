@@ -1,6 +1,7 @@
 import {
   ArgonClient,
   type ArgonPrimitivesBitcoinBitcoinNetwork,
+  type ArgonPrimitivesBitcoinUtxoRef,
   formatArgons,
   getOfflineRegistry,
   type KeyringPair,
@@ -14,13 +15,35 @@ import { TxResult } from './TxResult';
 import { stringToU8a, u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
-import { u128 } from '@polkadot/types-codec';
+import { bool, Option, u128 } from '@polkadot/types-codec';
 import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import { blake2AsU8a } from '@polkadot/util-crypto';
 
 export const SATS_PER_BTC = 100_000_000n;
 
 type IQueryableClient = ArgonClient | ApiDecoration<'promise'>;
+type UtxoRefLike =
+  | ArgonPrimitivesBitcoinUtxoRef
+  | { txid: string | Uint8Array; outputIndex: number };
+
+type UtxoRefOption = { unwrap: () => ArgonPrimitivesBitcoinUtxoRef };
+
+function normalizeUtxoRef(utxoRef: UtxoRefLike): {
+  txid: string;
+  outputIndex: number;
+} {
+  let txid = utxoRef.txid;
+  if (typeof txid === 'object' && 'toHex' in txid) {
+    txid = txid.toHex();
+  } else if (typeof txid !== 'string') {
+    txid = u8aToHex(txid);
+  }
+  let outputIndex = utxoRef.outputIndex;
+  if (typeof outputIndex !== 'number') {
+    outputIndex = outputIndex.toNumber();
+  }
+  return { txid, outputIndex };
+}
 
 export class BitcoinLock implements IBitcoinLock {
   public utxoId: number;
@@ -43,7 +66,7 @@ export class BitcoinLock implements IBitcoinLock {
   public vaultClaimHeight: number;
   public openClaimHeight: number;
   public createdAtHeight: number;
-  public isVerified: boolean;
+  public isFunded: boolean;
   public createdAtArgonBlock: number;
   public fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 
@@ -64,7 +87,7 @@ export class BitcoinLock implements IBitcoinLock {
     this.vaultClaimHeight = data.vaultClaimHeight;
     this.openClaimHeight = data.openClaimHeight;
     this.createdAtHeight = data.createdAtHeight;
-    this.isVerified = data.isVerified;
+    this.isFunded = data.isFunded;
     this.fundHoldExtensionsByBitcoinExpirationHeight =
       data.fundHoldExtensionsByBitcoinExpirationHeight;
     this.createdAtArgonBlock = data.createdAtArgonBlock;
@@ -78,17 +101,26 @@ export class BitcoinLock implements IBitcoinLock {
    * @return.vout - The output index of the UTXO in the transaction.
    * @return.bitcoinTxid - The Bitcoin transaction ID of the UTXO formatted in little endian
    */
-  public async getUtxoRef(
+  public async getFundingUtxoRef(
     client: IQueryableClient,
   ): Promise<{ txid: string; vout: number; bitcoinTxid: string } | undefined> {
-    const refRaw = await client.query.bitcoinUtxos.utxoIdToRef(this.utxoId);
-    if (!refRaw) {
+    let refRaw: Option<ArgonPrimitivesBitcoinUtxoRef>;
+    if (
+      'utxoIdToRef' in client.query.bitcoinUtxos &&
+      typeof client.query.bitcoinUtxos.utxoIdToRef === 'function'
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      refRaw = await client.query.bitcoinUtxos.utxoIdToRef(this.utxoId);
+    } else {
+      refRaw = await client.query.bitcoinUtxos.utxoIdToFundingUtxoRef(this.utxoId);
+    }
+    if (!refRaw || refRaw.isNone) {
       return;
     }
     const ref = refRaw.unwrap();
 
     const txid = u8aToHex(ref.txid);
-    const bitcoinTxid = u8aToHex(ref.txid.reverse());
+    const bitcoinTxid = u8aToHex(ref.txid.slice().reverse());
     const vout = ref.outputIndex.toNumber();
     return { txid, vout, bitcoinTxid };
   }
@@ -471,6 +503,86 @@ export class BitcoinLock implements IBitcoinLock {
     return await submitter.submit(args);
   }
 
+  public static async createIncreaseSecuritizationTx(
+    args: {
+      utxoId: number;
+      client: ArgonClient;
+      newSatoshis: bigint;
+    } & ISubmittableOptions,
+  ): Promise<SubmittableExtrinsic | undefined> {
+    const { client, newSatoshis, utxoId } = args;
+    const txBuilder = client.tx.bitcoinLocks.increaseSecuritization;
+    if (!txBuilder?.meta) {
+      return undefined;
+    }
+    return txBuilder(utxoId, newSatoshis);
+  }
+
+  public static async createFundWithUtxoCandidateTx(
+    args: {
+      client: ArgonClient;
+      utxoId: number;
+      utxoRef: UtxoRefLike;
+    } & ISubmittableOptions,
+  ): Promise<SubmittableExtrinsic | undefined> {
+    const { client, utxoId, utxoRef } = args;
+    const txBuilder = client.tx.bitcoinUtxos?.fundWithUtxoCandidate;
+    if (!txBuilder?.meta) {
+      return undefined;
+    }
+    return txBuilder(utxoId, normalizeUtxoRef(utxoRef));
+  }
+
+  public static async createOrphanedUtxoReleaseRequestTx(
+    args: {
+      client: ArgonClient;
+      utxoRef: UtxoRefLike;
+      releaseRequest: IReleaseRequest;
+    } & ISubmittableOptions,
+  ): Promise<SubmittableExtrinsic | undefined> {
+    const {
+      client,
+      utxoRef,
+      releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
+    } = args;
+
+    if (!toScriptPubkey.startsWith('0x')) {
+      throw new Error('toScriptPubkey must be a hex string starting with 0x');
+    }
+
+    const txBuilder = client.tx.bitcoinLocks.requestOrphanedUtxoRelease;
+    if (!txBuilder?.meta) {
+      return undefined;
+    }
+
+    return txBuilder(normalizeUtxoRef(utxoRef), toScriptPubkey, bitcoinNetworkFee);
+  }
+
+  public static async createOrphanedUtxoCosignTx(
+    args: {
+      client: ArgonClient;
+      orphanOwner: string;
+      utxoRef: UtxoRefLike;
+      vaultSignature: Uint8Array;
+    } & ISubmittableOptions,
+  ): Promise<SubmittableExtrinsic | undefined> {
+    const { client, orphanOwner, utxoRef, vaultSignature } = args;
+    if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
+      throw new Error(
+        `Invalid vault signature length: ${vaultSignature.byteLength}. Must be 70-73 bytes.`,
+      );
+    }
+    if (!client.tx.bitcoinLocks.cosignOrphanedUtxoRelease?.meta) {
+      return undefined;
+    }
+    const signature = u8aToHex(vaultSignature);
+    return client.tx.bitcoinLocks.cosignOrphanedUtxoRelease(
+      orphanOwner,
+      normalizeUtxoRef(utxoRef),
+      signature,
+    );
+  }
+
   public static async get(
     client: IQueryableClient,
     utxoId: number,
@@ -507,11 +619,10 @@ export class BitcoinLock implements IBitcoinLock {
     const vaultClaimHeight = utxo.vaultClaimHeight.toNumber();
     const openClaimHeight = utxo.openClaimHeight.toNumber();
     const createdAtHeight = utxo.createdAtHeight.toNumber();
-    const isVerified = utxo.isVerified.toJSON();
+    const isFunded = ((utxo as { isVerified?: bool })?.isVerified ?? utxo.isFunded).toJSON();
     const fundHoldExtensionsByBitcoinExpirationHeight = Object.fromEntries(
       [...utxo.fundHoldExtensions.entries()].map(([x, y]) => [x.toNumber(), y.toBigInt()]),
     );
-
     return new BitcoinLock({
       utxoId,
       p2wshScriptHashHex,
@@ -529,7 +640,7 @@ export class BitcoinLock implements IBitcoinLock {
       openClaimHeight,
       createdAtHeight,
       securityFees,
-      isVerified,
+      isFunded,
       fundHoldExtensionsByBitcoinExpirationHeight,
       createdAtArgonBlock,
     });
@@ -826,7 +937,7 @@ export interface IBitcoinLock {
   vaultClaimHeight: number;
   openClaimHeight: number;
   createdAtHeight: number;
-  isVerified: boolean;
+  isFunded: boolean;
   createdAtArgonBlock: number;
   fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 }

@@ -20,19 +20,21 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
-	pub static MinimumSatoshisPerTrackedUtxo: u64 = 100_000_000; // 1 bitcoin minimum
+	pub static MinimumSatoshisPerCandidateUtxo: u64 = 100_000_000; // 1 bitcoin minimum
 
 	pub const MaxPendingConfirmationUtxos: u32 = 10;
+	pub const MaxCandidateUtxosPerLock: u32 = 10;
 
 	pub const MaxPendingConfirmationBlocks: u32 = 10;
 
-	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
-	pub static UtxoVerifiedCallback: Option<fn((UtxoId, Satoshis)) -> DispatchResult> = None;
-	pub static LastInvalidUtxo: Option<(UtxoId, UtxoRef, Satoshis)> = None;
+pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
+pub static UtxoVerifiedCallback: Option<fn((UtxoId, Satoshis)) -> DispatchResult> = None;
+pub static OrphanDetectedCallback: Option<fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult> = None;
+pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
 }
 
 pub struct StaticEventHandler;
-impl BitcoinUtxoEvents for StaticEventHandler {
+impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 	fn funding_received(
 		utxo_id: UtxoId,
 		received_satoshis: Satoshis,
@@ -43,16 +45,29 @@ impl BitcoinUtxoEvents for StaticEventHandler {
 			Ok(())
 		}
 	}
-	fn invalid_utxo_received(
-		utxo_id: UtxoId,
-		utxo_ref: UtxoRef,
-		satoshis: Satoshis,
-	) -> sp_runtime::DispatchResult {
-		LastInvalidUtxo::set(Some((utxo_id, utxo_ref, satoshis)));
-		Ok(())
-	}
 	fn spent(_utxo_id: UtxoId) -> DispatchResult {
 		Ok(())
+	}
+
+	fn funding_promoted_by_account(
+		_utxo_id: UtxoId,
+		_received_satoshis: Satoshis,
+		_account_id: &u64,
+		_utxo_ref: &UtxoRef,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn orphaned_utxo_detected(
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_utxo_ref: UtxoRef,
+	) -> DispatchResult {
+		if let Some(callback) = OrphanDetectedCallback::get() {
+			callback((_utxo_id, _utxo_ref, _satoshis))
+		} else {
+			Ok(())
+		}
 	}
 
 	fn timeout_waiting_for_funding(_utxo_id: UtxoId) -> sp_runtime::DispatchResult {
@@ -63,10 +78,11 @@ impl BitcoinUtxoEvents for StaticEventHandler {
 impl pallet_bitcoin_utxos::Config for Test {
 	type WeightInfo = ();
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type EventHandler = StaticEventHandler;
 	type MaximumSatoshiThresholdFromExpected = MaximumSatoshiThresholdFromExpected;
-	type MinimumSatoshisPerTrackedUtxo = MinimumSatoshisPerTrackedUtxo;
+	type MinimumSatoshisPerCandidateUtxo = MinimumSatoshisPerCandidateUtxo;
 }
 
 pub fn new_test_ext() -> TestState {

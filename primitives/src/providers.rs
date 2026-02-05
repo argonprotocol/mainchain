@@ -94,23 +94,31 @@ pub trait BitcoinUtxoTracker {
 		satoshis: Satoshis,
 		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError>;
-	fn get(utxo_id: UtxoId) -> Option<UtxoRef>;
+	fn get_funding_utxo_ref(utxo_id: UtxoId) -> Option<UtxoRef>;
 	fn unwatch(utxo_id: UtxoId);
+	/// Remove a candidate UTXO by reference after it is released.
+	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)>;
 }
 
-pub trait BitcoinUtxoEvents {
+pub trait BitcoinUtxoEvents<AccountId> {
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult;
 	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult;
-	fn invalid_utxo_received(
+	fn funding_promoted_by_account(
 		utxo_id: UtxoId,
-		utxo_ref: UtxoRef,
+		received_satoshis: Satoshis,
+		account_id: &AccountId,
+		utxo_ref: &UtxoRef,
+	) -> DispatchResult;
+	fn orphaned_utxo_detected(
+		utxo_id: UtxoId,
 		satoshis: Satoshis,
+		utxo_ref: UtxoRef,
 	) -> DispatchResult;
 	fn spent(utxo_id: UtxoId) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
-impl BitcoinUtxoEvents for Tuple {
+impl<A> BitcoinUtxoEvents<A> for Tuple {
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 		for_tuples!( #( Tuple::funding_received(utxo_id, received_satoshis)?; )* );
 		Ok(())
@@ -121,12 +129,22 @@ impl BitcoinUtxoEvents for Tuple {
 		Ok(())
 	}
 
-	fn invalid_utxo_received(
+	fn funding_promoted_by_account(
 		utxo_id: UtxoId,
-		utxo_ref: UtxoRef,
-		satoshis: Satoshis,
+		received_satoshis: Satoshis,
+		account_id: &A,
+		utxo_ref: &UtxoRef,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::invalid_utxo_received(utxo_id, utxo_ref.clone(), satoshis)?; )* );
+		for_tuples!( #( Tuple::funding_promoted_by_account(utxo_id, received_satoshis, account_id, utxo_ref)?; )* );
+		Ok(())
+	}
+
+	fn orphaned_utxo_detected(
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
+		utxo_ref: UtxoRef,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())?; )* );
 		Ok(())
 	}
 

@@ -181,7 +181,7 @@ pub trait BitcoinVaultProvider {
 		current_height: BitcoinHeight,
 	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError>;
 
-	/// Argons no longer in a "pending state" - eg, verified bitcoin or canceled
+	/// Argons no longer in a "pending state" - eg, funded bitcoin or canceled
 	fn remove_pending(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
@@ -195,7 +195,7 @@ pub trait BitcoinVaultProvider {
 	) -> Result<(), VaultError>;
 
 	/// Track an orphaned cosign request for a UTXO.
-	fn update_orphaned_cosign_list(
+	fn update_orphan_cosign_list(
 		vault_id: VaultId,
 		utxo_id: UtxoId,
 		account_id: &Self::AccountId,
@@ -254,8 +254,8 @@ where
 	/// The securitization locked for bitcoin (at the ratio given)
 	#[codec(compact)]
 	pub securitization_locked: Balance,
-	/// Securitization pending bitcoin verification (this is "out of" the securitization_locked,
-	/// not in addition to)
+	/// Securitization pending bitcoin funding confirmation (this is "out of" the
+	/// securitization_locked, not in addition to)
 	#[codec(compact)]
 	pub securitization_pending_activation: Balance,
 	/// Securitization that will be released at the given block height (NOTE: these are grouped by

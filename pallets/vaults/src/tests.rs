@@ -1,6 +1,6 @@
 use crate::{
-	Error, Event, HoldReason, LastCollectFrameByVaultId, PendingCosignByVaultId, VaultConfig,
-	VaultIdByOperator,
+	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
+	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 	mock::{Vaults, *},
 	pallet::{
 		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick, RevenuePerFrameByVault,
@@ -1116,6 +1116,12 @@ fn vaults_can_collect_revenue() {
 			Error::<Test>::PendingCosignsBeforeCollect
 		);
 		PendingCosignByVaultId::<Test>::mutate(1, |a| a.remove(&1));
+		OrphanedUtxoAccountsByVaultId::<Test>::insert(1, 1, 1);
+		assert_err!(
+			Vaults::collect(RuntimeOrigin::signed(1), 1),
+			Error::<Test>::PendingOrphanedUtxoCosignsBeforeCollect
+		);
+		OrphanedUtxoAccountsByVaultId::<Test>::remove(1, 1);
 
 		assert_ok!(Vaults::collect(RuntimeOrigin::signed(1), 1));
 		assert_eq!(Balances::free_balance(1), 1_000_000 - 500_000 + fee + vault_lp_earnings);
