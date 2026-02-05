@@ -3,6 +3,7 @@ use crate::utils::{
 };
 use argon_client::{
 	FetchAt,
+	api::storage,
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
 };
@@ -102,20 +103,83 @@ async fn test_end_to_end_default_vote_mining() {
 	miner2_res.unwrap();
 	miner1_res.unwrap();
 
+	// Ensure registrations are visible in finalized state before counting vote blocks.
+	let mut finalized_wait =
+		grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
+	let lookup_1 = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_1.account_id.clone()));
+	let lookup_1b = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_1_second_account.clone()));
+	let lookup_2 = storage()
+		.mining_slot()
+		.account_index_lookup(grandpa_miner.client.api_account(&miner_2.account_id.clone()));
+	let mut finalized_blocks = 0;
+	loop {
+		if let Some(Ok(block)) = finalized_wait.next().await {
+			let fetch_at = FetchAt::Block(block.hash());
+			let one = grandpa_miner
+				.client
+				.fetch_storage(&lookup_1, fetch_at)
+				.await
+				.expect("Fetch miner 1 registration");
+			let one_b = grandpa_miner
+				.client
+				.fetch_storage(&lookup_1b, fetch_at)
+				.await
+				.expect("Fetch miner 1 secondary registration");
+			let two = grandpa_miner
+				.client
+				.fetch_storage(&lookup_2, fetch_at)
+				.await
+				.expect("Fetch miner 2 registration");
+			if one.is_some() && one_b.is_some() && two.is_some() {
+				break;
+			}
+			finalized_blocks += 1;
+			if finalized_blocks >= 120 {
+				panic!("Miners not visible in finalized state after 120 blocks");
+			}
+		}
+	}
+
 	let mut vote_blocks = 0;
 	let mut miner_vote_blocks = (0, 0, 0);
 	authors.clear();
 
 	let mut block_loops = 0;
+	let mut start_tick = None;
+	let mut last_tick = None;
+	let max_wait_ticks = if std::env::var("CI").is_ok() { 30 } else { 20 };
 	while let Some(Ok(block)) = blocks_sub.next().await {
 		let mut author = None;
 		let mut block_seal = None;
+		let mut tick = None;
 		for digest in block.header().runtime_digest().logs.iter() {
 			if let Some(seal) = digest.as_block_seal() {
 				block_seal = Some(seal.clone());
 			}
 			if let Some(a) = digest.as_author::<AccountId>() {
 				author = Some(a);
+			}
+			if let Some(t) = digest.as_tick() {
+				tick = Some(t.0);
+			}
+		}
+		if let Some(tick) = tick {
+			last_tick = Some(tick);
+			if start_tick.is_none() {
+				start_tick = Some(tick);
+			}
+			if let Some(start_tick) = start_tick {
+				if tick.saturating_sub(start_tick) >= max_wait_ticks {
+					println!(
+						"Stopping vote mining wait after {} ticks (start {}, current {})",
+						max_wait_ticks, start_tick, tick
+					);
+					break;
+				}
 			}
 		}
 		if let (Some(author), Some(BlockSealDigest::Vote { .. })) = (author, block_seal) {
@@ -133,14 +197,20 @@ async fn test_end_to_end_default_vote_mining() {
 		}
 		block_loops += 1;
 		println!("Block Loops: {}", block_loops);
-		if block_loops >= 40 {
+		if block_loops >= 300 {
 			break;
 		}
 	}
 
 	println!(
-		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({})",
-		vote_blocks, miner_vote_blocks.0, miner_vote_blocks.2, miner_vote_blocks.1
+		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({}). Ticks: start {:?}, last {:?}, max_wait {}",
+		vote_blocks,
+		miner_vote_blocks.0,
+		miner_vote_blocks.2,
+		miner_vote_blocks.1,
+		start_tick,
+		last_tick,
+		max_wait_ticks
 	);
 	assert!(vote_blocks >= 2);
 	assert!(miner_vote_blocks.0 >= 1);

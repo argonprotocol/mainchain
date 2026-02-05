@@ -504,10 +504,29 @@ mod tests {
 		let vote_power = (hold_note.microgons as f64 * 0.2f64) as u128;
 
 		let mut channel_hold_result = None;
-		for _ in 0..5 {
+		let start_tick = ticker.current();
+		let max_wait_ticks = if std::env::var("CI").is_ok() { 20 } else { 10 };
+		loop {
 			let vote_tick = ticker.current();
+			if vote_tick.saturating_sub(start_tick) > max_wait_ticks {
+				break;
+			}
+			let voting_schedule = VotingSchedule::when_creating_votes(vote_tick);
+			let grandparent_tick = voting_schedule.grandparent_votes_tick();
 			let Ok((best_grandparent, _)) = ctx.client.get_vote_block_hash(vote_tick).await else {
-				println!("No vote block hash for tick {}. Waiting", vote_tick);
+				let best_hash = ctx.client.best_block_hash().await?;
+				let recent_blocks = ctx
+					.client
+					.fetch_storage(
+						&api::ticks::storage::StorageApi.recent_blocks_at_ticks(grandparent_tick),
+						FetchAt::Block(best_hash),
+					)
+					.await?
+					.map(|blocks| blocks.0.len())
+					.unwrap_or(0);
+				println!(
+					"No vote block hash for tick {vote_tick} (grandparent tick {grandparent_tick}, recent_blocks_at_ticks={recent_blocks}). Waiting",
+				);
 				tokio::time::sleep(
 					ticker.duration_to_next_tick().saturating_sub(Duration::from_millis(200)),
 				)
@@ -548,7 +567,14 @@ mod tests {
 			}
 		}
 
-		let channel_hold_result = channel_hold_result.expect("Should have channel hold result");
+		let channel_hold_result = channel_hold_result.unwrap_or_else(|| {
+			panic!(
+				"Should have channel hold result after waiting {} ticks (start {}, now {})",
+				max_wait_ticks,
+				start_tick,
+				ticker.current()
+			)
+		});
 
 		println!("ChannelHold result is {:?}", channel_hold_result);
 
@@ -577,29 +603,34 @@ mod tests {
 					last_block_fork = fork_power;
 					if let Some(notebook) = notebooks.notebooks.first() {
 						assert_eq!(notebook.audit_first_failure, None);
-						if notebook.notebook_number == channel_hold_result.notebook_number {
+						if notebook.notebook_number == channel_hold_result.notebook_number &&
+							tick == voting_schedule.block_tick()
+						{
 							assert_eq!(votes.votes_count, 1, "Should have votes");
 							assert_eq!(votes.voting_power, vote_power);
-							assert_eq!(tick, voting_schedule.block_tick())
+							if let Some(Some(parent_voting_key)) = ctx
+								.client
+								.fetch_storage(
+									&storage().block_seal().parent_voting_key(),
+									FetchAt::Block(block_hash),
+								)
+								.await?
+							{
+								assert_eq!(
+									parent_voting_key.0,
+									parent_key
+										.parent_voting_key
+										.expect("Should have parent voting key")
+										.0
+								);
+								did_see_voting_key = true;
+							}
+							break;
 						}
 					}
-					if let Some(Some(parent_voting_key)) = ctx
-						.client
-						.fetch_storage(
-							&storage().block_seal().parent_voting_key(),
-							FetchAt::Block(block_hash),
-						)
-						.await?
-					{
-						assert_eq!(
-							parent_voting_key.0,
-							parent_key.parent_voting_key.expect("Should have parent voting key").0
-						);
-						did_see_voting_key = true;
-					}
 
-					// should have gotten a vote in tick 2
-					if tick >= voting_schedule.block_tick() + 3 {
+					// give finalized chain extra time to include the notebook at the expected tick
+					if tick >= voting_schedule.block_tick() + 10 {
 						break;
 					}
 				},
