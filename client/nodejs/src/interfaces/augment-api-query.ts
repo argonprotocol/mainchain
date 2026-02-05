@@ -261,6 +261,16 @@ declare module '@polkadot/api-base/types/storage' {
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
+       * Expiration of orphaned utxo refs by user account
+       **/
+      orphanedUtxoExpirationByFrame: AugmentedQuery<
+        ApiType,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<BTreeSet<ITuple<[AccountId32, ArgonPrimitivesBitcoinUtxoRef]>>>,
+        [u64]
+      >;
+      /**
        * Mismatched utxos that were sent with invalid amounts to a locked bitcoin
        **/
       orphanedUtxosByAccount: AugmentedQuery<
@@ -286,6 +296,16 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Candidate UTXOs associated with a lock (mismatches, extra funding, etc.).
+       **/
+      candidateUtxoRefsByUtxoId: AugmentedQuery<
+        ApiType,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<BTreeMap<ArgonPrimitivesBitcoinUtxoRef, u64>>,
+        [u64]
+      >;
+      /**
        * An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
        **/
       confirmedBitcoinBlockTip: AugmentedQuery<
@@ -298,9 +318,9 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * Locked Bitcoin UTXOs that have had ownership confirmed and amounts within the
-       * MinimumSatoshiThreshold of the expected. If a Bitcoin UTXO is moved before the expiration
-       * block, the funds are burned and the UTXO is unlocked.
+       * Locked Bitcoin UTXOs that have been funded with a UtxoRef from the Bitcoin network and
+       * amounts within the MinimumSatoshiThreshold of the expected. If a Bitcoin UTXO is moved
+       * before the expiration block, the funds are burned and the UTXO is unlocked.
        **/
       lockedUtxos: AugmentedQuery<
         ApiType,
@@ -312,6 +332,14 @@ declare module '@polkadot/api-base/types/storage' {
             | Uint8Array,
         ) => Observable<Option<ArgonPrimitivesBitcoinUtxoValue>>,
         [ArgonPrimitivesBitcoinUtxoRef]
+      >;
+      /**
+       * Bitcoin locks that are pending full funding on the bitcoin network
+       **/
+      locksPendingFunding: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
+        []
       >;
       /**
        * Bitcoin Oracle Operator Account
@@ -337,18 +365,10 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * A mapping of utxo id to the confirmed utxo reference
        **/
-      utxoIdToRef: AugmentedQuery<
+      utxoIdToFundingUtxoRef: AugmentedQuery<
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
         [u64]
-      >;
-      /**
-       * Bitcoin locks that are pending full funding on the bitcoin network
-       **/
-      utxosPendingConfirmation: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
-        []
       >;
     };
     blockRewards: {

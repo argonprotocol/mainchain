@@ -7,7 +7,7 @@ use pallet_prelude::*;
 use crate::{
 	Error, Event, FEE_PROOF_MESSAGE_KEY, FeeCouponProof, FeeCouponsByPublic, HoldReason,
 	LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest, MicrogonPerBtcHistory,
-	MinimumSatoshis, OrphanedUtxo, OrphanedUtxosByAccount,
+	MinimumSatoshis, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
 	mock::*,
 	pallet::{
 		FeeCouponsExpiringByFrame, LockCosignDueByFrame, LockReleaseCosignHeightById,
@@ -47,7 +47,7 @@ fn can_lock_a_bitcoin_utxo_until_expiration() {
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.owner_account, 2);
-		assert!(!lock.is_verified);
+		assert!(!lock.is_funded);
 		let liquidity_promised = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(lock.liquidity_promised, liquidity_promised);
@@ -125,13 +125,13 @@ fn can_lock_a_bitcoin_utxo_with_a_preset_rate() {
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.owner_account, 2);
-		assert!(!lock.is_verified);
+		assert!(!lock.is_funded);
 		assert_eq!(lock.liquidity_promised, 500_000 * MICROGONS_PER_ARGON);
 	});
 }
 
 #[test]
-fn cleans_up_a_verification_timed_out_bitcoin() {
+fn cleans_up_a_funding_timed_out_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -331,7 +331,7 @@ fn can_lock_a_bitcoin_utxo_with_a_coupon() {
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.owner_account, 2);
-		assert!(!lock.is_verified);
+		assert!(!lock.is_funded);
 		let liquidity_promised = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(lock.liquidity_promised, liquidity_promised);
@@ -342,8 +342,9 @@ fn can_lock_a_bitcoin_utxo_with_a_coupon() {
 	set_bitcoin_height(12);
 }
 
+/// Records orphaned UTXOs without funding the lock.
 #[test]
-fn tracks_orphaned_utxos() {
+fn records_orphaned_utxos_while_lock_pending() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -364,25 +365,17 @@ fn tracks_orphaned_utxos() {
 		assert_eq!(DefaultVault::get().securitization_locked, price);
 
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
-		assert_ok!(BitcoinLocks::invalid_utxo_received(1, utxo_ref.clone(), 10_000));
-		assert_eq!(
-			OrphanedUtxosByAccount::<Test>::get(1, utxo_ref),
-			Some(OrphanedUtxo {
-				utxo_id: 1,
-				satoshis: 10_000,
-				vault_id: 1,
-				recorded_argon_block_number: 1,
-				cosign_request: None,
-			})
-		);
-		// still waiting for the real funding
-		assert!(LocksByUtxoId::<Test>::get(1).is_some());
-		assert_eq!(WatchedUtxosById::get().len(), 1);
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+		// still waiting for funding
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert!(!lock.is_funded);
 	});
 }
 
+/// Requests an orphaned UTXO release, tracks cosign state, and clears it after cosign.
 #[test]
-fn allows_users_to_reclaim_orphaned_bitcoins() {
+fn allows_users_to_reclaim_orphaned_utxos() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -406,7 +399,8 @@ fn allows_users_to_reclaim_orphaned_bitcoins() {
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().securitization_locked, price);
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
-		assert_ok!(BitcoinLocks::invalid_utxo_received(1, utxo_ref.clone(), 10_000));
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
 		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
 
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -416,37 +410,417 @@ fn allows_users_to_reclaim_orphaned_bitcoins() {
 			release_script_pubkey.clone(),
 			1000
 		));
-		assert!(VaultViewOfOrphanCosigns::get().get(&vault_id).unwrap().contains(&who));
+		assert_eq!(
+			VaultViewOfOrphanedUtxoCosigns::get()
+				.get(&vault_id)
+				.and_then(|entries| entries.get(&who))
+				.copied(),
+			Some(1)
+		);
 
-		let orphaned_utxo = OrphanedUtxosByAccount::<Test>::get(who, utxo_ref.clone()).unwrap();
-		assert!(orphaned_utxo.cosign_request.is_some());
-		let orphan_cosign = orphaned_utxo.cosign_request.unwrap();
-		assert_eq!(orphan_cosign.to_script_pubkey, release_script_pubkey.clone());
-		assert_eq!(orphan_cosign.bitcoin_network_fee, 1000);
-		assert_eq!(orphan_cosign.created_at_argon_block_number, 1);
+		let orphan_entry = OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref).unwrap();
+		let orphaned_cosign = orphan_entry.cosign_request.unwrap();
+		assert_eq!(orphaned_cosign.to_script_pubkey, release_script_pubkey.clone());
+		assert_eq!(orphaned_cosign.bitcoin_network_fee, 1000);
+		assert_eq!(orphaned_cosign.created_at_argon_block_number, 1);
 
+		let signature = BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()));
 		assert_ok!(BitcoinLocks::cosign_orphaned_utxo_release(
 			RuntimeOrigin::signed(1),
 			who,
 			utxo_ref.clone(),
-			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
+			signature.clone(),
 		));
 		System::assert_last_event(
 			Event::<Test>::OrphanedUtxoCosigned {
-				utxo_id: orphaned_utxo.utxo_id,
+				utxo_id: orphan_entry.utxo_id,
 				vault_id,
 				utxo_ref: utxo_ref.clone(),
-				signature: BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec())),
+				account_id: who,
+				signature,
 			}
 			.into(),
 		);
-		assert_eq!(OrphanedUtxosByAccount::<Test>::get(1, utxo_ref), None);
-		assert_eq!(VaultViewOfOrphanCosigns::get().get(&vault_id).unwrap().len(), 0);
+		assert_eq!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref), None);
+		assert!(!VaultViewOfOrphanedUtxoCosigns::get().contains_key(&vault_id));
+	});
+}
+
+/// Allows orphaned UTXO release requests after a lock is canceled.
+#[test]
+fn allows_orphan_release_after_cancel() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		let vault_id = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			vault_id,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+
+		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
+		assert!(LocksByUtxoId::<Test>::get(1).is_none());
+
+		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+			RuntimeOrigin::signed(who),
+			utxo_ref.clone(),
+			release_script_pubkey.clone(),
+			1000
+		));
+		assert!(
+			OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
+				.unwrap()
+				.cosign_request
+				.is_some()
+		);
+		assert_eq!(
+			VaultViewOfOrphanedUtxoCosigns::get()
+				.get(&vault_id)
+				.and_then(|entries| entries.get(&who))
+				.copied(),
+			Some(1)
+		);
+	});
+}
+
+/// Funds a lock with a candidate UTXO ref and clears the candidate entry.
+#[test]
+fn promotes_candidate_utxo_and_funds_lock() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		insert_candidate_utxo(utxo_ref.clone(), 1, 10_000);
+
+		assert_ok!(BitcoinLocks::funding_promoted_by_account(1, 10_000, &who, &utxo_ref));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert!(lock.is_funded);
+		System::assert_last_event(
+			Event::<Test>::UtxoFundedFromCandidate {
+				utxo_id: 1,
+				utxo_ref,
+				vault_id: 1,
+				account_id: who,
+			}
+			.into(),
+		);
+	});
+}
+
+/// Cancels an unfunded lock on timeout.
+#[test]
+fn cancels_without_release_request_and_cleans_orphaned_utxos() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
+		assert!(LocksByUtxoId::<Test>::get(1).is_none());
+	});
+}
+
+/// Expires orphaned UTXO release requests after the configured window.
+#[test]
+fn orphan_release_requests_expire() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+
+		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+			RuntimeOrigin::signed(who),
+			utxo_ref.clone(),
+			release_script_pubkey,
+			1000
+		));
+		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
+		assert!(LocksByUtxoId::<Test>::get(1).is_none());
+
+		let expires_at = CurrentFrameId::get() + OrphanedUtxoReleaseExpiryFrames::get();
+		assert!(
+			OrphanedUtxoExpirationByFrame::<Test>::get(expires_at)
+				.contains(&(who, utxo_ref.clone()))
+		);
+		CurrentFrameId::set(expires_at);
+		BitcoinLocks::on_initialize(3);
+
+		assert_eq!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref), None);
+	});
+}
+
+/// Clears orphaned release requests when a lock is externally spent.
+#[test]
+fn external_spend_clears_orphan_release_requests() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		let vault_id = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			vault_id,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			vault_id,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+
+		let utxo_ref = UtxoRef { txid: H256Le([7; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+		let other_utxo_ref = UtxoRef { txid: H256Le([8; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(2, 15_000, other_utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &other_utxo_ref));
+
+		let release_script_pubkey = make_script_pubkey(&[2; 32]);
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+			RuntimeOrigin::signed(who),
+			utxo_ref.clone(),
+			release_script_pubkey,
+			1000
+		));
+		assert!(
+			OrphanedUtxosByAccount::<Test>::get(&who, &utxo_ref)
+				.unwrap()
+				.cosign_request
+				.is_some()
+		);
+		assert_eq!(
+			VaultViewOfOrphanedUtxoCosigns::get()
+				.get(&vault_id)
+				.and_then(|entries| entries.get(&who))
+				.copied(),
+			Some(1)
+		);
+
+		assert_ok!(BitcoinLocks::spent(1));
+
+		assert_eq!(OrphanedUtxosByAccount::<Test>::get(&who, &utxo_ref), None);
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(&who, &other_utxo_ref));
+		assert!(VaultViewOfOrphanedUtxoCosigns::get().get(&vault_id).is_none());
+	});
+}
+
+/// Rejects duplicate orphaned UTXO release requests.
+#[test]
+fn orphan_release_request_is_rejected_when_duplicate() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([3; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+
+		let release_script_pubkey = make_script_pubkey(&[1; 32]);
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+			RuntimeOrigin::signed(who),
+			utxo_ref.clone(),
+			release_script_pubkey.clone(),
+			1000
+		));
+		assert_noop!(
+			BitcoinLocks::request_orphaned_utxo_release(
+				RuntimeOrigin::signed(who),
+				utxo_ref,
+				release_script_pubkey,
+				1000
+			),
+			Error::<Test>::OrphanedUtxoReleaseRequested
+		);
+	});
+}
+
+/// Rejects orphaned UTXO releases that target the funding UTXO ref.
+#[test]
+fn rejects_release_for_funding_utxo_ref() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([4; 32]), output_index: 0 };
+		GetUtxoRef::set(Some(utxo_ref.clone()));
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
+
+		let release_script_pubkey = make_script_pubkey(&[2; 32]);
+		assert_noop!(
+			BitcoinLocks::request_orphaned_utxo_release(
+				RuntimeOrigin::signed(who),
+				utxo_ref,
+				release_script_pubkey,
+				1000
+			),
+			Error::<Test>::FundingUtxoCannotBeReleased
+		);
+	});
+}
+
+/// Allows release requests even when orphaned releases are pending.
+#[test]
+fn request_release_allows_pending_orphaned_releases() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		assert_ok!(BitcoinLocks::orphaned_utxo_detected(1, 10_000, utxo_ref.clone()));
+
+		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+			RuntimeOrigin::signed(who),
+			utxo_ref,
+			release_script_pubkey,
+			1000
+		));
+
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			make_script_pubkey(&[1; 32]),
+			1000
+		));
+	});
+}
+
+/// Scales lock values and emits events when securitization is increased.
+#[test]
+fn increase_securitization_scales_lock_values() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let before = LocksByUtxoId::<Test>::get(1).unwrap();
+		let new_satoshis = SATOSHIS_PER_BITCOIN * 2;
+
+		assert_ok!(BitcoinLocks::increase_securitization(
+			RuntimeOrigin::signed(who),
+			1,
+			new_satoshis
+		));
+
+		let after = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(after.satoshis, new_satoshis);
+		assert_eq!(after.liquidity_promised, before.liquidity_promised * 2u128);
+		assert_eq!(after.locked_market_rate, before.locked_market_rate * 2u128);
+		System::assert_last_event(
+			Event::<Test>::SecuritizationIncreased {
+				utxo_id: 1,
+				vault_id: 1,
+				new_satoshis,
+				account_id: who,
+			}
+			.into(),
+		);
 	});
 }
 
 #[test]
-fn marks_a_verified_bitcoin() {
+fn marks_a_funded_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -467,7 +841,7 @@ fn marks_a_verified_bitcoin() {
 		assert_eq!(DefaultVault::get().securitization_locked, price);
 
 		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
-		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
+		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_funded);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert_eq!(LastLockEvent::get(), Some((1, who, price)));
 	});
@@ -585,7 +959,7 @@ fn burns_a_spent_bitcoin() {
 }
 
 #[test]
-fn cancels_an_unverified_spent_bitcoin() {
+fn cancels_an_unfunded_spent_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -601,7 +975,7 @@ fn cancels_an_unverified_spent_bitcoin() {
 			pubkey,
 			None
 		));
-		assert!(!LocksByUtxoId::<Test>::get(1).unwrap().is_verified);
+		assert!(!LocksByUtxoId::<Test>::get(1).unwrap().is_funded);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		// spend before verify
 		assert_ok!(BitcoinLocks::spent(1));

@@ -1,5 +1,5 @@
-use crate::{Config, pallet::LocksByUtxoId};
-use frame_support::traits::UncheckedOnRuntimeUpgrade;
+use crate::{Config, LocksByUtxoId};
+use frame_support::{traits::UncheckedOnRuntimeUpgrade, weights::Weight};
 use pallet_prelude::*;
 
 mod old_storage {
@@ -86,8 +86,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 		Ok(<old_storage::Model<T>>::encode(&old_storage::Model { locked_utxos }))
 	}
 
-	fn on_runtime_upgrade() -> frame_support::weights::Weight {
-		let mut count = 0;
+	fn on_runtime_upgrade() -> Weight {
+		let mut count = 0u64;
 		log::info!("Migrating Bitcoin locks");
 
 		LocksByUtxoId::<T>::translate::<old_storage::LockedBitcoin<T>, _>(|_utxo_id, old| {
@@ -110,7 +110,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 				open_claim_height: old.open_claim_height,
 				created_at_height: old.created_at_height,
 				utxo_script_pubkey: old.utxo_script_pubkey,
-				is_verified: old.is_verified,
+				is_funded: old.is_verified,
 				fund_hold_extensions: old.fund_hold_extensions,
 				security_fees: old.security_fees,
 			})

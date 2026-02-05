@@ -851,7 +851,8 @@ mod test {
 			.refresh_utxo_status(vec![(Some(utxo_ref), utxo_value)], 1000)
 			.expect("sync 2");
 		assert_eq!(latest.spent.len(), 1);
-
-		assert_eq!(latest.spent.get(&1), Some(&(tx_block_height as BitcoinHeight)));
+		let spend = &latest.spent[0];
+		assert_eq!(spend.utxo_id, 1);
+		assert_eq!(spend.bitcoin_height, tx_block_height as BitcoinHeight);
 	}
 }

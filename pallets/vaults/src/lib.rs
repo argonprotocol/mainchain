@@ -319,6 +319,8 @@ pub mod pallet {
 		FundingChangeAlreadyScheduled,
 		/// A vault must clear out all pending cosigns before it can collect
 		PendingCosignsBeforeCollect,
+		/// A vault must clear out all pending orphan cosigns before it can collect
+		PendingOrphanedUtxoCosignsBeforeCollect,
 		/// An account may only be associated with a single vault
 		AccountAlreadyHasVault,
 	}
@@ -652,6 +654,9 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			let pending_cosigns = PendingCosignByVaultId::<T>::get(vault_id);
 			ensure!(pending_cosigns.is_empty(), Error::<T>::PendingCosignsBeforeCollect);
+			let has_orphan_cosigns =
+				OrphanedUtxoAccountsByVaultId::<T>::iter_prefix(vault_id).next().is_some();
+			ensure!(!has_orphan_cosigns, Error::<T>::PendingOrphanedUtxoCosignsBeforeCollect);
 
 			LastCollectFrameByVaultId::<T>::insert(vault_id, T::CurrentFrameId::get());
 			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |a| {
@@ -1333,7 +1338,7 @@ pub mod pallet {
 			})
 		}
 
-		fn update_orphaned_cosign_list(
+		fn update_orphan_cosign_list(
 			vault_id: VaultId,
 			_utxo_id: UtxoId,
 			account_id: &Self::AccountId,

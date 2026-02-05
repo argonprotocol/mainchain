@@ -168,6 +168,7 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
+			pallet_bitcoin_utxos::migrations::RenamePendingConfirmation<Runtime>,
 			pallet_bitcoin_locks::migrations::SecuritizationMigration<Runtime>,
 			pallet_vaults::migrations::SecuritizationMigration<Runtime>,
 			pallet_treasury::migrations::PalletMigrate<Runtime>,

@@ -2,22 +2,22 @@ use crate::{
 	Error, Event,
 	mock::{System, *},
 	pallet::{
-		ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxos, UtxoIdToRef,
-		UtxosPendingConfirmation,
+		CandidateUtxoRefsByUtxoId, ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxos,
+		LocksPendingFunding, UtxoIdToFundingUtxoRef,
 	},
 };
 use argon_primitives::{
 	BitcoinUtxoTracker,
 	bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, H256Le,
-		UtxoRef, UtxoValue,
+		Satoshis, UtxoId, UtxoRef, UtxoValue,
 	},
-	inherents::{BitcoinUtxoFunding, BitcoinUtxoSync},
+	inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
 };
 use frame_support::{assert_err, assert_noop, assert_ok, pallet_prelude::Hooks};
 use pallet_prelude::*;
 use sp_core::H256;
-use sp_runtime::DispatchError;
+use sp_runtime::{DispatchError, DispatchResult};
 
 #[test]
 fn only_an_operator_can_submit_oracle_block() {
@@ -68,7 +68,7 @@ fn can_watch_utxos() {
 		});
 		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, satoshis, watch_for_spent_until),);
 		assert_eq!(
-			*UtxosPendingConfirmation::<Test>::get().get(&1).unwrap(),
+			*LocksPendingFunding::<Test>::get().get(&1).unwrap(),
 			UtxoValue {
 				utxo_id: 1,
 				script_pubkey,
@@ -98,7 +98,7 @@ fn can_watch_utxos() {
 			},
 		));
 		System::assert_last_event(Event::UtxoUnwatched { utxo_id: 1 }.into());
-		assert!(UtxosPendingConfirmation::<Test>::get().is_empty());
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
 	});
 }
 
@@ -146,7 +146,7 @@ fn it_should_move_utxos_to_lock_once_verified() {
 		System::set_block_number(1);
 
 		let script_pubkey = make_pubkey([0u8; 34]);
-		let satoshis = MinimumSatoshisPerTrackedUtxo::get();
+		let satoshis = MinimumSatoshisPerCandidateUtxo::get();
 		let watch_for_spent_until = 10;
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
 			block_height: 2,
@@ -170,7 +170,9 @@ fn it_should_move_utxos_to_lock_once_verified() {
 		System::assert_last_event(
 			Event::UtxoVerified { utxo_id: 1, satoshis_received: satoshis }.into(),
 		);
-		assert!(UtxosPendingConfirmation::<Test>::get().is_empty(),);
+		assert!(LocksPendingFunding::<Test>::get().is_empty(),);
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(utxo_ref.clone()));
 		assert_eq!(
 			LockedUtxos::<Test>::get(&utxo_ref),
 			Some(UtxoValue {
@@ -184,11 +186,14 @@ fn it_should_move_utxos_to_lock_once_verified() {
 	});
 }
 
+/// Records mismatched UTXOs while pending, but clears candidate refs once funding is confirmed.
 #[test]
 fn it_should_ignore_extra_funding_utxos() {
-	MinimumSatoshisPerTrackedUtxo::set(1000);
+	MinimumSatoshisPerCandidateUtxo::set(1000);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		OrphanDetectedCallback::set(Some(record_orphan_detected));
+		LastOrphanDetected::set(None);
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
 			block_height: 2,
 			block_hash: H256Le([0; 32]),
@@ -199,7 +204,7 @@ fn it_should_ignore_extra_funding_utxos() {
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
 		let utxo_ref_2 = UtxoRef { txid: H256Le([1; 32]), output_index: 1 };
 		let utxo_ref_3 = UtxoRef { txid: H256Le([2; 32]), output_index: 1 };
-		assert_eq!(UtxosPendingConfirmation::<Test>::get().len(), 1);
+		assert_eq!(LocksPendingFunding::<Test>::get().len(), 1);
 
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
@@ -238,13 +243,15 @@ fn it_should_ignore_extra_funding_utxos() {
 		System::assert_has_event(
 			Event::UtxoRejected {
 				utxo_id: 1,
+				utxo_ref: utxo_ref_2.clone(),
 				satoshis_received: 89_999,
 				rejected_reason: BitcoinRejectedReason::SatoshisOutsideAcceptedRange,
 			}
 			.into(),
 		);
-		assert_eq!(LastInvalidUtxo::get(), Some((1, utxo_ref_2.clone(), 89_999,)));
-		assert!(UtxosPendingConfirmation::<Test>::get().is_empty(),);
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert!(LocksPendingFunding::<Test>::get().is_empty(),);
+		assert_eq!(LastOrphanDetected::get(), Some((1, utxo_ref_2.clone(), 89_999)));
 		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref), None);
 		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref_2), None);
 		assert_eq!(
@@ -257,18 +264,19 @@ fn it_should_ignore_extra_funding_utxos() {
 				watch_for_spent_until_height: 100,
 			})
 		);
-		assert_eq!(UtxoIdToRef::<Test>::get(1), Some(utxo_ref_3.clone()));
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(utxo_ref_3.clone()));
 
 		// test cleanup
 		BitcoinUtxos::unwatch(1);
 		assert_eq!(LockedUtxos::<Test>::get(&utxo_ref_3), None);
-		assert_eq!(UtxoIdToRef::<Test>::get(1), None);
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
+		OrphanDetectedCallback::set(None);
 	});
 }
 
 #[test]
 fn it_should_preserve_storage_if_one_sync_fails() {
-	MinimumSatoshisPerTrackedUtxo::set(100);
+	MinimumSatoshisPerCandidateUtxo::set(100);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
@@ -327,7 +335,7 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 			})
 		);
 		assert_eq!(
-			UtxosPendingConfirmation::<Test>::get().get(&2),
+			LocksPendingFunding::<Test>::get().get(&2),
 			Some(&UtxoValue {
 				utxo_id: 2,
 				script_pubkey: make_pubkey([1u8; 34]),
@@ -337,6 +345,383 @@ fn it_should_preserve_storage_if_one_sync_fails() {
 			})
 		);
 	});
+}
+
+/// Does not track extra UTXOs after a lock is funded as candidates.
+#[test]
+fn does_not_track_utxos_after_funding() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		OrphanDetectedCallback::set(Some(record_orphan_detected));
+		LastOrphanDetected::set(None);
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let satoshis = MinimumSatoshisPerCandidateUtxo::get();
+		let watch_for_spent_until = 10;
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, satoshis, watch_for_spent_until),);
+		let funded_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: funded_ref.clone(),
+					satoshis,
+					expected_satoshis: satoshis,
+					bitcoin_height: 2,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(funded_ref.clone()));
+
+		InherentIncluded::<Test>::set(false);
+		let extra_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 1 };
+		System::set_block_number(2);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 3,
+			block_hash: H256Le([1; 32]),
+		});
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: extra_ref.clone(),
+					satoshis: satoshis + 10_000,
+					expected_satoshis: satoshis,
+					bitcoin_height: 3,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 3, block_hash: H256Le([1; 32]) },
+			},
+		));
+
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert_eq!(LastOrphanDetected::get(), Some((1, extra_ref.clone(), satoshis + 10_000)));
+
+		OrphanDetectedCallback::set(None);
+	});
+}
+
+/// Promotes only non-selected candidates to orphans when a user funds with a candidate.
+#[test]
+fn promotes_non_selected_candidate_on_manual_funding() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		OrphanDetectedCallback::set(Some(record_orphan_detected));
+		LastOrphanDetected::set(None);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let chosen_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+		let other_ref = UtxoRef { txid: H256Le([2; 32]), output_index: 1 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: chosen_ref.clone(),
+						satoshis: expected_satoshis - 10_001,
+						expected_satoshis,
+						bitcoin_height: 2,
+					},
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: other_ref.clone(),
+						satoshis: expected_satoshis - 12_000,
+						expected_satoshis,
+						bitcoin_height: 2,
+					},
+				],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&chosen_ref));
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&other_ref));
+
+		assert_ok!(BitcoinUtxos::fund_with_utxo_candidate(
+			RuntimeOrigin::signed(1),
+			1,
+			chosen_ref.clone()
+		));
+
+		assert_eq!(
+			LastOrphanDetected::get(),
+			Some((1, other_ref.clone(), expected_satoshis - 12_000))
+		);
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(chosen_ref.clone()));
+		assert!(LockedUtxos::<Test>::get(&chosen_ref).is_some());
+
+		OrphanDetectedCallback::set(None);
+	});
+}
+
+/// Promotes candidate UTXOs to orphan entries when a lock times out.
+#[test]
+fn promotes_candidates_to_orphans_on_timeout() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		OrphanDetectedCallback::set(Some(record_orphan_detected));
+		LastOrphanDetected::set(None);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let orphan_ref = UtxoRef { txid: H256Le([9; 32]), output_index: 0 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: orphan_ref.clone(),
+					satoshis: expected_satoshis - 10_001,
+					expected_satoshis,
+					bitcoin_height: 2,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&orphan_ref));
+
+		assert_ok!(BitcoinUtxos::lock_timeout_pending_funding(1));
+		assert!(!LocksPendingFunding::<Test>::get().contains_key(&1));
+		assert_eq!(
+			LastOrphanDetected::get(),
+			Some((1, orphan_ref.clone(), expected_satoshis - 10_001))
+		);
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+	});
+}
+
+/// Clears candidates and pending funding when a tracked UTXO is reported spent.
+#[test]
+fn spent_clears_candidates_and_pending() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let candidate_ref = UtxoRef { txid: H256Le([9; 32]), output_index: 0 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: candidate_ref.clone(),
+					satoshis: expected_satoshis - 10_001,
+					expected_satoshis,
+					bitcoin_height: 2,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&candidate_ref));
+
+		InherentIncluded::<Test>::set(false);
+		System::set_block_number(2);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: vec![BitcoinUtxoSpend {
+					utxo_id: 1,
+					utxo_ref: Some(candidate_ref.clone()),
+					bitcoin_height: 2,
+				}],
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert!(LocksPendingFunding::<Test>::get().contains_key(&1));
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
+		assert!(LockedUtxos::<Test>::get(&candidate_ref).is_none());
+	});
+}
+
+/// Spent funding UTXOs clear the lock state.
+#[test]
+fn funded_utxo_spend_clears_lock_state() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let funding_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![BitcoinUtxoFunding {
+					utxo_id: 1,
+					utxo_ref: funding_ref.clone(),
+					satoshis: expected_satoshis,
+					expected_satoshis,
+					bitcoin_height: 2,
+				}],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), Some(funding_ref.clone()));
+		assert!(LockedUtxos::<Test>::contains_key(&funding_ref));
+
+		InherentIncluded::<Test>::set(false);
+		System::set_block_number(2);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: vec![BitcoinUtxoSpend {
+					utxo_id: 1,
+					utxo_ref: Some(funding_ref.clone()),
+					bitcoin_height: 2,
+				}],
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
+		assert!(LockedUtxos::<Test>::get(&funding_ref).is_none());
+	});
+}
+
+/// Ignores duplicate candidate UTXOs for the same lock.
+#[test]
+fn ignores_duplicate_candidates() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let duplicate_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: vec![
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: duplicate_ref.clone(),
+						satoshis: expected_satoshis - 10_001,
+						expected_satoshis,
+						bitcoin_height: 2,
+					},
+					BitcoinUtxoFunding {
+						utxo_id: 1,
+						utxo_ref: duplicate_ref.clone(),
+						satoshis: expected_satoshis - 10_001,
+						expected_satoshis,
+						bitcoin_height: 2,
+					},
+				],
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		assert_eq!(CandidateUtxoRefsByUtxoId::<Test>::get(1).len(), 1);
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&duplicate_ref));
+	});
+}
+
+/// Rejects candidate storage when the max candidate count is exceeded.
+#[test]
+fn rejects_when_candidate_limit_exceeded() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 2,
+			block_hash: H256Le([0; 32]),
+		});
+
+		let script_pubkey = make_pubkey([0u8; 34]);
+		let expected_satoshis = 100_000;
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, expected_satoshis, 100),);
+
+		let mut funded = Vec::new();
+		for i in 0..(MaxCandidateUtxosPerLock::get() + 1) {
+			funded.push(BitcoinUtxoFunding {
+				utxo_id: 1,
+				utxo_ref: UtxoRef { txid: H256Le([i as u8; 32]), output_index: 0 },
+				satoshis: expected_satoshis - 10_001,
+				expected_satoshis,
+				bitcoin_height: 2,
+			});
+		}
+
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded,
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+			},
+		));
+
+		let error: DispatchError = Error::<Test>::MaxCandidateUtxosExceeded.into();
+		System::assert_has_event(
+			Event::UtxoVerifiedError { utxo_id: 1, error: error.stripped() }.into(),
+		);
+		assert_eq!(
+			CandidateUtxoRefsByUtxoId::<Test>::get(1).len() as u32,
+			MaxCandidateUtxosPerLock::get()
+		);
+	});
+}
+
+fn record_orphan_detected(input: (UtxoId, UtxoRef, Satoshis)) -> DispatchResult {
+	LastOrphanDetected::set(Some(input));
+	Ok(())
 }
 
 fn make_pubkey(pubkey: [u8; 34]) -> BitcoinCosignScriptPubkey {

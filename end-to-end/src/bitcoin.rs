@@ -379,14 +379,14 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 			.await
 			.unwrap()
 			.expect("Utxo state should be present");
-		if utxo_lock.is_verified {
-			println!("Utxo lock is verified in block {:?}", next.unwrap().hash());
+		if utxo_lock.is_funded {
+			println!("Utxo lock is funded in block {:?}", next.unwrap().hash());
 			break;
 		}
-		println!("Waiting for utxo lock to be verified in block {:?}", next.unwrap().hash());
+		println!("Waiting for utxo lock to be funded in block {:?}", next.unwrap().hash());
 		max_blocks -= 1;
 		if max_blocks == 0 {
-			panic!("No utxo lock verified after 100 blocks");
+			panic!("No utxo lock funded after 100 blocks");
 		}
 	}
 
@@ -834,7 +834,7 @@ async fn wait_for_mint(
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let pending_utxos = client
-		.fetch_storage(&storage().bitcoin_utxos().utxos_pending_confirmation(), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_utxos().locks_pending_funding(), FetchAt::Finalized)
 		.await?
 		.unwrap()
 		.0;
@@ -862,7 +862,10 @@ async fn wait_for_mint(
 		let _ = finalized_sub.next().await;
 	}
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_ref(*utxo_id), FetchAt::Finalized)
+		.fetch_storage(
+			&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(*utxo_id),
+			FetchAt::Finalized,
+		)
 		.await?
 		.expect("utxo");
 	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());

@@ -10,6 +10,7 @@ pub trait WeightInfo {
 	}
 	fn set_confirmed_block() -> Weight;
 	fn set_operator() -> Weight;
+	fn fund_with_utxo_candidate() -> Weight;
 
 	// Individual UTXO operation weights (linear benchmarks for sync composition)
 	fn utxo_spent(n: u32) -> Weight;
@@ -29,6 +30,10 @@ impl WeightInfo for () {
 	}
 
 	fn set_operator() -> Weight {
+		Weight::zero()
+	}
+
+	fn fund_with_utxo_candidate() -> Weight {
 		Weight::zero()
 	}
 

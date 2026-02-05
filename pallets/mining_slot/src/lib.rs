@@ -357,6 +357,8 @@ pub mod pallet {
 		InsufficientFunds,
 		/// The mining bid cannot be reduced
 		BidCannotBeReduced,
+		/// Cannot change the funding account for an existing bid
+		CannotChangeFundingAccount,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
 		/// The argonots on hold cannot be released
@@ -507,6 +509,16 @@ pub mod pallet {
 			);
 
 			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
+			if let Some(existing) = existing_bid.as_ref() {
+				let existing_funding = existing
+					.external_funding_account
+					.clone()
+					.unwrap_or_else(|| miner_account_id.clone());
+				ensure!(
+					existing_funding == funding_account,
+					Error::<T>::CannotChangeFundingAccount
+				);
+			}
 			let current_registration = Self::get_active_registration(&miner_account_id);
 			let next_frame_id = NextFrameId::<T>::get();
 			if let Some(ref registration) = current_registration {

@@ -7,7 +7,7 @@ use argon_primitives::{
 		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, H256Le, Satoshis, UtxoRef,
 		UtxoValue,
 	},
-	inherents::{BitcoinUtxoFunding, BitcoinUtxoSync},
+	inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
 };
 use bitcoin::{bip158, hashes::Hash};
 use bitcoincore_rpc::{Auth, RpcApi};
@@ -177,7 +177,11 @@ impl UtxoSpendFilter {
 					// If we're tracking the UTXO, it has been spent
 					if let Some(id) = utxo_ref_to_utxo_id.get(&utxo_ref) {
 						// TODO: should we figure out who spent it here?
-						result.spent.insert(*id, height);
+						result.spent.push(BitcoinUtxoSpend {
+							utxo_id: *id,
+							utxo_ref: Some(utxo_ref),
+							bitcoin_height: height,
+						});
 					}
 				}
 			}

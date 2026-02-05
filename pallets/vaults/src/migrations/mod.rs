@@ -96,7 +96,7 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade for Inn
 				{
 					let securitization = lock.get_securitization().collateral_required.into();
 					securitization_locked += securitization;
-					if !lock.is_verified {
+					if !lock.is_funded {
 						securitization_pending_activation += securitization;
 					}
 				}
@@ -244,7 +244,7 @@ mod test {
 				utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
 					wscript_hash: H256::from([0u8; 32]),
 				},
-				is_verified: true,
+				is_funded: true,
 				fund_hold_extensions: Default::default(),
 				security_fees: 10u128,
 			};

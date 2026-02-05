@@ -32,6 +32,7 @@ pub trait WeightInfo {
 	// Orphaned Utxo process
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
+	fn increase_securitization() -> Weight;
 
 	fn register_fee_coupon() -> Weight;
 }
@@ -50,5 +51,6 @@ impl WeightInfo for () {
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
+	fn increase_securitization() -> Weight { Weight::zero() }
 	fn register_fee_coupon() -> Weight { Weight::zero() }
 }
