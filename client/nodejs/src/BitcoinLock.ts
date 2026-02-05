@@ -82,13 +82,13 @@ export class BitcoinLock implements IBitcoinLock {
     client: IQueryableClient,
   ): Promise<{ txid: string; vout: number; bitcoinTxid: string } | undefined> {
     const refRaw = await client.query.bitcoinUtxos.utxoIdToRef(this.utxoId);
-    if (!refRaw) {
+    if (!refRaw || refRaw.isNone) {
       return;
     }
     const ref = refRaw.unwrap();
 
     const txid = u8aToHex(ref.txid);
-    const bitcoinTxid = u8aToHex(ref.txid.reverse());
+    const bitcoinTxid = u8aToHex(ref.txid.slice().reverse());
     const vout = ref.outputIndex.toNumber();
     return { txid, vout, bitcoinTxid };
   }
