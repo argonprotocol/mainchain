@@ -3238,6 +3238,7 @@ declare module '@polkadot/types/lookup' {
     readonly isCannotRegisterOverlappingSessions: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isBidCannotBeReduced: boolean;
+    readonly isCannotChangeFundingAccount: boolean;
     readonly isInvalidBidAmount: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly type:
@@ -3248,6 +3249,7 @@ declare module '@polkadot/types/lookup' {
       | 'CannotRegisterOverlappingSessions'
       | 'InsufficientFunds'
       | 'BidCannotBeReduced'
+      | 'CannotChangeFundingAccount'
       | 'InvalidBidAmount'
       | 'UnrecoverableHold';
   }

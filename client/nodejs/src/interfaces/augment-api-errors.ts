@@ -547,6 +547,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BidTooLow: AugmentedError<ApiType>;
       /**
+       * Cannot change the funding account for an existing bid
+       **/
+      CannotChangeFundingAccount: AugmentedError<ApiType>;
+      /**
        * An account can only have one active registration
        **/
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;

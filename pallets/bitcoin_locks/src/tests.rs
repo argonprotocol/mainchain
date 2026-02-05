@@ -7,7 +7,7 @@ use pallet_prelude::*;
 use crate::{
 	Error, Event, FEE_PROOF_MESSAGE_KEY, FeeCouponProof, FeeCouponsByPublic, HoldReason,
 	LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest, MicrogonPerBtcHistory,
-	MinimumSatoshis, OrphanedUtxosByAccount,
+	MinimumSatoshis, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
 	mock::*,
 	pallet::{
 		FeeCouponsExpiringByFrame, LockCosignDueByFrame, LockReleaseCosignHeightById,
@@ -16,8 +16,7 @@ use crate::{
 };
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
-	BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider,
-	TransactionSponsorProvider, TxSponsor,
+	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider, TransactionSponsorProvider, TxSponsor,
 	bitcoin::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
 		SATOSHIS_PER_BITCOIN, UtxoRef,

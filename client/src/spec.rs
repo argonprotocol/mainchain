@@ -3794,9 +3794,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				117u8, 102u8, 205u8, 46u8, 91u8, 78u8, 58u8, 104u8, 31u8, 24u8, 88u8, 102u8, 38u8,
-				20u8, 135u8, 124u8, 194u8, 49u8, 196u8, 27u8, 50u8, 199u8, 16u8, 175u8, 141u8,
-				44u8, 102u8, 163u8, 58u8, 104u8, 162u8, 6u8,
+				76u8, 227u8, 133u8, 236u8, 105u8, 197u8, 1u8, 143u8, 142u8, 48u8, 199u8, 150u8,
+				91u8, 129u8, 162u8, 110u8, 170u8, 66u8, 80u8, 33u8, 66u8, 127u8, 120u8, 231u8,
+				214u8, 147u8, 157u8, 37u8, 76u8, 214u8, 74u8, 80u8,
 			]
 	}
 	pub mod system {
@@ -12587,7 +12587,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of frames an orphaned UTXO release request remains valid."]
+				#[doc = " Number of frames orphaned UTXO release entries are retained after a lock lifecycle"]
+				#[doc = " transition before being cleaned up."]
 				pub fn orphaned_utxo_release_expiry_frames(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -30095,9 +30096,12 @@ pub mod api {
 					#[doc = "The mining bid cannot be reduced"]
 					BidCannotBeReduced,
 					#[codec(index = 7)]
+					#[doc = "Cannot change the funding account for an existing bid"]
+					CannotChangeFundingAccount,
+					#[codec(index = 8)]
 					#[doc = "Bids must be in allowed increments"]
 					InvalidBidAmount,
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "The argonots on hold cannot be released"]
 					UnrecoverableHold,
 				}

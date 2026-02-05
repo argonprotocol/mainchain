@@ -83,7 +83,8 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
       /**
-       * Number of frames an orphaned UTXO release request remains valid.
+       * Number of frames orphaned UTXO release entries are retained after a lock lifecycle
+       * transition before being cleaned up.
        **/
       orphanedUtxoReleaseExpiryFrames: u64 & AugmentedConst<ApiType>;
       /**

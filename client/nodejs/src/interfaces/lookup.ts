@@ -2809,6 +2809,7 @@ export default {
       'CannotRegisterOverlappingSessions',
       'InsufficientFunds',
       'BidCannotBeReduced',
+      'CannotChangeFundingAccount',
       'InvalidBidAmount',
       'UnrecoverableHold',
     ],
