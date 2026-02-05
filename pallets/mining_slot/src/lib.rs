@@ -351,6 +351,8 @@ pub mod pallet {
 		BidTooLow,
 		/// An account can only have one active registration
 		CannotRegisterOverlappingSessions,
+		/// Cannot re-register an account with a different funding account
+		CannotChangeFundingAccount,
 		/// The funding account does not have enough funds to cover the bid
 		InsufficientFunds,
 		/// The mining bid cannot be reduced
@@ -508,11 +510,29 @@ pub mod pallet {
 			let current_registration = Self::get_active_registration(&miner_account_id);
 			let next_frame_id = NextFrameId::<T>::get();
 			if let Some(ref registration) = current_registration {
+				let current_funding_account = registration
+					.external_funding_account
+					.as_ref()
+					.unwrap_or(&registration.account_id);
+				ensure!(
+					current_funding_account == &funding_account,
+					Error::<T>::CannotChangeFundingAccount
+				);
 				let frames = T::FramesPerMiningTerm::get() as FrameId;
 				// ensure we are not overlapping sessions
 				ensure!(
 					registration.starting_frame_id + frames == next_frame_id,
 					Error::<T>::CannotRegisterOverlappingSessions
+				);
+			}
+			if let Some(ref existing_registration) = existing_bid {
+				let existing_funding_account = existing_registration
+					.external_funding_account
+					.as_ref()
+					.unwrap_or(&existing_registration.account_id);
+				ensure!(
+					existing_funding_account == &funding_account,
+					Error::<T>::CannotChangeFundingAccount
 				);
 			}
 
@@ -846,8 +866,9 @@ impl<T: Config> Pallet<T> {
 				active_miners -= 1;
 				let _ = released_miners_by_account_id.try_insert(account_id.clone(), miner.clone());
 				removed_miners.push((account_id, miner.authority_keys.clone()));
-				let is_in_next = slot_cohort.iter().any(|x| x.account_id == miner.account_id);
-				Self::release_mining_seat_argonots(&miner, is_in_next);
+				let next_registration =
+					slot_cohort.iter().find(|x| x.account_id == miner.account_id);
+				Self::release_mining_seat_argonots(&miner, next_registration);
 			}
 		}
 
@@ -1188,7 +1209,7 @@ impl<T: Config> Pallet<T> {
 
 		// if we've already held for next, reduce now
 		if let Some(current_registration) = current_registration {
-			argonots_needed -= current_registration.argonots;
+			argonots_needed.saturating_reduce(current_registration.argonots);
 		}
 
 		if argonots_needed == 0u32.into() {
@@ -1228,23 +1249,27 @@ impl<T: Config> Pallet<T> {
 	}
 
 	/// Release the argonots from the mining seat. If the Argonots will be re-used in the next
-	/// era, we should not unlock it
+	/// era, we should not unlock the difference.
 	pub(crate) fn release_mining_seat_argonots(
 		active_registration: &Registration<T>,
-		is_registered_for_next: bool,
+		next_registration: Option<&Registration<T>>,
 	) {
-		if is_registered_for_next {
-			return;
-		}
 		let account_id = &active_registration.account_id;
 
-		let funding_account = active_registration
-			.external_funding_account
-			.clone()
-			.unwrap_or(account_id.clone());
+		let funding_account =
+			active_registration.external_funding_account.as_ref().unwrap_or(account_id);
 
-		if let Err(e) = Self::release_argonots_hold(&funding_account, active_registration.argonots)
-		{
+		// Only decrease the amount on hold when the miner renews with a lower requirement.
+		let amount_to_release = if let Some(next_registration) = next_registration {
+			active_registration.argonots.saturating_sub(next_registration.argonots)
+		} else {
+			active_registration.argonots
+		};
+
+		if amount_to_release == T::Balance::zero() {
+			return;
+		}
+		if let Err(e) = Self::release_argonots_hold(funding_account, amount_to_release) {
 			log::error!(
 				"Failed to release argonots from funding account {:?} (account {:?}). {:?}",
 				funding_account,
@@ -1261,15 +1286,15 @@ impl<T: Config> Pallet<T> {
 	pub(crate) fn release_failed_bid(bid_registration: &Registration<T>) -> DispatchResult {
 		let funding_account = bid_registration
 			.external_funding_account
-			.clone()
-			.unwrap_or(bid_registration.account_id.clone());
-		let account_id = bid_registration.account_id.clone();
+			.as_ref()
+			.unwrap_or(&bid_registration.account_id);
+		let account_id = &bid_registration.account_id;
 
 		if bid_registration.bid > T::Balance::zero() {
 			let pool_account = T::BidPoolProvider::get_bid_pool_account();
 			T::ArgonCurrency::transfer(
 				&pool_account,
-				&funding_account,
+				funding_account,
 				bid_registration.bid,
 				Preservation::Expendable,
 			)?;
@@ -1277,15 +1302,15 @@ impl<T: Config> Pallet<T> {
 
 		let mut held_argonots = false;
 		let mut argonots_to_unhold: T::Balance = bid_registration.argonots;
-		if let Some(active) = Self::get_active_registration(&account_id) {
+		if let Some(active) = Self::get_active_registration(account_id) {
 			argonots_to_unhold.saturating_reduce(active.argonots);
 			held_argonots = true;
 		}
 
-		Self::release_argonots_hold(&funding_account, argonots_to_unhold)?;
+		Self::release_argonots_hold(funding_account, argonots_to_unhold)?;
 
 		Self::deposit_event(Event::<T>::SlotBidderDropped {
-			account_id,
+			account_id: account_id.clone(),
 			preserved_argonot_hold: held_argonots,
 		});
 
