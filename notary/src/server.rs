@@ -277,8 +277,7 @@ impl NotaryServer {
 				.await
 				.map_err(|e| {
 					Error::InternalError(format!(
-						"An error occurred creating a Notebook Audit Failure listener {}",
-						e
+						"An error occurred creating a Notebook Audit Failure listener {e}"
 					))
 				})?;
 		let audit_failure_number: Arc<Mutex<Option<NotebookNumber>>> = Default::default();

@@ -55,10 +55,10 @@ impl Drop for ArgonTestNotary {
 			handle.block_on(async {
 				let pool =
 					PgPool::connect(&db_url).await.context("failed to connect to db").unwrap();
-				sqlx::query(&format!("DROP DATABASE \"{}\" WITH(FORCE)", db_name))
+				sqlx::query(&format!("DROP DATABASE \"{db_name}\" WITH(FORCE)"))
 					.execute(&pool)
 					.await
-					.map_err(|e| eprintln!("Failed to drop db: {:?}", e))
+					.map_err(|e| eprintln!("Failed to drop db: {e:?}"))
 					.ok();
 			});
 		})
@@ -116,7 +116,7 @@ impl ArgonTestNotary {
 
 	pub fn create_archive_bucket() -> String {
 		let archive_uuid = Uuid::new_v4();
-		let bucket_name = format!("notary-archives-{}", archive_uuid);
+		let bucket_name = format!("notary-archives-{archive_uuid}");
 		bucket_name
 	}
 
@@ -139,7 +139,7 @@ impl ArgonTestNotary {
 		let mut uid: String = "".to_string();
 		for _ in 0..10 {
 			uid = generate_random_db_name();
-			let db_name = format!("notary_{}", uid);
+			let db_name = format!("notary_{uid}");
 			let result = sqlx::query("SELECT 1 FROM pg_database WHERE datname = $1")
 				.bind(&db_name)
 				.fetch_one(&pool)
@@ -149,9 +149,9 @@ impl ArgonTestNotary {
 			}
 		}
 
-		let db_name = format!("notary_{}", uid);
-		let db_url = format!("{}/{}", db_base_url, db_name);
-		sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name)).execute(&pool).await?;
+		let db_name = format!("notary_{uid}");
+		let db_url = format!("{db_base_url}/{db_name}");
+		sqlx::query(&format!("CREATE DATABASE \"{db_name}\"")).execute(&pool).await?;
 		// migrate from notary project path
 		let output = Command::new("./argon-notary")
 			.current_dir(&target_dir)

@@ -69,12 +69,12 @@ impl XPrivCommands {
 				let xpriv = xpriv_file.read()?;
 
 				let child_xpub = derive_xpub(&xpriv, &hd_path)?;
-				println!("{}", child_xpub);
+				println!("{child_xpub}");
 			},
 			XPrivCommands::DerivePubkey { xpriv_file, hd_path } => {
 				let xpriv = xpriv_file.read()?;
 				let pubkey = derive_pubkey(&xpriv, &hd_path)?;
-				println!("{}", pubkey);
+				println!("{pubkey}");
 			},
 		}
 		Ok(())

@@ -144,10 +144,7 @@ impl S3Archive {
 			remove_bucket_on_drop,
 		};
 
-		Ok((
-			buckets,
-			ArchiveSettings { archive_host: format!("{}/{}", minio_endpoint, bucket_name) },
-		))
+		Ok((buckets, ArchiveSettings { archive_host: format!("{minio_endpoint}/{bucket_name}") }))
 	}
 
 	pub async fn new(
@@ -211,7 +208,7 @@ impl S3Archive {
 		notebook: Vec<u8>,
 	) -> anyhow::Result<(), Error> {
 		let bucket_path = get_notebook_bucket(self.notary_id);
-		let key = format!("{}/{}.scale", bucket_path, notebook_number);
+		let key = format!("{bucket_path}/{notebook_number}.scale");
 		let res = self.put_public(key, notebook).await?;
 		trace!(?res, notebook_number, "Put header");
 		Ok(())
@@ -223,7 +220,7 @@ impl S3Archive {
 		header: Vec<u8>,
 	) -> anyhow::Result<(), Error> {
 		let bucket_path = get_header_bucket(self.notary_id);
-		let key = format!("{}/{}.scale", bucket_path, notebook_number);
+		let key = format!("{bucket_path}/{notebook_number}.scale");
 		let res = self.put_public(key, header).await?;
 		trace!(?res, notebook_number, "Put header");
 		Ok(())

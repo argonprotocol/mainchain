@@ -98,7 +98,7 @@ impl ChainTransferStore {
 		.map_err(|_| Error::TransferToLocalchainNotFound { change_index, note_index })?;
 
 		let amount = stored_amount.amount.parse::<u128>().map_err(|e| {
-			Error::InternalError(format!("Failed to parse amount from mainchain {}", e))
+			Error::InternalError(format!("Failed to parse amount from mainchain {e}"))
 		})?;
 		ensure!(
 			proposed_amount == amount,

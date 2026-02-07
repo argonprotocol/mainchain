@@ -262,7 +262,7 @@ where
 				},
 				other => {
 					self.backend.unpin_block(parent_hash);
-					warn!("Import of own block - result not success: {:?}", other);
+					warn!("Import of own block - result not success: {other:?}");
 				},
 			},
 			Err(e) => {

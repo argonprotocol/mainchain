@@ -113,10 +113,10 @@ impl CoinUsdPriceLookup {
 				Ok((provider, Err(err))) => {
 					// Avoid the literal substring "error" in our own message; upstream errors may
 					// still contain it.
-					println!("Price lookup failed on {provider:?}: {}", err);
+					println!("Price lookup failed on {provider:?}: {err}");
 				},
 				Err(join_err) => {
-					println!("Price lookup task failed: {}", join_err);
+					println!("Price lookup task failed: {join_err}");
 				},
 			}
 		}

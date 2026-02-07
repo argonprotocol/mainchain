@@ -196,7 +196,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			}
 		}
 		for (vault_id, (bonded, oldest_frame)) in &bonded_by_vault {
-			info!("Migrating prebonded argons for vault ID {:?}", vault_id);
+			info!("Migrating prebonded argons for vault ID {vault_id:?}");
 			let vault_operator = T::TreasuryVaultProvider::get_vault_operator(*vault_id)
 				.expect("Vault must exist for prebonded argons");
 			let target_principal = T::Currency::balance_on_hold(
@@ -207,8 +207,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InnerMigrate<T> {
 			let held_principal = target_principal;
 
 			info!(
-				"Setting funder state for vault ID {:?}, operator {:?}, bonded principal {:?}, target principal {:?}, held principal {:?}",
-				vault_id, vault_operator, bonded_principal, target_principal, held_principal
+				"Setting funder state for vault ID {vault_id:?}, operator {vault_operator:?}, bonded principal {bonded_principal:?}, target principal {target_principal:?}, held principal {held_principal:?}"
 			);
 			let mut basis_frame_id = *oldest_frame;
 			if let Some(old_bonded) = prebonded.get(vault_id) {

@@ -66,7 +66,7 @@ impl CosignReleaser {
 		};
 		let descriptor = cosign_script.create_descriptor()?;
 		psbt.update_input_with_descriptor(0, &descriptor).map_err(|_| {
-			log::error!("Error updating PSBT with descriptor: {:#?}", descriptor);
+			log::error!("Error updating PSBT with descriptor: {descriptor:#?}");
 			Error::PsbtFinalizeError
 		})?;
 

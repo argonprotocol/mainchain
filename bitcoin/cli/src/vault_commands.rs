@@ -70,7 +70,7 @@ impl VaultCommands {
 					.await?
 					.expect("current tick not found");
 
-				println!("Showing for: {:#?} btc", btc);
+				println!("Showing for: {btc:#?} btc");
 				println!("Current mint value: {} argons", ArgonFormatter(argons_needed));
 
 				// NOTE: the typegen doesn't work, so revert to dynamic storage
@@ -119,7 +119,7 @@ impl VaultCommands {
 				}
 
 				if table.is_empty() {
-					println!("No vaults found that can support {} btc", btc);
+					println!("No vaults found that can support {btc} btc");
 				} else {
 					println!("{table}");
 				}
@@ -137,7 +137,7 @@ impl VaultCommands {
 
 				let url = client.create_polkadotjs_deeplink(&call)?;
 				println!("Vault funds needed: {}", config.argons_needed());
-				println!("Link to create transaction:\n\t{}", url);
+				println!("Link to create transaction:\n\t{url}");
 			},
 			VaultCommands::PendingRelease { vault_id, keypair: _ } => {
 				let client = MainchainClient::from_url(&rpc_url)
@@ -174,8 +174,7 @@ impl VaultCommands {
 				}
 
 				println!(
-					"Pending as of block #{:?}\n\nNOTE: does not include eligible for reclaim by vault.\n\n{table}",
-					current_block
+					"Pending as of block #{current_block:?}\n\nNOTE: does not include eligible for reclaim by vault.\n\n{table}"
 				);
 			},
 		}

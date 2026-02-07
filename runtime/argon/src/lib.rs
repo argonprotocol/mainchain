@@ -352,7 +352,7 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 
 		log::info!("Scheduling grandpa change");
 		if let Err(err) = Grandpa::schedule_change(next_authorities, 0, None) {
-			log::error!("Failed to schedule grandpa change: {:?}", err);
+			log::error!("Failed to schedule grandpa change: {err:?}");
 		}
 		pallet_grandpa::CurrentSetId::<Runtime>::mutate(|x| *x += 1);
 	}

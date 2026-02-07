@@ -91,7 +91,7 @@ impl XprivFile {
 			use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 			output_file
 				.set_permissions(Permissions::from_mode(0o600))
-				.map_err(|e| anyhow!("Failed to set permissions: {}", e))?;
+				.map_err(|e| anyhow!("Failed to set permissions: {e}"))?;
 		}
 
 		if let Some(password) = password {

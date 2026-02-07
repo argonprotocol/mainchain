@@ -88,5 +88,5 @@ pub enum Subcommand {
 }
 
 fn parse_ss58_account_id(data: &str) -> Result<AccountId, String> {
-	sp_core::crypto::Ss58Codec::from_ss58check(data).map_err(|err| format!("{:?}", err))
+	sp_core::crypto::Ss58Codec::from_ss58check(data).map_err(|err| format!("{err:?}"))
 }

@@ -44,7 +44,7 @@ async fn test_end_to_end_default_vote_mining() {
 					grandpa_miner.client.get_ownership(&author, FetchAt::Block(block.hash())).await
 				{
 					if ownership.free >= (ownership_needed * 2) && !authors.contains(&author) {
-						println!("Block Author is ready {:?}", keyring);
+						println!("Block Author is ready {keyring:?}");
 						authors.insert(author);
 					}
 				}
@@ -61,7 +61,7 @@ async fn test_end_to_end_default_vote_mining() {
 			}
 			counter += 1;
 			if counter >= 50 {
-				panic!("Blocks not produced by both authors after 50 blocks -> {:?}", authors);
+				panic!("Blocks not produced by both authors after 50 blocks -> {authors:?}");
 			}
 		}
 	}
@@ -175,8 +175,7 @@ async fn test_end_to_end_default_vote_mining() {
 			if let Some(start_tick) = start_tick {
 				if tick.saturating_sub(start_tick) >= max_wait_ticks {
 					println!(
-						"Stopping vote mining wait after {} ticks (start {}, current {})",
-						max_wait_ticks, start_tick, tick
+						"Stopping vote mining wait after {max_wait_ticks} ticks (start {start_tick}, current {tick})"
 					);
 					break;
 				}
@@ -196,7 +195,7 @@ async fn test_end_to_end_default_vote_mining() {
 			}
 		}
 		block_loops += 1;
-		println!("Block Loops: {}", block_loops);
+		println!("Block Loops: {block_loops}");
 		if block_loops >= 300 {
 			break;
 		}

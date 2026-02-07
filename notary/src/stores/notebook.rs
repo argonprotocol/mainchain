@@ -159,7 +159,7 @@ impl NotebookStore {
 			header: header.header,
 			hash: H256::from_slice(&rows.hash),
 			signature: Signature::try_from(&rows.signature[..])
-				.map_err(|e| Error::InternalError(format!("Unable to read signature: {:?}", e)))?,
+				.map_err(|e| Error::InternalError(format!("Unable to read signature: {e:?}")))?,
 			notarizations: BoundedVec::truncate_from(notarizations),
 			new_account_origins: BoundedVec::truncate_from(new_account_origins),
 		})
@@ -207,8 +207,7 @@ impl NotebookStore {
 					.or_else(|| new_account_origin_map.get(&localchain_account_id).cloned())
 					.ok_or(|| {
 						Error::InternalError(format!(
-							"Could not find origin for account {:?}",
-							localchain_account_id
+							"Could not find origin for account {localchain_account_id:?}"
 						))
 					})
 					.map_err(|e| Error::InternalError(e().to_string()))?;
@@ -310,7 +309,7 @@ impl NotebookStore {
 			voting_power,
 			|hash| {
 				notary_sign(keystore, &public, hash)
-					.map_err(|e| Error::InternalError(format!("Unable to sign notebook: {:?}", e)))
+					.map_err(|e| Error::InternalError(format!("Unable to sign notebook: {e:?}")))
 			},
 		)
 		.await?;

@@ -17,9 +17,9 @@ use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
 
 pub fn get_infura_url(use_sepolia: bool, project_id: String) -> String {
 	if use_sepolia {
-		format!("https://sepolia.infura.io/v3/{}", project_id)
+		format!("https://sepolia.infura.io/v3/{project_id}")
 	} else {
-		format!("https://mainnet.infura.io/v3/{}", project_id)
+		format!("https://mainnet.infura.io/v3/{project_id}")
 	}
 }
 pub const USDC_ADDRESS: Address = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
@@ -99,7 +99,7 @@ impl UniswapOracle {
 		Ok(PriceAndLiquidity {
 			price: FixedU128::from_inner(float),
 			liquidity: Balance::try_from(liquidity_mainchain_units)
-				.map_err(|e| anyhow!("Failed to convert liquidity  {:?}", e))?,
+				.map_err(|e| anyhow!("Failed to convert liquidity  {e:?}"))?,
 		})
 	}
 
@@ -147,23 +147,20 @@ impl UniswapOracle {
 			match pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await {
 				Ok(res) => break res,
 				Err(e) => {
-					let error_msg = format!("{:?}", e);
+					let error_msg = format!("{e:?}");
 					if error_msg.contains("ZeroData") {
-						return Err(anyhow!("No data for fee tier {:?}: {:?}", fee, e));
+						return Err(anyhow!("No data for fee tier {fee:?}: {e:?}"));
 					}
 					if error_msg.contains("execution reverted: OLD") {
 						if backup_second_options.is_empty() {
-							return Err(anyhow!(
-								"All time windows exhausted for fee tier {:?}",
-								fee
-							));
+							return Err(anyhow!("All time windows exhausted for fee tier {fee:?}"));
 						}
 						time_window_seconds = backup_second_options.remove(0);
 						trace!(fee = ?fee, new_time_window = ?time_window_seconds, "Reducing time window and retrying observe due to OLD error");
 						continue;
 					}
 					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
-					return Err(anyhow!("Error calling observe: {:?}", e));
+					return Err(anyhow!("Error calling observe: {e:?}"));
 				},
 			}
 		};
@@ -314,7 +311,7 @@ mod test {
 				error!("Error getting price: {:?}", e);
 			})
 			.expect("Failed to get price");
-		println!("Price: {:?}", price);
+		println!("Price: {price:?}");
 		if LOOKUP_TOKEN_ADDRESS == ARGONOT_ADDRESS {
 			// ARGONOT is a floating coin
 			assert!(price.price.to_float() < 0.1);

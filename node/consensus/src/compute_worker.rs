@@ -219,7 +219,7 @@ where
 		let _ = self
 			.block_found_tx
 			.unbounded_send((build, BlockSealDigest::Compute { nonce: nonce.nonce }))
-			.inspect_err(|e| error!("Error sending block found message: {:?}", e));
+			.inspect_err(|e| error!("Error sending block found message: {e:?}"));
 	}
 }
 
@@ -255,7 +255,7 @@ impl BlockComputeNonce {
 			Err(e) => {
 				// If this fails, it means system resources aren't available. To avoid setting the
 				// wrong return value, we should crash
-				panic!("Error calculating hash: {:?}", e);
+				panic!("Error calculating hash: {e:?}");
 			},
 		};
 		let threshold = Self::threshold(compute_difficulty);
@@ -348,7 +348,7 @@ pub fn run_compute_solver_threads<B, Proof, C>(
 				match solver.check_next() {
 					Ok(Some(nonce)) => worker.submit(nonce, &key_block_hash),
 					Err(err) => {
-						warn!("Mining failed: {:?}", err);
+						warn!("Mining failed: {err:?}");
 						if matches!(err, RandomXError::CreationError(_)) {
 							tokio::time::sleep(Duration::from_secs(10)).await;
 						}
@@ -514,10 +514,7 @@ where
 				.client
 				.compute_puzzle(best_hash)
 				.inspect_err(|err| {
-					warn!(
-						"Unable to pull new block for compute miner. No difficulty found!! {}",
-						err
-					)
+					warn!("Unable to pull new block for compute miner. No difficulty found!! {err}")
 				})
 				.ok()?;
 			let activate_mining_time =

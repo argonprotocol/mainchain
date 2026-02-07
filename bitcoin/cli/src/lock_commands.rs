@@ -218,7 +218,7 @@ impl LockCommands {
 				let call =
 					tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into(), None);
 				let url = client.create_polkadotjs_deeplink(&call)?;
-				println!("Link to complete transaction:\n\t{}", url);
+				println!("Link to complete transaction:\n\t{url}");
 			},
 			LockCommands::SendToAddress { utxo_id } => {
 				let client = MainchainClient::from_url(&rpc_url)
@@ -416,7 +416,7 @@ impl LockCommands {
 					network_fee.to_sat(),
 				);
 				let url = client.create_polkadotjs_deeplink(&call)?;
-				println!("Link to create transaction:\n\t{}", url);
+				println!("Link to create transaction:\n\t{url}");
 			},
 			LockCommands::VaultCosignRelease { utxo_id, xpriv_file, hd_path } => {
 				let client = MainchainClient::from_url(&rpc_url)
@@ -465,7 +465,7 @@ impl LockCommands {
 				let release_fulfill =
 					tx().bitcoin_locks().cosign_release(utxo_id, signature.into());
 				let url = client.create_polkadotjs_deeplink(&release_fulfill)?;
-				println!("Link to create transaction:\n\t{}", url);
+				println!("Link to create transaction:\n\t{url}");
 			},
 			LockCommands::OwnerCosignRelease {
 				utxo_id,
@@ -576,7 +576,7 @@ impl LockCommands {
 						.cosign_script
 						.script_args
 						.bitcoin_vault_pubkey()
-						.map_err(|e| anyhow!("Could not convert the vault pubkey {:?}", e))?,
+						.map_err(|e| anyhow!("Could not convert the vault pubkey {e:?}"))?,
 					signature.try_into()?,
 				);
 				let vault_fingerprint = Fingerprint::from(utxo.vault_xpub_sources.0);
@@ -595,10 +595,9 @@ impl LockCommands {
 						.cosign_script
 						.script_args
 						.bitcoin_owner_pubkey()
-						.map_err(|e| anyhow!("Could not convert owner pubkey {:?}", e))?;
+						.map_err(|e| anyhow!("Could not convert owner pubkey {e:?}"))?;
 					println!(
-						"Adding owner pubkey to psbt bip32 derivation: {:?}, {:?}",
-						owner_pubkey, keysource
+						"Adding owner pubkey to psbt bip32 derivation: {owner_pubkey:?}, {keysource:?}"
 					);
 					releaser.psbt.inputs[0].bip32_derivation.insert(
 						secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes()[..])?,
@@ -628,8 +627,7 @@ impl LockCommands {
 					let psbt_bytes = general_purpose::STANDARD.encode(&finalized.serialize()[..]);
 					if let Ok(tx) = get_tx_hex(&finalized.extract_tx()?) {
 						println!(
-							"Broadcast this transaction to the network:\n\n{}\n\nTo view the finalized psbt, you can load this\n\n{}",
-							tx, psbt_bytes
+							"Broadcast this transaction to the network:\n\n{tx}\n\nTo view the finalized psbt, you can load this\n\n{psbt_bytes}"
 						);
 						return Ok(());
 					}
@@ -743,7 +741,7 @@ impl LockCommands {
 				}
 
 				wait_for_confirmations(&mut releaser, bitcoin_rpc_url.unwrap()).await?;
-				println!("You have claimed this UTXO to {}", dest_pubkey);
+				println!("You have claimed this UTXO to {dest_pubkey}");
 			},
 		}
 		Ok(())
@@ -762,7 +760,7 @@ async fn wait_for_confirmations(
 			let mut confirmations = confirmations.lock().unwrap();
 			if next_confirmations > *confirmations {
 				*confirmations = next_confirmations;
-				println!("Transaction confirmations: {}/6", confirmations);
+				println!("Transaction confirmations: {confirmations}/6");
 				if *confirmations >= 6 {
 					return true;
 				}

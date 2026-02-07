@@ -256,10 +256,9 @@ pub async fn price_index_loop_from_file(
 		}
 
 		let price_data_raw = fs::read_to_string(&file_path)
-			.map_err(|e| anyhow!("Failed to load price data from file: {:?}", e))?;
-		let price_data: PriceIndex = serde_json::from_str(&price_data_raw).map_err(|e| {
-			anyhow!("Failed to parse price data from file {:?}: {:?}", file_path, e)
-		})?;
+			.map_err(|e| anyhow!("Failed to load price data from file: {e:?}"))?;
+		let price_data: PriceIndex = serde_json::from_str(&price_data_raw)
+			.map_err(|e| anyhow!("Failed to parse price data from file {file_path:?}: {e:?}"))?;
 
 		let price_index = tx().price_index().submit(Index {
 			argon_usd_target_price: to_api_fixed_u128(price_data.argon_usd_target_price),

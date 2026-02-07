@@ -31,7 +31,7 @@ impl DomainStore {
   }
 
   pub fn tld_from_string(top_level: String) -> Result<DomainTopLevel> {
-    let tld_json_str = format!("\"{}\"", top_level);
+    let tld_json_str = format!("\"{top_level}\"");
     let top_level: DomainTopLevel = serde_json::from_str(&tld_json_str)?;
     Ok(top_level)
   }

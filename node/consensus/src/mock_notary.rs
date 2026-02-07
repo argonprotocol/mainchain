@@ -135,7 +135,7 @@ impl MockNotary {
 			.header_channel
 			.0
 			.notify(|| Ok::<NotebookHeaderInfo, anyhow::Error>((header, hash)))
-			.inspect_err(|e| println!("Failed to notify header: {:?}", e));
+			.inspect_err(|e| println!("Failed to notify header: {e:?}"));
 	}
 
 	pub async fn next_details(&self) -> (NotebookNumber, Tick) {

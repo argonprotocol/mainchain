@@ -46,7 +46,7 @@ fn parse_schedule(html: String) -> Result<Vec<CpiSchedule>> {
 		let release_date = parse_date(&release_date, vec!["%b. %d, %Y", "%b %d, %Y"])?; // Nov. 14, 2023
 
 		// ref month looks like December 2023
-		let ref_month = parse_date(&format!("1 {}", ref_month), vec!["%d %B %Y"])?;
+		let ref_month = parse_date(&format!("1 {ref_month}"), vec!["%d %B %Y"])?;
 
 		cpi_schedule.push(CpiSchedule { ref_month, release_date });
 	}

@@ -640,7 +640,7 @@ fn external_spend_clears_orphan_release_requests() {
 			1000
 		));
 		assert!(
-			OrphanedUtxosByAccount::<Test>::get(&who, &utxo_ref)
+			OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
 				.unwrap()
 				.cosign_request
 				.is_some()
@@ -655,9 +655,9 @@ fn external_spend_clears_orphan_release_requests() {
 
 		assert_ok!(BitcoinLocks::spent(1));
 
-		assert_eq!(OrphanedUtxosByAccount::<Test>::get(&who, &utxo_ref), None);
-		assert!(OrphanedUtxosByAccount::<Test>::contains_key(&who, &other_utxo_ref));
-		assert!(VaultViewOfOrphanedUtxoCosigns::get().get(&vault_id).is_none());
+		assert_eq!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref), None);
+		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &other_utxo_ref));
+		assert!(!VaultViewOfOrphanedUtxoCosigns::get().contains_key(&vault_id));
 	});
 }
 
@@ -859,7 +859,7 @@ fn calculates_redemption_prices() {
 			let price: f64 = price
 				.replace(",", "")
 				.parse()
-				.unwrap_or_else(|_| panic!("should parse price {}", price));
+				.unwrap_or_else(|_| panic!("should parse price {price}"));
 
 			FixedU128::from_float(price)
 		}
@@ -873,8 +873,7 @@ fn calculates_redemption_prices() {
 			assert_eq!(
 				new_price,
 				expected_price.saturating_mul_int(MICROGONS_PER_ARGON),
-				"{}: redemption price",
-				name
+				"{name}: redemption price"
 			);
 		}
 		test_scenario(

@@ -18,7 +18,7 @@ pub struct H256(pub [u8; 32]);
 
 impl Debug for H256 {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{:#x}", self)
+		write!(f, "{self:#x}")
 	}
 }
 
@@ -26,11 +26,11 @@ impl Display for H256 {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "0x")?;
 		for i in &self.0[0..2] {
-			write!(f, "{:02x}", i)?;
+			write!(f, "{i:02x}")?;
 		}
 		write!(f, "…")?;
 		for i in &self.0[30..32] {
-			write!(f, "{:02x}", i)?;
+			write!(f, "{i:02x}")?;
 		}
 		Ok(())
 	}
@@ -42,7 +42,7 @@ impl LowerHex for H256 {
 			write!(f, "0x")?;
 		}
 		for i in &self.0 {
-			write!(f, "{:02x}", i)?;
+			write!(f, "{i:02x}")?;
 		}
 		Ok(())
 	}
@@ -54,7 +54,7 @@ impl UpperHex for H256 {
 			write!(f, "0X")?;
 		}
 		for i in &self.0 {
-			write!(f, "{:02X}", i)?;
+			write!(f, "{i:02X}")?;
 		}
 		Ok(())
 	}

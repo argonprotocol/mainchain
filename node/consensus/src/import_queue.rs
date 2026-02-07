@@ -282,7 +282,7 @@ where
 			ForkPower::default()
 		} else {
 			ForkPower::try_from(best_header.digest()).map_err(|e| {
-				Error::MissingRuntimeData(format!("Failed to get best fork power: {:?}", e))
+				Error::MissingRuntimeData(format!("Failed to get best fork power: {e:?}"))
 			})?
 		};
 
@@ -296,7 +296,7 @@ where
 			.ok_or(Error::UnableToDecodeDigest("tick".to_string()))?
 			.0;
 		let fork_power = ForkPower::try_from(digest)
-			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {:?}", e)))?;
+			.map_err(|e| Error::MissingRuntimeData(format!("Failed to get fork power: {e:?}")))?;
 
 		if fork_power >= best_block_power {
 			// NOTE: only import as best block if it beats the best stored block. There are cases
@@ -434,7 +434,7 @@ where
 		}
 		let header = client
 			.header(parent_hash)?
-			.ok_or(Error::BlockNotFound(format!("{:?}", parent_hash)))?;
+			.ok_or(Error::BlockNotFound(format!("{parent_hash:?}")))?;
 		number = *header.number();
 		parent_hash = *header.parent_hash();
 		block_hash = header.hash();
@@ -553,7 +553,7 @@ where
 			if seal_digest.is_vote() {
 				let is_valid = runtime_api
 					.is_valid_signature(parent_hash, pre_hash, &seal_digest, digest)
-					.map_err(|e| format!("Error verifying miner signature {:?}", e))?;
+					.map_err(|e| format!("Error verifying miner signature {e:?}"))?;
 				if !is_valid {
 					return Err(Error::InvalidVoteSealSignature.into());
 				}
@@ -591,7 +591,7 @@ where
 				let digest_notebooks = runtime_api
 					.digest_notebooks(parent_hash, digest)
 					.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
-					.map_err(|e| format!("Failed to get digest notebooks: {:?}", e))?;
+					.map_err(|e| format!("Failed to get digest notebooks: {e:?}"))?;
 				self.notary_client
 					.verify_notebook_audits(&parent_hash, digest_notebooks)
 					.await

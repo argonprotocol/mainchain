@@ -52,7 +52,7 @@ impl LocalchainCli {
 		} else {
 			// Print the error
 			let stderr = String::from_utf8_lossy(&output.stderr);
-			Err(anyhow::anyhow!("Failed to run argon-localchain: {:?}", stderr))
+			Err(anyhow::anyhow!("Failed to run argon-localchain: {stderr:?}"))
 		}
 	}
 }

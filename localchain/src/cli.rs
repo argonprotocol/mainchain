@@ -395,7 +395,7 @@ where
         keystore_password,
       } => {
         if !Path::new(&path).exists() {
-          return Err(anyhow!("Localchain does not exist at {:?}", path));
+          return Err(anyhow!("Localchain does not exist at {path:?}"));
         }
         let account_overview: LocalchainOverview = if sync_latest {
           let localchain = Localchain::load(LocalchainConfig {
@@ -436,7 +436,7 @@ where
         keystore_password,
       } => {
         if fs::metadata(&path).is_ok() {
-          return Err(anyhow!("Localchain already exists at {:?}", path));
+          return Err(anyhow!("Localchain already exists at {path:?}"));
         }
 
         let db = Localchain::create_db(path.clone()).await?;
@@ -528,7 +528,7 @@ where
         let filename = save_to_path.unwrap_or_else(|| {
           let mut path = env::temp_dir();
           let argons = format_argons(microgons);
-          path.push(format!("Send {}.argon", argons));
+          path.push(format!("Send {argons}.argon"));
           path
             .to_str()
             .expect("Path should convert to a string")
@@ -536,7 +536,7 @@ where
         });
         fs::write(&filename, result)?;
 
-        println!("Argon file saved to: {:?}", filename);
+        println!("Argon file saved to: {filename:?}");
       }
       TransactionsSubcommand::Receive {
         receive_argon_file: ReceiveArgonFileArgs { argon_file },

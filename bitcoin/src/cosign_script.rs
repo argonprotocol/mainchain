@@ -139,7 +139,7 @@ impl CosignScript {
 		// strip whitespace
 		let policy_str = policy_str.split_whitespace().collect::<alloc::string::String>();
 		Concrete::from_str(&policy_str).map_err(|e| {
-			log::error!("Miniscript error: {}", e);
+			log::error!("Miniscript error: {e}");
 			BitcoinError::InvalidPolicy
 		})
 	}
@@ -187,7 +187,7 @@ impl CosignScript {
 				.map_err(|_| BitcoinError::InvalidPolicy)?;
 			#[cfg(all(debug_assertions, feature = "std"))]
 			if let Descriptor::Wsh(ref wsh) = descriptor {
-				println!("Miniscript: {}", wsh);
+				println!("Miniscript: {wsh}");
 			}
 
 			descriptor.sanity_check().map_err(|_| BitcoinError::UnsafePolicy)?;
@@ -279,7 +279,7 @@ mod test {
 			&block_address,
 		);
 
-		println!("{:#?} #{:?}", src_tx, vout);
+		println!("{src_tx:#?} #{vout:?}");
 
 		let block_height = bitcoind.client.get_block_count().unwrap();
 		let register_height = block_height;
@@ -602,7 +602,7 @@ mod test {
 						&[serde_json::to_value(psbt_text.clone()).unwrap()],
 					)
 					.unwrap();
-				println!("Analyzed Psbt: {:#?}", analyzed);
+				println!("Analyzed Psbt: {analyzed:#?}");
 			}
 
 			let import = bitcoind
@@ -623,10 +623,10 @@ mod test {
 						&[serde_json::to_value(&psbt_text).unwrap()],
 					)
 					.unwrap();
-				println!("Analyzed Psbt: {:#?}", analyzed);
+				println!("Analyzed Psbt: {analyzed:#?}");
 			}
 			let tx = bitcoind.client.finalize_psbt(&psbt_text, Some(true)).unwrap();
-			print!("Finalized: {:?}", tx);
+			print!("Finalized: {tx:?}");
 			let tx_hex = tx.transaction().unwrap().unwrap().raw_hex();
 
 			let acceptance =
@@ -795,13 +795,13 @@ mod test {
 			unlocker.extract_tx().expect("tx")
 		};
 
-		println!("{:#?}", tx);
+		println!("{tx:#?}");
 		let tx_hex = tx.raw_hex();
 
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
 		let did_accept = acceptance.first().unwrap();
-		println!("{:?}", did_accept);
-		println!("btcdeb --tx={:?} --txin={:?}", tx_hex, source_txin);
+		println!("{did_accept:?}");
+		println!("btcdeb --tx={tx_hex:?} --txin={source_txin:?}");
 		assert!(did_accept.allowed);
 
 		check_spent(

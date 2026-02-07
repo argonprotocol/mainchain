@@ -233,7 +233,7 @@ pub mod pallet {
 		pub fn apply(origin: OriginFor<T>, seal: BlockSealInherent) -> DispatchResult {
 			ensure_none(origin)?;
 			Self::apply_seal(seal).inspect_err(|e| {
-				log::error!("Error applying block seal: {:?}", e);
+				log::error!("Error applying block seal: {e:?}");
 			})?;
 			Ok(())
 		}
@@ -525,17 +525,13 @@ pub mod pallet {
 
 			if grandparent_tick_blocks.is_empty() {
 				log::info!(
-					"No eligible blocks to vote on in grandparent tick {:?}",
-					voted_for_block_at_tick
+					"No eligible blocks to vote on in grandparent tick {voted_for_block_at_tick:?}"
 				);
 				return Ok(Default::default());
 			};
 
 			log::info!(
-				"Finding votes for block at tick {} - (grandparents={:?}, notebook tick={})",
-				voted_for_block_at_tick,
-				grandparent_tick_blocks,
-				expected_notebook_tick
+				"Finding votes for block at tick {voted_for_block_at_tick} - (grandparents={grandparent_tick_blocks:?}, notebook tick={expected_notebook_tick})"
 			);
 
 			let mut best_votes = vec![];

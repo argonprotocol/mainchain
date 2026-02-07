@@ -239,7 +239,7 @@ pub mod pallet {
 				let start_argons = reward.argons;
 				let start_ownership = reward.ownership;
 				if let Err(e) = Self::mint::<T::ArgonCurrency>(reward) {
-					log::error!("Failed to mint argons for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to mint argons for reward: {reward:?}, {e:?}");
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: Some(start_argons),
@@ -248,7 +248,7 @@ pub mod pallet {
 					});
 				}
 				if let Err(e) = Self::mint::<T::OwnershipCurrency>(reward) {
-					log::error!("Failed to mint ownership for reward: {:?}, {:?}", reward, e);
+					log::error!("Failed to mint ownership for reward: {reward:?}, {e:?}");
 					Self::deposit_event(Event::RewardCreateError {
 						account_id: reward.account_id.clone(),
 						argons: None,
@@ -380,9 +380,7 @@ pub mod pallet {
 
 			if block_argons != start_block_argons {
 				log::trace!(
-					"Argons per block adjusted to {:?} (change: {:?})",
-					block_argons,
-					rewards_change
+					"Argons per block adjusted to {block_argons:?} (change: {rewards_change:?})"
 				);
 			}
 

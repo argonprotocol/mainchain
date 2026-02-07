@@ -4,6 +4,9 @@ use crate as pallet_bitcoin_utxos;
 use argon_primitives::{BitcoinUtxoEvents, bitcoin::UtxoId};
 use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
+type UtxoVerifiedCallbackFn = fn((UtxoId, Satoshis)) -> DispatchResult;
+type OrphanDetectedCallbackFn = fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult;
+
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test
@@ -26,11 +29,10 @@ parameter_types! {
 	pub const MaxCandidateUtxosPerLock: u32 = 10;
 
 	pub const MaxPendingConfirmationBlocks: u32 = 10;
-
-pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
-pub static UtxoVerifiedCallback: Option<fn((UtxoId, Satoshis)) -> DispatchResult> = None;
-pub static OrphanDetectedCallback: Option<fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult> = None;
-pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
+	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
+	pub static UtxoVerifiedCallback: Option<UtxoVerifiedCallbackFn> = None;
+	pub static OrphanDetectedCallback: Option<OrphanDetectedCallbackFn> = None;
+	pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
 }
 
 pub struct StaticEventHandler;

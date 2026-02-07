@@ -33,7 +33,7 @@ impl Client {
 		match auth {
 			Auth::None => {},
 			Auth::UserPass(u, p) => {
-				let auth = format!("{}:{}", u, p);
+				let auth = format!("{u}:{p}");
 				basic = Some(auth.into_bytes());
 			},
 			Auth::CookieFile(file) => {
@@ -110,18 +110,18 @@ fn log_response(cmd: &str, resp: &bitcoincore_rpc::Result<jsonrpc::Response>) {
 		match resp {
 			Err(e) =>
 				if log_enabled!(Debug) {
-					debug!(target: "bitcoincore_rpc", "JSON-RPC failed parsing reply of {}: {:?}", cmd, e);
+					debug!(target: "bitcoincore_rpc", "JSON-RPC failed parsing reply of {cmd}: {e:?}");
 				},
 			Ok(resp) =>
 				if let Some(ref e) = resp.error {
 					if log_enabled!(Debug) {
-						debug!(target: "bitcoincore_rpc", "JSON-RPC error for {}: {:?}", cmd, e);
+						debug!(target: "bitcoincore_rpc", "JSON-RPC error for {cmd}: {e:?}");
 					}
 				} else if log_enabled!(Trace) {
 					let def =
 						serde_json::value::to_raw_value(&serde_json::value::Value::Null).unwrap();
 					let result = resp.result.as_ref().unwrap_or(&def);
-					trace!(target: "bitcoincore_rpc", "JSON-RPC response for {}: {}", cmd, result);
+					trace!(target: "bitcoincore_rpc", "JSON-RPC response for {cmd}: {result}");
 				},
 		}
 	}

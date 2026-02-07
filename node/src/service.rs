@@ -121,13 +121,13 @@ where
 
 	let (bitcoin_url, bitcoin_auth) = mining_config
 		.bitcoin_rpc_url_with_auth()
-		.map_err(|e| ServiceError::Other(format!("Failed to parse bitcoin rpc url {:?}", e)))?;
+		.map_err(|e| ServiceError::Other(format!("Failed to parse bitcoin rpc url {e:?}")))?;
 	let utxo_tracker = UtxoTracker::new(
 		bitcoin_url.origin().unicode_serialization(),
 		bitcoin_auth,
 		config.prometheus_registry(),
 	)
-	.map_err(|e| ServiceError::Other(format!("Failed to initialize bitcoin monitoring {:?}", e)))?;
+	.map_err(|e| ServiceError::Other(format!("Failed to initialize bitcoin monitoring {e:?}")))?;
 
 	let utxo_tracker = Arc::new(utxo_tracker);
 
@@ -135,21 +135,21 @@ where
 	let ticker = {
 		let finalized_hash = client.info().finalized_hash;
 		let ticker: Ticker = client.runtime_api().ticker(finalized_hash).map_err(|e| {
-			ServiceError::Other(format!("Failed to establish runtime ticker: {:?}", e))
+			ServiceError::Other(format!("Failed to establish runtime ticker: {e:?}"))
 		})?;
 		let latest_tick = client
 			.runtime_api()
 			.current_tick(finalized_hash)
-			.map_err(|e| ServiceError::Other(format!("Failed to get runtime tick: {:?}", e)))?;
+			.map_err(|e| ServiceError::Other(format!("Failed to get runtime tick: {e:?}")))?;
 		aux_client
 			.migrate(latest_tick)
-			.map_err(|e| ServiceError::Other(format!("Failed to migrate aux data: {:?}", e)))?;
+			.map_err(|e| ServiceError::Other(format!("Failed to migrate aux data: {e:?}")))?;
 		ticker
 	};
 	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 	let notebook_downloader = NotebookDownloader::new(mining_config.notebook_archive_hosts.clone())
 		.map_err(|e| {
-			ServiceError::Other(format!("Failed to initialize notebook downloader {:?}", e))
+			ServiceError::Other(format!("Failed to initialize notebook downloader {e:?}"))
 		})?;
 	let notary_client = run_notary_sync(
 		&task_manager,

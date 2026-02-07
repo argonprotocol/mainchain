@@ -408,7 +408,7 @@ impl MainchainClient {
 
     let in_block = InnerMainchainClient::wait_for_ext_in_block(tx_progress, false)
       .await
-      .map_err(|e| anyhow!("Error submitting notebook to block: {:?}", e))?;
+      .map_err(|e| anyhow!("Error submitting notebook to block: {e:?}"))?;
 
     let transfer = in_block.events.iter().find_map(|event| {
       if let Some(Ok(transfer)) = event

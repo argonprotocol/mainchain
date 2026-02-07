@@ -32,7 +32,7 @@ pub struct MaxLengthString(pub BoundedVec<u8, ConstU32<100>>);
 impl Display for MaxLengthString {
 	fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
 		let str_value = String::from_utf8(self.0.clone().into_inner()).unwrap_or_default();
-		write!(f, "{}", str_value)
+		write!(f, "{str_value}")
 	}
 }
 

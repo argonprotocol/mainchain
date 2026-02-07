@@ -206,7 +206,7 @@ async fn main() -> anyhow::Result<()> {
 			},
 		Subcommand::Bitcoin { bitcoin_rpc_url } => {
 			let mut bitcoin_url = Url::parse(&bitcoin_rpc_url).map_err(|e| {
-				anyhow!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e)
+				anyhow!("Unable to parse bitcoin rpc url ({bitcoin_rpc_url}) {e:?}")
 			})?;
 			let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
 			let bitcoin_auth = if !user.is_empty() {

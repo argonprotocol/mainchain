@@ -109,8 +109,7 @@ where
 
 		if notebook_tick < current_clocktime_tick.saturating_sub(OLDEST_TICK_TO_SOLVE_FOR) {
 			trace!(
-				"Notebook tick {} is too old to be considered for block creation with votes",
-				notebook_tick
+				"Notebook tick {notebook_tick} is too old to be considered for block creation with votes"
 			);
 			return Ok(result);
 		}
@@ -132,7 +131,7 @@ where
 		let block_votes = self.aux_client.get_votes(votes_tick)?.get();
 		let votes_count = block_votes.iter().fold(0u32, |acc, x| acc + x.raw_votes.len() as u32);
 		if votes_count == 0 {
-			trace!("No block votes at tick {}", votes_tick);
+			trace!("No block votes at tick {votes_tick}");
 			return Ok(result);
 		}
 
@@ -151,7 +150,7 @@ where
 		let Some((block_hash, seal_strength, miner_nonce_score)) =
 			self.get_best_block_at_parent(&voting_schedule).await?
 		else {
-			trace!("No parent block to build on for tick {}", votes_tick);
+			trace!("No parent block to build on for tick {votes_tick}");
 			return Ok(result);
 		};
 		tracing::trace!(
@@ -195,8 +194,7 @@ where
 				})
 				.map_err(|e| {
 					Error::StringError(format!(
-						"Failed to send CreateTaxVoteBlockV2 message: {:?}",
-						e
+						"Failed to send CreateTaxVoteBlockV2 message: {e:?}"
 					))
 				})?;
 			result.found_block = true;
@@ -334,12 +332,11 @@ where
 
 	fn get_fork_power(&self, block_hash: B::Hash) -> Result<ForkPower, Error> {
 		let header = self.client.header(block_hash)?.ok_or_else(|| {
-			Error::StringError(format!("Could not find header for block {:?}", block_hash))
+			Error::StringError(format!("Could not find header for block {block_hash:?}"))
 		})?;
 		let digest = header.digest();
-		ForkPower::try_from(digest).map_err(|e| {
-			Error::StringError(format!("Could not get fork power from header: {:?}", e))
-		})
+		ForkPower::try_from(digest)
+			.map_err(|e| Error::StringError(format!("Could not get fork power from header: {e:?}")))
 	}
 }
 
@@ -353,11 +350,10 @@ pub fn create_vote_seal<Hash: AsRef<[u8]>>(
 	let message = BlockVote::seal_signature_message(pre_hash);
 	let signature = keystore
 		.sign_with(BLOCK_SEAL_KEY_TYPE, BLOCK_SEAL_CRYPTO_ID, vote_authority.as_slice(), &message)
-		.map_err(|e| ConsensusError::CannotSign(format!("{}. Key: {:?}", e, vote_authority)))?
+		.map_err(|e| ConsensusError::CannotSign(format!("{e}. Key: {vote_authority:?}")))?
 		.ok_or_else(|| {
 			ConsensusError::CannotSign(format!(
-				"Could not find key in keystore. Key: {:?}",
-				vote_authority
+				"Could not find key in keystore. Key: {vote_authority:?}"
 			))
 		})?;
 

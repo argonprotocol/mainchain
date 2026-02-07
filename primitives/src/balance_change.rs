@@ -299,11 +299,11 @@ impl<'a> serde::Deserialize<'a> for MultiSignatureBytes {
 		let hex = String::deserialize(deserializer)?;
 		let bytes = match sp_core::bytes::from_hex(&hex) {
 			Ok(bytes) => bytes,
-			Err(e) => return Err(serde::de::Error::custom(std::format!("Invalid hex: {}", e))),
+			Err(e) => return Err(serde::de::Error::custom(std::format!("Invalid hex: {e}"))),
 		};
 
 		Decode::decode(&mut &bytes[..]).map_err(|e| {
-			serde::de::Error::custom(std::format!("Unable to decode Multisignature {}", e))
+			serde::de::Error::custom(std::format!("Unable to decode Multisignature {e}"))
 		})
 	}
 }

@@ -127,7 +127,7 @@ pub struct BalanceChangeSummary {
 }
 
 fn get_note_descriptions(change: &BalanceChangeRow) -> Vec<String> {
-  get_notes(change).iter().map(|n| format!("{}", n)).collect()
+  get_notes(change).iter().map(|n| format!("{n}")).collect()
 }
 
 fn get_notes(change: &BalanceChangeRow) -> Vec<Note> {
@@ -699,7 +699,7 @@ mod tests {
       OverviewStore::new(alice_pool.clone(), "alice".to_string(), Default::default());
     {
       let overview = alice_overview.get().await?;
-      println!("Alice {:#?}", overview);
+      println!("Alice {overview:#?}");
       assert_eq!(overview.balance, 5_000_000);
       assert_eq!(overview.pending_balance_change, 0);
       assert_eq!(overview.tax, 0);
@@ -721,7 +721,7 @@ mod tests {
       .await?;
     {
       let overview = alice_overview.get().await?;
-      println!("Alice {:#?}", overview);
+      println!("Alice {overview:#?}");
       assert_eq!(overview.balance, 4_800_000);
       assert_eq!(overview.pending_balance_change, -3_300_000);
       assert_eq!(overview.tax, 200_000);
@@ -746,7 +746,7 @@ mod tests {
     let bob_overview = OverviewStore::new(bob_pool.clone(), "bob".to_string(), Default::default());
     {
       let overview = bob_overview.get().await?;
-      println!("Bob {:#?}", overview);
+      println!("Bob {overview:#?}");
       assert_eq!(overview.balance, 3_100_000);
       assert_eq!(overview.pending_balance_change, 0);
       assert_eq!(overview.tax, 200_000);
@@ -762,7 +762,7 @@ mod tests {
     {
       bob_localchain.balance_sync().sync(None).await?;
       let overview = bob_overview.get().await?;
-      println!("Bob {:#?}", overview);
+      println!("Bob {overview:#?}");
       assert_eq!(overview.balance, 3_100_000);
       assert_eq!(overview.pending_balance_change, 0);
       assert_eq!(overview.tax, 200_000);
@@ -778,7 +778,7 @@ mod tests {
     {
       alice_localchain.balance_sync().sync(None).await?;
       let overview = alice_overview.get().await?;
-      println!("Alice {:#?}", overview);
+      println!("Alice {overview:#?}");
       assert_eq!(overview.balance, 1_500_000);
       assert_eq!(overview.pending_balance_change, 0);
       assert_eq!(overview.tax, 200_000);

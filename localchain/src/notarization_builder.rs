@@ -1571,7 +1571,7 @@ mod test {
       .import_argon_file(ArgonFile::create(vec![balance_change], ArgonFileType::Send).to_json()?)
       .await;
     let error_message = res.unwrap_err().to_string();
-    println!("Error accepting funds {:?}", error_message);
+    println!("Error accepting funds {error_message:?}");
     assert!(error_message.contains("account restriction"));
     Ok(())
   }

@@ -80,7 +80,7 @@ impl NotaryClients {
       mainchain_client
         .get_notary_details(notary_id)
         .await?
-        .ok_or(anyhow!("Notary {} not found", notary_id))
+        .ok_or(anyhow!("Notary {notary_id} not found"))
     }?;
 
     info!(

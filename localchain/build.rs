@@ -54,7 +54,7 @@ fn main() {
     if !output.status.success() {
       // Convert the output to a String to display the error
       let stderr = String::from_utf8_lossy(&output.stderr);
-      panic!("Error setting up {}: {}", database_url, stderr);
+      panic!("Error setting up {database_url}: {stderr}");
     }
   }
 

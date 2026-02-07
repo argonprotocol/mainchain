@@ -27,7 +27,7 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 
 	let notary_account = AccountId::from_str("5EqLq7FdVERJVdzM2AjxQ3v2yP4BjU9tPsKGxtcao8Vq92J8")?;
 	let notary_public = NotaryPublic::from_str("5HENL2mzQABFLQaf8fWygpmxn1oHDSzssvQzd1BkWsJETstN")
-		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
+		.map_err(|e| format!("Error parsing notary public {e:?}"))?;
 
 	let founding_grandpas: Vec<GrandpaId> = vec![
 		"962abf1be4e94bb80e6488a2af551c529571fdd1d972b5c7e311d7507f0882ec",
@@ -106,9 +106,9 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 
 fn grandpa_public(hex: &str) -> Result<GrandpaId, String> {
 	let bytes =
-		hex::decode(hex).map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?;
+		hex::decode(hex).map_err(|e| format!("Error decoding testnet grandpa key {e:?}"))?;
 	GrandpaId::from_slice(bytes.as_bytes_ref())
-		.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))
+		.map_err(|e| format!("Error decoding testnet grandpa key {e:?}"))
 }
 
 fn get_boot_addrs(

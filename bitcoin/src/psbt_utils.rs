@@ -18,7 +18,7 @@ use miniscript::psbt::PsbtExt;
 pub fn finalize(psbt: &Psbt) -> Result<Psbt, Error> {
 	let secp = Secp256k1::new();
 	let psbt = psbt.clone().finalize(&secp).map_err(|(_, e)| {
-		log::error!("Error finalizing PSBT: {:#?}", e);
+		log::error!("Error finalizing PSBT: {e:#?}");
 		Error::PsbtFinalizeError
 	})?;
 	Ok(psbt)
@@ -83,7 +83,7 @@ where
 	let txid = client
 		.send_raw_transaction(&tx)
 		.map_err(|e| Error::BroadcastError(e.to_string()))?;
-	log::info!("Transaction broadcast with txid: {}", txid);
+	log::info!("Transaction broadcast with txid: {txid}");
 	// wait for the tx to be confirmed
 	loop {
 		let info = client
@@ -160,7 +160,7 @@ pub fn sign_derived(
 			.bip32_derivation
 			.insert(pubkey.inner, (master_xpub.fingerprint(), hd_path.clone()));
 
-		trace!("Signing with derived key: {}", pubkey);
+		trace!("Signing with derived key: {pubkey}");
 
 		let _ = psbt.sign(&master_xpriv, &secp).map_err(|(_, errs)| Error::from(errs))?;
 

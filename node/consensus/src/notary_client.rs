@@ -205,7 +205,7 @@ where
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 		let idle_delay = Duration::from_millis(idle_delay);
 		notary_client_poll.update_notaries(&best_block).await.unwrap_or_else(|e| {
-			warn!("Could not update notaries at best hash {} - {:?}", best_block, e)
+			warn!("Could not update notaries at best hash {best_block} - {e:?}")
 		});
 
 		let mut best_block = Box::pin(client.every_import_notification_stream());
@@ -217,7 +217,7 @@ where
 		loop {
 			tokio::select! {
 				Some((notary_id, notebook_number)) =  notary_client_poll.poll_subscriptions() => {
-					trace!( "Next notebook pushed (notary {}, notebook {})", notary_id, notebook_number);
+					trace!( "Next notebook pushed (notary {notary_id}, notebook {notebook_number})");
 				},
 				Some(ref block) = best_block.next() => {
 					if block.is_new_best {
@@ -229,9 +229,7 @@ where
 						if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
 							warn!(
 
-								"Could not update notaries at best hash {} - {:?}",
-								best_hash,
-								e
+								"Could not update notaries at best hash {best_hash} - {e:?}"
 							);
 						}
 					}
@@ -255,7 +253,7 @@ where
 				.process_queues(None)
 				.await
 				.inspect_err(|err| {
-					warn!("Error while processing notary queues: {:?}", err);
+					warn!("Error while processing notary queues: {err:?}");
 				})
 				.unwrap_or(false);
 
@@ -396,11 +394,11 @@ where
 				self.has_client(notary_id).await && self.has_subscription(notary_id).await;
 
 			if !is_connected || reconnect_ids.contains(&notary_id) {
-				info!("Connecting to notary id={}", notary_id);
+				info!("Connecting to notary id={notary_id}");
 				if let Err(e) = self.connect_to_notary(notary_id).await {
 					self.disconnect(
 						&notary_id,
-						Some(format!("Notary {} sync failed. {:?}", notary_id, e)),
+						Some(format!("Notary {notary_id} sync failed. {e:?}")),
 					)
 					.await;
 					continue;
@@ -409,7 +407,7 @@ where
 				if let Err(e) = self.subscribe_to_notebooks(notary_id).await {
 					self.disconnect(
 						&notary_id,
-						Some(format!("Notary {} subscription failed. {:?}", notary_id, e)),
+						Some(format!("Notary {notary_id} subscription failed. {e:?}")),
 					)
 					.await;
 				}
@@ -437,13 +435,8 @@ where
 	}
 
 	pub async fn poll_subscriptions(&self) -> Option<(NotaryId, NotebookNumber)> {
-		let mut subscription_ids = self
-			.subscriptions_by_id
-			.read()
-			.await
-			.iter()
-			.map(|(i, _)| *i)
-			.collect::<Vec<_>>();
+		let mut subscription_ids =
+			self.subscriptions_by_id.read().await.keys().copied().collect::<Vec<_>>();
 
 		// If there are no subscriptions, return early
 		if subscription_ids.is_empty() {
@@ -478,7 +471,7 @@ where
 						self.enqueue_notebook(notary_id, notebook_number, None, None).await
 					{
 						if did_overflow {
-							info!("Overflowed queue for notary {}", notary_id);
+							info!("Overflowed queue for notary {notary_id}");
 							self.unsubscribe_if_overflowed(notary_id).await;
 						}
 					}
@@ -537,8 +530,7 @@ where
 					Ok(()) => {
 						let has_more_work = self_clone.queue_depth(notary_id).await > 0;
 						trace!(
-							"Processed notebook {} for notary {}. More work? {}",
-							notebook_number, notary_id, has_more_work
+							"Processed notebook {notebook_number} for notary {notary_id}. More work? {has_more_work}"
 						);
 						Ok::<_, Error>(has_more_work)
 					},
@@ -549,10 +541,7 @@ where
 								Error::NotebookAuditBeforeTick(_) |
 								Error::StateUnavailableError
 						) {
-							trace!(
-								"In queue, re-queuing notebook for notary {} - {:?}",
-								notary_id, e
-							);
+							trace!("In queue, re-queuing notebook for notary {notary_id} - {e:?}");
 							self_clone
 								.enqueue_notebook(
 									notary_id,
@@ -577,10 +566,10 @@ where
 			match result {
 				Ok(inner_result) => match inner_result {
 					Ok(x) => has_more_work = has_more_work || x,
-					Err(err) => warn!("Error processing notebooks for a notary {:?}", err),
+					Err(err) => warn!("Error processing notebooks for a notary {err:?}"),
 				},
 				Err(join_error) => {
-					warn!("Error while processing notary queue - {:?}", join_error);
+					warn!("Error while processing notary queue - {join_error:?}");
 				},
 			}
 		}
@@ -722,8 +711,7 @@ where
 			.await
 			.map_err(|e| {
 				Error::NotaryError(format!(
-					"Could not get notary {notary_id}, notebook {notebook_number} from notebook downloader - {:?}",
-					e
+					"Could not get notary {notary_id}, notebook {notebook_number} from notebook downloader - {e:?}"
 				))
 			})
 	}
@@ -751,8 +739,7 @@ where
 			.await
 			.map_err(|e| {
 				Error::NotaryError(format!(
-					"Could not download notebook {} from notary {} - {:?}",
-					notebook_number, notary_id, e
+					"Could not download notebook {notebook_number} from notary {notary_id} - {e:?}"
 				))
 			})?;
 		Ok(bytes)
@@ -761,10 +748,10 @@ where
 	async fn connect_to_notary(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
 		let notebook_meta = client.metadata().await.map_err(|e| {
-			Error::NotaryError(format!("Could not get metadata from notary - {:?}", e))
+			Error::NotaryError(format!("Could not get metadata from notary - {e:?}"))
 		})?;
 		let archive_host = client.get_archive_base_url().await.map_err(|e| {
-			Error::NotaryError(format!("Could not get archive host from notary - {:?}", e))
+			Error::NotaryError(format!("Could not get archive host from notary - {e:?}"))
 		})?;
 		self.notary_archive_host_by_id.write().await.insert(id, archive_host.clone());
 		if notebook_meta.last_closed_notebook_number > 0 {
@@ -776,8 +763,7 @@ where
 
 	pub async fn disconnect(&self, notary_id: &NotaryId, reason: Option<String>) {
 		info!(
-			"Notary client disconnected from notary #{} (or could not connect). Reason? {:?}",
-			notary_id, reason
+			"Notary client disconnected from notary #{notary_id} (or could not connect). Reason? {reason:?}"
 		);
 		self.notary_client_by_id.write().await.remove(notary_id);
 		self.subscriptions_by_id.write().await.remove(notary_id);
@@ -786,7 +772,7 @@ where
 	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error> {
 		let client = self.get_or_connect_to_client(id).await?;
 		let stream: RawHeadersSubscription = client.subscribe_headers().await.map_err(|e| {
-			Error::NotaryError(format!("Could not subscribe to notebooks from notary - {:?}", e))
+			Error::NotaryError(format!("Could not subscribe to notebooks from notary - {e:?}"))
 		})?;
 		self.subscriptions_by_id.write().await.insert(id, Box::pin(stream));
 		Ok(())
@@ -821,8 +807,7 @@ where
 				// store by default
 				if counter >= 500 {
 					return Err(Error::NotaryError(format!(
-						"Could not find place to audit this notebook {} in runtime",
-						notebook_number
+						"Could not find place to audit this notebook {notebook_number} in runtime"
 					)));
 				}
 
@@ -853,8 +838,7 @@ where
 			.decode_signed_raw_notebook_header(&best_hash, raw_header.0.clone())?
 			.map_err(|e| {
 				Error::NotaryError(format!(
-					"Unable to decode notebook header in runtime. Notary={}, notebook={} -> {:?}",
-					notary_id, notebook_number, e
+					"Unable to decode notebook header in runtime. Notary={notary_id}, notebook={notebook_number} -> {e:?}"
 				))
 			})?;
 
@@ -890,8 +874,7 @@ where
 				.unbounded_send(voting_power)
 				.map_err(|e| {
 					Error::NotaryError(format!(
-						"Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {:?}",
-						e
+						"Could not send tick state to sender (notary {notary_id}, notebook {notebook_number}) - {e:?}"
 					))
 				})?;
 		}
@@ -947,8 +930,7 @@ where
 			}
 
 			info!(
-				"Notebook digest has missing audits. Will attempt to catchup now. {:#?}",
-				missing_audits_by_notary
+				"Notebook digest has missing audits. Will attempt to catchup now. {missing_audits_by_notary:#?}"
 			);
 
 			if needs_notary_updates {
@@ -976,10 +958,9 @@ where
 					break;
 				}
 				if start.elapsed() > Duration::from_secs(wait_time as u64) {
-					warn!("Timed out waiting for missing audits. {:#?}", missing_audits_by_notary);
+					warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
 					return Err(Error::UnableToSyncNotary(format!(
-						"Could not process all missing audits in {} seconds",
-						wait_time
+						"Could not process all missing audits in {wait_time} seconds"
 					)));
 				}
 			}
@@ -1020,10 +1001,9 @@ where
 			}
 			let notebook_range =
 				missing_notebooks[0]..missing_notebooks[missing_notebooks.len() - 1];
-			info!("Missing notebooks for notary {}. Enqueued: {:?}", notary_id, notebook_range);
+			info!("Missing notebooks for notary {notary_id}. Enqueued: {notebook_range:?}");
 			return Err(Error::MissingNotebooksError(format!(
-				"Missing notebooks #{:?} to audit {} for notary {}",
-				notebook_range, notebook_number, notary_id
+				"Missing notebooks #{notebook_range:?} to audit {notebook_number} for notary {notary_id}"
 			)));
 		}
 		Ok(notebook_dependencies)
@@ -1100,8 +1080,7 @@ where
 				// consider it failed.
 				if tick > self.client.current_tick(*best_hash)? {
 					return Err(Error::NotebookAuditBeforeTick(format!(
-						"Notebook tick is > runtime. Notary={}, notebook={}, tick={}",
-						notary_id, notebook_number, tick
+						"Notebook tick is > runtime. Notary={notary_id}, notebook={notebook_number}, tick={tick}"
 					)));
 				}
 
@@ -1143,8 +1122,7 @@ where
 			})?;
 		host.clone().try_into().map_err(|e| {
 			Error::NotaryError(format!(
-				"Could not convert host to string for notary {} - {:?}",
-				notary_id, e
+				"Could not convert host to string for notary {notary_id} - {e:?}"
 			))
 		})
 	}
@@ -1159,8 +1137,7 @@ where
 			let host_str = self.get_notary_host(notary_id).await?;
 			let c = argon_notary_apis::create_client(&host_str).await.map_err(|e| {
 				Error::NotaryError(format!(
-					"Could not connect to notary {} ({}) for audit - {:?}",
-					notary_id, host_str, e
+					"Could not connect to notary {notary_id} ({host_str}) for audit - {e:?}"
 				))
 			})?;
 			let c = Arc::new(c);
@@ -1766,7 +1743,7 @@ mod test {
 
 		// still missing number 9
 		assert!(matches!(result, Error::MissingNotebooksError(_)),);
-		println!("result: {}", result);
+		println!("result: {result}");
 		assert!(result.to_string().contains("#9..9"));
 
 		for _ in 0..9 {

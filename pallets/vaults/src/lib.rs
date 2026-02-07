@@ -386,7 +386,7 @@ pub mod pallet {
 						.map_err(DispatchError::from)
 				});
 				if let Err(e) = res {
-					log::error!("Vault `{}` unable to recoupd released funds {:?}", vault_id, e);
+					log::error!("Vault `{vault_id}` unable to recoupd released funds {e:?}");
 					Self::deposit_event(Event::<T>::FundsReleasedError { vault_id, error: e });
 				}
 			}
@@ -432,7 +432,7 @@ pub mod pallet {
 			);
 
 			let xpub: BitcoinXPub = bitcoin_xpubkey.try_into().map_err(|e| {
-				log::error!("Unable to decode xpubkey: {:?}", e);
+				log::error!("Unable to decode xpubkey: {e:?}");
 				Error::<T>::InvalidXpubkey
 			})?;
 			ensure!(xpub.is_hardened(), Error::<T>::UnsafeXpubkey);
@@ -726,11 +726,7 @@ pub mod pallet {
 			let balance = T::Currency::release(&reason.into(), who, amount, Precision::Exact)
 				.inspect_err(|e| {
 					log::warn!(
-						"Error releasing {:?} hold for {:?}. Amount {:?}. {:?}",
-						reason,
-						who,
-						amount,
-						e
+						"Error releasing {reason:?} hold for {who:?}. Amount {amount:?}. {e:?}"
 					);
 				})?;
 
@@ -895,10 +891,7 @@ pub mod pallet {
 								Fortitude::Force,
 							) {
 								log::error!(
-									"Error burning uncollected funds for vault {}, frame {}: {:?}",
-									vault_id,
-									frame_id,
-									e
+									"Error burning uncollected funds for vault {vault_id}, frame {frame_id}: {e:?}"
 								);
 								continue;
 							}
@@ -922,7 +915,7 @@ pub mod pallet {
 					Ok(())
 				})
 				.inspect_err(|err: &VaultError| {
-					log::error!("Error processing frame revenue for vault {}: {:?}", vault_id, err);
+					log::error!("Error processing frame revenue for vault {vault_id}: {err:?}");
 				});
 				if is_empty {
 					RevenuePerFrameByVault::<T>::remove(vault_id);
@@ -998,7 +991,7 @@ pub mod pallet {
 				.map_err(|_| VaultError::UnrecoverableHold)?;
 				Ok(())
 			}) {
-				log::error!("Unable to record vault frame profits for vault {}: {:?}", vault_id, e);
+				log::error!("Unable to record vault frame profits for vault {vault_id}: {e:?}");
 				let error: Error<T> = e.into();
 				Self::deposit_event(Event::TreasuryRecordingError {
 					vault_id,

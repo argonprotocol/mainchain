@@ -36,8 +36,8 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)
 		Ok(bitcoind) => bitcoind,
 		Err(e) => {
 			fs2::FileExt::unlock(&file).expect("Failed to unlock file");
-			eprintln!("Failed to start bitcoind: {:#?}", e);
-			return Err(anyhow!("Failed to start bitcoind: {:#?}", e));
+			eprintln!("Failed to start bitcoind: {e:#?}");
+			return Err(anyhow!("Failed to start bitcoind: {e:#?}"));
 		},
 	};
 	let url = read_rpc_url(&bitcoind)?;

@@ -47,8 +47,7 @@ impl NotarizationTracker {
       tips
         .retain(|t| !(t.account_id == change.account_id && t.account_type == change.account_type));
       let previous_balance_proof = change.previous_balance_proof.clone().ok_or(anyhow!(
-        "Balance change {:?} is missing previous balance proof",
-        change
+        "Balance change {change:?} is missing previous balance proof"
       ))?;
       let tip = BalanceTip {
         account_id: change.account_id.clone(),

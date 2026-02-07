@@ -84,8 +84,7 @@ impl ArgonNodeStartArgs {
 		let node_log = "info";
 
 		let rust_log = format!(
-			"{},node={},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info", //,grandpa=trace,runtime::grandpa=trace",
-			overall_log, node_log,
+			"{overall_log},node={node_log},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info",
 		);
 
 		Ok(Self {
@@ -194,7 +193,7 @@ impl ArgonTestNode {
 			more_args.push("--blocks-pruning=archive".to_string());
 		}
 
-		println!("Starting argon-node with args: {:?}. {:?}", args, more_args);
+		println!("Starting argon-node with args: {args:?}. {more_args:?}");
 
 		let mut proc = Command::new("./argon-node")
 			.current_dir(args.target_dir.clone())
@@ -225,7 +224,7 @@ impl ArgonTestNode {
 			.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
 			.await?;
 		assert_eq!(port_matches.len(), 1);
-		println!("Started argon-node with RPC port {:?}", port_matches);
+		println!("Started argon-node with RPC port {port_matches:?}");
 		args.rpc_port = port_matches[0].parse::<u16>().expect("Failed to parse port");
 		Ok((proc, log_watch))
 	}
@@ -245,7 +244,7 @@ impl ArgonTestNode {
 		let mut bitcoind = None;
 		if args.bitcoin_rpc.is_empty() {
 			let (bitcoin, rpc_url, _) = start_bitcoind().map_err(|e| {
-				eprintln!("ERROR starting bitcoind {:#?}", e);
+				eprintln!("ERROR starting bitcoind {e:#?}");
 				e
 			})?;
 			bitcoind = Some(bitcoin);
@@ -299,7 +298,7 @@ impl ArgonTestNode {
 			.push(public_key.as_hex().to_string())
 			.expect("should allow inserting public key");
 
-		println!("Inserting key {:?} {:?}", key_type, public_key);
+		println!("Inserting key {key_type:?} {public_key:?}");
 		self.client.rpc.request::<()>("author_insertKey", params).await?;
 		Ok(public_key)
 	}

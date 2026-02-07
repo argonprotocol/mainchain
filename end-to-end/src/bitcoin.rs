@@ -148,8 +148,8 @@ async fn test_bitcoin_minting_e2e() {
 	// 4. Owner funds the LockedBitcoin utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
 	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
-	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
-	assert!(send_to_address.contains(&format!("{} satoshis to {}", utxo_satoshis, scriptaddress)));
+	println!("Checking for {utxo_satoshis} satoshis to {scriptaddress}");
+	assert!(send_to_address.contains(&format!("{utxo_satoshis} satoshis to {scriptaddress}")));
 
 	let (txid, vout, _) =
 		fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
@@ -364,8 +364,8 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	// 4. Owner funds the LockedBitcoin utxo and submits it
 	let scriptbuf: ScriptBuf = script_address.into();
 	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
-	println!("Checking for {} satoshis to {}", utxo_satoshis, scriptaddress);
-	assert!(send_to_address.contains(&format!("{} satoshis to {}", utxo_satoshis, scriptaddress)));
+	println!("Checking for {utxo_satoshis} satoshis to {scriptaddress}");
+	assert!(send_to_address.contains(&format!("{utxo_satoshis} satoshis to {scriptaddress}")));
 
 	let _ = fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
 
@@ -429,7 +429,7 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 		bitcoin_url.set_username(&user).unwrap();
 		bitcoin_url.set_password(Some(&pass)).unwrap();
 	}
-	println!("Owner pubkey is {}", owner_compressed_pubkey);
+	println!("Owner pubkey is {owner_compressed_pubkey}");
 	tokio::spawn(async move {
 		loop {
 			bitcoind_client.generate_to_address(1, &block_creator).unwrap();
@@ -501,10 +501,10 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 	let parent_part = parent_hd_key_path.pop().unwrap();
 	let is_internal_hd = parent_part.ends_with('1');
 	let hardened_parent_hd_key_path = parent_hd_key_path.join("/").replace('\'', "h");
-	println!("Hardened Parent HD Key Path: {}", hardened_parent_hd_key_path);
+	println!("Hardened Parent HD Key Path: {hardened_parent_hd_key_path}");
 
 	let descriptors = bitcoind.client.call::<serde_json::Value>("listdescriptors", &[]).unwrap();
-	println!("Descriptors: {:#?}", descriptors);
+	println!("Descriptors: {descriptors:#?}");
 	// Step 5: Find the hardened parent xpub in the descriptors
 	let master_fingerprint = descriptors["descriptors"]
 		.as_array()
@@ -524,7 +524,7 @@ fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPat
 		})
 		.expect("Parent xpub not found in descriptors");
 	let master_fingerprint = Fingerprint::from_hex(master_fingerprint).unwrap();
-	println!("Master Fingerprint: {}", master_fingerprint);
+	println!("Master Fingerprint: {master_fingerprint}");
 	master_fingerprint
 }
 
@@ -570,7 +570,7 @@ async fn create_xpriv_and_derive(
 	println!("Result from derive-pubkey: {}", result.trim());
 
 	let pubkey = PublicKey::from_str(result.trim())
-		.map_err(|e| anyhow!("Failed to parse public key: {}", e))?;
+		.map_err(|e| anyhow!("Failed to parse public key: {e}"))?;
 
 	Ok((
 		path.to_str().unwrap().to_string(),
@@ -584,7 +584,7 @@ async fn create_xpriv_and_master_xpub(
 	test_node: &ArgonTestNode,
 	name: &str,
 ) -> anyhow::Result<(String, String, Xpub, String)> {
-	let path = env::temp_dir().join(format!("{}.xpriv", name));
+	let path = env::temp_dir().join(format!("{name}.xpriv"));
 	if path.is_file() {
 		fs::remove_file(&path).await?;
 	}
@@ -621,7 +621,7 @@ async fn create_xpriv_and_master_xpub(
 	.await?;
 
 	let xpub =
-		Xpub::from_str(xpub_result.trim()).map_err(|e| anyhow!("Failed to parse xpub: {}", e))?;
+		Xpub::from_str(xpub_result.trim()).map_err(|e| anyhow!("Failed to parse xpub: {e}"))?;
 
 	Ok((
 		path.to_str().unwrap().to_string(),
@@ -686,7 +686,7 @@ async fn create_vault(
 		.await?
 		.find_first::<api::vaults::events::VaultCreated>()?
 		.expect("vault created");
-	println!("vault created {:?}", vault_creation);
+	println!("vault created {vault_creation:?}");
 	assert_eq!(vault_creation.vault_id, 1);
 
 	Ok(vault_creation.vault_id)
@@ -736,7 +736,7 @@ async fn request_bitcoin_lock(
 	)
 	.await?;
 
-	println!("Owner locked bitcoin with pubkey: {}", owner_compressed_pubkey);
+	println!("Owner locked bitcoin with pubkey: {owner_compressed_pubkey}");
 
 	let lock_tx = test_node
 		.client
@@ -839,7 +839,7 @@ async fn wait_for_mint(
 		.unwrap()
 		.0;
 	if !pending_utxos.is_empty() {
-		println!("Waiting for pending utxo to be verified {:?}", pending_utxos);
+		println!("Waiting for pending utxo to be verified {pending_utxos:?}");
 		let mut counter = 0;
 		while let Some(block) = finalized_sub.next().await {
 			let block = block?;
@@ -1054,12 +1054,12 @@ async fn owner_sees_signature_and_releases(
 	println!("Processing with wallet");
 	{
 		let psbt = Psbt::from_str(psbt_text).expect("psbt");
-		println!("PSBT from cli: {:#?}", psbt);
+		println!("PSBT from cli: {psbt:#?}");
 		let analyzed = bitcoind
 			.client
 			.call::<serde_json::Value>("analyzepsbt", &[serde_json::to_value(psbt_text).unwrap()])
 			.unwrap();
-		println!("Analyzed Psbt: {:#?}", analyzed);
+		println!("Analyzed Psbt: {analyzed:#?}");
 	}
 	let import = bitcoind.client.wallet_process_psbt(
 		psbt_text,
@@ -1067,19 +1067,19 @@ async fn owner_sees_signature_and_releases(
 		Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
 		None,
 	)?;
-	println!("Processed with wallet {:?}", import);
+	println!("Processed with wallet {import:?}");
 	{
 		let psbt = Psbt::from_str(import.psbt.as_str()).expect("psbt");
-		println!("PSBT after import: {:#?}", psbt);
+		println!("PSBT after import: {psbt:#?}");
 		let analyzed = bitcoind
 			.client
 			.call::<serde_json::Value>("analyzepsbt", &[serde_json::to_value(psbt_text).unwrap()])
 			.unwrap();
-		println!("Analyzed Psbt: {:#?}", analyzed);
+		println!("Analyzed Psbt: {analyzed:#?}");
 	}
 
 	let finalized = bitcoind.client.finalize_psbt(&import.psbt, None)?;
-	println!("Finalized psbt! {:?}", finalized);
+	println!("Finalized psbt! {finalized:?}");
 	let acceptance = bitcoind
 		.client
 		.test_mempool_accept(&[&finalized.hex.unwrap()])

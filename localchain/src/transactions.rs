@@ -28,7 +28,7 @@ impl From<i64> for TransactionType {
       1 => TransactionType::Request,
       2 => TransactionType::OpenChannelHold,
       3 => TransactionType::Consolidation,
-      _ => panic!("Unknown transaction type {}", i),
+      _ => panic!("Unknown transaction type {i}"),
     }
   }
 }

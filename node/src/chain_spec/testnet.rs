@@ -30,14 +30,14 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 
 	let notary_account = AccountId::from_str("5CFiHEZUFSqwEeiSqJwfxjp4wZWxom73y5EjVsrAw3GwQuWh")?;
 	let notary_public = NotaryPublic::from_str("5CGRRiYmYcnxPEpGmhHLp6SywpSKN23PbVHM9Y3Td7n6xvm2")
-		.map_err(|e| format!("Error parsing notary public {:?}", e))?;
+		.map_err(|e| format!("Error parsing notary public {e:?}"))?;
 
 	let grandpa_key = GrandpaId::from_slice(
 		hex::decode("1e69c7672dfb67dc19abfce302caf4c60cc5cb21f39538f749efdc6a28feaba6")
-			.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?
+			.map_err(|e| format!("Error decoding testnet grandpa key {e:?}"))?
 			.as_bytes_ref(),
 	)
-	.map_err(|e| format!("Error decoding testnet grandpa key {:?}", e))?;
+	.map_err(|e| format!("Error decoding testnet grandpa key {e:?}"))?;
 
 	Ok(ChainSpec::builder(
 		WASM_BINARY.ok_or_else(|| "Wasm not available".to_string())?,

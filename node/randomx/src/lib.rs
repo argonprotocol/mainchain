@@ -197,7 +197,7 @@ pub mod full_vm {
 
 			for handle in spawned {
 				handle.join().map_err(|e| {
-					RandomXError::CreationError(format!("Dataset init error: {:?}", e))
+					RandomXError::CreationError(format!("Dataset init error: {e:?}"))
 				})??;
 			}
 			Ok(())

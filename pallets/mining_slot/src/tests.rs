@@ -1140,7 +1140,7 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 				}
 			}
 			assert!(!valid_seals.is_empty(), "Should have found at least one valid seal");
-			println!("Valid seals: {:?}", valid_seals);
+			println!("Valid seals: {valid_seals:?}");
 		}
 	})
 }
@@ -1279,7 +1279,7 @@ fn it_distributes_seals_evenly() {
 				MiningSlots::reset_miner_nonce_scoring();
 			}
 		}
-		println!("{:#?}", winners_by_id);
+		println!("{winners_by_id:#?}");
 		assert_eq!(winners_by_id.len(), 100, "Should have 100 unique winning miners");
 		let expected_wins_per_miner = 10_000f64 / 100f64;
 		let mut max_diff = 0f64;
@@ -1292,10 +1292,7 @@ fn it_distributes_seals_evenly() {
 			}
 			assert!(
 				diff_percent.abs() <= 0.05,
-				"Account {:?} had {} wins which is more than 5% different from expected {}",
-				account,
-				wins,
-				expected_wins_per_miner
+				"Account {account:?} had {wins} wins which is more than 5% different from expected {expected_wins_per_miner}"
 			);
 			sum += wins;
 		}

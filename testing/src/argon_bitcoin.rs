@@ -42,7 +42,7 @@ pub async fn run_bitcoin_cli(
 		tokio::select! {
 			line = stdout_reader.next_line() => {
 				if let Ok(Some(line)) = line {
-					println!("CLI      {}", line);
+					println!("CLI      {line}");
 					out_log.push_str(&line);
 					out_log.push('\n');
 				} else {
@@ -51,7 +51,7 @@ pub async fn run_bitcoin_cli(
 			},
 			line = stderr_reader.next_line() => {
 				if let Ok(Some(line)) = line {
-					eprintln!("CLI      {}", line);
+					eprintln!("CLI      {line}");
 					err_log.push_str(&line);
 					err_log.push('\n');
 				} else {
@@ -66,6 +66,6 @@ pub async fn run_bitcoin_cli(
 	if status.success() {
 		Ok(out_log)
 	} else {
-		Err(anyhow::anyhow!("Failed to run argon-bitcoin: {:?}", err_log))
+		Err(anyhow::anyhow!("Failed to run argon-bitcoin: {err_log:?}"))
 	}
 }

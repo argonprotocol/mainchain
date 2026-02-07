@@ -67,7 +67,7 @@ impl KeystoreParams {
 			Some(SecretString::new(rpassword::prompt_password("Keystore Password: ")?))
 		} else if let Some(ref file) = self.password_filename {
 			let password = fs::read_to_string(file)
-				.map_err(|e| anyhow!("Unable to read password file: {}", e))?;
+				.map_err(|e| anyhow!("Unable to read password file: {e}"))?;
 			Some(SecretString::new(password))
 		} else {
 			password
@@ -123,11 +123,7 @@ impl KeystoreParams {
 			},
 		};
 		keystore.insert(key_type_id, &suri, &public_bytes).map_err(|_| {
-			anyhow!(
-				"Unable to insert keypair (type={:?}, in memory? {})",
-				key_type_id,
-				allow_in_memory
-			)
+			anyhow!("Unable to insert keypair (type={key_type_id:?}, in memory? {allow_in_memory})")
 		})?;
 		Ok((keystore, address))
 	}

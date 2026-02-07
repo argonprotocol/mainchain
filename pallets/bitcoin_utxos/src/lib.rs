@@ -282,7 +282,7 @@ pub mod pallet {
 					Self::lock_funding_received(utxo_id, utxo_ref, satoshis, bitcoin_height)
 				});
 				if let Err(e) = res {
-					log::warn!("Failed to verify UTXO {}: {:?}", utxo_id, e);
+					log::warn!("Failed to verify UTXO {utxo_id}: {e:?}");
 					Self::deposit_event(Event::UtxoVerifiedError { utxo_id, error: e });
 				}
 			}
@@ -308,9 +308,7 @@ pub mod pallet {
 					let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
 					if let Err(e) = res {
 						log::warn!(
-							"Failed to reject UTXO {:?} due to lookup expiration: {:?}",
-							utxo_id,
-							e
+							"Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}"
 						);
 						Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
 					}

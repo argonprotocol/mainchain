@@ -39,9 +39,7 @@ pub async fn bitcoin_loop(
 	let connected_bitcoin_network = bitcoin_client.get_blockchain_info()?.chain.into();
 	if required_bitcoin_network != connected_bitcoin_network {
 		bail!(
-			"Connected to incorrect bitcoin network. Expected {:?}, but connected to {:?}",
-			required_bitcoin_network,
-			connected_bitcoin_network
+			"Connected to incorrect bitcoin network. Expected {required_bitcoin_network:?}, but connected to {connected_bitcoin_network:?}"
 		);
 	}
 
@@ -83,15 +81,13 @@ pub async fn bitcoin_loop(
 							_ => None,
 						})
 						.is_some()
-				}) || format!("{:#}", e)
-					.contains("Invalid Transaction (1010)");
+				}) || format!("{e:#}").contains("Invalid Transaction (1010)");
 
 				if is_invalid_1010 {
 					return Err(anyhow::anyhow!(
 						"Failed to submit bitcoin tip due to invalid transaction. \
 						This may be due to insufficient funds in the oracle account or a bad nonce. Throwing to kick off a restart. \
-						Error: {}",
-						e
+						Error: {e}"
 					));
 				}
 

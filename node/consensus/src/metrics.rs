@@ -252,7 +252,7 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 					data.vote_blocks_created = data.vote_blocks_created.saturating_add(1);
 				}
 			})
-			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))
+			.inspect_err(|e| log::error!("Error updating block metrics: {e:?}"))
 			.ok();
 	}
 
@@ -314,7 +314,7 @@ impl<C: AuxStore> ConsensusMetrics<C> {
 				data.mined_ownership_tokens_total.saturating_accrue(ownership_tokens);
 				data.mined_argons_total.saturating_accrue(argons);
 			})
-			.inspect_err(|e| log::error!("Error updating block metrics: {:?}", e))
+			.inspect_err(|e| log::error!("Error updating block metrics: {e:?}"))
 			.ok();
 	}
 }

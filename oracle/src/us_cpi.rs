@@ -464,7 +464,7 @@ mod tests {
 	#[ignore]
 	async fn test_can_get_raw_cpi() {
 		let cpi = get_raw_cpi().await.unwrap();
-		println!("CPI: {:?}", cpi);
+		println!("CPI: {cpi:?}");
 		assert!(cpi.value >= FixedU128::from_u32(200));
 	}
 

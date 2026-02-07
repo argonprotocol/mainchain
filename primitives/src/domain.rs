@@ -77,11 +77,11 @@ impl Domain {
 		}
 		let top_level = parts[1];
 		let domain_name = parts[0].to_lowercase();
-		let tld_str = format!("\"{}\"", top_level);
+		let tld_str = format!("\"{top_level}\"");
 		let mut parsed_tld = serde_json::from_str(&tld_str).ok();
 		if parsed_tld.is_none() {
 			let tld_str = top_level[0..1].to_uppercase() + &top_level[1..];
-			let tld_str = format!("\"{}\"", tld_str);
+			let tld_str = format!("\"{tld_str}\"");
 			parsed_tld = serde_json::from_str(&tld_str).ok();
 		}
 		if parsed_tld.is_none() {

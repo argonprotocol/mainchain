@@ -63,7 +63,7 @@ impl TryInto<NotebookHeader> for NotebookHeaderRow {
 			block_votes_root: H256::from_slice(&self.block_votes_root[..]),
 			block_votes_count: self.block_votes_count as u32,
 			block_voting_power: self.block_voting_power.parse::<u128>().map_err(|e| {
-				Error::InternalError(format!("Error decoding block voting power: {:?}", e))
+				Error::InternalError(format!("Error decoding block voting power: {e:?}"))
 			})?,
 			blocks_with_votes: BoundedVec::truncate_from(
 				self.blocks_with_votes
@@ -298,8 +298,7 @@ impl NotebookHeaderStore {
 
 		let data: [u8; 32] = record.try_into().map_err(|_| {
 			Error::InternalError(format!(
-				"Error decoding notebook accounts_root for {}",
-				notebook_number
+				"Error decoding notebook accounts_root for {notebook_number}"
 			))
 		})?;
 		Ok(data.into())

@@ -59,14 +59,14 @@ impl FinalizedNotebookHeaderListener {
 			Ok(notebook_number) =>
 				NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?,
 			Err(e) => {
-				return Err(anyhow::anyhow!("Error parsing notified notebook number {:?}", e));
+				return Err(anyhow::anyhow!("Error parsing notified notebook number {e:?}"));
 			},
 		};
 		let hash = header.header.hash();
 
 		self.completed_notebook_sender.notify(|| Ok((header.clone(), hash))).map_err(
 			|e: anyhow::Error| {
-				anyhow::anyhow!("Error sending completed notebook notification {:?}", e)
+				anyhow::anyhow!("Error sending completed notebook notification {e:?}")
 			},
 		)?;
 		Ok(header)
@@ -236,14 +236,12 @@ pub fn notary_sign(
 		.ed25519_sign(NOTARY_KEYID, public, &hash[..])
 		.map_err(|e| {
 			Error::InternalError(format!(
-				"Unable to sign notebook header for submission to mainchain {}",
-				e
+				"Unable to sign notebook header for submission to mainchain {e}"
 			))
 		})?
 		.unwrap_or_else(|| {
 			panic!(
-				"Could not sign the notebook header. Ensure the notary key {:?} is installed in the keystore",
-				public
+				"Could not sign the notebook header. Ensure the notary key {public:?} is installed in the keystore"
 			)
 		});
 	Ok(sig)
@@ -576,7 +574,7 @@ mod tests {
 			)
 		});
 
-		println!("ChannelHold result is {:?}", channel_hold_result);
+		println!("ChannelHold result is {channel_hold_result:?}");
 
 		let voting_schedule = VotingSchedule::when_creating_votes(channel_hold_result.tick);
 		let mut best_sub = ctx.client.live.blocks().subscribe_finalized().await?;

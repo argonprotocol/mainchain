@@ -836,7 +836,7 @@ mod tests {
     tick: Tick,
   ) -> Result<()> {
     let balance_tip = balance_change.get_balance_tip(account)?;
-    println!("got balance tip for account {:?}", balance_tip);
+    println!("got balance tip for account {balance_tip:?}");
     let mut state = mock_notary.state.lock().await;
     state.balance_tips.insert(
       LocalchainAccountId::new(account.get_account_id32()?, account.account_type),
@@ -969,7 +969,7 @@ mod tests {
     sqlx::migrate!()
       .run(&alice_pool)
       .await
-      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
+      .map_err(|e| anyhow!("Error migrating database {e:?}"))?;
     let mut alice_db = alice_pool.acquire().await?;
 
     let alice_store = OpenChannelHoldsStore::new(alice_pool, ticker, &notary_clients, &keystore);
@@ -1017,7 +1017,7 @@ mod tests {
     sqlx::migrate!()
       .run(&alice_pool)
       .await
-      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
+      .map_err(|e| anyhow!("Error migrating database {e:?}"))?;
     let mut alice_db = alice_pool.acquire().await?;
 
     let alice_address = AccountStore::to_address(&Alice.to_account_id());
@@ -1135,7 +1135,7 @@ mod tests {
     sqlx::migrate!()
       .run(&alice_pool)
       .await
-      .map_err(|e| anyhow!("Error migrating database {:?}", e))?;
+      .map_err(|e| anyhow!("Error migrating database {e:?}"))?;
 
     let not_alice = AccountStore::to_address(&Ferdie.to_account_id());
 

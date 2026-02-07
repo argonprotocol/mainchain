@@ -105,18 +105,18 @@ pub fn sign_psbt_derived(
 	xpriv_hd_path: &str,
 	finalize: bool,
 ) -> Result<String, String> {
-	let xpriv = Xpriv::from_str(xpriv_b58).map_err(|e| format!("Invalid xpriv: {}", e))?;
-	let psbt_bytes: Vec<u8> = from_hex(psbt_hex).map_err(|e| format!("Invalid PSBT hex: {}", e))?;
-	let mut psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| format!("Invalid PSBT: {}", e))?;
+	let xpriv = Xpriv::from_str(xpriv_b58).map_err(|e| format!("Invalid xpriv: {e}"))?;
+	let psbt_bytes: Vec<u8> = from_hex(psbt_hex).map_err(|e| format!("Invalid PSBT hex: {e}"))?;
+	let mut psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| format!("Invalid PSBT: {e}"))?;
 	let hd_path =
-		DerivationPath::from_str(xpriv_hd_path).map_err(|e| format!("Invalid HD path: {}", e))?;
+		DerivationPath::from_str(xpriv_hd_path).map_err(|e| format!("Invalid HD path: {e}"))?;
 	let _ = psbt_utils::sign_derived(&mut psbt, xpriv, hd_path)
-		.map_err(|e| format!("Error signing PSBT: {}", e))?;
+		.map_err(|e| format!("Error signing PSBT: {e}"))?;
 	if finalize {
-		psbt = psbt_utils::finalize(&psbt).map_err(|e| format!("Error finalizing PSBT: {}", e))?;
+		psbt = psbt_utils::finalize(&psbt).map_err(|e| format!("Error finalizing PSBT: {e}"))?;
 	}
 	let signed_psbt_hex = psbt.serialize_hex();
-	Ok(format!("0x{}", signed_psbt_hex))
+	Ok(format!("0x{signed_psbt_hex}"))
 }
 
 #[wasm_bindgen(js_name = "signPsbt")]
@@ -128,16 +128,16 @@ pub fn sign_psbt(
 ) -> Result<String, String> {
 	let private_key_bytes: Vec<u8> = from_hex(private_key_hex)?;
 	let private_key = PrivateKey::from_slice(&private_key_bytes, bitcoin_network)
-		.map_err(|e| format!("Invalid private key: {}", e))?;
-	let psbt_bytes: Vec<u8> = from_hex(psbt_hex).map_err(|e| format!("Invalid PSBT hex: {}", e))?;
+		.map_err(|e| format!("Invalid private key: {e}"))?;
+	let psbt_bytes: Vec<u8> = from_hex(psbt_hex).map_err(|e| format!("Invalid PSBT hex: {e}"))?;
 
-	let mut psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| format!("Invalid PSBT: {}", e))?;
-	psbt_utils::sign(&mut psbt, private_key).map_err(|e| format!("Error signing PSBT: {}", e))?;
+	let mut psbt = Psbt::deserialize(&psbt_bytes).map_err(|e| format!("Invalid PSBT: {e}"))?;
+	psbt_utils::sign(&mut psbt, private_key).map_err(|e| format!("Error signing PSBT: {e}"))?;
 	if finalize {
-		psbt = psbt_utils::finalize(&psbt).map_err(|e| format!("Error finalizing PSBT: {}", e))?;
+		psbt = psbt_utils::finalize(&psbt).map_err(|e| format!("Error finalizing PSBT: {e}"))?;
 	}
 	let signed_psbt_hex = psbt.serialize_hex();
-	Ok(format!("0x{}", signed_psbt_hex))
+	Ok(format!("0x{signed_psbt_hex}"))
 }
 
 #[wasm_bindgen(js_name = "getCosignPsbt")]
@@ -187,7 +187,7 @@ fn from_hex<T: TryFrom<Vec<u8>>>(text: impl AsRef<str>) -> Result<T, String> {
 		text = &text[2..];
 	}
 	let res: T = hex::decode(text)
-		.map_err(|e| format!("Unable to decode the hex text {} -> {}", text, e))?
+		.map_err(|e| format!("Unable to decode the hex text {text} -> {e}"))?
 		.try_into()
 		.map_err(|_| "Unable to convert the text to a fixed length array".to_string())?;
 	Ok(res)

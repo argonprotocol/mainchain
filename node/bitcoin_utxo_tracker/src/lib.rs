@@ -90,7 +90,7 @@ impl UtxoTracker {
 			&network,
 			&connected_network,
 		);
-		info!(target: "node::bitcoin_utxo_tracker", "Connected to correct bitcoin network: {:?}", connected_network);
+		info!(target: "node::bitcoin_utxo_tracker", "Connected to correct bitcoin network: {connected_network:?}");
 		Ok(())
 	}
 

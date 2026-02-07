@@ -118,7 +118,7 @@ impl From<i64> for BalanceChangeStatus {
       3 => BalanceChangeStatus::Immortalized,
       4 => BalanceChangeStatus::WaitingForSendClaim,
       5 => BalanceChangeStatus::Canceled,
-      _ => panic!("Unknown balance change status {}", i),
+      _ => panic!("Unknown balance change status {i}"),
     }
   }
 }
@@ -204,8 +204,7 @@ impl BalanceChangeStore {
       .await?;
     if status != BalanceChangeStatus::WaitingForSendClaim as i64 {
       return Err(anyhow::anyhow!(
-        "Balance change not in correct state - {:?}",
-        status
+        "Balance change not in correct state - {status:?}"
       ))?;
     }
 
@@ -296,7 +295,7 @@ impl BalanceChangeStore {
       .await?;
       let notebook_number = notarization
         .notebook_number
-        .ok_or_else(|| anyhow::anyhow!("Notarization {} not sent to notary", notarization_id))?;
+        .ok_or_else(|| anyhow::anyhow!("Notarization {notarization_id} not sent to notary"))?;
 
       balance_change.previous_balance_proof = Some(BalanceProof {
         notary_id: latest.notary_id as NotaryId,
@@ -608,7 +607,7 @@ mod test {
     );
 
     let by_id = BalanceChangeStore::db_get_by_id(&mut db, id).await?;
-    println!("{:?}", by_id);
+    println!("{by_id:?}");
     assert_eq!(by_id.balance, "100");
     assert_eq!(by_id.status, BalanceChangeStatus::WaitingForSendClaim);
 

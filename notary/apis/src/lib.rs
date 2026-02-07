@@ -44,21 +44,21 @@ pub struct ArchiveHost {
 }
 
 pub fn get_notebook_bucket(notary_id: NotaryId) -> String {
-	format!("notary/{}/notebook", notary_id)
+	format!("notary/{notary_id}/notebook")
 }
 
 pub fn get_header_bucket(notary_id: NotaryId) -> String {
-	format!("notary/{}/header", notary_id)
+	format!("notary/{notary_id}/header")
 }
 
 pub fn get_notebook_url(url: &str, notary_id: NotaryId, notebook_number: NotebookNumber) -> String {
 	let url = url.trim_end_matches('/');
-	format!("{}/notary/{}/notebook/{}.scale", url, notary_id, notebook_number)
+	format!("{url}/notary/{notary_id}/notebook/{notebook_number}.scale")
 }
 
 pub fn get_header_url(url: &str, notary_id: NotaryId, notebook_number: NotebookNumber) -> String {
 	let url = url.trim_end_matches('/');
-	format!("{}/notary/{}/header/{}.scale", url, notary_id, notebook_number)
+	format!("{url}/notary/{notary_id}/header/{notebook_number}.scale")
 }
 
 impl ArchiveHost {
@@ -165,7 +165,7 @@ pub async fn download_notebook(
 
 pub async fn create_client(url: &str) -> anyhow::Result<Client> {
 	let transport_builder = WsTransportClientBuilder::default();
-	let url = Url::parse(url).map_err(|e| anyhow!("Invalid URL: {:?} -> {}", url, e))?;
+	let url = Url::parse(url).map_err(|e| anyhow!("Invalid URL: {url:?} -> {e}"))?;
 
 	let (sender, receiver) = transport_builder.build(url).await?;
 	let client = ClientBuilder::default().build_with_tokio(sender, receiver);

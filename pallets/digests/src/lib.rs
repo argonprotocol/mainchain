@@ -76,7 +76,7 @@ pub mod pallet {
 				Ok(digests) => {
 					TempDigests::<T>::put(digests);
 				},
-				Err(e) => panic!("Could not load digests: {:?}", e),
+				Err(e) => panic!("Could not load digests: {e:?}"),
 			}
 
 			T::DbWeight::get().reads_writes(1, 0)
@@ -101,7 +101,7 @@ pub mod pallet {
 			}
 			let digest = frame_system::Pallet::<T>::digest();
 			let digests = Self::decode(&digest).inspect_err(|e| {
-				log::warn!("Could not decode digests: {:?}", e);
+				log::warn!("Could not decode digests: {e:?}");
 			})?;
 			Ok(digests)
 		}
@@ -110,7 +110,7 @@ pub mod pallet {
 			digest: &Digest,
 		) -> Result<(T::AccountId, Tick, Option<VotingKey>), DispatchError> {
 			let decoded = Self::decode(digest).map_err(|e| {
-				log::error!("Could not load digests: {:?}", e);
+				log::error!("Could not load digests: {e:?}");
 				Error::<T>::CouldNotDecodeDigest
 			})?;
 			let mut parent_voting_key = None;
@@ -128,7 +128,7 @@ pub mod pallet {
 		fn get() -> Result<Digestset<T::NotebookVerifyError, T::AccountId>, DispatchError> {
 			// this can get called before on_initialize, so we need to make sure we have the digests
 			Self::read_digest().map_err(|e| {
-				log::error!("Could not load digests: {:?}", e);
+				log::error!("Could not load digests: {e:?}");
 				Error::<T>::CouldNotDecodeDigest.into()
 			})
 		}

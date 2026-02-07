@@ -87,7 +87,7 @@ impl TryFrom<i32> for AccountType {
 		match value {
 			0 => Ok(AccountType::Tax),
 			1 => Ok(AccountType::Deposit),
-			_ => Err(format!("Invalid account_type value {}", value)),
+			_ => Err(format!("Invalid account_type value {value}")),
 		}
 	}
 }

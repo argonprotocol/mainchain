@@ -704,10 +704,7 @@ fn it_can_find_best_vote_seal_v2() {
 			for (vote, _) in &notebook_vote.raw_votes {
 				let block_vote = BlockVoteT::<H256>::decode(&mut vote.as_slice()).unwrap();
 				let calculated = block_vote.get_seal_strength(notebook_vote.notary_id, voting_key);
-				println!(
-					"{:?}. Strongest {:?}, calculated {:?}",
-					block_vote, strongest, calculated
-				);
+				println!("{block_vote:?}. Strongest {strongest:?}, calculated {calculated:?}");
 				assert!(calculated >= strongest);
 			}
 		}

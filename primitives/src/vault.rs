@@ -557,10 +557,7 @@ impl<
 
 	/// The amount of securitization that can be re-locked (with expiration extended out)
 	pub fn get_relock_capacity(&self) -> Balance {
-		self.securitization_release_schedule
-			.iter()
-			.map(|(_h, releasing)| *releasing)
-			.sum()
+		self.securitization_release_schedule.values().copied().sum()
 	}
 
 	pub fn available_for_lock(&self) -> Balance {

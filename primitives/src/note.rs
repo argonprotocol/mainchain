@@ -155,7 +155,7 @@ impl Display for NoteType {
 				write!(f, "SendToMainchain")
 			},
 			NoteType::ClaimFromMainchain { transfer_id } => {
-				write!(f, "ClaimFromMainchain(transfer_id={})", transfer_id)
+				write!(f, "ClaimFromMainchain(transfer_id={transfer_id})")
 			},
 			NoteType::Claim => {
 				write!(f, "Claim")

@@ -104,7 +104,7 @@ impl MainchainClient {
 		account_id: &AccountId32,
 	) -> anyhow::Result<ArgonExtrinsicParamsBuilder<ArgonConfig>> {
 		let nonce = self.get_account_nonce(account_id).await?;
-		println!("latest nonce for account {:?} is {:?}", account_id, nonce);
+		println!("latest nonce for account {account_id:?} is {nonce:?}");
 		Ok(Self::ext_params_builder().nonce(nonce.into()))
 	}
 
@@ -254,7 +254,7 @@ impl MainchainClient {
 		let info = self
 			.fetch_storage(&storage().system().account(account_id.clone()), FetchAt::Finalized)
 			.await?
-			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
+			.ok_or_else(|| anyhow!("No record found for account {account_id:?}"))?;
 		Ok(info)
 	}
 
@@ -275,7 +275,7 @@ impl MainchainClient {
 		let balance = self
 			.fetch_storage(&storage().ownership().account(account_id.clone()), at_block)
 			.await?
-			.ok_or_else(|| anyhow!("No record found for account {:?}", account_id))?;
+			.ok_or_else(|| anyhow!("No record found for account {account_id:?}"))?;
 		Ok(balance)
 	}
 
@@ -328,7 +328,7 @@ impl MainchainClient {
 		let best_vote_block = votable_blocks.last().ok_or_else(|| {
 			anyhow!("No vote block found at grandparent tick ({grandparent_tick})")
 		})?;
-		debug!("Block to vote on at grandparent tick {}: {:?}", grandparent_tick, best_vote_block);
+		debug!("Block to vote on at grandparent tick {grandparent_tick}: {best_vote_block:?}");
 
 		let minimum = self
 			.fetch_storage(
@@ -473,12 +473,12 @@ impl MainchainClient {
 
 	async fn create_ws_client(url: &str) -> Result<WsClient, Error> {
 		let url = Url::parse(url)
-			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {} -> {}", url, e)))?;
+			.map_err(|e| Error::Other(format!("Invalid Mainchain URL: {url} -> {e}")))?;
 		let builder = WsTransportClientBuilder::default();
 		let (sender, receiver) = builder
 			.build(url)
 			.await
-			.map_err(|e| Error::Other(format!("Websocket handshake error {:?}", e)))?;
+			.map_err(|e| Error::Other(format!("Websocket handshake error {e:?}")))?;
 		let client = ClientBuilder::default()
 			.enable_ws_ping(PingConfig::default())
 			.build_with_tokio(sender, receiver);

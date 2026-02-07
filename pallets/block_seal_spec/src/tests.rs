@@ -216,7 +216,7 @@ fn assert_next_minimum(start_minimum: u64, actual_votes: u64, next_minimum: u64)
 		1,
 		10_000,
 	);
-	assert_eq!(next_minimum, actual, "Failed for actual votes {}", actual_votes);
+	assert_eq!(next_minimum, actual, "Failed for actual votes {actual_votes}");
 }
 
 fn create_default_notebook(
@@ -517,5 +517,5 @@ fn assert_next_difficulty(start_difficulty: u64, time_observed: u64, next_diffic
 		1,
 		10000,
 	);
-	assert_eq!(next_difficulty, actual, "Failed for time_observed {}", time_observed);
+	assert_eq!(next_difficulty, actual, "Failed for time_observed {time_observed}");
 }

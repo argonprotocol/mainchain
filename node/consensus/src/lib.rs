@@ -510,12 +510,12 @@ mod test {
 
 		for signed in justification.justification.commit.precommits.iter() {
 			let message = finality_grandpa::Message::Precommit(signed.precommit.clone());
-			println!("Message: {:#?}", signed);
+			println!("Message: {signed:#?}");
 
 			for i in 0..10u64 {
 				let buf = (message.clone(), justification.justification.round, i).encode();
 				if signed.id.verify(&buf, &signed.signature) {
-					println!("Signature verified at {}", i);
+					println!("Signature verified at {i}");
 					assert_eq!(i, 0);
 				}
 			}

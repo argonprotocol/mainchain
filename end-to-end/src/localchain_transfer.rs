@@ -19,28 +19,28 @@ async fn test_localchain_transfers_using_cli() {
 		.run(&test_node, vec!["accounts", "create", "--suri", "//chicken dog pig box bread cat"])
 		.await
 		.unwrap();
-	println!("{}", primary_localchain);
+	println!("{primary_localchain}");
 	let alice = localchain_cli
 		.run(&test_node, vec!["accounts", "create", "-n", "alice", "--suri", "//Alice"])
 		.await
 		.unwrap();
-	println!("{}", alice);
+	println!("{alice}");
 
 	let list = localchain_cli.run(&test_node, vec!["accounts", "list"]).await.unwrap();
-	println!("{}", list);
+	println!("{list}");
 
 	let mainchain_transfer = localchain_cli
 		.run(&test_node, vec!["transactions", "from-mainchain", "-n", "alice", "10"])
 		.await
 		.unwrap();
-	println!("{}", mainchain_transfer);
+	println!("{mainchain_transfer}");
 
 	loop {
 		let refreshed = localchain_cli
 			.run(&test_node, vec!["accounts", "info", "-n", "alice", "--sync-latest"])
 			.await
 			.unwrap();
-		println!("{}", refreshed);
+		println!("{refreshed}");
 
 		if refreshed.contains("processing") {
 			tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -67,7 +67,7 @@ async fn test_localchain_transfers_using_cli() {
 		)
 		.await
 		.unwrap();
-	println!("{}", file);
+	println!("{file}");
 
 	// import by primary
 	let imported = localchain_cli
@@ -78,14 +78,14 @@ async fn test_localchain_transfers_using_cli() {
 		.await
 		.unwrap();
 
-	println!("{}", imported);
+	println!("{imported}");
 
 	loop {
 		let refreshed = localchain_cli
 			.run(&test_node, vec!["accounts", "info", "-n", "alice", "--sync-latest"])
 			.await
 			.unwrap();
-		println!("{}", refreshed);
+		println!("{refreshed}");
 
 		if refreshed.contains("pending") {
 			tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -101,7 +101,7 @@ async fn test_localchain_transfers_using_cli() {
 		.run(&test_node, vec!["accounts", "info", "-n", "primary", "--sync-latest"])
 		.await
 		.unwrap();
-	println!("{}", primary);
+	println!("{primary}");
 	assert!(primary.contains("₳4.8"));
 
 	let to_mainchain = localchain_cli
@@ -111,14 +111,14 @@ async fn test_localchain_transfers_using_cli() {
 		)
 		.await
 		.unwrap();
-	println!("{}", to_mainchain);
+	println!("{to_mainchain}");
 
 	loop {
 		let refreshed = localchain_cli
 			.run(&test_node, vec!["accounts", "info", "-n", "primary", "--sync-latest"])
 			.await
 			.unwrap();
-		println!("{}", refreshed);
+		println!("{refreshed}");
 
 		if refreshed.contains("pending") {
 			tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -132,7 +132,7 @@ async fn test_localchain_transfers_using_cli() {
 	let pair = Pair::from_string("//chicken dog pig box bread cat", None).unwrap();
 	let mainchain_balance = test_node.client.get_argons(&pair.public().into()).await.unwrap();
 	assert_eq!(mainchain_balance.free, 4_800_000);
-	println!("Mainchain account of primary localchain: {:#?}", mainchain_balance);
+	println!("Mainchain account of primary localchain: {mainchain_balance:#?}");
 
 	drop(test_node);
 	drop(test_notary);

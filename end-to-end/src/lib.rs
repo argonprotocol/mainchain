@@ -160,7 +160,7 @@ pub(crate) mod utils {
 		let register = client
 			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)
 			.await?;
-		println!("miner registered. {:?}", register);
+		println!("miner registered. {register:?}");
 
 		let wait_til_past_frame_id = client
 			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
@@ -173,7 +173,7 @@ pub(crate) mod utils {
 			let fetch_at = FetchAt::Block(block.hash());
 			let account_index = client.fetch_storage(&lookup, fetch_at).await?;
 			if let Some((frame_id, index)) = account_index {
-				println!("Miner 1 registered at frame {}, index {}", frame_id, index);
+				println!("Miner 1 registered at frame {frame_id}, index {index}");
 				break;
 			}
 			let registered_miners = client
@@ -198,7 +198,7 @@ pub(crate) mod utils {
 			);
 			let block_confirm = client.block_number(register.block_hash()).await;
 			if block_confirm.is_err() {
-				println!("Block no longer finalized! {:?}", block_confirm);
+				println!("Block no longer finalized! {block_confirm:?}");
 			}
 			if next_frame_id > wait_til_past_frame_id {
 				panic!("next frameId changed while waiting for registration");

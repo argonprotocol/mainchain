@@ -241,7 +241,7 @@ impl MiningConfig {
 					"Compute fallback mining is enabled without a compute author. Unable to activate!"
 				);
 			}
-			log::info!("Compute fallback mining is enabled with {} threads", compute_threads);
+			log::info!("Compute fallback mining is enabled with {compute_threads} threads");
 		} else {
 			log::info!("Compute fallback mining is disabled");
 		}
@@ -256,7 +256,7 @@ impl MiningConfig {
 		};
 
 		let mut bitcoin_url = Url::parse(bitcoin_rpc_url).map_err(|e| {
-			Error::Input(format!("Unable to parse bitcoin rpc url ({}) {:?}", bitcoin_rpc_url, e))
+			Error::Input(format!("Unable to parse bitcoin rpc url ({bitcoin_rpc_url}) {e:?}"))
 		})?;
 		let (user, password) = (bitcoin_url.username(), bitcoin_url.password());
 

@@ -363,8 +363,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		for notebook in &headers.notebook_digest.notebooks {
 			if notebook.notary_id == notary_id && notebook.notebook_number != expected_next_number {
 				return Err(Error::StringError(format!(
-					"Missing notebook {} for notary {} (stopped here, might be more)",
-					expected_next_number, notary_id
+					"Missing notebook {expected_next_number} for notary {notary_id} (stopped here, might be more)"
 				)));
 			}
 			expected_next_number += 1;
@@ -488,8 +487,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 		let notebook_number = notebook_details.notebook_number;
 
 		trace!(
-			"Storing vote details for tick {} and notary {} at notebook #{}",
-			tick, notary_id, notebook_number
+			"Storing vote details for tick {tick} and notary {notary_id} at notebook #{notebook_number}"
 		);
 
 		let mut voting_power = 0u128;

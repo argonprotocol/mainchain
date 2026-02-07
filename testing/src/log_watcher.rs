@@ -30,7 +30,7 @@ impl LogWatcher {
 				match line {
 					Ok(line) => {
 						{
-							println!("{} {}", name_clone, line);
+							println!("{name_clone} {line}");
 							let mut log_guard = log_clone.lock().unwrap();
 							log_guard.push_str(&line);
 							log_guard.push('\n');
@@ -38,7 +38,7 @@ impl LogWatcher {
 						let _ = log_notifier.send(()); // Notify log updates
 					},
 					Err(e) => {
-						eprintln!("Error reading log line: {:?}", e);
+						eprintln!("Error reading log line: {e:?}");
 						break;
 					},
 				}

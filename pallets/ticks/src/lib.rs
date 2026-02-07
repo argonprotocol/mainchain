@@ -104,7 +104,7 @@ pub mod pallet {
 			let blocks_for_proposed = RecentBlocksAtTicks::<T>::get(proposed_tick);
 			let blocks_at_proposed = blocks_for_proposed.len();
 			if blocks_for_proposed.is_full() {
-				panic!("No more blocks can be proposed at tick {:?}", proposed_tick);
+				panic!("No more blocks can be proposed at tick {proposed_tick:?}");
 			}
 
 			if MAX_BLOCKS_PER_TICK as usize - blocks_at_proposed == 1 {
@@ -121,8 +121,7 @@ pub mod pallet {
 
 			if proposed_tick < parent_tick {
 				panic!(
-					"Proposed tick is less than or equal to current tick. Proposed: {:?}, Current: {:?}",
-					proposed_tick, parent_tick
+					"Proposed tick is less than or equal to current tick. Proposed: {proposed_tick:?}, Current: {parent_tick:?}"
 				);
 			}
 

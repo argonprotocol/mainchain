@@ -35,11 +35,11 @@ fn main() {
 				if !output.status.success() {
 					// Convert the output to a String to display the error
 					let stderr = String::from_utf8_lossy(&output.stderr);
-					println!("Error setting up {}: {}", database_url, stderr);
+					println!("Error setting up {database_url}: {stderr}");
 				}
 			},
 			Err(e) => {
-				println!("Error setting up {}: {}", database_url, e);
+				println!("Error setting up {database_url}: {e}");
 			},
 		}
 	}

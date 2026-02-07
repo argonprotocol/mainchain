@@ -415,7 +415,7 @@ pub mod pallet {
 
 			// if it's time for the cohort to start, do it
 			if let Some(activating_frame_id) = Self::get_newly_started_frame() {
-				log::info!("Starting Frame {}", activating_frame_id);
+				log::info!("Starting Frame {activating_frame_id}");
 				Self::adjust_argonots_per_seat();
 				Self::start_new_frame(activating_frame_id);
 				// we use the current price as part of calculations
@@ -1086,9 +1086,7 @@ impl<T: Config> Pallet<T> {
 		ScheduledCohortSizeChangeByFrame::<T>::mutate(|x| {
 			if x.try_insert(frame_id, next_cohort_size).is_err() {
 				log::error!(
-					"Unable to schedule cohort size change to {} at frame {}",
-					next_cohort_size,
-					frame_id,
+					"Unable to schedule cohort size change to {next_cohort_size} at frame {frame_id}",
 				);
 			}
 		});
@@ -1126,7 +1124,7 @@ impl<T: Config> Pallet<T> {
 		let threshold = U256::MAX / U256::from(ticks_before_close);
 
 		if vote_seal_proof < threshold {
-			log::info!("VRF Close triggered: {:?} < {:?}", vote_seal_proof, threshold);
+			log::info!("VRF Close triggered: {vote_seal_proof:?} < {threshold:?}");
 			let frame_id = NextFrameId::<T>::get();
 			Self::deposit_event(Event::<T>::MiningBidsClosed { frame_id });
 			return true;
@@ -1246,8 +1244,7 @@ impl<T: Config> Pallet<T> {
 		T::OwnershipCurrency::release(&reason.into(), account_id, amount, Precision::Exact)
 			.map_err(|e| {
 				log::warn!(
-					"Error recovering mining slot hold for {account_id:?}. Amount {amount:?}. {:?}",
-					e
+					"Error recovering mining slot hold for {account_id:?}. Amount {amount:?}. {e:?}"
 				);
 				Error::<T>::UnrecoverableHold
 			})?;
@@ -1281,10 +1278,7 @@ impl<T: Config> Pallet<T> {
 		}
 		if let Err(e) = Self::release_argonots_hold(funding_account, amount_to_release) {
 			log::error!(
-				"Failed to release argonots from funding account {:?} (account {:?}). {:?}",
-				funding_account,
-				account_id,
-				e,
+				"Failed to release argonots from funding account {funding_account:?} (account {account_id:?}). {e:?}",
 			);
 			Self::deposit_event(Event::<T>::ReleaseMinerSeatError {
 				account_id: account_id.clone(),

@@ -700,7 +700,7 @@ pub mod pallet {
 					Ok(())
 				});
 				if let Err(e) = res {
-					log::error!("Bitcoin utxo id {:?} failed to be burned {:?}", utxo_id, e);
+					log::error!("Bitcoin utxo id {utxo_id:?} failed to be burned {e:?}");
 					Self::deposit_event(Event::<T>::LockExpirationError { utxo_id, error: e });
 				}
 			}
@@ -711,9 +711,7 @@ pub mod pallet {
 				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
 				if let Err(e) = res {
 					log::error!(
-						"Bitcoin lock id {:?} failed to handle overdue `cosign` {:?}",
-						utxo_id,
-						e
+						"Bitcoin lock id {utxo_id:?} failed to handle overdue `cosign` {e:?}"
 					);
 					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
 				}
@@ -738,11 +736,7 @@ pub mod pallet {
 					Ok::<(), DispatchError>(())
 				});
 				if let Err(e) = res {
-					log::error!(
-						"Orphaned bitcoin utxo {:?} failed expiry cleanup {:?}",
-						utxo_ref,
-						e
-					);
+					log::error!("Orphaned bitcoin utxo {utxo_ref:?} failed expiry cleanup {e:?}");
 				}
 			}
 
@@ -1403,7 +1397,7 @@ pub mod pallet {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {
 				if let Some(lock) = a {
 					if lock.is_funded {
-						log::warn!("Utxo id {:?} already funded", utxo_id);
+						log::warn!("Utxo id {utxo_id:?} already funded");
 						return Ok(());
 					}
 					lock.is_funded = true;
@@ -1439,7 +1433,7 @@ pub mod pallet {
 					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
 						.map_err(Error::<T>::from)?;
 				} else {
-					log::warn!("Funded utxo_id {:?} not found", utxo_id);
+					log::warn!("Funded utxo_id {utxo_id:?} not found");
 				}
 				Ok::<(), DispatchError>(())
 			})
@@ -1903,9 +1897,7 @@ pub mod pallet {
 			});
 			if overflowed {
 				log::warn!(
-					"Orphaned UTXO cleanup schedule overflowed for lock {:?} at frame {:?}",
-					utxo_id,
-					expiry_frame
+					"Orphaned UTXO cleanup schedule overflowed for lock {utxo_id:?} at frame {expiry_frame:?}"
 				);
 			}
 		}

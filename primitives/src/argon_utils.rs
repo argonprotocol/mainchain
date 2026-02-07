@@ -11,9 +11,9 @@ pub fn format_argons(argons: u128) -> String {
 	let whole_part_str = insert_commas(whole_part);
 
 	if decimal_part == 0 {
-		return format!("₳{}", whole_part_str);
+		return format!("₳{whole_part_str}");
 	}
-	format!("₳{}.{:02}", whole_part_str, decimal_part)
+	format!("₳{whole_part_str}.{decimal_part:02}")
 }
 
 fn insert_commas(n: u128) -> String {

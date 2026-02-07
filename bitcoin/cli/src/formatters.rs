@@ -6,7 +6,7 @@ pub fn parse_number(s: &str) -> Result<f32, String> {
 	let cleaned: String = s.chars().filter(|&c| c.is_ascii_digit() || c == '.').collect();
 
 	// Ensure there's a decimal point for integer numbers by appending ".0" if needed
-	let cleaned = if !cleaned.contains('.') { format!("{}.0", cleaned) } else { cleaned };
+	let cleaned = if !cleaned.contains('.') { format!("{cleaned}.0") } else { cleaned };
 
 	// Parse the cleaned string as an f32
 	let number: f32 = cleaned.parse().map_err(|_| "Invalid number".to_string())?;
@@ -24,7 +24,7 @@ impl fmt::Display for Argons {
 		let decimal_part = (value.fract() * 100.0).round(); // Extract and round the decimal part
 
 		if decimal_part == 0.0 {
-			write!(f, "₳{}", whole_part_str)
+			write!(f, "₳{whole_part_str}")
 		} else {
 			write!(f, "₳{}.{:02}", whole_part_str, decimal_part as u32)
 		}
@@ -45,13 +45,13 @@ pub struct Pct(pub f32);
 impl fmt::Display for Pct {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let value = self.0;
-		let mut value_str = &*format!("{}", value);
+		let mut value_str = &*format!("{value}");
 
 		if value_str.contains('.') {
 			value_str = value_str.trim_end_matches('0').trim_end_matches('.');
 		}
 
-		write!(f, "{}%", value_str)
+		write!(f, "{value_str}%")
 	}
 }
 
@@ -60,13 +60,13 @@ pub struct Pct64(pub f64);
 impl fmt::Display for Pct64 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let value = self.0;
-		let mut value_str = &*format!("{}", value);
+		let mut value_str = &*format!("{value}");
 
 		if value_str.contains('.') {
 			value_str = value_str.trim_end_matches('0').trim_end_matches('.');
 		}
 
-		write!(f, "{}%", value_str)
+		write!(f, "{value_str}%")
 	}
 }
 

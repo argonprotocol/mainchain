@@ -179,7 +179,7 @@ impl VaultConfig {
 						}
 						Ok(Validation::Valid)
 					},
-					Err(e) => Ok(Validation::Invalid(format!("Invalid xpub: {:?}", e).into())),
+					Err(e) => Ok(Validation::Invalid(format!("Invalid xpub: {e:?}").into())),
 				}
 			})
 			.prompt();
@@ -301,7 +301,7 @@ impl VaultConfig {
 			},
 			"securitization_ratio" => {
 				let ratio = parse_number(&value).unwrap();
-				Some(format!("{:.2}x", ratio))
+				Some(format!("{ratio:.2}x"))
 			},
 			_ => None,
 		}
