@@ -1172,9 +1172,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							246u8, 7u8, 67u8, 3u8, 128u8, 128u8, 162u8, 176u8, 157u8, 73u8, 58u8,
-							209u8, 90u8, 38u8, 243u8, 66u8, 79u8, 201u8, 208u8, 7u8, 33u8, 192u8,
-							223u8, 181u8, 47u8, 40u8, 113u8, 71u8, 213u8, 186u8, 41u8, 170u8,
+							229u8, 248u8, 45u8, 35u8, 70u8, 125u8, 111u8, 24u8, 222u8, 209u8,
+							236u8, 114u8, 221u8, 183u8, 190u8, 246u8, 20u8, 204u8, 21u8, 193u8,
+							225u8, 68u8, 57u8, 0u8, 4u8, 149u8, 97u8, 151u8, 246u8, 28u8, 18u8,
+							131u8,
 						],
 					)
 				}
@@ -1192,9 +1193,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							215u8, 100u8, 11u8, 204u8, 114u8, 52u8, 125u8, 226u8, 141u8, 98u8,
-							218u8, 132u8, 169u8, 117u8, 6u8, 52u8, 165u8, 199u8, 9u8, 66u8, 91u8,
-							243u8, 73u8, 47u8, 138u8, 226u8, 45u8, 88u8, 34u8, 207u8, 177u8, 80u8,
+							210u8, 115u8, 220u8, 105u8, 123u8, 45u8, 165u8, 126u8, 190u8, 14u8,
+							57u8, 105u8, 109u8, 112u8, 39u8, 194u8, 34u8, 116u8, 9u8, 186u8, 246u8,
+							96u8, 249u8, 205u8, 208u8, 117u8, 232u8, 51u8, 108u8, 246u8, 199u8,
+							177u8,
 						],
 					)
 				}
@@ -3794,9 +3796,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				76u8, 227u8, 133u8, 236u8, 105u8, 197u8, 1u8, 143u8, 142u8, 48u8, 199u8, 150u8,
-				91u8, 129u8, 162u8, 110u8, 170u8, 66u8, 80u8, 33u8, 66u8, 127u8, 120u8, 231u8,
-				214u8, 147u8, 157u8, 37u8, 76u8, 214u8, 74u8, 80u8,
+				147u8, 151u8, 163u8, 20u8, 85u8, 108u8, 17u8, 178u8, 200u8, 20u8, 176u8, 116u8,
+				63u8, 119u8, 242u8, 126u8, 102u8, 156u8, 142u8, 227u8, 162u8, 69u8, 118u8, 57u8,
+				123u8, 44u8, 140u8, 79u8, 143u8, 32u8, 235u8, 250u8,
 			]
 	}
 	pub mod system {
@@ -5791,10 +5793,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							65u8, 76u8, 236u8, 145u8, 239u8, 5u8, 252u8, 166u8, 192u8, 148u8, 74u8,
-							0u8, 193u8, 58u8, 200u8, 235u8, 253u8, 224u8, 142u8, 249u8, 197u8,
-							113u8, 77u8, 91u8, 255u8, 110u8, 197u8, 144u8, 96u8, 224u8, 209u8,
-							251u8,
+							249u8, 141u8, 35u8, 219u8, 107u8, 156u8, 8u8, 169u8, 243u8, 202u8,
+							147u8, 97u8, 159u8, 142u8, 215u8, 253u8, 46u8, 147u8, 112u8, 112u8,
+							126u8, 231u8, 229u8, 119u8, 141u8, 216u8, 229u8, 75u8, 120u8, 170u8,
+							123u8, 54u8,
 						],
 					)
 				}
@@ -5856,9 +5858,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							96u8, 2u8, 110u8, 161u8, 166u8, 159u8, 182u8, 55u8, 154u8, 33u8, 36u8,
-							183u8, 61u8, 106u8, 132u8, 176u8, 86u8, 10u8, 166u8, 144u8, 219u8,
-							52u8, 253u8, 122u8, 201u8, 37u8, 102u8, 57u8, 6u8, 22u8, 227u8, 83u8,
+							74u8, 66u8, 97u8, 132u8, 188u8, 121u8, 238u8, 73u8, 222u8, 46u8, 140u8,
+							198u8, 229u8, 7u8, 16u8, 203u8, 173u8, 29u8, 11u8, 55u8, 70u8, 121u8,
+							164u8, 48u8, 138u8, 3u8, 114u8, 126u8, 31u8, 118u8, 25u8, 53u8,
 						],
 					)
 				}
@@ -6755,9 +6757,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							159u8, 213u8, 161u8, 203u8, 251u8, 3u8, 148u8, 251u8, 166u8, 83u8, 4u8,
-							148u8, 123u8, 177u8, 193u8, 134u8, 255u8, 119u8, 193u8, 71u8, 207u8,
-							1u8, 148u8, 23u8, 116u8, 35u8, 12u8, 199u8, 52u8, 54u8, 124u8, 199u8,
+							26u8, 246u8, 238u8, 150u8, 123u8, 132u8, 50u8, 185u8, 239u8, 177u8,
+							235u8, 124u8, 254u8, 209u8, 155u8, 0u8, 168u8, 34u8, 81u8, 172u8, 2u8,
+							141u8, 3u8, 11u8, 33u8, 116u8, 171u8, 229u8, 38u8, 199u8, 169u8, 205u8,
 						],
 					)
 				}
@@ -7018,10 +7020,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							249u8, 46u8, 79u8, 181u8, 74u8, 135u8, 101u8, 141u8, 95u8, 238u8,
-							106u8, 44u8, 143u8, 27u8, 111u8, 196u8, 44u8, 36u8, 98u8, 63u8, 91u8,
-							218u8, 160u8, 72u8, 34u8, 138u8, 78u8, 241u8, 140u8, 216u8, 133u8,
-							73u8,
+							57u8, 254u8, 28u8, 104u8, 2u8, 62u8, 115u8, 22u8, 227u8, 235u8, 85u8,
+							7u8, 33u8, 87u8, 246u8, 138u8, 124u8, 192u8, 173u8, 36u8, 156u8, 19u8,
+							83u8, 7u8, 71u8, 186u8, 150u8, 190u8, 2u8, 79u8, 130u8, 191u8,
 						],
 					)
 				}
@@ -7070,9 +7071,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							55u8, 122u8, 152u8, 99u8, 52u8, 176u8, 164u8, 176u8, 186u8, 191u8,
-							226u8, 94u8, 163u8, 42u8, 194u8, 254u8, 215u8, 201u8, 9u8, 7u8, 84u8,
-							43u8, 154u8, 244u8, 93u8, 160u8, 97u8, 70u8, 70u8, 62u8, 42u8, 183u8,
+							243u8, 199u8, 201u8, 164u8, 55u8, 32u8, 148u8, 82u8, 24u8, 43u8, 219u8,
+							240u8, 76u8, 159u8, 69u8, 108u8, 16u8, 171u8, 141u8, 66u8, 145u8,
+							107u8, 108u8, 229u8, 86u8, 101u8, 229u8, 96u8, 41u8, 81u8, 178u8, 2u8,
 						],
 					)
 				}
@@ -20833,9 +20834,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							174u8, 49u8, 63u8, 155u8, 4u8, 185u8, 99u8, 130u8, 67u8, 27u8, 14u8,
-							103u8, 158u8, 72u8, 28u8, 199u8, 72u8, 114u8, 192u8, 65u8, 34u8, 84u8,
-							185u8, 202u8, 125u8, 96u8, 243u8, 193u8, 148u8, 45u8, 22u8, 3u8,
+							64u8, 6u8, 133u8, 252u8, 195u8, 202u8, 82u8, 65u8, 94u8, 43u8, 33u8,
+							127u8, 6u8, 129u8, 240u8, 87u8, 147u8, 105u8, 181u8, 194u8, 13u8,
+							109u8, 127u8, 58u8, 184u8, 246u8, 214u8, 229u8, 45u8, 103u8, 156u8,
+							26u8,
 						],
 					)
 				}
@@ -20865,9 +20867,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							39u8, 205u8, 100u8, 227u8, 72u8, 152u8, 138u8, 75u8, 172u8, 137u8,
-							13u8, 168u8, 227u8, 20u8, 80u8, 233u8, 227u8, 108u8, 147u8, 21u8, 32u8,
-							77u8, 76u8, 75u8, 156u8, 113u8, 145u8, 3u8, 123u8, 85u8, 208u8, 239u8,
+							199u8, 70u8, 193u8, 81u8, 154u8, 155u8, 108u8, 135u8, 241u8, 117u8,
+							114u8, 255u8, 194u8, 129u8, 245u8, 109u8, 240u8, 125u8, 143u8, 99u8,
+							201u8, 211u8, 125u8, 128u8, 105u8, 37u8, 73u8, 112u8, 155u8, 154u8,
+							60u8, 220u8,
 						],
 					)
 				}
@@ -20893,9 +20896,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							176u8, 80u8, 124u8, 42u8, 231u8, 99u8, 62u8, 26u8, 228u8, 246u8, 114u8,
-							196u8, 151u8, 245u8, 74u8, 161u8, 86u8, 4u8, 59u8, 216u8, 158u8, 220u8,
-							202u8, 43u8, 248u8, 39u8, 171u8, 162u8, 173u8, 115u8, 105u8, 13u8,
+							74u8, 232u8, 189u8, 21u8, 163u8, 128u8, 229u8, 220u8, 143u8, 228u8,
+							181u8, 221u8, 16u8, 14u8, 1u8, 155u8, 147u8, 138u8, 215u8, 46u8, 86u8,
+							151u8, 16u8, 35u8, 69u8, 100u8, 78u8, 83u8, 20u8, 112u8, 186u8, 43u8,
 						],
 					)
 				}
@@ -20918,9 +20921,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							229u8, 37u8, 115u8, 223u8, 107u8, 161u8, 212u8, 14u8, 154u8, 111u8,
-							43u8, 205u8, 234u8, 199u8, 229u8, 108u8, 25u8, 75u8, 9u8, 69u8, 77u8,
-							83u8, 234u8, 232u8, 146u8, 184u8, 237u8, 30u8, 24u8, 23u8, 178u8, 80u8,
+							108u8, 254u8, 73u8, 114u8, 220u8, 144u8, 81u8, 162u8, 103u8, 62u8,
+							193u8, 219u8, 104u8, 155u8, 170u8, 249u8, 151u8, 85u8, 137u8, 92u8,
+							146u8, 142u8, 134u8, 31u8, 25u8, 124u8, 92u8, 127u8, 182u8, 110u8,
+							254u8, 165u8,
 						],
 					)
 				}
@@ -20946,9 +20950,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							172u8, 103u8, 69u8, 251u8, 7u8, 56u8, 206u8, 9u8, 64u8, 106u8, 42u8,
-							65u8, 19u8, 210u8, 19u8, 149u8, 0u8, 69u8, 153u8, 16u8, 162u8, 153u8,
-							57u8, 178u8, 71u8, 228u8, 126u8, 198u8, 161u8, 102u8, 193u8, 4u8,
+							69u8, 74u8, 91u8, 113u8, 113u8, 142u8, 201u8, 240u8, 142u8, 204u8,
+							171u8, 93u8, 179u8, 152u8, 59u8, 129u8, 255u8, 72u8, 69u8, 109u8,
+							249u8, 207u8, 1u8, 103u8, 230u8, 56u8, 46u8, 23u8, 158u8, 248u8, 114u8,
+							119u8,
 						],
 					)
 				}
@@ -20971,10 +20976,9 @@ pub mod api {
 							weight,
 						},
 						[
-							176u8, 245u8, 132u8, 253u8, 16u8, 109u8, 106u8, 91u8, 15u8, 92u8,
-							168u8, 217u8, 27u8, 91u8, 101u8, 122u8, 76u8, 0u8, 44u8, 222u8, 57u8,
-							145u8, 231u8, 251u8, 21u8, 229u8, 140u8, 226u8, 177u8, 175u8, 48u8,
-							144u8,
+							40u8, 204u8, 33u8, 7u8, 68u8, 87u8, 197u8, 73u8, 8u8, 98u8, 197u8,
+							154u8, 92u8, 239u8, 123u8, 227u8, 191u8, 240u8, 9u8, 28u8, 210u8, 61u8,
+							46u8, 219u8, 242u8, 139u8, 138u8, 44u8, 239u8, 218u8, 116u8, 114u8,
 						],
 					)
 				}
@@ -21014,9 +21018,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							169u8, 230u8, 66u8, 48u8, 52u8, 28u8, 183u8, 126u8, 8u8, 51u8, 93u8,
-							177u8, 55u8, 159u8, 91u8, 90u8, 100u8, 65u8, 63u8, 6u8, 50u8, 244u8,
-							15u8, 57u8, 164u8, 202u8, 152u8, 121u8, 255u8, 163u8, 247u8, 201u8,
+							71u8, 183u8, 134u8, 179u8, 221u8, 56u8, 5u8, 113u8, 34u8, 86u8, 23u8,
+							191u8, 33u8, 244u8, 240u8, 198u8, 184u8, 94u8, 208u8, 149u8, 51u8,
+							167u8, 96u8, 150u8, 178u8, 11u8, 37u8, 225u8, 141u8, 6u8, 234u8, 241u8,
 						],
 					)
 				}
@@ -21039,10 +21043,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							237u8, 12u8, 205u8, 34u8, 155u8, 152u8, 166u8, 74u8, 236u8, 198u8,
-							173u8, 43u8, 133u8, 71u8, 157u8, 194u8, 144u8, 145u8, 203u8, 216u8,
-							156u8, 243u8, 96u8, 52u8, 129u8, 250u8, 197u8, 164u8, 197u8, 56u8,
-							204u8, 192u8,
+							225u8, 101u8, 138u8, 88u8, 124u8, 52u8, 213u8, 94u8, 113u8, 116u8,
+							246u8, 195u8, 34u8, 249u8, 37u8, 103u8, 207u8, 221u8, 226u8, 81u8,
+							184u8, 117u8, 66u8, 101u8, 237u8, 36u8, 93u8, 7u8, 34u8, 79u8, 9u8,
+							101u8,
 						],
 					)
 				}
@@ -21378,9 +21382,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							128u8, 12u8, 183u8, 34u8, 135u8, 7u8, 56u8, 52u8, 138u8, 61u8, 191u8,
-							145u8, 71u8, 226u8, 25u8, 124u8, 172u8, 24u8, 52u8, 62u8, 177u8, 11u8,
-							145u8, 138u8, 202u8, 226u8, 129u8, 38u8, 53u8, 134u8, 74u8, 4u8,
+							29u8, 251u8, 197u8, 190u8, 52u8, 40u8, 142u8, 4u8, 206u8, 31u8, 67u8,
+							163u8, 135u8, 48u8, 163u8, 82u8, 6u8, 140u8, 244u8, 247u8, 208u8,
+							172u8, 62u8, 163u8, 202u8, 84u8, 83u8, 196u8, 17u8, 109u8, 227u8,
+							177u8,
 						],
 					)
 				}
@@ -21403,9 +21408,10 @@ pub mod api {
 							weight,
 						},
 						[
-							54u8, 115u8, 68u8, 225u8, 57u8, 123u8, 46u8, 209u8, 171u8, 129u8, 78u8,
-							24u8, 11u8, 56u8, 210u8, 151u8, 156u8, 129u8, 82u8, 85u8, 236u8, 61u8,
-							199u8, 157u8, 18u8, 62u8, 12u8, 242u8, 218u8, 171u8, 87u8, 152u8,
+							182u8, 240u8, 173u8, 197u8, 32u8, 192u8, 0u8, 112u8, 164u8, 54u8, 80u8,
+							242u8, 152u8, 255u8, 201u8, 199u8, 107u8, 68u8, 86u8, 235u8, 218u8,
+							125u8, 0u8, 100u8, 216u8, 217u8, 26u8, 201u8, 227u8, 101u8, 117u8,
+							238u8,
 						],
 					)
 				}
@@ -21443,10 +21449,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							174u8, 238u8, 222u8, 167u8, 109u8, 223u8, 191u8, 165u8, 92u8, 221u8,
-							96u8, 230u8, 171u8, 243u8, 8u8, 155u8, 32u8, 16u8, 166u8, 92u8, 221u8,
-							73u8, 233u8, 36u8, 221u8, 169u8, 131u8, 237u8, 237u8, 100u8, 151u8,
-							210u8,
+							129u8, 115u8, 150u8, 111u8, 98u8, 123u8, 163u8, 238u8, 16u8, 178u8,
+							109u8, 58u8, 253u8, 59u8, 51u8, 123u8, 231u8, 249u8, 41u8, 40u8, 167u8,
+							254u8, 97u8, 172u8, 248u8, 156u8, 65u8, 206u8, 217u8, 18u8, 151u8,
+							53u8,
 						],
 					)
 				}
@@ -23100,11 +23106,9 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-				#[doc = ""]
-				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-				#[doc = "to create the asset."]
-				#[doc = "`native` should be true if this asset originates from this chain"]
+				#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
+				#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
+				#[doc = "for an asset that already exists on an external chain."]
 				pub struct CreateErc6160Asset {
 					pub asset: create_erc6160_asset::Asset,
 				}
@@ -23117,33 +23121,6 @@ pub mod api {
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CreateErc6160Asset {
 					const PALLET: &'static str = "TokenGateway";
 					const CALL: &'static str = "create_erc6160_asset";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-				#[doc = ""]
-				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-				#[doc = "to create the asset."]
-				pub struct UpdateErc6160Asset {
-					pub asset: update_erc6160_asset::Asset,
-				}
-				pub mod update_erc6160_asset {
-					use super::runtime_types;
-					pub type Asset = runtime_types::token_gateway_primitives::GatewayAssetUpdate;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdateErc6160Asset {
-					const PALLET: &'static str = "TokenGateway";
-					const CALL: &'static str = "update_erc6160_asset";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -23170,34 +23147,6 @@ pub mod api {
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdateAssetPrecision {
 					const PALLET: &'static str = "TokenGateway";
 					const CALL: &'static str = "update_asset_precision";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
-				#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
-				#[doc = "for an asset that already exists on an external chain."]
-				pub struct RegisterAssetLocally {
-					pub asset: register_asset_locally::Asset,
-				}
-				pub mod register_asset_locally {
-					use super::runtime_types;
-					pub type Asset = runtime_types::pallet_token_gateway::types::AssetRegistration<
-						::core::primitive::u32,
-					>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterAssetLocally {
-					const PALLET: &'static str = "TokenGateway";
-					const CALL: &'static str = "register_asset_locally";
 				}
 			}
 			pub struct TransactionApi;
@@ -23238,11 +23187,9 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-				#[doc = ""]
-				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-				#[doc = "to create the asset."]
-				#[doc = "`native` should be true if this asset originates from this chain"]
+				#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
+				#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
+				#[doc = "for an asset that already exists on an external chain."]
 				pub fn create_erc6160_asset(
 					&self,
 					asset: types::create_erc6160_asset::Asset,
@@ -23256,26 +23203,6 @@ pub mod api {
 							61u8, 237u8, 221u8, 207u8, 211u8, 120u8, 149u8, 146u8, 203u8, 71u8,
 							153u8, 77u8, 242u8, 66u8, 3u8, 152u8, 222u8, 13u8, 237u8, 216u8, 40u8,
 							177u8, 74u8, 154u8, 235u8, 19u8, 196u8, 245u8, 254u8, 97u8, 50u8, 54u8,
-						],
-					)
-				}
-				#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-				#[doc = ""]
-				#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-				#[doc = "to create the asset."]
-				pub fn update_erc6160_asset(
-					&self,
-					asset: types::update_erc6160_asset::Asset,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpdateErc6160Asset>
-				{
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"TokenGateway",
-						"update_erc6160_asset",
-						types::UpdateErc6160Asset { asset },
-						[
-							250u8, 3u8, 125u8, 102u8, 250u8, 103u8, 98u8, 244u8, 4u8, 139u8, 175u8,
-							235u8, 244u8, 238u8, 87u8, 142u8, 23u8, 106u8, 251u8, 68u8, 109u8,
-							166u8, 80u8, 236u8, 18u8, 11u8, 121u8, 32u8, 247u8, 61u8, 206u8, 52u8,
 						],
 					)
 				}
@@ -23294,25 +23221,6 @@ pub mod api {
 							96u8, 35u8, 153u8, 210u8, 67u8, 246u8, 139u8, 59u8, 230u8, 145u8,
 							124u8, 229u8, 97u8, 90u8, 139u8, 148u8, 215u8, 40u8, 145u8, 235u8,
 							204u8, 196u8,
-						],
-					)
-				}
-				#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
-				#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
-				#[doc = "for an asset that already exists on an external chain."]
-				pub fn register_asset_locally(
-					&self,
-					asset: types::register_asset_locally::Asset,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::RegisterAssetLocally>
-				{
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"TokenGateway",
-						"register_asset_locally",
-						types::RegisterAssetLocally { asset },
-						[
-							119u8, 204u8, 28u8, 44u8, 40u8, 228u8, 25u8, 109u8, 188u8, 124u8, 55u8,
-							178u8, 98u8, 68u8, 232u8, 130u8, 44u8, 144u8, 121u8, 124u8, 107u8,
-							204u8, 141u8, 39u8, 210u8, 143u8, 159u8, 1u8, 104u8, 4u8, 3u8, 144u8,
 						],
 					)
 				}
@@ -31609,37 +31517,18 @@ pub mod api {
 						>,
 					},
 					#[codec(index = 2)]
-					#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-					#[doc = ""]
-					#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-					#[doc = "to create the asset."]
-					#[doc = "`native` should be true if this asset originates from this chain"]
+					#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
+					#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
+					#[doc = "for an asset that already exists on an external chain."]
 					create_erc6160_asset {
 						asset: runtime_types::pallet_token_gateway::types::AssetRegistration<
 							::core::primitive::u32,
 						>,
 					},
-					#[codec(index = 3)]
-					#[doc = "Registers a multi-chain ERC6160 asset. The asset should not already exist."]
-					#[doc = ""]
-					#[doc = "This works by dispatching a request to the TokenGateway module on each requested chain"]
-					#[doc = "to create the asset."]
-					update_erc6160_asset {
-						asset: runtime_types::token_gateway_primitives::GatewayAssetUpdate,
-					},
 					#[codec(index = 4)]
 					#[doc = "Update the precision for an existing asset"]
 					update_asset_precision {
 						update: runtime_types::pallet_token_gateway::types::PrecisionUpdate<
-							::core::primitive::u32,
-						>,
-					},
-					#[codec(index = 5)]
-					#[doc = "Registers a multi-chain ERC6160 asset without sending any dispatch request."]
-					#[doc = "You should use register_asset_locally when you want to enable token gateway transfers"]
-					#[doc = "for an asset that already exists on an external chain."]
-					register_asset_locally {
-						asset: runtime_types::pallet_token_gateway::types::AssetRegistration<
 							::core::primitive::u32,
 						>,
 					},
@@ -34111,27 +34000,6 @@ pub mod api {
 					runtime_types::ismp::host::StateMachine,
 				>,
 				pub minimum_balance: ::core::option::Option<::core::primitive::u128>,
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct GatewayAssetUpdate {
-				pub asset_id: crate::types::H256,
-				pub add_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-					runtime_types::ismp::host::StateMachine,
-				>,
-				pub remove_chains: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-					runtime_types::ismp::host::StateMachine,
-				>,
-				pub new_admins: runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-					runtime_types::ismp::host::StateMachine,
-					::subxt::ext::subxt_core::utils::H160,
-				)>,
 			}
 		}
 	}
