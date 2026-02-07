@@ -48,7 +48,10 @@ jobs:
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu')}}
-        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')

@@ -22,7 +22,10 @@ jobs:
         uses: ./.github/templates/clear-space
 
       - name: Install linux dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -64,7 +67,10 @@ jobs:
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu')}}
-        run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm libudev-dev protobuf-compiler pkg-config
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
@@ -76,6 +82,7 @@ jobs:
           echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
           echo "CC=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
           echo "CXX=/opt/homebrew/opt/llvm@18/bin/clang++" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=/opt/homebrew/opt/llvm@18/lib" >> $GITHUB_ENV
 
       - uses: ./.github/templates/rust-cache
         with:

@@ -150,9 +150,12 @@ where
                 inherited_implication,
                 source,
             )?;
-            if let Some( max_fee_with_tip) = tx_sponsor.as_ref().and_then(|sp| sp.max_fee_with_tip) {
-                if let pallet_transaction_payment::Val::<T>::Charge { tip, fee, .. } = &inner_val {
-                    let total_fee: T::Balance = (*fee + *tip).into();
+            if let Some(max_fee_with_tip) = tx_sponsor.as_ref().and_then(|sp| sp.max_fee_with_tip)
+            {
+                if let pallet_transaction_payment::Val::<T>::Charge { fee_with_tip, .. } =
+                    &inner_val
+                {
+                    let total_fee: T::Balance = (*fee_with_tip).into();
                     if total_fee > max_fee_with_tip {
                         return Err(TransactionValidityError::Invalid(
                             InvalidTransaction::Custom(INVALID_TX_SPONSORED_FEE_TOO_HIGH),

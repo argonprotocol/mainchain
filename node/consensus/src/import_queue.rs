@@ -631,7 +631,7 @@ where
 
 			// inherent data passed in is what we would have generated...
 			let inherent_res = runtime_api
-				.check_inherents(parent_hash, check_block.clone(), inherent_data)
+				.check_inherents(parent_hash, check_block.clone().into(), inherent_data)
 				.map_err(|e| Error::Client(e.into()))?;
 
 			if !inherent_res.ok() {

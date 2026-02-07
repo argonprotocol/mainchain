@@ -283,8 +283,10 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				},
 				finalized = finalized_stream.next() => {
 					if let Some(finalized) = finalized {
-						for hash in finalized.stale_heads.iter() {
-							stale_branches.insert(*hash, ());
+						for stale in finalized.stale_blocks.iter() {
+							if stale.is_head {
+								stale_branches.insert(stale.hash, ());
+							}
 						}
 						if let Some(metrics) = consensus_metrics_finder.as_ref() {
 							let authority_keys = keystore.ed25519_public_keys(BLOCK_SEAL_KEY_TYPE).into_iter().map(BlockSealAuthorityId::from).collect::<HashSet<_>>();
