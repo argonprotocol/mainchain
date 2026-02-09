@@ -322,7 +322,6 @@ jobs:
         with:
           node-version: 20
           cache: yarn
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: yarn install
@@ -389,6 +388,13 @@ jobs:
       - name: Bump workspace versions for dev publish
         if: github.event_name == 'push' && github.ref_name == 'main'
         run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
+
+      - name: Prepare npm trusted publishing
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        run: |
+          npm install -g npm@^11.5.1
+          npm --version
+          npm config delete //registry.npmjs.org/:_authToken || true
 
       - name: Publish npm dev packages
         if: github.event_name == 'push' && github.ref_name == 'main'
