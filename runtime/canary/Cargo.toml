@@ -78,6 +78,8 @@ pallet-notaries = { workspace = true }
 pallet-treasury = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
+pallet-inbound-transfer-log = { workspace = true }
+pallet-operational-accounts = { workspace = true }
 pallet-fee-control = { workspace = true }
 pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
@@ -110,12 +112,14 @@ std = [
 	"pallet-domains/std",
 	"pallet-fee-control/std",
 	"pallet-hyperbridge/std",
+	"pallet-inbound-transfer-log/std",
 	"pallet-ismp-runtime-api/std",
 	"pallet-ismp/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
+	"pallet-operational-accounts/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
 	"pallet-token-gateway/std",
@@ -141,11 +145,13 @@ runtime-benchmarks = [
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
 	"pallet-fee-control/runtime-benchmarks",
+	"pallet-inbound-transfer-log/runtime-benchmarks",
 	"pallet-ismp/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
+	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",
@@ -167,11 +173,13 @@ try-runtime = [
 	"pallet-domains/try-runtime",
 	"pallet-fee-control/try-runtime",
 	"pallet-hyperbridge/try-runtime",
+	"pallet-inbound-transfer-log/try-runtime",
 	"pallet-ismp/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
+	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-token-gateway/try-runtime",

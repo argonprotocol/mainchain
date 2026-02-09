@@ -18,6 +18,8 @@ members = [
     "pallets/notaries",
     "pallets/notebook",
     "pallets/price_index",
+    "pallets/inbound_transfer_log",
+    "pallets/operational_accounts",
     "pallets/pallet_prelude",
     "pallets/ticks",
     "pallets/mint",
@@ -180,6 +182,10 @@ sqlx = { version = "0.8.5" }
 chrono = { version = "0.4", features = ["serde"] }
 
 polkadot-sdk = { version = "2506.0.0", default-features = false }
+frame-support = { version = "41.0.0", default-features = false }
+frame-system = { version = "41.0.0", default-features = false }
+pallet-assets = { version = "43.0.0", default-features = false }
+pallet-balances = { version = "42.0.0", default-features = false }
 # substrate crates needing extra features
 substrate-wasm-builder = { version = "27.0.0", default-features = false }
 sp-application-crypto = { version = "41.0.0", default-features = false }
@@ -293,5 +299,7 @@ pallet-notaries = { path = "pallets/notaries", default-features = false }
 pallet-ticks = { path = "pallets/ticks", default-features = false }
 pallet-mint = { path = "pallets/mint", default-features = false }
 pallet-price-index = { path = "pallets/price_index", default-features = false }
+pallet-inbound-transfer-log = { path = "pallets/inbound_transfer_log", default-features = false }
+pallet-operational-accounts = { path = "pallets/operational_accounts", default-features = false }
 pallet-prelude = { path = "pallets/pallet_prelude", default-features = false }
 pallet-vaults = { path = "pallets/vaults", default-features = false }

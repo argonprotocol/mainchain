@@ -25,7 +25,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use pallet_bitcoin_locks::MinimumSatoshis;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use sp_runtime::impl_opaque_keys;
+use sp_runtime::{Weight, impl_opaque_keys};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -128,6 +128,10 @@ mod runtime {
 	pub type Treasury = pallet_treasury;
 	#[runtime::pallet_index(32)]
 	pub type FeeControl = pallet_fee_control;
+	#[runtime::pallet_index(33)]
+	pub type InboundTransferLog = pallet_inbound_transfer_log;
+	#[runtime::pallet_index(34)]
+	pub type OperationalAccounts = pallet_operational_accounts;
 }
 
 argon_runtime_common::call_filters!();
@@ -288,6 +292,7 @@ impl pallet_vaults::Config for Runtime {
 	type MaxVaults = MaxVaults;
 	type MaxPendingCosignsPerVault = MaxPendingCosignsPerVault;
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 }
 
 pub struct DidStartNewFrame;
@@ -378,9 +383,11 @@ impl pallet_treasury::Config for Runtime {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;
-	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MiningFrameTransitionProvider = MiningSlot;
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type OperationalRewardsProvider = OperationalAccounts;
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -399,6 +406,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = Treasury;
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
@@ -615,6 +623,61 @@ impl pallet_token_gateway::Config for Runtime {
 	type EvmToSubstrate = ();
 }
 
+impl pallet_inbound_transfer_log::Config for Runtime {
+	type InboundTransfersRetentionBlocks = InboundTransfersRetentionBlocks;
+	type MaxTransfersToRetainPerBlock = MaxTransfersToRetainPerBlock;
+	type MaxInboundTransferBytes = MaxInboundTransferBytes;
+	type MinimumTransferMicrogonsToRecord = MinimumTransferMicrogonsToRecord;
+	type OwnershipAssetId = OwnershipTokenAssetId;
+	type WeightInfo = weights::pallet_inbound_transfer_log::WeightInfo<Runtime>;
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+}
+
+pub struct OperationalAccountsLegacyVaultProvider;
+impl pallet_operational_accounts::LegacyVaultProvider<AccountId, Balance>
+	for OperationalAccountsLegacyVaultProvider
+{
+	fn legacy_vaults()
+	-> sp_std::vec::Vec<pallet_operational_accounts::LegacyVaultInfo<AccountId, Balance>> {
+		let mut entries = sp_std::vec::Vec::new();
+		for (operator_account, vault_id) in pallet_vaults::VaultIdByOperator::<Runtime>::iter() {
+			let Some(vault) = pallet_vaults::VaultsById::<Runtime>::get(vault_id) else {
+				continue;
+			};
+			let has_treasury_pool_participation = pallet_treasury::FunderStateByVaultAndAccount::<
+				Runtime,
+			>::contains_key(vault_id, &operator_account);
+			entries.push(pallet_operational_accounts::LegacyVaultInfo {
+				vault_account: operator_account.clone(),
+				activated_securitization: vault.get_activated_securitization(),
+				has_treasury_pool_participation,
+			});
+		}
+		entries
+	}
+}
+
+impl pallet_operational_accounts::Config for Runtime {
+	type Balance = Balance;
+	type FrameProvider = MiningSlot;
+	type AccessCodeExpirationFrames = OperationalAccessCodeExpirationFrames;
+	type MaxAccessCodesExpiringPerFrame = MaxAccessCodesExpiringPerFrame;
+	type MaxUnactivatedAccessCodes = MaxIssuableOperationalAccessCodes;
+	type MaxIssuableAccessCodes = MaxIssuableOperationalAccessCodes;
+	type MaxOperationalRewardsQueued = OperationalMaxRewardsQueued;
+	type MinBitcoinLockSizeForOperational = MinBitcoinLockSizeForOperational;
+	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
+	type MiningSeatsForOperational = MiningSeatsForOperational;
+	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
+	type OperationalReferralReward = OperationalActivationReward;
+	type OperationalReferralBonusReward = OperationalReferralBonusReward;
+	type MaxLegacyVaultRegistrations = MaxLegacyVaultRegistrations;
+	type LegacyVaultProvider = OperationalAccountsLegacyVaultProvider;
+	type OperationalRewardsPayer = Treasury;
+	type WeightInfo = weights::pallet_operational_accounts::WeightInfo<Runtime>;
+}
+
 impl pallet_ismp::Config for Runtime {
 	// configure the runtime event
 	// Permissioned origin who can create or update consensus clients
@@ -661,17 +724,18 @@ impl pallet_hyperbridge::Config for Runtime {
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type TransactionSponsorProviders = (BitcoinLocks, ProxyFeeDelegate<Runtime>);
+	type TransactionSponsorProviders =
+		(BitcoinLocks, OperationalAccounts, ProxyFeeDelegate<Runtime>);
 }
 
-// Add the token gateway pallet to your ISMP router
 #[derive(Default)]
 pub struct Router;
 
 impl IsmpRouter for Router {
 	fn module_for_id(&self, id: Vec<u8>) -> Result<Box<dyn IsmpModule>, anyhow::Error> {
 		match id.as_slice() {
-			id if TokenGateway::is_token_gateway(id) => Ok(Box::new(TokenGateway::default())),
+			id if TokenGateway::is_token_gateway(id) =>
+				Ok(Box::new(pallet_inbound_transfer_log::TokenGatewayHook::<Runtime>::default())),
 			_ => Err(Error::ModuleNotFound(id))?,
 		}
 	}

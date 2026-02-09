@@ -3,8 +3,8 @@
 
 use super::*;
 use argon_primitives::{AccountId, NotaryId, balance_change::MerkleProof, localchain::BlockVote};
-use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
+use polkadot_sdk::frame_benchmarking::v2::*;
 use sp_core::U256;
 
 #[benchmarks(

@@ -143,6 +143,7 @@ pub mod pallet {
 		type RuntimeHoldReason: From<HoldReason>;
 
 		type BidPoolProvider: MiningBidPoolProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 
@@ -395,7 +396,21 @@ pub mod pallet {
 			// clear out previous miners
 			ReleasedMinersByAccountId::<T>::take();
 
-			T::DbWeight::get().reads_writes(2, 2)
+			let mut weight = T::DbWeight::get().reads_writes(2, 2);
+			let next_frame_id = NextFrameId::<T>::get();
+			let is_new_frame = if next_frame_id == 1 {
+				T::TickProvider::current_tick() >= Self::frame_1_begins_tick()
+			} else {
+				FrameRewardTicksRemaining::<T>::get().is_zero()
+			};
+			if is_new_frame {
+				weight = weight.saturating_add(
+					T::OperationalAccountsHook::mining_seat_won_weight()
+						.saturating_mul(u64::from(NextCohortSize::<T>::get())),
+				);
+			}
+
+			weight
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
@@ -890,6 +905,7 @@ impl<T: Config> Pallet<T> {
 		let mut miner_scoring = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
+			T::OperationalAccountsHook::mining_seat_won(&entry.account_id);
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
 			total_price_per_seat += entry.bid;

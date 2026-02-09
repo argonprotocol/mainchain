@@ -11,7 +11,7 @@ use crate::{
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 };
-use codec::{Codec, Decode, Encode, FullCodec, HasCompact, MaxEncodedLen};
+use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
 use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
@@ -179,6 +179,141 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 		Ok(())
 	}
 }
+
+pub trait OperationalAccountsHook<AccountId, Balance> {
+	fn vault_created_weight() -> Weight;
+	fn vault_created(_vault_operator_account: &AccountId) {}
+	fn bitcoin_lock_funded_weight() -> Weight;
+	fn bitcoin_lock_funded(_vault_operator_account: &AccountId, _total_locked: Balance) {}
+	fn mining_seat_won_weight() -> Weight;
+	fn mining_seat_won(_miner_account: &AccountId) {}
+	fn treasury_pool_participated_weight() -> Weight;
+	fn treasury_pool_participated(_vault_operator_account: &AccountId, _amount: Balance) {}
+	fn uniswap_transfer_confirmed_weight() -> Weight;
+	fn uniswap_transfer_confirmed(_account_id: &AccountId, _amount: Balance) {}
+}
+
+#[allow(clippy::let_and_return)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
+impl<AccountId, Balance> OperationalAccountsHook<AccountId, Balance> for Tuple
+where
+	Balance: Copy,
+{
+	fn vault_created_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::vault_created_weight()); )* );
+		weight
+	}
+
+	fn vault_created(vault_operator_account: &AccountId) {
+		for_tuples!( #( Tuple::vault_created(vault_operator_account); )* );
+	}
+
+	fn bitcoin_lock_funded_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::bitcoin_lock_funded_weight()); )* );
+		weight
+	}
+
+	fn bitcoin_lock_funded(vault_operator_account: &AccountId, total_locked: Balance) {
+		for_tuples!( #( Tuple::bitcoin_lock_funded(vault_operator_account, total_locked); )* );
+	}
+
+	fn mining_seat_won_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::mining_seat_won_weight()); )* );
+		weight
+	}
+
+	fn mining_seat_won(miner_account: &AccountId) {
+		for_tuples!( #( Tuple::mining_seat_won(miner_account); )* );
+	}
+
+	fn treasury_pool_participated_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!(
+			#( weight = weight.saturating_add(Tuple::treasury_pool_participated_weight()); )*
+		);
+		weight
+	}
+
+	fn treasury_pool_participated(vault_operator_account: &AccountId, amount: Balance) {
+		for_tuples!( #( Tuple::treasury_pool_participated(vault_operator_account, amount); )* );
+	}
+
+	fn uniswap_transfer_confirmed_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!(
+			#( weight = weight.saturating_add(Tuple::uniswap_transfer_confirmed_weight()); )*
+		);
+		weight
+	}
+
+	fn uniswap_transfer_confirmed(account_id: &AccountId, amount: Balance) {
+		for_tuples!( #( Tuple::uniswap_transfer_confirmed(account_id, amount); )* );
+	}
+}
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+	RuntimeDebug,
+)]
+pub enum OperationalRewardKind {
+	Activation,
+	ReferralBonus,
+}
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+	RuntimeDebug,
+)]
+pub struct OperationalRewardPayout<AccountId, Balance> {
+	pub operational_account: AccountId,
+	pub payout_account: AccountId,
+	pub reward_kind: OperationalRewardKind,
+	pub amount: Balance,
+}
+
+pub trait OperationalRewardsProvider<AccountId: FullCodec, Balance: FullCodec> {
+	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>>;
+	fn mark_reward_paid(reward: &OperationalRewardPayout<AccountId, Balance>);
+}
+
+impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<AccountId, Balance>
+	for ()
+{
+	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>> {
+		Vec::new()
+	}
+
+	fn mark_reward_paid(_reward: &OperationalRewardPayout<AccountId, Balance>) {}
+}
+
+pub trait OperationalRewardsPayer<AccountId: FullCodec, Balance: FullCodec> {
+	fn try_pay_reward_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn try_pay_reward(_reward: &OperationalRewardPayout<AccountId, Balance>) -> bool {
+		false
+	}
+}
+
+impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsPayer<AccountId, Balance> for () {}
 
 /// Argon CPI is the US CPI deconstructed by the Argon market price in Dollars
 pub type ArgonCPI = FixedI128;

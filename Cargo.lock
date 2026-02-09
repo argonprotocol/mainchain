@@ -724,6 +724,7 @@ dependencies = [
  "alloy-primitives 0.7.7",
  "alloy-sol-macro 0.7.7",
  "const-hex",
+ "serde",
 ]
 
 [[package]]
@@ -1020,12 +1021,14 @@ dependencies = [
  "pallet-domains",
  "pallet-fee-control",
  "pallet-hyperbridge",
+ "pallet-inbound-transfer-log",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-notaries",
  "pallet-notebook",
+ "pallet-operational-accounts",
  "pallet-price-index",
  "pallet-ticks",
  "pallet-token-gateway",
@@ -1356,12 +1359,14 @@ dependencies = [
  "pallet-domains",
  "pallet-fee-control",
  "pallet-hyperbridge",
+ "pallet-inbound-transfer-log",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-notaries",
  "pallet-notebook",
+ "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
  "pallet-ticks",
@@ -11770,6 +11775,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-inbound-transfer-log"
+version = "1.3.27"
+dependencies = [
+ "alloy-primitives 1.4.1",
+ "alloy-sol-types 0.7.7",
+ "anyhow",
+ "argon-primitives",
+ "frame-support 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frame-system 41.0.0",
+ "ismp",
+ "pallet-assets",
+ "pallet-balances",
+ "pallet-hyperbridge",
+ "pallet-ismp",
+ "pallet-prelude",
+ "pallet-token-gateway",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+]
+
+[[package]]
 name = "pallet-indices"
 version = "41.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12181,6 +12208,22 @@ dependencies = [
  "scale-info",
  "sp-runtime 42.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-staking 39.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pallet-operational-accounts"
+version = "1.3.27"
+dependencies = [
+ "argon-primitives",
+ "frame-support 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frame-system 41.0.0",
+ "ismp",
+ "pallet-inbound-transfer-log",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+ "serde",
 ]
 
 [[package]]

@@ -39,7 +39,7 @@ pub mod pallet {
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::{
-		OnNewSlot,
+		OnNewSlot, OperationalAccountsHook,
 		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
 	};
 
@@ -100,6 +100,9 @@ pub mod pallet {
 		/// The number of frames within which revenue must be collected
 		#[pallet::constant]
 		type RevenueCollectionExpirationFrames: Get<FrameId>;
+
+		/// Hook to notify operational accounts about vault lifecycle events.
+		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -416,7 +419,11 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(T::WeightInfo::create())]
+		#[pallet::weight(
+			T::WeightInfo::create().saturating_add(
+				T::OperationalAccountsHook::vault_created_weight(),
+			)
+		)]
 		pub fn create(
 			origin: OriginFor<T>,
 			vault_config: VaultConfig<T::Balance>,
@@ -475,6 +482,7 @@ pub mod pallet {
 			Self::hold(&who, securitization, HoldReason::EnterVault).map_err(Error::<T>::from)?;
 
 			VaultsById::<T>::insert(vault_id, vault);
+			T::OperationalAccountsHook::vault_created(&who);
 			Self::deposit_event(Event::VaultCreated {
 				vault_id,
 				securitization,
@@ -1292,8 +1300,13 @@ pub mod pallet {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
 				vault.did_confirm_pending_activation(securitization);
+				T::OperationalAccountsHook::bitcoin_lock_funded(
+					&vault.operator_account_id,
+					vault.get_activated_securitization(),
+				);
 				Ok(())
-			})
+			})?;
+			Ok(())
 		}
 
 		fn cancel(
