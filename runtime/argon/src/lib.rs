@@ -69,6 +69,8 @@ mod runtime {
 	pub type Proxy = pallet_proxy;
 	#[runtime::pallet_index(5)]
 	pub type Ticks = pallet_ticks;
+	// NOTE: `MiningSlot::is_new_frame_started()` is set during MiningSlot on_initialize.
+	// Pallets with a lower index cannot rely on it in their on_initialize hooks.
 	#[runtime::pallet_index(6)]
 	pub type MiningSlot = pallet_mining_slot;
 	#[runtime::pallet_index(7)]
@@ -99,7 +101,7 @@ mod runtime {
 	// NOTE: BlockRewards must come after seal (on_finalize uses seal info)
 	#[runtime::pallet_index(19)]
 	pub type BlockRewards = pallet_block_rewards;
-	// NOTE: must come after MiningSlot finalize
+	// NOTE: must come after MiningSlot so `is_new_frame_started` is available in initialize.
 	#[runtime::pallet_index(20)]
 	pub type Mint = pallet_mint;
 	#[runtime::pallet_index(21)]
@@ -275,7 +277,7 @@ impl Get<FrameId> for GetCurrentFrameId {
 }
 
 impl pallet_vaults::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_vaults::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -399,7 +401,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = Treasury;
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Vaults);
+	type SlotEvents = use_unless_benchmark!((GrandpaSlotRotation, BlockRewards, Vaults), ());
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

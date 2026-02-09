@@ -327,6 +327,10 @@ pub trait OnNewSlot<AccountId> {
 	type Key: Decode + RuntimeAppPublic;
 	fn on_frame_start(_frame_id: FrameId) {}
 
+	fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+		Weight::zero()
+	}
+
 	fn rotate_grandpas(
 		_current_frame_id: FrameId,
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
@@ -337,6 +341,9 @@ pub trait OnNewSlot<AccountId> {
 
 pub trait SlotEvents<AccountId> {
 	fn on_frame_start(_frame_id: FrameId) {}
+	fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+		Weight::zero()
+	}
 	fn rotate_grandpas<Ks: OpaqueKeys>(
 		_current_frame_id: FrameId,
 		_removed_authorities: Vec<(AccountId, Ks)>,
@@ -350,6 +357,13 @@ pub trait SlotEvents<AccountId> {
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_frame_start(frame_id: FrameId) {
 		for_tuples!( #( Tuple::on_frame_start(frame_id); )* );
+	}
+
+	#[allow(clippy::let_and_return)]
+	fn on_frame_start_weight(frame_id: FrameId) -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::on_frame_start_weight(frame_id)); )* );
+		weight
 	}
 
 	fn rotate_grandpas<Ks: OpaqueKeys>(

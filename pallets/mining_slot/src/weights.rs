@@ -7,6 +7,7 @@ pub trait WeightInfo {
 	fn configure_mining_slot_delay() -> Weight;
 
 	// Hooks with variance
+	fn on_finalize_record_block_author() -> Weight;
 	fn on_finalize_grandpa_rotation() -> Weight;
 	fn start_new_frame(m: u32) -> Weight;
 
@@ -28,6 +29,10 @@ impl WeightInfo for () {
 	}
 
 	fn on_finalize_grandpa_rotation() -> Weight {
+		Weight::zero()
+	}
+
+	fn on_finalize_record_block_author() -> Weight {
 		Weight::zero()
 	}
 

@@ -180,6 +180,40 @@ mod benchmarks {
 		Ok(())
 	}
 
+	/// Hook: On finalize vote-seal author scoring update
+	#[benchmark]
+	fn on_finalize_record_block_author() -> Result<(), BenchmarkError> {
+		let frame_id: FrameId = 2;
+		let author: T::AccountId = account("author", 0, 0);
+		let cohort = BoundedVec::<MinerNonceScoring<T>, T::MaxCohortSize>::truncate_from(vec![
+			MinerNonceScoring {
+				nonce: U256::from(1u64),
+				last_win_block: None,
+				blocks_won_in_frame: 0,
+				frame_start_blocks_won_surplus: 0,
+			},
+		]);
+		AccountIndexLookup::<T>::insert(&author, (frame_id, 0));
+		MinerNonceScoringByCohort::<T>::mutate(|scores| {
+			let _ = scores.try_insert(frame_id, cohort);
+		});
+
+		#[block]
+		{
+			Pallet::<T>::record_block_author(author.clone());
+		}
+
+		let updated = MinerNonceScoringByCohort::<T>::get();
+		let blocks_won = updated
+			.get(&frame_id)
+			.and_then(|entry| entry.first())
+			.map(|entry| entry.blocks_won_in_frame)
+			.unwrap_or_default();
+		assert_eq!(blocks_won, 1u16, "author score should increment");
+
+		Ok(())
+	}
+
 	/// Frame transitions: start_new_frame with cross-pallet operations
 	#[benchmark]
 	fn start_new_frame(m: Linear<1, 256>) -> Result<(), BenchmarkError> {
