@@ -392,27 +392,4 @@ jobs:
 
       - name: Publish npm dev packages
         if: github.event_name == 'push' && github.ref_name == 'main'
-        run: |
-          VERSION="${{ steps.npm_dev_version.outputs.version }}"
-
-          publish_if_missing() {
-            local package_name=$1
-            local workspace_path=$2
-
-            if npm view "${package_name}@${VERSION}" version >/dev/null 2>&1; then
-              echo "Skipping ${package_name}@${VERSION}; already published"
-              return 0
-            fi
-
-            npm publish --access public --tag dev --workspace="${workspace_path}"
-          }
-
-          publish_if_missing "@argonprotocol/mainchain" "client/nodejs"
-          publish_if_missing "@argonprotocol/localchain-darwin-x64" "localchain/npm/darwin-x64"
-          publish_if_missing "@argonprotocol/localchain-darwin-arm64" "localchain/npm/darwin-arm64"
-          publish_if_missing "@argonprotocol/localchain-linux-x64-gnu" "localchain/npm/linux-x64-gnu"
-          publish_if_missing "@argonprotocol/localchain-linux-arm64-gnu" "localchain/npm/linux-arm64-gnu"
-          publish_if_missing "@argonprotocol/localchain-win32-x64-msvc" "localchain/npm/win32-x64-msvc"
-          publish_if_missing "@argonprotocol/localchain" "localchain"
-          publish_if_missing "@argonprotocol/bitcoin" "bitcoin/nodejs"
-          publish_if_missing "@argonprotocol/testing" "testing/nodejs"
+        run: yarn workspace @argonprotocol/mainchain exec node --import tsx ../../scripts/publish-npm-workspaces.ts --tag dev
