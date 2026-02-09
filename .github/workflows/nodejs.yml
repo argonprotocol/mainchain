@@ -380,7 +380,7 @@ jobs:
         if: github.event_name == 'push' && github.ref_name == 'main'
         id: npm_dev_version
         run: |
-          NEXT_PATCH_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); const [major, minor, patch] = version.split('.').map(Number); if ([major, minor, patch].some(Number.isNaN)) { throw new Error('Invalid semver: ' + version); } console.log(`${major}.${minor}.${patch + 1}`);")
+          NEXT_PATCH_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); const [major, minor, patch] = version.split('.').map(Number); if ([major, minor, patch].some(Number.isNaN)) { throw new Error('Invalid semver: ' + version); } console.log(major + '.' + minor + '.' + (patch + 1));")
           SHORT_SHA="${GITHUB_SHA::8}"
           VERSION="${NEXT_PATCH_VERSION}-dev.${SHORT_SHA}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
