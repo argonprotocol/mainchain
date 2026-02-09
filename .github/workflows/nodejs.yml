@@ -306,7 +306,6 @@ jobs:
     name: Upload assets
     permissions:
       contents: write
-      id-token: write
     runs-on: ubuntu-latest
     needs:
       - test-linux
@@ -322,6 +321,7 @@ jobs:
         with:
           node-version: 20
           cache: yarn
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: yarn install
@@ -374,28 +374,3 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute npm dev version
-        if: github.event_name == 'push' && github.ref_name == 'main'
-        id: npm_dev_version
-        run: |
-          BASE_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) { throw new Error('Invalid semver: ' + version); } console.log(version);")
-          SHORT_SHA="${GITHUB_SHA::8}"
-          VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Publishing npm dev version: $VERSION"
-
-      - name: Bump workspace versions for dev publish
-        if: github.event_name == 'push' && github.ref_name == 'main'
-        run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
-
-      - name: Prepare npm trusted publishing
-        if: github.event_name == 'push' && github.ref_name == 'main'
-        run: |
-          npm install -g npm@^11.5.1
-          npm --version
-          npm config delete //registry.npmjs.org/:_authToken || true
-
-      - name: Publish npm dev packages
-        if: github.event_name == 'push' && github.ref_name == 'main'
-        run: yarn workspace @argonprotocol/mainchain exec node --import tsx ../../scripts/publish-npm-workspaces.ts --tag dev
