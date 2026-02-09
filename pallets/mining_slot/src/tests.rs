@@ -1950,11 +1950,27 @@ fn it_should_rotate_grandpas() {
 		assert_eq!(MiningSlots::get_newly_started_frame(), None);
 		CurrentTick::set(100 + TicksBetweenSlots::get());
 		ElapsedTicks::set(100 + TicksBetweenSlots::get());
-		assert_eq!(MiningSlots::get_newly_started_frame(), Some(1));
 		System::initialize(&5, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(5);
+		assert_eq!(MiningSlots::get_newly_started_frame(), Some(1));
 		MiningSlots::on_finalize(5);
 		assert_eq!(GrandaRotations::get(), vec![0, 0, 1]);
+	});
+}
+
+#[test]
+fn frame_reward_ticks_decrement_once_per_block_when_no_new_frame() {
+	new_test_ext().execute_with(|| {
+		System::initialize(&1, &System::parent_hash(), &Default::default());
+		NextFrameId::<Test>::set(2);
+		ActiveMinersCount::<Test>::set(0);
+		FrameRewardTicksRemaining::<Test>::set(5);
+
+		MiningSlots::on_initialize(1);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 4);
+
+		MiningSlots::on_finalize(1);
+		assert_eq!(FrameRewardTicksRemaining::<Test>::get(), 4);
 	});
 }
 

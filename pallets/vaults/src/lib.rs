@@ -11,6 +11,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 pub mod migrations;
 pub mod weights;
 
@@ -379,7 +381,9 @@ pub mod pallet {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let bitcoin_completions = (start_bitcoin_height..=bitcoin_block_height)
 				.flat_map(VaultFundsReleasingByHeight::<T>::take);
+			let mut completions = 0u32;
 			for vault_id in bitcoin_completions {
+				completions += 1;
 				let res = with_storage_layer(|| {
 					Self::release_funds(vault_id, bitcoin_block_height)
 						.map_err(Error::<T>::from)
@@ -391,7 +395,9 @@ pub mod pallet {
 				}
 			}
 
-			T::DbWeight::get().reads_writes(0, 2)
+			let height_range =
+				bitcoin_block_height.saturating_sub(start_bitcoin_height).saturating_add(1) as u32;
+			T::WeightInfo::on_initialize_with_vault_releases(height_range, completions)
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {
@@ -921,6 +927,10 @@ pub mod pallet {
 					RevenuePerFrameByVault::<T>::remove(vault_id);
 				}
 			}
+		}
+
+		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+			T::WeightInfo::on_frame_start(T::MaxVaults::get())
 		}
 	}
 

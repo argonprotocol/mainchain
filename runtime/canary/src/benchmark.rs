@@ -7,4 +7,5 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_balances, Ownership]
 	[pallet_timestamp, Timestamp]
 	[pallet_mining_slot, MiningSlot]
+	[pallet_vaults, Vaults]
 );

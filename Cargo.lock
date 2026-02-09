@@ -13013,6 +13013,7 @@ dependencies = [
  "bitcoin",
  "k256",
  "pallet-bitcoin-locks",
+ "pallet-bitcoin-utxos",
  "pallet-prelude",
  "pallet-treasury 1.3.27",
  "parity-scale-codec",
