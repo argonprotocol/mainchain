@@ -1,6 +1,12 @@
 {
-  "version": "1.3.27",
+  "version": "1.3.27-dev.aaaaaaaa",
   "npmClient": "yarn",
   "useWorkspaces": true,
-  "workspaces": ["client/nodejs", "localchain", "localchain/npm/*"]
+  "workspaces": [
+    "bitcoin/nodejs",
+    "client/nodejs",
+    "localchain",
+    "localchain/npm/*",
+    "testing/nodejs"
+  ]
 }
