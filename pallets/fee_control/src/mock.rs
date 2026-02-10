@@ -205,7 +205,7 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 			pallet_transaction_payment::Val::Charge {
 				tip: TipAmount::get(),
 				who,
-				fee: FeeAmount::get(),
+				fee_with_tip: FeeAmount::get().saturating_add(TipAmount::get()),
 			},
 			origin,
 		))
@@ -222,8 +222,8 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 		PrepareCount::mutate(|c| *c += 1);
 
 		match val {
-			pallet_transaction_payment::Val::Charge { tip, who, fee } => {
-				let total_fee_with_tip: Balance = fee.saturating_add(tip);
+			pallet_transaction_payment::Val::Charge { tip, who, fee_with_tip } => {
+				let total_fee_with_tip: Balance = fee_with_tip;
 				Balances::burn_from(
 					&who,
 					total_fee_with_tip,
@@ -235,7 +235,11 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 				LastPayer::mutate(|c| *c = Some(who));
 				let imbalance =
 					fungible::Credit::<u64, Balances>::default().split(total_fee_with_tip).1;
-				Ok(pallet_transaction_payment::Pre::Charge { tip, who, imbalance: Some(imbalance) })
+				Ok(pallet_transaction_payment::Pre::Charge {
+					tip,
+					who,
+					liquidity_info: Some(imbalance),
+				})
 			},
 			pallet_transaction_payment::Val::NoCharge => {
 				LastPayer::set(None);

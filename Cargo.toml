@@ -52,7 +52,7 @@ authors = ["Argon <https://github.com/argonprotocol>"]
 description = "The Argon ecosystem is a stablecoin on top of bitcoin."
 homepage = "https://argonprotocol.org"
 license = "MIT-0"
-rust-version = "1.87.0"
+rust-version = "1.88.0"
 repository = "https://github.com/argonprotocol/mainchain"
 documentation = "https://argonprotocol.org/docs"
 
@@ -128,9 +128,6 @@ sqlx-macros = { opt-level = 3, debug = false }
 
 [workspace.lints.clippy]
 
-[patch.crates-io]
-pallet-election-provider-multi-block = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2506" }
-
 [workspace.dependencies]
 futures = { version = "0.3" }
 futures-timer = "3.0.1"
@@ -179,17 +176,18 @@ uuid = { version = "1.11.0" }
 sqlx = { version = "0.8.5" }
 chrono = { version = "0.4", features = ["serde"] }
 
-polkadot-sdk = { version = "2506.0.0", default-features = false }
+polkadot-sdk = { version = "=2512.1.0", default-features = false }
 # substrate crates needing extra features
-substrate-wasm-builder = { version = "27.0.0", default-features = false }
-sp-application-crypto = { version = "41.0.0", default-features = false }
-sp-io = { version = "41.0.1", default-features = false }
-sp-runtime = { version = "42.0.0", default-features = false }
+substrate-wasm-builder = { version = "31.1.0", default-features = false }
+sp-application-crypto = { version = "44.0.0", default-features = false }
+sp-io = { version = "44.0.0", default-features = false }
+sp-runtime = { version = "45.0.0", default-features = false }
 sp-debug-derive = { version = "14.0.0", default-features = false }
-frame-benchmarking = { version = "41", default-features = false }
-sc-cli = { version = "0.53", default-features = false, features = ["rocksdb"] }
+frame-benchmarking = { version = "45.0.2", default-features = false }
+sc-cli = { version = "0.57.0", default-features = false, features = ["rocksdb"] }
+rocksdb = { version = "0.24.0", default-features = false, features = ["snappy", "bindgen-runtime"] }
 
-finality-grandpa = { version = "0.16", default-features = false }
+finality-grandpa = { version = "0.16.3", default-features = false }
 
 # test clients
 fs2 = { version = "0.4" }
@@ -240,13 +238,13 @@ cmake = { version = "0.1" }
 dotenv = { version = "0.15" }
 
 # hyperprocessor bridge
-pallet-ismp = { version = "2506.1.0", default-features = false }
-pallet-ismp-runtime-api = { version = "2506.1.0", default-features = false }
-pallet-hyperbridge = { version = "2506.1.0", default-features = false }
-pallet-token-gateway = { version = "2506.1.0", default-features = false }
-pallet-ismp-rpc = { version = "2506.1.0", default-features = false }
-ismp-grandpa = { version = "2506.1.0", default-features = false }
-ismp = { version = "2506.1.0", default-features = false }
+pallet-ismp = { version = "2512.0.0", default-features = false }
+pallet-ismp-runtime-api = { version = "2512.0.0", default-features = false }
+pallet-hyperbridge = { version = "2512.0.0", default-features = false }
+pallet-token-gateway = { version = "2512.0.0", default-features = false }
+pallet-ismp-rpc = { version = "2512.0.0", default-features = false }
+ismp-grandpa = { version = "2512.0.0", default-features = false }
+ismp = { version = "2512.0.0", default-features = false }
 
 ethers = { version = "2.0.14" }
 uniswap-sdk-core = { version = "5.3.0" }
@@ -257,8 +255,7 @@ alloy-provider = { version = "1.0.42" }
 alloy-transport = { version = "1.0.42" }
 alloy-eips = { version = "1.0.42" }
 
-# releases are using old versions of jsonrpsee
-subxt = { version = "0.43" }
+subxt = { version = "0.44.2" }
 
 argon-testing = { path = "testing" }
 argon-localchain = { path = "localchain" }

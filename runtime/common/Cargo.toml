@@ -56,7 +56,7 @@ polkadot-sdk.features = [
 sp-debug-derive = { workspace = true, features = ["force-debug"] }
 
 pallet-token-gateway = { workspace = true }
-pallet-ismp = { workspace = true, features = ["unsigned"] }
+pallet-ismp = { workspace = true }
 pallet-ismp-runtime-api = { workspace = true }
 pallet-hyperbridge = { workspace = true }
 ismp-grandpa = { workspace = true }

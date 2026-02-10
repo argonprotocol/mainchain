@@ -22,6 +22,7 @@ codec = { workspace = true }
 log = { workspace = true }
 hex-literal = { workspace = true }
 sc-cli = { workspace = true }
+rocksdb = { workspace = true }
 
 polkadot-sdk.workspace = true
 
