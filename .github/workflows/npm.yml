@@ -10,11 +10,11 @@ on:
       - completed
   workflow_dispatch:
     inputs:
-      run_id:
-        description: 'Run ID from Build + Test Node.js Apis'
-        required: true
       ref:
         description: 'Git ref to checkout (branch, tag, or SHA). Defaults to current ref.'
+        required: false
+      tag:
+        description: 'Release tag to fetch artifacts from. Defaults to latest non-prerelease.'
         required: false
       dry_run:
         description: 'Use npm publish --dry-run'
@@ -60,29 +60,31 @@ jobs:
         run: yarn install
 
       - name: Download localchain bindings
-        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.run_id }}
+          run-id: ${{ github.event.workflow_run.id }}
           pattern: bindings-*
           path: localchain/artifacts
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download bitcoin artifacts
-        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.run_id }}
+          run-id: ${{ github.event.workflow_run.id }}
           name: bitcoin-wasm
           path: bitcoin/nodejs/ts/wasm
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve release tag
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         id: release_tag
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
             TAG="${{ github.ref_name }}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
           else
             TAG="$(gh release list --exclude-pre-releases --json tagName --jq '.[0].tagName')"
           fi
@@ -95,13 +97,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download localchain artifacts
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: gh release download ${{ steps.release_tag.outputs.tag }} --dir ./localchain/artifacts --pattern *.node
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download bitcoin artifacts from release
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: |
           gh release download ${{ steps.release_tag.outputs.tag }} --dir ./bitcoin/nodejs/ts/wasm --pattern bitcoin-wasm.tar.gz
           tar -xzf ./bitcoin/nodejs/ts/wasm/bitcoin-wasm.tar.gz -C ./bitcoin/nodejs/ts/wasm
