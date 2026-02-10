@@ -24,6 +24,11 @@ on:
   push:
     tags:
       - v[0-9]+.*
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 defaults:
   run:
@@ -32,7 +37,7 @@ defaults:
 jobs:
   publish:
     name: Publish packages
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -41,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref || github.ref_name }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref_name }}
           fetch-depth: 0
 
       - name: Setup node
@@ -72,16 +77,31 @@ jobs:
           path: bitcoin/nodejs/ts/wasm
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve release tag
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        id: release_tag
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="$(gh release list --exclude-pre-releases --json tagName --jq '.[0].tagName')"
+          fi
+          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
+            echo "Unable to resolve release tag" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Download localchain artifacts
-        if: github.event_name == 'push'
-        run: gh release download ${{ github.ref_name }} --dir ./localchain/artifacts --pattern *.node
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: gh release download ${{ steps.release_tag.outputs.tag }} --dir ./localchain/artifacts --pattern *.node
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download bitcoin artifacts from release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
-          gh release download ${{ github.ref_name }} --dir ./bitcoin/nodejs/ts/wasm --pattern bitcoin-wasm.tar.gz
+          gh release download ${{ steps.release_tag.outputs.tag }} --dir ./bitcoin/nodejs/ts/wasm --pattern bitcoin-wasm.tar.gz
           tar -xzf ./bitcoin/nodejs/ts/wasm/bitcoin-wasm.tar.gz -C ./bitcoin/nodejs/ts/wasm
           ls -R ./bitcoin/nodejs/ts/wasm
         env:
@@ -95,14 +115,13 @@ jobs:
         working-directory: ./localchain
 
       - name: Compute npm dev version
-        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'push'
         id: npm_dev_version
         run: |
           BASE_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) { throw new Error('Invalid semver: ' + version); } console.log(version);")
+          HEAD_SHA="$(git rev-parse HEAD)"
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          else
-            HEAD_SHA="$(git rev-parse HEAD)"
           fi
           SHORT_SHA="${HEAD_SHA:0:8}"
           VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
@@ -110,7 +129,7 @@ jobs:
           echo "Publishing npm dev version: $VERSION"
 
       - name: Bump workspace versions for dev publish
-        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'push'
         run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
 
       - name: Verify artifacts
@@ -118,11 +137,14 @@ jobs:
         working-directory: ./localchain
 
       - name: Publish mainchain
-        if: ${{ vars.NPM_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        if: ${{ vars.NPM_ENABLED == 'true' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
         run: |
           PUBLISH_ARGS=(--access public)
           if [[ "${{ github.event_name }}" != "push" ]]; then
             PUBLISH_ARGS+=(--tag dev)
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PUBLISH_ARGS+=(--dry-run)
           fi
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
             PUBLISH_ARGS+=(--dry-run)
