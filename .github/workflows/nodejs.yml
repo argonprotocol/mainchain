@@ -46,7 +46,7 @@ jobs:
             target: aarch64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-    name: localchain - ${{ matrix.target }} - node@20
+    name: localchain - ${{ matrix.target }} - node@22
     runs-on: ${{matrix.os}}
     env:
       DEBUG: napi:*
@@ -57,7 +57,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: yarn
 
       - name: Install dependencies
@@ -138,7 +138,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [ 20, 22 ]
+        node: [ 22, 24 ]
         os: [ macos-latest, windows-latest ]
         include:
           - os: macos-latest
@@ -188,7 +188,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [ 20, 22 ]
+        node: [ 22, 24 ]
         os: [ ubuntu-latest, ubuntu-22.04-arm ]
         include:
           - os: ubuntu-latest
@@ -319,7 +319,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: yarn
           registry-url: 'https://registry.npmjs.org'
 

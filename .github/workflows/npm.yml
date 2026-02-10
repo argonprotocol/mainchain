@@ -1,0 +1,135 @@
+name: Publish NPM
+
+on:
+  workflow_run:
+    workflows:
+      - Build + Test Node.js Apis
+    branches:
+      - main
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run ID from Build + Test Node.js Apis'
+        required: true
+      ref:
+        description: 'Git ref to checkout (branch, tag, or SHA). Defaults to current ref.'
+        required: false
+      dry_run:
+        description: 'Use npm publish --dry-run'
+        required: true
+        type: boolean
+        default: true
+  push:
+    tags:
+      - v[0-9]+.*
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    name: Publish packages
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Download localchain bindings
+        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.run_id }}
+          pattern: bindings-*
+          path: localchain/artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download bitcoin artifacts
+        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.run_id }}
+          name: bitcoin-wasm
+          path: bitcoin/nodejs/ts/wasm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download localchain artifacts
+        if: github.event_name == 'push'
+        run: gh release download ${{ github.ref_name }} --dir ./localchain/artifacts --pattern *.node
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download bitcoin artifacts from release
+        if: github.event_name == 'push'
+        run: |
+          gh release download ${{ github.ref_name }} --dir ./bitcoin/nodejs/ts/wasm --pattern bitcoin-wasm.tar.gz
+          tar -xzf ./bitcoin/nodejs/ts/wasm/bitcoin-wasm.tar.gz -C ./bitcoin/nodejs/ts/wasm
+          ls -R ./bitcoin/nodejs/ts/wasm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build typescript
+        run: yarn tsc
+
+      - name: Move artifacts
+        run: yarn artifacts
+        working-directory: ./localchain
+
+      - name: Compute npm dev version
+        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        id: npm_dev_version
+        run: |
+          BASE_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) { throw new Error('Invalid semver: ' + version); } console.log(version);")
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            HEAD_SHA="$(git rev-parse HEAD)"
+          fi
+          SHORT_SHA="${HEAD_SHA:0:8}"
+          VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing npm dev version: $VERSION"
+
+      - name: Bump workspace versions for dev publish
+        if: github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch'
+        run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
+
+      - name: Verify artifacts
+        run: ls -R ./npm
+        working-directory: ./localchain
+
+      - name: Publish mainchain
+        if: ${{ vars.NPM_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: |
+          PUBLISH_ARGS=(--access public)
+          if [[ "${{ github.event_name }}" != "push" ]]; then
+            PUBLISH_ARGS+=(--tag dev)
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.dry_run }}" == "true" ]]; then
+            PUBLISH_ARGS+=(--dry-run)
+          fi
+          npm publish "${PUBLISH_ARGS[@]}" --workspace=client/nodejs
+          npm publish "${PUBLISH_ARGS[@]}" --workspace=localchain
+          npm publish "${PUBLISH_ARGS[@]}" --workspace=bitcoin/nodejs
+          npm publish "${PUBLISH_ARGS[@]}" --workspace=testing/nodejs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
