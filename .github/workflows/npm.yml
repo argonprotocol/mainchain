@@ -91,6 +91,8 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download localchain artifacts
         if: github.event_name == 'push' || github.event_name == 'pull_request'
