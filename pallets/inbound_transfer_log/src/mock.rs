@@ -45,9 +45,15 @@ pub mod gateway {
 	use super::*;
 	use frame_support::{
 		dispatch::{DispatchResultWithPostInfo, Pays, PostDispatchInfo},
-		traits::AsEnsureOriginWithArg,
+		traits::{
+			Currency, fungible, fungibles,
+			tokens::{
+				DepositConsequence, Fortitude, Precision, Preservation, Provenance,
+				WithdrawConsequence,
+			},
+		},
 	};
-	use frame_system::{EnsureRoot, EnsureSigned};
+	use frame_system::EnsureRoot;
 	use ismp::{
 		consensus::{ConsensusClient, ConsensusClientId, ConsensusStateId, StateMachineClient},
 		dispatcher::{DispatchRequest, FeeMetadata, IsmpDispatcher},
@@ -67,7 +73,6 @@ pub mod gateway {
 		pub enum GatewayTest {
 			System: frame_system,
 			Balances: pallet_balances,
-			Assets: pallet_assets,
 			Ismp: pallet_ismp,
 			Hyperbridge: pallet_hyperbridge,
 			TokenGateway: pallet_token_gateway,
@@ -86,13 +91,6 @@ pub mod gateway {
 
 	parameter_types! {
 		pub const ExistentialDeposit: Balance = 1;
-		pub const AssetDeposit: Balance = 0;
-		pub const AssetAccountDeposit: Balance = 0;
-		pub const MetadataDepositBase: Balance = 0;
-		pub const MetadataDepositPerByte: Balance = 0;
-		pub const ApprovalDeposit: Balance = 0;
-		pub const StringLimit: u32 = 50;
-		pub const RemoveItemsLimit: u32 = 1_000;
 
 		pub const HostStateMachine: StateMachine = StateMachine::Substrate(*b"tstt");
 		pub const Coprocessor: Option<StateMachine> = None;
@@ -119,28 +117,151 @@ pub mod gateway {
 		type DoneSlashHandler = ();
 	}
 
-	impl pallet_assets::Config for GatewayTest {
-		type RuntimeEvent = RuntimeEvent;
-		type Balance = Balance;
+	pub struct OwnershipTokenAsset;
+
+	impl fungibles::Inspect<AccountId32> for OwnershipTokenAsset {
 		type AssetId = u32;
-		type AssetIdParameter = u32;
-		type Currency = Balances;
-		type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId32>>;
-		type ForceOrigin = EnsureRoot<AccountId32>;
-		type AssetDeposit = AssetDeposit;
-		type AssetAccountDeposit = AssetAccountDeposit;
-		type MetadataDepositBase = MetadataDepositBase;
-		type MetadataDepositPerByte = MetadataDepositPerByte;
-		type ApprovalDeposit = ApprovalDeposit;
-		type StringLimit = StringLimit;
-		type Freezer = ();
-		type Holder = ();
-		type Extra = ();
-		type CallbackHandle = ();
-		type WeightInfo = ();
-		type RemoveItemsLimit = RemoveItemsLimit;
-		#[cfg(feature = "runtime-benchmarks")]
-		type BenchmarkHelper = ();
+		type Balance = Balance;
+
+		fn total_issuance(asset: Self::AssetId) -> Self::Balance {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			Balances::total_issuance()
+		}
+
+		fn minimum_balance(asset: Self::AssetId) -> Self::Balance {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			<Balances as Currency<AccountId32>>::minimum_balance()
+		}
+
+		fn total_balance(asset: Self::AssetId, who: &AccountId32) -> Self::Balance {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			<Balances as Currency<AccountId32>>::total_balance(who)
+		}
+
+		fn balance(asset: Self::AssetId, who: &AccountId32) -> Self::Balance {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			Balances::balance(who)
+		}
+
+		fn reducible_balance(
+			asset: Self::AssetId,
+			who: &AccountId32,
+			preservation: Preservation,
+			force: Fortitude,
+		) -> Self::Balance {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			Balances::reducible_balance(who, preservation, force)
+		}
+
+		fn can_deposit(
+			asset: Self::AssetId,
+			who: &AccountId32,
+			amount: Self::Balance,
+			provenance: Provenance,
+		) -> DepositConsequence {
+			if asset != OwnershipAssetId::get() {
+				return DepositConsequence::UnknownAsset;
+			}
+			Balances::can_deposit(who, amount, provenance)
+		}
+
+		fn can_withdraw(
+			asset: Self::AssetId,
+			who: &AccountId32,
+			amount: Self::Balance,
+		) -> WithdrawConsequence<Self::Balance> {
+			if asset != OwnershipAssetId::get() {
+				return WithdrawConsequence::UnknownAsset;
+			}
+			Balances::can_withdraw(who, amount)
+		}
+
+		fn asset_exists(asset: Self::AssetId) -> bool {
+			asset == OwnershipAssetId::get()
+		}
+	}
+
+	impl fungibles::Unbalanced<AccountId32> for OwnershipTokenAsset {
+		fn handle_dust(dust: fungibles::Dust<AccountId32, Self>) {
+			if dust.0 != OwnershipAssetId::get() {
+				return;
+			}
+			<Balances as fungible::Unbalanced<AccountId32>>::handle_dust(fungible::Dust(dust.1))
+		}
+
+		fn write_balance(
+			asset: Self::AssetId,
+			who: &AccountId32,
+			amount: Self::Balance,
+		) -> Result<Option<Self::Balance>, DispatchError> {
+			if asset != OwnershipAssetId::get() {
+				return Err(DispatchError::Unavailable);
+			}
+			<Balances as fungible::Unbalanced<AccountId32>>::write_balance(who, amount)
+		}
+
+		fn set_total_issuance(asset: Self::AssetId, amount: Self::Balance) {
+			if asset != OwnershipAssetId::get() {
+				return;
+			}
+			<Balances as fungible::Unbalanced<AccountId32>>::set_total_issuance(amount)
+		}
+	}
+
+	impl fungibles::Mutate<AccountId32> for OwnershipTokenAsset {
+		fn burn_from(
+			asset: Self::AssetId,
+			who: &AccountId32,
+			amount: Self::Balance,
+			preservation: Preservation,
+			precision: Precision,
+			force: Fortitude,
+		) -> Result<Self::Balance, DispatchError> {
+			if asset != OwnershipAssetId::get() {
+				return Err(DispatchError::Unavailable);
+			}
+			<Self as fungibles::Unbalanced<AccountId32>>::decrease_balance(
+				asset,
+				who,
+				amount,
+				precision,
+				preservation,
+				force,
+			)
+		}
+	}
+
+	impl fungibles::metadata::Inspect<AccountId32> for OwnershipTokenAsset {
+		fn name(asset: Self::AssetId) -> Vec<u8> {
+			if asset != OwnershipAssetId::get() {
+				return Vec::new();
+			}
+			b"Argon Ownership Token".to_vec()
+		}
+
+		fn symbol(asset: Self::AssetId) -> Vec<u8> {
+			if asset != OwnershipAssetId::get() {
+				return Vec::new();
+			}
+			b"ARGONOT".to_vec()
+		}
+
+		fn decimals(asset: Self::AssetId) -> u8 {
+			if asset != OwnershipAssetId::get() {
+				return 0;
+			}
+			Decimals::get()
+		}
 	}
 
 	#[derive(Default)]
@@ -291,7 +412,7 @@ pub mod gateway {
 		type NativeCurrency = Balances;
 		type AssetAdmin = TokenGatewayAdmin;
 		type CreateOrigin = EnsureRoot<AccountId32>;
-		type Assets = Assets;
+		type Assets = OwnershipTokenAsset;
 		type NativeAssetId = NativeAssetId;
 		type Decimals = Decimals;
 		type EvmToSubstrate = MockEvmToSubstrate;

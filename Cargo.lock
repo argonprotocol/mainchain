@@ -11785,7 +11785,6 @@ dependencies = [
  "frame-support 41.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "frame-system 41.0.0",
  "ismp",
- "pallet-assets",
  "pallet-balances",
  "pallet-hyperbridge",
  "pallet-ismp",

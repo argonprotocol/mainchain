@@ -138,6 +138,28 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn on_uniswap_transfer() {
+		let linked = linked_accounts::<T>();
+		let mut account = default_operational_account::<T>(&linked);
+		account.vault_created = true;
+		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
+		account.has_treasury_pool_participation = true;
+		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
+		insert_operational_account::<T>(&linked, account);
+		link_vault_to_owner::<T>(&linked);
+
+		#[block]
+		{
+			OperationalAccountsPallet::<T>::on_uniswap_transfer(
+				&linked.vault,
+				<T::Balance as Zero>::zero(),
+			);
+		}
+
+		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+	}
+
+	#[benchmark]
 	fn issue_access_code() {
 		let sponsor: T::AccountId = account("sponsor", 0, USER_SEED);
 		let sponsor_links = LinkedAccounts {

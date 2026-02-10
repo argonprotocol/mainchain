@@ -30,7 +30,6 @@ alloy-sol-types = { version = "0.7.7", default-features = false }
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 alloy-primitives = { workspace = true, default-features = true }
-pallet-assets = { workspace = true, default-features = true }
 pallet-balances = { workspace = true, default-features = true }
 pallet-hyperbridge = { workspace = true }
 pallet-ismp = { workspace = true, features = ["unsigned"], default-features = true }

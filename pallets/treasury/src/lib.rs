@@ -269,6 +269,8 @@ pub mod pallet {
 			if T::MiningFrameTransitionProvider::is_new_frame_started().is_some() {
 				// Snapshot how many queued rewards we will attempt this frame so
 				// on_finalize work is pre-accounted in on_initialize.
+				// This is bounded decode work because the provider is backed by
+				// a bounded operational rewards queue.
 				let payout_count = T::OperationalRewardsProvider::pending_rewards().len() as u64;
 				Self::frame_transition_base_weight()
 					.saturating_add(T::WeightInfo::try_pay_reward().saturating_mul(payout_count))

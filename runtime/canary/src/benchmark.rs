@@ -6,5 +6,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_balances, Balances]
 	[pallet_balances, Ownership]
 	[pallet_timestamp, Timestamp]
+	[pallet_inbound_transfer_log, InboundTransferLog]
 	[pallet_mining_slot, MiningSlot]
+	[pallet_operational_accounts, OperationalAccounts]
 );

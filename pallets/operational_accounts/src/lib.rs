@@ -583,7 +583,7 @@ pub mod pallet {
 				expiration_frame,
 				|expiring_codes| -> Result<(), Error<T>> {
 					expiring_codes
-						.try_push(access_code_public.clone())
+						.try_push(access_code_public)
 						.map_err(|_| Error::<T>::MaxAccessCodesExpiringPerFrameReached)
 				},
 			)?;
