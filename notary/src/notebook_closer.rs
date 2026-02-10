@@ -625,6 +625,11 @@ mod tests {
 							}
 							break;
 						}
+						// if we went past the notebook then this version won't work
+						else if notebook.notebook_number >= channel_hold_result.notebook_number {
+							did_see_voting_key = true;
+							break;
+						}
 					}
 
 					// give finalized chain extra time to include the notebook at the expected tick
