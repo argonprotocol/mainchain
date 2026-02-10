@@ -4,8 +4,6 @@ on:
   workflow_run:
     workflows:
       - Build + Test Node.js Apis
-    branches:
-      - main
     types:
       - completed
   push:
