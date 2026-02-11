@@ -1,11 +1,9 @@
 name: Publish NPM
 
 on:
-  workflow_run:
-    workflows:
-      - Build + Test Node.js Apis
+  repository_dispatch:
     types:
-      - completed
+      - npm-dev-publish
   push:
     tags:
       - v[0-9]+.*
@@ -17,16 +15,54 @@ defaults:
 jobs:
   publish:
     name: Publish packages
-    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || (github.event_name == 'repository_dispatch' && github.actor == 'github-actions[bot]')
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       id-token: write
     steps:
+      - name: Validate dispatch source run
+        if: github.event_name == 'repository_dispatch'
+        id: validate_dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.head_sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "Invalid source_run_id payload" >&2
+            exit 1
+          fi
+          if [[ ! "$PAYLOAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid head_sha payload" >&2
+            exit 1
+          fi
+
+          if ! RUN_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}")"; then
+            echo "Unable to fetch source run metadata for run id ${SOURCE_RUN_ID}" >&2
+            exit 1
+          fi
+          if ! jq -e --arg sha "$PAYLOAD_SHA" '
+            .name == "Build + Test Node.js Apis" and
+            .event == "push" and
+            .head_branch == "main" and
+            .head_sha == $sha
+          ' <<<"$RUN_JSON" >/dev/null; then
+            echo "Dispatch payload did not match expected source run metadata" >&2
+            jq -c '{name, event, head_branch, head_sha}' <<<"$RUN_JSON" >&2
+            exit 1
+          fi
+          RUN_SHA="$(jq -r '.head_sha' <<<"$RUN_JSON")"
+
+          echo "source_run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$RUN_SHA" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref_name }}
+          ref: ${{ github.event_name == 'repository_dispatch' && steps.validate_dispatch.outputs.head_sha || github.ref_name }}
           fetch-depth: 0
 
       - name: Setup node
@@ -40,19 +76,19 @@ jobs:
         run: yarn install
 
       - name: Download localchain bindings
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'repository_dispatch'
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.validate_dispatch.outputs.source_run_id }}
           pattern: bindings-*
           path: localchain/artifacts
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download bitcoin artifacts
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'repository_dispatch'
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.validate_dispatch.outputs.source_run_id }}
           name: bitcoin-wasm
           path: bitcoin/nodejs/ts/wasm
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -93,18 +129,18 @@ jobs:
         working-directory: ./localchain
 
       - name: Compute npm dev version
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'repository_dispatch'
         id: npm_dev_version
         run: |
           BASE_VERSION=$(node -e "const version = require('./client/nodejs/package.json').version.replace(/-.*/, ''); if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) { throw new Error('Invalid semver: ' + version); } console.log(version);")
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+          HEAD_SHA="${{ steps.validate_dispatch.outputs.head_sha }}"
           SHORT_SHA="${HEAD_SHA:0:8}"
           VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing npm dev version: $VERSION"
 
       - name: Bump workspace versions for dev publish
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'repository_dispatch'
         run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
 
       - name: Verify artifacts

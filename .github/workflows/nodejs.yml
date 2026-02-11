@@ -3,6 +3,7 @@ name: Build + Test Node.js Apis
   push:
     branches:
       - main
+    tags:
       - v[0-9]+.*
   workflow_dispatch:
 
@@ -372,5 +373,15 @@ jobs:
               bitcoin-wasm.tar.gz \
               --clobber
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Dispatch npm publish workflow
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          gh api repos/${GITHUB_REPOSITORY}/dispatches \
+            --method POST \
+            -f event_type=npm-dev-publish \
+            -f client_payload[source_run_id]=${GITHUB_RUN_ID} \
+            -f client_payload[head_sha]=${GITHUB_SHA}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
