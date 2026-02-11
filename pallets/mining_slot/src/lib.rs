@@ -143,6 +143,7 @@ pub mod pallet {
 		type RuntimeHoldReason: From<HoldReason>;
 
 		type BidPoolProvider: MiningBidPoolProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
 
@@ -398,16 +399,22 @@ pub mod pallet {
 			ReleasedMinersByAccountId::<T>::take();
 
 			let has_vote_seal = Self::has_vote_seal_digest();
-			let mut weight = T::DbWeight::get().reads_writes(2, 2);
+			// Worst-case bookkeeping done directly in `on_initialize` before adding delegated
+			// benchmarked path weights below.
+			let mut weight = T::DbWeight::get().reads_writes(12, 5);
 			if has_vote_seal {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_record_block_author());
 			}
 			if let Some(frame_id) = Self::evaluate_newly_started_frame(has_vote_seal) {
-				let cohort_size = NextCohortSize::<T>::get();
+				let cohort_size = NextCohortSize::<T>::get() as u64;
 				weight = weight
 					.saturating_add(T::WeightInfo::start_new_frame(cohort_size))
 					.saturating_add(T::WeightInfo::on_finalize_frame_adjustments())
-					.saturating_add(T::SlotEvents::on_frame_start_weight(frame_id));
+					.saturating_add(T::SlotEvents::on_frame_start_weight(frame_id))
+					.saturating_add(
+						T::OperationalAccountsHook::mining_seat_won_weight()
+							.saturating_mul(cohort_size),
+					);
 			} else if Self::should_rotate_grandpas(n) {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_grandpa_rotation());
 			}
@@ -927,6 +934,7 @@ impl<T: Config> Pallet<T> {
 		let mut miner_scoring = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
+			T::OperationalAccountsHook::mining_seat_won(&entry.account_id);
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
 			total_price_per_seat += entry.bid;

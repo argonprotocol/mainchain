@@ -3,6 +3,7 @@ use pallet_prelude::*;
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
 	fn on_frame_transition() -> Weight;
+	fn try_pay_reward() -> Weight;
 	// Main extrinsic functions
 	fn bond_argons() -> Weight;
 	fn unbond_argons() -> Weight;
@@ -19,6 +20,10 @@ pub trait WeightInfo {
 impl WeightInfo for () {
 	fn on_frame_transition() -> Weight {
 		Weight::zero()
+	}
+	fn try_pay_reward() -> Weight {
+		// Conservative placeholder until pallet_treasury runtime benchmarks are wired.
+		Weight::from_parts(100_000_000, 0)
 	}
 	fn bond_argons() -> Weight {
 		Weight::zero()

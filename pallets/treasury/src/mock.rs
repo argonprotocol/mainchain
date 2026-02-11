@@ -1,16 +1,61 @@
 use crate as pallet_treasury;
-use argon_primitives::vault::TreasuryVaultProvider;
+use argon_primitives::{
+	OperationalAccountsHook, OperationalRewardPayout, OperationalRewardsProvider,
+	vault::TreasuryVaultProvider,
+};
 use frame_support::traits::Currency;
 use pallet_prelude::{
-	argon_primitives::{
-		MiningFrameTransitionProvider,
-		vault::{MiningBidPoolProvider, VaultTreasuryFrameEarnings},
-	},
+	argon_primitives::{MiningFrameTransitionProvider, vault::VaultTreasuryFrameEarnings},
 	*,
 };
 use std::collections::HashMap;
 
 type Block = frame_system::mocking::MockBlock<Test>;
+
+pub struct TestOperationalAccountsHook;
+
+impl OperationalAccountsHook<u64, Balance> for TestOperationalAccountsHook {
+	fn vault_created_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn bitcoin_lock_funded_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn mining_seat_won_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn treasury_pool_participated_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn uniswap_transfer_confirmed_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn treasury_pool_participated(vault_operator_account: &u64, amount: Balance) {
+		TreasuryPoolParticipated::mutate(|calls| calls.push((*vault_operator_account, amount)));
+	}
+}
+
+pub struct TestOperationalRewardsProvider;
+
+impl OperationalRewardsProvider<u64, Balance> for TestOperationalRewardsProvider {
+	fn pending_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
+		PendingOperationalRewards::get()
+	}
+
+	fn mark_reward_paid(reward: &OperationalRewardPayout<u64, Balance>) {
+		PendingOperationalRewards::mutate(|pending| {
+			if let Some(pos) = pending.iter().position(|entry| entry == reward) {
+				pending.remove(pos);
+			}
+		});
+		PaidOperationalRewards::mutate(|paid| paid.push(reward.clone()));
+	}
+}
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -58,24 +103,27 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 }
 
 parameter_types! {
-	pub static NextSlot: BlockNumberFor<Test> = 100;
-	pub static MiningWindowBlocks: BlockNumberFor<Test> = 100;
+	pub const NextSlot: BlockNumberFor<Test> = 100;
+	pub const MiningWindowBlocks: BlockNumberFor<Test> = 100;
 
 	pub const BidPoolAccountId: u64 = 10000;
 
-	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
+	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxVaultsPerPool: u32 = 100;
-	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
+	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
-	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
+	pub static TreasuryPoolParticipated: Vec<(u64, Balance)> = vec![];
+	pub static PendingOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
+	pub static PaidOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
 }
 
 #[derive(Clone)]
@@ -148,11 +196,37 @@ impl pallet_treasury::Config for Test {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
-	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MiningFrameTransitionProvider = StaticMiningBidPoolProvider;
+	type OperationalAccountsHook = TestOperationalAccountsHook;
+	type OperationalRewardsProvider = TestOperationalRewardsProvider;
 }
 
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
+}
+
+pub fn reset_treasury_pool_participated() {
+	TreasuryPoolParticipated::set(vec![]);
+}
+
+pub fn take_treasury_pool_participated() -> Vec<(u64, Balance)> {
+	let values = TreasuryPoolParticipated::get();
+	TreasuryPoolParticipated::set(vec![]);
+	values
+}
+
+pub fn set_pending_operational_rewards(rewards: Vec<OperationalRewardPayout<u64, Balance>>) {
+	PendingOperationalRewards::set(rewards);
+}
+
+pub fn pending_operational_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
+	PendingOperationalRewards::get()
+}
+
+pub fn take_paid_operational_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
+	let values = PaidOperationalRewards::get();
+	PaidOperationalRewards::set(vec![]);
+	values
 }
