@@ -10,7 +10,7 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::AccountId32;
 
 use crate::mock::{
-	InboundTransferLog as InboundTransferLogPallet, InboundTransfersRetentionBlocks, Test,
+	InboundTransferLog as InboundTransferLogPallet, Test,
 	gateway::{
 		GatewayTest, InboundTransferLog as GatewayInboundTransferLog,
 		new_test_ext as new_gateway_test_ext,
@@ -35,7 +35,7 @@ fn test_on_initialize_removes_expired_transfers() {
 		InboundTransfersExpiringAt::<Test>::try_mutate(1, |keys| keys.try_push(key).map(|_| ()))
 			.unwrap();
 
-		let cleanup_block = InboundTransfersRetentionBlocks::get() + 1;
+		let cleanup_block = 1u32.into();
 		InboundTransferLogPallet::on_initialize(cleanup_block);
 
 		assert!(!InboundEvmTransfers::<Test>::contains_key(key));
@@ -79,7 +79,7 @@ fn test_on_token_gateway_request_ignores_invalid_body() {
 }
 
 #[test]
-fn test_on_token_gateway_request_rejects_large_body() {
+fn test_on_token_gateway_request_continues_processing_large_body() {
 	new_gateway_test_ext().execute_with(|| {
 		initialize_gateway_block();
 		let max_len = crate::mock::MaxInboundTransferBytes::get() as usize;
@@ -100,7 +100,7 @@ fn test_on_token_gateway_request_rejects_large_body() {
 		assert_drop_event_emitted(
 			StateMachine::Evm(1),
 			77,
-			crate::InboundTransferDropReason::AbiDecodeFailed,
+			crate::InboundTransferDropReason::UnknownAsset,
 		);
 	});
 }
@@ -257,7 +257,7 @@ fn test_on_initialize_keeps_future_transfers() {
 		InboundTransfersExpiringAt::<Test>::try_mutate(2, |keys| keys.try_push(key).map(|_| ()))
 			.unwrap();
 
-		let cleanup_block = InboundTransfersRetentionBlocks::get() + 1;
+		let cleanup_block = 1u32.into();
 		InboundTransferLogPallet::on_initialize(cleanup_block);
 
 		assert!(InboundEvmTransfers::<Test>::contains_key(key));

@@ -207,9 +207,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
-			let retention_blocks: BlockNumberFor<T> = T::InboundTransfersRetentionBlocks::get();
-			let expiring =
-				InboundTransfersExpiringAt::<T>::take(n.saturating_sub(retention_blocks));
+			let expiring = InboundTransfersExpiringAt::<T>::take(n);
 			let expiring_len = expiring.len() as u32;
 			for key in expiring {
 				InboundEvmTransfers::<T>::remove(key);

@@ -802,7 +802,9 @@ pub mod pallet {
 						reward_config.operational_referral_reward,
 					);
 					let bonus_every = T::ReferralBonusEveryXOperationalSponsees::get();
-					if sponsor_account.operational_referrals_count % bonus_every == 0 {
+					if bonus_every > 0 &&
+						sponsor_account.operational_referrals_count % bonus_every == 0
+					{
 						Self::enqueue_reward(
 							sponsor_account,
 							sponsor,

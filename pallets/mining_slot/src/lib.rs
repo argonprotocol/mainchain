@@ -406,14 +406,14 @@ pub mod pallet {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_record_block_author());
 			}
 			if let Some(frame_id) = Self::evaluate_newly_started_frame(has_vote_seal) {
-				let cohort_size = NextCohortSize::<T>::get() as u64;
+				let cohort_size = NextCohortSize::<T>::get();
 				weight = weight
 					.saturating_add(T::WeightInfo::start_new_frame(cohort_size))
 					.saturating_add(T::WeightInfo::on_finalize_frame_adjustments())
 					.saturating_add(T::SlotEvents::on_frame_start_weight(frame_id))
 					.saturating_add(
 						T::OperationalAccountsHook::mining_seat_won_weight()
-							.saturating_mul(cohort_size),
+							.saturating_mul(cohort_size as u64),
 					);
 			} else if Self::should_rotate_grandpas(n) {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_grandpa_rotation());
