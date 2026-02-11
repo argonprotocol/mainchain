@@ -69,6 +69,7 @@ fn it_should_read_and_clear_the_digests() {
 		}
 		.create_pre_runtime_digest();
 
+		System::set_block_number(41);
 		System::initialize(&42, &System::parent_hash(), &pre_digest);
 		Digests::on_initialize(42);
 

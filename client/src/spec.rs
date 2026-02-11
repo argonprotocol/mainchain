@@ -253,7 +253,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -655,7 +655,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -1172,10 +1172,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							229u8, 248u8, 45u8, 35u8, 70u8, 125u8, 111u8, 24u8, 222u8, 209u8,
-							236u8, 114u8, 221u8, 183u8, 190u8, 246u8, 20u8, 204u8, 21u8, 193u8,
-							225u8, 68u8, 57u8, 0u8, 4u8, 149u8, 97u8, 151u8, 246u8, 28u8, 18u8,
-							131u8,
+							101u8, 162u8, 181u8, 195u8, 168u8, 10u8, 169u8, 151u8, 147u8, 89u8,
+							100u8, 66u8, 26u8, 161u8, 178u8, 60u8, 239u8, 11u8, 182u8, 130u8, 93u8,
+							218u8, 110u8, 19u8, 181u8, 17u8, 186u8, 54u8, 36u8, 193u8, 70u8, 160u8,
 						],
 					)
 				}
@@ -1193,10 +1192,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							210u8, 115u8, 220u8, 105u8, 123u8, 45u8, 165u8, 126u8, 190u8, 14u8,
-							57u8, 105u8, 109u8, 112u8, 39u8, 194u8, 34u8, 116u8, 9u8, 186u8, 246u8,
-							96u8, 249u8, 205u8, 208u8, 117u8, 232u8, 51u8, 108u8, 246u8, 199u8,
-							177u8,
+							211u8, 195u8, 164u8, 217u8, 151u8, 219u8, 175u8, 18u8, 90u8, 108u8,
+							49u8, 11u8, 200u8, 78u8, 77u8, 224u8, 130u8, 216u8, 92u8, 14u8, 181u8,
+							153u8, 119u8, 61u8, 86u8, 155u8, 176u8, 221u8, 191u8, 212u8, 199u8,
+							91u8,
 						],
 					)
 				}
@@ -3796,9 +3795,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				147u8, 151u8, 163u8, 20u8, 85u8, 108u8, 17u8, 178u8, 200u8, 20u8, 176u8, 116u8,
-				63u8, 119u8, 242u8, 126u8, 102u8, 156u8, 142u8, 227u8, 162u8, 69u8, 118u8, 57u8,
-				123u8, 44u8, 140u8, 79u8, 143u8, 32u8, 235u8, 250u8,
+				226u8, 152u8, 92u8, 91u8, 118u8, 206u8, 249u8, 109u8, 229u8, 19u8, 207u8, 101u8,
+				150u8, 239u8, 200u8, 147u8, 101u8, 103u8, 97u8, 15u8, 48u8, 134u8, 28u8, 1u8, 5u8,
+				113u8, 89u8, 220u8, 3u8, 212u8, 19u8, 147u8,
 			]
 	}
 	pub mod system {
@@ -4916,10 +4915,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							26u8, 64u8, 181u8, 97u8, 134u8, 245u8, 139u8, 151u8, 67u8, 219u8,
-							106u8, 122u8, 100u8, 219u8, 153u8, 109u8, 13u8, 29u8, 83u8, 133u8,
-							148u8, 98u8, 67u8, 18u8, 112u8, 140u8, 164u8, 26u8, 195u8, 91u8, 190u8,
-							90u8,
+							93u8, 225u8, 154u8, 175u8, 142u8, 61u8, 94u8, 63u8, 60u8, 64u8, 243u8,
+							34u8, 115u8, 191u8, 171u8, 1u8, 92u8, 18u8, 154u8, 95u8, 188u8, 139u8,
+							6u8, 65u8, 59u8, 182u8, 236u8, 188u8, 248u8, 100u8, 142u8, 14u8,
 						],
 					)
 				}
@@ -5793,10 +5791,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							249u8, 141u8, 35u8, 219u8, 107u8, 156u8, 8u8, 169u8, 243u8, 202u8,
-							147u8, 97u8, 159u8, 142u8, 215u8, 253u8, 46u8, 147u8, 112u8, 112u8,
-							126u8, 231u8, 229u8, 119u8, 141u8, 216u8, 229u8, 75u8, 120u8, 170u8,
-							123u8, 54u8,
+							171u8, 149u8, 5u8, 33u8, 26u8, 86u8, 241u8, 230u8, 40u8, 9u8, 15u8,
+							34u8, 178u8, 11u8, 150u8, 76u8, 173u8, 239u8, 34u8, 80u8, 160u8, 183u8,
+							94u8, 67u8, 143u8, 87u8, 217u8, 139u8, 8u8, 159u8, 180u8, 49u8,
 						],
 					)
 				}
@@ -5858,9 +5855,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							74u8, 66u8, 97u8, 132u8, 188u8, 121u8, 238u8, 73u8, 222u8, 46u8, 140u8,
-							198u8, 229u8, 7u8, 16u8, 203u8, 173u8, 29u8, 11u8, 55u8, 70u8, 121u8,
-							164u8, 48u8, 138u8, 3u8, 114u8, 126u8, 31u8, 118u8, 25u8, 53u8,
+							205u8, 112u8, 226u8, 49u8, 42u8, 55u8, 135u8, 238u8, 117u8, 41u8,
+							179u8, 237u8, 207u8, 139u8, 164u8, 119u8, 212u8, 159u8, 72u8, 146u8,
+							7u8, 114u8, 72u8, 31u8, 231u8, 102u8, 134u8, 10u8, 183u8, 23u8, 210u8,
+							68u8,
 						],
 					)
 				}
@@ -6435,7 +6433,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "The dispatch origin for this call must be _Signed_."]
 				#[doc = ""]
-				#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+				#[doc = "WARNING: This may be called on accounts created by `create_pure`, however if done, then"]
 				#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
 				pub struct RemoveProxies;
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RemoveProxies {
@@ -6505,16 +6503,16 @@ pub mod api {
 				#[doc = "inaccessible."]
 				#[doc = ""]
 				#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
-				#[doc = "`pure` with corresponding parameters."]
+				#[doc = "`create_pure` with corresponding parameters."]
 				#[doc = ""]
-				#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+				#[doc = "- `spawner`: The account that originally called `create_pure` to create this account."]
 				#[doc = "- `index`: The disambiguation index originally passed to `create_pure`. Probably `0`."]
-				#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
-				#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
-				#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+				#[doc = "- `proxy_type`: The proxy type originally passed to `create_pure`."]
+				#[doc = "- `height`: The height of the chain when the call to `create_pure` was processed."]
+				#[doc = "- `ext_index`: The extrinsic index in which the call to `create_pure` was processed."]
 				#[doc = ""]
 				#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
-				#[doc = "account whose `pure` call has corresponding parameters."]
+				#[doc = "account whose `create_pure` call has corresponding parameters."]
 				pub struct KillPure {
 					pub spawner: kill_pure::Spawner,
 					pub proxy_type: kill_pure::ProxyType,
@@ -6757,9 +6755,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							26u8, 246u8, 238u8, 150u8, 123u8, 132u8, 50u8, 185u8, 239u8, 177u8,
-							235u8, 124u8, 254u8, 209u8, 155u8, 0u8, 168u8, 34u8, 81u8, 172u8, 2u8,
-							141u8, 3u8, 11u8, 33u8, 116u8, 171u8, 229u8, 38u8, 199u8, 169u8, 205u8,
+							192u8, 93u8, 103u8, 101u8, 139u8, 86u8, 251u8, 14u8, 100u8, 248u8,
+							85u8, 233u8, 255u8, 244u8, 136u8, 240u8, 169u8, 134u8, 86u8, 36u8,
+							71u8, 140u8, 5u8, 180u8, 197u8, 212u8, 239u8, 212u8, 164u8, 109u8,
+							86u8, 36u8,
 						],
 					)
 				}
@@ -6817,7 +6816,7 @@ pub mod api {
 				#[doc = ""]
 				#[doc = "The dispatch origin for this call must be _Signed_."]
 				#[doc = ""]
-				#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+				#[doc = "WARNING: This may be called on accounts created by `create_pure`, however if done, then"]
 				#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
 				pub fn remove_proxies(
 					&self,
@@ -6876,16 +6875,16 @@ pub mod api {
 				#[doc = "inaccessible."]
 				#[doc = ""]
 				#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
-				#[doc = "`pure` with corresponding parameters."]
+				#[doc = "`create_pure` with corresponding parameters."]
 				#[doc = ""]
-				#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+				#[doc = "- `spawner`: The account that originally called `create_pure` to create this account."]
 				#[doc = "- `index`: The disambiguation index originally passed to `create_pure`. Probably `0`."]
-				#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
-				#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
-				#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+				#[doc = "- `proxy_type`: The proxy type originally passed to `create_pure`."]
+				#[doc = "- `height`: The height of the chain when the call to `create_pure` was processed."]
+				#[doc = "- `ext_index`: The extrinsic index in which the call to `create_pure` was processed."]
 				#[doc = ""]
 				#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
-				#[doc = "account whose `pure` call has corresponding parameters."]
+				#[doc = "account whose `create_pure` call has corresponding parameters."]
 				pub fn kill_pure(
 					&self,
 					spawner: types::kill_pure::Spawner,
@@ -7020,9 +7019,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							57u8, 254u8, 28u8, 104u8, 2u8, 62u8, 115u8, 22u8, 227u8, 235u8, 85u8,
-							7u8, 33u8, 87u8, 246u8, 138u8, 124u8, 192u8, 173u8, 36u8, 156u8, 19u8,
-							83u8, 7u8, 71u8, 186u8, 150u8, 190u8, 2u8, 79u8, 130u8, 191u8,
+							27u8, 25u8, 47u8, 155u8, 160u8, 5u8, 25u8, 48u8, 189u8, 47u8, 105u8,
+							222u8, 122u8, 157u8, 133u8, 181u8, 46u8, 134u8, 177u8, 26u8, 155u8,
+							78u8, 100u8, 120u8, 238u8, 96u8, 166u8, 116u8, 200u8, 34u8, 28u8,
+							103u8,
 						],
 					)
 				}
@@ -7071,9 +7071,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							243u8, 199u8, 201u8, 164u8, 55u8, 32u8, 148u8, 82u8, 24u8, 43u8, 219u8,
-							240u8, 76u8, 159u8, 69u8, 108u8, 16u8, 171u8, 141u8, 66u8, 145u8,
-							107u8, 108u8, 229u8, 86u8, 101u8, 229u8, 96u8, 41u8, 81u8, 178u8, 2u8,
+							10u8, 55u8, 128u8, 206u8, 140u8, 18u8, 152u8, 46u8, 197u8, 64u8, 218u8,
+							162u8, 30u8, 122u8, 133u8, 187u8, 155u8, 155u8, 190u8, 36u8, 242u8,
+							196u8, 188u8, 165u8, 112u8, 139u8, 177u8, 5u8, 4u8, 166u8, 20u8, 205u8,
 						],
 					)
 				}
@@ -7193,6 +7193,8 @@ pub mod api {
 				pub who: pure_created::Who,
 				pub proxy_type: pure_created::ProxyType,
 				pub disambiguation_index: pure_created::DisambiguationIndex,
+				pub at: pure_created::At,
+				pub extrinsic_index: pure_created::ExtrinsicIndex,
 			}
 			pub mod pure_created {
 				use super::runtime_types;
@@ -7200,6 +7202,8 @@ pub mod api {
 				pub type Who = crate::types::AccountId32;
 				pub type ProxyType = runtime_types::argon_runtime::ProxyType;
 				pub type DisambiguationIndex = ::core::primitive::u16;
+				pub type At = ::core::primitive::u32;
+				pub type ExtrinsicIndex = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for PureCreated {
 				const PALLET: &'static str = "Proxy";
@@ -16175,9 +16179,9 @@ pub mod api {
 						"apply",
 						types::Apply { seal },
 						[
-							98u8, 26u8, 187u8, 196u8, 211u8, 73u8, 208u8, 71u8, 157u8, 4u8, 189u8,
-							3u8, 99u8, 147u8, 211u8, 197u8, 93u8, 232u8, 249u8, 145u8, 78u8, 2u8,
-							157u8, 207u8, 101u8, 92u8, 136u8, 177u8, 229u8, 57u8, 50u8, 14u8,
+							19u8, 42u8, 221u8, 20u8, 167u8, 86u8, 189u8, 167u8, 194u8, 30u8, 8u8,
+							142u8, 44u8, 16u8, 255u8, 78u8, 170u8, 70u8, 204u8, 97u8, 87u8, 28u8,
+							25u8, 240u8, 60u8, 166u8, 219u8, 165u8, 172u8, 60u8, 123u8, 188u8,
 						],
 					)
 				}
@@ -16330,9 +16334,10 @@ pub mod api {
 						"TempSealInherent",
 						(),
 						[
-							19u8, 2u8, 82u8, 157u8, 88u8, 253u8, 92u8, 46u8, 188u8, 126u8, 203u8,
-							173u8, 123u8, 24u8, 44u8, 56u8, 35u8, 29u8, 210u8, 59u8, 156u8, 187u8,
-							120u8, 68u8, 204u8, 110u8, 228u8, 40u8, 131u8, 89u8, 20u8, 108u8,
+							78u8, 155u8, 40u8, 223u8, 76u8, 39u8, 171u8, 255u8, 185u8, 146u8,
+							191u8, 119u8, 25u8, 239u8, 171u8, 44u8, 211u8, 217u8, 210u8, 210u8,
+							6u8, 68u8, 66u8, 78u8, 101u8, 94u8, 72u8, 147u8, 34u8, 138u8, 90u8,
+							156u8,
 						],
 					)
 				}
@@ -17876,6 +17881,26 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some credit was balanced and added to the TotalIssuance."]
+			pub struct MintedCredit {
+				pub amount: minted_credit::Amount,
+			}
+			pub mod minted_credit {
+				use super::runtime_types;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintedCredit {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "MintedCredit";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "Some amount was burned from an account."]
 			pub struct Burned {
 				pub who: burned::Who,
@@ -17889,6 +17914,26 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
 				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "Burned";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some debt has been dropped from the Total Issuance."]
+			pub struct BurnedDebt {
+				pub amount: burned_debt::Amount,
+			}
+			pub mod burned_debt {
+				use super::runtime_types;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnedDebt {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "BurnedDebt";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -18103,6 +18148,148 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TotalIssuanceForced {
 				const PALLET: &'static str = "Balances";
 				const EVENT: &'static str = "TotalIssuanceForced";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some balance was placed on hold."]
+			pub struct Held {
+				pub reason: held::Reason,
+				pub who: held::Who,
+				pub amount: held::Amount,
+			}
+			pub mod held {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Held {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "Held";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Held balance was burned from an account."]
+			pub struct BurnedHeld {
+				pub reason: burned_held::Reason,
+				pub who: burned_held::Who,
+				pub amount: burned_held::Amount,
+			}
+			pub mod burned_held {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnedHeld {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "BurnedHeld";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer of `amount` on hold from `source` to `dest` was initiated."]
+			pub struct TransferOnHold {
+				pub reason: transfer_on_hold::Reason,
+				pub source: transfer_on_hold::Source,
+				pub dest: transfer_on_hold::Dest,
+				pub amount: transfer_on_hold::Amount,
+			}
+			pub mod transfer_on_hold {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Source = crate::types::AccountId32;
+				pub type Dest = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOnHold {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "TransferOnHold";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The `transferred` balance is placed on hold at the `dest` account."]
+			pub struct TransferAndHold {
+				pub reason: transfer_and_hold::Reason,
+				pub source: transfer_and_hold::Source,
+				pub dest: transfer_and_hold::Dest,
+				pub transferred: transfer_and_hold::Transferred,
+			}
+			pub mod transfer_and_hold {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Source = crate::types::AccountId32;
+				pub type Dest = crate::types::AccountId32;
+				pub type Transferred = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferAndHold {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "TransferAndHold";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some balance was released from hold."]
+			pub struct Released {
+				pub reason: released::Reason,
+				pub who: released::Who,
+				pub amount: released::Amount,
+			}
+			pub mod released {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Released {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "Released";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An unexpected/defensive event was triggered."]
+			pub struct Unexpected(pub unexpected::Field0);
+			pub mod unexpected {
+				use super::runtime_types;
+				pub type Field0 = runtime_types::pallet_balances::pallet::UnexpectedKind;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Unexpected {
+				const PALLET: &'static str = "Balances";
+				const EVENT: &'static str = "Unexpected";
 			}
 		}
 		pub mod storage {
@@ -19379,6 +19566,26 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some credit was balanced and added to the TotalIssuance."]
+			pub struct MintedCredit {
+				pub amount: minted_credit::Amount,
+			}
+			pub mod minted_credit {
+				use super::runtime_types;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintedCredit {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "MintedCredit";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "Some amount was burned from an account."]
 			pub struct Burned {
 				pub who: burned::Who,
@@ -19392,6 +19599,26 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for Burned {
 				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "Burned";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some debt has been dropped from the Total Issuance."]
+			pub struct BurnedDebt {
+				pub amount: burned_debt::Amount,
+			}
+			pub mod burned_debt {
+				use super::runtime_types;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnedDebt {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "BurnedDebt";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -19606,6 +19833,148 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TotalIssuanceForced {
 				const PALLET: &'static str = "Ownership";
 				const EVENT: &'static str = "TotalIssuanceForced";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some balance was placed on hold."]
+			pub struct Held {
+				pub reason: held::Reason,
+				pub who: held::Who,
+				pub amount: held::Amount,
+			}
+			pub mod held {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Held {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "Held";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Held balance was burned from an account."]
+			pub struct BurnedHeld {
+				pub reason: burned_held::Reason,
+				pub who: burned_held::Who,
+				pub amount: burned_held::Amount,
+			}
+			pub mod burned_held {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnedHeld {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "BurnedHeld";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer of `amount` on hold from `source` to `dest` was initiated."]
+			pub struct TransferOnHold {
+				pub reason: transfer_on_hold::Reason,
+				pub source: transfer_on_hold::Source,
+				pub dest: transfer_on_hold::Dest,
+				pub amount: transfer_on_hold::Amount,
+			}
+			pub mod transfer_on_hold {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Source = crate::types::AccountId32;
+				pub type Dest = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOnHold {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "TransferOnHold";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The `transferred` balance is placed on hold at the `dest` account."]
+			pub struct TransferAndHold {
+				pub reason: transfer_and_hold::Reason,
+				pub source: transfer_and_hold::Source,
+				pub dest: transfer_and_hold::Dest,
+				pub transferred: transfer_and_hold::Transferred,
+			}
+			pub mod transfer_and_hold {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Source = crate::types::AccountId32;
+				pub type Dest = crate::types::AccountId32;
+				pub type Transferred = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferAndHold {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "TransferAndHold";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Some balance was released from hold."]
+			pub struct Released {
+				pub reason: released::Reason,
+				pub who: released::Who,
+				pub amount: released::Amount,
+			}
+			pub mod released {
+				use super::runtime_types;
+				pub type Reason = runtime_types::argon_runtime::RuntimeHoldReason;
+				pub type Who = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Released {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "Released";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An unexpected/defensive event was triggered."]
+			pub struct Unexpected(pub unexpected::Field0);
+			pub mod unexpected {
+				use super::runtime_types;
+				pub type Field0 = runtime_types::pallet_balances::pallet::UnexpectedKind;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Unexpected {
+				const PALLET: &'static str = "Ownership";
+				const EVENT: &'static str = "Unexpected";
 			}
 		}
 		pub mod storage {
@@ -20402,6 +20771,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type StorageVersion = runtime_types::pallet_transaction_payment::Releases;
 				}
+				pub mod tx_payment_credit {
+					use super::runtime_types;
+					pub type TxPaymentCredit = runtime_types :: frame_support :: traits :: storage :: NoDrop < runtime_types :: frame_support :: traits :: tokens :: fungible :: imbalance :: Imbalance < :: core :: primitive :: u128 > > ;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -20444,6 +20817,29 @@ pub mod api {
 							178u8, 126u8, 31u8, 203u8, 134u8, 154u8, 38u8, 122u8, 155u8, 150u8,
 							251u8, 174u8, 15u8, 74u8, 134u8, 216u8, 244u8, 168u8, 175u8, 158u8,
 							144u8,
+						],
+					)
+				}
+				#[doc = " The `OnChargeTransaction` stores the withdrawn tx fee here."]
+				#[doc = ""]
+				#[doc = " Use `withdraw_txfee` and `remaining_txfee` to access from outside the crate."]
+				pub fn tx_payment_credit(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::tx_payment_credit::TxPaymentCredit,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TransactionPayment",
+						"TxPaymentCredit",
+						(),
+						[
+							39u8, 127u8, 132u8, 77u8, 25u8, 10u8, 195u8, 64u8, 255u8, 212u8, 183u8,
+							177u8, 238u8, 24u8, 81u8, 65u8, 93u8, 177u8, 209u8, 134u8, 245u8,
+							241u8, 252u8, 87u8, 179u8, 61u8, 168u8, 77u8, 65u8, 13u8, 72u8, 205u8,
 						],
 					)
 				}
@@ -20834,10 +21230,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							64u8, 6u8, 133u8, 252u8, 195u8, 202u8, 82u8, 65u8, 94u8, 43u8, 33u8,
-							127u8, 6u8, 129u8, 240u8, 87u8, 147u8, 105u8, 181u8, 194u8, 13u8,
-							109u8, 127u8, 58u8, 184u8, 246u8, 214u8, 229u8, 45u8, 103u8, 156u8,
-							26u8,
+							207u8, 247u8, 170u8, 12u8, 21u8, 132u8, 128u8, 37u8, 1u8, 41u8, 100u8,
+							132u8, 16u8, 72u8, 232u8, 120u8, 37u8, 177u8, 78u8, 228u8, 145u8,
+							148u8, 159u8, 55u8, 95u8, 34u8, 235u8, 133u8, 120u8, 230u8, 122u8,
+							210u8,
 						],
 					)
 				}
@@ -20867,10 +21263,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							199u8, 70u8, 193u8, 81u8, 154u8, 155u8, 108u8, 135u8, 241u8, 117u8,
-							114u8, 255u8, 194u8, 129u8, 245u8, 109u8, 240u8, 125u8, 143u8, 99u8,
-							201u8, 211u8, 125u8, 128u8, 105u8, 37u8, 73u8, 112u8, 155u8, 154u8,
-							60u8, 220u8,
+							236u8, 16u8, 139u8, 244u8, 40u8, 43u8, 155u8, 143u8, 215u8, 209u8,
+							130u8, 4u8, 141u8, 113u8, 72u8, 108u8, 5u8, 152u8, 82u8, 199u8, 35u8,
+							13u8, 56u8, 109u8, 98u8, 129u8, 49u8, 67u8, 64u8, 186u8, 75u8, 49u8,
 						],
 					)
 				}
@@ -20896,9 +21291,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							74u8, 232u8, 189u8, 21u8, 163u8, 128u8, 229u8, 220u8, 143u8, 228u8,
-							181u8, 221u8, 16u8, 14u8, 1u8, 155u8, 147u8, 138u8, 215u8, 46u8, 86u8,
-							151u8, 16u8, 35u8, 69u8, 100u8, 78u8, 83u8, 20u8, 112u8, 186u8, 43u8,
+							32u8, 157u8, 9u8, 227u8, 102u8, 176u8, 145u8, 98u8, 120u8, 180u8, 75u8,
+							115u8, 153u8, 73u8, 238u8, 151u8, 18u8, 219u8, 2u8, 253u8, 98u8, 143u8,
+							211u8, 248u8, 182u8, 80u8, 82u8, 140u8, 156u8, 180u8, 93u8, 242u8,
 						],
 					)
 				}
@@ -20921,10 +21316,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							108u8, 254u8, 73u8, 114u8, 220u8, 144u8, 81u8, 162u8, 103u8, 62u8,
-							193u8, 219u8, 104u8, 155u8, 170u8, 249u8, 151u8, 85u8, 137u8, 92u8,
-							146u8, 142u8, 134u8, 31u8, 25u8, 124u8, 92u8, 127u8, 182u8, 110u8,
-							254u8, 165u8,
+							110u8, 39u8, 241u8, 44u8, 108u8, 35u8, 46u8, 210u8, 4u8, 229u8, 16u8,
+							77u8, 112u8, 157u8, 161u8, 236u8, 101u8, 66u8, 75u8, 7u8, 253u8, 40u8,
+							110u8, 191u8, 101u8, 67u8, 136u8, 162u8, 10u8, 38u8, 24u8, 248u8,
 						],
 					)
 				}
@@ -20950,10 +21344,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							69u8, 74u8, 91u8, 113u8, 113u8, 142u8, 201u8, 240u8, 142u8, 204u8,
-							171u8, 93u8, 179u8, 152u8, 59u8, 129u8, 255u8, 72u8, 69u8, 109u8,
-							249u8, 207u8, 1u8, 103u8, 230u8, 56u8, 46u8, 23u8, 158u8, 248u8, 114u8,
-							119u8,
+							212u8, 17u8, 51u8, 10u8, 115u8, 207u8, 114u8, 215u8, 76u8, 254u8, 24u8,
+							4u8, 127u8, 98u8, 73u8, 81u8, 173u8, 40u8, 127u8, 34u8, 253u8, 211u8,
+							156u8, 146u8, 100u8, 240u8, 32u8, 131u8, 85u8, 89u8, 138u8, 161u8,
 						],
 					)
 				}
@@ -20976,9 +21369,10 @@ pub mod api {
 							weight,
 						},
 						[
-							40u8, 204u8, 33u8, 7u8, 68u8, 87u8, 197u8, 73u8, 8u8, 98u8, 197u8,
-							154u8, 92u8, 239u8, 123u8, 227u8, 191u8, 240u8, 9u8, 28u8, 210u8, 61u8,
-							46u8, 219u8, 242u8, 139u8, 138u8, 44u8, 239u8, 218u8, 116u8, 114u8,
+							175u8, 214u8, 11u8, 163u8, 104u8, 243u8, 197u8, 183u8, 230u8, 49u8,
+							222u8, 45u8, 139u8, 157u8, 249u8, 143u8, 185u8, 124u8, 235u8, 243u8,
+							8u8, 5u8, 252u8, 116u8, 154u8, 9u8, 239u8, 172u8, 229u8, 92u8, 184u8,
+							222u8,
 						],
 					)
 				}
@@ -21018,9 +21412,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							71u8, 183u8, 134u8, 179u8, 221u8, 56u8, 5u8, 113u8, 34u8, 86u8, 23u8,
-							191u8, 33u8, 244u8, 240u8, 198u8, 184u8, 94u8, 208u8, 149u8, 51u8,
-							167u8, 96u8, 150u8, 178u8, 11u8, 37u8, 225u8, 141u8, 6u8, 234u8, 241u8,
+							239u8, 186u8, 252u8, 76u8, 229u8, 230u8, 76u8, 69u8, 143u8, 112u8,
+							148u8, 122u8, 32u8, 193u8, 208u8, 52u8, 173u8, 199u8, 26u8, 203u8,
+							111u8, 202u8, 142u8, 66u8, 211u8, 196u8, 67u8, 54u8, 213u8, 43u8,
+							170u8, 134u8,
 						],
 					)
 				}
@@ -21043,10 +21438,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							225u8, 101u8, 138u8, 88u8, 124u8, 52u8, 213u8, 94u8, 113u8, 116u8,
-							246u8, 195u8, 34u8, 249u8, 37u8, 103u8, 207u8, 221u8, 226u8, 81u8,
-							184u8, 117u8, 66u8, 101u8, 237u8, 36u8, 93u8, 7u8, 34u8, 79u8, 9u8,
-							101u8,
+							29u8, 211u8, 173u8, 241u8, 104u8, 170u8, 154u8, 240u8, 108u8, 39u8,
+							48u8, 94u8, 247u8, 255u8, 19u8, 104u8, 246u8, 157u8, 162u8, 250u8,
+							179u8, 249u8, 71u8, 23u8, 223u8, 164u8, 233u8, 64u8, 36u8, 127u8, 19u8,
+							7u8,
 						],
 					)
 				}
@@ -21382,10 +21777,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							29u8, 251u8, 197u8, 190u8, 52u8, 40u8, 142u8, 4u8, 206u8, 31u8, 67u8,
-							163u8, 135u8, 48u8, 163u8, 82u8, 6u8, 140u8, 244u8, 247u8, 208u8,
-							172u8, 62u8, 163u8, 202u8, 84u8, 83u8, 196u8, 17u8, 109u8, 227u8,
-							177u8,
+							221u8, 84u8, 2u8, 90u8, 4u8, 111u8, 174u8, 128u8, 38u8, 18u8, 208u8,
+							185u8, 23u8, 125u8, 68u8, 254u8, 134u8, 174u8, 123u8, 37u8, 21u8, 43u8,
+							203u8, 230u8, 6u8, 115u8, 149u8, 190u8, 92u8, 212u8, 139u8, 144u8,
 						],
 					)
 				}
@@ -21408,10 +21802,10 @@ pub mod api {
 							weight,
 						},
 						[
-							182u8, 240u8, 173u8, 197u8, 32u8, 192u8, 0u8, 112u8, 164u8, 54u8, 80u8,
-							242u8, 152u8, 255u8, 201u8, 199u8, 107u8, 68u8, 86u8, 235u8, 218u8,
-							125u8, 0u8, 100u8, 216u8, 217u8, 26u8, 201u8, 227u8, 101u8, 117u8,
-							238u8,
+							103u8, 131u8, 2u8, 212u8, 199u8, 118u8, 250u8, 145u8, 153u8, 68u8,
+							120u8, 145u8, 193u8, 47u8, 137u8, 116u8, 99u8, 121u8, 125u8, 240u8,
+							42u8, 114u8, 28u8, 220u8, 102u8, 22u8, 18u8, 211u8, 45u8, 187u8, 23u8,
+							2u8,
 						],
 					)
 				}
@@ -21449,10 +21843,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							129u8, 115u8, 150u8, 111u8, 98u8, 123u8, 163u8, 238u8, 16u8, 178u8,
-							109u8, 58u8, 253u8, 59u8, 51u8, 123u8, 231u8, 249u8, 41u8, 40u8, 167u8,
-							254u8, 97u8, 172u8, 248u8, 156u8, 65u8, 206u8, 217u8, 18u8, 151u8,
-							53u8,
+							83u8, 2u8, 102u8, 196u8, 233u8, 180u8, 197u8, 196u8, 49u8, 227u8,
+							123u8, 39u8, 213u8, 105u8, 142u8, 60u8, 18u8, 174u8, 52u8, 151u8, 41u8,
+							25u8, 87u8, 121u8, 5u8, 75u8, 193u8, 228u8, 243u8, 13u8, 205u8, 192u8,
 						],
 					)
 				}
@@ -26415,8 +26808,45 @@ pub mod api {
 			}
 			pub mod traits {
 				use super::runtime_types;
+				pub mod storage {
+					use super::runtime_types;
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct NoDrop<_0>(pub _0);
+				}
 				pub mod tokens {
 					use super::runtime_types;
+					pub mod fungible {
+						use super::runtime_types;
+						pub mod imbalance {
+							use super::runtime_types;
+							#[derive(
+								:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+								:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+								Clone,
+								Debug,
+							)]
+							#[decode_as_type(
+								crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+							)]
+							#[encode_as_type(
+								crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+							)]
+							pub struct Imbalance<_0> {
+								pub amount: _0,
+							}
+						}
+					}
 					pub mod misc {
 						use super::runtime_types;
 						#[derive(
@@ -27877,41 +28307,105 @@ pub mod api {
 					#[doc = "Some amount was minted into an account."]
 					Minted { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
 					#[codec(index = 11)]
+					#[doc = "Some credit was balanced and added to the TotalIssuance."]
+					MintedCredit { amount: ::core::primitive::u128 },
+					#[codec(index = 12)]
 					#[doc = "Some amount was burned from an account."]
 					Burned { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 12)]
+					#[codec(index = 13)]
+					#[doc = "Some debt has been dropped from the Total Issuance."]
+					BurnedDebt { amount: ::core::primitive::u128 },
+					#[codec(index = 14)]
 					#[doc = "Some amount was suspended from an account (it can be restored later)."]
 					Suspended { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 13)]
+					#[codec(index = 15)]
 					#[doc = "Some amount was restored into an account."]
 					Restored { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 14)]
+					#[codec(index = 16)]
 					#[doc = "An account was upgraded."]
 					Upgraded { who: crate::types::AccountId32 },
-					#[codec(index = 15)]
+					#[codec(index = 17)]
 					#[doc = "Total issuance was increased by `amount`, creating a credit to be balanced."]
 					Issued { amount: ::core::primitive::u128 },
-					#[codec(index = 16)]
+					#[codec(index = 18)]
 					#[doc = "Total issuance was decreased by `amount`, creating a debt to be balanced."]
 					Rescinded { amount: ::core::primitive::u128 },
-					#[codec(index = 17)]
+					#[codec(index = 19)]
 					#[doc = "Some balance was locked."]
 					Locked { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 18)]
+					#[codec(index = 20)]
 					#[doc = "Some balance was unlocked."]
 					Unlocked { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 19)]
+					#[codec(index = 21)]
 					#[doc = "Some balance was frozen."]
 					Frozen { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 20)]
+					#[codec(index = 22)]
 					#[doc = "Some balance was thawed."]
 					Thawed { who: crate::types::AccountId32, amount: ::core::primitive::u128 },
-					#[codec(index = 21)]
+					#[codec(index = 23)]
 					#[doc = "The `TotalIssuance` was forcefully changed."]
 					TotalIssuanceForced {
 						old: ::core::primitive::u128,
 						new: ::core::primitive::u128,
 					},
+					#[codec(index = 24)]
+					#[doc = "Some balance was placed on hold."]
+					Held {
+						reason: runtime_types::argon_runtime::RuntimeHoldReason,
+						who: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 25)]
+					#[doc = "Held balance was burned from an account."]
+					BurnedHeld {
+						reason: runtime_types::argon_runtime::RuntimeHoldReason,
+						who: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 26)]
+					#[doc = "A transfer of `amount` on hold from `source` to `dest` was initiated."]
+					TransferOnHold {
+						reason: runtime_types::argon_runtime::RuntimeHoldReason,
+						source: crate::types::AccountId32,
+						dest: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 27)]
+					#[doc = "The `transferred` balance is placed on hold at the `dest` account."]
+					TransferAndHold {
+						reason: runtime_types::argon_runtime::RuntimeHoldReason,
+						source: crate::types::AccountId32,
+						dest: crate::types::AccountId32,
+						transferred: ::core::primitive::u128,
+					},
+					#[codec(index = 28)]
+					#[doc = "Some balance was released from hold."]
+					Released {
+						reason: runtime_types::argon_runtime::RuntimeHoldReason,
+						who: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+					},
+					#[codec(index = 29)]
+					#[doc = "An unexpected/defensive event was triggered."]
+					Unexpected(runtime_types::pallet_balances::pallet::UnexpectedKind),
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum UnexpectedKind {
+					#[codec(index = 0)]
+					BalanceUpdated,
+					#[codec(index = 1)]
+					FailedToMutateAccount,
 				}
 			}
 			pub mod types {
@@ -30977,7 +31471,7 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "The dispatch origin for this call must be _Signed_."]
 					#[doc = ""]
-					#[doc = "WARNING: This may be called on accounts created by `pure`, however if done, then"]
+					#[doc = "WARNING: This may be called on accounts created by `create_pure`, however if done, then"]
 					#[doc = "the unreserved fees will be inaccessible. **All access to this account will be lost.**"]
 					remove_proxies,
 					#[codec(index = 4)]
@@ -31011,16 +31505,16 @@ pub mod api {
 					#[doc = "inaccessible."]
 					#[doc = ""]
 					#[doc = "Requires a `Signed` origin, and the sender account must have been created by a call to"]
-					#[doc = "`pure` with corresponding parameters."]
+					#[doc = "`create_pure` with corresponding parameters."]
 					#[doc = ""]
-					#[doc = "- `spawner`: The account that originally called `pure` to create this account."]
+					#[doc = "- `spawner`: The account that originally called `create_pure` to create this account."]
 					#[doc = "- `index`: The disambiguation index originally passed to `create_pure`. Probably `0`."]
-					#[doc = "- `proxy_type`: The proxy type originally passed to `pure`."]
-					#[doc = "- `height`: The height of the chain when the call to `pure` was processed."]
-					#[doc = "- `ext_index`: The extrinsic index in which the call to `pure` was processed."]
+					#[doc = "- `proxy_type`: The proxy type originally passed to `create_pure`."]
+					#[doc = "- `height`: The height of the chain when the call to `create_pure` was processed."]
+					#[doc = "- `ext_index`: The extrinsic index in which the call to `create_pure` was processed."]
 					#[doc = ""]
 					#[doc = "Fails with `NoPermission` in case the caller is not a previously created pure"]
-					#[doc = "account whose `pure` call has corresponding parameters."]
+					#[doc = "account whose `create_pure` call has corresponding parameters."]
 					kill_pure {
 						spawner: ::subxt::ext::subxt_core::utils::MultiAddress<
 							crate::types::AccountId32,
@@ -31197,6 +31691,8 @@ pub mod api {
 						who: crate::types::AccountId32,
 						proxy_type: runtime_types::argon_runtime::ProxyType,
 						disambiguation_index: ::core::primitive::u16,
+						at: ::core::primitive::u32,
+						extrinsic_index: ::core::primitive::u32,
 					},
 					#[codec(index = 2)]
 					#[doc = "A pure proxy was killed by its spawner."]
@@ -32989,6 +33485,26 @@ pub mod api {
 						pub header: _0,
 						pub extrinsics: ::subxt::ext::subxt_core::alloc::vec::Vec<_1>,
 					}
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct LazyBlock<_0, _1> {
+						pub header: _0,
+						pub extrinsics: ::subxt::ext::subxt_core::alloc::vec::Vec<
+							runtime_types::sp_runtime::OpaqueExtrinsic,
+						>,
+						#[codec(skip)]
+						pub __ignore: ::core::marker::PhantomData<_1>,
+					}
 				}
 				pub mod digest {
 					use super::runtime_types;
@@ -33862,7 +34378,20 @@ pub mod api {
 				Sr25519([::core::primitive::u8; 64usize]),
 				#[codec(index = 2)]
 				Ecdsa([::core::primitive::u8; 65usize]),
+				#[codec(index = 3)]
+				Eth([::core::primitive::u8; 65usize]),
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct OpaqueExtrinsic(
+				pub ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+			);
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,

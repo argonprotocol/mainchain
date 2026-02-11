@@ -57,32 +57,47 @@ async fn test_can_prove_finality() {
 	miner_3_args.is_validator = false;
 	miner_3_args.extra_flags.push("--sync=warp".to_string());
 	miner_3_args.rust_log += ",sync=trace,warp=trace";
+	let finalized_count = grandpa_miner.client.latest_finalized_block().await.unwrap();
 	let miner_3 = grandpa_miner.fork_node_with(miner_3_args).await.unwrap();
 	println!("Charlie started");
 	let mut blocks_sub = miner_3.client.live.blocks().subscribe_finalized().await.unwrap();
 
-	// wait for blocks sub, timeout after 30 seconds
-	let finalized_count = grandpa_miner.client.latest_finalized_block().await.unwrap();
-	let starting_finalized = miner_3.client.latest_finalized_block().await.unwrap();
-	let mut catchup_blocks = finalized_count.saturating_sub(starting_finalized);
+	// Wait for Charlie to catch up to Alice's finalized height snapshot.
+	let timeout_at = tokio::time::Instant::now() + tokio::time::Duration::from_secs(90);
+	let mut charlie_finalized = 0u32;
 	loop {
-		if catchup_blocks == 0 {
+		if charlie_finalized >= finalized_count {
 			break;
 		}
+		if tokio::time::Instant::now() >= timeout_at {
+			break;
+		}
+
 		select! {
-			Some(block) = blocks_sub.next() => {
-				catchup_blocks -= 1;
-				println!("Block finalized for charlie. Started at {}, now {:?}. Remaining {}", starting_finalized, block.unwrap().number(), catchup_blocks);
-				if catchup_blocks == 0 {
-					break;
+			maybe_block = blocks_sub.next() => {
+				match maybe_block {
+					Some(Ok(block)) => {
+						charlie_finalized = block.number();
+						println!(
+							"Block finalized for charlie. Height {charlie_finalized}, target {finalized_count}"
+						);
+					}
+					Some(Err(error)) => {
+						println!("Charlie finalized subscription error: {error:#}");
+					}
+					None => {
+						println!("Charlie finalized subscription ended before catchup");
+						break;
+					}
 				}
 			}
-			_ = tokio::time::sleep(tokio::time::Duration::from_secs(90)) => {
-				break;
-			}
+			_ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {}
 		}
 	}
-	assert_eq!(catchup_blocks, 0);
+	assert!(
+		charlie_finalized >= finalized_count,
+		"Charlie finalized {charlie_finalized} but target was {finalized_count}"
+	);
 
 	drop(miner_1);
 	drop(grandpa_miner);

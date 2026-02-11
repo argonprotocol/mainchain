@@ -33,6 +33,7 @@ import type {
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
+  ArgonRuntimeRuntimeHoldReason,
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
   IsmpConsensusStateMachineHeight,
@@ -40,6 +41,7 @@ import type {
   IsmpEventsRequestResponseHandled,
   IsmpEventsTimeoutHandled,
   IsmpHostStateMachine,
+  PalletBalancesUnexpectedKind,
   PalletDomainsDomainRegistration,
   PalletHyperbridgeVersionedHostParams,
   PalletIsmpErrorsHandlingError,
@@ -70,6 +72,18 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [who: AccountId32, amount: u128],
         { who: AccountId32; amount: u128 }
+      >;
+      /**
+       * Some debt has been dropped from the Total Issuance.
+       **/
+      BurnedDebt: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
+      /**
+       * Held balance was burned from an account.
+       **/
+      BurnedHeld: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
       >;
       /**
        * Some amount was deposited (e.g. for transaction fees).
@@ -105,6 +119,14 @@ declare module '@polkadot/api-base/types/events' {
         { who: AccountId32; amount: u128 }
       >;
       /**
+       * Some balance was placed on hold.
+       **/
+      Held: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
+      >;
+      /**
        * Total issuance was increased by `amount`, creating a credit to be balanced.
        **/
       Issued: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
@@ -123,6 +145,18 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [who: AccountId32, amount: u128],
         { who: AccountId32; amount: u128 }
+      >;
+      /**
+       * Some credit was balanced and added to the TotalIssuance.
+       **/
+      MintedCredit: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
+      /**
+       * Some balance was released from hold.
+       **/
+      Released: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
       >;
       /**
        * Total issuance was decreased by `amount`, creating a debt to be balanced.
@@ -203,6 +237,46 @@ declare module '@polkadot/api-base/types/events' {
         [from: AccountId32, to: AccountId32, amount: u128],
         { from: AccountId32; to: AccountId32; amount: u128 }
       >;
+      /**
+       * The `transferred` balance is placed on hold at the `dest` account.
+       **/
+      TransferAndHold: AugmentedEvent<
+        ApiType,
+        [
+          reason: ArgonRuntimeRuntimeHoldReason,
+          source: AccountId32,
+          dest: AccountId32,
+          transferred: u128,
+        ],
+        {
+          reason: ArgonRuntimeRuntimeHoldReason;
+          source: AccountId32;
+          dest: AccountId32;
+          transferred: u128;
+        }
+      >;
+      /**
+       * A transfer of `amount` on hold from `source` to `dest` was initiated.
+       **/
+      TransferOnHold: AugmentedEvent<
+        ApiType,
+        [
+          reason: ArgonRuntimeRuntimeHoldReason,
+          source: AccountId32,
+          dest: AccountId32,
+          amount: u128,
+        ],
+        {
+          reason: ArgonRuntimeRuntimeHoldReason;
+          source: AccountId32;
+          dest: AccountId32;
+          amount: u128;
+        }
+      >;
+      /**
+       * An unexpected/defensive event was triggered.
+       **/
+      Unexpected: AugmentedEvent<ApiType, [PalletBalancesUnexpectedKind]>;
       /**
        * Some balance was unlocked.
        **/
@@ -1010,6 +1084,18 @@ declare module '@polkadot/api-base/types/events' {
         { who: AccountId32; amount: u128 }
       >;
       /**
+       * Some debt has been dropped from the Total Issuance.
+       **/
+      BurnedDebt: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
+      /**
+       * Held balance was burned from an account.
+       **/
+      BurnedHeld: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
+      >;
+      /**
        * Some amount was deposited (e.g. for transaction fees).
        **/
       Deposit: AugmentedEvent<
@@ -1043,6 +1129,14 @@ declare module '@polkadot/api-base/types/events' {
         { who: AccountId32; amount: u128 }
       >;
       /**
+       * Some balance was placed on hold.
+       **/
+      Held: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
+      >;
+      /**
        * Total issuance was increased by `amount`, creating a credit to be balanced.
        **/
       Issued: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
@@ -1061,6 +1155,18 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [who: AccountId32, amount: u128],
         { who: AccountId32; amount: u128 }
+      >;
+      /**
+       * Some credit was balanced and added to the TotalIssuance.
+       **/
+      MintedCredit: AugmentedEvent<ApiType, [amount: u128], { amount: u128 }>;
+      /**
+       * Some balance was released from hold.
+       **/
+      Released: AugmentedEvent<
+        ApiType,
+        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
+        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
       >;
       /**
        * Total issuance was decreased by `amount`, creating a debt to be balanced.
@@ -1141,6 +1247,46 @@ declare module '@polkadot/api-base/types/events' {
         [from: AccountId32, to: AccountId32, amount: u128],
         { from: AccountId32; to: AccountId32; amount: u128 }
       >;
+      /**
+       * The `transferred` balance is placed on hold at the `dest` account.
+       **/
+      TransferAndHold: AugmentedEvent<
+        ApiType,
+        [
+          reason: ArgonRuntimeRuntimeHoldReason,
+          source: AccountId32,
+          dest: AccountId32,
+          transferred: u128,
+        ],
+        {
+          reason: ArgonRuntimeRuntimeHoldReason;
+          source: AccountId32;
+          dest: AccountId32;
+          transferred: u128;
+        }
+      >;
+      /**
+       * A transfer of `amount` on hold from `source` to `dest` was initiated.
+       **/
+      TransferOnHold: AugmentedEvent<
+        ApiType,
+        [
+          reason: ArgonRuntimeRuntimeHoldReason,
+          source: AccountId32,
+          dest: AccountId32,
+          amount: u128,
+        ],
+        {
+          reason: ArgonRuntimeRuntimeHoldReason;
+          source: AccountId32;
+          dest: AccountId32;
+          amount: u128;
+        }
+      >;
+      /**
+       * An unexpected/defensive event was triggered.
+       **/
+      Unexpected: AugmentedEvent<ApiType, [PalletBalancesUnexpectedKind]>;
       /**
        * Some balance was unlocked.
        **/
@@ -1253,12 +1399,16 @@ declare module '@polkadot/api-base/types/events' {
           who: AccountId32,
           proxyType: ArgonRuntimeProxyType,
           disambiguationIndex: u16,
+          at: u32,
+          extrinsicIndex: u32,
         ],
         {
           pure: AccountId32;
           who: AccountId32;
           proxyType: ArgonRuntimeProxyType;
           disambiguationIndex: u16;
+          at: u32;
+          extrinsicIndex: u32;
         }
       >;
       /**

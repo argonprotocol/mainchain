@@ -547,6 +547,7 @@ fn it_skips_ineligible_voting_roots() {
 			parent_vote_root: old_root2,
 		}]);
 
+		System::set_block_number(2);
 		System::initialize(
 			&3,
 			&System::parent_hash(),

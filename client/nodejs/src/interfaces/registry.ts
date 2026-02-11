@@ -74,6 +74,8 @@ import type {
   FrameSupportDispatchPerDispatchClassWeightsPerClass,
   FrameSupportDispatchRawOrigin,
   FrameSupportPalletId,
+  FrameSupportStorageNoDrop,
+  FrameSupportTokensFungibleImbalance,
   FrameSupportTokensMiscBalanceStatus,
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
   FrameSupportTokensMiscIdAmountRuntimeHoldReason,
@@ -131,6 +133,7 @@ import type {
   PalletBalancesEvent,
   PalletBalancesReasons,
   PalletBalancesReserveData,
+  PalletBalancesUnexpectedKind,
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
@@ -267,7 +270,6 @@ import type {
   SpWeightsRuntimeDbWeight,
   SpWeightsWeightV2Weight,
   TokenGatewayPrimitivesGatewayAssetRegistration,
-  TokenGatewayPrimitivesGatewayAssetUpdate,
 } from '@polkadot/types/lookup';
 
 declare module '@polkadot/types/types/registry' {
@@ -340,6 +342,8 @@ declare module '@polkadot/types/types/registry' {
     FrameSupportDispatchPerDispatchClassWeightsPerClass: FrameSupportDispatchPerDispatchClassWeightsPerClass;
     FrameSupportDispatchRawOrigin: FrameSupportDispatchRawOrigin;
     FrameSupportPalletId: FrameSupportPalletId;
+    FrameSupportStorageNoDrop: FrameSupportStorageNoDrop;
+    FrameSupportTokensFungibleImbalance: FrameSupportTokensFungibleImbalance;
     FrameSupportTokensMiscBalanceStatus: FrameSupportTokensMiscBalanceStatus;
     FrameSupportTokensMiscIdAmountRuntimeFreezeReason: FrameSupportTokensMiscIdAmountRuntimeFreezeReason;
     FrameSupportTokensMiscIdAmountRuntimeHoldReason: FrameSupportTokensMiscIdAmountRuntimeHoldReason;
@@ -397,6 +401,7 @@ declare module '@polkadot/types/types/registry' {
     PalletBalancesEvent: PalletBalancesEvent;
     PalletBalancesReasons: PalletBalancesReasons;
     PalletBalancesReserveData: PalletBalancesReserveData;
+    PalletBalancesUnexpectedKind: PalletBalancesUnexpectedKind;
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
@@ -533,6 +538,5 @@ declare module '@polkadot/types/types/registry' {
     SpWeightsRuntimeDbWeight: SpWeightsRuntimeDbWeight;
     SpWeightsWeightV2Weight: SpWeightsWeightV2Weight;
     TokenGatewayPrimitivesGatewayAssetRegistration: TokenGatewayPrimitivesGatewayAssetRegistration;
-    TokenGatewayPrimitivesGatewayAssetUpdate: TokenGatewayPrimitivesGatewayAssetUpdate;
   } // InterfaceTypes
 } // declare module

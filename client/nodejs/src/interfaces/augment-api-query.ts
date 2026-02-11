@@ -50,6 +50,7 @@ import type {
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   FrameSupportDispatchPerDispatchClassWeight,
+  FrameSupportTokensFungibleImbalance,
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
   FrameSupportTokensMiscIdAmountRuntimeHoldReason,
   FrameSystemAccountInfo,
@@ -1368,6 +1369,16 @@ declare module '@polkadot/api-base/types/storage' {
       storageVersion: AugmentedQuery<
         ApiType,
         () => Observable<PalletTransactionPaymentReleases>,
+        []
+      >;
+      /**
+       * The `OnChargeTransaction` stores the withdrawn tx fee here.
+       *
+       * Use `withdraw_txfee` and `remaining_txfee` to access from outside the crate.
+       **/
+      txPaymentCredit: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<FrameSupportTokensFungibleImbalance>>,
         []
       >;
     };

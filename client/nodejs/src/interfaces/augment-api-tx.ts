@@ -57,7 +57,6 @@ import type {
   SpConsensusGrandpaEquivocationProof,
   SpCoreVoid,
   SpWeightsWeightV2Weight,
-  TokenGatewayPrimitivesGatewayAssetUpdate,
 } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
@@ -1358,16 +1357,16 @@ declare module '@polkadot/api-base/types/submittable' {
        * inaccessible.
        *
        * Requires a `Signed` origin, and the sender account must have been created by a call to
-       * `pure` with corresponding parameters.
+       * `create_pure` with corresponding parameters.
        *
-       * - `spawner`: The account that originally called `pure` to create this account.
+       * - `spawner`: The account that originally called `create_pure` to create this account.
        * - `index`: The disambiguation index originally passed to `create_pure`. Probably `0`.
-       * - `proxy_type`: The proxy type originally passed to `pure`.
-       * - `height`: The height of the chain when the call to `pure` was processed.
-       * - `ext_index`: The extrinsic index in which the call to `pure` was processed.
+       * - `proxy_type`: The proxy type originally passed to `create_pure`.
+       * - `height`: The height of the chain when the call to `create_pure` was processed.
+       * - `ext_index`: The extrinsic index in which the call to `create_pure` was processed.
        *
        * Fails with `NoPermission` in case the caller is not a previously created pure
-       * account whose `pure` call has corresponding parameters.
+       * account whose `create_pure` call has corresponding parameters.
        **/
       killPure: AugmentedSubmittable<
         (
@@ -1559,7 +1558,7 @@ declare module '@polkadot/api-base/types/submittable' {
        *
        * The dispatch origin for this call must be _Signed_.
        *
-       * WARNING: This may be called on accounts created by `pure`, however if done, then
+       * WARNING: This may be called on accounts created by `create_pure`, however if done, then
        * the unreserved fees will be inaccessible. **All access to this account will be lost.**
        **/
       removeProxies: AugmentedSubmittable<() => SubmittableExtrinsic<ApiType>, []>;
@@ -1814,28 +1813,11 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     tokenGateway: {
       /**
-       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
-       *
-       * This works by dispatching a request to the TokenGateway module on each requested chain
-       * to create the asset.
-       * `native` should be true if this asset originates from this chain
-       **/
-      createErc6160Asset: AugmentedSubmittable<
-        (
-          asset:
-            | PalletTokenGatewayAssetRegistration
-            | { localId?: any; reg?: any; native?: any; precision?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletTokenGatewayAssetRegistration]
-      >;
-      /**
        * Registers a multi-chain ERC6160 asset without sending any dispatch request.
        * You should use register_asset_locally when you want to enable token gateway transfers
        * for an asset that already exists on an external chain.
        **/
-      registerAssetLocally: AugmentedSubmittable<
+      createErc6160Asset: AugmentedSubmittable<
         (
           asset:
             | PalletTokenGatewayAssetRegistration
@@ -1888,22 +1870,6 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [PalletTokenGatewayPrecisionUpdate]
-      >;
-      /**
-       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
-       *
-       * This works by dispatching a request to the TokenGateway module on each requested chain
-       * to create the asset.
-       **/
-      updateErc6160Asset: AugmentedSubmittable<
-        (
-          asset:
-            | TokenGatewayPrimitivesGatewayAssetUpdate
-            | { assetId?: any; addChains?: any; removeChains?: any; newAdmins?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [TokenGatewayPrimitivesGatewayAssetUpdate]
       >;
     };
     treasury: {

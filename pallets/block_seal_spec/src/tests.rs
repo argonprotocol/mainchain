@@ -40,7 +40,7 @@ fn it_will_adjust_minimum() {
 				(10, 1, 0u128),
 			])
 		}));
-		System::set_block_number(2);
+		System::set_block_number(1);
 
 		let start_vote_minimum = BlockSealSpec::vote_minimum();
 
@@ -144,7 +144,7 @@ fn it_checks_the_vote_digest() {
 		let mut book2 = create_default_notebook(2, 1, 2);
 		book2.block_votes_count = 3;
 		book2.block_voting_power = 10_000;
-		System::set_block_number(2);
+		System::set_block_number(1);
 		let digest_details = vec![
 			NotaryNotebookVoteDigestDetails::from(&book1),
 			NotaryNotebookVoteDigestDetails::from(&book2),
@@ -163,7 +163,7 @@ fn it_checks_the_vote_digest() {
 		BlockSealSpec::on_finalize(2);
 
 		///// Test with empty set
-		System::set_block_number(3);
+		System::set_block_number(2);
 		System::initialize(
 			&3,
 			&System::parent_hash(),
@@ -493,6 +493,7 @@ fn it_changes_key_block_appropriately() {
 		assert_eq!(CurrentComputeKeyBlock::<Test>::get(), Some(System::block_hash(0)));
 
 		let next_rotation = KEY_BLOCK_ROTATION.into();
+		System::set_block_number(next_rotation - 1);
 		System::initialize(&next_rotation, &System::parent_hash(), &Default::default());
 		BlockSealSpec::on_timestamp_set(next_rotation);
 		BlockSealSpec::on_initialize(next_rotation);

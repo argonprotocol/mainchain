@@ -11,7 +11,7 @@ use std::panic::catch_unwind;
 fn it_panics_if_the_tick_is_invalid() {
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
-		System::set_block_number(2);
+		System::set_block_number(1);
 		Digests::mutate(|a| a.tick.0 = 2);
 		System::initialize(&2, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(2);
@@ -29,6 +29,7 @@ fn it_panics_if_the_tick_is_invalid() {
 fn it_tests_the_current_tick() {
 	new_test_ext(500).execute_with(|| {
 		Digests::mutate(|a| a.tick.0 = 2);
+		System::set_block_number(1);
 		System::initialize(&2, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(2);
 		assert_eq!(Ticks::current_tick(), 2);
@@ -75,7 +76,7 @@ fn it_tests_the_current_tick() {
 fn it_should_track_blocks_at_tick() {
 	new_test_ext(500).execute_with(|| {
 		// Go past genesis block so events get deposited
-		System::set_block_number(2);
+		System::set_block_number(1);
 		let mut parent_hash = System::parent_hash();
 		let mut last_block_tick = 0;
 		for i in 0..=501u64 {
