@@ -9,6 +9,7 @@ pub trait WeightInfo {
 	fn replace_bitcoin_xpub() -> Weight;
 	fn on_initialize_with_vault_releases(height_range: u32, vault_count: u32) -> Weight;
 	fn collect() -> Weight;
+	fn on_frame_start(vault_count: u32) -> Weight;
 }
 
 // For backwards compatibility and tests.
@@ -32,6 +33,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn collect() -> Weight {
+		Weight::zero()
+	}
+	fn on_frame_start(_vault_count: u32) -> Weight {
 		Weight::zero()
 	}
 }

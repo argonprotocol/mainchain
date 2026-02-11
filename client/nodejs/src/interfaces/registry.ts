@@ -267,6 +267,7 @@ import type {
   SpWeightsRuntimeDbWeight,
   SpWeightsWeightV2Weight,
   TokenGatewayPrimitivesGatewayAssetRegistration,
+  TokenGatewayPrimitivesGatewayAssetUpdate,
 } from '@polkadot/types/lookup';
 
 declare module '@polkadot/types/types/registry' {
@@ -532,5 +533,6 @@ declare module '@polkadot/types/types/registry' {
     SpWeightsRuntimeDbWeight: SpWeightsRuntimeDbWeight;
     SpWeightsWeightV2Weight: SpWeightsWeightV2Weight;
     TokenGatewayPrimitivesGatewayAssetRegistration: TokenGatewayPrimitivesGatewayAssetRegistration;
+    TokenGatewayPrimitivesGatewayAssetUpdate: TokenGatewayPrimitivesGatewayAssetUpdate;
   } // InterfaceTypes
 } // declare module

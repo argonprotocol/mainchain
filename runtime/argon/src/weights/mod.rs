@@ -4,3 +4,4 @@ pub mod pallet_balances_balances;
 pub mod pallet_balances_ownership;
 pub mod pallet_mining_slot;
 pub mod pallet_timestamp;
+pub mod pallet_vaults;

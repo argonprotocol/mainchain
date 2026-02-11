@@ -337,34 +337,45 @@ mod tests {
 			env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
 			env::set_var("INFURA_PROJECT_ID", "test");
 		}
-		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
-		spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
 		let argon_address = Address::from_str(ARGON_TOKEN_ADDRESS).unwrap();
-		use_mock_uniswap_prices(
-			argon_address,
-			vec![
-				PriceAndLiquidity { price: FixedU128::from_float(1.0), liquidity: 100_000_000 },
-				PriceAndLiquidity { price: FixedU128::from_float(1.01), liquidity: 100_000_000 },
-				PriceAndLiquidity { price: FixedU128::from_float(1.02), liquidity: 100_000_000 },
-			],
-		);
+		// Keep enough mocked samples so the loop never falls back to live Uniswap RPC in test.
+		let mut argon_prices = Vec::with_capacity(100);
+		for i in 0..100 {
+			let price = match i % 3 {
+				0 => 1.0,
+				1 => 1.01,
+				_ => 1.02,
+			};
+			argon_prices.push(PriceAndLiquidity {
+				price: FixedU128::from_float(price),
+				liquidity: 100_000_000,
+			});
+		}
+		use_mock_uniswap_prices(argon_address, argon_prices);
 
 		let argonot_address = Address::from_str(ARGONOT_TOKEN_ADDRESS).unwrap();
-		use_mock_uniswap_prices(
-			argonot_address,
-			vec![
-				PriceAndLiquidity { price: FixedU128::from_float(2.0), liquidity: 1_000_000 },
-				PriceAndLiquidity { price: FixedU128::from_float(2.01), liquidity: 1_000_000 },
-				PriceAndLiquidity { price: FixedU128::from_float(2.02), liquidity: 1_000_000 },
-			],
-		);
+		let mut argonot_prices = Vec::with_capacity(100);
+		for i in 0..100 {
+			let price = match i % 3 {
+				0 => 2.0,
+				1 => 2.01,
+				_ => 2.02,
+			};
+			argonot_prices.push(PriceAndLiquidity {
+				price: FixedU128::from_float(price),
+				liquidity: 1_000_000,
+			});
+		}
+		use_mock_uniswap_prices(argonot_address, argonot_prices);
 		use_mock_price_lookups(PriceLookups {
 			bitcoin: FixedU128::from_float(62_000.23),
 			usdc: FixedU128::from_float(1.0),
 		});
 		use_mock_cpi_values(vec![0.2, 0.1, -0.1, 0.3]).await;
+		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
+		spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
 		let mut counter = 0;
 		let mut blocks = 0;
 		while let Some(Ok(block)) = block_sub.next().await {

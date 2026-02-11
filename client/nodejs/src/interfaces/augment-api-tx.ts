@@ -57,6 +57,7 @@ import type {
   SpConsensusGrandpaEquivocationProof,
   SpCoreVoid,
   SpWeightsWeightV2Weight,
+  TokenGatewayPrimitivesGatewayAssetUpdate,
 } from '@polkadot/types/lookup';
 
 export type __AugmentedSubmittable = AugmentedSubmittable<() => unknown>;
@@ -1813,11 +1814,28 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     tokenGateway: {
       /**
+       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
+       *
+       * This works by dispatching a request to the TokenGateway module on each requested chain
+       * to create the asset.
+       * `native` should be true if this asset originates from this chain
+       **/
+      createErc6160Asset: AugmentedSubmittable<
+        (
+          asset:
+            | PalletTokenGatewayAssetRegistration
+            | { localId?: any; reg?: any; native?: any; precision?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletTokenGatewayAssetRegistration]
+      >;
+      /**
        * Registers a multi-chain ERC6160 asset without sending any dispatch request.
        * You should use register_asset_locally when you want to enable token gateway transfers
        * for an asset that already exists on an external chain.
        **/
-      createErc6160Asset: AugmentedSubmittable<
+      registerAssetLocally: AugmentedSubmittable<
         (
           asset:
             | PalletTokenGatewayAssetRegistration
@@ -1870,6 +1888,22 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [PalletTokenGatewayPrecisionUpdate]
+      >;
+      /**
+       * Registers a multi-chain ERC6160 asset. The asset should not already exist.
+       *
+       * This works by dispatching a request to the TokenGateway module on each requested chain
+       * to create the asset.
+       **/
+      updateErc6160Asset: AugmentedSubmittable<
+        (
+          asset:
+            | TokenGatewayPrimitivesGatewayAssetUpdate
+            | { assetId?: any; addChains?: any; removeChains?: any; newAdmins?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [TokenGatewayPrimitivesGatewayAssetUpdate]
       >;
     };
     treasury: {

@@ -3,7 +3,7 @@ extern crate alloc;
 extern crate core;
 
 use argon_primitives::{
-	SlotEvents, TickProvider,
+	ArgonDigests, SlotEvents, TickProvider,
 	block_seal::{MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig},
 	inherents::BlockSealInherent,
 	providers::*,
@@ -365,7 +365,9 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
+		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+			// Reset this block-scoped flag before we compute transition state for the current
+			// block.
 			NewlyStartedFrameId::<T>::take();
 			let digest = <frame_system::Pallet<T>>::digest();
 			for log in digest.logs.iter() {
@@ -395,22 +397,30 @@ pub mod pallet {
 			// clear out previous miners
 			ReleasedMinersByAccountId::<T>::take();
 
-			T::DbWeight::get().reads_writes(2, 2)
+			let has_vote_seal = Self::has_vote_seal_digest();
+			let mut weight = T::DbWeight::get().reads_writes(2, 2);
+			if has_vote_seal {
+				weight = weight.saturating_add(T::WeightInfo::on_finalize_record_block_author());
+			}
+			if let Some(frame_id) = Self::evaluate_newly_started_frame(has_vote_seal) {
+				let cohort_size = NextCohortSize::<T>::get();
+				weight = weight
+					.saturating_add(T::WeightInfo::start_new_frame(cohort_size))
+					.saturating_add(T::WeightInfo::on_finalize_frame_adjustments())
+					.saturating_add(T::SlotEvents::on_frame_start_weight(frame_id));
+			} else if Self::should_rotate_grandpas(n) {
+				weight = weight.saturating_add(T::WeightInfo::on_finalize_grandpa_rotation());
+			}
+
+			weight
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
-			if T::SealerInfo::is_block_vote_seal() {
+			if Self::has_vote_seal_digest() {
 				// Sealer info is only available after the block seal inherents (eg, between
 				// initialize and finalize)
 				let author = T::SealerInfo::get_sealer_info().block_author_account_id;
 				Self::record_block_author(author);
-			}
-			// if this is a vote block OR we've fallen into a zero-registered-miner hole, increment
-			// ticks
-			if T::SealerInfo::is_block_vote_seal() ||
-				(ActiveMinersCount::<T>::get().is_zero() && NextFrameId::<T>::get() > 1)
-			{
-				FrameRewardTicksRemaining::<T>::mutate(|x| x.saturating_reduce(1u64));
 			}
 
 			// if it's time for the cohort to start, do it
@@ -420,19 +430,12 @@ pub mod pallet {
 				Self::start_new_frame(activating_frame_id);
 				// we use the current price as part of calculations
 				Self::adjust_number_of_seats();
-			} else {
-				let rotate_grandpa_blocks = UniqueSaturatedInto::<u32>::unique_saturated_into(
-					T::GrandpaRotationBlocks::get(),
-				);
-				let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-				// rotate grandpas on off rotations
-				if !HasAddedGrandpaRotation::<T>::get() ||
-					current_block % rotate_grandpa_blocks == 0
-				{
-					let current_frame_id = Self::current_frame_id();
-					T::SlotEvents::rotate_grandpas::<T::Keys>(current_frame_id, vec![], vec![]);
-					HasAddedGrandpaRotation::<T>::put(true);
-				}
+			}
+			// rotate grandpas on off rotations
+			else if Self::should_rotate_grandpas(n) {
+				let current_frame_id = Self::current_frame_id();
+				T::SlotEvents::rotate_grandpas::<T::Keys>(current_frame_id, vec![], vec![]);
+				HasAddedGrandpaRotation::<T>::put(true);
 			}
 			if let Some(frame_info) = TempFrameInfoDigest::<T>::take() {
 				assert_eq!(
@@ -773,6 +776,10 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn get_newly_started_frame() -> Option<FrameId> {
+		NewlyStartedFrameId::<T>::get()
+	}
+
+	fn evaluate_newly_started_frame(has_vote_seal: bool) -> Option<FrameId> {
 		if let Some(frame_id) = NewlyStartedFrameId::<T>::get() {
 			return Some(frame_id);
 		}
@@ -784,12 +791,42 @@ impl<T: Config> Pallet<T> {
 				return Some(next_frame_id);
 			}
 		}
-		let remaining_frame_ticks = FrameRewardTicksRemaining::<T>::get();
+		let mut remaining_frame_ticks = FrameRewardTicksRemaining::<T>::get();
+		if Self::is_frame_reward_tick(has_vote_seal) {
+			remaining_frame_ticks.saturating_reduce(1u64);
+			FrameRewardTicksRemaining::<T>::put(remaining_frame_ticks);
+		}
 		if remaining_frame_ticks.is_zero() {
 			NewlyStartedFrameId::<T>::put(next_frame_id);
 			return Some(next_frame_id);
 		}
 		None
+	}
+
+	/// if this is a vote block OR we've fallen into a zero-registered-miner hole, increment
+	/// ticks
+	fn is_frame_reward_tick(has_vote_seal: bool) -> bool {
+		let no_registered_miners =
+			ActiveMinersCount::<T>::get().is_zero() && NextFrameId::<T>::get() > 1;
+		no_registered_miners || has_vote_seal
+	}
+
+	fn has_vote_seal_digest() -> bool {
+		if let Some(seal) = <frame_system::Pallet<T>>::digest()
+			.logs
+			.iter()
+			.find_map(|log| log.as_block_seal())
+		{
+			return seal.is_vote();
+		}
+		T::SealerInfo::is_block_vote_seal()
+	}
+
+	fn should_rotate_grandpas(n: BlockNumberFor<T>) -> bool {
+		let rotate_grandpa_blocks =
+			UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
+		let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
+		!HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0
 	}
 
 	pub fn is_registered_mining_active() -> bool {

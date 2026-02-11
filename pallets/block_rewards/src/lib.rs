@@ -437,6 +437,11 @@ pub mod pallet {
 				rewards.try_push((frame_id + 1, ArgonsPerBlock::<T>::get()))
 			});
 		}
+
+		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+			// Includes local cohort/argon updates plus provider-backed price/tick lookups.
+			T::DbWeight::get().reads_writes(6, 3)
+		}
 	}
 }
 
