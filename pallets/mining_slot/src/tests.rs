@@ -1148,6 +1148,15 @@ fn it_will_end_auctions_if_a_seal_qualifies() {
 }
 
 #[test]
+fn it_does_not_close_bids_when_vrf_window_config_is_zero() {
+	BlocksBeforeBidEndForVrfClose::set(0);
+	new_test_ext().execute_with(|| {
+		FrameRewardTicksRemaining::<Test>::set(0);
+		assert!(!MiningSlots::check_for_bidding_close(U256::from(1u32)));
+	});
+}
+
+#[test]
 fn it_should_allow_each_miner_to_get_full_rewards() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
@@ -1896,6 +1905,28 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		assert_eq!(FrameStartTicks::<Test>::get().get(&1), Some(&next_divisible_period));
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+	});
+}
+
+#[test]
+fn it_allows_zero_vrf_close_window_update_to_disable_vrf_closing() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let starting_config = MiningConfig::<Test>::get();
+
+		assert_ok!(MiningSlots::configure_mining_slot_delay(RuntimeOrigin::root(), None, Some(5)));
+		assert_eq!(MiningConfig::<Test>::get().ticks_before_bid_end_for_vrf_close, 5);
+
+		assert_ok!(MiningSlots::configure_mining_slot_delay(RuntimeOrigin::root(), None, Some(0)));
+		assert_eq!(MiningConfig::<Test>::get().ticks_before_bid_end_for_vrf_close, 0);
+		System::assert_last_event(
+			Event::MiningConfigurationUpdated {
+				slot_bidding_start_after_ticks: starting_config.slot_bidding_start_after_ticks,
+				ticks_between_slots: starting_config.ticks_between_slots,
+				ticks_before_bid_end_for_vrf_close: 0,
+			}
+			.into(),
+		);
 	});
 }
 
