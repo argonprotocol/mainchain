@@ -19,7 +19,8 @@ pub mod pallet {
 	use super::*;
 	use argon_primitives::{
 		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
-		TransferToLocalchainId,
+		TickProvider, TransferToLocalchainId,
+		notary::NotaryProvider,
 		notebook::{ChainTransfer, NotebookHeader},
 	};
 
@@ -55,7 +56,8 @@ pub mod pallet {
 			+ MaxEncodedLen;
 
 		type NotebookProvider: NotebookProvider;
-		type NotebookTick: Get<Tick>;
+		type NotaryProvider: NotaryProvider<Self::Block, <Self as frame_system::Config>::AccountId>;
+		type TickProvider: TickProvider<Self::Block>;
 		type EventHandler: BurnEventHandler<<Self as Config>::Balance>;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -83,6 +85,12 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
+	/// Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
+	///
+	/// NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,
+	/// not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending
+	/// transfers for that notary remain frozen by design until a notary-switch recovery path is
+	/// executed.
 	pub type ExpiringTransfersOutByNotary<T: Config> = StorageDoubleMap<
 		Hasher1 = Twox64Concat,
 		Hasher2 = Twox64Concat,
@@ -177,6 +185,10 @@ pub mod pallet {
 		NotebookIncludesExpiredLocalchainTransfer,
 		/// The notary id is not registered
 		InvalidNotaryUsedForTransfer,
+		/// The notary is currently locked and cannot process transfers
+		NotaryLockedForTransfer,
+		/// No transfer IDs are currently available
+		NoAvailableTransferId,
 	}
 
 	#[pallet::genesis_config]
@@ -210,6 +222,15 @@ pub mod pallet {
 			notary_id: NotaryId,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			let current_tick = T::TickProvider::current_tick();
+			ensure!(
+				T::NotaryProvider::active_notaries().contains(&notary_id),
+				Error::<T>::InvalidNotaryUsedForTransfer,
+			);
+			ensure!(
+				!T::NotebookProvider::is_notary_locked_at_tick(notary_id, current_tick),
+				Error::<T>::NotaryLockedForTransfer,
+			);
 
 			ensure!(
 				T::Argon::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
@@ -227,7 +248,7 @@ pub mod pallet {
 				Preservation::Expendable,
 			)?;
 
-			let expiration_tick: Tick = T::NotebookTick::get() + T::TransferExpirationTicks::get();
+			let expiration_tick: Tick = current_tick + T::TransferExpirationTicks::get();
 
 			PendingTransfersOut::<T>::insert(
 				transfer_id,
@@ -278,8 +299,8 @@ pub mod pallet {
 						}
 					},
 					ChainTransfer::ToLocalchain { transfer_id } => {
-						if let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) {
-							<ExpiringTransfersOutByNotary<T>>::mutate(
+						if let Some(transfer) = PendingTransfersOut::<T>::take(transfer_id) {
+							ExpiringTransfersOutByNotary::<T>::mutate(
 								transfer.notary_id,
 								transfer.expiration_tick,
 								|e| {
@@ -317,38 +338,49 @@ pub mod pallet {
 				T::EventHandler::on_argon_burn(&header.tax.into());
 			}
 
-			let expiring = <ExpiringTransfersOutByNotary<T>>::take(notary_id, header.tick);
-			for transfer_id in expiring.into_iter() {
-				let Some(transfer) = <PendingTransfersOut<T>>::take(transfer_id) else { continue };
-				match T::Argon::transfer(
-					&Self::notary_account_id(transfer.notary_id),
-					&transfer.account_id,
-					transfer.amount,
-					Preservation::Expendable,
-				) {
-					Ok(_) => {
-						Self::deposit_event(Event::TransferToLocalchainExpired {
-							account_id: transfer.account_id,
-							transfer_id,
-							notary_id: transfer.notary_id,
-						});
-					},
-					Err(e) => {
-						// can't panic here or chain will get stuck
-						log::warn!(
-							"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
-							&transfer.account_id,
-							transfer.amount,
-							e
-						);
-						Self::deposit_event(Event::TransferToLocalchainRefundError {
-							account_id: transfer.account_id,
-							notebook_number: header.notebook_number,
-							transfer_id,
-							notary_id: transfer.notary_id,
-							error: e,
-						});
-					},
+			// Use notebook tick progression as the expiry boundary so delayed-but-valid notebooks
+			// can still consume transfers before they are treated as stale.
+			let expiring_ticks: Vec<Tick> =
+				ExpiringTransfersOutByNotary::<T>::iter_prefix(notary_id)
+					.filter_map(|(tick, _)| if tick < header.tick { Some(tick) } else { None })
+					.collect();
+
+			for tick in expiring_ticks.into_iter() {
+				let expiring = ExpiringTransfersOutByNotary::<T>::take(notary_id, tick);
+				for transfer_id in expiring.into_iter() {
+					let Some(transfer) = PendingTransfersOut::<T>::take(transfer_id) else {
+						continue;
+					};
+					match T::Argon::transfer(
+						&Self::notary_account_id(transfer.notary_id),
+						&transfer.account_id,
+						transfer.amount,
+						Preservation::Expendable,
+					) {
+						Ok(_) => {
+							Self::deposit_event(Event::TransferToLocalchainExpired {
+								account_id: transfer.account_id,
+								transfer_id,
+								notary_id: transfer.notary_id,
+							});
+						},
+						Err(e) => {
+							// can't panic here or chain will get stuck
+							log::warn!(
+								"Failed to return pending Localchain transfer to account {:?} (amount={:?}): {:?}",
+								&transfer.account_id,
+								transfer.amount,
+								e
+							);
+							Self::deposit_event(Event::TransferToLocalchainRefundError {
+								account_id: transfer.account_id,
+								notebook_number: header.notebook_number,
+								transfer_id,
+								notary_id: transfer.notary_id,
+								error: e,
+							});
+						},
+					}
 				}
 			}
 		}
@@ -365,7 +397,7 @@ pub mod pallet {
 			microgons: <T as Config>::Balance,
 			at_tick: Tick,
 		) -> bool {
-			let result = <PendingTransfersOut<T>>::get(transfer_id);
+			let result = PendingTransfersOut::<T>::get(transfer_id);
 			if let Some(transfer) = result {
 				return transfer.notary_id == notary_id &&
 					transfer.amount == microgons &&
@@ -409,9 +441,21 @@ pub mod pallet {
 		}
 
 		fn next_transfer_id() -> Result<TransferToLocalchainId, Error<T>> {
-			let transfer_id = NextTransferId::<T>::get().unwrap_or(1);
-			let next_transfer_id = transfer_id.increment();
-			NextTransferId::<T>::set(next_transfer_id);
+			let mut next_transfer_id = NextTransferId::<T>::get().unwrap_or(1);
+			if next_transfer_id == 0 {
+				next_transfer_id = 1;
+			}
+			ensure!(
+				!PendingTransfersOut::<T>::contains_key(next_transfer_id),
+				Error::<T>::NoAvailableTransferId
+			);
+			let transfer_id = next_transfer_id;
+
+			next_transfer_id = transfer_id.wrapping_add(1);
+			if next_transfer_id == 0 {
+				next_transfer_id = 1;
+			}
+			NextTransferId::<T>::set(Some(next_transfer_id));
 			Ok(transfer_id)
 		}
 	}
