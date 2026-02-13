@@ -1,0 +1,46 @@
+[package]
+name = "pallet-operational-accounts"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime"] }
+pallet-prelude = { workspace = true }
+argon-primitives = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+ismp = { workspace = true, default-features = true }
+pallet-inbound-transfer-log = { workspace = true, default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"argon-primitives/std",
+	"codec/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+	"serde/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

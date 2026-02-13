@@ -260,6 +260,7 @@ fn it_adds_new_cohorts_on_block() {
 		BidsForNextSlotCohort::<Test>::set(cohort.clone());
 
 		CurrentTick::set(10);
+		MiningSeatsWon::set(vec![]);
 
 		IsBlockVoteSeal::set(true);
 		// on 8, we're filling indexes 2 and 3 [0, 1, -> 2, -> 3, _, _]
@@ -324,6 +325,7 @@ fn it_adds_new_cohorts_on_block() {
 			"Should emit a new slot event for the new cohort"
 		);
 		assert_eq!(LastSlotRemoved::get().len(), 2);
+		assert_eq!(MiningSeatsWon::get(), vec![1]);
 
 		System::assert_last_event(
 			Event::NewMiners {
