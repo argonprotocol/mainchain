@@ -1159,6 +1159,9 @@ impl<T: Config> Pallet<T> {
 		let mining_config = MiningConfig::<T>::get();
 
 		let ticks_before_close = mining_config.ticks_before_bid_end_for_vrf_close;
+		if ticks_before_close == 0 {
+			return false;
+		}
 		// Are we in the closing eligibility window?
 		if FrameRewardTicksRemaining::<T>::get() > ticks_before_close {
 			return false;
