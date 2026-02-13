@@ -83,6 +83,7 @@ enum Commands {
 		rpc_rate_limit_max_slowdowns: usize,
 
 		/// Trust proxy headers (`x-forwarded-for`, `x-real-ip`) when deriving per-IP keys.
+		/// Only enable this when the node is behind trusted proxies.
 		#[clap(long, env = "ARGON_RPC_RATE_LIMIT_TRUST_PROXY_HEADERS", default_value_t = false)]
 		rpc_rate_limit_trust_proxy_headers: bool,
 
