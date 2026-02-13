@@ -34,6 +34,35 @@ fn it_can_send_funds_to_localchain() {
 }
 
 #[test]
+fn it_rejects_invalid_notary_transfer() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 1000);
+
+		assert_noop!(
+			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 99),
+			Error::<Test>::InvalidNotaryUsedForTransfer
+		);
+	});
+}
+
+#[test]
+fn it_rejects_locked_notary_transfer() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 1000);
+		LockedNotaries::set([(1, 1)].into_iter().collect());
+
+		assert_noop!(
+			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 1),
+			Error::<Test>::NotaryLockedForTransfer
+		);
+	});
+}
+
+#[test]
 fn it_allows_you_to_transfer_full_balance() {
 	new_test_ext().execute_with(|| {
 		let who = Bob.to_account_id();
@@ -52,7 +81,7 @@ fn it_allows_you_to_transfer_full_balance() {
 }
 
 #[test]
-fn it_expires_transfers_on_notebook_tick() {
+fn it_expires_transfers_when_notebook_tick_advances_past_expiration() {
 	new_test_ext().execute_with(|| {
 		let who = Bob.to_account_id();
 		// Go past genesis block so events get deposited
@@ -70,24 +99,45 @@ fn it_expires_transfers_on_notebook_tick() {
 
 		ChainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
-			notebook_number: 10,
-			tick: expires_tick,
-			chain_transfers: Default::default(),
-			changed_accounts_root: Default::default(),
-			changed_account_origins: Default::default(),
+			notebook_number: 1,
+			tick: expires_tick + 1,
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
 			version: 1,
 			tax: 0,
 			block_voting_power: 0,
 			blocks_with_votes: Default::default(),
 			block_votes_root: H256::random(),
 			secret_hash: H256::random(),
-
 			parent_secret: None,
 			block_votes_count: 0,
 			domains: Default::default(),
 		});
 		assert!(System::account_exists(&who));
 		assert_eq!(Balances::free_balance(&who), 2000);
+	});
+}
+
+#[test]
+fn it_does_not_expire_transfers_without_notebook_submission() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 2000);
+		assert_ok!(ChainTransferPallet::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			2000,
+			1,
+		));
+		assert_eq!(Balances::free_balance(&who), 0);
+
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
+		NotebookTick::set(expires_tick + 10);
+		ChainTransferPallet::on_finalize(System::block_number());
+
+		assert_eq!(Balances::free_balance(&who), 0);
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick), vec![1]);
 	});
 }
 
@@ -120,6 +170,41 @@ fn it_can_handle_multiple_transfer() {
 			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who.clone()), 1200, 1,),
 			Error::<Test>::MaxBlockTransfersExceeded
 		);
+	});
+}
+
+#[test]
+fn it_rejects_transfer_id_reuse_when_wrapped() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		MaxPendingTransfersOutPerBlock::set(3);
+		System::set_block_number(1);
+		set_argons(&who, 5000);
+
+		assert_ok!(ChainTransferPallet::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			1000,
+			1,
+		));
+		assert_eq!(NextTransferId::<Test>::get(), Some(2));
+
+		NextTransferId::<Test>::set(Some(u32::MAX));
+		System::inc_account_nonce(&who);
+		assert_ok!(ChainTransferPallet::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			1000,
+			1,
+		));
+		assert_eq!(NextTransferId::<Test>::get(), Some(1));
+
+		System::inc_account_nonce(&who);
+		assert_noop!(
+			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who.clone()), 1000, 1),
+			Error::<Test>::NoAvailableTransferId
+		);
+
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
+		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick), vec![1, u32::MAX]);
 	});
 }
 

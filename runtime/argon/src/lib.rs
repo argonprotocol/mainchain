@@ -447,7 +447,8 @@ impl pallet_chain_transfer::Config for Runtime {
 	type Balance = Balance;
 	type NotebookProvider =
 		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
-	type NotebookTick = NotebookTickProvider;
+	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type EventHandler = use_unless_benchmark!(Mint, ());
 	type PalletId = ChainTransferPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;
