@@ -370,12 +370,12 @@ pub mod pallet {
 		) -> bool {
 			let key_history = <NotaryKeyHistory<T>>::get(notary_id);
 
-			// find the first key that is valid at the given block height
-			let mut public =
-				key_history.iter().find(|(tick, _)| *tick >= at_tick).map(|(_, public)| public);
-			if public.is_none() && !key_history.is_empty() && key_history[0].0 < at_tick {
-				public = key_history.first().map(|(_, public)| public);
-			}
+			// Choose the latest effective key at or before `at_tick`.
+			let public = key_history
+				.iter()
+				.filter(|(tick, _)| *tick <= at_tick)
+				.max_by_key(|(tick, _)| *tick)
+				.map(|(_, public)| public);
 
 			if let Some(public) = public {
 				return public.verify(message, signature);

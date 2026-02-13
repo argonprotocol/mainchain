@@ -4,7 +4,11 @@ use pallet_prelude::*;
 use sp_keyring::Sr25519Keyring::Alice;
 
 use crate as pallet_chain_transfer;
-use argon_primitives::{NotebookProvider, NotebookSecret};
+use argon_primitives::{
+	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
+	notary::{NotaryProvider, NotarySignature},
+	tick::Ticker,
+};
 use frame_support::traits::Currency;
 use sp_runtime::AccountId32;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
@@ -47,6 +51,7 @@ parameter_types! {
 	pub static BlockSealers: BTreeMap<BlockNumber, Vec<BlockSealAuthorityId>> = BTreeMap::new();
 
 	pub static LockedNotaries: BTreeMap<NotaryId, Tick> = BTreeMap::new();
+	pub static ActiveNotaries: Vec<NotaryId> = vec![1];
 
 	pub static IsProofOfCompute: bool = false;
 }
@@ -93,6 +98,53 @@ impl NotebookProvider for StaticNotebookProvider {
 	}
 }
 
+pub struct StaticNotaryProvider;
+impl NotaryProvider<Block, AccountId32> for StaticNotaryProvider {
+	fn verify_signature(
+		_notary_id: NotaryId,
+		_at_tick: Tick,
+		_message: &H256,
+		_signature: &NotarySignature,
+	) -> bool {
+		true
+	}
+
+	fn active_notaries() -> Vec<NotaryId> {
+		ActiveNotaries::get()
+	}
+
+	fn notary_operator_account_id(_notary_id: NotaryId) -> Option<AccountId32> {
+		None
+	}
+}
+
+pub struct StaticTickProvider;
+impl TickProvider<Block> for StaticTickProvider {
+	fn previous_tick() -> Tick {
+		NotebookTick::get().saturating_sub(1)
+	}
+
+	fn current_tick() -> Tick {
+		NotebookTick::get()
+	}
+
+	fn elapsed_ticks() -> Tick {
+		NotebookTick::get()
+	}
+
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(Self::current_tick())
+	}
+
+	fn ticker() -> Ticker {
+		Ticker::new(1000, 2)
+	}
+
+	fn blocks_at_tick(_tick: Tick) -> Vec<H256> {
+		vec![]
+	}
+}
+
 impl pallet_timestamp::Config for Test {
 	type Moment = u64;
 	type OnTimestampSet = ();
@@ -105,7 +157,8 @@ impl pallet_chain_transfer::Config for Test {
 	type Argon = Balances;
 	type Balance = Balance;
 	type NotebookProvider = StaticNotebookProvider;
-	type NotebookTick = NotebookTick;
+	type NotaryProvider = StaticNotaryProvider;
+	type TickProvider = StaticTickProvider;
 	type EventHandler = ();
 	type PalletId = LocalchainPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;

@@ -51,6 +51,8 @@ import type {
   ArgonPrimitivesNotebookNotebookHeader,
   ArgonPrimitivesNotebookSignedNotebookHeader,
   ArgonPrimitivesProvidersBlockSealerInfo,
+  ArgonPrimitivesProvidersOperationalRewardKind,
+  ArgonPrimitivesProvidersOperationalRewardPayout,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultVaultError,
@@ -179,6 +181,10 @@ import type {
   PalletHyperbridgeEvent,
   PalletHyperbridgeSubstrateHostParams,
   PalletHyperbridgeVersionedHostParams,
+  PalletInboundTransferLogAssetKind,
+  PalletInboundTransferLogEvent,
+  PalletInboundTransferLogInboundEvmTransfer,
+  PalletInboundTransferLogInboundTransferDropReason,
   PalletIsmpCall,
   PalletIsmpError,
   PalletIsmpErrorsHandlingError,
@@ -207,6 +213,15 @@ import type {
   PalletNotebookCall,
   PalletNotebookError,
   PalletNotebookEvent,
+  PalletOperationalAccountsAccessCodeMetadata,
+  PalletOperationalAccountsAccessCodeProof,
+  PalletOperationalAccountsAccountOwnershipProof,
+  PalletOperationalAccountsCall,
+  PalletOperationalAccountsError,
+  PalletOperationalAccountsEvent,
+  PalletOperationalAccountsLegacyVaultInfo,
+  PalletOperationalAccountsOperationalAccount,
+  PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexCall,
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexError,
@@ -319,6 +334,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesNotebookNotebookHeader: ArgonPrimitivesNotebookNotebookHeader;
     ArgonPrimitivesNotebookSignedNotebookHeader: ArgonPrimitivesNotebookSignedNotebookHeader;
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
+    ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
+    ArgonPrimitivesProvidersOperationalRewardPayout: ArgonPrimitivesProvidersOperationalRewardPayout;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
@@ -447,6 +464,10 @@ declare module '@polkadot/types/types/registry' {
     PalletHyperbridgeEvent: PalletHyperbridgeEvent;
     PalletHyperbridgeSubstrateHostParams: PalletHyperbridgeSubstrateHostParams;
     PalletHyperbridgeVersionedHostParams: PalletHyperbridgeVersionedHostParams;
+    PalletInboundTransferLogAssetKind: PalletInboundTransferLogAssetKind;
+    PalletInboundTransferLogEvent: PalletInboundTransferLogEvent;
+    PalletInboundTransferLogInboundEvmTransfer: PalletInboundTransferLogInboundEvmTransfer;
+    PalletInboundTransferLogInboundTransferDropReason: PalletInboundTransferLogInboundTransferDropReason;
     PalletIsmpCall: PalletIsmpCall;
     PalletIsmpError: PalletIsmpError;
     PalletIsmpErrorsHandlingError: PalletIsmpErrorsHandlingError;
@@ -475,6 +496,15 @@ declare module '@polkadot/types/types/registry' {
     PalletNotebookCall: PalletNotebookCall;
     PalletNotebookError: PalletNotebookError;
     PalletNotebookEvent: PalletNotebookEvent;
+    PalletOperationalAccountsAccessCodeMetadata: PalletOperationalAccountsAccessCodeMetadata;
+    PalletOperationalAccountsAccessCodeProof: PalletOperationalAccountsAccessCodeProof;
+    PalletOperationalAccountsAccountOwnershipProof: PalletOperationalAccountsAccountOwnershipProof;
+    PalletOperationalAccountsCall: PalletOperationalAccountsCall;
+    PalletOperationalAccountsError: PalletOperationalAccountsError;
+    PalletOperationalAccountsEvent: PalletOperationalAccountsEvent;
+    PalletOperationalAccountsLegacyVaultInfo: PalletOperationalAccountsLegacyVaultInfo;
+    PalletOperationalAccountsOperationalAccount: PalletOperationalAccountsOperationalAccount;
+    PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;
     PalletPriceIndexCall: PalletPriceIndexCall;
     PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;
     PalletPriceIndexError: PalletPriceIndexError;
