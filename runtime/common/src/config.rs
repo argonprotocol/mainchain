@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use argon_primitives::MICROGONS_PER_ARGON;
 use ismp::host::StateMachine;
 use pallet_transaction_payment::Multiplier;
 use smallvec::smallvec;
@@ -90,7 +91,7 @@ parameter_types! {
 	pub const MaxTreasuryContributors: u32 = 100;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
-	pub const BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;
@@ -195,6 +196,43 @@ parameter_types! {
 	pub const OwnershipTokenAssetId: u32 = 1;
 	// Set the correct decimals for the native currency
 	pub const Decimals: u8 = 6;
+
+	// ## pallet_inbound_transfer_log
+	/// How many blocks to retain inbound transfer records.
+	pub const InboundTransfersRetentionBlocks: BlockNumber =
+		(10 * TicksPerDay::get()) as BlockNumber;
+	/// Maximum number of inbound transfers retained per block.
+	pub const MaxTransfersToRetainPerBlock: u32 = 100;
+	/// Maximum number of bytes allowed in a TokenGateway request body (0 disables the cap).
+	pub const MaxInboundTransferBytes: u32 = 10 * 1_024;
+	/// Minimum transfer amount (in microgons) to record.
+	pub const MinimumTransferMicrogonsToRecord: Balance = 1_000 * MICROGONS_PER_ARGON;
+
+	// ## pallet_operational_accounts
+	/// How many mining frames an access code remains valid.
+	pub const OperationalAccessCodeExpirationFrames: FrameId = 2;
+	/// Maximum number of access codes that may expire in the same frame.
+	pub const MaxAccessCodesExpiringPerFrame: u32 = 1_000;
+	/// Maximum number of issuable operational access codes allowed at once.
+	pub const MaxIssuableOperationalAccessCodes: u32 = 3;
+	/// Maximum number of queued operational rewards.
+	pub const OperationalMaxRewardsQueued: u32 = 1_000;
+	/// Minimum argon amount (base units) required for a qualifying bitcoin lock.
+	pub const MinBitcoinLockSizeForOperational: Balance = 2_000 * MICROGONS_PER_ARGON;
+	/// Additional argon amount (base units) required per access code after operational.
+	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
+	/// Mining seats required to become operational.
+	pub const MiningSeatsForOperational: u32 = 2;
+	/// Mining seats required per access code after operational.
+	pub const MiningSeatsPerAccessCode: u32 = 5;
+	/// Number of operational sponsees required per referral bonus reward.
+	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
+	/// Default reward paid when an account becomes operational.
+	pub const OperationalActivationReward: Balance = 500 * MICROGONS_PER_ARGON;
+	/// Default bonus reward paid every referral threshold.
+	pub const OperationalReferralBonusReward: Balance = 5_000 * MICROGONS_PER_ARGON;
+	/// Maximum legacy vault registrations to store for hydration.
+	pub const MaxLegacyVaultRegistrations: u32 = 200;
 }
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the

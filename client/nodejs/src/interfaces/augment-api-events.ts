@@ -31,6 +31,7 @@ import type {
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotaryNotaryRecord,
+  ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   ArgonRuntimeRuntimeHoldReason,
@@ -44,6 +45,8 @@ import type {
   PalletBalancesUnexpectedKind,
   PalletDomainsDomainRegistration,
   PalletHyperbridgeVersionedHostParams,
+  PalletInboundTransferLogInboundEvmTransfer,
+  PalletInboundTransferLogInboundTransferDropReason,
   PalletIsmpErrorsHandlingError,
   PalletMintMintType,
   PalletMultisigTimepoint,
@@ -709,6 +712,32 @@ declare module '@polkadot/api-base/types/events' {
         { amount: u128; account: AccountId32 }
       >;
     };
+    inboundTransferLog: {
+      /**
+       * A TokenGateway request was ignored or dropped.
+       **/
+      InboundEvmTransferDropped: AugmentedEvent<
+        ApiType,
+        [
+          source: IsmpHostStateMachine,
+          nonce: u64,
+          reason: PalletInboundTransferLogInboundTransferDropReason,
+        ],
+        {
+          source: IsmpHostStateMachine;
+          nonce: u64;
+          reason: PalletInboundTransferLogInboundTransferDropReason;
+        }
+      >;
+      /**
+       * A qualifying inbound TokenGateway request was recorded.
+       **/
+      InboundEvmTransferRecorded: AugmentedEvent<
+        ApiType,
+        [transfer: PalletInboundTransferLogInboundEvmTransfer],
+        { transfer: PalletInboundTransferLogInboundEvmTransfer }
+      >;
+    };
     ismp: {
       /**
        * Indicates that a consensus client has been created
@@ -1064,6 +1093,76 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [notaryId: u32, notebookNumber: u32],
         { notaryId: u32; notebookNumber: u32 }
+      >;
+    };
+    operationalAccounts: {
+      /**
+       * Account has become operational.
+       **/
+      AccountWentOperational: AugmentedEvent<
+        ApiType,
+        [account: AccountId32],
+        { account: AccountId32 }
+      >;
+      /**
+       * An operational account was registered with its linked accounts.
+       **/
+      OperationalAccountRegistered: AugmentedEvent<
+        ApiType,
+        [
+          account: AccountId32,
+          vaultAccount: AccountId32,
+          miningFundingAccount: AccountId32,
+          miningBotAccount: AccountId32,
+          sponsor: Option<AccountId32>,
+        ],
+        {
+          account: AccountId32;
+          vaultAccount: AccountId32;
+          miningFundingAccount: AccountId32;
+          miningBotAccount: AccountId32;
+          sponsor: Option<AccountId32>;
+        }
+      >;
+      /**
+       * A reward has been queued for treasury payout.
+       **/
+      OperationalRewardEarned: AugmentedEvent<
+        ApiType,
+        [
+          account: AccountId32,
+          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind,
+          amount: u128,
+        ],
+        {
+          account: AccountId32;
+          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
+          amount: u128;
+        }
+      >;
+      /**
+       * Reward enqueue failed because the pending queue is full.
+       **/
+      OperationalRewardEnqueueFailed: AugmentedEvent<
+        ApiType,
+        [
+          account: AccountId32,
+          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind,
+          amount: u128,
+        ],
+        {
+          account: AccountId32;
+          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
+          amount: u128;
+        }
+      >;
+      /**
+       * Reward config values were updated.
+       **/
+      RewardsConfigUpdated: AugmentedEvent<
+        ApiType,
+        [operationalReferralReward: u128, referralBonusReward: u128],
+        { operationalReferralReward: u128; referralBonusReward: u128 }
       >;
     };
     ownership: {
@@ -1573,16 +1672,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       BidPoolDistributed: AugmentedEvent<
         ApiType,
-        [frameId: u64, bidPoolDistributed: u128, bidPoolBurned: u128, bidPoolShares: u32],
-        { frameId: u64; bidPoolDistributed: u128; bidPoolBurned: u128; bidPoolShares: u32 }
-      >;
-      /**
-       * An error occurred burning from the bid pool
-       **/
-      CouldNotBurnBidPool: AugmentedEvent<
-        ApiType,
-        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+        [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, bidPoolShares: u32],
+        { frameId: u64; bidPoolDistributed: u128; treasuryReserves: u128; bidPoolShares: u32 }
       >;
       /**
        * An error occurred distributing a bid pool
@@ -1605,6 +1696,14 @@ declare module '@polkadot/api-base/types/events' {
           dispatchError: SpRuntimeDispatchError;
           isForVault: bool;
         }
+      >;
+      /**
+       * An error occurred reserving treasury reserves from the bid pool.
+       **/
+      CouldNotFundTreasury: AugmentedEvent<
+        ApiType,
+        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
        * An error occurred releasing a contributor hold

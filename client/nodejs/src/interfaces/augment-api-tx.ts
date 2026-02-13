@@ -49,6 +49,8 @@ import type {
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsUpdateConsensusState,
   PalletMultisigTimepoint,
+  PalletOperationalAccountsAccessCodeProof,
+  PalletOperationalAccountsAccountOwnershipProof,
   PalletPriceIndexPriceIndex,
   PalletTokenGatewayAssetRegistration,
   PalletTokenGatewayPrecisionUpdate,
@@ -1006,6 +1008,68 @@ declare module '@polkadot/api-base/types/submittable' {
       unlock: AugmentedSubmittable<
         (notaryId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u32]
+      >;
+    };
+    operationalAccounts: {
+      /**
+       * Issue an access code (the public key itself) for this operational account.
+       * The access code expires after `AccessCodeExpirationFrames`.
+       **/
+      issueAccessCode: AugmentedSubmittable<
+        (accessCodePublic: U8aFixed | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [U8aFixed]
+      >;
+      /**
+       * Register vault, mining funding, and bot accounts for the signer.
+       * If an access code is provided, the sponsor pays the transaction fee.
+       **/
+      register: AugmentedSubmittable<
+        (
+          vaultAccount: AccountId32 | string | Uint8Array,
+          miningFundingAccount: AccountId32 | string | Uint8Array,
+          miningBotAccount: AccountId32 | string | Uint8Array,
+          vaultAccountProof:
+            | PalletOperationalAccountsAccountOwnershipProof
+            | { signature?: any }
+            | string
+            | Uint8Array,
+          miningFundingAccountProof:
+            | PalletOperationalAccountsAccountOwnershipProof
+            | { signature?: any }
+            | string
+            | Uint8Array,
+          miningBotAccountProof:
+            | PalletOperationalAccountsAccountOwnershipProof
+            | { signature?: any }
+            | string
+            | Uint8Array,
+          accessCode:
+            | Option<PalletOperationalAccountsAccessCodeProof>
+            | null
+            | Uint8Array
+            | PalletOperationalAccountsAccessCodeProof
+            | { public?: any; signature?: any }
+            | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          AccountId32,
+          AccountId32,
+          AccountId32,
+          PalletOperationalAccountsAccountOwnershipProof,
+          PalletOperationalAccountsAccountOwnershipProof,
+          PalletOperationalAccountsAccountOwnershipProof,
+          Option<PalletOperationalAccountsAccessCodeProof>,
+        ]
+      >;
+      /**
+       * Update reward amounts for operational accounts.
+       **/
+      setRewardConfig: AugmentedSubmittable<
+        (
+          operationalReferralReward: u128 | AnyNumber | Uint8Array,
+          referralBonusReward: u128 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u128, u128]
       >;
     };
     ownership: {

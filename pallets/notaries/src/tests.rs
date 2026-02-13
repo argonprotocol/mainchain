@@ -289,6 +289,28 @@ fn it_verifies_notary_signatures_matching_block_heights() {
 
 		let hash: H256 = [1u8; 32].into();
 
+		// Before the first key activation tick, no signature should verify.
+		assert!(!<Notaries as NotaryProvider<Block, u64>>::verify_signature(
+			1,
+			1,
+			&hash,
+			&Ed25519Keyring::Alice.sign(&hash[..]),
+		));
+
+		// Between rotations, we should keep using the previous key.
+		assert!(<Notaries as NotaryProvider<Block, u64>>::verify_signature(
+			1,
+			3,
+			&hash,
+			&Ed25519Keyring::Alice.sign(&hash[..]),
+		));
+		assert!(!<Notaries as NotaryProvider<Block, u64>>::verify_signature(
+			1,
+			3,
+			&hash,
+			&Ed25519Keyring::Bob.sign(&hash[..]),
+		));
+
 		assert!(!<Notaries as NotaryProvider<Block, u64>>::verify_signature(
 			1,
 			4,

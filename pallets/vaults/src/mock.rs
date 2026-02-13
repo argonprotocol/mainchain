@@ -94,7 +94,7 @@ parameter_types! {
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 
-	pub static BurnFromBidPoolAmount: Percent = Percent::from_percent(20);
+	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 
 }
 pub struct StaticMiningFrameProvider;
@@ -156,6 +156,7 @@ impl pallet_vaults::Config for Test {
 	type MaxVaults = ConstU32<100>;
 	type MaxPendingCosignsPerVault = ConstU32<100>;
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
+	type OperationalAccountsHook = ();
 }
 
 impl pallet_treasury::Config for Test {
@@ -167,9 +168,11 @@ impl pallet_treasury::Config for Test {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
-	type BidPoolBurnPercent = BurnFromBidPoolAmount;
+	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
+	type OperationalAccountsHook = ();
+	type OperationalRewardsProvider = ();
 }
 
 pub struct StaticBitcoinUtxoTracker;
