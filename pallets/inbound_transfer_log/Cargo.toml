@@ -1,0 +1,54 @@
+[package]
+name = "pallet-inbound-transfer-log"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+anyhow = { workspace = true }
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+pallet-prelude = { workspace = true }
+pallet-token-gateway = { workspace = true }
+ismp = { workspace = true }
+argon-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+
+[dev-dependencies]
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core", "pallet-balances"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+alloy-primitives = { workspace = true, default-features = true }
+pallet-hyperbridge = { workspace = true }
+pallet-ismp = { workspace = true, default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"alloy-sol-types/std",
+	"anyhow/std",
+	"argon-primitives/std",
+	"codec/std",
+	"ismp/std",
+	"pallet-prelude/std",
+	"pallet-token-gateway/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
+	"pallet-token-gateway/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [ "pallet-token-gateway/try-runtime", "polkadot-sdk/try-runtime" ]
