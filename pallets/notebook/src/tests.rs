@@ -775,64 +775,87 @@ fn it_sorts_block_votes_correctly() {
 }
 
 #[test]
-fn it_handles_bad_secrets() {
+fn it_reports_bad_audit_result() {
 	new_test_ext().execute_with(|| {
-		new_test_ext().execute_with(|| {
-			// Go past genesis block so events get deposited
-			System::set_block_number(1);
+		System::set_block_number(1);
 
-			System::set_block_number(3);
-			System::on_initialize(3);
+		let notebook_hash = H256::random();
+		let digest = NotebookDigest {
+			notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult {
+				notary_id: 1,
+				notebook_number: 2,
+				tick: 3,
+				audit_first_failure: Some(VerifyError::InvalidSecretProvided),
+			}]),
+		};
 
-			let secrets = [H256::random(), H256::random(), H256::random()];
-			let mut secret_hashes = vec![];
-			// block number must be 1 prior to the current block number
-			let mut header = make_header(1, 2);
-			header.secret_hash =
-				NotebookHeader::create_secret_hash(secrets[0], header.block_votes_root, 1);
-			secret_hashes.push(header.secret_hash);
-			CurrentTick::set(2);
-			Notebook::process_notebook(header.clone());
-
-			System::set_block_number(4);
-			System::on_initialize(4);
-
-			let mut header = make_header(2, 3);
-			header.secret_hash =
-				NotebookHeader::create_secret_hash(secrets[1], header.block_votes_root, 2);
-			secret_hashes.push(header.secret_hash);
-			// wrong secret hash
-			header.parent_secret = Some(secrets[1]);
-
-			assert!(
-				!Notebook::check_audit_result(
-					1,
-					header.notebook_number,
-					header.tick,
-					header.hash(),
-					&NotebookDigest {
-						notebooks: BoundedVec::truncate_from(vec![NotebookAuditResult {
-							notary_id: 1,
-							notebook_number: header.notebook_number,
-							tick: header.tick,
-							audit_first_failure: None
-						}])
-					},
-					header.parent_secret
-				)
+		assert!(
+			!Notebook::check_audit_result(1, 2, 3, notebook_hash, &digest)
 				.expect("shouldn't throw an error ")
-			);
-			System::assert_last_event(
-				Event::<Test>::NotebookAuditFailure {
-					notary_id: 1,
-					notebook_number: 2,
-					notebook_hash: header.hash(),
-					first_failure_reason: VerifyError::InvalidSecretProvided,
-				}
-				.into(),
-			);
-		});
-	})
+		);
+		System::assert_last_event(
+			Event::<Test>::NotebookAuditFailure {
+				notary_id: 1,
+				notebook_number: 2,
+				notebook_hash,
+				first_failure_reason: VerifyError::InvalidSecretProvided,
+			}
+			.into(),
+		);
+	});
+}
+
+#[test]
+fn it_requires_parent_secret_for_non_genesis_audit_notebook() {
+	new_test_ext().execute_with(|| {
+		let notary_id = 1;
+		let mut header = make_header(2, 3);
+
+		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
+			v.try_insert(
+				0,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 2,
+						parent_secret: Some(H256::random()),
+						secret_hash: H256::random(),
+						block_votes_root: H256::random(),
+						notebook_number: 1,
+					},
+					true,
+				),
+			)
+		})
+		.expect("should insert details");
+
+		let mut notebook = argon_primitives::notebook::Notebook {
+			header: {
+				header.secret_hash =
+					NotebookHeader::create_secret_hash(H256::random(), header.block_votes_root, 2);
+				header
+			},
+			new_account_origins: bounded_vec![],
+			hash: Default::default(),
+			notarizations: bounded_vec![],
+			signature: ed25519::Signature::from_raw([0u8; 64]),
+		};
+		notebook.hash = notebook.calculate_hash();
+		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+
+		let header_hash = notebook.header.hash();
+		assert_eq!(
+			Notebook::audit_notebook(
+				1,
+				notary_id,
+				notebook.header.notebook_number,
+				notebook.header.tick,
+				header_hash,
+				&notebook.encode(),
+				vec![],
+			),
+			Err(VerifyError::InvalidSecretProvided)
+		);
+	});
 }
 
 #[test]
@@ -849,6 +872,14 @@ fn it_can_audit_notebooks_with_history() {
 
 		let notebook_number = 5;
 		let tick = 5;
+		let parent_secret = H256::random();
+		let parent_block_votes_root = H256::random();
+		let parent_secret_hash =
+			NotebookHeader::create_secret_hash(parent_secret, parent_block_votes_root, 4);
+		assert_eq!(
+			NotebookHeader::create_secret_hash(parent_secret, parent_block_votes_root, 4),
+			parent_secret_hash
+		);
 		let account_root = BalanceTip {
 			account_id: who.clone(),
 			account_type: AccountType::Deposit,
@@ -865,6 +896,8 @@ fn it_can_audit_notebooks_with_history() {
 		header.chain_transfers = bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }];
 		header.changed_account_origins =
 			bounded_vec![AccountOrigin { notebook_number, account_uid: 1 }];
+		header.parent_secret = Some(parent_secret);
+		assert_eq!(header.parent_secret, Some(parent_secret));
 
 		let merkle_leaves = vec![account_root.tip()];
 		let account_1_proof = merkle_proof::<Blake2Hasher, _, _>(&merkle_leaves, 0);
@@ -908,6 +941,12 @@ fn it_can_audit_notebooks_with_history() {
 		notebook.notarizations[0].balance_changes[0].sign(Bob.pair());
 		notebook.hash = notebook.calculate_hash();
 		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let notebook5_parent_secret = H256::random();
+		let notebook5_secret_hash = NotebookHeader::create_secret_hash(
+			notebook5_parent_secret,
+			notebook.header.block_votes_root,
+			notebook_number,
+		);
 
 		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
 			v.try_insert(
@@ -957,8 +996,8 @@ fn it_can_audit_notebooks_with_history() {
 						changed_accounts_root: H256::random(),
 						account_changelist: vec![],
 						used_transfers_to_localchain: vec![1],
-						block_votes_root: H256::random(),
-						secret_hash: H256::random(),
+						block_votes_root: parent_block_votes_root,
+						secret_hash: parent_secret_hash,
 					}
 					.encode()
 				}]
@@ -983,8 +1022,8 @@ fn it_can_audit_notebooks_with_history() {
 					changed_accounts_root: H256::random(),
 					account_changelist: vec![],
 					used_transfers_to_localchain: vec![],
-					block_votes_root: H256::random(),
-					secret_hash: H256::random(),
+					block_votes_root: parent_block_votes_root,
+					secret_hash: parent_secret_hash,
 				}
 				.encode()
 			}]
@@ -996,9 +1035,9 @@ fn it_can_audit_notebooks_with_history() {
 				(
 					NotaryNotebookKeyDetails {
 						tick,
-						parent_secret: None,
-						secret_hash: H256::random(),
-						block_votes_root: header.changed_accounts_root,
+						parent_secret: Some(notebook5_parent_secret),
+						secret_hash: notebook5_secret_hash,
+						block_votes_root: notebook.header.block_votes_root,
 						notebook_number,
 					},
 					true,
@@ -1021,6 +1060,13 @@ fn it_can_audit_notebooks_with_history() {
 		let notebook_number = 7;
 		let tick = 7;
 		let mut header = make_header(notebook_number, tick);
+		let notebook6_parent_secret = H256::random();
+		let notebook6_parent_secret_hash = NotebookHeader::create_secret_hash(
+			notebook6_parent_secret,
+			parent_block_votes_root,
+			notebook_number - 1,
+		);
+		header.parent_secret = Some(notebook6_parent_secret);
 		header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![
 			BalanceTip {
 				account_id: who.clone(),
@@ -1156,8 +1202,8 @@ fn it_can_audit_notebooks_with_history() {
 							account_uid: 1
 						}],
 						used_transfers_to_localchain: vec![],
-						block_votes_root: H256::random(),
-						secret_hash: H256::random(),
+						block_votes_root: parent_block_votes_root,
+						secret_hash: notebook6_parent_secret_hash,
 					}
 					.encode()
 				}]
@@ -1180,8 +1226,8 @@ fn it_can_audit_notebooks_with_history() {
 					changed_accounts_root: H256::random(),
 					account_changelist: vec![],
 					used_transfers_to_localchain: vec![],
-					block_votes_root: H256::random(),
-					secret_hash: H256::random(),
+					block_votes_root: parent_block_votes_root,
+					secret_hash: notebook6_parent_secret_hash,
 				}
 				.encode()
 			}]

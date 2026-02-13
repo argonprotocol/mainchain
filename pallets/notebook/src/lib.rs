@@ -269,7 +269,6 @@ pub mod pallet {
 					header.tick,
 					header_hash,
 					&notebook_digest,
-					header.parent_secret,
 				)
 				.inspect_err(|e| {
 					warn!(?notebook_number, ?notary_id, ?e, "Notebook audit failed",);
@@ -494,7 +493,6 @@ pub mod pallet {
 			tick: Tick,
 			notebook_hash: H256,
 			notebook_digest: &NotebookDigest,
-			parent_secret: Option<NotebookSecret>,
 		) -> Result<bool, DispatchError> {
 			let digest = notebook_digest
 				.notebooks
@@ -506,24 +504,7 @@ pub mod pallet {
 				})
 				.ok_or(Error::<T>::InvalidNotebookDigest)?;
 
-			let mut verify_error = digest.audit_first_failure.clone();
-			if verify_error.is_none() {
-				let notary_notebook_details = <LastNotebookDetailsByNotary<T>>::get(notary_id);
-				if let Some((parent, _)) = notary_notebook_details.first() {
-					// check secret
-					if let Some(secret) = parent_secret {
-						let secret_hash = NotebookHeader::create_secret_hash(
-							secret,
-							parent.block_votes_root,
-							parent.notebook_number,
-						);
-						if secret_hash != parent.secret_hash {
-							verify_error = Some(NotebookVerifyError::InvalidSecretProvided);
-						}
-					}
-				}
-			}
-			if let Some(first_failure_reason) = verify_error {
+			if let Some(first_failure_reason) = digest.audit_first_failure.clone() {
 				Self::deposit_event(Event::<T>::NotebookAuditFailure {
 					notary_id,
 					notebook_number,
@@ -533,7 +514,7 @@ pub mod pallet {
 				if Self::notary_failed_audit_by_id(notary_id).is_none() {
 					<NotariesLockedForFailedAudit<T>>::insert(
 						notary_id,
-						(notebook_number, tick, first_failure_reason.clone()),
+						(notebook_number, tick, first_failure_reason),
 					);
 				}
 				return Ok(false);
@@ -684,7 +665,11 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
-			if let Some(secret) = notebook.header.parent_secret {
+			if notebook.header.notebook_number > 1 {
+				let secret = notebook
+					.header
+					.parent_secret
+					.ok_or(NotebookVerifyError::InvalidSecretProvided)?;
 				let secret_hash = NotebookHeader::create_secret_hash(
 					secret,
 					parent_block_votes_root,
