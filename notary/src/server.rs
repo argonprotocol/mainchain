@@ -96,6 +96,8 @@ pub enum RpcRateLimitMode {
 	PerIp,
 }
 
+pub const DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS: usize = 10;
+
 pub struct RpcConfig {
 	pub max_payload_in_mb: u32,
 	pub max_payload_out_mb: u32,
@@ -105,6 +107,7 @@ pub struct RpcConfig {
 	pub batch_config: Option<BatchRequestConfig>,
 	pub rate_limit_per_minute: NonZeroU32,
 	pub rate_limit_mode: RpcRateLimitMode,
+	pub rate_limit_max_slowdowns: usize,
 	pub prometheus_port: Option<u16>,
 }
 
@@ -119,6 +122,7 @@ impl Default for RpcConfig {
 			batch_config: Some(BatchRequestConfig::Limit(100)),
 			rate_limit_per_minute: NonZeroU32::new(500).unwrap(),
 			rate_limit_mode: RpcRateLimitMode::PerIp,
+			rate_limit_max_slowdowns: DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS,
 			prometheus_port: Some(9116),
 		}
 	}

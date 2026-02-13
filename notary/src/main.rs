@@ -8,7 +8,7 @@ use argon_notary::{
 	block_watch::spawn_block_sync,
 	notebook_closer::{NOTARY_KEYID, spawn_notebook_closer},
 	s3_archive::S3Archive,
-	server::{ArchiveSettings, RpcConfig, RpcRateLimitMode},
+	server::{ArchiveSettings, DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS, RpcConfig, RpcRateLimitMode},
 };
 use argon_primitives::{AccountId, CryptoType, KeystoreParams, NotaryId, tick::Ticker};
 use clap::{Parser, Subcommand};
@@ -69,6 +69,14 @@ enum Commands {
 		/// Per-request RPC rate limit mode (`per-connection` or `per-ip`).
 		#[clap(long, env = "ARGON_RPC_RATE_LIMIT_MODE", default_value = "per-ip")]
 		rpc_rate_limit_mode: RpcRateLimitMode,
+
+		/// Maximum number of rate-limit retries to sleep through before rejecting a request.
+		#[clap(
+			long,
+			env = "ARGON_RPC_RATE_LIMIT_MAX_SLOWDOWNS",
+			default_value_t = DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS
+		)]
+		rpc_rate_limit_max_slowdowns: usize,
 
 		/// An s3 compatible endpoint for the archive (use minIO for self-hosted). Optional if
 		/// using a default region or in dev.
@@ -159,6 +167,7 @@ async fn main() -> anyhow::Result<()> {
 			archive_endpoint,
 			archive_region,
 			rpc_rate_limit_mode,
+			rpc_rate_limit_max_slowdowns,
 		} => {
 			let pool = PgPoolOptions::new()
 				.max_connections(100)
@@ -216,7 +225,11 @@ async fn main() -> anyhow::Result<()> {
 				pool.clone(),
 				ArchiveSettings { archive_host },
 				// uses prometheus 9116
-				RpcConfig { rate_limit_mode: rpc_rate_limit_mode, ..RpcConfig::default() },
+				RpcConfig {
+					rate_limit_mode: rpc_rate_limit_mode,
+					rate_limit_max_slowdowns: rpc_rate_limit_max_slowdowns,
+					..RpcConfig::default()
+				},
 				ticker,
 				bind_addr,
 				prom_registry.clone(),

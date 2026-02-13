@@ -8,7 +8,7 @@ use jsonrpsee::{
 	MethodResponse,
 	core::server::ConnectionId,
 	server::{HttpRequest, middleware::rpc::RpcServiceT},
-	types::{ErrorObject, Id, Request},
+	types::{ErrorObject, Request},
 };
 use polkadot_sdk::*;
 use prometheus::Registry;
@@ -21,7 +21,6 @@ use std::{
 use substrate_prometheus_endpoint::init_prometheus;
 
 const MAX_JITTER: Duration = Duration::from_millis(50);
-const MAX_RETRIES: usize = 10;
 const MAX_CLIENT_RATE_LIMIT_KEY_LEN: usize = 128;
 
 pub(crate) fn register_prometheus_metrics(
@@ -34,6 +33,7 @@ pub(crate) fn register_prometheus_metrics(
 			.with_rate_limit_per_minute(
 				rpc_config.rate_limit_per_minute,
 				rpc_config.rate_limit_mode,
+				rpc_config.rate_limit_max_slowdowns,
 			)
 	});
 	let prometheus_port = rpc_config.prometheus_port.unwrap_or(9116);
@@ -53,6 +53,7 @@ pub(crate) fn register_prometheus_metrics(
 #[derive(Debug, Clone, Default)]
 pub struct MiddlewareLayer {
 	rate_limit: Option<RateLimit>,
+	rate_limit_max_slowdowns: usize,
 	metrics: Option<Metrics>,
 }
 
@@ -67,13 +68,22 @@ impl MiddlewareLayer {
 		self,
 		n: NonZeroU32,
 		rate_limit_mode: RpcRateLimitMode,
+		rate_limit_max_slowdowns: usize,
 	) -> Self {
-		Self { rate_limit: Some(RateLimit::per_minute(n, rate_limit_mode)), metrics: self.metrics }
+		Self {
+			rate_limit: Some(RateLimit::per_minute(n, rate_limit_mode)),
+			rate_limit_max_slowdowns,
+			metrics: self.metrics,
+		}
 	}
 
 	/// Enable metrics middleware.
 	pub fn with_metrics(self, metrics: Metrics) -> Self {
-		Self { rate_limit: self.rate_limit, metrics: Some(metrics) }
+		Self {
+			rate_limit: self.rate_limit,
+			rate_limit_max_slowdowns: self.rate_limit_max_slowdowns,
+			metrics: Some(metrics),
+		}
 	}
 
 	/// Register a new websocket connection.
@@ -95,7 +105,12 @@ impl<S> tower::Layer<S> for MiddlewareLayer {
 	type Service = Middleware<S>;
 
 	fn layer(&self, service: S) -> Self::Service {
-		Middleware { service, rate_limit: self.rate_limit.clone(), metrics: self.metrics.clone() }
+		Middleware {
+			service,
+			rate_limit: self.rate_limit.clone(),
+			rate_limit_max_slowdowns: self.rate_limit_max_slowdowns,
+			metrics: self.metrics.clone(),
+		}
 	}
 }
 
@@ -109,6 +124,7 @@ impl<S> tower::Layer<S> for MiddlewareLayer {
 pub struct Middleware<S> {
 	service: S,
 	rate_limit: Option<RateLimit>,
+	rate_limit_max_slowdowns: usize,
 	metrics: Option<Metrics>,
 }
 
@@ -128,8 +144,18 @@ where
 		let service = self.service.clone();
 		let rate_limit = self.rate_limit.clone();
 		let metrics = self.metrics.clone();
+		let rate_limit_max_slowdowns = self.rate_limit_max_slowdowns;
 		let conn_id = req.extensions().get::<ConnectionId>().copied();
-		let client_key = get_client_rate_limit_key(&req);
+		let client_key = req
+			.extensions()
+			.get::<ClientRateLimitKey>()
+			.cloned()
+			.or_else(|| {
+				req.extensions()
+					.get::<ConnectionId>()
+					.map(|id| ClientRateLimitKey::from_connection(id.0))
+			})
+			.unwrap_or_else(ClientRateLimitKey::unknown);
 
 		async move {
 			let mut is_rate_limited = false;
@@ -139,19 +165,35 @@ where
 
 				// Check the request key against the configured limiter.
 				// If over quota, wait for the rejected duration plus jitter and retry.
-				// We keep retrying up to MAX_RETRIES before returning an explicit rate-limit error.
-				let mut attempts = 0;
-				while attempts < MAX_RETRIES {
-					let Some(retry_after) = limit.retry_after(conn_id, &client_key, jitter) else {
+				// We keep delaying up to the configured threshold before returning an explicit
+				// rate-limit error.
+				let mut rate_limit_slowdowns = 0;
+				while rate_limit_slowdowns < rate_limit_max_slowdowns {
+					let rate_limit_check = match &limit.inner {
+						RateLimitInner::PerConnection(inner) => {
+							let conn_id = conn_id.unwrap_or(ConnectionId(0));
+							inner.check_key(&conn_id).err().map(|rejected| {
+								jitter + rejected.wait_time_from(inner.clock().now())
+							})
+						},
+						RateLimitInner::PerIp(inner) => inner
+							.check_key(&client_key)
+							.err()
+							.map(|rejected| jitter + rejected.wait_time_from(inner.clock().now())),
+					};
+					let Some(retry_after) = rate_limit_check else {
 						break;
 					};
 					is_rate_limited = true;
-					attempts += 1;
+					rate_limit_slowdowns += 1;
 					tokio::time::sleep(retry_after).await;
 				}
 
-				if attempts >= MAX_RETRIES {
-					return reject_too_many_calls(req.id);
+				if rate_limit_slowdowns >= rate_limit_max_slowdowns {
+					return MethodResponse::error(
+						req.id,
+						ErrorObject::owned(-32999, "RPC rate limit exceeded", None::<()>),
+					);
 				}
 			}
 
@@ -164,10 +206,6 @@ where
 		}
 		.boxed()
 	}
-}
-
-fn reject_too_many_calls(id: Id) -> MethodResponse {
-	MethodResponse::error(id, ErrorObject::owned(-32999, "RPC rate limit exceeded", None::<()>))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -257,45 +295,13 @@ impl RateLimit {
 			RpcRateLimitMode::PerConnection => RateLimitInner::PerConnection(Arc::new(
 				PerConnectionRateLimitInner::keyed(Quota::per_minute(n)),
 			)),
-			RpcRateLimitMode::PerIp =>
-				RateLimitInner::PerIp(Arc::new(PerIpRateLimitInner::keyed(Quota::per_minute(n)))),
+			RpcRateLimitMode::PerIp => {
+				RateLimitInner::PerIp(Arc::new(PerIpRateLimitInner::keyed(Quota::per_minute(n))))
+			},
 		};
 
 		Self { inner }
 	}
-
-	fn retry_after(
-		&self,
-		conn_id: Option<ConnectionId>,
-		client_key: &ClientRateLimitKey,
-		jitter: Jitter,
-	) -> Option<Duration> {
-		match &self.inner {
-			RateLimitInner::PerConnection(inner) => {
-				let conn_id = conn_id.unwrap_or(ConnectionId(0));
-				inner
-					.check_key(&conn_id)
-					.err()
-					.map(|rejected| jitter + rejected.wait_time_from(inner.clock().now()))
-			},
-			RateLimitInner::PerIp(inner) => inner
-				.check_key(client_key)
-				.err()
-				.map(|rejected| jitter + rejected.wait_time_from(inner.clock().now())),
-		}
-	}
-}
-
-fn get_client_rate_limit_key(req: &Request<'_>) -> ClientRateLimitKey {
-	req.extensions()
-		.get::<ClientRateLimitKey>()
-		.cloned()
-		.or_else(|| {
-			req.extensions()
-				.get::<ConnectionId>()
-				.map(|id| ClientRateLimitKey::from_connection(id.0))
-		})
-		.unwrap_or_else(ClientRateLimitKey::unknown)
 }
 
 fn get_client_rate_limit_key_from_http_request<B>(request: &HttpRequest<B>) -> ClientRateLimitKey {
@@ -334,7 +340,13 @@ fn get_header_value<B>(request: &HttpRequest<B>, header: &str) -> Option<String>
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use jsonrpsee::server::HttpRequest;
+	use futures::future::ready;
+	use jsonrpsee::{
+		server::{HttpRequest, ResponsePayload},
+		types::Id,
+	};
+	use std::sync::atomic::{AtomicUsize, Ordering};
+	use tokio::time::timeout;
 
 	#[test]
 	fn extracts_first_forwarded_ip() {
@@ -362,5 +374,238 @@ mod tests {
 
 		let key = get_client_rate_limit_key_from_http_request(&request);
 		assert_eq!(key, ClientRateLimitKey::unknown());
+	}
+
+	#[derive(Debug, Clone)]
+	struct CountingService {
+		calls: Arc<AtomicUsize>,
+	}
+
+	impl CountingService {
+		fn new() -> Self {
+			Self { calls: Arc::new(AtomicUsize::new(0)) }
+		}
+
+		fn calls(&self) -> usize {
+			self.calls.load(Ordering::SeqCst)
+		}
+	}
+
+	impl<'a> RpcServiceT<'a> for CountingService {
+		type Future = futures::future::Ready<MethodResponse>;
+
+		fn call(&self, req: Request<'a>) -> Self::Future {
+			self.calls.fetch_add(1, Ordering::SeqCst);
+			let _ = &req;
+			ready(MethodResponse::response(req.id.clone(), ResponsePayload::success(()), 1024))
+		}
+	}
+
+	#[tokio::test]
+	async fn middleware_allows_first_request_when_rate_available() {
+		let service = CountingService::new();
+		let rate_limit = RateLimit {
+			inner: RateLimitInner::PerConnection(Arc::new(PerConnectionRateLimitInner::keyed(
+				Quota::per_minute(NonZeroU32::new(10).unwrap()),
+			))),
+		};
+		let middleware = Middleware {
+			service: service.clone(),
+			rate_limit: Some(rate_limit),
+			rate_limit_max_slowdowns: 10,
+			metrics: None,
+		};
+
+		let request = {
+			let mut request = Request::new("rpc.health".into(), None, Id::Number(1));
+			request.extensions_mut().insert(ConnectionId(99));
+			request.extensions_mut().insert(ClientRateLimitKey::from_ip("203.0.113.11"));
+			request
+		};
+
+		let response = middleware.call(request).await;
+		assert!(response.is_success());
+		assert_eq!(service.calls(), 1);
+	}
+
+	#[tokio::test]
+	async fn middleware_delays_connection_rate_limited_request() {
+		let service = CountingService::new();
+		let rate_limit = RateLimit {
+			inner: RateLimitInner::PerConnection(Arc::new(PerConnectionRateLimitInner::keyed(
+				Quota::per_second(NonZeroU32::new(1).unwrap()),
+			))),
+		};
+
+		let middleware = Middleware {
+			service: service.clone(),
+			rate_limit: Some(rate_limit),
+			rate_limit_max_slowdowns: 10,
+			metrics: None,
+		};
+
+		let mut first_request = Request::new("rpc.health".into(), None, Id::Number(1));
+		first_request.extensions_mut().insert(ConnectionId(1));
+		first_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let second_request = Request::new("rpc.health".into(), None, Id::Number(2));
+		let mut second_request = second_request;
+		second_request.extensions_mut().insert(ConnectionId(1));
+		second_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let first = middleware.call(first_request).await;
+		assert!(first.is_success());
+		assert_eq!(service.calls(), 1);
+
+		// Same connection and key should be rate-limited; this would complete immediately if keying
+		// is broken.
+		assert!(
+			timeout(Duration::from_millis(100), middleware.call(second_request))
+				.await
+				.is_err()
+		);
+		assert_eq!(service.calls(), 1);
+
+		let third_request = Request::new("rpc.health".into(), None, Id::Number(3));
+		let mut third_request = third_request;
+		third_request.extensions_mut().insert(ConnectionId(1));
+		third_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let third = timeout(Duration::from_millis(1500), middleware.call(third_request))
+			.await
+			.unwrap();
+		assert!(third.is_success());
+		assert_eq!(service.calls(), 2);
+	}
+
+	#[tokio::test]
+	async fn middleware_connection_mode_ignores_client_ip_key() {
+		let service = CountingService::new();
+		let rate_limit = RateLimit {
+			inner: RateLimitInner::PerConnection(Arc::new(PerConnectionRateLimitInner::keyed(
+				Quota::per_second(NonZeroU32::new(1).unwrap()),
+			))),
+		};
+
+		let middleware = Middleware {
+			service: service.clone(),
+			rate_limit: Some(rate_limit),
+			rate_limit_max_slowdowns: 10,
+			metrics: None,
+		};
+
+		let mut first_request = Request::new("rpc.health".into(), None, Id::Number(1));
+		first_request.extensions_mut().insert(ConnectionId(1));
+		first_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let mut second_request = Request::new("rpc.health".into(), None, Id::Number(2));
+		second_request.extensions_mut().insert(ConnectionId(1));
+		// Same connection but a different IP; should still share the same per-connection bucket.
+		second_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("198.51.100.20"));
+
+		let first = middleware.call(first_request).await;
+		assert!(first.is_success());
+
+		// If only IP-keying was applied, this could pass immediately; with per-connection mode it
+		// should delay.
+		let second = timeout(Duration::from_millis(100), middleware.call(second_request)).await;
+		assert!(second.is_err());
+		assert_eq!(service.calls(), 1);
+	}
+
+	#[tokio::test]
+	async fn middleware_per_ip_rate_limit_shares_across_connections_for_same_ip() {
+		let service = CountingService::new();
+		let rate_limit = RateLimit {
+			inner: RateLimitInner::PerIp(Arc::new(PerIpRateLimitInner::keyed(Quota::per_second(
+				NonZeroU32::new(1).unwrap(),
+			)))),
+		};
+		let middleware = Middleware {
+			service: service.clone(),
+			rate_limit: Some(rate_limit),
+			rate_limit_max_slowdowns: 10,
+			metrics: None,
+		};
+
+		let mut first_request = Request::new("rpc.health".into(), None, Id::Number(1));
+		first_request.extensions_mut().insert(ConnectionId(1));
+		first_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let mut second_request = Request::new("rpc.health".into(), None, Id::Number(2));
+		second_request.extensions_mut().insert(ConnectionId(2));
+		// Same IP but different connection; should be counted in the same per-IP bucket.
+		second_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let third_request = Request::new("rpc.health".into(), None, Id::Number(3));
+		let mut third_request = third_request;
+		third_request.extensions_mut().insert(ConnectionId(3));
+		third_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("198.51.100.20"));
+
+		let first = middleware.call(first_request).await;
+		assert!(first.is_success());
+
+		let second = timeout(Duration::from_millis(100), middleware.call(second_request)).await;
+		assert!(second.is_err(), "same IP across connections should be per-ip rate limited");
+
+		let third = timeout(Duration::from_millis(100), middleware.call(third_request)).await;
+		assert!(third.is_ok(), "different IP should not be coupled");
+		assert_eq!(service.calls(), 2);
+	}
+
+	#[tokio::test]
+	async fn middleware_uses_isolated_ip_keys() {
+		let service = CountingService::new();
+		let rate_limit = RateLimit {
+			inner: RateLimitInner::PerIp(Arc::new(PerIpRateLimitInner::keyed(Quota::per_second(
+				NonZeroU32::new(1).unwrap(),
+			)))),
+		};
+		let middleware = Middleware {
+			service: service.clone(),
+			rate_limit: Some(rate_limit),
+			rate_limit_max_slowdowns: 10,
+			metrics: None,
+		};
+
+		let mut first_request = Request::new("rpc.health".into(), None, Id::Number(1));
+		first_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+		let mut second_request = Request::new("rpc.health".into(), None, Id::Number(2));
+		second_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("198.51.100.20"));
+		let mut third_request = Request::new("rpc.health".into(), None, Id::Number(3));
+		third_request
+			.extensions_mut()
+			.insert(ClientRateLimitKey::from_ip("203.0.113.10"));
+
+		let first = middleware.call(first_request).await;
+		assert!(first.is_success());
+
+		let second = timeout(Duration::from_millis(200), middleware.call(second_request)).await;
+		assert!(second.is_ok(), "different ips should not share quota");
+
+		let third = timeout(Duration::from_millis(200), middleware.call(third_request)).await;
+		assert!(third.is_err(), "same ip should be rate-limited");
+
+		assert_eq!(service.calls(), 2);
 	}
 }
