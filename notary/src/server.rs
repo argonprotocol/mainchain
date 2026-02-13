@@ -151,6 +151,7 @@ impl NotaryServer {
 			max_subscriptions_per_connection,
 			max_buffer_capacity_per_connection,
 			batch_config,
+			rate_limit_trust_proxy_headers,
 			..
 		} = rpc_config;
 		let rpc_middleware = RpcServiceBuilder::new().option_layer(metrics);
@@ -158,7 +159,7 @@ impl NotaryServer {
 		let http_middleware = tower::ServiceBuilder::new()
 			.layer(ProxyGetRequestLayer::new("/health", "system_health")?)
 			.layer(cors)
-			.layer(ClientRateLimitKeyLayer::new(rpc_config.rate_limit_trust_proxy_headers));
+			.layer(ClientRateLimitKeyLayer::new(rate_limit_trust_proxy_headers));
 
 		let server = ServerBuilder::default()
 			.max_request_body_size(max_payload_in_mb.saturating_mul(MEGABYTE))

@@ -333,6 +333,9 @@ fn get_client_rate_limit_key_from_http_request<B>(
 	request: &HttpRequest<B>,
 	trust_proxy_headers: bool,
 ) -> Option<ClientRateLimitKey> {
+	// Proxy headers are only read when trust is explicitly enabled.
+	// This assumes the node is deployed behind trusted proxies and should only be
+	// enabled when the request path is controlled.
 	if trust_proxy_headers {
 		if let Some(key) = get_forwarded_ip(request).or_else(|| get_header_ip(request, "x-real-ip"))
 		{
@@ -398,10 +401,19 @@ mod tests {
 	}
 
 	#[test]
-	fn extracts_no_key_when_proxy_headers_enabled_but_missing_connection_id() {
+	fn extracts_no_key_when_proxy_headers_enabled_but_no_client_or_connection_key() {
 		let request = HttpRequest::new(());
-		let key = get_client_rate_limit_key_from_http_request(&request, false);
+		let key = get_client_rate_limit_key_from_http_request(&request, true);
 		assert_eq!(key, None);
+	}
+
+	#[test]
+	fn falls_back_to_connection_id_when_proxy_headers_enabled_but_missing_proxy_header() {
+		let mut request = HttpRequest::new(());
+		request.extensions_mut().insert(ConnectionId(42));
+
+		let key = get_client_rate_limit_key_from_http_request(&request, true);
+		assert_eq!(key, Some(ClientRateLimitKey::from_connection(42)));
 	}
 
 	#[derive(Debug, Clone)]
