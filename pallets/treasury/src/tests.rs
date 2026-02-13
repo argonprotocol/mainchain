@@ -4,7 +4,7 @@ use crate::{
 	mock::{Treasury, *},
 	pallet::{CapitalActive, VaultPoolsByFrame},
 };
-use argon_primitives::vault::MiningBidPoolProvider;
+use argon_primitives::{OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer};
 use frame_support::{assert_err, assert_ok, traits::fungible::InspectHold};
 use pallet_prelude::{argon_primitives::vault::VaultTreasuryFrameEarnings, *};
 use sp_runtime::Permill;
@@ -347,6 +347,152 @@ fn test_lock_in_caps_by_vault_activated_limit() {
 	});
 }
 
+#[test]
+fn test_treasury_pool_participated_only_on_first_operator_bond() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		reset_treasury_pool_participated();
+
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 10,
+				activated: 1_000_000_000, // cap is 100m per frame
+				sharing_percent: Permill::from_percent(50),
+				is_closed: false,
+			},
+		);
+
+		set_argons(10, 1_000_000_000);
+		assert_ok!(Treasury::set_allocation(RuntimeOrigin::signed(10), 1, 100_000_000));
+
+		Treasury::lock_in_vault_capital(2);
+		assert_eq!(take_treasury_pool_participated(), vec![(10, 10_000_000u128)]);
+
+		Treasury::lock_in_vault_capital(3);
+		assert!(take_treasury_pool_participated().is_empty());
+	});
+}
+
+#[test]
+fn test_pay_operational_rewards_from_treasury_reserves() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		set_pending_operational_rewards(vec![]);
+		let reserves_account = Treasury::get_treasury_reserves_account();
+
+		set_argons(reserves_account, 1_000_000_000);
+		set_argons(42, 0);
+
+		let reward = OperationalRewardPayout {
+			operational_account: 99,
+			payout_account: 42,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 250_000_000,
+		};
+
+		set_pending_operational_rewards(vec![reward.clone()]);
+		Treasury::pay_operational_rewards();
+
+		assert_eq!(Balances::free_balance(42), 250_000_000);
+		assert_eq!(Balances::free_balance(reserves_account), 750_000_000);
+		assert_eq!(take_paid_operational_rewards(), vec![reward]);
+	});
+}
+
+#[test]
+fn test_try_pay_operational_reward_pays_immediately_when_funded() {
+	new_test_ext().execute_with(|| {
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		set_argons(reserves_account, 1_000_000);
+		set_argons(42, 0);
+
+		let reward = OperationalRewardPayout {
+			operational_account: 99,
+			payout_account: 42,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 250_000,
+		};
+
+		let paid = <Treasury as OperationalRewardsPayer<u64, Balance>>::try_pay_reward(&reward);
+		assert!(paid);
+		assert_eq!(Balances::free_balance(42), 250_000);
+	});
+}
+
+#[test]
+fn test_try_pay_operational_reward_skips_when_insufficient() {
+	new_test_ext().execute_with(|| {
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		set_argons(reserves_account, 10);
+		set_argons(42, 0);
+
+		let reward = OperationalRewardPayout {
+			operational_account: 99,
+			payout_account: 42,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 250,
+		};
+
+		let paid = <Treasury as OperationalRewardsPayer<u64, Balance>>::try_pay_reward(&reward);
+		assert!(!paid);
+		assert_eq!(Balances::free_balance(42), 0);
+	});
+}
+
+#[test]
+fn test_operational_rewards_remain_pending_when_insufficient_funds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		set_pending_operational_rewards(vec![]);
+		let reserves_account = Treasury::get_treasury_reserves_account();
+
+		set_argons(reserves_account, 50_000_000);
+
+		let reward = OperationalRewardPayout {
+			operational_account: 99,
+			payout_account: 42,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 250_000_000,
+		};
+
+		set_pending_operational_rewards(vec![reward.clone()]);
+		Treasury::pay_operational_rewards();
+
+		assert!(take_paid_operational_rewards().is_empty());
+		assert_eq!(pending_operational_rewards(), vec![reward]);
+	});
+}
+
+#[test]
+fn test_pay_operational_rewards_processes_all_queued_when_funded() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		set_pending_operational_rewards(vec![]);
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		set_argons(reserves_account, 1_000_000_000_000);
+
+		let rewards = (0..=3u64)
+			.map(|i| OperationalRewardPayout {
+				operational_account: 1_000 + i,
+				payout_account: 2_000 + i,
+				reward_kind: OperationalRewardKind::Activation,
+				amount: 1,
+			})
+			.collect::<Vec<_>>();
+		set_pending_operational_rewards(rewards);
+
+		Treasury::pay_operational_rewards();
+
+		assert_eq!(take_paid_operational_rewards().len(), 4);
+		assert!(pending_operational_rewards().is_empty());
+	});
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DistributeScenario {
@@ -529,7 +675,7 @@ fn test_distribute_bid_pool_emits_event_and_records_profits() {
 				frame_id: s.frame_id,
 				bid_pool_distributed: s.bid_pool_distributed,
 				bid_pool_shares: s.bid_pool_shares as u32,
-				bid_pool_burned: s.bid_pool_total - s.bid_pool_distributed - 1,
+				treasury_reserves: s.bid_pool_total - s.bid_pool_distributed - 1,
 			}
 			.into(),
 		);
@@ -576,8 +722,31 @@ fn test_distribute_bid_pool_emits_event_and_records_profits() {
 			Some(s.per_vault_gross_earnings)
 		);
 
-		// 1 unit dust remains.
-		assert_eq!(Balances::free_balance(Treasury::get_bid_pool_account()), 1);
+		// 1 unit dust remains after reserves are siphoned. In mock runtimes using `u64` account
+		// ids, the treasury reserves and bid pool accounts can collide due to truncation.
+		let bid_pool_account = Treasury::get_bid_pool_account();
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		let expected_reserves = s.bid_pool_total - s.bid_pool_distributed - 1;
+		if bid_pool_account == reserves_account {
+			assert_eq!(Balances::free_balance(bid_pool_account), expected_reserves + 1);
+		} else {
+			assert_eq!(Balances::free_balance(bid_pool_account), 1);
+			assert_eq!(Balances::free_balance(reserves_account), expected_reserves);
+		}
+	});
+}
+
+#[test]
+fn test_distribute_bid_pool_preserves_pool_accounts() {
+	new_test_ext().execute_with(|| {
+		let s = setup_distribute_scenario();
+
+		Treasury::distribute_bid_pool(s.frame_id);
+
+		let bid_pool_account = Treasury::get_bid_pool_account();
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		assert!(System::providers(&bid_pool_account) > 0);
+		assert!(System::providers(&reserves_account) > 0);
 	});
 }
 

@@ -1,7 +1,8 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
-	BlockNumber, BlockSealerInfo, BlockSealerProvider, TickProvider, VotingSchedule,
-	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, vault::MiningBidPoolProvider,
+	BlockNumber, BlockSealerInfo, BlockSealerProvider, OperationalAccountsHook, TickProvider,
+	VotingSchedule, block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker,
+	vault::MiningBidPoolProvider,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::*;
@@ -100,6 +101,7 @@ parameter_types! {
 	pub static LastSlotRemoved: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static GrandaRotations: Vec<FrameId> = vec![];
+	pub static MiningSeatsWon: Vec<u64> = vec![];
 
 	// set slot bidding active by default
 	pub static ElapsedTicks: u64 = 3;
@@ -146,6 +148,33 @@ impl OnNewSlot<u64> for StaticNewSlotEvent {
 		LastSlotAdded::set(added_authorities.into_iter().map(|(a, b)| (*a, b)).collect());
 		GrandaRotations::mutate(|a| a.push(current_frame_id));
 		LastBidPoolDistribution::set((current_frame_id, CurrentTick::get()));
+	}
+}
+
+pub struct StaticOperationalAccountsHook;
+impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
+	fn vault_created_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn bitcoin_lock_funded_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn mining_seat_won_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn treasury_pool_participated_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn uniswap_transfer_confirmed_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn mining_seat_won(miner_account: &u64) {
+		MiningSeatsWon::mutate(|accounts| accounts.push(*miner_account));
 	}
 }
 
@@ -226,6 +255,7 @@ impl pallet_mining_slot::Config for Test {
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = StaticBondProvider;
+	type OperationalAccountsHook = StaticOperationalAccountsHook;
 	type SlotEvents = (StaticNewSlotEvent,);
 	type GrandpaRotationBlocks = GrandpaRotationFrequency;
 	type MiningAuthorityId = UintAuthorityId;
