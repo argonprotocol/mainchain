@@ -6,9 +6,13 @@ use argon_client::{
 use argon_notary::{
 	NotaryServer,
 	block_watch::spawn_block_sync,
+	ensure,
 	notebook_closer::{NOTARY_KEYID, spawn_notebook_closer},
 	s3_archive::S3Archive,
-	server::{ArchiveSettings, RpcConfig},
+	server::{
+		ArchiveSettings, DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS, MAX_RATE_LIMIT_MAX_SLOWDOWNS, RpcConfig,
+		RpcRateLimitMode,
+	},
 };
 use argon_primitives::{AccountId, CryptoType, KeystoreParams, NotaryId, tick::Ticker};
 use clap::{Parser, Subcommand};
@@ -65,6 +69,22 @@ enum Commands {
 		/// Should this node finalize notebook?
 		#[clap(short, long, env, default_value = "true")]
 		finalize_notebooks: bool,
+
+		/// Per-request RPC rate limit mode (`per-connection` or `per-ip`).
+		#[clap(long, env = "ARGON_RPC_RATE_LIMIT_MODE", default_value = "per-ip")]
+		rpc_rate_limit_mode: RpcRateLimitMode,
+
+		/// Maximum number of rate-limit retries to sleep through before rejecting a request.
+		#[clap(
+			long,
+			env = "ARGON_RPC_RATE_LIMIT_MAX_SLOWDOWNS",
+			default_value_t = DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS
+		)]
+		rpc_rate_limit_max_slowdowns: usize,
+
+		/// Trust proxy headers (`x-forwarded-for`, `x-real-ip`) when deriving per-IP keys.
+		#[clap(long, env = "ARGON_RPC_RATE_LIMIT_TRUST_PROXY_HEADERS", default_value_t = false)]
+		rpc_rate_limit_trust_proxy_headers: bool,
 
 		/// An s3 compatible endpoint for the archive (use minIO for self-hosted). Optional if
 		/// using a default region or in dev.
@@ -154,7 +174,17 @@ async fn main() -> anyhow::Result<()> {
 			mut archive_public_host,
 			archive_endpoint,
 			archive_region,
+			rpc_rate_limit_trust_proxy_headers,
+			rpc_rate_limit_mode,
+			rpc_rate_limit_max_slowdowns,
 		} => {
+			ensure!(
+				rpc_rate_limit_max_slowdowns <= MAX_RATE_LIMIT_MAX_SLOWDOWNS,
+				Error::Input(format!(
+					"rpc_rate_limit_max_slowdowns must be <= {MAX_RATE_LIMIT_MAX_SLOWDOWNS}",
+				)),
+			);
+
 			let pool = PgPoolOptions::new()
 				.max_connections(100)
 				.connect(&db_url)
@@ -211,7 +241,12 @@ async fn main() -> anyhow::Result<()> {
 				pool.clone(),
 				ArchiveSettings { archive_host },
 				// uses prometheus 9116
-				RpcConfig::default(),
+				RpcConfig {
+					rate_limit_trust_proxy_headers: rpc_rate_limit_trust_proxy_headers,
+					rate_limit_mode: rpc_rate_limit_mode,
+					rate_limit_max_slowdowns: rpc_rate_limit_max_slowdowns,
+					..RpcConfig::default()
+				},
 				ticker,
 				bind_addr,
 				prom_registry.clone(),
