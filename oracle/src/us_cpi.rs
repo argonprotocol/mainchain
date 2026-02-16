@@ -195,6 +195,7 @@ impl UsCpiRetriever {
 
 	fn ticks_since_last_cpi(&self, tick: Tick) -> Tick {
 		tick.saturating_sub(self.current_cpi_release_tick)
+			.min(self.current_cpi_duration_ticks)
 	}
 
 	fn calculate_cpi_change_per_tick(&self) -> FixedI128 {
@@ -583,6 +584,10 @@ mod tests {
 		assert_eq!(retriever.ticks_since_last_cpi(tick + 30), 30);
 		assert_eq!(retriever.ticks_since_last_cpi(tick + 60), 60);
 		assert_eq!(retriever.ticks_since_last_cpi(tick + 60 * 24), 24 * 60);
+		assert_eq!(
+			retriever.ticks_since_last_cpi(tick + retriever.current_cpi_duration_ticks + 1),
+			retriever.current_cpi_duration_ticks
+		);
 	}
 
 	#[test]
