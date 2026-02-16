@@ -36,7 +36,12 @@ pub type MaxDomainsPerNotebook = ConstU32<MAX_DOMAINS_PER_NOTEBOOK>;
 pub type AccountOriginUid = u32;
 pub type NotebookNumber = u32;
 
-pub const NOTEBOOK_VERSION: u16 = 1;
+pub const NOTEBOOK_VERSION_1: u16 = 1;
+pub const NOTEBOOK_VERSION_2: u16 = 2;
+pub const NOTEBOOK_VERSION: u16 = NOTEBOOK_VERSION_1;
+
+pub const NOTEBOOK_PARENT_SECRET_REVEAL_DELAY_V1: NotebookNumber = 1;
+pub const NOTEBOOK_PARENT_SECRET_REVEAL_DELAY_V2: NotebookNumber = 10;
 
 #[derive(
 	Clone,
@@ -300,6 +305,20 @@ pub struct SignedNotebookHeader {
 }
 
 impl NotebookHeader {
+	pub fn parent_secret_reveal_delay(version: u16) -> NotebookNumber {
+		match version {
+			NOTEBOOK_VERSION_2 => NOTEBOOK_PARENT_SECRET_REVEAL_DELAY_V2,
+			_ => NOTEBOOK_PARENT_SECRET_REVEAL_DELAY_V1,
+		}
+	}
+
+	pub fn parent_secret_notebook_number(
+		notebook_number: NotebookNumber,
+		version: u16,
+	) -> NotebookNumber {
+		notebook_number.saturating_sub(Self::parent_secret_reveal_delay(version))
+	}
+
 	pub fn hash(&self) -> H256 {
 		self.using_encoded(blake2_256).into()
 	}

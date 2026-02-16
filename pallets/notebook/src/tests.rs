@@ -859,6 +859,243 @@ fn it_requires_parent_secret_for_non_genesis_audit_notebook() {
 }
 
 #[test]
+fn it_rejects_mismatched_audit_notebook_version() {
+	new_test_ext().execute_with(|| {
+		let notary_id = 1;
+		let mut notebook = argon_primitives::notebook::Notebook {
+			header: make_header(1, 1),
+			new_account_origins: bounded_vec![],
+			hash: Default::default(),
+			notarizations: bounded_vec![],
+			signature: ed25519::Signature::from_raw([0u8; 64]),
+		};
+		notebook.hash = notebook.calculate_hash();
+		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let header_hash = notebook.header.hash();
+
+		assert_eq!(
+			Notebook::audit_notebook(
+				2,
+				notary_id,
+				notebook.header.notebook_number,
+				notebook.header.tick,
+				header_hash,
+				&notebook.encode(),
+				vec![],
+			),
+			Err(VerifyError::InvalidNotebookVersion)
+		);
+	});
+}
+
+#[test]
+fn it_can_audit_v2_before_parent_reveal_maturity() {
+	new_test_ext().execute_with(|| {
+		let notary_id = 1;
+		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
+			v.try_insert(
+				0,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 10,
+						parent_secret: Some(H256::random()),
+						secret_hash: H256::random(),
+						block_votes_root: H256::random(),
+						notebook_number: 9,
+					},
+					true,
+				),
+			)
+		})
+		.expect("should insert details");
+
+		let mut header = make_header(10, 11);
+		header.version = 2;
+		header.parent_secret = None;
+		header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(Vec::<Vec<u8>>::new());
+		header.secret_hash =
+			NotebookHeader::create_secret_hash(H256::random(), header.block_votes_root, 10);
+		let tick = header.tick;
+
+		let mut notebook = argon_primitives::notebook::Notebook {
+			header,
+			new_account_origins: bounded_vec![],
+			hash: Default::default(),
+			notarizations: bounded_vec![Notarization::new(
+				vec![],
+				vec![BlockVote::create_default_vote(NotaryOperator::get(), tick)],
+				vec![]
+			)],
+			signature: ed25519::Signature::from_raw([0u8; 64]),
+		};
+		notebook.header.block_votes_root =
+			block_votes_root(notebook.notarizations.to_vec().clone());
+		notebook.hash = notebook.calculate_hash();
+		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let header_hash = notebook.header.hash();
+
+		assert_ok!(Notebook::audit_notebook(
+			2,
+			notary_id,
+			notebook.header.notebook_number,
+			notebook.header.tick,
+			header_hash,
+			&notebook.encode(),
+			vec![]
+		));
+	});
+}
+
+#[test]
+fn it_uses_retained_history_for_v2_parent_secret_lookup() {
+	new_test_ext().execute_with(|| {
+		let notary_id = 1;
+		let parent_secret = H256::random();
+		let parent_block_votes_root = H256::random();
+		let parent_secret_hash =
+			NotebookHeader::create_secret_hash(parent_secret, parent_block_votes_root, 1);
+
+		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
+			v.try_insert(
+				0,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 11,
+						parent_secret: Some(H256::random()),
+						secret_hash: H256::random(),
+						block_votes_root: H256::random(),
+						notebook_number: 10,
+					},
+					true,
+				),
+			)
+			.expect("insert latest");
+			v.try_insert(
+				1,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 2,
+						parent_secret: None,
+						secret_hash: parent_secret_hash,
+						block_votes_root: parent_block_votes_root,
+						notebook_number: 1,
+					},
+					true,
+				),
+			)
+		})
+		.expect("insert parent details");
+
+		let mut header = make_header(11, 12);
+		header.version = 2;
+		header.parent_secret = Some(parent_secret);
+		header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(Vec::<Vec<u8>>::new());
+		header.secret_hash =
+			NotebookHeader::create_secret_hash(H256::random(), header.block_votes_root, 11);
+		let tick = header.tick;
+
+		let mut notebook = argon_primitives::notebook::Notebook {
+			header,
+			new_account_origins: bounded_vec![],
+			hash: Default::default(),
+			notarizations: bounded_vec![Notarization::new(
+				vec![],
+				vec![BlockVote::create_default_vote(NotaryOperator::get(), tick)],
+				vec![]
+			)],
+			signature: ed25519::Signature::from_raw([0u8; 64]),
+		};
+		notebook.header.block_votes_root =
+			block_votes_root(notebook.notarizations.to_vec().clone());
+		notebook.hash = notebook.calculate_hash();
+		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let header_hash = notebook.header.hash();
+
+		assert_ok!(Notebook::audit_notebook(
+			2,
+			notary_id,
+			notebook.header.notebook_number,
+			notebook.header.tick,
+			header_hash,
+			&notebook.encode(),
+			vec![]
+		));
+	});
+}
+
+#[test]
+fn it_requires_parent_secret_after_v2_reveal_maturity() {
+	new_test_ext().execute_with(|| {
+		let notary_id = 1;
+		let parent_secret = H256::random();
+		let parent_block_votes_root = H256::random();
+		let parent_secret_hash =
+			NotebookHeader::create_secret_hash(parent_secret, parent_block_votes_root, 1);
+
+		LastNotebookDetailsByNotary::<Test>::mutate(notary_id, |v| {
+			v.try_insert(
+				0,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 11,
+						parent_secret: Some(H256::random()),
+						secret_hash: H256::random(),
+						block_votes_root: H256::random(),
+						notebook_number: 10,
+					},
+					true,
+				),
+			)
+			.expect("insert latest");
+			v.try_insert(
+				1,
+				(
+					NotaryNotebookKeyDetails {
+						tick: 2,
+						parent_secret: None,
+						secret_hash: parent_secret_hash,
+						block_votes_root: parent_block_votes_root,
+						notebook_number: 1,
+					},
+					true,
+				),
+			)
+		})
+		.expect("insert parent details");
+
+		let mut header = make_header(11, 12);
+		header.version = 2;
+		header.parent_secret = None;
+		header.secret_hash =
+			NotebookHeader::create_secret_hash(H256::random(), header.block_votes_root, 11);
+
+		let mut notebook = argon_primitives::notebook::Notebook {
+			header,
+			new_account_origins: bounded_vec![],
+			hash: Default::default(),
+			notarizations: bounded_vec![],
+			signature: ed25519::Signature::from_raw([0u8; 64]),
+		};
+		notebook.hash = notebook.calculate_hash();
+		notebook.signature = Ed25519Keyring::Bob.pair().sign(notebook.hash.as_ref());
+		let header_hash = notebook.header.hash();
+
+		assert_eq!(
+			Notebook::audit_notebook(
+				2,
+				notary_id,
+				notebook.header.notebook_number,
+				notebook.header.tick,
+				header_hash,
+				&notebook.encode(),
+				vec![],
+			),
+			Err(VerifyError::InvalidSecretProvided)
+		);
+	});
+}
+
+#[test]
 fn it_can_audit_notebooks_with_history() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited

@@ -264,10 +264,14 @@ where
 			}
 
 			let forkpower = self.get_fork_power(parent_hash)?;
-			if let Some((_, best_forkpower)) = &best_parent {
-				// If we already have a parent, we only want to replace it if the new one has
-				// strictly more fork power.
-				if forkpower <= *best_forkpower {
+			if let Some((best_parent_hash, best_forkpower)) = &best_parent {
+				// Prefer strictly better fork power; use hash as deterministic tie-break.
+				if !is_better_fork_candidate(
+					&parent_hash,
+					&forkpower,
+					best_parent_hash,
+					best_forkpower,
+				) {
 					continue;
 				}
 			}
@@ -279,7 +283,7 @@ where
 		};
 
 		// now figure out of there's a descendent we want to be able to beat
-		let mut best_child: Option<ForkPower> = None;
+		let mut best_child: Option<(B::Hash, ForkPower)> = None;
 		let notebook_in_block_tick = voting_schedule.block_tick();
 		for leaf in leaves {
 			if leaf == best_parent_hash {
@@ -297,22 +301,27 @@ where
 				self.get_block_ancestor_with_tick(leaf, notebook_in_block_tick)
 			{
 				let fork_power = self.get_fork_power(competing_hash)?;
-				// If we already have a child, we only want to replace it if the new one has
-				// strictly more fork power.
-				if let Some(best_fork_power) = &best_child {
-					if fork_power < *best_fork_power {
+				// Prefer strictly better fork power; use hash as deterministic tie-break.
+				if let Some((best_child_hash, best_fork_power)) = &best_child {
+					if !is_better_fork_candidate(
+						&competing_hash,
+						&fork_power,
+						best_child_hash,
+						best_fork_power,
+					) {
 						continue;
 					}
 				}
-				best_child = Some(fork_power);
+				best_child = Some((competing_hash, fork_power));
 			}
 		}
 
-		let (best_peer_seal_strength, best_miner_nonce_score) = if let Some(power) = &best_child {
-			(power.seal_strength, power.miner_nonce_score)
-		} else {
-			(U256::MAX, None)
-		};
+		let (best_peer_seal_strength, best_miner_nonce_score) =
+			if let Some((_, power)) = &best_child {
+				(power.seal_strength, power.miner_nonce_score)
+			} else {
+				(U256::MAX, None)
+			};
 
 		Ok(Some((best_parent_hash, best_peer_seal_strength, best_miner_nonce_score)))
 	}
@@ -338,6 +347,21 @@ where
 		ForkPower::try_from(digest)
 			.map_err(|e| Error::StringError(format!("Could not get fork power from header: {e:?}")))
 	}
+}
+
+fn is_better_fork_candidate<Hash: Ord>(
+	candidate_hash: &Hash,
+	candidate_fork_power: &ForkPower,
+	best_hash: &Hash,
+	best_fork_power: &ForkPower,
+) -> bool {
+	if candidate_fork_power > best_fork_power {
+		return true;
+	}
+	if candidate_fork_power < best_fork_power {
+		return false;
+	}
+	candidate_hash < best_hash
 }
 
 pub fn create_vote_seal<Hash: AsRef<[u8]>>(
@@ -417,5 +441,25 @@ mod tests {
 			),
 			Err(Error::ConsensusError(ConsensusError::CannotSign(_)))
 		),);
+	}
+
+	#[test]
+	fn it_uses_hash_tie_break_for_equal_parent_fork_power() {
+		let fork_power = ForkPower::default();
+		let lower_hash = H256::from_low_u64_be(1);
+		let higher_hash = H256::from_low_u64_be(2);
+
+		assert!(is_better_fork_candidate(&lower_hash, &fork_power, &higher_hash, &fork_power));
+		assert!(!is_better_fork_candidate(&higher_hash, &fork_power, &lower_hash, &fork_power));
+	}
+
+	#[test]
+	fn it_uses_hash_tie_break_for_equal_child_fork_power() {
+		let fork_power = ForkPower::default();
+		let lower_hash = H256::from_low_u64_be(11);
+		let higher_hash = H256::from_low_u64_be(12);
+
+		assert!(is_better_fork_candidate(&lower_hash, &fork_power, &higher_hash, &fork_power));
+		assert!(!is_better_fork_candidate(&higher_hash, &fork_power, &lower_hash, &fork_power));
 	}
 }
