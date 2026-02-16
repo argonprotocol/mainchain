@@ -1,7 +1,7 @@
 use std::{env, fs};
 
 use crate::utils::parse_date;
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, ensure};
 use chrono::{DateTime, Utc};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,13 @@ fn parse_schedule(html: String) -> Result<Vec<CpiSchedule>> {
 
 		// ref month looks like December 2023
 		let ref_month = parse_date(&format!("1 {ref_month}"), vec!["%d %B %Y"])?;
+		let release_lag_days = release_date.signed_duration_since(ref_month).num_days();
+		ensure!(
+			(20..=90).contains(&release_lag_days),
+			"Invalid CPI schedule row: ref_month={}, release_date={}",
+			ref_month,
+			release_date
+		);
 
 		cpi_schedule.push(CpiSchedule { ref_month, release_date });
 	}
@@ -170,5 +177,29 @@ mod tests {
 	async fn test_can_get_schedule() {
 		let schedule = load_cpi_schedule().await.unwrap();
 		assert!(schedule.len().ge(&12));
+	}
+
+	#[test]
+	fn test_rejects_invalid_release_year() {
+		let html = r#"
+		<!DOCTYPE HTML>
+		<html lang="en-us"><body>
+		<div id="main-content-td" class="main-content">
+			<div id="bodytext" class="verdana md">
+				<table class="release-list">
+				<tbody>
+				<tr class="release-list-odd-row">
+				<td>January 2026</td>
+				<td>Feb. 11, 2025</td>
+				<td>08:30 AM</td>
+				</tr>
+				</tbody>
+				</table>
+			</div>
+		</div>
+	</body></html>"#;
+
+		let err = parse_schedule(html.to_string()).unwrap_err().to_string();
+		assert!(err.contains("Invalid CPI schedule row"));
 	}
 }
