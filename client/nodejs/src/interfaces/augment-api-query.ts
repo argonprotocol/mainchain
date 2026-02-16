@@ -484,6 +484,14 @@ declare module '@polkadot/api-base/types/storage' {
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
     };
     chainTransfer: {
+      /**
+       * Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
+       *
+       * NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,
+       * not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending
+       * transfers for that notary remain frozen by design until a notary-switch recovery path is
+       * executed.
+       **/
       expiringTransfersOutByNotary: AugmentedQuery<
         ApiType,
         (

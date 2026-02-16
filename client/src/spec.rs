@@ -1886,10 +1886,9 @@ pub mod api {
 						"digest_notebooks",
 						types::DigestNotebooks { digests },
 						[
-							59u8, 123u8, 39u8, 131u8, 51u8, 146u8, 132u8, 191u8, 10u8, 243u8,
-							163u8, 178u8, 82u8, 130u8, 216u8, 67u8, 228u8, 172u8, 157u8, 112u8,
-							150u8, 255u8, 131u8, 201u8, 201u8, 162u8, 35u8, 83u8, 201u8, 230u8,
-							9u8, 189u8,
+							216u8, 23u8, 190u8, 156u8, 105u8, 255u8, 74u8, 200u8, 8u8, 76u8, 220u8,
+							215u8, 187u8, 127u8, 79u8, 234u8, 39u8, 201u8, 104u8, 7u8, 75u8, 239u8,
+							216u8, 146u8, 255u8, 221u8, 122u8, 98u8, 73u8, 85u8, 31u8, 48u8,
 						],
 					)
 				}
@@ -1974,10 +1973,10 @@ pub mod api {
 						"notary_by_id",
 						types::NotaryById { notary_id },
 						[
-							29u8, 14u8, 152u8, 42u8, 109u8, 22u8, 100u8, 15u8, 34u8, 251u8, 77u8,
-							169u8, 251u8, 86u8, 66u8, 148u8, 95u8, 204u8, 58u8, 239u8, 175u8,
-							160u8, 245u8, 226u8, 34u8, 98u8, 42u8, 237u8, 235u8, 59u8, 244u8,
-							207u8,
+							226u8, 232u8, 144u8, 12u8, 120u8, 161u8, 71u8, 66u8, 1u8, 108u8, 170u8,
+							151u8, 82u8, 1u8, 154u8, 209u8, 240u8, 168u8, 56u8, 132u8, 161u8,
+							194u8, 119u8, 70u8, 250u8, 205u8, 87u8, 77u8, 103u8, 118u8, 27u8,
+							240u8,
 						],
 					)
 				}
@@ -1992,10 +1991,9 @@ pub mod api {
 						"notaries",
 						types::Notaries {},
 						[
-							243u8, 144u8, 18u8, 22u8, 156u8, 62u8, 195u8, 227u8, 128u8, 217u8,
-							30u8, 166u8, 128u8, 70u8, 191u8, 144u8, 89u8, 251u8, 151u8, 165u8,
-							222u8, 162u8, 220u8, 208u8, 19u8, 61u8, 197u8, 120u8, 128u8, 152u8,
-							66u8, 78u8,
+							186u8, 200u8, 107u8, 13u8, 46u8, 2u8, 13u8, 144u8, 158u8, 113u8, 54u8,
+							243u8, 73u8, 32u8, 251u8, 46u8, 31u8, 167u8, 65u8, 27u8, 54u8, 85u8,
+							75u8, 236u8, 127u8, 151u8, 96u8, 73u8, 23u8, 122u8, 244u8, 95u8,
 						],
 					)
 				}
@@ -2174,9 +2172,9 @@ pub mod api {
 							raw_audit_dependency_summaries,
 						},
 						[
-							91u8, 31u8, 41u8, 101u8, 104u8, 72u8, 126u8, 194u8, 127u8, 93u8, 82u8,
-							204u8, 53u8, 184u8, 130u8, 96u8, 108u8, 137u8, 59u8, 56u8, 164u8, 69u8,
-							250u8, 183u8, 132u8, 123u8, 233u8, 232u8, 140u8, 188u8, 214u8, 151u8,
+							66u8, 247u8, 90u8, 64u8, 238u8, 163u8, 144u8, 65u8, 28u8, 222u8, 168u8,
+							202u8, 231u8, 152u8, 237u8, 36u8, 167u8, 186u8, 33u8, 23u8, 160u8,
+							25u8, 201u8, 213u8, 38u8, 207u8, 254u8, 245u8, 45u8, 78u8, 200u8, 89u8,
 						],
 					)
 				}
@@ -3811,9 +3809,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				37u8, 65u8, 212u8, 89u8, 141u8, 245u8, 38u8, 153u8, 169u8, 38u8, 118u8, 80u8, 49u8,
-				3u8, 17u8, 166u8, 69u8, 35u8, 104u8, 81u8, 50u8, 213u8, 89u8, 252u8, 8u8, 82u8,
-				188u8, 122u8, 123u8, 198u8, 117u8, 110u8,
+				95u8, 172u8, 130u8, 254u8, 40u8, 180u8, 80u8, 149u8, 187u8, 237u8, 134u8, 222u8,
+				192u8, 177u8, 55u8, 87u8, 247u8, 25u8, 221u8, 246u8, 253u8, 228u8, 179u8, 3u8,
+				251u8, 153u8, 3u8, 167u8, 46u8, 88u8, 52u8, 107u8,
 			]
 	}
 	pub mod system {
@@ -4931,10 +4929,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							87u8, 57u8, 141u8, 249u8, 176u8, 181u8, 126u8, 142u8, 122u8, 203u8,
-							225u8, 75u8, 184u8, 240u8, 188u8, 123u8, 202u8, 178u8, 147u8, 45u8,
-							154u8, 211u8, 179u8, 153u8, 103u8, 189u8, 158u8, 99u8, 15u8, 11u8,
-							130u8, 97u8,
+							28u8, 10u8, 172u8, 113u8, 182u8, 144u8, 223u8, 81u8, 67u8, 162u8,
+							145u8, 116u8, 66u8, 218u8, 82u8, 120u8, 188u8, 157u8, 104u8, 20u8,
+							217u8, 25u8, 219u8, 130u8, 160u8, 12u8, 208u8, 111u8, 203u8, 228u8,
+							187u8, 187u8,
 						],
 					)
 				}
@@ -5307,9 +5305,9 @@ pub mod api {
 						"TempDigests",
 						(),
 						[
-							167u8, 150u8, 44u8, 37u8, 16u8, 201u8, 97u8, 103u8, 222u8, 95u8, 206u8,
-							206u8, 25u8, 206u8, 150u8, 229u8, 143u8, 251u8, 68u8, 239u8, 201u8,
-							94u8, 2u8, 166u8, 230u8, 1u8, 223u8, 204u8, 71u8, 108u8, 3u8, 96u8,
+							34u8, 54u8, 100u8, 25u8, 40u8, 144u8, 21u8, 143u8, 19u8, 163u8, 5u8,
+							54u8, 86u8, 150u8, 226u8, 184u8, 141u8, 160u8, 53u8, 13u8, 213u8, 22u8,
+							242u8, 219u8, 136u8, 169u8, 152u8, 66u8, 102u8, 18u8, 54u8, 156u8,
 						],
 					)
 				}
@@ -13704,9 +13702,9 @@ pub mod api {
 						"BlockNotebooks",
 						(),
 						[
-							251u8, 150u8, 228u8, 246u8, 109u8, 140u8, 61u8, 132u8, 31u8, 170u8,
-							200u8, 149u8, 252u8, 52u8, 244u8, 29u8, 112u8, 10u8, 99u8, 47u8, 250u8,
-							234u8, 241u8, 26u8, 190u8, 158u8, 76u8, 81u8, 206u8, 89u8, 219u8, 50u8,
+							48u8, 175u8, 190u8, 234u8, 187u8, 253u8, 69u8, 142u8, 200u8, 101u8,
+							13u8, 126u8, 99u8, 4u8, 2u8, 72u8, 182u8, 103u8, 178u8, 38u8, 64u8,
+							204u8, 71u8, 190u8, 8u8, 190u8, 65u8, 56u8, 162u8, 89u8, 102u8, 106u8,
 						],
 					)
 				}
@@ -13746,9 +13744,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						(),
 						[
-							240u8, 224u8, 83u8, 126u8, 214u8, 70u8, 158u8, 16u8, 59u8, 89u8, 246u8,
-							172u8, 92u8, 218u8, 9u8, 252u8, 48u8, 65u8, 106u8, 211u8, 109u8, 85u8,
-							239u8, 200u8, 56u8, 182u8, 252u8, 139u8, 240u8, 118u8, 154u8, 189u8,
+							3u8, 133u8, 18u8, 76u8, 241u8, 16u8, 95u8, 2u8, 30u8, 116u8, 67u8,
+							22u8, 210u8, 112u8, 113u8, 247u8, 128u8, 32u8, 136u8, 155u8, 28u8,
+							46u8, 133u8, 252u8, 137u8, 142u8, 160u8, 35u8, 167u8, 174u8, 204u8,
+							37u8,
 						],
 					)
 				}
@@ -13770,9 +13769,10 @@ pub mod api {
 						"NotariesLockedForFailedAudit",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							240u8, 224u8, 83u8, 126u8, 214u8, 70u8, 158u8, 16u8, 59u8, 89u8, 246u8,
-							172u8, 92u8, 218u8, 9u8, 252u8, 48u8, 65u8, 106u8, 211u8, 109u8, 85u8,
-							239u8, 200u8, 56u8, 182u8, 252u8, 139u8, 240u8, 118u8, 154u8, 189u8,
+							3u8, 133u8, 18u8, 76u8, 241u8, 16u8, 95u8, 2u8, 30u8, 116u8, 67u8,
+							22u8, 210u8, 112u8, 113u8, 247u8, 128u8, 32u8, 136u8, 155u8, 28u8,
+							46u8, 133u8, 252u8, 137u8, 142u8, 160u8, 35u8, 167u8, 174u8, 204u8,
+							37u8,
 						],
 					)
 				}
@@ -14178,6 +14178,12 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`."]
+				#[doc = ""]
+				#[doc = " NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,"]
+				#[doc = " not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending"]
+				#[doc = " transfers for that notary remain frozen by design until a notary-switch recovery path is"]
+				#[doc = " executed."]
 				pub fn expiring_transfers_out_by_notary_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -14199,6 +14205,12 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`."]
+				#[doc = ""]
+				#[doc = " NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,"]
+				#[doc = " not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending"]
+				#[doc = " transfers for that notary remain frozen by design until a notary-switch recovery path is"]
+				#[doc = " executed."]
 				pub fn expiring_transfers_out_by_notary_iter1(
 					&self,
 					_0: types::expiring_transfers_out_by_notary::Param0,
@@ -14223,6 +14235,12 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`."]
+				#[doc = ""]
+				#[doc = " NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,"]
+				#[doc = " not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending"]
+				#[doc = " transfers for that notary remain frozen by design until a notary-switch recovery path is"]
+				#[doc = " executed."]
 				pub fn expiring_transfers_out_by_notary(
 					&self,
 					_0: types::expiring_transfers_out_by_notary::Param0,
@@ -25947,83 +25965,85 @@ pub mod api {
 					#[codec(index = 24)]
 					InvalidNotebookHeaderHash,
 					#[codec(index = 25)]
-					DuplicateChainTransfer,
+					InvalidNotebookVersion,
 					#[codec(index = 26)]
-					DuplicatedAccountOriginUid,
+					DuplicateChainTransfer,
 					#[codec(index = 27)]
-					InvalidNotarySignature,
+					DuplicatedAccountOriginUid,
 					#[codec(index = 28)]
-					InvalidSecretProvided,
+					InvalidNotarySignature,
 					#[codec(index = 29)]
-					NotebookTooOld,
+					InvalidSecretProvided,
 					#[codec(index = 30)]
-					CatchupNotebooksMissing,
+					NotebookTooOld,
 					#[codec(index = 31)]
-					DecodeError,
+					CatchupNotebooksMissing,
 					#[codec(index = 32)]
-					AccountChannelHoldDoesntExist,
+					DecodeError,
 					#[codec(index = 33)]
-					AccountAlreadyHasChannelHold,
+					AccountChannelHoldDoesntExist,
 					#[codec(index = 34)]
+					AccountAlreadyHasChannelHold,
+					#[codec(index = 35)]
 					ChannelHoldNotReadyForClaim {
 						current_tick: ::core::primitive::u64,
 						claim_tick: ::core::primitive::u64,
 					},
-					#[codec(index = 35)]
-					AccountLocked,
 					#[codec(index = 36)]
-					MissingChannelHoldNote,
+					AccountLocked,
 					#[codec(index = 37)]
-					InvalidChannelHoldNote,
+					MissingChannelHoldNote,
 					#[codec(index = 38)]
-					InvalidChannelHoldClaimers,
+					InvalidChannelHoldNote,
 					#[codec(index = 39)]
-					ChannelHoldNoteBelowMinimum,
+					InvalidChannelHoldClaimers,
 					#[codec(index = 40)]
-					InvalidTaxNoteAccount,
+					ChannelHoldNoteBelowMinimum,
 					#[codec(index = 41)]
-					InvalidTaxOperation,
+					InvalidTaxNoteAccount,
 					#[codec(index = 42)]
+					InvalidTaxOperation,
+					#[codec(index = 43)]
 					InsufficientTaxIncluded {
 						tax_sent: ::core::primitive::u128,
 						tax_owed: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 43)]
-					InsufficientBlockVoteTax,
 					#[codec(index = 44)]
-					IneligibleTaxVoter,
+					InsufficientBlockVoteTax,
 					#[codec(index = 45)]
-					BlockVoteInvalidSignature,
+					IneligibleTaxVoter,
 					#[codec(index = 46)]
-					InvalidBlockVoteAllocation,
+					BlockVoteInvalidSignature,
 					#[codec(index = 47)]
-					InvalidBlockVoteRoot,
+					InvalidBlockVoteAllocation,
 					#[codec(index = 48)]
-					InvalidBlockVotesCount,
+					InvalidBlockVoteRoot,
 					#[codec(index = 49)]
-					InvalidBlockVotingPower,
+					InvalidBlockVotesCount,
 					#[codec(index = 50)]
-					InvalidBlockVoteList,
+					InvalidBlockVotingPower,
 					#[codec(index = 51)]
-					InvalidComputeProof,
+					InvalidBlockVoteList,
 					#[codec(index = 52)]
-					InvalidBlockVoteSource,
+					InvalidComputeProof,
 					#[codec(index = 53)]
-					InsufficientBlockVoteMinimum,
+					InvalidBlockVoteSource,
 					#[codec(index = 54)]
+					InsufficientBlockVoteMinimum,
+					#[codec(index = 55)]
 					InvalidBlockVoteTick {
 						tick: ::core::primitive::u64,
 						notebook_tick: ::core::primitive::u64,
 					},
-					#[codec(index = 55)]
-					InvalidDefaultBlockVote,
 					#[codec(index = 56)]
+					InvalidDefaultBlockVote,
+					#[codec(index = 57)]
 					InvalidDefaultBlockVoteAuthor {
 						author: crate::types::AccountId32,
 						expected: crate::types::AccountId32,
 					},
-					#[codec(index = 57)]
+					#[codec(index = 58)]
 					NoDefaultBlockVote,
 				}
 			}
@@ -30750,6 +30770,12 @@ pub mod api {
 					#[codec(index = 5)]
 					#[doc = "The notary id is not registered"]
 					InvalidNotaryUsedForTransfer,
+					#[codec(index = 6)]
+					#[doc = "The notary is currently locked and cannot process transfers"]
+					NotaryLockedForTransfer,
+					#[codec(index = 7)]
+					#[doc = "No transfer IDs are currently available"]
+					NoAvailableTransferId,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

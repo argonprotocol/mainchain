@@ -135,6 +135,9 @@ pub enum VerifyError {
 	#[error("Invalid notebook header hash")]
 	InvalidNotebookHeaderHash,
 
+	#[error("Invalid notebook version")]
+	InvalidNotebookVersion,
+
 	#[error("Duplicate chain transfer")]
 	DuplicateChainTransfer,
 

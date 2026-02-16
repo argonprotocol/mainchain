@@ -926,6 +926,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidPreviousBalanceProof: boolean;
     readonly isInvalidNotebookHash: boolean;
     readonly isInvalidNotebookHeaderHash: boolean;
+    readonly isInvalidNotebookVersion: boolean;
     readonly isDuplicateChainTransfer: boolean;
     readonly isDuplicatedAccountOriginUid: boolean;
     readonly isInvalidNotarySignature: boolean;
@@ -1002,6 +1003,7 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidPreviousBalanceProof'
       | 'InvalidNotebookHash'
       | 'InvalidNotebookHeaderHash'
+      | 'InvalidNotebookVersion'
       | 'DuplicateChainTransfer'
       | 'DuplicatedAccountOriginUid'
       | 'InvalidNotarySignature'
@@ -3917,13 +3919,17 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidOrDuplicatedLocalchainTransfer: boolean;
     readonly isNotebookIncludesExpiredLocalchainTransfer: boolean;
     readonly isInvalidNotaryUsedForTransfer: boolean;
+    readonly isNotaryLockedForTransfer: boolean;
+    readonly isNoAvailableTransferId: boolean;
     readonly type:
       | 'MaxBlockTransfersExceeded'
       | 'InsufficientFunds'
       | 'InsufficientNotarizedFunds'
       | 'InvalidOrDuplicatedLocalchainTransfer'
       | 'NotebookIncludesExpiredLocalchainTransfer'
-      | 'InvalidNotaryUsedForTransfer';
+      | 'InvalidNotaryUsedForTransfer'
+      | 'NotaryLockedForTransfer'
+      | 'NoAvailableTransferId';
   }
 
   /** @name ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails (460) */

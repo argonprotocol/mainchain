@@ -127,22 +127,11 @@ impl PartialOrd for ForkPower {
 	/// - We prefer vote over compute, so always take a fork with more vote blocks
 	/// - Requiring compute to have notebooks means it cannot be used as a fallback mechanism, so we
 	///   will ignore that. It also skews compute towards the moments after a notebook arrives.
-	/// - We want votes to come from the most inclusive block - so we should include notebooks and
-	///   total voting power (aka, money). Without this, a "planned" notebook from a rogue notary
-	///   could attempt to leave out other notebooks to pre-plan a known key
+	/// - NOTE: notebook count is intentionally excluded from ordering to avoid private/withheld
+	///   notebook release influencing fork choice.
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		let mut cmp = Ordering::Equal;
-		// Only sort by notebooks if both are vote blocks
-		//
-		// NOTE: careful to sort by `is_latest_vote`, as a block with a vote is always better than a
-		// compute nonce, but only at the same height
-		if self.is_latest_vote && other.is_latest_vote {
-			cmp = self.notebooks.cmp(&other.notebooks);
-		}
-		if cmp == Ordering::Equal {
-			// count forks with tax votes over compute
-			cmp = self.vote_created_blocks.cmp(&other.vote_created_blocks);
-		}
+		// count forks with tax votes over compute
+		let mut cmp = self.vote_created_blocks.cmp(&other.vote_created_blocks);
 		if cmp == Ordering::Equal {
 			// total spend on vote tax
 			cmp = self.voting_power.cmp(&other.voting_power);
@@ -203,7 +192,7 @@ mod test {
 
 		fork_a.add_vote(0, 2, U256::one(), None);
 		fork_b.add_vote(0, 1, U256::one(), None);
-		assert!(fork_a > fork_b, "more notebooks should be better");
+		assert!(fork_a.eq_weight(&fork_b), "notebook count should not affect vote fork comparison");
 
 		fork_a.add_compute(0, 0, 1000);
 		fork_b.add_compute(0, 2, 1000);
@@ -211,7 +200,6 @@ mod test {
 			fork_a.eq_weight(&fork_b),
 			"Compute blocks should be equal if they have the same compute difficulty - notebooks don't matter"
 		);
-		fork_a.notebooks = fork_b.notebooks;
 		fork_a.vote_created_blocks = fork_b.vote_created_blocks;
 
 		fork_a.add_vote(0, 0, U256::zero(), None);

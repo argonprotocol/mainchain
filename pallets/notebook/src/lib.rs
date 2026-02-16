@@ -64,7 +64,7 @@ pub mod pallet {
 		type Digests: Get<Result<Digestset<NotebookVerifyError, Self::AccountId>, DispatchError>>;
 	}
 
-	const MAX_NOTEBOOK_DETAILS_PER_NOTARY: u32 = 3;
+	const MAX_NOTEBOOK_DETAILS_PER_NOTARY: u32 = 16;
 
 	/// Double storage map of notary id + notebook # to the change root
 	#[pallet::storage]
@@ -573,7 +573,7 @@ pub mod pallet {
 
 		#[allow(clippy::too_many_arguments)]
 		pub fn audit_notebook(
-			_version: u32,
+			version: u32,
 			notary_id: NotaryId,
 			notebook_number: NotebookNumber,
 			notebook_tick: Tick,
@@ -604,40 +604,6 @@ pub mod pallet {
 				a.notebook_number.cmp(&b.notebook_number)
 			});
 
-			let mut parent_secret_hash = NotebookSecretHash::zero();
-			let mut parent_block_votes_root = H256::zero();
-			let previous_notebook = notebook_number.saturating_sub(1);
-			let mut last_notebook_processed: NotebookNumber =
-				<LastNotebookDetailsByNotary<T>>::get(notary_id)
-					.first()
-					.map(|(details, _)| {
-						if details.notebook_number == previous_notebook {
-							parent_secret_hash = details.secret_hash;
-							parent_block_votes_root = details.block_votes_root;
-						}
-						details.notebook_number
-					})
-					.unwrap_or_default();
-
-			for audit_summary in audit_dependency_summaries {
-				ensure!(
-					audit_summary.notebook_number == last_notebook_processed + 1,
-					NotebookVerifyError::CatchupNotebooksMissing
-				);
-				if audit_summary.notebook_number == previous_notebook {
-					parent_secret_hash = audit_summary.details.secret_hash;
-					parent_block_votes_root = audit_summary.details.block_votes_root;
-				}
-
-				last_notebook_processed = audit_summary.notebook_number;
-				history_lookup.add_audit_summary(audit_summary);
-			}
-
-			ensure!(
-				notebook_number == last_notebook_processed + 1,
-				NotebookVerifyError::CatchupNotebooksMissing
-			);
-
 			let notebook = Notebook::decode(&mut bytes.as_ref()).map_err(|e| {
 				warn!(
 					"Notebook audit failed to decode for notary {notary_id}, notebook {notebook_number}: {:?}",
@@ -649,6 +615,12 @@ pub mod pallet {
 			ensure!(
 				notebook.header.notebook_number == notebook_number,
 				NotebookVerifyError::InvalidNotebookHeaderHash
+			);
+			let requested_version =
+				u16::try_from(version).map_err(|_| NotebookVerifyError::InvalidNotebookVersion)?;
+			ensure!(
+				notebook.header.version == requested_version,
+				NotebookVerifyError::InvalidNotebookVersion
 			);
 			ensure!(
 				notebook.header.hash() == header_hash,
@@ -665,7 +637,49 @@ pub mod pallet {
 				NotebookVerifyError::InvalidNotarySignature
 			);
 
-			if notebook.header.notebook_number > 1 {
+			let parent_notebook_number = NotebookHeader::parent_secret_notebook_number(
+				notebook_number,
+				notebook.header.version,
+			);
+			let mut parent_secret_hash = NotebookSecretHash::zero();
+			let mut parent_block_votes_root = H256::zero();
+			let mut found_parent_notebook = parent_notebook_number == 0;
+			let notary_notebook_details = <LastNotebookDetailsByNotary<T>>::get(notary_id);
+			let mut last_notebook_processed: NotebookNumber = notary_notebook_details
+				.first()
+				.map(|(details, _)| details.notebook_number)
+				.unwrap_or_default();
+			if let Some((details, _)) = notary_notebook_details
+				.iter()
+				.find(|(details, _)| details.notebook_number == parent_notebook_number)
+			{
+				parent_secret_hash = details.secret_hash;
+				parent_block_votes_root = details.block_votes_root;
+				found_parent_notebook = true;
+			}
+
+			for audit_summary in audit_dependency_summaries {
+				ensure!(
+					audit_summary.notebook_number == last_notebook_processed + 1,
+					NotebookVerifyError::CatchupNotebooksMissing
+				);
+				if audit_summary.notebook_number == parent_notebook_number {
+					parent_secret_hash = audit_summary.details.secret_hash;
+					parent_block_votes_root = audit_summary.details.block_votes_root;
+					found_parent_notebook = true;
+				}
+
+				last_notebook_processed = audit_summary.notebook_number;
+				history_lookup.add_audit_summary(audit_summary);
+			}
+
+			ensure!(
+				notebook_number == last_notebook_processed + 1,
+				NotebookVerifyError::CatchupNotebooksMissing
+			);
+			ensure!(found_parent_notebook, NotebookVerifyError::CatchupNotebooksMissing);
+
+			if parent_notebook_number > 0 {
 				let secret = notebook
 					.header
 					.parent_secret
@@ -673,7 +687,7 @@ pub mod pallet {
 				let secret_hash = NotebookHeader::create_secret_hash(
 					secret,
 					parent_block_votes_root,
-					notebook.header.notebook_number.saturating_sub(1),
+					parent_notebook_number,
 				);
 				ensure!(
 					secret_hash == parent_secret_hash,

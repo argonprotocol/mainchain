@@ -392,6 +392,14 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
       /**
+       * No transfer IDs are currently available
+       **/
+      NoAvailableTransferId: AugmentedError<ApiType>;
+      /**
+       * The notary is currently locked and cannot process transfers
+       **/
+      NotaryLockedForTransfer: AugmentedError<ApiType>;
+      /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;

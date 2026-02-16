@@ -732,6 +732,7 @@ export default {
       InvalidPreviousBalanceProof: 'Null',
       InvalidNotebookHash: 'Null',
       InvalidNotebookHeaderHash: 'Null',
+      InvalidNotebookVersion: 'Null',
       DuplicateChainTransfer: 'Null',
       DuplicatedAccountOriginUid: 'Null',
       InvalidNotarySignature: 'Null',
@@ -3373,6 +3374,8 @@ export default {
       'InvalidOrDuplicatedLocalchainTransfer',
       'NotebookIncludesExpiredLocalchainTransfer',
       'InvalidNotaryUsedForTransfer',
+      'NotaryLockedForTransfer',
+      'NoAvailableTransferId',
     ],
   },
   /**
