@@ -315,12 +315,18 @@ impl NotebookHeaderStore {
 		header.secret_hash = header.hash_secret(secret.into());
 
 		Self::save_secret(db, notebook_number, H256::from_slice(&secret)).await?;
-		let parent_secret = sqlx::query_scalar!(
-			"SELECT secret FROM notebook_secrets WHERE notebook_number = $1 LIMIT 1",
-			(notebook_number - 1) as i32
-		)
-		.fetch_optional(&mut *db)
-		.await?;
+		let parent_secret_notebook_number =
+			NotebookHeader::parent_secret_notebook_number(notebook_number, header.version);
+		let parent_secret = if parent_secret_notebook_number == 0 {
+			None
+		} else {
+			sqlx::query_scalar!(
+				"SELECT secret FROM notebook_secrets WHERE notebook_number = $1 LIMIT 1",
+				parent_secret_notebook_number as i32
+			)
+			.fetch_optional(&mut *db)
+			.await?
+		};
 
 		header.parent_secret = parent_secret.map(|a| H256::from_slice(&a[..]));
 		Ok(())

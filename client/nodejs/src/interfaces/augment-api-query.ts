@@ -47,6 +47,7 @@ import type {
   ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails,
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesProvidersBlockSealerInfo,
+  ArgonPrimitivesProvidersOperationalRewardPayout,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   FrameSupportDispatchPerDispatchClassWeight,
@@ -74,9 +75,14 @@ import type {
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletHyperbridgeVersionedHostParams,
+  PalletInboundTransferLogInboundEvmTransfer,
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMultisigMultisig,
+  PalletOperationalAccountsAccessCodeMetadata,
+  PalletOperationalAccountsLegacyVaultInfo,
+  PalletOperationalAccountsOperationalAccount,
+  PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
@@ -478,6 +484,14 @@ declare module '@polkadot/api-base/types/storage' {
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
     };
     chainTransfer: {
+      /**
+       * Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
+       *
+       * NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,
+       * not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending
+       * transfers for that notary remain frozen by design until a notary-switch recovery path is
+       * executed.
+       **/
       expiringTransfersOutByNotary: AugmentedQuery<
         ApiType,
         (
@@ -588,6 +602,26 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         () => Observable<PalletHyperbridgeVersionedHostParams>,
         []
+      >;
+    };
+    inboundTransferLog: {
+      /**
+       * Inbound EVM transfers recorded by their request commitment key.
+       **/
+      inboundEvmTransfers: AugmentedQuery<
+        ApiType,
+        (
+          arg: H256 | string | Uint8Array,
+        ) => Observable<Option<PalletInboundTransferLogInboundEvmTransfer>>,
+        [H256]
+      >;
+      /**
+       * Index of inbound transfer record keys expiring at a given block.
+       **/
+      inboundTransfersExpiringAt: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>,
+        [u32]
       >;
     };
     ismp: {
@@ -1002,6 +1036,72 @@ declare module '@polkadot/api-base/types/storage' {
           arg2: u32 | AnyNumber | Uint8Array,
         ) => Observable<Option<H256>>,
         [u32, u32]
+      >;
+    };
+    operationalAccounts: {
+      /**
+       * Registered access codes keyed by their public key.
+       **/
+      accessCodesByPublic: AugmentedQuery<
+        ApiType,
+        (
+          arg: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletOperationalAccountsAccessCodeMetadata>>,
+        [U8aFixed]
+      >;
+      /**
+       * Registered access codes expiring at a given mining frame.
+       **/
+      accessCodesExpiringByFrame: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<U8aFixed>>,
+        [u64]
+      >;
+      /**
+       * Tracks whether the initial migration has already run.
+       **/
+      legacyVaultHydrationComplete: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * Legacy vault data used to hydrate accounts as they register.
+       **/
+      legacyVaultRegistrations: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletOperationalAccountsLegacyVaultInfo>>,
+        []
+      >;
+      /**
+       * Reverse lookup of any linked account to its operational account id.
+       **/
+      operationalAccountBySubAccount: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<AccountId32>>,
+        [AccountId32]
+      >;
+      /**
+       * Registered operational accounts keyed by the primary account id.
+       **/
+      operationalAccounts: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletOperationalAccountsOperationalAccount>>,
+        [AccountId32]
+      >;
+      /**
+       * Pending operational account rewards waiting on treasury payout (FIFO queue).
+       **/
+      operationalRewardsQueue: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<ArgonPrimitivesProvidersOperationalRewardPayout>>,
+        []
+      >;
+      /**
+       * Configured reward amounts for operational accounts.
+       **/
+      rewards: AugmentedQuery<
+        ApiType,
+        () => Observable<PalletOperationalAccountsRewardsConfig>,
+        []
       >;
     };
     ownership: {

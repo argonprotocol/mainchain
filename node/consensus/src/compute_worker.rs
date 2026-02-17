@@ -253,9 +253,11 @@ impl BlockComputeNonce {
 		let hash = match hash {
 			Ok(hash) => hash,
 			Err(e) => {
-				// If this fails, it means system resources aren't available. To avoid setting the
-				// wrong return value, we should crash
-				panic!("Error calculating hash: {e:?}");
+				// Local verifier failure must be treated as node-fatal to avoid classifying a
+				// peer's block as invalid due to this node's RandomX/runtime issue.
+				panic!(
+					"Local RandomX error while verifying compute nonce; refusing to mark peer block invalid: {e:?}"
+				);
 			},
 		};
 		let threshold = Self::threshold(compute_difficulty);

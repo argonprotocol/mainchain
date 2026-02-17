@@ -187,6 +187,28 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxSetIdSessionEntries: u64 & AugmentedConst<ApiType>;
     };
+    inboundTransferLog: {
+      /**
+       * How many blocks to retain inbound transfer records.
+       **/
+      inboundTransfersRetentionBlocks: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of bytes allowed in a TokenGateway request body (0 disables the cap).
+       **/
+      maxInboundTransferBytes: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of records retained from a single block.
+       **/
+      maxTransfersToRetainPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
+       * Minimum amount (in base units) to record an inbound transfer.
+       **/
+      minimumTransferMicrogonsToRecord: u128 & AugmentedConst<ApiType>;
+      /**
+       * Ownership token asset id (Argonot).
+       **/
+      ownershipAssetId: u32 & AugmentedConst<ApiType>;
+    };
     miningSlot: {
       /**
        * The max percent swing for the argonots per slot (from the last percent)
@@ -288,6 +310,60 @@ declare module '@polkadot/api-base/types/consts' {
        * notaries to switch to new keys after a new key is finalized)
        **/
       metaChangesTickDelay: u64 & AugmentedConst<ApiType>;
+    };
+    operationalAccounts: {
+      /**
+       * How many frames an access code remains valid.
+       **/
+      accessCodeExpirationFrames: u64 & AugmentedConst<ApiType>;
+      /**
+       * Additional argon amount (base units) required per access code after operational.
+       **/
+      bitcoinLockSizeForAccessCode: u128 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of access codes that may expire in the same frame.
+       **/
+      maxAccessCodesExpiringPerFrame: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of issuable access codes allowed at once.
+       **/
+      maxIssuableAccessCodes: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of legacy vault records to hydrate on registration.
+       **/
+      maxLegacyVaultRegistrations: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of queued operational rewards.
+       **/
+      maxOperationalRewardsQueued: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of unactivated (issued but unused) access codes allowed at once.
+       **/
+      maxUnactivatedAccessCodes: u32 & AugmentedConst<ApiType>;
+      /**
+       * Minimum argon amount (base units) required to mark a bitcoin lock as qualifying.
+       **/
+      minBitcoinLockSizeForOperational: u128 & AugmentedConst<ApiType>;
+      /**
+       * Mining seats required to become operational.
+       **/
+      miningSeatsForOperational: u32 & AugmentedConst<ApiType>;
+      /**
+       * Mining seats required per access code after operational.
+       **/
+      miningSeatsPerAccessCode: u32 & AugmentedConst<ApiType>;
+      /**
+       * Default bonus reward paid every referral threshold.
+       **/
+      operationalReferralBonusReward: u128 & AugmentedConst<ApiType>;
+      /**
+       * Default reward paid when an account becomes operational.
+       **/
+      operationalReferralReward: u128 & AugmentedConst<ApiType>;
+      /**
+       * Number of operational sponsees required per referral bonus reward.
+       **/
+      referralBonusEveryXOperationalSponsees: u32 & AugmentedConst<ApiType>;
     };
     ownership: {
       /**
@@ -449,10 +525,6 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
-       * Bid Pool burn percent
-       **/
-      bidPoolBurnPercent: Percent & AugmentedConst<ApiType>;
-      /**
        * The maximum number of contributors to a bond fund
        **/
       maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
@@ -468,6 +540,10 @@ declare module '@polkadot/api-base/types/consts' {
        * A pallet id that is used to hold the bid pool
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
+      /**
+       * Percent of the bid pool reserved for treasury reserves.
+       **/
+      percentForTreasuryReserves: Percent & AugmentedConst<ApiType>;
     };
     txPause: {
       /**

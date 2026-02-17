@@ -392,6 +392,14 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
       MaxBlockTransfersExceeded: AugmentedError<ApiType>;
       /**
+       * No transfer IDs are currently available
+       **/
+      NoAvailableTransferId: AugmentedError<ApiType>;
+      /**
+       * The notary is currently locked and cannot process transfers
+       **/
+      NotaryLockedForTransfer: AugmentedError<ApiType>;
+      /**
        * A transfer was submitted in a previous block but the expiration block has passed
        **/
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
@@ -740,6 +748,48 @@ declare module '@polkadot/api-base/types/errors' {
        * A notebook was already provided at this tick
        **/
       NotebookTickAlreadyUsed: AugmentedError<ApiType>;
+    };
+    operationalAccounts: {
+      /**
+       * The access code is already registered.
+       **/
+      AccessCodeAlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * One of the provided accounts is already linked to an operational account.
+       **/
+      AccountAlreadyLinked: AugmentedError<ApiType>;
+      /**
+       * The caller already registered an operational account.
+       **/
+      AlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * The access code provided is not registered.
+       **/
+      InvalidAccessCode: AugmentedError<ApiType>;
+      /**
+       * The access code activation proof is invalid.
+       **/
+      InvalidAccessCodeProof: AugmentedError<ApiType>;
+      /**
+       * One of the linked account ownership proofs is invalid.
+       **/
+      InvalidAccountProof: AugmentedError<ApiType>;
+      /**
+       * Too many access codes are already scheduled to expire in this frame.
+       **/
+      MaxAccessCodesExpiringPerFrameReached: AugmentedError<ApiType>;
+      /**
+       * Too many unactivated access codes are outstanding.
+       **/
+      MaxUnactivatedAccessCodesReached: AugmentedError<ApiType>;
+      /**
+       * No access codes are currently issuable.
+       **/
+      NoIssuableAccessCodes: AugmentedError<ApiType>;
+      /**
+       * The caller has not registered an operational account.
+       **/
+      NotOperationalAccount: AugmentedError<ApiType>;
     };
     ownership: {
       /**

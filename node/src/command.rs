@@ -141,13 +141,6 @@ pub fn run() -> sc_cli::Result<()> {
 			let mut cli = cli;
 			// this is required for hyperbridge
 			cli.run.base.offchain_worker_params.indexing_enabled = true;
-			// Set max rpc request and response size to 150mb
-			cli.run.base.rpc_params.rpc_max_request_size = 150;
-			cli.run.base.rpc_params.rpc_max_response_size = 150;
-			for x in cli.run.base.rpc_params.experimental_rpc_endpoint.iter_mut() {
-				x.max_payload_in_mb = 150;
-				x.max_payload_out_mb = 150;
-			}
 
 			let runner = cli.create_runner(&cli.run.base)?;
 

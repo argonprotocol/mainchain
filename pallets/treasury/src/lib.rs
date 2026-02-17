@@ -28,7 +28,7 @@ pub use pallet::*;
 /// The system will only mint argons for BitcoinLocks when the CPI is negative. Treasury pools
 /// allow Bitcoins to still be granted liquidity by adding the following funds to the pool:
 /// 1. The mint rights garnered over the current day (slot period)
-/// 2. 80% of the mining bid pool for the next slot cohort (20% is burned)
+/// 2. 80% of the mining bid pool for the next slot cohort (20% reserved for treasury reserves)
 /// 3. The treasury pool for each vault
 ///
 /// Funds are then distributed in this order:
@@ -37,7 +37,7 @@ pub use pallet::*;
 ///
 /// Treasury pool imbalances are added to the front of the "Mint" queue. Before minting occurs
 /// for bitcoins in the list, any pending Treasury Pools are paid out (oldest first). Within the
-/// pool, contributors are paid out at a floored pro-rata. Excess is burned.
+/// pool, contributors are paid out at a floored pro-rata. Excess remains in the bid pool.
 ///
 /// Bitcoins with remaining mint-able argons are added to the end of the mint-queue. Only bitcoins
 /// locked the same day as a slot are eligible for instant-liquidity.
@@ -47,7 +47,8 @@ pub use pallet::*;
 /// `Activated securitization` is 2x the amount of LockedBitcoins.
 ///
 /// ## Profits from Bid Pool
-/// Once each bid pool is closed, 20% of the pool is burned. Then the remaining funds are
+/// Once each bid pool is closed, 20% of the pool is reserved for treasury reserves. (Operational
+/// rewards are one use of these reserves.) The remaining funds are
 /// distributed pro-rata to each vault's slot treasury pool. Vault's automatically disperse funds
 /// to contributors based on the vault's sharing percent, and each individual contributor's
 /// pro-rata.
@@ -62,11 +63,15 @@ pub mod pallet {
 	use argon_primitives::vault::{
 		MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings,
 	};
-	use pallet_prelude::argon_primitives::MiningFrameTransitionProvider;
+	use pallet_prelude::argon_primitives::{
+		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardPayout,
+		OperationalRewardsPayer, OperationalRewardsProvider,
+	};
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::info;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const TREASURY_RESERVES_SUB_ACCOUNT: [u8; 16] = *b"treasury-reserve";
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -114,15 +119,21 @@ pub mod pallet {
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		/// Bid Pool burn percent
+		/// Percent of the bid pool reserved for treasury reserves.
 		#[pallet::constant]
-		type BidPoolBurnPercent: Get<Percent>;
+		type PercentForTreasuryReserves: Get<Percent>;
 
 		/// The number of vaults that can participate in each bond. This is a substrate limit.
 		#[pallet::constant]
 		type MaxVaultsPerPool: Get<u32>;
 
 		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
+
+		/// Optional hook for operational account state updates.
+		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
+
+		/// Provider of pending operational rewards for payout from treasury reserves.
+		type OperationalRewardsProvider: OperationalRewardsProvider<Self::AccountId, Self::Balance>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -182,13 +193,17 @@ pub mod pallet {
 			dispatch_error: DispatchError,
 			is_for_vault: bool,
 		},
-		/// An error occurred burning from the bid pool
-		CouldNotBurnBidPool { frame_id: FrameId, amount: T::Balance, dispatch_error: DispatchError },
+		/// An error occurred reserving treasury reserves from the bid pool.
+		CouldNotFundTreasury {
+			frame_id: FrameId,
+			amount: T::Balance,
+			dispatch_error: DispatchError,
+		},
 		/// Funds from the active bid pool have been distributed
 		BidPoolDistributed {
 			frame_id: FrameId,
 			bid_pool_distributed: T::Balance,
-			bid_pool_burned: T::Balance,
+			treasury_reserves: T::Balance,
 			bid_pool_shares: u32,
 		},
 		/// The next bid pool has been locked in
@@ -252,8 +267,14 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			if T::MiningFrameTransitionProvider::is_new_frame_started().is_some() {
-				// we do nothing here, all work is done in on_finalize
-				T::WeightInfo::on_frame_transition()
+				// Snapshot how many queued rewards we will attempt this frame so
+				// on_finalize work is pre-accounted in on_initialize.
+				// This is bounded decode work because the provider is backed by
+				// a bounded operational rewards queue.
+				let payout_count = T::OperationalRewardsProvider::pending_rewards().len() as u64;
+				Self::frame_transition_base_weight()
+					.saturating_add(T::WeightInfo::try_pay_reward().saturating_mul(payout_count))
+					.saturating_add(T::DbWeight::get().reads_writes(1, 1))
 			} else {
 				Weight::zero()
 			}
@@ -271,6 +292,7 @@ pub mod pallet {
 				Self::release_bonded_principal(frame_id);
 				Self::distribute_bid_pool(payout_frame);
 				Self::lock_in_vault_capital(frame_id);
+				Self::pay_operational_rewards();
 			}
 		}
 	}
@@ -338,6 +360,20 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		pub fn get_bid_pool_account() -> T::AccountId {
+			T::PalletId::get().into_account_truncating()
+		}
+
+		pub fn get_treasury_reserves_account() -> T::AccountId {
+			T::PalletId::get().into_sub_account_truncating(TREASURY_RESERVES_SUB_ACCOUNT)
+		}
+
+		fn ensure_account_provider(account_id: &T::AccountId) {
+			if frame_system::Pallet::<T>::providers(account_id) == 0 {
+				frame_system::Pallet::<T>::inc_providers(account_id);
+			}
+		}
+
 		pub(crate) fn create_hold(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
 			if amount == Zero::zero() {
 				return Ok(());
@@ -370,24 +406,29 @@ pub mod pallet {
 		/// contributors besides the vault operator, who must collect theirs.
 		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
 			let bid_pool_account = Self::get_bid_pool_account();
+			Self::ensure_account_provider(&bid_pool_account);
 			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
 
-			let burn_amount = T::BidPoolBurnPercent::get().mul_ceil(total_bid_pool_amount);
-			if let Err(e) = T::Currency::burn_from(
+			let reserves_amount =
+				T::PercentForTreasuryReserves::get().mul_ceil(total_bid_pool_amount);
+			let mut reserves_reserved = T::Balance::zero();
+			let reserves_account = Self::get_treasury_reserves_account();
+			Self::ensure_account_provider(&reserves_account);
+			if let Err(e) = T::Currency::transfer(
 				&bid_pool_account,
-				burn_amount,
-				Preservation::Expendable,
-				Precision::Exact,
-				Fortitude::Force,
+				&reserves_account,
+				reserves_amount,
+				Preservation::Preserve,
 			) {
-				Self::deposit_event(Event::<T>::CouldNotBurnBidPool {
+				Self::deposit_event(Event::<T>::CouldNotFundTreasury {
 					frame_id,
-					amount: burn_amount,
+					amount: reserves_amount,
 					dispatch_error: e,
 				});
+			} else {
+				reserves_reserved = reserves_amount;
+				total_bid_pool_amount.saturating_reduce(reserves_amount);
 			}
-
-			total_bid_pool_amount.saturating_reduce(burn_amount);
 			let mut remaining_bid_pool = total_bid_pool_amount;
 
 			let mut treasury_by_vault = VaultPoolsByFrame::<T>::get(frame_id);
@@ -501,7 +542,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::BidPoolDistributed {
 				frame_id,
 				bid_pool_distributed: total_bid_pool_amount - remaining_bid_pool,
-				bid_pool_burned: burn_amount,
+				treasury_reserves: reserves_reserved,
 				bid_pool_shares: bid_pool_entrants as u32,
 			});
 		}
@@ -589,14 +630,26 @@ pub mod pallet {
 				}
 
 				total_activated_capital.saturating_accrue(capital_potential);
+				let vault_operator = T::TreasuryVaultProvider::get_vault_operator(vault_id);
 				// Bond principal into this frame's pool up to the vault target.
 				for (account_id, amount) in pool.bond_holders {
+					let is_operator = vault_operator.as_ref() == Some(&account_id);
+					let operator_was_zero = if is_operator {
+						FunderStateByVaultAndAccount::<T>::get(vault_id, &account_id)
+							.map(|state| state.bonded_principal.is_zero())
+							.unwrap_or(true)
+					} else {
+						false
+					};
 					// Update long-lived bonded principal.
-					FunderStateByVaultAndAccount::<T>::mutate(vault_id, account_id, |e| {
+					FunderStateByVaultAndAccount::<T>::mutate(vault_id, &account_id, |e| {
 						let mut s = e.take().unwrap_or_default();
 						s.bonded_principal.saturating_accrue(amount);
 						*e = Some(s);
 					});
+					if is_operator && operator_was_zero && !amount.is_zero() {
+						T::OperationalAccountsHook::treasury_pool_participated(&account_id, amount);
+					}
 				}
 			}
 
@@ -612,6 +665,47 @@ pub mod pallet {
 			});
 
 			VaultPoolsByFrame::<T>::insert(frame_id, vault_pools);
+		}
+
+		pub(crate) fn pay_operational_rewards() {
+			let payouts = T::OperationalRewardsProvider::pending_rewards();
+			if payouts.is_empty() {
+				return;
+			}
+			let treasury_reserves_account = Self::get_treasury_reserves_account();
+			Self::ensure_account_provider(&treasury_reserves_account);
+			let mut available = T::Currency::balance(&treasury_reserves_account);
+			for payout in payouts {
+				if payout.amount.is_zero() {
+					continue;
+				}
+				if payout.amount > available {
+					break;
+				}
+				if let Err(e) = T::Currency::transfer(
+					&treasury_reserves_account,
+					&payout.payout_account,
+					payout.amount,
+					Preservation::Preserve,
+				) {
+					log::error!(
+						"Failed to pay operational reward {:?} to {:?}: {:?}",
+						payout.reward_kind,
+						payout.payout_account,
+						e
+					);
+					continue;
+				}
+				available.saturating_reduce(payout.amount);
+				T::OperationalRewardsProvider::mark_reward_paid(&payout);
+			}
+		}
+
+		fn frame_transition_base_weight() -> Weight {
+			T::WeightInfo::on_frame_transition().saturating_add(
+				T::OperationalAccountsHook::treasury_pool_participated_weight()
+					.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
+			)
 		}
 
 		pub(crate) fn release_bonded_principal(frame_id: FrameId) {
@@ -702,6 +796,39 @@ pub mod pallet {
 			let activated_securitization =
 				T::TreasuryVaultProvider::get_activated_securitization(vault_id);
 			activated_securitization / 10u128.into()
+		}
+	}
+
+	impl<T: Config> OperationalRewardsPayer<T::AccountId, T::Balance> for Pallet<T> {
+		fn try_pay_reward_weight() -> Weight {
+			T::WeightInfo::try_pay_reward()
+		}
+
+		fn try_pay_reward(reward: &OperationalRewardPayout<T::AccountId, T::Balance>) -> bool {
+			if reward.amount.is_zero() {
+				return true;
+			}
+			let treasury_reserves_account = Self::get_treasury_reserves_account();
+			Self::ensure_account_provider(&treasury_reserves_account);
+			let available = T::Currency::balance(&treasury_reserves_account);
+			if reward.amount > available {
+				return false;
+			}
+			if let Err(e) = T::Currency::transfer(
+				&treasury_reserves_account,
+				&reward.payout_account,
+				reward.amount,
+				Preservation::Preserve,
+			) {
+				log::error!(
+					"Failed to pay operational reward {:?} to {:?}: {:?}",
+					reward.reward_kind,
+					reward.payout_account,
+					e
+				);
+				return false;
+			}
+			true
 		}
 	}
 
