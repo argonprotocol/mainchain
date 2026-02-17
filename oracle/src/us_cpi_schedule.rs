@@ -50,9 +50,7 @@ fn parse_schedule(html: String) -> Result<Vec<CpiSchedule>> {
 		let release_lag_days = release_date.signed_duration_since(ref_month).num_days();
 		ensure!(
 			(20..=90).contains(&release_lag_days),
-			"Invalid CPI schedule row: ref_month={}, release_date={}",
-			ref_month,
-			release_date
+			"Invalid CPI schedule row: ref_month={ref_month}, release_date={release_date}"
 		);
 
 		cpi_schedule.push(CpiSchedule { ref_month, release_date });
