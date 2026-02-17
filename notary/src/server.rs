@@ -1,6 +1,6 @@
 use crate::{
 	Error,
-	middleware::{MiddlewareLayer, register_prometheus_metrics},
+	middleware::{ClientRateLimitKeyLayer, MiddlewareLayer, register_prometheus_metrics},
 	notary_metrics::NotaryMetrics,
 	stores::{
 		balance_tip::BalanceTipStore,
@@ -23,6 +23,7 @@ use argon_primitives::{
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotaryId,
 	NotebookMeta, NotebookNumber, SignedNotebookHeader, tick::Ticker,
 };
+use clap::ValueEnum;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
 	RpcModule, TrySendError,
@@ -88,6 +89,16 @@ pub struct ArchiveSettings {
 	pub archive_host: String,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub enum RpcRateLimitMode {
+	PerConnection,
+	#[default]
+	PerIp,
+}
+
+pub const DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS: usize = 10;
+pub const MAX_RATE_LIMIT_MAX_SLOWDOWNS: usize = 1_000;
+
 pub struct RpcConfig {
 	pub max_payload_in_mb: u32,
 	pub max_payload_out_mb: u32,
@@ -96,6 +107,9 @@ pub struct RpcConfig {
 	pub max_buffer_capacity_per_connection: u32,
 	pub batch_config: Option<BatchRequestConfig>,
 	pub rate_limit_per_minute: NonZeroU32,
+	pub rate_limit_mode: RpcRateLimitMode,
+	pub rate_limit_max_slowdowns: usize,
+	pub rate_limit_trust_proxy_headers: bool,
 	pub prometheus_port: Option<u16>,
 }
 
@@ -109,6 +123,9 @@ impl Default for RpcConfig {
 			max_buffer_capacity_per_connection: 64,
 			batch_config: Some(BatchRequestConfig::Limit(100)),
 			rate_limit_per_minute: NonZeroU32::new(500).unwrap(),
+			rate_limit_mode: RpcRateLimitMode::PerIp,
+			rate_limit_max_slowdowns: DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS,
+			rate_limit_trust_proxy_headers: false,
 			prometheus_port: Some(9116),
 		}
 	}
@@ -116,7 +133,7 @@ impl Default for RpcConfig {
 const MEGABYTE: u32 = 1024 * 1024;
 
 type NotaryServerT = Server<
-	Stack<CorsLayer, Stack<ProxyGetRequestLayer, Identity>>,
+	Stack<ClientRateLimitKeyLayer, Stack<CorsLayer, Stack<ProxyGetRequestLayer, Identity>>>,
 	Stack<Either<MiddlewareLayer, Identity>, Identity>,
 >;
 
@@ -134,13 +151,15 @@ impl NotaryServer {
 			max_subscriptions_per_connection,
 			max_buffer_capacity_per_connection,
 			batch_config,
+			rate_limit_trust_proxy_headers,
 			..
 		} = rpc_config;
 		let rpc_middleware = RpcServiceBuilder::new().option_layer(metrics);
 		let cors = CorsLayer::new().allow_methods(Any).allow_origin(Any).allow_headers(Any);
 		let http_middleware = tower::ServiceBuilder::new()
 			.layer(ProxyGetRequestLayer::new("/health", "system_health")?)
-			.layer(cors);
+			.layer(cors)
+			.layer(ClientRateLimitKeyLayer::new(rate_limit_trust_proxy_headers));
 
 		let server = ServerBuilder::default()
 			.max_request_body_size(max_payload_in_mb.saturating_mul(MEGABYTE))
