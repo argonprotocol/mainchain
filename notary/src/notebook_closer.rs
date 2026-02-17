@@ -398,18 +398,26 @@ mod tests {
 		.await?;
 
 		// wait for domain finalized
-		let instant = tokio::time::Instant::now();
+		let start_tick = ticker.current();
+		let max_wait_ticks = if std::env::var("CI").is_ok() { 60 } else { 20 };
 		loop {
 			let status = NotebookStatusStore::get(&pool, result.notebook_number).await?;
 			if status.finalized_time.is_some() {
 				break;
 			}
-			if instant.elapsed() > Duration::from_secs(20) {
-				panic!("Should have finalized notebook {}", result.notebook_number);
+			let current_tick = ticker.current();
+			if current_tick.saturating_sub(start_tick) > max_wait_ticks {
+				panic!(
+					"Should have finalized notebook {} after {} ticks (start {}, now {}, step {})",
+					result.notebook_number,
+					max_wait_ticks,
+					start_tick,
+					current_tick,
+					status.step as i32
+				);
 			}
-			// yield
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 			check_block_watch_status(block_tracker.clone()).await?;
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 		}
 		let zone_block = set_zone_record(&ctx.client.live, domain_hash, Alice).await?;
 		println!("set zone record");

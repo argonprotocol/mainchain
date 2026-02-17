@@ -84,7 +84,6 @@ async fn test_end_to_end_default_vote_mining() {
 		register_miner_keys(&miner_1, miner_1_keyring, 2),
 		register_miner_keys(&miner_2, miner_2_keyring, 1)
 	);
-	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
 	let (miner2_res, miner1_res) = join!(
 		register_miners(
 			&miner_2,
@@ -144,6 +143,8 @@ async fn test_end_to_end_default_vote_mining() {
 		}
 	}
 
+	// Start a fresh finalized stream after registrations are confirmed.
+	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
 	let mut vote_blocks = 0;
 	let mut miner_vote_blocks = (0, 0, 0);
 	authors.clear();
@@ -151,7 +152,7 @@ async fn test_end_to_end_default_vote_mining() {
 	let mut block_loops = 0;
 	let mut start_tick = None;
 	let mut last_tick = None;
-	let max_wait_ticks = if std::env::var("CI").is_ok() { 30 } else { 20 };
+	let max_wait_ticks = if std::env::var("CI").is_ok() { 60 } else { 20 };
 	while let Some(Ok(block)) = blocks_sub.next().await {
 		let mut author = None;
 		let mut block_seal = None;

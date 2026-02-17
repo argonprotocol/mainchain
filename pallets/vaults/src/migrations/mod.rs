@@ -148,8 +148,8 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade for Inn
 }
 
 pub type SecuritizationMigration<T> = frame_support::migrations::VersionedMigration<
-	10,
 	11,
+	12,
 	InnerMigrate<T>,
 	crate::Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
