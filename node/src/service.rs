@@ -147,10 +147,13 @@ where
 		ticker
 	};
 	let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
-	let notebook_downloader = NotebookDownloader::new(mining_config.notebook_archive_hosts.clone())
-		.map_err(|e| {
-			ServiceError::Other(format!("Failed to initialize notebook downloader {e:?}"))
-		})?;
+	let notebook_downloader = NotebookDownloader::new(
+		mining_config.notebook_archive_hosts.clone(),
+		mining_config.notebook_download_trust_mode,
+		mining_config.notebook_header_max_bytes,
+		mining_config.notebook_body_max_bytes,
+	)
+	.map_err(|e| ServiceError::Other(format!("Failed to initialize notebook downloader {e:?}")))?;
 	let notary_client = run_notary_sync(
 		&task_manager,
 		client.clone(),

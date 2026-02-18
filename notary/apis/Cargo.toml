@@ -26,3 +26,4 @@ jsonrpsee = { workspace = true, features = ["server", "async-client"] }
 reqwest = { workspace = true, features = ["rustls-tls", "gzip", "brotli", "deflate"] }
 argon-notary-audit = { workspace = true }
 argon-primitives = { workspace = true }
+url = { workspace = true }

@@ -5,6 +5,7 @@ use crate::{
 	service,
 	service::{FullClient, new_partial},
 };
+use argon_notary_apis::DownloadTrustMode;
 use argon_primitives::prelude::sp_api::ConstructRuntimeApi;
 use polkadot_sdk::{sc_service::TaskManager, *};
 use sc_chain_spec::ChainSpec;
@@ -190,6 +191,9 @@ pub struct MiningConfig {
 	pub compute_author: Option<AccountId32>,
 	bitcoin_rpc_url: Option<String>,
 	pub notebook_archive_hosts: Vec<String>,
+	pub notebook_download_trust_mode: DownloadTrustMode,
+	pub notebook_header_max_bytes: Option<u64>,
+	pub notebook_body_max_bytes: Option<u64>,
 }
 
 impl From<Cli> for MiningConfig {
@@ -199,6 +203,8 @@ impl From<Cli> for MiningConfig {
 }
 
 impl MiningConfig {
+	const MB: u64 = 1024 * 1024;
+
 	pub fn new(cli: &Cli) -> Self {
 		let compute_author = if let Some(compute_author) = &cli.run.compute_author {
 			Some(compute_author.clone())
@@ -213,13 +219,35 @@ impl MiningConfig {
 		let compute_threads = cli.run.compute_miners;
 
 		let bitcoin_rpc_url = cli.bitcoin_rpc_url.clone();
+		let notebook_download_trust_mode = Self::notebook_download_trust_mode(cli);
+		let notebook_header_max_bytes = Some(Self::mb_to_bytes(cli.run.notebook_header_max_mb));
+		let notebook_body_max_bytes = Some(Self::mb_to_bytes(cli.run.notebook_body_max_mb));
 
 		Self {
 			compute_threads,
 			compute_author,
 			bitcoin_rpc_url,
 			notebook_archive_hosts: cli.run.notebook_archive_hosts.clone(),
+			notebook_download_trust_mode,
+			notebook_header_max_bytes,
+			notebook_body_max_bytes,
 		}
+	}
+
+	fn notebook_download_trust_mode(cli: &Cli) -> DownloadTrustMode {
+		let shared_params = &cli.run.base.shared_params;
+		let selected_chain_id = shared_params.chain_id(shared_params.is_dev());
+		let is_dev_chain = cli
+			.load_spec(&selected_chain_id)
+			.map(|chain_spec| matches!(chain_spec.id(), "argon-dev" | "argon-local" | "argon-meta"))
+			.unwrap_or_else(|_| {
+				matches!(selected_chain_id.as_str(), "dev" | "dev-docker" | "local" | "meta")
+			});
+		if is_dev_chain { DownloadTrustMode::Dev } else { DownloadTrustMode::Strict }
+	}
+
+	fn mb_to_bytes(mb: u64) -> u64 {
+		mb.saturating_mul(Self::MB)
 	}
 
 	pub fn compute_threads(&self) -> usize {
@@ -261,5 +289,74 @@ impl MiningConfig {
 		bitcoin_url.set_username("").ok();
 		bitcoin_url.set_password(None).ok();
 		Ok((bitcoin_url, bitcoin_auth))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use clap::Parser;
+
+	fn parse_cli(args: &[&str]) -> Cli {
+		Cli::parse_from(args)
+	}
+
+	#[test]
+	fn notebook_size_defaults_are_in_mb_and_converted_to_bytes() {
+		let cli = parse_cli(&["argon-node", "--chain", "mainnet"]);
+		let config = MiningConfig::new(&cli);
+
+		assert_eq!(config.notebook_header_max_bytes, Some(2 * 1024 * 1024));
+		assert_eq!(config.notebook_body_max_bytes, Some(16 * 1024 * 1024));
+	}
+
+	#[test]
+	fn notebook_size_mb_overrides_are_converted_to_bytes() {
+		let cli = parse_cli(&[
+			"argon-node",
+			"--chain",
+			"mainnet",
+			"--notebook-header-max-mb",
+			"2",
+			"--notebook-body-max-mb",
+			"4",
+		]);
+		let config = MiningConfig::new(&cli);
+
+		assert_eq!(config.notebook_header_max_bytes, Some(2 * 1024 * 1024));
+		assert_eq!(config.notebook_body_max_bytes, Some(4 * 1024 * 1024));
+	}
+
+	#[test]
+	fn notebook_trust_mode_is_dev_for_dev_chains() {
+		for chain in ["dev", "dev-docker", "local", "meta"] {
+			let cli = parse_cli(&["argon-node", "--chain", chain]);
+			let config = MiningConfig::new(&cli);
+			assert_eq!(
+				config.notebook_download_trust_mode,
+				DownloadTrustMode::Dev,
+				"expected dev mode for chain `{chain}`"
+			);
+		}
+	}
+
+	#[test]
+	fn notebook_trust_mode_is_strict_for_live_chains() {
+		for chain in ["mainnet", "testnet"] {
+			let cli = parse_cli(&["argon-node", "--chain", chain]);
+			let config = MiningConfig::new(&cli);
+			assert_eq!(
+				config.notebook_download_trust_mode,
+				DownloadTrustMode::Strict,
+				"expected strict mode for chain `{chain}`"
+			);
+		}
+	}
+
+	#[test]
+	fn notebook_trust_mode_follows_chain_even_with_dev_flag() {
+		let cli = parse_cli(&["argon-node", "--chain", "mainnet", "--dev"]);
+		let config = MiningConfig::new(&cli);
+		assert_eq!(config.notebook_download_trust_mode, DownloadTrustMode::Strict);
 	}
 }
