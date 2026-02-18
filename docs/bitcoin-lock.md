@@ -98,7 +98,7 @@ keys.
 > [account setup](./account-setup.md).
 
 ```bash
-$ argon-bitcoin-cli xpriv master --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv
+$ argon-bitcoin-cli xpriv master --xpriv-password-interactive --xpriv-path=~/vault1.xpriv
 ```
 
 > NOTE: for testnet, you must append `--bitcoin-network=signet`
@@ -112,7 +112,7 @@ to get your UtxoId in step 5 and recording alongside it).
 > You can use this XPriv again with a different HD Path for as many combinations as you'd like.
 
 ```bash
-$ argon-bitcoin-cli xpriv derive-pubkey --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv --hd-path="m/84'/0'/0'"
+$ argon-bitcoin-cli xpriv derive-pubkey --xpriv-password-interactive --xpriv-path=~/vault1.xpriv --hd-path="m/84'/0'/0'"
 ```
 
 ### 3. Choose a Vault
@@ -297,7 +297,7 @@ This must be a trusted JSON-RPC endpoint (not REST or WebSocket). Example provid
 For testnet, you can use `https://bitcoin:bitcoin@electrs.testnet.argonprotocol.org`
 
 ```bash
-$ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --xpriv-password=supersecret --xpriv-path=~/vault1.xpriv \
+$ argon-bitcoin-cli lock owner-cosign-release --utxo-id=1 --xpriv-password-interactive --xpriv-path=~/vault1.xpriv \
   --bitcoin-rpc-url=https://btc.getblock.io/mainnet/?api_key=your_api_key \
   --hd-path="m/84'/0'/0'" --wait
 ```
