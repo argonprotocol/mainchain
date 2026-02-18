@@ -900,7 +900,6 @@ dependencies = [
  "argon-bitcoin-cli-macros",
  "argon-client",
  "argon-primitives",
- "base58",
  "base64 0.22.1",
  "bip39",
  "bitcoin",
