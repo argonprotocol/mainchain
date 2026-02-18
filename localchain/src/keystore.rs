@@ -1,11 +1,11 @@
 use anyhow::anyhow;
+use argon_primitives::read_secret_input;
 use codec::Encode;
 use polkadot_sdk::*;
 use sp_core::crypto::SecretString;
 use sp_core::crypto::Ss58Codec;
 use sp_core::{ByteArray, Pair};
 use sqlx::SqlitePool;
-use std::fs;
 use std::path::PathBuf;
 #[cfg(feature = "napi")]
 use std::sync::Arc;
@@ -281,16 +281,16 @@ pub mod napi_ext {
 /// Only a single option should be picked.
 impl EmbeddedKeyPassword {
   pub fn get_password(&self) -> Result<Option<SecretString>> {
-    if self.key_password_interactive {
-      let password = rpassword::prompt_password("Key password: ")?;
-      return Ok(Some(SecretString::new(password)));
-    } else if let Some(ref file) = self.key_password_filename {
-      let password = fs::read_to_string(PathBuf::from(file))?;
-      return Ok(Some(SecretString::new(password)));
-    } else if let Some(ref password) = self.key_password {
-      return Ok(Some(SecretString::new(password.clone())));
-    }
-    Ok(None)
+    read_secret_input(
+      "Key password: ",
+      self.key_password_interactive,
+      self
+        .key_password
+        .as_ref()
+        .map(|p| SecretString::new(p.clone())),
+      self.key_password_filename.as_ref().map(PathBuf::from),
+    )
+    .map_err(Into::into)
   }
 }
 

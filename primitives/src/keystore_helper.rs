@@ -36,11 +36,12 @@ pub struct KeystoreParams {
 
 	/// File that contains the password used by the keystore.
 	#[arg(
-		global = true,
-		long,
-        value_name = "PATH",
-        conflicts_with_all = & ["password_interactive", "password"]
-    )]
+			global = true,
+			long = "password-file",
+			alias = "password-filename",
+	        value_name = "PATH",
+	        conflicts_with_all = & ["password_interactive", "password"]
+	    )]
 	pub password_filename: Option<PathBuf>,
 }
 
@@ -61,19 +62,12 @@ impl Display for CryptoType {
 
 impl KeystoreParams {
 	pub fn read_password(&self) -> anyhow::Result<Option<SecretString>> {
-		let (password_interactive, password) = (self.password_interactive, self.password.clone());
-
-		let pass = if password_interactive {
-			Some(SecretString::new(rpassword::prompt_password("Keystore Password: ")?))
-		} else if let Some(ref file) = self.password_filename {
-			let password = fs::read_to_string(file)
-				.map_err(|e| anyhow!("Unable to read password file: {e}"))?;
-			Some(SecretString::new(password))
-		} else {
-			password
-		};
-
-		Ok(pass)
+		read_secret_input(
+			"Keystore Password: ",
+			self.password_interactive,
+			self.password.clone(),
+			self.password_filename.clone(),
+		)
 	}
 
 	pub fn open(&self) -> anyhow::Result<KeystorePtr> {
@@ -149,6 +143,35 @@ impl KeystoreParams {
 
 		Ok(uri)
 	}
+}
+
+pub fn read_secret_input(
+	prompt: &str,
+	interactive: bool,
+	secret: Option<SecretString>,
+	secret_filename: Option<PathBuf>,
+) -> anyhow::Result<Option<SecretString>> {
+	let value = if interactive {
+		Some(SecretString::new(rpassword::prompt_password(prompt)?))
+	} else if let Some(file) = secret_filename {
+		let secret = fs::read_to_string(&file)
+			.map_err(|e| anyhow!("Unable to read secret file {}: {e}", file.display()))?;
+		Some(SecretString::new(secret.trim_end().to_owned()))
+	} else {
+		secret
+	};
+	Ok(value)
+}
+
+pub fn read_secret_text_input(
+	prompt: &str,
+	interactive: bool,
+	secret: Option<String>,
+	secret_filename: Option<PathBuf>,
+) -> anyhow::Result<Option<String>> {
+	let value =
+		read_secret_input(prompt, interactive, secret.map(SecretString::new), secret_filename)?;
+	Ok(value.map(|s| s.expose_secret().to_string()))
 }
 
 /// Parse a secret string, returning a displayable error.
