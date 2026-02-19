@@ -20,7 +20,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 	properties.insert("ss58Format".into(), ADDRESS_PREFIX.into());
 
 	// Lower CI difficulty to reduce flakiness from slower runners.
-	let hashes_per_second: u64 = if env::var("CI").is_ok() { 100 } else { 400 };
+	let hashes_per_second: u64 = if env::var("CI").is_ok() { 50 } else { 400 };
 	const TICK_MILLIS: u64 = 2000;
 
 	let ticker = Ticker::new(TICK_MILLIS, 2);

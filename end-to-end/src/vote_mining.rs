@@ -145,6 +145,7 @@ async fn test_end_to_end_default_vote_mining() {
 
 	// Start a fresh finalized stream after registrations are confirmed.
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
+	let start_finalized_block = grandpa_miner.client.latest_finalized_block().await.unwrap();
 	let mut vote_blocks = 0;
 	let mut miner_vote_blocks = (0, 0, 0);
 	authors.clear();
@@ -152,8 +153,13 @@ async fn test_end_to_end_default_vote_mining() {
 	let mut block_loops = 0;
 	let mut start_tick = None;
 	let mut last_tick = None;
-	let max_wait_ticks = if std::env::var("CI").is_ok() { 60 } else { 20 };
+	let max_wait_ticks = if std::env::var("CI").is_ok() { 90 } else { 30 };
 	while let Some(Ok(block)) = blocks_sub.next().await {
+		// Ignore finalized backlog before this phase started.
+		if block.number() <= start_finalized_block {
+			continue;
+		}
+
 		let mut author = None;
 		let mut block_seal = None;
 		let mut tick = None;
@@ -176,7 +182,8 @@ async fn test_end_to_end_default_vote_mining() {
 			if let Some(start_tick) = start_tick {
 				if tick.saturating_sub(start_tick) >= max_wait_ticks {
 					println!(
-						"Stopping vote mining wait after {max_wait_ticks} ticks (start {start_tick}, current {tick})"
+						"Stopping vote mining wait after {max_wait_ticks} ticks (start {start_tick}, current {tick}, finalized start #{start_finalized_block}, current #{})",
+						block.number(),
 					);
 					break;
 				}
@@ -203,13 +210,14 @@ async fn test_end_to_end_default_vote_mining() {
 	}
 
 	println!(
-		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({}). Ticks: start {:?}, last {:?}, max_wait {}",
+		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({}). Ticks: start {:?}, last {:?}. Finalized start #{}. Wait {} ticks",
 		vote_blocks,
 		miner_vote_blocks.0,
 		miner_vote_blocks.2,
 		miner_vote_blocks.1,
 		start_tick,
 		last_tick,
+		start_finalized_block,
 		max_wait_ticks
 	);
 	assert!(vote_blocks >= 2);

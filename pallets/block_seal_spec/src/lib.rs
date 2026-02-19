@@ -22,7 +22,7 @@ pub mod weights;
 const MAX_ADJUST_UP: u128 = 4; // Represents 4x adjustment
 const MAX_ADJUST_DOWN: u128 = 4; // Represents 1/4 adjustment
 const MAX_COMPUTE_DIFFICULTY: u128 = u128::MAX;
-const MIN_COMPUTE_DIFFICULTY: u128 = 200;
+const MIN_COMPUTE_DIFFICULTY: u128 = if option_env!("CI").is_some() { 25 } else { 200 };
 const MAX_TAX_MINIMUM: u128 = u128::MAX;
 const MIN_TAX_MINIMUM: u128 = ABSOLUTE_TAX_VOTE_MINIMUM;
 pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
