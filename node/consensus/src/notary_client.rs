@@ -1,6 +1,7 @@
 use crate::{aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics};
 use argon_notary_apis::{
-	ArchiveHost, Client, SystemRpcClient, get_header_url, get_notebook_url,
+	ArchiveHost, Client, DownloadKind, DownloadPolicy, DownloadTrustMode, SystemRpcClient,
+	get_download_path_suffix, get_header_url, get_notebook_url,
 	notebook::{NotebookRpcClient, RawHeadersSubscription},
 };
 use argon_primitives::{
@@ -700,14 +701,15 @@ where
 		notebook_number: NotebookNumber,
 		mut download_url: Option<String>,
 	) -> Result<SignedHeaderBytes, Error> {
+		let expected_archive_origin =
+			self.notary_archive_host_by_id.read().await.get(&notary_id).cloned();
 		if download_url.is_none() {
-			if let Some(archive_host) = self.notary_archive_host_by_id.read().await.get(&notary_id)
-			{
+			if let Some(archive_host) = expected_archive_origin.as_ref() {
 				download_url = Some(get_header_url(archive_host, notary_id, notebook_number));
 			}
 		}
 		self.notebook_downloader
-			.get_header(notary_id, notebook_number, download_url)
+			.get_header(notary_id, notebook_number, download_url, expected_archive_origin)
 			.await
 			.map_err(|e| {
 				Error::NotaryError(format!(
@@ -721,10 +723,12 @@ where
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 	) -> Result<NotebookBytes, Error> {
-		let download_url = if let Some(archive_host) =
-			self.notary_archive_host_by_id.read().await.get(&notary_id)
-		{
+		let expected_archive_origin =
+			self.notary_archive_host_by_id.read().await.get(&notary_id).cloned();
+		let download_url = if let Some(archive_host) = expected_archive_origin.as_ref() {
 			Some(get_notebook_url(archive_host, notary_id, notebook_number))
+		} else if self.notebook_downloader.is_strict() {
+			None
 		} else {
 			let client = self.get_or_connect_to_client(notary_id).await.ok();
 			if let Some(client) = client {
@@ -735,7 +739,7 @@ where
 		};
 		let bytes = self
 			.notebook_downloader
-			.get_body(notary_id, notebook_number, download_url)
+			.get_body(notary_id, notebook_number, download_url, expected_archive_origin)
 			.await
 			.map_err(|e| {
 				Error::NotaryError(format!(
@@ -1245,12 +1249,20 @@ where
 
 pub struct NotebookDownloader {
 	pub archive_hosts: Vec<ArchiveHost>,
+	pub trust_mode: DownloadTrustMode,
+	pub header_max_bytes: Option<u64>,
+	pub notebook_max_bytes: Option<u64>,
 }
 
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 
 impl NotebookDownloader {
-	pub fn new<AR, S>(archive_hosts: AR) -> Result<Self, Error>
+	pub fn new<AR, S>(
+		archive_hosts: AR,
+		trust_mode: DownloadTrustMode,
+		header_max_bytes: Option<u64>,
+		notebook_max_bytes: Option<u64>,
+	) -> Result<Self, Error>
 	where
 		AR: IntoIterator<Item = S>,
 		S: AsRef<str>,
@@ -1260,7 +1272,11 @@ impl NotebookDownloader {
 			.map(|host| ArchiveHost::new(host.as_ref().to_string()))
 			.collect::<Result<Vec<_>, _>>()
 			.map_err(|e| Error::NotaryArchiveError(e.to_string()))?;
-		Ok(Self { archive_hosts })
+		Ok(Self { archive_hosts, trust_mode, header_max_bytes, notebook_max_bytes })
+	}
+
+	pub fn is_strict(&self) -> bool {
+		matches!(self.trust_mode, DownloadTrustMode::Strict)
 	}
 
 	pub async fn get_header(
@@ -1268,15 +1284,33 @@ impl NotebookDownloader {
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		download_url: Option<String>,
+		expected_archive_origin: Option<String>,
 	) -> Result<SignedHeaderBytes, Error> {
+		let path_suffix =
+			get_download_path_suffix(DownloadKind::Header, notary_id, notebook_number);
 		if let Some(url) = download_url {
-			if let Ok(header) = ArchiveHost::download_header_bytes(url, DOWNLOAD_TIMEOUT).await {
+			let policy = DownloadPolicy {
+				trust_mode: self.trust_mode,
+				expected_origin: expected_archive_origin.clone(),
+				expected_path_suffix: Some(path_suffix.clone()),
+				max_bytes: self.header_max_bytes,
+			};
+			if let Ok(header) =
+				ArchiveHost::download_header_bytes_with_policy(url, DOWNLOAD_TIMEOUT, &policy).await
+			{
 				return Ok(header);
 			}
 		}
 		for archive_host in &self.archive_hosts {
+			let url = archive_host.get_header_url(notary_id, notebook_number);
+			let policy = DownloadPolicy {
+				trust_mode: self.trust_mode,
+				expected_origin: Some(archive_host.url.as_str().to_string()),
+				expected_path_suffix: Some(path_suffix.clone()),
+				max_bytes: self.header_max_bytes,
+			};
 			if let Ok(header) =
-				archive_host.get_header(notary_id, notebook_number, DOWNLOAD_TIMEOUT).await
+				ArchiveHost::download_header_bytes_with_policy(url, DOWNLOAD_TIMEOUT, &policy).await
 			{
 				return Ok(header);
 			}
@@ -1290,15 +1324,35 @@ impl NotebookDownloader {
 		notary_id: NotaryId,
 		notebook_number: NotebookNumber,
 		download_url: Option<String>,
+		expected_archive_origin: Option<String>,
 	) -> Result<NotebookBytes, Error> {
+		let path_suffix =
+			get_download_path_suffix(DownloadKind::Notebook, notary_id, notebook_number);
 		if let Some(url) = download_url {
-			if let Ok(body) = ArchiveHost::download_notebook_bytes(url, DOWNLOAD_TIMEOUT).await {
+			let policy = DownloadPolicy {
+				trust_mode: self.trust_mode,
+				expected_origin: expected_archive_origin.clone(),
+				expected_path_suffix: Some(path_suffix.clone()),
+				max_bytes: self.notebook_max_bytes,
+			};
+			if let Ok(body) =
+				ArchiveHost::download_notebook_bytes_with_policy(url, DOWNLOAD_TIMEOUT, &policy)
+					.await
+			{
 				return Ok(body);
 			}
 		}
 		for archive_host in &self.archive_hosts {
+			let url = archive_host.get_notebook_url(notary_id, notebook_number);
+			let policy = DownloadPolicy {
+				trust_mode: self.trust_mode,
+				expected_origin: Some(archive_host.url.as_str().to_string()),
+				expected_path_suffix: Some(path_suffix.clone()),
+				max_bytes: self.notebook_max_bytes,
+			};
 			if let Ok(body) =
-				archive_host.get_notebook(notary_id, notebook_number, DOWNLOAD_TIMEOUT).await
+				ArchiveHost::download_notebook_bytes_with_policy(url, DOWNLOAD_TIMEOUT, &policy)
+					.await
 			{
 				return Ok(body);
 			}
@@ -1517,7 +1571,9 @@ mod test {
 
 		let ticker = Ticker::new(2000, 2);
 
-		let notebook_downloader = NotebookDownloader::new(vec![archive_host]).unwrap();
+		let notebook_downloader =
+			NotebookDownloader::new(vec![archive_host], DownloadTrustMode::Dev, None, None)
+				.unwrap();
 		let notary_client = NotaryClient::new(
 			client.clone(),
 			aux_client,

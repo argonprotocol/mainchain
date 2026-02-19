@@ -76,6 +76,7 @@ pallet-ismp-rpc = { workspace = true }
 
 # Local Dependencies
 argon-node-consensus = { workspace = true }
+argon-notary-apis = { workspace = true }
 argon-runtime = { workspace = true, features = ["default"] }
 argon-canary-runtime = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
