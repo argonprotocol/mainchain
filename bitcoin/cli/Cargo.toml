@@ -36,6 +36,7 @@ argon-primitives = { workspace = true, features = ["default"] }
 argon-bitcoin = { workspace = true, features = ["default"] }
 argon-bitcoin-cli-macros = { workspace = true }
 rand = { workspace = true }
+rpassword = { workspace = true }
 
 [features]
 default = []

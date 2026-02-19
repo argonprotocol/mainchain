@@ -20,6 +20,7 @@ use argon_primitives::{
 		SATOSHIS_PER_BITCOIN, UtxoId,
 	},
 	prelude::sp_core::crypto::ExposeSecret,
+	read_secret_input,
 };
 use base64::{Engine, engine::general_purpose};
 use bitcoin::{
@@ -33,6 +34,7 @@ use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, pres
 use polkadot_sdk::{sp_core::crypto::SecretString, *};
 use sp_runtime::{FixedPointNumber, FixedU128, testing::H256};
 use std::{
+	path::PathBuf,
 	str::FromStr,
 	sync::{Arc, Mutex},
 	time::Duration,
@@ -110,15 +112,28 @@ pub enum LockCommands {
 		utxo_id: UtxoId,
 
 		/// Provide the hd path to put as a hint into the psbt (if applicable)
-		#[clap(long, required_unless_present("private_key"))]
+		#[clap(long)]
 		hd_path: Option<String>,
 
 		/// Provide the parent fingerprint to put as a hint into the psbt (if applicable)
 		#[clap(long)]
 		parent_fingerprint: Option<String>,
 
-		/// Provide the private key directly to sign the psbt
-		#[clap(long, value_parser = secret_string_from_str)]
+		/// Read private key (WIF) from file to sign the psbt.
+		#[clap(long, conflicts_with_all = & ["private_key_interactive", "private_key"])]
+		private_key_file: Option<PathBuf>,
+
+		/// Enter private key (WIF) interactively with hidden terminal input.
+		#[clap(long, conflicts_with_all = & ["private_key_file", "private_key"])]
+		private_key_interactive: bool,
+
+		/// Legacy and insecure: puts private key in process arguments.
+		#[clap(
+					long,
+					hide = true,
+					value_parser = secret_string_from_str,
+					conflicts_with_all = & ["private_key_file", "private_key_interactive"]
+				)]
 		private_key: Option<SecretString>,
 
 		#[clap(flatten)]
@@ -311,7 +326,8 @@ impl LockCommands {
 						format!("{}, vout={}", utxo_txid, a.output_index)
 					})
 					.unwrap_or("-".to_string());
-				let cosign_script = get_cosign_script(&lock, Network::Bitcoin)?;
+				let network = get_bitcoin_network(&client, fetch_at).await?;
+				let cosign_script = get_cosign_script(&lock, network)?;
 
 				let vault_pubkey: CompressedBitcoinPubkey = lock.vault_pubkey.into();
 				let vault_bitcoin_pubkey: bitcoin::CompressedPublicKey = vault_pubkey.try_into()?;
@@ -471,16 +487,19 @@ impl LockCommands {
 				utxo_id,
 				parent_fingerprint,
 				hd_path,
+				private_key_file,
+				private_key_interactive,
 				private_key,
 				wait,
 				xpriv_file,
 				bitcoin_rpc_url,
 			} => {
-				let private_key = if let Some(private_key) = private_key {
-					Some(bitcoin::PrivateKey::from_str(private_key.expose_secret())?)
-				} else {
-					None
-				};
+				let private_key = read_private_key(
+					private_key,
+					private_key_file,
+					private_key_interactive,
+					xpriv_file.allow_insecure_cli_secrets,
+				)?;
 
 				let client = MainchainClient::from_url(&rpc_url)
 					.await
@@ -746,6 +765,35 @@ impl LockCommands {
 		}
 		Ok(())
 	}
+}
+
+fn read_private_key(
+	private_key_from_argv: Option<SecretString>,
+	private_key_file: Option<PathBuf>,
+	private_key_interactive: bool,
+	allow_insecure_cli_secrets: bool,
+) -> anyhow::Result<Option<bitcoin::PrivateKey>> {
+	if private_key_from_argv.is_some() && !allow_insecure_cli_secrets {
+		bail!(
+			"`--private-key` is disabled by default because command-line args leak via process lists and shell history. Use --private-key-file or --private-key-interactive. To bypass (unsafe), add --allow-insecure-cli-secrets."
+		);
+	}
+	let private_key = read_secret_input(
+		"Private key (WIF): ",
+		private_key_interactive,
+		private_key_from_argv,
+		private_key_file,
+	)?;
+	let Some(private_key) = private_key else {
+		return Ok(None);
+	};
+	let private_key = private_key.expose_secret().trim();
+	if private_key.is_empty() {
+		bail!("Private key cannot be empty");
+	}
+	let private_key = bitcoin::PrivateKey::from_str(private_key)
+		.context("Unable to parse private key (expected WIF)")?;
+	Ok(Some(private_key))
 }
 
 async fn wait_for_confirmations(
