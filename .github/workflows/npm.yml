@@ -124,7 +124,10 @@ jobs:
           set -euo pipefail
 
           TAG="${{ steps.release_tag.outputs.tag }}"
-          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+          if ! RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"; then
+            echo "No release found for tag $TAG. Ensure the release exists and is published before running this workflow." >&2
+            exit 1
+          fi
 
           if ! jq -e '.draft == false and (.published_at != null)' <<<"$RELEASE_JSON" >/dev/null; then
             echo "workflow_dispatch requires an already published release for tag $TAG" >&2
