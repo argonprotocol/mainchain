@@ -107,6 +107,9 @@ jobs:
           if [[ -z "$TAG" || "$TAG" == "null" ]]; then
             TAG="${{ github.event.release.tag_name }}"
           fi
+          if [[ "$TAG" == refs/tags/* ]]; then
+            TAG="${TAG#refs/tags/}"
+          fi
           if [[ -z "$TAG" || "$TAG" == "null" ]]; then
             TAG="${{ github.ref_name }}"
           fi
