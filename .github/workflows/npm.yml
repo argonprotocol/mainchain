@@ -4,9 +4,15 @@ on:
   repository_dispatch:
     types:
       - npm-dev-publish
-  push:
-    tags:
-      - v[0-9]+.*
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release tag to publish (for example: v1.4.0)'
+        required: true
+        type: string
 
 defaults:
   run:
@@ -15,7 +21,7 @@ defaults:
 jobs:
   publish:
     name: Publish packages
-    if: github.event_name == 'push' || (github.event_name == 'repository_dispatch' && github.actor == 'github-actions[bot]')
+    if: github.event_name != 'repository_dispatch' || github.actor == 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -62,7 +68,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'repository_dispatch' && steps.validate_dispatch.outputs.head_sha || github.ref_name }}
+          ref: ${{ github.event_name == 'repository_dispatch' && steps.validate_dispatch.outputs.head_sha || github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
           fetch-depth: 0
 
       - name: Setup node
@@ -94,28 +100,47 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve release tag
-        if: github.event_name == 'push'
+        if: github.event_name != 'repository_dispatch'
         id: release_tag
         run: |
-          TAG="${{ github.ref_name }}"
+          TAG="${{ github.event.inputs.tag }}"
+          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
+            TAG="${{ github.ref_name }}"
+          fi
           if [[ -z "$TAG" || "$TAG" == "null" ]]; then
             echo "Unable to resolve release tag" >&2
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate workflow dispatch release is published
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.release_tag.outputs.tag }}"
+          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+
+          if ! jq -e '.draft == false and (.published_at != null)' <<<"$RELEASE_JSON" >/dev/null; then
+            echo "workflow_dispatch requires an already published release for tag $TAG" >&2
+            exit 1
+          fi
 
       - name: Download localchain artifacts
-        if: github.event_name == 'push'
-        run: gh release download ${{ steps.release_tag.outputs.tag }} --dir ./localchain/artifacts --pattern *.node
+        if: github.event_name != 'repository_dispatch'
+        run: gh release download ${{ steps.release_tag.outputs.tag }} --dir ./localchain/artifacts --pattern '*.node'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download bitcoin artifacts from release
-        if: github.event_name == 'push'
+        if: github.event_name != 'repository_dispatch'
         run: |
-          gh release download ${{ steps.release_tag.outputs.tag }} --dir ./bitcoin/nodejs/ts/wasm --pattern bitcoin-wasm.tar.gz
+          gh release download ${{ steps.release_tag.outputs.tag }} --dir ./bitcoin/nodejs/ts/wasm --pattern 'bitcoin-wasm.tar.gz'
           tar -xzf ./bitcoin/nodejs/ts/wasm/bitcoin-wasm.tar.gz -C ./bitcoin/nodejs/ts/wasm
           ls -R ./bitcoin/nodejs/ts/wasm
         env:
@@ -151,7 +176,7 @@ jobs:
         if: ${{ vars.NPM_ENABLED == 'true' }}
         run: |
           PUBLISH_ARGS=(--access public)
-          if [[ "${{ github.event_name }}" != "push" ]]; then
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             PUBLISH_ARGS+=(--tag dev)
           fi
           npm publish "${PUBLISH_ARGS[@]}" --workspace=client/nodejs
