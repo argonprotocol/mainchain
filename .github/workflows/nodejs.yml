@@ -3,7 +3,6 @@ name: Build + Test Node.js Apis
   push:
     branches:
       - main
-    tags:
       - v[0-9]+.*
   workflow_dispatch:
 
