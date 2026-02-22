@@ -591,7 +591,7 @@ where
 							e,
 							Error::MissingNotebooksError(_) |
 								Error::NotebookAuditBeforeTick(_) |
-								Error::StateUnavailableError
+								Error::NotaryAuditDeferred(_)
 						) {
 							trace!("In queue, re-queuing notebook for notary {notary_id} - {e:?}");
 							self_clone
@@ -875,11 +875,15 @@ where
 				);
 				let parent_hash = self.client.parent_hash(&best_hash)?;
 				if parent_hash == best_hash {
-					return Err(Error::StateUnavailableError);
+					return Err(Error::NotaryAuditDeferred(format!(
+						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={best_hash:?}"
+					)));
 				}
 				best_hash = parent_hash;
 				if !self.client.has_block_state(best_hash) {
-					return Err(Error::StateUnavailableError);
+					return Err(Error::NotaryAuditDeferred(format!(
+						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={best_hash:?}"
+					)));
 				}
 				latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
 			}
@@ -945,88 +949,143 @@ where
 		parent_hash: &B::Hash,
 		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
 	) -> Result<(), Error> {
-		for _ in 0..2 {
-			let mut missing_audits_by_notary = BTreeMap::new();
-			let notary_ids = self.get_notary_ids().await;
-			let mut needs_notary_updates = false;
-			for digest_record in &notebook_audit_results {
-				let notary_audits =
-					self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
+		self.verify_notebook_audits_with_timeout_and_mode(
+			parent_hash,
+			notebook_audit_results,
+			None,
+			true,
+		)
+		.await
+	}
 
-				let audit = notary_audits.get(&digest_record.notebook_number);
+	pub async fn verify_notebook_audits_for_import(
+		self: &Arc<Self>,
+		parent_hash: &B::Hash,
+		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
+		max_wait: Duration,
+	) -> Result<(), Error> {
+		self.verify_notebook_audits_with_timeout_and_mode(
+			parent_hash,
+			notebook_audit_results,
+			Some(max_wait),
+			false,
+		)
+		.await
+	}
 
-				if let Some(audit) = audit {
-					if digest_record.audit_first_failure != audit.audit_first_failure {
-						return Err(Error::InvalidNotebookDigest(format!(
-							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-							digest_record.notary_id,
-							digest_record.notebook_number,
-							digest_record.audit_first_failure,
-							audit.audit_first_failure
-						)));
-					}
-				} else {
-					if !notary_ids.contains(&digest_record.notary_id) ||
-						!self.has_client(digest_record.notary_id).await
-					{
-						needs_notary_updates = true;
-					}
-					self.enqueue_notebook(
+	pub async fn verify_notebook_audits_with_timeout(
+		self: &Arc<Self>,
+		parent_hash: &B::Hash,
+		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
+		max_wait: Option<Duration>,
+	) -> Result<(), Error> {
+		self.verify_notebook_audits_with_timeout_and_mode(
+			parent_hash,
+			notebook_audit_results,
+			max_wait,
+			true,
+		)
+		.await
+	}
+
+	async fn verify_notebook_audits_with_timeout_and_mode(
+		self: &Arc<Self>,
+		parent_hash: &B::Hash,
+		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
+		max_wait: Option<Duration>,
+		allow_notary_updates: bool,
+	) -> Result<(), Error> {
+		let mut missing_audits_by_notary = BTreeMap::new();
+		let notary_ids = self.get_notary_ids().await;
+		let mut needs_notary_updates = false;
+		for digest_record in &notebook_audit_results {
+			let notary_audits =
+				self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
+
+			let audit = notary_audits.get(&digest_record.notebook_number);
+
+			if let Some(audit) = audit {
+				if digest_record.audit_first_failure != audit.audit_first_failure {
+					return Err(Error::InvalidNotebookDigest(format!(
+						"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
 						digest_record.notary_id,
 						digest_record.notebook_number,
-						None,
-						None,
-					)
-					.await?;
-					missing_audits_by_notary
-						.entry(digest_record.notary_id)
-						.or_insert_with(Vec::new)
-						.push(digest_record.notebook_number);
-				}
-			}
-			if missing_audits_by_notary.is_empty() {
-				return Ok(());
-			}
-
-			info!(
-				"Notebook digest has missing audits. Will attempt to catchup now. {missing_audits_by_notary:#?}"
-			);
-
-			if needs_notary_updates {
-				self.update_notaries(parent_hash).await?;
-			}
-
-			// drain queues
-			// NOTE: only do this for 10 seconds
-			let start = Instant::now();
-			// wait a max of 5 seconds per notebook.
-			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
-
-			// if we're importing a specific block, then network syncing should be off
-			while self.process_queues(Some(*parent_hash)).await? {
-				tokio::time::sleep(Duration::from_millis(30)).await;
-				let mut has_more_work = false;
-				for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
-					let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
-					audits.retain(|notebook_number| !notary_audits.contains_key(notebook_number));
-					if !audits.is_empty() {
-						has_more_work = true;
-					}
-				}
-				if !has_more_work {
-					break;
-				}
-				if start.elapsed() > Duration::from_secs(wait_time as u64) {
-					warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
-					return Err(Error::UnableToSyncNotary(format!(
-						"Could not process all missing audits in {wait_time} seconds"
+						digest_record.audit_first_failure,
+						audit.audit_first_failure
 					)));
 				}
+			} else {
+				if !notary_ids.contains(&digest_record.notary_id) ||
+					!self.has_client(digest_record.notary_id).await
+				{
+					needs_notary_updates = true;
+				}
+				self.enqueue_notebook(
+					digest_record.notary_id,
+					digest_record.notebook_number,
+					None,
+					None,
+				)
+				.await?;
+				missing_audits_by_notary
+					.entry(digest_record.notary_id)
+					.or_insert_with(Vec::new)
+					.push(digest_record.notebook_number);
 			}
 		}
-		Err(Error::InvalidNotebookDigest(
-			"Notebook digest record could not verify all records in local storage".to_string(),
-		))
+		if missing_audits_by_notary.is_empty() {
+			return Ok(());
+		}
+
+		info!(
+			"Notebook digest has missing audits. Will attempt to catchup now. {missing_audits_by_notary:#?}"
+		);
+
+		let start = Instant::now();
+		// Wait up to 5s per notary with missing audits, with a small floor/ceiling.
+		let calculated_wait_secs = (missing_audits_by_notary.len() * 5).clamp(6, 120) as u64;
+		let wait_time_secs = max_wait
+			.map(|duration| duration.as_secs().max(1))
+			.unwrap_or(calculated_wait_secs);
+		let wait_time = Duration::from_secs(wait_time_secs);
+		let timeout_error = || {
+			Error::UnableToSyncNotary(format!(
+				"Could not process all missing audits in {wait_time_secs} seconds"
+			))
+		};
+
+		if needs_notary_updates && allow_notary_updates {
+			let Some(remaining) = wait_time.checked_sub(start.elapsed()) else {
+				warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
+				return Err(timeout_error());
+			};
+			tokio::time::timeout(remaining, self.update_notaries(parent_hash))
+				.await
+				.map_err(|_| timeout_error())??;
+		}
+
+		loop {
+			if start.elapsed() > wait_time {
+				warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
+				return Err(timeout_error());
+			}
+			// If we're importing a specific block, network syncing should be off.
+			let has_more_work = self.process_queues(Some(*parent_hash)).await?;
+			let mut has_missing_audits = false;
+			for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
+				let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
+				audits.retain(|notebook_number| !notary_audits.contains_key(notebook_number));
+				if !audits.is_empty() {
+					has_missing_audits = true;
+				}
+			}
+			if !has_missing_audits {
+				return Ok(());
+			}
+			// If queue processing made no progress, back off slightly to avoid tight loops.
+			let sleep_ms = if has_more_work { 30 } else { 250 };
+			tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
+		}
 	}
 
 	async fn get_notebook_dependencies(
