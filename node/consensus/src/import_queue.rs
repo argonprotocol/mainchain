@@ -1,8 +1,16 @@
-use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
+use crate::{
+	NotaryClient,
+	aux_client::ArgonAux,
+	compute_worker::BlockComputeNonce,
+	error::Error,
+	pending_import_replay::{
+		DeferFullImportResult, PendingImportReplayQueue, spawn_pending_import_replay_task,
+	},
+};
 use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
 	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
-	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
+	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, NotebookAuditResult, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
@@ -31,8 +39,10 @@ use sp_runtime::{
 	Justification,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
-use std::{marker::PhantomData, sync::Arc};
-use tracing::error;
+use std::{fmt, marker::PhantomData, sync::Arc, time::Duration};
+use tracing::{error, warn};
+
+const IMPORT_NOTEBOOK_AUDIT_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct ImportMetrics {
@@ -81,16 +91,22 @@ impl ImportMetrics {
 	}
 }
 
-pub trait ImportApisExt<B: BlockT>: HeaderBackend<B> + BlockBackend<B> {
+pub trait ImportApisExt<B: BlockT, AC>: HeaderBackend<B> + BlockBackend<B> {
 	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool;
 	fn has_new_price_index(&self, hash: B::Hash) -> bool;
+	fn runtime_digest_notebooks(
+		&self,
+		parent_hash: B::Hash,
+		digest: &sp_runtime::Digest,
+	) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, Error>;
 }
 
-impl<B: BlockT, C> ImportApisExt<B> for C
+impl<B: BlockT, C, AC> ImportApisExt<B, AC> for C
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B>,
-	C::Api: BlockImportApis<B>,
+	C::Api: BlockImportApis<B> + BlockCreatorApis<B, AC, NotebookVerifyError>,
+	AC: Codec + Clone,
 {
 	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool {
 		self.runtime_api().has_new_bitcoin_tip(hash).unwrap_or(false)
@@ -99,16 +115,220 @@ where
 	fn has_new_price_index(&self, hash: B::Hash) -> bool {
 		self.runtime_api().has_new_price_index(hash).unwrap_or(false)
 	}
+
+	fn runtime_digest_notebooks(
+		&self,
+		parent_hash: B::Hash,
+		digest: &sp_runtime::Digest,
+	) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, Error> {
+		self.runtime_api()
+			.digest_notebooks(parent_hash, digest)
+			.map_err(|e| {
+				Error::MissingRuntimeData(format!("Error calling digest notebooks api: {e:?}"))
+			})?
+			.map_err(|e| {
+				Error::MissingRuntimeData(format!("Failed to get digest notebooks: {e:?}"))
+			})
+	}
 }
 
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
-	client: Arc<C>,
+	pub(crate) client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
+	pub(crate) notary_client: Arc<NotaryClient<B, C, AC>>,
 	import_lock: Arc<tokio::sync::Mutex<()>>,
+	pub(crate) pending_full_import_queue: PendingImportReplayQueue<B, C>,
 	metrics: Arc<Option<ImportMetrics>>,
 	_phantom: PhantomData<AC>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+struct ImportContext<B: BlockT> {
+	hash: B::Hash,
+	number: NumberFor<B>,
+	parent_hash: B::Hash,
+	info: sp_blockchain::Info<B>,
+	is_block_gap: bool,
+	parent_block_state: BlockStatus,
+	block_header_status: sp_blockchain::BlockStatus,
+	state_action: ImportStateAction,
+	skip_execution_checks: bool,
+	has_body: bool,
+	origin: BlockOrigin,
+	finalized: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ImportStateAction {
+	StateApply,
+	StateImport,
+	Execute,
+	ExecuteIfPossible,
+	Skip,
+}
+
+impl fmt::Debug for ImportStateAction {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let action = match self {
+			Self::StateApply => "state_apply",
+			Self::StateImport => "state_import",
+			Self::Execute => "execute",
+			Self::ExecuteIfPossible => "execute_if_possible",
+			Self::Skip => "skip",
+		};
+		f.write_str(action)
+	}
+}
+
+impl<B: BlockT> ImportContext<B> {
+	fn from_block<C>(client: &C, block: &mut BlockImportParams<B>) -> Self
+	where
+		C: HeaderBackend<B> + BlockBackend<B>,
+	{
+		let hash = block.post_hash();
+		let number = *block.header.number();
+		let parent_hash = *block.header.parent_hash();
+		// Prematurely set fork choice = false to avoid any chance of setting best block.
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+		let info = client.info();
+		let is_block_gap = info.block_gap.is_some_and(|a| a.start <= number && number <= a.end);
+		let parent_block_state = client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
+		let block_header_status =
+			client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
+		let state_action = match block.state_action {
+			StateAction::ApplyChanges(StorageChanges::Changes(_)) => ImportStateAction::StateApply,
+			StateAction::ApplyChanges(StorageChanges::Import(_)) => ImportStateAction::StateImport,
+			StateAction::Execute => ImportStateAction::Execute,
+			StateAction::ExecuteIfPossible => ImportStateAction::ExecuteIfPossible,
+			StateAction::Skip => ImportStateAction::Skip,
+		};
+		Self {
+			hash,
+			number,
+			parent_hash,
+			info,
+			is_block_gap,
+			parent_block_state,
+			block_header_status,
+			state_action,
+			skip_execution_checks: block.state_action.skip_execution_checks(),
+			has_body: block.body.is_some(),
+			origin: block.origin,
+			finalized: block.finalized,
+		}
+	}
+
+	fn refresh<C>(&mut self, client: &C, block: &mut BlockImportParams<B>)
+	where
+		C: HeaderBackend<B> + BlockBackend<B>,
+	{
+		*self = Self::from_block(client, block);
+	}
+
+	fn is_parent_state_available(&self) -> bool {
+		self.parent_block_state == BlockStatus::InChainWithState
+	}
+
+	fn is_parent_unknown(&self) -> bool {
+		self.parent_block_state == BlockStatus::Unknown
+	}
+
+	fn is_header_already_imported(&self) -> bool {
+		self.block_header_status == sp_blockchain::BlockStatus::InChain
+	}
+
+	fn is_my_block(&self) -> bool {
+		self.origin == BlockOrigin::Own
+	}
+
+	fn is_initial_sync(&self) -> bool {
+		self.origin == BlockOrigin::NetworkInitialSync
+	}
+
+	fn can_defer_full_import(&self) -> bool {
+		self.has_body && !self.finalized && !self.is_my_block()
+	}
+
+	fn supports_deferred_full_import(&self) -> bool {
+		matches!(
+			self.state_action,
+			ImportStateAction::Execute | ImportStateAction::ExecuteIfPossible
+		)
+	}
+
+	fn can_defer_notebook_verification(&self) -> bool {
+		self.supports_deferred_full_import() && self.can_defer_full_import()
+	}
+
+	fn are_import_details_already_queued(
+		&self,
+		is_full_import_already_queued: bool,
+		has_justifications: bool,
+	) -> bool {
+		self.has_body &&
+			!self.finalized &&
+			!has_justifications &&
+			self.supports_deferred_full_import() &&
+			self.is_header_already_imported() &&
+			is_full_import_already_queued
+	}
+
+	fn can_execute_block(&self) -> bool {
+		self.state_action != ImportStateAction::ExecuteIfPossible ||
+			self.is_parent_state_available()
+	}
+
+	fn should_verify_notebooks(&self) -> bool {
+		!self.skip_execution_checks &&
+			!self.is_initial_sync() &&
+			!self.is_my_block() &&
+			self.number > self.info.finalized_number &&
+			!self.finalized
+	}
+
+	fn has_state_or_block(&self) -> bool {
+		!self.skip_execution_checks
+	}
+
+	fn can_finalize_import(&self, is_finalized_descendent: bool) -> bool {
+		is_finalized_descendent || self.is_initial_sync() || self.finalized
+	}
+}
+
+#[allow(clippy::large_enum_variant)]
+enum ImportGateOutcome<B: BlockT> {
+	Continue { block: BlockImportParams<B>, import_context: ImportContext<B> },
+	Return(ImportResult),
+}
+
+impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
+	pub(crate) fn new_with_components(
+		inner: I,
+		client: Arc<C>,
+		aux_client: ArgonAux<B, C>,
+		notary_client: Arc<NotaryClient<B, C, AC>>,
+		metrics: Arc<Option<ImportMetrics>>,
+	) -> Self {
+		let pending_full_import_queue = PendingImportReplayQueue::<B, C>::new(client.clone());
+		Self {
+			inner,
+			client,
+			aux_client,
+			notary_client,
+			import_lock: Default::default(),
+			pending_full_import_queue,
+			metrics,
+			_phantom: PhantomData,
+		}
+	}
+
+	#[cfg(test)]
+	pub(crate) async fn pending_full_imports_len(&self) -> usize {
+		self.pending_full_import_queue.len().await
+	}
 }
 
 impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, I, C, AC> {
@@ -117,9 +337,253 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 			inner: self.inner.clone(),
 			client: self.client.clone(),
 			aux_client: self.aux_client.clone(),
+			notary_client: self.notary_client.clone(),
 			import_lock: self.import_lock.clone(),
+			pending_full_import_queue: self.pending_full_import_queue.clone(),
 			metrics: self.metrics.clone(),
 			_phantom: PhantomData,
+		}
+	}
+}
+
+impl<B, I, C, AC> ArgonBlockImport<B, I, C, AC>
+where
+	B: BlockT,
+	I: BlockImport<B> + Send + Sync,
+	I::Error: Into<ConsensusError>,
+	C: ImportApisExt<B, AC>
+		+ crate::notary_client::NotaryApisExt<B, AC>
+		+ AuxStore
+		+ Send
+		+ Sync
+		+ 'static,
+	AC: Clone + Codec + Send + Sync + 'static,
+{
+	fn finalize_gate_outcome(
+		block: BlockImportParams<B>,
+		import_context: ImportContext<B>,
+	) -> Result<ImportGateOutcome<B>, Error> {
+		let has_justifications = block
+			.justifications
+			.as_ref()
+			.is_some_and(|justifications| justifications.iter().next().is_some());
+		// If the header is already in the DB we usually short-circuit unless the
+		// new import carries something we still need (state/body or finality/justification).
+		if import_context.is_header_already_imported() &&
+			!import_context.has_state_or_block() &&
+			!block.finalized &&
+			!has_justifications
+		{
+			return Ok(ImportGateOutcome::Return(ImportResult::AlreadyInChain));
+		}
+		Ok(ImportGateOutcome::Continue { block, import_context })
+	}
+
+	async fn queue_full_import_for_replay(
+		&self,
+		block: BlockImportParams<B>,
+		import_context: &mut ImportContext<B>,
+	) -> Result<DeferFullImportResult<B>, Error> {
+		match self.pending_full_import_queue.defer_full_import(block).await? {
+			DeferFullImportResult::Deferred(mut queued_block) => {
+				import_context.refresh(&*self.client, &mut queued_block);
+				Ok(DeferFullImportResult::Deferred(queued_block))
+			},
+			DeferFullImportResult::SaturatedHeaderOnly(mut header_only) => {
+				import_context.refresh(&*self.client, &mut header_only);
+				Ok(DeferFullImportResult::SaturatedHeaderOnly(header_only))
+			},
+		}
+	}
+
+	async fn defer_full_import_or_missing_state(
+		&self,
+		block: BlockImportParams<B>,
+		import_context: &mut ImportContext<B>,
+	) -> Result<Option<BlockImportParams<B>>, Error> {
+		match self.queue_full_import_for_replay(block, import_context).await {
+			Ok(DeferFullImportResult::Deferred(queued_block)) => Ok(Some(queued_block)),
+			Ok(DeferFullImportResult::SaturatedHeaderOnly(header_only_block)) => {
+				warn!(
+					context = ?import_context,
+					capacity = crate::pending_import_replay::MAX_PENDING_IMPORTS,
+					"Pending replay queue full; importing header-only without deferring full-body replay"
+				);
+				Ok(Some(header_only_block))
+			},
+			Err(Error::PendingImportUnsupported(reason)) => {
+				warn!(
+					context = ?import_context,
+					?reason,
+					"Deferred replay unsupported for this block; returning MissingState"
+				);
+				Ok(None)
+			},
+			Err(err) => Err(err),
+		}
+	}
+
+	async fn run_pre_import_gates(
+		&self,
+		mut block: BlockImportParams<B>,
+		mut import_context: ImportContext<B>,
+		notary_client: &Arc<NotaryClient<B, C, AC>>,
+		block_hash: B::Hash,
+		block_number: NumberFor<B>,
+		parent_hash: B::Hash,
+	) -> Result<ImportGateOutcome<B>, Error> {
+		let queued_before_import = self.pending_full_import_queue.has_hash(block_hash).await;
+		let has_justifications = block
+			.justifications
+			.as_ref()
+			.is_some_and(|justifications| justifications.iter().next().is_some());
+		if import_context
+			.are_import_details_already_queued(queued_before_import, has_justifications)
+		{
+			return Ok(ImportGateOutcome::Return(ImportResult::AlreadyInChain));
+		}
+
+		if !import_context.can_execute_block() {
+			// Full execution blocked by missing parent state: queue full block and import header
+			// path.
+			if import_context.is_parent_unknown() || !import_context.can_defer_full_import() {
+				return Ok(ImportGateOutcome::Return(ImportResult::MissingState));
+			}
+			let Some(queued_block) =
+				self.defer_full_import_or_missing_state(block, &mut import_context).await?
+			else {
+				return Ok(ImportGateOutcome::Return(ImportResult::MissingState));
+			};
+			block = queued_block;
+			return Self::finalize_gate_outcome(block, import_context);
+		}
+
+		if !import_context.should_verify_notebooks() {
+			return Self::finalize_gate_outcome(block, import_context);
+		}
+
+		// Notebook verification requires parent state. If it's unavailable, defer or block.
+		if !import_context.is_parent_state_available() {
+			if import_context.is_parent_unknown() ||
+				!import_context.can_defer_notebook_verification()
+			{
+				return Ok(ImportGateOutcome::Return(ImportResult::MissingState));
+			}
+			let Some(queued_block) =
+				self.defer_full_import_or_missing_state(block, &mut import_context).await?
+			else {
+				return Ok(ImportGateOutcome::Return(ImportResult::MissingState));
+			};
+			block = queued_block;
+			return Self::finalize_gate_outcome(block, import_context);
+		}
+
+		let digest_notebooks =
+			self.client.runtime_digest_notebooks(parent_hash, block.header.digest())?;
+		if digest_notebooks.is_empty() {
+			return Self::finalize_gate_outcome(block, import_context);
+		}
+		if let Err(err) = notary_client
+			.verify_notebook_audits_for_import(
+				&parent_hash,
+				digest_notebooks,
+				IMPORT_NOTEBOOK_AUDIT_TIMEOUT,
+			)
+			.await
+		{
+			match err {
+				err if err.is_retryable_notebook_audit_error() =>
+					if import_context.can_defer_notebook_verification() {
+						let Some(queued_block) = self
+							.defer_full_import_or_missing_state(block, &mut import_context)
+							.await?
+						else {
+							return Ok(ImportGateOutcome::Return(ImportResult::MissingState));
+						};
+						block = queued_block;
+					} else {
+						return Err(err);
+					},
+				Error::InvalidNotebookDigest(_) => {
+					warn!(
+						number = ?block_number,
+						block_hash = ?block_hash,
+						parent_hash = ?parent_hash,
+						origin = ?block.origin,
+						"Rejecting block with invalid notebook digest: {err}"
+					);
+					return Ok(ImportGateOutcome::Return(ImportResult::KnownBad));
+				},
+				e => return Err(e),
+			}
+		}
+
+		Self::finalize_gate_outcome(block, import_context)
+	}
+
+	pub(crate) async fn replay_pending_full_imports(&self) {
+		let pending_count = self.pending_full_import_queue.len().await;
+		if pending_count == 0 {
+			return;
+		}
+
+		let mut replayed = 0usize;
+		while let Some((pending_import, replay_context)) = self
+			.pending_full_import_queue
+			.dequeue_ready_for_replay(&self.notary_client)
+			.await
+		{
+			replayed = replayed.saturating_add(1);
+			let mut replay_retry_block =
+				PendingImportReplayQueue::<B, C>::retry_block_from_pending(&pending_import);
+			match <Self as BlockImport<B>>::import_block(self, pending_import.block).await {
+				Ok(ImportResult::KnownBad) => {
+					warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						"Pending full block import replay resolved as known-bad"
+					);
+				},
+				Ok(ImportResult::MissingState) => {
+					warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						"Pending full block replay still missing state; requeueing"
+					);
+					if let Some(block) = replay_retry_block.take() {
+						self.pending_full_import_queue.requeue_retry_block(block).await;
+					}
+				},
+				Ok(ImportResult::AlreadyInChain) => {
+					let state_status = self
+						.client
+						.block_status(replay_context.hash)
+						.unwrap_or(BlockStatus::Unknown);
+					if state_status != BlockStatus::InChainWithState {
+						warn!(
+							block_hash = ?replay_context.hash,
+							number = ?replay_context.number,
+							?state_status,
+							"Pending full block replay returned AlreadyInChain without state; requeueing"
+						);
+						if let Some(block) = replay_retry_block.take() {
+							self.pending_full_import_queue.requeue_retry_block(block).await;
+						}
+					}
+				},
+				Ok(_) => {},
+				Err(err) => {
+					warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						error = ?err,
+						"Pending full block replay failed; requeueing"
+					);
+					if let Some(block) = replay_retry_block.take() {
+						self.pending_full_import_queue.requeue_retry_block(block).await;
+					}
+				},
+			}
 		}
 	}
 }
@@ -130,7 +594,12 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ImportApisExt<B> + AuxStore + Send + Sync + 'static,
+	C: ImportApisExt<B, AC>
+		+ crate::notary_client::NotaryApisExt<B, AC>
+		+ AuxStore
+		+ Send
+		+ Sync
+		+ 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
@@ -204,46 +673,33 @@ where
 	) -> Result<ImportResult, Self::Error> {
 		// single thread the import queue to ensure we don't have multiple imports
 		let _import_lock = self.import_lock.lock().await;
-		let block_hash = block.post_hash();
-		let block_number = *block.header.number();
-		let parent_hash = *block.header.parent_hash();
-		// prematurely set fork choice = false to avoid any chance of setting best block
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-
-		let info = self.client.info();
-		let is_block_gap =
-			info.block_gap.is_some_and(|a| a.start <= block_number && block_number <= a.end);
-		let parent_block_state =
-			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
-		let block_header_status =
-			self.client.status(block_hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
-		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
-		// imported. Various sync strategies will access this path without state set yet
+		let mut import_context = ImportContext::from_block(&*self.client, &mut block);
+		let block_hash = import_context.hash;
+		let block_number = import_context.number;
+		let parent_hash = import_context.parent_hash;
 		tracing::trace!(
-			number=?block_number,
-			hash=?block_hash,
-			parent=?parent_hash,
-			is_block_gap,
-			action=match block.state_action {
-				StateAction::ApplyChanges(StorageChanges::Changes(_)) => "state_apply",
-				StateAction::ApplyChanges(StorageChanges::Import(_)) => "state_import",
-				StateAction::Execute => "execute",
-				StateAction::ExecuteIfPossible => "execute_if_possible",
-				StateAction::Skip => "skip",
-			},
-			origin=?block.origin,
-			parent_block_state=?parent_block_state,
-			block_header_status=?block_header_status,
-			finalized=block.finalized,
+			context = ?import_context,
 			"Begin import."
 		);
 
-		if matches!(block.state_action, StateAction::ExecuteIfPossible) &&
-			parent_block_state != BlockStatus::InChainWithState
+		match self
+			.run_pre_import_gates(
+				block,
+				import_context,
+				&self.notary_client,
+				block_hash,
+				block_number,
+				parent_hash,
+			)
+			.await?
 		{
-			tracing::debug!(?block_hash, ?block_number, parent=?parent_hash, "Parent state missing; returning missing state action");
-			return Ok(ImportResult::MissingState);
+			ImportGateOutcome::Continue { block: next_block, import_context: next_context } => {
+				block = next_block;
+				import_context = next_context;
+			},
+			ImportGateOutcome::Return(result) => return Ok(result),
 		}
+		let info = &import_context.info;
 
 		let is_finalized_descendent = is_on_finalized_chain(
 			&(*self.client),
@@ -253,23 +709,10 @@ where
 		)
 		.unwrap_or_default();
 
-		let can_finalize = is_finalized_descendent ||
-			block.origin == BlockOrigin::NetworkInitialSync ||
-			block.finalized;
+		let can_finalize = import_context.can_finalize_import(is_finalized_descendent);
 
-		let is_block_header_already_imported =
-			block_header_status == sp_blockchain::BlockStatus::InChain;
-		let has_state_or_block = !block.state_action.skip_execution_checks();
-		// If the header is already in the DB we usually short‑circuit unless the
-		// new import carries *something* we still need (state/body *or* finality).
-		if is_block_header_already_imported && !has_state_or_block && !block.finalized {
-			tracing::debug!(
-				?block_hash,
-				?block_number,
-				"Skipping reimport of known block without state or finalization"
-			);
-			return Ok(ImportResult::AlreadyInChain);
-		}
+		let is_block_header_already_imported = import_context.is_header_already_imported();
+		let has_state_or_block = import_context.has_state_or_block();
 		// Otherwise (e.g. now finalized or now with state) we fall through and let
 		// `inner.import_block` upgrade the existing header.
 		let best_header = self
@@ -342,7 +785,7 @@ where
 		let mut record_block_key_on_import = None;
 
 		let is_vote_block = fork_power.is_latest_vote;
-		if !is_block_gap &&
+		if !import_context.is_block_gap &&
 			!is_block_header_already_imported &&
 			block.origin != BlockOrigin::NetworkInitialSync
 		{
@@ -395,8 +838,7 @@ where
 				is_vote_block,
 			)?;
 			if let Some(metrics) = &*self.metrics {
-				// only try to read data if we have state or a block, and still have it flexible if
-				// so
+				// Runtime-backed reads below require a successfully imported state.
 				if has_state_or_block && !is_block_header_already_imported {
 					if is_vote_block {
 						metrics.imported_vote_sealed_blocks_total.with_label_values(&[]).inc();
@@ -469,10 +911,9 @@ where
 #[allow(dead_code)]
 struct Verifier<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	notary_client: Arc<NotaryClient<B, C, AC>>,
 	utxo_tracker: Arc<UtxoTracker>,
 	telemetry: Option<TelemetryHandle>,
-	_phantom: PhantomData<AC>,
+	_phantom: PhantomData<(B, AC)>,
 }
 
 #[async_trait::async_trait]
@@ -581,33 +1022,6 @@ where
 				}
 			}
 
-			// if we're importing a non-finalized block from someone else, verify the notebook
-			// audits
-			let latest_verified_finalized = self.client.info().finalized_number;
-			if !matches!(block_params.origin, BlockOrigin::Own | BlockOrigin::NetworkInitialSync) &&
-				block_number > latest_verified_finalized &&
-				!block_params.finalized
-			{
-				let digest_notebooks = runtime_api
-					.digest_notebooks(parent_hash, digest)
-					.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
-					.map_err(|e| format!("Failed to get digest notebooks: {e:?}"))?;
-				self.notary_client
-					.verify_notebook_audits(&parent_hash, digest_notebooks)
-					.await
-					.inspect_err(|e| {
-						error!(
-						?block_number,
-						block_hash=?post_hash,
-						?parent_hash,
-						origin = ?block_params.origin,
-						import_existing = block_params.import_existing,
-						finalized = block_params.finalized,
-						has_justification = block_params.justifications.is_some(),
-						"Failed to verify notebook audits {}", e.to_string())
-					})?;
-			}
-
 			let check_block = B::new(block_params.header.clone(), inner_body);
 
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
@@ -680,18 +1094,22 @@ where
 	let metrics = registry.and_then(|r| ImportMetrics::new(r).ok());
 	let metrics = Arc::new(metrics);
 
-	let importer = ArgonBlockImport {
-		inner: block_import,
-		client: client.clone(),
+	let importer = ArgonBlockImport::new_with_components(
+		block_import,
+		client.clone(),
 		aux_client,
-		import_lock: Default::default(),
+		notary_client.clone(),
 		metrics,
-		_phantom: PhantomData,
-	};
+	);
+	let replay_importer = importer.clone();
+	spawn_pending_import_replay_task(spawner, move || {
+		let replay_importer = replay_importer.clone();
+		async move { replay_importer.replay_pending_full_imports().await }
+	});
+
 	let verifier = Verifier::<B, C, AC> {
 		client: client.clone(),
 		utxo_tracker,
-		notary_client,
 		telemetry,
 		_phantom: PhantomData,
 	};
@@ -706,702 +1124,4 @@ where
 		),
 		importer,
 	)
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-	use argon_primitives::{
-		BlockSealAuthoritySignature, ComputeDifficulty, Digestset, FORK_POWER_DIGEST,
-		HashOutput as BlockHash, NotebookDigest, PARENT_VOTING_KEY_DIGEST, ParentVotingKeyDigest,
-		VotingKey,
-		prelude::{
-			sp_runtime::{generic::SignedBlock, traits::BlakeTwo256},
-			*,
-		},
-	};
-	use async_trait::async_trait;
-	use polkadot_sdk::{
-		frame_support::{BoundedVec, assert_ok},
-		sc_client_api::KeyValueStates,
-		sc_consensus::ImportedState,
-		sp_core::{ByteArray, U256},
-		sp_runtime::DigestItem,
-	};
-	use sc_consensus::{
-		BlockCheckParams, BlockImportParams, ImportResult, ImportedAux, StateAction::*,
-	};
-	use sp_blockchain::{BlockStatus, Error as BlockchainError, HeaderBackend};
-	use sp_runtime::{
-		Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
-		traits::{Block as BlockT, Header as HeaderT, NumberFor},
-	};
-	use std::{
-		collections::{BTreeMap, HashMap},
-		sync::{Arc, Mutex},
-	};
-	// -------------------------------------------
-	// Tiny in–memory client & mini importer
-	// -------------------------------------------
-
-	#[derive(Clone)]
-	pub struct MemChain {
-		headers: Arc<Mutex<HashMap<BlockHash, Header>>>,
-		block_status: Arc<Mutex<HashMap<BlockHash, BlockStatus>>>,
-		block_state: Arc<Mutex<HashMap<BlockHash, sp_consensus::BlockStatus>>>,
-		best: Arc<Mutex<(BlockNumber, BlockHash)>>,
-		finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
-		aux: Arc<Mutex<BTreeMap<Vec<u8>, Vec<u8>>>>,
-	}
-	impl MemChain {
-		pub fn new(genesis: Header) -> Self {
-			let h = genesis.hash();
-			Self {
-				headers: Arc::new(Mutex::new([(h, genesis)].into())),
-				block_status: Arc::new(Mutex::new([(h, BlockStatus::InChain)].into())),
-				block_state: Arc::new(Mutex::new(
-					[(h, sp_consensus::BlockStatus::InChainWithState)].into(),
-				)),
-				best: Arc::new(Mutex::new((0u32, h))),
-				finalized: Arc::new(Mutex::new((0u32, h))),
-				aux: Arc::new(Mutex::new(BTreeMap::new())),
-			}
-		}
-		pub fn insert(&self, hdr: Header) {
-			let h = hdr.hash();
-			self.block_status.lock().unwrap().insert(h, BlockStatus::InChain);
-			self.block_state
-				.lock()
-				.unwrap()
-				.insert(h, sp_consensus::BlockStatus::InChainPruned); // header only, no state yet
-			self.headers.lock().unwrap().insert(h, hdr);
-		}
-
-		pub fn set_state(&self, h: BlockHash, state: sp_consensus::BlockStatus) {
-			self.block_status.lock().unwrap().insert(h, BlockStatus::InChain);
-			self.block_state.lock().unwrap().insert(h, state);
-		}
-	}
-	impl HeaderBackend<Block> for MemChain {
-		fn header(&self, h: BlockHash) -> Result<Option<Header>, BlockchainError> {
-			Ok(self.headers.lock().unwrap().get(&h).cloned())
-		}
-		fn info(&self) -> sp_blockchain::Info<Block> {
-			let best = *self.best.lock().unwrap();
-			let fin = *self.finalized.lock().unwrap();
-			sp_blockchain::Info {
-				finalized_hash: fin.1,
-				finalized_number: fin.0,
-				finalized_state: None,
-				best_hash: best.1,
-				best_number: best.0,
-				block_gap: None,
-				genesis_hash: best.1,
-				number_leaves: 0,
-			}
-		}
-		fn status(&self, h: BlockHash) -> Result<BlockStatus, BlockchainError> {
-			Ok(if self.headers.lock().unwrap().contains_key(&h) {
-				BlockStatus::InChain
-			} else {
-				BlockStatus::Unknown
-			})
-		}
-
-		fn number(&self, hash: BlockHash) -> sp_blockchain::Result<Option<BlockNumber>> {
-			Ok(self.headers.lock().unwrap().get(&hash).map(|h| *h.number()))
-		}
-
-		fn hash(&self, number: NumberFor<Block>) -> sp_blockchain::Result<Option<BlockHash>> {
-			Ok(self
-				.headers
-				.lock()
-				.unwrap()
-				.values()
-				.find(|h| *h.number() == number)
-				.map(|h| h.hash()))
-		}
-	}
-
-	impl ImportApisExt<Block> for MemChain {
-		fn has_new_bitcoin_tip(&self, _hash: BlockHash) -> bool {
-			false
-		}
-
-		fn has_new_price_index(&self, _hash: BlockHash) -> bool {
-			false
-		}
-	}
-
-	impl BlockBackend<Block> for MemChain {
-		fn block_body(
-			&self,
-			_hash: BlockHash,
-		) -> sc_client_api::blockchain::Result<Option<Vec<UncheckedExtrinsic>>> {
-			Ok(Some(Vec::new()))
-		}
-		fn block(&self, hash: BlockHash) -> sp_blockchain::Result<Option<SignedBlock<Block>>> {
-			if let Some(header) = self.headers.lock().unwrap().get(&hash) {
-				Ok(Some(SignedBlock {
-					block: Block::new(header.clone(), Vec::new()),
-					justifications: None,
-				}))
-			} else {
-				Ok(None)
-			}
-		}
-		fn block_status(
-			&self,
-			hash: BlockHash,
-		) -> sc_client_api::blockchain::Result<sp_consensus::BlockStatus> {
-			let map = self.block_state.lock().unwrap();
-			Ok(map.get(&hash).cloned().unwrap_or(sp_consensus::BlockStatus::Unknown))
-		}
-
-		fn justifications(
-			&self,
-			_hash: BlockHash,
-		) -> sc_client_api::blockchain::Result<Option<sp_runtime::Justifications>> {
-			Ok(None)
-		}
-
-		fn block_indexed_body(
-			&self,
-			_hash: BlockHash,
-		) -> sc_client_api::blockchain::Result<Option<Vec<Vec<u8>>>> {
-			Ok(Some(Vec::new()))
-		}
-
-		fn requires_full_sync(&self) -> bool {
-			false
-		}
-
-		fn block_hash(&self, number: NumberFor<Block>) -> sp_blockchain::Result<Option<BlockHash>> {
-			Ok(self
-				.headers
-				.lock()
-				.unwrap()
-				.values()
-				.find(|h| *h.number() == number)
-				.map(|h| h.hash()))
-		}
-
-		fn indexed_transaction(&self, _hash: BlockHash) -> sp_blockchain::Result<Option<Vec<u8>>> {
-			Ok(None)
-		}
-	}
-
-	impl AuxStore for MemChain {
-		fn insert_aux<
-			'a,
-			'b: 'a,
-			'c: 'a,
-			I: IntoIterator<Item = &'a (&'c [u8], &'c [u8])>,
-			D: IntoIterator<Item = &'a &'b [u8]>,
-		>(
-			&self,
-			insert: I,
-			delete: D,
-		) -> sc_client_api::blockchain::Result<()> {
-			let mut aux = self.aux.lock().expect("aux is poisoned");
-			for (k, v) in insert {
-				aux.insert(k.to_vec(), v.to_vec());
-			}
-			for k in delete {
-				aux.remove(*k);
-			}
-			Ok(())
-		}
-
-		fn get_aux(&self, key: &[u8]) -> sc_client_api::blockchain::Result<Option<Vec<u8>>> {
-			let aux = self.aux.lock().unwrap();
-			Ok(aux.get(key).cloned())
-		}
-	}
-
-	/// Opaque block header type.
-	type Header = generic::Header<BlockNumber, BlakeTwo256>;
-	/// Opaque block type.
-	type Block = generic::Block<Header, UncheckedExtrinsic>;
-
-	#[async_trait]
-	impl sc_consensus::BlockImport<Block> for MemChain {
-		type Error = ConsensusError;
-
-		async fn check_block(
-			&self,
-			_: BlockCheckParams<Block>,
-		) -> Result<ImportResult, Self::Error> {
-			Ok(ImportResult::Imported(ImportedAux::default()))
-		}
-
-		async fn import_block(
-			&self,
-			params: BlockImportParams<Block>,
-		) -> Result<ImportResult, Self::Error> {
-			let num = *params.header.number();
-			let hash = params.header.hash();
-			// store/overwrite header so later calls see it in MemChain
-			self.insert(params.header.clone());
-			match params.state_action {
-				ApplyChanges(_) | Execute =>
-					self.set_state(hash, sp_consensus::BlockStatus::InChainWithState),
-				ExecuteIfPossible => {
-					// If the parent already has full state we can execute immediately.
-					let p_hash = *params.header.parent_hash();
-					let parent_has_state = matches!(
-						self.block_state.lock().unwrap().get(&p_hash),
-						Some(sp_consensus::BlockStatus::InChainWithState)
-					);
-					if parent_has_state {
-						self.set_state(hash, sp_consensus::BlockStatus::InChainWithState);
-					} else {
-						// header‑only until the parent’s state arrives
-						// (behaves like real client which retries later)
-					}
-				},
-				Skip => {}, // header only
-			}
-			// minimal: just mark best/finalized if fork_choice says so
-			if let Some(fork_choice) = params.fork_choice {
-				match fork_choice {
-					sc_consensus::ForkChoiceStrategy::Custom(set_best) if set_best => {
-						let mut best = self.best.lock().unwrap();
-						if num > best.0 || (num == best.0 && hash != best.1) {
-							*best = (num, hash);
-						}
-					},
-					_ => {},
-				}
-			}
-			if params.finalized {
-				let mut fin = self.finalized.lock().unwrap();
-				if num > fin.0 || (num == fin.0 && hash != fin.1) {
-					*fin = (num, hash);
-				}
-			}
-			Ok(ImportResult::Imported(ImportedAux::default()))
-		}
-	}
-
-	fn create_header(
-		number: BlockNumber,
-		parent: H256,
-		compute_difficulty: ComputeDifficulty,
-		voting_key: Option<VotingKey>,
-		author: AccountId,
-	) -> (Header, DigestItem) {
-		let (digest, block_digest) = create_digest(compute_difficulty, voting_key, author);
-		(Header::new(number, H256::zero(), H256::zero(), parent, digest), block_digest)
-	}
-	fn has_state(db: &MemChain, h: H256) -> bool {
-		matches!(
-			db.block_state.lock().unwrap().get(&h),
-			Some(sp_consensus::BlockStatus::InChainWithState)
-		)
-	}
-
-	fn create_digest(
-		compute_difficulty: ComputeDifficulty,
-		voting_key: Option<VotingKey>,
-		author: AccountId,
-	) -> (Digest, DigestItem) {
-		let mut power = ForkPower::default();
-		if compute_difficulty > 0 {
-			power.add(0, 0, BlockSealDigest::Compute { nonce: U256::zero() }, compute_difficulty);
-		} else {
-			power.add(
-				500,
-				1,
-				BlockSealDigest::Vote {
-					seal_strength: U256::one(),
-					miner_nonce_score: Some(U256::one()),
-					signature: BlockSealAuthoritySignature::from_slice(&[0u8; 64])
-						.expect("serialization of block seal strength failed"),
-				},
-				0,
-			);
-		}
-		let digests = Digestset {
-			author,
-			block_vote: Default::default(),
-			voting_key: None, // runtime digest
-			fork_power: None, // runtime digest
-			frame_info: None, // runtime digest
-			tick: Default::default(),
-			notebooks: NotebookDigest::<NotebookVerifyError> { notebooks: BoundedVec::new() },
-		};
-		let mut digest = digests.create_pre_runtime_digest();
-		digest.push(DigestItem::Consensus(FORK_POWER_DIGEST, power.encode()));
-		digest.push(DigestItem::Consensus(
-			PARENT_VOTING_KEY_DIGEST,
-			ParentVotingKeyDigest { parent_voting_key: voting_key }.encode(),
-		));
-		let block_digest = BlockSealDigest::Compute { nonce: U256::zero() };
-		(digest, block_digest.to_digest())
-	}
-
-	fn new_importer() -> (ArgonBlockImport<Block, MemChain, MemChain, H256>, MemChain) {
-		let genesis = Header::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
-		let client = MemChain::new(genesis.clone());
-		let db_arc = std::sync::Arc::new(client.clone());
-		let importer = ArgonBlockImport::<Block, _, _, _> {
-			inner: client.clone(),
-			client: db_arc.clone(),
-			aux_client: ArgonAux::new(db_arc.clone()),
-			import_lock: Default::default(),
-			metrics: Default::default(),
-			_phantom: PhantomData,
-		};
-		(importer, client)
-	}
-
-	fn create_params(
-		block_number: BlockNumber,
-		parent_hash: H256,
-		compute_difficulty: ComputeDifficulty,
-		voting_key: Option<VotingKey>,
-		origin: BlockOrigin,
-		state_action: StateAction<Block>,
-		author: Option<AccountId>,
-	) -> BlockImportParams<Block> {
-		let author = author.unwrap_or_else(|| AccountId::from([0u8; 32]));
-		let (header, post_digest) =
-			create_header(block_number, parent_hash, compute_difficulty, voting_key, author);
-		let mut params = BlockImportParams::new(origin, header.clone());
-		params.state_action = state_action;
-		params.post_digests.push(post_digest);
-		params.post_hash = Some(header.hash());
-		params
-	}
-
-	#[tokio::test]
-	async fn gap_header_not_best() {
-		let (importer, client) = new_importer();
-		let parent = client.info().best_hash;
-		let params = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::Skip,
-			None,
-		);
-
-		let res = importer.import_block(params).await.unwrap();
-		assert!(matches!(res, ImportResult::Imported(_)));
-		assert_eq!(client.info().best_number, 0u32);
-	}
-
-	#[tokio::test]
-	async fn higher_fork_power_sets_best() {
-		let (importer, client) = new_importer();
-		let parent = client.info().best_hash;
-
-		// weaker block (power 1)
-		let p1 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::Execute,
-			None,
-		);
-
-		let _ = importer.import_block(p1).await.unwrap();
-
-		// stronger block (power 2)
-		let p2 = create_params(
-			1,
-			parent,
-			2,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::Execute,
-			None,
-		);
-		let h2 = p2.header.hash();
-		let _ = importer.import_block(p2).await.unwrap();
-
-		assert_eq!(client.info().best_hash, h2);
-	}
-
-	#[tokio::test]
-	async fn header_plus_state_can_be_best() {
-		let (importer, _client) = new_importer();
-		let parent = importer.client.info().best_hash;
-		let params = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
-				block: H256::zero(),
-				state: KeyValueStates(Vec::new()),
-			})),
-			None,
-		);
-
-		let res = importer.import_block(params).await.unwrap();
-		// We just care that full import ran; NoopImport returns Imported(...)
-		assert!(matches!(res, ImportResult::Imported(_)));
-	}
-
-	#[tokio::test]
-	async fn state_ugprade_test() {
-		let (importer, client) = new_importer();
-		let parent = importer.client.info().best_hash;
-		// header-only import
-		let gap = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::Skip,
-			None,
-		);
-		let hash = gap.header.hash();
-		importer.import_block(gap).await.unwrap();
-		assert!(!has_state(&client, hash));
-
-		// now with state
-		let state = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkInitialSync,
-			StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
-				block: H256::zero(),
-				state: KeyValueStates(Vec::new()),
-			})),
-			None,
-		);
-		importer.import_block(state).await.unwrap();
-		assert!(has_state(&client, hash));
-	}
-
-	#[tokio::test]
-	async fn finalized_upgrade_reimports() {
-		let (importer, _client) = new_importer();
-		let parent = importer.client.info().best_hash;
-		let params1 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Skip,
-			None,
-		);
-		let _ = importer.import_block(params1).await.unwrap();
-
-		// second import – now marked finalized
-		let mut params2 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Skip,
-			None,
-		);
-		params2.finalized = true;
-
-		let res2 = importer.import_block(params2).await.unwrap();
-		assert!(matches!(res2, ImportResult::Imported(_)));
-	}
-
-	#[tokio::test]
-	async fn duplicate_header_short_circuits() {
-		let (importer, _client) = new_importer();
-		let parent = importer.client.info().best_hash;
-		let params = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Skip,
-			None,
-		);
-
-		// first import
-		let _ = importer.import_block(params).await.unwrap();
-
-		// build identical params again (BlockImportParams isn't Clone)
-		let params2 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Skip,
-			None,
-		);
-
-		let res2 = importer.import_block(params2).await.unwrap();
-		assert!(matches!(res2, ImportResult::AlreadyInChain));
-	}
-
-	#[tokio::test]
-	async fn tie_loser_test() {
-		let (importer, client) = new_importer();
-		let parent = client.info().best_hash;
-
-		// loser (hash2 > hash1)
-		let loser = create_params(1, parent, 1, None, BlockOrigin::Own, StateAction::Execute, None);
-		assert_ok!(importer.import_block(loser).await); // Imported
-
-		// winner (smaller hash)
-		let winner = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::Own,
-			StateAction::Execute,
-			Some(AccountId::from([2u8; 32])),
-		);
-		let h_win = winner.header.hash();
-		assert_ok!(importer.import_block(winner).await); // Imported(best)
-
-		assert_eq!(client.info().best_hash, h_win);
-
-		// replay loser
-		let loser2 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::Own,
-			StateAction::Skip,
-			Some(AccountId::from([0u8; 32])),
-		);
-		let res = importer.import_block(loser2).await.unwrap();
-		assert!(matches!(res, ImportResult::AlreadyInChain));
-		assert_eq!(client.info().best_hash, h_win);
-	}
-
-	#[tokio::test]
-	async fn duplicate_vote_block_same_tick_fails() {
-		let (importer, _client) = new_importer();
-		let parent = importer.client.info().best_hash;
-
-		let author = AccountId::from([9u8; 32]);
-		let vote_key = H256::random();
-
-		// First vote → ok
-		let p1 = create_params(
-			1,
-			parent,
-			0,
-			Some(vote_key),
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Execute,
-			Some(author.clone()),
-		);
-		let p1_hash = p1.post_hash();
-		assert!(matches!(importer.import_block(p1).await.unwrap(), ImportResult::Imported(_)));
-
-		// Second vote by same author + same voting_key at same tick ⇒ Err
-		let mut p2 = create_params(
-			1,
-			parent,
-			0,
-			Some(vote_key),
-			BlockOrigin::NetworkBroadcast,
-			StateAction::Execute,
-			Some(author),
-		);
-		p2.header.extrinsics_root = H256::random();
-		p2.header.state_root = H256::random();
-		p2.post_hash = Some(p2.header.hash()); // refresh the cached value
-		let p2_hash = p2.post_hash();
-		let err = importer.import_block(p2).await;
-
-		assert_ne!(p1_hash, p2_hash, "post hashes should differ");
-
-		assert!(err.is_err(), "duplicate vote block should fail");
-	}
-
-	#[tokio::test]
-	async fn duplicate_compute_loser_same_power_fails() {
-		let (importer, client) = new_importer();
-		let parent = client.info().best_hash;
-
-		// Winner first (smaller hash) so later blocks at same power are losers
-		let winner = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::Own,
-			StateAction::Execute,
-			Some(AccountId::from([1u8; 32])),
-		);
-		let h_winner = winner.post_hash();
-		importer.import_block(winner).await.unwrap();
-
-		// First loser from author X
-		let author = AccountId::from([2u8; 32]);
-		let mut loser1 = create_params(
-			1,
-			parent,
-			1,
-			None,
-			BlockOrigin::Own,
-			StateAction::Execute,
-			Some(author.clone()),
-		);
-		loser1.header.extrinsics_root = H256::random();
-		loser1.header.state_root = H256::random();
-		loser1.post_hash = Some(loser1.header.hash()); // refresh the cached
-		assert_ne!(loser1.post_hash(), h_winner, "loser1 should differ from winner");
-		importer.import_block(loser1).await.unwrap(); // ok
-
-		// Second loser, same author, same fork-power, same tick ⇒ Err
-		let loser2 =
-			create_params(1, parent, 1, None, BlockOrigin::Own, StateAction::Execute, Some(author));
-		let err = importer.import_block(loser2).await;
-		assert!(err.is_err(), "duplicate compute loser should fail");
-	}
-
-	#[tokio::test]
-	async fn reorg_to_lower_power_then_recover() {
-		let (importer, client) = new_importer();
-		let genesis = client.info().best_hash;
-
-		// Node-2 fork: height 1..100, power 200.
-		let mut parent = genesis;
-		let mut hash50 = H256::zero();
-		for n in 1..=100 {
-			let p =
-				create_params(n, parent, 200 + n as u128, None, BlockOrigin::Own, Execute, None);
-			if n == 50 {
-				hash50 = p.header.hash();
-			}
-			parent = p.header.hash();
-			importer.import_block(p).await.unwrap();
-		}
-		assert_eq!(client.info().best_number, 100);
-
-		// Archive node finalises *lower-power* fork at height 51, power 151.
-		let p = create_params(51, hash50, 151, None, BlockOrigin::Own, Execute, None);
-		let back_best = p.header.hash();
-		assert_ok!(importer.import_block(p).await);
-		*client.best.lock().unwrap() = (51, back_best);
-
-		// Fresh block from node-2 with power 152 must become best.
-		let p =
-			create_params(52, client.info().best_hash, 152, None, BlockOrigin::Own, Execute, None);
-		let hash130 = p.header.hash();
-		importer.import_block(p).await.unwrap();
-
-		assert_eq!(client.info().best_hash, hash130);
-	}
 }
