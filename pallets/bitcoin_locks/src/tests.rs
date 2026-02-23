@@ -150,9 +150,11 @@ fn cleans_up_a_funding_timed_out_bitcoin() {
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().securitization_locked, price);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 
 		assert_ok!(BitcoinLocks::timeout_waiting_for_funding(1));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 	});
 }
 
@@ -844,6 +846,7 @@ fn marks_a_funded_bitcoin() {
 		assert!(LocksByUtxoId::<Test>::get(1).unwrap().is_funded);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert_eq!(LastLockEvent::get(), Some((1, who, price)));
+		assert_eq!(DefaultVault::get().securitized_satoshis, SATOSHIS_PER_BITCOIN);
 	});
 }
 
@@ -931,6 +934,7 @@ fn burns_a_spent_bitcoin() {
 		assert_eq!(DefaultVault::get().securitization_locked, price);
 		// first verify
 		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
+		assert_eq!(DefaultVault::get().securitized_satoshis, SATOSHIS_PER_BITCOIN);
 
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(50000)));
 
@@ -944,6 +948,7 @@ fn burns_a_spent_bitcoin() {
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), price - new_price);
 		assert_eq!(DefaultVault::get().securitization, allocated - new_price);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinLockBurned { vault_id: 1, utxo_id: 1, was_utxo_spent: true }
@@ -976,12 +981,14 @@ fn cancels_an_unfunded_spent_bitcoin() {
 		));
 		assert!(!LocksByUtxoId::<Test>::get(1).unwrap().is_funded);
 		assert_eq!(WatchedUtxosById::get().len(), 1);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 		// spend before verify
 		assert_ok!(BitcoinLocks::spent(1));
 
 		assert_eq!(WatchedUtxosById::get().len(), 0);
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 		assert_eq!(CanceledLocks::get().len(), 1);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 	});
 }
 
@@ -1107,6 +1114,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		assert_eq!(vault.securitization_locked, lock.liquidity_promised);
 		// first verify
 		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis);
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -1159,6 +1167,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_price)));
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who), 0);
 		assert_eq!(Balances::balance(&who), 2000 + market_price);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 	});
 }
 
@@ -1187,6 +1196,7 @@ fn clears_released_bitcoins() {
 		assert_eq!(vault.securitization_locked, lock.liquidity_promised);
 		// first verify
 		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis);
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
@@ -1239,6 +1249,7 @@ fn clears_released_bitcoins() {
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), lock.liquidity_promised);
 		assert_eq!(DefaultVault::get().securitization, vault.securitization);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
 		assert_eq!(LockReleaseCosignHeightById::<Test>::get(1), Some(1));
 
 		System::assert_last_event(

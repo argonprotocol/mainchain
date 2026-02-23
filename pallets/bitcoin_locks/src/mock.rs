@@ -79,6 +79,7 @@ parameter_types! {
 		securitization:  200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
+		securitized_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
@@ -358,6 +359,27 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn get_securitization_ratio(_vault_id: VaultId) -> Result<FixedU128, VaultError> {
 		Ok(DefaultVault::get().securitization_ratio)
+	}
+
+	fn add_securitized_satoshis(_vault_id: VaultId, satoshis: Satoshis) -> Result<(), VaultError> {
+		DefaultVault::mutate(|vault| {
+			vault.securitized_satoshis = vault.securitized_satoshis.saturating_add(satoshis);
+		});
+		Ok(())
+	}
+
+	fn reduce_securitized_satoshis(
+		_vault_id: VaultId,
+		satoshis: Satoshis,
+	) -> Result<(), VaultError> {
+		DefaultVault::mutate(|vault| -> Result<(), VaultError> {
+			let remaining = vault
+				.securitized_satoshis
+				.checked_sub(satoshis)
+				.ok_or(VaultError::InternalError)?;
+			vault.securitized_satoshis = remaining;
+			Ok(())
+		})
 	}
 }
 

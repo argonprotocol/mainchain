@@ -45,7 +45,7 @@ pub mod pallet {
 		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(13);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -475,6 +475,7 @@ pub mod pallet {
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
+				securitized_satoshis: 0,
 				terms,
 				securitization_ratio,
 				opened_tick,
@@ -1044,6 +1045,32 @@ pub mod pallet {
 			let vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
 			Ok(vault.securitization_ratio)
+		}
+
+		fn add_securitized_satoshis(
+			vault_id: VaultId,
+			satoshis: Satoshis,
+		) -> Result<(), VaultError> {
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				vault.securitized_satoshis = vault.securitized_satoshis.saturating_add(satoshis);
+				Ok(())
+			})
+		}
+
+		fn reduce_securitized_satoshis(
+			vault_id: VaultId,
+			satoshis: Satoshis,
+		) -> Result<(), VaultError> {
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				let remaining = vault
+					.securitized_satoshis
+					.checked_sub(satoshis)
+					.ok_or(VaultError::InternalError)?;
+				vault.securitized_satoshis = remaining;
+				Ok(())
+			})
 		}
 
 		fn lock(
