@@ -362,11 +362,30 @@ fn test_activation_queues_reward_when_requirements_met() {
 		assert_eq!(operational_account.rewards_earned_count, 1);
 		assert_eq!(operational_account.rewards_earned_amount, 1_000);
 
-		OperationalAccountsPallet::mark_reward_paid(&reward);
+		OperationalAccountsPallet::mark_reward_paid(&reward, reward.amount);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert_eq!(operational_account.rewards_collected_amount, 1_000);
 		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+	});
+}
+
+#[test]
+fn test_mark_reward_paid_consumes_queue_on_partial_payment() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(61, 62, 63, 64);
+		register_account(&account_set, None);
+		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+
+		let reward = OperationalRewardsQueue::<Test>::get()[0].clone();
+		OperationalAccountsPallet::mark_reward_paid(&reward, 250);
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert_eq!(operational_account.rewards_collected_amount, 250);
+
+		let queue = OperationalRewardsQueue::<Test>::get();
+		assert!(queue.is_empty());
 	});
 }
 

@@ -47,13 +47,22 @@ impl OperationalRewardsProvider<u64, Balance> for TestOperationalRewardsProvider
 		PendingOperationalRewards::get()
 	}
 
-	fn mark_reward_paid(reward: &OperationalRewardPayout<u64, Balance>) {
+	fn mark_reward_paid(reward: &OperationalRewardPayout<u64, Balance>, amount_paid: Balance) {
+		let mut paid_amount = 0;
 		PendingOperationalRewards::mutate(|pending| {
-			if let Some(pos) = pending.iter().position(|entry| entry == reward) {
-				pending.remove(pos);
-			}
+			let Some(pos) = pending.iter().position(|entry| entry == reward) else {
+				return;
+			};
+			let queued_amount = pending[pos].amount;
+			paid_amount = amount_paid.min(queued_amount);
+			pending.remove(pos);
 		});
-		PaidOperationalRewards::mutate(|paid| paid.push(reward.clone()));
+		if paid_amount.is_zero() {
+			return;
+		}
+		let mut paid_reward = reward.clone();
+		paid_reward.amount = paid_amount;
+		PaidOperationalRewards::mutate(|paid| paid.push(paid_reward));
 	}
 }
 

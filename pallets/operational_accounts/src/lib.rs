@@ -36,9 +36,6 @@ pub mod pallet {
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_funding";
 	pub const MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 22] = b"operational_mining_bot";
-	// Upper bound of immediate treasury payout attempts from one operation:
-	// account activation reward + sponsor activation reward + sponsor referral bonus.
-	const MAX_IMMEDIATE_REWARD_PAYOUTS_PER_OPERATION: u64 = 3;
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -123,7 +120,8 @@ pub mod pallet {
 
 		/// Provider for legacy vault hydration data.
 		type LegacyVaultProvider: LegacyVaultProvider<Self::AccountId, Self::Balance>;
-		/// Pays operational rewards immediately when possible.
+		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
+		/// transition via treasury queue processing).
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
 
 		/// Weight information for this pallet.
@@ -415,12 +413,7 @@ pub mod pallet {
 		/// Register vault, mining funding, and bot accounts for the signer.
 		/// If an access code is provided, the sponsor pays the transaction fee.
 		#[pallet::call_index(0)]
-		#[pallet::weight(
-			T::WeightInfo::register().saturating_add(
-				T::OperationalRewardsPayer::try_pay_reward_weight()
-					.saturating_mul(MAX_IMMEDIATE_REWARD_PAYOUTS_PER_OPERATION),
-			)
-		)]
+		#[pallet::weight(T::WeightInfo::register())]
 		#[allow(clippy::too_many_arguments)]
 		pub fn register(
 			origin: OriginFor<T>,
@@ -630,11 +623,6 @@ pub mod pallet {
 			});
 		}
 
-		fn immediate_reward_payout_weight() -> Weight {
-			T::OperationalRewardsPayer::try_pay_reward_weight()
-				.saturating_mul(MAX_IMMEDIATE_REWARD_PAYOUTS_PER_OPERATION)
-		}
-
 		fn run_initial_migration() -> Weight {
 			if HasInitialMigrationRun::<T>::get() {
 				return T::DbWeight::get().reads(1);
@@ -702,12 +690,6 @@ pub mod pallet {
 				reward_kind: reward_kind_event,
 				amount,
 			});
-
-			if T::OperationalRewardsPayer::try_pay_reward(&payout) &&
-				Self::remove_reward_from_queue(&payout)
-			{
-				operational_account.rewards_collected_amount.saturating_accrue(payout.amount);
-			}
 		}
 
 		fn has_achieved_operational(operational_account: &OperationalAccount<T>) -> bool {
@@ -826,15 +808,17 @@ pub mod pallet {
 			account.mining_seat_high_watermark.saturating_add(account.mining_seat_accrual)
 		}
 
-		fn remove_reward_from_queue(
+		fn apply_reward_payment(
 			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
-		) -> bool {
+			amount_paid: T::Balance,
+		) -> T::Balance {
 			OperationalRewardsQueue::<T>::mutate(|queue| {
 				let Some(pos) = queue.iter().position(|entry| entry == reward) else {
-					return false;
+					return T::Balance::zero();
 				};
+				let queued_amount = queue[pos].amount;
 				queue.remove(pos);
-				true
+				amount_paid.min(queued_amount)
 			})
 		}
 	}
@@ -842,7 +826,6 @@ pub mod pallet {
 	impl<T: Config> OperationalAccountsHook<T::AccountId, T::Balance> for Pallet<T> {
 		fn vault_created_weight() -> Weight {
 			<T as Config>::WeightInfo::on_vault_created()
-				.saturating_add(Self::immediate_reward_payout_weight())
 		}
 
 		fn vault_created(account_id: &T::AccountId) {
@@ -862,7 +845,6 @@ pub mod pallet {
 
 		fn bitcoin_lock_funded_weight() -> Weight {
 			<T as Config>::WeightInfo::on_bitcoin_lock_funded()
-				.saturating_add(Self::immediate_reward_payout_weight())
 		}
 
 		fn bitcoin_lock_funded(vault_operator_account: &T::AccountId, total_locked: T::Balance) {
@@ -884,7 +866,6 @@ pub mod pallet {
 
 		fn mining_seat_won_weight() -> Weight {
 			<T as Config>::WeightInfo::on_mining_seat_won()
-				.saturating_add(Self::immediate_reward_payout_weight())
 		}
 
 		fn mining_seat_won(miner_account: &T::AccountId) {
@@ -903,7 +884,6 @@ pub mod pallet {
 
 		fn treasury_pool_participated_weight() -> Weight {
 			<T as Config>::WeightInfo::on_treasury_pool_participated()
-				.saturating_add(Self::immediate_reward_payout_weight())
 		}
 
 		fn treasury_pool_participated(vault_operator_account: &T::AccountId, _amount: T::Balance) {
@@ -922,7 +902,6 @@ pub mod pallet {
 
 		fn uniswap_transfer_confirmed_weight() -> Weight {
 			<T as Config>::WeightInfo::on_uniswap_transfer()
-				.saturating_add(Self::immediate_reward_payout_weight())
 		}
 
 		fn uniswap_transfer_confirmed(account_id: &T::AccountId, amount: T::Balance) {
@@ -935,13 +914,17 @@ pub mod pallet {
 			OperationalRewardsQueue::<T>::get().into_iter().collect()
 		}
 
-		fn mark_reward_paid(reward: &OperationalRewardPayout<T::AccountId, T::Balance>) {
-			if !Self::remove_reward_from_queue(reward) {
+		fn mark_reward_paid(
+			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
+			amount_paid: T::Balance,
+		) {
+			let amount_paid = Self::apply_reward_payment(reward, amount_paid);
+			if amount_paid.is_zero() {
 				return;
 			}
 			OperationalAccounts::<T>::mutate(&reward.operational_account, |maybe_account| {
 				if let Some(account) = maybe_account {
-					account.rewards_collected_amount.saturating_accrue(reward.amount);
+					account.rewards_collected_amount.saturating_accrue(amount_paid);
 				}
 			});
 		}

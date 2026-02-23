@@ -290,7 +290,8 @@ pub struct OperationalRewardPayout<AccountId, Balance> {
 
 pub trait OperationalRewardsProvider<AccountId: FullCodec, Balance: FullCodec> {
 	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>>;
-	fn mark_reward_paid(reward: &OperationalRewardPayout<AccountId, Balance>);
+	/// Mark a queued reward as processed and record how much was actually paid.
+	fn mark_reward_paid(reward: &OperationalRewardPayout<AccountId, Balance>, amount_paid: Balance);
 }
 
 impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<AccountId, Balance>
@@ -300,7 +301,11 @@ impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<Accoun
 		Vec::new()
 	}
 
-	fn mark_reward_paid(_reward: &OperationalRewardPayout<AccountId, Balance>) {}
+	fn mark_reward_paid(
+		_reward: &OperationalRewardPayout<AccountId, Balance>,
+		_amount_paid: Balance,
+	) {
+	}
 }
 
 pub trait OperationalRewardsPayer<AccountId: FullCodec, Balance: FullCodec> {
