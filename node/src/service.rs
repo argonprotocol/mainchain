@@ -6,13 +6,15 @@ use crate::{
 	runtime_api::{BaseHostRuntimeApis, opaque::Block},
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
+#[cfg(any(not(debug_assertions), test))]
+use argon_node_consensus::read_chain_spec_bitcoin_network;
 use argon_node_consensus::{
 	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
-	create_import_queue, run_block_builder_task, run_notary_sync,
+	create_import_queue, read_chain_spec_ticker, run_block_builder_task, run_notary_sync,
 };
-use argon_primitives::{AccountId, TickApis, tick::Ticker};
+use argon_primitives::{AccountId, TickApis, digests::ArgonDigests, tick::Tick};
 use polkadot_sdk::*;
-use sc_client_api::BlockBackend;
+use sc_client_api::{BlockBackend, HeaderBackend};
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
 	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport,
@@ -25,7 +27,7 @@ use sc_service::{
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
-use sp_blockchain::HeaderBackend;
+use sp_runtime::traits::Header as HeaderT;
 use std::{sync::Arc, time::Duration};
 
 pub(crate) type FullClient<Runtime> = sc_service::TFullClient<
@@ -132,15 +134,10 @@ where
 	let utxo_tracker = Arc::new(utxo_tracker);
 
 	let aux_client = ArgonAux::<Block, _>::new(client.clone());
+	let ticker = read_chain_spec_ticker(config.chain_spec.as_ref())
+		.map_err(|e| ServiceError::Other(e.to_string()))?;
 	let ticker = {
-		let finalized_hash = client.info().finalized_hash;
-		let ticker: Ticker = client.runtime_api().ticker(finalized_hash).map_err(|e| {
-			ServiceError::Other(format!("Failed to establish runtime ticker: {e:?}"))
-		})?;
-		let latest_tick = client
-			.runtime_api()
-			.current_tick(finalized_hash)
-			.map_err(|e| ServiceError::Other(format!("Failed to get runtime tick: {e:?}")))?;
+		let latest_tick = resolve_startup_tick(&client)?;
 		aux_client
 			.migrate(latest_tick)
 			.map_err(|e| ServiceError::Other(format!("Failed to migrate aux data: {e:?}")))?;
@@ -267,7 +264,9 @@ where
 
 	#[cfg(not(debug_assertions))]
 	{
-		utxo_tracker.ensure_correct_network(&client).map_err(|e| {
+		let bitcoin_network = read_chain_spec_bitcoin_network(config.chain_spec.as_ref())
+			.map_err(|e| ServiceError::Other(e.to_string()))?;
+		utxo_tracker.ensure_correct_network(bitcoin_network).map_err(|e| {
 			ServiceError::Other(format!("Failed to get bitcoin network validated {:?}", e))
 		})?;
 	}
@@ -404,4 +403,73 @@ where
 	}
 
 	Ok(task_manager)
+}
+
+fn resolve_startup_tick<Runtime>(client: &Arc<FullClient<Runtime>>) -> Result<Tick, ServiceError>
+where
+	Runtime: ConstructRuntimeApi<Block, FullClient<Runtime>> + Send + Sync + 'static,
+	Runtime::RuntimeApi: TickApis<Block>,
+{
+	let info = client.info();
+	let best_header = client
+		.header(info.best_hash)
+		.map_err(|e| {
+			ServiceError::Other(format!(
+				"Failed to read best header {} at startup: {e:?}",
+				info.best_hash
+			))
+		})?
+		.ok_or_else(|| {
+			ServiceError::Other(format!("Best header {} missing at startup", info.best_hash))
+		})?;
+
+	if *best_header.number() == 0 {
+		// Genesis-only fallback: use runtime state while no tick digest exists yet.
+		return client.runtime_api().current_tick(info.best_hash).map_err(|e| {
+			ServiceError::Other(format!(
+				"Failed to read startup tick from genesis runtime state: {e:?}"
+			))
+		});
+	}
+
+	best_header
+		.digest()
+		.convert_first(|a| a.as_tick())
+		.map(|digest| digest.0)
+		.ok_or_else(|| {
+			ServiceError::Other(format!(
+				"Missing tick digest in best header {} (#{}) at startup",
+				info.best_hash,
+				best_header.number()
+			))
+		})
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{read_chain_spec_bitcoin_network, read_chain_spec_ticker};
+	use crate::chain_spec::{development_config, mainnet_config};
+	use argon_primitives::{bitcoin::BitcoinNetwork, tick::Ticker};
+
+	#[test]
+	fn reads_dev_chain_genesis_values_from_state_anchor() {
+		let chain_spec = development_config().expect("Development chain spec should build");
+		let ticker = read_chain_spec_ticker(&chain_spec).expect("Ticker should decode");
+		let bitcoin_network =
+			read_chain_spec_bitcoin_network(&chain_spec).expect("Bitcoin network should decode");
+
+		assert_eq!(ticker, Ticker::new(2_000, 2));
+		assert_eq!(bitcoin_network, BitcoinNetwork::Regtest);
+	}
+
+	#[test]
+	fn reads_mainnet_chain_genesis_values_from_state_anchor() {
+		let chain_spec = mainnet_config().expect("Mainnet chain spec should build");
+		let ticker = read_chain_spec_ticker(&chain_spec).expect("Ticker should decode");
+		let bitcoin_network =
+			read_chain_spec_bitcoin_network(&chain_spec).expect("Bitcoin network should decode");
+
+		assert_eq!(ticker, Ticker::new(60_000, 60));
+		assert_eq!(bitcoin_network, BitcoinNetwork::Bitcoin);
+	}
 }
