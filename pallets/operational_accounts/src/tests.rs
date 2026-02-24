@@ -3,7 +3,7 @@ use crate::{
 	AccessCodesExpiringByFrame, AccountOwnershipProof, HasInitialMigrationRun, LegacyVaultInfo,
 	LegacyVaultRegistrations, MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
 	MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY, OperationalAccountBySubAccount, OperationalAccounts,
-	OperationalRewardsQueue, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	OperationalProgressPatch, OperationalRewardsQueue, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
 	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
@@ -13,7 +13,7 @@ use frame_support::{assert_err, assert_noop, assert_ok};
 use pallet_prelude::*;
 use sp_core::{Pair, sr25519};
 use sp_io::hashing::blake2_256;
-use sp_runtime::{MultiSigner, traits::IdentifyAccount};
+use sp_runtime::{DispatchError, MultiSigner, traits::IdentifyAccount};
 
 use crate::mock::{
 	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
@@ -153,6 +153,186 @@ fn test_register_with_access_code_sets_sponsor_and_decrements_unactivated() {
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.unactivated_access_codes, 0);
 		assert_eq!(sponsor_account.issuable_access_codes, 0);
+	});
+}
+
+#[test]
+fn test_force_set_progress_guardrails() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(1, 2, 3, 4);
+		register_account(&account_set, None);
+		let non_empty_patch = OperationalProgressPatch {
+			has_uniswap_transfer: Some(true),
+			vault_created: None,
+			has_treasury_pool_participation: None,
+			observed_bitcoin_total: None,
+			observed_mining_seat_total: None,
+		};
+
+		assert_noop!(
+			OperationalAccountsPallet::force_set_progress(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				account_set.owner.clone(),
+				non_empty_patch.clone(),
+				true,
+			),
+			DispatchError::BadOrigin
+		);
+
+		assert_noop!(
+			OperationalAccountsPallet::force_set_progress(
+				RuntimeOrigin::root(),
+				account_id_from_seed(99),
+				non_empty_patch.clone(),
+				true,
+			),
+			crate::Error::<Test>::NotOperationalAccount
+		);
+
+		let empty_patch = OperationalProgressPatch {
+			has_uniswap_transfer: None,
+			vault_created: None,
+			has_treasury_pool_participation: None,
+			observed_bitcoin_total: None,
+			observed_mining_seat_total: None,
+		};
+
+		assert_noop!(
+			OperationalAccountsPallet::force_set_progress(
+				RuntimeOrigin::root(),
+				account_set.owner.clone(),
+				empty_patch,
+				true,
+			),
+			crate::Error::<Test>::NoProgressUpdateProvided
+		);
+	});
+}
+
+#[test]
+fn test_force_set_progress_applies_patch_and_reconciles_totals() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(9, 10, 11, 12);
+		register_account(&account_set, None);
+		OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("account");
+			account.bitcoin_high_watermark = 1_000;
+			account.bitcoin_accrual = 0;
+			account.mining_seat_high_watermark = 5;
+			account.mining_seat_accrual = 0;
+		});
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				has_uniswap_transfer: Some(true),
+				vault_created: None,
+				has_treasury_pool_participation: None,
+				observed_bitcoin_total: Some(1_400),
+				observed_mining_seat_total: None,
+			},
+			false,
+		));
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(account.has_uniswap_transfer);
+		assert!(!account.vault_created);
+		assert!(!account.has_treasury_pool_participation);
+		assert_eq!(account.bitcoin_high_watermark, 1_000);
+		assert_eq!(account.bitcoin_accrual, 400);
+		assert_eq!(account.mining_seat_high_watermark, 5);
+		assert_eq!(account.mining_seat_accrual, 0);
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				has_uniswap_transfer: None,
+				vault_created: Some(true),
+				has_treasury_pool_participation: Some(true),
+				observed_bitcoin_total: None,
+				observed_mining_seat_total: Some(9),
+			},
+			false,
+		));
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(account.has_uniswap_transfer);
+		assert!(account.vault_created);
+		assert!(account.has_treasury_pool_participation);
+		assert_eq!(account.bitcoin_high_watermark, 1_000);
+		assert_eq!(account.bitcoin_accrual, 400);
+		assert_eq!(account.mining_seat_high_watermark, 5);
+		assert_eq!(account.mining_seat_accrual, 4);
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				has_uniswap_transfer: None,
+				vault_created: None,
+				has_treasury_pool_participation: None,
+				observed_bitcoin_total: Some(600),
+				observed_mining_seat_total: Some(3),
+			},
+			false,
+		));
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.bitcoin_high_watermark, 1_000);
+		assert_eq!(account.bitcoin_accrual, 0);
+		assert_eq!(account.mining_seat_high_watermark, 5);
+		assert_eq!(account.mining_seat_accrual, 0);
+	});
+}
+
+#[test]
+fn test_force_set_progress_recompute_flag_controls_side_effects() {
+	new_test_ext().execute_with(|| {
+		let no_recompute_set = make_account_set(17, 18, 19, 20);
+		register_account(&no_recompute_set, None);
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			no_recompute_set.owner.clone(),
+			OperationalProgressPatch {
+				has_uniswap_transfer: Some(true),
+				vault_created: Some(true),
+				has_treasury_pool_participation: Some(true),
+				observed_bitcoin_total: Some(MinBitcoinLockSizeForOperational::get()),
+				observed_mining_seat_total: Some(2),
+			},
+			false,
+		));
+
+		let no_recompute =
+			OperationalAccounts::<Test>::get(&no_recompute_set.owner).expect("account");
+		assert!(!no_recompute.is_operational);
+		assert_eq!(no_recompute.issuable_access_codes, 0);
+		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+
+		let recompute_set = make_account_set(21, 22, 23, 24);
+		register_account(&recompute_set, None);
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			recompute_set.owner.clone(),
+			OperationalProgressPatch {
+				has_uniswap_transfer: Some(true),
+				vault_created: Some(true),
+				has_treasury_pool_participation: Some(true),
+				observed_bitcoin_total: Some(MinBitcoinLockSizeForOperational::get()),
+				observed_mining_seat_total: Some(2),
+			},
+			true,
+		));
+
+		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
+		assert!(recompute.is_operational);
+		assert_eq!(recompute.issuable_access_codes, 1);
+		let queue = OperationalRewardsQueue::<Test>::get();
+		assert_eq!(queue.len(), 1);
+		assert_eq!(queue[0].operational_account, recompute_set.owner);
 	});
 }
 

@@ -1125,6 +1125,30 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
+       * Operational progress was forced by root.
+       **/
+      OperationalProgressForced: AugmentedEvent<
+        ApiType,
+        [
+          account: AccountId32,
+          updateOperationalProgress: bool,
+          hasUniswapTransfer: bool,
+          vaultCreated: bool,
+          hasTreasuryPoolParticipation: bool,
+          observedBitcoinTotal: u128,
+          observedMiningSeatTotal: u32,
+        ],
+        {
+          account: AccountId32;
+          updateOperationalProgress: bool;
+          hasUniswapTransfer: bool;
+          vaultCreated: bool;
+          hasTreasuryPoolParticipation: bool;
+          observedBitcoinTotal: u128;
+          observedMiningSeatTotal: u32;
+        }
+      >;
+      /**
        * A reward has been queued for treasury payout.
        **/
       OperationalRewardEarned: AugmentedEvent<

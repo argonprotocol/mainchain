@@ -192,6 +192,26 @@ mod benchmarks {
 		assert_eq!(config.referral_bonus_reward, referral_bonus_reward);
 	}
 
+	#[benchmark]
+	fn force_set_progress() {
+		let linked = linked_accounts::<T>();
+		let account = default_operational_account::<T>(&linked);
+		insert_operational_account::<T>(&linked, account);
+		let patch = OperationalProgressPatch {
+			has_uniswap_transfer: Some(true),
+			vault_created: Some(true),
+			has_treasury_pool_participation: Some(true),
+			observed_bitcoin_total: Some(T::MinBitcoinLockSizeForOperational::get()),
+			observed_mining_seat_total: Some(T::MiningSeatsForOperational::get()),
+		};
+
+		#[extrinsic_call]
+		force_set_progress(RawOrigin::Root, linked.owner.clone(), patch, true);
+
+		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
+		assert!(account.is_operational);
+	}
+
 	impl_benchmark_test_suite!(
 		OperationalAccountsPallet,
 		crate::mock::new_test_ext(),

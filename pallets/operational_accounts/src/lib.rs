@@ -236,6 +236,40 @@ pub mod pallet {
 		pub is_operational: bool,
 	}
 
+	#[derive(
+		Decode,
+		DecodeWithMemTracking,
+		Encode,
+		Clone,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		RuntimeDebug,
+		MaxEncodedLen,
+	)]
+	pub struct OperationalProgressPatch<Balance: Member + MaxEncodedLen + Default> {
+		/// Override for whether at least one qualifying Uniswap transfer has been observed.
+		pub has_uniswap_transfer: Option<bool>,
+		/// Override for whether the vault has been created.
+		pub vault_created: Option<bool>,
+		/// Override for whether the account has participated in a treasury pool.
+		pub has_treasury_pool_participation: Option<bool>,
+		/// Override for total observed bitcoin lock value.
+		pub observed_bitcoin_total: Option<Balance>,
+		/// Override for total observed mining seats won.
+		pub observed_mining_seat_total: Option<u32>,
+	}
+
+	impl<Balance: Member + MaxEncodedLen + Default> OperationalProgressPatch<Balance> {
+		fn has_updates(&self) -> bool {
+			self.has_uniswap_transfer.is_some() ||
+				self.vault_created.is_some() ||
+				self.has_treasury_pool_participation.is_some() ||
+				self.observed_bitcoin_total.is_some() ||
+				self.observed_mining_seat_total.is_some()
+		}
+	}
+
 	#[pallet::storage]
 	/// Registered operational accounts keyed by the primary account id.
 	pub type OperationalAccounts<T: Config> =
@@ -353,6 +387,16 @@ pub mod pallet {
 			operational_referral_reward: T::Balance,
 			referral_bonus_reward: T::Balance,
 		},
+		/// Operational progress was forced by root.
+		OperationalProgressForced {
+			account: T::AccountId,
+			update_operational_progress: bool,
+			has_uniswap_transfer: bool,
+			vault_created: bool,
+			has_treasury_pool_participation: bool,
+			observed_bitcoin_total: T::Balance,
+			observed_mining_seat_total: u32,
+		},
 	}
 
 	#[pallet::error]
@@ -377,6 +421,8 @@ pub mod pallet {
 		MaxUnactivatedAccessCodesReached,
 		/// Too many access codes are already scheduled to expire in this frame.
 		MaxAccessCodesExpiringPerFrameReached,
+		/// The requested progress patch does not contain any updates.
+		NoProgressUpdateProvided,
 	}
 
 	#[pallet::hooks]
@@ -604,6 +650,72 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+
+		/// Force-update operational progress markers for an account.
+		#[pallet::call_index(3)]
+		#[pallet::weight(T::WeightInfo::force_set_progress())]
+		pub fn force_set_progress(
+			origin: OriginFor<T>,
+			owner: T::AccountId,
+			patch: OperationalProgressPatch<T::Balance>,
+			update_operational_progress: bool,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			ensure!(patch.has_updates(), Error::<T>::NoProgressUpdateProvided);
+
+			let mut has_uniswap_transfer = false;
+			let mut vault_created = false;
+			let mut has_treasury_pool_participation = false;
+			let mut observed_bitcoin_total = T::Balance::zero();
+			let mut observed_mining_seat_total = 0u32;
+
+			OperationalAccounts::<T>::try_mutate(
+				&owner,
+				|maybe_account| -> Result<(), Error<T>> {
+					let account =
+						maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+
+					if let Some(value) = patch.has_uniswap_transfer {
+						account.has_uniswap_transfer = value;
+					}
+					if let Some(value) = patch.vault_created {
+						account.vault_created = value;
+					}
+					if let Some(value) = patch.has_treasury_pool_participation {
+						account.has_treasury_pool_participation = value;
+					}
+					if let Some(value) = patch.observed_bitcoin_total {
+						Self::recalculate_bitcoin_accrual(account, value);
+					}
+					if let Some(value) = patch.observed_mining_seat_total {
+						Self::set_observed_mining_seat_total(account, value);
+					}
+
+					if update_operational_progress {
+						Self::maybe_activate_operational(&owner, account);
+						Self::materialize_issuable_access_codes(account);
+					}
+
+					has_uniswap_transfer = account.has_uniswap_transfer;
+					vault_created = account.vault_created;
+					has_treasury_pool_participation = account.has_treasury_pool_participation;
+					observed_bitcoin_total = Self::observed_bitcoin_total(account);
+					observed_mining_seat_total = Self::observed_mining_seat_total(account);
+					Ok(())
+				},
+			)?;
+
+			Self::deposit_event(Event::OperationalProgressForced {
+				account: owner,
+				update_operational_progress,
+				has_uniswap_transfer,
+				vault_created,
+				has_treasury_pool_participation,
+				observed_bitcoin_total,
+				observed_mining_seat_total,
+			});
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -808,16 +920,38 @@ pub mod pallet {
 			account.mining_seat_high_watermark.saturating_add(account.mining_seat_accrual)
 		}
 
+		fn set_observed_mining_seat_total(
+			account: &mut OperationalAccount<T>,
+			observed_total: u32,
+		) {
+			// Mining seats are treated as monotonic awards; keep the watermark stable
+			// and only recompute accrual above the existing watermark.
+			let prior_high_watermark = account.mining_seat_high_watermark;
+			let next_accrual = observed_total.saturating_sub(prior_high_watermark);
+			let next_high_watermark = prior_high_watermark;
+			account.mining_seat_accrual = next_accrual;
+			account.mining_seat_high_watermark = next_high_watermark;
+		}
+
+		fn recalculate_bitcoin_accrual(
+			account: &mut OperationalAccount<T>,
+			total_locked: T::Balance,
+		) {
+			account.bitcoin_accrual = total_locked.saturating_sub(account.bitcoin_high_watermark);
+		}
+
 		fn apply_reward_payment(
 			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
 			amount_paid: T::Balance,
 		) -> T::Balance {
 			OperationalRewardsQueue::<T>::mutate(|queue| {
-				let Some(pos) = queue.iter().position(|entry| entry == reward) else {
+				// `reward` comes from a copied snapshot; resolve its live queue index before
+				// removal.
+				let Some(queue_index) = queue.iter().position(|entry| entry == reward) else {
 					return T::Balance::zero();
 				};
-				let queued_amount = queue[pos].amount;
-				queue.remove(pos);
+				let queued_amount = queue[queue_index].amount;
+				queue.remove(queue_index);
 				amount_paid.min(queued_amount)
 			})
 		}
@@ -857,8 +991,7 @@ pub mod pallet {
 				let Some(account) = maybe_account else {
 					return;
 				};
-				account.bitcoin_accrual =
-					total_locked.saturating_sub(account.bitcoin_high_watermark);
+				Self::recalculate_bitcoin_accrual(account, total_locked);
 				Self::maybe_activate_operational(&owner, account);
 				Self::materialize_issuable_access_codes(account);
 			});

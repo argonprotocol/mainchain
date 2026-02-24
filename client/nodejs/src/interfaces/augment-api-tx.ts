@@ -51,6 +51,7 @@ import type {
   PalletMultisigTimepoint,
   PalletOperationalAccountsAccessCodeProof,
   PalletOperationalAccountsAccountOwnershipProof,
+  PalletOperationalAccountsOperationalProgressPatch,
   PalletPriceIndexPriceIndex,
   PalletTokenGatewayAssetRegistration,
   PalletTokenGatewayPrecisionUpdate,
@@ -1011,6 +1012,27 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
     };
     operationalAccounts: {
+      /**
+       * Force-update operational progress markers for an account.
+       **/
+      forceSetProgress: AugmentedSubmittable<
+        (
+          owner: AccountId32 | string | Uint8Array,
+          patch:
+            | PalletOperationalAccountsOperationalProgressPatch
+            | {
+                hasUniswapTransfer?: any;
+                vaultCreated?: any;
+                hasTreasuryPoolParticipation?: any;
+                observedBitcoinTotal?: any;
+                observedMiningSeatTotal?: any;
+              }
+            | string
+            | Uint8Array,
+          updateOperationalProgress: bool | boolean | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, PalletOperationalAccountsOperationalProgressPatch, bool]
+      >;
       /**
        * Issue an access code (the public key itself) for this operational account.
        * The access code expires after `AccessCodeExpirationFrames`.
