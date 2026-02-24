@@ -1,6 +1,32 @@
 # Changelog
 
-## [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...e08f5d2a691256dadf398d3a62030f4bffe5c4ee) (2026-01-26)
+## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...a5db044c74c574bb1b0873c7bc29f86004f6031a) (2026-02-17)
+
+### Features
+
+* **consensus:** harden fork choice + block seal
+([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
+* **consensus:** harden fork choice + block seal
+([87ffcf0](https://github.com/argonprotocol/mainchain/commit/87ffcf04390a4dc6027ba0b1e796bb5d6a805b7a))
+* operational accounts + rewards
+([e65a5a9](https://github.com/argonprotocol/mainchain/commit/e65a5a9fb4f794c738078a17dfeaf622313cdce1))
+* **bitcoin_locks:** orphaned utxo as funding
+([5f50aec](https://github.com/argonprotocol/mainchain/commit/5f50aecadd65824ca14dff644ef895c4efcdf790))
+* ability to set treasury allocation
+([f3b0985](https://github.com/argonprotocol/mainchain/commit/f3b098534e7365e593978243bc575befe0a2d7e9))
+* vault ability to set a securitization target
+([e4eb617](https://github.com/argonprotocol/mainchain/commit/e4eb617e35c1f3648be9daf4eb108d7302bcce8e))
+
+### Fixes
+
+* **weights:** align mining-slot/vault benchmarks
+([bd7b405](https://github.com/argonprotocol/mainchain/commit/bd7b405224067c968097ce6c542b3fb5342ed01d))
+* duplicate metadata field
+([163d2ce](https://github.com/argonprotocol/mainchain/commit/163d2cee25f0e3432025c24332dd6893f1edadd6))
+* **nodejs/client:** bitcoin txid reversed
+([53a5f71](https://github.com/argonprotocol/mainchain/commit/53a5f71c6bbe04c908ca4a4cea2dce403dcb2ce4))
+
+### [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...v1.3.27) (2026-01-29)
 
 ### [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...v1.3.26) (2026-01-25)
 

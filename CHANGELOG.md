@@ -1,6 +1,75 @@
 # Changelog
 
-## [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...e08f5d2a691256dadf398d3a62030f4bffe5c4ee) (2026-01-26)
+## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...a5db044c74c574bb1b0873c7bc29f86004f6031a) (2026-02-17)
+
+### Features
+
+* **consensus:** harden fork choice + block seal
+([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
+* **consensus:** harden fork choice + block seal
+([87ffcf0](https://github.com/argonprotocol/mainchain/commit/87ffcf04390a4dc6027ba0b1e796bb5d6a805b7a))
+* **notary:** make rpc rate-limit configurable
+([dd6e57c](https://github.com/argonprotocol/mainchain/commit/dd6e57c916c347750ec27c432e2d2ed82296ba13))
+* **node:** make large RPC payload limits opt-in
+([8ab59d5](https://github.com/argonprotocol/mainchain/commit/8ab59d515108a9f13980c3879c020a2ae29a2c80))
+* copilot feedback
+([c1d6d22](https://github.com/argonprotocol/mainchain/commit/c1d6d226551f632f8111a9c8aa2aadbd6b05a899))
+* operational accounts + rewards
+([e65a5a9](https://github.com/argonprotocol/mainchain/commit/e65a5a9fb4f794c738078a17dfeaf622313cdce1))
+* **bitcoin_locks:** orphaned utxo as funding
+([5f50aec](https://github.com/argonprotocol/mainchain/commit/5f50aecadd65824ca14dff644ef895c4efcdf790))
+* **benchmarking:** add mining_slot rotation benchmarks + weights
+([74befb9](https://github.com/argonprotocol/mainchain/commit/74befb97f5aaf28d790fb87c20a028b62e807d11))
+* ability to set treasury allocation
+([f3b0985](https://github.com/argonprotocol/mainchain/commit/f3b098534e7365e593978243bc575befe0a2d7e9))
+* vault ability to set a securitization target
+([e4eb617](https://github.com/argonprotocol/mainchain/commit/e4eb617e35c1f3648be9daf4eb108d7302bcce8e))
+* catch the bitcoin transaction error
+([36ad6c5](https://github.com/argonprotocol/mainchain/commit/36ad6c522c7e667832323fb98877fb318ebda058))
+
+### Fixes
+
+* migrations for vault wrong
+([a5db044](https://github.com/argonprotocol/mainchain/commit/a5db044c74c574bb1b0873c7bc29f86004f6031a))
+* lint
+([f68edea](https://github.com/argonprotocol/mainchain/commit/f68edea6acde1a15c9dacb3e6310f77b895bb441))
+* **notary:** address rpc rate-limit review comments
+([5365e5a](https://github.com/argonprotocol/mainchain/commit/5365e5a4afd071852d177084c2c3ffa133d99a38))
+* **oracle:** harden CPI schedule and smoothing
+([b9c7974](https://github.com/argonprotocol/mainchain/commit/b9c79740f9fab5717bbc8ee0c7f4dcf9a57b47f3))
+* **mining-slot:** handle zero VRF close window safely
+([f0d5c18](https://github.com/argonprotocol/mainchain/commit/f0d5c188a09d6ecedffba97efa33dfe79ba88136))
+* **notaries:** select signing key by effective tick
+([fdab61c](https://github.com/argonprotocol/mainchain/commit/fdab61cd17317a286bea64def0c1029638940947))
+* **consensus:** clarify compute nonce verifier panic rationale
+([4cd0a78](https://github.com/argonprotocol/mainchain/commit/4cd0a784591d4d84cf36a1eb70074a70262888cc))
+* **chain-transfer:** finalize expirations and harden transfer ids
+([a1dd3b2](https://github.com/argonprotocol/mainchain/commit/a1dd3b2624975d54cb00ae508f47c57fdb81eef1))
+* don’t use live price index
+([1a6c8f4](https://github.com/argonprotocol/mainchain/commit/1a6c8f4788f684ef5eebee8c61f53cc9d94b74fb))
+* **weights:** align mining-slot/vault benchmarks
+([bd7b405](https://github.com/argonprotocol/mainchain/commit/bd7b405224067c968097ce6c542b3fb5342ed01d))
+* compiler error
+([8f6b267](https://github.com/argonprotocol/mainchain/commit/8f6b267eef7a721c986d11e6d6fafd799116de13))
+* attempt to fix ci for gh actions
+([83ad97c](https://github.com/argonprotocol/mainchain/commit/83ad97c298d0c34f312a397bd639d1817d2a6d7d))
+* duplicate metadata field
+([163d2ce](https://github.com/argonprotocol/mainchain/commit/163d2cee25f0e3432025c24332dd6893f1edadd6))
+* **mining-slot:** reconcile argonot holds
+([8d8bb76](https://github.com/argonprotocol/mainchain/commit/8d8bb768b2ddf387d11246478477d66d0769943c))
+* **nodejs/client:** bitcoin txid reversed
+([53a5f71](https://github.com/argonprotocol/mainchain/commit/53a5f71c6bbe04c908ca4a4cea2dce403dcb2ce4))
+* **bitcoin_locks:** signing not properly verified
+([0cb1925](https://github.com/argonprotocol/mainchain/commit/0cb1925dc478d998073def90c9298890e7df8421))
+* migration test errors
+([b8ecd7f](https://github.com/argonprotocol/mainchain/commit/b8ecd7fba1566a8b2672d19ab7a87922225ae472))
+
+### [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...v1.3.27) (2026-01-29)
+
+#### Fixes
+
+* don’t add fee coupon revenue as uncollected
+([6d16e57](https://github.com/argonprotocol/mainchain/commit/6d16e57abd90aa00f42330a4ae9bdf9e698c73df))
 
 ### [v1.3.26](https://github.com/argonprotocol/mainchain/compare/v1.3.25...v1.3.26) (2026-01-25)
 
