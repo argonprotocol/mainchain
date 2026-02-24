@@ -674,18 +674,41 @@ pub mod pallet {
 			}
 			let treasury_reserves_account = Self::get_treasury_reserves_account();
 			Self::ensure_account_provider(&treasury_reserves_account);
-			let mut available = T::Currency::balance(&treasury_reserves_account);
+			let available = T::Currency::reducible_balance(
+				&treasury_reserves_account,
+				Preservation::Preserve,
+				Fortitude::Polite,
+			);
+			let total_pending = payouts
+				.iter()
+				.fold(T::Balance::zero(), |acc, payout| acc.saturating_add(payout.amount));
+
+			let pay_in_full = !total_pending.is_zero() && available >= total_pending;
+			let payout_budget = if pay_in_full { total_pending } else { available };
+			let mut remaining_budget = payout_budget;
 			for payout in payouts {
-				if payout.amount.is_zero() {
+				let mut payout_amount = if pay_in_full {
+					payout.amount
+				} else if total_pending.is_zero() ||
+					payout.amount.is_zero() ||
+					remaining_budget.is_zero()
+				{
+					T::Balance::zero()
+				} else {
+					Perbill::from_rational(payout.amount, total_pending).mul_floor(payout_budget)
+				};
+				if payout_amount > remaining_budget {
+					payout_amount = remaining_budget;
+				}
+				if payout_amount.is_zero() {
+					T::OperationalRewardsProvider::mark_reward_paid(&payout, T::Balance::zero());
 					continue;
 				}
-				if payout.amount > available {
-					break;
-				}
+
 				if let Err(e) = T::Currency::transfer(
 					&treasury_reserves_account,
 					&payout.payout_account,
-					payout.amount,
+					payout_amount,
 					Preservation::Preserve,
 				) {
 					log::error!(
@@ -694,10 +717,11 @@ pub mod pallet {
 						payout.payout_account,
 						e
 					);
+					T::OperationalRewardsProvider::mark_reward_paid(&payout, T::Balance::zero());
 					continue;
 				}
-				available.saturating_reduce(payout.amount);
-				T::OperationalRewardsProvider::mark_reward_paid(&payout);
+				remaining_budget.saturating_reduce(payout_amount);
+				T::OperationalRewardsProvider::mark_reward_paid(&payout, payout_amount);
 			}
 		}
 
@@ -810,7 +834,11 @@ pub mod pallet {
 			}
 			let treasury_reserves_account = Self::get_treasury_reserves_account();
 			Self::ensure_account_provider(&treasury_reserves_account);
-			let available = T::Currency::balance(&treasury_reserves_account);
+			let available = T::Currency::reducible_balance(
+				&treasury_reserves_account,
+				Preservation::Preserve,
+				Fortitude::Polite,
+			);
 			if reward.amount > available {
 				return false;
 			}
