@@ -549,6 +549,49 @@ fn test_operational_rewards_with_no_funds_are_consumed_with_zero_payout() {
 }
 
 #[test]
+fn test_operational_rewards_with_one_microgon_and_three_accounts_zeroes_everyone() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		set_pending_operational_rewards(vec![]);
+		let reserves_account = Treasury::get_treasury_reserves_account();
+		set_argons(reserves_account, 1);
+		set_argons(42, 0);
+		set_argons(43, 0);
+		set_argons(44, 0);
+
+		let reward_a = OperationalRewardPayout {
+			operational_account: 99,
+			payout_account: 42,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 1,
+		};
+		let reward_b = OperationalRewardPayout {
+			operational_account: 100,
+			payout_account: 43,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 1,
+		};
+		let reward_c = OperationalRewardPayout {
+			operational_account: 101,
+			payout_account: 44,
+			reward_kind: OperationalRewardKind::Activation,
+			amount: 1,
+		};
+		set_pending_operational_rewards(vec![reward_a, reward_b, reward_c]);
+
+		Treasury::pay_operational_rewards();
+
+		assert!(take_paid_operational_rewards().is_empty());
+		assert!(pending_operational_rewards().is_empty());
+		assert_eq!(Balances::free_balance(42), 0);
+		assert_eq!(Balances::free_balance(43), 0);
+		assert_eq!(Balances::free_balance(44), 0);
+		assert_eq!(Balances::free_balance(reserves_account), 1);
+	});
+}
+
+#[test]
 fn test_pay_operational_rewards_processes_all_queued_when_funded() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
