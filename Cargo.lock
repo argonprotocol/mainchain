@@ -900,7 +900,6 @@ dependencies = [
  "argon-bitcoin-cli-macros",
  "argon-client",
  "argon-primitives",
- "base58",
  "base64 0.22.1",
  "bip39",
  "bitcoin",
@@ -1076,6 +1075,7 @@ dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
  "argon-node-consensus",
+ "argon-notary-apis",
  "argon-primitives",
  "argon-randomx",
  "argon-runtime",
@@ -1192,6 +1192,7 @@ dependencies = [
  "subxt 0.44.2",
  "thiserror 2.0.18",
  "tracing",
+ "url",
 ]
 
 [[package]]
