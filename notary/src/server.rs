@@ -743,12 +743,15 @@ mod tests {
 		let notebook1 = download_notebook(&client, 1, Duration::from_secs(5))
 			.await
 			.expect("Should be able to download notebook");
-		NotebookAuditFailureStore::record(&mut db, 1, notebook1.hash, "failure".to_string(), 1)
-			.await
-			.expect("Should be able to record audit failure");
 		{
 			let mut stream = notary.audit_failure_stream.subscribe(2);
-			stream.next().await.expect("Should get audit failure");
+			NotebookAuditFailureStore::record(&mut db, 1, notebook1.hash, "failure".to_string(), 1)
+				.await
+				.expect("Should be able to record audit failure");
+			tokio::time::timeout(Duration::from_secs(10), stream.next())
+				.await
+				.expect("Timed out waiting for audit failure notification")
+				.expect("Should get audit failure");
 		}
 
 		assert_eq!(*notary.audit_failure_number.lock().await, Some(1));
