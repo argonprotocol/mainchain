@@ -1,4 +1,12 @@
-use crate::{aux_client::ArgonAux, error::Error, metrics::ConsensusMetrics};
+use crate::{
+	aux_client::ArgonAux,
+	error::Error,
+	metrics::ConsensusMetrics,
+	state_anchor::{
+		DEFAULT_STATE_LOOKBACK_DEPTH, ResolveBestOrFinalizedStateHashError, StateAnchorClient,
+		resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+	},
+};
 use argon_notary_apis::{
 	ArchiveHost, Client, DownloadKind, DownloadPolicy, DownloadTrustMode, SystemRpcClient,
 	get_download_path_suffix, get_header_url, get_notebook_url,
@@ -153,9 +161,9 @@ where
 		self.info().finalized_hash
 	}
 	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error> {
-		let header = self
-			.header(*hash)?
-			.ok_or(Error::StringError("Unable to find parent block".into()))?;
+		let header = self.header(*hash)?.ok_or_else(|| {
+			Error::BlockNotFound(format!("Unable to find parent block: {hash:?}"))
+		})?;
 		Ok(*header.parent_hash())
 	}
 }
@@ -205,9 +213,29 @@ where
 	let notary_sync_task = async move {
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 		let idle_delay = Duration::from_millis(idle_delay);
-		notary_client_poll.update_notaries(&best_block).await.unwrap_or_else(|e| {
-			warn!("Could not update notaries at best hash {best_block} - {e:?}")
-		});
+		let initial_notary_hash = match resolve_best_or_finalized_state_hash(
+			notary_client_poll.as_ref(),
+			best_block,
+			client.finalized_hash(),
+			DEFAULT_STATE_LOOKBACK_DEPTH,
+		) {
+			Ok(hash) => Some(hash),
+			Err(ResolveBestOrFinalizedStateHashError::NoAvailableStateHash) => None,
+			Err(ResolveBestOrFinalizedStateHashError::Client(err)) => {
+				warn!("Could not resolve a stateful hash for initial notary update - {err:?}");
+				None
+			},
+		};
+		if let Some(initial_notary_hash) = initial_notary_hash {
+			notary_client_poll
+				.update_notaries(&initial_notary_hash)
+				.await
+				.unwrap_or_else(|e| {
+					warn!("Could not update notaries at startup hash {initial_notary_hash} - {e:?}")
+				});
+		} else {
+			trace!("Skipping initial notary update because no stateful hash is available yet");
+		}
 
 		let mut best_block = Box::pin(client.every_import_notification_stream());
 		let mut health_tick = time::interval(
@@ -277,6 +305,7 @@ type PendingNotebook = (NotebookNumber, Option<SignedHeaderBytes>, Instant);
 
 type NotebookCount = u32;
 pub type VotingPowerInfo = (Tick, BlockVotingPower, NotebookCount);
+
 pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
 	pub notary_client_by_id: Arc<RwLock<BTreeMap<NotaryId, Arc<Client>>>>,
@@ -294,6 +323,27 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	queue_lock: Arc<Mutex<()>>,
 	_block: PhantomData<AC>,
 	is_solving_blocks: bool,
+}
+
+impl<B, C, AC> StateAnchorClient<B::Hash> for NotaryClient<B, C, AC>
+where
+	B: BlockT,
+	C: NotaryApisExt<B, AC> + AuxStore + Send + Sync + 'static,
+	AC: Clone + Codec + Send + Sync + 'static,
+{
+	type Error = Error;
+
+	fn has_block_state(&self, hash: B::Hash) -> bool {
+		self.client.has_block_state(hash)
+	}
+
+	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Self::Error> {
+		match self.client.parent_hash(hash) {
+			Ok(parent_hash) => Ok(Some(parent_hash)),
+			Err(Error::BlockNotFound(_)) => Ok(None),
+			Err(error) => Err(error),
+		}
+	}
 }
 
 impl<B, C, AC> NotaryClient<B, C, AC>
@@ -498,11 +548,32 @@ where
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
-		let finalized_hash = self.client.finalized_hash();
-		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
-		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
+
+		let Some(finalized_hash) = resolve_stateful_hash(
+			self.as_ref(),
+			self.client.finalized_hash(),
+			DEFAULT_STATE_LOOKBACK_DEPTH,
+		)?
+		else {
+			trace!("Skipping notary queue processing: finalized chain has no available state hash");
 			return Ok(true);
-		}
+		};
+
+		let best_hash = if let Some(parent_hash) = importing_with_parent_hash {
+			if self.client.has_block_state(parent_hash) { parent_hash } else { finalized_hash }
+		} else {
+			let chain_best_hash = self.client.best_hash();
+			let Some(best_with_state) = resolve_stateful_hash(
+				self.as_ref(),
+				chain_best_hash,
+				DEFAULT_STATE_LOOKBACK_DEPTH,
+			)?
+			else {
+				trace!("Skipping notary queue processing: best chain has no available state hash");
+				return Ok(true);
+			};
+			best_with_state
+		};
 		let queued_notaries =
 			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
 
@@ -822,7 +893,11 @@ where
 					trying_block_hash = ?best_hash,
 					"Checking if we can audit at parent block",
 				);
-				best_hash = self.client.parent_hash(&best_hash)?;
+				let parent_hash = self.client.parent_hash(&best_hash)?;
+				if parent_hash == best_hash {
+					return Err(Error::StateUnavailableError);
+				}
+				best_hash = parent_hash;
 				if !self.client.has_block_state(best_hash) {
 					return Err(Error::StateUnavailableError);
 				}
@@ -1396,11 +1471,18 @@ mod test {
 		pub decode_intercept:
 			Arc<parking_lot::Mutex<Option<NotaryNotebookDetails<<Block as BlockT>::Hash>>>>,
 		pub decode_intercepted_at_block: Arc<parking_lot::Mutex<Option<<Block as BlockT>::Hash>>>,
+		pub block_state_by_hash: Arc<parking_lot::Mutex<BTreeMap<H256, bool>>>,
+		pub best_hash: Arc<parking_lot::Mutex<H256>>,
+		pub finalized_hash: Arc<parking_lot::Mutex<H256>>,
 	}
 
 	impl TestNode {
 		fn new() -> Self {
-			Self::default()
+			Self {
+				best_hash: Arc::new(parking_lot::Mutex::new(H256::from_slice(&[1; 32]))),
+				finalized_hash: Arc::new(parking_lot::Mutex::new(H256::from_slice(&[0; 32]))),
+				..Default::default()
+			}
 		}
 
 		pub fn add_notary(&self, notary: &MockNotary) -> usize {
@@ -1419,6 +1501,18 @@ mod test {
 				state: NotaryState::Active,
 			});
 			index
+		}
+
+		fn set_best_hash(&self, hash: H256) {
+			*self.best_hash.lock() = hash;
+		}
+
+		fn set_finalized_hash(&self, hash: H256) {
+			*self.finalized_hash.lock() = hash;
+		}
+
+		fn set_block_state(&self, hash: H256, has_state: bool) {
+			self.block_state_by_hash.lock().insert(hash, has_state);
 		}
 	}
 
@@ -1451,8 +1545,8 @@ mod test {
 	}
 
 	impl NotaryApisExt<Block, AccountId> for TestNode {
-		fn has_block_state(&self, _block_hash: <Block as BlockT>::Hash) -> bool {
-			true
+		fn has_block_state(&self, block_hash: <Block as BlockT>::Hash) -> bool {
+			*self.block_state_by_hash.lock().get(&block_hash).unwrap_or(&true)
 		}
 		fn notaries(&self, _block_hash: H256) -> Result<Vec<NotaryRecordT>, Error> {
 			Ok(self.notaries.lock().clone())
@@ -1538,10 +1632,10 @@ mod test {
 			}))
 		}
 		fn best_hash(&self) -> <Block as BlockT>::Hash {
-			H256::from_slice(&[1; 32])
+			*self.best_hash.lock()
 		}
 		fn finalized_hash(&self) -> <Block as BlockT>::Hash {
-			H256::from_slice(&[0; 32])
+			*self.finalized_hash.lock()
 		}
 		fn parent_hash(
 			&self,
@@ -1890,6 +1984,77 @@ mod test {
 		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(notary_client.queue_depth(1).await, 0);
 		assert_eq!(notary_client.notebook_queue_by_id.read().await.get(&2).unwrap().len(), 1);
+	}
+
+	#[tokio::test]
+	async fn falls_back_to_ancestor_with_state_when_best_is_pruned() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		let block_0 = H256::from_slice(&[0; 32]);
+		let block_1 = H256::from_slice(&[1; 32]);
+		let block_2 = H256::from_slice(&[2; 32]);
+		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
+		client.set_best_hash(block_2);
+		client.set_finalized_hash(block_2);
+		client.set_block_state(block_2, false);
+		client.set_block_state(block_1, true);
+		client.set_block_state(block_0, true);
+
+		notary_client.process_queues(None).await.expect("Could not process queues");
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+	}
+
+	#[tokio::test]
+	async fn prefers_nearest_best_ancestor_state_over_finalized_state() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		let block_0 = H256::from_slice(&[0; 32]);
+		let block_1 = H256::from_slice(&[1; 32]);
+		let block_2 = H256::from_slice(&[2; 32]);
+		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
+		client.set_best_hash(block_2);
+		client.set_finalized_hash(block_0);
+		client.set_block_state(block_2, false);
+		client.set_block_state(block_1, true);
+		client.set_block_state(block_0, true);
+
+		client.decode_intercept.lock().replace(NotaryNotebookDetails {
+			notary_id: 1,
+			notebook_number: 1,
+			version: 1,
+			tick: 1,
+			header_hash: H256::from_slice(&[9; 32]),
+			block_votes_count: 0,
+			block_voting_power: 0,
+			blocks_with_votes: vec![],
+			raw_audit_summary: vec![],
+		});
+
+		notary_client.process_queues(None).await.expect("Could not process queues");
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_1));
 	}
 
 	#[tokio::test]
