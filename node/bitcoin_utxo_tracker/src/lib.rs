@@ -15,7 +15,7 @@ use log::info;
 pub use metrics::BitcoinMetrics;
 use parking_lot::Mutex;
 use polkadot_sdk::*;
-use sc_client_api::{HeaderBackend, backend::AuxStore};
+use sc_client_api::backend::AuxStore;
 use sp_api::ProvideRuntimeApi;
 use sp_runtime::traits::Block as BlockT;
 use std::{sync::Arc, time::Instant};
@@ -74,14 +74,10 @@ impl UtxoTracker {
 		Ok(Self { filter: Arc::new(Mutex::new(filter)), metrics })
 	}
 
-	pub fn ensure_correct_network<B, C>(&self, client: &Arc<C>) -> anyhow::Result<()>
-	where
-		B: BlockT,
-		C: ProvideRuntimeApi<B> + HeaderBackend<B> + 'static,
-		C::Api: BitcoinApis<B, Balance>,
-	{
-		let latest = client.info().finalized_hash;
-		let network = client.runtime_api().get_bitcoin_network(latest)?;
+	pub fn ensure_correct_network(
+		&self,
+		network: argon_primitives::bitcoin::BitcoinNetwork,
+	) -> anyhow::Result<()> {
 		let filter = self.filter.lock();
 		let connected_network = filter.get_network()?;
 		ensure!(

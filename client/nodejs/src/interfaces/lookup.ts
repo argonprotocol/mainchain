@@ -3092,6 +3092,7 @@ export default {
     securitizationTarget: 'Compact<u128>',
     securitizationLocked: 'Compact<u128>',
     securitizationPendingActivation: 'Compact<u128>',
+    securitizedSatoshis: 'Compact<u64>',
     securitizationReleaseSchedule: 'BTreeMap<u64, u128>',
     securitizationRatio: 'Compact<u128>',
     isClosed: 'bool',

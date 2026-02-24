@@ -3809,9 +3809,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				95u8, 172u8, 130u8, 254u8, 40u8, 180u8, 80u8, 149u8, 187u8, 237u8, 134u8, 222u8,
-				192u8, 177u8, 55u8, 87u8, 247u8, 25u8, 221u8, 246u8, 253u8, 228u8, 179u8, 3u8,
-				251u8, 153u8, 3u8, 167u8, 46u8, 88u8, 52u8, 107u8,
+				5u8, 244u8, 115u8, 59u8, 172u8, 193u8, 76u8, 254u8, 218u8, 21u8, 26u8, 3u8, 60u8,
+				209u8, 244u8, 221u8, 100u8, 222u8, 252u8, 179u8, 186u8, 159u8, 185u8, 53u8, 160u8,
+				79u8, 42u8, 14u8, 88u8, 234u8, 206u8, 222u8,
 			]
 	}
 	pub mod system {
@@ -10472,9 +10472,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							40u8, 150u8, 14u8, 48u8, 100u8, 47u8, 232u8, 219u8, 117u8, 82u8, 53u8,
-							3u8, 184u8, 39u8, 207u8, 185u8, 42u8, 92u8, 245u8, 192u8, 20u8, 65u8,
-							47u8, 11u8, 101u8, 226u8, 105u8, 183u8, 60u8, 229u8, 105u8, 116u8,
+							152u8, 220u8, 83u8, 122u8, 202u8, 127u8, 162u8, 230u8, 7u8, 115u8,
+							64u8, 44u8, 216u8, 20u8, 203u8, 160u8, 40u8, 246u8, 170u8, 165u8, 64u8,
+							109u8, 240u8, 43u8, 136u8, 125u8, 233u8, 204u8, 10u8, 228u8, 167u8,
+							91u8,
 						],
 					)
 				}
@@ -10496,9 +10497,10 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							40u8, 150u8, 14u8, 48u8, 100u8, 47u8, 232u8, 219u8, 117u8, 82u8, 53u8,
-							3u8, 184u8, 39u8, 207u8, 185u8, 42u8, 92u8, 245u8, 192u8, 20u8, 65u8,
-							47u8, 11u8, 101u8, 226u8, 105u8, 183u8, 60u8, 229u8, 105u8, 116u8,
+							152u8, 220u8, 83u8, 122u8, 202u8, 127u8, 162u8, 230u8, 7u8, 115u8,
+							64u8, 44u8, 216u8, 20u8, 203u8, 160u8, 40u8, 246u8, 170u8, 165u8, 64u8,
+							109u8, 240u8, 43u8, 136u8, 125u8, 233u8, 204u8, 10u8, 228u8, 167u8,
+							91u8,
 						],
 					)
 				}
@@ -27397,6 +27399,8 @@ pub mod api {
 					pub securitization_locked: _1,
 					#[codec(compact)]
 					pub securitization_pending_activation: _1,
+					#[codec(compact)]
+					pub securitized_satoshis: ::core::primitive::u64,
 					pub securitization_release_schedule:
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,

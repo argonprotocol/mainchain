@@ -141,7 +141,7 @@ in next step), your key is impossible to uncover through the vault activities.
 > will need to manage your XPriv key as a password encrypted file.
 
 ```bash
-$ argon-bitcoin-cli xpriv master --xpriv-password=supersecret --xpriv-path=/tmp/vault1.xpriv
+$ argon-bitcoin-cli xpriv master --xpriv-password-interactive --xpriv-path=/tmp/vault1.xpriv
 ```
 
 > NOTE: on testnet, you must add `--bitcoin-network=signet` to the command above to create a Signet
@@ -165,7 +165,7 @@ Let's generate the XPub key.
 > path also needs to be hardened to ensure the key is secure.
 
 ```bash
-$ argon-bitcoin-cli xpriv derive-xpub --xpriv-path=~/.xpriv/vault1.xpriv --xpriv-password=supersecret --hd-path="m/84'/0'/0'"
+$ argon-bitcoin-cli xpriv derive-xpub --xpriv-path=~/.xpriv/vault1.xpriv --xpriv-password-interactive --hd-path="m/84'/0'/0'"
 ```
 
 ### 3. Create a Vault
@@ -237,7 +237,7 @@ When you encounter a LockedBitcoin Cosign Request, you will need to know:
 
 ```bash
 $ argon-bitcoin-cli lock vault-cosign-release --utxo-id=1 \
-  --xpriv-path=~/.xpriv/vault.xpub --xpriv-password=supersecret --hd-path="m/84'/0'/0'" \
+  --xpriv-path=~/.xpriv/vault.xpriv --xpriv-password-interactive --hd-path="m/84'/0'/0'" \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org
 ```
 
@@ -261,7 +261,7 @@ https://mempool.space/testnet.
 
 ```bash
 $ argon-bitcoin-cli lock claim-utxo-psbt --utxo-id=1 \
-  --xpriv-path=~/.xpriv/vault.xpub --xpriv-password=supersecret --hd-path="m/84'/0'/0'" \
+  --xpriv-path=~/.xpriv/vault.xpriv --xpriv-password-interactive --hd-path="m/84'/0'/0'" \
   --dest_pubkey=tb1q3hkkt02k975ddxzeeeupy9cpysr2cy929ck4qp \
   --fee-rate-sats-per-vb=3 \
   --trusted-rpc-url wss://rpc.testnet.argonprotocol.org \

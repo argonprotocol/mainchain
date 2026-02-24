@@ -543,6 +543,38 @@ fn it_accounts_for_pending_bitcoins() {
 }
 
 #[test]
+fn it_tracks_securitized_satoshis_via_provider_methods() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+
+		assert_ok!(Vaults::add_securitized_satoshis(1, 1_000));
+		assert_ok!(Vaults::add_securitized_satoshis(1, 500));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
+
+		assert_ok!(Vaults::reduce_securitized_satoshis(1, 600));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
+	});
+}
+
+#[test]
+fn it_errors_when_reducing_securitized_satoshis_below_zero() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+
+		assert_err!(Vaults::reduce_securitized_satoshis(1, 1), VaultError::InternalError);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+	});
+}
+
+#[test]
 fn it_can_burn_funds() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited

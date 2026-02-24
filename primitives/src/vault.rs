@@ -123,6 +123,13 @@ pub trait BitcoinVaultProvider {
 	/// Get the securitization ratio offered by this vault
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError>;
 
+	/// Add funded securitized satoshis tracked for this vault.
+	fn add_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis) -> Result<(), VaultError>;
+
+	/// Reduce funded securitized satoshis tracked for this vault.
+	fn reduce_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis)
+	-> Result<(), VaultError>;
+
 	/// Holds the given "securitization" from the vault. Returns the fee amount
 	fn lock(
 		vault_id: VaultId,
@@ -258,6 +265,9 @@ where
 	/// securitization_locked, not in addition to)
 	#[codec(compact)]
 	pub securitization_pending_activation: Balance,
+	/// The number of funded satoshis currently securitized by this vault.
+	#[codec(compact)]
+	pub securitized_satoshis: Satoshis,
 	/// Securitization that will be released at the given block height (NOTE: these are grouped by
 	/// next day of bitcoin blocks). This securitization can be relocked
 	pub securitization_release_schedule: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
@@ -807,6 +817,7 @@ mod test {
 			securitization_target: securitization,
 			securitization_locked: 0,
 			securitization_pending_activation: 0,
+			securitized_satoshis: 0,
 			securitization_release_schedule: Default::default(),
 			securitization_ratio: FixedU128::from_float(ratio),
 			is_closed: false,
