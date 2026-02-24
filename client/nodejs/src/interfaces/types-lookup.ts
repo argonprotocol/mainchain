@@ -3552,6 +3552,7 @@ declare module '@polkadot/types/lookup' {
     readonly securitizationTarget: Compact<u128>;
     readonly securitizationLocked: Compact<u128>;
     readonly securitizationPendingActivation: Compact<u128>;
+    readonly securitizedSatoshis: Compact<u64>;
     readonly securitizationReleaseSchedule: BTreeMap<u64, u128>;
     readonly securitizationRatio: Compact<u128>;
     readonly isClosed: bool;
