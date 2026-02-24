@@ -443,6 +443,7 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 		vec![
 			"lock",
 			"owner-cosign-release",
+			"--allow-insecure-cli-secrets",
 			"--utxo-id",
 			&utxo_id.to_string(),
 			"--hd-path",
@@ -541,6 +542,7 @@ async fn create_xpriv_and_derive(
 		vec![
 			"xpriv",
 			"master",
+			"--allow-insecure-cli-secrets",
 			"--xpriv-password",
 			password,
 			"--xpriv-path",
@@ -557,6 +559,7 @@ async fn create_xpriv_and_derive(
 		vec![
 			"xpriv",
 			"derive-pubkey",
+			"--allow-insecure-cli-secrets",
 			"--xpriv-path",
 			path.to_str().unwrap(),
 			"--xpriv-password",
@@ -594,6 +597,7 @@ async fn create_xpriv_and_master_xpub(
 		vec![
 			"xpriv",
 			"master",
+			"--allow-insecure-cli-secrets",
 			"--xpriv-password",
 			password,
 			"--xpriv-path",
@@ -610,6 +614,7 @@ async fn create_xpriv_and_master_xpub(
 		vec![
 			"xpriv",
 			"derive-xpub",
+			"--allow-insecure-cli-secrets",
 			"--xpriv-path",
 			path.to_str().unwrap(),
 			"--xpriv-password",
@@ -1000,6 +1005,7 @@ async fn vault_cosigns_release(
 		vec![
 			"lock",
 			"vault-cosign-release",
+			"--allow-insecure-cli-secrets",
 			"--utxo-id",
 			&utxo_id.to_string(),
 			"--xpriv-path",

@@ -660,7 +660,8 @@ pub struct EmbeddedKeyPassword {
 
   /// File that contains the password used by the embedded keystore.
   #[arg(
-    long,
+    long = "key-password-file",
+    alias = "key-password-filename",
     value_name = "PATH",
     conflicts_with_all = &["key_password_interactive", "key_password"]
   )]
