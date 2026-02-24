@@ -254,9 +254,19 @@ pub mod pallet {
 		pub vault_created: Option<bool>,
 		/// Override for whether the account has participated in a treasury pool.
 		pub has_treasury_pool_participation: Option<bool>,
-		/// Override for total observed bitcoin lock value.
+		/// Requested minimum for the total observed bitcoin lock value.
+		///
+		/// This is treated as a monotonic high-watermark override: the effective stored
+		/// `observed_bitcoin_total` will be at least this value, but will not be decreased
+		/// below any existing observed total. If the provided value is lower than the
+		/// current total, the current (higher) total is retained.
 		pub observed_bitcoin_total: Option<Balance>,
-		/// Override for total observed mining seats won.
+		/// Requested minimum for the total observed mining seats won.
+		///
+		/// This is treated as a monotonic high-watermark override: the effective stored
+		/// `observed_mining_seat_total` will be at least this value, but will not be
+		/// decreased below any existing observed total. If the provided value is lower
+		/// than the current total, the current (higher) total is retained.
 		pub observed_mining_seat_total: Option<u32>,
 	}
 
