@@ -47,6 +47,14 @@ pub struct ArgonRunCmd {
 	/// Should be a list of base URL hosts (eg, https://archives.argonprotocol.org).
 	#[arg(long, verbatim_doc_comment)]
 	pub notebook_archive_hosts: Vec<String>,
+
+	/// Maximum header download size (in MB). Downloads above this limit are rejected.
+	#[arg(long, env = "ARGON_NOTEBOOK_HEADER_MAX_MB", default_value_t = 2)]
+	pub notebook_header_max_mb: u64,
+
+	/// Maximum notebook body download size (in MB). Downloads above this limit are rejected.
+	#[arg(long, env = "ARGON_NOTEBOOK_BODY_MAX_MB", default_value_t = 16)]
+	pub notebook_body_max_mb: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

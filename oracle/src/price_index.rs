@@ -83,7 +83,7 @@ pub async fn price_index_loop(
 		constants_client.at(&constants().price_index().max_argon_target_change_per_tick())?,
 	);
 
-	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
+	let mut last_attempted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
 	let mut last_target_price = last_price
 		.as_ref()
 		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
@@ -108,6 +108,14 @@ pub async fn price_index_loop(
 	let account_id = signer.account_id();
 
 	loop {
+		let tick = ticker.current();
+		if tick == last_attempted_tick {
+			let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
+			sleep(sleep_time).await;
+			continue;
+		}
+		last_attempted_tick = tick;
+
 		let (usd_price_lookup, _) = join!(usd_price_lookups.get_latest_prices(), us_cpi.refresh());
 		let usd_price_lookup = match usd_price_lookup {
 			Ok(x) => x,
@@ -116,13 +124,6 @@ pub async fn price_index_loop(
 				continue;
 			},
 		};
-
-		let tick = ticker.current();
-		if tick == last_submitted_tick {
-			let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
-			sleep(sleep_time).await;
-			continue;
-		}
 		let us_cpi_ratio = us_cpi.get_us_cpi_ratio(tick);
 		let target_price = argon_price_lookup.get_target_price(us_cpi_ratio).clamp(
 			last_target_price.saturating_sub(max_argon_target_change_per_tick),
@@ -199,7 +200,6 @@ pub async fn price_index_loop(
 				.tx()
 				.sign_and_submit_then_watch(&price_index, &signer, params)
 				.await?;
-			last_submitted_tick = tick;
 			last_target_price = target_price;
 
 			info!("Submitted price index with progress: {:?}", progress);
