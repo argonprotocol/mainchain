@@ -692,8 +692,10 @@ pub mod pallet {
 					}
 
 					if update_operational_progress {
-						Self::maybe_activate_operational(&owner, account);
-						Self::materialize_issuable_access_codes(account);
+						let activated = Self::maybe_activate_operational(&owner, account);
+						if !activated {
+							Self::materialize_issuable_access_codes(account);
+						}
 					}
 
 					has_uniswap_transfer = account.has_uniswap_transfer;
