@@ -34,6 +34,7 @@ polkadot-sdk.features = [
     "sp-inherents",
     "sp-offchain",
     "sp-session",
+    "sp-staking",
     "sp-transaction-pool",
     "sp-version",
     "sp-genesis-builder",

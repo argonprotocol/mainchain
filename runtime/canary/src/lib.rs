@@ -135,6 +135,24 @@ argon_runtime_common::inject_common_apis!();
 argon_runtime_common::call_filters!();
 argon_runtime_common::vault_admin_fee_refund_policy!();
 argon_runtime_common::deal_with_fees!();
+argon_runtime_common::inject_grandpa_support!();
+
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Runtime
+where
+	RuntimeCall: From<LocalCall>,
+{
+	type Extrinsic = UncheckedExtrinsic;
+	type RuntimeCall = RuntimeCall;
+}
+
+impl<LocalCall> frame_system::offchain::CreateBare<LocalCall> for Runtime
+where
+	RuntimeCall: From<LocalCall>,
+{
+	fn create_bare(call: RuntimeCall) -> UncheckedExtrinsic {
+		UncheckedExtrinsic::new_bare(call)
+	}
+}
 
 #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
 impl frame_system::Config for Runtime {
@@ -371,37 +389,6 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		use_unless_benchmark!(DidStartNewFrame, benchmarking::BenchmarkDidStartNewFrame);
 }
 
-pub struct GrandpaSlotRotation;
-
-impl OnNewSlot<AccountId> for GrandpaSlotRotation {
-	type Key = GrandpaId;
-	fn rotate_grandpas(
-		_current_frame_id: FrameId,
-		_removed_authorities: Vec<(&AccountId, Self::Key)>,
-		_added_authorities: Vec<(&AccountId, Self::Key)>,
-	) {
-		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
-
-		// TODO: we need to be able to run multiple grandpas on a single miner before activating
-		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
-		//  blocks to activate a more decentralized grandpa process
-		// for (_, authority_id) in removed_authorities {
-		// 	if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
-		// 		next_authorities.remove(index);
-		// 	}
-		// }
-		// for (_, authority_id) in added_authorities {
-		// 	next_authorities.push((authority_id, 1));
-		// }
-
-		log::info!("Scheduling grandpa change");
-		if let Err(err) = Grandpa::schedule_change(next_authorities, 0, None) {
-			log::error!("Failed to schedule grandpa change: {err:?}");
-		}
-		pallet_grandpa::CurrentSetId::<Runtime>::mutate(|x| *x += 1);
-	}
-}
-
 pub struct TicksSinceGenesis;
 impl Get<Tick> for TicksSinceGenesis {
 	fn get() -> Tick {
@@ -475,6 +462,11 @@ impl pallet_mining_slot::Config for Runtime {
 		(GrandpaSlotRotation,)
 	);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
+	type GrandpaRecentActivityWindowInRotations = GrandpaRecentActivityWindowInRotations;
+	type GrandpaTotalVoteWeight = GrandpaTotalVoteWeight;
+	type GrandpaRecencyWindowFallbackMultiplier = GrandpaRecencyWindowFallbackMultiplier;
+	type MaxGrandpaAuthorities = MaxGrandpaAuthorities;
+	type MaxGrandpaAuthorityWeightPercent = MaxGrandpaAuthorityWeightPercent;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
@@ -504,11 +496,11 @@ impl pallet_block_seal::Config for Runtime {
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = weights::pallet_grandpa::WeightInfo<Runtime>;
-	type MaxAuthorities = MaxGrandpas;
+	type MaxAuthorities = MaxGrandpaAuthorities;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
-	type KeyOwnerProof = sp_core::Void;
-	type EquivocationReportSystem = ();
+	type KeyOwnerProof = GrandpaKeyOwnerProof;
+	type EquivocationReportSystem = GrandpaEquivocationReportSystem<ConstU64<480>>;
 }
 
 impl pallet_localchain_transfer::Config for Runtime {

@@ -1063,6 +1063,15 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       nextFrameId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
+       * The immediately previous GRANDPA authority set retained for equivocation reports that cross
+       * a set boundary.
+       **/
+      previousGrandpaAuthorities: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>>>,
+        []
+      >;
+      /**
        * The miners released in the last block (only kept for a single block)
        **/
       releasedMinersByAccountId: AugmentedQuery<

@@ -1,4 +1,7 @@
-use crate::utils::{activate_vote_mining, create_active_notary_with_archive_bucket};
+use crate::utils::{
+	create_active_notary_with_archive_bucket, force_set_ownership_balance,
+	mining_slot_ownership_needed, register_miner_keys, register_miners, wait_for_finalized_catchup,
+};
 use argon_client::{
 	api::storage,
 	conversion::SubxtRuntime,
@@ -10,6 +13,8 @@ use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTe
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
+use sp_keyring::Sr25519Keyring::Alice;
+use tokio::join;
 
 /// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]
@@ -42,7 +47,35 @@ async fn test_end_to_end_default_vote_mining() {
 
 	let miner_2_keyring = miner_2.keyring();
 
-	activate_vote_mining(&grandpa_miner, &miner_1, &miner_2).await.unwrap();
+	let ownership_needed = mining_slot_ownership_needed(&grandpa_miner).await.unwrap();
+	let seeded_ownership = ownership_needed.saturating_mul(2);
+	force_set_ownership_balance(&grandpa_miner, &miner_1.account_id, seeded_ownership)
+		.await
+		.unwrap();
+	force_set_ownership_balance(&grandpa_miner, &miner_2.account_id, seeded_ownership)
+		.await
+		.unwrap();
+	wait_for_finalized_catchup(&grandpa_miner, &miner_1).await.unwrap();
+	wait_for_finalized_catchup(&grandpa_miner, &miner_2).await.unwrap();
+
+	let (keys1, keys2) = join!(
+		register_miner_keys(&miner_1, miner_1_keyring, 1),
+		register_miner_keys(&miner_2, miner_2_keyring, 1)
+	);
+	let keys1 = keys1.unwrap();
+	let keys2 = keys2.unwrap();
+	register_miners(
+		&grandpa_miner,
+		Sr25519Signer::new(Alice.pair()),
+		vec![
+			(miner_2.account_id.clone(), keys2),
+			(miner_1.account_id.clone(), keys1.clone()),
+			(miner_1_second_account.clone(), keys1),
+		],
+		None,
+	)
+	.await
+	.unwrap();
 
 	// Ensure registrations are visible in finalized state before counting vote blocks.
 	let mut finalized_wait =

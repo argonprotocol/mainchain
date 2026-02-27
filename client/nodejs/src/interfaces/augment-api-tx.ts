@@ -44,6 +44,7 @@ import type {
   ArgonPrimitivesNotebookSignedNotebookHeader,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultTerms,
+  ArgonRuntimeGrandpaKeyOwnerProof,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   ArgonRuntimeSessionKeys,
@@ -65,7 +66,6 @@ import type {
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
   SpConsensusGrandpaEquivocationProof,
-  SpCoreVoid,
   SpWeightsWeightV2Weight,
 } from '@polkadot/types/lookup';
 
@@ -794,9 +794,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | { setId?: any; equivocation?: any }
             | string
             | Uint8Array,
-          keyOwnerProof: SpCoreVoid | null,
+          keyOwnerProof: ArgonRuntimeGrandpaKeyOwnerProof | { setId?: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [SpConsensusGrandpaEquivocationProof, SpCoreVoid]
+        [SpConsensusGrandpaEquivocationProof, ArgonRuntimeGrandpaKeyOwnerProof]
       >;
       /**
        * Report voter equivocation/misbehavior. This method will verify the
@@ -816,9 +816,9 @@ declare module '@polkadot/api-base/types/submittable' {
             | { setId?: any; equivocation?: any }
             | string
             | Uint8Array,
-          keyOwnerProof: SpCoreVoid | null,
+          keyOwnerProof: ArgonRuntimeGrandpaKeyOwnerProof | { setId?: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [SpConsensusGrandpaEquivocationProof, SpCoreVoid]
+        [SpConsensusGrandpaEquivocationProof, ArgonRuntimeGrandpaKeyOwnerProof]
       >;
     };
     localchainTransfer: {

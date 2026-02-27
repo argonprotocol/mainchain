@@ -275,6 +275,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       framesPerMiningTerm: u32 & AugmentedConst<ApiType>;
       /**
+       * Multiplier used for a single recency-window retry when too few authorities are eligible.
+       **/
+      grandpaRecencyWindowFallbackMultiplier: u32 & AugmentedConst<ApiType>;
+      /**
+       * Number of GRANDPA rotation periods to include when scoring recent activity.
+       **/
+      grandpaRecentActivityWindowInRotations: u32 & AugmentedConst<ApiType>;
+      /**
+       * Fixed total GRANDPA vote weight budget distributed each rotation.
+       **/
+      grandpaTotalVoteWeight: u64 & AugmentedConst<ApiType>;
+      /**
        * The initial argonots needed per seat before a prior-day median is available.
        **/
       initialArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
@@ -283,6 +295,14 @@ declare module '@polkadot/api-base/types/consts' {
        * dynamically
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of GRANDPA authorities derived from mining activity.
+       **/
+      maxGrandpaAuthorities: u32 & AugmentedConst<ApiType>;
+      /**
+       * Max share a single GRANDPA authority can carry when the guard is enforceable.
+       **/
+      maxGrandpaAuthorityWeightPercent: Percent & AugmentedConst<ApiType>;
       /**
        * The minimum number of miners per cohort
        **/
