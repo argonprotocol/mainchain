@@ -1984,10 +1984,10 @@ mod test {
 		let block_1 = H256::from_slice(&[1; 32]);
 		let block_2 = H256::from_slice(&[2; 32]);
 		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
-		client.set_best_hash(block_1);
-		client.set_finalized_hash(block_2);
-		client.set_block_state(block_1, true);
-		client.set_block_state(block_2, false);
+		client.set_best_hash(block_2);
+		client.set_finalized_hash(block_1);
+		client.set_block_state(block_2, true);
+		client.set_block_state(block_1, false);
 		client.set_block_state(block_0, true);
 
 		let has_more_work =
