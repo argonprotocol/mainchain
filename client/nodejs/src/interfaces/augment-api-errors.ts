@@ -787,6 +787,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoIssuableAccessCodes: AugmentedError<ApiType>;
       /**
+       * The requested progress patch does not contain any updates.
+       **/
+      NoProgressUpdateProvided: AugmentedError<ApiType>;
+      /**
        * The caller has not registered an operational account.
        **/
       NotOperationalAccount: AugmentedError<ApiType>;
