@@ -343,23 +343,36 @@ impl OnNewSlot<AccountId> for GrandpaSlotRotation {
 		_removed_authorities: Vec<(&AccountId, Self::Key)>,
 		_added_authorities: Vec<(&AccountId, Self::Key)>,
 	) {
-		let next_authorities: AuthorityList = Grandpa::grandpa_authorities();
+		let current_authorities: AuthorityList = Grandpa::grandpa_authorities();
+		let next_authorities =
+			match pallet_mining_slot::grandpa::derive_authorities_from_recent_mining::<
+				Runtime,
+				GrandpaId,
+			>() {
+				Ok(authorities) => authorities,
+				Err(
+					pallet_mining_slot::grandpa::DeriveAuthoritiesError::RegisteredMiningInactive,
+				) => {
+					log::trace!("Skipping grandpa rotation while registered mining is inactive");
+					return;
+				},
+				Err(pallet_mining_slot::grandpa::DeriveAuthoritiesError::NoEligibleWeights) => {
+					log::warn!(
+						"Skipping grandpa rotation because no miners were active in the recent window"
+					);
+					return;
+				},
+			};
 
-		// TODO: we need to be able to run multiple grandpas on a single miner before activating
-		// 	changing the authorities. We want to activate a trailing 3 hours of miners who closed
-		//  blocks to activate a more decentralized grandpa process
-		// for (_, authority_id) in removed_authorities {
-		// 	if let Some(index) = next_authorities.iter().position(|x| x.0 == authority_id) {
-		// 		next_authorities.remove(index);
-		// 	}
-		// }
-		// for (_, authority_id) in added_authorities {
-		// 	next_authorities.push((authority_id, 1));
-		// }
+		if next_authorities == current_authorities {
+			log::trace!("Skipping grandpa change because authority set is unchanged");
+			return;
+		}
 
-		log::info!("Scheduling grandpa change");
+		log::info!("Scheduling grandpa change (authorities={})", next_authorities.len());
 		if let Err(err) = Grandpa::schedule_change(next_authorities, 0, None) {
 			log::error!("Failed to schedule grandpa change: {err:?}");
+			return;
 		}
 		pallet_grandpa::CurrentSetId::<Runtime>::mutate(|x| *x += 1);
 	}
@@ -411,6 +424,11 @@ impl pallet_mining_slot::Config for Runtime {
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
+	type GrandpaRecentActivityWindowInRotations = GrandpaRecentActivityWindowInRotations;
+	type GrandpaTotalVoteWeight = GrandpaTotalVoteWeight;
+	type GrandpaRecencyWindowFallbackMultiplier = GrandpaRecencyWindowFallbackMultiplier;
+	type MaxGrandpaAuthorities = MaxGrandpaAuthorities;
+	type MaxGrandpaAuthorityWeightPercent = MaxGrandpaAuthorityWeightPercent;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);

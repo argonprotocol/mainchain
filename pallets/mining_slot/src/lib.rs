@@ -22,6 +22,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod grandpa;
 pub mod migrations;
 pub mod weights;
 
@@ -49,6 +50,24 @@ pub mod weights;
 /// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
 /// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
 /// Treasury.
+///
+/// ### GRANDPA Authority Derivation
+/// The pallet also derives GRANDPA authorities from recent mining activity.
+///
+/// - Eligibility is recency-based: operators must have produced blocks within the configured window
+///   (`GrandpaRotationBlocks * GrandpaRecentActivityWindowInRotations`).
+/// - Authorities are ranked by recent activity and bounded to `MaxGrandpaAuthorities`.
+/// - Operator influence is weighted from recent activity and then normalized into a fixed vote
+///   budget to keep authority weights stable and deterministic.
+/// - A per-operator maximum share (`MaxGrandpaAuthorityWeightPercent`) is enforced so finality
+///   weight cannot concentrate in a single authority.
+/// - If active authorities are below the minimum needed for the configured max share (`ceil(100 /
+///   MaxGrandpaAuthorityWeightPercent)`), selected authorities receive equal weights so finality
+///   can continue without dropping below a viable set.
+///
+/// This design intentionally balances three goals: exclude stale operators, preserve economic
+/// influence for active operators, and constrain concentration to improve finality stall
+/// resistance.
 #[frame_support::pallet]
 pub mod pallet {
 	use codec::FullCodec;
@@ -149,6 +168,21 @@ pub mod pallet {
 
 		/// How often to rotate grandpas
 		type GrandpaRotationBlocks: Get<BlockNumberFor<Self>>;
+		/// Number of GRANDPA rotation periods to include when scoring recent activity.
+		#[pallet::constant]
+		type GrandpaRecentActivityWindowInRotations: Get<u32>;
+		/// Fixed total GRANDPA vote weight budget distributed each rotation.
+		#[pallet::constant]
+		type GrandpaTotalVoteWeight: Get<u64>;
+		/// Multiplier used for a single recency-window retry when too few authorities are eligible.
+		#[pallet::constant]
+		type GrandpaRecencyWindowFallbackMultiplier: Get<u32>;
+		/// Maximum number of GRANDPA authorities derived from mining activity.
+		#[pallet::constant]
+		type MaxGrandpaAuthorities: Get<u32>;
+		/// Max share a single GRANDPA authority can carry when the guard is enforceable.
+		#[pallet::constant]
+		type MaxGrandpaAuthorityWeightPercent: Get<Percent>;
 
 		/// The mining authority runtime public key
 		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo + PartialEq;
