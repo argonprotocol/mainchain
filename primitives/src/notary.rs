@@ -5,7 +5,7 @@ use alloc::{
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::fmt::Debug;
-use frame_support::pallet_prelude::ConstU32;
+use frame_support::{pallet_prelude::ConstU32, weights::Weight};
 use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
@@ -22,7 +22,19 @@ pub type NotaryId = u32;
 pub type NotaryPublic = ed25519::Public;
 pub type NotarySignature = ed25519::Signature;
 
+pub trait NotaryProviderWeightInfo {
+	fn active_notaries() -> Weight;
+}
+
+impl NotaryProviderWeightInfo for () {
+	fn active_notaries() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait NotaryProvider<B: BlockT, AccountId> {
+	type Weights: NotaryProviderWeightInfo;
+
 	fn verify_signature(
 		notary_id: NotaryId,
 		at_tick: Tick,

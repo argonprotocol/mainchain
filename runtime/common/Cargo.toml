@@ -81,6 +81,7 @@ pallet-price-index = { workspace = true }
 pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
+pallet-prelude = { workspace = true }
 argon-primitives = { workspace = true }
 argon-bitcoin = { workspace = true }
 
@@ -114,6 +115,7 @@ std = [
 	"pallet-mint/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
+	"pallet-prelude/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
 	"pallet-token-gateway/std",
@@ -142,6 +144,7 @@ runtime-benchmarks = [
 	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-token-gateway/runtime-benchmarks",

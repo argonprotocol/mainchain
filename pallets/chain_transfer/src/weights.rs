@@ -1,3 +1,7 @@
+use argon_primitives::{
+	notary::{NotaryProvider, NotaryProviderWeightInfo},
+	providers::{ChainTransferLookupWeightInfo, NotebookProvider, NotebookProviderWeightInfo},
+};
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_chain_transfer.
@@ -8,6 +12,54 @@ pub trait WeightInfo {
 	// Event handlers and components
 	fn notebook_submitted_event_handler(t: u32) -> Weight;
 	fn process_expired_transfers(e: u32) -> Weight;
+	fn provider_is_valid_transfer_to_localchain() -> Weight;
+}
+
+type NotebookProviderWeights<T> =
+	<<T as crate::Config>::NotebookProvider as NotebookProvider>::Weights;
+type NotaryProviderWeights<T> = <<T as crate::Config>::NotaryProvider as NotaryProvider<
+	<T as frame_system::Config>::Block,
+	<T as frame_system::Config>::AccountId,
+>>::Weights;
+
+pub struct WithProviderWeights<
+	T,
+	Base,
+	NotebookProviderWeight = NotebookProviderWeights<T>,
+	NotaryProviderWeight = NotaryProviderWeights<T>,
+>(PhantomData<(T, Base, NotebookProviderWeight, NotaryProviderWeight)>);
+impl<T, Base, NotebookProviderWeight, NotaryProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, NotebookProviderWeight, NotaryProviderWeight>
+where
+	T: crate::Config,
+	Base: WeightInfo,
+	NotebookProviderWeight: NotebookProviderWeightInfo,
+	NotaryProviderWeight: NotaryProviderWeightInfo,
+{
+	fn send_to_localchain() -> Weight {
+		Base::send_to_localchain()
+			.saturating_add(NotaryProviderWeight::active_notaries())
+			.saturating_add(NotebookProviderWeight::is_notary_locked_at_tick())
+	}
+
+	fn notebook_submitted_event_handler(t: u32) -> Weight {
+		Base::notebook_submitted_event_handler(t)
+	}
+
+	fn process_expired_transfers(e: u32) -> Weight {
+		Base::process_expired_transfers(e)
+	}
+
+	fn provider_is_valid_transfer_to_localchain() -> Weight {
+		Base::provider_is_valid_transfer_to_localchain()
+	}
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> ChainTransferLookupWeightInfo for ProviderWeightAdapter<T> {
+	fn is_valid_transfer_to_localchain() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_is_valid_transfer_to_localchain()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -21,6 +73,10 @@ impl WeightInfo for () {
 	}
 
 	fn process_expired_transfers(_e: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_is_valid_transfer_to_localchain() -> Weight {
 		Weight::zero()
 	}
 }

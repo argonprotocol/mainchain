@@ -231,6 +231,8 @@ impl TickProvider<Block> for StaticTickProvider {
 
 pub struct StaticBlockSealerProvider;
 impl BlockSealerProvider<u64, UintAuthorityId> for StaticBlockSealerProvider {
+	type Weights = ();
+
 	fn get_sealer_info() -> BlockSealerInfo<u64, UintAuthorityId> {
 		BlockSealer::get()
 	}

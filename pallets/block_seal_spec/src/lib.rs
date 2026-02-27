@@ -207,6 +207,10 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let voting_schedule = T::TickProvider::voting_schedule();
+			let notebook_count =
+				T::NotebookProvider::vote_eligible_notebook_count(&voting_schedule);
+
 			let digest = <frame_system::Pallet<T>>::digest();
 			for log in digest.logs.iter() {
 				if let DigestItem::PreRuntime(BLOCK_VOTES_DIGEST_ID, data) = log {
@@ -222,7 +226,9 @@ pub mod pallet {
 				}
 			}
 
-			T::DbWeight::get().reads_writes(3, 3)
+			<T as Config>::WeightInfo::on_initialize_with_digest().saturating_add(
+				<T as Config>::WeightInfo::on_finalize_with_vote_adjustment(notebook_count),
+			)
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
@@ -482,6 +488,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BlockSealSpecProvider<T::Block> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 			<VoteMinimumHistory<T>>::get().first().cloned()
 		}

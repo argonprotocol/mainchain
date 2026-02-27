@@ -12,6 +12,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 pub mod weights;
 
 #[frame_support::pallet]
@@ -26,7 +28,7 @@ pub mod pallet {
 		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
 		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
 		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
-		TransferToLocalchainId,
+		TransferToLocalchainId, VotingSchedule,
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{
 			NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
@@ -194,16 +196,23 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight((
-			T::WeightInfo::submit(notebooks.len() as u32)
-				.saturating_add(
-					notebooks.iter()
-						.map(|notebook| {
-							T::WeightInfo::submit_with_account_origins(notebook.header.changed_account_origins.len() as u32)
-						})
-						.fold(Weight::zero(), Weight::saturating_add)
-				),
-			DispatchClass::Mandatory
-		))]
+					T::WeightInfo::submit(notebooks.len() as u32)
+						.saturating_add(
+							notebooks.iter()
+								.map(|notebook| {
+									T::WeightInfo::submit_with_account_origins(notebook.header.changed_account_origins.len() as u32)
+								})
+								.fold(Weight::zero(), Weight::saturating_add)
+						)
+						.saturating_add(
+							notebooks.iter()
+								.map(|notebook| {
+									T::WeightInfo::submit_with_chain_transfers(notebook.header.chain_transfers.len() as u32)
+								})
+								.fold(Weight::zero(), Weight::saturating_add)
+						),
+					DispatchClass::Mandatory
+				))]
 		pub fn submit(
 			origin: OriginFor<T>,
 			notebooks: Vec<SignedNotebookHeader>,
@@ -769,9 +778,25 @@ pub mod pallet {
 				})
 				.collect()
 		}
+
+		pub fn notebooks_at_tick(
+			tick: Tick,
+		) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+			let mut notebooks = Vec::new();
+			for (notary_id, details) in <LastNotebookDetailsByNotary<T>>::iter() {
+				for (book, _) in details.iter() {
+					if book.tick == tick {
+						notebooks.push((notary_id, book.notebook_number, book.parent_secret));
+					}
+				}
+			}
+			notebooks
+		}
 	}
 
 	impl<T: Config> NotebookProvider for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn get_eligible_tick_votes_root(
 			notary_id: NotaryId,
 			tick: Tick,
@@ -797,18 +822,21 @@ pub mod pallet {
 				.collect()
 		}
 
-		fn notebooks_at_tick(
-			tick: Tick,
+		fn eligible_notebooks_for_vote(
+			voting_schedule: &VotingSchedule,
 		) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
-			let mut notebooks = Vec::new();
-			for (notary_id, details) in <LastNotebookDetailsByNotary<T>>::iter() {
-				for (book, _) in details.iter() {
-					if book.tick == tick {
-						notebooks.push((notary_id, book.notebook_number, book.parent_secret));
-					}
-				}
-			}
-			notebooks
+			Self::notebooks_at_tick(voting_schedule.notebook_tick())
+		}
+
+		fn vote_eligible_notebook_count(voting_schedule: &VotingSchedule) -> u32 {
+			let tick = voting_schedule.notebook_tick();
+			T::Digests::get()
+				.expect("Digests must be set")
+				.notebooks
+				.notebooks
+				.iter()
+				.filter(|notebook| notebook.tick == tick)
+				.count() as u32
 		}
 
 		fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
