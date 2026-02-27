@@ -57,23 +57,24 @@ async fn test_end_to_end_default_vote_mining() {
 
 	let miner_2_keyring = miner_2.keyring();
 
-	let (keys1, keys_1_2, keys2) = join!(
+	let (keys1, keys2) = join!(
 		register_miner_keys(&miner_1, miner_1_keyring, 1),
-		register_miner_keys(&miner_1, miner_1_keyring, 2),
 		register_miner_keys(&miner_2, miner_2_keyring, 1)
 	);
+	let keys1 = keys1.unwrap();
+	let keys2 = keys2.unwrap();
 	let (miner2_res, miner1_res) = join!(
 		register_miners(
 			&miner_2,
 			miner_2_keyring.pair().into(),
-			vec![(miner_2.account_id.clone(), keys2.unwrap())]
+			vec![(miner_2.account_id.clone(), keys2)]
 		),
 		register_miners(
 			&miner_1,
 			miner_1_keyring.pair().into(),
 			vec![
-				(miner_1.account_id.clone(), keys1.unwrap()),
-				(miner_1_second_account.clone(), keys_1_2.unwrap())
+				(miner_1.account_id.clone(), keys1.clone()),
+				(miner_1_second_account.clone(), keys1)
 			],
 		),
 	);
