@@ -27,8 +27,8 @@ use sc_service::{
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
-use sp_runtime::traits::Header as HeaderT;
 use sp_keystore::{Keystore, KeystorePtr};
+use sp_runtime::traits::Header as HeaderT;
 use std::{sync::Arc, time::Duration};
 
 pub(crate) type FullClient<Runtime> = sc_service::TFullClient<
@@ -473,7 +473,7 @@ where
 				info.best_hash,
 				best_header.number()
 			))
-			})
+		})
 }
 
 fn ensure_single_local_grandpa_key(
@@ -496,8 +496,7 @@ fn ensure_single_local_grandpa_key(
 		.join(",");
 
 	Err(ServiceError::Other(format!(
-		"{err_prefix} ({stage}): found {} keys [{}]. Configure exactly one local GRANDPA key.",
-		key_count, local_keys
+		"{err_prefix} ({stage}): found {key_count} keys [{local_keys}]. Configure exactly one local GRANDPA key."
 	)))
 }
 
