@@ -162,7 +162,7 @@ author_rotateKeys"}' http://localhost:9944/
 Mining requires you to have two tokens: Argons and Argonots (Ownership Tokens). There are initially
 100 mining slots available in Argon, each lasting 10 days. So every day, you are bidding for 1 of 10
 available slots. This will grow to 1,440 slots as the network grows. Bidding will continue until a
-random block less than or equal to 200 ticks before the next slot begins (slots start every 1440
+random block less than or equal to 30 ticks before the next slot begins (slots start every 1440
 ticks).
 
 At any given time, a mining slot requires you to own and lock 1/100th (or current mining slots) of
@@ -206,7 +206,7 @@ slash following command instead:
 Now that you have an account with Argons and Argonots (Ownership Tokens), you can bid for a mining
 slot. You're bidding for a 10- day period starting at the next block that is divisible by 1440 ticks
 (eg, every ticks blocks from the genesis block). Mining bids close in a randomly chosen block within
-200 blocks of the next slot. Mining bids begin after a 10-day bootstrap period called "Slot Zero".
+30 ticks of the next slot. Mining bids begin after a 10-day bootstrap period called "Slot Zero".
 
 > NOTE: in the Testnet, you can start bidding right away.
 
@@ -301,7 +301,7 @@ selected. This occurred on February 24th, 2025 at 12pm EDT.
 
 #### Slot Bid End-time
 
-Slot bidding is for the next slot, and the end time is a random block within 200 blocks of the next
+Slot bidding is for the next slot, and the end time is a random block within 30 ticks of the next
 slot. Randomization is determined from the block "seal" used to close a block. You can see if
 bidding has closed by looking at the `IsNextSlotBiddingOpen` variable in the mining_slot pallet.
 

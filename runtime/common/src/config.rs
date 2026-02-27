@@ -103,7 +103,12 @@ parameter_types! {
 	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(40);
 	pub const TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_rational(2, 1); // Ideally we want 2x bids per seat
-	pub const GrandpaRotationBlocks: BlockNumber = 260;
+	pub const GrandpaRotationBlocks: BlockNumber = 240;
+	pub const GrandpaRecentActivityWindowInRotations: u32 = 3;
+	pub const GrandpaTotalVoteWeight: u64 = 10_000;
+	pub const GrandpaRecencyWindowFallbackMultiplier: u32 = 2;
+	pub const MaxGrandpaAuthorities: u32 = 100;
+	pub const MaxGrandpaAuthorityWeightPercent: Percent = Percent::from_percent(15);
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
 	// ### pallet_vaults

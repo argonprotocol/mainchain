@@ -1,6 +1,7 @@
 use crate::{
 	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
 	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
+	grandpa::DeriveAuthoritiesError,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
@@ -23,7 +24,11 @@ use pallet_prelude::{
 };
 use polkadot_sdk::sp_core::bounded_btree_map;
 use sp_core::bounded_vec;
-use std::{collections::HashMap, env};
+use sp_runtime::testing::UintAuthorityId;
+use std::{
+	collections::{BTreeMap, HashMap},
+	env,
+};
 
 #[test]
 #[should_panic]
@@ -1957,6 +1962,499 @@ fn it_can_change_the_compute_mining_block() {
 			.into(),
 		);
 	});
+}
+
+#[test]
+fn grandpa_authority_derivation_requires_active_registered_mining() {
+	new_test_ext().execute_with(|| {
+		ActiveMinersCount::<Test>::set(0);
+		NextFrameId::<Test>::set(1);
+
+		let result =
+			crate::grandpa::derive_authorities_from_recent_mining::<Test, UintAuthorityId>();
+		assert_eq!(result, Err(DeriveAuthoritiesError::RegisteredMiningInactive));
+	});
+}
+
+#[test]
+fn grandpa_authority_derivation_uses_recent_mining_activity() {
+	GrandpaRotationFrequency::set(10);
+	new_test_ext().execute_with(|| {
+		ActiveMinersCount::<Test>::set(3);
+		NextFrameId::<Test>::set(2);
+		System::set_block_number(30);
+		GrandpaRecentActivityWindowInRotations::set(1);
+		MaxGrandpaAuthorityWeightPercent::set(Percent::from_percent(0));
+
+		let cohort: BoundedVec<Registration<Test>, MaxCohortSize> = bounded_vec![
+			MiningRegistration {
+				account_id: 1,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 11u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 2,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 11u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 3,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 22u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+		];
+		MinersByCohort::<Test>::insert(1, cohort);
+
+		MinerNonceScoringByCohort::<Test>::mutate(|scores| {
+			scores
+				.try_insert(
+					1,
+					bounded_vec![
+						MinerNonceScoring {
+							nonce: U256::from(1u8),
+							last_win_block: Some(29),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(2u8),
+							last_win_block: Some(27),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(3u8),
+							last_win_block: Some(5),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+					],
+				)
+				.unwrap();
+		});
+
+		let authorities =
+			crate::grandpa::derive_authorities_from_recent_mining::<Test, UintAuthorityId>()
+				.unwrap();
+
+		assert_eq!(authorities, vec![(11u64.into(), 2)]);
+	});
+}
+
+#[test]
+fn grandpa_authority_derivation_weighted_allocation_cases() {
+	let cases = vec![
+		(
+			"minimum feasible share with two operators",
+			vec![(1u64, 9u64), (2u64, 1u64)],
+			Percent::from_percent(20),
+			vec![(1u64, 5_000u64), (2u64, 5_000u64)],
+		),
+		(
+			"cap and redistribute with six operators",
+			vec![
+				(1u64, 50u64),
+				(2u64, 1u64),
+				(3u64, 1u64),
+				(4u64, 1u64),
+				(5u64, 1u64),
+				(6u64, 1u64),
+			],
+			Percent::from_percent(20),
+			vec![
+				(1u64, 2_000u64),
+				(2u64, 1_600u64),
+				(3u64, 1_600u64),
+				(4u64, 1_600u64),
+				(5u64, 1_600u64),
+				(6u64, 1_600u64),
+			],
+		),
+		(
+			"equalize five operators at twenty percent",
+			vec![(1u64, 50u64), (2u64, 1u64), (3u64, 1u64), (4u64, 1u64), (5u64, 1u64)],
+			Percent::from_percent(20),
+			vec![
+				(1u64, 2_000u64),
+				(2u64, 2_000u64),
+				(3u64, 2_000u64),
+				(4u64, 2_000u64),
+				(5u64, 2_000u64),
+			],
+		),
+		(
+			"preserve proportional influence below cap",
+			vec![(1u64, 5u64), (2u64, 3u64), (3u64, 2u64)],
+			Percent::from_percent(50),
+			vec![(1u64, 5_000u64), (2u64, 3_000u64), (3u64, 2_000u64)],
+		),
+	];
+
+	for (case_name, raw_weight_entries, configured_share, expected_entries) in cases {
+		let raw_weights = raw_weight_entries
+			.into_iter()
+			.map(|(key, weight)| (key.into(), weight))
+			.collect::<BTreeMap<UintAuthorityId, u64>>();
+		let expected = expected_entries
+			.into_iter()
+			.map(|(key, weight)| (key.into(), weight))
+			.collect::<Vec<(UintAuthorityId, u64)>>();
+
+		let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+			raw_weights,
+			configured_share,
+			MaxGrandpaAuthorities::get(),
+		)
+		.unwrap();
+		let max_weight = authorities.iter().map(|(_, weight)| *weight).max().unwrap_or_default();
+		let final_total_weight = authorities.iter().map(|(_, weight)| *weight).sum::<u64>();
+		let min_authorities_needed = 100u64.div_ceil(configured_share.deconstruct().max(1) as u64);
+		let max_allowed_weight = configured_share.mul_floor(GrandpaTotalVoteWeight::get()).max(1);
+
+		assert_eq!(authorities, expected, "{case_name}");
+		assert_eq!(final_total_weight, GrandpaTotalVoteWeight::get(), "{case_name}");
+		if authorities.len() as u64 >= min_authorities_needed {
+			assert!(max_weight <= max_allowed_weight, "{case_name}");
+		}
+	}
+}
+
+#[test]
+fn grandpa_authority_derivation_skips_guard_on_zero_percent() {
+	let mut raw_weights = BTreeMap::<UintAuthorityId, u64>::new();
+	raw_weights.insert(1u64.into(), 3);
+	raw_weights.insert(2u64.into(), 3);
+	raw_weights.insert(3u64.into(), 3);
+	raw_weights.insert(4u64.into(), 3);
+	raw_weights.insert(5u64.into(), 3);
+	raw_weights.insert(6u64.into(), 3);
+
+	let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights,
+		Percent::from_percent(0),
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+	assert_eq!(
+		authorities,
+		vec![
+			(1u64.into(), 3),
+			(2u64.into(), 3),
+			(3u64.into(), 3),
+			(4u64.into(), 3),
+			(5u64.into(), 3),
+			(6u64.into(), 3)
+		]
+	);
+}
+
+#[test]
+fn grandpa_authority_derivation_enforces_cap_and_total_weight_invariants() {
+	let raw_weights: BTreeMap<UintAuthorityId, u64> = BTreeMap::from([
+		(1u64.into(), 40u64),
+		(2u64.into(), 20u64),
+		(3u64.into(), 10u64),
+		(4u64.into(), 10u64),
+		(5u64.into(), 10u64),
+		(6u64.into(), 5u64),
+		(7u64.into(), 5u64),
+	]);
+	let configured_share = Percent::from_percent(15);
+	let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights,
+		configured_share,
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+
+	let total_weight = authorities.iter().map(|(_, weight)| *weight).sum::<u64>();
+	assert_eq!(total_weight, GrandpaTotalVoteWeight::get());
+
+	let max_operator_weight = configured_share.mul_floor(GrandpaTotalVoteWeight::get()).max(1);
+
+	assert!(authorities.iter().all(|(_, weight)| *weight <= max_operator_weight));
+}
+
+#[test]
+fn grandpa_authority_derivation_is_deterministic_across_input_insertion_order() {
+	let insertion_order_a =
+		[(3u64, 10u64), (1u64, 50u64), (4u64, 10u64), (2u64, 20u64), (5u64, 5u64), (6u64, 5u64)];
+	let insertion_order_b =
+		[(2u64, 20u64), (5u64, 5u64), (4u64, 10u64), (6u64, 5u64), (1u64, 50u64), (3u64, 10u64)];
+
+	let raw_weights_a = insertion_order_a
+		.into_iter()
+		.map(|(key, weight)| (key.into(), weight))
+		.collect::<BTreeMap<UintAuthorityId, u64>>();
+	let raw_weights_b = insertion_order_b
+		.into_iter()
+		.map(|(key, weight)| (key.into(), weight))
+		.collect::<BTreeMap<UintAuthorityId, u64>>();
+
+	let authorities_a = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights_a,
+		Percent::from_percent(20),
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+	let authorities_b = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights_b,
+		Percent::from_percent(20),
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+
+	assert_eq!(authorities_a, authorities_b);
+}
+
+#[test]
+fn grandpa_authority_derivation_recent_activity_window_boundary_behavior() {
+	GrandpaRotationFrequency::set(10);
+	new_test_ext().execute_with(|| {
+		ActiveMinersCount::<Test>::set(3);
+		NextFrameId::<Test>::set(2);
+		System::set_block_number(30);
+		GrandpaRecentActivityWindowInRotations::set(1);
+		MaxGrandpaAuthorityWeightPercent::set(Percent::from_percent(0));
+
+		let cohort: BoundedVec<Registration<Test>, MaxCohortSize> = bounded_vec![
+			MiningRegistration {
+				account_id: 1,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 11u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 2,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 22u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 3,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 33u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+		];
+		MinersByCohort::<Test>::insert(1, cohort);
+
+		MinerNonceScoringByCohort::<Test>::mutate(|scores| {
+			scores
+				.try_insert(
+					1,
+					bounded_vec![
+						MinerNonceScoring {
+							nonce: U256::from(1u8),
+							last_win_block: Some(20), /* exactly current - window; should be
+							                           * included */
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(2u8),
+							last_win_block: Some(19), // older than window; should be excluded
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(3u8),
+							last_win_block: Some(30), // current block; should be included
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+					],
+				)
+				.unwrap();
+		});
+
+		let authorities =
+			crate::grandpa::derive_authorities_from_recent_mining::<Test, UintAuthorityId>()
+				.unwrap();
+		assert_eq!(authorities, vec![(11u64.into(), 1), (33u64.into(), 1)]);
+	});
+}
+
+#[test]
+fn grandpa_authority_derivation_limits_to_top_max_authorities() {
+	let raw_weights = (1u64..=120)
+		.map(|key| (key.into(), 1u64))
+		.collect::<BTreeMap<UintAuthorityId, u64>>();
+	let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights,
+		Percent::from_percent(0),
+		100,
+	)
+	.unwrap();
+
+	assert_eq!(authorities.len(), 100);
+	assert_eq!(authorities.first(), Some(&(1u64.into(), 1)));
+	assert_eq!(authorities.last(), Some(&(100u64.into(), 1)));
+}
+
+#[test]
+fn grandpa_authority_derivation_uses_equal_weights_below_minimum_authorities() {
+	let raw_weights: BTreeMap<UintAuthorityId, u64> = BTreeMap::from([
+		(1u64.into(), 50u64),
+		(2u64.into(), 20u64),
+		(3u64.into(), 10u64),
+		(4u64.into(), 10u64),
+		(5u64.into(), 5u64),
+		(6u64.into(), 5u64),
+	]);
+	let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights,
+		Percent::from_percent(15),
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+
+	let total_weight = authorities.iter().map(|(_, weight)| *weight).sum::<u64>();
+	assert_eq!(total_weight, GrandpaTotalVoteWeight::get());
+	assert_eq!(authorities.len(), 6);
+	assert_eq!(authorities.iter().filter(|(_, weight)| *weight == 1_667).count(), 4);
+	assert_eq!(authorities.iter().filter(|(_, weight)| *weight == 1_666).count(), 2);
+}
+
+#[test]
+fn grandpa_authority_derivation_expands_recent_activity_window_for_liveness() {
+	GrandpaRotationFrequency::set(10);
+	GrandpaRecentActivityWindowInRotations::set(1);
+	MaxGrandpaAuthorityWeightPercent::set(Percent::from_percent(25));
+	new_test_ext().execute_with(|| {
+		ActiveMinersCount::<Test>::set(4);
+		NextFrameId::<Test>::set(2);
+		System::set_block_number(30);
+
+		let cohort: BoundedVec<Registration<Test>, MaxCohortSize> = bounded_vec![
+			MiningRegistration {
+				account_id: 1,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 11u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 2,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 22u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 3,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 33u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 4,
+				argonots: 0,
+				bid: 0,
+				authority_keys: 44u64.into(),
+				starting_frame_id: 1,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+		];
+		MinersByCohort::<Test>::insert(1, cohort);
+
+		MinerNonceScoringByCohort::<Test>::mutate(|scores| {
+			scores
+				.try_insert(
+					1,
+					bounded_vec![
+						MinerNonceScoring {
+							nonce: U256::from(1u8),
+							last_win_block: Some(30),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(2u8),
+							last_win_block: Some(25),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(3u8),
+							last_win_block: Some(20),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+						MinerNonceScoring {
+							nonce: U256::from(4u8),
+							last_win_block: Some(15),
+							blocks_won_in_frame: 0,
+							frame_start_blocks_won_surplus: 0,
+						},
+					],
+				)
+				.unwrap();
+		});
+
+		let authorities =
+			crate::grandpa::derive_authorities_from_recent_mining::<Test, UintAuthorityId>()
+				.unwrap();
+		assert_eq!(
+			authorities,
+			vec![
+				(11u64.into(), 2_500),
+				(22u64.into(), 2_500),
+				(33u64.into(), 2_500),
+				(44u64.into(), 2_500)
+			]
+		);
+	});
+}
+
+#[test]
+fn grandpa_authority_derivation_handles_extremely_skewed_large_weights() {
+	let raw_weights: BTreeMap<UintAuthorityId, u64> = BTreeMap::from([
+		(1u64.into(), u64::MAX - 5_000),
+		(2u64.into(), 2_000),
+		(3u64.into(), 2_000),
+		(4u64.into(), 1_000),
+	]);
+	let authorities = crate::grandpa::derive_authorities_from_weights::<Test, UintAuthorityId>(
+		raw_weights,
+		Percent::from_percent(20),
+		MaxGrandpaAuthorities::get(),
+	)
+	.unwrap();
+
+	let total_weight = authorities.iter().map(|(_, weight)| *weight).sum::<u64>();
+	assert_eq!(total_weight, GrandpaTotalVoteWeight::get());
+	assert!(authorities.iter().all(|(_, weight)| *weight <= 2_500));
+	assert!(authorities.iter().all(|(_, weight)| *weight >= 1));
 }
 
 #[test]

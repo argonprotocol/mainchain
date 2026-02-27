@@ -114,6 +114,11 @@ parameter_types! {
 	pub static IsSlotBiddingStarted: bool = false;
 
 	pub static GrandpaRotationFrequency: BlockNumber = 10;
+	pub static GrandpaRecentActivityWindowInRotations: u32 = 3;
+	pub static GrandpaTotalVoteWeight: u64 = 10_000;
+	pub static GrandpaRecencyWindowFallbackMultiplier: u32 = 2;
+	pub static MaxGrandpaAuthorities: u32 = 100;
+	pub static MaxGrandpaAuthorityWeightPercent: Percent = Percent::from_percent(15);
 
 	pub const BidPoolAccountId: u64 = 10000;
 
@@ -258,6 +263,11 @@ impl pallet_mining_slot::Config for Test {
 	type OperationalAccountsHook = StaticOperationalAccountsHook;
 	type SlotEvents = (StaticNewSlotEvent,);
 	type GrandpaRotationBlocks = GrandpaRotationFrequency;
+	type GrandpaRecentActivityWindowInRotations = GrandpaRecentActivityWindowInRotations;
+	type GrandpaTotalVoteWeight = GrandpaTotalVoteWeight;
+	type GrandpaRecencyWindowFallbackMultiplier = GrandpaRecencyWindowFallbackMultiplier;
+	type MaxGrandpaAuthorities = MaxGrandpaAuthorities;
+	type MaxGrandpaAuthorityWeightPercent = MaxGrandpaAuthorityWeightPercent;
 	type MiningAuthorityId = UintAuthorityId;
 	type Keys = MockSessionKeys;
 	type TickProvider = StaticTickProvider;
