@@ -183,7 +183,9 @@ pub mod pallet {
 			<PayoutsByBlock<T>>::take(cleanup_block);
 			BlockFees::<T>::set(0u128.into());
 
-			T::DbWeight::get().reads_writes(1, 1)
+			T::DbWeight::get()
+				.reads_writes(1, 1)
+				.saturating_add(T::WeightInfo::on_initialize_with_rewards())
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {

@@ -104,6 +104,8 @@ parameter_types! {
 
 pub struct StaticBlockSealerProvider;
 impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
+	type Weights = ();
+
 	fn get_sealer_info() -> BlockSealerInfo<u64> {
 		BlockSealer::get()
 	}
@@ -114,6 +116,8 @@ impl BlockSealerProvider<u64> for StaticBlockSealerProvider {
 
 pub struct TestProvider;
 impl NotaryProvider<Block, TestAccountId> for TestProvider {
+	type Weights = ();
+
 	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
@@ -125,6 +129,8 @@ impl NotaryProvider<Block, TestAccountId> for TestProvider {
 	}
 }
 impl NotebookProvider for TestProvider {
+	type Weights = ();
+
 	fn get_eligible_tick_votes_root(
 		_notary_id: NotaryId,
 		_tick: Tick,
@@ -134,7 +140,12 @@ impl NotebookProvider for TestProvider {
 	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
 		NotebooksInBlock::get()
 	}
-	fn notebooks_at_tick(_tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+	fn eligible_notebooks_for_vote(
+		_voting_schedule: &VotingSchedule,
+	) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		todo!()
+	}
+	fn vote_eligible_notebook_count(_voting_schedule: &VotingSchedule) -> u32 {
 		todo!()
 	}
 	fn is_notary_locked_at_tick(_notary_id: NotaryId, _tick: Tick) -> bool {

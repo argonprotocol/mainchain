@@ -1,118 +1,157 @@
 # Mini RFC: Benchmarking Strategy for Argon Runtime
 
+Last updated: 2026-02-27
+
 ## Context
 
-The previous benchmark effort ran against the real runtime configuration. That caused recurring
-issues:
+Running benchmarks against full production wiring caused recurring issues:
 
-- Benchmarks required real crypto/material (xpubs, signatures), making setup brittle.
-- Cross-pallet event handlers (notebooks, slot changes, bitcoin flows) cascaded and were hard to
-  measure without double-counting.
-- Per-pallet benchmarks became tightly coupled to other pallets' runtime behavior.
+- brittle setup requirements (cross-pallet prerequisites, runtime ordering, key material),
+- unclear attribution of provider costs across pallets,
+- repeated drift between benchmark assumptions and runtime-benchmark execution (WASM no-std).
 
-We also want to split work into small, per-pallet PRs with clear review boundaries.
+We still want small, reviewable, per-pallet benchmark PRs with minimal runtime churn.
 
 ## Goals
 
-- Deterministic, low-friction weight benchmarks per pallet.
-- Avoid crypto and external validation in weight benchmarks.
-- Avoid double-counting handler costs; make event-driven costs explicit.
-- Support per-pallet PRs without huge runtime wiring diffs.
+- Deterministic, low-friction benchmark execution.
+- Provider costs charged where consumed, without adding per-call arithmetic in `lib.rs`.
+- Runtime-benchmark overrides that are compile-time only.
+- Worst-case benchmark coverage for consensus-sensitive paths.
 
 ## Non-goals
 
-- Full end-to-end scenario/perf benchmarks (keep separate).
-- Economic/parameter changes (e.g., WeightToFee) as part of benchmark infra.
-- Perfect modeling of real-world crypto costs inside weight benchmarks.
+- Full e2e/perf scenario benchmarking.
+- Economic parameter tuning (for example `WeightToFee`) in this effort.
+- Perfect real-world crypto modeling.
 
-## Proposal
+## Accepted Pattern (Current)
 
-### 1) Two-tier benchmarking
+### 1) Benchmark-aware runtime config
 
-- Tier A (weights): per-pallet, minimal-state benchmarks used to generate WeightInfo.
-- Tier B (scenario/perf): end-to-end flows (notebooks, bitcoin lifecycle) measured separately and
-  not used for weights.
+Under `feature = "runtime-benchmarks"`, runtime associated types use benchmark providers via
+`use_unless_benchmark!(Prod, Bench)` inline in runtime `Config` impls.
 
-### 2) Benchmark-aware runtime config
+Current benchmark providers are centralized in `pallet_prelude::benchmarking` and exported via
+`runtime/common/src/benchmarking.rs`.
 
-Under `cfg(feature = "runtime-benchmarks")`, override runtime Config types to benchmark stubs:
+### 2) Provider weights are published by provider pallets
 
-- BitcoinVerifier -> BenchmarkBitcoinVerifier (accepts deterministic inputs).
-- NotaryProvider / NotebookProvider / AuthorityProvider -> static benchmark providers.
-- EventHandler -> () or a no-op benchmark handler.
+Provider traits expose associated weight types (for example `type Weights`) through traits in
+`primitives/src/providers.rs`.
 
-This keeps weight benchmarks deterministic and avoids real signature/validation requirements. The
-override is compile-time only and does not affect production runtime.
+Provider-owning pallets expose provider weight adapters in their own `weights.rs`, for example:
 
-### 3) Event handler weight aggregation
+- `ProviderWeightAdapter<T>` maps provider-weight trait methods to pallet `WeightInfo`.
+- consumer pallets compose provider costs in `WithProviderWeights<...>` wrappers.
 
-Add weight reporting to event handler traits so we can charge handlers once, in a single place.
+This keeps provider weight composition in `weights.rs` and out of pallet/runtime `lib.rs`.
 
-Example (conceptual):
+### 3) Benchmark provider state is in-memory, not storage side channels
 
-- In primitives/src/providers.rs:
-  - fn notebook_submitted_weight(header: &NotebookHeader) -> Weight;
-  - Provide tuple impl that sums weights.
-- In pallets/notebook:
-  - Weight function includes T::EventHandler::notebook_submitted_weight(header).
+Benchmark mock providers are explicitly seeded by benchmarks.
 
-This avoids double-counting and makes event-driven costs explicit and testable.
+- `std` benchmark builds use `parameter_types! { static ... }` holder state.
+- no-std runtime-benchmark WASM uses an internal in-memory fallback.
 
-### 4) Benchmark-only setup helpers (optional)
+No `:argon:bench:*` temporary storage keys are used for provider state lookup.
 
-If benchmark-only providers are sufficient, we should not need extra storage helpers. Only add
-helpers if a pallet cannot be made deterministic via provider overrides.
+### 4) Worst-case benchmark shaping is explicit
 
-### 5) Per-pallet PRs
-
-Split work into small, reviewable PRs:
-
-1. Infra PR: benchmark-only providers + event handler weight aggregation + mini RFC.
-2. Per-pallet PRs: add or refine benchmarks for each pallet, using the shared pattern.
-3. Runtime wiring PR: update weight modules and benchmark lists (including liquidity_pools ->
-   treasury rename).
-
-## Alternatives Considered
-
-- Keep real runtime config for benchmarks: rejected (brittle, slow, double-count risk).
-- Measure crypto cost inside benchmarks: possible but not required; can be added as fixed costs
-  later.
-- Charge event handler weight inside each handler: risks double counting and unclear attribution.
-
-## Risks
-
-- Benchmark-only providers could diverge from real runtime behavior if overused.
-- Event handler weight aggregation must be kept in sync as handlers evolve.
+- `pallet_block_seal::apply` benchmark measures the vote path (not compute path).
+- notebook-provider lookup benchmarks seed max history depth for notary notebook history.
+- `BenchmarkNotaryProvider::verify_signature` executes a deterministic lightweight real
+  `ed25519_verify` to include signature verification cost shape in benchmarked paths.
 
 ## Keeping runtime changes minimal
 
-To avoid littering runtime code with weight logic:
+- no new provider `saturating_add(...)` logic in pallet/runtime `lib.rs`.
+- provider-cost composition is done in pallet `weights.rs` wrappers (`WithProviderWeights`).
+- runtime `lib.rs` changes are limited to associated type wiring for provider overrides and
+  selecting wrapper weight types.
 
-- Use `cfg(feature = \"runtime-benchmarks\")` directly on the associated types inside each runtime
-  `Config` impl (so the override is visible where it is used).
-- Keep event handler weight aggregation inside traits in primitives, not in runtime.
-- Prefer tuple implementations with default `Weight::zero()` so runtime wiring stays unchanged.
-- Limit runtime diffs to small, local blocks (no per-call additions in runtime logic).
+## Implementation Status (Overall)
 
-## Open Questions
+`Complete` in the table below means:
 
-- Should crypto verification get a fixed weight constant, or be ignored in weights?
-- Should event handler weights be charged by the source pallet (notebook) or the handler pallet?
-- Which pallets should be prioritized for early PRs?
+- runtime benchmark target is dispatched in both runtimes (where applicable),
+- generated runtime weight modules are present in both runtimes (where applicable),
+- the local pallet benchmark suite is implemented (not placeholder-only).
 
-## Suggested Next Steps
+### Benchmark Completion Matrix
 
-- Implement infra PR (benchmark-only providers + event handler weight aggregation).
-- Pick 1-2 pallets (e.g., bitcoin_locks, notebook) to validate the pattern.
+Local pallets in this repo (`pallets/*`):
 
-## Agent Prompt (copy/paste)
+| Complete | Pallet | Local Benchmark Suite | Dispatched (Argon/Canary) | Weights Present (Argon/Canary) | Notes |
+| --- | --- | --- | --- | --- | --- |
+| [ ] | `pallet_bitcoin_locks` | missing | no / no | no / no | no `pallets/bitcoin_locks/src/benchmarking.rs` |
+| [ ] | `pallet_bitcoin_utxos` | missing | no / no | no / no | no `pallets/bitcoin_utxos/src/benchmarking.rs` |
+| [ ] | `pallet_block_rewards` | placeholder-only | no / no | no / no | `pallets/block_rewards/src/benchmarking.rs` placeholder |
+| [x] | `pallet_block_seal` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [x] | `pallet_block_seal_spec` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [x] | `pallet_chain_transfer` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [ ] | `pallet_digests` | missing | no / no | no / no | no `pallets/digests/src/benchmarking.rs` |
+| [ ] | `pallet_domains` | missing | no / no | no / no | no `pallets/domains/src/benchmarking.rs` |
+| [ ] | `pallet_fee_control` | missing | no / no | no / no | no `pallets/fee_control/src/benchmarking.rs` |
+| [x] | `pallet_inbound_transfer_log` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [x] | `pallet_mining_slot` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [ ] | `pallet_mint` | missing | no / no | no / no | no `pallets/mint/src/benchmarking.rs` |
+| [ ] | `pallet_notaries` | missing | no / no | no / no | no `pallets/notaries/src/benchmarking.rs` |
+| [x] | `pallet_notebook` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [x] | `pallet_operational_accounts` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| [ ] | `pallet_price_index` | missing | no / no | no / no | no `pallets/price_index/src/benchmarking.rs` |
+| [ ] | `pallet_ticks` | missing | no / no | no / no | no `pallets/ticks/src/benchmarking.rs` |
+| [ ] | `pallet_treasury` | placeholder-only | no / no | no / no | `pallets/treasury/src/benchmarking.rs` placeholder |
+| [x] | `pallet_vaults` | implemented | yes / yes | yes / yes | full suite + generated weights |
 
-You are in `/Users/blakebyrnes/Projects/DataLiberationFoundation/mainchain-work`. Goal: finish
-benchmark/weight integration by pallet (reviewable PRs). Use `./scripts/benchmark.sh` (template:
-`scripts/weight_template.hbs`) to generate weights. Do not reintroduce `frame_benchmarking` weights;
-`pallet_ismp_grandpa` needs the rename fix. Keep benchmark providers gated by
-`cfg(feature = "runtime-benchmarks")` using the `use_unless_benchmark!` macro inline in runtime
-configs (`type Foo = use_unless_benchmark!(Prod, Bench);`). Mining_slot benchmarks: `bid` fills
-cohort to capacity and bumps lowest bidder; ensure DB weights are present. If benchmark output has
-duplicate “range of component” docs, de-dupe via the benchmark script. Prefer minimal, reviewable
-changes; split PRs by pallet.
+Runtime-dispatched upstream benchmarks:
+
+| Complete | Benchmark Target | Suite Source | Dispatched (Argon/Canary) | Weights Present (Argon/Canary) | Notes |
+| --- | --- | --- | --- | --- | --- |
+| [x] | `frame_benchmarking::BaselineBench` | upstream | yes / yes | n/a | baseline harness benchmark |
+| [x] | `frame_system` | upstream | yes / yes | yes / yes | `frame_system.rs` |
+| [x] | `pallet_balances::Balances` | upstream | yes / yes | yes / yes | `pallet_balances_balances.rs` |
+| [x] | `pallet_balances::Ownership` | upstream | yes / yes | yes / yes | `pallet_balances_ownership.rs` |
+| [x] | `pallet_timestamp` | upstream | yes / yes | yes / yes | `pallet_timestamp.rs` |
+
+### Provider-weight pattern adoption
+
+- Shared benchmark providers are centralized in `pallet_prelude::benchmarking` and exported via
+  `runtime/common/src/benchmarking.rs`.
+- Provider-weight adapters/wrappers are in pallet `weights.rs` (not `lib.rs`) for:
+  - `pallet_block_seal`,
+  - `pallet_block_seal_spec`,
+  - `pallet_chain_transfer`,
+  - `pallet_notebook`,
+  - `pallet_mining_slot`,
+  - `pallet_block_rewards` (wrapper shape present).
+
+### Validation status
+
+- targeted benchmark regeneration has been run for `pallet_block_seal`,
+  `pallet_block_seal_spec`, `pallet_chain_transfer`, and `pallet_notebook` on argon/canary,
+- `cargo check -p argon-runtime -p argon-canary-runtime --features runtime-benchmarks`,
+- `cargo make fmt`,
+- `cargo make lint`,
+- no `UNKNOWN KEY` / `:argon:bench:` artifacts in targeted generated weight files.
+
+### Deferred / follow-up
+
+- implement actual benchmark suites for `pallet_block_rewards` and `pallet_treasury` and wire their
+  generated runtime weight modules when complete,
+- additional provider cleanup work outside this scope (for example domains/block_rewards follow-up
+  items) remain separate,
+- mandatory-inherent liveness guardrails are deferred to a follow-up PR (not this benchmark PR),
+  specifically:
+  - authoring-side caps for mandatory inherent payload size/count (notebook + bitcoin paths),
+  - worst-case inclusion/import tests to ensure mandatory inherents do not fail with
+    `InvalidTransaction::BadMandatory`,
+  - safe defer/drop policy for overflow inputs so block production remains live,
+- if we need richer modeling for crypto-heavy providers, add dedicated provider weight trait methods
+  in a follow-up instead of pushing weight arithmetic into runtime logic.
+
+## Risks
+
+- benchmark providers can drift from production behavior if benchmark setup assumptions are not kept
+  explicit in benchmark code,
+- provider call counts in benchmark setup can regress if benchmark preconditions change silently.

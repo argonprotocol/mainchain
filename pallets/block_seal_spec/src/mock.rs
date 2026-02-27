@@ -82,6 +82,8 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, u64> for StaticAuthorityProv
 pub struct StaticNotebookProvider;
 
 impl NotebookProvider for StaticNotebookProvider {
+	type Weights = ();
+
 	fn get_eligible_tick_votes_root(
 		notary_id: NotaryId,
 		tick: Tick,
@@ -89,10 +91,15 @@ impl NotebookProvider for StaticNotebookProvider {
 		VotingRoots::get().get(&(notary_id, tick)).cloned()
 	}
 	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
-		todo!()
+		vec![]
 	}
-	fn notebooks_at_tick(_tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
-		todo!()
+	fn eligible_notebooks_for_vote(
+		_voting_schedule: &VotingSchedule,
+	) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		vec![]
+	}
+	fn vote_eligible_notebook_count(_voting_schedule: &VotingSchedule) -> u32 {
+		0
 	}
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
 		LockedNotaries::get().contains(&(notary_id, tick))

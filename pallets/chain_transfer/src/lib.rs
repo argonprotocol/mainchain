@@ -12,6 +12,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 pub mod weights;
 
 #[frame_support::pallet]
@@ -300,12 +302,20 @@ pub mod pallet {
 					},
 					ChainTransfer::ToLocalchain { transfer_id } => {
 						if let Some(transfer) = PendingTransfersOut::<T>::take(transfer_id) {
-							ExpiringTransfersOutByNotary::<T>::mutate(
+							ExpiringTransfersOutByNotary::<T>::mutate_exists(
 								transfer.notary_id,
 								transfer.expiration_tick,
-								|e| {
-									if let Some(pos) = e.iter().position(|x| x == transfer_id) {
-										e.remove(pos);
+								|maybe_expiring| {
+									let Some(expiring) = maybe_expiring else {
+										return;
+									};
+									if let Some(pos) =
+										expiring.iter().position(|x| x == transfer_id)
+									{
+										expiring.remove(pos);
+									}
+									if expiring.is_empty() {
+										*maybe_expiring = None;
 									}
 								},
 							);
@@ -341,8 +351,8 @@ pub mod pallet {
 			// Use notebook tick progression as the expiry boundary so delayed-but-valid notebooks
 			// can still consume transfers before they are treated as stale.
 			let expiring_ticks: Vec<Tick> =
-				ExpiringTransfersOutByNotary::<T>::iter_prefix(notary_id)
-					.filter_map(|(tick, _)| if tick < header.tick { Some(tick) } else { None })
+				ExpiringTransfersOutByNotary::<T>::iter_key_prefix(notary_id)
+					.filter(|tick| *tick < header.tick)
 					.collect();
 
 			for tick in expiring_ticks.into_iter() {
@@ -390,6 +400,8 @@ pub mod pallet {
 		ChainTransferLookup<<T as frame_system::Config>::AccountId, <T as Config>::Balance>
 		for Pallet<T>
 	{
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn is_valid_transfer_to_localchain(
 			notary_id: NotaryId,
 			transfer_id: TransferToLocalchainId,

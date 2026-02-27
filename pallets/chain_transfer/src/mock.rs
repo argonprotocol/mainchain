@@ -81,13 +81,20 @@ pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 
 pub struct StaticNotebookProvider;
 impl NotebookProvider for StaticNotebookProvider {
+	type Weights = ();
+
 	fn get_eligible_tick_votes_root(_: NotaryId, _tick: Tick) -> Option<(H256, NotebookNumber)> {
 		None
 	}
 	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)> {
 		todo!()
 	}
-	fn notebooks_at_tick(_: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+	fn eligible_notebooks_for_vote(
+		_voting_schedule: &VotingSchedule,
+	) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		todo!()
+	}
+	fn vote_eligible_notebook_count(_voting_schedule: &VotingSchedule) -> u32 {
 		todo!()
 	}
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
@@ -100,6 +107,8 @@ impl NotebookProvider for StaticNotebookProvider {
 
 pub struct StaticNotaryProvider;
 impl NotaryProvider<Block, AccountId32> for StaticNotaryProvider {
+	type Weights = ();
+
 	fn verify_signature(
 		_notary_id: NotaryId,
 		_at_tick: Tick,

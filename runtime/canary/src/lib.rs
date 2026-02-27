@@ -16,8 +16,10 @@ pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 use polkadot_sdk::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+use argon_runtime_common::benchmarking;
 pub use argon_runtime_common::config::NotaryRecordT;
-use argon_runtime_common::{benchmarking, prelude::*, use_unless_benchmark};
+use argon_runtime_common::{prelude::*, use_unless_benchmark};
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
@@ -194,9 +196,12 @@ impl pallet_block_seal_spec::Config for Runtime {
 	type AuthorityProvider = MiningSlot;
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type NotebookProvider =
-		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider<Runtime>);
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
-	type WeightInfo = ();
+	type WeightInfo = pallet_block_seal_spec::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_block_seal_spec::WeightInfo<Runtime>,
+	>;
 	type TargetBlockVotes = TargetBlockVotes;
 	type HistoricalComputeBlocksForAverage = SealSpecComputeHistoryToTrack;
 	type HistoricalVoteBlocksForAverage = SealSpecVoteHistoryForAverage;
@@ -212,7 +217,7 @@ impl Get<Tick> for NotebookTickProvider {
 }
 
 impl pallet_block_rewards::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = pallet_block_rewards::weights::WithProviderWeights<Runtime, ()>;
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
@@ -220,7 +225,7 @@ impl pallet_block_rewards::Config for Runtime {
 	type BlockRewardAccountsProvider = MiningSlot;
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type NotebookProvider =
-		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider<Runtime>);
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type StartingArgonsPerBlock = StartingArgonsPerBlock;
 	type StartingOwnershipTokensPerBlock = StartingOwnershipTokensPerBlock;
@@ -395,7 +400,10 @@ impl pallet_treasury::Config for Runtime {
 }
 
 impl pallet_mining_slot::Config for Runtime {
-	type WeightInfo = weights::pallet_mining_slot::WeightInfo<Runtime>;
+	type WeightInfo = pallet_mining_slot::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_mining_slot::WeightInfo<Runtime>,
+	>;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
@@ -422,10 +430,16 @@ impl pallet_mining_slot::Config for Runtime {
 
 impl pallet_block_seal::Config for Runtime {
 	type AuthorityId = BlockSealAuthorityId;
-	type WeightInfo = ();
-	type AuthorityProvider = MiningSlot;
+	type WeightInfo = pallet_block_seal::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_block_seal::WeightInfo<Runtime>,
+	>;
+	type AuthorityProvider = use_unless_benchmark!(
+		MiningSlot,
+		benchmarking::BenchmarkAuthorityProvider<Runtime, BlockSealAuthorityId>
+	);
 	type NotebookProvider =
-		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider<Runtime>);
 	type BlockSealSpecProvider = BlockSealSpec;
 	type FindAuthor = Digests;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
@@ -444,11 +458,14 @@ impl pallet_grandpa::Config for Runtime {
 }
 
 impl pallet_chain_transfer::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = pallet_chain_transfer::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_chain_transfer::WeightInfo<Runtime>,
+	>;
 	type Argon = Balances;
 	type Balance = Balance;
 	type NotebookProvider =
-		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider);
+		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider<Runtime>);
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type EventHandler = use_unless_benchmark!(Mint, ());
@@ -458,7 +475,10 @@ impl pallet_chain_transfer::Config for Runtime {
 }
 
 impl pallet_notebook::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = pallet_notebook::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_notebook::WeightInfo<Runtime>,
+	>;
 	type EventHandler = use_unless_benchmark!((ChainTransfer, BlockSealSpec, Domains), ());
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type ChainTransferLookup = ChainTransfer;
