@@ -1758,8 +1758,8 @@ declare module '@polkadot/api-base/types/events' {
         { frameId: u64; totalActivatedCapital: u128; participatingVaults: u32 }
       >;
       /**
-       * Some mining bond capital was refunded due to less activated vault funds than bond
-       * capital
+       * Some mining bond capital was refunded because vault securitized satoshis (`sats *
+       * securitization ratio`) were lower than bond capital
        **/
       RefundedTreasuryCapital: AugmentedEvent<
         ApiType,
