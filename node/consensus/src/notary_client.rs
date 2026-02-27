@@ -4,7 +4,7 @@ use crate::{
 	metrics::ConsensusMetrics,
 	state_anchor::{
 		DEFAULT_STATE_LOOKBACK_DEPTH, ResolveBestOrFinalizedStateHashError, StateAnchorClient,
-		resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+		resolve_best_or_finalized_state_hash,
 	},
 };
 use argon_notary_apis::{
@@ -543,37 +543,16 @@ where
 		// Only respect pause flag when running under normal sync.
 		// When importing a specific block (e.g. during verification), always allow processing.
 		if *self.pause_queue_processing.read().await && importing_with_parent_hash.is_none() {
-			return Ok(true);
+			return Ok(false);
 		}
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
-
-		let Some(finalized_hash) = resolve_stateful_hash(
-			self.as_ref(),
-			self.client.finalized_hash(),
-			DEFAULT_STATE_LOOKBACK_DEPTH,
-		)?
-		else {
-			trace!("Skipping notary queue processing: finalized chain has no available state hash");
-			return Ok(true);
-		};
-
-		let best_hash = if let Some(parent_hash) = importing_with_parent_hash {
-			if self.client.has_block_state(parent_hash) { parent_hash } else { finalized_hash }
-		} else {
-			let chain_best_hash = self.client.best_hash();
-			let Some(best_with_state) = resolve_stateful_hash(
-				self.as_ref(),
-				chain_best_hash,
-				DEFAULT_STATE_LOOKBACK_DEPTH,
-			)?
-			else {
-				trace!("Skipping notary queue processing: best chain has no available state hash");
-				return Ok(true);
-			};
-			best_with_state
-		};
+		let finalized_hash = self.client.finalized_hash();
+		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
+		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
+			return Ok(false);
+		}
 		let queued_notaries =
 			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
 
@@ -1987,7 +1966,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn falls_back_to_ancestor_with_state_when_best_is_pruned() {
+	async fn skips_queue_processing_when_finalized_lacks_state() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
@@ -2005,18 +1984,20 @@ mod test {
 		let block_1 = H256::from_slice(&[1; 32]);
 		let block_2 = H256::from_slice(&[2; 32]);
 		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
-		client.set_best_hash(block_2);
+		client.set_best_hash(block_1);
 		client.set_finalized_hash(block_2);
-		client.set_block_state(block_2, false);
 		client.set_block_state(block_1, true);
+		client.set_block_state(block_2, false);
 		client.set_block_state(block_0, true);
 
-		notary_client.process_queues(None).await.expect("Could not process queues");
-		assert_eq!(notary_client.queue_depth(1).await, 0);
+		let has_more_work =
+			notary_client.process_queues(None).await.expect("Could not process queues");
+		assert!(!has_more_work);
+		assert_eq!(notary_client.queue_depth(1).await, 1);
 	}
 
 	#[tokio::test]
-	async fn prefers_nearest_best_ancestor_state_over_finalized_state() {
+	async fn skips_queue_processing_when_best_lacks_state_even_if_ancestor_has_state() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
@@ -2052,9 +2033,11 @@ mod test {
 			raw_audit_summary: vec![],
 		});
 
-		notary_client.process_queues(None).await.expect("Could not process queues");
-		assert_eq!(notary_client.queue_depth(1).await, 0);
-		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_1));
+		let has_more_work =
+			notary_client.process_queues(None).await.expect("Could not process queues");
+		assert!(!has_more_work);
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), None);
 	}
 
 	#[tokio::test]
