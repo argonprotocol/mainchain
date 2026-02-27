@@ -43,8 +43,8 @@ pub use pallet::*;
 /// locked the same day as a slot are eligible for instant-liquidity.
 ///
 /// ## Treasury Pool Allocation
-/// Each slot's treasury pool can bond argons up to 1/10th of a vault's `activated securitization`.
-/// `Activated securitization` is 2x the amount of LockedBitcoins.
+/// Each slot's treasury pool can bond argons up to 1/10th of a vault's securitized satoshis
+/// (`sats * securitization ratio`).
 ///
 /// ## Profits from Bid Pool
 /// Once each bid pool is closed, 20% of the pool is reserved for treasury reserves. (Operational
@@ -220,8 +220,8 @@ pub mod pallet {
 			account_id: T::AccountId,
 			dispatch_error: DispatchError,
 		},
-		/// Some mining bond capital was refunded due to less activated vault funds than bond
-		/// capital
+		/// Some mining bond capital was refunded because vault securitized satoshis (`sats *
+		/// securitization ratio`) were lower than bond capital
 		RefundedTreasuryCapital {
 			frame_id: FrameId,
 			vault_id: VaultId,
@@ -253,8 +253,6 @@ pub mod pallet {
 		CouldNotFindTreasury,
 		/// Max contributors for a fund exceeded
 		MaxContributorsExceeded,
-		/// The added amount would exceed the activated securitization
-		ActivatedSecuritizationExceeded,
 		/// Max Vaults exceeded
 		MaxVaultsExceeded,
 		/// This fund has already been renewed
@@ -547,13 +545,13 @@ pub mod pallet {
 			});
 		}
 
-		/// Locks in the vault capital for the next frame based on activated securitization and
-		/// funders.
+		/// Locks in the vault capital for the next frame based on vault securitized satoshis (`sats
+		/// * securitization ratio`) and funders.
 		pub(crate) fn lock_in_vault_capital(frame_id: FrameId) {
 			let mut vault_candidates: Vec<VaultCandidateCapital<T>> = Vec::new();
 
 			for vault_id in FundersByVaultId::<T>::iter_keys() {
-				let activated_cap = Self::get_vault_activated_funds_per_slot(vault_id);
+				let activated_cap = Self::get_vault_securitized_funds_per_slot(vault_id);
 				if activated_cap.is_zero() {
 					continue;
 				}
@@ -816,10 +814,10 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn get_vault_activated_funds_per_slot(vault_id: VaultId) -> T::Balance {
-			let activated_securitization =
-				T::TreasuryVaultProvider::get_activated_securitization(vault_id);
-			activated_securitization / 10u128.into()
+		fn get_vault_securitized_funds_per_slot(vault_id: VaultId) -> T::Balance {
+			let securitized_satoshis = T::TreasuryVaultProvider::get_securitized_satoshis(vault_id);
+			let securitized_capital: T::Balance = u128::from(securitized_satoshis).into();
+			securitized_capital / 10u128.into()
 		}
 	}
 

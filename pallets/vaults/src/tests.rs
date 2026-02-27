@@ -550,13 +550,31 @@ fn it_tracks_securitized_satoshis_via_provider_methods() {
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
 
-		assert_ok!(Vaults::add_securitized_satoshis(1, 1_000));
-		assert_ok!(Vaults::add_securitized_satoshis(1, 500));
+		assert_ok!(Vaults::add_securitized_satoshis(1, 1_000, FixedU128::one()));
+		assert_ok!(Vaults::add_securitized_satoshis(1, 500, FixedU128::one()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 1_500);
 
-		assert_ok!(Vaults::reduce_securitized_satoshis(1, 600));
+		assert_ok!(Vaults::reduce_securitized_satoshis(1, 600, FixedU128::one()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 900);
+
+		let mut config = default_vault();
+		config.securitization_ratio = FixedU128::from_u32(2);
+		set_argons(2, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(2), config));
+
+		assert_ok!(Vaults::add_securitized_satoshis(2, 1_000, FixedU128::from_u32(2)));
+		let vault = VaultsById::<Test>::get(2).unwrap();
+		assert_eq!(vault.locked_satoshis, 1_000);
+		assert_eq!(vault.securitized_satoshis, 2_000);
+
+		assert_ok!(Vaults::reduce_securitized_satoshis(2, 600, FixedU128::from_u32(2)));
+		let vault = VaultsById::<Test>::get(2).unwrap();
+		assert_eq!(vault.locked_satoshis, 400);
+		assert_eq!(vault.securitized_satoshis, 800);
 	});
 }
 
@@ -568,9 +586,14 @@ fn it_errors_when_reducing_securitized_satoshis_below_zero() {
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
 
-		assert_err!(Vaults::reduce_securitized_satoshis(1, 1), VaultError::InternalError);
+		assert_err!(
+			Vaults::reduce_securitized_satoshis(1, 1, FixedU128::one()),
+			VaultError::InternalError
+		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
 	});
 }
 

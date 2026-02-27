@@ -3809,9 +3809,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				67u8, 184u8, 90u8, 97u8, 54u8, 99u8, 152u8, 164u8, 156u8, 17u8, 162u8, 68u8, 102u8,
-				94u8, 130u8, 124u8, 6u8, 36u8, 98u8, 241u8, 242u8, 243u8, 100u8, 58u8, 156u8,
-				131u8, 160u8, 144u8, 223u8, 215u8, 33u8, 120u8,
+				165u8, 64u8, 226u8, 46u8, 197u8, 212u8, 239u8, 246u8, 108u8, 211u8, 19u8, 206u8,
+				84u8, 173u8, 52u8, 232u8, 113u8, 177u8, 15u8, 180u8, 109u8, 1u8, 4u8, 41u8, 239u8,
+				163u8, 143u8, 243u8, 81u8, 196u8, 157u8, 237u8,
 			]
 	}
 	pub mod system {
@@ -10472,10 +10472,9 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							152u8, 220u8, 83u8, 122u8, 202u8, 127u8, 162u8, 230u8, 7u8, 115u8,
-							64u8, 44u8, 216u8, 20u8, 203u8, 160u8, 40u8, 246u8, 170u8, 165u8, 64u8,
-							109u8, 240u8, 43u8, 136u8, 125u8, 233u8, 204u8, 10u8, 228u8, 167u8,
-							91u8,
+							188u8, 235u8, 72u8, 60u8, 229u8, 217u8, 171u8, 203u8, 11u8, 13u8,
+							168u8, 178u8, 209u8, 235u8, 19u8, 27u8, 229u8, 9u8, 148u8, 12u8, 4u8,
+							206u8, 25u8, 167u8, 127u8, 4u8, 34u8, 23u8, 225u8, 34u8, 23u8, 48u8,
 						],
 					)
 				}
@@ -10497,10 +10496,9 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							152u8, 220u8, 83u8, 122u8, 202u8, 127u8, 162u8, 230u8, 7u8, 115u8,
-							64u8, 44u8, 216u8, 20u8, 203u8, 160u8, 40u8, 246u8, 170u8, 165u8, 64u8,
-							109u8, 240u8, 43u8, 136u8, 125u8, 233u8, 204u8, 10u8, 228u8, 167u8,
-							91u8,
+							188u8, 235u8, 72u8, 60u8, 229u8, 217u8, 171u8, 203u8, 11u8, 13u8,
+							168u8, 178u8, 209u8, 235u8, 19u8, 27u8, 229u8, 9u8, 148u8, 12u8, 4u8,
+							206u8, 25u8, 167u8, 127u8, 4u8, 34u8, 23u8, 225u8, 34u8, 23u8, 48u8,
 						],
 					)
 				}
@@ -24300,8 +24298,8 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
-			#[doc = "capital"]
+			#[doc = "Some mining bond capital was refunded because vault securitized satoshis (`sats *"]
+			#[doc = "securitization ratio`) were lower than bond capital"]
 			pub struct RefundedTreasuryCapital {
 				pub frame_id: refunded_treasury_capital::FrameId,
 				pub vault_id: refunded_treasury_capital::VaultId,
@@ -27480,6 +27478,8 @@ pub mod api {
 					pub securitization_locked: _1,
 					#[codec(compact)]
 					pub securitization_pending_activation: _1,
+					#[codec(compact)]
+					pub locked_satoshis: ::core::primitive::u64,
 					#[codec(compact)]
 					pub securitized_satoshis: ::core::primitive::u64,
 					pub securitization_release_schedule:
@@ -34014,15 +34014,12 @@ pub mod api {
 					#[doc = "Max contributors for a fund exceeded"]
 					MaxContributorsExceeded,
 					#[codec(index = 7)]
-					#[doc = "The added amount would exceed the activated securitization"]
-					ActivatedSecuritizationExceeded,
-					#[codec(index = 8)]
 					#[doc = "Max Vaults exceeded"]
 					MaxVaultsExceeded,
-					#[codec(index = 9)]
+					#[codec(index = 8)]
 					#[doc = "This fund has already been renewed"]
 					AlreadyRenewed,
-					#[codec(index = 10)]
+					#[codec(index = 9)]
 					#[doc = "Vault operator only"]
 					NotAVaultOperator,
 				}
@@ -34082,8 +34079,8 @@ pub mod api {
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 5)]
-					#[doc = "Some mining bond capital was refunded due to less activated vault funds than bond"]
-					#[doc = "capital"]
+					#[doc = "Some mining bond capital was refunded because vault securitized satoshis (`sats *"]
+					#[doc = "securitization ratio`) were lower than bond capital"]
 					RefundedTreasuryCapital {
 						frame_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,

@@ -3578,6 +3578,7 @@ declare module '@polkadot/types/lookup' {
     readonly securitizationTarget: Compact<u128>;
     readonly securitizationLocked: Compact<u128>;
     readonly securitizationPendingActivation: Compact<u128>;
+    readonly lockedSatoshis: Compact<u64>;
     readonly securitizedSatoshis: Compact<u64>;
     readonly securitizationReleaseSchedule: BTreeMap<u64, u128>;
     readonly securitizationRatio: Compact<u128>;
@@ -4310,7 +4311,6 @@ declare module '@polkadot/types/lookup' {
     readonly isInternalError: boolean;
     readonly isCouldNotFindTreasury: boolean;
     readonly isMaxContributorsExceeded: boolean;
-    readonly isActivatedSecuritizationExceeded: boolean;
     readonly isMaxVaultsExceeded: boolean;
     readonly isAlreadyRenewed: boolean;
     readonly isNotAVaultOperator: boolean;
@@ -4322,7 +4322,6 @@ declare module '@polkadot/types/lookup' {
       | 'InternalError'
       | 'CouldNotFindTreasury'
       | 'MaxContributorsExceeded'
-      | 'ActivatedSecuritizationExceeded'
       | 'MaxVaultsExceeded'
       | 'AlreadyRenewed'
       | 'NotAVaultOperator';

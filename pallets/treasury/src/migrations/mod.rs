@@ -335,7 +335,7 @@ mod test {
 				42,
 				TestVault {
 					account_id: 42,
-					activated: 100_000_000,
+					securitized_satoshis: 100_000_000,
 					is_closed: false,
 					sharing_percent: Permill::from_percent(10),
 				},
@@ -344,7 +344,7 @@ mod test {
 				43,
 				TestVault {
 					account_id: 2,
-					activated: 100_000_000,
+					securitized_satoshis: 100_000_000,
 					is_closed: false,
 					sharing_percent: Permill::from_percent(10),
 				},

@@ -475,6 +475,7 @@ pub mod pallet {
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
+				locked_satoshis: 0,
 				securitized_satoshis: 0,
 				terms,
 				securitization_ratio,
@@ -959,9 +960,9 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn get_activated_securitization(vault_id: VaultId) -> Self::Balance {
+		fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
 			VaultsById::<T>::get(vault_id)
-				.map(|a| a.get_activated_securitization())
+				.map(|a| a.securitized_satoshis)
 				.unwrap_or_default()
 		}
 
@@ -1050,10 +1051,13 @@ pub mod pallet {
 		fn add_securitized_satoshis(
 			vault_id: VaultId,
 			satoshis: Satoshis,
+			securitization_ratio: FixedU128,
 		) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.securitized_satoshis = vault.securitized_satoshis.saturating_add(satoshis);
+				let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
+				vault.locked_satoshis.saturating_accrue(satoshis);
+				vault.securitized_satoshis.saturating_accrue(securitized_satoshis);
 				Ok(())
 			})
 		}
@@ -1061,14 +1065,18 @@ pub mod pallet {
 		fn reduce_securitized_satoshis(
 			vault_id: VaultId,
 			satoshis: Satoshis,
+			securitization_ratio: FixedU128,
 		) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				let remaining = vault
-					.securitized_satoshis
-					.checked_sub(satoshis)
-					.ok_or(VaultError::InternalError)?;
-				vault.securitized_satoshis = remaining;
+				let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
+				if vault.locked_satoshis < satoshis ||
+					vault.securitized_satoshis < securitized_satoshis
+				{
+					return Err(VaultError::InternalError);
+				}
+				vault.locked_satoshis.saturating_reduce(satoshis);
+				vault.securitized_satoshis.saturating_reduce(securitized_satoshis);
 				Ok(())
 			})
 		}
