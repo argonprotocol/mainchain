@@ -238,8 +238,11 @@ where
 			"Begin import."
 		);
 
+		let parent_is_genesis = parent_hash == info.genesis_hash;
 		if matches!(block.state_action, StateAction::ExecuteIfPossible) &&
-			parent_block_state != BlockStatus::InChainWithState
+			parent_block_state != BlockStatus::InChainWithState &&
+			block.origin != BlockOrigin::NetworkInitialSync &&
+			!parent_is_genesis
 		{
 			tracing::debug!(?block_hash, ?block_number, parent=?parent_hash, "Parent state missing; returning missing state action");
 			return Ok(ImportResult::MissingState);
@@ -260,9 +263,15 @@ where
 		let is_block_header_already_imported =
 			block_header_status == sp_blockchain::BlockStatus::InChain;
 		let has_state_or_block = !block.state_action.skip_execution_checks();
-		// If the header is already in the DB we usually short‑circuit unless the
+		// If the header is already in the DB we usually short-circuit unless the
 		// new import carries *something* we still need (state/body *or* finality).
-		if is_block_header_already_imported && !has_state_or_block && !block.finalized {
+		// During block-gap recovery we must still process known headers to fetch
+		// missing body/state data.
+		if is_block_header_already_imported &&
+			!has_state_or_block &&
+			!block.finalized &&
+			!is_block_gap
+		{
 			tracing::debug!(
 				?block_hash,
 				?block_number,
@@ -731,7 +740,9 @@ mod test {
 	use sc_consensus::{
 		BlockCheckParams, BlockImportParams, ImportResult, ImportedAux, StateAction::*,
 	};
-	use sp_blockchain::{BlockStatus, Error as BlockchainError, HeaderBackend};
+	use sp_blockchain::{
+		BlockGap, BlockGapType, BlockStatus, Error as BlockchainError, HeaderBackend,
+	};
 	use sp_runtime::{
 		Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
 		traits::{Block as BlockT, Header as HeaderT, NumberFor},
@@ -749,6 +760,7 @@ mod test {
 		headers: Arc<Mutex<HashMap<BlockHash, Header>>>,
 		block_status: Arc<Mutex<HashMap<BlockHash, BlockStatus>>>,
 		block_state: Arc<Mutex<HashMap<BlockHash, sp_consensus::BlockStatus>>>,
+		block_gap: Arc<Mutex<Option<sp_blockchain::BlockGap<BlockNumber>>>>,
 		best: Arc<Mutex<(BlockNumber, BlockHash)>>,
 		finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
 		aux: Arc<Mutex<BTreeMap<Vec<u8>, Vec<u8>>>>,
@@ -762,6 +774,7 @@ mod test {
 				block_state: Arc::new(Mutex::new(
 					[(h, sp_consensus::BlockStatus::InChainWithState)].into(),
 				)),
+				block_gap: Arc::new(Mutex::new(None)),
 				best: Arc::new(Mutex::new((0u32, h))),
 				finalized: Arc::new(Mutex::new((0u32, h))),
 				aux: Arc::new(Mutex::new(BTreeMap::new())),
@@ -781,6 +794,10 @@ mod test {
 			self.block_status.lock().unwrap().insert(h, BlockStatus::InChain);
 			self.block_state.lock().unwrap().insert(h, state);
 		}
+
+		pub fn set_block_gap(&self, gap: Option<sp_blockchain::BlockGap<BlockNumber>>) {
+			*self.block_gap.lock().unwrap() = gap;
+		}
 	}
 	impl HeaderBackend<Block> for MemChain {
 		fn header(&self, h: BlockHash) -> Result<Option<Header>, BlockchainError> {
@@ -789,13 +806,14 @@ mod test {
 		fn info(&self) -> sp_blockchain::Info<Block> {
 			let best = *self.best.lock().unwrap();
 			let fin = *self.finalized.lock().unwrap();
+			let block_gap = self.block_gap.lock().unwrap().clone();
 			sp_blockchain::Info {
 				finalized_hash: fin.1,
 				finalized_number: fin.0,
 				finalized_state: None,
 				best_hash: best.1,
 				best_number: best.0,
-				block_gap: None,
+				block_gap,
 				genesis_hash: best.1,
 				number_leaves: 0,
 			}
@@ -1246,6 +1264,102 @@ mod test {
 
 		let res2 = importer.import_block(params2).await.unwrap();
 		assert!(matches!(res2, ImportResult::AlreadyInChain));
+	}
+
+	#[tokio::test]
+	async fn block_gap_reimport_does_not_short_circuit_known_header() {
+		let (importer, client) = new_importer();
+		let parent = importer.client.info().best_hash;
+		let params = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+		let block_hash = params.header.hash();
+
+		// First pass stores header-only state for this block.
+		let _ = importer.import_block(params).await.unwrap();
+		assert_eq!(
+			client.block_status(block_hash).unwrap(),
+			sp_consensus::BlockStatus::InChainPruned
+		);
+
+		// Simulate missing-body gap recovery for this known block.
+		client.set_block_gap(Some(BlockGap {
+			start: 1,
+			end: 1,
+			gap_type: BlockGapType::MissingBody,
+		}));
+
+		let params2 = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+		let res2 = importer.import_block(params2).await.unwrap();
+
+		// Gap imports must be processed instead of treated as redundant.
+		assert!(matches!(res2, ImportResult::Imported(_)));
+	}
+
+	#[tokio::test]
+	async fn execute_if_possible_allows_genesis_parent_when_pruned() {
+		let (importer, client) = new_importer();
+		let parent = importer.client.info().genesis_hash;
+		client.set_state(parent, sp_consensus::BlockStatus::InChainPruned);
+
+		let params = create_params(
+			1,
+			parent,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ExecuteIfPossible,
+			None,
+		);
+		let res = importer.import_block(params).await.unwrap();
+
+		// Genesis may report pruned status during sync; do not dead-loop on MissingState.
+		assert!(!matches!(res, ImportResult::MissingState));
+	}
+
+	#[tokio::test]
+	async fn execute_if_possible_does_not_missing_state_in_network_initial_sync() {
+		let (importer, _client) = new_importer();
+		let genesis = importer.client.info().genesis_hash;
+
+		let block_1 = create_params(
+			1,
+			genesis,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+		let block_1_hash = block_1.header.hash();
+		let _ = importer.import_block(block_1).await.unwrap();
+
+		let block_2 = create_params(
+			2,
+			block_1_hash,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ExecuteIfPossible,
+			None,
+		);
+		let res = importer.import_block(block_2).await.unwrap();
+
+		assert!(!matches!(res, ImportResult::MissingState));
 	}
 
 	#[tokio::test]
