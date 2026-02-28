@@ -548,10 +548,11 @@ where
 		let Some(_lock) = self.queue_lock.try_lock().ok() else {
 			return Ok(true);
 		};
+		let is_import_context = importing_with_parent_hash.is_some();
 		let finalized_hash = self.client.finalized_hash();
 		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
 		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
-			return Ok(false);
+			return Ok(is_import_context);
 		}
 		let queued_notaries =
 			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
@@ -2038,6 +2039,39 @@ mod test {
 		assert!(!has_more_work);
 		assert_eq!(notary_client.queue_depth(1).await, 1);
 		assert_eq!(*client.decode_intercepted_at_block.lock(), None);
+	}
+
+	#[tokio::test]
+	async fn keeps_import_catchup_active_when_state_is_missing() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		let block_0 = H256::from_slice(&[0; 32]);
+		let block_1 = H256::from_slice(&[1; 32]);
+		let block_2 = H256::from_slice(&[2; 32]);
+		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
+		client.set_best_hash(block_2);
+		client.set_finalized_hash(block_0);
+		client.set_block_state(block_0, true);
+		client.set_block_state(block_1, true);
+		client.set_block_state(block_2, false);
+
+		let has_more_work = notary_client
+			.process_queues(Some(block_2))
+			.await
+			.expect("Could not process queues");
+		assert!(has_more_work);
+		assert_eq!(notary_client.queue_depth(1).await, 1);
 	}
 
 	#[tokio::test]
