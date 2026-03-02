@@ -1007,8 +1007,12 @@ pub mod pallet {
 				&lock_extension,
 			)
 			.map_err(Error::<T>::from)?;
-			T::VaultProvider::reduce_securitized_satoshis(vault_id, lock.satoshis)
-				.map_err(Error::<T>::from)?;
+			T::VaultProvider::reduce_securitized_satoshis(
+				vault_id,
+				lock.satoshis,
+				lock.securitization_ratio,
+			)
+			.map_err(Error::<T>::from)?;
 
 			LockReleaseCosignHeightById::<T>::insert(
 				utxo_id,
@@ -1427,8 +1431,12 @@ pub mod pallet {
 						lock.satoshis = received_satoshis;
 					}
 					lock.utxo_satoshis = Some(received_satoshis);
-					T::VaultProvider::add_securitized_satoshis(lock.vault_id, lock.satoshis)
-						.map_err(Error::<T>::from)?;
+					T::VaultProvider::add_securitized_satoshis(
+						lock.vault_id,
+						lock.satoshis,
+						lock.securitization_ratio,
+					)
+					.map_err(Error::<T>::from)?;
 					T::LockEvents::utxo_locked(
 						utxo_id,
 						&lock.owner_account,
@@ -1726,8 +1734,12 @@ pub mod pallet {
 				&lock.get_lock_extension(),
 			)
 			.map_err(Error::<T>::from)?;
-			T::VaultProvider::reduce_securitized_satoshis(lock.vault_id, lock.satoshis)
-				.map_err(Error::<T>::from)?;
+			T::VaultProvider::reduce_securitized_satoshis(
+				lock.vault_id,
+				lock.satoshis,
+				lock.securitization_ratio,
+			)
+			.map_err(Error::<T>::from)?;
 
 			let amount_eligible_for_pool = lock.liquidity_promised.min(redemption_price);
 			T::LockEvents::utxo_released(utxo_id, is_externally_spent, amount_eligible_for_pool)?;
@@ -1791,8 +1803,12 @@ pub mod pallet {
 				)?;
 				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
 			}
-			T::VaultProvider::reduce_securitized_satoshis(vault_id, lock.satoshis)
-				.map_err(Error::<T>::from)?;
+			T::VaultProvider::reduce_securitized_satoshis(
+				vault_id,
+				lock.satoshis,
+				lock.securitization_ratio,
+			)
+			.map_err(Error::<T>::from)?;
 			// count the amount we took from the vault as the burn amount
 			T::LockEvents::utxo_released(utxo_id, false, adjusted_market_rate)?;
 

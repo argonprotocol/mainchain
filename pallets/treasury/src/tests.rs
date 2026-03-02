@@ -199,7 +199,7 @@ fn test_can_lock_next_pool_capital() {
 			1,
 			TestVault {
 				account_id: 1,
-				activated: 5_000_000_000,
+				securitized_satoshis: 5_000_000_000,
 				sharing_percent: Permill::from_percent(50),
 				is_closed: false,
 			},
@@ -208,7 +208,7 @@ fn test_can_lock_next_pool_capital() {
 			2,
 			TestVault {
 				account_id: 1,
-				activated: 5_000_000_000,
+				securitized_satoshis: 5_000_000_000,
 				sharing_percent: Permill::from_percent(40),
 				is_closed: false,
 			},
@@ -258,7 +258,7 @@ fn test_lock_in_respects_max_vaults_per_pool() {
 			1,
 			TestVault {
 				account_id: 1,
-				activated: 5_000_000_000,
+				securitized_satoshis: 5_000_000_000,
 				sharing_percent: Permill::from_percent(10),
 				is_closed: false,
 			},
@@ -267,7 +267,7 @@ fn test_lock_in_respects_max_vaults_per_pool() {
 			2,
 			TestVault {
 				account_id: 1,
-				activated: 5_000_000_000,
+				securitized_satoshis: 5_000_000_000,
 				sharing_percent: Permill::from_percent(10),
 				is_closed: false,
 			},
@@ -276,7 +276,7 @@ fn test_lock_in_respects_max_vaults_per_pool() {
 			3,
 			TestVault {
 				account_id: 1,
-				activated: 5_000_000_000,
+				securitized_satoshis: 5_000_000_000,
 				sharing_percent: Permill::from_percent(10),
 				is_closed: false,
 			},
@@ -313,7 +313,7 @@ fn test_lock_in_respects_max_vaults_per_pool() {
 }
 
 #[test]
-fn test_lock_in_caps_by_vault_activated_limit() {
+fn test_lock_in_caps_by_securitized_satoshis_limit() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrameId::set(1);
@@ -321,7 +321,7 @@ fn test_lock_in_caps_by_vault_activated_limit() {
 			1,
 			TestVault {
 				account_id: 1,
-				activated: 1_000_000_000, // cap is 100m per frame
+				securitized_satoshis: 1_000_000_000,
 				sharing_percent: Permill::from_percent(50),
 				is_closed: false,
 			},
@@ -334,13 +334,51 @@ fn test_lock_in_caps_by_vault_activated_limit() {
 		assert_eq!(
 			CapitalActive::<Test>::get().into_inner(),
 			vec![TreasuryCapital { vault_id: 1, activated_capital: 100_000_000u128, frame_id: 2 }],
-			"activated capital must be capped by vault activated limit"
+			"activated capital must be capped by vault securitized satoshis"
 		);
 		System::assert_last_event(
 			Event::<Test>::NextBidPoolCapitalLocked {
 				frame_id: 2,
 				participating_vaults: 1,
 				total_activated_capital: 100_000_000,
+			}
+			.into(),
+		);
+	});
+}
+
+#[test]
+fn test_lock_in_caps_by_explicit_securitized_satoshis_amount() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 1,
+				securitized_satoshis: 1_000_000_000,
+				sharing_percent: Permill::from_percent(50),
+				is_closed: false,
+			},
+		);
+
+		let vault_satoshis = 77_777;
+		set_vault_securitized_satoshis(1, vault_satoshis);
+
+		set_argons(2, 10_000_000_000);
+		assert_ok!(Treasury::set_allocation(RuntimeOrigin::signed(2), 1, 5_000_000_000));
+
+		Treasury::lock_in_vault_capital(2);
+		assert_eq!(
+			CapitalActive::<Test>::get().into_inner(),
+			vec![TreasuryCapital { vault_id: 1, activated_capital: 7_777u128, frame_id: 2 }],
+			"activated capital must be capped by securitized satoshis"
+		);
+		System::assert_last_event(
+			Event::<Test>::NextBidPoolCapitalLocked {
+				frame_id: 2,
+				participating_vaults: 1,
+				total_activated_capital: 7_777,
 			}
 			.into(),
 		);
@@ -358,7 +396,7 @@ fn test_treasury_pool_participated_only_on_first_operator_bond() {
 			1,
 			TestVault {
 				account_id: 10,
-				activated: 1_000_000_000, // cap is 100m per frame
+				securitized_satoshis: 1_000_000_000,
 				sharing_percent: Permill::from_percent(50),
 				is_closed: false,
 			},
@@ -673,7 +711,7 @@ fn setup_distribute_scenario() -> DistributeScenario {
 		1,
 		TestVault {
 			account_id: 10,
-			activated: 5_000_000_000,
+			securitized_satoshis: 5_000_000_000,
 			sharing_percent: Permill::from_percent(50),
 			is_closed: false,
 		},
@@ -682,7 +720,7 @@ fn setup_distribute_scenario() -> DistributeScenario {
 		2,
 		TestVault {
 			account_id: 11,
-			activated: 5_000_000_000,
+			securitized_satoshis: 5_000_000_000,
 			sharing_percent: Permill::from_percent(60),
 			is_closed: false,
 		},
@@ -1094,7 +1132,7 @@ fn test_bond_holder_sort_order() {
 			1,
 			TestVault {
 				account_id: 1,
-				activated: 50_000_000_000,
+				securitized_satoshis: 50_000_000_000,
 				sharing_percent: Permill::from_percent(10),
 				is_closed: false,
 			},
