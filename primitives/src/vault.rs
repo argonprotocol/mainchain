@@ -46,8 +46,8 @@ pub trait TreasuryVaultProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
-	/// Get the total amount of securitization activated for the vault
-	fn get_activated_securitization(vault_id: VaultId) -> Self::Balance;
+	/// Get the number of securitized satoshis tracked by the vault.
+	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis;
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	/// Gets the percent of profit sharing
@@ -123,12 +123,19 @@ pub trait BitcoinVaultProvider {
 	/// Get the securitization ratio offered by this vault
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError>;
 
-	/// Add funded securitized satoshis tracked for this vault.
-	fn add_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis) -> Result<(), VaultError>;
+	/// Add satoshis from a funded lock to this vault's satoshi totals.
+	fn add_securitized_satoshis(
+		vault_id: VaultId,
+		satoshis: Satoshis,
+		securitization_ratio: FixedU128,
+	) -> Result<(), VaultError>;
 
-	/// Reduce funded securitized satoshis tracked for this vault.
-	fn reduce_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis)
-	-> Result<(), VaultError>;
+	/// Reduce satoshis from this vault's satoshi totals.
+	fn reduce_securitized_satoshis(
+		vault_id: VaultId,
+		satoshis: Satoshis,
+		securitization_ratio: FixedU128,
+	) -> Result<(), VaultError>;
 
 	/// Holds the given "securitization" from the vault. Returns the fee amount
 	fn lock(
@@ -265,7 +272,10 @@ where
 	/// securitization_locked, not in addition to)
 	#[codec(compact)]
 	pub securitization_pending_activation: Balance,
-	/// The number of funded satoshis currently securitized by this vault.
+	/// The number of locked satoshis currently tracked by this vault.
+	#[codec(compact)]
+	pub locked_satoshis: Satoshis,
+	/// The number of securitized satoshis (`sats * securitization ratio`).
 	#[codec(compact)]
 	pub securitized_satoshis: Satoshis,
 	/// Securitization that will be released at the given block height (NOTE: these are grouped by
@@ -817,6 +827,7 @@ mod test {
 			securitization_target: securitization,
 			securitization_locked: 0,
 			securitization_pending_activation: 0,
+			locked_satoshis: 0,
 			securitized_satoshis: 0,
 			securitization_release_schedule: Default::default(),
 			securitization_ratio: FixedU128::from_float(ratio),

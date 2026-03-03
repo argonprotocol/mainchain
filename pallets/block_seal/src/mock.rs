@@ -118,6 +118,8 @@ impl AuthorityProvider<BlockSealAuthorityId, Block, AccountId> for StaticAuthori
 
 pub struct StaticNotebookProvider;
 impl NotebookProvider for StaticNotebookProvider {
+	type Weights = ();
+
 	fn get_eligible_tick_votes_root(
 		notary_id: NotaryId,
 		tick: Tick,
@@ -133,8 +135,16 @@ impl NotebookProvider for StaticNotebookProvider {
 		}
 		res
 	}
-	fn notebooks_at_tick(tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
-		NotebooksAtTick::get().get(&tick).cloned().unwrap_or_default()
+	fn eligible_notebooks_for_vote(
+		voting_schedule: &VotingSchedule,
+	) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)> {
+		NotebooksAtTick::get()
+			.get(&voting_schedule.notebook_tick())
+			.cloned()
+			.unwrap_or_default()
+	}
+	fn vote_eligible_notebook_count(voting_schedule: &VotingSchedule) -> u32 {
+		Self::eligible_notebooks_for_vote(voting_schedule).len() as u32
 	}
 	fn is_notary_locked_at_tick(_: NotaryId, _: Tick) -> bool {
 		false
@@ -175,6 +185,8 @@ impl TickProvider<Block> for StaticTickProvider {
 
 pub struct StaticBlockSealSpecProvider;
 impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
+	type Weights = ();
+
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
 	}

@@ -216,7 +216,7 @@ mod v12_storage {
 		#[allow(clippy::type_complexity)]
 		pub vaults: Vec<(VaultId, Vault<<T as frame_system::Config>::AccountId, T::Balance>)>,
 		#[allow(clippy::type_complexity)]
-		pub funded_locks: Vec<(VaultId, Satoshis)>,
+		pub funded_locks: Vec<(VaultId, Satoshis, Satoshis)>,
 	}
 }
 
@@ -230,42 +230,51 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade
 		use codec::Encode;
 
 		let vaults = v12_storage::VaultsById::<T>::iter().collect::<Vec<_>>();
-		let funded_locks =
-			pallet_bitcoin_locks::LocksByUtxoId::<T>::iter()
-				.filter_map(|(_utxo_id, lock)| {
-					if lock.is_funded { Some((lock.vault_id, lock.satoshis)) } else { None }
-				})
-				.collect::<Vec<_>>();
+		let funded_locks = pallet_bitcoin_locks::LocksByUtxoId::<T>::iter()
+			.filter_map(|(_utxo_id, lock)| {
+				if lock.is_funded {
+					let securitized_satoshis =
+						lock.securitization_ratio.saturating_mul_int(lock.satoshis);
+					Some((lock.vault_id, lock.satoshis, securitized_satoshis))
+				} else {
+					None
+				}
+			})
+			.collect::<Vec<_>>();
 		Ok(v12_storage::Model::<T> { vaults, funded_locks }.encode())
 	}
 
 	fn on_runtime_upgrade() -> frame_support::weights::Weight {
 		let mut count = 0usize;
 		let bitcoins = pallet_bitcoin_locks::LocksByUtxoId::<T>::iter().collect::<Vec<_>>();
-		let mut funded_by_vault: BTreeMap<VaultId, Satoshis> = BTreeMap::new();
+		let mut funded_by_vault: BTreeMap<VaultId, (Satoshis, Satoshis)> = BTreeMap::new();
 		for (_utxo_id, lock) in &bitcoins {
 			if !lock.is_funded {
 				continue;
 			}
+			let securitized_satoshis = lock.securitization_ratio.saturating_mul_int(lock.satoshis);
 			funded_by_vault
 				.entry(lock.vault_id)
-				.and_modify(|value| *value = value.saturating_add(lock.satoshis))
-				.or_insert(lock.satoshis);
+				.and_modify(|(locked, securitized)| {
+					locked.saturating_accrue(lock.satoshis);
+					securitized.saturating_accrue(securitized_satoshis);
+				})
+				.or_insert((lock.satoshis, securitized_satoshis));
 		}
 
 		VaultsById::<T>::translate::<v12_storage::Vault<T::AccountId, <T as Config>::Balance>, _>(
 			|vault_id, vault| {
 				count = count.saturating_add(1);
+				let (locked_satoshis, securitized_satoshis) =
+					funded_by_vault.get(&vault_id).copied().unwrap_or_default();
 				Some(Vault {
 					operator_account_id: vault.operator_account_id,
 					securitization: vault.securitization,
 					securitization_target: vault.securitization_target,
 					securitization_locked: vault.securitization_locked,
 					securitization_pending_activation: vault.securitization_pending_activation,
-					securitized_satoshis: funded_by_vault
-						.get(&vault_id)
-						.copied()
-						.unwrap_or_default(),
+					locked_satoshis,
+					securitized_satoshis,
 					securitization_release_schedule: vault.securitization_release_schedule,
 					securitization_ratio: vault.securitization_ratio,
 					is_closed: vault.is_closed,
@@ -287,12 +296,15 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade
 		let old = <v12_storage::Model<T>>::decode(&mut &state[..]).map_err(|_| {
 			sp_runtime::TryRuntimeError::Other("Failed to decode old value from storage")
 		})?;
-		let mut expected_by_vault: BTreeMap<VaultId, Satoshis> = BTreeMap::new();
-		for (vault_id, satoshis) in old.funded_locks {
+		let mut expected_by_vault: BTreeMap<VaultId, (Satoshis, Satoshis)> = BTreeMap::new();
+		for (vault_id, locked_satoshis, securitized_satoshis) in old.funded_locks {
 			expected_by_vault
 				.entry(vault_id)
-				.and_modify(|value| *value = value.saturating_add(satoshis))
-				.or_insert(satoshis);
+				.and_modify(|(locked, securitized)| {
+					locked.saturating_accrue(locked_satoshis);
+					securitized.saturating_accrue(securitized_satoshis);
+				})
+				.or_insert((locked_satoshis, securitized_satoshis));
 		}
 
 		let new_vaults = VaultsById::<T>::iter().collect::<BTreeMap<_, _>>();
@@ -301,9 +313,15 @@ impl<T: Config + pallet_bitcoin_locks::Config> UncheckedOnRuntimeUpgrade
 			let new_vault = new_vaults
 				.get(&vault_id)
 				.ok_or(sp_runtime::TryRuntimeError::Other("Missing vault in new storage"))?;
+			let (expected_locked, expected_securitized) =
+				expected_by_vault.get(&vault_id).copied().unwrap_or_default();
 			assert_eq!(
-				new_vault.securitized_satoshis,
-				expected_by_vault.get(&vault_id).copied().unwrap_or_default(),
+				new_vault.locked_satoshis, expected_locked,
+				"Incorrect locked satoshi backfill for vault {}",
+				vault_id
+			);
+			assert_eq!(
+				new_vault.securitized_satoshis, expected_securitized,
 				"Incorrect securitized satoshi backfill for vault {}",
 				vault_id
 			);
@@ -543,7 +561,7 @@ mod test {
 				liquidity_promised: 100,
 				locked_market_rate: 100,
 				owner_account: 1,
-				securitization_ratio: FixedU128::one(),
+				securitization_ratio: FixedU128::from_u32(2),
 				security_fees: 10u128,
 				coupon_paid_fees: 0u128,
 				satoshis: 5_000,
@@ -575,8 +593,10 @@ mod test {
 
 			let migrated_1 = VaultsById::<Test>::get(1).expect("vault 1 exists");
 			let migrated_2 = VaultsById::<Test>::get(2).expect("vault 2 exists");
+			assert_eq!(migrated_1.locked_satoshis, 1_000);
+			assert_eq!(migrated_2.locked_satoshis, 5_000);
 			assert_eq!(migrated_1.securitized_satoshis, 1_000);
-			assert_eq!(migrated_2.securitized_satoshis, 5_000);
+			assert_eq!(migrated_2.securitized_satoshis, 10_000);
 		});
 	}
 }

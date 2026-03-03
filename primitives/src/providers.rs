@@ -22,7 +22,84 @@ use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
 };
 
+pub trait NotebookProviderWeightInfo {
+	fn notebooks_in_block() -> Weight;
+	fn vote_eligible_notebook_count(n: u32) -> Weight;
+	fn eligible_notebooks_for_vote(n: u32) -> Weight;
+	fn get_eligible_tick_votes_root() -> Weight;
+	fn is_notary_locked_at_tick() -> Weight;
+}
+
+impl NotebookProviderWeightInfo for () {
+	fn notebooks_in_block() -> Weight {
+		Weight::zero()
+	}
+
+	fn vote_eligible_notebook_count(_n: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn eligible_notebooks_for_vote(_n: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn get_eligible_tick_votes_root() -> Weight {
+		Weight::zero()
+	}
+
+	fn is_notary_locked_at_tick() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait ChainTransferLookupWeightInfo {
+	fn is_valid_transfer_to_localchain() -> Weight;
+}
+
+impl ChainTransferLookupWeightInfo for () {
+	fn is_valid_transfer_to_localchain() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait BlockSealSpecProviderWeightInfo {
+	fn grandparent_vote_minimum() -> Weight;
+	fn compute_difficulty() -> Weight;
+	fn compute_key_block_hash() -> Weight;
+}
+
+impl BlockSealSpecProviderWeightInfo for () {
+	fn grandparent_vote_minimum() -> Weight {
+		Weight::zero()
+	}
+
+	fn compute_difficulty() -> Weight {
+		Weight::zero()
+	}
+
+	fn compute_key_block_hash() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait BlockSealerProviderWeightInfo {
+	fn get_sealer_info() -> Weight;
+	fn is_block_vote_seal() -> Weight;
+}
+
+impl BlockSealerProviderWeightInfo for () {
+	fn get_sealer_info() -> Weight {
+		Weight::zero()
+	}
+
+	fn is_block_vote_seal() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait NotebookProvider {
+	type Weights: NotebookProviderWeightInfo;
+
 	/// Returns a block voting root only if submitted in time for previous block
 	fn get_eligible_tick_votes_root(
 		notary_id: NotaryId,
@@ -31,8 +108,13 @@ pub trait NotebookProvider {
 
 	fn notebooks_in_block() -> Vec<(NotaryId, NotebookNumber, Tick)>;
 
-	/// Returns notebooks by notary with their parent secret
-	fn notebooks_at_tick(tick: Tick) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>;
+	/// Returns notebooks that are eligible for vote processing under a schedule.
+	fn eligible_notebooks_for_vote(
+		voting_schedule: &VotingSchedule,
+	) -> Vec<(NotaryId, NotebookNumber, Option<NotebookSecret>)>;
+
+	/// Returns the notebook count eligible for voting for the current schedule.
+	fn vote_eligible_notebook_count(voting_schedule: &VotingSchedule) -> u32;
 
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
@@ -324,6 +406,8 @@ impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsPayer<AccountId
 pub type ArgonCPI = FixedI128;
 
 pub trait ChainTransferLookup<AccountId, Balance> {
+	type Weights: ChainTransferLookupWeightInfo;
+
 	fn is_valid_transfer_to_localchain(
 		notary_id: NotaryId,
 		transfer_to_localchain_id: TransferToLocalchainId,
@@ -334,6 +418,8 @@ pub trait ChainTransferLookup<AccountId, Balance> {
 }
 
 pub trait BlockSealSpecProvider<Block: BlockT> {
+	type Weights: BlockSealSpecProviderWeightInfo;
+
 	fn grandparent_vote_minimum() -> Option<VoteMinimum>;
 	fn compute_difficulty() -> ComputeDifficulty;
 	fn compute_key_block_hash() -> Option<Block::Hash>;
@@ -348,6 +434,8 @@ pub struct BlockSealerInfo<AccountId: FullCodec, AuthorityId: FullCodec = BlockS
 }
 
 pub trait BlockSealerProvider<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
+	type Weights: BlockSealerProviderWeightInfo;
+
 	fn get_sealer_info() -> BlockSealerInfo<AccountId, AuthorityId>;
 	fn is_block_vote_seal() -> bool;
 }

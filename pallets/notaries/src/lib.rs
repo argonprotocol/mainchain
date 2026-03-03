@@ -362,6 +362,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> NotaryProvider<T::Block, T::AccountId> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn verify_signature(
 			notary_id: NotaryId,
 			at_tick: Tick,

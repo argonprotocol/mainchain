@@ -43,6 +43,8 @@ parameter_types! {
 
 pub struct NotaryProviderImpl;
 impl NotaryProvider<Block, AccountId32> for NotaryProviderImpl {
+	type Weights = ();
+
 	fn verify_signature(_: NotaryId, _: Tick, _: &H256, _: &NotarySignature) -> bool {
 		true
 	}
@@ -83,6 +85,8 @@ impl Get<Result<Digestset<VerifyError, AccountId32>, DispatchError>> for DigestG
 
 pub struct ChainTransferLookupImpl;
 impl ChainTransferLookup<AccountId32, Balance> for ChainTransferLookupImpl {
+	type Weights = ();
+
 	fn is_valid_transfer_to_localchain(
 		notary_id: NotaryId,
 		transfer_to_localchain_id: TransferToLocalchainId,
@@ -123,6 +127,8 @@ pub fn set_argons(account_id: &AccountId32, amount: Balance) {
 
 pub struct StaticBlockSealSpecProvider;
 impl BlockSealSpecProvider<Block> for StaticBlockSealSpecProvider {
+	type Weights = ();
+
 	fn grandparent_vote_minimum() -> Option<VoteMinimum> {
 		GrandpaVoteMinimum::get()
 	}

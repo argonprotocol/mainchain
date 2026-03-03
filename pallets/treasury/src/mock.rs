@@ -1,7 +1,7 @@
 use crate as pallet_treasury;
 use argon_primitives::{
 	OperationalAccountsHook, OperationalRewardPayout, OperationalRewardsProvider,
-	vault::TreasuryVaultProvider,
+	bitcoin::Satoshis, vault::TreasuryVaultProvider,
 };
 use frame_support::traits::Currency;
 use pallet_prelude::{
@@ -137,7 +137,7 @@ parameter_types! {
 
 #[derive(Clone)]
 pub struct TestVault {
-	pub activated: Balance,
+	pub securitized_satoshis: Satoshis,
 	pub sharing_percent: Permill,
 	pub account_id: u64,
 	pub is_closed: bool,
@@ -149,13 +149,24 @@ pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	});
 }
 
+pub fn set_vault_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis) {
+	VaultsById::mutate(|x| {
+		if let Some(vault) = x.get_mut(&vault_id) {
+			vault.securitized_satoshis = satoshis;
+		}
+	});
+}
+
 pub struct StaticTreasuryVaultProvider;
 impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = u64;
 
-	fn get_activated_securitization(vault_id: VaultId) -> Self::Balance {
-		VaultsById::get().get(&vault_id).map(|a| a.activated).unwrap_or_default()
+	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
+		VaultsById::get()
+			.get(&vault_id)
+			.map(|a| a.securitized_satoshis)
+			.unwrap_or_default()
 	}
 
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
