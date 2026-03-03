@@ -27,6 +27,7 @@ use sc_service::{
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
+use sp_keystore::{Keystore, KeystorePtr};
 use sp_runtime::traits::Header as HeaderT;
 use std::{sync::Arc, time::Duration};
 
@@ -40,6 +41,7 @@ type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// The minimum period of blocks on which justifications will be
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
+const GRANDPA_KEY_GUARD_INTERVAL: Duration = Duration::from_secs(30);
 
 type ArgonBlockImport<Runtime> = argon_node_consensus::import_queue::ArgonBlockImport<
 	Block,
@@ -351,6 +353,39 @@ where
 	}
 	// grandpa voter task
 	if !disable_grandpa {
+		let grandpa_authority_keystore = if role.is_authority() {
+			let keystore = keystore_container.keystore();
+			ensure_single_local_grandpa_key(
+				&keystore,
+				"startup",
+				"Refusing to start authority with multiple local GRANDPA keys",
+			)?;
+
+			let runtime_guard_keystore = keystore.clone();
+			task_manager.spawn_essential_handle().spawn_blocking(
+				"grandpa-key-guard",
+				None,
+				async move {
+					loop {
+						if let Err(err) = ensure_single_local_grandpa_key(
+							&runtime_guard_keystore,
+							"runtime",
+							"Detected multiple local GRANDPA keys while running",
+						) {
+							log::error!("{err:?}");
+							return;
+						}
+
+						std::thread::sleep(GRANDPA_KEY_GUARD_INTERVAL);
+					}
+				},
+			);
+
+			Some(keystore)
+		} else {
+			None
+		};
+
 		// TODO: we need to create a keystore for each grandpa voter we want to run. Probably a
 		// service 	 that can dynamically allocate an deallocate voters with restricted/filtered
 		// keystore access start the full GRANDPA voter
@@ -366,11 +401,7 @@ where
 				justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
 				name: Some(name),
 				observer_enabled: false,
-				keystore: if role.is_authority() {
-					Some(keystore_container.keystore())
-				} else {
-					None
-				},
+				keystore: grandpa_authority_keystore,
 				local_role: role,
 				telemetry: telemetry.as_ref().map(|x| x.handle()),
 				protocol_name: grandpa_protocol_name,
@@ -443,6 +474,30 @@ where
 				best_header.number()
 			))
 		})
+}
+
+fn ensure_single_local_grandpa_key(
+	keystore: &KeystorePtr,
+	stage: &'static str,
+	err_prefix: &'static str,
+) -> Result<(), ServiceError> {
+	let grandpa_keys = keystore.keys(sp_consensus_grandpa::KEY_TYPE).map_err(|e| {
+		ServiceError::Other(format!("Failed to list local GRANDPA keys ({stage}): {e:?}"))
+	})?;
+	let key_count = grandpa_keys.len();
+	if key_count <= 1 {
+		return Ok(());
+	}
+
+	let local_keys = grandpa_keys
+		.into_iter()
+		.map(|key| format!("0x{}", hex::encode(key)))
+		.collect::<Vec<_>>()
+		.join(",");
+
+	Err(ServiceError::Other(format!(
+		"{err_prefix} ({stage}): found {key_count} keys [{local_keys}]. Configure exactly one local GRANDPA key."
+	)))
 }
 
 #[cfg(test)]
