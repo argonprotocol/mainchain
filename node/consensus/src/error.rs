@@ -77,11 +77,31 @@ pub enum Error {
 	#[error("Notary sync missing notebook dependencies: {0}")]
 	MissingNotebooksError(String),
 
+	#[error("Notebook audit deferred: {0}")]
+	NotaryAuditDeferred(String),
+
+	#[error("Pending import replay queue is full: {0}")]
+	PendingImportQueueFull(String),
+
+	#[error("Pending import replay cannot safely defer this block: {0}")]
+	PendingImportUnsupported(String),
+
 	#[error("A duplicate block was created by this author {0} for the given {1} key {2}")]
 	DuplicateAuthoredBlock(AccountId, String, String),
+}
 
-	#[error("The block state is not available")]
-	StateUnavailableError,
+impl Error {
+	pub(crate) fn is_retryable_notebook_audit_error(&self) -> bool {
+		matches!(
+			self,
+			Self::MissingNotebooksError(_) |
+				Self::NotebookAuditBeforeTick(_) |
+				Self::UnableToSyncNotary(_) |
+				Self::NotaryAuditDeferred(_) |
+				Self::NotaryError(_) |
+				Self::NotaryArchiveError(_)
+		)
+	}
 }
 
 impl From<String> for Error {
