@@ -1174,9 +1174,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							205u8, 148u8, 71u8, 106u8, 97u8, 240u8, 221u8, 250u8, 218u8, 63u8,
-							238u8, 191u8, 79u8, 117u8, 194u8, 165u8, 28u8, 50u8, 58u8, 21u8, 92u8,
-							27u8, 175u8, 248u8, 168u8, 51u8, 239u8, 5u8, 2u8, 6u8, 21u8, 184u8,
+							155u8, 128u8, 45u8, 27u8, 30u8, 53u8, 45u8, 51u8, 80u8, 223u8, 76u8,
+							79u8, 162u8, 165u8, 208u8, 25u8, 66u8, 115u8, 146u8, 50u8, 207u8, 98u8,
+							184u8, 171u8, 111u8, 10u8, 192u8, 166u8, 52u8, 58u8, 152u8, 168u8,
 						],
 					)
 				}
@@ -1194,9 +1194,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							48u8, 84u8, 166u8, 61u8, 148u8, 68u8, 137u8, 10u8, 209u8, 242u8, 108u8,
-							167u8, 86u8, 26u8, 137u8, 181u8, 47u8, 55u8, 14u8, 161u8, 131u8, 44u8,
-							134u8, 215u8, 155u8, 155u8, 65u8, 128u8, 254u8, 179u8, 163u8, 126u8,
+							163u8, 76u8, 186u8, 231u8, 44u8, 191u8, 234u8, 194u8, 202u8, 150u8,
+							14u8, 171u8, 254u8, 18u8, 52u8, 77u8, 49u8, 12u8, 125u8, 128u8, 55u8,
+							241u8, 247u8, 149u8, 240u8, 249u8, 237u8, 86u8, 110u8, 232u8, 35u8,
+							227u8,
 						],
 					)
 				}
@@ -3809,9 +3810,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				165u8, 64u8, 226u8, 46u8, 197u8, 212u8, 239u8, 246u8, 108u8, 211u8, 19u8, 206u8,
-				84u8, 173u8, 52u8, 232u8, 113u8, 177u8, 15u8, 180u8, 109u8, 1u8, 4u8, 41u8, 239u8,
-				163u8, 143u8, 243u8, 81u8, 196u8, 157u8, 237u8,
+				139u8, 75u8, 31u8, 230u8, 201u8, 252u8, 106u8, 29u8, 43u8, 207u8, 8u8, 106u8,
+				108u8, 50u8, 112u8, 135u8, 201u8, 43u8, 118u8, 237u8, 197u8, 101u8, 6u8, 139u8,
+				222u8, 168u8, 182u8, 63u8, 40u8, 201u8, 43u8, 155u8,
 			]
 	}
 	pub mod system {
@@ -4929,9 +4930,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							25u8, 118u8, 132u8, 82u8, 175u8, 156u8, 26u8, 72u8, 85u8, 180u8, 172u8,
-							230u8, 182u8, 144u8, 1u8, 155u8, 12u8, 217u8, 255u8, 104u8, 198u8,
-							60u8, 104u8, 87u8, 42u8, 217u8, 255u8, 28u8, 86u8, 60u8, 148u8, 49u8,
+							84u8, 241u8, 130u8, 27u8, 150u8, 9u8, 29u8, 5u8, 135u8, 216u8, 231u8,
+							50u8, 245u8, 162u8, 90u8, 222u8, 31u8, 48u8, 157u8, 120u8, 184u8,
+							245u8, 34u8, 134u8, 116u8, 128u8, 142u8, 249u8, 60u8, 8u8, 37u8, 0u8,
 						],
 					)
 				}
@@ -5805,10 +5806,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							140u8, 191u8, 87u8, 43u8, 233u8, 188u8, 183u8, 199u8, 14u8, 192u8,
-							200u8, 216u8, 202u8, 134u8, 99u8, 24u8, 177u8, 179u8, 154u8, 5u8,
-							184u8, 101u8, 231u8, 201u8, 131u8, 160u8, 22u8, 99u8, 63u8, 90u8,
-							251u8, 80u8,
+							72u8, 60u8, 39u8, 193u8, 172u8, 151u8, 80u8, 9u8, 9u8, 82u8, 41u8,
+							231u8, 79u8, 194u8, 230u8, 66u8, 116u8, 40u8, 53u8, 177u8, 217u8, 77u8,
+							145u8, 230u8, 226u8, 115u8, 204u8, 156u8, 10u8, 144u8, 190u8, 172u8,
 						],
 					)
 				}
@@ -5870,9 +5870,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							151u8, 17u8, 108u8, 62u8, 210u8, 30u8, 141u8, 70u8, 191u8, 64u8, 221u8,
-							13u8, 114u8, 85u8, 111u8, 45u8, 93u8, 77u8, 208u8, 118u8, 148u8, 231u8,
-							236u8, 253u8, 51u8, 108u8, 235u8, 132u8, 18u8, 67u8, 189u8, 225u8,
+							182u8, 0u8, 45u8, 87u8, 62u8, 48u8, 33u8, 101u8, 166u8, 195u8, 255u8,
+							204u8, 121u8, 33u8, 45u8, 19u8, 12u8, 201u8, 230u8, 209u8, 147u8,
+							117u8, 61u8, 213u8, 183u8, 205u8, 64u8, 30u8, 86u8, 232u8, 159u8,
+							236u8,
 						],
 					)
 				}
@@ -6769,9 +6770,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							123u8, 130u8, 107u8, 120u8, 60u8, 194u8, 201u8, 3u8, 250u8, 27u8,
-							228u8, 62u8, 16u8, 227u8, 3u8, 28u8, 154u8, 1u8, 221u8, 98u8, 17u8,
-							206u8, 11u8, 225u8, 68u8, 25u8, 233u8, 202u8, 48u8, 19u8, 54u8, 193u8,
+							161u8, 110u8, 216u8, 233u8, 123u8, 232u8, 82u8, 210u8, 248u8, 106u8,
+							54u8, 30u8, 126u8, 142u8, 133u8, 146u8, 173u8, 199u8, 63u8, 157u8,
+							116u8, 181u8, 22u8, 129u8, 44u8, 226u8, 38u8, 163u8, 134u8, 126u8,
+							108u8, 14u8,
 						],
 					)
 				}
@@ -7032,9 +7034,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							141u8, 253u8, 57u8, 10u8, 152u8, 52u8, 173u8, 67u8, 68u8, 74u8, 65u8,
-							144u8, 153u8, 186u8, 158u8, 246u8, 74u8, 247u8, 186u8, 3u8, 115u8,
-							46u8, 222u8, 125u8, 221u8, 12u8, 31u8, 85u8, 76u8, 174u8, 40u8, 171u8,
+							172u8, 133u8, 174u8, 82u8, 39u8, 148u8, 46u8, 120u8, 155u8, 27u8, 2u8,
+							158u8, 224u8, 166u8, 35u8, 42u8, 177u8, 174u8, 148u8, 247u8, 81u8,
+							29u8, 189u8, 61u8, 192u8, 171u8, 244u8, 196u8, 236u8, 8u8, 93u8, 21u8,
 						],
 					)
 				}
@@ -7083,9 +7085,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							181u8, 173u8, 2u8, 61u8, 93u8, 126u8, 102u8, 103u8, 23u8, 119u8, 188u8,
-							4u8, 223u8, 127u8, 143u8, 131u8, 155u8, 75u8, 68u8, 32u8, 56u8, 58u8,
-							87u8, 169u8, 89u8, 172u8, 229u8, 126u8, 231u8, 37u8, 91u8, 34u8,
+							2u8, 161u8, 165u8, 14u8, 235u8, 226u8, 159u8, 177u8, 29u8, 131u8,
+							215u8, 127u8, 7u8, 38u8, 198u8, 180u8, 63u8, 211u8, 160u8, 50u8, 10u8,
+							15u8, 126u8, 185u8, 134u8, 218u8, 0u8, 5u8, 239u8, 208u8, 52u8, 69u8,
 						],
 					)
 				}
@@ -21262,9 +21264,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							169u8, 113u8, 235u8, 85u8, 150u8, 169u8, 7u8, 191u8, 226u8, 203u8,
-							94u8, 32u8, 96u8, 176u8, 17u8, 241u8, 82u8, 236u8, 233u8, 247u8, 34u8,
-							76u8, 135u8, 145u8, 128u8, 227u8, 96u8, 9u8, 177u8, 250u8, 50u8, 34u8,
+							227u8, 234u8, 82u8, 168u8, 120u8, 136u8, 215u8, 218u8, 0u8, 151u8,
+							67u8, 255u8, 70u8, 233u8, 215u8, 152u8, 119u8, 91u8, 174u8, 6u8, 165u8,
+							229u8, 228u8, 44u8, 209u8, 17u8, 55u8, 243u8, 79u8, 37u8, 72u8, 192u8,
 						],
 					)
 				}
@@ -21294,10 +21296,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							234u8, 148u8, 18u8, 176u8, 121u8, 226u8, 105u8, 197u8, 100u8, 150u8,
-							216u8, 153u8, 237u8, 209u8, 113u8, 140u8, 108u8, 32u8, 93u8, 87u8,
-							144u8, 2u8, 237u8, 205u8, 164u8, 0u8, 26u8, 23u8, 131u8, 119u8, 193u8,
-							242u8,
+							211u8, 123u8, 84u8, 101u8, 16u8, 202u8, 63u8, 162u8, 159u8, 31u8,
+							201u8, 185u8, 222u8, 251u8, 171u8, 186u8, 175u8, 61u8, 50u8, 199u8,
+							16u8, 53u8, 80u8, 194u8, 255u8, 222u8, 77u8, 31u8, 224u8, 79u8, 181u8,
+							107u8,
 						],
 					)
 				}
@@ -21323,9 +21325,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							230u8, 199u8, 131u8, 61u8, 14u8, 0u8, 143u8, 11u8, 128u8, 131u8, 189u8,
-							144u8, 192u8, 29u8, 215u8, 85u8, 57u8, 89u8, 177u8, 78u8, 251u8, 225u8,
-							79u8, 23u8, 210u8, 157u8, 229u8, 193u8, 137u8, 54u8, 117u8, 246u8,
+							28u8, 97u8, 203u8, 55u8, 51u8, 110u8, 76u8, 199u8, 235u8, 18u8, 75u8,
+							236u8, 174u8, 141u8, 222u8, 132u8, 42u8, 125u8, 250u8, 239u8, 152u8,
+							95u8, 228u8, 233u8, 184u8, 61u8, 26u8, 145u8, 146u8, 177u8, 137u8,
+							231u8,
 						],
 					)
 				}
@@ -21348,9 +21351,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							1u8, 224u8, 30u8, 37u8, 72u8, 143u8, 36u8, 228u8, 201u8, 210u8, 67u8,
-							154u8, 205u8, 159u8, 69u8, 78u8, 134u8, 196u8, 120u8, 18u8, 41u8, 5u8,
-							187u8, 103u8, 42u8, 142u8, 107u8, 23u8, 90u8, 171u8, 222u8, 235u8,
+							224u8, 208u8, 183u8, 198u8, 43u8, 220u8, 233u8, 41u8, 127u8, 107u8,
+							77u8, 126u8, 199u8, 13u8, 102u8, 87u8, 175u8, 92u8, 57u8, 181u8, 119u8,
+							205u8, 219u8, 50u8, 149u8, 252u8, 235u8, 68u8, 219u8, 164u8, 169u8,
+							131u8,
 						],
 					)
 				}
@@ -21376,9 +21380,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							33u8, 66u8, 88u8, 162u8, 57u8, 225u8, 42u8, 65u8, 94u8, 183u8, 84u8,
-							53u8, 104u8, 243u8, 5u8, 48u8, 141u8, 38u8, 168u8, 73u8, 35u8, 130u8,
-							82u8, 148u8, 42u8, 200u8, 185u8, 126u8, 219u8, 208u8, 97u8, 228u8,
+							172u8, 254u8, 180u8, 91u8, 49u8, 156u8, 218u8, 29u8, 78u8, 65u8, 247u8,
+							52u8, 25u8, 215u8, 57u8, 215u8, 26u8, 205u8, 83u8, 0u8, 12u8, 191u8,
+							43u8, 56u8, 248u8, 87u8, 220u8, 168u8, 50u8, 26u8, 107u8, 170u8,
 						],
 					)
 				}
@@ -21401,9 +21405,9 @@ pub mod api {
 							weight,
 						},
 						[
-							47u8, 2u8, 163u8, 13u8, 71u8, 48u8, 123u8, 87u8, 158u8, 162u8, 91u8,
-							170u8, 195u8, 129u8, 69u8, 108u8, 32u8, 51u8, 129u8, 91u8, 215u8, 79u8,
-							244u8, 212u8, 204u8, 52u8, 244u8, 229u8, 193u8, 193u8, 81u8, 115u8,
+							14u8, 185u8, 55u8, 235u8, 94u8, 66u8, 25u8, 32u8, 196u8, 135u8, 158u8,
+							57u8, 20u8, 139u8, 11u8, 196u8, 27u8, 146u8, 108u8, 79u8, 44u8, 219u8,
+							135u8, 40u8, 55u8, 154u8, 201u8, 224u8, 156u8, 108u8, 205u8, 236u8,
 						],
 					)
 				}
@@ -21443,10 +21447,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							139u8, 28u8, 171u8, 222u8, 6u8, 194u8, 134u8, 130u8, 121u8, 53u8,
-							108u8, 113u8, 27u8, 136u8, 96u8, 186u8, 94u8, 249u8, 182u8, 156u8,
-							115u8, 97u8, 201u8, 25u8, 10u8, 81u8, 106u8, 176u8, 137u8, 230u8, 11u8,
-							33u8,
+							122u8, 255u8, 237u8, 83u8, 97u8, 202u8, 203u8, 250u8, 119u8, 123u8,
+							216u8, 228u8, 12u8, 127u8, 138u8, 89u8, 28u8, 131u8, 88u8, 100u8, 53u8,
+							68u8, 195u8, 25u8, 42u8, 246u8, 199u8, 212u8, 223u8, 164u8, 191u8,
+							37u8,
 						],
 					)
 				}
@@ -21469,9 +21473,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							6u8, 161u8, 199u8, 98u8, 1u8, 72u8, 74u8, 197u8, 163u8, 182u8, 44u8,
-							78u8, 53u8, 56u8, 209u8, 30u8, 13u8, 215u8, 174u8, 144u8, 156u8, 64u8,
-							210u8, 72u8, 226u8, 234u8, 39u8, 66u8, 177u8, 140u8, 96u8, 173u8,
+							233u8, 143u8, 102u8, 171u8, 68u8, 111u8, 111u8, 76u8, 138u8, 152u8,
+							53u8, 163u8, 219u8, 223u8, 69u8, 118u8, 213u8, 15u8, 52u8, 96u8, 43u8,
+							200u8, 34u8, 4u8, 209u8, 254u8, 139u8, 83u8, 71u8, 228u8, 220u8, 199u8,
 						],
 					)
 				}
@@ -21807,10 +21811,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							191u8, 120u8, 215u8, 49u8, 53u8, 203u8, 254u8, 169u8, 234u8, 208u8,
-							110u8, 17u8, 210u8, 90u8, 102u8, 123u8, 118u8, 163u8, 1u8, 144u8,
-							207u8, 3u8, 42u8, 3u8, 101u8, 154u8, 170u8, 40u8, 208u8, 191u8, 139u8,
-							22u8,
+							156u8, 37u8, 249u8, 20u8, 20u8, 1u8, 218u8, 113u8, 190u8, 242u8, 35u8,
+							252u8, 242u8, 146u8, 147u8, 3u8, 174u8, 88u8, 192u8, 230u8, 33u8, 23u8,
+							122u8, 208u8, 38u8, 251u8, 87u8, 193u8, 123u8, 240u8, 199u8, 191u8,
 						],
 					)
 				}
@@ -21833,9 +21836,9 @@ pub mod api {
 							weight,
 						},
 						[
-							127u8, 3u8, 223u8, 30u8, 49u8, 226u8, 250u8, 115u8, 40u8, 198u8, 139u8,
-							51u8, 100u8, 113u8, 52u8, 71u8, 94u8, 214u8, 84u8, 42u8, 205u8, 37u8,
-							52u8, 121u8, 1u8, 47u8, 133u8, 145u8, 89u8, 201u8, 47u8, 11u8,
+							1u8, 32u8, 87u8, 141u8, 77u8, 255u8, 229u8, 120u8, 181u8, 187u8, 93u8,
+							252u8, 208u8, 49u8, 2u8, 114u8, 180u8, 131u8, 186u8, 68u8, 79u8, 237u8,
+							87u8, 212u8, 121u8, 33u8, 24u8, 187u8, 160u8, 56u8, 148u8, 124u8,
 						],
 					)
 				}
@@ -21873,9 +21876,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							210u8, 220u8, 18u8, 9u8, 139u8, 74u8, 43u8, 13u8, 121u8, 26u8, 96u8,
-							36u8, 128u8, 195u8, 97u8, 224u8, 9u8, 227u8, 146u8, 146u8, 85u8, 189u8,
-							44u8, 120u8, 197u8, 98u8, 27u8, 247u8, 80u8, 96u8, 211u8, 114u8,
+							163u8, 59u8, 130u8, 38u8, 141u8, 237u8, 247u8, 221u8, 232u8, 186u8,
+							249u8, 99u8, 101u8, 28u8, 90u8, 163u8, 78u8, 52u8, 228u8, 19u8, 156u8,
+							138u8, 63u8, 105u8, 46u8, 108u8, 114u8, 40u8, 144u8, 167u8, 20u8, 80u8,
 						],
 					)
 				}
@@ -24786,6 +24789,11 @@ pub mod api {
 						runtime_types::pallet_inbound_transfer_log::pallet::InboundEvmTransfer;
 					pub type Param0 = crate::types::H256;
 				}
+				pub mod recent_argon_transfers_by_account {
+					use super::runtime_types;
+					pub type RecentArgonTransfersByAccount = ::core::primitive::u32;
+					pub type Param0 = crate::types::AccountId32;
+				}
 				pub mod inbound_transfers_expiring_at {
 					use super::runtime_types;
 					pub type InboundTransfersExpiringAt =
@@ -24839,6 +24847,59 @@ pub mod api {
 							182u8, 39u8, 186u8, 139u8, 215u8, 30u8, 131u8, 42u8, 89u8, 155u8,
 							160u8, 13u8, 91u8, 10u8, 21u8, 163u8, 57u8, 198u8, 2u8, 66u8, 141u8,
 							5u8, 143u8, 88u8, 207u8, 168u8, 45u8, 216u8, 152u8, 26u8, 39u8, 112u8,
+						],
+					)
+				}
+				#[doc = " Recent qualifying Argon transfer count keyed by recipient account."]
+				#[doc = ""]
+				#[doc = " This is a transient retained-window index over `InboundEvmTransfers`, not permanent"]
+				#[doc = " history."]
+				pub fn recent_argon_transfers_by_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"InboundTransferLog",
+						"RecentArgonTransfersByAccount",
+						(),
+						[
+							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
+							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
+							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
+							163u8, 142u8,
+						],
+					)
+				}
+				#[doc = " Recent qualifying Argon transfer count keyed by recipient account."]
+				#[doc = ""]
+				#[doc = " This is a transient retained-window index over `InboundEvmTransfers`, not permanent"]
+				#[doc = " history."]
+				pub fn recent_argon_transfers_by_account(
+					&self,
+					_0: types::recent_argon_transfers_by_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::recent_argon_transfers_by_account::Param0,
+					>,
+					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"InboundTransferLog",
+						"RecentArgonTransfersByAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
+							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
+							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
+							163u8, 142u8,
 						],
 					)
 				}
@@ -25114,6 +25175,33 @@ pub mod api {
 					const PALLET: &'static str = "OperationalAccounts";
 					const CALL: &'static str = "force_set_progress";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."]
+				pub struct SetEncryptedServerForSponsee {
+					pub sponsee: set_encrypted_server_for_sponsee::Sponsee,
+					pub encrypted_server: set_encrypted_server_for_sponsee::EncryptedServer,
+				}
+				pub mod set_encrypted_server_for_sponsee {
+					use super::runtime_types;
+					pub type Sponsee = crate::types::AccountId32;
+					pub type EncryptedServer =
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetEncryptedServerForSponsee {
+					const PALLET: &'static str = "OperationalAccounts";
+					const CALL: &'static str = "set_encrypted_server_for_sponsee";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -25204,6 +25292,26 @@ pub mod api {
 							40u8, 191u8, 114u8, 215u8, 220u8, 54u8, 189u8, 56u8, 231u8, 219u8,
 							197u8, 43u8, 229u8, 17u8, 138u8, 64u8, 185u8, 21u8, 15u8, 131u8, 146u8,
 							85u8, 78u8, 170u8, 222u8, 211u8, 94u8, 37u8, 4u8, 62u8, 4u8, 65u8,
+						],
+					)
+				}
+				#[doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."]
+				pub fn set_encrypted_server_for_sponsee(
+					&self,
+					sponsee: types::set_encrypted_server_for_sponsee::Sponsee,
+					encrypted_server: types::set_encrypted_server_for_sponsee::EncryptedServer,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetEncryptedServerForSponsee,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"OperationalAccounts",
+						"set_encrypted_server_for_sponsee",
+						types::SetEncryptedServerForSponsee { sponsee, encrypted_server },
+						[
+							146u8, 194u8, 196u8, 181u8, 181u8, 244u8, 138u8, 121u8, 31u8, 94u8,
+							215u8, 181u8, 248u8, 179u8, 149u8, 183u8, 91u8, 10u8, 248u8, 34u8,
+							49u8, 81u8, 202u8, 48u8, 250u8, 108u8, 196u8, 167u8, 214u8, 102u8,
+							52u8, 167u8,
 						],
 					)
 				}
@@ -25368,6 +25476,28 @@ pub mod api {
 				const PALLET: &'static str = "OperationalAccounts";
 				const EVENT: &'static str = "OperationalProgressForced";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A sponsor updated the encrypted server payload for a sponsee."]
+			pub struct EncryptedServerUpdated {
+				pub sponsor: encrypted_server_updated::Sponsor,
+				pub sponsee: encrypted_server_updated::Sponsee,
+			}
+			pub mod encrypted_server_updated {
+				use super::runtime_types;
+				pub type Sponsor = crate::types::AccountId32;
+				pub type Sponsee = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for EncryptedServerUpdated {
+				const PALLET: &'static str = "OperationalAccounts";
+				const EVENT: &'static str = "EncryptedServerUpdated";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -25428,6 +25558,14 @@ pub mod api {
 								::core::primitive::u128,
 							>,
 						>;
+				}
+				pub mod encrypted_server_by_sponsee {
+					use super::runtime_types;
+					pub type EncryptedServerBySponsee =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>;
+					pub type Param0 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -25704,6 +25842,51 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Opaque encrypted sponsor server payload keyed by the sponsee operational account."]
+				pub fn encrypted_server_by_sponsee_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::encrypted_server_by_sponsee::EncryptedServerBySponsee,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"EncryptedServerBySponsee",
+						(),
+						[
+							231u8, 52u8, 30u8, 233u8, 142u8, 119u8, 8u8, 110u8, 172u8, 62u8, 94u8,
+							217u8, 133u8, 7u8, 74u8, 64u8, 57u8, 62u8, 69u8, 171u8, 227u8, 51u8,
+							44u8, 242u8, 153u8, 36u8, 47u8, 54u8, 105u8, 86u8, 154u8, 141u8,
+						],
+					)
+				}
+				#[doc = " Opaque encrypted sponsor server payload keyed by the sponsee operational account."]
+				pub fn encrypted_server_by_sponsee(
+					&self,
+					_0: types::encrypted_server_by_sponsee::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::encrypted_server_by_sponsee::Param0,
+					>,
+					types::encrypted_server_by_sponsee::EncryptedServerBySponsee,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"EncryptedServerBySponsee",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							231u8, 52u8, 30u8, 233u8, 142u8, 119u8, 8u8, 110u8, 172u8, 62u8, 94u8,
+							217u8, 133u8, 7u8, 74u8, 64u8, 57u8, 62u8, 69u8, 171u8, 227u8, 51u8,
+							44u8, 242u8, 153u8, 36u8, 47u8, 54u8, 105u8, 86u8, 154u8, 141u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -25869,6 +26052,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
 						"MaxUnactivatedAccessCodes",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of encrypted server bytes stored per sponsee."]
+				pub fn max_encrypted_server_len(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"MaxEncryptedServerLen",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -32736,7 +32936,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for the signer."] # [doc = "If an access code is provided, the sponsor pays the transaction fee."] register { vault_account : crate :: types :: AccountId32 , mining_funding_account : crate :: types :: AccountId32 , mining_bot_account : crate :: types :: AccountId32 , vault_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , mining_funding_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , mining_bot_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , access_code : :: core :: option :: Option < runtime_types :: pallet_operational_accounts :: pallet :: AccessCodeProof > , } , # [codec (index = 1)] # [doc = "Issue an access code (the public key itself) for this operational account."] # [doc = "The access code expires after `AccessCodeExpirationFrames`."] issue_access_code { access_code_public : [:: core :: primitive :: u8 ; 32usize] , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , }
+					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for the signer."] # [doc = "If an access code is provided, the sponsor pays the transaction fee."] register { vault_account : crate :: types :: AccountId32 , mining_funding_account : crate :: types :: AccountId32 , mining_bot_account : crate :: types :: AccountId32 , vault_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , mining_funding_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , mining_bot_account_proof : runtime_types :: pallet_operational_accounts :: pallet :: AccountOwnershipProof , access_code : :: core :: option :: Option < runtime_types :: pallet_operational_accounts :: pallet :: AccessCodeProof > , } , # [codec (index = 1)] # [doc = "Issue an access code (the public key itself) for this operational account."] # [doc = "The access code expires after `AccessCodeExpirationFrames`."] issue_access_code { access_code_public : [:: core :: primitive :: u8 ; 32usize] , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -32784,6 +32984,12 @@ pub mod api {
 					#[codec(index = 10)]
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
+					#[codec(index = 11)]
+					#[doc = "The encrypted server payload exceeds the configured max length."]
+					EncryptedServerTooLong,
+					#[codec(index = 12)]
+					#[doc = "The caller is not the sponsor of the requested sponsee."]
+					NotSponsorOfSponsee,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32843,6 +33049,12 @@ pub mod api {
 						has_treasury_pool_participation: ::core::primitive::bool,
 						observed_bitcoin_total: ::core::primitive::u128,
 						observed_mining_seat_total: ::core::primitive::u32,
+					},
+					#[codec(index = 6)]
+					#[doc = "A sponsor updated the encrypted server payload for a sponsee."]
+					EncryptedServerUpdated {
+						sponsor: crate::types::AccountId32,
+						sponsee: crate::types::AccountId32,
 					},
 				}
 				#[derive(

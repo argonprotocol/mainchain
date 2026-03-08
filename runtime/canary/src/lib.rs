@@ -689,6 +689,7 @@ impl pallet_operational_accounts::Config for Runtime {
 	type MaxAccessCodesExpiringPerFrame = MaxAccessCodesExpiringPerFrame;
 	type MaxUnactivatedAccessCodes = MaxIssuableOperationalAccessCodes;
 	type MaxIssuableAccessCodes = MaxIssuableOperationalAccessCodes;
+	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MaxOperationalRewardsQueued = OperationalMaxRewardsQueued;
 	type MinBitcoinLockSizeForOperational = MinBitcoinLockSizeForOperational;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
@@ -699,6 +700,7 @@ impl pallet_operational_accounts::Config for Runtime {
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
 	type MaxLegacyVaultRegistrations = MaxLegacyVaultRegistrations;
 	type LegacyVaultProvider = OperationalAccountsLegacyVaultProvider;
+	type RecentArgonTransferLookup = InboundTransferLog;
 	type OperationalRewardsPayer = Treasury;
 	type WeightInfo = weights::pallet_operational_accounts::WeightInfo<Runtime>;
 }
@@ -748,7 +750,7 @@ impl pallet_hyperbridge::Config for Runtime {
 
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
-	type FeelessCallTxPoolKeyProviders = ();
+	type FeelessCallTxPoolKeyProviders = OperationalAccounts;
 	type TransactionSponsorProviders =
 		(BitcoinLocks, OperationalAccounts, ProxyFeeDelegate<Runtime>);
 }

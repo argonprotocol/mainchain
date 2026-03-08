@@ -763,6 +763,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AlreadyRegistered: AugmentedError<ApiType>;
       /**
+       * The encrypted server payload exceeds the configured max length.
+       **/
+      EncryptedServerTooLong: AugmentedError<ApiType>;
+      /**
        * The access code provided is not registered.
        **/
       InvalidAccessCode: AugmentedError<ApiType>;
@@ -794,6 +798,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The caller has not registered an operational account.
        **/
       NotOperationalAccount: AugmentedError<ApiType>;
+      /**
+       * The caller is not the sponsor of the requested sponsee.
+       **/
+      NotSponsorOfSponsee: AugmentedError<ApiType>;
     };
     ownership: {
       /**

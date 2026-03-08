@@ -217,6 +217,8 @@ parameter_types! {
 	pub const MaxIssuableOperationalAccessCodes: u32 = 3;
 	/// Maximum number of queued operational rewards.
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
+	/// Maximum number of opaque encrypted sponsor server bytes stored per sponsee.
+	pub const MaxEncryptedServerLen: u32 = 256;
 	/// Minimum argon amount (base units) required for a qualifying bitcoin lock.
 	pub const MinBitcoinLockSizeForOperational: Balance = 2_000 * MICROGONS_PER_ARGON;
 	/// Additional argon amount (base units) required per access code after operational.

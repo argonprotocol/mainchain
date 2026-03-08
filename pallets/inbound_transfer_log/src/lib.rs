@@ -80,7 +80,7 @@ pub mod pallet {
 	use sp_runtime::traits::Saturating;
 
 	use alloy_sol_types::SolValue;
-	use argon_primitives::OperationalAccountsHook;
+	use argon_primitives::{OperationalAccountsHook, RecentArgonTransferLookup};
 	use ismp::{host::StateMachine, router::PostRequest};
 	use pallet_token_gateway::{
 		impls::convert_to_balance,
@@ -168,6 +168,14 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, H256, InboundEvmTransfer<T>, OptionQuery>;
 
 	#[pallet::storage]
+	/// Recent qualifying Argon transfer count keyed by recipient account.
+	///
+	/// This is a transient retained-window index over `InboundEvmTransfers`, not permanent
+	/// history.
+	pub type RecentArgonTransfersByAccount<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+
+	#[pallet::storage]
 	/// Index of inbound transfer record keys expiring at a given block.
 	pub type InboundTransfersExpiringAt<T: Config> = StorageMap<
 		_,
@@ -210,7 +218,9 @@ pub mod pallet {
 			let expiring = InboundTransfersExpiringAt::<T>::take(n);
 			let expiring_len = expiring.len() as u32;
 			for key in expiring {
-				InboundEvmTransfers::<T>::remove(key);
+				if let Some(transfer) = InboundEvmTransfers::<T>::take(key) {
+					Self::decrement_recent_argon_transfer(&transfer);
+				}
 			}
 			T::WeightInfo::on_initialize_cleanup(expiring_len)
 		}
@@ -238,6 +248,30 @@ pub mod pallet {
 				return Some(body.into());
 			}
 			None
+		}
+
+		fn increment_recent_argon_transfer(transfer: &InboundEvmTransfer<T>) {
+			if transfer.asset_kind != AssetKind::Argon {
+				return;
+			}
+			RecentArgonTransfersByAccount::<T>::mutate(&transfer.to, |count| {
+				count.saturating_inc();
+			});
+		}
+
+		fn decrement_recent_argon_transfer(transfer: &InboundEvmTransfer<T>) {
+			if transfer.asset_kind != AssetKind::Argon {
+				return;
+			}
+			RecentArgonTransfersByAccount::<T>::mutate_exists(&transfer.to, |maybe_count| {
+				let Some(count) = maybe_count.as_mut() else {
+					return;
+				};
+				count.saturating_reduce(1);
+				if *count == 0 {
+					*maybe_count = None;
+				}
+			});
 		}
 
 		/// Best-effort hook for inbound TokenGateway ISMP requests.
@@ -341,12 +375,14 @@ pub mod pallet {
 			};
 
 			InboundEvmTransfers::<T>::insert(record_key, transfer.clone());
+			Self::increment_recent_argon_transfer(&transfer);
 
 			if InboundTransfersExpiringAt::<T>::try_mutate(expires_at_block, |keys| {
 				keys.try_push(record_key)
 			})
 			.is_err()
 			{
+				Self::decrement_recent_argon_transfer(&transfer);
 				InboundEvmTransfers::<T>::remove(record_key);
 				return Self::drop_inbound_request(
 					&source,
@@ -367,6 +403,12 @@ pub mod pallet {
 			Self::deposit_event(Event::InboundEvmTransferRecorded { transfer });
 			<T as Config>::WeightInfo::on_token_gateway_request_recorded()
 				.saturating_add(hook_weight)
+		}
+	}
+
+	impl<T: Config> RecentArgonTransferLookup<T::AccountId> for Pallet<T> {
+		fn has_recent_argon_transfer(account_id: &T::AccountId) -> bool {
+			RecentArgonTransfersByAccount::<T>::get(account_id) > 0
 		}
 	}
 }

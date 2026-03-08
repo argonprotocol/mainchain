@@ -1084,6 +1084,16 @@ declare module '@polkadot/api-base/types/submittable' {
         ]
       >;
       /**
+       * Store an opaque encrypted sponsor server payload for a sponsored operational account.
+       **/
+      setEncryptedServerForSponsee: AugmentedSubmittable<
+        (
+          sponsee: AccountId32 | string | Uint8Array,
+          encryptedServer: Bytes | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, Bytes]
+      >;
+      /**
        * Update reward amounts for operational accounts.
        **/
       setRewardConfig: AugmentedSubmittable<
