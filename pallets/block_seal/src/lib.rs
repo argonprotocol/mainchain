@@ -155,7 +155,12 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			T::DbWeight::get().reads_writes(2, 2)
+			let voting_schedule = T::TickProvider::voting_schedule();
+			let notebook_count =
+				T::NotebookProvider::vote_eligible_notebook_count(&voting_schedule);
+
+			T::WeightInfo::on_initialize_with_notebooks(notebook_count)
+				.saturating_add(T::WeightInfo::on_finalize_with_notebooks(notebook_count))
 		}
 
 		fn on_finalize(_: BlockNumberFor<T>) {
@@ -170,7 +175,7 @@ pub mod pallet {
 			let votes_tick = voting_schedule.eligible_votes_tick();
 
 			let mut notebooks_at_tick =
-				T::NotebookProvider::notebooks_at_tick(voting_schedule.notebook_tick());
+				T::NotebookProvider::eligible_notebooks_for_vote(&voting_schedule);
 			notebooks_at_tick.sort_by(|(na, _, _), (nb, _, _)| na.cmp(nb));
 
 			let parent_voting_keys = notebooks_at_tick
@@ -688,6 +693,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BlockSealerProvider<T::AccountId> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn get_sealer_info() -> BlockSealerInfo<T::AccountId> {
 			<LastBlockSealerInfo<T>>::get().expect("BlockSealer must be set")
 		}

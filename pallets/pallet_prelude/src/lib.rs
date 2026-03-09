@@ -45,3 +45,6 @@ pub mod test;
 
 #[cfg(feature = "test")]
 pub use test::*;
+
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking;

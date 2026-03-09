@@ -986,10 +986,6 @@ declare module '@polkadot/api-base/types/errors' {
     };
     treasury: {
       /**
-       * The added amount would exceed the activated securitization
-       **/
-      ActivatedSecuritizationExceeded: AugmentedError<ApiType>;
-      /**
        * This fund has already been renewed
        **/
       AlreadyRenewed: AugmentedError<ApiType>;

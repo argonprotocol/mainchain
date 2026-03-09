@@ -41,20 +41,18 @@ Treasury Pools offer LockedBitcoins upfront liquidity in the case where they wil
 to a below-target argon price. A treasury pool for a slot accumulates all mining bid capital on top
 of Bonded Argons provided by argon holders in the network. The pool is distributed first to any
 pending Bitcoins, and then to each vault based on the size of its contributed treasury pool. The
-per-slot treasury pool is capped at one-tenth of a vault's activated securitization.
+per-slot treasury pool is capped at one-tenth of a vault's securitized satoshis
+(`sats * securitization ratio`).
 
 If a treasury pool is used to fund Bitcoins, it will be the first to be paid out once the argon
 price is back at (or above) target.
-
-`Activated securitization` is the amount of securitization currently locked into Bitcoin multiplied
-by the securitization ratio. In other words, it's the capital locked into use.
 
 To bond argons to a `Treasury Pool`, any account can submit argons to a given cohort's bid pool
 using the `Treasury` pallet. The vault can control how much of the treasury pool earnings are shared
 with those contributing capital.
 
 > A vault operator can pre-bond argons to the treasury pool, which gives them first priority to
-> capitalize on activated securitization. This is fully optional. The prebond api is
+> capitalize on the per-slot treasury pool cap. This is fully optional. The prebond api is
 > `liquidyPool.vault_operator_prebond`
 
 ### Variables for Treasury Pools
