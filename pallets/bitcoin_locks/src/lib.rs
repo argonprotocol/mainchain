@@ -1739,6 +1739,24 @@ pub mod pallet {
 
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			if LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id) {
+				let request = Self::take_release_request(utxo_id)?;
+				// We don't branch on spend status here. A valid release request must be made far
+				// enough ahead of claim height that the overdue-cosign path should always run
+				// before a normal expiration burn. If a burn still happens with a pending
+				// release request, treat it as a terminal failure and burn the held release
+				// funds.
+				if request.redemption_price > T::Balance::zero() {
+					let _ = T::Currency::burn_held(
+						&HoldReason::ReleaseBitcoinLock.into(),
+						&lock.owner_account,
+						request.redemption_price,
+						Precision::Exact,
+						Fortitude::Force,
+					)?;
+					frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
+				}
+			}
 			if is_externally_spent {
 				Self::clear_orphans_for_lock(utxo_id, &lock)?;
 			} else {
