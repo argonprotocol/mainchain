@@ -1,6 +1,6 @@
 use crate::utils::{
-	create_active_notary_with_archive_bucket, mining_slot_ownership_needed, register_miner_keys,
-	register_miners,
+	create_active_notary_with_archive_bucket, force_set_ownership_balance,
+	mining_slot_ownership_needed, register_miner_keys, register_miners, wait_for_finalized_catchup,
 };
 use argon_client::{
 	FetchAt,
@@ -13,66 +13,36 @@ use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_min
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
-use sp_keyring::Sr25519Keyring;
-use std::collections::HashSet;
 use tokio::join;
 
 /// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_end_to_end_default_vote_mining() {
-	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
+	let compute_threads = test_miner_count();
+	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", compute_threads, "").unwrap();
 	let archive_bucket = ArgonTestNotary::create_archive_bucket();
 	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
 	grandpa_miner.notebook_archive_urls.push(archive_host);
 
 	let grandpa_miner = ArgonTestNode::start(grandpa_miner).await.unwrap();
-	let miner_threads = test_miner_count();
-	let miner_1 = grandpa_miner.fork_node("bob", miner_threads).await.unwrap();
-	let miner_2 = grandpa_miner.fork_node("dave", miner_threads).await.unwrap();
+	let miner_1 = grandpa_miner.fork_node("bob", 0).await.unwrap();
+	let miner_2 = grandpa_miner.fork_node("dave", 0).await.unwrap();
 
 	let test_notary = create_active_notary_with_archive_bucket(&grandpa_miner, archive_bucket)
 		.await
 		.expect("Notary registered");
 
-	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
 	let ownership_needed = mining_slot_ownership_needed(&grandpa_miner).await.unwrap();
-	let mut authors = HashSet::<AccountId>::new();
-	let mut counter = 0;
-	let mut rewards_counter = 0;
-	loop {
-		if let Some(Ok(block)) = blocks_sub.next().await {
-			if let Some(author) =
-				block.header().runtime_digest().logs.iter().find_map(|a| a.as_author())
-			{
-				let keyring = Sr25519Keyring::from_account_id(&author).unwrap();
-				println!("Block Author {:?} ({})", keyring, block.number());
-
-				if let Ok(ownership) =
-					grandpa_miner.client.get_ownership(&author, FetchAt::Block(block.hash())).await
-				{
-					if ownership.free >= (ownership_needed * 2) && !authors.contains(&author) {
-						println!("Block Author is ready {keyring:?}");
-						authors.insert(author);
-					}
-				}
-			}
-			if authors.len() == 2 {
-				println!("Both authors have produced blocks");
-				if rewards_counter == 0 {
-					rewards_counter = counter + 5;
-				}
-				if counter >= rewards_counter {
-					println!("Both authors have rewards matured");
-					break;
-				}
-			}
-			counter += 1;
-			if counter >= 50 {
-				panic!("Blocks not produced by both authors after 50 blocks -> {authors:?}");
-			}
-		}
-	}
+	let seeded_ownership = ownership_needed.saturating_mul(2);
+	force_set_ownership_balance(&grandpa_miner, &miner_1.account_id, seeded_ownership)
+		.await
+		.unwrap();
+	force_set_ownership_balance(&grandpa_miner, &miner_2.account_id, seeded_ownership)
+		.await
+		.unwrap();
+	wait_for_finalized_catchup(&grandpa_miner, &miner_1).await.unwrap();
+	wait_for_finalized_catchup(&grandpa_miner, &miner_2).await.unwrap();
 
 	let miner_1_keyring = miner_1.keyring();
 	let miner_1_second_account = miner_1
@@ -156,7 +126,6 @@ async fn test_end_to_end_default_vote_mining() {
 	let start_finalized_block = grandpa_miner.client.latest_finalized_block().await.unwrap();
 	let mut vote_blocks = 0;
 	let mut miner_vote_blocks = (0, 0, 0);
-	authors.clear();
 
 	let mut block_loops = 0;
 	let mut start_tick = None;

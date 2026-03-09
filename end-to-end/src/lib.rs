@@ -118,6 +118,53 @@ pub(crate) mod utils {
 			.unwrap_or_default())
 	}
 
+	pub(crate) async fn force_set_ownership_balance(
+		test_node: &ArgonTestNode,
+		account_id: &AccountId,
+		amount: Balance,
+	) -> anyhow::Result<()> {
+		let account = test_node.client.api_account(account_id);
+		sudo(
+			test_node,
+			RuntimeCall::Ownership(
+				api::runtime_types::pallet_balances::pallet::Call::force_set_balance {
+					who: account.into(),
+					new_free: amount,
+				},
+			),
+			true,
+		)
+		.await?;
+		Ok(())
+	}
+
+	pub(crate) async fn wait_for_finalized_catchup(
+		source: &ArgonTestNode,
+		node: &ArgonTestNode,
+	) -> anyhow::Result<()> {
+		let finalized = source.client.latest_finalized_block_hash().await?;
+		let block_number = source.client.block_number(finalized.hash()).await?;
+		let latest_node_finalized = node.client.latest_finalized_block_hash().await?;
+		let latest_node_number = node.client.block_number(latest_node_finalized.hash()).await?;
+		if latest_node_finalized.hash() == finalized.hash() || latest_node_number >= block_number {
+			return Ok(());
+		}
+
+		let mut catchup_sub = node.client.live.blocks().subscribe_finalized().await?;
+		while let Some(next) = catchup_sub.next().await {
+			let next = next?;
+			println!(
+				"Waiting for node catchup to finalized block {:?}. At {:?}",
+				block_number,
+				next.header().number
+			);
+			if next.hash().as_ref() == finalized.hash().as_ref() || next.number() >= block_number {
+				break;
+			}
+		}
+		Ok(())
+	}
+
 	pub(crate) async fn register_miner_keys(
 		node: &ArgonTestNode,
 		miner: Sr25519Keyring,
