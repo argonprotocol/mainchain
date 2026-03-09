@@ -6,6 +6,7 @@ pub trait WeightInfo {
 	fn issue_access_code() -> Weight;
 	fn set_reward_config() -> Weight;
 	fn force_set_progress() -> Weight;
+	fn set_encrypted_server_for_sponsee() -> Weight;
 	fn on_vault_created() -> Weight;
 	fn on_bitcoin_lock_funded() -> Weight;
 	fn on_mining_seat_won() -> Weight;
@@ -25,6 +26,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn force_set_progress() -> Weight {
+		Weight::zero()
+	}
+	fn set_encrypted_server_for_sponsee() -> Weight {
 		Weight::zero()
 	}
 	fn on_vault_created() -> Weight {

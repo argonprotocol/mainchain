@@ -1638,6 +1638,10 @@ export default {
         observedBitcoinTotal: 'u128',
         observedMiningSeatTotal: 'u32',
       },
+      EncryptedServerUpdated: {
+        sponsor: 'AccountId32',
+        sponsee: 'AccountId32',
+      },
     },
   },
   /**
@@ -2928,6 +2932,10 @@ export default {
         patch: 'PalletOperationalAccountsOperationalProgressPatch',
         updateOperationalProgress: 'bool',
       },
+      set_encrypted_server_for_sponsee: {
+        sponsee: 'AccountId32',
+        encryptedServer: 'Bytes',
+      },
     },
   },
   /**
@@ -3805,7 +3813,7 @@ export default {
     amount: 'u128',
   },
   /**
-   * Lookup547: pallet_operational_accounts::pallet::Error<T>
+   * Lookup548: pallet_operational_accounts::pallet::Error<T>
    **/
   PalletOperationalAccountsError: {
     _enum: [
@@ -3820,58 +3828,60 @@ export default {
       'MaxUnactivatedAccessCodesReached',
       'MaxAccessCodesExpiringPerFrameReached',
       'NoProgressUpdateProvided',
+      'EncryptedServerTooLong',
+      'NotSponsorOfSponsee',
     ],
   },
   /**
-   * Lookup550: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup551: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup551: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup552: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup552: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup553: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup553: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup554: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup554: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup555: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup557: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup558: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup558: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup559: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup559: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup560: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup560: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup561: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup561: frame_metadata_hash_extension::Mode
+   * Lookup562: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup562: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup563: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup564: argon_runtime::Runtime
+   * Lookup565: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

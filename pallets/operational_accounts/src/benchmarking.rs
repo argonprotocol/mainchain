@@ -26,6 +26,19 @@ mod benchmarks {
 	#[benchmark]
 	fn register() {
 		let caller: T::AccountId = account("caller", 0, USER_SEED);
+		let sponsor = linked_accounts::<T>();
+		let access_code = make_access_code_proof::<T>(&caller, 4);
+		let mut sponsor_account = default_operational_account::<T>(&sponsor);
+		sponsor_account.is_operational = true;
+		sponsor_account.unactivated_access_codes = 1;
+		insert_operational_account::<T>(&sponsor, sponsor_account);
+		AccessCodesByPublic::<T>::insert(
+			access_code.public,
+			AccessCodeMetadata { sponsor: sponsor.owner.clone(), expiration_frame: 1 },
+		);
+		AccessCodesExpiringByFrame::<T>::mutate(1, |expiring_codes| {
+			let _ = expiring_codes.try_push(access_code.public);
+		});
 		let (vault, vault_proof) =
 			make_linked_account::<T>(&caller, 1, VAULT_ACCOUNT_PROOF_MESSAGE_KEY);
 		let (mining_funding, mining_funding_proof) =
@@ -42,13 +55,14 @@ mod benchmarks {
 			vault_proof,
 			mining_funding_proof,
 			mining_bot_proof,
-			None,
+			Some(access_code.clone()),
 		);
 
 		assert!(OperationalAccounts::<T>::contains_key(caller));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_funding));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
+		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
 	}
 
 	#[benchmark]
@@ -212,6 +226,38 @@ mod benchmarks {
 		assert!(account.is_operational);
 	}
 
+	#[benchmark]
+	fn set_encrypted_server_for_sponsee() {
+		let sponsor = linked_accounts::<T>();
+		let sponsee = LinkedAccounts {
+			owner: account("sponsee_owner", 0, USER_SEED),
+			vault: account("sponsee_vault", 0, USER_SEED),
+			mining_funding: account("sponsee_mining_funding", 0, USER_SEED),
+			mining_bot: account("sponsee_mining_bot", 0, USER_SEED),
+		};
+		insert_operational_account::<T>(&sponsor, default_operational_account::<T>(&sponsor));
+		let mut sponsee_account = default_operational_account::<T>(&sponsee);
+		sponsee_account.sponsor = Some(sponsor.owner.clone());
+		insert_operational_account::<T>(&sponsee, sponsee_account);
+		let encrypted_server = vec![7u8; 32];
+		let sponsor_owner = sponsor.owner.clone();
+		whitelist_account!(sponsor_owner);
+
+		#[extrinsic_call]
+		set_encrypted_server_for_sponsee(
+			RawOrigin::Signed(sponsor_owner),
+			sponsee.owner.clone(),
+			encrypted_server.clone(),
+		);
+
+		assert_eq!(
+			EncryptedServerBySponsee::<T>::get(&sponsee.owner)
+				.expect("payload stored")
+				.to_vec(),
+			encrypted_server
+		);
+	}
+
 	impl_benchmark_test_suite!(
 		OperationalAccountsPallet,
 		crate::mock::new_test_ext(),
@@ -294,5 +340,18 @@ mod benchmarks {
 				.expect("benchmark signing key should exist")
 				.into();
 		(account_id, AccountOwnershipProof { signature })
+	}
+
+	fn make_access_code_proof<T: Config>(owner: &T::AccountId, seed: u8) -> AccessCodeProof {
+		let seed_phrase = match seed {
+			4 => "//operational-access-code-4",
+			_ => "//operational-access-code-proof",
+		};
+		let public =
+			sp_io::crypto::sr25519_generate(BENCH_KEY_TYPE, Some(seed_phrase.as_bytes().to_vec()));
+		let message = (ACCESS_CODE_PROOF_MESSAGE_KEY, public, owner).using_encoded(blake2_256);
+		let signature = sp_io::crypto::sr25519_sign(BENCH_KEY_TYPE, &public, message.as_slice())
+			.expect("benchmark signing key should exist");
+		AccessCodeProof { public, signature }
 	}
 }

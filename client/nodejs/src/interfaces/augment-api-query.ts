@@ -623,6 +623,17 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>,
         [u32]
       >;
+      /**
+       * Recent qualifying Argon transfer count keyed by recipient account.
+       *
+       * This is a transient retained-window index over `InboundEvmTransfers`, not permanent
+       * history.
+       **/
+      recentArgonTransfersByAccount: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<u32>,
+        [AccountId32]
+      >;
     };
     ismp: {
       /**
@@ -1056,6 +1067,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<U8aFixed>>,
         [u64]
+      >;
+      /**
+       * Opaque encrypted sponsor server payload keyed by the sponsee operational account.
+       **/
+      encryptedServerBySponsee: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<Bytes>>,
+        [AccountId32]
       >;
       /**
        * Tracks whether the initial migration has already run.

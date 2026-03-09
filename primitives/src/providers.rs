@@ -62,6 +62,30 @@ impl ChainTransferLookupWeightInfo for () {
 	}
 }
 
+pub trait RecentArgonTransferLookup<AccountId> {
+	fn has_recent_argon_transfer(account_id: &AccountId) -> bool;
+}
+
+impl<AccountId> RecentArgonTransferLookup<AccountId> for () {
+	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
+		false
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+impl<AccountId> RecentArgonTransferLookup<AccountId> for Tuple {
+	fn has_recent_argon_transfer(account_id: &AccountId) -> bool {
+		for_tuples!(
+			#(
+			if Tuple::has_recent_argon_transfer(account_id) {
+				return true;
+			}
+			)*
+		);
+		false
+	}
+}
+
 pub trait BlockSealSpecProviderWeightInfo {
 	fn grandparent_vote_minimum() -> Weight;
 	fn compute_difficulty() -> Weight;

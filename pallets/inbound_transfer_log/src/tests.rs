@@ -1,6 +1,10 @@
-use crate::{InboundEvmTransfer, InboundEvmTransfers, InboundTransfersExpiringAt};
+use crate::{
+	InboundEvmTransfer, InboundEvmTransfers, InboundTransfersExpiringAt,
+	RecentArgonTransfersByAccount,
+};
 use alloy_primitives::U256;
 use alloy_sol_types::SolValue;
+use argon_primitives::RecentArgonTransferLookup;
 use codec::Encode;
 use ismp::{host::StateMachine, router::PostRequest};
 use pallet_prelude::*;
@@ -32,6 +36,7 @@ fn test_on_initialize_removes_expired_transfers() {
 		};
 
 		InboundEvmTransfers::<Test>::insert(key, transfer);
+		RecentArgonTransfersByAccount::<Test>::insert(10, 1);
 		InboundTransfersExpiringAt::<Test>::try_mutate(1, |keys| keys.try_push(key).map(|_| ()))
 			.unwrap();
 
@@ -39,6 +44,7 @@ fn test_on_initialize_removes_expired_transfers() {
 		InboundTransferLogPallet::on_initialize(cleanup_block);
 
 		assert!(!InboundEvmTransfers::<Test>::contains_key(key));
+		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(10), 0);
 		assert!(InboundTransfersExpiringAt::<Test>::get(1).is_empty());
 	});
 }
@@ -315,11 +321,26 @@ fn test_on_token_gateway_request_records_transfer() {
 		assert_eq!(record.to, to);
 		assert_eq!(record.asset_kind, crate::AssetKind::Argon);
 		assert_eq!(record.amount, 1_500_000);
+		assert_eq!(RecentArgonTransfersByAccount::<GatewayTest>::get(&to), 1);
+		assert!(
+			<GatewayInboundTransferLog as RecentArgonTransferLookup<_>>::has_recent_argon_transfer(
+				&to
+			)
+		);
 		let retention_blocks: BlockNumberFor<GatewayTest> =
 			crate::mock::gateway::GatewayInboundTransfersRetentionBlocks::get();
 		assert_eq!(
 			record.expires_at_block,
 			frame_system::Pallet::<GatewayTest>::block_number() + retention_blocks
+		);
+
+		frame_system::Pallet::<GatewayTest>::set_block_number(1 + retention_blocks);
+		GatewayInboundTransferLog::on_initialize(1 + retention_blocks);
+
+		assert!(
+			!<GatewayInboundTransferLog as RecentArgonTransferLookup<_>>::has_recent_argon_transfer(
+				&to
+			)
 		);
 	});
 }

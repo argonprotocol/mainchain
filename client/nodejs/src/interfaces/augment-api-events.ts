@@ -1105,6 +1105,14 @@ declare module '@polkadot/api-base/types/events' {
         { account: AccountId32 }
       >;
       /**
+       * A sponsor updated the encrypted server payload for a sponsee.
+       **/
+      EncryptedServerUpdated: AugmentedEvent<
+        ApiType,
+        [sponsor: AccountId32, sponsee: AccountId32],
+        { sponsor: AccountId32; sponsee: AccountId32 }
+      >;
+      /**
        * An operational account was registered with its linked accounts.
        **/
       OperationalAccountRegistered: AugmentedEvent<

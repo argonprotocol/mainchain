@@ -31,6 +31,7 @@ parameter_types! {
 		pub const MaxAccessCodesExpiringPerFrame: u32 = 16;
 		pub const MaxUnactivatedAccessCodes: u32 = 2;
 		pub const MaxIssuableAccessCodes: u32 = 2;
+	pub const MaxEncryptedServerLen: u32 = 256;
 	pub const MaxOperationalRewardsQueued: u32 = 100;
 	pub const MinBitcoinLockSizeForOperational: Balance = 2_000;
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
@@ -66,6 +67,7 @@ impl pallet_operational_accounts::Config for Test {
 	type MaxAccessCodesExpiringPerFrame = MaxAccessCodesExpiringPerFrame;
 	type MaxUnactivatedAccessCodes = MaxUnactivatedAccessCodes;
 	type MaxIssuableAccessCodes = MaxIssuableAccessCodes;
+	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MaxOperationalRewardsQueued = MaxOperationalRewardsQueued;
 	type MinBitcoinLockSizeForOperational = MinBitcoinLockSizeForOperational;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
@@ -76,6 +78,7 @@ impl pallet_operational_accounts::Config for Test {
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
 	type MaxLegacyVaultRegistrations = MaxLegacyVaultRegistrations;
 	type LegacyVaultProvider = ();
+	type RecentArgonTransferLookup = InboundTransferLog;
 	type OperationalRewardsPayer = ();
 	type WeightInfo = ();
 }

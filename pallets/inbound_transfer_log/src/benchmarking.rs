@@ -21,22 +21,24 @@ mod benchmarks {
 	fn on_initialize_cleanup(c: Linear<1, 1_024>) {
 		let retention: BlockNumberFor<T> =
 			T::InboundTransfersRetentionBlocks::get().saturated_into();
-		let expiry_block = BlockNumberFor::<T>::one();
-		let cleanup_block = expiry_block.saturating_add(retention);
-		let to: T::AccountId = account("to", 0, 0);
-		let transfer = InboundEvmTransfer::<T> {
-			source: ismp::host::StateMachine::Evm(1),
-			nonce: 1,
-			evm_from: H160::repeat_byte(1),
-			to,
-			asset_kind: AssetKind::Argon,
-			amount: 1_000,
-			expires_at_block: expiry_block,
-		};
+		let current_block = BlockNumberFor::<T>::one();
+		let expiry_block = current_block.saturating_add(retention);
+		let cleanup_block = expiry_block;
 		let count = c.min(T::MaxTransfersToRetainPerBlock::get());
 		for i in 0..count {
+			let to: T::AccountId = account("to", i, 0);
 			let key = H256::repeat_byte(i as u8);
-			InboundEvmTransfers::<T>::insert(key, transfer.clone());
+			let transfer = InboundEvmTransfer::<T> {
+				source: ismp::host::StateMachine::Evm(1),
+				nonce: i as u64,
+				evm_from: H160::repeat_byte(1),
+				to: to.clone(),
+				asset_kind: AssetKind::Argon,
+				amount: 1_000,
+				expires_at_block: expiry_block,
+			};
+			InboundEvmTransfers::<T>::insert(key, transfer);
+			RecentArgonTransfersByAccount::<T>::insert(to, 1);
 			InboundTransfersExpiringAt::<T>::try_mutate(expiry_block, |keys| {
 				keys.try_push(key).map_err(|_| ())?;
 				Ok::<(), ()>(())
@@ -50,6 +52,7 @@ mod benchmarks {
 		}
 
 		assert!(InboundEvmTransfers::<T>::iter().next().is_none());
+		assert!(RecentArgonTransfersByAccount::<T>::iter().next().is_none());
 	}
 
 	#[benchmark]
@@ -72,6 +75,7 @@ mod benchmarks {
 
 		let record_key = H256::from(sp_io::hashing::blake2_256(&(source, 42u64).encode()));
 		assert!(InboundEvmTransfers::<T>::contains_key(record_key));
+		assert!(RecentArgonTransfersByAccount::<T>::iter().next().is_some());
 	}
 
 	#[benchmark]

@@ -325,6 +325,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxAccessCodesExpiringPerFrame: u32 & AugmentedConst<ApiType>;
       /**
+       * Maximum number of encrypted server bytes stored per sponsee.
+       **/
+      maxEncryptedServerLen: u32 & AugmentedConst<ApiType>;
+      /**
        * Maximum number of issuable access codes allowed at once.
        **/
       maxIssuableAccessCodes: u32 & AugmentedConst<ApiType>;

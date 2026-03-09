@@ -1,15 +1,16 @@
 use crate::{
 	ACCESS_CODE_PROOF_MESSAGE_KEY, AccessCodeMetadata, AccessCodeProof, AccessCodesByPublic,
-	AccessCodesExpiringByFrame, AccountOwnershipProof, HasInitialMigrationRun, LegacyVaultInfo,
-	LegacyVaultRegistrations, MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
-	MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY, OperationalAccountBySubAccount, OperationalAccounts,
-	OperationalProgressPatch, OperationalRewardsQueue, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	AccessCodesExpiringByFrame, AccountOwnershipProof, EncryptedServerBySponsee,
+	HasInitialMigrationRun, LegacyVaultInfo, LegacyVaultRegistrations,
+	MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY, MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+	OperationalAccountBySubAccount, OperationalAccounts, OperationalProgressPatch,
+	OperationalRewardsQueue, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
-	OperationalRewardsProvider, Signature,
+	FeelessCallTxPoolKeyProvider, OperationalAccountsHook, OperationalRewardKind,
+	OperationalRewardPayout, OperationalRewardsProvider, Signature,
 };
-use frame_support::{assert_err, assert_noop, assert_ok};
+use frame_support::{assert_err, assert_noop, assert_ok, dispatch::CheckIfFeeless};
 use pallet_prelude::*;
 use sp_core::{Pair, sr25519};
 use sp_io::hashing::blake2_256;
@@ -17,9 +18,10 @@ use sp_runtime::{DispatchError, MultiSigner, traits::IdentifyAccount};
 
 use crate::mock::{
 	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
-	MaxIssuableAccessCodes, MaxOperationalRewardsQueued, MinBitcoinLockSizeForOperational,
-	OperationalAccounts as OperationalAccountsPallet, OperationalReferralBonusReward,
-	OperationalReferralReward, RuntimeOrigin, System, Test, TestAccountId, new_test_ext,
+	MaxEncryptedServerLen, MaxIssuableAccessCodes, MaxOperationalRewardsQueued,
+	MinBitcoinLockSizeForOperational, OperationalAccounts as OperationalAccountsPallet,
+	OperationalReferralBonusReward, OperationalReferralReward, RuntimeCall, RuntimeOrigin, System,
+	Test, TestAccountId, new_test_ext,
 };
 
 #[test]
@@ -125,6 +127,122 @@ fn test_register_rejects_duplicate_subaccounts() {
 }
 
 #[test]
+fn test_register_is_feeless_for_recent_argon_transfer_on_linked_account() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(70, 71, 72, 73);
+		pallet_inbound_transfer_log::RecentArgonTransfersByAccount::<Test>::insert(
+			account_set.vault.clone(),
+			1,
+		);
+
+		let call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: account_set.vault.clone(),
+			mining_funding_account: account_set.mining_funding.clone(),
+			mining_bot_account: account_set.mining_bot.clone(),
+			vault_account_proof: account_set.vault_proof.clone(),
+			mining_funding_account_proof: account_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: account_set.mining_bot_proof.clone(),
+			access_code: None,
+		});
+
+		assert!(call.is_feeless(&RuntimeOrigin::signed(account_set.owner.clone())));
+	});
+}
+
+#[test]
+fn test_register_is_feeless_for_existing_system_account_activity() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(74, 75, 76, 77);
+		System::inc_account_nonce(&account_set.mining_funding);
+
+		let call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: account_set.vault.clone(),
+			mining_funding_account: account_set.mining_funding.clone(),
+			mining_bot_account: account_set.mining_bot.clone(),
+			vault_account_proof: account_set.vault_proof.clone(),
+			mining_funding_account_proof: account_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: account_set.mining_bot_proof.clone(),
+			access_code: None,
+		});
+
+		assert!(call.is_feeless(&RuntimeOrigin::signed(account_set.owner.clone())));
+	});
+}
+
+#[test]
+fn test_register_is_not_feeless_without_valid_linked_account_proofs() {
+	new_test_ext().execute_with(|| {
+		let owner_set = make_account_set(78, 79, 80, 81);
+		let attacker = account_id_from_seed(82);
+		pallet_inbound_transfer_log::RecentArgonTransfersByAccount::<Test>::insert(
+			owner_set.vault.clone(),
+			1,
+		);
+
+		let call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: owner_set.vault.clone(),
+			mining_funding_account: owner_set.mining_funding.clone(),
+			mining_bot_account: owner_set.mining_bot.clone(),
+			vault_account_proof: owner_set.vault_proof.clone(),
+			mining_funding_account_proof: owner_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: owner_set.mining_bot_proof.clone(),
+			access_code: None,
+		});
+
+		assert!(!call.is_feeless(&RuntimeOrigin::signed(attacker)));
+	});
+}
+
+#[test]
+fn test_register_feeless_key_is_stable_for_linked_accounts() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(83, 84, 85, 86);
+		let call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: account_set.vault.clone(),
+			mining_funding_account: account_set.mining_funding.clone(),
+			mining_bot_account: account_set.mining_bot.clone(),
+			vault_account_proof: account_set.vault_proof.clone(),
+			mining_funding_account_proof: account_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: account_set.mining_bot_proof.clone(),
+			access_code: None,
+		});
+		let same_call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: account_set.vault.clone(),
+			mining_funding_account: account_set.mining_funding.clone(),
+			mining_bot_account: account_set.mining_bot.clone(),
+			vault_account_proof: account_set.vault_proof.clone(),
+			mining_funding_account_proof: account_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: account_set.mining_bot_proof.clone(),
+			access_code: Some(make_access_code_proof(&account_set.owner, 22)),
+		});
+		let different_set = make_account_set(82, 83, 84, 85);
+		let different_call = RuntimeCall::OperationalAccounts(crate::Call::<Test>::register {
+			vault_account: different_set.vault.clone(),
+			mining_funding_account: different_set.mining_funding.clone(),
+			mining_bot_account: different_set.mining_bot.clone(),
+			vault_account_proof: different_set.vault_proof.clone(),
+			mining_funding_account_proof: different_set.mining_funding_proof.clone(),
+			mining_bot_account_proof: different_set.mining_bot_proof.clone(),
+			access_code: None,
+		});
+
+		let key = <OperationalAccountsPallet as FeelessCallTxPoolKeyProvider<_>>::key_for(&call)
+			.expect("register conflict key");
+		let same_key =
+			<OperationalAccountsPallet as FeelessCallTxPoolKeyProvider<_>>::key_for(&same_call)
+				.expect("same register conflict key");
+		let different_key =
+			<OperationalAccountsPallet as FeelessCallTxPoolKeyProvider<_>>::key_for(
+				&different_call,
+			)
+			.expect("different register conflict key");
+
+		assert_eq!(key, same_key);
+		assert_ne!(key, different_key);
+	});
+}
+
+#[test]
 fn test_register_with_access_code_sets_sponsor_and_decrements_unactivated() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
@@ -153,6 +271,22 @@ fn test_register_with_access_code_sets_sponsor_and_decrements_unactivated() {
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.unactivated_access_codes, 0);
 		assert_eq!(sponsor_account.issuable_access_codes, 0);
+	});
+}
+
+#[test]
+fn test_register_hydrates_recent_argon_transfer_on_linked_account() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(24, 25, 26, 27);
+		pallet_inbound_transfer_log::RecentArgonTransfersByAccount::<Test>::insert(
+			account_set.mining_funding.clone(),
+			1,
+		);
+
+		register_account(&account_set, None);
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(account.has_uniswap_transfer);
 	});
 }
 
@@ -868,6 +1002,94 @@ fn test_pending_rewards_returns_all_queued_rewards() {
 		assert_eq!(rewards.len(), 5);
 		assert_eq!(rewards[0].operational_account, account_id_from_seed(1));
 		assert_eq!(rewards[4].operational_account, account_id_from_seed(5));
+	});
+}
+
+#[test]
+fn test_sponsor_can_set_encrypted_server_for_sponsee() {
+	new_test_ext().execute_with(|| {
+		let sponsor_set = make_account_set(86, 87, 88, 89);
+		let sponsee_set = make_account_set(90, 91, 92, 93);
+		register_account(&sponsor_set, None);
+		register_account(&sponsee_set, None);
+		OperationalAccounts::<Test>::mutate(&sponsee_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("sponsee account");
+			account.sponsor = Some(sponsor_set.owner.clone());
+		});
+
+		let encrypted_server = vec![4u8; 48];
+		assert_ok!(OperationalAccountsPallet::set_encrypted_server_for_sponsee(
+			RuntimeOrigin::signed(sponsor_set.owner.clone()),
+			sponsee_set.owner.clone(),
+			encrypted_server.clone(),
+		));
+		assert_eq!(
+			EncryptedServerBySponsee::<Test>::get(&sponsee_set.owner)
+				.expect("encrypted server")
+				.to_vec(),
+			encrypted_server
+		);
+
+		let replacement = vec![5u8; 16];
+		assert_ok!(OperationalAccountsPallet::set_encrypted_server_for_sponsee(
+			RuntimeOrigin::signed(sponsor_set.owner.clone()),
+			sponsee_set.owner.clone(),
+			replacement.clone(),
+		));
+		assert_eq!(
+			EncryptedServerBySponsee::<Test>::get(&sponsee_set.owner)
+				.expect("replacement encrypted server")
+				.to_vec(),
+			replacement
+		);
+	});
+}
+
+#[test]
+fn test_set_encrypted_server_requires_sponsor_relationship() {
+	new_test_ext().execute_with(|| {
+		let sponsor_set = make_account_set(94, 95, 96, 97);
+		let sponsee_set = make_account_set(98, 99, 100, 101);
+		let outsider_set = make_account_set(102, 103, 104, 105);
+		register_account(&sponsor_set, None);
+		register_account(&sponsee_set, None);
+		register_account(&outsider_set, None);
+		OperationalAccounts::<Test>::mutate(&sponsee_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("sponsee account");
+			account.sponsor = Some(sponsor_set.owner.clone());
+		});
+
+		assert_noop!(
+			OperationalAccountsPallet::set_encrypted_server_for_sponsee(
+				RuntimeOrigin::signed(outsider_set.owner.clone()),
+				sponsee_set.owner.clone(),
+				vec![1u8; 8],
+			),
+			crate::Error::<Test>::NotSponsorOfSponsee
+		);
+	});
+}
+
+#[test]
+fn test_set_encrypted_server_rejects_oversized_payload() {
+	new_test_ext().execute_with(|| {
+		let sponsor_set = make_account_set(106, 107, 108, 109);
+		let sponsee_set = make_account_set(110, 111, 112, 113);
+		register_account(&sponsor_set, None);
+		register_account(&sponsee_set, None);
+		OperationalAccounts::<Test>::mutate(&sponsee_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("sponsee account");
+			account.sponsor = Some(sponsor_set.owner.clone());
+		});
+
+		assert_noop!(
+			OperationalAccountsPallet::set_encrypted_server_for_sponsee(
+				RuntimeOrigin::signed(sponsor_set.owner.clone()),
+				sponsee_set.owner.clone(),
+				vec![9u8; MaxEncryptedServerLen::get() as usize + 1],
+			),
+			crate::Error::<Test>::EncryptedServerTooLong
+		);
 	});
 }
 

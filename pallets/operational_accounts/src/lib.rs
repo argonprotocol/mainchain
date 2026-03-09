@@ -20,16 +20,21 @@ mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use alloc::vec::Vec;
 	use argon_primitives::{
-		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardKind,
-		OperationalRewardPayout, OperationalRewardsPayer, OperationalRewardsProvider, Signature,
+		FeelessCallTxPoolKeyProvider, MiningFrameTransitionProvider, OperationalAccountsHook,
+		OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer,
+		OperationalRewardsProvider, RecentArgonTransferLookup, Signature,
 		TransactionSponsorProvider, TxSponsor,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use pallet_prelude::*;
 	use polkadot_sdk::{frame_support::traits::IsSubType, frame_system::ensure_root};
 	use sp_core::sr25519;
-	use sp_runtime::{AccountId32, traits::Verify};
+	use sp_runtime::{
+		AccountId32,
+		traits::{Verify, Zero},
+	};
 
 	/// Domain separator for access code activation proofs.
 	pub const ACCESS_CODE_PROOF_MESSAGE_KEY: &[u8; 17] = b"access_code_claim";
@@ -108,6 +113,9 @@ pub mod pallet {
 		/// Maximum number of unactivated (issued but unused) access codes allowed at once.
 		#[pallet::constant]
 		type MaxUnactivatedAccessCodes: Get<u32>;
+		/// Maximum number of encrypted server bytes stored per sponsee.
+		#[pallet::constant]
+		type MaxEncryptedServerLen: Get<u32>;
 		/// Minimum argon amount (base units) required to mark a bitcoin lock as qualifying.
 		#[pallet::constant]
 		type MinBitcoinLockSizeForOperational: Get<Self::Balance>;
@@ -120,6 +128,8 @@ pub mod pallet {
 
 		/// Provider for legacy vault hydration data.
 		type LegacyVaultProvider: LegacyVaultProvider<Self::AccountId, Self::Balance>;
+		/// Provider for recent qualifying inbound Argon transfer lookup.
+		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
 		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
 		/// transition via treasury queue processing).
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
@@ -367,6 +377,16 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	/// Opaque encrypted sponsor server payload keyed by the sponsee operational account.
+	pub type EncryptedServerBySponsee<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		T::AccountId,
+		BoundedVec<u8, T::MaxEncryptedServerLen>,
+		OptionQuery,
+	>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -407,6 +427,8 @@ pub mod pallet {
 			observed_bitcoin_total: T::Balance,
 			observed_mining_seat_total: u32,
 		},
+		/// A sponsor updated the encrypted server payload for a sponsee.
+		EncryptedServerUpdated { sponsor: T::AccountId, sponsee: T::AccountId },
 	}
 
 	#[pallet::error]
@@ -433,6 +455,10 @@ pub mod pallet {
 		MaxAccessCodesExpiringPerFrameReached,
 		/// The requested progress patch does not contain any updates.
 		NoProgressUpdateProvided,
+		/// The encrypted server payload exceeds the configured max length.
+		EncryptedServerTooLong,
+		/// The caller is not the sponsor of the requested sponsee.
+		NotSponsorOfSponsee,
 	}
 
 	#[pallet::hooks]
@@ -470,6 +496,34 @@ pub mod pallet {
 		/// If an access code is provided, the sponsor pays the transaction fee.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
+		#[pallet::feeless_if(
+			|origin: &OriginFor<T>,
+			 vault_account: &T::AccountId,
+			 mining_funding_account: &T::AccountId,
+			 mining_bot_account: &T::AccountId,
+			 vault_account_proof: &AccountOwnershipProof,
+			 mining_funding_account_proof: &AccountOwnershipProof,
+			 mining_bot_account_proof: &AccountOwnershipProof,
+			 _access_code: &Option<AccessCodeProof>|
+			 -> bool {
+				let Ok(signer) = ensure_signed(origin.clone()) else {
+					return false;
+				};
+				Pallet::<T>::has_recent_registration_activity(
+					vault_account,
+					mining_funding_account,
+					mining_bot_account,
+				) && Pallet::<T>::has_valid_registration_proofs(
+					&signer,
+					vault_account,
+					mining_funding_account,
+					mining_bot_account,
+					vault_account_proof,
+					mining_funding_account_proof,
+					mining_bot_account_proof,
+				)
+			}
+		)]
 		#[allow(clippy::too_many_arguments)]
 		pub fn register(
 			origin: OriginFor<T>,
@@ -496,22 +550,14 @@ pub mod pallet {
 				Error::<T>::AccountAlreadyLinked
 			);
 			ensure!(
-				vault_account_proof.verify(&who, &vault_account, VAULT_ACCOUNT_PROOF_MESSAGE_KEY),
-				Error::<T>::InvalidAccountProof
-			);
-			ensure!(
-				mining_funding_account_proof.verify(
+				Self::has_valid_registration_proofs(
 					&who,
+					&vault_account,
 					&mining_funding_account,
-					MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
-				),
-				Error::<T>::InvalidAccountProof
-			);
-			ensure!(
-				mining_bot_account_proof.verify(
-					&who,
 					&mining_bot_account,
-					MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
+					&vault_account_proof,
+					&mining_funding_account_proof,
+					&mining_bot_account_proof,
 				),
 				Error::<T>::InvalidAccountProof
 			);
@@ -541,7 +587,12 @@ pub mod pallet {
 				} else {
 					(T::Balance::zero(), false, false)
 				};
-			let has_uniswap_transfer = legacy_bitcoin_total > T::Balance::zero();
+			let has_uniswap_transfer = legacy_bitcoin_total > T::Balance::zero() ||
+				Self::has_recent_argon_transfer_on_linked_accounts(
+					&vault_account,
+					&mining_funding_account,
+					&mining_bot_account,
+				);
 
 			OperationalAccounts::<T>::insert(
 				&who,
@@ -728,9 +779,90 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+
+		/// Store an opaque encrypted sponsor server payload for a sponsored operational account.
+		#[pallet::call_index(4)]
+		#[pallet::weight(T::WeightInfo::set_encrypted_server_for_sponsee())]
+		pub fn set_encrypted_server_for_sponsee(
+			origin: OriginFor<T>,
+			sponsee: T::AccountId,
+			encrypted_server: Vec<u8>,
+		) -> DispatchResult {
+			let sponsor = ensure_signed(origin)?;
+			ensure!(
+				OperationalAccounts::<T>::contains_key(&sponsor),
+				Error::<T>::NotOperationalAccount
+			);
+			let sponsee_account =
+				OperationalAccounts::<T>::get(&sponsee).ok_or(Error::<T>::NotOperationalAccount)?;
+			ensure!(
+				sponsee_account.sponsor == Some(sponsor.clone()),
+				Error::<T>::NotSponsorOfSponsee
+			);
+
+			let encrypted_server: BoundedVec<u8, T::MaxEncryptedServerLen> =
+				encrypted_server.try_into().map_err(|_| Error::<T>::EncryptedServerTooLong)?;
+			EncryptedServerBySponsee::<T>::insert(&sponsee, encrypted_server);
+			Self::deposit_event(Event::EncryptedServerUpdated { sponsor, sponsee });
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn has_recent_registration_activity(
+			vault_account: &T::AccountId,
+			mining_funding_account: &T::AccountId,
+			mining_bot_account: &T::AccountId,
+		) -> bool {
+			Self::linked_account_has_system_activity(vault_account) ||
+				Self::linked_account_has_system_activity(mining_funding_account) ||
+				Self::linked_account_has_system_activity(mining_bot_account) ||
+				Self::has_recent_argon_transfer_on_linked_accounts(
+					vault_account,
+					mining_funding_account,
+					mining_bot_account,
+				)
+		}
+
+		fn linked_account_has_system_activity(account_id: &T::AccountId) -> bool {
+			let account = frame_system::Pallet::<T>::account(account_id);
+			!account.nonce.is_zero() ||
+				account.providers > 0 ||
+				account.consumers > 0 ||
+				account.sufficients > 0
+		}
+
+		fn has_recent_argon_transfer_on_linked_accounts(
+			vault_account: &T::AccountId,
+			mining_funding_account: &T::AccountId,
+			mining_bot_account: &T::AccountId,
+		) -> bool {
+			T::RecentArgonTransferLookup::has_recent_argon_transfer(vault_account) ||
+				T::RecentArgonTransferLookup::has_recent_argon_transfer(mining_funding_account) ||
+				T::RecentArgonTransferLookup::has_recent_argon_transfer(mining_bot_account)
+		}
+
+		fn has_valid_registration_proofs(
+			owner: &T::AccountId,
+			vault_account: &T::AccountId,
+			mining_funding_account: &T::AccountId,
+			mining_bot_account: &T::AccountId,
+			vault_account_proof: &AccountOwnershipProof,
+			mining_funding_account_proof: &AccountOwnershipProof,
+			mining_bot_account_proof: &AccountOwnershipProof,
+		) -> bool {
+			vault_account_proof.verify(owner, vault_account, VAULT_ACCOUNT_PROOF_MESSAGE_KEY) &&
+				mining_funding_account_proof.verify(
+					owner,
+					mining_funding_account,
+					MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+				) && mining_bot_account_proof.verify(
+				owner,
+				mining_bot_account,
+				MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
+			)
+		}
+
 		/// Record a confirmed Uniswap transfer to a linked vault account.
 		pub fn on_uniswap_transfer(account_id: &T::AccountId, _amount: T::Balance) {
 			let Some(owner) = OperationalAccountBySubAccount::<T>::get(account_id) else {
@@ -1096,6 +1228,34 @@ pub mod pallet {
 						max_fee_with_tip: None,
 						unique_tx_key: Some(access_code.public.encode()),
 					})
+				},
+				_ => None,
+			}
+		}
+	}
+
+	impl<T: Config> FeelessCallTxPoolKeyProvider<T::RuntimeCall> for Pallet<T>
+	where
+		T::RuntimeCall: IsSubType<Call<T>>,
+	{
+		fn key_for(call: &T::RuntimeCall) -> Option<Vec<u8>> {
+			let pallet_call: &Call<T> = <T::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call)?;
+			match pallet_call {
+				Call::register {
+					vault_account,
+					mining_funding_account,
+					mining_bot_account,
+					..
+				} => {
+					let key = (
+						b"operational-register",
+						vault_account,
+						mining_funding_account,
+						mining_bot_account,
+					)
+						.using_encoded(blake2_256)
+						.to_vec();
+					Some(key)
 				},
 				_ => None,
 			}
