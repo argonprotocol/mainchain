@@ -1,5 +1,6 @@
 use crate::utils::{
-	create_active_notary, mining_slot_ownership_needed, register_miner_keys, register_miners,
+	create_active_notary_with_archive_bucket, mining_slot_ownership_needed, register_miner_keys,
+	register_miners,
 };
 use argon_client::{
 	FetchAt,
@@ -8,7 +9,7 @@ use argon_client::{
 	signer::{Signer, Sr25519Signer},
 };
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
-use argon_testing::{ArgonTestNode, test_miner_count};
+use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
@@ -20,12 +21,19 @@ use tokio::join;
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_end_to_end_default_vote_mining() {
-	let grandpa_miner = ArgonTestNode::start_with_args("alice", 0).await.unwrap();
+	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
+	let archive_bucket = ArgonTestNotary::create_archive_bucket();
+	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
+	grandpa_miner.notebook_archive_urls.push(archive_host);
+
+	let grandpa_miner = ArgonTestNode::start(grandpa_miner).await.unwrap();
 	let miner_threads = test_miner_count();
 	let miner_1 = grandpa_miner.fork_node("bob", miner_threads).await.unwrap();
 	let miner_2 = grandpa_miner.fork_node("dave", miner_threads).await.unwrap();
 
-	let test_notary = create_active_notary(&grandpa_miner).await.expect("Notary registered");
+	let test_notary = create_active_notary_with_archive_bucket(&grandpa_miner, archive_bucket)
+		.await
+		.expect("Notary registered");
 
 	let mut blocks_sub = grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
 	let ownership_needed = mining_slot_ownership_needed(&grandpa_miner).await.unwrap();
