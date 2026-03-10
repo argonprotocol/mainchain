@@ -17,6 +17,8 @@ use std::{collections::BTreeMap, error::Error as StdError, sync::Arc};
 
 // This must stay aligned with upstream GRANDPA warp proof generation.
 const MAX_WARP_SYNC_PROOF_SIZE: usize = 8 * 1024 * 1024;
+// This matches upstream's small slack for SCALE-encoding the outer proof wrapper.
+const WARP_SYNC_PROOF_ENCODING_SLACK: usize = 50;
 
 pub struct ArgonWarpSyncProvider<Block: BlockT, Backend: ClientBackend<Block>>
 where
@@ -133,7 +135,9 @@ where
 		};
 		let proof_size = proof.encoded_size();
 
-		if proofs_encoded_len + proof_size >= MAX_WARP_SYNC_PROOF_SIZE - 50 {
+		if proofs_encoded_len + proof_size >=
+			MAX_WARP_SYNC_PROOF_SIZE - WARP_SYNC_PROOF_ENCODING_SLACK
+		{
 			proof_limit_reached = true;
 			break
 		}
@@ -160,7 +164,9 @@ where
 				.ok_or(WarpProofError::MissingData)?;
 			let proof = WarpSyncFragment { header, justification: latest_justification };
 
-			if proofs_encoded_len + proof.encoded_size() >= MAX_WARP_SYNC_PROOF_SIZE - 50 {
+			if proofs_encoded_len + proof.encoded_size() >=
+				MAX_WARP_SYNC_PROOF_SIZE - WARP_SYNC_PROOF_ENCODING_SLACK
+			{
 				false
 			} else {
 				proofs.push(proof);
@@ -214,9 +220,9 @@ where
 {
 	if let Some(expected_hash) = hard_fork_hash_by_block_number.get(&number) {
 		if *expected_hash != hash {
-			return Err(WarpProofError::InvalidRequest(
-				"Configured GRANDPA hard fork does not match the canonical chain".to_string(),
-			))
+			return Err(WarpProofError::InvalidRequest(format!(
+				"Configured GRANDPA hard fork does not match the canonical chain at block {number:?}: expected hash {expected_hash:?}, canonical hash {hash:?}",
+			)))
 		}
 		return Ok(true)
 	}
