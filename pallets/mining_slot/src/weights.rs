@@ -1,4 +1,7 @@
-use argon_primitives::providers::{BlockSealerProvider, BlockSealerProviderWeightInfo};
+use argon_primitives::providers::{
+	BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo,
+};
+use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -17,6 +20,7 @@ pub trait WeightInfo {
 
 	// Event handlers
 	fn block_seal_read_vote() -> Weight;
+	fn provider_has_active_rewards_account_seat() -> Weight;
 }
 
 type SealerInfoProviderWeights<T> = <<T as crate::Config>::SealerInfo as BlockSealerProvider<
@@ -60,6 +64,17 @@ where
 	fn block_seal_read_vote() -> Weight {
 		Base::block_seal_read_vote()
 	}
+
+	fn provider_has_active_rewards_account_seat() -> Weight {
+		Base::provider_has_active_rewards_account_seat()
+	}
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> MiningSlotProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn has_active_rewards_account_seat() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_has_active_rewards_account_seat()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -89,6 +104,10 @@ impl WeightInfo for () {
 	}
 
 	fn block_seal_read_vote() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_has_active_rewards_account_seat() -> Weight {
 		Weight::zero()
 	}
 }

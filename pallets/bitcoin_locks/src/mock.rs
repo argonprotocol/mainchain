@@ -173,6 +173,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 pub struct StaticVaultProvider;
 
 impl BitcoinVaultProvider for StaticVaultProvider {
+	type Weights = ();
 	type Balance = Balance;
 	type AccountId = u64;
 
@@ -195,6 +196,17 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			return Some(1);
 		}
 		None
+	}
+
+	fn get_registration_vault_data(
+		account_id: &Self::AccountId,
+	) -> Option<argon_primitives::vault::RegistrationVaultData<Self::Balance>> {
+		Self::get_vault_id(account_id).map(|vault_id| {
+			argon_primitives::vault::RegistrationVaultData {
+				vault_id,
+				activated_securitization: DefaultVault::get().get_activated_securitization(),
+			}
+		})
 	}
 
 	fn cancel(

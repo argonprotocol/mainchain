@@ -333,10 +333,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxIssuableAccessCodes: u32 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of legacy vault records to hydrate on registration.
-       **/
-      maxLegacyVaultRegistrations: u32 & AugmentedConst<ApiType>;
-      /**
        * Maximum number of queued operational rewards.
        **/
       maxOperationalRewardsQueued: u32 & AugmentedConst<ApiType>;

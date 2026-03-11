@@ -384,7 +384,7 @@ parameter_types! {
 }
 
 impl pallet_treasury::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_treasury::WeightInfo<Runtime>;
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -658,30 +658,6 @@ impl pallet_inbound_transfer_log::Config for Runtime {
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 }
 
-pub struct OperationalAccountsLegacyVaultProvider;
-impl pallet_operational_accounts::LegacyVaultProvider<AccountId, Balance>
-	for OperationalAccountsLegacyVaultProvider
-{
-	fn legacy_vaults()
-	-> sp_std::vec::Vec<pallet_operational_accounts::LegacyVaultInfo<AccountId, Balance>> {
-		let mut entries = sp_std::vec::Vec::new();
-		for (operator_account, vault_id) in pallet_vaults::VaultIdByOperator::<Runtime>::iter() {
-			let Some(vault) = pallet_vaults::VaultsById::<Runtime>::get(vault_id) else {
-				continue;
-			};
-			let has_treasury_pool_participation = pallet_treasury::FunderStateByVaultAndAccount::<
-				Runtime,
-			>::contains_key(vault_id, &operator_account);
-			entries.push(pallet_operational_accounts::LegacyVaultInfo {
-				vault_account: operator_account.clone(),
-				activated_securitization: vault.get_activated_securitization(),
-				has_treasury_pool_participation,
-			});
-		}
-		entries
-	}
-}
-
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type FrameProvider = MiningSlot;
@@ -698,11 +674,24 @@ impl pallet_operational_accounts::Config for Runtime {
 	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
 	type OperationalReferralReward = OperationalActivationReward;
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
-	type MaxLegacyVaultRegistrations = MaxLegacyVaultRegistrations;
-	type LegacyVaultProvider = OperationalAccountsLegacyVaultProvider;
+	type VaultProvider = use_unless_benchmark!(
+		Vaults,
+		benchmarking::BenchmarkOperationalAccountsVaultProvider<Balance, AccountId>
+	);
+	type MiningSlotProvider = use_unless_benchmark!(
+		MiningSlot,
+		benchmarking::BenchmarkOperationalAccountsMiningSlotProvider<AccountId>
+	);
+	type TreasuryPoolProvider = use_unless_benchmark!(
+		Treasury,
+		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
+	);
 	type RecentArgonTransferLookup = InboundTransferLog;
 	type OperationalRewardsPayer = Treasury;
-	type WeightInfo = weights::pallet_operational_accounts::WeightInfo<Runtime>;
+	type WeightInfo = pallet_operational_accounts::WithProviderWeights<
+		Runtime,
+		weights::pallet_operational_accounts::WeightInfo<Runtime>,
+	>;
 }
 
 impl pallet_ismp::Config for Runtime {
@@ -750,9 +739,8 @@ impl pallet_hyperbridge::Config for Runtime {
 
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
-	type FeelessCallTxPoolKeyProviders = OperationalAccounts;
-	type TransactionSponsorProviders =
-		(BitcoinLocks, OperationalAccounts, ProxyFeeDelegate<Runtime>);
+	type FeelessCallTxPoolKeyProviders = ();
+	type TransactionSponsorProviders = (BitcoinLocks, ProxyFeeDelegate<Runtime>);
 }
 
 #[derive(Default)]

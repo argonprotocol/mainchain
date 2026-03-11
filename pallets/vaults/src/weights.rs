@@ -1,3 +1,5 @@
+use argon_primitives::vault::BitcoinVaultProviderWeightInfo;
+use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_vaults.
@@ -10,6 +12,14 @@ pub trait WeightInfo {
 	fn on_initialize_with_vault_releases(height_range: u32, vault_count: u32) -> Weight;
 	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
+	fn provider_get_registration_vault_data() -> Weight;
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_registration_vault_data() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_registration_vault_data()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -36,6 +46,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn on_frame_start(_vault_count: u32) -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_registration_vault_data() -> Weight {
 		Weight::zero()
 	}
 }

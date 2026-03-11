@@ -13,5 +13,6 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_chain_transfer, ChainTransfer]
 	[pallet_notebook, Notebook]
 	[pallet_vaults, Vaults]
+	[pallet_treasury, Treasury]
 	[pallet_operational_accounts, OperationalAccounts]
 );

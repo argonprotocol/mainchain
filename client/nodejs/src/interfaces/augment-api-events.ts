@@ -1118,14 +1118,14 @@ declare module '@polkadot/api-base/types/events' {
       OperationalAccountRegistered: AugmentedEvent<
         ApiType,
         [
-          account: AccountId32,
+          operationalAccount: AccountId32,
           vaultAccount: AccountId32,
           miningFundingAccount: AccountId32,
           miningBotAccount: AccountId32,
           sponsor: Option<AccountId32>,
         ],
         {
-          account: AccountId32;
+          operationalAccount: AccountId32;
           vaultAccount: AccountId32;
           miningFundingAccount: AccountId32;
           miningBotAccount: AccountId32;

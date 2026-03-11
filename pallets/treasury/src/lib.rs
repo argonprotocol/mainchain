@@ -60,8 +60,9 @@ pub use pallet::*;
 pub mod pallet {
 	use super::*;
 	use alloc::{collections::BTreeMap, vec::Vec};
-	use argon_primitives::vault::{
-		MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings,
+	use argon_primitives::{
+		TreasuryPoolProvider,
+		vault::{MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardPayout,
@@ -864,6 +865,14 @@ pub mod pallet {
 
 		fn get_bid_pool_account() -> Self::AccountId {
 			T::PalletId::get().into_account_truncating()
+		}
+	}
+
+	impl<T: Config> TreasuryPoolProvider<T::AccountId> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
+		fn has_pool_participation(vault_id: VaultId, account_id: &T::AccountId) -> bool {
+			FunderStateByVaultAndAccount::<T>::contains_key(vault_id, account_id)
 		}
 	}
 

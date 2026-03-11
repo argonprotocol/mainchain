@@ -1,3 +1,5 @@
+use argon_primitives::TreasuryPoolProviderWeightInfo;
+use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -14,6 +16,14 @@ pub trait WeightInfo {
 	fn rollover_contributors(v: u32, c: u32) -> Weight;
 	fn end_pool_capital_raise(v: u32, c: u32) -> Weight;
 	fn release_rolling_contributors(v: u32, c: u32) -> Weight;
+	fn provider_has_pool_participation() -> Weight;
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn has_pool_participation() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_has_pool_participation()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -50,6 +60,10 @@ impl WeightInfo for () {
 	}
 
 	fn release_rolling_contributors(_v: u32, _c: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_has_pool_participation() -> Weight {
 		Weight::zero()
 	}
 }

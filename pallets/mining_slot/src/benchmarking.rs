@@ -2,7 +2,9 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use argon_primitives::{AccountId, NotaryId, balance_change::MerkleProof, localchain::BlockVote};
+use argon_primitives::{
+	AccountId, MiningSlotProvider, NotaryId, balance_change::MerkleProof, localchain::BlockVote,
+};
 use frame_system::RawOrigin;
 use polkadot_sdk::frame_benchmarking::v2::*;
 use sp_core::U256;
@@ -380,6 +382,61 @@ mod benchmarks {
 		}
 
 		assert!(!IsNextSlotBiddingOpen::<T>::get());
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_has_active_rewards_account_seat() -> Result<(), BenchmarkError> {
+		use frame_support::traits::fungible::{InspectHold, Mutate, MutateHold};
+		use sp_runtime::codec::Decode;
+
+		let rewards_account: T::AccountId = account("provider_rewards", 0, 0);
+		let hold_reason: T::RuntimeHoldReason = HoldReason::RegisterAsMiner.into();
+		let argonots_per_seat: T::Balance = 100_000u128.into();
+		let frames_per_term = T::FramesPerMiningTerm::get() as FrameId;
+		let max_cohort_size = T::MaxCohortSize::get().max(1);
+		let _ = T::OwnershipCurrency::mint_into(&rewards_account, 1_000_000u128.into());
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason, &rewards_account) == 0u32.into() {
+			frame_system::Pallet::<T>::inc_providers(&rewards_account);
+		}
+		let _ = T::OwnershipCurrency::hold(&hold_reason, &rewards_account, argonots_per_seat);
+
+		let key_size = T::Keys::max_encoded_len();
+		let key_data = vec![0u8; key_size];
+		let keys =
+			T::Keys::decode(&mut &key_data[..]).expect("failed to create benchmark mining keys");
+		// Benchmark the held-account worst case: all cohorts exist, all are full, and the
+		// rewards account is not present so the scan walks every registration.
+		for frame_id in 1..=frames_per_term {
+			let mut cohort = Vec::with_capacity(max_cohort_size as usize);
+			for miner_index in 0..max_cohort_size {
+				let account_index =
+					(frame_id as u32).saturating_mul(max_cohort_size).saturating_add(miner_index);
+				cohort.push(Registration::<T> {
+					account_id: account("provider_miner", account_index, 0),
+					external_funding_account: Some(account("provider_funding", account_index, 0)),
+					bid: 10_000u128.into(),
+					argonots: argonots_per_seat,
+					authority_keys: keys.clone(),
+					starting_frame_id: frame_id,
+					bid_at_tick: 0,
+				});
+			}
+			MinersByCohort::<T>::insert(
+				frame_id,
+				BoundedVec::<Registration<T>, T::MaxCohortSize>::truncate_from(cohort),
+			);
+		}
+
+		#[block]
+		{
+			assert!(
+				!<Pallet<T> as MiningSlotProvider<T::AccountId>>::has_active_rewards_account_seat(
+					&rewards_account,
+				)
+			);
+		}
+
 		Ok(())
 	}
 }

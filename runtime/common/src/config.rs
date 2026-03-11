@@ -233,8 +233,6 @@ parameter_types! {
 	pub const OperationalActivationReward: Balance = 500 * MICROGONS_PER_ARGON;
 	/// Default bonus reward paid every referral threshold.
 	pub const OperationalReferralBonusReward: Balance = 5_000 * MICROGONS_PER_ARGON;
-	/// Maximum legacy vault registrations to store for hydration.
-	pub const MaxLegacyVaultRegistrations: u32 = 200;
 }
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the

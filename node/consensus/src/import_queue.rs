@@ -808,7 +808,7 @@ mod test {
 		fn info(&self) -> sp_blockchain::Info<Block> {
 			let best = *self.best.lock().unwrap();
 			let fin = *self.finalized.lock().unwrap();
-			let block_gap = self.block_gap.lock().unwrap().clone();
+			let block_gap = *self.block_gap.lock().unwrap();
 			sp_blockchain::Info {
 				finalized_hash: fin.1,
 				finalized_number: fin.0,

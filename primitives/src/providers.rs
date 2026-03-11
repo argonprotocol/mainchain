@@ -3,7 +3,7 @@ use polkadot_sdk::*;
 
 use crate::{
 	BlockSealAuthorityId, ComputeDifficulty, MICROGONS_PER_ARGON, NotaryId, NotebookHeader,
-	NotebookNumber, NotebookSecret, TransferToLocalchainId, VoteMinimum, VotingSchedule,
+	NotebookNumber, NotebookSecret, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
 	},
@@ -62,6 +62,26 @@ impl ChainTransferLookupWeightInfo for () {
 	}
 }
 
+pub trait MiningSlotProviderWeightInfo {
+	fn has_active_rewards_account_seat() -> Weight;
+}
+
+impl MiningSlotProviderWeightInfo for () {
+	fn has_active_rewards_account_seat() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait TreasuryPoolProviderWeightInfo {
+	fn has_pool_participation() -> Weight;
+}
+
+impl TreasuryPoolProviderWeightInfo for () {
+	fn has_pool_participation() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait RecentArgonTransferLookup<AccountId> {
 	fn has_recent_argon_transfer(account_id: &AccountId) -> bool;
 }
@@ -84,6 +104,18 @@ impl<AccountId> RecentArgonTransferLookup<AccountId> for Tuple {
 		);
 		false
 	}
+}
+
+pub trait MiningSlotProvider<AccountId> {
+	type Weights: MiningSlotProviderWeightInfo;
+
+	fn has_active_rewards_account_seat(account_id: &AccountId) -> bool;
+}
+
+pub trait TreasuryPoolProvider<AccountId> {
+	type Weights: TreasuryPoolProviderWeightInfo;
+
+	fn has_pool_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
 }
 
 pub trait BlockSealSpecProviderWeightInfo {
