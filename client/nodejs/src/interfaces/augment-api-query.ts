@@ -80,7 +80,6 @@ import type {
   PalletMintMintAction,
   PalletMultisigMultisig,
   PalletOperationalAccountsAccessCodeMetadata,
-  PalletOperationalAccountsLegacyVaultInfo,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexCpiMeasurementBucket,
@@ -1075,18 +1074,6 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: AccountId32 | string | Uint8Array) => Observable<Option<Bytes>>,
         [AccountId32]
-      >;
-      /**
-       * Tracks whether the initial migration has already run.
-       **/
-      legacyVaultHydrationComplete: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      /**
-       * Legacy vault data used to hydrate accounts as they register.
-       **/
-      legacyVaultRegistrations: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<PalletOperationalAccountsLegacyVaultInfo>>,
-        []
       >;
       /**
        * Reverse lookup of any linked account to its operational account id.

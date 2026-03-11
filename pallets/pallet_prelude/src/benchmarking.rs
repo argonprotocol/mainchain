@@ -12,6 +12,7 @@ use argon_primitives::{
 	notary::{NotaryProvider, NotarySignature},
 	providers::{AuthorityProvider, NotebookProvider},
 	tick::{Tick, TickDigest, Ticker},
+	vault::RegistrationVaultData,
 };
 use codec::Decode;
 use core::marker::PhantomData;
@@ -32,6 +33,21 @@ pub struct BenchmarkNotebookProviderState {
 	pub eligible_vote_roots: BTreeMap<(NotaryId, Tick), (H256, NotebookNumber)>,
 	pub notary_locked_from_tick: BTreeMap<NotaryId, Tick>,
 	pub call_counters: BenchmarkNotebookProviderCallCounters,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BenchmarkOperationalAccountsProviderCallCounters {
+	pub get_registration_vault_data: u32,
+	pub has_active_rewards_account_seat: u32,
+	pub has_pool_participation: u32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BenchmarkOperationalAccountsProviderState {
+	pub vault_registration_data: Option<RegistrationVaultData<u128>>,
+	pub has_active_rewards_account_seat: bool,
+	pub has_pool_participation: bool,
+	pub call_counters: BenchmarkOperationalAccountsProviderCallCounters,
 }
 
 pub fn set_all_digests<T, VerifyError>(
@@ -367,6 +383,32 @@ pub fn reset_benchmark_notebook_provider_call_counters() {
 	set_benchmark_notebook_provider_state(state);
 }
 
+pub fn set_benchmark_operational_accounts_provider_state(
+	state: BenchmarkOperationalAccountsProviderState,
+) {
+	operational_accounts_state_backend::set(state);
+}
+
+pub fn reset_benchmark_operational_accounts_provider_state() {
+	operational_accounts_state_backend::reset();
+}
+
+pub fn benchmark_operational_accounts_provider_state() -> BenchmarkOperationalAccountsProviderState
+{
+	operational_accounts_state_backend::get()
+}
+
+pub fn benchmark_operational_accounts_provider_call_counters()
+-> BenchmarkOperationalAccountsProviderCallCounters {
+	benchmark_operational_accounts_provider_state().call_counters
+}
+
+pub fn reset_benchmark_operational_accounts_provider_call_counters() {
+	let mut state = benchmark_operational_accounts_provider_state();
+	state.call_counters = BenchmarkOperationalAccountsProviderCallCounters::default();
+	set_benchmark_operational_accounts_provider_state(state);
+}
+
 pub fn synthetic_benchmark_votes_root(notary_id: NotaryId, tick: Tick) -> H256 {
 	let mut bytes = [0u8; 32];
 	bytes[..4].copy_from_slice(&notary_id.to_be_bytes());
@@ -401,6 +443,30 @@ mod state_backend {
 	}
 }
 
+#[cfg(feature = "std")]
+mod operational_accounts_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkOperationalAccountsProviderStateHolder:
+			BenchmarkOperationalAccountsProviderState =
+				BenchmarkOperationalAccountsProviderState::default();
+	}
+
+	pub(super) fn set(state: BenchmarkOperationalAccountsProviderState) {
+		BenchmarkOperationalAccountsProviderStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkOperationalAccountsProviderStateHolder::reset();
+	}
+
+	pub(super) fn get() -> BenchmarkOperationalAccountsProviderState {
+		BenchmarkOperationalAccountsProviderStateHolder::get()
+	}
+}
+
 #[cfg(not(feature = "std"))]
 mod state_backend {
 	use super::*;
@@ -427,5 +493,35 @@ mod state_backend {
 
 	pub(super) fn get() -> BenchmarkNotebookProviderState {
 		unsafe { (*BENCHMARK_NOTEBOOK_PROVIDER_STATE.0.get()).clone().unwrap_or_default() }
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod operational_accounts_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<BenchmarkOperationalAccountsProviderState>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_OPERATIONAL_ACCOUNTS_PROVIDER_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: BenchmarkOperationalAccountsProviderState) {
+		unsafe {
+			*BENCHMARK_OPERATIONAL_ACCOUNTS_PROVIDER_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		set(BenchmarkOperationalAccountsProviderState::default());
+	}
+
+	pub(super) fn get() -> BenchmarkOperationalAccountsProviderState {
+		unsafe {
+			(*BENCHMARK_OPERATIONAL_ACCOUNTS_PROVIDER_STATE.0.get())
+				.clone()
+				.unwrap_or_default()
+		}
 	}
 }

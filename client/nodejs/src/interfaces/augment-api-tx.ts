@@ -49,9 +49,8 @@ import type {
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsUpdateConsensusState,
   PalletMultisigTimepoint,
-  PalletOperationalAccountsAccessCodeProof,
-  PalletOperationalAccountsAccountOwnershipProof,
   PalletOperationalAccountsOperationalProgressPatch,
+  PalletOperationalAccountsRegistration,
   PalletPriceIndexPriceIndex,
   PalletTokenGatewayAssetRegistration,
   PalletTokenGatewayPrecisionUpdate,
@@ -1042,46 +1041,15 @@ declare module '@polkadot/api-base/types/submittable' {
         [U8aFixed]
       >;
       /**
-       * Register vault, mining funding, and bot accounts for the signer.
-       * If an access code is provided, the sponsor pays the transaction fee.
+       * Register vault, mining funding, and bot accounts for an operational account.
+       * Any account in the registration may submit the transaction.
+       * If an access code is provided, the registration records the sponsor relationship.
        **/
       register: AugmentedSubmittable<
         (
-          vaultAccount: AccountId32 | string | Uint8Array,
-          miningFundingAccount: AccountId32 | string | Uint8Array,
-          miningBotAccount: AccountId32 | string | Uint8Array,
-          vaultAccountProof:
-            | PalletOperationalAccountsAccountOwnershipProof
-            | { signature?: any }
-            | string
-            | Uint8Array,
-          miningFundingAccountProof:
-            | PalletOperationalAccountsAccountOwnershipProof
-            | { signature?: any }
-            | string
-            | Uint8Array,
-          miningBotAccountProof:
-            | PalletOperationalAccountsAccountOwnershipProof
-            | { signature?: any }
-            | string
-            | Uint8Array,
-          accessCode:
-            | Option<PalletOperationalAccountsAccessCodeProof>
-            | null
-            | Uint8Array
-            | PalletOperationalAccountsAccessCodeProof
-            | { public?: any; signature?: any }
-            | string,
+          registration: PalletOperationalAccountsRegistration | { V1: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [
-          AccountId32,
-          AccountId32,
-          AccountId32,
-          PalletOperationalAccountsAccountOwnershipProof,
-          PalletOperationalAccountsAccountOwnershipProof,
-          PalletOperationalAccountsAccountOwnershipProof,
-          Option<PalletOperationalAccountsAccessCodeProof>,
-        ]
+        [PalletOperationalAccountsRegistration]
       >;
       /**
        * Store an opaque encrypted sponsor server payload for a sponsored operational account.

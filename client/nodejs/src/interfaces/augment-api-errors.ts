@@ -779,6 +779,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidAccountProof: AugmentedError<ApiType>;
       /**
+       * The caller is not one of the accounts included in the registration.
+       **/
+      InvalidRegistrationSubmitter: AugmentedError<ApiType>;
+      /**
        * Too many access codes are already scheduled to expire in this frame.
        **/
       MaxAccessCodesExpiringPerFrameReached: AugmentedError<ApiType>;

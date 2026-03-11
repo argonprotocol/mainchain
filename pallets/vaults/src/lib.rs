@@ -36,7 +36,10 @@ pub mod pallet {
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
-		vault::{BitcoinVaultProvider, TreasuryVaultProvider, Vault, VaultError, VaultTerms},
+		vault::{
+			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault, VaultError,
+			VaultTerms,
+		},
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
@@ -1024,6 +1027,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BitcoinVaultProvider for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
@@ -1040,6 +1044,17 @@ pub mod pallet {
 
 		fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId> {
 			VaultIdByOperator::<T>::get(account_id)
+		}
+
+		fn get_registration_vault_data(
+			account_id: &Self::AccountId,
+		) -> Option<RegistrationVaultData<Self::Balance>> {
+			let vault_id = VaultIdByOperator::<T>::get(account_id)?;
+			let vault = VaultsById::<T>::get(vault_id)?;
+			Some(RegistrationVaultData {
+				vault_id,
+				activated_securitization: vault.get_activated_securitization(),
+			})
 		}
 
 		fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {

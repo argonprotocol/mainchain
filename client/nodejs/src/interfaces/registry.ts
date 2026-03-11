@@ -219,9 +219,11 @@ import type {
   PalletOperationalAccountsCall,
   PalletOperationalAccountsError,
   PalletOperationalAccountsEvent,
-  PalletOperationalAccountsLegacyVaultInfo,
+  PalletOperationalAccountsOpaqueEncryptionPubkey,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsOperationalProgressPatch,
+  PalletOperationalAccountsRegistration,
+  PalletOperationalAccountsRegistrationV1,
   PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexCall,
   PalletPriceIndexCpiMeasurementBucket,
@@ -503,9 +505,11 @@ declare module '@polkadot/types/types/registry' {
     PalletOperationalAccountsCall: PalletOperationalAccountsCall;
     PalletOperationalAccountsError: PalletOperationalAccountsError;
     PalletOperationalAccountsEvent: PalletOperationalAccountsEvent;
-    PalletOperationalAccountsLegacyVaultInfo: PalletOperationalAccountsLegacyVaultInfo;
+    PalletOperationalAccountsOpaqueEncryptionPubkey: PalletOperationalAccountsOpaqueEncryptionPubkey;
     PalletOperationalAccountsOperationalAccount: PalletOperationalAccountsOperationalAccount;
     PalletOperationalAccountsOperationalProgressPatch: PalletOperationalAccountsOperationalProgressPatch;
+    PalletOperationalAccountsRegistration: PalletOperationalAccountsRegistration;
+    PalletOperationalAccountsRegistrationV1: PalletOperationalAccountsRegistrationV1;
     PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;
     PalletPriceIndexCall: PalletPriceIndexCall;
     PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;

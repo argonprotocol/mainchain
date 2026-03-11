@@ -10,4 +10,5 @@ pub mod pallet_mining_slot;
 pub mod pallet_notebook;
 pub mod pallet_operational_accounts;
 pub mod pallet_timestamp;
+pub mod pallet_treasury;
 pub mod pallet_vaults;

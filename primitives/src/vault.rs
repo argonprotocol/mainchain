@@ -1,7 +1,7 @@
 use alloc::collections::BTreeSet;
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::iter::Sum;
-use frame_support::PalletError;
+use frame_support::{PalletError, weights::Weight};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
@@ -25,6 +25,22 @@ pub trait MiningBidPoolProvider {
 
 	/// Transfer funds to the bid pool and hold
 	fn get_bid_pool_account() -> Self::AccountId;
+}
+
+pub trait BitcoinVaultProviderWeightInfo {
+	fn get_registration_vault_data() -> Weight;
+}
+
+impl BitcoinVaultProviderWeightInfo for () {
+	fn get_registration_vault_data() -> Weight {
+		Weight::zero()
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegistrationVaultData<Balance> {
+	pub vault_id: VaultId,
+	pub activated_securitization: Balance,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -113,12 +129,16 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 }
 
 pub trait BitcoinVaultProvider {
+	type Weights: BitcoinVaultProviderWeightInfo;
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
 	type AccountId: Codec;
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
+	fn get_registration_vault_data(
+		account_id: &Self::AccountId,
+	) -> Option<RegistrationVaultData<Self::Balance>>;
 
 	/// Get the securitization ratio offered by this vault
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError>;

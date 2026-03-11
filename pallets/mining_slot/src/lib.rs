@@ -708,6 +708,22 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	}
 }
 
+impl<T: Config> MiningSlotProvider<T::AccountId> for Pallet<T> {
+	type Weights = crate::weights::ProviderWeightAdapter<T>;
+
+	fn has_active_rewards_account_seat(account_id: &T::AccountId) -> bool {
+		if T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), account_id) ==
+			0u32.into()
+		{
+			return false;
+		}
+
+		MinersByCohort::<T>::iter().any(|(_, cohort)| {
+			cohort.iter().any(|registration| registration.rewards_account() == *account_id)
+		})
+	}
+}
+
 impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> for Pallet<T> {
 	fn authority_count() -> u32 {
 		ActiveMinersCount::<T>::get().into()
@@ -934,7 +950,9 @@ impl<T: Config> Pallet<T> {
 		let mut miner_scoring = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
-			T::OperationalAccountsHook::mining_seat_won(&entry.account_id);
+			let mining_account =
+				entry.external_funding_account.as_ref().unwrap_or(&entry.account_id);
+			T::OperationalAccountsHook::mining_seat_won(mining_account);
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
 			total_price_per_seat += entry.bid;

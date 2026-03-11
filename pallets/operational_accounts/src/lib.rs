@@ -5,7 +5,7 @@ extern crate alloc;
 
 pub use pallet::*;
 use pallet_prelude::frame_support;
-pub use weights::WeightInfo;
+pub use weights::{WeightInfo, WithProviderWeights};
 
 #[cfg(test)]
 mod mock;
@@ -22,14 +22,14 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		FeelessCallTxPoolKeyProvider, MiningFrameTransitionProvider, OperationalAccountsHook,
+		MiningFrameTransitionProvider, MiningSlotProvider, OperationalAccountsHook,
 		OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer,
-		OperationalRewardsProvider, RecentArgonTransferLookup, Signature,
-		TransactionSponsorProvider, TxSponsor,
+		OperationalRewardsProvider, RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
+		vault::BitcoinVaultProvider,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use pallet_prelude::*;
-	use polkadot_sdk::{frame_support::traits::IsSubType, frame_system::ensure_root};
+	use polkadot_sdk::frame_system::ensure_root;
 	use sp_core::sr25519;
 	use sp_runtime::{
 		AccountId32,
@@ -38,29 +38,13 @@ pub mod pallet {
 
 	/// Domain separator for access code activation proofs.
 	pub const ACCESS_CODE_PROOF_MESSAGE_KEY: &[u8; 17] = b"access_code_claim";
+	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_funding";
 	pub const MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 22] = b"operational_mining_bot";
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
-
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
-	pub struct LegacyVaultInfo<AccountId, Balance> {
-		pub vault_account: AccountId,
-		pub activated_securitization: Balance,
-		pub has_treasury_pool_participation: bool,
-	}
-
-	pub trait LegacyVaultProvider<AccountId, Balance> {
-		fn legacy_vaults() -> alloc::vec::Vec<LegacyVaultInfo<AccountId, Balance>>;
-	}
-
-	impl<AccountId, Balance> LegacyVaultProvider<AccountId, Balance> for () {
-		fn legacy_vaults() -> alloc::vec::Vec<LegacyVaultInfo<AccountId, Balance>> {
-			alloc::vec::Vec::new()
-		}
-	}
 
 	#[pallet::config]
 	#[pallet::disable_frame_system_supertrait_check]
@@ -104,9 +88,6 @@ pub mod pallet {
 		/// Maximum number of issuable access codes allowed at once.
 		#[pallet::constant]
 		type MaxIssuableAccessCodes: Get<u32>;
-		/// Maximum number of legacy vault records to hydrate on registration.
-		#[pallet::constant]
-		type MaxLegacyVaultRegistrations: Get<u32>;
 		/// Maximum number of queued operational rewards.
 		#[pallet::constant]
 		type MaxOperationalRewardsQueued: Get<u32>;
@@ -126,8 +107,12 @@ pub mod pallet {
 		#[pallet::constant]
 		type MiningSeatsPerAccessCode: Get<u32>;
 
-		/// Provider for legacy vault hydration data.
-		type LegacyVaultProvider: LegacyVaultProvider<Self::AccountId, Self::Balance>;
+		/// Provider for current vault state used to initialize registration.
+		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
+		/// Provider for whether a linked mining rewards account currently has an active seat.
+		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
+		/// Provider for whether a linked vault account has treasury pool participation.
+		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId>;
 		/// Provider for recent qualifying inbound Argon transfer lookup.
 		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
 		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
@@ -160,7 +145,16 @@ pub mod pallet {
 		pub fn verify<AccountId: EncodeLike>(&self, account_id: &AccountId) -> bool {
 			let message =
 				(ACCESS_CODE_PROOF_MESSAGE_KEY, self.public, account_id).using_encoded(blake2_256);
-			self.signature.verify(message.as_slice(), &self.public)
+			let verified = self.signature.verify(message.as_slice(), &self.public);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				return true;
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
 		}
 	}
 
@@ -190,8 +184,82 @@ pub mod pallet {
 				return false;
 			};
 			let message = (domain, owner, &account_id).using_encoded(blake2_256);
-			self.signature.verify(message.as_slice(), &account_id)
+			let verified = self.signature.verify(message.as_slice(), &account_id);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				return true;
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
 		}
+	}
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		RuntimeDebug,
+		MaxEncodedLen,
+		Default,
+	)]
+	pub struct OpaqueEncryptionPubkey(pub [u8; 32]);
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		RuntimeDebugNoBound,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct RegistrationV1<T: Config> {
+		/// Primary operational account that owns the linked accounts.
+		pub operational_account: T::AccountId,
+		/// Opaque public encryption key for this operational account, currently x25519 bytes.
+		pub encryption_pubkey: OpaqueEncryptionPubkey,
+		/// Proof that the primary operational account is controlled by the registrant.
+		pub operational_account_proof: AccountOwnershipProof,
+		/// Vault account associated with this operational account.
+		pub vault_account: T::AccountId,
+		/// Mining funding account associated with this operational account.
+		pub mining_funding_account: T::AccountId,
+		/// Bot account used for mining operations.
+		pub mining_bot_account: T::AccountId,
+		/// Proof that the vault account is controlled by the registrant.
+		pub vault_account_proof: AccountOwnershipProof,
+		/// Proof that the mining funding account is controlled by the registrant.
+		pub mining_funding_account_proof: AccountOwnershipProof,
+		/// Proof that the mining bot account is controlled by the registrant.
+		pub mining_bot_account_proof: AccountOwnershipProof,
+		/// Optional sponsor access code used to link this registration to a sponsor.
+		pub access_code: Option<AccessCodeProof>,
+	}
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		RuntimeDebugNoBound,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub enum Registration<T: Config> {
+		V1(RegistrationV1<T>),
 	}
 
 	#[derive(
@@ -206,24 +274,26 @@ pub mod pallet {
 		pub mining_funding_account: T::AccountId,
 		/// Bot account used for mining operations.
 		pub mining_bot_account: T::AccountId,
+		/// Opaque public encryption key for this operational account, currently x25519 bytes.
+		pub encryption_pubkey: OpaqueEncryptionPubkey,
 		/// Sponsor account, if known.
 		pub sponsor: Option<T::AccountId>,
 		/// Whether at least one qualifying Uniswap transfer has been observed.
 		pub has_uniswap_transfer: bool,
 		/// Whether the vault has been created for this operational account.
 		pub vault_created: bool,
-		/// Bitcoin amount accrued since the last bitcoin high watermark.
+		/// Bitcoin amount accrued above the bitcoin already applied to access code issuance.
 		pub bitcoin_accrual: T::Balance,
-		/// Bitcoin locked high watermark consumed by previously issued bitcoin access codes.
-		pub bitcoin_high_watermark: T::Balance,
+		/// Bitcoin already applied to previously issued bitcoin access codes.
+		pub bitcoin_applied_total: T::Balance,
 		/// Whether the account has participated in a treasury pool.
 		pub has_treasury_pool_participation: bool,
-		/// Mining seats accrued since the last mining high watermark.
+		/// Mining seats accrued since the last mining access code issuance.
 		#[codec(compact)]
 		pub mining_seat_accrual: u32,
-		/// Mining seats high watermark consumed by previously issued mining access codes.
+		/// Mining seats already applied to previously issued mining access codes.
 		#[codec(compact)]
-		pub mining_seat_high_watermark: u32,
+		pub mining_seat_applied_total: u32,
 		/// Number of sponsored accounts that have become operational.
 		#[codec(compact)]
 		pub operational_referrals_count: u32,
@@ -266,17 +336,17 @@ pub mod pallet {
 		pub has_treasury_pool_participation: Option<bool>,
 		/// Requested minimum for the total observed bitcoin lock value.
 		///
-		/// This is treated as a monotonic high-watermark override: the effective stored
-		/// `observed_bitcoin_total` will be at least this value, but will not be decreased
-		/// below any existing observed total. If the provided value is lower than the
-		/// current total, the current (higher) total is retained.
+		/// This is treated as a monotonic applied-total override: the effective stored
+		/// `observed_bitcoin_total` will be at least this value, while preserving the
+		/// bitcoin already applied to issued access codes. If the provided value is
+		/// lower than the applied total, the current total is retained.
 		pub observed_bitcoin_total: Option<Balance>,
 		/// Requested minimum for the total observed mining seats won.
 		///
-		/// This is treated as a monotonic high-watermark override: the effective stored
-		/// `observed_mining_seat_total` will be at least this value, but will not be
-		/// decreased below any existing observed total. If the provided value is lower
-		/// than the current total, the current (higher) total is retained.
+		/// This is treated as a monotonic applied-total override: the effective stored
+		/// `observed_mining_seat_total` will be at least this value, while preserving
+		/// the seats already applied to issued access codes. If the provided value is
+		/// lower than the applied total, the current total is retained.
 		pub observed_mining_seat_total: Option<u32>,
 	}
 
@@ -314,19 +384,6 @@ pub mod pallet {
 		BoundedVec<sr25519::Public, T::MaxAccessCodesExpiringPerFrame>,
 		ValueQuery,
 	>;
-
-	#[pallet::storage]
-	/// Legacy vault data used to hydrate accounts as they register.
-	pub type LegacyVaultRegistrations<T: Config> = StorageValue<
-		_,
-		BoundedVec<LegacyVaultInfo<T::AccountId, T::Balance>, T::MaxLegacyVaultRegistrations>,
-		ValueQuery,
-	>;
-
-	#[pallet::storage]
-	/// Tracks whether the initial migration has already run.
-	#[pallet::storage_prefix = "LegacyVaultHydrationComplete"]
-	pub type HasInitialMigrationRun<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	#[derive(
 		Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen,
@@ -392,7 +449,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// An operational account was registered with its linked accounts.
 		OperationalAccountRegistered {
-			account: T::AccountId,
+			operational_account: T::AccountId,
 			vault_account: T::AccountId,
 			mining_funding_account: T::AccountId,
 			mining_bot_account: T::AccountId,
@@ -435,6 +492,8 @@ pub mod pallet {
 	pub enum Error<T> {
 		/// The caller already registered an operational account.
 		AlreadyRegistered,
+		/// The caller is not one of the accounts included in the registration.
+		InvalidRegistrationSubmitter,
 		/// One of the provided accounts is already linked to an operational account.
 		AccountAlreadyLinked,
 		/// One of the linked account ownership proofs is invalid.
@@ -464,7 +523,14 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_runtime_upgrade() -> Weight {
-			Self::run_initial_migration()
+			if Rewards::<T>::exists() {
+				return T::DbWeight::get().reads(1);
+			}
+			Rewards::<T>::put(RewardsConfig {
+				operational_referral_reward: T::OperationalReferralReward::get(),
+				referral_bonus_reward: T::OperationalReferralBonusReward::get(),
+			});
+			T::DbWeight::get().reads_writes(1, 1)
 		}
 
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
@@ -492,51 +558,40 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Register vault, mining funding, and bot accounts for the signer.
-		/// If an access code is provided, the sponsor pays the transaction fee.
+		/// Register vault, mining funding, and bot accounts for an operational account.
+		/// Any account in the registration may submit the transaction.
+		/// If an access code is provided, the registration records the sponsor relationship.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
-		#[pallet::feeless_if(
-			|origin: &OriginFor<T>,
-			 vault_account: &T::AccountId,
-			 mining_funding_account: &T::AccountId,
-			 mining_bot_account: &T::AccountId,
-			 vault_account_proof: &AccountOwnershipProof,
-			 mining_funding_account_proof: &AccountOwnershipProof,
-			 mining_bot_account_proof: &AccountOwnershipProof,
-			 _access_code: &Option<AccessCodeProof>|
-			 -> bool {
-				let Ok(signer) = ensure_signed(origin.clone()) else {
-					return false;
-				};
-				Pallet::<T>::has_recent_registration_activity(
-					vault_account,
-					mining_funding_account,
-					mining_bot_account,
-				) && Pallet::<T>::has_valid_registration_proofs(
-					&signer,
-					vault_account,
-					mining_funding_account,
-					mining_bot_account,
-					vault_account_proof,
-					mining_funding_account_proof,
-					mining_bot_account_proof,
-				)
-			}
-		)]
-		#[allow(clippy::too_many_arguments)]
-		pub fn register(
-			origin: OriginFor<T>,
-			vault_account: T::AccountId,
-			mining_funding_account: T::AccountId,
-			mining_bot_account: T::AccountId,
-			vault_account_proof: AccountOwnershipProof,
-			mining_funding_account_proof: AccountOwnershipProof,
-			mining_bot_account_proof: AccountOwnershipProof,
-			access_code: Option<AccessCodeProof>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			ensure!(!OperationalAccounts::<T>::contains_key(&who), Error::<T>::AlreadyRegistered);
+		pub fn register(origin: OriginFor<T>, registration: Registration<T>) -> DispatchResult {
+			let Registration::V1(RegistrationV1 {
+				operational_account,
+				encryption_pubkey,
+				operational_account_proof,
+				vault_account,
+				mining_funding_account,
+				mining_bot_account,
+				vault_account_proof,
+				mining_funding_account_proof,
+				mining_bot_account_proof,
+				access_code,
+			}) = registration;
+			let submitter = ensure_signed(origin)?;
+			ensure!(
+				submitter == operational_account ||
+					submitter == vault_account ||
+					submitter == mining_funding_account ||
+					submitter == mining_bot_account,
+				Error::<T>::InvalidRegistrationSubmitter
+			);
+			ensure!(
+				!OperationalAccounts::<T>::contains_key(&operational_account),
+				Error::<T>::AlreadyRegistered
+			);
+			ensure!(
+				!OperationalAccountBySubAccount::<T>::contains_key(&operational_account),
+				Error::<T>::AccountAlreadyLinked
+			);
 			ensure!(
 				!OperationalAccountBySubAccount::<T>::contains_key(&vault_account),
 				Error::<T>::AccountAlreadyLinked
@@ -550,22 +605,33 @@ pub mod pallet {
 				Error::<T>::AccountAlreadyLinked
 			);
 			ensure!(
-				Self::has_valid_registration_proofs(
-					&who,
+				operational_account_proof.verify(
+					&operational_account,
+					&operational_account,
+					OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY
+				) && vault_account_proof.verify(
+					&operational_account,
 					&vault_account,
+					VAULT_ACCOUNT_PROOF_MESSAGE_KEY
+				) && mining_funding_account_proof.verify(
+					&operational_account,
 					&mining_funding_account,
+					MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+				) && mining_bot_account_proof.verify(
+					&operational_account,
 					&mining_bot_account,
-					&vault_account_proof,
-					&mining_funding_account_proof,
-					&mining_bot_account_proof,
+					MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
 				),
 				Error::<T>::InvalidAccountProof
 			);
 
-			let sponsor = if let Some(access_code) = access_code {
+			let sponsor = if let Some(access_code) = access_code.as_ref() {
 				let code = AccessCodesByPublic::<T>::take(access_code.public)
 					.ok_or(Error::<T>::InvalidAccessCode)?;
-				ensure!(access_code.verify(&who), Error::<T>::InvalidAccessCodeProof);
+				ensure!(
+					access_code.verify(&operational_account),
+					Error::<T>::InvalidAccessCodeProof
+				);
 				AccessCodesExpiringByFrame::<T>::mutate(code.expiration_frame, |expiring_codes| {
 					if let Some(index) =
 						expiring_codes.iter().position(|public| *public == access_code.public)
@@ -577,37 +643,42 @@ pub mod pallet {
 			} else {
 				None
 			};
-			let legacy_info = LegacyVaultRegistrations::<T>::mutate(|entries| {
-				let pos = entries.iter().position(|entry| entry.vault_account == vault_account)?;
-				Some(entries.remove(pos))
-			});
-			let (legacy_bitcoin_total, legacy_has_treasury, legacy_vault_created) =
-				if let Some(info) = legacy_info {
-					(info.activated_securitization, info.has_treasury_pool_participation, true)
-				} else {
-					(T::Balance::zero(), false, false)
-				};
-			let has_uniswap_transfer = legacy_bitcoin_total > T::Balance::zero() ||
-				Self::has_recent_argon_transfer_on_linked_accounts(
-					&vault_account,
-					&mining_funding_account,
-					&mining_bot_account,
-				);
+			let vault_registration = T::VaultProvider::get_registration_vault_data(&vault_account);
+			let has_treasury_pool_participation = vault_registration
+				.as_ref()
+				.map(|vault| {
+					T::TreasuryPoolProvider::has_pool_participation(vault.vault_id, &vault_account)
+				})
+				.unwrap_or(false);
+			let observed_mining_seat_total = u32::from(
+				T::MiningSlotProvider::has_active_rewards_account_seat(&mining_funding_account),
+			);
+			let has_uniswap_transfer =
+				T::RecentArgonTransferLookup::has_recent_argon_transfer(&operational_account) ||
+					T::RecentArgonTransferLookup::has_recent_argon_transfer(&vault_account) ||
+					T::RecentArgonTransferLookup::has_recent_argon_transfer(
+						&mining_funding_account,
+					) || T::RecentArgonTransferLookup::has_recent_argon_transfer(&mining_bot_account);
 
 			OperationalAccounts::<T>::insert(
-				&who,
+				&operational_account,
 				OperationalAccount {
 					vault_account: vault_account.clone(),
 					mining_funding_account: mining_funding_account.clone(),
 					mining_bot_account: mining_bot_account.clone(),
+					encryption_pubkey,
 					sponsor: sponsor.clone(),
 					has_uniswap_transfer,
-					vault_created: legacy_vault_created,
-					bitcoin_accrual: legacy_bitcoin_total,
-					bitcoin_high_watermark: T::Balance::zero(),
-					has_treasury_pool_participation: legacy_has_treasury,
-					mining_seat_accrual: 0,
-					mining_seat_high_watermark: 0,
+					vault_created: vault_registration.is_some(),
+					// Bootstrap lookup seeds current observed totals as live accrual so
+					// registration matches the normal hook-driven activation path.
+					bitcoin_accrual: vault_registration
+						.map(|vault| vault.activated_securitization)
+						.unwrap_or_else(Zero::zero),
+					bitcoin_applied_total: T::Balance::zero(),
+					has_treasury_pool_participation,
+					mining_seat_accrual: observed_mining_seat_total,
+					mining_seat_applied_total: 0,
 					operational_referrals_count: 0,
 					referral_access_code_pending: false,
 					issuable_access_codes: 0,
@@ -619,20 +690,23 @@ pub mod pallet {
 				},
 			);
 
-			OperationalAccountBySubAccount::<T>::insert(&vault_account, &who);
-			OperationalAccountBySubAccount::<T>::insert(&mining_funding_account, &who);
-			OperationalAccountBySubAccount::<T>::insert(&mining_bot_account, &who);
-			OperationalAccounts::<T>::mutate(&who, |maybe_account| {
-				if let Some(account) = maybe_account {
-					Self::maybe_activate_operational(&who, account);
+			OperationalAccountBySubAccount::<T>::insert(&vault_account, &operational_account);
+			OperationalAccountBySubAccount::<T>::insert(
+				&mining_funding_account,
+				&operational_account,
+			);
+			OperationalAccountBySubAccount::<T>::insert(&mining_bot_account, &operational_account);
+			OperationalAccounts::<T>::mutate(&operational_account, |maybe_account| {
+				if let Some(stored_account) = maybe_account {
+					Self::maybe_activate_operational(&operational_account, stored_account);
 				}
 			});
 
 			Self::deposit_event(Event::OperationalAccountRegistered {
-				account: who,
-				vault_account,
-				mining_funding_account,
-				mining_bot_account,
+				operational_account: operational_account.clone(),
+				vault_account: vault_account.clone(),
+				mining_funding_account: mining_funding_account.clone(),
+				mining_bot_account: mining_bot_account.clone(),
 				sponsor: sponsor.clone(),
 			});
 			if let Some(sponsor) = sponsor {
@@ -809,60 +883,6 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn has_recent_registration_activity(
-			vault_account: &T::AccountId,
-			mining_funding_account: &T::AccountId,
-			mining_bot_account: &T::AccountId,
-		) -> bool {
-			Self::linked_account_has_system_activity(vault_account) ||
-				Self::linked_account_has_system_activity(mining_funding_account) ||
-				Self::linked_account_has_system_activity(mining_bot_account) ||
-				Self::has_recent_argon_transfer_on_linked_accounts(
-					vault_account,
-					mining_funding_account,
-					mining_bot_account,
-				)
-		}
-
-		fn linked_account_has_system_activity(account_id: &T::AccountId) -> bool {
-			let account = frame_system::Pallet::<T>::account(account_id);
-			!account.nonce.is_zero() ||
-				account.providers > 0 ||
-				account.consumers > 0 ||
-				account.sufficients > 0
-		}
-
-		fn has_recent_argon_transfer_on_linked_accounts(
-			vault_account: &T::AccountId,
-			mining_funding_account: &T::AccountId,
-			mining_bot_account: &T::AccountId,
-		) -> bool {
-			T::RecentArgonTransferLookup::has_recent_argon_transfer(vault_account) ||
-				T::RecentArgonTransferLookup::has_recent_argon_transfer(mining_funding_account) ||
-				T::RecentArgonTransferLookup::has_recent_argon_transfer(mining_bot_account)
-		}
-
-		fn has_valid_registration_proofs(
-			owner: &T::AccountId,
-			vault_account: &T::AccountId,
-			mining_funding_account: &T::AccountId,
-			mining_bot_account: &T::AccountId,
-			vault_account_proof: &AccountOwnershipProof,
-			mining_funding_account_proof: &AccountOwnershipProof,
-			mining_bot_account_proof: &AccountOwnershipProof,
-		) -> bool {
-			vault_account_proof.verify(owner, vault_account, VAULT_ACCOUNT_PROOF_MESSAGE_KEY) &&
-				mining_funding_account_proof.verify(
-					owner,
-					mining_funding_account,
-					MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
-				) && mining_bot_account_proof.verify(
-				owner,
-				mining_bot_account,
-				MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
-			)
-		}
-
 		/// Record a confirmed Uniswap transfer to a linked vault account.
 		pub fn on_uniswap_transfer(account_id: &T::AccountId, _amount: T::Balance) {
 			let Some(owner) = OperationalAccountBySubAccount::<T>::get(account_id) else {
@@ -877,33 +897,6 @@ pub mod pallet {
 				account.has_uniswap_transfer = true;
 				Self::maybe_activate_operational(&owner, account);
 			});
-		}
-
-		fn run_initial_migration() -> Weight {
-			if HasInitialMigrationRun::<T>::get() {
-				return T::DbWeight::get().reads(1);
-			}
-			Rewards::<T>::put(RewardsConfig {
-				operational_referral_reward: T::OperationalReferralReward::get(),
-				referral_bonus_reward: T::OperationalReferralBonusReward::get(),
-			});
-			let legacy_entries = T::LegacyVaultProvider::legacy_vaults();
-			let mut writes = 2u64;
-			if !legacy_entries.is_empty() {
-				let mut registrations: BoundedVec<
-					LegacyVaultInfo<T::AccountId, T::Balance>,
-					T::MaxLegacyVaultRegistrations,
-				> = BoundedVec::default();
-				for entry in legacy_entries {
-					if registrations.try_push(entry).is_err() {
-						break;
-					}
-				}
-				LegacyVaultRegistrations::<T>::put(registrations);
-				writes = writes.saturating_add(1);
-			}
-			HasInitialMigrationRun::<T>::put(true);
-			T::DbWeight::get().reads_writes(1, writes)
 		}
 
 		fn decrement_unactivated_access_codes(account: &mut OperationalAccount<T>) {
@@ -980,14 +973,14 @@ pub mod pallet {
 				if bitcoin_threshold > T::Balance::zero() &&
 					account.bitcoin_accrual >= bitcoin_threshold
 				{
-					account.bitcoin_high_watermark = Self::observed_bitcoin_total(account);
+					account.bitcoin_applied_total = Self::observed_bitcoin_total(account);
 					account.bitcoin_accrual = T::Balance::zero();
 					account.issuable_access_codes.saturating_accrue(1);
 					continue;
 				}
 				if mining_seat_threshold > 0 && account.mining_seat_accrual >= mining_seat_threshold
 				{
-					account.mining_seat_high_watermark = Self::observed_mining_seat_total(account);
+					account.mining_seat_applied_total = Self::observed_mining_seat_total(account);
 					account.mining_seat_accrual = 0;
 					account.issuable_access_codes.saturating_accrue(1);
 					continue;
@@ -1057,31 +1050,28 @@ pub mod pallet {
 		}
 
 		fn observed_bitcoin_total(account: &OperationalAccount<T>) -> T::Balance {
-			account.bitcoin_high_watermark.saturating_add(account.bitcoin_accrual)
+			account.bitcoin_applied_total.saturating_add(account.bitcoin_accrual)
 		}
 
 		fn observed_mining_seat_total(account: &OperationalAccount<T>) -> u32 {
-			account.mining_seat_high_watermark.saturating_add(account.mining_seat_accrual)
+			account.mining_seat_applied_total.saturating_add(account.mining_seat_accrual)
 		}
 
 		fn set_observed_mining_seat_total(
 			account: &mut OperationalAccount<T>,
 			observed_total: u32,
 		) {
-			// Mining seats are treated as monotonic awards; keep the watermark stable
-			// and only recompute accrual above the existing watermark.
-			let prior_high_watermark = account.mining_seat_high_watermark;
-			let next_accrual = observed_total.saturating_sub(prior_high_watermark);
-			let next_high_watermark = prior_high_watermark;
+			let prior_applied_total = account.mining_seat_applied_total;
+			let next_accrual = observed_total.saturating_sub(prior_applied_total);
 			account.mining_seat_accrual = next_accrual;
-			account.mining_seat_high_watermark = next_high_watermark;
+			account.mining_seat_applied_total = prior_applied_total;
 		}
 
 		fn recalculate_bitcoin_accrual(
 			account: &mut OperationalAccount<T>,
 			total_locked: T::Balance,
 		) {
-			account.bitcoin_accrual = total_locked.saturating_sub(account.bitcoin_high_watermark);
+			account.bitcoin_accrual = total_locked.saturating_sub(account.bitcoin_applied_total);
 		}
 
 		fn apply_reward_payment(
@@ -1204,61 +1194,6 @@ pub mod pallet {
 					account.rewards_collected_amount.saturating_accrue(amount_paid);
 				}
 			});
-		}
-	}
-
-	impl<T: Config> TransactionSponsorProvider<T::AccountId, T::RuntimeCall, T::Balance> for Pallet<T>
-	where
-		T::RuntimeCall: IsSubType<Call<T>>,
-	{
-		fn get_transaction_sponsor(
-			signer: &T::AccountId,
-			call: &T::RuntimeCall,
-		) -> Option<TxSponsor<T::AccountId, T::Balance>> {
-			let pallet_call: &Call<T> = <T::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call)?;
-			match pallet_call {
-				Call::register { access_code, .. } => {
-					let access_code = access_code.as_ref()?;
-					let code = AccessCodesByPublic::<T>::get(access_code.public)?;
-					if !access_code.verify(signer) {
-						return None;
-					}
-					Some(TxSponsor {
-						payer: code.sponsor,
-						max_fee_with_tip: None,
-						unique_tx_key: Some(access_code.public.encode()),
-					})
-				},
-				_ => None,
-			}
-		}
-	}
-
-	impl<T: Config> FeelessCallTxPoolKeyProvider<T::RuntimeCall> for Pallet<T>
-	where
-		T::RuntimeCall: IsSubType<Call<T>>,
-	{
-		fn key_for(call: &T::RuntimeCall) -> Option<Vec<u8>> {
-			let pallet_call: &Call<T> = <T::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call)?;
-			match pallet_call {
-				Call::register {
-					vault_account,
-					mining_funding_account,
-					mining_bot_account,
-					..
-				} => {
-					let key = (
-						b"operational-register",
-						vault_account,
-						mining_funding_account,
-						mining_bot_account,
-					)
-						.using_encoded(blake2_256)
-						.to_vec();
-					Some(key)
-				},
-				_ => None,
-			}
 		}
 	}
 }

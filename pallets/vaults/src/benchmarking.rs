@@ -102,7 +102,7 @@ mod benchmarks {
 	use argon_primitives::{
 		OnNewSlot,
 		bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinXPub, H256Le},
-		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		vault::{BitcoinVaultProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
 	use frame_support::traits::{Get, Hooks, fungible::InspectHold};
 
@@ -261,6 +261,25 @@ mod benchmarks {
 				.all(|entry| entry.uncollected_revenue == T::Balance::zero()),
 			"expected all frame revenue to be collected"
 		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_registration_vault_data() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_vault_caller", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
+
+		#[block]
+		{
+			let registration =
+				<Pallet<T> as BitcoinVaultProvider>::get_registration_vault_data(&caller);
+			assert_eq!(
+				registration.map(|entry| entry.vault_id),
+				Some(vault_id),
+				"expected provider lookup to resolve the created vault"
+			);
+		}
+
 		Ok(())
 	}
 

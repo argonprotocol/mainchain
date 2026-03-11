@@ -4,20 +4,77 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{OperationalAccountsHook, Signature};
+use argon_primitives::OperationalAccountsHook;
 use codec::Decode;
 use frame_system::RawOrigin;
-use pallet_prelude::*;
+use pallet_prelude::{
+	benchmarking::{
+		BenchmarkOperationalAccountsProviderCallCounters,
+		BenchmarkOperationalAccountsProviderState,
+		benchmark_operational_accounts_provider_call_counters,
+		reset_benchmark_operational_accounts_provider_call_counters,
+		reset_benchmark_operational_accounts_provider_state,
+		set_benchmark_operational_accounts_provider_state,
+	},
+	*,
+};
 use polkadot_sdk::{
 	frame_benchmarking,
 	frame_benchmarking::v2::*,
-	sp_core::{crypto::KeyTypeId, sr25519},
-	sp_io::{self, hashing::blake2_256},
-	sp_runtime::traits::Zero,
+	sp_core::sr25519,
+	sp_runtime::traits::{SaturatedConversion, Zero},
 };
 
 const USER_SEED: u32 = 0;
-const BENCH_KEY_TYPE: KeyTypeId = KeyTypeId(*b"opac");
+const BENCH_OPERATIONAL_ACCOUNT: [u8; 32] = [
+	106, 16, 190, 2, 157, 30, 210, 131, 68, 101, 135, 20, 90, 79, 136, 82, 37, 72, 155, 73, 4, 36,
+	160, 50, 141, 204, 226, 164, 138, 230, 254, 97,
+];
+const BENCH_VAULT_ACCOUNT: [u8; 32] = [
+	24, 157, 172, 41, 41, 109, 49, 129, 77, 200, 197, 108, 243, 211, 106, 5, 67, 55, 43, 186, 117,
+	56, 250, 50, 42, 74, 235, 254, 188, 57, 224, 86,
+];
+const BENCH_MINING_FUNDING_ACCOUNT: [u8; 32] = [
+	26, 79, 238, 72, 193, 186, 26, 72, 232, 205, 67, 120, 42, 132, 133, 214, 53, 170, 145, 207,
+	184, 44, 187, 71, 127, 12, 28, 87, 107, 196, 3, 28,
+];
+const BENCH_MINING_BOT_ACCOUNT: [u8; 32] = [
+	142, 229, 4, 20, 142, 117, 195, 78, 143, 5, 24, 153, 179, 198, 228, 36, 31, 241, 141, 193, 201,
+	33, 18, 96, 182, 166, 164, 52, 190, 219, 72, 95,
+];
+const BENCH_ACCESS_CODE_PUBLIC: [u8; 32] = [
+	194, 226, 189, 113, 224, 74, 106, 242, 137, 124, 52, 20, 214, 253, 64, 52, 119, 36, 80, 96,
+	253, 34, 218, 170, 65, 47, 245, 27, 131, 192, 194, 46,
+];
+const BENCH_OPERATIONAL_SIGNATURE: [u8; 64] = [
+	230, 146, 70, 252, 75, 156, 14, 179, 5, 252, 131, 55, 28, 132, 179, 106, 133, 194, 117, 53, 7,
+	114, 109, 51, 140, 222, 142, 222, 43, 159, 230, 89, 159, 206, 150, 92, 229, 141, 6, 3, 121,
+	207, 240, 213, 196, 141, 121, 5, 161, 224, 2, 153, 56, 45, 192, 84, 130, 92, 152, 65, 16, 0,
+	252, 130,
+];
+const BENCH_VAULT_SIGNATURE: [u8; 64] = [
+	208, 37, 32, 57, 145, 169, 149, 246, 23, 137, 200, 189, 56, 8, 210, 234, 138, 80, 93, 177, 220,
+	97, 176, 197, 92, 69, 194, 70, 52, 195, 122, 2, 92, 108, 24, 222, 71, 106, 164, 170, 122, 11,
+	220, 221, 45, 77, 177, 52, 238, 110, 133, 134, 67, 192, 67, 134, 77, 247, 247, 167, 165, 159,
+	248, 133,
+];
+const BENCH_MINING_FUNDING_SIGNATURE: [u8; 64] = [
+	204, 30, 215, 199, 3, 160, 79, 206, 129, 74, 58, 226, 244, 227, 87, 155, 111, 157, 218, 163,
+	248, 225, 78, 150, 65, 23, 151, 84, 74, 134, 187, 39, 135, 206, 70, 119, 84, 176, 37, 93, 41,
+	112, 113, 184, 124, 65, 108, 129, 200, 202, 188, 23, 26, 47, 167, 239, 63, 181, 237, 102, 180,
+	195, 96, 137,
+];
+const BENCH_MINING_BOT_SIGNATURE: [u8; 64] = [
+	198, 19, 229, 142, 158, 206, 161, 89, 52, 138, 239, 238, 61, 243, 178, 227, 34, 135, 47, 31,
+	131, 165, 92, 199, 109, 211, 96, 42, 32, 41, 17, 33, 44, 252, 182, 102, 104, 87, 223, 157, 11,
+	135, 111, 189, 98, 83, 208, 56, 143, 194, 77, 72, 165, 46, 134, 218, 194, 69, 34, 97, 215, 124,
+	158, 129,
+];
+const BENCH_ACCESS_CODE_SIGNATURE: [u8; 64] = [
+	170, 36, 183, 56, 107, 58, 13, 16, 115, 132, 63, 37, 140, 27, 84, 40, 81, 152, 48, 54, 147, 83,
+	164, 193, 205, 195, 202, 61, 245, 88, 99, 30, 55, 196, 28, 150, 3, 169, 10, 7, 123, 188, 204,
+	42, 23, 162, 235, 99, 46, 221, 130, 45, 74, 84, 84, 251, 236, 101, 89, 190, 23, 115, 251, 139,
+];
 
 #[benchmarks]
 mod benchmarks {
@@ -25,9 +82,12 @@ mod benchmarks {
 
 	#[benchmark]
 	fn register() {
-		let caller: T::AccountId = account("caller", 0, USER_SEED);
+		reset_benchmark_operational_accounts_provider_state();
+		reset_benchmark_operational_accounts_provider_call_counters();
+		let caller = benchmark_account_id::<T>(BENCH_OPERATIONAL_ACCOUNT);
+		let operational_account_proof = benchmark_account_proof(BENCH_OPERATIONAL_SIGNATURE);
 		let sponsor = linked_accounts::<T>();
-		let access_code = make_access_code_proof::<T>(&caller, 4);
+		let access_code = benchmark_access_code_proof();
 		let mut sponsor_account = default_operational_account::<T>(&sponsor);
 		sponsor_account.is_operational = true;
 		sponsor_account.unactivated_access_codes = 1;
@@ -39,30 +99,87 @@ mod benchmarks {
 		AccessCodesExpiringByFrame::<T>::mutate(1, |expiring_codes| {
 			let _ = expiring_codes.try_push(access_code.public);
 		});
-		let (vault, vault_proof) =
-			make_linked_account::<T>(&caller, 1, VAULT_ACCOUNT_PROOF_MESSAGE_KEY);
-		let (mining_funding, mining_funding_proof) =
-			make_linked_account::<T>(&caller, 2, MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY);
-		let (mining_bot, mining_bot_proof) =
-			make_linked_account::<T>(&caller, 3, MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY);
+		let vault = benchmark_account_id::<T>(BENCH_VAULT_ACCOUNT);
+		let mining_funding = benchmark_account_id::<T>(BENCH_MINING_FUNDING_ACCOUNT);
+		let mining_bot = benchmark_account_id::<T>(BENCH_MINING_BOT_ACCOUNT);
+		let vault_proof = benchmark_account_proof(BENCH_VAULT_SIGNATURE);
+		let mining_funding_proof = benchmark_account_proof(BENCH_MINING_FUNDING_SIGNATURE);
+		let mining_bot_proof = benchmark_account_proof(BENCH_MINING_BOT_SIGNATURE);
+		#[cfg(test)]
+		seed_mock_registration_lookup();
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: T::MinBitcoinLockSizeForOperational::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
+		let registration = Registration::V1(RegistrationV1 {
+			operational_account: caller.clone(),
+			encryption_pubkey: OpaqueEncryptionPubkey([7u8; 32]),
+			operational_account_proof,
+			vault_account: vault.clone(),
+			mining_funding_account: mining_funding.clone(),
+			mining_bot_account: mining_bot.clone(),
+			vault_account_proof: vault_proof,
+			mining_funding_account_proof: mining_funding_proof,
+			mining_bot_account_proof: mining_bot_proof,
+			access_code: Some(access_code.clone()),
+		});
+		let Registration::V1(RegistrationV1 {
+			operational_account,
+			operational_account_proof,
+			vault_account,
+			mining_funding_account,
+			mining_bot_account,
+			vault_account_proof,
+			mining_funding_account_proof,
+			mining_bot_account_proof,
+			..
+		}) = &registration;
+		assert!(operational_account_proof.verify(
+			operational_account,
+			operational_account,
+			OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
+		));
+		assert!(vault_account_proof.verify(
+			operational_account,
+			vault_account,
+			VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+		));
+		assert!(mining_funding_account_proof.verify(
+			operational_account,
+			mining_funding_account,
+			MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+		));
+		assert!(mining_bot_account_proof.verify(
+			operational_account,
+			mining_bot_account,
+			MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
+		));
 		whitelist_account!(caller);
 		#[extrinsic_call]
-		register(
-			RawOrigin::Signed(caller.clone()),
-			vault.clone(),
-			mining_funding.clone(),
-			mining_bot.clone(),
-			vault_proof,
-			mining_funding_proof,
-			mining_bot_proof,
-			Some(access_code.clone()),
-		);
+		register(RawOrigin::Signed(caller.clone()), registration);
 
-		assert!(OperationalAccounts::<T>::contains_key(caller));
+		let account = OperationalAccounts::<T>::get(&caller).expect("account stored");
+		assert_eq!(account.bitcoin_accrual, T::MinBitcoinLockSizeForOperational::get());
+		assert!(account.vault_created);
+		assert!(account.has_treasury_pool_participation);
+		assert_eq!(account.mining_seat_accrual, 1);
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_funding));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
 		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
+		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
+			get_registration_vault_data: 1,
+			has_active_rewards_account_seat: 1,
+			has_pool_participation: 1,
+		});
 	}
 
 	#[benchmark]
@@ -264,6 +381,12 @@ mod benchmarks {
 		crate::mock::Test
 	);
 
+	fn assert_provider_calls(expected: BenchmarkOperationalAccountsProviderCallCounters) {
+		if !cfg!(test) {
+			assert_eq!(benchmark_operational_accounts_provider_call_counters(), expected);
+		}
+	}
+
 	struct LinkedAccounts<T: Config> {
 		owner: T::AccountId,
 		vault: T::AccountId,
@@ -285,14 +408,15 @@ mod benchmarks {
 			vault_account: linked.vault.clone(),
 			mining_funding_account: linked.mining_funding.clone(),
 			mining_bot_account: linked.mining_bot.clone(),
+			encryption_pubkey: OpaqueEncryptionPubkey([0u8; 32]),
 			sponsor: None,
 			has_uniswap_transfer: false,
 			vault_created: false,
 			bitcoin_accrual: <T::Balance as Zero>::zero(),
-			bitcoin_high_watermark: <T::Balance as Zero>::zero(),
+			bitcoin_applied_total: <T::Balance as Zero>::zero(),
 			has_treasury_pool_participation: false,
 			mining_seat_accrual: 0,
-			mining_seat_high_watermark: 0,
+			mining_seat_applied_total: 0,
 			operational_referrals_count: 0,
 			referral_access_code_pending: false,
 			issuable_access_codes: 0,
@@ -319,39 +443,131 @@ mod benchmarks {
 		OperationalAccountBySubAccount::<T>::insert(&linked.mining_funding, &linked.owner);
 	}
 
-	fn make_linked_account<T: Config>(
-		owner: &T::AccountId,
-		seed: u8,
-		domain: &[u8],
-	) -> (T::AccountId, AccountOwnershipProof) {
-		let seed_phrase = match seed {
-			1 => "//operational-access-code-1",
-			2 => "//operational-access-code-2",
-			3 => "//operational-access-code-3",
-			_ => "//operational-access-code",
-		};
-		let public =
-			sp_io::crypto::sr25519_generate(BENCH_KEY_TYPE, Some(seed_phrase.as_bytes().to_vec()));
-		let account_id = T::AccountId::decode(&mut &public.0[..])
-			.expect("sr25519 public key should decode into benchmark AccountId");
-		let message = (domain, owner, &account_id).using_encoded(blake2_256);
-		let signature: Signature =
-			sp_io::crypto::sr25519_sign(BENCH_KEY_TYPE, &public, message.as_slice())
-				.expect("benchmark signing key should exist")
-				.into();
-		(account_id, AccountOwnershipProof { signature })
+	fn benchmark_account_id<T: Config>(bytes: [u8; 32]) -> T::AccountId {
+		T::AccountId::decode(&mut &bytes[..]).expect("benchmark account should decode")
 	}
 
-	fn make_access_code_proof<T: Config>(owner: &T::AccountId, seed: u8) -> AccessCodeProof {
-		let seed_phrase = match seed {
-			4 => "//operational-access-code-4",
-			_ => "//operational-access-code-proof",
+	fn benchmark_account_proof(signature: [u8; 64]) -> AccountOwnershipProof {
+		AccountOwnershipProof { signature: sr25519::Signature::from_raw(signature).into() }
+	}
+
+	fn benchmark_access_code_proof() -> AccessCodeProof {
+		AccessCodeProof {
+			public: sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC),
+			signature: sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE),
+		}
+	}
+
+	#[cfg(test)]
+	fn seed_mock_registration_lookup() {
+		let vault_account = crate::mock::TestAccountId::decode(&mut &BENCH_VAULT_ACCOUNT[..])
+			.expect("benchmark vault account should decode");
+		let mining_funding_account =
+			crate::mock::TestAccountId::decode(&mut &BENCH_MINING_FUNDING_ACCOUNT[..])
+				.expect("benchmark mining funding account should decode");
+		crate::mock::set_registration_lookup(
+			vault_account,
+			mining_funding_account,
+			crate::mock::MinBitcoinLockSizeForOperational::get(),
+			true,
+			1,
+		);
+	}
+
+	#[cfg(test)]
+	mod fixture_output {
+		use super::*;
+		use argon_primitives::Signature;
+		use polkadot_sdk::{
+			sp_io::hashing::blake2_256,
+			sp_runtime::{AccountId32, traits::Verify},
 		};
-		let public =
-			sp_io::crypto::sr25519_generate(BENCH_KEY_TYPE, Some(seed_phrase.as_bytes().to_vec()));
-		let message = (ACCESS_CODE_PROOF_MESSAGE_KEY, public, owner).using_encoded(blake2_256);
-		let signature = sp_io::crypto::sr25519_sign(BENCH_KEY_TYPE, &public, message.as_slice())
-			.expect("benchmark signing key should exist");
-		AccessCodeProof { public, signature }
+
+		#[test]
+		fn register_fixture_signatures_verify() {
+			let operational_account = AccountId32::new(BENCH_OPERATIONAL_ACCOUNT);
+			let vault_account = AccountId32::new(BENCH_VAULT_ACCOUNT);
+			let mining_funding_account = AccountId32::new(BENCH_MINING_FUNDING_ACCOUNT);
+			let mining_bot_account = AccountId32::new(BENCH_MINING_BOT_ACCOUNT);
+			let access_code_public = sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC);
+
+			let operational_signature: Signature =
+				sr25519::Signature::from_raw(BENCH_OPERATIONAL_SIGNATURE).into();
+			let vault_signature: Signature =
+				sr25519::Signature::from_raw(BENCH_VAULT_SIGNATURE).into();
+			let mining_funding_signature: Signature =
+				sr25519::Signature::from_raw(BENCH_MINING_FUNDING_SIGNATURE).into();
+			let mining_bot_signature: Signature =
+				sr25519::Signature::from_raw(BENCH_MINING_BOT_SIGNATURE).into();
+			let access_code_signature = sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE);
+
+			assert!(
+				operational_signature.verify(
+					(
+						OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
+						&operational_account,
+						&operational_account,
+					)
+						.using_encoded(blake2_256)
+						.as_slice(),
+					&operational_account,
+				)
+			);
+			assert!(
+				vault_signature.verify(
+					(VAULT_ACCOUNT_PROOF_MESSAGE_KEY, &operational_account, &vault_account)
+						.using_encoded(blake2_256)
+						.as_slice(),
+					&vault_account,
+				)
+			);
+			assert!(
+				mining_funding_signature.verify(
+					(
+						MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+						&operational_account,
+						&mining_funding_account,
+					)
+						.using_encoded(blake2_256)
+						.as_slice(),
+					&mining_funding_account,
+				)
+			);
+			assert!(
+				mining_bot_signature.verify(
+					(
+						MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
+						&operational_account,
+						&mining_bot_account,
+					)
+						.using_encoded(blake2_256)
+						.as_slice(),
+					&mining_bot_account,
+				)
+			);
+			assert!(
+				access_code_signature.verify(
+					(ACCESS_CODE_PROOF_MESSAGE_KEY, access_code_public, &operational_account,)
+						.using_encoded(blake2_256)
+						.as_slice(),
+					&access_code_public,
+				)
+			);
+		}
+
+		#[test]
+		#[ignore = "manual helper to print the fixed benchmark proof fixture data"]
+		fn print_register_fixture_data() {
+			println!("operational_account={:?}", BENCH_OPERATIONAL_ACCOUNT);
+			println!("vault_account={:?}", BENCH_VAULT_ACCOUNT);
+			println!("mining_funding_account={:?}", BENCH_MINING_FUNDING_ACCOUNT);
+			println!("mining_bot_account={:?}", BENCH_MINING_BOT_ACCOUNT);
+			println!("access_code_public={:?}", BENCH_ACCESS_CODE_PUBLIC);
+			println!("operational_signature={:?}", BENCH_OPERATIONAL_SIGNATURE);
+			println!("vault_signature={:?}", BENCH_VAULT_SIGNATURE);
+			println!("mining_funding_signature={:?}", BENCH_MINING_FUNDING_SIGNATURE);
+			println!("mining_bot_signature={:?}", BENCH_MINING_BOT_SIGNATURE);
+			println!("access_code_signature={:?}", BENCH_ACCESS_CODE_SIGNATURE);
+		}
 	}
 }
