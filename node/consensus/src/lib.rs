@@ -455,6 +455,7 @@ impl NotebookTickChecker {
 	) -> Option<Instant> {
 		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
+			// Delay within the current tick window, not from the start of a fresh tick.
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
 			let elapsed = duration_per_tick.saturating_sub(duration_to_next_tick);
@@ -500,7 +501,9 @@ impl NotebookTickChecker {
 	}
 
 	fn percentile_tick_offset(duration_per_tick: Duration, percentile: Permill) -> Duration {
-		let millis_offset = percentile.mul_floor(duration_per_tick.as_millis() as u64);
+		let millis_u128 = duration_per_tick.as_millis();
+		let millis_u64 = millis_u128.min(u64::MAX as u128) as u64;
+		let millis_offset = percentile.mul_floor(millis_u64);
 		Duration::from_millis(millis_offset)
 	}
 }
