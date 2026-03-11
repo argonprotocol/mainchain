@@ -13,7 +13,8 @@ pub trait WeightInfo {
 			weight = weight.saturating_add(Self::lock_verified(verified));
 		}
 		if timed_out > 0 {
-			weight = weight.saturating_add(Self::pending_funding_timeout(timed_out));
+			weight = weight
+				.saturating_add(Self::pending_funding_timeout().saturating_mul(timed_out.into()));
 		}
 		weight
 	}
@@ -26,7 +27,7 @@ pub trait WeightInfo {
 	// Individual UTXO operation weights (linear benchmarks for sync composition)
 	fn utxo_spent(n: u32) -> Weight;
 	fn lock_verified(n: u32) -> Weight;
-	fn pending_funding_timeout(n: u32) -> Weight;
+	fn pending_funding_timeout() -> Weight;
 }
 
 type EventHandlerWeights<T> = <<T as crate::pallet::Config>::EventHandler as BitcoinUtxoEvents<
@@ -80,12 +81,12 @@ where
 		Base::lock_verified(n).saturating_add(provider_weight.saturating_mul(n.into()))
 	}
 
-	fn pending_funding_timeout(n: u32) -> Weight {
+	fn pending_funding_timeout() -> Weight {
 		let provider_weight = EventHandlerWeight::timeout_waiting_for_funding().saturating_add(
 			EventHandlerWeight::orphaned_utxo_detected()
 				.saturating_mul(T::MaxCandidateUtxosPerLock::get().into()),
 		);
-		Base::pending_funding_timeout(n).saturating_add(provider_weight.saturating_mul(n.into()))
+		Base::pending_funding_timeout().saturating_add(provider_weight)
 	}
 }
 
@@ -119,7 +120,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn pending_funding_timeout(_n: u32) -> Weight {
+	fn pending_funding_timeout() -> Weight {
 		Weight::zero()
 	}
 }
