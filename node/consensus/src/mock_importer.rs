@@ -39,15 +39,6 @@ use std::{
 };
 
 impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
-	pub(crate) fn new_for_tests(
-		inner: I,
-		client: Arc<C>,
-		aux_client: ArgonAux<B, C>,
-		notary_client: Arc<NotaryClient<B, C, AC>>,
-	) -> Self {
-		Self::new_with_components(inner, client, aux_client, notary_client, Arc::new(None))
-	}
-
 	pub(crate) async fn pending_import_count_for_tests(&self) -> usize {
 		self.pending_full_imports_len().await
 	}
@@ -62,6 +53,8 @@ pub(crate) struct MemChain {
 	block_state: Arc<Mutex<HashMap<BlockHash, sp_consensus::BlockStatus>>>,
 	runtime_notebooks:
 		Arc<Mutex<HashMap<BlockHash, Vec<NotebookAuditResult<NotebookVerifyError>>>>>,
+	block_gap: Arc<Mutex<Option<sp_blockchain::BlockGap<BlockNumber>>>>,
+	genesis_hash: BlockHash,
 	best: Arc<Mutex<(BlockNumber, BlockHash)>>,
 	finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
 	aux: Arc<Mutex<BTreeMap<Vec<u8>, Vec<u8>>>>,
@@ -75,6 +68,8 @@ impl MemChain {
 				[(h, sp_consensus::BlockStatus::InChainWithState)].into(),
 			)),
 			runtime_notebooks: Arc::new(Mutex::new(HashMap::new())),
+			block_gap: Arc::new(Mutex::new(None)),
+			genesis_hash: h,
 			best: Arc::new(Mutex::new((0u32, h))),
 			finalized: Arc::new(Mutex::new((0u32, h))),
 			aux: Arc::new(Mutex::new(BTreeMap::new())),
@@ -104,6 +99,10 @@ impl MemChain {
 	pub(crate) fn force_best(&self, best_number: BlockNumber, best_hash: BlockHash) {
 		*self.best.lock().unwrap() = (best_number, best_hash);
 	}
+
+	pub(crate) fn set_block_gap(&self, block_gap: Option<sp_blockchain::BlockGap<BlockNumber>>) {
+		*self.block_gap.lock().unwrap() = block_gap;
+	}
 }
 impl HeaderBackend<Block> for MemChain {
 	fn header(&self, h: BlockHash) -> Result<Option<Header>, BlockchainError> {
@@ -118,8 +117,8 @@ impl HeaderBackend<Block> for MemChain {
 			finalized_state: None,
 			best_hash: best.1,
 			best_number: best.0,
-			block_gap: None,
-			genesis_hash: best.1,
+			block_gap: *self.block_gap.lock().unwrap(),
+			genesis_hash: self.genesis_hash,
 			number_leaves: 0,
 		}
 	}

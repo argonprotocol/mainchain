@@ -532,13 +532,11 @@ where
 			return;
 		}
 
-		let mut replayed = 0usize;
 		while let Some((pending_import, replay_context)) = self
 			.pending_full_import_queue
 			.dequeue_ready_for_replay(&self.notary_client)
 			.await
 		{
-			replayed = replayed.saturating_add(1);
 			let mut replay_retry_block =
 				PendingImportReplayQueue::<B, C>::retry_block_from_pending(&pending_import);
 			match <Self as BlockImport<B>>::import_block(self, pending_import.block).await {
@@ -1115,7 +1113,6 @@ where
 	let verifier = Verifier::<B, C, AC> {
 		client: client.clone(),
 		utxo_tracker,
-		notary_client,
 		telemetry,
 		_phantom: PhantomData,
 	};

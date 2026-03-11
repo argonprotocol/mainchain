@@ -17,7 +17,7 @@ use crate::{
 pub(crate) const MAX_PENDING_IMPORTS: usize = 1024;
 const PENDING_IMPORTS_AUX_KEY: &[u8] = b"argon/consensus/pending-imports/v1";
 const REPLAY_NOTEBOOK_AUDIT_TIMEOUT: Duration = Duration::from_secs(2);
-const MAX_REPLAY_SCAN_PER_PASS: usize = 64;
+pub(crate) const MAX_REPLAY_SCAN_PER_PASS: usize = 64;
 
 pub(crate) struct PendingBlockImport<B: BlockT> {
 	pub(crate) hash: B::Hash,
@@ -28,6 +28,7 @@ pub(crate) struct PendingBlockImport<B: BlockT> {
 pub(crate) struct PendingImportReplayQueue<B: BlockT, C: AuxStore> {
 	client: Arc<C>,
 	pending_imports: Arc<tokio::sync::Mutex<Vec<PendingBlockImport<B>>>>,
+	replay_scan_cursor: Arc<std::sync::Mutex<Option<B::Hash>>>,
 }
 
 pub(crate) enum EnqueueResult {
@@ -36,18 +37,17 @@ pub(crate) enum EnqueueResult {
 	QueueFull,
 }
 
-pub(crate) enum DeferFullImportResult<B: BlockT> {
-	Deferred(BlockImportParams<B>),
-	SaturatedHeaderOnly(BlockImportParams<B>),
-}
-
 impl<B, C> Clone for PendingImportReplayQueue<B, C>
 where
 	B: BlockT,
 	C: AuxStore,
 {
 	fn clone(&self) -> Self {
-		Self { client: self.client.clone(), pending_imports: self.pending_imports.clone() }
+		Self {
+			client: self.client.clone(),
+			pending_imports: self.pending_imports.clone(),
+			replay_scan_cursor: self.replay_scan_cursor.clone(),
+		}
 	}
 }
 
@@ -64,7 +64,11 @@ where
 				"Recovered pending full block imports from aux store"
 			);
 		}
-		Self { client, pending_imports: Arc::new(tokio::sync::Mutex::new(pending_imports)) }
+		Self {
+			client,
+			pending_imports: Arc::new(tokio::sync::Mutex::new(pending_imports)),
+			replay_scan_cursor: Arc::new(std::sync::Mutex::new(None)),
+		}
 	}
 
 	pub(crate) async fn len(&self) -> usize {
@@ -103,7 +107,7 @@ where
 	pub(crate) async fn defer_full_import(
 		&self,
 		block: BlockImportParams<B>,
-	) -> Result<DeferFullImportResult<B>, Error> {
+	) -> Result<BlockImportParams<B>, Error> {
 		if !block.intermediates.is_empty() {
 			warn!(
 				block_hash = ?block.post_hash(),
@@ -117,19 +121,39 @@ where
 		}
 		let (header_only, pending_full_import) = split_for_deferred_import(block);
 		match self.enqueue(pending_full_import).await {
-			EnqueueResult::Enqueued | EnqueueResult::AlreadyQueued =>
-				Ok(DeferFullImportResult::Deferred(header_only)),
-			EnqueueResult::QueueFull => Ok(DeferFullImportResult::SaturatedHeaderOnly(header_only)),
+			EnqueueResult::Enqueued | EnqueueResult::AlreadyQueued => Ok(header_only),
+			EnqueueResult::QueueFull => Err(Error::PendingImportQueueFull(format!(
+				"capacity={}, block_hash={:?}, number={:?}",
+				MAX_PENDING_IMPORTS,
+				header_only.post_hash(),
+				header_only.header.number(),
+			))),
 		}
 	}
 
-	pub(crate) async fn dequeue_ready(&self) -> Option<PendingBlockImport<B>>
+	// Replay has two competing requirements:
+	// - keep the queue deterministic and preserve import ordering
+	// - avoid starvation when each replay pass can only inspect a bounded window
+	//
+	// We address that by snapshotting the sorted queue, resuming the bounded scan by block hash,
+	// and letting `pending_import_ready_for_replay` enforce the real ordering constraint via
+	// parent-state and notebook checks. The cursor is a hash rather than an index because the queue
+	// is pruned, resorted, and requeued between passes.
+	async fn replay_scan_snapshot(&self, max_scan: usize) -> ReplayScanSnapshot<B>
 	where
 		C: BlockBackend<B>,
 	{
+		let scan_cursor =
+			*self.replay_scan_cursor.lock().expect("replay scan cursor lock poisoned");
 		let mut pending_imports = self.pending_imports.lock().await;
 		if pending_imports.is_empty() {
-			return None;
+			drop(pending_imports);
+			*self.replay_scan_cursor.lock().expect("replay scan cursor lock poisoned") = None;
+			return ReplayScanSnapshot {
+				ordered_candidates: Vec::new(),
+				start_index: 0,
+				scan_len: 0,
+			};
 		}
 
 		let before = pending_imports.len();
@@ -143,13 +167,39 @@ where
 		}
 
 		sort_pending_imports(&mut pending_imports);
-		let next_ready_index = pending_imports.iter().position(|entry| {
-			self.client.block_status(entry.parent_hash).unwrap_or(BlockStatus::Unknown) ==
-				BlockStatus::InChainWithState
-		});
-		let next = next_ready_index.map(|index| pending_imports.remove(index));
 		self.persist_snapshot(&pending_imports);
-		next
+
+		if pending_imports.is_empty() {
+			drop(pending_imports);
+			*self.replay_scan_cursor.lock().expect("replay scan cursor lock poisoned") = None;
+			return ReplayScanSnapshot {
+				ordered_candidates: Vec::new(),
+				start_index: 0,
+				scan_len: 0,
+			};
+		}
+
+		let ordered_candidates = pending_imports
+			.iter()
+			.map(|pending_import| PendingReplayContext {
+				hash: pending_import.hash,
+				number: *pending_import.block.header.number(),
+				parent_hash: pending_import.parent_hash,
+				origin: pending_import.block.origin,
+				finalized: pending_import.block.finalized,
+				skip_execution_checks: pending_import.block.state_action.skip_execution_checks(),
+				digest: pending_import.block.header.digest().clone(),
+			})
+			.collect::<Vec<_>>();
+		let start_index = ordered_candidates
+			.iter()
+			.position(|candidate| Some(candidate.hash) == scan_cursor)
+			.unwrap_or(0);
+		let scan_len = ordered_candidates.len().min(max_scan);
+		let scan_snapshot = ReplayScanSnapshot { ordered_candidates, start_index, scan_len };
+		drop(pending_imports);
+
+		scan_snapshot
 	}
 
 	pub(crate) async fn pending_import_ready_for_replay<AC>(
@@ -230,7 +280,6 @@ where
 		C: ImportApisExt<B, AC> + NotaryApisExt<B, AC> + BlockBackend<B> + 'static,
 		AC: Clone + codec::Codec + Send + Sync + 'static,
 	{
-		let mut deferred_candidates = Vec::new();
 		let actual_pending_count = self.len().await;
 		if actual_pending_count > MAX_REPLAY_SCAN_PER_PASS {
 			debug!(
@@ -239,29 +288,41 @@ where
 				"Limiting pending import replay scan due to bounded scan limit"
 			);
 		}
-		let pending_count = actual_pending_count.min(MAX_REPLAY_SCAN_PER_PASS);
-		for _ in 0..pending_count {
-			let Some(pending_import) = self.dequeue_ready().await else {
-				break;
-			};
-			let replay_context =
-				PendingReplayContext::from_block(pending_import.hash, &pending_import.block);
-			if self.pending_import_ready_for_replay(notary_client, &replay_context).await {
-				for pending in deferred_candidates {
-					self.requeue_pending_import(pending).await;
+		let scan_snapshot = self.replay_scan_snapshot(MAX_REPLAY_SCAN_PER_PASS).await;
+		let scan_order = scan_snapshot.ordered_candidates[scan_snapshot.start_index..]
+			.iter()
+			.enumerate()
+			.map(|(offset, replay_context)| (scan_snapshot.start_index + offset, replay_context))
+			.chain(scan_snapshot.ordered_candidates[..scan_snapshot.start_index].iter().enumerate())
+			.take(scan_snapshot.scan_len);
+		for (current_index, replay_context) in scan_order {
+			*self.replay_scan_cursor.lock().expect("replay scan cursor lock poisoned") =
+				if scan_snapshot.ordered_candidates.len() > 1 {
+					Some(
+						scan_snapshot.ordered_candidates
+							[(current_index + 1) % scan_snapshot.ordered_candidates.len()]
+						.hash,
+					)
+				} else {
+					None
+				};
+			if self.pending_import_ready_for_replay(notary_client, replay_context).await {
+				let replay_context = replay_context.clone();
+				let mut pending_imports = self.pending_imports.lock().await;
+				if let Some(index) =
+					pending_imports.iter().position(|entry| entry.hash == replay_context.hash)
+				{
+					let pending_import = pending_imports.remove(index);
+					self.persist_snapshot(&pending_imports);
+					return Some((pending_import, replay_context));
 				}
-				return Some((pending_import, replay_context));
+				continue;
 			}
 			debug!(
 				block_hash = ?replay_context.hash,
 				number = ?replay_context.number,
 				"Pending block replay deferred: prerequisites not ready"
 			);
-			deferred_candidates.push(pending_import);
-		}
-
-		for pending in deferred_candidates {
-			self.requeue_pending_import(pending).await;
 		}
 		None
 	}
@@ -291,8 +352,9 @@ where
 				block_hash = ?pending_import.hash,
 				number = ?pending_import.block.header.number(),
 				queue_len = pending_imports.len(),
-				"Pending replay queue is full while requeueing deferred import; keeping deferred import"
+				"Pending replay queue is full while requeueing deferred import; dropping replay"
 			);
+			return;
 		}
 		pending_imports.push(pending_import);
 		sort_pending_imports(&mut pending_imports);
@@ -435,7 +497,7 @@ impl<B: BlockT> PersistedPendingBlockImport<B> {
 		block.post_hash = self.post_hash;
 
 		let hash = block.post_hash();
-		let parent_hash: B::Hash = *block.header.parent_hash();
+		let parent_hash = *block.header.parent_hash();
 		PendingBlockImport { hash, parent_hash, block }
 	}
 }
@@ -517,7 +579,7 @@ fn persist_pending_imports_to_aux<B: BlockT, C: AuxStore>(
 	client.insert_aux(&[(PENDING_IMPORTS_AUX_KEY, encoded.as_slice())], &[])
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct PendingReplayContext<B: BlockT> {
 	pub(crate) hash: B::Hash,
 	pub(crate) number: sp_runtime::traits::NumberFor<B>,
@@ -528,16 +590,157 @@ pub(crate) struct PendingReplayContext<B: BlockT> {
 	pub(crate) digest: sp_runtime::Digest,
 }
 
-impl<B: BlockT> PendingReplayContext<B> {
-	pub(crate) fn from_block(hash: B::Hash, block: &BlockImportParams<B>) -> Self {
-		Self {
-			hash,
-			number: *block.header.number(),
-			parent_hash: *block.header.parent_hash(),
-			origin: block.origin,
-			finalized: block.finalized,
-			skip_execution_checks: block.state_action.skip_execution_checks(),
-			digest: block.header.digest().clone(),
+struct ReplayScanSnapshot<B: BlockT> {
+	ordered_candidates: Vec<PendingReplayContext<B>>,
+	start_index: usize,
+	scan_len: usize,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{
+		NotaryClient, NotebookDownloader,
+		aux_client::ArgonAux,
+		mock_importer::{
+			create_params, has_state, new_importer, new_importer_with_notary, pending_import_count,
+		},
+	};
+	use argon_notary_apis::DownloadTrustMode;
+	use argon_primitives::{NotebookAuditResult, prelude::*, tick::Ticker};
+	use polkadot_sdk::{
+		sc_consensus::{BlockImport, ImportResult},
+		sp_blockchain::HeaderBackend,
+		sp_core::H256,
+	};
+	use std::sync::Arc;
+
+	#[tokio::test]
+	async fn test_replay_scans_past_unready_entry_and_imports_ready_entry() {
+		let (importer, client) = new_importer_with_notary();
+		let genesis_hash = client.info().best_hash;
+
+		let parent = create_params(
+			1,
+			genesis_hash,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			None,
+		);
+		let parent_hash = parent.post_hash();
+		let _ = importer.import_block(parent).await.unwrap();
+		assert!(!has_state(&client, parent_hash));
+
+		client.set_runtime_notebooks(
+			parent_hash,
+			vec![NotebookAuditResult {
+				notary_id: 1,
+				notebook_number: 1,
+				tick: 1,
+				audit_first_failure: None,
+			}],
+		);
+
+		let mut blocked = create_params(
+			2,
+			parent_hash,
+			1,
+			None,
+			BlockOrigin::NetworkBroadcast,
+			StateAction::ExecuteIfPossible,
+			Some(AccountId::from([1u8; 32])),
+		);
+		blocked.body = Some(Vec::new());
+		let blocked_hash = blocked.post_hash();
+		let blocked_result = importer.import_block(blocked).await.unwrap();
+		assert!(matches!(blocked_result, ImportResult::Imported(_)));
+
+		let mut ready = create_params(
+			2,
+			parent_hash,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ExecuteIfPossible,
+			Some(AccountId::from([2u8; 32])),
+		);
+		ready.body = Some(Vec::new());
+		let ready_hash = ready.post_hash();
+		let ready_result = importer.import_block(ready).await.unwrap();
+		assert!(matches!(ready_result, ImportResult::Imported(_)));
+
+		assert_eq!(pending_import_count(&importer).await, 2);
+		client.set_state(parent_hash, sp_consensus::BlockStatus::InChainWithState);
+
+		importer.replay_pending_full_imports().await;
+
+		assert!(!has_state(&client, blocked_hash), "blocked replay should remain queued");
+		assert!(has_state(&client, ready_hash), "ready replay should still import");
+		assert_eq!(
+			pending_import_count(&importer).await,
+			1,
+			"only the blocked replay should remain queued",
+		);
+	}
+
+	#[tokio::test]
+	async fn test_bounded_replay_scan_advances_cursor_after_blocked_batch() {
+		let (_, client) = new_importer();
+		let client = Arc::new(client.clone());
+		let queue = PendingImportReplayQueue::new(client.clone());
+		let parent_hash = client.info().best_hash;
+		let blocked_parent_hash = H256::repeat_byte(9);
+		let notebook_downloader =
+			NotebookDownloader::new(Vec::<String>::new(), DownloadTrustMode::Dev, None, None)
+				.expect("notebook downloader should initialize");
+		let notary_client = Arc::new(NotaryClient::new(
+			client.clone(),
+			ArgonAux::new(client.clone()),
+			notebook_downloader,
+			Arc::new(None),
+			Ticker::new(2_000, 2),
+			true,
+		));
+
+		for offset in 0..MAX_REPLAY_SCAN_PER_PASS as u8 {
+			let mut params = create_params(
+				1,
+				blocked_parent_hash,
+				1,
+				None,
+				BlockOrigin::NetworkBroadcast,
+				StateAction::ExecuteIfPossible,
+				Some(AccountId::from([offset; 32])),
+			);
+			params.body = Some(Vec::new());
+			assert!(matches!(queue.enqueue(params).await, EnqueueResult::Enqueued));
 		}
+
+		let mut ready = create_params(
+			2,
+			parent_hash,
+			1,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::ExecuteIfPossible,
+			Some(AccountId::from([MAX_REPLAY_SCAN_PER_PASS as u8; 32])),
+		);
+		ready.body = Some(Vec::new());
+		let ready_hash = ready.post_hash();
+		assert!(matches!(queue.enqueue(ready).await, EnqueueResult::Enqueued));
+
+		assert!(
+			queue.dequeue_ready_for_replay(&notary_client).await.is_none(),
+			"the first bounded pass should only see blocked entries",
+		);
+
+		let second_batch = queue.dequeue_ready_for_replay(&notary_client).await;
+		assert_eq!(
+			second_batch.map(|(_, replay_context)| replay_context.hash),
+			Some(ready_hash),
+			"the next scan should continue after the previously scanned bounded window",
+		);
 	}
 }
