@@ -6,6 +6,7 @@ use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
 type UtxoVerifiedCallbackFn = fn((UtxoId, Satoshis)) -> DispatchResult;
 type OrphanDetectedCallbackFn = fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult;
+type CandidateRejectedCallbackFn = fn((UtxoId, u64, UtxoRef, Satoshis)) -> DispatchResult;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -33,10 +34,14 @@ parameter_types! {
 	pub static UtxoVerifiedCallback: Option<UtxoVerifiedCallbackFn> = None;
 	pub static OrphanDetectedCallback: Option<OrphanDetectedCallbackFn> = None;
 	pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
+	pub static CandidateRejectedCallback: Option<CandidateRejectedCallbackFn> = None;
+	pub static LastCandidateRejected: Option<(UtxoId, u64, UtxoRef, Satoshis)> = None;
 }
 
 pub struct StaticEventHandler;
 impl BitcoinUtxoEvents<u64> for StaticEventHandler {
+	type Weights = ();
+
 	fn funding_received(
 		utxo_id: UtxoId,
 		received_satoshis: Satoshis,
@@ -58,6 +63,25 @@ impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 		_utxo_ref: &UtxoRef,
 	) -> DispatchResult {
 		Ok(())
+	}
+
+	fn candidate_rejected_by_account(
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_account_id: &u64,
+		_utxo_ref: &UtxoRef,
+	) -> DispatchResult {
+		if let Some(callback) = CandidateRejectedCallback::get() {
+			callback((_utxo_id, *_account_id, _utxo_ref.clone(), _satoshis))
+		} else {
+			LastCandidateRejected::set(Some((
+				_utxo_id,
+				*_account_id,
+				_utxo_ref.clone(),
+				_satoshis,
+			)));
+			Ok(())
+		}
 	}
 
 	fn orphaned_utxo_detected(

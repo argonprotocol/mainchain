@@ -2441,7 +2441,17 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly utxoRef: ArgonPrimitivesBitcoinUtxoRef;
     } & Struct;
-    readonly type: 'Sync' | 'SetConfirmedBlock' | 'SetOperator' | 'FundWithUtxoCandidate';
+    readonly isRejectUtxoCandidate: boolean;
+    readonly asRejectUtxoCandidate: {
+      readonly utxoId: u64;
+      readonly utxoRef: ArgonPrimitivesBitcoinUtxoRef;
+    } & Struct;
+    readonly type:
+      | 'Sync'
+      | 'SetConfirmedBlock'
+      | 'SetOperator'
+      | 'FundWithUtxoCandidate'
+      | 'RejectUtxoCandidate';
   }
 
   /** @name ArgonPrimitivesInherentsBitcoinUtxoSync (207) */

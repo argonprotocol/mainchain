@@ -1,28 +1,98 @@
+use argon_primitives::providers::{BitcoinUtxoEvents, BitcoinUtxoEventsWeightInfo};
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_utxos.
 pub trait WeightInfo {
 	// Actual extrinsics
-	fn sync(spent: u32, verified: u32) -> Weight {
-		Weight::zero()
-			.saturating_add(Self::utxo_spent(spent))
-			.saturating_add(Self::lock_verified(verified))
+	fn sync(spent: u32, verified: u32, timed_out: u32) -> Weight {
+		let mut weight = Self::sync_base();
+		if spent > 0 {
+			weight = weight.saturating_add(Self::utxo_spent(spent));
+		}
+		if verified > 0 {
+			weight = weight.saturating_add(Self::lock_verified(verified));
+		}
+		if timed_out > 0 {
+			weight = weight.saturating_add(Self::pending_funding_timeout(timed_out));
+		}
+		weight
 	}
+	fn sync_base() -> Weight;
 	fn set_confirmed_block() -> Weight;
 	fn set_operator() -> Weight;
 	fn fund_with_utxo_candidate() -> Weight;
+	fn reject_utxo_candidate() -> Weight;
 
 	// Individual UTXO operation weights (linear benchmarks for sync composition)
 	fn utxo_spent(n: u32) -> Weight;
 	fn lock_verified(n: u32) -> Weight;
+	fn pending_funding_timeout(n: u32) -> Weight;
+}
+
+type EventHandlerWeights<T> = <<T as crate::pallet::Config>::EventHandler as BitcoinUtxoEvents<
+	<T as frame_system::Config>::AccountId,
+>>::Weights;
+
+pub struct WithProviderWeights<T, Base, EventHandlerWeight = EventHandlerWeights<T>>(
+	PhantomData<(T, Base, EventHandlerWeight)>,
+);
+impl<T, Base, EventHandlerWeight> WeightInfo for WithProviderWeights<T, Base, EventHandlerWeight>
+where
+	T: crate::pallet::Config,
+	Base: WeightInfo,
+	EventHandlerWeight: BitcoinUtxoEventsWeightInfo,
+{
+	fn sync_base() -> Weight {
+		Base::sync_base()
+	}
+
+	fn set_confirmed_block() -> Weight {
+		Base::set_confirmed_block()
+	}
+
+	fn set_operator() -> Weight {
+		Base::set_operator()
+	}
+
+	fn fund_with_utxo_candidate() -> Weight {
+		Base::fund_with_utxo_candidate()
+			.saturating_add(EventHandlerWeight::funding_promoted_by_account())
+			.saturating_add(
+				EventHandlerWeight::orphaned_utxo_detected()
+					.saturating_mul(T::MaxCandidateUtxosPerLock::get().saturating_sub(1).into()),
+			)
+	}
+
+	fn reject_utxo_candidate() -> Weight {
+		Base::reject_utxo_candidate()
+			.saturating_add(EventHandlerWeight::candidate_rejected_by_account())
+	}
+
+	fn utxo_spent(n: u32) -> Weight {
+		Base::utxo_spent(n).saturating_add(EventHandlerWeight::spent().saturating_mul(n.into()))
+	}
+
+	fn lock_verified(n: u32) -> Weight {
+		let provider_weight = EventHandlerWeight::funding_received().saturating_add(
+			EventHandlerWeight::orphaned_utxo_detected()
+				.saturating_mul(T::MaxCandidateUtxosPerLock::get().into()),
+		);
+		Base::lock_verified(n).saturating_add(provider_weight.saturating_mul(n.into()))
+	}
+
+	fn pending_funding_timeout(n: u32) -> Weight {
+		let provider_weight = EventHandlerWeight::timeout_waiting_for_funding().saturating_add(
+			EventHandlerWeight::orphaned_utxo_detected()
+				.saturating_mul(T::MaxCandidateUtxosPerLock::get().into()),
+		);
+		Base::pending_funding_timeout(n).saturating_add(provider_weight.saturating_mul(n.into()))
+	}
 }
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
-	fn sync(spent: u32, verified: u32) -> Weight {
+	fn sync_base() -> Weight {
 		Weight::zero()
-			.saturating_add(Self::utxo_spent(spent))
-			.saturating_add(Self::lock_verified(verified))
 	}
 
 	fn set_confirmed_block() -> Weight {
@@ -37,11 +107,19 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn reject_utxo_candidate() -> Weight {
+		Weight::zero()
+	}
+
 	fn utxo_spent(_n: u32) -> Weight {
 		Weight::zero()
 	}
 
 	fn lock_verified(_n: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn pending_funding_timeout(_n: u32) -> Weight {
 		Weight::zero()
 	}
 }

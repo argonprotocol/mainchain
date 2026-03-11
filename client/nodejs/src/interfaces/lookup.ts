@@ -2025,6 +2025,10 @@ export default {
         utxoId: 'u64',
         utxoRef: 'ArgonPrimitivesBitcoinUtxoRef',
       },
+      reject_utxo_candidate: {
+        utxoId: 'u64',
+        utxoRef: 'ArgonPrimitivesBitcoinUtxoRef',
+      },
     },
   },
   /**

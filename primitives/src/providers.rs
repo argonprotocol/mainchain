@@ -82,6 +82,41 @@ impl TreasuryPoolProviderWeightInfo for () {
 	}
 }
 
+pub trait BitcoinUtxoEventsWeightInfo {
+	fn funding_received() -> Weight;
+	fn timeout_waiting_for_funding() -> Weight;
+	fn funding_promoted_by_account() -> Weight;
+	fn candidate_rejected_by_account() -> Weight;
+	fn orphaned_utxo_detected() -> Weight;
+	fn spent() -> Weight;
+}
+
+impl BitcoinUtxoEventsWeightInfo for () {
+	fn funding_received() -> Weight {
+		Weight::zero()
+	}
+
+	fn timeout_waiting_for_funding() -> Weight {
+		Weight::zero()
+	}
+
+	fn funding_promoted_by_account() -> Weight {
+		Weight::zero()
+	}
+
+	fn candidate_rejected_by_account() -> Weight {
+		Weight::zero()
+	}
+
+	fn orphaned_utxo_detected() -> Weight {
+		Weight::zero()
+	}
+
+	fn spent() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait RecentArgonTransferLookup<AccountId> {
 	fn has_recent_argon_transfer(account_id: &AccountId) -> bool;
 }
@@ -239,11 +274,19 @@ pub trait BitcoinUtxoTracker {
 }
 
 pub trait BitcoinUtxoEvents<AccountId> {
+	type Weights: BitcoinUtxoEventsWeightInfo;
+
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult;
 	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult;
 	fn funding_promoted_by_account(
 		utxo_id: UtxoId,
 		received_satoshis: Satoshis,
+		account_id: &AccountId,
+		utxo_ref: &UtxoRef,
+	) -> DispatchResult;
+	fn candidate_rejected_by_account(
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
 		account_id: &AccountId,
 		utxo_ref: &UtxoRef,
 	) -> DispatchResult;
@@ -257,6 +300,8 @@ pub trait BitcoinUtxoEvents<AccountId> {
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<A> BitcoinUtxoEvents<A> for Tuple {
+	type Weights = ();
+
 	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 		for_tuples!( #( Tuple::funding_received(utxo_id, received_satoshis)?; )* );
 		Ok(())
@@ -274,6 +319,16 @@ impl<A> BitcoinUtxoEvents<A> for Tuple {
 		utxo_ref: &UtxoRef,
 	) -> DispatchResult {
 		for_tuples!( #( Tuple::funding_promoted_by_account(utxo_id, received_satoshis, account_id, utxo_ref)?; )* );
+		Ok(())
+	}
+
+	fn candidate_rejected_by_account(
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
+		account_id: &A,
+		utxo_ref: &UtxoRef,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::candidate_rejected_by_account(utxo_id, satoshis, account_id, utxo_ref)?; )* );
 		Ok(())
 	}
 

@@ -8,6 +8,9 @@ pub use weights::*;
 
 pub mod migrations;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[cfg(test)]
 mod mock;
 
@@ -245,6 +248,7 @@ pub mod pallet {
 			T::WeightInfo::sync(
 				utxo_sync.spent.len() as u32,
 				utxo_sync.funded.len() as u32,
+				T::MaxPendingConfirmationUtxos::get(),
 			),
 			DispatchClass::Mandatory
 		))]
@@ -396,6 +400,22 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		/// Reject a pending candidate UTXO and materialize it as an orphan through the locks
+		/// pallet.
+		#[pallet::call_index(4)]
+		#[pallet::weight(T::WeightInfo::reject_utxo_candidate())]
+		pub fn reject_utxo_candidate(
+			origin: OriginFor<T>,
+			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let (_, satoshis) =
+				Self::unwatch_candidate(utxo_id, &utxo_ref).ok_or(Error::<T>::UtxoNotCandidate)?;
+			T::EventHandler::candidate_rejected_by_account(utxo_id, satoshis, &who, &utxo_ref)?;
+			Ok(())
+		}
 	}
 
 	impl<T: Config> BitcoinUtxoTracker for Pallet<T> {
@@ -454,8 +474,7 @@ pub mod pallet {
 					if let Some(sats) = inner.remove(utxo_ref) {
 						result = Some((utxo_ref.clone(), sats));
 					}
-					let should_clear = inner.is_empty();
-					if should_clear {
+					if inner.is_empty() {
 						*refs = None;
 					}
 				}
