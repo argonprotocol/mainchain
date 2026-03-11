@@ -16,7 +16,6 @@ mod benchmarks {
 	use frame_system::RawOrigin;
 
 	const MAX_SYNC_ITEMS: u32 = 20;
-	const MAX_TIMEOUT_ITEMS: u32 = 20;
 
 	#[benchmark]
 	fn sync_base() -> Result<(), BenchmarkError> {
@@ -166,30 +165,27 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn pending_funding_timeout(n: Linear<1, MAX_TIMEOUT_ITEMS>) -> Result<(), BenchmarkError> {
+	fn pending_funding_timeout() -> Result<(), BenchmarkError> {
 		let satoshis = benchmark_satoshis::<T>();
 		let candidate_count = T::MaxCandidateUtxosPerLock::get();
+		let utxo_id: UtxoId = 1;
+		let submitted_at_height = 1;
+		let oldest_pending_bitcoin_submitted_height = 2;
 
-		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
-			seed_pending_funding_at_height::<T>(utxo_id, satoshis, 1)?;
-			seed_candidates::<T>(utxo_id, candidate_count, None)?;
-		}
+		seed_pending_funding_at_height::<T>(utxo_id, satoshis, submitted_at_height)?;
+		seed_candidates::<T>(utxo_id, candidate_count, None)?;
 
 		#[block]
 		{
-			for i in 0..n {
-				let utxo_id = i.saturating_add(1) as UtxoId;
-				Pallet::<T>::lock_timeout_pending_funding(utxo_id)
-					.map_err(|_| BenchmarkError::Stop("pending funding timeout failed"))?;
-			}
+			Pallet::<T>::process_pending_funding_timeout(
+				utxo_id,
+				submitted_at_height,
+				oldest_pending_bitcoin_submitted_height,
+			);
 		}
 
 		assert!(LocksPendingFunding::<T>::get().is_empty());
-		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
-			assert!(CandidateUtxoRefsByUtxoId::<T>::get(utxo_id).is_empty());
-		}
+		assert!(CandidateUtxoRefsByUtxoId::<T>::get(utxo_id).is_empty());
 		Ok(())
 	}
 }

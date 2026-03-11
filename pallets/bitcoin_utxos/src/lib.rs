@@ -248,7 +248,7 @@ pub mod pallet {
 			T::WeightInfo::sync(
 				utxo_sync.spent.len() as u32,
 				utxo_sync.funded.len() as u32,
-				T::MaxPendingConfirmationUtxos::get(),
+				Pallet::<T>::pending_funding_timeout_count(),
 			),
 			DispatchClass::Mandatory
 		))]
@@ -308,15 +308,11 @@ pub mod pallet {
 				.saturating_sub(T::MaxPendingConfirmationBlocks::get());
 			let locks_pending = LocksPendingFunding::<T>::get();
 			for (utxo_id, utxo_value) in locks_pending.into_iter() {
-				if utxo_value.submitted_at_height < oldest_pending_bitcoin_submitted_height {
-					let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
-					if let Err(e) = res {
-						log::warn!(
-							"Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}"
-						);
-						Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
-					}
-				}
+				Self::process_pending_funding_timeout(
+					utxo_id,
+					utxo_value.submitted_at_height,
+					oldest_pending_bitcoin_submitted_height,
+				);
 			}
 
 			SynchedBitcoinBlock::<T>::set(Some(sync_to_block));
@@ -527,6 +523,39 @@ pub mod pallet {
 				}
 			}
 			utxos
+		}
+
+		// Pre-dispatch weight has to use the current pending set. The actual timeout loop can only
+		// process fewer entries than this, because verified funding is applied first and removes
+		// matching locks from the pending map before timeout handling runs.
+		fn pending_funding_timeout_count() -> u32 {
+			let Some(current_confirmed) = ConfirmedBitcoinBlockTip::<T>::get() else {
+				return 0;
+			};
+			let oldest_pending_bitcoin_submitted_height = current_confirmed
+				.block_height
+				.saturating_sub(T::MaxPendingConfirmationBlocks::get());
+			let mut count = 0u32;
+			for (_, entry) in LocksPendingFunding::<T>::get() {
+				if entry.submitted_at_height < oldest_pending_bitcoin_submitted_height {
+					count = count.saturating_add(1);
+				}
+			}
+			count
+		}
+
+		pub(crate) fn process_pending_funding_timeout(
+			utxo_id: UtxoId,
+			submitted_at_height: BitcoinHeight,
+			oldest_pending_bitcoin_submitted_height: BitcoinHeight,
+		) {
+			if submitted_at_height < oldest_pending_bitcoin_submitted_height {
+				let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
+				if let Err(e) = res {
+					log::warn!("Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}");
+					Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
+				}
+			}
 		}
 
 		fn send_candidates_as_orphans(utxo_id: UtxoId) -> DispatchResult {
