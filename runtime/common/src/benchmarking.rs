@@ -23,10 +23,18 @@ use argon_primitives::{
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
-	BenchmarkAuthorityProvider, BenchmarkNotaryProvider, BenchmarkNotebookProvider,
-	BenchmarkOperationalAccountsProviderState, BenchmarkTickProvider,
-	benchmark_operational_accounts_provider_state,
-	set_benchmark_operational_accounts_provider_state,
+	BenchmarkAuthorityProvider, BenchmarkBitcoinBlockHeightChange,
+	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinNetwork, BenchmarkBitcoinUtxoTracker,
+	BenchmarkBitcoinUtxoTrackerState, BenchmarkBitcoinVaultProvider,
+	BenchmarkBitcoinVaultProviderState, BenchmarkCurrentFrameId, BenchmarkCurrentTick,
+	BenchmarkDidStartNewFrame, BenchmarkNotaryProvider, BenchmarkNotebookProvider,
+	BenchmarkOperationalAccountsProviderState, BenchmarkPriceProvider, BenchmarkPriceProviderState,
+	BenchmarkTickProvider, BenchmarkUtxoLockEvents, benchmark_operational_accounts_provider_state,
+	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
+	reset_benchmark_bitcoin_vault_provider_state, reset_benchmark_price_provider_state,
+	reset_benchmark_utxo_lock_events_state, set_benchmark_bitcoin_locks_runtime_state,
+	set_benchmark_bitcoin_utxo_tracker_state, set_benchmark_bitcoin_vault_provider_state,
+	set_benchmark_operational_accounts_provider_state, set_benchmark_price_provider_state,
 };
 
 pub struct BenchmarkBitcoinSignatureVerifier;

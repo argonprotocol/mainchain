@@ -13,18 +13,41 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
+use argon_primitives::providers::BitcoinUtxoEventsWeightInfo;
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_locks.
 pub trait WeightInfo {
 	// Core extrinsics
 	fn initialize() -> Weight;
+	fn initialize_for() -> Weight;
 	fn request_release() -> Weight;
-	fn cosign_release() -> Weight;  // CRITICAL: Was missing - complex signature verification + cross-pallet ops
+	fn cosign_release() -> Weight;
 	fn ratchet() -> Weight;
 
 	// Hooks with variance
-	fn on_initialize_with_expirations_and_overdue(expiring_count: u32, overdue_count: u32) -> Weight;
+	fn on_initialize_with_expirations_and_overdue(
+		expiring_count: u32,
+		overdue_count: u32,
+		orphan_expiring_count: u32,
+	) -> Weight {
+		let mut weight = Self::on_initialize_base();
+		if expiring_count > 0 {
+			weight = weight.saturating_add(Self::on_initialize_expiring_locks(expiring_count));
+		}
+		if overdue_count > 0 {
+			weight = weight.saturating_add(Self::on_initialize_overdue_releases(overdue_count));
+		}
+		if orphan_expiring_count > 0 {
+			weight = weight
+				.saturating_add(Self::on_initialize_orphan_expirations(orphan_expiring_count));
+		}
+		weight
+	}
+	fn on_initialize_base() -> Weight;
+	fn on_initialize_expiring_locks(n: u32) -> Weight;
+	fn on_initialize_overdue_releases(n: u32) -> Weight;
+	fn on_initialize_orphan_expirations(n: u32) -> Weight;
 
 	// Admin function
 	fn admin_modify_minimum_locked_sats() -> Weight;
@@ -35,22 +58,67 @@ pub trait WeightInfo {
 	fn increase_securitization() -> Weight;
 
 	fn register_fee_coupon() -> Weight;
+
+	// Bitcoin UTXO event handler provider weights
+	fn provider_funding_received() -> Weight;
+	fn provider_timeout_waiting_for_funding() -> Weight;
+	fn provider_funding_promoted_by_account() -> Weight;
+	fn provider_candidate_rejected_by_account() -> Weight;
+	fn provider_orphaned_utxo_detected() -> Weight;
+	fn provider_spent() -> Weight;
 }
 
 
 /// Placeholder implementation for tests and no-std environments
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
+	fn funding_received() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_funding_received()
+	}
+
+	fn timeout_waiting_for_funding() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_timeout_waiting_for_funding()
+	}
+
+	fn funding_promoted_by_account() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_funding_promoted_by_account()
+	}
+
+	fn candidate_rejected_by_account() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_candidate_rejected_by_account()
+	}
+
+	fn orphaned_utxo_detected() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_orphaned_utxo_detected()
+	}
+
+	fn spent() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_spent()
+	}
+}
+
 // For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn initialize() -> Weight { Weight::zero() }
+	fn initialize_for() -> Weight { Weight::zero() }
 	fn request_release() -> Weight { Weight::zero() }
 	fn cosign_release() -> Weight { Weight::zero() }
 	fn ratchet() -> Weight { Weight::zero() }
-	fn on_initialize_with_expirations_and_overdue(_expiring_count: u32, _overdue_count: u32) -> Weight { Weight::zero() }
+	fn on_initialize_base() -> Weight { Weight::zero() }
+	fn on_initialize_expiring_locks(_n: u32) -> Weight { Weight::zero() }
+	fn on_initialize_overdue_releases(_n: u32) -> Weight { Weight::zero() }
+	fn on_initialize_orphan_expirations(_n: u32) -> Weight { Weight::zero() }
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
 	fn register_fee_coupon() -> Weight { Weight::zero() }
+	fn provider_funding_received() -> Weight { Weight::zero() }
+	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }
+	fn provider_funding_promoted_by_account() -> Weight { Weight::zero() }
+	fn provider_candidate_rejected_by_account() -> Weight { Weight::zero() }
+	fn provider_orphaned_utxo_detected() -> Weight { Weight::zero() }
+	fn provider_spent() -> Weight { Weight::zero() }
 }

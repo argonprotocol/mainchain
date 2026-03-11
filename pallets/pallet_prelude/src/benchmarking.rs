@@ -1,21 +1,33 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use crate::*;
-use alloc::{collections::BTreeMap, vec, vec::Vec};
+use alloc::{
+	collections::{BTreeMap, BTreeSet},
+	vec,
+	vec::Vec,
+};
 use argon_primitives::{
-	NotaryId, NotebookNumber, NotebookSecret, VotingSchedule,
+	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, PriceProvider, UtxoLockEvents, VaultId,
+	VotingSchedule,
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
+		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
+	},
 	block_seal::MiningAuthority,
 	digests::{
 		AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID, BlockVoteDigest, NOTEBOOKS_DIGEST_ID,
 		NotebookDigest, TICK_DIGEST_ID,
 	},
 	notary::{NotaryProvider, NotarySignature},
-	providers::{AuthorityProvider, NotebookProvider},
+	providers::{AuthorityProvider, BitcoinUtxoTracker, NotebookProvider},
 	tick::{Tick, TickDigest, Ticker},
-	vault::RegistrationVaultData,
+	vault::{
+		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, Vault,
+		VaultError,
+	},
 };
-use codec::Decode;
-use core::marker::PhantomData;
+use codec::{Decode, Encode, HasCompact};
+use core::{iter::Sum, marker::PhantomData};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BenchmarkNotebookProviderCallCounters {
@@ -523,5 +535,878 @@ mod operational_accounts_state_backend {
 				.clone()
 				.unwrap_or_default()
 		}
+	}
+}
+
+fn decode_benchmark_state<State: Decode + Default>(encoded: Vec<u8>) -> State {
+	if encoded.is_empty() {
+		State::default()
+	} else {
+		State::decode(&mut &encoded[..]).unwrap_or_default()
+	}
+}
+
+#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+pub struct BenchmarkPriceProviderState {
+	pub btc_price_in_usd: Option<FixedU128>,
+	pub argon_price_in_usd: Option<FixedU128>,
+	pub argon_target_price_in_usd: Option<FixedU128>,
+	pub circulation: u128,
+}
+
+impl Default for BenchmarkPriceProviderState {
+	fn default() -> Self {
+		Self {
+			btc_price_in_usd: Some(FixedU128::from_rational(62_000_00u128, 100u128)),
+			argon_price_in_usd: Some(FixedU128::one()),
+			argon_target_price_in_usd: Some(FixedU128::one()),
+			circulation: 1_000,
+		}
+	}
+}
+
+pub fn set_benchmark_price_provider_state(state: BenchmarkPriceProviderState) {
+	price_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_price_provider_state() {
+	price_state_backend::reset();
+}
+
+pub fn benchmark_price_provider_state() -> BenchmarkPriceProviderState {
+	decode_benchmark_state(price_state_backend::get())
+}
+
+pub struct BenchmarkPriceProvider<Balance>(PhantomData<Balance>);
+impl<Balance> PriceProvider<Balance> for BenchmarkPriceProvider<Balance>
+where
+	Balance:
+		Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
+{
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		benchmark_price_provider_state().btc_price_in_usd
+	}
+
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		benchmark_price_provider_state().argon_price_in_usd
+	}
+
+	fn get_argon_cpi() -> Option<ArgonCPI> {
+		let state = benchmark_price_provider_state();
+		let ratio = state.argon_target_price_in_usd? / state.argon_price_in_usd?;
+		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);
+		Some(ratio_as_cpi - One::one())
+	}
+
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
+		Self::get_argon_cpi().unwrap_or_default()
+	}
+
+	fn get_circulation() -> Balance {
+		benchmark_price_provider_state().circulation.into()
+	}
+
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		let state = benchmark_price_provider_state();
+		Some(state.argon_price_in_usd? / state.argon_target_price_in_usd?)
+	}
+}
+
+#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+pub struct BenchmarkBitcoinUtxoTrackerState {
+	pub watched_utxos_by_id: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)>,
+	pub funding_utxo_refs_by_id: BTreeMap<UtxoId, UtxoRef>,
+	pub candidate_utxos_by_ref: BTreeMap<UtxoRef, (UtxoId, Satoshis)>,
+	pub bitcoin_network: BitcoinNetwork,
+	pub bitcoin_block_height_change: (BitcoinHeight, BitcoinHeight),
+}
+
+impl Default for BenchmarkBitcoinUtxoTrackerState {
+	fn default() -> Self {
+		Self {
+			watched_utxos_by_id: BTreeMap::new(),
+			funding_utxo_refs_by_id: BTreeMap::new(),
+			candidate_utxos_by_ref: BTreeMap::new(),
+			bitcoin_network: BitcoinNetwork::Regtest,
+			bitcoin_block_height_change: (0, 0),
+		}
+	}
+}
+
+pub fn set_benchmark_bitcoin_utxo_tracker_state(state: BenchmarkBitcoinUtxoTrackerState) {
+	bitcoin_utxo_tracker_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_bitcoin_utxo_tracker_state() {
+	bitcoin_utxo_tracker_state_backend::reset();
+}
+
+pub fn benchmark_bitcoin_utxo_tracker_state() -> BenchmarkBitcoinUtxoTrackerState {
+	decode_benchmark_state(bitcoin_utxo_tracker_state_backend::get())
+}
+
+pub struct BenchmarkBitcoinUtxoTracker;
+impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
+	fn watch_for_utxo(
+		utxo_id: UtxoId,
+		script_pubkey: BitcoinCosignScriptPubkey,
+		satoshis: Satoshis,
+		watch_for_spent_until: BitcoinHeight,
+	) -> Result<(), DispatchError> {
+		let mut state = benchmark_bitcoin_utxo_tracker_state();
+		state
+			.watched_utxos_by_id
+			.insert(utxo_id, (script_pubkey, satoshis, watch_for_spent_until));
+		set_benchmark_bitcoin_utxo_tracker_state(state);
+		Ok(())
+	}
+
+	fn get_funding_utxo_ref(utxo_id: UtxoId) -> Option<UtxoRef> {
+		benchmark_bitcoin_utxo_tracker_state()
+			.funding_utxo_refs_by_id
+			.get(&utxo_id)
+			.cloned()
+	}
+
+	fn unwatch(utxo_id: UtxoId) {
+		let mut state = benchmark_bitcoin_utxo_tracker_state();
+		state.watched_utxos_by_id.remove(&utxo_id);
+		state.funding_utxo_refs_by_id.remove(&utxo_id);
+		state.candidate_utxos_by_ref.retain(|_, (id, _)| *id != utxo_id);
+		set_benchmark_bitcoin_utxo_tracker_state(state);
+	}
+
+	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
+		let mut state = benchmark_bitcoin_utxo_tracker_state();
+		let mut removed = None;
+		if let Some((candidate_utxo_id, satoshis)) = state.candidate_utxos_by_ref.remove(utxo_ref) {
+			if candidate_utxo_id == utxo_id {
+				removed = Some((utxo_ref.clone(), satoshis));
+			} else {
+				state
+					.candidate_utxos_by_ref
+					.insert(utxo_ref.clone(), (candidate_utxo_id, satoshis));
+			}
+		}
+		set_benchmark_bitcoin_utxo_tracker_state(state);
+		removed
+	}
+}
+
+pub struct BenchmarkBitcoinBlockHeightChange;
+impl Get<(BitcoinHeight, BitcoinHeight)> for BenchmarkBitcoinBlockHeightChange {
+	fn get() -> (BitcoinHeight, BitcoinHeight) {
+		benchmark_bitcoin_utxo_tracker_state().bitcoin_block_height_change
+	}
+}
+
+pub struct BenchmarkBitcoinNetwork;
+impl Get<BitcoinNetwork> for BenchmarkBitcoinNetwork {
+	fn get() -> BitcoinNetwork {
+		benchmark_bitcoin_utxo_tracker_state().bitcoin_network
+	}
+}
+
+#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+pub struct BenchmarkBitcoinLocksRuntimeState {
+	pub current_frame_id: FrameId,
+	pub current_tick: Tick,
+	pub did_start_new_frame: bool,
+}
+
+impl Default for BenchmarkBitcoinLocksRuntimeState {
+	fn default() -> Self {
+		Self { current_frame_id: 1, current_tick: 1, did_start_new_frame: true }
+	}
+}
+
+pub fn set_benchmark_bitcoin_locks_runtime_state(state: BenchmarkBitcoinLocksRuntimeState) {
+	bitcoin_locks_runtime_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_bitcoin_locks_runtime_state() {
+	bitcoin_locks_runtime_state_backend::reset();
+}
+
+pub fn benchmark_bitcoin_locks_runtime_state() -> BenchmarkBitcoinLocksRuntimeState {
+	decode_benchmark_state(bitcoin_locks_runtime_state_backend::get())
+}
+
+pub struct BenchmarkCurrentFrameId;
+impl Get<FrameId> for BenchmarkCurrentFrameId {
+	fn get() -> FrameId {
+		benchmark_bitcoin_locks_runtime_state().current_frame_id
+	}
+}
+
+pub struct BenchmarkCurrentTick;
+impl Get<Tick> for BenchmarkCurrentTick {
+	fn get() -> Tick {
+		benchmark_bitcoin_locks_runtime_state().current_tick
+	}
+}
+
+pub struct BenchmarkDidStartNewFrame;
+impl Get<bool> for BenchmarkDidStartNewFrame {
+	fn get() -> bool {
+		benchmark_bitcoin_locks_runtime_state().did_start_new_frame
+	}
+}
+
+#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+pub struct BenchmarkBitcoinVaultProviderState<AccountId, Balance>
+where
+	AccountId: Codec + Ord,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	pub vaults: BTreeMap<VaultId, Vault<AccountId, Balance>>,
+	pub vault_xpubs_by_id: BTreeMap<VaultId, (BitcoinXPub, BitcoinXPub)>,
+	pub canceled_locks: Vec<(VaultId, Balance)>,
+	pub charge_fee: bool,
+	pub pending_cosigns: BTreeMap<VaultId, BTreeSet<UtxoId>>,
+	pub orphaned_utxo_cosigns: BTreeMap<VaultId, BTreeMap<AccountId, u32>>,
+}
+
+impl<AccountId, Balance> Default for BenchmarkBitcoinVaultProviderState<AccountId, Balance>
+where
+	AccountId: Codec + Ord,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	fn default() -> Self {
+		Self {
+			vaults: BTreeMap::new(),
+			vault_xpubs_by_id: BTreeMap::new(),
+			canceled_locks: Vec::new(),
+			charge_fee: false,
+			pending_cosigns: BTreeMap::new(),
+			orphaned_utxo_cosigns: BTreeMap::new(),
+		}
+	}
+}
+
+pub fn set_benchmark_bitcoin_vault_provider_state<AccountId, Balance>(
+	state: BenchmarkBitcoinVaultProviderState<AccountId, Balance>,
+) where
+	AccountId: Codec + Ord,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	bitcoin_vault_provider_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_bitcoin_vault_provider_state() {
+	bitcoin_vault_provider_state_backend::reset();
+}
+
+pub fn benchmark_bitcoin_vault_provider_state<AccountId, Balance>()
+-> BenchmarkBitcoinVaultProviderState<AccountId, Balance>
+where
+	AccountId: Codec + Ord,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	decode_benchmark_state(bitcoin_vault_provider_state_backend::get())
+}
+
+fn mutate_benchmark_bitcoin_vault_provider_state<AccountId, Balance, ResultT>(
+	f: impl FnOnce(&mut BenchmarkBitcoinVaultProviderState<AccountId, Balance>) -> ResultT,
+) -> ResultT
+where
+	AccountId: Codec + Ord,
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	let mut state = benchmark_bitcoin_vault_provider_state::<AccountId, Balance>();
+	let result = f(&mut state);
+	set_benchmark_bitcoin_vault_provider_state(state);
+	result
+}
+
+pub struct BenchmarkBitcoinVaultProvider<Currency, AccountId, Balance>(
+	PhantomData<(Currency, AccountId, Balance)>,
+);
+impl<Currency, AccountId, Balance> BitcoinVaultProvider
+	for BenchmarkBitcoinVaultProvider<Currency, AccountId, Balance>
+where
+	Currency: Mutate<AccountId, Balance = Balance>,
+	AccountId: Codec + Clone + Ord + PartialEq,
+	Balance: Codec
+		+ Copy
+		+ MaxEncodedLen
+		+ Default
+		+ AtLeast32BitUnsigned
+		+ TypeInfo
+		+ Clone
+		+ core::fmt::Debug
+		+ PartialEq
+		+ Eq
+		+ Sum,
+{
+	type Weights = ();
+	type Balance = Balance;
+	type AccountId = AccountId;
+
+	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.operator_account_id == *account_id)
+			.unwrap_or(false)
+	}
+
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.operator_account_id.clone())
+	}
+
+	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.iter()
+			.find_map(
+				|(vault_id, vault)| {
+					if vault.operator_account_id == *account_id { Some(*vault_id) } else { None }
+				},
+			)
+	}
+
+	fn get_registration_vault_data(
+		account_id: &Self::AccountId,
+	) -> Option<RegistrationVaultData<Self::Balance>> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.iter()
+			.find_map(|(vault_id, vault)| {
+				(vault.operator_account_id == *account_id).then_some(RegistrationVaultData {
+					vault_id: *vault_id,
+					activated_securitization: vault.get_activated_securitization(),
+				})
+			})
+	}
+
+	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.securitization_ratio)
+			.ok_or(VaultError::VaultNotFound)
+	}
+
+	fn add_securitized_satoshis(
+		vault_id: VaultId,
+		satoshis: Satoshis,
+		securitization_ratio: FixedU128,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
+			vault.locked_satoshis.saturating_accrue(satoshis);
+			vault.securitized_satoshis.saturating_accrue(securitized_satoshis);
+			Ok(())
+		})
+	}
+
+	fn reduce_securitized_satoshis(
+		vault_id: VaultId,
+		satoshis: Satoshis,
+		securitization_ratio: FixedU128,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
+			if vault.locked_satoshis < satoshis || vault.securitized_satoshis < securitized_satoshis
+			{
+				return Err(VaultError::InternalError);
+			}
+			vault.locked_satoshis.saturating_reduce(satoshis);
+			vault.securitized_satoshis.saturating_reduce(securitized_satoshis);
+			Ok(())
+		})
+	}
+
+	fn lock(
+		vault_id: VaultId,
+		locker: &Self::AccountId,
+		securitization: &Securitization<Self::Balance>,
+		_satoshis: Satoshis,
+		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
+		_has_fee_coupon: bool,
+	) -> Result<Self::Balance, VaultError> {
+		let (total_fee, charge_fee) =
+			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+				let charge_fee = state.charge_fee;
+				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+				ensure!(
+					vault.available_for_lock() >= securitization.collateral_required,
+					VaultError::InsufficientVaultFunds
+				);
+				let term =
+					extension.as_ref().map(|(duration, _)| *duration).unwrap_or(FixedU128::one());
+				if let Some((_, lock_extension)) = extension {
+					vault.extend_lock(securitization, lock_extension)?;
+				} else {
+					vault.lock(securitization)?;
+				}
+				let total_fee = vault
+					.terms
+					.bitcoin_annual_percent_rate
+					.saturating_mul(term)
+					.saturating_mul_int(securitization.liquidity_promised)
+					.saturating_add(vault.terms.bitcoin_base_fee);
+				Ok::<_, VaultError>((total_fee, charge_fee))
+			})?;
+
+		if charge_fee {
+			Currency::burn_from(
+				locker,
+				total_fee,
+				Preservation::Expendable,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| VaultError::InsufficientFunds)?;
+		}
+
+		Ok(total_fee)
+	}
+
+	fn schedule_for_release(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+		_satoshis: Satoshis,
+		lock_extension: &LockExtension<Self::Balance>,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			vault.schedule_for_release(securitization, lock_extension)?;
+			Ok(())
+		})
+	}
+
+	fn cancel(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			vault.release_lock(securitization);
+			state.canceled_locks.push((vault_id, securitization.liquidity_promised));
+			Ok(())
+		})
+	}
+
+	fn burn(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+		market_rate: Self::Balance,
+		lock_extension: &LockExtension<Self::Balance>,
+	) -> Result<Self::Balance, VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			Ok(vault.burn(securitization, market_rate, lock_extension)?.burned_amount)
+		})
+	}
+
+	fn compensate_lost_bitcoin(
+		vault_id: VaultId,
+		_beneficiary: &Self::AccountId,
+		securitization: &Securitization<Self::Balance>,
+		market_rate: Self::Balance,
+		lock_extension: &LockExtension<Self::Balance>,
+	) -> Result<Self::Balance, VaultError> {
+		Self::burn(vault_id, securitization, market_rate, lock_extension)
+	}
+
+	fn create_utxo_script_pubkey(
+		vault_id: VaultId,
+		_owner_pubkey: CompressedBitcoinPubkey,
+		_vault_claim_height: BitcoinHeight,
+		_open_claim_height: BitcoinHeight,
+		_current_height: BitcoinHeight,
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError> {
+		let state = benchmark_bitcoin_vault_provider_state::<AccountId, Balance>();
+		let (vault_xpub, vault_claim_xpub) = state
+			.vault_xpubs_by_id
+			.get(&vault_id)
+			.cloned()
+			.ok_or(VaultError::NoVaultBitcoinPubkeysAvailable)?;
+		Ok((
+			vault_xpub,
+			vault_claim_xpub,
+			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::repeat_byte(vault_id as u8) },
+		))
+	}
+
+	fn remove_pending(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			vault
+				.securitization_pending_activation
+				.saturating_reduce(securitization.collateral_required);
+			Ok(())
+		})
+	}
+
+	fn update_pending_cosign_list(
+		vault_id: VaultId,
+		utxo_id: UtxoId,
+		should_remove: bool,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let entries = state.pending_cosigns.entry(vault_id).or_default();
+			if should_remove {
+				entries.remove(&utxo_id);
+				if entries.is_empty() {
+					state.pending_cosigns.remove(&vault_id);
+				}
+			} else {
+				entries.insert(utxo_id);
+			}
+			Ok(())
+		})
+	}
+
+	fn update_orphan_cosign_list(
+		vault_id: VaultId,
+		_utxo_id: UtxoId,
+		account_id: &Self::AccountId,
+		should_remove: bool,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault_entries = state.orphaned_utxo_cosigns.entry(vault_id).or_default();
+			let count = vault_entries.entry(account_id.clone()).or_default();
+			if should_remove {
+				*count = count.saturating_sub(1);
+				if *count == 0 {
+					vault_entries.remove(account_id);
+				}
+			} else {
+				*count = count.saturating_add(1);
+			}
+			if vault_entries.is_empty() {
+				state.orphaned_utxo_cosigns.remove(&vault_id);
+			}
+			Ok(())
+		})
+	}
+}
+
+#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+pub struct BenchmarkUtxoLockEventsState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	pub last_lock_event: Option<(UtxoId, AccountId, Balance)>,
+	pub last_release_event: Option<(UtxoId, bool, Balance)>,
+}
+
+impl<AccountId, Balance> Default for BenchmarkUtxoLockEventsState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	fn default() -> Self {
+		Self { last_lock_event: None, last_release_event: None }
+	}
+}
+
+pub fn set_benchmark_utxo_lock_events_state<AccountId, Balance>(
+	state: BenchmarkUtxoLockEventsState<AccountId, Balance>,
+) where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	utxo_lock_events_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_utxo_lock_events_state() {
+	utxo_lock_events_state_backend::reset();
+}
+
+pub fn benchmark_utxo_lock_events_state<AccountId, Balance>()
+-> BenchmarkUtxoLockEventsState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	decode_benchmark_state(utxo_lock_events_state_backend::get())
+}
+
+pub struct BenchmarkUtxoLockEvents<AccountId, Balance>(PhantomData<(AccountId, Balance)>);
+impl<AccountId, Balance> UtxoLockEvents<AccountId, Balance>
+	for BenchmarkUtxoLockEvents<AccountId, Balance>
+where
+	AccountId: Codec + Clone,
+	Balance: Codec + Copy,
+{
+	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
+		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
+		state.last_lock_event = Some((utxo_id, account_id.clone(), amount));
+		set_benchmark_utxo_lock_events_state(state);
+		Ok(())
+	}
+
+	fn utxo_released(
+		utxo_id: UtxoId,
+		remove_pending_mints: bool,
+		burned_argons: Balance,
+	) -> DispatchResult {
+		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
+		state.last_release_event = Some((utxo_id, remove_pending_mints, burned_argons));
+		set_benchmark_utxo_lock_events_state(state);
+		Ok(())
+	}
+}
+
+#[cfg(feature = "std")]
+mod price_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkPriceProviderStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkPriceProviderStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkPriceProviderStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkPriceProviderStateHolder::get()
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod price_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_PRICE_PROVIDER_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_PRICE_PROVIDER_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_PRICE_PROVIDER_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe { (*BENCHMARK_PRICE_PROVIDER_STATE.0.get()).clone().unwrap_or_default() }
+	}
+}
+
+#[cfg(feature = "std")]
+mod bitcoin_utxo_tracker_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkBitcoinUtxoTrackerStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkBitcoinUtxoTrackerStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkBitcoinUtxoTrackerStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkBitcoinUtxoTrackerStateHolder::get()
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod bitcoin_utxo_tracker_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_BITCOIN_UTXO_TRACKER_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_BITCOIN_UTXO_TRACKER_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_BITCOIN_UTXO_TRACKER_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe { (*BENCHMARK_BITCOIN_UTXO_TRACKER_STATE.0.get()).clone().unwrap_or_default() }
+	}
+}
+
+#[cfg(feature = "std")]
+mod bitcoin_locks_runtime_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkBitcoinLocksRuntimeStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkBitcoinLocksRuntimeStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkBitcoinLocksRuntimeStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkBitcoinLocksRuntimeStateHolder::get()
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod bitcoin_locks_runtime_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe { (*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get()).clone().unwrap_or_default() }
+	}
+}
+
+#[cfg(feature = "std")]
+mod bitcoin_vault_provider_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkBitcoinVaultProviderStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkBitcoinVaultProviderStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkBitcoinVaultProviderStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkBitcoinVaultProviderStateHolder::get()
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod bitcoin_vault_provider_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_BITCOIN_VAULT_PROVIDER_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_BITCOIN_VAULT_PROVIDER_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_BITCOIN_VAULT_PROVIDER_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe { (*BENCHMARK_BITCOIN_VAULT_PROVIDER_STATE.0.get()).clone().unwrap_or_default() }
+	}
+}
+
+#[cfg(feature = "std")]
+mod utxo_lock_events_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkUtxoLockEventsStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkUtxoLockEventsStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkUtxoLockEventsStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkUtxoLockEventsStateHolder::get()
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod utxo_lock_events_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_UTXO_LOCK_EVENTS_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe { (*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get()).clone().unwrap_or_default() }
 	}
 }

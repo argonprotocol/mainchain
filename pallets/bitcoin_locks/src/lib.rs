@@ -12,6 +12,8 @@ use argon_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitc
 pub use pallet::*;
 pub use weights::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 
@@ -691,61 +693,19 @@ pub mod pallet {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let expirations = (start_bitcoin_height..=bitcoin_block_height)
 				.flat_map(LockExpirationsByBitcoinHeight::<T>::take);
-			// if a lock expires, we need to burn the funds
-			let mut expiring_count: u64 = 0;
-			for utxo_id in expirations {
-				expiring_count = expiring_count.saturating_add(1);
-				let res = with_storage_layer(|| {
-					Self::burn_bitcoin_lock(utxo_id, false)?;
-					Ok(())
-				});
-				if let Err(e) = res {
-					log::error!("Bitcoin utxo id {utxo_id:?} failed to be burned {e:?}");
-					Self::deposit_event(Event::<T>::LockExpirationError { utxo_id, error: e });
-				}
-			}
+			let expiring_count = Self::process_expiring_locks(expirations);
 
 			let overdue = LockCosignDueByFrame::<T>::take(T::CurrentFrameId::get());
-			let overdue_count = overdue.len() as u64;
-			for utxo_id in overdue {
-				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
-				if let Err(e) = res {
-					log::error!(
-						"Bitcoin lock id {utxo_id:?} failed to handle overdue `cosign` {e:?}"
-					);
-					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
-				}
-			}
+			let overdue_count = Self::process_overdue_releases(overdue);
 
 			let expiring = OrphanedUtxoExpirationByFrame::<T>::take(T::CurrentFrameId::get());
-			let orphan_expiring_count = expiring.len() as u64;
-			for (account_id, utxo_ref) in expiring {
-				let res: Result<(), DispatchError> = with_storage_layer(|| {
-					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref)
-					{
-						if request.cosign_request.is_some() {
-							T::VaultProvider::update_orphan_cosign_list(
-								request.vault_id,
-								request.utxo_id,
-								&account_id,
-								true,
-							)
-							.map_err(Error::<T>::from)?;
-						}
-					}
-					Ok::<(), DispatchError>(())
-				});
-				if let Err(e) = res {
-					log::error!("Orphaned bitcoin utxo {utxo_ref:?} failed expiry cleanup {e:?}");
-				}
-			}
+			let orphan_expiring_count = Self::process_orphaned_utxo_expirations(expiring);
 
-			let extra_items = expiring_count
-				.saturating_add(overdue_count)
-				.saturating_add(orphan_expiring_count);
-			T::DbWeight::get()
-				.reads_writes(2, 1)
-				.saturating_add(T::DbWeight::get().reads_writes(extra_items, extra_items))
+			T::WeightInfo::on_initialize_with_expirations_and_overdue(
+				expiring_count.min(u32::MAX as u64) as u32,
+				overdue_count.min(u32::MAX as u64) as u32,
+				orphan_expiring_count.min(u32::MAX as u64) as u32,
+			)
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {
@@ -1274,7 +1234,7 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(8)]
-		#[pallet::weight(T::WeightInfo::initialize())]
+		#[pallet::weight(T::WeightInfo::initialize_for())]
 		pub fn initialize_for(
 			origin: OriginFor<T>,
 			account_id: T::AccountId,
@@ -1399,6 +1359,8 @@ pub mod pallet {
 		}
 	}
 	impl<T: Config> BitcoinUtxoEvents<T::AccountId> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {
 				if let Some(lock) = a {
@@ -1469,6 +1431,18 @@ pub mod pallet {
 					.map_err(Error::<T>::from)?;
 			}
 			Ok(())
+		}
+
+		fn candidate_rejected_by_account(
+			utxo_id: UtxoId,
+			satoshis: Satoshis,
+			account_id: &T::AccountId,
+			utxo_ref: &UtxoRef,
+		) -> DispatchResult {
+			let lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			ensure!(lock.owner_account == *account_id, Error::<T>::NoPermissions);
+			ensure!(!lock.is_funded, Error::<T>::OrphanedUtxoFundingConflict);
+			Self::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())
 		}
 
 		fn orphaned_utxo_detected(
@@ -1702,6 +1676,65 @@ pub mod pallet {
 			// target = 1.5, price = 1.4, offset = 0.1, target_offset = 1.1
 			// need to multiply price by 1.1 to get to pegged price
 			Ok(target_offset.saturating_mul_int(liquidity_promised))
+		}
+
+		pub(crate) fn process_expiring_locks(expirations: impl IntoIterator<Item = UtxoId>) -> u64 {
+			let mut expiring_count: u64 = 0;
+			for utxo_id in expirations {
+				expiring_count = expiring_count.saturating_add(1);
+				let res = with_storage_layer(|| {
+					Self::burn_bitcoin_lock(utxo_id, false)?;
+					Ok(())
+				});
+				if let Err(e) = res {
+					log::error!("Bitcoin utxo id {utxo_id:?} failed to be burned {e:?}");
+					Self::deposit_event(Event::<T>::LockExpirationError { utxo_id, error: e });
+				}
+			}
+			expiring_count
+		}
+
+		pub(crate) fn process_overdue_releases(overdue: impl IntoIterator<Item = UtxoId>) -> u64 {
+			let mut overdue_count: u64 = 0;
+			for utxo_id in overdue {
+				overdue_count = overdue_count.saturating_add(1);
+				let res = with_storage_layer(|| Self::cosign_bitcoin_overdue(utxo_id));
+				if let Err(e) = res {
+					log::error!(
+						"Bitcoin lock id {utxo_id:?} failed to handle overdue `cosign` {e:?}"
+					);
+					Self::deposit_event(Event::<T>::CosignOverdueError { utxo_id, error: e });
+				}
+			}
+			overdue_count
+		}
+
+		pub(crate) fn process_orphaned_utxo_expirations(
+			expiring: impl IntoIterator<Item = (T::AccountId, UtxoRef)>,
+		) -> u64 {
+			let mut orphan_expiring_count: u64 = 0;
+			for (account_id, utxo_ref) in expiring {
+				orphan_expiring_count = orphan_expiring_count.saturating_add(1);
+				let res: Result<(), DispatchError> = with_storage_layer(|| {
+					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref)
+					{
+						if request.cosign_request.is_some() {
+							T::VaultProvider::update_orphan_cosign_list(
+								request.vault_id,
+								request.utxo_id,
+								&account_id,
+								true,
+							)
+							.map_err(Error::<T>::from)?;
+						}
+					}
+					Ok::<(), DispatchError>(())
+				});
+				if let Err(e) = res {
+					log::error!("Orphaned bitcoin utxo {utxo_ref:?} failed expiry cleanup {e:?}");
+				}
+			}
+			orphan_expiring_count
 		}
 
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {

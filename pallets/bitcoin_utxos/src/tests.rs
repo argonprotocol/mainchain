@@ -519,6 +519,57 @@ fn promotes_candidates_to_orphans_on_timeout() {
 	});
 }
 
+/// Rejecting a candidate moves it out of candidate storage and delegates orphan creation.
+#[test]
+fn rejects_candidate_by_account() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		LastCandidateRejected::set(None);
+
+		let candidate_ref = UtxoRef { txid: H256Le([7; 32]), output_index: 0 };
+		CandidateUtxoRefsByUtxoId::<Test>::try_mutate(1, |refs| {
+			refs.try_insert(candidate_ref.clone(), 90_000).map_err(|_| ())
+		})
+		.expect("candidate inserted");
+
+		assert_ok!(BitcoinUtxos::reject_utxo_candidate(
+			RuntimeOrigin::signed(7),
+			1,
+			candidate_ref.clone()
+		));
+
+		assert_eq!(LastCandidateRejected::get(), Some((1, 7, candidate_ref.clone(), 90_000)));
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+	});
+}
+
+/// Candidate rejection rolls back if the locks-side authorization callback rejects it.
+#[test]
+fn reject_candidate_rolls_back_on_handler_error() {
+	MinimumSatoshisPerCandidateUtxo::set(1000);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		LastCandidateRejected::set(None);
+		CandidateRejectedCallback::set(Some(|_| Err(Error::<Test>::NoPermissions.into())));
+
+		let candidate_ref = UtxoRef { txid: H256Le([8; 32]), output_index: 0 };
+		CandidateUtxoRefsByUtxoId::<Test>::try_mutate(1, |refs| {
+			refs.try_insert(candidate_ref.clone(), 91_000).map_err(|_| ())
+		})
+		.expect("candidate inserted");
+
+		assert_noop!(
+			BitcoinUtxos::reject_utxo_candidate(RuntimeOrigin::signed(7), 1, candidate_ref.clone()),
+			Error::<Test>::NoPermissions
+		);
+
+		assert_eq!(LastCandidateRejected::get(), None);
+		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&candidate_ref));
+		CandidateRejectedCallback::set(None);
+	});
+}
+
 /// Clears candidates and pending funding when a tracked UTXO is reported spent.
 #[test]
 fn spent_clears_candidates_and_pending() {

@@ -313,20 +313,28 @@ impl Get<bool> for DidStartNewFrame {
 pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bitcoin_locks::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_bitcoin_locks::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LockEvents = (Mint,);
-	type BitcoinUtxoTracker = BitcoinUtxos;
-	type PriceProvider = PriceIndex;
+	type LockEvents =
+		use_unless_benchmark!((Mint,), benchmarking::BenchmarkUtxoLockEvents<AccountId, Balance>);
+	type BitcoinUtxoTracker =
+		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinUtxoTracker);
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type BitcoinSignatureVerifier = use_unless_benchmark!(
 		BitcoinSignatureVerifier,
 		benchmarking::BenchmarkBitcoinSignatureVerifier
 	);
-	type BitcoinBlockHeightChange = BitcoinUtxos;
-	type GetBitcoinNetwork = BitcoinUtxos;
-	type VaultProvider = Vaults;
+	type BitcoinBlockHeightChange =
+		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinBlockHeightChange);
+	type GetBitcoinNetwork =
+		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinNetwork);
+	type VaultProvider = use_unless_benchmark!(
+		Vaults,
+		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
+	);
 	type ArgonTicksPerDay = TicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
@@ -334,11 +342,13 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
-	type CurrentFrameId = GetCurrentFrameId;
+	type CurrentFrameId =
+		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type MaxConcurrentlyExpiringLocks = MaxConcurrentlyExpiringLocks;
-	type CurrentTick = Ticks;
+	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
 	type MaxBtcPriceTickAge = MaxBtcPriceTickAge;
-	type DidStartNewFrame = DidStartNewFrame;
+	type DidStartNewFrame =
+		use_unless_benchmark!(DidStartNewFrame, benchmarking::BenchmarkDidStartNewFrame);
 }
 
 pub struct GrandpaSlotRotation;
@@ -562,7 +572,10 @@ impl Get<Satoshis> for GetMinimumSatoshisPerLock {
 }
 
 impl pallet_bitcoin_utxos::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = pallet_bitcoin_utxos::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_bitcoin_utxos::WeightInfo<Runtime>,
+	>;
 	type EventHandler = use_unless_benchmark!(BitcoinLocks, ());
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
 	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;

@@ -2,6 +2,8 @@ pub mod frame_system;
 pub mod ismp_grandpa;
 pub mod pallet_balances_balances;
 pub mod pallet_balances_ownership;
+pub mod pallet_bitcoin_locks;
+pub mod pallet_bitcoin_utxos;
 pub mod pallet_block_seal;
 pub mod pallet_block_seal_spec;
 pub mod pallet_chain_transfer;

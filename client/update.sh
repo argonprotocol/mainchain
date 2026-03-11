@@ -12,19 +12,21 @@ mkfifo "$PIPE"
 cleanup() {
     echo "Cleaning up..."
     rm -f "$PIPE"
-    kill $argon_PID
-    wait $argon_PID 2>/dev/null
+    kill "$argon_PID" 2>/dev/null || true
+    wait "$argon_PID" 2>/dev/null || true
 }
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
-"$BASEDIR/../target/debug/argon-node" --tmp --no-mdns --chain=meta --rpc-port=9944 --compute-miners=0 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
+"$BASEDIR/../target/debug/argon-node" --tmp --no-mdns --no-prometheus --chain=meta --rpc-port=9944 --compute-miners=0 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
 set +x
 argon_PID=$!
 
 while IFS= read -r line; do
     echo "$line"
-    if [[ "$line" == *"Running JSON-RPC server: addr=127.0.0.1:9944"* ]]; then
+    if curl -sf -H "Content-Type: application/json" \
+        -d '{"id":"1", "jsonrpc":"2.0", "method": "system_health", "params":[]}' \
+        http://127.0.0.1:9944 >/dev/null; then
         echo "Detected JSON-RPC server startup."
         break
     fi

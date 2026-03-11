@@ -375,6 +375,37 @@ fn records_orphaned_utxos_while_lock_pending() {
 	});
 }
 
+/// Rejecting a funding candidate materializes it as an orphaned UTXO for the lock owner.
+#[test]
+fn rejects_candidate_into_orphaned_utxo() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+
+		let utxo_ref = UtxoRef { txid: H256Le([9; 32]), output_index: 0 };
+		assert_ok!(<BitcoinLocks as BitcoinUtxoEvents<u64>>::candidate_rejected_by_account(
+			1, 10_000, &who, &utxo_ref,
+		));
+
+		let orphan = OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref).expect("orphan recorded");
+		assert_eq!(orphan.utxo_id, 1);
+		assert_eq!(orphan.satoshis, 10_000);
+		assert!(orphan.cosign_request.is_none());
+	});
+}
+
 /// Requests an orphaned UTXO release, tracks cosign state, and clears it after cosign.
 #[test]
 fn allows_users_to_reclaim_orphaned_utxos() {

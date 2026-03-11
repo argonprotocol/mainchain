@@ -1,6 +1,6 @@
-# Mini RFC: Benchmarking Strategy for Argon Runtime
+# Mini RFC: Benchmarking Strategy for Runtime Weights
 
-Last updated: 2026-02-27
+Last updated: 2026-03-11
 
 ## Context
 
@@ -38,7 +38,7 @@ Current benchmark providers are centralized in `pallet_prelude::benchmarking` an
 ### 2) Provider weights are published by provider pallets
 
 Provider traits expose associated weight types (for example `type Weights`) through traits in
-`primitives/src/providers.rs`.
+`primitives/src/providers.rs`, including event-handler style providers such as `BitcoinUtxoEvents`.
 
 Provider-owning pallets expose provider weight adapters in their own `weights.rs`, for example:
 
@@ -72,47 +72,54 @@ No `:argon:bench:*` temporary storage keys are used for provider state lookup.
 
 ## Implementation Status (Overall)
 
-`Complete` in the table below means:
+The tables below use two checks:
 
-- runtime benchmark target is dispatched in both runtimes (where applicable),
-- generated runtime weight modules are present in both runtimes (where applicable),
-- the local pallet benchmark suite is implemented (not placeholder-only).
+- `Runtime Measured`: this repo/runtime has wired and generated measured benchmark weights for the
+  pallet.
+- `Weights Wired`: the runtime uses a real, non-placeholder weight implementation for the pallet.
 
-### Benchmark Completion Matrix
+### Local Pallets
 
 Local pallets in this repo (`pallets/*`):
 
-| Complete | Pallet | Local Benchmark Suite | Dispatched (Argon/Canary) | Weights Present (Argon/Canary) | Notes |
-| --- | --- | --- | --- | --- | --- |
-| [ ] | `pallet_bitcoin_locks` | missing | no / no | no / no | no `pallets/bitcoin_locks/src/benchmarking.rs` |
-| [ ] | `pallet_bitcoin_utxos` | missing | no / no | no / no | no `pallets/bitcoin_utxos/src/benchmarking.rs` |
-| [ ] | `pallet_block_rewards` | placeholder-only | no / no | no / no | `pallets/block_rewards/src/benchmarking.rs` placeholder |
-| [x] | `pallet_block_seal` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [x] | `pallet_block_seal_spec` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [x] | `pallet_chain_transfer` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [ ] | `pallet_digests` | missing | no / no | no / no | no `pallets/digests/src/benchmarking.rs` |
-| [ ] | `pallet_domains` | missing | no / no | no / no | no `pallets/domains/src/benchmarking.rs` |
-| [ ] | `pallet_fee_control` | missing | no / no | no / no | no `pallets/fee_control/src/benchmarking.rs` |
-| [x] | `pallet_inbound_transfer_log` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [x] | `pallet_mining_slot` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [ ] | `pallet_mint` | missing | no / no | no / no | no `pallets/mint/src/benchmarking.rs` |
-| [ ] | `pallet_notaries` | missing | no / no | no / no | no `pallets/notaries/src/benchmarking.rs` |
-| [x] | `pallet_notebook` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [x] | `pallet_operational_accounts` | implemented | yes / yes | yes / yes | full suite + generated weights |
-| [ ] | `pallet_price_index` | missing | no / no | no / no | no `pallets/price_index/src/benchmarking.rs` |
-| [ ] | `pallet_ticks` | missing | no / no | no / no | no `pallets/ticks/src/benchmarking.rs` |
-| [ ] | `pallet_treasury` | placeholder-only | no / no | no / no | `pallets/treasury/src/benchmarking.rs` placeholder |
-| [x] | `pallet_vaults` | implemented | yes / yes | yes / yes | full suite + generated weights |
+| Pallet                        | Runtime Measured | Weights Wired |
+| ----------------------------- | ---------------- | ------------- |
+| `pallet_bitcoin_locks`        | [x]              | [x]           |
+| `pallet_bitcoin_utxos`        | [x]              | [x]           |
+| `pallet_block_rewards`        | [ ]              | [ ]           |
+| `pallet_block_seal`           | [x]              | [x]           |
+| `pallet_block_seal_spec`      | [x]              | [x]           |
+| `pallet_chain_transfer`       | [x]              | [x]           |
+| `pallet_digests`              | [ ]              | [ ]           |
+| `pallet_domains`              | [ ]              | [ ]           |
+| `pallet_fee_control`          | [ ]              | [ ]           |
+| `pallet_inbound_transfer_log` | [x]              | [x]           |
+| `pallet_mining_slot`          | [x]              | [x]           |
+| `pallet_mint`                 | [ ]              | [ ]           |
+| `pallet_notaries`             | [ ]              | [ ]           |
+| `pallet_notebook`             | [x]              | [x]           |
+| `pallet_operational_accounts` | [x]              | [x]           |
+| `pallet_price_index`          | [ ]              | [ ]           |
+| `pallet_ticks`                | [ ]              | [ ]           |
+| `pallet_treasury`             | [ ]              | [ ]           |
+| `pallet_vaults`               | [x]              | [x]           |
 
-Runtime-dispatched upstream benchmarks:
+Upstream / runtime pallets:
 
-| Complete | Benchmark Target | Suite Source | Dispatched (Argon/Canary) | Weights Present (Argon/Canary) | Notes |
-| --- | --- | --- | --- | --- | --- |
-| [x] | `frame_benchmarking::BaselineBench` | upstream | yes / yes | n/a | baseline harness benchmark |
-| [x] | `frame_system` | upstream | yes / yes | yes / yes | `frame_system.rs` |
-| [x] | `pallet_balances::Balances` | upstream | yes / yes | yes / yes | `pallet_balances_balances.rs` |
-| [x] | `pallet_balances::Ownership` | upstream | yes / yes | yes / yes | `pallet_balances_ownership.rs` |
-| [x] | `pallet_timestamp` | upstream | yes / yes | yes / yes | `pallet_timestamp.rs` |
+| Pallet                       | Runtime Measured | Weights Wired |
+| ---------------------------- | ---------------- | ------------- |
+| `frame_system`               | [x]              | [x]           |
+| `pallet_balances::Balances`  | [x]              | [x]           |
+| `pallet_balances::Ownership` | [x]              | [x]           |
+| `pallet_timestamp`           | [x]              | [x]           |
+| `pallet_tx_pause`            | [ ]              | [x]           |
+| `pallet_multisig`            | [ ]              | [x]           |
+| `pallet_proxy`               | [ ]              | [x]           |
+| `pallet_sudo`                | [ ]              | [x]           |
+| `pallet_utility`             | [ ]              | [x]           |
+| `pallet_transaction_payment` | [ ]              | [x]           |
+| `ismp_grandpa`               | [ ]              | [x]           |
+| `pallet_grandpa`             | [ ]              | [ ]           |
 
 ### Provider-weight pattern adoption
 
@@ -121,6 +128,7 @@ Runtime-dispatched upstream benchmarks:
 - Provider-weight adapters/wrappers are in pallet `weights.rs` (not `lib.rs`) for:
   - `pallet_block_seal`,
   - `pallet_block_seal_spec`,
+  - `pallet_bitcoin_utxos`,
   - `pallet_chain_transfer`,
   - `pallet_notebook`,
   - `pallet_mining_slot`,
@@ -128,9 +136,10 @@ Runtime-dispatched upstream benchmarks:
 
 ### Validation status
 
-- targeted benchmark regeneration has been run for `pallet_block_seal`,
-  `pallet_block_seal_spec`, `pallet_chain_transfer`, and `pallet_notebook` on argon/canary,
-- `cargo check -p argon-runtime -p argon-canary-runtime --features runtime-benchmarks`,
+- targeted benchmark regeneration has been run for `pallet_block_seal`, `pallet_block_seal_spec`,
+  `pallet_chain_transfer`, `pallet_notebook`, `pallet_bitcoin_utxos`, and `pallet_bitcoin_locks`,
+- `cargo check -p argon-runtime --features runtime-benchmarks`,
+- `cargo check -p argon-canary-runtime --features runtime-benchmarks`,
 - `cargo make fmt`,
 - `cargo make lint`,
 - no `UNKNOWN KEY` / `:argon:bench:` artifacts in targeted generated weight files.
