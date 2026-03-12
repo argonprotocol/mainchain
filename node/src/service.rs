@@ -27,6 +27,9 @@ use sc_service::{
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_api::{ConstructRuntimeApi, ProvideRuntimeApi};
+use sp_consensus_grandpa::AuthorityId as GrandpaAuthorityId;
+use sp_core::crypto::ByteArray;
+use sp_keystore::KeystorePtr;
 use sp_runtime::traits::Header as HeaderT;
 use std::{sync::Arc, time::Duration};
 
@@ -40,6 +43,8 @@ type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 /// The minimum period of blocks on which justifications will be
 /// imported and generated.
 const GRANDPA_JUSTIFICATION_PERIOD: u32 = 512;
+const GRANDPA_KEY_GUARD_INTERVAL: Duration = Duration::from_secs(30);
+type ActiveGrandpaAuthorities = Arc<dyn Fn() -> Vec<GrandpaAuthorityId> + Send + Sync>;
 
 type ArgonBlockImport<Runtime> = argon_node_consensus::import_queue::ArgonBlockImport<
 	Block,
@@ -271,13 +276,23 @@ where
 		})?;
 	}
 	let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
+	let shared_authority_set = grandpa_link.shared_authority_set().clone();
+	let active_grandpa_authorities: ActiveGrandpaAuthorities = {
+		let shared_authority_set = shared_authority_set.clone();
+		Arc::new(move || {
+			shared_authority_set
+				.current_authorities()
+				.iter()
+				.map(|(authority, _)| authority.clone())
+				.collect()
+		})
+	};
 
 	let rpc_builder = {
 		let client = client.clone();
 		let transaction_pool = transaction_pool.clone();
 		let backend = backend.clone();
 		let justification_stream = grandpa_link.justification_stream();
-		let shared_authority_set = grandpa_link.shared_authority_set().clone();
 		let finality_proof_provider = GrandpaFinalityProofProvider::new_for_service(
 			backend.clone(),
 			Some(shared_authority_set.clone()),
@@ -351,9 +366,42 @@ where
 	}
 	// grandpa voter task
 	if !disable_grandpa {
-		// TODO: we need to create a keystore for each grandpa voter we want to run. Probably a
-		// service 	 that can dynamically allocate an deallocate voters with restricted/filtered
-		// keystore access start the full GRANDPA voter
+		let grandpa_authority_keystore = if role.is_authority() {
+			let keystore = keystore_container.keystore();
+			ensure_single_local_grandpa_authority(
+				&keystore,
+				&*active_grandpa_authorities,
+				"startup",
+				"Refusing to start authority with multiple local GRANDPA authorities in the active set",
+			)?;
+
+			let runtime_guard_keystore = keystore.clone();
+			let runtime_guard_active_grandpa_authorities = active_grandpa_authorities.clone();
+			task_manager
+				.spawn_essential_handle()
+				.spawn("grandpa-key-guard", None, async move {
+					loop {
+						if let Err(err) = ensure_single_local_grandpa_authority(
+							&runtime_guard_keystore,
+							&*runtime_guard_active_grandpa_authorities,
+							"runtime",
+							"Detected multiple local GRANDPA authorities in the active set while running",
+						) {
+							log::error!("{err:?}");
+							return;
+						}
+
+						tokio::time::sleep(GRANDPA_KEY_GUARD_INTERVAL).await;
+					}
+				});
+
+			Some(keystore)
+		} else {
+			None
+		};
+
+		// If we later support multiple local GRANDPA voters, this needs one voter process
+		// per selected local authority instead of a single full voter.
 		// NOTE: non-authorities could run the GRANDPA observer protocol, but at
 		// this point the full voter should provide better guarantees of block
 		// and vote data availability than the observer. The observer has not
@@ -366,11 +414,7 @@ where
 				justification_generation_period: GRANDPA_JUSTIFICATION_PERIOD,
 				name: Some(name),
 				observer_enabled: false,
-				keystore: if role.is_authority() {
-					Some(keystore_container.keystore())
-				} else {
-					None
-				},
+				keystore: grandpa_authority_keystore,
 				local_role: role,
 				telemetry: telemetry.as_ref().map(|x| x.handle()),
 				protocol_name: grandpa_protocol_name,
@@ -445,11 +489,56 @@ where
 		})
 }
 
+fn ensure_single_local_grandpa_authority(
+	keystore: &KeystorePtr,
+	active_grandpa_authorities: &dyn Fn() -> Vec<GrandpaAuthorityId>,
+	stage: &'static str,
+	err_prefix: &'static str,
+) -> Result<(), ServiceError> {
+	let local_authorities =
+		local_active_grandpa_authorities(keystore, &active_grandpa_authorities());
+	if local_authorities.len() <= 1 {
+		return Ok(());
+	}
+
+	let local_keys = local_authorities
+		.into_iter()
+		.map(|authority| format!("0x{}", hex::encode(authority.to_raw_vec())))
+		.collect::<Vec<_>>()
+		.join(",");
+
+	Err(ServiceError::Other(format!(
+		"{err_prefix} ({stage}): found multiple local authorities in the active GRANDPA set [{local_keys}]. Configure at most one local GRANDPA voter per authority set."
+	)))
+}
+
+fn local_active_grandpa_authorities(
+	keystore: &KeystorePtr,
+	active_grandpa_authorities: &[GrandpaAuthorityId],
+) -> Vec<GrandpaAuthorityId> {
+	active_grandpa_authorities
+		.iter()
+		.filter(|authority| {
+			keystore.has_keys(&[(authority.to_raw_vec(), sp_consensus_grandpa::KEY_TYPE)])
+		})
+		.cloned()
+		.collect()
+}
+
 #[cfg(test)]
 mod tests {
-	use super::{read_chain_spec_bitcoin_network, read_chain_spec_ticker};
+	use super::{
+		GrandpaAuthorityId, ensure_single_local_grandpa_authority, read_chain_spec_bitcoin_network,
+		read_chain_spec_ticker,
+	};
 	use crate::chain_spec::{development_config, mainnet_config};
 	use argon_primitives::{bitcoin::BitcoinNetwork, tick::Ticker};
+	use polkadot_sdk::{
+		sp_consensus_grandpa,
+		sp_core::ed25519,
+		sp_keystore::{Keystore, KeystorePtr, testing::MemoryKeystore},
+	};
+	use std::sync::Arc;
 
 	#[test]
 	fn reads_dev_chain_genesis_values_from_state_anchor() {
@@ -471,5 +560,25 @@ mod tests {
 
 		assert_eq!(ticker, Ticker::new(60_000, 60));
 		assert_eq!(bitcoin_network, BitcoinNetwork::Bitcoin);
+	}
+
+	#[test]
+	fn allows_no_active_local_grandpa_authority() {
+		let keystore: KeystorePtr = Arc::new(MemoryKeystore::new());
+		keystore
+			.ed25519_generate_new(sp_consensus_grandpa::KEY_TYPE, Some("//Alice"))
+			.expect("Creates local grandpa key");
+		let active_grandpa_authorities =
+			|| vec![GrandpaAuthorityId::from(ed25519::Public::from_raw([2u8; 32]))];
+
+		assert!(
+			ensure_single_local_grandpa_authority(
+				&keystore,
+				&active_grandpa_authorities,
+				"test",
+				"test"
+			)
+			.is_ok()
+		);
 	}
 }

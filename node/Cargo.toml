@@ -70,6 +70,7 @@ polkadot-sdk.features = [
 jsonrpsee = { workspace = true, features = ["server"] }
 serde_json = { workspace = true }
 color-backtrace = { workspace = true }
+tokio = { workspace = true }
 
 pallet-ismp-runtime-api = { workspace = true, features = ["default"] }
 pallet-ismp-rpc = { workspace = true }
