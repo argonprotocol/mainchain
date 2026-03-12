@@ -576,6 +576,7 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 	>;
 	type EventHandler = use_unless_benchmark!(BitcoinLocks, ());
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+	type MaxPendingFundingExpirationsPerBlock = MaxPendingFundingExpirationsPerBlock;
 	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type MinimumSatoshisPerCandidateUtxo = GetMinimumSatoshisPerLock;

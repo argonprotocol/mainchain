@@ -320,6 +320,14 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Pending funding entries that have expired and are awaiting bounded cleanup.
+       **/
+      expiredPendingFunding: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
+        []
+      >;
+      /**
        * Check if the inherent was included
        **/
       inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;

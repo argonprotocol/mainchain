@@ -49,6 +49,9 @@ pub mod pallet {
 		/// The maximum number of UTXOs that can be watched in a block and/or expiring at same block
 		#[pallet::constant]
 		type MaxPendingConfirmationUtxos: Get<u32>;
+		/// The maximum number of expired pending funding entries cleaned up in a block
+		#[pallet::constant]
+		type MaxPendingFundingExpirationsPerBlock: Get<u32>;
 		/// Maximum number of candidate UTXOs stored per lock
 		#[pallet::constant]
 		type MaxCandidateUtxosPerLock: Get<u32>;
@@ -81,6 +84,14 @@ pub mod pallet {
 	/// Bitcoin locks that are pending full funding on the bitcoin network
 	#[pallet::storage]
 	pub type LocksPendingFunding<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
+		ValueQuery,
+	>;
+
+	/// Pending funding entries that have expired and are awaiting bounded cleanup.
+	#[pallet::storage]
+	pub type ExpiredPendingFunding<T: Config> = StorageValue<
 		_,
 		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
 		ValueQuery,
@@ -220,10 +231,14 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			TempParentHasSyncState::<T>::put(ConfirmedBitcoinBlockTip::<T>::get().is_some());
-			PreviousBitcoinBlockTip::<T>::set(ConfirmedBitcoinBlockTip::<T>::get());
-			// 1 write is temporary
-			T::DbWeight::get().reads_writes(2, 1)
+			let utxo_ids = Self::prepare_expired_pending_funding_cleanup(
+				T::MaxPendingFundingExpirationsPerBlock::get(),
+			);
+			let processed = utxo_ids.len() as u32;
+			for utxo_id in utxo_ids {
+				Self::process_expired_pending_funding_entry(utxo_id);
+			}
+			T::WeightInfo::on_initialize(processed)
 		}
 
 		fn on_finalize(_: BlockNumberFor<T>) {
@@ -245,13 +260,12 @@ pub mod pallet {
 		/// Submitted when a bitcoin UTXO has been moved or confirmed.
 		#[pallet::call_index(0)]
 		#[pallet::weight((
-			T::WeightInfo::sync(
-				utxo_sync.spent.len() as u32,
-				utxo_sync.funded.len() as u32,
-				Pallet::<T>::pending_funding_timeout_count(),
-			),
-			DispatchClass::Mandatory
-		))]
+				T::WeightInfo::sync(
+					utxo_sync.spent.len() as u32,
+					utxo_sync.funded.len() as u32,
+				),
+				DispatchClass::Mandatory
+			))]
 		pub fn sync(origin: OriginFor<T>, utxo_sync: BitcoinUtxoSync) -> DispatchResult {
 			ensure_none(origin)?;
 			log::info!(
@@ -303,17 +317,28 @@ pub mod pallet {
 				}
 			}
 
-			let oldest_pending_bitcoin_submitted_height = current_confirmed
+			let oldest_pending_funding_height = sync_to_block
 				.block_height
 				.saturating_sub(T::MaxPendingConfirmationBlocks::get());
-			let locks_pending = LocksPendingFunding::<T>::get();
-			for (utxo_id, utxo_value) in locks_pending.into_iter() {
-				Self::process_pending_funding_timeout(
-					utxo_id,
-					utxo_value.submitted_at_height,
-					oldest_pending_bitcoin_submitted_height,
-				);
-			}
+			let mut newly_expired = Vec::new();
+			LocksPendingFunding::<T>::mutate(|pending| {
+				pending.retain(|utxo_id, entry| {
+					let is_expired = entry.submitted_at_height < oldest_pending_funding_height;
+					if is_expired {
+						newly_expired.push((*utxo_id, entry.clone()));
+					}
+					!is_expired
+				});
+			});
+			ExpiredPendingFunding::<T>::mutate(|expired| {
+				for (utxo_id, entry) in newly_expired {
+					let inserted = expired.try_insert(utxo_id, entry);
+					debug_assert!(
+						inserted.is_ok(),
+						"expired pending funding queue capacity is preserved when entries move out of pending"
+					);
+				}
+			});
 
 			SynchedBitcoinBlock::<T>::set(Some(sync_to_block));
 
@@ -425,7 +450,13 @@ pub mod pallet {
 				!UtxoIdToFundingUtxoRef::<T>::contains_key(utxo_id),
 				Error::<T>::DuplicateUtxoId
 			);
+			let expired_count = ExpiredPendingFunding::<T>::get().len();
 			LocksPendingFunding::<T>::try_mutate(|utxo_pending_confirmation| {
+				ensure!(
+					utxo_pending_confirmation.len().saturating_add(expired_count) <
+						T::MaxPendingConfirmationUtxos::get() as usize,
+					Error::<T>::MaxUtxosExceeded
+				);
 				ensure!(
 					!utxo_pending_confirmation
 						.iter()
@@ -460,6 +491,7 @@ pub mod pallet {
 				LockedUtxos::<T>::take(utxo_ref);
 			}
 			LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
 			let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
 		}
 
@@ -523,39 +555,6 @@ pub mod pallet {
 				}
 			}
 			utxos
-		}
-
-		// Pre-dispatch weight has to use the current pending set. The actual timeout loop can only
-		// process fewer entries than this, because verified funding is applied first and removes
-		// matching locks from the pending map before timeout handling runs.
-		fn pending_funding_timeout_count() -> u32 {
-			let Some(current_confirmed) = ConfirmedBitcoinBlockTip::<T>::get() else {
-				return 0;
-			};
-			let oldest_pending_bitcoin_submitted_height = current_confirmed
-				.block_height
-				.saturating_sub(T::MaxPendingConfirmationBlocks::get());
-			let mut count = 0u32;
-			for (_, entry) in LocksPendingFunding::<T>::get() {
-				if entry.submitted_at_height < oldest_pending_bitcoin_submitted_height {
-					count = count.saturating_add(1);
-				}
-			}
-			count
-		}
-
-		pub(crate) fn process_pending_funding_timeout(
-			utxo_id: UtxoId,
-			submitted_at_height: BitcoinHeight,
-			oldest_pending_bitcoin_submitted_height: BitcoinHeight,
-		) {
-			if submitted_at_height < oldest_pending_bitcoin_submitted_height {
-				let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
-				if let Err(e) = res {
-					log::warn!("Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}");
-					Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
-				}
-			}
 		}
 
 		fn send_candidates_as_orphans(utxo_id: UtxoId) -> DispatchResult {
@@ -660,14 +659,29 @@ pub mod pallet {
 		}
 
 		pub fn lock_timeout_pending_funding(utxo_id: UtxoId) -> DispatchResult {
-			if LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id)).is_some() {
-				// send candidates first!
-				Self::send_candidates_as_orphans(utxo_id)?;
-				<Self as BitcoinUtxoTracker>::unwatch(utxo_id);
-				T::EventHandler::timeout_waiting_for_funding(utxo_id)?;
-				Self::deposit_event(Event::UtxoUnwatched { utxo_id });
-			}
+			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+			// send candidates first!
+			Self::send_candidates_as_orphans(utxo_id)?;
+			<Self as BitcoinUtxoTracker>::unwatch(utxo_id);
+			T::EventHandler::timeout_waiting_for_funding(utxo_id)?;
+			Self::deposit_event(Event::UtxoUnwatched { utxo_id });
 			Ok(())
+		}
+
+		// Separated so the benchmark measures the real hook setup and full expired-queue decode.
+		pub(crate) fn prepare_expired_pending_funding_cleanup(limit: u32) -> Vec<UtxoId> {
+			TempParentHasSyncState::<T>::put(ConfirmedBitcoinBlockTip::<T>::get().is_some());
+			PreviousBitcoinBlockTip::<T>::set(ConfirmedBitcoinBlockTip::<T>::get());
+			ExpiredPendingFunding::<T>::get().keys().take(limit as usize).copied().collect()
+		}
+
+		// Separated so the benchmark measures the real one-item cleanup body.
+		pub(crate) fn process_expired_pending_funding_entry(utxo_id: UtxoId) {
+			let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
+			if let Err(e) = res {
+				log::warn!("Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}");
+				Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
+			}
 		}
 
 		pub fn utxo_spent(
@@ -681,6 +695,7 @@ pub mod pallet {
 						LockedUtxos::<T>::take(locked_ref);
 						UtxoIdToFundingUtxoRef::<T>::remove(utxo_id);
 						LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+						ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
 						let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
 
 						T::EventHandler::spent(utxo_id)?;
@@ -700,6 +715,7 @@ pub mod pallet {
 				LockedUtxos::<T>::take(locked_ref);
 			}
 			LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
 			let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
 
 			T::EventHandler::spent(utxo_id)?;
