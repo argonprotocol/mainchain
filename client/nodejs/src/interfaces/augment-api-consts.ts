@@ -110,6 +110,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of UTXOs that can be watched in a block and/or expiring at same block
        **/
       maxPendingConfirmationUtxos: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of expired pending funding entries cleaned up in a block
+       **/
+      maxPendingFundingExpirationsPerBlock: u32 & AugmentedConst<ApiType>;
     };
     blockRewards: {
       /**

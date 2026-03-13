@@ -27,6 +27,11 @@ mod benchmarks {
 			block_hash: benchmark_block_hash(199),
 		});
 		InherentIncluded::<T>::put(false);
+		let satoshis = benchmark_satoshis::<T>();
+		for i in 0..T::MaxPendingConfirmationUtxos::get() {
+			let utxo_id = i.saturating_add(1) as UtxoId;
+			seed_pending_funding_at_height::<T>(utxo_id, satoshis, sync_to_block.block_height)?;
+		}
 		let utxo_sync =
 			BitcoinUtxoSync { spent: vec![], funded: vec![], sync_to_block: sync_to_block.clone() };
 
@@ -38,6 +43,40 @@ mod benchmarks {
 
 		assert_eq!(SynchedBitcoinBlock::<T>::get(), Some(sync_to_block));
 		assert!(InherentIncluded::<T>::get());
+		Ok(())
+	}
+
+	#[benchmark]
+	fn on_initialize_base() -> Result<(), BenchmarkError> {
+		let sync_to_block =
+			BitcoinBlock { block_height: 1_000, block_hash: benchmark_block_hash(201) };
+		ConfirmedBitcoinBlockTip::<T>::put(sync_to_block.clone());
+		PreviousBitcoinBlockTip::<T>::kill();
+		TempParentHasSyncState::<T>::put(false);
+		let satoshis = benchmark_satoshis::<T>();
+		ExpiredPendingFunding::<T>::try_mutate(|expired| {
+			for i in 0..T::MaxPendingConfirmationUtxos::get() {
+				let utxo_id = i.saturating_add(1) as UtxoId;
+				expired
+					.try_insert(utxo_id, benchmark_utxo_value(utxo_id, satoshis))
+					.map_err(|_| BenchmarkError::Stop("expired pending funding storage full"))?;
+			}
+			Ok::<(), BenchmarkError>(())
+		})?;
+
+		#[block]
+		{
+			Pallet::<T>::prepare_expired_pending_funding_cleanup(
+				T::MaxPendingFundingExpirationsPerBlock::get(),
+			);
+		}
+
+		assert_eq!(PreviousBitcoinBlockTip::<T>::get(), Some(sync_to_block));
+		assert!(TempParentHasSyncState::<T>::get());
+		assert_eq!(
+			ExpiredPendingFunding::<T>::get().len(),
+			T::MaxPendingConfirmationUtxos::get() as usize
+		);
 		Ok(())
 	}
 
@@ -169,22 +208,21 @@ mod benchmarks {
 		let satoshis = benchmark_satoshis::<T>();
 		let candidate_count = T::MaxCandidateUtxosPerLock::get();
 		let utxo_id: UtxoId = 1;
-		let submitted_at_height = 1;
-		let oldest_pending_bitcoin_submitted_height = 2;
-
-		seed_pending_funding_at_height::<T>(utxo_id, satoshis, submitted_at_height)?;
 		seed_candidates::<T>(utxo_id, candidate_count, None)?;
+		ExpiredPendingFunding::<T>::try_mutate(|expired| {
+			expired
+				.try_insert(utxo_id, benchmark_utxo_value(utxo_id, satoshis))
+				.map_err(|_| BenchmarkError::Stop("expired pending funding storage full"))?;
+			Ok::<(), BenchmarkError>(())
+		})?;
 
 		#[block]
 		{
-			Pallet::<T>::process_pending_funding_timeout(
-				utxo_id,
-				submitted_at_height,
-				oldest_pending_bitcoin_submitted_height,
-			);
+			Pallet::<T>::process_expired_pending_funding_entry(utxo_id);
 		}
 
 		assert!(LocksPendingFunding::<T>::get().is_empty());
+		assert!(!ExpiredPendingFunding::<T>::get().contains_key(&utxo_id));
 		assert!(CandidateUtxoRefsByUtxoId::<T>::get(utxo_id).is_empty());
 		Ok(())
 	}
@@ -236,8 +274,9 @@ fn seed_pending_funding_at_height<T: Config>(
 		pending
 			.try_insert(utxo_id, utxo_value)
 			.map_err(|_| BenchmarkError::Stop("pending funding storage full"))?;
-		Ok(())
-	})
+		Ok::<(), BenchmarkError>(())
+	})?;
+	Ok(())
 }
 
 fn seed_candidates<T: Config>(

@@ -3811,9 +3811,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				138u8, 53u8, 38u8, 42u8, 52u8, 12u8, 214u8, 5u8, 84u8, 90u8, 35u8, 137u8, 104u8,
-				3u8, 115u8, 100u8, 238u8, 97u8, 25u8, 216u8, 69u8, 223u8, 108u8, 170u8, 60u8,
-				244u8, 33u8, 217u8, 159u8, 155u8, 236u8, 43u8,
+				195u8, 125u8, 173u8, 9u8, 225u8, 149u8, 242u8, 150u8, 228u8, 154u8, 28u8, 161u8,
+				24u8, 56u8, 255u8, 103u8, 186u8, 59u8, 87u8, 239u8, 108u8, 32u8, 108u8, 169u8,
+				241u8, 143u8, 17u8, 64u8, 114u8, 207u8, 220u8, 102u8,
 			]
 	}
 	pub mod system {
@@ -9331,6 +9331,14 @@ pub mod api {
 							runtime_types::argon_primitives::bitcoin::UtxoValue,
 						>;
 				}
+				pub mod expired_pending_funding {
+					use super::runtime_types;
+					pub type ExpiredPendingFunding =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u64,
+							runtime_types::argon_primitives::bitcoin::UtxoValue,
+						>;
+				}
 				pub mod candidate_utxo_refs_by_utxo_id {
 					use super::runtime_types;
 					pub type CandidateUtxoRefsByUtxoId =
@@ -9490,6 +9498,27 @@ pub mod api {
 							113u8, 160u8, 128u8, 100u8, 246u8, 199u8, 165u8, 142u8, 113u8, 105u8,
 							182u8, 27u8, 194u8, 5u8, 131u8, 125u8, 25u8, 171u8, 163u8, 206u8, 76u8,
 							217u8,
+						],
+					)
+				}
+				#[doc = " Pending funding entries that have expired and are awaiting bounded cleanup."]
+				pub fn expired_pending_funding(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::expired_pending_funding::ExpiredPendingFunding,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinUtxos",
+						"ExpiredPendingFunding",
+						(),
+						[
+							7u8, 197u8, 250u8, 167u8, 188u8, 174u8, 76u8, 250u8, 18u8, 41u8, 229u8,
+							242u8, 32u8, 144u8, 85u8, 163u8, 182u8, 91u8, 72u8, 78u8, 86u8, 151u8,
+							146u8, 190u8, 19u8, 11u8, 95u8, 211u8, 101u8, 33u8, 104u8, 18u8,
 						],
 					)
 				}
@@ -9705,6 +9734,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"BitcoinUtxos",
 						"MaxPendingConfirmationUtxos",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of expired pending funding entries cleaned up in a block"]
+				pub fn max_pending_funding_expirations_per_block(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinUtxos",
+						"MaxPendingFundingExpirationsPerBlock",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,

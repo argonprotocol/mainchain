@@ -4,7 +4,7 @@ use pallet_prelude::*;
 /// Weight functions needed for pallet_bitcoin_utxos.
 pub trait WeightInfo {
 	// Actual extrinsics
-	fn sync(spent: u32, verified: u32, timed_out: u32) -> Weight {
+	fn sync(spent: u32, verified: u32) -> Weight {
 		let mut weight = Self::sync_base();
 		if spent > 0 {
 			weight = weight.saturating_add(Self::utxo_spent(spent));
@@ -12,12 +12,17 @@ pub trait WeightInfo {
 		if verified > 0 {
 			weight = weight.saturating_add(Self::lock_verified(verified));
 		}
+		weight
+	}
+	fn on_initialize(timed_out: u32) -> Weight {
+		let mut weight = Self::on_initialize_base();
 		if timed_out > 0 {
 			weight = weight
 				.saturating_add(Self::pending_funding_timeout().saturating_mul(timed_out.into()));
 		}
 		weight
 	}
+	fn on_initialize_base() -> Weight;
 	fn sync_base() -> Weight;
 	fn set_confirmed_block() -> Weight;
 	fn set_operator() -> Weight;
@@ -43,6 +48,10 @@ where
 	Base: WeightInfo,
 	EventHandlerWeight: BitcoinUtxoEventsWeightInfo,
 {
+	fn on_initialize_base() -> Weight {
+		Base::on_initialize_base()
+	}
+
 	fn sync_base() -> Weight {
 		Base::sync_base()
 	}
@@ -92,6 +101,10 @@ where
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn on_initialize_base() -> Weight {
+		Weight::zero()
+	}
+
 	fn sync_base() -> Weight {
 		Weight::zero()
 	}

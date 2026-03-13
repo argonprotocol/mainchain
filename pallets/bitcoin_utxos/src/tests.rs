@@ -2,8 +2,8 @@ use crate::{
 	Error, Event,
 	mock::{System, *},
 	pallet::{
-		CandidateUtxoRefsByUtxoId, ConfirmedBitcoinBlockTip, InherentIncluded, LockedUtxos,
-		LocksPendingFunding, UtxoIdToFundingUtxoRef,
+		CandidateUtxoRefsByUtxoId, ConfirmedBitcoinBlockTip, ExpiredPendingFunding,
+		InherentIncluded, LockedUtxos, LocksPendingFunding, UtxoIdToFundingUtxoRef,
 	},
 };
 use argon_primitives::{
@@ -66,6 +66,7 @@ fn can_watch_utxos() {
 			block_height: 1,
 			block_hash: H256Le([0; 32]),
 		});
+		BitcoinUtxos::on_initialize(1);
 		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, satoshis, watch_for_spent_until),);
 		assert_eq!(
 			*LocksPendingFunding::<Test>::get().get(&1).unwrap(),
@@ -84,9 +85,10 @@ fn can_watch_utxos() {
 			Error::<Test>::ScriptPubkeyConflict
 		);
 
-		// check that it is removed on expiration
+		// check that it is moved to the expired queue on sync and cleaned on the next block
+		let expiration_height = (1 + MaxPendingConfirmationBlocks::get() as BitcoinHeight) + 1;
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
-			block_height: (1 + MaxPendingConfirmationBlocks::get() as BitcoinHeight) + 1,
+			block_height: expiration_height,
 			block_hash: H256Le([0; 32]),
 		});
 		assert_ok!(BitcoinUtxos::sync(
@@ -94,11 +96,107 @@ fn can_watch_utxos() {
 			BitcoinUtxoSync {
 				funded: Default::default(),
 				spent: Default::default(),
-				sync_to_block: BitcoinBlock { block_height: 10, block_hash: H256Le([0; 32]) },
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([0; 32]),
+				},
 			},
 		));
-		System::assert_last_event(Event::UtxoUnwatched { utxo_id: 1 }.into());
 		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert_eq!(ExpiredPendingFunding::<Test>::get().len(), 1);
+		BitcoinUtxos::on_finalize(1);
+
+		System::set_block_number(2);
+		BitcoinUtxos::on_initialize(2);
+		System::assert_last_event(Event::UtxoUnwatched { utxo_id: 1 }.into());
+		assert_eq!(ExpiredPendingFunding::<Test>::get().len(), 0);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([0; 32]),
+				},
+			},
+		));
+		BitcoinUtxos::on_finalize(2);
+	});
+}
+
+#[test]
+fn on_initialize_processes_expired_pending_funding_up_to_cap() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: 1,
+			block_hash: H256Le([0; 32]),
+		});
+		BitcoinUtxos::on_initialize(1);
+
+		for utxo_id in 1..=3 {
+			assert_ok!(BitcoinUtxos::watch_for_utxo(
+				utxo_id,
+				make_pubkey([utxo_id as u8; 34]),
+				100 + utxo_id,
+				10,
+			));
+		}
+
+		let expiration_height = 1 + MaxPendingConfirmationBlocks::get() as BitcoinHeight + 1;
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: expiration_height,
+			block_hash: H256Le([1; 32]),
+		});
+
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
+			},
+		));
+
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert_eq!(ExpiredPendingFunding::<Test>::get().len(), 3);
+		BitcoinUtxos::on_finalize(1);
+
+		System::set_block_number(2);
+		BitcoinUtxos::on_initialize(2);
+		assert_eq!(ExpiredPendingFunding::<Test>::get().len(), 1);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
+			},
+		));
+		BitcoinUtxos::on_finalize(2);
+
+		System::set_block_number(3);
+		BitcoinUtxos::on_initialize(3);
+		assert_eq!(ExpiredPendingFunding::<Test>::get().len(), 0);
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
+			},
+		));
+		BitcoinUtxos::on_finalize(3);
 	});
 }
 
@@ -149,11 +247,16 @@ fn it_should_move_utxos_to_lock_once_verified() {
 		let satoshis = MinimumSatoshisPerCandidateUtxo::get();
 		let watch_for_spent_until = 10;
 		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
-			block_height: 2,
+			block_height: 1,
 			block_hash: H256Le([0; 32]),
 		});
 		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script_pubkey, satoshis, watch_for_spent_until),);
 		let utxo_ref = UtxoRef { txid: H256Le([0; 32]), output_index: 0 };
+		let expiration_height = 1 + MaxPendingConfirmationBlocks::get() as BitcoinHeight + 1;
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: expiration_height,
+			block_hash: H256Le([1; 32]),
+		});
 
 		let utxo_sync = BitcoinUtxoSync {
 			funded: vec![BitcoinUtxoFunding {
@@ -161,10 +264,13 @@ fn it_should_move_utxos_to_lock_once_verified() {
 				utxo_ref: utxo_ref.clone(),
 				satoshis,
 				expected_satoshis: satoshis,
-				bitcoin_height: 2,
+				bitcoin_height: 1 + MaxPendingConfirmationBlocks::get() as BitcoinHeight,
 			}],
 			spent: Default::default(),
-			sync_to_block: BitcoinBlock { block_height: 1, block_hash: H256Le([0; 32]) },
+			sync_to_block: BitcoinBlock {
+				block_height: expiration_height,
+				block_hash: H256Le([1; 32]),
+			},
 		};
 		assert_ok!(BitcoinUtxos::sync(RuntimeOrigin::none(), utxo_sync),);
 		System::assert_last_event(
@@ -179,7 +285,7 @@ fn it_should_move_utxos_to_lock_once_verified() {
 				utxo_id: 1,
 				script_pubkey,
 				satoshis,
-				submitted_at_height: 2,
+				submitted_at_height: 1,
 				watch_for_spent_until_height: 10
 			})
 		);
@@ -423,6 +529,7 @@ fn promotes_non_selected_candidate_on_manual_funding() {
 			block_height: 2,
 			block_hash: H256Le([0; 32]),
 		});
+		BitcoinUtxos::on_initialize(1);
 
 		let script_pubkey = make_pubkey([0u8; 34]);
 		let expected_satoshis = 100_000;
@@ -487,6 +594,7 @@ fn promotes_candidates_to_orphans_on_timeout() {
 			block_height: 2,
 			block_hash: H256Le([0; 32]),
 		});
+		BitcoinUtxos::on_initialize(1);
 
 		let script_pubkey = make_pubkey([0u8; 34]);
 		let expected_satoshis = 100_000;
@@ -509,13 +617,61 @@ fn promotes_candidates_to_orphans_on_timeout() {
 		));
 		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&orphan_ref));
 
-		assert_ok!(BitcoinUtxos::lock_timeout_pending_funding(1));
+		let expiration_height = 2 + MaxPendingConfirmationBlocks::get() as BitcoinHeight + 1;
+		BitcoinUtxos::on_finalize(1);
+		System::set_block_number(2);
+		BitcoinUtxos::on_initialize(2);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: expiration_height,
+			block_hash: H256Le([1; 32]),
+		});
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
+			},
+		));
+
 		assert!(!LocksPendingFunding::<Test>::get().contains_key(&1));
+		assert!(ExpiredPendingFunding::<Test>::get().contains_key(&1));
+		assert!(!BitcoinUtxos::active_utxos().iter().any(|(utxo_ref, entry)| {
+			utxo_ref == &Some(orphan_ref.clone()) && entry.utxo_id == 1
+		}));
+		assert_noop!(
+			BitcoinUtxos::fund_with_utxo_candidate(RuntimeOrigin::signed(1), 1, orphan_ref.clone()),
+			Error::<Test>::UtxoNotLocked
+		);
+		BitcoinUtxos::on_finalize(2);
+
+		System::set_block_number(3);
+		BitcoinUtxos::on_initialize(3);
 		assert_eq!(
 			LastOrphanDetected::get(),
 			Some((1, orphan_ref.clone(), expected_satoshis - 10_001))
 		);
 		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
+		assert!(!ExpiredPendingFunding::<Test>::get().contains_key(&1));
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: expiration_height + 1,
+			block_hash: H256Le([2; 32]),
+		});
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height + 1,
+					block_hash: H256Le([2; 32]),
+				},
+			},
+		));
+		BitcoinUtxos::on_finalize(3);
 	});
 }
 

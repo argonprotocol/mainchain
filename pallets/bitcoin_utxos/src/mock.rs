@@ -27,6 +27,7 @@ parameter_types! {
 	pub static MinimumSatoshisPerCandidateUtxo: u64 = 100_000_000; // 1 bitcoin minimum
 
 	pub const MaxPendingConfirmationUtxos: u32 = 10;
+	pub const MaxPendingFundingExpirationsPerBlock: u32 = 2;
 	pub const MaxCandidateUtxosPerLock: u32 = 10;
 
 	pub const MaxPendingConfirmationBlocks: u32 = 10;
@@ -104,6 +105,7 @@ impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 impl pallet_bitcoin_utxos::Config for Test {
 	type WeightInfo = ();
 	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
+	type MaxPendingFundingExpirationsPerBlock = MaxPendingFundingExpirationsPerBlock;
 	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;
 	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type EventHandler = StaticEventHandler;
