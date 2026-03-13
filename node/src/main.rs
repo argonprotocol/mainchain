@@ -9,6 +9,8 @@ mod service;
 
 mod cli;
 mod command;
+mod grandpa_hard_forks;
+mod grandpa_warp_sync;
 // mod grandpa_set_id_patch;
 mod rpc;
 pub(crate) mod runtime_api;
