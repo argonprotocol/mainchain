@@ -34,6 +34,7 @@ polkadot-sdk.features = [
     "sp-core",
     "sc-executor",
     "sc-network",
+    "sc-network-sync",
     "sc-consensus-grandpa",
     "sp-consensus-grandpa",
     "sc-service",

@@ -1,6 +1,8 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 use crate::{
 	command::MiningConfig,
+	grandpa_hard_forks,
+	grandpa_warp_sync::ArgonWarpSyncProvider,
 	rpc,
 	rpc::GrandpaDeps,
 	runtime_api::{BaseHostRuntimeApis, opaque::Block},
@@ -17,8 +19,8 @@ use polkadot_sdk::*;
 use sc_client_api::{BlockBackend, HeaderBackend};
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
-	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider, GrandpaBlockImport,
-	ThreeQuartersOfTheUnfinalizedChain,
+	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider,
+	GenesisAuthoritySetProvider, GrandpaBlockImport, ThreeQuartersOfTheUnfinalizedChain,
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
@@ -102,6 +104,9 @@ where
 		telemetry
 	});
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
+	let grandpa_genesis_authorities = client.get().map_err(|error| {
+		ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
+	})?;
 
 	let transaction_pool = Arc::from(
 		sc_transaction_pool::Builder::new(
@@ -113,13 +118,18 @@ where
 		.with_prometheus(config.prometheus_registry())
 		.build(),
 	);
-	let (grandpa_block_import, grandpa_link) = sc_consensus_grandpa::block_import(
-		client.clone(),
-		GRANDPA_JUSTIFICATION_PERIOD,
-		&client,
-		select_chain.clone(),
-		telemetry.as_ref().map(|x| x.handle()),
-	)?;
+	let (grandpa_block_import, grandpa_link) =
+		sc_consensus_grandpa::block_import_with_authority_set_hard_forks(
+			client.clone(),
+			GRANDPA_JUSTIFICATION_PERIOD,
+			&client,
+			select_chain.clone(),
+			grandpa_hard_forks::authority_set_hard_forks(
+				config.chain_spec.id(),
+				&grandpa_genesis_authorities,
+			),
+			telemetry.as_ref().map(|x| x.handle()),
+		)?;
 
 	let (bitcoin_url, bitcoin_auth) = mining_config
 		.bitcoin_rpc_url_with_auth()
@@ -237,11 +247,17 @@ where
 			Arc::clone(&peer_store_handle),
 		);
 	net_config.add_notification_protocol(grandpa_protocol_config);
+	let grandpa_genesis_authorities = client.get().map_err(|error| {
+		ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
+	})?;
 
-	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
+	let warp_sync = Arc::new(ArgonWarpSyncProvider::new(
 		backend.clone(),
 		grandpa_link.shared_authority_set().clone(),
-		Vec::default(),
+		grandpa_hard_forks::authority_set_hard_forks(
+			config.chain_spec.id(),
+			&grandpa_genesis_authorities,
+		),
 	));
 	let (network, system_rpc_tx, tx_handler_controller, sync_service) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
