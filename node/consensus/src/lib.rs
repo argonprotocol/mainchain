@@ -455,17 +455,20 @@ impl NotebookTickChecker {
 	) -> Option<Instant> {
 		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
-			// offset the block creation by the miner's percentile of nonce score
-			// it must account for the current delay into the tick duration
+			// Delay within the current tick window, not from the start of a fresh tick.
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
 			let elapsed = duration_per_tick.saturating_sub(duration_to_next_tick);
-			let millis_offset = percentile.mul_floor(duration_per_tick.as_millis() as u64);
-			let start_delay = Duration::from_millis(millis_offset);
-			if start_delay > elapsed {
-				let start_time = Some(Instant::now() + start_delay);
+			let target_offset = Self::percentile_tick_offset(duration_per_tick, percentile);
+			if let Some(remaining_delay) =
+				Self::remaining_delay_for_target_offset(target_offset, elapsed)
+			{
+				let now = Instant::now();
+				let start_time = Some(now + remaining_delay);
 				tracing::trace!(
-					start_delay = ?start_delay,
+					elapsed = ?elapsed,
+					target_offset = ?target_offset,
+					remaining_delay = ?remaining_delay,
 					miner_percentile = ?percentile,
 					duration_to_next_tick = ?duration_to_next_tick,
 					"Delay vote block creation due to miner percentile vs tick elapsed"
@@ -488,15 +491,27 @@ impl NotebookTickChecker {
 		});
 		notebooks_to_check
 	}
+
+	fn remaining_delay_for_target_offset(
+		target_offset: Duration,
+		elapsed: Duration,
+	) -> Option<Duration> {
+		let remaining_delay = target_offset.saturating_sub(elapsed);
+		if remaining_delay.is_zero() { None } else { Some(remaining_delay) }
+	}
+
+	fn percentile_tick_offset(duration_per_tick: Duration, percentile: Permill) -> Duration {
+		let millis_u128 = duration_per_tick.as_millis();
+		let millis_u64 = millis_u128.min(u64::MAX as u128) as u64;
+		let millis_offset = percentile.mul_floor(millis_u64);
+		Duration::from_millis(millis_offset)
+	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::NotebookTickChecker;
-	use argon_primitives::{
-		prelude::{sp_core::U256, sp_runtime::Permill, *},
-		tick::Ticker,
-	};
+	use argon_primitives::prelude::{sp_runtime::Permill, *};
 	use argon_runtime::{Block, Header};
 	use codec::{Decode, Encode};
 	use sc_consensus_grandpa::{FinalityProof, GrandpaJustification};
@@ -546,17 +561,55 @@ mod test {
 	}
 
 	#[test]
-	fn test_notebook_tick_checker_should_delay_block_attempt() {
-		let ticker = Ticker::start(Duration::from_secs(2), 2);
-		let miner_nonce_score = Some((U256::from(100), Permill::from_percent(50)));
-		let now = Instant::now();
-		// we can't guarantee when this will run, so we just check it if it does
-		if let Some(delay) = NotebookTickChecker::should_delay_block_attempt(
-			ticker.current(),
-			&ticker,
-			miner_nonce_score,
-		) {
-			assert_eq!(delay.duration_since(now).as_secs(), 1);
-		}
+	fn test_notebook_tick_checker_remaining_delay_for_percentile() {
+		let tick_duration = Duration::from_secs(2);
+
+		assert_eq!(
+			NotebookTickChecker::remaining_delay_for_target_offset(
+				NotebookTickChecker::percentile_tick_offset(
+					tick_duration,
+					Permill::from_percent(50),
+				),
+				Duration::ZERO,
+			),
+			Some(Duration::from_secs(1))
+		);
+		assert_eq!(
+			NotebookTickChecker::remaining_delay_for_target_offset(
+				NotebookTickChecker::percentile_tick_offset(
+					tick_duration,
+					Permill::from_percent(50),
+				),
+				Duration::from_millis(500),
+			),
+			Some(Duration::from_millis(500))
+		);
+		assert_eq!(
+			NotebookTickChecker::remaining_delay_for_target_offset(
+				NotebookTickChecker::percentile_tick_offset(
+					tick_duration,
+					Permill::from_percent(75),
+				),
+				Duration::from_secs(1),
+			),
+			Some(Duration::from_millis(500))
+		);
+		assert_eq!(
+			NotebookTickChecker::remaining_delay_for_target_offset(
+				NotebookTickChecker::percentile_tick_offset(
+					tick_duration,
+					Permill::from_percent(50),
+				),
+				Duration::from_millis(1500),
+			),
+			None
+		);
+		assert_eq!(
+			NotebookTickChecker::remaining_delay_for_target_offset(
+				NotebookTickChecker::percentile_tick_offset(tick_duration, Permill::zero(),),
+				Duration::from_millis(250),
+			),
+			None
+		);
 	}
 }
