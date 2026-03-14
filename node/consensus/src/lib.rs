@@ -32,6 +32,10 @@ use tokio::{sync::Mutex, time, time::Instant};
 use tracing::{debug, info, trace, warn};
 
 #[cfg(test)]
+mod import_queue_test;
+#[cfg(test)]
+pub(crate) mod mock_importer;
+#[cfg(test)]
 pub(crate) mod mock_notary;
 
 pub mod aux_client;

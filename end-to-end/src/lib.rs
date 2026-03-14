@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod bitcoin;
 #[cfg(test)]
+mod finality;
+#[cfg(test)]
 mod localchain_transfer;
 #[cfg(test)]
 mod notary;
@@ -11,8 +13,9 @@ mod vote_mining;
 
 #[cfg(test)]
 pub(crate) mod utils {
+	use anyhow::Context;
 	use argon_client::{
-		FetchAt, TxInBlockWithEvents, api,
+		FetchAt, MainchainClient, TxInBlockWithEvents, api,
 		api::{
 			runtime_types::{
 				argon_primitives::block_seal,
@@ -28,8 +31,9 @@ pub(crate) mod utils {
 	};
 	use argon_primitives::{BLOCK_SEAL_KEY_TYPE, prelude::*};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
-	use sp_core::{Pair, crypto::key_types::GRANDPA};
+	use sp_core::{DeriveJunction, Pair, crypto::key_types::GRANDPA};
 	use sp_keyring::{Sr25519Keyring, Sr25519Keyring::Alice};
+	use tokio::join;
 
 	#[allow(dead_code)]
 	pub(crate) async fn transfer_mainchain(
@@ -68,7 +72,7 @@ pub(crate) mod utils {
 					operator_account,
 				},
 			),
-			false,
+			true,
 		)
 		.await?;
 		println!("Sudo approved notary");
@@ -88,7 +92,9 @@ pub(crate) mod utils {
 		test_node: &ArgonTestNode,
 		archive_bucket: String,
 	) -> anyhow::Result<ArgonTestNotary> {
-		let test_notary = ArgonTestNotary::start_with_archive(test_node, archive_bucket).await?;
+		let test_notary =
+			ArgonTestNotary::start_with_archive(test_node, archive_bucket, None, None, true)
+				.await?;
 		activate_notary(test_node, &test_notary).await?;
 
 		Ok(test_notary)
@@ -165,6 +171,59 @@ pub(crate) mod utils {
 		Ok(())
 	}
 
+	pub(crate) async fn activate_vote_mining(
+		source: &ArgonTestNode,
+		miner_1: &ArgonTestNode,
+		miner_2: &ArgonTestNode,
+	) -> anyhow::Result<()> {
+		let ownership_needed = mining_slot_ownership_needed(source).await?;
+		let seeded_ownership = ownership_needed.saturating_mul(2);
+		force_set_ownership_balance(source, &miner_1.account_id, seeded_ownership).await?;
+		force_set_ownership_balance(source, &miner_2.account_id, seeded_ownership).await?;
+		wait_for_finalized_catchup(source, miner_1).await?;
+		wait_for_finalized_catchup(source, miner_2).await?;
+
+		let miner_1_keyring = miner_1.keyring();
+		let miner_1_second_account = miner_1
+			.keyring()
+			.pair()
+			.clone()
+			.derive(vec![DeriveJunction::hard(1)].into_iter(), None)
+			.unwrap()
+			.0;
+		let miner_1_second_signer = Sr25519Signer::new(miner_1_second_account);
+		let miner_1_second_account = miner_1_second_signer.account_id();
+		let miner_2_keyring = miner_2.keyring();
+
+		let (keys1, keys_1_2, keys2) = join!(
+			register_miner_keys(miner_1, miner_1_keyring, 1),
+			register_miner_keys(miner_1, miner_1_keyring, 2),
+			register_miner_keys(miner_2, miner_2_keyring, 1)
+		);
+		let keys1 = keys1.context("failed to register miner_1 primary session keys")?;
+		let keys_1_2 = keys_1_2.context("failed to register miner_1 secondary session keys")?;
+		let keys2 = keys2.context("failed to register miner_2 session keys")?;
+		let source_signer = Sr25519Signer::new(Alice.pair());
+		let source_nonce = source.client.get_account_nonce(&source_signer.account_id()).await?;
+		register_miners(
+			source,
+			Sr25519Signer::new(Alice.pair()),
+			vec![(miner_2.account_id.clone(), keys2)],
+			Some(source_nonce),
+		)
+		.await
+		.context("failed to register miner_2 bids")?;
+		register_miners(
+			source,
+			Sr25519Signer::new(Alice.pair()),
+			vec![(miner_1.account_id.clone(), keys1), (miner_1_second_account, keys_1_2)],
+			Some(source_nonce + 1),
+		)
+		.await
+		.context("failed to register miner_1 bids")?;
+		Ok(())
+	}
+
 	pub(crate) async fn register_miner_keys(
 		node: &ArgonTestNode,
 		miner: Sr25519Keyring,
@@ -185,6 +244,7 @@ pub(crate) mod utils {
 		node: &ArgonTestNode,
 		funding: Sr25519Signer,
 		miner_accounts: Vec<(AccountId, SessionKeys)>,
+		nonce: Option<Nonce>,
 	) -> anyhow::Result<()> {
 		let client = node.client.clone();
 
@@ -202,7 +262,11 @@ pub(crate) mod utils {
 				})
 			})
 			.collect::<Vec<_>>();
-		let params = client.params_with_best_nonce(&funding.account_id()).await?.build();
+		let params = if let Some(nonce) = nonce {
+			MainchainClient::ext_params_builder().nonce(nonce.into()).build()
+		} else {
+			client.params_with_best_nonce(&funding.account_id()).await?.build()
+		};
 
 		let register = client
 			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)

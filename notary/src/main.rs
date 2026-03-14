@@ -87,6 +87,10 @@ enum Commands {
 		#[clap(long, env = "ARGON_RPC_RATE_LIMIT_TRUST_PROXY_HEADERS", default_value_t = false)]
 		rpc_rate_limit_trust_proxy_headers: bool,
 
+		/// Prometheus metrics bind port. Use `0` to choose an ephemeral local port.
+		#[clap(long, env = "ARGON_PROMETHEUS_PORT")]
+		prometheus_port: Option<u16>,
+
 		/// An s3 compatible endpoint for the archive (use minIO for self-hosted). Optional if
 		/// using a default region or in dev.
 		#[clap(long, env = "AWS_S3_ENDPOINT")]
@@ -178,6 +182,7 @@ async fn main() -> anyhow::Result<()> {
 			rpc_rate_limit_trust_proxy_headers,
 			rpc_rate_limit_mode,
 			rpc_rate_limit_max_slowdowns,
+			prometheus_port,
 		} => {
 			ensure!(
 				rpc_rate_limit_max_slowdowns <= MAX_RATE_LIMIT_MAX_SLOWDOWNS,
@@ -246,6 +251,7 @@ async fn main() -> anyhow::Result<()> {
 					rate_limit_trust_proxy_headers: rpc_rate_limit_trust_proxy_headers,
 					rate_limit_mode: rpc_rate_limit_mode,
 					rate_limit_max_slowdowns: rpc_rate_limit_max_slowdowns,
+					prometheus_port,
 					..RpcConfig::default()
 				},
 				ticker,
