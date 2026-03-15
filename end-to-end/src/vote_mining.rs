@@ -66,7 +66,8 @@ async fn test_end_to_end_default_vote_mining() {
 		register_miners(
 			&miner_2,
 			miner_2_keyring.pair().into(),
-			vec![(miner_2.account_id.clone(), keys2.unwrap())]
+			vec![(miner_2.account_id.clone(), keys2.unwrap())],
+			None,
 		),
 		register_miners(
 			&miner_1,
@@ -75,6 +76,7 @@ async fn test_end_to_end_default_vote_mining() {
 				(miner_1.account_id.clone(), keys1.unwrap()),
 				(miner_1_second_account.clone(), keys_1_2.unwrap())
 			],
+			None,
 		),
 	);
 	miner2_res.unwrap();

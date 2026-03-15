@@ -41,6 +41,7 @@ pub struct ArgonNodeStartArgs {
 	pub rpc_port: u16,
 	pub bootnodes: String,
 	pub base_data_path: PathBuf,
+	pub cleanup_base_data_path: bool,
 	pub rust_log: String,
 	pub authority: String,
 	pub is_validator: bool,
@@ -91,6 +92,7 @@ impl ArgonNodeStartArgs {
 			target_dir,
 			rust_log,
 			base_data_path: Self::get_temp_dir()?,
+			cleanup_base_data_path: true,
 			bootnodes: bootnodes.to_string(),
 			compute_miners,
 			bitcoin_rpc: "".to_string(),
@@ -121,14 +123,25 @@ impl ArgonNodeStartArgs {
 
 impl Drop for ArgonTestNode {
 	fn drop(&mut self) {
+		self.log_watcher.close();
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
+			let _ = proc.wait();
 		}
-		remove_dir_all(self.start_args.base_data_path.clone()).unwrap();
+		if self.start_args.cleanup_base_data_path {
+			let base_data_path = self.start_args.base_data_path.clone();
+			if let Err(error) = remove_dir_all(&base_data_path) {
+				if error.kind() != std::io::ErrorKind::NotFound {
+					eprintln!(
+						"Failed to remove node base path {}: {error}",
+						base_data_path.display()
+					);
+				}
+			}
+		}
 		if let Some(mut bitcoind) = self.bitcoind.take() {
 			let _ = bitcoind.stop();
 		}
-		self.log_watcher.close();
 	}
 }
 
@@ -136,14 +149,22 @@ lazy_static! {
 	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }
 impl ArgonTestNode {
+	pub fn stop(&mut self) -> anyhow::Result<()> {
+		self.log_watcher.close();
+		if let Some(mut proc) = self.proc.take() {
+			proc.kill()?;
+			let _ = proc.wait();
+		}
+		Ok(())
+	}
+
 	/// Restart the node with the same rpc port. NOTE: does not currently support the p2p address
 	/// too
 	///
 	/// If you want to add that, you need to capture the boot url, and also probably use
 	/// pre-generated libp2p nodeIds.
 	pub async fn restart(&mut self, wait_duration: Duration) -> anyhow::Result<()> {
-		self.log_watcher.close();
-		self.proc.take().unwrap().kill()?;
+		self.stop()?;
 		tokio::time::sleep(wait_duration).await;
 		let (proc, log_watcher) = Self::start_process(&mut self.start_args).await?;
 		self.proc = Some(proc);

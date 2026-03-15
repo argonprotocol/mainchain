@@ -1,5 +1,5 @@
 use crate::{ArgonTestNode, get_target_dir, log_watcher::LogWatcher};
-use anyhow::Context;
+use anyhow::{Context, bail};
 use argon_client::{
 	MainchainClient,
 	api::{
@@ -18,10 +18,15 @@ use sp_core::{
 	ed25519, sr25519,
 };
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use std::{env, path::PathBuf, process, process::Command, sync::Arc, thread};
+use std::{
+	env, net::TcpListener, path::PathBuf, process, process::Command, sync::Arc, thread,
+	time::Duration,
+};
 use tokio::runtime::Runtime;
 use url::Url;
 use uuid::Uuid;
+
+const MAX_DB_NAME_ATTEMPTS: usize = 32;
 
 pub struct ArgonTestNotary {
 	// Keep a handle to the node; once it's dropped the node is killed.
@@ -33,10 +38,12 @@ pub struct ArgonTestNotary {
 	pub db_url: String,
 	log_watcher: LogWatcher,
 	start_args: Args,
+	cleanup_db: bool,
 }
 
 struct Args {
 	port: u16,
+	prometheus_port: u16,
 	operator_address: String,
 	db_url: String,
 	mainchain_url: String,
@@ -45,14 +52,23 @@ struct Args {
 
 impl Drop for ArgonTestNotary {
 	fn drop(&mut self) {
+		self.log_watcher.close();
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
+			let _ = proc.wait();
+		}
+		if !self.cleanup_db {
+			return;
 		}
 		let db_url = self.db_url.clone();
 		let db_name = self.db_name.clone();
 		thread::spawn(move || {
 			let handle = Runtime::new().unwrap();
 			handle.block_on(async {
+				if !is_valid_db_identifier(&db_name) {
+					eprintln!("Skipping drop of invalid notary db name {db_name:?}");
+					return;
+				}
 				let pool =
 					PgPool::connect(&db_url).await.context("failed to connect to db").unwrap();
 				sqlx::query(&format!("DROP DATABASE \"{db_name}\" WITH(FORCE)"))
@@ -69,8 +85,10 @@ impl Drop for ArgonTestNotary {
 
 impl ArgonTestNotary {
 	pub fn stop(&mut self) {
+		self.log_watcher.close();
 		if let Some(mut proc) = self.proc.take() {
 			let _ = proc.kill();
+			let _ = proc.wait();
 		}
 	}
 
@@ -80,6 +98,9 @@ impl ArgonTestNotary {
 
 	pub async fn restart(&mut self) -> anyhow::Result<()> {
 		self.stop();
+		if self.start_args.port != 0 {
+			Self::prepare_fixed_port(self.start_args.port).await?;
+		}
 		let mut proc = Self::start_process(get_target_dir(), &self.start_args).await?;
 		let stdout = proc.stdout.take().unwrap();
 		self.log_watcher = LogWatcher::new(stdout, "notary");
@@ -107,6 +128,8 @@ impl ArgonTestNotary {
 				&args.mainchain_url,
 				"--bind-addr",
 				&format!("127.0.0.1:{}", args.port),
+				"--prometheus-port",
+				&args.prometheus_port.to_string(),
 				"--archive-bucket",
 				&args.archive_bucket,
 			])
@@ -123,6 +146,9 @@ impl ArgonTestNotary {
 	pub async fn start_with_archive(
 		node: &ArgonTestNode,
 		archive_bucket: String,
+		fixed_port: Option<u16>,
+		existing_db_name: Option<String>,
+		cleanup_db: bool,
 	) -> anyhow::Result<Self> {
 		let target_dir = get_target_dir();
 
@@ -136,36 +162,56 @@ impl ArgonTestNotary {
 			.await
 			.context("failed to connect to db")?;
 
-		let mut uid: String = "".to_string();
-		for _ in 0..10 {
-			uid = generate_random_db_name();
-			let db_name = format!("notary_{uid}");
-			let result = sqlx::query("SELECT 1 FROM pg_database WHERE datname = $1")
-				.bind(&db_name)
-				.fetch_one(&pool)
-				.await;
-			if result.is_err() {
-				break;
-			}
-		}
-
-		let db_name = format!("notary_{uid}");
+		let db_name = match existing_db_name {
+			Some(db_name) => {
+				if !is_valid_db_identifier(&db_name) {
+					bail!("invalid existing notary db name: {db_name}");
+				}
+				db_name
+			},
+			None => Self::find_available_db_name(&pool).await?,
+		};
 		let db_url = format!("{db_base_url}/{db_name}");
-		sqlx::query(&format!("CREATE DATABASE \"{db_name}\"")).execute(&pool).await?;
+		let database_exists = sqlx::query("SELECT 1 FROM pg_database WHERE datname = $1")
+			.bind(&db_name)
+			.fetch_optional(&pool)
+			.await?
+			.is_some();
+		let created_database = !database_exists;
+		if created_database {
+			sqlx::query(&format!("CREATE DATABASE \"{db_name}\"")).execute(&pool).await?;
+		}
 		// migrate from notary project path
 		let output = Command::new("./argon-notary")
 			.current_dir(&target_dir)
 			.args(vec!["migrate", "--db-url", &db_url])
 			.output()?;
+		if !output.status.success() {
+			if created_database {
+				let _ = sqlx::query(&format!("DROP DATABASE IF EXISTS \"{db_name}\""))
+					.execute(&pool)
+					.await;
+			}
+			bail!(
+				"failed to migrate notary db {db_name}: status={} stdout={} stderr={}",
+				output.status,
+				String::from_utf8_lossy(&output.stdout),
+				String::from_utf8_lossy(&output.stderr),
+			);
+		}
 		println!("Migrated notary db {}: {:?}", db_name, output.stdout);
 
 		let mut args = Args {
-			port: 0,
+			port: fixed_port.unwrap_or_default(),
+			prometheus_port: 0,
 			operator_address: operator.public().to_ss58check(),
 			db_url: db_url.clone(),
 			mainchain_url: node.client.url.clone(),
 			archive_bucket,
 		};
+		if args.port != 0 {
+			Self::prepare_fixed_port(args.port).await?;
+		}
 		let mut proc =
 			Self::start_process(target_dir, &args).await.context("failed to start notary")?;
 
@@ -191,12 +237,76 @@ impl ArgonTestNotary {
 			db_name,
 			db_url: db_base_url,
 			start_args: args,
+			cleanup_db,
 		})
+	}
+
+	async fn prepare_fixed_port(port: u16) -> anyhow::Result<()> {
+		if Self::port_available(port) {
+			return Ok(());
+		}
+
+		eprintln!("Stopping stale notary process on port {port}");
+		let _ = Command::new("pkill")
+			.args(["-INT", "-f", &format!("argon-notary.*127.0.0.1:{port}")])
+			.status();
+		tokio::time::sleep(Duration::from_secs(1)).await;
+		Self::wait_for_port(port).await
+	}
+
+	async fn wait_for_port(port: u16) -> anyhow::Result<()> {
+		let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+
+		loop {
+			if Self::port_available(port) {
+				return Ok(());
+			}
+			match TcpListener::bind(("127.0.0.1", port)) {
+				Ok(listener) => {
+					drop(listener);
+					return Ok(());
+				},
+				Err(error) if tokio::time::Instant::now() < deadline => {
+					eprintln!("Waiting for notary port {port} to become available: {error}");
+					tokio::time::sleep(Duration::from_millis(250)).await;
+				},
+				Err(error) => {
+					return Err(anyhow::anyhow!(
+						"notary port {port} stayed unavailable before restart: {error}"
+					));
+				},
+			}
+		}
+	}
+
+	fn port_available(port: u16) -> bool {
+		TcpListener::bind(("127.0.0.1", port)).map(drop).is_ok()
+	}
+
+	pub async fn clone_database(template_db_name: &str) -> anyhow::Result<String> {
+		if !is_valid_db_identifier(template_db_name) {
+			bail!("invalid template notary db name: {template_db_name}");
+		}
+		let db_base_url = env::var("NOTARY_DB_URL")
+			.unwrap_or("postgres://postgres:postgres@localhost:5432".to_string());
+		let pool = PgPoolOptions::new()
+			.max_connections(1)
+			.connect(&db_base_url)
+			.await
+			.context("failed to connect to db")?;
+
+		let db_name = Self::find_available_db_name(&pool).await?;
+
+		sqlx::query(&format!("CREATE DATABASE \"{db_name}\" TEMPLATE \"{template_db_name}\""))
+			.execute(&pool)
+			.await?;
+
+		Ok(db_name)
 	}
 
 	pub async fn start(node: &ArgonTestNode) -> anyhow::Result<Self> {
 		let archive_bucket = Self::create_archive_bucket();
-		Self::start_with_archive(node, archive_bucket).await
+		Self::start_with_archive(node, archive_bucket, None, None, true).await
 	}
 
 	pub async fn register_operator(&self, argon_test_node: &ArgonTestNode) -> anyhow::Result<()> {
@@ -221,6 +331,22 @@ impl ArgonTestNotary {
 
 		Ok(())
 	}
+
+	async fn find_available_db_name(pool: &PgPool) -> anyhow::Result<String> {
+		for _ in 0..MAX_DB_NAME_ATTEMPTS {
+			let candidate = format!("notary_{}", generate_random_db_name());
+			let exists = sqlx::query("SELECT 1 FROM pg_database WHERE datname = $1")
+				.bind(&candidate)
+				.fetch_optional(pool)
+				.await?
+				.is_some();
+			if !exists {
+				return Ok(candidate);
+			}
+		}
+
+		bail!("failed to find a free notary db name after {MAX_DB_NAME_ATTEMPTS} attempts")
+	}
 }
 
 fn generate_random_db_name() -> String {
@@ -242,4 +368,14 @@ fn generate_random_db_name() -> String {
 	}
 
 	db_name
+}
+
+fn is_valid_db_identifier(name: &str) -> bool {
+	let mut chars = name.chars();
+	match chars.next() {
+		Some(first) if first == '_' || first.is_ascii_alphabetic() => {},
+		_ => return false,
+	}
+
+	chars.all(|char| char == '_' || char.is_ascii_alphanumeric())
 }

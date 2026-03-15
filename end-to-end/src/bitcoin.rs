@@ -189,7 +189,7 @@ async fn test_bitcoin_minting_e2e() {
 		.expect("Couldn't register vote miner");
 
 	// Register the miner against the test node since we are having fork issues
-	register_miners(&test_node, alice_signer, vec![(vote_miner_account.clone(), keys)])
+	register_miners(&test_node, alice_signer, vec![(vote_miner_account.clone(), keys)], None)
 		.await
 		.unwrap();
 
