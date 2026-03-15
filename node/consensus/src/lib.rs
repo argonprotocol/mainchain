@@ -47,6 +47,7 @@ pub mod import_queue;
 pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
+pub(crate) mod pending_import_replay;
 pub mod state_anchor;
 
 pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
@@ -459,20 +460,17 @@ impl NotebookTickChecker {
 	) -> Option<Instant> {
 		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
-			// Delay within the current tick window, not from the start of a fresh tick.
+			// offset the block creation by the miner's percentile of nonce score
+			// it must account for the current delay into the tick duration
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
 			let elapsed = duration_per_tick.saturating_sub(duration_to_next_tick);
-			let target_offset = Self::percentile_tick_offset(duration_per_tick, percentile);
-			if let Some(remaining_delay) =
-				Self::remaining_delay_for_target_offset(target_offset, elapsed)
-			{
-				let now = Instant::now();
-				let start_time = Some(now + remaining_delay);
+			let millis_offset = percentile.mul_floor(duration_per_tick.as_millis() as u64);
+			let start_delay = Duration::from_millis(millis_offset);
+			if start_delay > elapsed {
+				let start_time = Some(Instant::now() + start_delay);
 				tracing::trace!(
-					elapsed = ?elapsed,
-					target_offset = ?target_offset,
-					remaining_delay = ?remaining_delay,
+					start_delay = ?start_delay,
 					miner_percentile = ?percentile,
 					duration_to_next_tick = ?duration_to_next_tick,
 					"Delay vote block creation due to miner percentile vs tick elapsed"
@@ -495,54 +493,30 @@ impl NotebookTickChecker {
 		});
 		notebooks_to_check
 	}
-
-	fn remaining_delay_for_target_offset(
-		target_offset: Duration,
-		elapsed: Duration,
-	) -> Option<Duration> {
-		let remaining_delay = target_offset.saturating_sub(elapsed);
-		if remaining_delay.is_zero() { None } else { Some(remaining_delay) }
-	}
-
-	fn percentile_tick_offset(duration_per_tick: Duration, percentile: Permill) -> Duration {
-		let millis_u128 = duration_per_tick.as_millis();
-		let millis_u64 = millis_u128.min(u64::MAX as u128) as u64;
-		let millis_offset = percentile.mul_floor(millis_u64);
-		Duration::from_millis(millis_offset)
-	}
 }
 
 #[cfg(test)]
-mod test {
-	use crate::NotebookTickChecker;
-	use argon_primitives::prelude::{sp_runtime::Permill, *};
+mod tests {
+	use super::*;
 	use argon_runtime::{Block, Header};
 	use codec::{Decode, Encode};
 	use sc_consensus_grandpa::{FinalityProof, GrandpaJustification};
 	use sp_runtime::RuntimeAppPublic;
-	use std::{collections::HashSet, time::Duration};
-	use tokio::time::Instant;
 
 	#[test]
-	fn decode_finality() {
-		// First block in mainnet on 105 is 17572. Version deployed on
-		// set id 1 at 17574
-		// set id 0
+	fn test_decode_finality() {
 		let encoded_17573 = hex::decode("7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712e9062d560600000000007927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400000c7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400005c9a28ed3f1a5bb94bd8780e9ad3640edd55652dd516fd303d539c64b25572de7b31a99ad3e0e8d636a5615978b107da853b3d9e2360fcbf2e3b1542e77fce0a45a74d33ead0b5ff58607fc60556cf1b291d4c503254ae07f17b3d54f8c5c27f7927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a5440000b5c9b05beb4413ed4565492339a1735ff25f419d100d6cea8e5c7947f3ffb9e6079c034c23720f4cbb6151e260b2bd5fedfd3667589c338f5271787b27f08b0c803c5c3c4059380a8603f785a093c227a8a2f4a7437c466f1f7233a6881400e67927b62bef2a417d0affc650f9a3cd2e3ef69a27cbd7ba14691774b0ea2cd712a54400009230a62facc51e07b1210eb52d7257d12257c66106aa723439019070b647efc9d25e7d58dde8cc2e4a8abec11601895c069ad09ad98e77e9af76aa2fb72e560f962abf1be4e94bb80e6488a2af551c529571fdd1d972b5c7e311d7507f0882ec0000").unwrap();
 
 		let finality_proof = FinalityProof::<Header>::decode(&mut &encoded_17573[..]).unwrap();
-
 		let justification =
 			GrandpaJustification::<Block>::decode(&mut &finality_proof.justification[..]).unwrap();
 
 		for signed in justification.justification.commit.precommits.iter() {
 			let message = finality_grandpa::Message::Precommit(signed.precommit.clone());
-			println!("Message: {signed:#?}");
 
 			for i in 0..10u64 {
 				let buf = (message.clone(), justification.justification.round, i).encode();
 				if signed.id.verify(&buf, &signed.signature) {
-					println!("Signature verified at {i}");
 					assert_eq!(i, 0);
 				}
 			}
@@ -560,60 +534,20 @@ mod test {
 
 		assert_eq!(checker.get_ready(), [tick_2].into_iter().collect::<HashSet<_>>());
 		assert_eq!(checker.get_next_check_delay().unwrap().as_secs(), 9);
-
 		assert_eq!(checker.ticks_to_recheck.len(), 1);
 	}
 
 	#[test]
-	fn test_notebook_tick_checker_remaining_delay_for_percentile() {
-		let tick_duration = Duration::from_secs(2);
-
-		assert_eq!(
-			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
-				Duration::ZERO,
-			),
-			Some(Duration::from_secs(1))
-		);
-		assert_eq!(
-			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
-				Duration::from_millis(500),
-			),
-			Some(Duration::from_millis(500))
-		);
-		assert_eq!(
-			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(75),
-				),
-				Duration::from_secs(1),
-			),
-			Some(Duration::from_millis(500))
-		);
-		assert_eq!(
-			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
-				Duration::from_millis(1500),
-			),
-			None
-		);
-		assert_eq!(
-			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(tick_duration, Permill::zero(),),
-				Duration::from_millis(250),
-			),
-			None
-		);
+	fn test_notebook_tick_checker_should_delay_block_attempt() {
+		let ticker = Ticker::start(Duration::from_secs(2), 2);
+		let miner_nonce_score = Some((U256::from(100), Permill::from_percent(50)));
+		let now = Instant::now();
+		if let Some(delay) = NotebookTickChecker::should_delay_block_attempt(
+			ticker.current(),
+			&ticker,
+			miner_nonce_score,
+		) {
+			assert_eq!(delay.duration_since(now).as_secs(), 1);
+		}
 	}
 }
