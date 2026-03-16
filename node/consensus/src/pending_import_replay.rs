@@ -714,6 +714,8 @@ mod tests {
 			notebook_downloader,
 			Arc::new(None),
 			Ticker::new(2_000, 2),
+			None,
+			Duration::from_millis(250),
 			true,
 		));
 
