@@ -31,7 +31,7 @@ use sp_runtime::{
 	Justification,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
-use std::{marker::PhantomData, sync::Arc};
+use std::{fmt, marker::PhantomData, sync::Arc};
 use tracing::error;
 
 #[derive(Clone)]
@@ -111,6 +111,127 @@ pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	_phantom: PhantomData<AC>,
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+struct ImportContext<B: BlockT> {
+	hash: B::Hash,
+	number: NumberFor<B>,
+	parent_hash: B::Hash,
+	info: sp_blockchain::Info<B>,
+	is_block_gap: bool,
+	parent_block_state: BlockStatus,
+	block_header_status: sp_blockchain::BlockStatus,
+	state_action: ImportStateAction,
+	skip_execution_checks: bool,
+	origin: BlockOrigin,
+	finalized: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ImportStateAction {
+	StateApply,
+	StateImport,
+	Execute,
+	ExecuteIfPossible,
+	Skip,
+}
+
+impl fmt::Debug for ImportStateAction {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let action = match self {
+			Self::StateApply => "state_apply",
+			Self::StateImport => "state_import",
+			Self::Execute => "execute",
+			Self::ExecuteIfPossible => "execute_if_possible",
+			Self::Skip => "skip",
+		};
+		f.write_str(action)
+	}
+}
+
+impl<B: BlockT> ImportContext<B> {
+	fn from_block<C>(client: &C, block: &mut BlockImportParams<B>) -> Self
+	where
+		C: HeaderBackend<B> + BlockBackend<B>,
+	{
+		let hash = block.post_hash();
+		let number = *block.header.number();
+		let parent_hash = *block.header.parent_hash();
+		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
+
+		let info = client.info();
+		let is_block_gap =
+			info.block_gap.is_some_and(|gap| gap.start <= number && number <= gap.end);
+		let parent_block_state = client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
+		let block_header_status =
+			client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
+		let state_action = match block.state_action {
+			StateAction::ApplyChanges(StorageChanges::Changes(_)) => ImportStateAction::StateApply,
+			StateAction::ApplyChanges(StorageChanges::Import(_)) => ImportStateAction::StateImport,
+			StateAction::Execute => ImportStateAction::Execute,
+			StateAction::ExecuteIfPossible => ImportStateAction::ExecuteIfPossible,
+			StateAction::Skip => ImportStateAction::Skip,
+		};
+
+		Self {
+			hash,
+			number,
+			parent_hash,
+			info,
+			is_block_gap,
+			parent_block_state,
+			block_header_status,
+			state_action,
+			skip_execution_checks: block.state_action.skip_execution_checks(),
+			origin: block.origin,
+			finalized: block.finalized,
+		}
+	}
+
+	fn is_parent_state_available(&self) -> bool {
+		self.parent_block_state == BlockStatus::InChainWithState
+	}
+
+	fn parent_is_genesis(&self) -> bool {
+		self.parent_hash == self.info.genesis_hash
+	}
+
+	fn is_initial_sync(&self) -> bool {
+		self.origin == BlockOrigin::NetworkInitialSync
+	}
+
+	fn is_header_already_imported(&self) -> bool {
+		self.block_header_status == sp_blockchain::BlockStatus::InChain
+	}
+
+	fn has_state_or_block(&self) -> bool {
+		!self.skip_execution_checks
+	}
+
+	fn should_return_missing_state_for_execution(&self) -> bool {
+		self.state_action == ImportStateAction::ExecuteIfPossible &&
+			!self.is_parent_state_available() &&
+			!self.is_initial_sync() &&
+			!self.parent_is_genesis()
+	}
+
+	fn should_short_circuit_known_header(&self) -> bool {
+		self.is_header_already_imported() &&
+			!self.has_state_or_block() &&
+			!self.finalized &&
+			!self.is_block_gap
+	}
+
+	fn can_finalize_import(&self, is_finalized_descendent: bool) -> bool {
+		is_finalized_descendent || self.is_initial_sync() || self.finalized
+	}
+}
+
+enum PreImportOutcome<B: BlockT> {
+	ContinueImport { import_context: ImportContext<B> },
+	ReturnResult(ImportResult),
+}
+
 impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, I, C, AC> {
 	fn clone(&self) -> Self {
 		Self {
@@ -121,6 +242,39 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 			metrics: self.metrics.clone(),
 			_phantom: PhantomData,
 		}
+	}
+}
+
+impl<B, I, C, AC> ArgonBlockImport<B, I, C, AC>
+where
+	B: BlockT,
+	I: BlockImport<B> + Send + Sync,
+	I::Error: Into<ConsensusError>,
+	C: ImportApisExt<B> + AuxStore + Send + Sync + 'static,
+	AC: Clone + Codec + Send + Sync + 'static,
+{
+	fn finish_pre_import(import_context: ImportContext<B>) -> PreImportOutcome<B> {
+		if import_context.should_short_circuit_known_header() {
+			tracing::debug!(
+				context = ?import_context,
+				"Skipping reimport of known block without state or finalization"
+			);
+			return PreImportOutcome::ReturnResult(ImportResult::AlreadyInChain);
+		}
+
+		PreImportOutcome::ContinueImport { import_context }
+	}
+
+	fn evaluate_pre_import(import_context: ImportContext<B>) -> PreImportOutcome<B> {
+		if import_context.should_return_missing_state_for_execution() {
+			tracing::debug!(
+				context = ?import_context,
+				"Parent state missing; returning missing state action"
+			);
+			return PreImportOutcome::ReturnResult(ImportResult::MissingState);
+		}
+
+		Self::finish_pre_import(import_context)
 	}
 }
 
@@ -218,50 +372,19 @@ where
 	) -> Result<ImportResult, Self::Error> {
 		// single thread the import queue to ensure we don't have multiple imports
 		let _import_lock = self.import_lock.lock().await;
-		let block_hash = block.post_hash();
-		let block_number = *block.header.number();
-		let parent_hash = *block.header.parent_hash();
-		// prematurely set fork choice = false to avoid any chance of setting best block
-		block.fork_choice = Some(ForkChoiceStrategy::Custom(false));
-
-		let info = self.client.info();
-		let is_block_gap =
-			info.block_gap.is_some_and(|a| a.start <= block_number && block_number <= a.end);
-		let parent_block_state =
-			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
-		let block_header_status =
-			self.client.status(block_hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
+		let import_context = ImportContext::from_block(&*self.client, &mut block);
 		// NOTE: do not access runtime here without knowing for CERTAIN state is successfully
 		// imported. Various sync strategies will access this path without state set yet
-		tracing::trace!(
-			number=?block_number,
-			hash=?block_hash,
-			parent=?parent_hash,
-			is_block_gap,
-			action=match block.state_action {
-				StateAction::ApplyChanges(StorageChanges::Changes(_)) => "state_apply",
-				StateAction::ApplyChanges(StorageChanges::Import(_)) => "state_import",
-				StateAction::Execute => "execute",
-				StateAction::ExecuteIfPossible => "execute_if_possible",
-				StateAction::Skip => "skip",
-			},
-			origin=?block.origin,
-			parent_block_state=?parent_block_state,
-			block_header_status=?block_header_status,
-			finalized=block.finalized,
-			"Begin import."
-		);
+		tracing::trace!(context = ?import_context, "Begin import.");
 
-		let parent_is_genesis = parent_hash == info.genesis_hash;
-		if matches!(block.state_action, StateAction::ExecuteIfPossible) &&
-			parent_block_state != BlockStatus::InChainWithState &&
-			block.origin != BlockOrigin::NetworkInitialSync &&
-			!parent_is_genesis
-		{
-			tracing::debug!(?block_hash, ?block_number, parent=?parent_hash, "Parent state missing; returning missing state action");
-			return Ok(ImportResult::MissingState);
-		}
-
+		let import_context = match Self::evaluate_pre_import(import_context) {
+			PreImportOutcome::ContinueImport { import_context } => import_context,
+			PreImportOutcome::ReturnResult(result) => return Ok(result),
+		};
+		let info = &import_context.info;
+		let block_hash = import_context.hash;
+		let block_number = import_context.number;
+		let parent_hash = import_context.parent_hash;
 		let is_finalized_descendent = is_on_finalized_chain(
 			&(*self.client),
 			&block,
@@ -270,31 +393,10 @@ where
 		)
 		.unwrap_or_default();
 
-		let can_finalize = is_finalized_descendent ||
-			block.origin == BlockOrigin::NetworkInitialSync ||
-			block.finalized;
+		let can_finalize = import_context.can_finalize_import(is_finalized_descendent);
+		let is_block_header_already_imported = import_context.is_header_already_imported();
+		let has_state_or_block = import_context.has_state_or_block();
 
-		let is_block_header_already_imported =
-			block_header_status == sp_blockchain::BlockStatus::InChain;
-		let has_state_or_block = !block.state_action.skip_execution_checks();
-		// If the header is already in the DB we usually short-circuit unless the
-		// new import carries *something* we still need (state/body *or* finality).
-		// During block-gap recovery we must still process known headers to fetch
-		// missing body/state data.
-		if is_block_header_already_imported &&
-			!has_state_or_block &&
-			!block.finalized &&
-			!is_block_gap
-		{
-			tracing::debug!(
-				?block_hash,
-				?block_number,
-				"Skipping reimport of known block without state or finalization"
-			);
-			return Ok(ImportResult::AlreadyInChain);
-		}
-		// Otherwise (e.g. now finalized or now with state) we fall through and let
-		// `inner.import_block` upgrade the existing header.
 		let best_header = self
 			.client
 			.header(info.best_hash)
@@ -365,7 +467,7 @@ where
 		let mut record_block_key_on_import = None;
 
 		let is_vote_block = fork_power.is_latest_vote;
-		if !is_block_gap &&
+		if !import_context.is_block_gap &&
 			!is_block_header_already_imported &&
 			block.origin != BlockOrigin::NetworkInitialSync
 		{
@@ -418,8 +520,7 @@ where
 				is_vote_block,
 			)?;
 			if let Some(metrics) = &*self.metrics {
-				// only try to read data if we have state or a block, and still have it flexible if
-				// so
+				// Runtime-backed reads below require a successfully imported state.
 				if has_state_or_block && !is_block_header_already_imported {
 					if is_vote_block {
 						metrics.imported_vote_sealed_blocks_total.with_label_values(&[]).inc();
