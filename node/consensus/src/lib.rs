@@ -47,6 +47,7 @@ pub mod import_queue;
 pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
+pub(crate) mod pending_import_replay;
 pub mod state_anchor;
 
 pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
