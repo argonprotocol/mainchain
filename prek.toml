@@ -1,0 +1,28 @@
+default_stages = ["pre-commit", "pre-push"]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "check-yaml" },
+    { id = "check-toml" },
+    { id = "check-case-conflict" },
+    { id = "check-executables-have-shebangs" },
+    { id = "check-merge-conflict" },
+    { id = "detect-private-key" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+    {
+        id = "format",
+        name = "Format code with cargo fmt + zepter",
+        entry = "cargo make format",
+        language = "system",
+        types = ["rust"],
+        pass_filenames = false,
+        stages = ["pre-commit", "pre-push"],
+    },
+]
