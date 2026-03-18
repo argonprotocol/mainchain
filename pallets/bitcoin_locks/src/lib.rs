@@ -819,6 +819,11 @@ pub mod pallet {
 				return Ok(());
 			}
 
+			ensure!(
+				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
+				Error::<T>::LockInProcessOfRelease
+			);
+
 			// The user must request a co-sign 10 days before the vault can claim on bitcoin to give
 			// them enough time to react. At the time of claim height, the utxo is claimable on the
 			// bitcoin network, so this time frame must be "inside" the claim height
@@ -1174,6 +1179,13 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// NOTE: The `signature` parameter is NOT verified on-chain. The orphan record does
+		/// not retain the cosign script args needed for verification (they are cleaned up
+		/// with the BitcoinLock). The signature is passed through to the
+		/// `OrphanedUtxoCosigned` event so the lock owner can construct the Bitcoin release
+		/// transaction off-chain. A garbage signature means the owner can't spend — no
+		/// on-chain damage. To add on-chain verification, the cosign script args would need
+		/// to be stored in `OrphanedUtxo` (storage migration required).
 		#[pallet::call_index(6)]
 		#[pallet::weight(T::WeightInfo::cosign_orphaned_utxo_release())]
 		pub fn cosign_orphaned_utxo_release(
@@ -1369,8 +1381,9 @@ pub mod pallet {
 						return Ok(());
 					}
 					lock.is_funded = true;
-					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
-						.map_err(Error::<T>::from)?;
+					// Save the original securitization before any adjustments so
+					// remove_pending correctly reverses what lock() added.
+					let original_securitization = lock.get_securitization();
 
 					// If we received different amount of sats than expected, we need to adjust
 					// the lock parameters. We will not change the fee.
@@ -1404,7 +1417,10 @@ pub mod pallet {
 						&lock.owner_account,
 						lock.liquidity_promised,
 					)?;
-					T::VaultProvider::remove_pending(lock.vault_id, &lock.get_securitization())
+					// Confirm pending with the original securitization (matching what
+					// lock() added) but after all adjustments, so the operational
+					// accounts hook sees the final vault state.
+					T::VaultProvider::remove_pending(lock.vault_id, &original_securitization)
 						.map_err(Error::<T>::from)?;
 				} else {
 					log::warn!("Funded utxo_id {utxo_id:?} not found");
@@ -1543,8 +1559,10 @@ pub mod pallet {
 			};
 
 			let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
-			let vault_claim_height = current_bitcoin_height + T::LockDurationBlocks::get();
-			let open_claim_height = vault_claim_height + T::LockReclamationBlocks::get();
+			let vault_claim_height =
+				current_bitcoin_height.saturating_add(T::LockDurationBlocks::get());
+			let open_claim_height =
+				vault_claim_height.saturating_add(T::LockReclamationBlocks::get());
 
 			let liquidity_promised = if let Some(rate) = options.and_then(|a| a.microgons_per_btc())
 			{

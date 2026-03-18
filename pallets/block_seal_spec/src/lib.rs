@@ -403,8 +403,8 @@ pub mod pallet {
 					continue;
 				}
 				if !T::NotebookProvider::is_notary_locked_at_tick(header.notary_id, header.tick) {
-					block_votes.votes_count += header.block_votes_count;
-					block_votes.voting_power += header.block_voting_power;
+					block_votes.votes_count.saturating_accrue(header.block_votes_count);
+					block_votes.voting_power.saturating_accrue(header.block_voting_power);
 				}
 			}
 

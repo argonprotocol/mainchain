@@ -933,7 +933,7 @@ impl<T: Config> Pallet<T> {
 			for miner in rotating_out {
 				let account_id = miner.account_id.clone();
 				AccountIndexLookup::<T>::remove(&account_id);
-				active_miners -= 1;
+				active_miners.saturating_reduce(1);
 				let _ = released_miners_by_account_id.try_insert(account_id.clone(), miner.clone());
 				removed_miners.push((account_id, miner.authority_keys.clone()));
 				let next_registration =

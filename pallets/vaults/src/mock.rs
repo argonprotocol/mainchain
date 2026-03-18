@@ -173,6 +173,7 @@ impl pallet_treasury::Config for Test {
 	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
 	type OperationalAccountsHook = ();
 	type OperationalRewardsProvider = ();
+	type PriceProvider = StaticPriceProvider;
 }
 
 pub struct StaticBitcoinUtxoTracker;

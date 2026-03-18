@@ -399,6 +399,7 @@ impl pallet_treasury::Config for Runtime {
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = Vaults;
+	type PriceProvider = PriceIndex;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;

@@ -1453,6 +1453,38 @@ fn it_should_aggregate_holds_for_a_second_release() {
 }
 
 #[test]
+fn it_rejects_duplicate_release_request() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let who = 1;
+		let satoshis = SATOSHIS_PER_BITCOIN;
+		set_argons(who, 2_000);
+		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(Balances::mint_into(&who, 200_000 * MICROGONS_PER_ARGON));
+
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			make_script_pubkey(&[0; 32]),
+			10
+		));
+		assert_noop!(
+			BitcoinLocks::request_release(
+				RuntimeOrigin::signed(who),
+				1,
+				make_script_pubkey(&[0; 32]),
+				10
+			),
+			Error::<Test>::LockInProcessOfRelease
+		);
+	});
+}
+
+#[test]
 fn it_should_allow_a_ratchet_up() {
 	ChargeFee::set(true);
 	new_test_ext().execute_with(|| {
