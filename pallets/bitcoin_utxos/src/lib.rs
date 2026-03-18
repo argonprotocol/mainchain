@@ -332,11 +332,11 @@ pub mod pallet {
 			});
 			ExpiredPendingFunding::<T>::mutate(|expired| {
 				for (utxo_id, entry) in newly_expired {
-					let inserted = expired.try_insert(utxo_id, entry);
-					debug_assert!(
-						inserted.is_ok(),
-						"expired pending funding queue capacity is preserved when entries move out of pending"
-					);
+					if expired.try_insert(utxo_id, entry).is_err() {
+						log::error!(
+							"Expired pending funding queue full — utxo {utxo_id:?} dropped"
+						);
+					}
 				}
 			});
 

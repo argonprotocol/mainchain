@@ -345,12 +345,12 @@ pub mod pallet {
 			let total_minted = mining_mint + bitcoin_utxos;
 			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
 			if let Some(microgons) = mining_prorata {
-				MintedMiningMicrogons::<T>::mutate(|mint| *mint -= microgons);
+				MintedMiningMicrogons::<T>::mutate(|mint| mint.saturating_reduce(microgons));
 			}
 
 			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
 			if let Some(microgons) = bitcoin_prorata {
-				MintedBitcoinMicrogons::<T>::mutate(|mint| *mint -= microgons);
+				MintedBitcoinMicrogons::<T>::mutate(|mint| mint.saturating_reduce(microgons));
 			}
 		}
 	}

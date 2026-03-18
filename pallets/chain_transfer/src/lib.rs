@@ -331,21 +331,26 @@ pub mod pallet {
 			}
 
 			if header.tax > 0 {
-				if let Err(e) = T::Argon::burn_from(
+				let tax: T::Balance = header.tax.into();
+				let burned = T::Argon::burn_from(
 					&notary_pallet_account_id,
-					header.tax.into(),
+					tax,
 					Preservation::Preserve,
-					Precision::Exact,
+					Precision::BestEffort,
 					Fortitude::Force,
-				) {
+				)
+				.unwrap_or_default();
+				if !burned.is_zero() {
+					T::EventHandler::on_argon_burn(&burned);
+				}
+				if burned < tax {
 					Self::deposit_event(Event::TaxationError {
 						notary_id,
 						notebook_number: header.notebook_number,
-						tax: header.tax.into(),
-						error: e,
+						tax,
+						error: DispatchError::Token(TokenError::FundsUnavailable),
 					});
 				}
-				T::EventHandler::on_argon_burn(&header.tax.into());
 			}
 
 			// Use notebook tick progression as the expiry boundary so delayed-but-valid notebooks

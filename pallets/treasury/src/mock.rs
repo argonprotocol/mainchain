@@ -1,7 +1,7 @@
 use crate as pallet_treasury;
 use argon_primitives::{
 	OperationalAccountsHook, OperationalRewardPayout, OperationalRewardsProvider,
-	bitcoin::Satoshis, vault::TreasuryVaultProvider,
+	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
 };
 use frame_support::traits::Currency;
 use pallet_prelude::{
@@ -129,6 +129,10 @@ parameter_types! {
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
 
+	// BTC=$100 / argon=$1 makes 1 sat = 1 microgon for clean test math
+	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(100.00));
+	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
 	pub static TreasuryPoolParticipated: Vec<(u64, Balance)> = vec![];
 	pub static PendingOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
@@ -155,6 +159,28 @@ pub fn set_vault_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis) {
 			vault.securitized_satoshis = satoshis;
 		}
 	});
+}
+
+pub struct StaticPriceProvider;
+impl PriceProvider<Balance> for StaticPriceProvider {
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		BitcoinPricePerUsd::get()
+	}
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonPricePerUsd::get()
+	}
+	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
+		None
+	}
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		None
+	}
+	fn get_circulation() -> Balance {
+		0
+	}
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> argon_primitives::ArgonCPI {
+		FixedI128::zero()
+	}
 }
 
 pub struct StaticTreasuryVaultProvider;
@@ -213,6 +239,7 @@ impl pallet_treasury::Config for Test {
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
+	type PriceProvider = StaticPriceProvider;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;

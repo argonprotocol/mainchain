@@ -349,3 +349,85 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 		);
 	});
 }
+
+#[test]
+fn it_emits_taxation_error_when_burn_fails() {
+	MaxNotebookBlocksToRemember::set(2);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		// Notary escrow has no funds — burn will fail
+		let issuance_before = Balances::total_issuance();
+
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 1,
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			tax: 5000,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+			parent_secret: None,
+			block_votes_count: 0,
+			domains: Default::default(),
+		});
+
+		// Total issuance unchanged — burn failed, nothing burned
+		assert_eq!(Balances::total_issuance(), issuance_before);
+		System::assert_has_event(
+			Event::<Test>::TaxationError {
+				notary_id: 1,
+				notebook_number: 1,
+				tax: 5000,
+				error: sp_runtime::TokenError::FundsUnavailable.into(),
+			}
+			.into(),
+		);
+	});
+}
+
+#[test]
+fn it_partially_burns_tax_when_escrow_is_low() {
+	MaxNotebookBlocksToRemember::set(2);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let who = ChainTransferPallet::notary_account_id(1);
+		// Fund escrow with less than the tax (but above ED so burn can occur)
+		set_argons(&who, 15_000);
+
+		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 1,
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			tax: 20_000,
+			block_voting_power: 0,
+			blocks_with_votes: Default::default(),
+			block_votes_root: H256::random(),
+			secret_hash: H256::random(),
+			parent_secret: None,
+			block_votes_count: 0,
+			domains: Default::default(),
+		});
+
+		// Should have burned what it could (balance minus ED=10_000 to preserve account)
+		assert!(Balances::total_issuance() < 15_000);
+		// Error event emitted for the shortfall
+		System::assert_has_event(
+			Event::<Test>::TaxationError {
+				notary_id: 1,
+				notebook_number: 1,
+				tax: 20_000,
+				error: sp_runtime::TokenError::FundsUnavailable.into(),
+			}
+			.into(),
+		);
+	});
+}

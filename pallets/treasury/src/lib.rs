@@ -62,6 +62,7 @@ pub mod pallet {
 	use alloc::{collections::BTreeMap, vec::Vec};
 	use argon_primitives::{
 		TreasuryPoolProvider,
+		providers::PriceProvider,
 		vault::{MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
 	use pallet_prelude::argon_primitives::{
@@ -108,6 +109,8 @@ pub mod pallet {
 		type RuntimeHoldReason: From<HoldReason>;
 
 		type TreasuryVaultProvider: TreasuryVaultProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+
+		type PriceProvider: PriceProvider<Self::Balance>;
 
 		/// The maximum number of contributors to a bond fund
 		#[pallet::constant]
@@ -817,8 +820,9 @@ pub mod pallet {
 
 		fn get_vault_securitized_funds_per_slot(vault_id: VaultId) -> T::Balance {
 			let securitized_satoshis = T::TreasuryVaultProvider::get_securitized_satoshis(vault_id);
-			let securitized_capital: T::Balance = u128::from(securitized_satoshis).into();
-			securitized_capital / 10u128.into()
+			let securitized_argons =
+				T::PriceProvider::get_bitcoin_argon_price(securitized_satoshis).unwrap_or_default();
+			securitized_argons / 10u128.into()
 		}
 	}
 

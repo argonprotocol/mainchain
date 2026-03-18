@@ -34,6 +34,13 @@ fn it_records_burnt_argons_by_prorata() {
 		MintedBitcoinMicrogons::<Test>::set(66);
 		Mint::on_argon_burn(10);
 		assert_eq!(MintedMiningMicrogons::<Test>::get(), 33 - 3);
+
+		// burn amount larger than tracked mints saturates to zero
+		MintedMiningMicrogons::<Test>::set(5);
+		MintedBitcoinMicrogons::<Test>::set(5);
+		Mint::on_argon_burn(100);
+		assert_eq!(MintedMiningMicrogons::<Test>::get(), 0);
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 0);
 	});
 }
 
