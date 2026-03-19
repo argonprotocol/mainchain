@@ -184,7 +184,7 @@ parameter_types! {
 
 	// Fees
 	pub FeeMultiplier: Multiplier = Multiplier::one();
-	pub const TransactionByteFee: Balance = 10;
+	pub const TransactionByteFee: Balance = 1;
 
 
 	// ## pallet_hyperbridge
@@ -251,7 +251,7 @@ impl WeightToFeePolynomial for ArgonWeightToFee {
 	type Balance = Balance;
 	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
 		let p = ARGON; // microgons
-		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		let q = 10_000 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
 		// BAB - disabling wage protector for fees. Makes it hard to keep system stable
 		// let cpi = PriceIndex::get_argon_cpi().unwrap_or(ArgonCPI::zero());
 		// if cpi.is_positive() {
