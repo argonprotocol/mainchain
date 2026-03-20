@@ -52,8 +52,8 @@ pub mod state_anchor;
 pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
 pub use state_anchor::{
 	DEFAULT_STATE_LOOKBACK_DEPTH, GenesisStorageReadError, ResolveBestOrFinalizedStateHashError,
-	read_chain_spec_bitcoin_network, read_chain_spec_ticker, read_genesis_storage_value,
-	resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+	read_chain_spec_bitcoin_network, read_chain_spec_grandpa_authorities, read_chain_spec_ticker,
+	read_genesis_storage_value, resolve_best_or_finalized_state_hash, resolve_stateful_hash,
 };
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};

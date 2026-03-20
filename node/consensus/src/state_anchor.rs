@@ -5,6 +5,7 @@ use polkadot_sdk::{
 	sc_service::{ChainSpec, TFullClient},
 	sp_blockchain::{self, HeaderBackend},
 	sp_consensus::BlockStatus,
+	sp_consensus_grandpa::AuthorityList,
 	sp_io,
 	sp_runtime::traits::{Block as BlockT, Header},
 };
@@ -121,6 +122,12 @@ pub fn read_chain_spec_bitcoin_network(
 	chain_spec: &dyn ChainSpec,
 ) -> Result<BitcoinNetwork, GenesisStorageReadError> {
 	read_genesis_storage_value(chain_spec, b"BitcoinUtxos", b"BitcoinNetwork")
+}
+
+pub fn read_chain_spec_grandpa_authorities(
+	chain_spec: &dyn ChainSpec,
+) -> Result<AuthorityList, GenesisStorageReadError> {
+	read_genesis_storage_value(chain_spec, b"Grandpa", b"Authorities")
 }
 
 pub fn read_genesis_storage_value<T: Decode>(

@@ -12,7 +12,8 @@ use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::read_chain_spec_bitcoin_network;
 use argon_node_consensus::{
 	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
-	create_import_queue, read_chain_spec_ticker, run_block_builder_task, run_notary_sync,
+	create_import_queue, read_chain_spec_grandpa_authorities, read_chain_spec_ticker,
+	run_block_builder_task, run_notary_sync,
 };
 use argon_primitives::{AccountId, TickApis, digests::ArgonDigests, tick::Tick};
 use polkadot_sdk::*;
@@ -104,9 +105,12 @@ where
 		telemetry
 	});
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
-	let grandpa_genesis_authorities = client.get().map_err(|error| {
-		ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
-	})?;
+	let grandpa_genesis_authorities =
+		read_chain_spec_grandpa_authorities(config.chain_spec.as_ref()).map_err(|error| {
+			ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
+		})?;
+	let genesis_authority_set_provider =
+		FixedGenesisAuthoritySetProvider::new(grandpa_genesis_authorities.clone());
 
 	let transaction_pool = Arc::from(
 		sc_transaction_pool::Builder::new(
@@ -122,7 +126,7 @@ where
 		sc_consensus_grandpa::block_import_with_authority_set_hard_forks(
 			client.clone(),
 			GRANDPA_JUSTIFICATION_PERIOD,
-			&client,
+			&genesis_authority_set_provider,
 			select_chain.clone(),
 			grandpa_hard_forks::authority_set_hard_forks(
 				config.chain_spec.id(),
@@ -247,9 +251,10 @@ where
 			Arc::clone(&peer_store_handle),
 		);
 	net_config.add_notification_protocol(grandpa_protocol_config);
-	let grandpa_genesis_authorities = client.get().map_err(|error| {
-		ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
-	})?;
+	let grandpa_genesis_authorities =
+		read_chain_spec_grandpa_authorities(config.chain_spec.as_ref()).map_err(|error| {
+			ServiceError::Other(format!("Failed to read GRANDPA genesis authorities: {error}"))
+		})?;
 
 	let warp_sync = Arc::new(ArgonWarpSyncProvider::new(
 		backend.clone(),
@@ -421,6 +426,22 @@ where
 	Ok(task_manager)
 }
 
+struct FixedGenesisAuthoritySetProvider {
+	authorities: sp_consensus_grandpa::AuthorityList,
+}
+
+impl FixedGenesisAuthoritySetProvider {
+	fn new(authorities: sp_consensus_grandpa::AuthorityList) -> Self {
+		Self { authorities }
+	}
+}
+
+impl GenesisAuthoritySetProvider<Block> for FixedGenesisAuthoritySetProvider {
+	fn get(&self) -> Result<sp_consensus_grandpa::AuthorityList, sp_blockchain::Error> {
+		Ok(self.authorities.clone())
+	}
+}
+
 fn resolve_startup_tick<Runtime>(client: &Arc<FullClient<Runtime>>) -> Result<Tick, ServiceError>
 where
 	Runtime: ConstructRuntimeApi<Block, FullClient<Runtime>> + Send + Sync + 'static,
@@ -463,29 +484,48 @@ where
 
 #[cfg(test)]
 mod tests {
-	use super::{read_chain_spec_bitcoin_network, read_chain_spec_ticker};
-	use crate::chain_spec::{development_config, mainnet_config};
+	use super::{
+		read_chain_spec_bitcoin_network, read_chain_spec_grandpa_authorities,
+		read_chain_spec_ticker,
+	};
+	use crate::chain_spec::ChainSpec;
 	use argon_primitives::{bitcoin::BitcoinNetwork, tick::Ticker};
 
 	#[test]
-	fn reads_dev_chain_genesis_values_from_state_anchor() {
-		let chain_spec = development_config().expect("Development chain spec should build");
-		let ticker = read_chain_spec_ticker(&chain_spec).expect("Ticker should decode");
-		let bitcoin_network =
-			read_chain_spec_bitcoin_network(&chain_spec).expect("Bitcoin network should decode");
-
-		assert_eq!(ticker, Ticker::new(2_000, 2));
-		assert_eq!(bitcoin_network, BitcoinNetwork::Regtest);
-	}
-
-	#[test]
 	fn reads_mainnet_chain_genesis_values_from_state_anchor() {
-		let chain_spec = mainnet_config().expect("Mainnet chain spec should build");
+		let chain_spec =
+			ChainSpec::from_json_bytes(&include_bytes!("./chain_spec/argon_foundation.json")[..])
+				.expect("Mainnet chain spec should load");
 		let ticker = read_chain_spec_ticker(&chain_spec).expect("Ticker should decode");
 		let bitcoin_network =
 			read_chain_spec_bitcoin_network(&chain_spec).expect("Bitcoin network should decode");
 
 		assert_eq!(ticker, Ticker::new(60_000, 60));
 		assert_eq!(bitcoin_network, BitcoinNetwork::Bitcoin);
+	}
+
+	#[test]
+	fn reads_testnet_chain_genesis_values_from_state_anchor() {
+		let chain_spec =
+			ChainSpec::from_json_bytes(&include_bytes!("./chain_spec/testnet1.json")[..])
+				.expect("Testnet chain spec should load");
+		let ticker = read_chain_spec_ticker(&chain_spec).expect("Ticker should decode");
+		let bitcoin_network =
+			read_chain_spec_bitcoin_network(&chain_spec).expect("Bitcoin network should decode");
+
+		assert_eq!(ticker, Ticker::new(60_000, 60));
+		assert_eq!(bitcoin_network, BitcoinNetwork::Signet);
+	}
+
+	#[test]
+	fn reads_testnet_grandpa_authorities_from_chain_spec() {
+		let chain_spec =
+			ChainSpec::from_json_bytes(&include_bytes!("./chain_spec/testnet1.json")[..])
+				.expect("Testnet chain spec should load");
+		let authorities = read_chain_spec_grandpa_authorities(&chain_spec)
+			.expect("GRANDPA authorities should decode");
+
+		assert_eq!(authorities.len(), 1);
+		assert_eq!(authorities[0].1, 10);
 	}
 }
