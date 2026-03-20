@@ -1,9 +1,21 @@
 # Changelog
 
-## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...a5db044c74c574bb1b0873c7bc29f86004f6031a) (2026-02-17)
+## [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.3.27...065d5ed4faac63d04560feee760dd9af2c46831f) (2026-03-19)
 
 ### Features
 
+* **bitcoin:** add candidate return flow
+([2242f27](https://github.com/argonprotocol/mainchain/commit/2242f27feeedb293676d131ac41b218424cae693))
+* **operational-accounts:** simplify paid registration bootstrap
+([03044c9](https://github.com/argonprotocol/mainchain/commit/03044c9985c277ccc170b825c99a259f8d085fe7))
+* improve operational account recovery
+([fb7b3b5](https://github.com/argonprotocol/mainchain/commit/fb7b3b5ccfddf1f96fb22c0d7be993488e7b150b))
+* **vaults:** track locked and securitized satoshis
+([7822163](https://github.com/argonprotocol/mainchain/commit/7822163831cf9ebf5cbfaf3ed01a5428d92ff767))
+* **operational-accounts:** add root progress override patch
+([2835686](https://github.com/argonprotocol/mainchain/commit/2835686bda0328f99c83fb11d9b0dff39e9cae10))
+* **vaults:** track securitized satoshis phase 1
+([1135732](https://github.com/argonprotocol/mainchain/commit/11357326893bee45c1cf9e62511dda9062fe90db))
 * **consensus:** harden fork choice + block seal
 ([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
 * **consensus:** harden fork choice + block seal
@@ -19,6 +31,8 @@
 
 ### Fixes
 
+* **bitcoin:** avoid overweighting pending funding expiration cleanup
+([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
 * **weights:** align mining-slot/vault benchmarks
 ([bd7b405](https://github.com/argonprotocol/mainchain/commit/bd7b405224067c968097ce6c542b3fb5342ed01d))
 * duplicate metadata field

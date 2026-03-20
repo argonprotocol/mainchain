@@ -33,3 +33,4 @@ node_modules
 /.yarn/install-state.gz
 /.port-lock
 /state.raw
+/.claude/worktrees

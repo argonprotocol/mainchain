@@ -273,6 +273,15 @@ declare module '@polkadot/api-base/types/submittable' {
         (satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u64]
       >;
+      /**
+       * NOTE: The `signature` parameter is NOT verified on-chain. The orphan record does
+       * not retain the cosign script args needed for verification (they are cleaned up
+       * with the BitcoinLock). The signature is passed through to the
+       * `OrphanedUtxoCosigned` event so the lock owner can construct the Bitcoin release
+       * transaction off-chain. A garbage signature means the owner can't spend — no
+       * on-chain damage. To add on-chain verification, the cosign script args would need
+       * to be stored in `OrphanedUtxo` (storage migration required).
+       **/
       cosignOrphanedUtxoRelease: AugmentedSubmittable<
         (
           orphanOwner: AccountId32 | string | Uint8Array,

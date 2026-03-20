@@ -11304,6 +11304,13 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				#[doc = "NOTE: The `signature` parameter is NOT verified on-chain. The orphan record does"]
+				#[doc = "not retain the cosign script args needed for verification (they are cleaned up"]
+				#[doc = "with the BitcoinLock). The signature is passed through to the"]
+				#[doc = "`OrphanedUtxoCosigned` event so the lock owner can construct the Bitcoin release"]
+				#[doc = "transaction off-chain. A garbage signature means the owner can't spend — no"]
+				#[doc = "on-chain damage. To add on-chain verification, the cosign script args would need"]
+				#[doc = "to be stored in `OrphanedUtxo` (storage migration required)."]
 				pub struct CosignOrphanedUtxoRelease {
 					pub orphan_owner: cosign_orphaned_utxo_release::OrphanOwner,
 					pub utxo_ref: cosign_orphaned_utxo_release::UtxoRef,
@@ -11554,6 +11561,13 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = "NOTE: The `signature` parameter is NOT verified on-chain. The orphan record does"]
+				#[doc = "not retain the cosign script args needed for verification (they are cleaned up"]
+				#[doc = "with the BitcoinLock). The signature is passed through to the"]
+				#[doc = "`OrphanedUtxoCosigned` event so the lock owner can construct the Bitcoin release"]
+				#[doc = "transaction off-chain. A garbage signature means the owner can't spend — no"]
+				#[doc = "on-chain damage. To add on-chain verification, the cosign script args would need"]
+				#[doc = "to be stored in `OrphanedUtxo` (storage migration required)."]
 				pub fn cosign_orphaned_utxo_release(
 					&self,
 					orphan_owner: types::cosign_orphaned_utxo_release::OrphanOwner,
@@ -30084,6 +30098,13 @@ pub mod api {
 						bitcoin_network_fee: ::core::primitive::u64,
 					},
 					#[codec(index = 6)]
+					#[doc = "NOTE: The `signature` parameter is NOT verified on-chain. The orphan record does"]
+					#[doc = "not retain the cosign script args needed for verification (they are cleaned up"]
+					#[doc = "with the BitcoinLock). The signature is passed through to the"]
+					#[doc = "`OrphanedUtxoCosigned` event so the lock owner can construct the Bitcoin release"]
+					#[doc = "transaction off-chain. A garbage signature means the owner can't spend — no"]
+					#[doc = "on-chain damage. To add on-chain verification, the cosign script args would need"]
+					#[doc = "to be stored in `OrphanedUtxo` (storage migration required)."]
 					cosign_orphaned_utxo_release {
 						orphan_owner: crate::types::AccountId32,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
