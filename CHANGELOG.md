@@ -1,9 +1,29 @@
 # Changelog
 
-## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...a5db044c74c574bb1b0873c7bc29f86004f6031a) (2026-02-17)
+## [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.3.27...065d5ed4faac63d04560feee760dd9af2c46831f) (2026-03-19)
 
 ### Features
 
+* **bitcoin:** add candidate return flow
+([2242f27](https://github.com/argonprotocol/mainchain/commit/2242f27feeedb293676d131ac41b218424cae693))
+* **operational-accounts:** simplify paid registration bootstrap
+([03044c9](https://github.com/argonprotocol/mainchain/commit/03044c9985c277ccc170b825c99a259f8d085fe7))
+* improve operational account recovery
+([fb7b3b5](https://github.com/argonprotocol/mainchain/commit/fb7b3b5ccfddf1f96fb22c0d7be993488e7b150b))
+* **vaults:** track locked and securitized satoshis
+([7822163](https://github.com/argonprotocol/mainchain/commit/7822163831cf9ebf5cbfaf3ed01a5428d92ff767))
+* **benchmarks:** wire provider weight composition
+([22cadc4](https://github.com/argonprotocol/mainchain/commit/22cadc4b9ce445ed346f467605a8bf4d0a6a8e6d))
+* **operational-accounts:** add root progress override patch
+([2835686](https://github.com/argonprotocol/mainchain/commit/2835686bda0328f99c83fb11d9b0dff39e9cae10))
+* **vaults:** track securitized satoshis phase 1
+([1135732](https://github.com/argonprotocol/mainchain/commit/11357326893bee45c1cf9e62511dda9062fe90db))
+* **security:** harden bitcoin CLI secret handling
+([80a6c3f](https://github.com/argonprotocol/mainchain/commit/80a6c3f2a7e7d3821f738be42a77ac23942f14f8))
+* **rewards:** settle operational payouts once per frame
+([2deed46](https://github.com/argonprotocol/mainchain/commit/2deed465bd2ac46eafd7b7e02c7362991bcb1043))
+* **node:** enforce notebook download trust and size policy
+([9310a3e](https://github.com/argonprotocol/mainchain/commit/9310a3ec9f7f63d146adc2a2cb4e690a00a13e4e))
 * **consensus:** harden fork choice + block seal
 ([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
 * **consensus:** harden fork choice + block seal
@@ -29,6 +49,28 @@
 
 ### Fixes
 
+* arithmetic safety, tax burn accounting, and treasury pool cap
+([e7d830a](https://github.com/argonprotocol/mainchain/commit/e7d830a2630bdb39081882b676aedf656fee5abe))
+* **bitcoin:** avoid overweighting pending funding expiration cleanup
+([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
+* **consensus:** correct vote-seal delay window math
+([9964842](https://github.com/argonprotocol/mainchain/commit/9964842e8e24aaa087c80d80a140ffc35912fbc6))
+* clear pending release when a bitcoin lock burns
+([4d61584](https://github.com/argonprotocol/mainchain/commit/4d615846f5224c832e5a0a51c069515b4e358c3b))
+* **node:** repair warp sync across historical handoffs
+([a80aaea](https://github.com/argonprotocol/mainchain/commit/a80aaea768abd83a472fe7b8850485ce9b4e81b7)),
+closes [#272](https://github.com/argonprotocol/mainchain/issues/272)
+* tests failing for voting_mining (#423)
+([97b012d](https://github.com/argonprotocol/mainchain/commit/97b012d5e1e625650915433b701f80db13d9b474)),
+closes [#423](https://github.com/argonprotocol/mainchain/issues/423)
+* **consensus:** keep import audit catchup active
+([f528425](https://github.com/argonprotocol/mainchain/commit/f528425b0f33c69a72bb54d0719bfda94081e998))
+* **consensus:** rollback notary queue state fallback
+([c3ed160](https://github.com/argonprotocol/mainchain/commit/c3ed160ddcf53f2404e2c29fd9c7f4ba4f49ffd6))
+* **notary:** stabilize audit failure notification test
+([c9db5c0](https://github.com/argonprotocol/mainchain/commit/c9db5c0149f338a0b12dac0e7f8fe04df1666341))
+* attempt to fix vote mining
+([0de71cc](https://github.com/argonprotocol/mainchain/commit/0de71ccfd39991aa8a380d9e0bc0c9f1cddc504b))
 * migrations for vault wrong
 ([a5db044](https://github.com/argonprotocol/mainchain/commit/a5db044c74c574bb1b0873c7bc29f86004f6031a))
 * lint

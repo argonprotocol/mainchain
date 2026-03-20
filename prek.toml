@@ -7,6 +7,7 @@ hooks = [
     { id = "end-of-file-fixer" },
     { id = "check-yaml" },
     { id = "check-toml" },
+    { id = "check-symlinks" },
     { id = "check-case-conflict" },
     { id = "check-executables-have-shebangs" },
     { id = "check-merge-conflict" },
@@ -17,12 +18,21 @@ hooks = [
 repo = "local"
 hooks = [
     {
-        id = "format",
-        name = "Format code with cargo fmt + zepter",
-        entry = "cargo make format",
+        id = "rust-pre-commit",
+        name = "Format Rust code and restage hook fixes",
+        entry = "bash scripts/prek_rust_pre_commit.sh",
+        language = "system",
+        types = ["rust"],
+        pass_filenames = true,
+        stages = ["pre-commit"],
+    },
+    {
+        id = "rust-clippy-check",
+        name = "Run full workspace clippy before push",
+        entry = "cargo make lint-check",
         language = "system",
         types = ["rust"],
         pass_filenames = false,
-        stages = ["pre-commit", "pre-push"],
+        stages = ["pre-push"],
     },
 ]
