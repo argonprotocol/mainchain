@@ -65,6 +65,7 @@ export class TxSubmitter {
       accountAddress: this.pair.address,
       submittedTime: new Date(),
       submittedAtBlockNumber: blockHeight,
+      nonce: signedTx.nonce.toNumber(),
     });
     if (options.disableAutomaticTxTracking !== true) {
       await signedTx.send(result.onSubscriptionResult.bind(result));

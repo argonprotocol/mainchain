@@ -70,6 +70,7 @@ export class TxResult {
       submittedTime: Date;
       submittedAtBlockNumber: number;
       accountAddress: string;
+      nonce: number;
     },
   ) {
     this.waitForFinalizedBlock = new Promise((resolve, reject) => {
