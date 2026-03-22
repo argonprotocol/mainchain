@@ -433,7 +433,15 @@ mod benchmarks {
 		reset_benchmark_environment::<T>();
 		let context = create_funded_lock::<T>(16)?;
 		let orphan_ref = benchmark_utxo_ref(1_104);
+		let release_script_pubkey = benchmark_script_pubkey(11)?;
 		seed_orphan_with_request::<T>(&context, orphan_ref)?;
+		Pallet::<T>::request_release(
+			RawOrigin::Signed(context.owner.clone()).into(),
+			context.utxo_id,
+			release_script_pubkey,
+			1_000,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed release request"))?;
 
 		#[block]
 		{

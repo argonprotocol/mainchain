@@ -3811,9 +3811,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				195u8, 125u8, 173u8, 9u8, 225u8, 149u8, 242u8, 150u8, 228u8, 154u8, 28u8, 161u8,
-				24u8, 56u8, 255u8, 103u8, 186u8, 59u8, 87u8, 239u8, 108u8, 32u8, 108u8, 169u8,
-				241u8, 143u8, 17u8, 64u8, 114u8, 207u8, 220u8, 102u8,
+				186u8, 154u8, 136u8, 186u8, 143u8, 19u8, 24u8, 147u8, 237u8, 202u8, 154u8, 86u8,
+				66u8, 255u8, 173u8, 132u8, 23u8, 158u8, 217u8, 16u8, 243u8, 143u8, 123u8, 145u8,
+				6u8, 58u8, 81u8, 233u8, 108u8, 17u8, 248u8, 144u8,
 			]
 	}
 	pub mod system {
@@ -4931,10 +4931,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							15u8, 223u8, 148u8, 156u8, 40u8, 162u8, 196u8, 129u8, 47u8, 120u8,
-							208u8, 147u8, 234u8, 117u8, 174u8, 47u8, 54u8, 232u8, 231u8, 64u8,
-							173u8, 67u8, 97u8, 58u8, 215u8, 16u8, 108u8, 213u8, 77u8, 168u8, 3u8,
-							107u8,
+							71u8, 194u8, 101u8, 214u8, 120u8, 116u8, 245u8, 193u8, 196u8, 208u8,
+							216u8, 91u8, 249u8, 51u8, 76u8, 84u8, 166u8, 129u8, 148u8, 103u8,
+							149u8, 83u8, 57u8, 216u8, 9u8, 109u8, 21u8, 91u8, 161u8, 91u8, 252u8,
+							113u8,
 						],
 					)
 				}
@@ -11797,6 +11797,27 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct BitcoinSpentAfterRelease {
+				pub utxo_id: bitcoin_spent_after_release::UtxoId,
+				pub vault_id: bitcoin_spent_after_release::VaultId,
+			}
+			pub mod bitcoin_spent_after_release {
+				use super::runtime_types;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type VaultId = ::core::primitive::u32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinSpentAfterRelease {
+				const PALLET: &'static str = "BitcoinLocks";
+				const EVENT: &'static str = "BitcoinSpentAfterRelease";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct BitcoinCosignPastDue {
 				pub utxo_id: bitcoin_cosign_past_due::UtxoId,
 				pub vault_id: bitcoin_cosign_past_due::VaultId,
@@ -12142,7 +12163,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Stores the block number where the lock was released"]
+				#[doc = " Stores the block number where a release was cosigned by the vault."]
 				pub fn lock_release_cosign_height_by_id_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -12164,7 +12185,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Stores the block number where the lock was released"]
+				#[doc = " Stores the block number where a release was cosigned by the vault."]
 				pub fn lock_release_cosign_height_by_id(
 					&self,
 					_0: types::lock_release_cosign_height_by_id::Param0,
@@ -30323,39 +30344,44 @@ pub mod api {
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
 					#[codec(index = 5)]
+					BitcoinSpentAfterRelease {
+						utxo_id: ::core::primitive::u64,
+						vault_id: ::core::primitive::u32,
+					},
+					#[codec(index = 6)]
 					BitcoinCosignPastDue {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						compensation_amount: ::core::primitive::u128,
 						compensated_account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 7)]
 					#[doc = "An error occurred while refunding an overdue cosigned bitcoin lock"]
 					CosignOverdueError {
 						utxo_id: ::core::primitive::u64,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 7)]
+					#[codec(index = 8)]
 					#[doc = "An error occurred while completing a lock"]
 					LockExpirationError {
 						utxo_id: ::core::primitive::u64,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					OrphanedUtxoReceived {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						vault_id: ::core::primitive::u32,
 						satoshis: ::core::primitive::u64,
 					},
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					OrphanedUtxoReleaseRequested {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						vault_id: ::core::primitive::u32,
 						account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 10)]
+					#[codec(index = 11)]
 					OrphanedUtxoCosigned {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
@@ -30363,14 +30389,14 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
-					#[codec(index = 11)]
+					#[codec(index = 12)]
 					UtxoFundedFromCandidate {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						vault_id: ::core::primitive::u32,
 						account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 12)]
+					#[codec(index = 13)]
 					SecuritizationIncreased {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,

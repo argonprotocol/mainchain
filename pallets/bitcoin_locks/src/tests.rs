@@ -940,7 +940,7 @@ fn calculates_redemption_prices() {
 }
 
 #[test]
-fn burns_a_spent_bitcoin() {
+fn burns_an_externally_spent_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -963,22 +963,8 @@ fn burns_a_spent_bitcoin() {
 		let price = StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().securitization_locked, price);
-		// first verify
 		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
 		assert_ok!(Balances::mint_into(&who, price));
-		let providers_before_request = System::providers(&who);
-		assert_ok!(BitcoinLocks::request_release(
-			RuntimeOrigin::signed(who),
-			1,
-			make_script_pubkey(&[0; 32]),
-			11
-		));
-		let cosign_due_frame = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
-		assert!(LockReleaseRequestsByUtxoId::<Test>::contains_key(1));
-		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).contains(&1));
-		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&1));
-		assert!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who) > 0);
-		assert_eq!(System::providers(&who), providers_before_request + 1);
 		assert_eq!(DefaultVault::get().securitized_satoshis, SATOSHIS_PER_BITCOIN);
 
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(50000)));
@@ -994,11 +980,6 @@ fn burns_a_spent_bitcoin() {
 		assert_eq!(DefaultVault::get().get_relock_capacity(), price - new_price);
 		assert_eq!(DefaultVault::get().securitization, allocated - new_price);
 		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
-		assert!(!LockReleaseRequestsByUtxoId::<Test>::contains_key(1));
-		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
-		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
-		assert_eq!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who), 0);
-		assert_eq!(System::providers(&who), providers_before_request);
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinLockBurned { vault_id: 1, utxo_id: 1, was_utxo_spent: true }
@@ -1009,6 +990,72 @@ fn burns_a_spent_bitcoin() {
 
 		assert_eq!(LastReleaseEvent::get(), Some((1, true, new_price)));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
+	});
+}
+
+#[test]
+fn spent_after_release_request_finalizes_as_release() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let who = 1;
+		set_argons(who, 2_000);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		let vault = DefaultVault::get();
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
+		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
+
+		let providers_before_request = System::providers(&who);
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			make_script_pubkey(&[0; 32]),
+			11
+		));
+		let cosign_due_frame = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
+		let redemption_price = LockReleaseRequestsByUtxoId::<Test>::get(1)
+			.expect("release request should exist")
+			.redemption_price;
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).contains(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&1));
+		assert_eq!(System::providers(&who), providers_before_request + 1);
+		assert_eq!(
+			Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who),
+			redemption_price
+		);
+
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(50_000)));
+
+		assert_ok!(BitcoinLocks::spent(1));
+		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
+		assert_eq!(DefaultVault::get().get_relock_capacity(), lock.liquidity_promised);
+		assert_eq!(DefaultVault::get().securitization, vault.securitization);
+		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
+		assert!(!LockReleaseRequestsByUtxoId::<Test>::contains_key(1));
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
+		assert_eq!(LockReleaseCosignHeightById::<Test>::get(1), None);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who), 0);
+		assert_eq!(System::providers(&who), providers_before_request);
+		assert_eq!(Balances::balance(&who), 2_000 + lock.liquidity_promised - redemption_price);
+		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_price)));
+
+		System::assert_last_event(
+			Event::<Test>::BitcoinSpentAfterRelease { vault_id: 1, utxo_id: 1 }.into(),
+		);
 	});
 }
 

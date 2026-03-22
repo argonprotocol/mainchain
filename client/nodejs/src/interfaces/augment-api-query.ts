@@ -228,7 +228,7 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * Stores the block number where the lock was released
+       * Stores the block number where a release was cosigned by the vault.
        **/
       lockReleaseCosignHeightById: AugmentedQuery<
         ApiType,
