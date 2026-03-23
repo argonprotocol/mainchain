@@ -364,6 +364,11 @@ declare module '@polkadot/api-base/types/events' {
           accountId: AccountId32;
         }
       >;
+      BitcoinSpentAfterRelease: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, vaultId: u32],
+        { utxoId: u64; vaultId: u32 }
+      >;
       BitcoinUtxoCosigned: AugmentedEvent<
         ApiType,
         [utxoId: u64, vaultId: u32, signature: Bytes],

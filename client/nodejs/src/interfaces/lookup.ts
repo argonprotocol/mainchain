@@ -555,6 +555,10 @@ export default {
         vaultId: 'u32',
         signature: 'Bytes',
       },
+      BitcoinSpentAfterRelease: {
+        utxoId: 'u64',
+        vaultId: 'u32',
+      },
       BitcoinCosignPastDue: {
         utxoId: 'u64',
         vaultId: 'u32',

@@ -191,7 +191,7 @@ pub mod pallet {
 	pub type LocksByUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, LockedBitcoin<T>, OptionQuery>;
 
-	/// Stores the block number where the lock was released
+	/// Stores the block number where a release was cosigned by the vault.
 	#[pallet::storage]
 	pub type LockReleaseCosignHeightById<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, BlockNumberFor<T>, OptionQuery>;
@@ -515,6 +515,10 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
 			signature: BitcoinSignature,
+		},
+		BitcoinSpentAfterRelease {
+			utxo_id: UtxoId,
+			vault_id: VaultId,
 		},
 		BitcoinCosignPastDue {
 			utxo_id: UtxoId,
@@ -925,6 +929,8 @@ pub mod pallet {
 
 			ensure!(T::VaultProvider::is_owner(vault_id, &who), Error::<T>::NoPermissions);
 			let request = Self::take_release_request(utxo_id)?;
+			let bitcoin_network_fee = request.bitcoin_network_fee;
+			let to_script_pubkey = request.to_script_pubkey.clone();
 
 			let utxo_ref = T::BitcoinUtxoTracker::get_funding_utxo_ref(utxo_id)
 				.ok_or(Error::<T>::BitcoinUtxoNotFound)?;
@@ -943,8 +949,8 @@ pub mod pallet {
 				utxo_ref.txid.into(),
 				utxo_ref.output_index,
 				ReleaseStep::VaultCosign,
-				Amount::from_sat(request.bitcoin_network_fee),
-				request.to_script_pubkey.into(),
+				Amount::from_sat(bitcoin_network_fee),
+				to_script_pubkey.into(),
 				T::GetBitcoinNetwork::get().into(),
 			)
 			.map_err(|_| Error::<T>::BitcoinUnableToBeDecodedForRelease)?;
@@ -953,39 +959,19 @@ pub mod pallet {
 				T::BitcoinSignatureVerifier::verify_signature(releaser, vault_pubkey, &signature)?;
 			ensure!(is_valid, Error::<T>::BitcoinInvalidCosignature);
 
-			// burn the owner's held funds
-			let burn_amount = request.redemption_price;
-			let _ = T::Currency::burn_held(
-				&HoldReason::ReleaseBitcoinLock.into(),
+			Self::finalize_release_request(
+				utxo_id,
+				lock,
+				request,
 				&owner_account,
-				burn_amount,
-				Precision::Exact,
-				Fortitude::Force,
-			)?;
-			frame_system::Pallet::<T>::dec_providers(&owner_account)?;
-			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
-
-			T::VaultProvider::schedule_for_release(
 				vault_id,
 				&securitization,
-				lock.satoshis,
 				&lock_extension,
-			)
-			.map_err(Error::<T>::from)?;
-			T::VaultProvider::reduce_securitized_satoshis(
-				vault_id,
-				lock.satoshis,
-				lock.securitization_ratio,
-			)
-			.map_err(Error::<T>::from)?;
-
+			)?;
 			LockReleaseCosignHeightById::<T>::insert(
 				utxo_id,
 				frame_system::Pallet::<T>::block_number(),
 			);
-
-			Self::schedule_orphans_for_cleanup(utxo_id, &lock);
-			T::BitcoinUtxoTracker::unwatch(utxo_id);
 
 			Self::deposit_event(Event::BitcoinUtxoCosigned { utxo_id, vault_id, signature });
 
@@ -1522,11 +1508,13 @@ pub mod pallet {
 		}
 
 		fn spent(utxo_id: UtxoId) -> DispatchResult {
-			if LocksByUtxoId::<T>::contains_key(utxo_id) {
-				Self::burn_bitcoin_lock(utxo_id, true)
-			} else {
-				Ok(())
+			if !LocksByUtxoId::<T>::contains_key(utxo_id) {
+				return Ok(());
 			}
+			if LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id) {
+				return Self::complete_release_after_spent(utxo_id);
+			}
+			Self::burn_bitcoin_lock(utxo_id, true)
 		}
 	}
 
@@ -1822,6 +1810,27 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn complete_release_after_spent(utxo_id: UtxoId) -> DispatchResult {
+			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			let owner_account = lock.owner_account.clone();
+			let vault_id = lock.vault_id;
+			let securitization = lock.get_securitization();
+			let lock_extension = lock.get_lock_extension();
+			let request = Self::take_release_request(utxo_id)?;
+
+			Self::finalize_release_request(
+				utxo_id,
+				lock,
+				request,
+				&owner_account,
+				vault_id,
+				&securitization,
+				&lock_extension,
+			)?;
+			Self::deposit_event(Event::BitcoinSpentAfterRelease { utxo_id, vault_id });
+			Ok(())
+		}
+
 		fn take_release_request(
 			utxo_id: UtxoId,
 		) -> Result<LockReleaseRequest<T::Balance>, Error<T>> {
@@ -1833,6 +1842,48 @@ pub mod pallet {
 			});
 			T::VaultProvider::update_pending_cosign_list(request.vault_id, utxo_id, true)?;
 			Ok(request)
+		}
+
+		fn finalize_release_request(
+			utxo_id: UtxoId,
+			lock: LockedBitcoin<T>,
+			request: LockReleaseRequest<T::Balance>,
+			owner_account: &T::AccountId,
+			vault_id: VaultId,
+			securitization: &Securitization<T::Balance>,
+			lock_extension: &LockExtension<T::Balance>,
+		) -> DispatchResult {
+			ensure!(lock.is_funded, Error::<T>::LockPendingFunding);
+
+			let burn_amount = request.redemption_price;
+			if burn_amount > T::Balance::zero() {
+				let _ = T::Currency::burn_held(
+					&HoldReason::ReleaseBitcoinLock.into(),
+					owner_account,
+					burn_amount,
+					Precision::Exact,
+					Fortitude::Force,
+				)?;
+				frame_system::Pallet::<T>::dec_providers(owner_account)?;
+			}
+			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+			T::VaultProvider::schedule_for_release(
+				vault_id,
+				securitization,
+				lock.satoshis,
+				lock_extension,
+			)
+			.map_err(Error::<T>::from)?;
+			T::VaultProvider::reduce_securitized_satoshis(
+				vault_id,
+				lock.satoshis,
+				lock.securitization_ratio,
+			)
+			.map_err(Error::<T>::from)?;
+
+			Self::schedule_orphans_for_cleanup(utxo_id, &lock);
+			T::BitcoinUtxoTracker::unwatch(utxo_id);
+			Ok(())
 		}
 
 		/// Call made during the on_initialize to implement cosign overdue penalties.

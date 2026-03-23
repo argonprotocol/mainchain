@@ -714,6 +714,11 @@ declare module '@polkadot/types/lookup' {
       readonly vaultId: u32;
       readonly signature: Bytes;
     } & Struct;
+    readonly isBitcoinSpentAfterRelease: boolean;
+    readonly asBitcoinSpentAfterRelease: {
+      readonly utxoId: u64;
+      readonly vaultId: u32;
+    } & Struct;
     readonly isBitcoinCosignPastDue: boolean;
     readonly asBitcoinCosignPastDue: {
       readonly utxoId: u64;
@@ -773,6 +778,7 @@ declare module '@polkadot/types/lookup' {
       | 'BitcoinLockBurned'
       | 'BitcoinUtxoCosignRequested'
       | 'BitcoinUtxoCosigned'
+      | 'BitcoinSpentAfterRelease'
       | 'BitcoinCosignPastDue'
       | 'CosignOverdueError'
       | 'LockExpirationError'
