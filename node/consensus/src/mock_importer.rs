@@ -37,6 +37,7 @@ use sp_runtime::{
 use std::{
 	collections::{BTreeMap, HashMap},
 	sync::{Arc, Mutex},
+	time::Duration,
 };
 
 impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
@@ -496,6 +497,8 @@ fn new_notary_client_for_tests(client: &Arc<MemChain>) -> Arc<NotaryClient<Block
 		notebook_downloader,
 		Arc::new(None),
 		ticker,
+		None,
+		Duration::from_millis(250),
 		true,
 	))
 }
