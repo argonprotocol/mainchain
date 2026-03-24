@@ -105,7 +105,7 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let _last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+	let mut last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
 
 	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
 
@@ -218,6 +218,7 @@ async fn test_bitcoin_minting_e2e() {
 		vout,
 		&ticker,
 		&price_index_operator,
+		&mut last_bitcoin_price_tick,
 	)
 	.await
 	.unwrap();
@@ -227,7 +228,8 @@ async fn test_bitcoin_minting_e2e() {
 		.unwrap();
 
 	println!("Submitting new bitcoin price");
-	submit_price(&ticker, &client, &price_index_operator).await;
+	submit_price_if_needed(&ticker, &client, &price_index_operator, &mut last_bitcoin_price_tick)
+		.await;
 
 	// 5. Ask for the bitcoin to be released
 	println!("\nOwner requests release");
@@ -323,7 +325,7 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let _last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+	let mut last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
 
 	let _ = run_bitcoin_cli(&test_node, vec!["vault", "list", "--btc", &utxo_btc.to_string()])
 		.await
@@ -391,7 +393,8 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	}
 
 	println!("Submitting new bitcoin price");
-	submit_price(&ticker, &client, &price_index_operator).await;
+	submit_price_if_needed(&ticker, &client, &price_index_operator, &mut last_bitcoin_price_tick)
+		.await;
 
 	// 5. Ask for the bitcoin to be releaseed
 	println!("\nOwner requests release");
@@ -471,11 +474,15 @@ async fn submit_price(
 	client: &MainchainClient,
 	price_index_operator: &sr25519::Pair,
 ) -> Tick {
-	let tick = ticker.current();
-	client
+	let signer = Sr25519Signer::new(price_index_operator.clone());
+	let account_id = signer.account_id();
+	let tick = current_chain_tick(client, ticker).await;
+	let nonce = client.get_account_nonce(&account_id).await.unwrap();
+	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
+	let progress = client
 		.live
 		.tx()
-		.sign_and_submit_then_watch_default(
+		.sign_and_submit_then_watch(
 			&tx().price_index().submit(Index {
 				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
 				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
@@ -484,15 +491,36 @@ async fn submit_price(
 				argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
 				tick,
 			}),
-			&Sr25519Signer::new(price_index_operator.clone()),
+			&signer,
+			params,
 		)
 		.await
-		.unwrap()
-		.wait_for_finalized_success()
-		.await
 		.unwrap();
+	MainchainClient::wait_for_ext_in_block(progress, true).await.unwrap();
 	println!("bitcoin prices submitted at tick {tick}",);
 	tick
+}
+
+async fn submit_price_if_needed(
+	ticker: &Ticker,
+	client: &MainchainClient,
+	price_index_operator: &sr25519::Pair,
+	last_submitted_tick: &mut Tick,
+) {
+	let current_tick = current_chain_tick(client, ticker).await;
+	if current_tick <= *last_submitted_tick {
+		return;
+	}
+
+	*last_submitted_tick = submit_price(ticker, client, price_index_operator).await;
+}
+
+async fn current_chain_tick(client: &MainchainClient, ticker: &Ticker) -> Tick {
+	client
+		.fetch_storage(&storage().ticks().current_tick(), FetchAt::Best)
+		.await
+		.unwrap()
+		.unwrap_or_else(|| ticker.current())
 }
 
 fn get_parent_fingerprint(bitcoind: &BitcoinD, owner_hd_key_path: &DerivationPath) -> Fingerprint {
@@ -836,6 +864,7 @@ async fn wait_for_mint(
 	vout: u32,
 	ticker: &Ticker,
 	price_index_operator: &sr25519::Pair,
+	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let pending_utxos = client
@@ -909,7 +938,7 @@ async fn wait_for_mint(
 			}
 			counter += 1;
 
-			submit_price(ticker, client, price_index_operator).await;
+			submit_price_if_needed(ticker, client, price_index_operator, last_submitted_tick).await;
 			if counter >= 30 {
 				let registered_miners = client
 					.fetch_storage(
