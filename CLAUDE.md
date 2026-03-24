@@ -100,6 +100,7 @@ cargo make docker
 ```bash
 # Create a new release with changelog updates
 cargo make release         # Auto-bump version
+cargo make release v1.4.2  # Use an explicit version
 cargo make release --major   # Major version bump
 cargo make release --minor   # Minor version bump
 cargo make release --patch   # Patch version bump

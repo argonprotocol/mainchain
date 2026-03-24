@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.3.27...065d5ed4faac63d04560feee760dd9af2c46831f) (2026-03-19)
+## [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.3.27...c95aa2a82a01062d0663a59543a48f88410f4ea9) (2026-03-23)
 
 ### Features
 
@@ -49,6 +49,11 @@
 
 ### Fixes
 
+* **bitcoin-locks:** treat spent release requests as completed releases
+([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
+* **node:** avoid GRANDPA genesis state reads at startup (#439)
+([7d670fb](https://github.com/argonprotocol/mainchain/commit/7d670fbfa9b02f795385cb22d8525d40a2c06cda)),
+closes [#439](https://github.com/argonprotocol/mainchain/issues/439)
 * arithmetic safety, tax burn accounting, and treasury pool cap
 ([e7d830a](https://github.com/argonprotocol/mainchain/commit/e7d830a2630bdb39081882b676aedf656fee5abe))
 * **bitcoin:** avoid overweighting pending funding expiration cleanup

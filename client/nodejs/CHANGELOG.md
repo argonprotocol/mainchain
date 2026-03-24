@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.3.27...065d5ed4faac63d04560feee760dd9af2c46831f) (2026-03-19)
+## [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.3.27...c95aa2a82a01062d0663a59543a48f88410f4ea9) (2026-03-23)
 
 ### Features
 
@@ -31,6 +31,8 @@
 
 ### Fixes
 
+* **bitcoin-locks:** treat spent release requests as completed releases
+([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
 * **bitcoin:** avoid overweighting pending funding expiration cleanup
 ([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
 * **weights:** align mining-slot/vault benchmarks
