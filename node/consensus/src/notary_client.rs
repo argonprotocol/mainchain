@@ -2,10 +2,7 @@ use crate::{
 	aux_client::ArgonAux,
 	error::Error,
 	metrics::ConsensusMetrics,
-	state_anchor::{
-		DEFAULT_STATE_LOOKBACK_DEPTH, ResolveBestOrFinalizedStateHashError, StateAnchorClient,
-		resolve_best_or_finalized_state_hash,
-	},
+	state_anchor::{DEFAULT_STATE_LOOKBACK_DEPTH, StateAnchorClient},
 };
 use argon_notary_apis::{
 	ArchiveHost, Client, DownloadKind, DownloadPolicy, DownloadTrustMode, SystemRpcClient,
@@ -57,6 +54,13 @@ use tokio::{
 use tracing::error;
 
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum NotebookAuditMode {
+	Sync,
+	Import { max_wait: Duration },
+}
 
 pub trait NotaryApisExt<B: BlockT, AC> {
 	fn has_block_state(&self, block_hash: B::Hash) -> bool;
@@ -213,19 +217,14 @@ where
 	let notary_sync_task = async move {
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
 		let idle_delay = Duration::from_millis(idle_delay);
-		let initial_notary_hash = match resolve_best_or_finalized_state_hash(
-			notary_client_poll.as_ref(),
-			best_block,
-			client.finalized_hash(),
-			DEFAULT_STATE_LOOKBACK_DEPTH,
-		) {
-			Ok(hash) => Some(hash),
-			Err(ResolveBestOrFinalizedStateHashError::NoAvailableStateHash) => None,
-			Err(ResolveBestOrFinalizedStateHashError::Client(err)) => {
-				warn!("Could not resolve a stateful hash for initial notary update - {err:?}");
-				None
-			},
-		};
+		let initial_notary_hash =
+			match resolve_client_stateful_hash::<B, _, AC>(client.as_ref(), best_block) {
+				Ok(hash) => hash,
+				Err(err) => {
+					warn!("Could not resolve a stateful hash for initial notary update - {err:?}");
+					None
+				},
+			};
 		if let Some(initial_notary_hash) = initial_notary_hash {
 			notary_client_poll
 				.update_notaries(&initial_notary_hash)
@@ -251,10 +250,17 @@ where
 				Some(ref block) = best_block.next() => {
 					if block.is_new_best {
 						let best_hash = block.hash;
-						if !client.has_block_state(best_hash) {
-							// We don't have the block state yet, so we can't update notaries
+						let Some(best_hash) =
+							resolve_client_stateful_hash::<B, _, AC>(client.as_ref(), best_hash)
+								.unwrap_or_else(|err| {
+									warn!(
+										"Could not resolve a stateful hash for best-block notary update - {err:?}"
+									);
+									None
+								})
+						else {
 							continue;
-						}
+						};
 						if let Err(e) = notary_client_poll.update_notaries(&best_hash).await {
 							warn!(
 
@@ -265,7 +271,15 @@ where
 				},
 				_ = health_tick.tick() => {
 					let best_hash = client.best_hash();
-					if client.has_block_state(best_hash) {
+					if let Some(best_hash) =
+						resolve_client_stateful_hash::<B, _, AC>(client.as_ref(), best_hash)
+							.unwrap_or_else(|err| {
+								warn!(
+									"Could not resolve a stateful hash for periodic notary update - {err:?}"
+								);
+								None
+							})
+					{
 						let _ = notary_client_poll.update_notaries(&best_hash).await;
 					}
 				},
@@ -302,6 +316,7 @@ where
 }
 
 type PendingNotebook = (NotebookNumber, Option<SignedHeaderBytes>, Instant);
+type ProcessingHashes<Hash> = (Hash, Hash);
 
 type NotebookCount = u32;
 pub type VotingPowerInfo = (Tick, BlockVotingPower, NotebookCount);
@@ -384,7 +399,12 @@ where
 	}
 
 	pub async fn update_notaries(&self, block_hash: &B::Hash) -> Result<(), Error> {
-		let notaries = self.client.notaries(*block_hash)?;
+		let Some(block_hash) =
+			resolve_client_stateful_hash::<B, _, AC>(self.client.as_ref(), *block_hash)?
+		else {
+			return Ok(());
+		};
+		let notaries = self.client.notaries(block_hash)?;
 		let mut reconnect_ids = BTreeSet::new();
 
 		{
@@ -549,13 +569,79 @@ where
 			return Ok(true);
 		};
 		let is_import_context = importing_with_parent_hash.is_some();
-		let finalized_hash = self.client.finalized_hash();
-		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
-		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
+		let block_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
+		let Some((best_hash, finalized_hash)) = self.resolve_processing_hashes(block_hash)? else {
 			return Ok(is_import_context);
-		}
-		let queued_notaries =
-			self.notebook_queue_by_id.read().await.keys().cloned().collect::<Vec<_>>();
+		};
+		self.process_queues_at_hash(best_hash, finalized_hash).await
+	}
+
+	pub async fn process_queues_at(self: &Arc<Self>, block_hash: B::Hash) -> Result<bool, Error> {
+		let Some((best_hash, finalized_hash)) = self.resolve_processing_hashes(block_hash)? else {
+			return Ok(true);
+		};
+		self.process_queues_at_hash(best_hash, finalized_hash).await
+	}
+
+	async fn process_selected_queues_at(
+		self: &Arc<Self>,
+		block_hash: B::Hash,
+		notary_ids: &BTreeSet<NotaryId>,
+	) -> Result<bool, Error> {
+		let Some((best_hash, finalized_hash)) = self.resolve_processing_hashes(block_hash)? else {
+			return Ok(true);
+		};
+		self.process_selected_queues_at_hash(best_hash, finalized_hash, notary_ids)
+			.await
+	}
+
+	fn resolve_processing_hashes(
+		&self,
+		block_hash: B::Hash,
+	) -> Result<Option<ProcessingHashes<B::Hash>>, Error> {
+		let Some(best_hash) =
+			resolve_client_stateful_hash::<B, _, AC>(self.client.as_ref(), block_hash)?
+		else {
+			return Ok(None);
+		};
+		let Some(finalized_hash) = resolve_client_stateful_hash::<B, _, AC>(
+			self.client.as_ref(),
+			self.client.finalized_hash(),
+		)?
+		else {
+			return Ok(None);
+		};
+		Ok(Some((best_hash, finalized_hash)))
+	}
+
+	async fn process_queues_at_hash(
+		self: &Arc<Self>,
+		best_hash: B::Hash,
+		finalized_hash: B::Hash,
+	) -> Result<bool, Error> {
+		let notary_ids =
+			self.notebook_queue_by_id.read().await.keys().copied().collect::<BTreeSet<_>>();
+		let has_more_work = self
+			.process_selected_queues_at_hash(best_hash, finalized_hash, &notary_ids)
+			.await?;
+		self.log_queue_depth().await;
+		Ok(has_more_work)
+	}
+
+	async fn process_selected_queues_at_hash(
+		self: &Arc<Self>,
+		best_hash: B::Hash,
+		finalized_hash: B::Hash,
+		notary_ids: &BTreeSet<NotaryId>,
+	) -> Result<bool, Error> {
+		let queued_notaries = self
+			.notebook_queue_by_id
+			.read()
+			.await
+			.keys()
+			.copied()
+			.filter(|notary_id| notary_ids.contains(notary_id))
+			.collect::<Vec<_>>();
 
 		let handles = queued_notaries.into_iter().map(|notary_id| {
 			let finalized_notebook_number =
@@ -591,7 +677,7 @@ where
 							e,
 							Error::MissingNotebooksError(_) |
 								Error::NotebookAuditBeforeTick(_) |
-								Error::StateUnavailableError
+								Error::NotaryAuditDeferred(_)
 						) {
 							trace!("In queue, re-queuing notebook for notary {notary_id} - {e:?}");
 							self_clone
@@ -625,7 +711,6 @@ where
 				},
 			}
 		}
-		self.log_queue_depth().await;
 		Ok(has_more_work)
 	}
 
@@ -875,11 +960,15 @@ where
 				);
 				let parent_hash = self.client.parent_hash(&best_hash)?;
 				if parent_hash == best_hash {
-					return Err(Error::StateUnavailableError);
+					return Err(Error::NotaryAuditDeferred(format!(
+						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={best_hash:?}"
+					)));
 				}
 				best_hash = parent_hash;
 				if !self.client.has_block_state(best_hash) {
-					return Err(Error::StateUnavailableError);
+					return Err(Error::NotaryAuditDeferred(format!(
+						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={best_hash:?}"
+					)));
 				}
 				latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
 			}
@@ -940,93 +1029,114 @@ where
 		Ok(())
 	}
 
-	pub async fn verify_notebook_audits(
+	pub(crate) async fn verify_notebook_audits(
 		self: &Arc<Self>,
 		parent_hash: &B::Hash,
 		notebook_audit_results: Vec<NotebookAuditResult<NotebookVerifyError>>,
+		mode: NotebookAuditMode,
 	) -> Result<(), Error> {
-		for _ in 0..2 {
-			let mut missing_audits_by_notary = BTreeMap::new();
-			let notary_ids = self.get_notary_ids().await;
-			let mut needs_notary_updates = false;
-			for digest_record in &notebook_audit_results {
-				let notary_audits =
-					self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
+		let max_wait = match mode {
+			NotebookAuditMode::Sync => None,
+			NotebookAuditMode::Import { max_wait } => Some(max_wait),
+		};
+		let mut missing_audits_by_notary = BTreeMap::new();
+		let notary_ids = self.get_notary_ids().await;
+		let mut needs_notary_updates = false;
+		for digest_record in &notebook_audit_results {
+			let notary_audits =
+				self.aux_client.get_notary_audit_history(digest_record.notary_id)?.get();
 
-				let audit = notary_audits.get(&digest_record.notebook_number);
-
-				if let Some(audit) = audit {
-					if digest_record.audit_first_failure != audit.audit_first_failure {
-						return Err(Error::InvalidNotebookDigest(format!(
-							"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
-							digest_record.notary_id,
-							digest_record.notebook_number,
-							digest_record.audit_first_failure,
-							audit.audit_first_failure
-						)));
-					}
-				} else {
-					if !notary_ids.contains(&digest_record.notary_id) ||
-						!self.has_client(digest_record.notary_id).await
-					{
-						needs_notary_updates = true;
-					}
-					self.enqueue_notebook(
+			let audit = notary_audits.get(&digest_record.notebook_number);
+			if let Some(audit) = audit {
+				if digest_record.audit_first_failure != audit.audit_first_failure {
+					return Err(Error::InvalidNotebookDigest(format!(
+						"Notary {}, notebook #{} has an audit mismatch \"{:?}\" with local result. \"{:?}\"",
 						digest_record.notary_id,
 						digest_record.notebook_number,
-						None,
-						None,
-					)
-					.await?;
-					missing_audits_by_notary
-						.entry(digest_record.notary_id)
-						.or_insert_with(Vec::new)
-						.push(digest_record.notebook_number);
+						digest_record.audit_first_failure,
+						audit.audit_first_failure
+					)));
 				}
+			} else {
+				if !notary_ids.contains(&digest_record.notary_id) ||
+					!self.has_client(digest_record.notary_id).await
+				{
+					needs_notary_updates = true;
+				}
+				self.enqueue_notebook(
+					digest_record.notary_id,
+					digest_record.notebook_number,
+					None,
+					None,
+				)
+				.await?;
+				missing_audits_by_notary
+					.entry(digest_record.notary_id)
+					.or_insert_with(Vec::new)
+					.push(digest_record.notebook_number);
 			}
-			if missing_audits_by_notary.is_empty() {
+		}
+		if missing_audits_by_notary.is_empty() {
+			return Ok(());
+		}
+
+		info!(
+			"Notebook digest has missing audits. Will attempt to catchup now. {missing_audits_by_notary:#?}"
+		);
+
+		let start = Instant::now();
+		let calculated_wait_secs = (missing_audits_by_notary.len() * 5).clamp(6, 120) as u64;
+		let wait_time_secs = max_wait
+			.map(|duration| duration.as_secs().max(1))
+			.unwrap_or(calculated_wait_secs);
+		let wait_time = Duration::from_secs(wait_time_secs);
+		let timeout_error = || {
+			Error::UnableToSyncNotary(format!(
+				"Could not process all missing audits in {wait_time_secs} seconds"
+			))
+		};
+
+		if needs_notary_updates {
+			let Some(remaining) = wait_time.checked_sub(start.elapsed()) else {
+				warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
+				return Err(timeout_error());
+			};
+			tokio::time::timeout(remaining, self.update_notaries(parent_hash))
+				.await
+				.map_err(|_| timeout_error())??;
+		}
+
+		loop {
+			if start.elapsed() > wait_time {
+				warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
+				return Err(timeout_error());
+			}
+
+			let missing_notary_ids = missing_audits_by_notary
+				.iter()
+				.filter_map(|(notary_id, audits)| (!audits.is_empty()).then_some(*notary_id))
+				.collect::<BTreeSet<_>>();
+			if missing_notary_ids.is_empty() {
 				return Ok(());
 			}
 
-			info!(
-				"Notebook digest has missing audits. Will attempt to catchup now. {missing_audits_by_notary:#?}"
-			);
-
-			if needs_notary_updates {
-				self.update_notaries(parent_hash).await?;
-			}
-
-			// drain queues
-			// NOTE: only do this for 10 seconds
-			let start = Instant::now();
-			// wait a max of 5 seconds per notebook.
-			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
-
-			// if we're importing a specific block, then network syncing should be off
-			while self.process_queues(Some(*parent_hash)).await? {
-				tokio::time::sleep(Duration::from_millis(30)).await;
-				let mut has_more_work = false;
-				for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
-					let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
-					audits.retain(|notebook_number| !notary_audits.contains_key(notebook_number));
-					if !audits.is_empty() {
-						has_more_work = true;
-					}
-				}
-				if !has_more_work {
-					break;
-				}
-				if start.elapsed() > Duration::from_secs(wait_time as u64) {
-					warn!("Timed out waiting for missing audits. {missing_audits_by_notary:#?}");
-					return Err(Error::UnableToSyncNotary(format!(
-						"Could not process all missing audits in {wait_time} seconds"
-					)));
+			let has_more_work =
+				self.process_selected_queues_at(*parent_hash, &missing_notary_ids).await?;
+			let mut has_missing_audits = false;
+			for (notary_id, audits) in missing_audits_by_notary.iter_mut() {
+				let notary_audits = self.aux_client.get_notary_audit_history(*notary_id)?.get();
+				audits.retain(|notebook_number| !notary_audits.contains_key(notebook_number));
+				if !audits.is_empty() {
+					has_missing_audits = true;
 				}
 			}
+			if !has_missing_audits {
+				return Ok(());
+			}
+
+			let sleep_ms = if has_more_work { 30 } else { 250 };
+			tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
 		}
-		Err(Error::InvalidNotebookDigest(
-			"Notebook digest record could not verify all records in local storage".to_string(),
-		))
 	}
 
 	async fn get_notebook_dependencies(
@@ -1231,6 +1341,31 @@ where
 		}
 		0
 	}
+}
+
+fn resolve_client_stateful_hash<B, C, AC>(
+	client: &C,
+	start_hash: B::Hash,
+) -> Result<Option<B::Hash>, Error>
+where
+	B: BlockT,
+	C: NotaryApisExt<B, AC> + ?Sized,
+	AC: Clone + Codec,
+{
+	let mut cursor = start_hash;
+	for _ in 0..DEFAULT_STATE_LOOKBACK_DEPTH {
+		if client.has_block_state(cursor) {
+			return Ok(Some(cursor));
+		}
+
+		let parent_hash = client.parent_hash(&cursor)?;
+		if parent_hash == cursor {
+			return Ok(None);
+		}
+		cursor = parent_hash;
+	}
+
+	Ok(None)
 }
 
 pub async fn get_notebook_header_data<B: BlockT, C, AccountId: Codec>(
@@ -1825,9 +1960,41 @@ mod test {
 					notebook_number: last.notebook_number,
 					audit_first_failure: None,
 				}],
+				NotebookAuditMode::Sync,
 			)
 			.await
 			.expect("Could not retrieve missing notebooks");
+	}
+
+	#[tokio::test]
+	async fn handles_audit_reconnect_in_import_mode() {
+		setup_logs();
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let mut last = test_notary.create_notebook_header(vec![]).await;
+		for _ in 0..12 {
+			last = test_notary.create_notebook_header(vec![]).await;
+		}
+
+		notary_client.disconnect(&1, None).await;
+
+		notary_client
+			.verify_notebook_audits(
+				&client.best_hash(),
+				vec![NotebookAuditResult {
+					notary_id: 1,
+					tick: last.tick,
+					notebook_number: last.notebook_number,
+					audit_first_failure: None,
+				}],
+				NotebookAuditMode::Import { max_wait: Duration::from_secs(20) },
+			)
+			.await
+			.expect("Could not retrieve missing notebooks in import mode");
 	}
 
 	#[tokio::test]
@@ -1967,7 +2134,44 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn skips_queue_processing_when_finalized_lacks_state() {
+	async fn targeted_import_catchup_only_processes_missing_notaries() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let mut test_notary2 = MockNotary::new(2);
+		test_notary2.start().await.expect("could not start second notary");
+		client.add_notary(&test_notary2);
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let notebook_1 = test_notary.create_notebook_header(vec![]).await;
+		let notebook_2 = test_notary2.create_notebook_header(vec![]).await;
+		notary_client
+			.enqueue_notebook(1, notebook_1.notebook_number, None, None)
+			.await
+			.expect("Could not enqueue notebook for first notary");
+		notary_client
+			.enqueue_notebook(2, notebook_2.notebook_number, None, None)
+			.await
+			.expect("Could not enqueue notebook for second notary");
+
+		let targeted = BTreeSet::from([1]);
+		notary_client
+			.process_selected_queues_at(client.best_hash(), &targeted)
+			.await
+			.expect("Could not process targeted queues");
+
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(notary_client.queue_depth(2).await, 1);
+	}
+
+	#[tokio::test]
+	async fn uses_stateful_ancestor_when_finalized_lacks_state() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
@@ -1990,15 +2194,27 @@ mod test {
 		client.set_block_state(block_2, true);
 		client.set_block_state(block_1, false);
 		client.set_block_state(block_0, true);
+		client.decode_intercept.lock().replace(NotaryNotebookDetails {
+			notary_id: 1,
+			notebook_number: 1,
+			version: 1,
+			tick: 1,
+			header_hash: H256::from_slice(&[9; 32]),
+			block_votes_count: 0,
+			block_voting_power: 0,
+			blocks_with_votes: vec![],
+			raw_audit_summary: vec![],
+		});
 
 		let has_more_work =
 			notary_client.process_queues(None).await.expect("Could not process queues");
 		assert!(!has_more_work);
-		assert_eq!(notary_client.queue_depth(1).await, 1);
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_2));
 	}
 
 	#[tokio::test]
-	async fn skips_queue_processing_when_best_lacks_state_even_if_ancestor_has_state() {
+	async fn uses_stateful_ancestor_when_best_lacks_state() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
@@ -2037,8 +2253,8 @@ mod test {
 		let has_more_work =
 			notary_client.process_queues(None).await.expect("Could not process queues");
 		assert!(!has_more_work);
-		assert_eq!(notary_client.queue_depth(1).await, 1);
-		assert_eq!(*client.decode_intercepted_at_block.lock(), None);
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_1));
 	}
 
 	#[tokio::test]
@@ -2065,7 +2281,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn keeps_import_catchup_active_when_state_is_missing() {
+	async fn import_catchup_uses_stateful_ancestor_when_target_hash_lacks_state() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
@@ -2088,13 +2304,25 @@ mod test {
 		client.set_block_state(block_0, true);
 		client.set_block_state(block_1, true);
 		client.set_block_state(block_2, false);
+		client.decode_intercept.lock().replace(NotaryNotebookDetails {
+			notary_id: 1,
+			notebook_number: 1,
+			version: 1,
+			tick: 1,
+			header_hash: H256::from_slice(&[9; 32]),
+			block_votes_count: 0,
+			block_voting_power: 0,
+			blocks_with_votes: vec![],
+			raw_audit_summary: vec![],
+		});
 
 		let has_more_work = notary_client
-			.process_queues(Some(block_2))
+			.process_queues_at(block_2)
 			.await
 			.expect("Could not process queues");
-		assert!(has_more_work);
-		assert_eq!(notary_client.queue_depth(1).await, 1);
+		assert!(!has_more_work);
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_1));
 	}
 
 	#[tokio::test]
