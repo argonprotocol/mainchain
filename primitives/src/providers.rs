@@ -606,12 +606,21 @@ pub trait TickProvider<B: BlockT> {
 /// An event handler to listen for submitted notebook
 pub trait NotebookEventHandler {
 	fn notebook_submitted(header: &NotebookHeader);
+	fn notebook_submitted_weight(header: &NotebookHeader) -> Weight {
+		let _ = header;
+		Weight::zero()
+	}
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl NotebookEventHandler for Tuple {
 	fn notebook_submitted(header: &NotebookHeader) {
 		for_tuples!( #( Tuple::notebook_submitted(&header); )* );
+	}
+	fn notebook_submitted_weight(header: &NotebookHeader) -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::notebook_submitted_weight(&header)); )* );
+		weight
 	}
 }
 

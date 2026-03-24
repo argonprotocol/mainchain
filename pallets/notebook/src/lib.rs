@@ -210,6 +210,13 @@ pub mod pallet {
 									T::WeightInfo::submit_with_chain_transfers(notebook.header.chain_transfers.len() as u32)
 								})
 								.fold(Weight::zero(), Weight::saturating_add)
+						)
+						.saturating_add(
+							notebooks.iter()
+								.map(|notebook| {
+									T::EventHandler::notebook_submitted_weight(&notebook.header)
+								})
+								.fold(Weight::zero(), Weight::saturating_add)
 						),
 					DispatchClass::Mandatory
 				))]

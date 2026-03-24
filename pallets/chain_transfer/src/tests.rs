@@ -431,3 +431,62 @@ fn it_partially_burns_tax_when_escrow_is_low() {
 		);
 	});
 }
+
+#[test]
+fn it_rejects_zero_amount_transfers() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 5000);
+		assert_noop!(
+			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 0, 1),
+			Error::<Test>::InsufficientFunds
+		);
+	});
+}
+
+#[test]
+fn it_makes_escrow_account_permanent() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 5000);
+
+		let escrow = ChainTransferPallet::notary_account_id(1);
+		assert_eq!(System::providers(&escrow), 0);
+
+		assert_ok!(ChainTransferPallet::send_to_localchain(
+			RuntimeOrigin::signed(who.clone()),
+			2000,
+			1,
+		));
+		// escrow has a provider ref and can't be reaped
+		assert!(System::providers(&escrow) > 0);
+
+		// even after draining the balance, the account persists
+		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
+		let header = NotebookHeader {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: expires_tick + 1,
+			tax: 0,
+			chain_transfers: bounded_vec![],
+			changed_accounts_root: H256::random(),
+			changed_account_origins: bounded_vec![],
+			version: 1,
+			block_votes_root: H256::random(),
+			block_votes_count: 0,
+			blocks_with_votes: bounded_vec![],
+			block_voting_power: 0,
+			secret_hash: H256::random(),
+			parent_secret: None,
+			domains: bounded_vec![],
+		};
+		<ChainTransferPallet as NotebookEventHandler>::notebook_submitted(&header);
+
+		// funds refunded back to user
+		assert_eq!(Balances::free_balance(&who), 5000);
+		// escrow still exists (not reaped)
+		assert!(System::account_exists(&escrow));
+	});
+}

@@ -144,6 +144,18 @@ Upstream / runtime pallets:
 - `cargo make lint`,
 - no `UNKNOWN KEY` / `:argon:bench:` artifacts in targeted generated weight files.
 
+### Notebook inherent event handler weight composition
+
+`NotebookEventHandler` now exposes `notebook_submitted_weight(&NotebookHeader) -> Weight` (same
+pattern as `BlockSealEventHandler::block_seal_read_weight`). The notebook `submit` inherent includes
+this in its weight declaration so the block builder accounts for event handler costs.
+
+`pallet_chain_transfer` implements this as
+`notebook_submitted_event_handler(chain_transfers) + process_expired_transfers(MaxPendingTransfersOutPerBlock)`.
+
+Measured cost at worst case (1000 expired transfers across 1000 ticks): ~44ms total ref_time, which
+is 0.44% of the 10-second block weight budget. Expiry processing is not overweight.
+
 ### Deferred / follow-up
 
 - implement actual benchmark suites for `pallet_block_rewards` and `pallet_treasury` and wire their
@@ -158,6 +170,19 @@ Upstream / runtime pallets:
   - safe defer/drop policy for overflow inputs so block production remains live,
 - if we need richer modeling for crypto-heavy providers, add dedicated provider weight trait methods
   in a follow-up instead of pushing weight arithmetic into runtime logic.
+
+## Reading benchmark weights
+
+Substrate weights are in **picoseconds** (10^-12 seconds). Common conversions:
+
+| Picoseconds | Human-readable |
+|-------------|---------------|
+| 1,000,000 (1M) | 1 microsecond |
+| 1,000,000,000 (1B) | 1 millisecond |
+| 1,000,000,000,000 (1T) | 1 second |
+
+The block weight budget is `WEIGHT_REF_TIME_PER_SECOND * 10` = **10 seconds** = 10 trillion
+picoseconds. A weight of `44_000_000` is 44 microseconds (0.044ms), not 44 milliseconds.
 
 ## Risks
 

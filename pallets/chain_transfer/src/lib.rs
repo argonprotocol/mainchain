@@ -102,18 +102,6 @@ pub mod pallet {
 		QueryKind = ValueQuery,
 	>;
 
-	#[pallet::storage]
-	pub type TransfersUsedInBlockNotebooks<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		BlockNumberFor<T>,
-		BoundedVec<
-			(<T as frame_system::Config>::AccountId, <T as frame_system::Config>::Nonce),
-			T::MaxPendingTransfersOutPerBlock,
-		>,
-		ValueQuery,
-	>;
-
 	/// The admin of the hyperbridge token gateway
 	#[pallet::storage]
 	pub type HyperbridgeTokenAdmin<T: Config> =
@@ -234,6 +222,7 @@ pub mod pallet {
 				Error::<T>::NotaryLockedForTransfer,
 			);
 
+			ensure!(!amount.is_zero(), Error::<T>::InsufficientFunds);
 			ensure!(
 				T::Argon::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
 					amount,
@@ -243,12 +232,9 @@ pub mod pallet {
 			// the nonce is incremented pre-dispatch. we want the nonce for the transaction
 			let transfer_id = Pallet::<T>::next_transfer_id()?;
 
-			T::Argon::transfer(
-				&who,
-				&Self::notary_account_id(notary_id),
-				amount,
-				Preservation::Expendable,
-			)?;
+			let escrow = Self::notary_account_id(notary_id);
+			Self::ensure_escrow_provider(&escrow);
+			T::Argon::transfer(&who, &escrow, amount, Preservation::Expendable)?;
 
 			let expiration_tick: Tick = current_tick + T::TransferExpirationTicks::get();
 
@@ -271,6 +257,14 @@ pub mod pallet {
 	}
 
 	impl<T: Config> NotebookEventHandler for Pallet<T> {
+		fn notebook_submitted_weight(header: &NotebookHeader) -> Weight {
+			let chain_transfer_count = header.chain_transfers.len() as u32;
+			// Worst case: one full tick of expired transfers per notebook
+			let max_expired = T::MaxPendingTransfersOutPerBlock::get();
+			T::WeightInfo::notebook_submitted_event_handler(chain_transfer_count)
+				.saturating_add(T::WeightInfo::process_expired_transfers(max_expired))
+		}
+
 		fn notebook_submitted(header: &NotebookHeader) {
 			let notary_id = header.notary_id;
 
@@ -451,6 +445,12 @@ pub mod pallet {
 
 		pub fn notary_account_id(notary_id: NotaryId) -> <T as frame_system::Config>::AccountId {
 			T::PalletId::get().into_sub_account_truncating(notary_id)
+		}
+
+		fn ensure_escrow_provider(account_id: &<T as frame_system::Config>::AccountId) {
+			if frame_system::Pallet::<T>::providers(account_id) == 0 {
+				frame_system::Pallet::<T>::inc_providers(account_id);
+			}
 		}
 
 		pub fn hyperbridge_token_admin() -> <T as frame_system::Config>::AccountId {
