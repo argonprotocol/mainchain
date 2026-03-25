@@ -645,7 +645,7 @@ mod tests {
 
 		closer.try_rotate_notebook().await?;
 		closer.try_close_notebook().await?;
-		let _ = header_listener.next().await;
+		let _ = header_listener.next().await?;
 
 		let mut stream = subscription.into_stream();
 		let notebook_number = stream.next().await.unwrap()?.notebook_number;

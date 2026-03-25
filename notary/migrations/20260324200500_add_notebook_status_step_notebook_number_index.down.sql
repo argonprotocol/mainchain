@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_notebook_status_step_notebook_number;
