@@ -291,6 +291,17 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Option<PalletBitcoinLocksOrphanedUtxo>>,
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
       >;
+      /**
+       * Index of active UTXO IDs per vault
+       **/
+      utxoIdsByVaultId: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [u32, u64]
+      >;
     };
     bitcoinUtxos: {
       /**

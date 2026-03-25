@@ -3262,7 +3262,7 @@ export default {
     createdAtArgonBlock: 'Compact<u32>',
   },
   /**
-   * Lookup420: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
+   * Lookup421: pallet_bitcoin_locks::pallet::LockReleaseRequest<Balance>
    **/
   PalletBitcoinLocksLockReleaseRequest: {
     utxoId: 'Compact<u64>',
@@ -3273,7 +3273,7 @@ export default {
     redemptionPrice: 'Compact<u128>',
   },
   /**
-   * Lookup422: pallet_bitcoin_locks::pallet::OrphanedUtxo<BlockNumber>
+   * Lookup423: pallet_bitcoin_locks::pallet::OrphanedUtxo<BlockNumber>
    **/
   PalletBitcoinLocksOrphanedUtxo: {
     utxoId: 'Compact<u64>',
@@ -3283,7 +3283,7 @@ export default {
     cosignRequest: 'Option<PalletBitcoinLocksOrphanedUtxoCosignRequest>',
   },
   /**
-   * Lookup424: pallet_bitcoin_locks::pallet::OrphanedUtxoCosignRequest<BlockNumber>
+   * Lookup425: pallet_bitcoin_locks::pallet::OrphanedUtxoCosignRequest<BlockNumber>
    **/
   PalletBitcoinLocksOrphanedUtxoCosignRequest: {
     bitcoinNetworkFee: 'u64',
@@ -3291,7 +3291,7 @@ export default {
     createdAtArgonBlockNumber: 'u32',
   },
   /**
-   * Lookup431: pallet_bitcoin_locks::pallet::FeeCoupon<Balance>
+   * Lookup432: pallet_bitcoin_locks::pallet::FeeCoupon<Balance>
    **/
   PalletBitcoinLocksFeeCoupon: {
     vaultId: 'Compact<u32>',
@@ -3300,7 +3300,7 @@ export default {
     maxFeePlusTip: 'Option<u128>',
   },
   /**
-   * Lookup433: pallet_bitcoin_locks::pallet::Error<T>
+   * Lookup434: pallet_bitcoin_locks::pallet::Error<T>
    **/
   PalletBitcoinLocksError: {
     _enum: {
@@ -3347,7 +3347,7 @@ export default {
     },
   },
   /**
-   * Lookup434: argon_primitives::vault::VaultError
+   * Lookup435: argon_primitives::vault::VaultError
    **/
   ArgonPrimitivesVaultVaultError: {
     _enum: [
@@ -3366,7 +3366,7 @@ export default {
     ],
   },
   /**
-   * Lookup446: pallet_notaries::pallet::Error<T>
+   * Lookup447: pallet_notaries::pallet::Error<T>
    **/
   PalletNotariesError: {
     _enum: [
@@ -3382,7 +3382,7 @@ export default {
     ],
   },
   /**
-   * Lookup450: argon_primitives::notary::NotaryNotebookKeyDetails
+   * Lookup451: argon_primitives::notary::NotaryNotebookKeyDetails
    **/
   ArgonPrimitivesNotaryNotaryNotebookKeyDetails: {
     notebookNumber: 'Compact<u32>',
@@ -3392,7 +3392,7 @@ export default {
     parentSecret: 'Option<H256>',
   },
   /**
-   * Lookup453: pallet_notebook::pallet::Error<T>
+   * Lookup454: pallet_notebook::pallet::Error<T>
    **/
   PalletNotebookError: {
     _enum: [
@@ -3414,7 +3414,7 @@ export default {
     ],
   },
   /**
-   * Lookup454: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
+   * Lookup455: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
    **/
   PalletChainTransferQueuedTransferOut: {
     accountId: 'AccountId32',
