@@ -12,13 +12,13 @@ use crate::{
 	},
 };
 use argon_notary_apis::error::Error;
-use argon_primitives::{AccountId, NotaryId, SignedNotebookHeader, tick::Ticker};
+use argon_primitives::{AccountId, NotaryId, NotebookNumber, SignedNotebookHeader, tick::Ticker};
 use futures::FutureExt;
 use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
 use sp_core::{H256, ed25519};
 use sp_keystore::KeystorePtr;
-use sqlx::{PgPool, postgres::PgListener};
+use sqlx::{Error as SqlxError, PgPool, postgres::PgListener};
 use std::{
 	sync::Arc,
 	time::{Duration, Instant},
@@ -41,6 +41,7 @@ pub struct NotebookCloser {
 pub struct FinalizedNotebookHeaderListener {
 	pool: PgPool,
 	completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
+	last_notebook_number: NotebookNumber,
 	listener: PgListener,
 }
 impl FinalizedNotebookHeaderListener {
@@ -48,20 +49,38 @@ impl FinalizedNotebookHeaderListener {
 		pool: PgPool,
 		completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
 	) -> anyhow::Result<Self> {
-		let mut listener = PgListener::connect_with(&pool).await?;
-		listener.listen("notebook_finalized").await?;
-		Ok(Self { pool, completed_notebook_sender, listener })
+		let last_notebook_number =
+			NotebookHeaderStore::latest(&pool).await?.last_closed_notebook_number;
+		let listener = Self::connect_listener(&pool).await?;
+
+		Ok(Self { pool, completed_notebook_sender, last_notebook_number, listener })
 	}
 
-	pub async fn next(&mut self) -> anyhow::Result<SignedNotebookHeader> {
+	async fn connect_listener(pool: &PgPool) -> anyhow::Result<PgListener> {
+		let mut listener = PgListener::connect_with(pool).await?;
+		listener.listen("notebook_finalized").await?;
+		Ok(listener)
+	}
+
+	pub async fn next(&mut self) -> anyhow::Result<Option<SignedNotebookHeader>> {
 		let notification = &self.listener.recv().await?;
-		let header = match notification.payload().parse() {
-			Ok(notebook_number) =>
-				NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?,
-			Err(e) => {
-				return Err(anyhow::anyhow!("Error parsing notified notebook number {e:?}"));
-			},
-		};
+		let notebook_number = notification
+			.payload()
+			.parse()
+			.map_err(|e| anyhow::anyhow!("Error parsing notified notebook number {e:?}"))?;
+
+		if notebook_number <= self.last_notebook_number {
+			return Ok(None);
+		}
+
+		Ok(Some(self.notify_closed_notebook(notebook_number).await?))
+	}
+
+	async fn notify_closed_notebook(
+		&mut self,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<SignedNotebookHeader> {
+		let header = NotebookHeaderStore::load_with_signature(&self.pool, notebook_number).await?;
 		let hash = header.header.hash();
 
 		self.completed_notebook_sender.notify(|| Ok((header.clone(), hash))).map_err(
@@ -69,22 +88,63 @@ impl FinalizedNotebookHeaderListener {
 				anyhow::anyhow!("Error sending completed notebook notification {e:?}")
 			},
 		)?;
+
+		self.last_notebook_number = header.header.notebook_number;
+
 		Ok(header)
+	}
+
+	async fn reconnect(&mut self, delay: Duration) -> anyhow::Result<()> {
+		loop {
+			match self.try_reconnect().await {
+				Ok(()) => return Ok(()),
+				Err(e) => {
+					tracing::error!(
+						"Error reconnecting finalized notebook header listener {:?}",
+						e
+					);
+					if is_closed_pool_error(&e) {
+						return Err(e);
+					}
+
+					tokio::time::sleep(delay).await;
+				},
+			}
+		}
+	}
+
+	async fn try_reconnect(&mut self) -> anyhow::Result<()> {
+		self.listener = Self::connect_listener(&self.pool).await?;
+
+		let latest = NotebookHeaderStore::latest(&self.pool).await?;
+		if latest.last_closed_notebook_number > self.last_notebook_number {
+			self.notify_closed_notebook(latest.last_closed_notebook_number).await?;
+		}
+
+		Ok(())
 	}
 
 	pub async fn create_task(&'_ mut self) -> anyhow::Result<()> {
 		loop {
 			match self.next().await {
-				Ok(_) => (),
+				Ok(Some(_)) | Ok(None) => (),
 				Err(e) => {
 					tracing::error!("Error listening for finalized notebook header {:?}", e);
-					if e.to_string().contains("closed pool") {
+					if is_closed_pool_error(&e) {
 						return Err(e);
 					}
+					self.reconnect(Duration::from_secs(1)).await?;
 				},
 			}
 		}
 	}
+}
+
+fn is_closed_pool_error(error: &anyhow::Error) -> bool {
+	error
+		.chain()
+		.filter_map(|source| source.downcast_ref::<SqlxError>())
+		.any(|source| matches!(source, SqlxError::PoolClosed))
 }
 
 type NotebookCloserHandles = (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow::Result<()>>);
@@ -255,6 +315,7 @@ struct NotebookAuditResponse {
 #[cfg(test)]
 mod tests {
 	use anyhow::{anyhow, bail};
+	use chrono::{Duration as ChronoDuration, Utc};
 	use frame_support::assert_ok;
 	use futures::{StreamExt, task::noop_waker_ref};
 	use prometheus::Registry;
@@ -300,7 +361,8 @@ mod tests {
 		BlockVoteDigest, DOMAIN_LEASE_COST, Domain, DomainHash, DomainTopLevel, HashOutput,
 		MerkleProof,
 		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
-		NotebookDigest, ParentVotingKeyDigest, TransferToLocalchainId, VotingSchedule,
+		NotebookDigest, ParentVotingKeyDigest, SignedNotebookHeader, TransferToLocalchainId,
+		VotingSchedule,
 		fork_power::ForkPower,
 		host::Host,
 		prelude::*,
@@ -313,8 +375,42 @@ mod tests {
 		NotaryServer,
 		block_watch::spawn_block_sync,
 		notebook_closer::NOTARY_KEYID,
+		server::NotebookHeaderStream,
 		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
 	};
+
+	#[sqlx::test]
+	async fn test_reconnect_publishes_latest_closed_notebook(pool: PgPool) -> anyhow::Result<()> {
+		let _ = tracing_subscriber::fmt::try_init();
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+		let notary_key =
+			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
+
+		create_closed_notebook(&pool, &keystore, &notary_key, 1).await?;
+
+		let (completed_notebook_sender, completed_notebook_stream) =
+			NotebookHeaderStream::channel();
+		let mut listener =
+			FinalizedNotebookHeaderListener::connect(pool.clone(), completed_notebook_sender)
+				.await?;
+		let mut subscription = completed_notebook_stream.subscribe(10);
+
+		create_closed_notebook(&pool, &keystore, &notary_key, 2).await?;
+		listener.reconnect(Duration::ZERO).await?;
+
+		let (header, _) = tokio::time::timeout(Duration::from_secs(1), subscription.next())
+			.await?
+			.expect("should publish the latest closed notebook");
+		assert_eq!(header.header.notebook_number, 2);
+		assert!(
+			tokio::time::timeout(Duration::from_millis(100), subscription.next())
+				.await
+				.is_err()
+		);
+
+		Ok(())
+	}
 
 	#[sqlx::test]
 	#[serial]
@@ -1081,6 +1177,48 @@ mod tests {
 		}
 		assert!(found, "Should have recorded a chain transfer");
 
+		Ok(())
+	}
+
+	async fn create_closed_notebook(
+		pool: &PgPool,
+		keystore: &KeystorePtr,
+		notary_key: &Public,
+		notebook_number: NotebookNumber,
+	) -> anyhow::Result<()> {
+		let mut tx = pool.begin().await?;
+		NotebookHeaderStore::create(
+			&mut tx,
+			1,
+			notebook_number,
+			notebook_number as u64,
+			(Utc::now() + ChronoDuration::try_minutes(1).unwrap()).timestamp_millis() as u64,
+		)
+		.await?;
+		NotebookHeaderStore::complete_notebook(
+			&mut tx,
+			notebook_number,
+			vec![],
+			vec![],
+			0,
+			[0u8; 32].into(),
+			vec![],
+			[0u8; 32].into(),
+			0,
+			Default::default(),
+			0,
+			|hash| notary_sign(keystore, notary_key, hash),
+		)
+		.await?;
+		NotebookStatusStore::next_step(&mut *tx, notebook_number, NotebookFinalizationStep::Open)
+			.await?;
+		NotebookStatusStore::next_step(
+			&mut *tx,
+			notebook_number,
+			NotebookFinalizationStep::ReadyForClose,
+		)
+		.await?;
+		tx.commit().await?;
 		Ok(())
 	}
 
