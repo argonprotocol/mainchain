@@ -81,7 +81,7 @@ pub mod pallet {
 	use sp_core::sr25519;
 	use sp_runtime::traits::Verify;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -190,6 +190,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type LocksByUtxoId<T: Config> =
 		StorageMap<_, Twox64Concat, UtxoId, LockedBitcoin<T>, OptionQuery>;
+
+	/// Index of active UTXO IDs per vault
+	#[pallet::storage]
+	pub type UtxoIdsByVaultId<T: Config> =
+		StorageDoubleMap<_, Twox64Concat, VaultId, Twox64Concat, UtxoId, (), OptionQuery>;
 
 	/// Stores the block number where a release was cosigned by the vault.
 	#[pallet::storage]
@@ -920,6 +925,7 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 			let lock_extension = lock.get_lock_extension();
 			let utxo_satoshis = lock.effective_satoshis();
 			let securitization = lock.get_securitization();
@@ -1425,6 +1431,7 @@ pub mod pallet {
 			}
 
 			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
+				UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 				Self::schedule_orphans_for_cleanup(utxo_id, &lock);
 				let securitization = lock.get_securitization();
 				T::VaultProvider::remove_pending(lock.vault_id, &securitization)
@@ -1635,6 +1642,7 @@ pub mod pallet {
 					created_at_argon_block: <frame_system::Pallet<T>>::block_number(),
 				},
 			);
+			UtxoIdsByVaultId::<T>::insert(vault_id, utxo_id, ());
 			Self::deposit_event(Event::<T>::BitcoinLockCreated {
 				utxo_id,
 				vault_id,
@@ -1745,6 +1753,7 @@ pub mod pallet {
 
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 			if LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id) {
 				let request = Self::take_release_request(utxo_id)?;
 				// We don't branch on spend status here. A valid release request must be made far
@@ -1812,6 +1821,7 @@ pub mod pallet {
 
 		fn complete_release_after_spent(utxo_id: UtxoId) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 			let owner_account = lock.owner_account.clone();
 			let vault_id = lock.vault_id;
 			let securitization = lock.get_securitization();
@@ -1889,6 +1899,7 @@ pub mod pallet {
 		/// Call made during the on_initialize to implement cosign overdue penalties.
 		pub(crate) fn cosign_bitcoin_overdue(utxo_id: UtxoId) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 			let vault_id = lock.vault_id;
 			let entry = Self::take_release_request(utxo_id)?;
 
@@ -2011,6 +2022,7 @@ pub mod pallet {
 			T::BitcoinUtxoTracker::unwatch(utxo_id);
 			Self::schedule_orphans_for_cleanup(utxo_id, lock);
 			LocksByUtxoId::<T>::remove(utxo_id);
+			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 
 			Ok(())
 		}

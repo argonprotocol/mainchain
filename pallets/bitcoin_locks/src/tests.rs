@@ -11,7 +11,7 @@ use crate::{
 	mock::*,
 	pallet::{
 		FeeCouponsExpiringByFrame, LockCosignDueByFrame, LockReleaseCosignHeightById,
-		LockReleaseRequestsByUtxoId, LocksByUtxoId,
+		LockReleaseRequestsByUtxoId, LocksByUtxoId, UtxoIdsByVaultId,
 	},
 };
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
@@ -66,6 +66,7 @@ fn can_lock_a_bitcoin_utxo_until_expiration() {
 			.into(),
 		);
 		assert!(LockExpirationsByBitcoinHeight::<Test>::get(lock.vault_claim_height).contains(&1));
+		assert!(UtxoIdsByVaultId::<Test>::contains_key(1, 1));
 		BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN).unwrap();
 
 		System::reset_events();
