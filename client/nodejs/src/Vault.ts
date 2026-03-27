@@ -51,6 +51,9 @@ export class Vault {
   public openedTick: number;
   public securitizationRatio!: number;
 
+  public lockedSatoshis!: number;
+  public securitizedSatoshis!: number;
+
   constructor(
     id: number,
     vault: ArgonPrimitivesVault,
@@ -97,6 +100,13 @@ export class Vault {
         PERMILL_DECIMALS,
       ),
     };
+    if ('lockedSatoshis' in vault) {
+      this.lockedSatoshis = vault.lockedSatoshis.toNumber();
+      this.securitizedSatoshis = vault.securitizedSatoshis.toNumber();
+    } else {
+      this.lockedSatoshis = 0;
+      this.securitizedSatoshis = 0;
+    }
 
     this.operatorAccountId = vault.operatorAccountId.toString();
     this.isClosed = vault.isClosed.valueOf();
