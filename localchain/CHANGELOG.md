@@ -1,11 +1,17 @@
 # Changelog
 
-## [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.3.27...c95aa2a82a01062d0663a59543a48f88410f4ea9) (2026-03-23)
+## [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...ec2972c497b09e63db88669bbab216f1297dc1c5) (2026-03-27)
 
-### Features
+### [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.4.1...v1.4.2) (2026-03-24)
+
+### [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.4.0...v1.4.1) (2026-03-20)
+
+#### Features
 
 * **security:** harden bitcoin CLI secret handling
 ([80a6c3f](https://github.com/argonprotocol/mainchain/commit/80a6c3f2a7e7d3821f738be42a77ac23942f14f8))
+
+## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...v1.4.0) (2026-02-17)
 
 ### [v1.3.27](https://github.com/argonprotocol/mainchain/compare/v1.3.26...v1.3.27) (2026-01-29)
 

@@ -530,11 +530,6 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Option<PalletChainTransferQueuedTransferOut>>,
         [u32]
       >;
-      transfersUsedInBlockNotebooks: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u32]>>>,
-        [u32]
-      >;
     };
     digests: {
       tempDigests: AugmentedQuery<

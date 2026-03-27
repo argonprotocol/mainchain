@@ -175,11 +175,11 @@ is 0.44% of the 10-second block weight budget. Expiry processing is not overweig
 
 Substrate weights are in **picoseconds** (10^-12 seconds). Common conversions:
 
-| Picoseconds | Human-readable |
-|-------------|---------------|
-| 1,000,000 (1M) | 1 microsecond |
-| 1,000,000,000 (1B) | 1 millisecond |
-| 1,000,000,000,000 (1T) | 1 second |
+| Picoseconds            | Human-readable |
+| ---------------------- | -------------- |
+| 1,000,000 (1M)         | 1 microsecond  |
+| 1,000,000,000 (1B)     | 1 millisecond  |
+| 1,000,000,000,000 (1T) | 1 second       |
 
 The block weight budget is `WEIGHT_REF_TIME_PER_SECOND * 10` = **10 seconds** = 10 trillion
 picoseconds. A weight of `44_000_000` is 44 microseconds (0.044ms), not 44 milliseconds.

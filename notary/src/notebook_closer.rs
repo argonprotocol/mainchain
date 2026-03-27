@@ -335,9 +335,17 @@ mod tests {
 		task::{Context, Poll},
 		time::Duration,
 	};
-	use subxt::{OnlineClient, blocks::Block, tx::TxProgress};
+	use subxt::{blocks::Block, tx::TxProgress};
 	use tokio::sync::Mutex;
 
+	use super::*;
+	use crate::{
+		NotaryServer,
+		block_watch::spawn_block_sync,
+		notebook_closer::NOTARY_KEYID,
+		server::NotebookHeaderStream,
+		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+	};
 	use argon_client::{
 		ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, ReconnectingClient,
 		TxInBlockWithEvents, api,
@@ -369,15 +377,6 @@ mod tests {
 	};
 	use argon_testing::start_argon_test_node;
 	use serial_test::serial;
-
-	use super::*;
-	use crate::{
-		NotaryServer,
-		block_watch::spawn_block_sync,
-		notebook_closer::NOTARY_KEYID,
-		server::NotebookHeaderStream,
-		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
-	};
 
 	#[sqlx::test]
 	async fn test_reconnect_publishes_latest_closed_notebook(pool: PgPool) -> anyhow::Result<()> {
@@ -773,7 +772,7 @@ mod tests {
 	}
 
 	fn get_digests(
-		block: Block<ArgonConfig, OnlineClient<ArgonConfig>>,
+		block: Block<ArgonConfig, ArgonOnlineClient>,
 	) -> (
 		Tick,
 		BlockVoteDigest,
@@ -1264,7 +1263,7 @@ mod tests {
 	}
 
 	async fn wait_for_in_block(
-		tx_progress: TxProgress<ArgonConfig, OnlineClient<ArgonConfig>>,
+		tx_progress: TxProgress<ArgonConfig, ArgonOnlineClient>,
 	) -> anyhow::Result<TxInBlockWithEvents, Error> {
 		let res = MainchainClient::wait_for_ext_in_block(tx_progress, false).await?;
 		Ok(res)
