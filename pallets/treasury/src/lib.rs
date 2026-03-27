@@ -72,7 +72,7 @@ pub mod pallet {
 	use sp_runtime::{BoundedBTreeMap, traits::AccountIdConversion};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 	const TREASURY_RESERVES_SUB_ACCOUNT: [u8; 16] = *b"treasury-reserve";
 
 	#[pallet::pallet]

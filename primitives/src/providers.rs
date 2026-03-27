@@ -618,9 +618,8 @@ impl NotebookEventHandler for Tuple {
 		for_tuples!( #( Tuple::notebook_submitted(&header); )* );
 	}
 	fn notebook_submitted_weight(header: &NotebookHeader) -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::notebook_submitted_weight(&header)); )* );
-		weight
+		let weights: &[Weight] = &[for_tuples!( #( Tuple::notebook_submitted_weight(header) ),* )];
+		weights.iter().fold(Weight::zero(), |acc, w| acc.saturating_add(*w))
 	}
 }
 
