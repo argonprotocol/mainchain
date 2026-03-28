@@ -3811,9 +3811,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				112u8, 81u8, 248u8, 143u8, 31u8, 255u8, 11u8, 172u8, 45u8, 180u8, 26u8, 105u8,
-				211u8, 49u8, 219u8, 157u8, 38u8, 55u8, 190u8, 211u8, 145u8, 241u8, 42u8, 170u8,
-				239u8, 192u8, 255u8, 40u8, 56u8, 105u8, 151u8, 210u8,
+				46u8, 179u8, 147u8, 197u8, 131u8, 45u8, 81u8, 177u8, 107u8, 234u8, 223u8, 99u8,
+				140u8, 201u8, 82u8, 214u8, 145u8, 71u8, 50u8, 245u8, 189u8, 210u8, 7u8, 175u8,
+				165u8, 202u8, 193u8, 109u8, 27u8, 167u8, 105u8, 169u8,
 			]
 	}
 	pub mod system {
@@ -14317,15 +14317,6 @@ pub mod api {
 					pub type Param0 = ::core::primitive::u32;
 					pub type Param1 = ::core::primitive::u64;
 				}
-				pub mod transfers_used_in_block_notebooks {
-					use super::runtime_types;
-					pub type TransfersUsedInBlockNotebooks =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
-							crate::types::AccountId32,
-							::core::primitive::u32,
-						)>;
-					pub type Param0 = ::core::primitive::u32;
-				}
 				pub mod hyperbridge_token_admin {
 					use super::runtime_types;
 					pub type HyperbridgeTokenAdmin = crate::types::AccountId32;
@@ -14489,49 +14480,6 @@ pub mod api {
 							18u8, 15u8, 42u8, 42u8, 238u8, 66u8, 238u8, 125u8, 186u8, 81u8, 111u8,
 							165u8, 145u8, 169u8, 75u8, 236u8, 127u8, 3u8, 166u8, 41u8, 158u8,
 							154u8,
-						],
-					)
-				}
-				pub fn transfers_used_in_block_notebooks_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::transfers_used_in_block_notebooks::TransfersUsedInBlockNotebooks,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"TransfersUsedInBlockNotebooks",
-						(),
-						[
-							56u8, 113u8, 70u8, 50u8, 20u8, 191u8, 57u8, 47u8, 98u8, 209u8, 251u8,
-							146u8, 233u8, 41u8, 193u8, 196u8, 198u8, 195u8, 231u8, 184u8, 49u8,
-							3u8, 16u8, 180u8, 218u8, 7u8, 51u8, 90u8, 220u8, 111u8, 153u8, 219u8,
-						],
-					)
-				}
-				pub fn transfers_used_in_block_notebooks(
-					&self,
-					_0: types::transfers_used_in_block_notebooks::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::transfers_used_in_block_notebooks::Param0,
-					>,
-					types::transfers_used_in_block_notebooks::TransfersUsedInBlockNotebooks,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
-						"TransfersUsedInBlockNotebooks",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							56u8, 113u8, 70u8, 50u8, 20u8, 191u8, 57u8, 47u8, 98u8, 209u8, 251u8,
-							146u8, 233u8, 41u8, 193u8, 196u8, 198u8, 195u8, 231u8, 184u8, 49u8,
-							3u8, 16u8, 180u8, 218u8, 7u8, 51u8, 90u8, 220u8, 111u8, 153u8, 219u8,
 						],
 					)
 				}

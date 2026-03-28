@@ -1,8 +1,36 @@
 # Changelog
 
-## [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.3.27...c95aa2a82a01062d0663a59543a48f88410f4ea9) (2026-03-23)
+## [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...ec2972c497b09e63db88669bbab216f1297dc1c5) (2026-03-27)
 
 ### Features
+
+* **bitcoin_locks:** add per-vault UTXO index and remove completed migrations
+([5078a46](https://github.com/argonprotocol/mainchain/commit/5078a46aecd9dd495a141f7284fd978d61394a7b))
+
+### Fixes
+
+* missing migration for vault funders
+([c4197f4](https://github.com/argonprotocol/mainchain/commit/c4197f4c159e6aa281824064733a62f0eb22bfc2))
+* chain transfer escrow safety and zero-amount validation
+([062ea8d](https://github.com/argonprotocol/mainchain/commit/062ea8d3bf9d18abfff27ce10a98603e5e24798a))
+* **notary:** enable reconnecting when notary subscription dies
+([f014d97](https://github.com/argonprotocol/mainchain/commit/f014d97bd329ae92453a512f7bac8e66dfe03d28))
+* **tests:** stabilize end-to-end tx submission
+([e1be922](https://github.com/argonprotocol/mainchain/commit/e1be92257663def75d2d7db4354be74f03ebe88f))
+
+### [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.4.1...v1.4.2) (2026-03-24)
+
+#### Fixes
+
+* **bitcoin-locks:** treat spent release requests as completed releases
+([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
+* **node:** avoid GRANDPA genesis state reads at startup (#439)
+([7d670fb](https://github.com/argonprotocol/mainchain/commit/7d670fbfa9b02f795385cb22d8525d40a2c06cda)),
+closes [#439](https://github.com/argonprotocol/mainchain/issues/439)
+
+### [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.4.0...v1.4.1) (2026-03-20)
+
+#### Features
 
 * **bitcoin:** add candidate return flow
 ([2242f27](https://github.com/argonprotocol/mainchain/commit/2242f27feeedb293676d131ac41b218424cae693))
@@ -24,6 +52,36 @@
 ([2deed46](https://github.com/argonprotocol/mainchain/commit/2deed465bd2ac46eafd7b7e02c7362991bcb1043))
 * **node:** enforce notebook download trust and size policy
 ([9310a3e](https://github.com/argonprotocol/mainchain/commit/9310a3ec9f7f63d146adc2a2cb4e690a00a13e4e))
+
+#### Fixes
+
+* arithmetic safety, tax burn accounting, and treasury pool cap
+([e7d830a](https://github.com/argonprotocol/mainchain/commit/e7d830a2630bdb39081882b676aedf656fee5abe))
+* **bitcoin:** avoid overweighting pending funding expiration cleanup
+([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
+* **consensus:** correct vote-seal delay window math
+([9964842](https://github.com/argonprotocol/mainchain/commit/9964842e8e24aaa087c80d80a140ffc35912fbc6))
+* clear pending release when a bitcoin lock burns
+([4d61584](https://github.com/argonprotocol/mainchain/commit/4d615846f5224c832e5a0a51c069515b4e358c3b))
+* **node:** repair warp sync across historical handoffs
+([a80aaea](https://github.com/argonprotocol/mainchain/commit/a80aaea768abd83a472fe7b8850485ce9b4e81b7)),
+closes [#272](https://github.com/argonprotocol/mainchain/issues/272)
+* tests failing for voting_mining (#423)
+([97b012d](https://github.com/argonprotocol/mainchain/commit/97b012d5e1e625650915433b701f80db13d9b474)),
+closes [#423](https://github.com/argonprotocol/mainchain/issues/423)
+* **consensus:** keep import audit catchup active
+([f528425](https://github.com/argonprotocol/mainchain/commit/f528425b0f33c69a72bb54d0719bfda94081e998))
+* **consensus:** rollback notary queue state fallback
+([c3ed160](https://github.com/argonprotocol/mainchain/commit/c3ed160ddcf53f2404e2c29fd9c7f4ba4f49ffd6))
+* **notary:** stabilize audit failure notification test
+([c9db5c0](https://github.com/argonprotocol/mainchain/commit/c9db5c0149f338a0b12dac0e7f8fe04df1666341))
+* attempt to fix vote mining
+([0de71cc](https://github.com/argonprotocol/mainchain/commit/0de71ccfd39991aa8a380d9e0bc0c9f1cddc504b))
+
+## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...v1.4.0) (2026-02-17)
+
+### Features
+
 * **consensus:** harden fork choice + block seal
 ([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
 * **consensus:** harden fork choice + block seal
@@ -49,33 +107,6 @@
 
 ### Fixes
 
-* **bitcoin-locks:** treat spent release requests as completed releases
-([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
-* **node:** avoid GRANDPA genesis state reads at startup (#439)
-([7d670fb](https://github.com/argonprotocol/mainchain/commit/7d670fbfa9b02f795385cb22d8525d40a2c06cda)),
-closes [#439](https://github.com/argonprotocol/mainchain/issues/439)
-* arithmetic safety, tax burn accounting, and treasury pool cap
-([e7d830a](https://github.com/argonprotocol/mainchain/commit/e7d830a2630bdb39081882b676aedf656fee5abe))
-* **bitcoin:** avoid overweighting pending funding expiration cleanup
-([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
-* **consensus:** correct vote-seal delay window math
-([9964842](https://github.com/argonprotocol/mainchain/commit/9964842e8e24aaa087c80d80a140ffc35912fbc6))
-* clear pending release when a bitcoin lock burns
-([4d61584](https://github.com/argonprotocol/mainchain/commit/4d615846f5224c832e5a0a51c069515b4e358c3b))
-* **node:** repair warp sync across historical handoffs
-([a80aaea](https://github.com/argonprotocol/mainchain/commit/a80aaea768abd83a472fe7b8850485ce9b4e81b7)),
-closes [#272](https://github.com/argonprotocol/mainchain/issues/272)
-* tests failing for voting_mining (#423)
-([97b012d](https://github.com/argonprotocol/mainchain/commit/97b012d5e1e625650915433b701f80db13d9b474)),
-closes [#423](https://github.com/argonprotocol/mainchain/issues/423)
-* **consensus:** keep import audit catchup active
-([f528425](https://github.com/argonprotocol/mainchain/commit/f528425b0f33c69a72bb54d0719bfda94081e998))
-* **consensus:** rollback notary queue state fallback
-([c3ed160](https://github.com/argonprotocol/mainchain/commit/c3ed160ddcf53f2404e2c29fd9c7f4ba4f49ffd6))
-* **notary:** stabilize audit failure notification test
-([c9db5c0](https://github.com/argonprotocol/mainchain/commit/c9db5c0149f338a0b12dac0e7f8fe04df1666341))
-* attempt to fix vote mining
-([0de71cc](https://github.com/argonprotocol/mainchain/commit/0de71ccfd39991aa8a380d9e0bc0c9f1cddc504b))
 * migrations for vault wrong
 ([a5db044](https://github.com/argonprotocol/mainchain/commit/a5db044c74c574bb1b0873c7bc29f86004f6031a))
 * lint

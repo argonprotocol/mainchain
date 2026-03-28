@@ -1,8 +1,27 @@
 # Changelog
 
-## [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.3.27...c95aa2a82a01062d0663a59543a48f88410f4ea9) (2026-03-23)
+## [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...ec2972c497b09e63db88669bbab216f1297dc1c5) (2026-03-27)
 
 ### Features
+
+* **bitcoin_locks:** add per-vault UTXO index and remove completed migrations
+([5078a46](https://github.com/argonprotocol/mainchain/commit/5078a46aecd9dd495a141f7284fd978d61394a7b))
+
+### Fixes
+
+* missing migration for vault funders
+([c4197f4](https://github.com/argonprotocol/mainchain/commit/c4197f4c159e6aa281824064733a62f0eb22bfc2))
+
+### [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.4.1...v1.4.2) (2026-03-24)
+
+#### Fixes
+
+* **bitcoin-locks:** treat spent release requests as completed releases
+([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
+
+### [v1.4.1](https://github.com/argonprotocol/mainchain/compare/v1.4.0...v1.4.1) (2026-03-20)
+
+#### Features
 
 * **bitcoin:** add candidate return flow
 ([2242f27](https://github.com/argonprotocol/mainchain/commit/2242f27feeedb293676d131ac41b218424cae693))
@@ -16,6 +35,16 @@
 ([2835686](https://github.com/argonprotocol/mainchain/commit/2835686bda0328f99c83fb11d9b0dff39e9cae10))
 * **vaults:** track securitized satoshis phase 1
 ([1135732](https://github.com/argonprotocol/mainchain/commit/11357326893bee45c1cf9e62511dda9062fe90db))
+
+#### Fixes
+
+* **bitcoin:** avoid overweighting pending funding expiration cleanup
+([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
+
+## [v1.4.0](https://github.com/argonprotocol/mainchain/compare/v1.3.27...v1.4.0) (2026-02-17)
+
+### Features
+
 * **consensus:** harden fork choice + block seal
 ([8c1e835](https://github.com/argonprotocol/mainchain/commit/8c1e8358ea2370894044e22bb01a6946fca72db5))
 * **consensus:** harden fork choice + block seal
@@ -31,10 +60,6 @@
 
 ### Fixes
 
-* **bitcoin-locks:** treat spent release requests as completed releases
-([ded1e25](https://github.com/argonprotocol/mainchain/commit/ded1e259dbccc4603e15151231dba2067279216a))
-* **bitcoin:** avoid overweighting pending funding expiration cleanup
-([3a19c75](https://github.com/argonprotocol/mainchain/commit/3a19c75b110a5616f049606f190755a1e3e88c13))
 * **weights:** align mining-slot/vault benchmarks
 ([bd7b405](https://github.com/argonprotocol/mainchain/commit/bd7b405224067c968097ce6c542b3fb5342ed01d))
 * duplicate metadata field
