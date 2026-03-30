@@ -1022,6 +1022,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxContributorsExceeded: AugmentedError<ApiType>;
       /**
+       * Max pending unlocks scheduled for a frame exceeded
+       **/
+      MaxPendingUnlocksExceeded: AugmentedError<ApiType>;
+      /**
        * Max Vaults exceeded
        **/
       MaxVaultsExceeded: AugmentedError<ApiType>;

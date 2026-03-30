@@ -256,6 +256,7 @@ import type {
   PalletTreasuryEvent,
   PalletTreasuryFunderState,
   PalletTreasuryHoldReason,
+  PalletTreasuryPendingUnlock,
   PalletTreasuryTreasuryCapital,
   PalletTreasuryTreasuryPool,
   PalletTxPauseCall,
@@ -542,6 +543,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryEvent: PalletTreasuryEvent;
     PalletTreasuryFunderState: PalletTreasuryFunderState;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
+    PalletTreasuryPendingUnlock: PalletTreasuryPendingUnlock;
     PalletTreasuryTreasuryCapital: PalletTreasuryTreasuryCapital;
     PalletTreasuryTreasuryPool: PalletTreasuryTreasuryPool;
     PalletTxPauseCall: PalletTxPauseCall;

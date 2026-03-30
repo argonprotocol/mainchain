@@ -1,6 +1,7 @@
 use argon_primitives::{
 	MiningSlotProvider, MiningSlotProviderWeightInfo, TreasuryPoolProvider,
 	TreasuryPoolProviderWeightInfo,
+	providers::OperationalRewardsProviderWeightInfo,
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 };
 use core::marker::PhantomData;
@@ -18,6 +19,8 @@ pub trait WeightInfo {
 	fn on_mining_seat_won() -> Weight;
 	fn on_treasury_pool_participated() -> Weight;
 	fn on_uniswap_transfer() -> Weight;
+	fn provider_pending_rewards() -> Weight;
+	fn provider_mark_reward_paid() -> Weight;
 }
 
 type VaultProviderWeights<T> =
@@ -103,6 +106,26 @@ where
 	fn on_uniswap_transfer() -> Weight {
 		Base::on_uniswap_transfer()
 	}
+
+	fn provider_pending_rewards() -> Weight {
+		Base::provider_pending_rewards()
+	}
+
+	fn provider_mark_reward_paid() -> Weight {
+		Base::provider_mark_reward_paid()
+	}
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+
+impl<T: crate::Config> OperationalRewardsProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn pending_rewards() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_pending_rewards()
+	}
+
+	fn mark_reward_paid() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_mark_reward_paid()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -135,6 +158,14 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn on_uniswap_transfer() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_pending_rewards() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_mark_reward_paid() -> Weight {
 		Weight::zero()
 	}
 }

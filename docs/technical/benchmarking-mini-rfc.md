@@ -1,6 +1,6 @@
 # Mini RFC: Benchmarking Strategy for Runtime Weights
 
-Last updated: 2026-03-11
+Last updated: 2026-03-29
 
 ## Context
 
@@ -101,7 +101,7 @@ Local pallets in this repo (`pallets/*`):
 | `pallet_operational_accounts` | [x]              | [x]           |
 | `pallet_price_index`          | [ ]              | [ ]           |
 | `pallet_ticks`                | [ ]              | [ ]           |
-| `pallet_treasury`             | [ ]              | [ ]           |
+| `pallet_treasury`             | [x]              | [x]           |
 | `pallet_vaults`               | [x]              | [x]           |
 
 Upstream / runtime pallets:
@@ -132,12 +132,15 @@ Upstream / runtime pallets:
   - `pallet_chain_transfer`,
   - `pallet_notebook`,
   - `pallet_mining_slot`,
+  - `pallet_operational_accounts`,
+  - `pallet_treasury`,
   - `pallet_block_rewards` (wrapper shape present).
 
 ### Validation status
 
 - targeted benchmark regeneration has been run for `pallet_block_seal`, `pallet_block_seal_spec`,
-  `pallet_chain_transfer`, `pallet_notebook`, `pallet_bitcoin_utxos`, and `pallet_bitcoin_locks`,
+  `pallet_chain_transfer`, `pallet_notebook`, `pallet_bitcoin_utxos`, `pallet_bitcoin_locks`,
+  `pallet_operational_accounts`, and `pallet_treasury`,
 - `cargo check -p argon-runtime --features runtime-benchmarks`,
 - `cargo check -p argon-canary-runtime --features runtime-benchmarks`,
 - `cargo make fmt`,
@@ -158,8 +161,8 @@ is 0.44% of the 10-second block weight budget. Expiry processing is not overweig
 
 ### Deferred / follow-up
 
-- implement actual benchmark suites for `pallet_block_rewards` and `pallet_treasury` and wire their
-  generated runtime weight modules when complete,
+- implement actual benchmark suites for `pallet_block_rewards` and wire its generated runtime weight
+  modules when complete,
 - additional provider cleanup work outside this scope (for example domains/block_rewards follow-up
   items) remain separate,
 - mandatory-inherent liveness guardrails are deferred to a follow-up PR (not this benchmark PR),

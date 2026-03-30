@@ -4,7 +4,10 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::OperationalAccountsHook;
+use argon_primitives::{
+	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
+	OperationalRewardsProvider,
+};
 use codec::Decode;
 use frame_system::RawOrigin;
 use pallet_prelude::{
@@ -288,6 +291,80 @@ mod benchmarks {
 		}
 
 		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+	}
+
+	#[benchmark]
+	fn provider_pending_rewards() {
+		OperationalRewardsQueue::<T>::kill();
+		let max_rewards = T::MaxOperationalRewardsQueued::get();
+
+		for reward_index in 0..max_rewards {
+			let operational_account: T::AccountId =
+				account("reward-owner", reward_index, USER_SEED);
+			let payout_account: T::AccountId = account("reward-payout", reward_index, USER_SEED);
+			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| {
+				queue.try_push(OperationalRewardPayout {
+					operational_account,
+					payout_account,
+					reward_kind: OperationalRewardKind::Activation,
+					amount: T::Balance::from(1_000u128),
+				})
+			});
+		}
+
+		#[block]
+		{
+			let payouts = <OperationalAccountsPallet<T> as OperationalRewardsProvider<
+				T::AccountId,
+				T::Balance,
+			>>::pending_rewards();
+			assert_eq!(payouts.len(), max_rewards as usize);
+		}
+	}
+
+	#[benchmark]
+	fn provider_mark_reward_paid() {
+		OperationalRewardsQueue::<T>::kill();
+		let max_rewards = T::MaxOperationalRewardsQueued::get().max(1);
+		let target_links = linked_accounts::<T>();
+		let mut target_account = default_operational_account::<T>(&target_links);
+		target_account.is_operational = true;
+		insert_operational_account::<T>(&target_links, target_account);
+
+		let mut target_reward = None;
+		for reward_index in 0..max_rewards {
+			let reward = OperationalRewardPayout {
+				operational_account: if reward_index + 1 == max_rewards {
+					target_links.owner.clone()
+				} else {
+					account("reward-owner", reward_index, USER_SEED)
+				},
+				payout_account: account("reward-payout", reward_index, USER_SEED),
+				reward_kind: OperationalRewardKind::Activation,
+				amount: T::Balance::from(1_000u128),
+			};
+			if reward_index + 1 == max_rewards {
+				target_reward = Some(reward.clone());
+			}
+			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| queue.try_push(reward));
+		}
+		let target_reward = target_reward.expect("target reward seeded");
+
+		#[block]
+		{
+			<OperationalAccountsPallet<T> as OperationalRewardsProvider<
+				T::AccountId,
+				T::Balance,
+			>>::mark_reward_paid(&target_reward, target_reward.amount);
+		}
+
+		assert!(!OperationalRewardsQueue::<T>::get().contains(&target_reward));
+		assert_eq!(
+			OperationalAccounts::<T>::get(&target_links.owner)
+				.expect("operational account should exist")
+				.rewards_collected_amount,
+			target_reward.amount,
+		);
 	}
 
 	#[benchmark]

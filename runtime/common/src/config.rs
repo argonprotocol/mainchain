@@ -89,6 +89,7 @@ parameter_types! {
 
 	// ### pallet_treasury
 	pub const MaxTreasuryContributors: u32 = 100;
+	pub const MaxTrackedTreasuryFunders: u32 = 105;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);

@@ -3811,9 +3811,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				46u8, 179u8, 147u8, 197u8, 131u8, 45u8, 81u8, 177u8, 107u8, 234u8, 223u8, 99u8,
-				140u8, 201u8, 82u8, 214u8, 145u8, 71u8, 50u8, 245u8, 189u8, 210u8, 7u8, 175u8,
-				165u8, 202u8, 193u8, 109u8, 27u8, 167u8, 105u8, 169u8,
+				101u8, 18u8, 225u8, 45u8, 77u8, 82u8, 138u8, 240u8, 57u8, 180u8, 80u8, 101u8, 29u8,
+				2u8, 243u8, 202u8, 23u8, 65u8, 48u8, 240u8, 112u8, 184u8, 80u8, 83u8, 249u8, 211u8,
+				24u8, 21u8, 172u8, 241u8, 27u8, 184u8,
 			]
 	}
 	pub mod system {
@@ -24539,12 +24539,25 @@ pub mod api {
 							runtime_types::pallet_treasury::pallet::TreasuryCapital,
 						>;
 				}
+				pub mod pending_unlocks_by_frame {
+					use super::runtime_types;
+					pub type PendingUnlocksByFrame =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_treasury::pallet::PendingUnlock,
+						>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod pending_unlock_retry_cursor {
+					use super::runtime_types;
+					pub type PendingUnlockRetryCursor = ::core::primitive::u64;
+				}
 				pub mod funders_by_vault_id {
 					use super::runtime_types;
 					pub type FundersByVaultId =
-						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
 							crate::types::AccountId32,
-						>;
+							::core::primitive::u128,
+						)>;
 					pub type Param0 = ::core::primitive::u32;
 				}
 			}
@@ -24597,7 +24610,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				#[doc = " Per-vault per-account commitment and held principal (long-lived source of truth)."]
 				pub fn funder_state_by_vault_and_account_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -24612,13 +24625,13 @@ pub mod api {
 						"FunderStateByVaultAndAccount",
 						(),
 						[
-							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
-							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
-							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
+							57u8, 114u8, 248u8, 127u8, 112u8, 254u8, 7u8, 231u8, 102u8, 34u8, 42u8,
+							162u8, 141u8, 4u8, 129u8, 251u8, 241u8, 178u8, 199u8, 239u8, 227u8,
+							234u8, 162u8, 88u8, 193u8, 156u8, 197u8, 29u8, 154u8, 6u8, 68u8, 219u8,
 						],
 					)
 				}
-				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				#[doc = " Per-vault per-account commitment and held principal (long-lived source of truth)."]
 				pub fn funder_state_by_vault_and_account_iter1(
 					&self,
 					_0: types::funder_state_by_vault_and_account::Param0,
@@ -24636,13 +24649,13 @@ pub mod api {
 						"FunderStateByVaultAndAccount",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
-							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
-							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
+							57u8, 114u8, 248u8, 127u8, 112u8, 254u8, 7u8, 231u8, 102u8, 34u8, 42u8,
+							162u8, 141u8, 4u8, 129u8, 251u8, 241u8, 178u8, 199u8, 239u8, 227u8,
+							234u8, 162u8, 88u8, 193u8, 156u8, 197u8, 29u8, 154u8, 6u8, 68u8, 219u8,
 						],
 					)
 				}
-				#[doc = " Per-vault per-account commitment and current bonded principal (long-lived source of truth)."]
+				#[doc = " Per-vault per-account commitment and held principal (long-lived source of truth)."]
 				pub fn funder_state_by_vault_and_account(
 					&self,
 					_0: types::funder_state_by_vault_and_account::Param0,
@@ -24669,9 +24682,9 @@ pub mod api {
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
 						),
 						[
-							217u8, 146u8, 4u8, 59u8, 121u8, 224u8, 81u8, 84u8, 16u8, 74u8, 8u8,
-							157u8, 139u8, 249u8, 97u8, 108u8, 33u8, 171u8, 190u8, 127u8, 86u8,
-							66u8, 103u8, 116u8, 219u8, 119u8, 230u8, 82u8, 197u8, 26u8, 71u8, 16u8,
+							57u8, 114u8, 248u8, 127u8, 112u8, 254u8, 7u8, 231u8, 102u8, 34u8, 42u8,
+							162u8, 141u8, 4u8, 129u8, 251u8, 241u8, 178u8, 199u8, 239u8, 227u8,
+							234u8, 162u8, 88u8, 193u8, 156u8, 197u8, 29u8, 154u8, 6u8, 68u8, 219u8,
 						],
 					)
 				}
@@ -24698,7 +24711,79 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Accounts that have a non-zero commitment for a vault. Bounded for predictable weights."]
+				#[doc = " Index of delayed unlocks that mature at the given frame."]
+				pub fn pending_unlocks_by_frame_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_unlocks_by_frame::PendingUnlocksByFrame,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"PendingUnlocksByFrame",
+						(),
+						[
+							37u8, 239u8, 75u8, 5u8, 235u8, 44u8, 56u8, 147u8, 170u8, 226u8, 247u8,
+							99u8, 251u8, 248u8, 129u8, 25u8, 160u8, 157u8, 219u8, 208u8, 254u8,
+							132u8, 92u8, 243u8, 5u8, 124u8, 207u8, 83u8, 41u8, 178u8, 34u8, 253u8,
+						],
+					)
+				}
+				#[doc = " Index of delayed unlocks that mature at the given frame."]
+				pub fn pending_unlocks_by_frame(
+					&self,
+					_0: types::pending_unlocks_by_frame::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_unlocks_by_frame::Param0,
+					>,
+					types::pending_unlocks_by_frame::PendingUnlocksByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"PendingUnlocksByFrame",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							37u8, 239u8, 75u8, 5u8, 235u8, 44u8, 56u8, 147u8, 170u8, 226u8, 247u8,
+							99u8, 251u8, 248u8, 129u8, 25u8, 160u8, 157u8, 219u8, 208u8, 254u8,
+							132u8, 92u8, 243u8, 5u8, 124u8, 207u8, 83u8, 41u8, 178u8, 34u8, 253u8,
+						],
+					)
+				}
+				#[doc = " Oldest matured unlock frame that still has entries to retry."]
+				pub fn pending_unlock_retry_cursor(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_unlock_retry_cursor::PendingUnlockRetryCursor,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"PendingUnlockRetryCursor",
+						(),
+						[
+							212u8, 119u8, 190u8, 183u8, 72u8, 56u8, 150u8, 88u8, 174u8, 198u8,
+							30u8, 87u8, 58u8, 8u8, 133u8, 114u8, 69u8, 218u8, 189u8, 83u8, 168u8,
+							226u8, 1u8, 54u8, 172u8, 252u8, 106u8, 97u8, 236u8, 169u8, 187u8,
+							240u8,
+						],
+					)
+				}
+				#[doc = " Bounded, sorted working set for a vault's treasury pool construction."]
+				#[doc = ""]
+				#[doc = " `FunderStateByVaultAndAccount` stores every funder's state. This index only keeps the top"]
+				#[doc = " funded contributors plus a small standby window so treasury can recover from a few exits"]
+				#[doc = " without a global scan. Entries are stored with the operator first while funded, then the"]
+				#[doc = " remaining accounts sorted by held principal descending."]
 				pub fn funders_by_vault_id_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -24713,14 +24798,19 @@ pub mod api {
 						"FundersByVaultId",
 						(),
 						[
-							253u8, 214u8, 27u8, 5u8, 127u8, 251u8, 250u8, 96u8, 207u8, 182u8,
-							212u8, 156u8, 138u8, 253u8, 78u8, 185u8, 9u8, 123u8, 70u8, 132u8,
-							105u8, 116u8, 19u8, 159u8, 244u8, 181u8, 126u8, 22u8, 38u8, 108u8,
-							158u8, 102u8,
+							169u8, 227u8, 14u8, 194u8, 3u8, 189u8, 49u8, 254u8, 94u8, 62u8, 230u8,
+							131u8, 176u8, 190u8, 42u8, 199u8, 128u8, 149u8, 43u8, 150u8, 156u8,
+							252u8, 51u8, 151u8, 92u8, 185u8, 61u8, 144u8, 252u8, 147u8, 120u8,
+							62u8,
 						],
 					)
 				}
-				#[doc = " Accounts that have a non-zero commitment for a vault. Bounded for predictable weights."]
+				#[doc = " Bounded, sorted working set for a vault's treasury pool construction."]
+				#[doc = ""]
+				#[doc = " `FunderStateByVaultAndAccount` stores every funder's state. This index only keeps the top"]
+				#[doc = " funded contributors plus a small standby window so treasury can recover from a few exits"]
+				#[doc = " without a global scan. Entries are stored with the operator first while funded, then the"]
+				#[doc = " remaining accounts sorted by held principal descending."]
 				pub fn funders_by_vault_id(
 					&self,
 					_0: types::funders_by_vault_id::Param0,
@@ -24738,10 +24828,10 @@ pub mod api {
 						"FundersByVaultId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							253u8, 214u8, 27u8, 5u8, 127u8, 251u8, 250u8, 96u8, 207u8, 182u8,
-							212u8, 156u8, 138u8, 253u8, 78u8, 185u8, 9u8, 123u8, 70u8, 132u8,
-							105u8, 116u8, 19u8, 159u8, 244u8, 181u8, 126u8, 22u8, 38u8, 108u8,
-							158u8, 102u8,
+							169u8, 227u8, 14u8, 194u8, 3u8, 189u8, 49u8, 254u8, 94u8, 62u8, 230u8,
+							131u8, 176u8, 190u8, 42u8, 199u8, 128u8, 149u8, 43u8, 150u8, 156u8,
+							252u8, 51u8, 151u8, 92u8, 185u8, 61u8, 144u8, 252u8, 147u8, 120u8,
+							62u8,
 						],
 					)
 				}
@@ -24751,7 +24841,7 @@ pub mod api {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " The maximum number of contributors to a bond fund"]
+				#[doc = " The maximum number of contributors in a vault's treasury pool"]
 				pub fn max_treasury_contributors(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -24760,6 +24850,24 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
 						"MaxTreasuryContributors",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of tracked funded contributors kept per vault, including standby"]
+				#[doc = " entries beyond the active pool size."]
+				pub fn max_tracked_treasury_funders(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxTrackedTreasuryFunders",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -24831,6 +24939,40 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of pending unlock entries that may mature in a single frame."]
+				pub fn max_pending_unlocks_per_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxPendingUnlocksPerFrame",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The number of frames an allocation decrease remains locked before release."]
+				pub fn treasury_exit_delay_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"TreasuryExitDelayFrames",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -34357,9 +34499,12 @@ pub mod api {
 					#[doc = "Max Vaults exceeded"]
 					MaxVaultsExceeded,
 					#[codec(index = 8)]
+					#[doc = "Max pending unlocks scheduled for a frame exceeded"]
+					MaxPendingUnlocksExceeded,
+					#[codec(index = 9)]
 					#[doc = "This fund has already been renewed"]
 					AlreadyRenewed,
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					#[doc = "Vault operator only"]
 					NotAVaultOperator,
 				}
@@ -34450,11 +34595,10 @@ pub mod api {
 				)]
 				pub struct FunderState {
 					#[codec(compact)]
-					pub target_principal: ::core::primitive::u128,
-					#[codec(compact)]
-					pub bonded_principal: ::core::primitive::u128,
-					#[codec(compact)]
 					pub held_principal: ::core::primitive::u128,
+					#[codec(compact)]
+					pub pending_unlock_amount: ::core::primitive::u128,
+					pub pending_unlock_at_frame: ::core::option::Option<::core::primitive::u64>,
 					#[codec(compact)]
 					pub lifetime_compounded_earnings: ::core::primitive::u128,
 					#[codec(compact)]
@@ -34477,6 +34621,23 @@ pub mod api {
 				pub enum HoldReason {
 					#[codec(index = 0)]
 					ContributedToTreasury,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PendingUnlock {
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					pub account_id: crate::types::AccountId32,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

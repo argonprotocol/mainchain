@@ -391,23 +391,42 @@ impl Get<Tick> for TicksSinceGenesis {
 
 parameter_types! {
 	pub const MinimumArgonsPerContributor: Balance = ARGON; // 1 argons minimum
+	pub const MaxPendingUnlocksPerFrame: u32 = 1000;
+	pub const TreasuryExitDelayFrames: FrameId = 10;
 }
 
 impl pallet_treasury::Config for Runtime {
-	type WeightInfo = weights::pallet_treasury::WeightInfo<Runtime>;
+	type WeightInfo = pallet_treasury::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_treasury::WeightInfo<Runtime>,
+	>;
 	type Balance = Balance;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type TreasuryVaultProvider = Vaults;
-	type PriceProvider = PriceIndex;
+	type TreasuryVaultProvider = use_unless_benchmark!(
+		Vaults,
+		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
+	);
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type MaxTreasuryContributors = MaxTreasuryContributors;
+	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
+	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
+	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
 	type MiningFrameTransitionProvider = MiningSlot;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type OperationalRewardsProvider = OperationalAccounts;
+	type OperationalRewardsProvider = use_unless_benchmark!(
+		OperationalAccounts,
+		benchmarking::BenchmarkOperationalRewardsProvider<
+			AccountId,
+			Balance,
+			OperationalMaxRewardsQueued
+		>
+	);
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -430,7 +449,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BidPoolProvider = Treasury;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Vaults);
+	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Treasury, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

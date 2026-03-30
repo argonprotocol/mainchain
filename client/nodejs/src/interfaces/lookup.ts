@@ -3748,9 +3748,9 @@ export default {
    * Lookup527: pallet_treasury::pallet::FunderState<T>
    **/
   PalletTreasuryFunderState: {
-    targetPrincipal: 'Compact<u128>',
-    bondedPrincipal: 'Compact<u128>',
     heldPrincipal: 'Compact<u128>',
+    pendingUnlockAmount: 'Compact<u128>',
+    pendingUnlockAtFrame: 'Option<u64>',
     lifetimeCompoundedEarnings: 'Compact<u128>',
     lifetimePrincipalDeployed: 'Compact<u128>',
     lifetimePrincipalLastBasisFrame: 'Compact<u64>',
@@ -3764,7 +3764,14 @@ export default {
     frameId: 'Compact<u64>',
   },
   /**
-   * Lookup533: pallet_treasury::pallet::Error<T>
+   * Lookup532: pallet_treasury::pallet::PendingUnlock<T>
+   **/
+  PalletTreasuryPendingUnlock: {
+    vaultId: 'Compact<u32>',
+    accountId: 'AccountId32',
+  },
+  /**
+   * Lookup535: pallet_treasury::pallet::Error<T>
    **/
   PalletTreasuryError: {
     _enum: [
@@ -3776,18 +3783,19 @@ export default {
       'CouldNotFindTreasury',
       'MaxContributorsExceeded',
       'MaxVaultsExceeded',
+      'MaxPendingUnlocksExceeded',
       'AlreadyRenewed',
       'NotAVaultOperator',
     ],
   },
   /**
-   * Lookup534: pallet_fee_control::pallet::Error<T>
+   * Lookup536: pallet_fee_control::pallet::Error<T>
    **/
   PalletFeeControlError: {
     _enum: ['SponsoredFeeTooHigh'],
   },
   /**
-   * Lookup536: pallet_operational_accounts::pallet::OperationalAccount<T>
+   * Lookup538: pallet_operational_accounts::pallet::OperationalAccount<T>
    **/
   PalletOperationalAccountsOperationalAccount: {
     vaultAccount: 'AccountId32',
@@ -3812,21 +3820,21 @@ export default {
     isOperational: 'bool',
   },
   /**
-   * Lookup537: pallet_operational_accounts::pallet::AccessCodeMetadata<T>
+   * Lookup539: pallet_operational_accounts::pallet::AccessCodeMetadata<T>
    **/
   PalletOperationalAccountsAccessCodeMetadata: {
     sponsor: 'AccountId32',
     expirationFrame: 'Compact<u64>',
   },
   /**
-   * Lookup540: pallet_operational_accounts::pallet::RewardsConfig<Balance>
+   * Lookup542: pallet_operational_accounts::pallet::RewardsConfig<Balance>
    **/
   PalletOperationalAccountsRewardsConfig: {
     operationalReferralReward: 'Compact<u128>',
     referralBonusReward: 'Compact<u128>',
   },
   /**
-   * Lookup542: argon_primitives::providers::OperationalRewardPayout<sp_core::crypto::AccountId32, Balance>
+   * Lookup544: argon_primitives::providers::OperationalRewardPayout<sp_core::crypto::AccountId32, Balance>
    **/
   ArgonPrimitivesProvidersOperationalRewardPayout: {
     operationalAccount: 'AccountId32',
@@ -3835,7 +3843,7 @@ export default {
     amount: 'u128',
   },
   /**
-   * Lookup545: pallet_operational_accounts::pallet::Error<T>
+   * Lookup547: pallet_operational_accounts::pallet::Error<T>
    **/
   PalletOperationalAccountsError: {
     _enum: [
@@ -3856,55 +3864,55 @@ export default {
     ],
   },
   /**
-   * Lookup548: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup550: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup549: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup551: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup550: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup552: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup551: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup553: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup552: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup554: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup555: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup557: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup556: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup558: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup557: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup559: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup558: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup560: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup559: frame_metadata_hash_extension::Mode
+   * Lookup561: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup560: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup562: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup562: argon_runtime::Runtime
+   * Lookup564: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

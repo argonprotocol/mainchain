@@ -82,6 +82,21 @@ impl TreasuryPoolProviderWeightInfo for () {
 	}
 }
 
+pub trait OperationalRewardsProviderWeightInfo {
+	fn pending_rewards() -> Weight;
+	fn mark_reward_paid() -> Weight;
+}
+
+impl OperationalRewardsProviderWeightInfo for () {
+	fn pending_rewards() -> Weight {
+		Weight::zero()
+	}
+
+	fn mark_reward_paid() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait BitcoinUtxoEventsWeightInfo {
 	fn funding_received() -> Weight;
 	fn timeout_waiting_for_funding() -> Weight;
@@ -482,7 +497,10 @@ pub struct OperationalRewardPayout<AccountId, Balance> {
 }
 
 pub trait OperationalRewardsProvider<AccountId: FullCodec, Balance: FullCodec> {
+	type Weights: OperationalRewardsProviderWeightInfo;
+
 	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>>;
+	fn max_pending_rewards() -> u32;
 	/// Mark a queued reward as processed and record how much was actually paid.
 	fn mark_reward_paid(reward: &OperationalRewardPayout<AccountId, Balance>, amount_paid: Balance);
 }
@@ -490,8 +508,14 @@ pub trait OperationalRewardsProvider<AccountId: FullCodec, Balance: FullCodec> {
 impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<AccountId, Balance>
 	for ()
 {
+	type Weights = ();
+
 	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>> {
 		Vec::new()
+	}
+
+	fn max_pending_rewards() -> u32 {
+		0
 	}
 
 	fn mark_reward_paid(
