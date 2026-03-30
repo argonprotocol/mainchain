@@ -206,6 +206,15 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	}
 }
 
+pub struct MockMiningSlotProvider;
+impl MiningSlotProvider<TestAccountId> for MockMiningSlotProvider {
+	type Weights = ();
+
+	fn has_active_rewards_account_seat(account_id: &TestAccountId) -> bool {
+		ActiveMiningRewardsAccounts::get().contains(account_id)
+	}
+}
+
 pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
@@ -214,15 +223,6 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 		TreasuryPoolParticipantsByVaultId::get()
 			.get(&vault_id)
 			.is_some_and(|accounts| accounts.contains(account_id))
-	}
-}
-
-pub struct MockMiningSlotProvider;
-impl MiningSlotProvider<TestAccountId> for MockMiningSlotProvider {
-	type Weights = ();
-
-	fn has_active_rewards_account_seat(account_id: &TestAccountId) -> bool {
-		ActiveMiningRewardsAccounts::get().contains(account_id)
 	}
 }
 

@@ -111,7 +111,7 @@ pub mod pallet {
 		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
 		/// Provider for whether a linked mining rewards account currently has an active seat.
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
-		/// Provider for whether a linked vault account has treasury pool participation.
+		/// Provider for whether a linked vault account currently has treasury pool participation.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId>;
 		/// Provider for recent qualifying inbound Argon transfer lookup.
 		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
@@ -1177,8 +1177,14 @@ pub mod pallet {
 	}
 
 	impl<T: Config> OperationalRewardsProvider<T::AccountId, T::Balance> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn pending_rewards() -> Vec<OperationalRewardPayout<T::AccountId, T::Balance>> {
 			OperationalRewardsQueue::<T>::get().into_iter().collect()
+		}
+
+		fn max_pending_rewards() -> u32 {
+			T::MaxOperationalRewardsQueued::get()
 		}
 
 		fn mark_reward_paid(

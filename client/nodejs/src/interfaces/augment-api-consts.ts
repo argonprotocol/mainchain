@@ -529,7 +529,16 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
-       * The maximum number of contributors to a bond fund
+       * The maximum number of pending unlock entries that may mature in a single frame.
+       **/
+      maxPendingUnlocksPerFrame: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of tracked funded contributors kept per vault, including standby
+       * entries beyond the active pool size.
+       **/
+      maxTrackedTreasuryFunders: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of contributors in a vault's treasury pool
        **/
       maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
       /**
@@ -548,6 +557,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Percent of the bid pool reserved for treasury reserves.
        **/
       percentForTreasuryReserves: Percent & AugmentedConst<ApiType>;
+      /**
+       * The number of frames an allocation decrease remains locked before release.
+       **/
+      treasuryExitDelayFrames: u64 & AugmentedConst<ApiType>;
     };
     txPause: {
       /**

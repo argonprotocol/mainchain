@@ -7,8 +7,8 @@ use alloc::{
 	vec::Vec,
 };
 use argon_primitives::{
-	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, PriceProvider, UtxoLockEvents, VaultId,
-	VotingSchedule,
+	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
+	UtxoLockEvents, VaultId, VotingSchedule,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
@@ -19,14 +19,16 @@ use argon_primitives::{
 		NotebookDigest, TICK_DIGEST_ID,
 	},
 	notary::{NotaryProvider, NotarySignature},
-	providers::{AuthorityProvider, BitcoinUtxoTracker, NotebookProvider},
+	providers::{
+		AuthorityProvider, BitcoinUtxoTracker, NotebookProvider, OperationalRewardsProvider,
+	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, Vault,
-		VaultError,
+		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
+		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
 	},
 };
-use codec::{Decode, Encode, HasCompact};
+use codec::{Decode, Encode, FullCodec, HasCompact};
 use core::{iter::Sum, marker::PhantomData};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -60,6 +62,27 @@ pub struct BenchmarkOperationalAccountsProviderState {
 	pub has_active_rewards_account_seat: bool,
 	pub has_pool_participation: bool,
 	pub call_counters: BenchmarkOperationalAccountsProviderCallCounters,
+}
+
+#[derive(Clone, Encode, Decode, PartialEq)]
+pub struct BenchmarkOperationalRewardsProviderState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	pub pending_rewards: Vec<OperationalRewardPayout<AccountId, Balance>>,
+	pub paid_rewards: Vec<OperationalRewardPayout<AccountId, Balance>>,
+	pub max_pending_rewards: u32,
+}
+
+impl<AccountId, Balance> Default for BenchmarkOperationalRewardsProviderState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	fn default() -> Self {
+		Self { pending_rewards: Vec::new(), paid_rewards: Vec::new(), max_pending_rewards: 0 }
+	}
 }
 
 pub fn set_all_digests<T, VerifyError>(
@@ -421,6 +444,79 @@ pub fn reset_benchmark_operational_accounts_provider_call_counters() {
 	set_benchmark_operational_accounts_provider_state(state);
 }
 
+pub fn set_benchmark_operational_rewards_provider_state<AccountId, Balance>(
+	state: BenchmarkOperationalRewardsProviderState<AccountId, Balance>,
+) where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	operational_rewards_provider_state_backend::set(state.encode());
+}
+
+pub fn reset_benchmark_operational_rewards_provider_state() {
+	operational_rewards_provider_state_backend::reset();
+}
+
+pub fn benchmark_operational_rewards_provider_state<AccountId, Balance>()
+-> BenchmarkOperationalRewardsProviderState<AccountId, Balance>
+where
+	AccountId: Codec,
+	Balance: Codec + Copy,
+{
+	decode_benchmark_state(operational_rewards_provider_state_backend::get())
+}
+
+fn mutate_benchmark_operational_rewards_provider_state<AccountId, Balance, ResultT>(
+	f: impl FnOnce(&mut BenchmarkOperationalRewardsProviderState<AccountId, Balance>) -> ResultT,
+) -> ResultT
+where
+	AccountId: Codec + Clone + PartialEq,
+	Balance: Codec + Copy + Ord,
+{
+	let mut state = benchmark_operational_rewards_provider_state::<AccountId, Balance>();
+	let result = f(&mut state);
+	set_benchmark_operational_rewards_provider_state(state);
+	result
+}
+
+pub struct BenchmarkOperationalRewardsProvider<AccountId, Balance, MaxPendingRewards = ConstU32<0>>(
+	PhantomData<(AccountId, Balance, MaxPendingRewards)>,
+);
+
+impl<AccountId, Balance, MaxPendingRewards> OperationalRewardsProvider<AccountId, Balance>
+	for BenchmarkOperationalRewardsProvider<AccountId, Balance, MaxPendingRewards>
+where
+	AccountId: FullCodec + Clone + PartialEq,
+	Balance: FullCodec + Copy + Ord,
+	MaxPendingRewards: Get<u32>,
+{
+	type Weights = ();
+
+	fn pending_rewards() -> Vec<OperationalRewardPayout<AccountId, Balance>> {
+		benchmark_operational_rewards_provider_state::<AccountId, Balance>().pending_rewards
+	}
+
+	fn max_pending_rewards() -> u32 {
+		let configured_max = benchmark_operational_rewards_provider_state::<AccountId, Balance>()
+			.max_pending_rewards;
+		if configured_max > 0 { configured_max } else { MaxPendingRewards::get() }
+	}
+
+	fn mark_reward_paid(
+		reward: &OperationalRewardPayout<AccountId, Balance>,
+		amount_paid: Balance,
+	) {
+		mutate_benchmark_operational_rewards_provider_state::<AccountId, Balance, _>(|state| {
+			let Some(index) = state.pending_rewards.iter().position(|entry| entry == reward) else {
+				return;
+			};
+			let mut paid_reward = state.pending_rewards.remove(index);
+			paid_reward.amount = paid_reward.amount.min(amount_paid);
+			state.paid_rewards.push(paid_reward);
+		});
+	}
+}
+
 pub fn synthetic_benchmark_votes_root(notary_id: NotaryId, tick: Tick) -> H256 {
 	let mut bytes = [0u8; 32];
 	bytes[..4].copy_from_slice(&notary_id.to_be_bytes());
@@ -479,6 +575,28 @@ mod operational_accounts_state_backend {
 	}
 }
 
+#[cfg(feature = "std")]
+mod operational_rewards_provider_state_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkOperationalRewardsProviderStateHolder: Vec<u8> = Vec::new();
+	}
+
+	pub(super) fn set(state: Vec<u8>) {
+		BenchmarkOperationalRewardsProviderStateHolder::set(state);
+	}
+
+	pub(super) fn reset() {
+		BenchmarkOperationalRewardsProviderStateHolder::reset();
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		BenchmarkOperationalRewardsProviderStateHolder::get()
+	}
+}
+
 #[cfg(not(feature = "std"))]
 mod state_backend {
 	use super::*;
@@ -532,6 +650,38 @@ mod operational_accounts_state_backend {
 	pub(super) fn get() -> BenchmarkOperationalAccountsProviderState {
 		unsafe {
 			(*BENCHMARK_OPERATIONAL_ACCOUNTS_PROVIDER_STATE.0.get())
+				.clone()
+				.unwrap_or_default()
+		}
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod operational_rewards_provider_state_backend {
+	use super::*;
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_OPERATIONAL_REWARDS_PROVIDER_STATE: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(None));
+
+	pub(super) fn set(state: Vec<u8>) {
+		unsafe {
+			*BENCHMARK_OPERATIONAL_REWARDS_PROVIDER_STATE.0.get() = Some(state);
+		}
+	}
+
+	pub(super) fn reset() {
+		unsafe {
+			*BENCHMARK_OPERATIONAL_REWARDS_PROVIDER_STATE.0.get() = None;
+		}
+	}
+
+	pub(super) fn get() -> Vec<u8> {
+		unsafe {
+			(*BENCHMARK_OPERATIONAL_REWARDS_PROVIDER_STATE.0.get())
 				.clone()
 				.unwrap_or_default()
 		}
@@ -753,7 +903,7 @@ impl Get<bool> for BenchmarkDidStartNewFrame {
 	}
 }
 
-#[derive(Clone, Encode, Decode, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, PartialEq)]
 pub struct BenchmarkBitcoinVaultProviderState<AccountId, Balance>
 where
 	AccountId: Codec + Ord,
@@ -762,6 +912,7 @@ where
 	pub vaults: BTreeMap<VaultId, Vault<AccountId, Balance>>,
 	pub vault_xpubs_by_id: BTreeMap<VaultId, (BitcoinXPub, BitcoinXPub)>,
 	pub canceled_locks: Vec<(VaultId, Balance)>,
+	pub treasury_frame_earnings: Vec<(VaultId, Balance)>,
 	pub charge_fee: bool,
 	pub pending_cosigns: BTreeMap<VaultId, BTreeSet<UtxoId>>,
 	pub orphaned_utxo_cosigns: BTreeMap<VaultId, BTreeMap<AccountId, u32>>,
@@ -777,6 +928,7 @@ where
 			vaults: BTreeMap::new(),
 			vault_xpubs_by_id: BTreeMap::new(),
 			canceled_locks: Vec::new(),
+			treasury_frame_earnings: Vec::new(),
 			charge_fee: false,
 			pending_cosigns: BTreeMap::new(),
 			orphaned_utxo_cosigns: BTreeMap::new(),
@@ -1090,6 +1242,66 @@ where
 			}
 			Ok(())
 		})
+	}
+}
+
+impl<Currency, AccountId, Balance> TreasuryVaultProvider
+	for BenchmarkBitcoinVaultProvider<Currency, AccountId, Balance>
+where
+	Currency: Mutate<AccountId, Balance = Balance>,
+	AccountId: Codec + Clone + Ord + PartialEq,
+	Balance: Codec
+		+ Copy
+		+ MaxEncodedLen
+		+ Default
+		+ AtLeast32BitUnsigned
+		+ TypeInfo
+		+ Clone
+		+ core::fmt::Debug
+		+ PartialEq
+		+ Eq
+		+ Sum,
+{
+	type Balance = Balance;
+	type AccountId = AccountId;
+
+	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.securitized_satoshis)
+			.unwrap_or_default()
+	}
+
+	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.operator_account_id.clone())
+	}
+
+	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.terms.treasury_profit_sharing)
+	}
+
+	fn is_vault_open(vault_id: VaultId) -> bool {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| !vault.is_closed)
+			.unwrap_or(false)
+	}
+
+	fn record_vault_frame_earnings(
+		_source_account_id: &Self::AccountId,
+		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
+	) {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			state.treasury_frame_earnings.push((profit.vault_id, profit.earnings_for_vault));
+		});
 	}
 }
 

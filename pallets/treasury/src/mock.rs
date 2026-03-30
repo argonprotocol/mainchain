@@ -37,14 +37,28 @@ impl OperationalAccountsHook<u64, Balance> for TestOperationalAccountsHook {
 
 	fn treasury_pool_participated(vault_operator_account: &u64, amount: Balance) {
 		TreasuryPoolParticipated::mutate(|calls| calls.push((*vault_operator_account, amount)));
+		TreasuryPoolParticipationRewardsToQueue::mutate(|queued_rewards| {
+			if queued_rewards.is_empty() {
+				return;
+			}
+			PendingOperationalRewards::mutate(|pending_rewards| {
+				pending_rewards.append(queued_rewards);
+			});
+		});
 	}
 }
 
 pub struct TestOperationalRewardsProvider;
 
 impl OperationalRewardsProvider<u64, Balance> for TestOperationalRewardsProvider {
+	type Weights = ();
+
 	fn pending_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
 		PendingOperationalRewards::get()
+	}
+
+	fn max_pending_rewards() -> u32 {
+		PendingOperationalRewards::get().len() as u32
 	}
 
 	fn mark_reward_paid(reward: &OperationalRewardPayout<u64, Balance>, amount_paid: Balance) {
@@ -120,8 +134,11 @@ parameter_types! {
 	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxTreasuryContributors: u32 = 10;
+	pub static MaxTrackedTreasuryFunders: u32 = 15;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxVaultsPerPool: u32 = 100;
+	pub static MaxPendingUnlocksPerFrame: u32 = 100;
+	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
@@ -135,6 +152,7 @@ parameter_types! {
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
 	pub static TreasuryPoolParticipated: Vec<(u64, Balance)> = vec![];
+	pub static TreasuryPoolParticipationRewardsToQueue: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
 	pub static PendingOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
 	pub static PaidOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
 }
@@ -241,10 +259,13 @@ impl pallet_treasury::Config for Test {
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
 	type PriceProvider = StaticPriceProvider;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
+	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
+	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
+	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
 	type MiningFrameTransitionProvider = StaticMiningBidPoolProvider;
 	type OperationalAccountsHook = TestOperationalAccountsHook;
 	type OperationalRewardsProvider = TestOperationalRewardsProvider;
@@ -252,6 +273,10 @@ impl pallet_treasury::Config for Test {
 
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
+}
+
+pub fn queue_treasury_participation_rewards(rewards: Vec<OperationalRewardPayout<u64, Balance>>) {
+	TreasuryPoolParticipationRewardsToQueue::set(rewards);
 }
 
 pub fn reset_treasury_pool_participated() {

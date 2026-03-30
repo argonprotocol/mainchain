@@ -154,10 +154,7 @@ macro_rules! inject_runtime_vars {
 		/// All migrations of the runtime, aside from the ones declared in the pallets.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = (
-			pallet_bitcoin_locks::migrations::PopulateVaultUtxoIndexMigration<Runtime>,
-			pallet_treasury::migrations::BackfillFundersByVaultIdMigration<Runtime>,
-		);
+		type Migrations = (pallet_treasury::migrations::SimplifyFunderStateMigration<Runtime>,);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =

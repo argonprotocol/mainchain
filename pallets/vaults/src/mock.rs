@@ -90,8 +90,11 @@ parameter_types! {
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxTreasuryContributors: u32 = 10;
+	pub static MaxTrackedTreasuryFunders: u32 = 15;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxVaultsPerPool: u32 = 100;
+	pub static MaxPendingUnlocksPerFrame: u32 = 100;
+	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
@@ -166,10 +169,13 @@ impl pallet_treasury::Config for Test {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = Vaults;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
+	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
+	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
+	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
 	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
 	type OperationalAccountsHook = ();
 	type OperationalRewardsProvider = ();
