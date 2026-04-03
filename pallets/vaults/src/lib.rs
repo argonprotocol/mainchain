@@ -48,7 +48,7 @@ pub mod pallet {
 		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(13);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(14);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -105,6 +105,12 @@ pub mod pallet {
 		/// The number of frames within which revenue must be collected
 		#[pallet::constant]
 		type RevenueCollectionExpirationFrames: Get<FrameId>;
+		/// Minimum vault securitization required while the operational floor lock is active.
+		#[pallet::constant]
+		type OperationalMinimumVaultSecuritization: Get<Self::Balance>;
+		/// Duration to keep the operational minimum securitization locked from vault creation.
+		#[pallet::constant]
+		type OperationalMinimumVaultLockTicks: Get<Tick>;
 
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
@@ -178,6 +184,11 @@ pub mod pallet {
 		BoundedBTreeSet<VaultId, T::MaxVaults>,
 		ValueQuery,
 	>;
+
+	/// Vaults whose temporary operational minimum may be released at a given tick.
+	#[pallet::storage]
+	pub type VaultsReleasingOperationalMinimumByTick<T: Config> =
+		StorageMap<_, Twox64Concat, Tick, BoundedBTreeSet<VaultId, T::MaxVaults>, ValueQuery>;
 
 	/// Tracks revenue from Bitcoin Locks and Treasury Pools for the trailing frames for each vault
 	/// (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
@@ -401,9 +412,19 @@ pub mod pallet {
 				}
 			}
 
+			let previous_tick = T::TickProvider::previous_tick();
+			let current_tick = T::TickProvider::current_tick();
+			let operational_unlocks =
+				Self::clear_expired_operational_minimums(previous_tick, current_tick);
 			let height_range =
 				bitcoin_block_height.saturating_sub(start_bitcoin_height).saturating_add(1) as u32;
-			T::WeightInfo::on_initialize_with_vault_releases(height_range, completions)
+			let operational_unlock_tick_count =
+				current_tick.saturating_sub(previous_tick).try_into().unwrap_or(u32::MAX);
+			T::WeightInfo::on_initialize_with_vault_releases(
+				height_range,
+				completions,
+				operational_unlock_tick_count.saturating_add(operational_unlocks),
+			)
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {
@@ -487,6 +508,7 @@ pub mod pallet {
 				is_closed: false,
 				pending_terms: None,
 				securitization_pending_activation: 0u32.into(),
+				operational_minimum_release_tick: None,
 			};
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
@@ -612,7 +634,7 @@ pub mod pallet {
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
 			vault.is_closed = true;
-			vault.securitization_target = 0u32.into();
+			vault.securitization_target = T::Balance::zero();
 			let start_securitization = vault.securitization;
 			Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
 			let securitization_remaining = vault.securitization;
@@ -705,6 +727,51 @@ pub mod pallet {
 			T::TickProvider::current_tick()
 		}
 
+		fn minimum_reducible_securitization(vault: &Vault<T::AccountId, T::Balance>) -> T::Balance {
+			if vault
+				.operational_minimum_release_tick
+				.is_some_and(|unlock_tick| unlock_tick > T::TickProvider::current_tick())
+			{
+				return T::OperationalMinimumVaultSecuritization::get();
+			}
+			T::Balance::zero()
+		}
+
+		fn clear_expired_operational_minimums(previous_tick: Tick, current_tick: Tick) -> u32 {
+			if current_tick <= previous_tick {
+				return 0;
+			}
+
+			let mut cleared = 0u32;
+			for tick in previous_tick.saturating_add(1)..=current_tick {
+				let vaults = VaultsReleasingOperationalMinimumByTick::<T>::take(tick);
+				for vault_id in vaults {
+					cleared = cleared.saturating_add(1);
+					let release_result = VaultsById::<T>::mutate(vault_id, |maybe_vault| {
+						let Some(vault) = maybe_vault.as_mut() else {
+							return Ok(());
+						};
+						if vault
+							.operational_minimum_release_tick
+							.is_none_or(|unlock_tick| unlock_tick > current_tick)
+						{
+							return Ok(());
+						}
+
+						vault.operational_minimum_release_tick = None;
+						Self::shrink_vault_securitization(vault)
+					});
+					if let Err(error) = release_result {
+						log::error!(
+							"Vault `{vault_id}` unable to release expired operational minimum {error:?}"
+						);
+					}
+				}
+			}
+
+			cleared
+		}
+
 		fn hold(
 			who: &T::AccountId,
 			amount: T::Balance,
@@ -769,16 +836,17 @@ pub mod pallet {
 			vault: &mut Vault<T::AccountId, T::Balance>,
 		) -> Result<(), VaultError> {
 			let uninhibited_securitization = vault.uninhibited_securitization();
+			let minimum_remaining_securitization =
+				vault.securitization_target.max(Self::minimum_reducible_securitization(vault));
 
 			if uninhibited_securitization.is_zero() ||
-				vault.securitization <= vault.securitization_target
+				vault.securitization <= minimum_remaining_securitization
 			{
 				return Ok(());
 			}
 			let amount_to_release =
-				vault.securitization.saturating_sub(vault.securitization_target);
+				vault.securitization.saturating_sub(minimum_remaining_securitization);
 			let free_securitization = uninhibited_securitization.min(amount_to_release);
-			vault.securitization.saturating_reduce(free_securitization);
 
 			ensure!(
 				T::Currency::balance_on_hold(
@@ -794,6 +862,7 @@ pub mod pallet {
 				HoldReason::EnterVault,
 			)
 			.map_err(|_| VaultError::UnrecoverableHold)?;
+			vault.securitization.saturating_reduce(free_securitization);
 			Ok(())
 		}
 
@@ -1054,7 +1123,44 @@ pub mod pallet {
 			Some(RegistrationVaultData {
 				vault_id,
 				activated_securitization: vault.get_activated_securitization(),
+				securitization: vault.securitization,
 			})
+		}
+
+		fn account_became_operational(vault_operator_account: &T::AccountId) {
+			let Some(vault_id) = VaultIdByOperator::<T>::get(vault_operator_account) else {
+				return;
+			};
+			let current_tick = T::TickProvider::current_tick();
+			let Some(unlock_tick) = VaultsById::<T>::get(vault_id).and_then(|vault| {
+				if vault.operational_minimum_release_tick.is_some() {
+					return None;
+				}
+
+				let unlock_tick =
+					vault.opened_tick.saturating_add(T::OperationalMinimumVaultLockTicks::get());
+				(unlock_tick > current_tick).then_some(unlock_tick)
+			}) else {
+				return;
+			};
+
+			if VaultsReleasingOperationalMinimumByTick::<T>::try_mutate(unlock_tick, |vaults| {
+				vaults.try_insert(vault_id)
+			})
+			.is_err()
+			{
+				log::error!("Unable to track operational minimum release for vault {vault_id}");
+				return;
+			}
+
+			VaultsById::<T>::mutate(vault_id, |maybe_vault| {
+				let Some(vault) = maybe_vault.as_mut() else {
+					return;
+				};
+				if vault.operational_minimum_release_tick.is_none() {
+					vault.operational_minimum_release_tick = Some(unlock_tick);
+				}
+			});
 		}
 
 		fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {

@@ -19,9 +19,10 @@ use sp_runtime::{AccountId32, DispatchError, MultiSigner, traits::IdentifyAccoun
 use crate::mock::{
 	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
 	MaxEncryptedServerLen, MaxIssuableAccessCodes, MaxOperationalRewardsQueued,
-	MinBitcoinLockSizeForOperational, OperationalAccounts as OperationalAccountsPallet,
+	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
 	OperationalReferralBonusReward, OperationalReferralReward, RuntimeOrigin, System, Test,
-	TestAccountId, new_test_ext, set_registration_lookup,
+	TestAccountId, ensure_registration_lookup, has_vault_operational_mark, new_test_ext,
+	set_registration_lookup,
 };
 
 #[test]
@@ -334,6 +335,10 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 	new_test_ext().execute_with(|| {
 		let no_recompute_set = make_account_set(17, 18, 19, 20);
 		register_account(&no_recompute_set, None);
+		ensure_registration_lookup(
+			no_recompute_set.vault.clone(),
+			no_recompute_set.mining_funding.clone(),
+		);
 
 		assert_ok!(OperationalAccountsPallet::force_set_progress(
 			RuntimeOrigin::root(),
@@ -342,7 +347,7 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 				has_uniswap_transfer: Some(true),
 				vault_created: Some(true),
 				has_treasury_pool_participation: Some(true),
-				observed_bitcoin_total: Some(MinBitcoinLockSizeForOperational::get()),
+				observed_bitcoin_total: Some(1),
 				observed_mining_seat_total: Some(2),
 			},
 			false,
@@ -356,6 +361,10 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 
 		let recompute_set = make_account_set(21, 22, 23, 24);
 		register_account(&recompute_set, None);
+		ensure_registration_lookup(
+			recompute_set.vault.clone(),
+			recompute_set.mining_funding.clone(),
+		);
 		assert_ok!(OperationalAccountsPallet::force_set_progress(
 			RuntimeOrigin::root(),
 			recompute_set.owner.clone(),
@@ -363,7 +372,7 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 				has_uniswap_transfer: Some(true),
 				vault_created: Some(true),
 				has_treasury_pool_participation: Some(true),
-				observed_bitcoin_total: Some(MinBitcoinLockSizeForOperational::get()),
+				observed_bitcoin_total: Some(1),
 				observed_mining_seat_total: Some(2),
 			},
 			true,
@@ -526,7 +535,8 @@ fn test_registration_lookup_hydrates_current_mining_registration() {
 		set_registration_lookup(
 			account_set.vault.clone(),
 			account_set.mining_funding.clone(),
-			MinBitcoinLockSizeForOperational::get(),
+			1,
+			OperationalMinimumVaultSecuritization::get(),
 			true,
 			1,
 		);
@@ -539,7 +549,7 @@ fn test_registration_lookup_hydrates_current_mining_registration() {
 		assert!(account.has_uniswap_transfer);
 		assert!(account.vault_created);
 		assert!(account.has_treasury_pool_participation);
-		assert_eq!(account.bitcoin_accrual, MinBitcoinLockSizeForOperational::get());
+		assert_eq!(account.bitcoin_accrual, 1);
 		assert_eq!(account.mining_seat_accrual, 1);
 		assert_eq!(account.issuable_access_codes, 0);
 
@@ -558,6 +568,7 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 			account_set.vault.clone(),
 			account_set.mining_funding.clone(),
 			BitcoinLockSizeForAccessCode::get(),
+			OperationalMinimumVaultSecuritization::get(),
 			true,
 			1,
 		);
@@ -591,6 +602,7 @@ fn test_activation_queues_reward_when_requirements_met() {
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert!(operational_account.is_operational);
+		assert!(has_vault_operational_mark(&account_set.vault));
 		assert_eq!(operational_account.issuable_access_codes, 1);
 		let queue = OperationalRewardsQueue::<Test>::get();
 		assert_eq!(queue.len(), 1);
@@ -607,6 +619,50 @@ fn test_activation_queues_reward_when_requirements_met() {
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert_eq!(operational_account.rewards_collected_amount, 1_000);
+		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+	});
+}
+
+#[test]
+fn test_activation_requires_positive_bitcoin() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(31, 32, 33, 34);
+		register_account(&account_set, None);
+		ensure_registration_lookup(account_set.vault.clone(), account_set.mining_funding.clone());
+
+		OperationalAccountsPallet::vault_created(&account_set.vault);
+		record_uniswap_transfer(&account_set.vault, 1_000);
+		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
+		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
+		OperationalAccountsPallet::treasury_pool_participated(&account_set.vault, 1);
+
+		let account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(!account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
+		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+	});
+}
+
+#[test]
+fn test_activation_requires_minimum_vault_securitization() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(35, 36, 37, 38);
+		set_registration_lookup(
+			account_set.vault.clone(),
+			account_set.mining_funding.clone(),
+			0,
+			OperationalMinimumVaultSecuritization::get().saturating_sub(1),
+			false,
+			0,
+		);
+		register_account(&account_set, None);
+		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+
+		let account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(!account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
 		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
 	});
 }
@@ -804,7 +860,7 @@ fn test_bitcoin_progress_is_single_pending_and_resets_on_issuance() {
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert_eq!(operational_account.issuable_access_codes, 1);
 
-		let min_lock = MinBitcoinLockSizeForOperational::get();
+		let min_lock = 1;
 		let access_code_threshold = BitcoinLockSizeForAccessCode::get();
 		set_issuable_access_codes(&account_set.owner, MaxIssuableAccessCodes::get());
 		OperationalAccountsPallet::bitcoin_lock_funded(
@@ -850,12 +906,12 @@ fn test_bitcoin_recovery_to_old_total_does_not_reaward_access_code() {
 		register_account(&account_set, None);
 		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
 
-		let min_lock = MinBitcoinLockSizeForOperational::get();
+		let min_lock = 1;
 		let access_code_threshold = BitcoinLockSizeForAccessCode::get();
 
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(3_000),
+			min_lock.saturating_add(access_code_threshold),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
@@ -866,7 +922,7 @@ fn test_bitcoin_recovery_to_old_total_does_not_reaward_access_code() {
 		OperationalAccountsPallet::bitcoin_lock_funded(&account_set.vault, min_lock);
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(3_000),
+			min_lock.saturating_add(access_code_threshold),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
@@ -875,7 +931,7 @@ fn test_bitcoin_recovery_to_old_total_does_not_reaward_access_code() {
 
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(3_000).saturating_add(access_code_threshold),
+			min_lock.saturating_add(access_code_threshold.saturating_mul(2)),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
@@ -1136,12 +1192,10 @@ fn record_recent_argon_transfer(account_id: &TestAccountId) {
 }
 
 fn satisfy_operational_requirements(mining_account: &TestAccountId, vault_account: &TestAccountId) {
+	ensure_registration_lookup(vault_account.clone(), mining_account.clone());
 	OperationalAccountsPallet::vault_created(vault_account);
 	record_uniswap_transfer(vault_account, 1_000);
-	OperationalAccountsPallet::bitcoin_lock_funded(
-		vault_account,
-		MinBitcoinLockSizeForOperational::get(),
-	);
+	OperationalAccountsPallet::bitcoin_lock_funded(vault_account, 1);
 	OperationalAccountsPallet::mining_seat_won(mining_account);
 	OperationalAccountsPallet::mining_seat_won(mining_account);
 	OperationalAccountsPallet::treasury_pool_participated(vault_account, 1);

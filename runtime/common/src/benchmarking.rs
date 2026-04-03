@@ -91,9 +91,17 @@ where
 		let result = state.vault_registration_data.clone().map(|data| RegistrationVaultData {
 			vault_id: data.vault_id,
 			activated_securitization: data.activated_securitization.saturated_into(),
+			securitization: data.securitization.saturated_into(),
 		});
 		set_benchmark_operational_accounts_provider_state(state);
 		result
+	}
+
+	fn account_became_operational(_vault_operator_account: &Self::AccountId) {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.account_became_operational =
+			state.call_counters.account_became_operational.saturating_add(1);
+		set_benchmark_operational_accounts_provider_state(state);
 	}
 
 	fn get_securitization_ratio(_vault_id: VaultId) -> Result<FixedU128, VaultError> {

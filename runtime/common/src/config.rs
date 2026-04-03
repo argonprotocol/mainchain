@@ -221,8 +221,10 @@ parameter_types! {
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
 	/// Maximum number of opaque encrypted sponsor server bytes stored per sponsee.
 	pub const MaxEncryptedServerLen: u32 = 256;
-	/// Minimum argon amount (base units) required for a qualifying bitcoin lock.
-	pub const MinBitcoinLockSizeForOperational: Balance = 2_000 * MICROGONS_PER_ARGON;
+	/// Minimum vault securitization (base units) required to become operational.
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
+	/// Duration that the operational minimum vault securitization remains locked.
+	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
 	/// Additional argon amount (base units) required per access code after operational.
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
 	/// Mining seats required to become operational.

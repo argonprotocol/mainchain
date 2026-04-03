@@ -9,16 +9,25 @@ pub trait WeightInfo {
 	fn modify_terms() -> Weight;
 	fn close() -> Weight;
 	fn replace_bitcoin_xpub() -> Weight;
-	fn on_initialize_with_vault_releases(height_range: u32, vault_count: u32) -> Weight;
+	fn on_initialize_with_vault_releases(
+		height_range: u32,
+		bitcoin_release_vault_count: u32,
+		operational_unlock_work: u32,
+	) -> Weight;
 	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
+	fn provider_account_became_operational() -> Weight;
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn get_registration_vault_data() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_registration_vault_data()
+	}
+
+	fn account_became_operational() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_account_became_operational()
 	}
 }
 
@@ -39,7 +48,11 @@ impl WeightInfo for () {
 	fn replace_bitcoin_xpub() -> Weight {
 		Weight::zero()
 	}
-	fn on_initialize_with_vault_releases(_height_range: u32, _vault_count: u32) -> Weight {
+	fn on_initialize_with_vault_releases(
+		_height_range: u32,
+		_bitcoin_release_vault_count: u32,
+		_operational_unlock_work: u32,
+	) -> Weight {
 		Weight::zero()
 	}
 	fn collect() -> Weight {
@@ -49,6 +62,10 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_get_registration_vault_data() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_account_became_operational() -> Weight {
 		Weight::zero()
 	}
 }

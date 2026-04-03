@@ -299,6 +299,8 @@ impl pallet_vaults::Config for Runtime {
 	type MaxVaults = MaxVaults;
 	type MaxPendingCosignsPerVault = MaxPendingCosignsPerVault;
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
+	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
+	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 }
 
@@ -699,7 +701,7 @@ impl pallet_operational_accounts::Config for Runtime {
 	type MaxIssuableAccessCodes = MaxIssuableOperationalAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MaxOperationalRewardsQueued = OperationalMaxRewardsQueued;
-	type MinBitcoinLockSizeForOperational = MinBitcoinLockSizeForOperational;
+	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
 	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;

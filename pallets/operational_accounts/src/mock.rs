@@ -39,7 +39,7 @@ parameter_types! {
 	pub const MaxIssuableAccessCodes: u32 = 2;
 	pub const MaxEncryptedServerLen: u32 = 256;
 	pub const MaxOperationalRewardsQueued: u32 = 100;
-	pub const MinBitcoinLockSizeForOperational: Balance = 2_000;
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
 	pub const MiningSeatsPerAccessCode: u32 = 5;
@@ -57,6 +57,7 @@ parameter_types! {
 	pub static TreasuryPoolParticipantsByVaultId:
 		BTreeMap<VaultId, BTreeSet<TestAccountId>> = BTreeMap::new();
 	pub static ActiveMiningRewardsAccounts: BTreeSet<TestAccountId> = BTreeSet::new();
+	pub static OperationalVaultsMarkedOperational: BTreeSet<TestAccountId> = BTreeSet::new();
 }
 
 pub struct StaticFrameProvider;
@@ -94,6 +95,12 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		account_id: &Self::AccountId,
 	) -> Option<RegistrationVaultData<Self::Balance>> {
 		RegistrationVaultDataByAccount::get().get(account_id).cloned()
+	}
+
+	fn account_became_operational(vault_operator_account: &TestAccountId) {
+		OperationalVaultsMarkedOperational::mutate(|entries| {
+			entries.insert(vault_operator_account.clone());
+		});
 	}
 
 	fn get_securitization_ratio(
@@ -235,7 +242,7 @@ impl pallet_operational_accounts::Config for Test {
 	type MaxIssuableAccessCodes = MaxIssuableAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MaxOperationalRewardsQueued = MaxOperationalRewardsQueued;
-	type MinBitcoinLockSizeForOperational = MinBitcoinLockSizeForOperational;
+	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
 	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
@@ -266,6 +273,7 @@ pub fn new_test_ext() -> TestState {
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
+		OperationalVaultsMarkedOperational::set(BTreeSet::new());
 		pallet_operational_accounts::Rewards::<Test>::put(crate::RewardsConfig {
 			operational_referral_reward: OperationalReferralReward::get(),
 			referral_bonus_reward: OperationalReferralBonusReward::get(),
@@ -278,6 +286,7 @@ pub fn set_registration_lookup(
 	vault_account: TestAccountId,
 	mining_funding_account: TestAccountId,
 	activated_securitization: Balance,
+	securitization: Balance,
 	has_treasury_pool_participation: bool,
 	observed_mining_seat_total: u32,
 ) {
@@ -286,7 +295,7 @@ pub fn set_registration_lookup(
 	RegistrationVaultDataByAccount::mutate(|entries| {
 		entries.insert(
 			vault_account.clone(),
-			RegistrationVaultData { vault_id, activated_securitization },
+			RegistrationVaultData { vault_id, activated_securitization, securitization },
 		);
 	});
 	if has_treasury_pool_participation {
@@ -299,4 +308,26 @@ pub fn set_registration_lookup(
 			entries.insert(mining_funding_account);
 		});
 	}
+}
+
+pub fn ensure_registration_lookup(
+	vault_account: TestAccountId,
+	mining_funding_account: TestAccountId,
+) {
+	if RegistrationVaultDataByAccount::get().contains_key(&vault_account) {
+		return;
+	}
+
+	set_registration_lookup(
+		vault_account,
+		mining_funding_account,
+		0,
+		OperationalMinimumVaultSecuritization::get(),
+		false,
+		0,
+	);
+}
+
+pub fn has_vault_operational_mark(vault_account: &TestAccountId) -> bool {
+	OperationalVaultsMarkedOperational::get().contains(vault_account)
 }

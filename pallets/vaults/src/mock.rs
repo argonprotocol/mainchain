@@ -96,6 +96,8 @@ parameter_types! {
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
+	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
 
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 
@@ -159,6 +161,8 @@ impl pallet_vaults::Config for Test {
 	type MaxVaults = ConstU32<100>;
 	type MaxPendingCosignsPerVault = ConstU32<100>;
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
+	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
+	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
 	type OperationalAccountsHook = ();
 }
 
