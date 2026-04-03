@@ -15,6 +15,7 @@ use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
+use frame_support::traits::Hooks;
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_prelude::{
 	argon_primitives::{
@@ -213,6 +214,107 @@ fn it_can_modify_a_vault_funds() {
 			FixedU128::from_float(2.0)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 2000);
+	});
+}
+
+#[test]
+fn it_locks_operational_minimum_after_becoming_operational() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.securitization = 2_500;
+		set_argons(1, 10_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
+
+		<Vaults as BitcoinVaultProvider>::account_became_operational(&1);
+
+		let unlock_tick = 1 + OperationalMinimumVaultLockTicks::get();
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert_eq!(vault.operational_minimum_release_tick, Some(unlock_tick));
+		assert!(
+			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
+				.contains(&1)
+		);
+	});
+}
+
+#[test]
+fn it_skips_operational_minimum_for_aged_vaults() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.securitization = 2_500;
+		set_argons(1, 10_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
+		CurrentTick::set(1 + OperationalMinimumVaultLockTicks::get());
+
+		<Vaults as BitcoinVaultProvider>::account_became_operational(&1);
+
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert_eq!(vault.operational_minimum_release_tick, None);
+		assert!(
+			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::iter()
+				.next()
+				.is_none()
+		);
+	});
+}
+
+#[test]
+fn it_clamps_modify_funding_to_operational_minimum() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.securitization = 2_500;
+		set_argons(1, 10_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
+		<Vaults as BitcoinVaultProvider>::account_became_operational(&1);
+
+		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 1_000, FixedU128::one(),));
+
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert_eq!(vault.securitization_target, 1_000);
+		assert_eq!(vault.securitization, OperationalMinimumVaultSecuritization::get());
+	});
+}
+
+#[test]
+fn it_keeps_then_releases_operational_minimum_for_closed_vaults() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let mut config = default_vault();
+		config.securitization = 2_500;
+		set_argons(1, 10_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
+		<Vaults as BitcoinVaultProvider>::account_became_operational(&1);
+		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
+
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert!(vault.is_closed);
+		assert_eq!(vault.securitization_target, 0);
+		assert_eq!(vault.securitization, OperationalMinimumVaultSecuritization::get());
+
+		let unlock_tick = 1 + OperationalMinimumVaultLockTicks::get();
+		PreviousTick::set(unlock_tick.saturating_sub(1));
+		CurrentTick::set(unlock_tick);
+
+		let _ = Vaults::on_initialize(1);
+
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert_eq!(vault.operational_minimum_release_tick, None);
+		assert!(
+			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
+				.is_empty()
+		);
+
+		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
+		assert!(vault.is_closed);
+		assert_eq!(vault.securitization_target, 0);
+		assert_eq!(vault.securitization, 0);
 	});
 }
 

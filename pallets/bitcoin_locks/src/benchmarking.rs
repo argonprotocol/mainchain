@@ -662,6 +662,7 @@ where
 		terms,
 		pending_terms: None,
 		opened_tick: 1,
+		operational_minimum_release_tick: None,
 	};
 	let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
 	state.vaults.insert(vault_id, vault);

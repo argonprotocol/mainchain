@@ -29,10 +29,15 @@ pub trait MiningBidPoolProvider {
 
 pub trait BitcoinVaultProviderWeightInfo {
 	fn get_registration_vault_data() -> Weight;
+	fn account_became_operational() -> Weight;
 }
 
 impl BitcoinVaultProviderWeightInfo for () {
 	fn get_registration_vault_data() -> Weight {
+		Weight::zero()
+	}
+
+	fn account_became_operational() -> Weight {
 		Weight::zero()
 	}
 }
@@ -41,6 +46,7 @@ impl BitcoinVaultProviderWeightInfo for () {
 pub struct RegistrationVaultData<Balance> {
 	pub vault_id: VaultId,
 	pub activated_securitization: Balance,
+	pub securitization: Balance,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -139,6 +145,7 @@ pub trait BitcoinVaultProvider {
 	fn get_registration_vault_data(
 		account_id: &Self::AccountId,
 	) -> Option<RegistrationVaultData<Self::Balance>>;
+	fn account_became_operational(_vault_operator_account: &Self::AccountId) {}
 
 	/// Get the securitization ratio offered by this vault
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError>;
@@ -313,6 +320,8 @@ where
 	/// A tick at which this vault is active
 	#[codec(compact)]
 	pub opened_tick: Tick,
+	/// Optional tick when the temporary operational minimum securitization may be released.
+	pub operational_minimum_release_tick: Option<Tick>,
 }
 
 #[derive(

@@ -67,8 +67,10 @@ where
 	fn register() -> Weight {
 		Base::register()
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
 			.saturating_add(TreasuryPoolProviderWeight::has_pool_participation())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn issue_access_code() -> Weight {
@@ -81,6 +83,8 @@ where
 
 	fn force_set_progress() -> Weight {
 		Base::force_set_progress()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn set_encrypted_server_for_sponsee() -> Weight {
@@ -89,22 +93,32 @@ where
 
 	fn on_vault_created() -> Weight {
 		Base::on_vault_created()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_bitcoin_lock_funded() -> Weight {
 		Base::on_bitcoin_lock_funded()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_mining_seat_won() -> Weight {
 		Base::on_mining_seat_won()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_treasury_pool_participated() -> Weight {
 		Base::on_treasury_pool_participated()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_uniswap_transfer() -> Weight {
 		Base::on_uniswap_transfer()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn provider_pending_rewards() -> Weight {

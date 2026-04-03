@@ -93,6 +93,7 @@ parameter_types! {
 		is_closed: false,
 		pending_terms: None,
 		securitization_pending_activation: 0,
+		operational_minimum_release_tick: None,
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
@@ -202,9 +203,11 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		account_id: &Self::AccountId,
 	) -> Option<argon_primitives::vault::RegistrationVaultData<Self::Balance>> {
 		Self::get_vault_id(account_id).map(|vault_id| {
+			let vault = DefaultVault::get();
 			argon_primitives::vault::RegistrationVaultData {
 				vault_id,
-				activated_securitization: DefaultVault::get().get_activated_securitization(),
+				activated_securitization: vault.get_activated_securitization(),
+				securitization: vault.securitization,
 			}
 		})
 	}

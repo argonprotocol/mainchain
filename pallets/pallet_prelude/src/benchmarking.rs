@@ -54,6 +54,7 @@ pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub get_registration_vault_data: u32,
 	pub has_active_rewards_account_seat: u32,
 	pub has_pool_participation: u32,
+	pub account_became_operational: u32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -1031,6 +1032,7 @@ where
 				(vault.operator_account_id == *account_id).then_some(RegistrationVaultData {
 					vault_id: *vault_id,
 					activated_securitization: vault.get_activated_securitization(),
+					securitization: vault.securitization,
 				})
 			})
 	}

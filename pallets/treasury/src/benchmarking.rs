@@ -631,6 +631,7 @@ fn benchmark_vault<T: Config>(
 		},
 		pending_terms: None,
 		opened_tick: 0,
+		operational_minimum_release_tick: None,
 	}
 }
 

@@ -97,9 +97,9 @@ pub mod pallet {
 		/// Maximum number of encrypted server bytes stored per sponsee.
 		#[pallet::constant]
 		type MaxEncryptedServerLen: Get<u32>;
-		/// Minimum argon amount (base units) required to mark a bitcoin lock as qualifying.
+		/// Minimum vault securitization required to become operational.
 		#[pallet::constant]
-		type MinBitcoinLockSizeForOperational: Get<Self::Balance>;
+		type OperationalMinimumVaultSecuritization: Get<Self::Balance>;
 		/// Mining seats required to become operational.
 		#[pallet::constant]
 		type MiningSeatsForOperational: Get<u32>;
@@ -942,13 +942,21 @@ pub mod pallet {
 		}
 
 		fn has_achieved_operational(operational_account: &OperationalAccount<T>) -> bool {
-			operational_account.vault_created &&
-				operational_account.has_uniswap_transfer &&
-				Self::observed_bitcoin_total(operational_account) >=
-					T::MinBitcoinLockSizeForOperational::get() &&
-				Self::observed_mining_seat_total(operational_account) >=
-					T::MiningSeatsForOperational::get() &&
-				operational_account.has_treasury_pool_participation
+			if !operational_account.vault_created ||
+				!operational_account.has_uniswap_transfer ||
+				Self::observed_bitcoin_total(operational_account).is_zero() ||
+				Self::observed_mining_seat_total(operational_account) <
+					T::MiningSeatsForOperational::get() ||
+				!operational_account.has_treasury_pool_participation
+			{
+				return false;
+			}
+
+			T::VaultProvider::get_registration_vault_data(&operational_account.vault_account)
+				.map(|vault| {
+					vault.securitization >= T::OperationalMinimumVaultSecuritization::get()
+				})
+				.unwrap_or(false)
 		}
 
 		fn increment_issuable_access_codes(account: &mut OperationalAccount<T>) {
@@ -1003,6 +1011,7 @@ pub mod pallet {
 			operational_account.is_operational = true;
 			Self::increment_issuable_access_codes(operational_account);
 			Self::materialize_issuable_access_codes(operational_account);
+			T::VaultProvider::account_became_operational(&operational_account.vault_account);
 			Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
 			let payout_account = operational_account.mining_funding_account.clone();
 			Self::enqueue_reward(

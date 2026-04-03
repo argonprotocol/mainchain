@@ -100,7 +100,7 @@ fn seed_release_schedule_for_benchmark<T: Config>(
 mod benchmarks {
 	use super::*;
 	use argon_primitives::{
-		OnNewSlot,
+		OnNewSlot, TickProvider,
 		bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinXPub, H256Le},
 		vault::{BitcoinVaultProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
@@ -274,11 +274,40 @@ mod benchmarks {
 			let registration =
 				<Pallet<T> as BitcoinVaultProvider>::get_registration_vault_data(&caller);
 			assert_eq!(
-				registration.map(|entry| entry.vault_id),
+				registration.clone().map(|entry| entry.vault_id),
 				Some(vault_id),
 				"expected provider lookup to resolve the created vault"
 			);
+			assert_eq!(
+				registration.map(|entry| entry.securitization),
+				Some(100_000u128.into()),
+				"expected provider lookup to return the vault securitization"
+			);
 		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_account_became_operational() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_became_operational", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 9, 100_000)?;
+		let expected_unlock_tick = T::TickProvider::current_tick()
+			.saturating_add(T::OperationalMinimumVaultLockTicks::get());
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::account_became_operational(&caller);
+		}
+
+		let vault = VaultsById::<T>::get(vault_id)
+			.ok_or(BenchmarkError::Stop("vault missing after operational callback"))?;
+		assert_eq!(vault.operational_minimum_release_tick, Some(expected_unlock_tick));
+		assert!(
+			VaultsReleasingOperationalMinimumByTick::<T>::get(expected_unlock_tick)
+				.contains(&vault_id),
+			"expected vault to be indexed by operational minimum release tick"
+		);
 
 		Ok(())
 	}
@@ -331,6 +360,7 @@ mod benchmarks {
 	fn on_initialize_with_vault_releases(
 		h: Linear<1, 366>,
 		v: Linear<1, MAX_RELEASE_COMPLETIONS>,
+		o: Linear<1, MAX_RELEASE_COMPLETIONS>,
 	) -> Result<(), BenchmarkError> {
 		let start_height: BitcoinHeight = 10_000;
 		let end_height = start_height.saturating_add((h.saturating_sub(1)).into());
@@ -338,8 +368,11 @@ mod benchmarks {
 		let current_tip = BitcoinBlock::new(end_height, H256Le([2u8; 32]));
 		pallet_bitcoin_utxos::PreviousBitcoinBlockTip::<T>::put(previous_tip);
 		pallet_bitcoin_utxos::ConfirmedBitcoinBlockTip::<T>::put(current_tip);
+		let current_tick = T::TickProvider::current_tick();
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
 
 		let mut first_vault_id: Option<VaultId> = None;
+		let mut first_operational_unlock_vault_id: Option<VaultId> = None;
 		let release_amount: T::Balance = 1_000u128.into();
 		for i in 0..v {
 			let operator: T::AccountId = account("vault_operator", i, 0);
@@ -363,6 +396,24 @@ mod benchmarks {
 					.map_err(|_| BenchmarkError::Stop("vault release set overflow"))
 			})?;
 		}
+		for i in 0..o {
+			let operator: T::AccountId = account("operational_unlock_operator", i, 1);
+			let seed = ((i + 200) % 250) as u8;
+			let vault_id = create_vault::<T>(&operator, seed, 100_000)?;
+			if first_operational_unlock_vault_id.is_none() {
+				first_operational_unlock_vault_id = Some(vault_id);
+			}
+			VaultsById::<T>::mutate(vault_id, |vault| {
+				let vault = vault.as_mut().expect("benchmark vault should exist");
+				vault.securitization_target = T::Balance::zero();
+				vault.operational_minimum_release_tick = Some(current_tick);
+			});
+			VaultsReleasingOperationalMinimumByTick::<T>::mutate(current_tick, |vaults| {
+				vaults
+					.try_insert(vault_id)
+					.map_err(|_| BenchmarkError::Stop("operational unlock set overflow"))
+			})?;
+		}
 
 		#[block]
 		{
@@ -381,6 +432,23 @@ mod benchmarks {
 		assert!(
 			vault.securitization < 1_000_000u128.into(),
 			"vault securitization should shrink after releases"
+		);
+		assert!(
+			VaultsReleasingOperationalMinimumByTick::<T>::get(current_tick).is_empty(),
+			"operational minimum release index should be drained for the processed tick"
+		);
+		let first_operational_unlock = first_operational_unlock_vault_id
+			.ok_or(BenchmarkError::Stop("missing operational unlock benchmark vault"))?;
+		let operational_unlock_vault = VaultsById::<T>::get(first_operational_unlock)
+			.ok_or(BenchmarkError::Stop("missing operational unlock vault"))?;
+		assert_eq!(
+			operational_unlock_vault.operational_minimum_release_tick, None,
+			"expected processed operational minimum lock to clear"
+		);
+		assert_eq!(
+			operational_unlock_vault.securitization,
+			T::Balance::zero(),
+			"expected processed operational unlock to release to the stored target"
 		);
 		Ok(())
 	}

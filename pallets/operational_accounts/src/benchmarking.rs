@@ -114,7 +114,8 @@ mod benchmarks {
 			BenchmarkOperationalAccountsProviderState {
 				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
 					vault_id: 1,
-					activated_securitization: T::MinBitcoinLockSizeForOperational::get()
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
 				has_active_rewards_account_seat: true,
@@ -170,7 +171,7 @@ mod benchmarks {
 		register(RawOrigin::Signed(caller.clone()), registration);
 
 		let account = OperationalAccounts::<T>::get(&caller).expect("account stored");
-		assert_eq!(account.bitcoin_accrual, T::MinBitcoinLockSizeForOperational::get());
+		assert_eq!(account.bitcoin_accrual, 1u128.into());
 		assert!(account.vault_created);
 		assert!(account.has_treasury_pool_participation);
 		assert_eq!(account.mining_seat_accrual, 1);
@@ -179,18 +180,32 @@ mod benchmarks {
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
 		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
-			get_registration_vault_data: 1,
+			get_registration_vault_data: 2,
 			has_active_rewards_account_seat: 1,
 			has_pool_participation: 1,
+			account_became_operational: 0,
 		});
 	}
 
 	#[benchmark]
 	fn on_vault_created() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
 		account.has_uniswap_transfer = true;
-		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
+		account.bitcoin_accrual = 1u128.into();
 		account.has_treasury_pool_participation = true;
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
@@ -201,43 +216,72 @@ mod benchmarks {
 			let _ = OperationalAccountsPallet::<T>::vault_created(&linked.vault);
 		}
 
-		assert!(OperationalAccounts::<T>::get(&linked.owner).is_some());
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
+				.is_operational
+		);
 	}
 
 	#[benchmark]
 	fn on_bitcoin_lock_funded() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
-		let threshold = T::BitcoinLockSizeForAccessCode::get();
 		let mut account = default_operational_account::<T>(&linked);
 		account.has_uniswap_transfer = true;
 		account.vault_created = true;
-		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
 		account.has_treasury_pool_participation = true;
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
-		account.is_operational = true;
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
 
 		#[block]
 		{
-			let _ = OperationalAccountsPallet::<T>::bitcoin_lock_funded(&linked.vault, threshold);
+			let _ =
+				OperationalAccountsPallet::<T>::bitcoin_lock_funded(&linked.vault, 1u128.into());
 		}
 
-		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
+				.is_operational
+		);
 	}
 
 	#[benchmark]
 	fn on_mining_seat_won() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
-		let seats_per_code = T::MiningSeatsPerAccessCode::get().max(1);
-		let accrual_start = seats_per_code.saturating_sub(1);
 		let mut account = default_operational_account::<T>(&linked);
 		account.has_uniswap_transfer = true;
 		account.vault_created = true;
-		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
+		account.bitcoin_accrual = 1u128.into();
 		account.has_treasury_pool_participation = true;
-		account.mining_seat_accrual = accrual_start.max(T::MiningSeatsForOperational::get());
-		account.is_operational = true;
+		account.mining_seat_accrual = T::MiningSeatsForOperational::get().saturating_sub(1);
 		insert_operational_account::<T>(&linked, account);
 		link_mining_funding_to_owner::<T>(&linked);
 
@@ -246,16 +290,33 @@ mod benchmarks {
 			let _ = OperationalAccountsPallet::<T>::mining_seat_won(&linked.mining_funding);
 		}
 
-		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
+				.is_operational
+		);
 	}
 
 	#[benchmark]
 	fn on_treasury_pool_participated() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
 		account.has_uniswap_transfer = true;
 		account.vault_created = true;
-		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
+		account.bitcoin_accrual = 1u128.into();
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
@@ -268,15 +329,32 @@ mod benchmarks {
 			);
 		}
 
-		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
+				.is_operational
+		);
 	}
 
 	#[benchmark]
 	fn on_uniswap_transfer() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
 		account.vault_created = true;
-		account.bitcoin_accrual = T::MinBitcoinLockSizeForOperational::get();
+		account.bitcoin_accrual = 1u128.into();
 		account.has_treasury_pool_participation = true;
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
@@ -290,7 +368,11 @@ mod benchmarks {
 			);
 		}
 
-		assert!(OperationalAccounts::<T>::contains_key(&linked.owner));
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
+				.is_operational
+		);
 	}
 
 	#[benchmark]
@@ -402,6 +484,19 @@ mod benchmarks {
 
 	#[benchmark]
 	fn force_set_progress() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				call_counters: Default::default(),
+			},
+		);
 		let linked = linked_accounts::<T>();
 		let account = default_operational_account::<T>(&linked);
 		insert_operational_account::<T>(&linked, account);
@@ -409,7 +504,7 @@ mod benchmarks {
 			has_uniswap_transfer: Some(true),
 			vault_created: Some(true),
 			has_treasury_pool_participation: Some(true),
-			observed_bitcoin_total: Some(T::MinBitcoinLockSizeForOperational::get()),
+			observed_bitcoin_total: Some(1u128.into()),
 			observed_mining_seat_total: Some(T::MiningSeatsForOperational::get()),
 		};
 
@@ -545,7 +640,8 @@ mod benchmarks {
 		crate::mock::set_registration_lookup(
 			vault_account,
 			mining_funding_account,
-			crate::mock::MinBitcoinLockSizeForOperational::get(),
+			1,
+			crate::mock::OperationalMinimumVaultSecuritization::get(),
 			true,
 			1,
 		);

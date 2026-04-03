@@ -151,10 +151,13 @@ macro_rules! inject_runtime_vars {
 			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
 			frame_system::WeightReclaim<Runtime>,
 		);
-		/// All migrations of the runtime, aside from the ones declared in the pallets.
+		/// All migrations of the runtime.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = (pallet_treasury::migrations::SimplifyFunderStateMigration<Runtime>,);
+		type Migrations = (
+			pallet_treasury::migrations::SimplifyFunderStateMigration<Runtime>,
+			pallet_vaults::migrations::AddOperationalMinimumReleaseTickMigration<Runtime>,
+		);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =

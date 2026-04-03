@@ -5,8 +5,9 @@
 An account is considered **operational** once it satisfies all of the following:
 
 - The vault has been created.
+- The vault securitization is at least `OperationalMinimumVaultSecuritization`.
 - At least one Argon Uniswap transfer has been recorded.
-- The bitcoin lock total has reached the configured threshold (`MinBitcoinLockSizeForOperational`).
+- The bitcoin lock total is greater than zero.
 - At least `MiningSeatsForOperational` mining seats have been won.
 - The account has participated in at least one treasury pool.
 
