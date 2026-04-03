@@ -615,6 +615,7 @@ fn benchmark_vault<T: Config>(
 ) -> Vault<T::AccountId, TreasuryBalanceOf<T>> {
 	Vault {
 		operator_account_id: operator,
+		bitcoin_lock_delegate_account: None,
 		securitization: TreasuryBalanceOf::<T>::zero(),
 		securitization_target: TreasuryBalanceOf::<T>::zero(),
 		securitization_locked: TreasuryBalanceOf::<T>::zero(),

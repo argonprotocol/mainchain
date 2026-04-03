@@ -9,6 +9,7 @@ pub trait WeightInfo {
 	fn modify_terms() -> Weight;
 	fn close() -> Weight;
 	fn replace_bitcoin_xpub() -> Weight;
+	fn set_bitcoin_lock_delegate() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -46,6 +47,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn replace_bitcoin_xpub() -> Weight {
+		Weight::zero()
+	}
+	fn set_bitcoin_lock_delegate() -> Weight {
 		Weight::zero()
 	}
 	fn on_initialize_with_vault_releases(

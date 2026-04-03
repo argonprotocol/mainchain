@@ -74,6 +74,10 @@ where
 		false
 	}
 
+	fn can_initialize_bitcoin_locks(_vault_id: VaultId, _account_id: &Self::AccountId) -> bool {
+		false
+	}
+
 	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
 		None
 	}

@@ -99,14 +99,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       /**
-       * The fee coupon already exists
-       **/
-      FeeCouponAlreadyExists: AugmentedError<ApiType>;
-      /**
-       * Initializing a lock for another account requires a fee coupon
-       **/
-      FeeCouponRequired: AugmentedError<ApiType>;
-      /**
        * Cannot request an orphaned release for the funding UTXO
        **/
       FundingUtxoCannotBeReleased: AugmentedError<ApiType>;
@@ -133,14 +125,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
       /**
-       * The provided fee coupon is already used or invalid
-       **/
-      InvalidFeeCoupon: AugmentedError<ApiType>;
-      /**
-       * The provided fee coupon proof is invalid
-       **/
-      InvalidFeeCouponProof: AugmentedError<ApiType>;
-      /**
        * Funding would result in an overflow of the balance type
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
@@ -156,11 +140,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The lock funding has not been confirmed on bitcoin
        **/
       LockPendingFunding: AugmentedError<ApiType>;
-      /**
-       * This bitcoin lock exceeded the maximum allowed number of satoshis for the provided fee
-       * coupon
-       **/
-      MaxFeeCouponSatoshisExceeded: AugmentedError<ApiType>;
       /**
        * Too many orphaned utxo release requests for a lock
        **/

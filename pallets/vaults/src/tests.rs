@@ -139,6 +139,32 @@ fn it_can_set_securitization_ratio_for_a_vault() {
 }
 
 #[test]
+fn it_can_set_a_bitcoin_lock_delegate() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+
+		assert_err!(
+			Vaults::set_bitcoin_lock_delegate(RuntimeOrigin::signed(2), 1, Some(9)),
+			Error::<Test>::NoPermissions
+		);
+
+		assert_ok!(Vaults::set_bitcoin_lock_delegate(RuntimeOrigin::signed(1), 1, Some(9)));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_lock_delegate_account, Some(9));
+		assert!(Vaults::can_initialize_bitcoin_locks(1, &1));
+		assert!(Vaults::can_initialize_bitcoin_locks(1, &9));
+		assert!(!Vaults::can_initialize_bitcoin_locks(1, &2));
+
+		assert_ok!(Vaults::set_bitcoin_lock_delegate(RuntimeOrigin::signed(1), 1, None));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().bitcoin_lock_delegate_account, None);
+		assert!(Vaults::can_initialize_bitcoin_locks(1, &1));
+		assert!(!Vaults::can_initialize_bitcoin_locks(1, &9));
+	});
+}
+
+#[test]
 fn it_will_reject_non_hardened_xpubs() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited

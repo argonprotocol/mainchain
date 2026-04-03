@@ -117,6 +117,13 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
+	/// Storage: `Vaults::VaultsById` (r:1 w:1)
+	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9016), added: 11491, mode: `MaxEncodedLen`)
+	fn set_bitcoin_lock_delegate() -> Weight {
+		Weight::from_parts(16_000_000, 12481)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+	}
 	/// Storage: `Vaults::VaultsById` (r:1 w:0)
 	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9025), added: 11500, mode: `MaxEncodedLen`)
 	/// Storage: `Vaults::PendingCosignByVaultId` (r:1 w:0)

@@ -776,7 +776,7 @@ impl pallet_hyperbridge::Config for Runtime {
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type TransactionSponsorProviders = (BitcoinLocks, ProxyFeeDelegate<Runtime>);
+	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }
 
 #[derive(Default)]

@@ -81,6 +81,10 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		false
 	}
 
+	fn can_initialize_bitcoin_locks(_vault_id: VaultId, _account_id: &Self::AccountId) -> bool {
+		false
+	}
+
 	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
 		None
 	}
@@ -131,7 +135,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_extension: Option<(FixedU128, &mut argon_primitives::vault::LockExtension<Self::Balance>)>,
-		_has_fee_coupon: bool,
+		_vault_covers_fee: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}

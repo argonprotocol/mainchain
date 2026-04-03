@@ -345,10 +345,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxUnactivatedAccessCodes: u32 & AugmentedConst<ApiType>;
       /**
-       * Minimum argon amount (base units) required to mark a bitcoin lock as qualifying.
-       **/
-      minBitcoinLockSizeForOperational: u128 & AugmentedConst<ApiType>;
-      /**
        * Mining seats required to become operational.
        **/
       miningSeatsForOperational: u32 & AugmentedConst<ApiType>;
@@ -356,6 +352,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Mining seats required per access code after operational.
        **/
       miningSeatsPerAccessCode: u32 & AugmentedConst<ApiType>;
+      /**
+       * Minimum vault securitization required to become operational.
+       **/
+      operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
       /**
        * Default bonus reward paid every referral threshold.
        **/
@@ -589,6 +589,14 @@ declare module '@polkadot/api-base/types/consts' {
        * The max number of vaults that can be created
        **/
       maxVaults: u32 & AugmentedConst<ApiType>;
+      /**
+       * Duration to keep the operational minimum securitization locked from vault creation.
+       **/
+      operationalMinimumVaultLockTicks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Minimum vault securitization required while the operational floor lock is active.
+       **/
+      operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
       /**
        * The number of frames within which revenue must be collected
        **/

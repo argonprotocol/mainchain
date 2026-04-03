@@ -496,6 +496,7 @@ pub mod pallet {
 
 			let vault = Vault {
 				operator_account_id: who.clone(),
+				bitcoin_lock_delegate_account: None,
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
@@ -716,6 +717,23 @@ pub mod pallet {
 				}
 				Ok(())
 			})
+		}
+
+		#[pallet::call_index(6)]
+		#[pallet::weight(T::WeightInfo::set_bitcoin_lock_delegate())]
+		pub fn set_bitcoin_lock_delegate(
+			origin: OriginFor<T>,
+			vault_id: VaultId,
+			delegate_account_id: Option<T::AccountId>,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+				ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
+				vault.bitcoin_lock_delegate_account = delegate_account_id.clone();
+				Ok::<(), Error<T>>(())
+			})?;
+			Ok(())
 		}
 	}
 
@@ -1107,6 +1125,14 @@ pub mod pallet {
 			false
 		}
 
+		fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &T::AccountId) -> bool {
+			if let Some(vault) = VaultsById::<T>::get(vault_id) {
+				return &vault.operator_account_id == account_id ||
+					vault.bitcoin_lock_delegate_account.as_ref() == Some(account_id);
+			}
+			false
+		}
+
 		fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 			VaultsById::<T>::get(vault_id).map(|a| a.operator_account_id)
 		}
@@ -1208,7 +1234,7 @@ pub mod pallet {
 			securitization: &Securitization<Self::Balance>,
 			satoshis: Satoshis,
 			extension: Option<(FixedU128, &mut LockExtension<T::Balance>)>,
-			mut has_fee_coupon: bool,
+			mut vault_covers_fee: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
@@ -1234,14 +1260,14 @@ pub mod pallet {
 					.saturating_add(base_fee)
 			};
 			if vault.operator_account_id == *account_id {
-				has_fee_coupon = true;
+				vault_covers_fee = true;
 			}
 
 			log::trace!(
-				"Vault {vault_id} trying to reserve {:?} for total_fees {:?} (has_fee_coupon: {})",
+				"Vault {vault_id} trying to reserve {:?} for total_fees {:?} (vault_covers_fee: {})",
 				securitization.collateral_required,
 				total_fee,
-				has_fee_coupon
+				vault_covers_fee
 			);
 
 			let is_ratchet = extension.is_some();
@@ -1249,7 +1275,7 @@ pub mod pallet {
 				vault_id,
 				locks_created: if is_ratchet { 0 } else { 1 },
 				total_fee,
-				has_fee_coupon,
+				has_fee_coupon: vault_covers_fee,
 				securitization_locked: securitization.collateral_required,
 				securitization_released: 0u32.into(),
 				satoshis_locked: satoshis,
@@ -1257,7 +1283,7 @@ pub mod pallet {
 			})?;
 
 			// do this second so the 'provider' is already on the account
-			if total_fee > T::Balance::zero() && !has_fee_coupon {
+			if total_fee > T::Balance::zero() && !vault_covers_fee {
 				T::Currency::transfer_and_hold(
 					&HoldReason::PendingCollect.into(),
 					account_id,
@@ -1287,7 +1313,7 @@ pub mod pallet {
 				locker: account_id.clone(),
 				liquidity_promised: securitization.liquidity_promised,
 				fee_revenue: total_fee,
-				did_use_fee_coupon: has_fee_coupon,
+				did_use_fee_coupon: vault_covers_fee,
 				is_ratchet,
 			});
 			VaultsById::<T>::insert(vault_id, vault);

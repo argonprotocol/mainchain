@@ -3,21 +3,19 @@ import {
   type ArgonPrimitivesBitcoinBitcoinNetwork,
   type ArgonPrimitivesBitcoinUtxoRef,
   formatArgons,
-  getOfflineRegistry,
   type KeyringPair,
   MICROGONS_PER_ARGON,
+  type SubmittableExtrinsic,
   TxSubmitter,
   Vault,
 } from './index';
 import { GenericEvent } from '@polkadot/types';
 import { ISubmittableOptions } from './TxSubmitter';
 import { TxResult } from './TxResult';
-import { stringToU8a, u8aToHex } from '@polkadot/util';
+import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
 import { bool, Option, u128 } from '@polkadot/types-codec';
-import { SubmittableExtrinsic } from '@polkadot/api/promise/types';
-import { blake2AsU8a } from '@polkadot/util-crypto';
 
 export const SATS_PER_BTC = 100_000_000n;
 
@@ -174,7 +172,6 @@ export class BitcoinLock implements IBitcoinLock {
       argonKeyring: KeyringPair;
       vault: Vault;
       microgonsPerBtc?: bigint;
-      couponProofKeypair?: KeyringPair;
     } & ISubmittableOptions,
   ): Promise<{
     txResult: TxResult;
@@ -189,25 +186,10 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinBlockHeight: number;
     }>;
   }> {
-    const {
-      priceIndex,
-      argonKeyring,
-      tip = 0n,
-      vault,
-      client,
-      microgonsPerBtc = null,
-      couponProofKeypair,
-    } = args;
+    const { priceIndex, argonKeyring, tip = 0n, vault, client, microgonsPerBtc = null } = args;
 
     const ratchetPrice = await this.getRatchetPrice(client, priceIndex, vault);
-    const feeCouponProof = couponProofKeypair
-      ? BitcoinLock.createCouponProof({ couponProofKeypair, argonKeyring })
-      : null;
-    const tx =
-      client.tx.bitcoinLocks.ratchet.meta.args.length === 2
-        ? client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsPerBtc, feeCouponProof } })
-        : // @ts-expect-error - legacy overload
-          client.tx.bitcoinLocks.ratchet(this.utxoId);
+    const tx = client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsPerBtc } });
     const txSubmitter = new TxSubmitter(client, tx, argonKeyring);
     const canAfford = await txSubmitter.canAfford({
       tip,
@@ -670,51 +652,6 @@ export class BitcoinLock implements IBitcoinLock {
     return undefined;
   }
 
-  public static areFeeCouponsSupported(client: ArgonClient): boolean {
-    return !!client.tx.bitcoinLocks.registerFeeCoupon?.meta;
-  }
-
-  public static createCouponProof(args: {
-    couponProofKeypair: KeyringPair;
-    argonKeyring: KeyringPair;
-  }): { public: Uint8Array; signature: Uint8Array } {
-    const { couponProofKeypair, argonKeyring } = args;
-    const registry = getOfflineRegistry();
-    const couponMessage = registry
-      .createType('([u8;17],[u8;32],AccountId)', [
-        stringToU8a('fee_proof_message'),
-        couponProofKeypair.publicKey,
-        argonKeyring.address,
-      ])
-      .toU8a();
-    const couponMessageHash = blake2AsU8a(couponMessage, 256);
-
-    return {
-      public: couponProofKeypair.publicKey,
-      signature: couponProofKeypair.sign(couponMessageHash),
-    };
-  }
-
-  public static createFeeCouponTx(args: {
-    client: ArgonClient;
-    couponProofKeypair: KeyringPair;
-    maxSatoshis: number;
-    maxFeePlusTip?: bigint;
-  }): SubmittableExtrinsic | undefined {
-    const { client, couponProofKeypair, maxSatoshis, maxFeePlusTip = null } = args;
-    if (!this.areFeeCouponsSupported(client)) {
-      return undefined;
-    }
-    if (couponProofKeypair.type !== 'sr25519') {
-      throw new Error(`Coupon proof keypair must be of type 'sr25519'`);
-    }
-    return client.tx.bitcoinLocks.registerFeeCoupon(
-      couponProofKeypair.publicKey,
-      maxSatoshis,
-      maxFeePlusTip,
-    );
-  }
-
   public static async createInitializeTx(args: {
     client: ArgonClient;
     vault: Vault;
@@ -726,8 +663,6 @@ export class BitcoinLock implements IBitcoinLock {
     microgonsPerBtc?: bigint;
     tip?: bigint;
     initializeForAccountId?: string;
-    couponProofKeypair?: KeyringPair;
-    skipCouponProofCheck?: boolean;
   }) {
     const {
       vault,
@@ -739,8 +674,6 @@ export class BitcoinLock implements IBitcoinLock {
       client,
       microgonsPerBtc = null,
       initializeForAccountId,
-      couponProofKeypair,
-      skipCouponProofCheck,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -748,39 +681,6 @@ export class BitcoinLock implements IBitcoinLock {
       );
     }
 
-    let feeCouponProof = null;
-    let prepaidFee = 0n;
-    if (this.areFeeCouponsSupported(client) && couponProofKeypair) {
-      if (skipCouponProofCheck !== true) {
-        const coupon = await client.query.bitcoinLocks.feeCouponsByPublic(
-          couponProofKeypair.publicKey,
-        );
-        if (!coupon.isSome) {
-          throw new Error(`Fee coupon for the provided public key not found on chain.`);
-        }
-        const { maxSatoshis, maxFeePlusTip } = coupon.unwrap();
-        if (satoshis > maxSatoshis.toBigInt()) {
-          throw new Error(
-            `Fee coupon max satoshis exceeded. Coupon max: ${maxSatoshis.toBigInt()}, requested: ${satoshis}`,
-          );
-        }
-        prepaidFee = maxFeePlusTip.isSome
-          ? maxFeePlusTip.value.toBigInt()
-          : BigInt(Number.MAX_SAFE_INTEGER);
-      } else {
-        prepaidFee = BigInt(Number.MAX_SAFE_INTEGER);
-      }
-      feeCouponProof = this.createCouponProof({ couponProofKeypair, argonKeyring });
-    }
-    if (
-      initializeForAccountId &&
-      initializeForAccountId !== argonKeyring.address &&
-      !feeCouponProof
-    ) {
-      throw new Error(
-        `Initializing for a different account ID requires a fee coupon proof to cover the security fee.`,
-      );
-    }
     let tx: SubmittableExtrinsic;
     if (initializeForAccountId) {
       tx = client.tx.bitcoinLocks.initializeFor(
@@ -791,21 +691,15 @@ export class BitcoinLock implements IBitcoinLock {
         {
           V1: {
             microgonsPerBtc,
-            feeCouponProof,
           },
         },
       );
     } else {
-      tx =
-        client.tx.bitcoinLocks.initialize.meta.args.length === 4
-          ? client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, {
-              V1: {
-                microgonsPerBtc,
-                feeCouponProof,
-              },
-            })
-          : // @ts-expect-error - legacy overload
-            client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey);
+      tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, {
+        V1: {
+          microgonsPerBtc,
+        },
+      });
     }
     const submitter = new TxSubmitter(client, tx, argonKeyring);
     const marketPrice = await this.getMarketRate(priceIndex, satoshis);
@@ -817,16 +711,11 @@ export class BitcoinLock implements IBitcoinLock {
       unavailableBalance: securityFee + (args.reducedBalanceBy ?? 0n),
       includeExistentialDeposit: true,
     });
-    let canAffordFinal = canAfford;
-    if (feeCouponProof) {
-      // if using a fee coupon, also ensure the prepaid fee covers the tx fee plus tip
-      canAffordFinal = prepaidFee >= txFee + tip;
-    }
     return {
       tx,
       securityFee,
       txFee,
-      canAfford: canAffordFinal,
+      canAfford,
       availableBalance,
       txFeePlusTip: txFee + tip,
     };

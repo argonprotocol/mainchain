@@ -1004,6 +1004,17 @@ where
 			.unwrap_or(false)
 	}
 
+	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| {
+				vault.operator_account_id == *account_id ||
+					vault.bitcoin_lock_delegate_account.as_ref() == Some(account_id)
+			})
+			.unwrap_or(false)
+	}
+
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults

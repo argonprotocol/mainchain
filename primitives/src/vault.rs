@@ -140,6 +140,7 @@ pub trait BitcoinVaultProvider {
 	type AccountId: Codec;
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
+	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
 	fn get_registration_vault_data(
@@ -171,7 +172,7 @@ pub trait BitcoinVaultProvider {
 		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
-		has_fee_coupon: bool,
+		vault_covers_fee: bool,
 	) -> Result<Self::Balance, VaultError>;
 
 	/// Release the lock and move into holding, eligible for relock
@@ -286,6 +287,8 @@ where
 {
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
+	/// Optional delegated hot account allowed to initialize bitcoin locks for this vault
+	pub bitcoin_lock_delegate_account: Option<AccountId>,
 	/// The securitization in the vault
 	#[codec(compact)]
 	pub securitization: Balance,
@@ -852,6 +855,7 @@ mod test {
 	fn default_vault(securitization: Balance, ratio: f64) -> Vault<u64, Balance> {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
+			bitcoin_lock_delegate_account: None,
 			securitization,
 			securitization_target: securitization,
 			securitization_locked: 0,
@@ -868,6 +872,7 @@ mod test {
 			},
 			pending_terms: None,
 			opened_tick: 0,
+			operational_minimum_release_tick: None,
 		}
 	}
 }

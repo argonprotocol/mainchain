@@ -139,8 +139,6 @@ import type {
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
-  PalletBitcoinLocksFeeCoupon,
-  PalletBitcoinLocksFeeCouponProof,
   PalletBitcoinLocksHoldReason,
   PalletBitcoinLocksLockOptions,
   PalletBitcoinLocksLockReleaseRequest,
@@ -426,8 +424,6 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
-    PalletBitcoinLocksFeeCoupon: PalletBitcoinLocksFeeCoupon;
-    PalletBitcoinLocksFeeCouponProof: PalletBitcoinLocksFeeCouponProof;
     PalletBitcoinLocksHoldReason: PalletBitcoinLocksHoldReason;
     PalletBitcoinLocksLockOptions: PalletBitcoinLocksLockOptions;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
