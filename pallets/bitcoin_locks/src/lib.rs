@@ -66,8 +66,8 @@ pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
-		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider,
-		TransactionSponsorProvider, TxSponsor, UtxoLockEvents, VaultId,
+		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, UtxoLockEvents,
+		VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey, BitcoinSignature,
 			CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
@@ -75,12 +75,8 @@ pub mod pallet {
 		},
 		vault::{BitcoinVaultProvider, LockExtension, Securitization, VaultError},
 	};
-	use codec::{EncodeLike, HasCompact};
+	use codec::HasCompact;
 	use core::iter::Sum;
-	use polkadot_sdk::frame_support::traits::IsSubType;
-	use sp_core::sr25519;
-	use sp_runtime::traits::Verify;
-
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
 
 	#[pallet::pallet]
@@ -261,23 +257,6 @@ pub mod pallet {
 	pub type MicrogonPerBtcHistory<T: Config> =
 		StorageValue<_, BoundedVec<(Tick, T::Balance), T::MaxBtcPriceTickAge>, ValueQuery>;
 
-	/// Fee Coupons
-	#[pallet::storage]
-	pub type FeeCouponsByPublic<T: Config> =
-		StorageMap<_, Blake2_128Concat, sr25519::Public, FeeCoupon<T::Balance>, OptionQuery>;
-
-	/// Fee Coupon Expirations
-	#[pallet::storage]
-	pub type FeeCouponsExpiringByFrame<T: Config> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		FrameId,
-		Blake2_128Concat,
-		sr25519::Public,
-		(),
-		OptionQuery,
-	>;
-
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LockedBitcoin<T: Config> {
@@ -296,7 +275,7 @@ pub mod pallet {
 		/// Sum of all lock fees (initial plus any ratcheting)
 		#[codec(compact)]
 		pub security_fees: T::Balance,
-		/// Fees paid using coupons for this lock
+		/// Fees covered by the vault for this lock
 		#[codec(compact)]
 		pub coupon_paid_fees: T::Balance,
 		/// The number of satoshis reserved for this lock
@@ -430,59 +409,6 @@ pub mod pallet {
 		pub to_script_pubkey: BitcoinScriptPubkey,
 		/// When this was requested to be released
 		pub created_at_argon_block_number: BlockNumber,
-	}
-
-	#[derive(
-		Decode,
-		DecodeWithMemTracking,
-		Encode,
-		CloneNoBound,
-		PartialEqNoBound,
-		EqNoBound,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
-	)]
-	pub struct FeeCouponProof {
-		/// The public id of the fee
-		pub public: sr25519::Public,
-		/// The signature over the prepaid id and amount
-		pub signature: sr25519::Signature,
-	}
-
-	pub const FEE_PROOF_MESSAGE_KEY: &[u8; 17] = b"fee_proof_message";
-
-	impl FeeCouponProof {
-		pub fn verify<AccountId: EncodeLike>(&self, account_id: &AccountId) -> bool {
-			let message =
-				(FEE_PROOF_MESSAGE_KEY, self.public, account_id).using_encoded(blake2_256);
-			self.signature.verify(message.as_slice(), &self.public)
-		}
-	}
-
-	#[derive(
-		Decode,
-		DecodeWithMemTracking,
-		Encode,
-		CloneNoBound,
-		PartialEqNoBound,
-		EqNoBound,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
-	)]
-	pub struct FeeCoupon<Balance: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen> {
-		/// The vault id this coupon is associated with
-		#[codec(compact)]
-		pub vault_id: VaultId,
-		/// The max number of satoshis this coupon can be used for
-		#[codec(compact)]
-		pub max_satoshis: Satoshis,
-		/// The expiration frame of this coupon
-		#[codec(compact)]
-		pub expiration_frame: FrameId,
-		/// Optional maximum fee + tip that can be used with this coupon
-		pub max_fee_plus_tip: Option<Balance>,
 	}
 
 	#[pallet::event]
@@ -636,17 +562,6 @@ pub mod pallet {
 		OverflowError,
 		/// An ineligible microgon rate per btc was requested
 		IneligibleMicrogonRateRequested,
-		/// The provided fee coupon is already used or invalid
-		InvalidFeeCoupon,
-		/// The provided fee coupon proof is invalid
-		InvalidFeeCouponProof,
-		/// This bitcoin lock exceeded the maximum allowed number of satoshis for the provided fee
-		/// coupon
-		MaxFeeCouponSatoshisExceeded,
-		/// The fee coupon already exists
-		FeeCouponAlreadyExists,
-		/// Initializing a lock for another account requires a fee coupon
-		FeeCouponRequired,
 		/// Cannot fund with an orphaned utxo after lock funding is confirmed
 		OrphanedUtxoFundingConflict,
 		/// Cannot lock an orphaned utxo with a pending release request
@@ -735,12 +650,6 @@ pub mod pallet {
 					}
 				}
 			});
-
-			for (prepaid_id, _) in
-				FeeCouponsExpiringByFrame::<T>::drain_prefix(T::CurrentFrameId::get())
-			{
-				FeeCouponsByPublic::<T>::remove(prepaid_id);
-			}
 		}
 	}
 
@@ -760,21 +669,13 @@ pub mod pallet {
 		V1 {
 			/// The microgons per btc rate to use for this lock
 			microgons_per_btc: Option<T::Balance>,
-			/// Proof for the use of a fee coupon
-			fee_coupon_proof: Option<FeeCouponProof>,
 		},
 	}
 
 	impl<T: Config> LockOptions<T> {
 		pub fn microgons_per_btc(&self) -> Option<T::Balance> {
 			match self {
-				LockOptions::<T>::V1 { microgons_per_btc, .. } => *microgons_per_btc,
-			}
-		}
-
-		pub fn fee_coupon_proof(&self) -> Option<&FeeCouponProof> {
-			match self {
-				LockOptions::<T>::V1 { fee_coupon_proof, .. } => fee_coupon_proof.as_ref(),
+				LockOptions::<T>::V1 { microgons_per_btc } => *microgons_per_btc,
 			}
 		}
 	}
@@ -799,7 +700,14 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
-			Self::create_bitcoin_lock(&account_id, vault_id, satoshis, bitcoin_pubkey, options)?;
+			Self::create_bitcoin_lock(
+				&account_id,
+				vault_id,
+				satoshis,
+				bitcoin_pubkey,
+				options,
+				false,
+			)?;
 			Ok(())
 		}
 
@@ -1014,19 +922,6 @@ pub mod pallet {
 				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
 				Error::<T>::LockInProcessOfRelease
 			);
-			let has_fee_coupon =
-				if let Some(coupon_proof) = options.as_ref().and_then(|o| o.fee_coupon_proof()) {
-					let coupon = FeeCouponsByPublic::<T>::take(coupon_proof.public)
-						.ok_or(Error::<T>::InvalidFeeCoupon)?;
-					ensure!(lock.vault_id == coupon.vault_id, Error::<T>::InvalidFeeCoupon);
-					ensure!(
-						coupon_proof.verify(&lock.owner_account),
-						Error::<T>::InvalidFeeCouponProof
-					);
-					true
-				} else {
-					false
-				};
 			let new_liquidity_promised =
 				if let Some(rate) = options.as_ref().and_then(|x| x.microgons_per_btc()) {
 					Self::get_bitcoin_argons_at_rate(lock.satoshis, rate)?
@@ -1090,7 +985,7 @@ pub mod pallet {
 				&securitization,
 				0,
 				Some((duration_for_new_funds, &mut lock_extension)),
-				has_fee_coupon,
+				false,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1207,36 +1102,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(7)]
-		#[pallet::weight(T::WeightInfo::register_fee_coupon())]
-		pub fn register_fee_coupon(
-			origin: OriginFor<T>,
-			public: sr25519::Public,
-			#[pallet::compact] max_satoshis: Satoshis,
-			max_fee_plus_tip: Option<T::Balance>,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			ensure!(
-				!FeeCouponsByPublic::<T>::contains_key(public),
-				Error::<T>::FeeCouponAlreadyExists
-			);
-			let vault_id = T::VaultProvider::get_vault_id(&who).ok_or(Error::<T>::NoPermissions)?;
-			ensure!(
-				max_satoshis >= MinimumSatoshis::<T>::get(),
-				Error::<T>::InsufficientSatoshisLocked
-			);
-
-			let expiration_frame = T::CurrentFrameId::get() + 2; // expires at the beginning of 2 frames from now. Means 24 hours plus rest of current frame
-
-			FeeCouponsByPublic::<T>::insert(
-				public,
-				FeeCoupon { vault_id, expiration_frame, max_satoshis, max_fee_plus_tip },
-			);
-			FeeCouponsExpiringByFrame::<T>::insert(expiration_frame, public, ());
-
-			Ok(())
-		}
-
 		#[pallet::call_index(8)]
 		#[pallet::weight(T::WeightInfo::initialize_for())]
 		pub fn initialize_for(
@@ -1246,14 +1111,21 @@ pub mod pallet {
 			#[pallet::compact] satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
-		) -> DispatchResult {
-			let _ = ensure_signed(origin)?;
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
 			ensure!(
-				options.as_ref().and_then(|o| o.fee_coupon_proof()).is_some(),
-				Error::<T>::FeeCouponRequired
+				T::VaultProvider::can_initialize_bitcoin_locks(vault_id, &who),
+				Error::<T>::NoPermissions
 			);
-			Self::create_bitcoin_lock(&account_id, vault_id, satoshis, bitcoin_pubkey, options)?;
-			Ok(())
+			Self::create_bitcoin_lock(
+				&account_id,
+				vault_id,
+				satoshis,
+				bitcoin_pubkey,
+				options,
+				true,
+			)?;
+			Ok(Pays::No.into())
 		}
 
 		#[pallet::call_index(9)]
@@ -1312,56 +1184,6 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config>
-		TransactionSponsorProvider<
-			<T as frame_system::Config>::AccountId,
-			T::RuntimeCall,
-			T::Balance,
-		> for Pallet<T>
-	where
-		T::RuntimeCall: IsSubType<Call<T>>,
-	{
-		fn get_transaction_sponsor(
-			signer: &<T as frame_system::Config>::AccountId,
-			call: &T::RuntimeCall,
-		) -> Option<TxSponsor<<T as frame_system::Config>::AccountId, T::Balance>> {
-			let pallet_call: &Call<T> = <T::RuntimeCall as IsSubType<Call<T>>>::is_sub_type(call)?;
-
-			match pallet_call {
-				Call::initialize { vault_id, satoshis, options, .. } |
-				Call::initialize_for { vault_id, satoshis, options, .. } => {
-					let account_id = match pallet_call {
-						Call::initialize { .. } => signer,
-						Call::initialize_for { account_id, .. } => account_id,
-						_ => unreachable!(),
-					};
-					let coupon_proof = options.as_ref().and_then(|a| a.fee_coupon_proof())?;
-					let Some(coupon) = FeeCouponsByPublic::<T>::get(coupon_proof.public) else {
-						log::info!(
-							"Fee coupon supplied without matching runtime coupon {:?}",
-							coupon_proof.public
-						);
-						return None;
-					};
-					if coupon.vault_id == *vault_id &&
-						*satoshis <= coupon.max_satoshis &&
-						coupon_proof.verify(account_id)
-					{
-						let vault_operator = T::VaultProvider::get_vault_operator(*vault_id)?;
-						Some(TxSponsor {
-							payer: vault_operator,
-							max_fee_with_tip: coupon.max_fee_plus_tip,
-							// only allow a single use of the coupon
-							unique_tx_key: Some(coupon_proof.public.encode()),
-						})
-					} else {
-						None
-					}
-				},
-				_ => None,
-			}
-		}
-	}
 	impl<T: Config> BitcoinUtxoEvents<T::AccountId> for Pallet<T> {
 		type Weights = crate::weights::ProviderWeightAdapter<T>;
 
@@ -1535,23 +1357,12 @@ pub mod pallet {
 			satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
+			vault_covers_fee: bool,
 		) -> DispatchResult {
 			ensure!(
 				satoshis >= MinimumSatoshis::<T>::get(),
 				Error::<T>::InsufficientSatoshisLocked
 			);
-			let has_fee_coupon = if let Some(coupon_proof) =
-				options.as_ref().and_then(|o| o.fee_coupon_proof())
-			{
-				let coupon = FeeCouponsByPublic::<T>::take(coupon_proof.public)
-					.ok_or(Error::<T>::InvalidFeeCoupon)?;
-				ensure!(satoshis <= coupon.max_satoshis, Error::<T>::MaxFeeCouponSatoshisExceeded);
-				ensure!(vault_id == coupon.vault_id, Error::<T>::InvalidFeeCoupon);
-				ensure!(coupon_proof.verify(&account_id), Error::<T>::InvalidFeeCouponProof);
-				true
-			} else {
-				false
-			};
 
 			let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
 			let vault_claim_height =
@@ -1577,7 +1388,7 @@ pub mod pallet {
 				&securitization,
 				satoshis,
 				None,
-				has_fee_coupon,
+				vault_covers_fee,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1626,7 +1437,7 @@ pub mod pallet {
 					liquidity_promised,
 					security_fees: fee,
 					securitization_ratio,
-					coupon_paid_fees: if has_fee_coupon { fee } else { T::Balance::zero() },
+					coupon_paid_fees: if vault_covers_fee { fee } else { T::Balance::zero() },
 					utxo_satoshis: None,
 					satoshis,
 					vault_pubkey,

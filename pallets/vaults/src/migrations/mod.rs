@@ -1,5 +1,6 @@
 use crate::{Config, VaultsById};
 use argon_primitives::{
+	bitcoin::{BitcoinHeight, Satoshis},
 	tick::Tick,
 	vault::{Vault, VaultTerms},
 };
@@ -29,23 +30,22 @@ where
 	#[codec(compact)]
 	pub securitization_pending_activation: Balance,
 	#[codec(compact)]
-	pub locked_satoshis: argon_primitives::bitcoin::Satoshis,
+	pub locked_satoshis: Satoshis,
 	#[codec(compact)]
-	pub securitized_satoshis: argon_primitives::bitcoin::Satoshis,
-	pub securitization_release_schedule:
-		BoundedBTreeMap<argon_primitives::bitcoin::BitcoinHeight, Balance, ConstU32<366>>,
+	pub securitized_satoshis: Satoshis,
+	pub securitization_release_schedule: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
 	#[codec(compact)]
 	pub securitization_ratio: FixedU128,
 	pub is_closed: bool,
 	pub terms: VaultTerms<Balance>,
-	pub pending_terms: Option<(argon_primitives::tick::Tick, VaultTerms<Balance>)>,
+	pub pending_terms: Option<(Tick, VaultTerms<Balance>)>,
 	#[codec(compact)]
 	pub opened_tick: Tick,
 }
 
-pub struct AddOperationalMinimumReleaseTick<T: crate::Config>(core::marker::PhantomData<T>);
+pub struct MigrateVaultV13ToV14<T: crate::Config>(core::marker::PhantomData<T>);
 
-impl<T: Config> UncheckedOnRuntimeUpgrade for AddOperationalMinimumReleaseTick<T>
+impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateVaultV13ToV14<T>
 where
 	T::AccountId: Codec,
 	T::Balance: Codec
@@ -73,6 +73,7 @@ where
 			translated = translated.saturating_add(1);
 			Some(Vault {
 				operator_account_id: vault.operator_account_id,
+				bitcoin_lock_delegate_account: None,
 				securitization: vault.securitization,
 				securitization_target: vault.securitization_target,
 				securitization_locked: vault.securitization_locked,
@@ -98,21 +99,28 @@ where
 		use frame_support::ensure;
 
 		let expected = u64::decode(&mut &state[..])
-			.map_err(|_| sp_runtime::TryRuntimeError::Other("Failed to decode vault count"))?;
-		let migrated = VaultsById::<T>::iter()
-			.filter(|(_, vault)| vault.operational_minimum_release_tick.is_none())
-			.count() as u64;
-		ensure!(expected == migrated, "Vault migration count mismatch");
-
+			.map_err(|_| sp_runtime::TryRuntimeError::Other("failed to decode vault count"))?;
+		let mut migrated = 0u64;
+		for (_, vault) in VaultsById::<T>::iter() {
+			ensure!(
+				vault.bitcoin_lock_delegate_account.is_none(),
+				"migrated vault unexpectedly had delegate account set"
+			);
+			ensure!(
+				vault.operational_minimum_release_tick.is_none(),
+				"migrated vault unexpectedly had operational minimum release tick set"
+			);
+			migrated = migrated.saturating_add(1);
+		}
+		ensure!(expected == migrated, "vault count mismatch after migration");
 		Ok(())
 	}
 }
 
-pub type AddOperationalMinimumReleaseTickMigration<T> =
-	frame_support::migrations::VersionedMigration<
-		13,
-		14,
-		AddOperationalMinimumReleaseTick<T>,
-		crate::pallet::Pallet<T>,
-		<T as frame_system::Config>::DbWeight,
-	>;
+pub type MigrateVaultV13ToV14Migration<T> = frame_support::migrations::VersionedMigration<
+	13,
+	14,
+	MigrateVaultV13ToV14<T>,
+	crate::pallet::Pallet<T>,
+	<T as frame_system::Config>::DbWeight,
+>;

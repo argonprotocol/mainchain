@@ -76,6 +76,8 @@ parameter_types! {
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
+		operator_account_id: 1,
+		bitcoin_lock_delegate_account: None,
 		securitization:  200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
@@ -87,7 +89,6 @@ parameter_types! {
 			treasury_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
-		operator_account_id: 1,
 		securitization_ratio: FixedU128::from_float(1.0),
 		securitization_release_schedule: BoundedBTreeMap::new(),
 		is_closed: false,
@@ -185,6 +186,15 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		false
 	}
 
+	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
+		if vault_id == 1 {
+			let vault = DefaultVault::get();
+			return vault.operator_account_id == *account_id ||
+				vault.bitcoin_lock_delegate_account == Some(*account_id);
+		}
+		false
+	}
+
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 		if vault_id == 1 {
 			return Some(DefaultVault::get().operator_account_id);
@@ -229,7 +239,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		securitization: &Securitization<Balance>,
 		_satoshis: Satoshis,
 		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
-		_has_fee_coupon: bool,
+		vault_covers_fee: bool,
 	) -> Result<Self::Balance, VaultError> {
 		ensure!(
 			DefaultVault::get().available_for_lock() >= securitization.collateral_required,
@@ -249,7 +259,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			.saturating_mul(term)
 			.saturating_mul_int(securitization.liquidity_promised)
 			.saturating_add(terms.bitcoin_base_fee);
-		if ChargeFee::get() {
+		if ChargeFee::get() && !vault_covers_fee {
 			Balances::burn_from(
 				locker,
 				total_fee,

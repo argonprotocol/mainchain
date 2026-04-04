@@ -30,9 +30,6 @@ const EXPIRING_LOCKS_BENCH_RANGE_END: u32 = 20;
 const OVERDUE_RELEASES_BENCH_RANGE_END: u32 = 20;
 const ORPHAN_EXPIRATIONS_BENCH_RANGE_END: u32 = 20;
 
-#[cfg(not(test))]
-const BENCH_COUPON_KEY_TYPE: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"blcp");
-
 #[benchmarks(where <T as frame_system::Config>::AccountId: Ord)]
 mod benchmarks {
 	use super::*;
@@ -62,20 +59,27 @@ mod benchmarks {
 	#[benchmark]
 	fn initialize_for() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
-		let sponsor: T::AccountId = account("bitcoin-lock-sponsor", 0, 0);
+		let delegate: T::AccountId = account("bitcoin-lock-delegate", 0, 0);
 		let beneficiary: T::AccountId = account("bitcoin-lock-beneficiary", 0, 0);
-		let operator: T::AccountId = account("coupon-operator", 0, 0);
+		let operator: T::AccountId = account("vault-operator", 0, 0);
 		let satoshis = benchmark_satoshis::<T>();
 		let owner_pubkey = benchmark_pubkey::<T>(2)?;
 		seed_price_state(100_000, 1, 1);
 		let vault_id = create_vault::<T>(&operator, 2, benchmark_vault_securitization())?;
+		let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
+		state
+			.vaults
+			.get_mut(&vault_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
+			.bitcoin_lock_delegate_account = Some(delegate.clone());
+		set_benchmark_bitcoin_vault_provider_state(state);
 		let options = benchmark_lock_options::<T>(vault_id, &beneficiary, satoshis, 12)?;
-		whitelist_account!(sponsor);
+		whitelist_account!(delegate);
 		whitelist_account!(beneficiary);
 
 		#[extrinsic_call]
 		_(
-			RawOrigin::Signed(sponsor),
+			RawOrigin::Signed(delegate),
 			beneficiary.clone(),
 			vault_id,
 			satoshis,
@@ -284,27 +288,6 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn register_fee_coupon() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let operator: T::AccountId = account("fee-coupon-operator", 0, 0);
-		let vault_id = create_vault::<T>(&operator, 8, benchmark_vault_securitization())?;
-		let public = benchmark_sr25519_public(8)?;
-		let satoshis = benchmark_satoshis::<T>();
-		assert_eq!(
-			T::VaultProvider::get_vault_id(&operator),
-			Some(vault_id),
-			"benchmark vault should resolve by operator"
-		);
-		whitelist_account!(operator);
-
-		#[extrinsic_call]
-		_(RawOrigin::Signed(operator), public, satoshis, Some(1_000u128.into()));
-
-		assert!(FeeCouponsByPublic::<T>::contains_key(public));
-		Ok(())
-	}
-
-	#[benchmark]
 	fn increase_securitization() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_unfunded_lock::<T>(9)?;
@@ -507,18 +490,14 @@ fn seed_microgons_per_btc_history<T: Config>(
 }
 
 fn benchmark_lock_options<T: Config>(
-	vault_id: VaultId,
-	account_id: &T::AccountId,
-	max_satoshis: Satoshis,
-	seed_hint: u8,
+	_vault_id: VaultId,
+	_account_id: &T::AccountId,
+	_max_satoshis: Satoshis,
+	_seed_hint: u8,
 ) -> Result<Option<LockOptions<T>>, BenchmarkError> {
 	let microgons_per_btc = benchmark_microgons_per_btc::<T>()?;
 	seed_microgons_per_btc_history::<T>(microgons_per_btc)?;
-	let fee_coupon_proof = seed_fee_coupon::<T>(vault_id, account_id, max_satoshis, seed_hint)?;
-	Ok(Some(LockOptions::V1 {
-		microgons_per_btc: Some(microgons_per_btc),
-		fee_coupon_proof: Some(fee_coupon_proof),
-	}))
+	Ok(Some(LockOptions::V1 { microgons_per_btc: Some(microgons_per_btc) }))
 }
 
 fn benchmark_block_hash(seed: u8) -> H256Le {
@@ -575,64 +554,6 @@ fn seed_bitcoin_heights(previous_height: BitcoinHeight, current_height: BitcoinH
 	set_benchmark_bitcoin_utxo_tracker_state(state);
 }
 
-fn seed_fee_coupon<T: Config>(
-	vault_id: VaultId,
-	account_id: &T::AccountId,
-	max_satoshis: Satoshis,
-	seed_hint: u8,
-) -> Result<FeeCouponProof, BenchmarkError> {
-	let public = benchmark_sr25519_public(seed_hint)?;
-	let expiration_frame = T::CurrentFrameId::get().saturating_add(2);
-	FeeCouponsByPublic::<T>::insert(
-		public,
-		FeeCoupon {
-			vault_id,
-			expiration_frame,
-			max_satoshis,
-			max_fee_plus_tip: Some(1_000u128.into()),
-		},
-	);
-	FeeCouponsExpiringByFrame::<T>::insert(expiration_frame, public, ());
-	let message = (FEE_PROOF_MESSAGE_KEY, public, account_id).using_encoded(blake2_256);
-	let signature = benchmark_sr25519_signature(seed_hint, &message)?;
-	Ok(FeeCouponProof { public, signature })
-}
-
-#[cfg(test)]
-fn benchmark_sr25519_public(seed_hint: u8) -> Result<sp_core::sr25519::Public, BenchmarkError> {
-	use sp_core::Pair;
-
-	Ok(sp_core::sr25519::Pair::from_seed(&[seed_hint; 32]).public())
-}
-
-#[cfg(not(test))]
-fn benchmark_sr25519_public(seed_hint: u8) -> Result<sp_core::sr25519::Public, BenchmarkError> {
-	Ok(sp_io::crypto::sr25519_generate(
-		BENCH_COUPON_KEY_TYPE,
-		Some(format!("//bitcoin-locks-bench-{seed_hint}").into_bytes()),
-	))
-}
-
-#[cfg(test)]
-fn benchmark_sr25519_signature(
-	seed_hint: u8,
-	message: &[u8],
-) -> Result<sp_core::sr25519::Signature, BenchmarkError> {
-	use sp_core::Pair;
-
-	Ok(sp_core::sr25519::Pair::from_seed(&[seed_hint; 32]).sign(message))
-}
-
-#[cfg(not(test))]
-fn benchmark_sr25519_signature(
-	seed_hint: u8,
-	message: &[u8],
-) -> Result<sp_core::sr25519::Signature, BenchmarkError> {
-	let public = benchmark_sr25519_public(seed_hint)?;
-	sp_io::crypto::sr25519_sign(BENCH_COUPON_KEY_TYPE, &public, message)
-		.ok_or(BenchmarkError::Stop("benchmark sr25519 signature failed"))
-}
-
 fn create_vault<T>(
 	operator: &T::AccountId,
 	seed_hint: u8,
@@ -650,6 +571,7 @@ where
 	};
 	let vault = Vault {
 		operator_account_id: operator.clone(),
+		bitcoin_lock_delegate_account: None,
 		securitization: securitization.into(),
 		securitization_target: securitization.into(),
 		securitization_locked: T::Balance::zero(),

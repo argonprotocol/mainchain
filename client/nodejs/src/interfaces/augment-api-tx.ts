@@ -396,14 +396,6 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Option<PalletBitcoinLocksLockOptions>]
       >;
-      registerFeeCoupon: AugmentedSubmittable<
-        (
-          public: U8aFixed | string | Uint8Array,
-          maxSatoshis: Compact<u64> | AnyNumber | Uint8Array,
-          maxFeePlusTip: Option<u128> | null | Uint8Array | u128 | AnyNumber,
-        ) => SubmittableExtrinsic<ApiType>,
-        [U8aFixed, Compact<u64>, Option<u128>]
-      >;
       requestOrphanedUtxoRelease: AugmentedSubmittable<
         (
           utxoRef:
@@ -2241,6 +2233,13 @@ declare module '@polkadot/api-base/types/submittable' {
           bitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]
+      >;
+      setBitcoinLockDelegate: AugmentedSubmittable<
+        (
+          vaultId: u32 | AnyNumber | Uint8Array,
+          delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u32, Option<AccountId32>]
       >;
     };
   } // AugmentedSubmittables

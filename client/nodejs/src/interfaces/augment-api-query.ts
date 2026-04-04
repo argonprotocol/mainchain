@@ -66,7 +66,6 @@ import type {
   PalletBalancesAccountData,
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
-  PalletBitcoinLocksFeeCoupon,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
@@ -192,25 +191,6 @@ declare module '@polkadot/api-base/types/storage' {
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
     bitcoinLocks: {
-      /**
-       * Fee Coupons
-       **/
-      feeCouponsByPublic: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<PalletBitcoinLocksFeeCoupon>>,
-        [U8aFixed]
-      >;
-      /**
-       * Fee Coupon Expirations
-       **/
-      feeCouponsExpiringByFrame: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u64 | AnyNumber | Uint8Array,
-          arg2: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<Null>>,
-        [u64, U8aFixed]
-      >;
       /**
        * Utxos that have been requested to be cosigned for releasing
        **/
@@ -1644,6 +1624,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesVault>>,
         [u32]
+      >;
+      /**
+       * Vaults whose temporary operational minimum may be released at a given tick.
+       **/
+      vaultsReleasingOperationalMinimumByTick: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u32>>,
+        [u64]
       >;
       /**
        * Vault Bitcoin Xpub and current child counter by VaultId
