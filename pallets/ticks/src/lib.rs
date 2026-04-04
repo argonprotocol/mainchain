@@ -8,6 +8,8 @@ pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 #[cfg(test)]
 mod mock;
 
@@ -95,6 +97,14 @@ pub mod pallet {
 			PreviousTick::<T>::put(parent_tick);
 			let digests = T::Digests::get().expect("Digests must be loadable");
 			let proposed_tick = digests.tick.0;
+			let cleanup_range = if parent_tick > MAX_RECENT_BLOCKS {
+				proposed_tick
+					.saturating_sub(parent_tick)
+					.saturating_add(1)
+					.min(u32::MAX as Tick) as u32
+			} else {
+				0
+			};
 			// if we're past the max recent blocks, remove the oldest
 			if parent_tick > MAX_RECENT_BLOCKS {
 				for tick in parent_tick..=proposed_tick {
@@ -131,11 +141,13 @@ pub mod pallet {
 				<GenesisTick<T>>::put(proposed_tick);
 			}
 
-			T::DbWeight::get().reads_writes(0, 1)
+			<T as Config>::WeightInfo::on_initialize_with_cleanup(cleanup_range)
 		}
 	}
 
 	impl<T: Config> TickProvider<T::Block> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn previous_tick() -> Tick {
 			<PreviousTick<T>>::get()
 		}

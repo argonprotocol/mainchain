@@ -169,6 +169,8 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		todo!()
 	}

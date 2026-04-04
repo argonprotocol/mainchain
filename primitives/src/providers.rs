@@ -82,6 +82,36 @@ impl TreasuryPoolProviderWeightInfo for () {
 	}
 }
 
+pub trait TickProviderWeightInfo {
+	fn previous_tick() -> Weight;
+	fn current_tick() -> Weight;
+	fn elapsed_ticks() -> Weight;
+	fn ticker() -> Weight;
+	fn blocks_at_tick() -> Weight;
+}
+
+impl TickProviderWeightInfo for () {
+	fn previous_tick() -> Weight {
+		Weight::zero()
+	}
+
+	fn current_tick() -> Weight {
+		Weight::zero()
+	}
+
+	fn elapsed_ticks() -> Weight {
+		Weight::zero()
+	}
+
+	fn ticker() -> Weight {
+		Weight::zero()
+	}
+
+	fn blocks_at_tick() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait OperationalRewardsProviderWeightInfo {
 	fn pending_rewards() -> Weight;
 	fn mark_reward_paid() -> Weight;
@@ -615,6 +645,8 @@ where
 }
 
 pub trait TickProvider<B: BlockT> {
+	type Weights: TickProviderWeightInfo;
+
 	/// The previous tick
 	fn previous_tick() -> Tick;
 	/// The current tick supplied by the Node tier

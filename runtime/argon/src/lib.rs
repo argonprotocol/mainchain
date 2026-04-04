@@ -187,7 +187,7 @@ impl pallet_tx_pause::Config for Runtime {
 	type UnpauseOrigin = EnsureRoot<AccountId>;
 	type WhitelistedCalls = TxPauseWhitelistedCalls;
 	type MaxNameLen = ConstU32<256>;
-	type WeightInfo = pallet_tx_pause::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_tx_pause::WeightInfo<Runtime>;
 }
 
 impl pallet_block_seal_spec::Config for Runtime {
@@ -220,8 +220,12 @@ impl pallet_block_rewards::Config for Runtime {
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
-	type BlockSealerProvider = BlockSeal;
-	type BlockRewardAccountsProvider = MiningSlot;
+	type BlockSealerProvider =
+		use_unless_benchmark!(BlockSeal, benchmarking::BenchmarkBlockSealerProvider<AccountId>);
+	type BlockRewardAccountsProvider = use_unless_benchmark!(
+		MiningSlot,
+		benchmarking::BenchmarkBlockRewardAccountsProvider<AccountId>
+	);
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type NotebookProvider =
 		use_unless_benchmark!(Notebook, benchmarking::BenchmarkNotebookProvider<Runtime>);
@@ -274,7 +278,7 @@ impl Get<bool> for MultiBlockPerTickEnabled {
 }
 
 impl pallet_ticks::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_ticks::WeightInfo<Runtime>;
 	type Digests = Digests;
 }
 
@@ -286,7 +290,10 @@ impl Get<FrameId> for GetCurrentFrameId {
 }
 
 impl pallet_vaults::Config for Runtime {
-	type WeightInfo = weights::pallet_vaults::WeightInfo<Runtime>;
+	type WeightInfo = pallet_vaults::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_vaults::WeightInfo<Runtime>,
+	>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -479,7 +486,7 @@ impl pallet_block_seal::Config for Runtime {
 
 impl pallet_grandpa::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_grandpa::WeightInfo<Runtime>;
 	type MaxAuthorities = MaxGrandpas;
 	type MaxNominators = ConstU32<0>;
 	type MaxSetIdSessionEntries = MaxSetIdSessionEntries;
@@ -554,7 +561,7 @@ impl pallet_multisig::Config for Runtime {
 	type DepositBase = DepositBase;
 	type DepositFactor = DepositFactor;
 	type MaxSignatories = MaxSignatories;
-	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_multisig::WeightInfo<Runtime>;
 	type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 impl pallet_proxy::Config for Runtime {
@@ -565,7 +572,7 @@ impl pallet_proxy::Config for Runtime {
 	type ProxyDepositBase = ProxyDepositBase;
 	type ProxyDepositFactor = ProxyDepositFactor;
 	type MaxProxies = MaxProxies;
-	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_proxy::WeightInfo<Runtime>;
 	type MaxPending = MaxPending;
 	type CallHasher = BlakeTwo256;
 	type AnnouncementDepositBase = AnnouncementDepositBase;
@@ -644,14 +651,14 @@ impl pallet_balances::Config<OwnershipToken> for Runtime {
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
-	type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_sudo::WeightInfo<Runtime>;
 }
 
 impl pallet_utility::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type PalletsOrigin = OriginCaller;
-	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_utility::WeightInfo<Runtime>;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -661,7 +668,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type WeightToFee = ArgonWeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
-	type WeightInfo = pallet_transaction_payment::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_transaction_payment::WeightInfo<Runtime>;
 }
 
 impl pallet_token_gateway::Config for Runtime {
@@ -670,15 +677,19 @@ impl pallet_token_gateway::Config for Runtime {
 	// Configured as Pallet balances
 	type NativeCurrency = Balances;
 	// AssetAdmin account to register new assets on the chain. We don't use this
-	type AssetAdmin = TokenAdmin;
+	type AssetAdmin =
+		use_unless_benchmark!(TokenAdmin, benchmarking::BenchmarkTokenAdmin<AccountId>);
 	// Configured as Pallet Assets
 	type Assets = OwnershipTokenAsset;
 	// The Native asset Id
 	type NativeAssetId = NativeAssetId;
 	// The precision of the native asset
 	type Decimals = Decimals;
-	type CreateOrigin = EnsureSignedBy<TokenAdmins, AccountId>;
-	type WeightInfo = ();
+	type CreateOrigin = use_unless_benchmark!(
+		EnsureSignedBy<TokenAdmins, AccountId>,
+		EnsureSignedBy<benchmarking::BenchmarkTokenAdmins<AccountId>, AccountId>
+	);
+	type WeightInfo = weights::pallet_token_gateway::WeightInfo<Runtime>;
 	type EvmToSubstrate = ();
 }
 

@@ -1,5 +1,6 @@
 use argon_primitives::providers::{
-	BlockSealSpecProviderWeightInfo, NotebookProvider, NotebookProviderWeightInfo,
+	BlockSealSpecProviderWeightInfo, NotebookProvider, NotebookProviderWeightInfo, TickProvider,
+	TickProviderWeightInfo,
 };
 use pallet_prelude::*;
 
@@ -16,23 +17,30 @@ pub trait WeightInfo {
 
 type NotebookProviderWeights<T> =
 	<<T as crate::Config>::NotebookProvider as NotebookProvider>::Weights;
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
-pub struct WithProviderWeights<T, Base, NotebookProviderWeight = NotebookProviderWeights<T>>(
-	PhantomData<(T, Base, NotebookProviderWeight)>,
-);
-impl<T, Base, NotebookProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, NotebookProviderWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	NotebookProviderWeight = NotebookProviderWeights<T>,
+	TickProviderWeight = TickProviderWeights<T>,
+>(PhantomData<(T, Base, NotebookProviderWeight, TickProviderWeight)>);
+impl<T, Base, NotebookProviderWeight, TickProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, NotebookProviderWeight, TickProviderWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	NotebookProviderWeight: NotebookProviderWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn configure() -> Weight {
 		Base::configure()
 	}
 
 	fn on_initialize_with_digest() -> Weight {
-		Base::on_initialize_with_digest()
+		Base::on_initialize_with_digest().saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn on_finalize_with_vote_adjustment(n: u32) -> Weight {
@@ -41,6 +49,7 @@ where
 			.saturating_add(
 				NotebookProviderWeight::is_notary_locked_at_tick().saturating_mul(n.into()),
 			)
+			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn notebook_submitted() -> Weight {

@@ -1,6 +1,9 @@
 use argon_primitives::{
 	notary::{NotaryProvider, NotaryProviderWeightInfo},
-	providers::{ChainTransferLookupWeightInfo, NotebookProvider, NotebookProviderWeightInfo},
+	providers::{
+		ChainTransferLookupWeightInfo, NotebookProvider, NotebookProviderWeightInfo, TickProvider,
+		TickProviderWeightInfo,
+	},
 };
 use pallet_prelude::*;
 
@@ -21,25 +24,31 @@ type NotaryProviderWeights<T> = <<T as crate::Config>::NotaryProvider as NotaryP
 	<T as frame_system::Config>::Block,
 	<T as frame_system::Config>::AccountId,
 >>::Weights;
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
 	Base,
 	NotebookProviderWeight = NotebookProviderWeights<T>,
 	NotaryProviderWeight = NotaryProviderWeights<T>,
->(PhantomData<(T, Base, NotebookProviderWeight, NotaryProviderWeight)>);
-impl<T, Base, NotebookProviderWeight, NotaryProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, NotebookProviderWeight, NotaryProviderWeight>
+	TickProviderWeight = TickProviderWeights<T>,
+>(PhantomData<(T, Base, NotebookProviderWeight, NotaryProviderWeight, TickProviderWeight)>);
+impl<T, Base, NotebookProviderWeight, NotaryProviderWeight, TickProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, NotebookProviderWeight, NotaryProviderWeight, TickProviderWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	NotebookProviderWeight: NotebookProviderWeightInfo,
 	NotaryProviderWeight: NotaryProviderWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn send_to_localchain() -> Weight {
 		Base::send_to_localchain()
 			.saturating_add(NotaryProviderWeight::active_notaries())
 			.saturating_add(NotebookProviderWeight::is_notary_locked_at_tick())
+			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn notebook_submitted_event_handler(t: u32) -> Weight {

@@ -129,6 +129,8 @@ impl NotaryProvider<Block, AccountId32> for StaticNotaryProvider {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		NotebookTick::get().saturating_sub(1)
 	}

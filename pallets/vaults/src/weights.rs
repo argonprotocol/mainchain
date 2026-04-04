@@ -1,4 +1,7 @@
-use argon_primitives::vault::BitcoinVaultProviderWeightInfo;
+use argon_primitives::{
+	providers::{TickProvider, TickProviderWeightInfo},
+	vault::BitcoinVaultProviderWeightInfo,
+};
 use core::marker::PhantomData;
 use pallet_prelude::*;
 
@@ -19,6 +22,71 @@ pub trait WeightInfo {
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
 	fn provider_account_became_operational() -> Weight;
+}
+
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
+
+pub struct WithProviderWeights<T, Base, TickProviderWeight = TickProviderWeights<T>>(
+	PhantomData<(T, Base, TickProviderWeight)>,
+);
+impl<T, Base, TickProviderWeight> WeightInfo for WithProviderWeights<T, Base, TickProviderWeight>
+where
+	T: crate::Config,
+	Base: WeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
+{
+	fn create() -> Weight {
+		Base::create().saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn modify_funding() -> Weight {
+		Base::modify_funding()
+	}
+
+	fn modify_terms() -> Weight {
+		Base::modify_terms().saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn close() -> Weight {
+		Base::close()
+	}
+
+	fn replace_bitcoin_xpub() -> Weight {
+		Base::replace_bitcoin_xpub()
+	}
+
+	fn on_initialize_with_vault_releases(
+		height_range: u32,
+		bitcoin_release_vault_count: u32,
+		operational_unlock_work: u32,
+	) -> Weight {
+		Base::on_initialize_with_vault_releases(
+			height_range,
+			bitcoin_release_vault_count,
+			operational_unlock_work,
+		)
+		.saturating_add(TickProviderWeight::previous_tick())
+		.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn collect() -> Weight {
+		Base::collect()
+	}
+
+	fn on_frame_start(vault_count: u32) -> Weight {
+		Base::on_frame_start(vault_count).saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn provider_get_registration_vault_data() -> Weight {
+		Base::provider_get_registration_vault_data()
+	}
+
+	fn provider_account_became_operational() -> Weight {
+		Base::provider_account_became_operational()
+			.saturating_add(TickProviderWeight::current_tick())
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
