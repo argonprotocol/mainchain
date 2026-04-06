@@ -48,16 +48,12 @@ where
 
 	fn submit_with_account_origins(a: u32) -> Weight {
 		Base::submit_with_account_origins(a)
-			.saturating_add(TickProviderWeight::current_tick().saturating_mul(2u64))
 	}
 
 	fn submit_with_chain_transfers(t: u32) -> Weight {
-		Base::submit_with_chain_transfers(t)
-			.saturating_add(
-				ChainTransferLookupWeight::is_valid_transfer_to_localchain()
-					.saturating_mul(t.into()),
-			)
-			.saturating_add(TickProviderWeight::current_tick().saturating_mul(2u64))
+		Base::submit_with_chain_transfers(t).saturating_add(
+			ChainTransferLookupWeight::is_valid_transfer_to_localchain().saturating_mul(t.into()),
+		)
 	}
 
 	fn unlock() -> Weight {

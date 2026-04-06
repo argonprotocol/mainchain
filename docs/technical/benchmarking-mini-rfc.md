@@ -158,7 +158,9 @@ benchmarks would miss the real tick-storage reads that production wiring perform
 - `cargo check -p argon-runtime --features runtime-benchmarks`,
 - `cargo check -p argon-canary-runtime --features runtime-benchmarks`,
 - `cargo make fmt`,
-- no `UNKNOWN KEY` / `:argon:bench:` artifacts in targeted generated weight files.
+- no `:argon:bench:` artifacts in targeted generated weight files;
+- `pallet_token_gateway` still has generated `UNKNOWN KEY` entries for request-commitment
+  storage, so the key mapping cleanup there remains follow-up work.
 
 ### Benchmark-only fee routing note
 

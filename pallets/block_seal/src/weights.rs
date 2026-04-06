@@ -62,6 +62,7 @@ where
 			.saturating_add(NotebookProviderWeight::notebooks_in_block())
 			.saturating_add(branch_provider_weight)
 			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(TickProviderWeight::blocks_at_tick())
 	}
 

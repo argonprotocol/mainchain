@@ -57,6 +57,10 @@ where
 		Base::replace_bitcoin_xpub()
 	}
 
+	fn set_bitcoin_lock_delegate() -> Weight {
+		Base::set_bitcoin_lock_delegate()
+	}
+
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
