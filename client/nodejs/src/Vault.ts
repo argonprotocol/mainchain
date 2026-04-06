@@ -53,6 +53,7 @@ export class Vault {
 
   public lockedSatoshis!: number;
   public securitizedSatoshis!: number;
+  public bitcoinLockDelegateAccount?: string;
 
   constructor(
     id: number,
@@ -124,6 +125,9 @@ export class Vault {
           PERMILL_DECIMALS,
         ),
       };
+    }
+    if ('bitcoinLockDelegateAccount' in vault && vault.bitcoinLockDelegateAccount.isSome) {
+      this.bitcoinLockDelegateAccount = vault.bitcoinLockDelegateAccount.unwrap().toHuman();
     }
   }
 
