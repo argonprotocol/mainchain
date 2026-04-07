@@ -1,5 +1,6 @@
 use argon_primitives::providers::{
-	ChainTransferLookup, ChainTransferLookupWeightInfo, NotebookProviderWeightInfo,
+	ChainTransferLookup, ChainTransferLookupWeightInfo, NotebookProviderWeightInfo, TickProvider,
+	TickProviderWeightInfo,
 };
 use pallet_prelude::*;
 
@@ -21,19 +22,28 @@ type ChainTransferLookupWeights<T> =
 		<T as frame_system::Config>::AccountId,
 		Balance,
 	>>::Weights;
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
-pub struct WithProviderWeights<T, Base, ChainTransferLookupWeight = ChainTransferLookupWeights<T>>(
-	PhantomData<(T, Base, ChainTransferLookupWeight)>,
-);
-impl<T, Base, ChainTransferLookupWeight> WeightInfo
-	for WithProviderWeights<T, Base, ChainTransferLookupWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	ChainTransferLookupWeight = ChainTransferLookupWeights<T>,
+	TickProviderWeight = TickProviderWeights<T>,
+>(PhantomData<(T, Base, ChainTransferLookupWeight, TickProviderWeight)>);
+impl<T, Base, ChainTransferLookupWeight, TickProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, ChainTransferLookupWeight, TickProviderWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	ChainTransferLookupWeight: ChainTransferLookupWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn submit(n: u32) -> Weight {
-		Base::submit(n)
+		Base::submit(n).saturating_add(
+			TickProviderWeight::current_tick().saturating_mul(n.saturating_add(1).into()),
+		)
 	}
 
 	fn submit_with_account_origins(a: u32) -> Weight {

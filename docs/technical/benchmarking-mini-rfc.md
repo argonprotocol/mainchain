@@ -1,6 +1,6 @@
 # Mini RFC: Benchmarking Strategy for Runtime Weights
 
-Last updated: 2026-03-29
+Last updated: 2026-04-03
 
 ## Context
 
@@ -34,6 +34,10 @@ Under `feature = "runtime-benchmarks"`, runtime associated types use benchmark p
 
 Current benchmark providers are centralized in `pallet_prelude::benchmarking` and exported via
 `runtime/common/src/benchmarking.rs`.
+
+If a runtime-benchmark override replaces a real storage-backed provider with an in-memory benchmark
+provider, the missing storage-read cost is added back through provider weights in consumer
+`WithProviderWeights<...>` wrappers instead of reintroducing runtime logic.
 
 ### 2) Provider weights are published by provider pallets
 
@@ -100,7 +104,7 @@ Local pallets in this repo (`pallets/*`):
 | `pallet_notebook`             | [x]              | [x]           |
 | `pallet_operational_accounts` | [x]              | [x]           |
 | `pallet_price_index`          | [ ]              | [ ]           |
-| `pallet_ticks`                | [ ]              | [ ]           |
+| `pallet_ticks`                | [x]              | [x]           |
 | `pallet_treasury`             | [x]              | [x]           |
 | `pallet_vaults`               | [x]              | [x]           |
 
@@ -112,14 +116,15 @@ Upstream / runtime pallets:
 | `pallet_balances::Balances`  | [x]              | [x]           |
 | `pallet_balances::Ownership` | [x]              | [x]           |
 | `pallet_timestamp`           | [x]              | [x]           |
-| `pallet_tx_pause`            | [ ]              | [x]           |
-| `pallet_multisig`            | [ ]              | [x]           |
-| `pallet_proxy`               | [ ]              | [x]           |
-| `pallet_sudo`                | [ ]              | [x]           |
-| `pallet_utility`             | [ ]              | [x]           |
-| `pallet_transaction_payment` | [ ]              | [x]           |
-| `ismp_grandpa`               | [ ]              | [x]           |
-| `pallet_grandpa`             | [ ]              | [ ]           |
+| `pallet_tx_pause`            | [x]              | [x]           |
+| `pallet_multisig`            | [x]              | [x]           |
+| `pallet_proxy`               | [x]              | [x]           |
+| `pallet_sudo`                | [x]              | [x]           |
+| `pallet_utility`             | [x]              | [x]           |
+| `pallet_transaction_payment` | [x]              | [x]           |
+| `ismp_grandpa`               | [x]              | [x]           |
+| `pallet_token_gateway`       | [x]              | [x]           |
+| `pallet_grandpa`             | [x]              | [x]           |
 
 ### Provider-weight pattern adoption
 
@@ -130,22 +135,48 @@ Upstream / runtime pallets:
   - `pallet_block_seal_spec`,
   - `pallet_bitcoin_utxos`,
   - `pallet_chain_transfer`,
+  - `pallet_ticks`,
   - `pallet_notebook`,
   - `pallet_mining_slot`,
   - `pallet_operational_accounts`,
   - `pallet_treasury`,
+  - `pallet_vaults`,
   - `pallet_block_rewards` (wrapper shape present).
+
+`pallet_ticks` follows the same pattern even though its provider methods are simple, because
+benchmark runtimes use `BenchmarkTickProvider`. Without provider-weight composition, consumer
+benchmarks would miss the real tick-storage reads that production wiring performs.
 
 ### Validation status
 
 - targeted benchmark regeneration has been run for `pallet_block_seal`, `pallet_block_seal_spec`,
   `pallet_chain_transfer`, `pallet_notebook`, `pallet_bitcoin_utxos`, `pallet_bitcoin_locks`,
-  `pallet_operational_accounts`, and `pallet_treasury`,
+  `pallet_operational_accounts`, `pallet_treasury`, `pallet_ticks`, `pallet_multisig`,
+  `pallet_proxy`, `pallet_sudo`, `pallet_utility`, `pallet_tx_pause`,
+  `pallet_transaction_payment`, `pallet_grandpa`, `ismp_grandpa`, and
+  `pallet_token_gateway`,
 - `cargo check -p argon-runtime --features runtime-benchmarks`,
 - `cargo check -p argon-canary-runtime --features runtime-benchmarks`,
 - `cargo make fmt`,
-- `cargo make lint`,
-- no `UNKNOWN KEY` / `:argon:bench:` artifacts in targeted generated weight files.
+- no `:argon:bench:` artifacts in targeted generated weight files;
+- `pallet_token_gateway` still has generated `UNKNOWN KEY` entries for request-commitment
+  storage, so the key mapping cleanup there remains follow-up work.
+
+### Benchmark-only fee routing note
+
+`pallet_transaction_payment` benchmarks exercise the runtime `OnUnbalanced` fee path. In this repo,
+that fee path resolves through `pallet_block_rewards::fees_account()`, which in production depends
+on block-sealer and reward-account providers. Benchmark runtimes therefore provide minimal
+benchmark-only `BlockSealerProvider` and `BlockRewardAccountsProvider` implementations so the fee
+benchmark measures cleanly without production block-author state.
+
+### Benchmark-only token gateway admin note
+
+`pallet_token_gateway` benchmarks call `T::CreateOrigin::try_successful_origin()`. In production
+that origin is derived from the singleton token-admin wiring, which in this repo resolves through
+`ChainTransfer::hyperbridge_token_admin()`. Benchmark runtimes therefore provide a minimal
+benchmark-only token-admin account and `SortedMembers` implementation so token-gateway benchmarks
+do not depend on chain-transfer genesis initialization.
 
 ### Notebook inherent event handler weight composition
 
@@ -165,6 +196,12 @@ is 0.44% of the 10-second block weight budget. Expiry processing is not overweig
   modules when complete,
 - additional provider cleanup work outside this scope (for example domains/block_rewards follow-up
   items) remain separate,
+- `pallet_ismp` and `pallet_hyperbridge` currently do not expose runtime `WeightInfo` associated
+  types in this crate version, so they are not wired through the same runtime-generated weight
+  pipeline as `ismp_grandpa` / `pallet_token_gateway`,
+- reconcile the `pallet_grandpa` benchmark generator output with the current upstream trait shape:
+  the generated file still emits the older equivocation method name and needs a small local
+  signature adjustment after generation,
 - mandatory-inherent liveness guardrails are deferred to a follow-up PR (not this benchmark PR),
   specifically:
   - authoring-side caps for mandatory inherent payload size/count (notebook + bitcoin paths),

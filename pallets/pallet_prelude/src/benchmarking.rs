@@ -20,7 +20,8 @@ use argon_primitives::{
 	},
 	notary::{NotaryProvider, NotarySignature},
 	providers::{
-		AuthorityProvider, BitcoinUtxoTracker, NotebookProvider, OperationalRewardsProvider,
+		AuthorityProvider, BitcoinUtxoTracker, BlockRewardAccountsProvider, BlockSealerInfo,
+		BlockSealerProvider, NotebookProvider, OperationalRewardsProvider,
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
@@ -370,6 +371,8 @@ impl<T: frame_system::Config> NotebookProvider for BenchmarkNotebookProvider<T> 
 
 pub struct BenchmarkTickProvider;
 impl<B: BlockT> argon_primitives::TickProvider<B> for BenchmarkTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		14
 	}
@@ -394,6 +397,42 @@ impl<B: BlockT> argon_primitives::TickProvider<B> for BenchmarkTickProvider {
 
 	fn blocks_at_tick(_tick: Tick) -> Vec<B::Hash> {
 		Vec::new()
+	}
+}
+
+pub struct BenchmarkBlockSealerProvider<AccountId>(PhantomData<AccountId>);
+impl<AccountId: FullCodec> BlockSealerProvider<AccountId>
+	for BenchmarkBlockSealerProvider<AccountId>
+{
+	type Weights = ();
+
+	fn get_sealer_info() -> BlockSealerInfo<AccountId> {
+		BlockSealerInfo {
+			block_author_account_id: benchmark_authority_account_id::<AccountId>(),
+			block_vote_rewards_account: None,
+			block_seal_authority: None,
+		}
+	}
+
+	fn is_block_vote_seal() -> bool {
+		false
+	}
+}
+
+pub struct BenchmarkBlockRewardAccountsProvider<AccountId>(PhantomData<AccountId>);
+impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId>
+	for BenchmarkBlockRewardAccountsProvider<AccountId>
+{
+	fn get_block_rewards_account(_author: &AccountId) -> Option<(AccountId, FrameId)> {
+		None
+	}
+
+	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)> {
+		Vec::new()
+	}
+
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		true
 	}
 }
 

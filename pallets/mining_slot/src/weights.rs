@@ -1,5 +1,6 @@
 use argon_primitives::providers::{
-	BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo,
+	BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo, TickProvider,
+	TickProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -27,18 +28,26 @@ type SealerInfoProviderWeights<T> = <<T as crate::Config>::SealerInfo as BlockSe
 	<T as frame_system::Config>::AccountId,
 	<T as crate::Config>::MiningAuthorityId,
 >>::Weights;
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
-pub struct WithProviderWeights<T, Base, SealerInfoWeight = SealerInfoProviderWeights<T>>(
-	PhantomData<(T, Base, SealerInfoWeight)>,
-);
-impl<T, Base, SealerInfoWeight> WeightInfo for WithProviderWeights<T, Base, SealerInfoWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	SealerInfoWeight = SealerInfoProviderWeights<T>,
+	TickProviderWeight = TickProviderWeights<T>,
+>(PhantomData<(T, Base, SealerInfoWeight, TickProviderWeight)>);
+impl<T, Base, SealerInfoWeight, TickProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, SealerInfoWeight, TickProviderWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	SealerInfoWeight: BlockSealerProviderWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn bid() -> Weight {
-		Base::bid()
+		Base::bid().saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn configure_mining_slot_delay() -> Weight {
@@ -54,7 +63,7 @@ where
 	}
 
 	fn start_new_frame(m: u32) -> Weight {
-		Base::start_new_frame(m)
+		Base::start_new_frame(m).saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn on_finalize_frame_adjustments() -> Weight {

@@ -478,7 +478,7 @@ async fn submit_price(
 	let account_id = signer.account_id();
 	let tick = current_chain_tick(client, ticker).await;
 	let nonce = client.get_account_nonce(&account_id).await.unwrap();
-	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
+	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
 	let progress = client
 		.live
 		.tx()

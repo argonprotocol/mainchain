@@ -127,6 +127,8 @@ impl MiningFrameProvider for StaticMiningFrameProvider {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		PreviousTick::get()
 	}

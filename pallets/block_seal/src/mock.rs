@@ -163,6 +163,8 @@ impl FindAuthor<AccountId> for StaticFindAuthor {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		todo!()
 	}

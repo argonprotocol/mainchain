@@ -209,6 +209,8 @@ impl From<u64> for MockSessionKeys {
 
 pub struct StaticTickProvider;
 impl TickProvider<Block> for StaticTickProvider {
+	type Weights = ();
+
 	fn previous_tick() -> Tick {
 		PreviousTick::get()
 	}

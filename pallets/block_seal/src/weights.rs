@@ -1,6 +1,6 @@
 use argon_primitives::providers::{
 	BlockSealSpecProvider, BlockSealSpecProviderWeightInfo, BlockSealerProviderWeightInfo,
-	NotebookProvider, NotebookProviderWeightInfo,
+	NotebookProvider, NotebookProviderWeightInfo, TickProvider, TickProviderWeightInfo,
 };
 use pallet_prelude::*;
 
@@ -19,20 +19,31 @@ type BlockSealSpecProviderWeights<T> =
 	<<T as crate::Config>::BlockSealSpecProvider as BlockSealSpecProvider<
 		<T as frame_system::Config>::Block,
 	>>::Weights;
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
 	Base,
 	NotebookProviderWeight = NotebookProviderWeights<T>,
 	BlockSealSpecProviderWeight = BlockSealSpecProviderWeights<T>,
->(PhantomData<(T, Base, NotebookProviderWeight, BlockSealSpecProviderWeight)>);
-impl<T, Base, NotebookProviderWeight, BlockSealSpecProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, NotebookProviderWeight, BlockSealSpecProviderWeight>
+	TickProviderWeight = TickProviderWeights<T>,
+>(PhantomData<(T, Base, NotebookProviderWeight, BlockSealSpecProviderWeight, TickProviderWeight)>);
+impl<T, Base, NotebookProviderWeight, BlockSealSpecProviderWeight, TickProviderWeight> WeightInfo
+	for WithProviderWeights<
+		T,
+		Base,
+		NotebookProviderWeight,
+		BlockSealSpecProviderWeight,
+		TickProviderWeight,
+	>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	NotebookProviderWeight: NotebookProviderWeightInfo,
 	BlockSealSpecProviderWeight: BlockSealSpecProviderWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn apply() -> Weight {
 		let compute_path_provider_weight = BlockSealSpecProviderWeight::compute_difficulty();
@@ -50,6 +61,9 @@ where
 		Base::apply()
 			.saturating_add(NotebookProviderWeight::notebooks_in_block())
 			.saturating_add(branch_provider_weight)
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(TickProviderWeight::blocks_at_tick())
 	}
 
 	fn on_finalize_with_notebooks(n: u32) -> Weight {
@@ -58,11 +72,13 @@ where
 			.saturating_add(
 				NotebookProviderWeight::get_eligible_tick_votes_root().saturating_mul(n.into()),
 			)
+			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn on_initialize_with_notebooks(notebook_count: u32) -> Weight {
 		Base::on_initialize_with_notebooks(notebook_count)
 			.saturating_add(NotebookProviderWeight::vote_eligible_notebook_count(notebook_count))
+			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn provider_get_sealer_info() -> Weight {
