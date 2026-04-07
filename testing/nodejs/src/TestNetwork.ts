@@ -9,7 +9,7 @@ export async function startNetwork(
     dockerEnv?: Record<string, string>;
   },
 ): Promise<{ archiveUrl: string; notaryUrl: string }> {
-  const config = Path.join(__dirname, `docker-compose.yml`);
+  const config = Path.join(__dirname, `dev.docker-compose.yml`);
   const env = {
     VERSION: 'dev',
     ARGON_CHAIN: 'dev-docker',

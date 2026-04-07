@@ -14,6 +14,6 @@ export default defineConfig({
   skipNodeModulesBundle: true,
   shims: true,
   onSuccess: async () => {
-    await fs.copyFile('../../docker-compose.yml', 'lib/docker-compose.yml');
+    await fs.copyFile('../../dev.docker-compose.yml', 'lib/dev.docker-compose.yml');
   },
 });

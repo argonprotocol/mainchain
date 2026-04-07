@@ -218,12 +218,12 @@ A docker compose is present to run the entire network using the "local testnet".
 
 You can build this using source, or run the pre-built images from the Docker Hub. To run with a
 specific version, you should pass a `VERSION=v1.3.0` (or whatever version you want) to the
-`docker compose` command.
+`docker compose` command with `-f dev.docker-compose.yml`.
 
 To run the local testnet using Docker, you can use the following command:
 
 ```sh
-VERSION=v1.3.0 RPC_PORT=9944 docker compose up
+VERSION=v1.3.0 RPC_PORT=9944 docker compose -f dev.docker-compose.yml up
 ```
 
 ### Profiles
@@ -245,7 +245,7 @@ To run multiple compose instances, you need to set `RPC_PORT=0`, otherwise, each
 port on 9944.
 
 ```sh
-VERSION=v1.3.0 RPC_PORT=0 docker compose --profile all up
+VERSION=v1.3.0 RPC_PORT=0 docker compose -f dev.docker-compose.yml --profile all up
 ```
 
 NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and an
@@ -258,7 +258,7 @@ INFURA_PROJECT_ID=7a5b4a7c036346cfa234234234234
 ```
 
 ```sh
-docker compose --env-file .env up
+docker compose -f dev.docker-compose.yml --env-file .env up
 ```
 
 ### Cargo Make
