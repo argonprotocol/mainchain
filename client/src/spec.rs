@@ -3811,9 +3811,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				158u8, 245u8, 51u8, 21u8, 195u8, 130u8, 32u8, 196u8, 237u8, 49u8, 203u8, 79u8,
-				13u8, 56u8, 156u8, 160u8, 126u8, 24u8, 159u8, 127u8, 234u8, 42u8, 0u8, 112u8, 68u8,
-				160u8, 95u8, 44u8, 44u8, 142u8, 100u8, 174u8,
+				237u8, 102u8, 2u8, 93u8, 222u8, 50u8, 178u8, 143u8, 239u8, 122u8, 198u8, 173u8,
+				226u8, 41u8, 22u8, 119u8, 95u8, 59u8, 245u8, 35u8, 120u8, 230u8, 144u8, 130u8,
+				151u8, 211u8, 23u8, 244u8, 214u8, 195u8, 196u8, 249u8,
 			]
 	}
 	pub mod system {
@@ -10579,6 +10579,17 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
+				pub mod recent_capacity_drops_by_vault {
+					use super::runtime_types;
+					pub type RecentCapacityDropsByVault =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_vaults::pallet::RecentCapacityDrop<
+								::core::primitive::u128,
+								::core::primitive::u32,
+							>,
+						>;
+					pub type Param0 = ::core::primitive::u32;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -11083,6 +11094,51 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Recent reductions in `available_for_lock`, grouped by vault."]
+				pub fn recent_capacity_drops_by_vault_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::recent_capacity_drops_by_vault::RecentCapacityDropsByVault,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"RecentCapacityDropsByVault",
+						(),
+						[
+							178u8, 129u8, 19u8, 233u8, 156u8, 255u8, 135u8, 53u8, 252u8, 48u8,
+							42u8, 181u8, 48u8, 141u8, 126u8, 52u8, 129u8, 72u8, 233u8, 187u8, 50u8,
+							166u8, 173u8, 219u8, 74u8, 211u8, 3u8, 76u8, 238u8, 27u8, 86u8, 171u8,
+						],
+					)
+				}
+				#[doc = " Recent reductions in `available_for_lock`, grouped by vault."]
+				pub fn recent_capacity_drops_by_vault(
+					&self,
+					_0: types::recent_capacity_drops_by_vault::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::recent_capacity_drops_by_vault::Param0,
+					>,
+					types::recent_capacity_drops_by_vault::RecentCapacityDropsByVault,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"RecentCapacityDropsByVault",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							178u8, 129u8, 19u8, 233u8, 156u8, 255u8, 135u8, 53u8, 252u8, 48u8,
+							42u8, 181u8, 48u8, 141u8, 126u8, 52u8, 129u8, 72u8, 233u8, 187u8, 50u8,
+							166u8, 173u8, 219u8, 74u8, 211u8, 3u8, 76u8, 238u8, 27u8, 86u8, 171u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -11187,6 +11243,57 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+				#[doc = " Number of Argon blocks to keep recent `available_for_lock` drops for stale init checks."]
+				pub fn recent_capacity_drop_block_window(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"RecentCapacityDropBlockWindow",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of recent `available_for_lock` drops retained per vault."]
+				pub fn max_recent_capacity_drops_per_vault(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"MaxRecentCapacityDropsPerVault",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " One no-fee stale `initialize_for` failure is allowed for each this-many units of lost"]
+				#[doc = " `available_for_lock`."]
+				pub fn capacity_drop_attempt_unit(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"CapacityDropAttemptUnit",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -35186,6 +35293,28 @@ pub mod api {
 					ObligationFee,
 					#[codec(index = 2)]
 					PendingCollect,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RecentCapacityDrop<_0, _1> {
+					#[codec(compact)]
+					pub block_number: _1,
+					#[codec(compact)]
+					pub available_before_drop: _0,
+					#[codec(compact)]
+					pub available_after_drop: _0,
+					#[codec(compact)]
+					pub no_fee_failures_used: _1,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

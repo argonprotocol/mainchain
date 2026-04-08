@@ -4,12 +4,16 @@ use crate::pallet::{Config, Event, Pallet};
 use Intermediate::*;
 use alloc::vec::Vec;
 use codec::EncodeLike;
-use frame_support::dispatch::CheckIfFeeless;
+use frame_support::{dispatch::CheckIfFeeless, traits::InstanceFilter};
 use pallet_prelude::{
 	Decode, DecodeWithMemTracking, DispatchInfoOf, DispatchResult, Encode, OriginFor, OriginTrait,
 	TransactionSource, TransactionValidityError, ValidTransaction, ValidateResult, Weight,
-	argon_primitives::{FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor},
-	sp_runtime::traits::{DispatchOriginOf, Implication, PostDispatchInfoOf, TransactionExtension},
+	argon_primitives::{
+		CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
+	},
+	sp_runtime::traits::{
+		DispatchOriginOf, Implication, PostDispatchInfoOf, StaticLookup, TransactionExtension, Zero,
+	},
 	*,
 };
 use pallet_transaction_payment::OnChargeTransaction;
@@ -73,6 +77,58 @@ where
 		}
 		call
 	}
+
+	fn validated_pool_key_context(
+		call: &RuntimeCallOf<T>,
+		signer: Option<T::AccountId>,
+	) -> (&RuntimeCallOf<T>, Option<T::AccountId>) {
+		let Some(signer) = signer else {
+			return (call, None);
+		};
+
+		if let Some(pallet_proxy::Call::proxy { real, force_proxy_type, call: inner_call }) =
+			<RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call)
+		{
+			let Ok(real) = T::Lookup::lookup(real.clone()) else {
+				return (call, Some(signer));
+			};
+			let Ok(def) =
+				pallet_proxy::Pallet::<T>::find_proxy(&real, &signer, force_proxy_type.clone())
+			else {
+				return (call, Some(signer));
+			};
+			if !def.delay.is_zero() || !Self::proxy_call_is_allowed(&def, inner_call.as_ref()) {
+				return (call, Some(signer));
+			}
+
+			return Self::validated_pool_key_context(inner_call.as_ref(), Some(real));
+		}
+
+		(call, Some(signer))
+	}
+
+	fn proxy_call_is_allowed(
+		def: &pallet_proxy::ProxyDefinition<
+			T::AccountId,
+			T::ProxyType,
+			<<T as pallet_proxy::Config>::BlockNumberProvider as sp_runtime::traits::BlockNumberProvider>::BlockNumber,
+		>,
+		call: &RuntimeCallOf<T>,
+	) -> bool {
+		// Mirror pallet_proxy::do_proxy authorization so tx-pool key derivation only treats a
+		// wrapped call as coming from `real` when pallet_proxy would actually allow it to dispatch.
+		match <RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call) {
+			Some(pallet_proxy::Call::add_proxy { proxy_type, .. }) |
+			Some(pallet_proxy::Call::remove_proxy { proxy_type, .. })
+				if !def.proxy_type.is_superset(proxy_type) =>
+				false,
+			Some(pallet_proxy::Call::remove_proxies { .. }) |
+			Some(pallet_proxy::Call::kill_pure { .. })
+				if def.proxy_type != T::ProxyType::default() =>
+				false,
+			_ => def.proxy_type.filter(call),
+		}
+	}
 }
 
 type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
@@ -118,20 +174,29 @@ where
         inherited_implication: &impl Implication,
         source: TransactionSource,
     ) -> ValidateResult<Self::Val, RuntimeCallOf<T>> {
+        let inner_call = Self::unwrap_proxy(call);
+        let (pool_key_call, pool_key_signer) =
+            Self::validated_pool_key_context(call, origin.as_signer().cloned());
+        let general_pool_key =
+            T::CallTxPoolKeyProviders::key_for(pool_key_call, pool_key_signer.as_ref());
         if call.is_feeless(&origin) {
             let mut validity = ValidTransaction::default();
-            if let Some(conflict_key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
-                // Use a stable conflict key so the txpool treats feeless transactions with the same
-                // key as mutually exclusive.
-                validity.provides.push(conflict_key);
-            }
+            let mut push_provides = |key: Option<Vec<u8>>| {
+                if let Some(key) = key {
+                    if !validity.provides.contains(&key) {
+                        validity.provides.push(key);
+                    }
+                }
+            };
+
+            push_provides(general_pool_key.clone());
+            push_provides(T::FeelessCallTxPoolKeyProviders::key_for(call));
+
             Ok((validity, Feeless(origin.clone()), origin))
         } else {
             let mut delegated_origin = origin.clone();
             let mut tx_sponsor = None;
             if let Some(signer) = origin.as_signer() {
-                let inner_call = Self::unwrap_proxy(call);
-
                 if let Some(sponsor) =
                     T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
                 {
@@ -163,9 +228,18 @@ where
                     }
                 }
             }
-            if let Some(key) = tx_sponsor.as_ref().and_then(|a| a.unique_tx_key.clone()) {
-                validity.provides.push(key);
-            }
+
+            let mut push_provides = |key: Option<Vec<u8>>| {
+                if let Some(key) = key {
+                    if !validity.provides.contains(&key) {
+                        validity.provides.push(key);
+                    }
+                }
+            };
+
+            push_provides(general_pool_key);
+            push_provides(tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone()));
+
             Ok((validity, RequiresFee(inner_val, delegated_origin, tx_sponsor), origin_out))
         }
     }

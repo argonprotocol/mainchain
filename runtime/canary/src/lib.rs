@@ -309,6 +309,9 @@ impl pallet_vaults::Config for Runtime {
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
+	type RecentCapacityDropBlockWindow = RecentCapacityDropBlockWindow;
+	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
+	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 }
 
@@ -787,6 +790,7 @@ impl pallet_hyperbridge::Config for Runtime {
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
+	type CallTxPoolKeyProviders = BitcoinLocks;
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }
 

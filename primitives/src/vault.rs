@@ -165,6 +165,13 @@ pub trait BitcoinVaultProvider {
 		securitization_ratio: FixedU128,
 	) -> Result<(), VaultError>;
 
+	/// Consume a recent-capacity-drop budget entry if a sponsored initialize-for request should
+	/// avoid transaction fees after failing due to recent vault capacity churn.
+	fn consume_recent_capacity_drop_budget(
+		vault_id: VaultId,
+		required_collateral: Self::Balance,
+	) -> Result<bool, VaultError>;
+
 	/// Holds the given "securitization" from the vault. Returns the fee amount
 	fn lock(
 		vault_id: VaultId,

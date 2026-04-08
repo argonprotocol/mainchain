@@ -810,6 +810,26 @@ impl<RuntimeCall> FeelessCallTxPoolKeyProvider<RuntimeCall> for Tuple {
 	}
 }
 
+/// Provides a mapping from any runtime call to a unique key used to safeguard the transaction
+/// pool against repeated concurrent submissions of the same logical request.
+pub trait CallTxPoolKeyProvider<RuntimeCall, AccountId> {
+	fn key_for(call: &RuntimeCall, signer: Option<&AccountId>) -> Option<Vec<u8>>;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall, AccountId> CallTxPoolKeyProvider<RuntimeCall, AccountId> for Tuple {
+	fn key_for(call: &RuntimeCall, signer: Option<&AccountId>) -> Option<Vec<u8>> {
+		for_tuples!(
+			#(
+			if let Some(key) = Tuple::key_for(call, signer) {
+				return Some(key);
+			}
+			)*
+		);
+		None
+	}
+}
+
 #[derive(Clone, PartialEq, Eq, RuntimeDebug)]
 pub struct TxSponsor<AccountId, Balance> {
 	/// The account that will pay for the transaction fee

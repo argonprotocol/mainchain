@@ -5,10 +5,16 @@ extern crate alloc;
 extern crate core;
 
 use alloc::vec::Vec;
+use codec::Encode;
+use frame_support::{dispatch::DispatchErrorWithPostInfo, traits::IsSubType};
 use pallet_prelude::*;
 
 use argon_bitcoin::CosignReleaser;
-use argon_primitives::bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey};
+use argon_primitives::{
+	CallTxPoolKeyProvider,
+	bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey},
+	vault::BitcoinVaultProvider,
+};
 pub use pallet::*;
 pub use weights::*;
 
@@ -1117,15 +1123,28 @@ pub mod pallet {
 				T::VaultProvider::can_initialize_bitcoin_locks(vault_id, &who),
 				Error::<T>::NoPermissions
 			);
-			Self::create_bitcoin_lock(
+			let securitization =
+				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
+
+			match Self::create_bitcoin_lock(
 				&account_id,
 				vault_id,
 				satoshis,
 				bitcoin_pubkey,
 				options,
 				true,
-			)?;
-			Ok(Pays::No.into())
+			) {
+				Ok(()) => Ok(Pays::No.into()),
+				Err(error)
+					if error == Error::<T>::InsufficientVaultFunds.into() &&
+						T::VaultProvider::consume_recent_capacity_drop_budget(
+							vault_id,
+							securitization.collateral_required,
+						)
+						.map_err(Error::<T>::from)? =>
+					Err(DispatchErrorWithPostInfo { post_info: Pays::No.into(), error }),
+				Err(error) => Err(error.into()),
+			}
 		}
 
 		#[pallet::call_index(9)]
@@ -1370,17 +1389,10 @@ pub mod pallet {
 			let open_claim_height =
 				vault_claim_height.saturating_add(T::LockReclamationBlocks::get());
 
-			let liquidity_promised = if let Some(rate) = options.and_then(|a| a.microgons_per_btc())
-			{
-				Self::get_bitcoin_argons_at_rate(satoshis, rate)?
-			} else {
-				T::PriceProvider::get_bitcoin_argon_price(satoshis)
-					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-			};
+			let securitization =
+				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
+			let liquidity_promised = securitization.liquidity_promised;
 			let locked_market_rate = Self::calculate_adjusted_market_rate(liquidity_promised)?;
-			let securitization_ratio =
-				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
-			let securitization = Securitization::new(liquidity_promised, securitization_ratio);
 
 			let fee = T::VaultProvider::lock(
 				vault_id,
@@ -1436,7 +1448,7 @@ pub mod pallet {
 					locked_market_rate,
 					liquidity_promised,
 					security_fees: fee,
-					securitization_ratio,
+					securitization_ratio: securitization.securitization_ratio,
 					coupon_paid_fees: if vault_covers_fee { fee } else { T::Balance::zero() },
 					utxo_satoshis: None,
 					satoshis,
@@ -1465,6 +1477,28 @@ pub mod pallet {
 			});
 
 			Ok(())
+		}
+
+		fn prepare_lock_securitization(
+			vault_id: VaultId,
+			satoshis: Satoshis,
+			options: Option<&LockOptions<T>>,
+		) -> Result<Securitization<T::Balance>, Error<T>> {
+			ensure!(
+				satoshis >= MinimumSatoshis::<T>::get(),
+				Error::<T>::InsufficientSatoshisLocked
+			);
+
+			let liquidity_promised =
+				if let Some(rate) = options.and_then(LockOptions::microgons_per_btc) {
+					Self::get_bitcoin_argons_at_rate(satoshis, rate)?
+				} else {
+					T::PriceProvider::get_bitcoin_argon_price(satoshis)
+						.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+				};
+			let securitization_ratio =
+				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
+			Ok(Securitization::new(liquidity_promised, securitization_ratio))
 		}
 
 		fn get_bitcoin_argons_at_rate(
@@ -1893,6 +1927,29 @@ pub mod pallet {
 			}
 
 			Ok(())
+		}
+	}
+}
+
+type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
+
+impl<T: Config> CallTxPoolKeyProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
+where
+	RuntimeCallOf<T>: IsSubType<Call<T>>,
+{
+	fn key_for(call: &RuntimeCallOf<T>, signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
+		let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
+		match call {
+			Call::initialize_for { account_id, vault_id, .. }
+				if signer.is_some_and(|signer| {
+					T::VaultProvider::can_initialize_bitcoin_locks(*vault_id, signer)
+				}) =>
+				Some(
+					(b"bitcoin_locks:init_for", vault_id, account_id)
+						.using_encoded(sp_crypto_hashing::blake2_256)
+						.to_vec(),
+				),
+			_ => None,
 		}
 	}
 }

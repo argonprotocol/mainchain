@@ -12,7 +12,7 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, H256Le, OpaqueBitcoinXpub, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId,
 		UtxoRef,
 	},
-	vault::{BitcoinVaultProvider, Vault, VaultTerms},
+	vault::{Vault, VaultTerms},
 };
 use frame_benchmarking::v2::*;
 use pallet_prelude::benchmarking::{

@@ -1295,6 +1295,13 @@ where
 			Ok(())
 		})
 	}
+
+	fn consume_recent_capacity_drop_budget(
+		_vault_id: VaultId,
+		_required_collateral: Self::Balance,
+	) -> Result<bool, VaultError> {
+		Ok(false)
+	}
 }
 
 impl<Currency, AccountId, Balance> TreasuryVaultProvider

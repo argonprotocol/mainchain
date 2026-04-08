@@ -129,6 +129,13 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
+	fn consume_recent_capacity_drop_budget(
+		_vault_id: VaultId,
+		_required_collateral: Self::Balance,
+	) -> Result<bool, argon_primitives::vault::VaultError> {
+		Ok(false)
+	}
+
 	fn lock(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,

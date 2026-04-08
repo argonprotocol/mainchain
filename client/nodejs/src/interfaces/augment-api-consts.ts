@@ -578,6 +578,11 @@ declare module '@polkadot/api-base/types/consts' {
     };
     vaults: {
       /**
+       * One no-fee stale `initialize_for` failure is allowed for each this-many units of lost
+       * `available_for_lock`.
+       **/
+      capacityDropAttemptUnit: u128 & AugmentedConst<ApiType>;
+      /**
        * Max concurrent cosigns pending per vault
        **/
       maxPendingCosignsPerVault: u32 & AugmentedConst<ApiType>;
@@ -585,6 +590,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The max pending vault term changes per block
        **/
       maxPendingTermModificationsPerTick: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of recent `available_for_lock` drops retained per vault.
+       **/
+      maxRecentCapacityDropsPerVault: u32 & AugmentedConst<ApiType>;
       /**
        * The max number of vaults that can be created
        **/
@@ -597,6 +606,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum vault securitization required while the operational floor lock is active.
        **/
       operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
+      /**
+       * Number of Argon blocks to keep recent `available_for_lock` drops for stale init checks.
+       **/
+      recentCapacityDropBlockWindow: u32 & AugmentedConst<ApiType>;
       /**
        * The number of frames within which revenue must be collected
        **/

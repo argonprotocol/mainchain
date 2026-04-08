@@ -267,6 +267,7 @@ import type {
   PalletVaultsError,
   PalletVaultsEvent,
   PalletVaultsHoldReason,
+  PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultConfig,
   PalletVaultsVaultFrameRevenue,
   SpArithmeticArithmeticError,
@@ -552,6 +553,7 @@ declare module '@polkadot/types/types/registry' {
     PalletVaultsError: PalletVaultsError;
     PalletVaultsEvent: PalletVaultsEvent;
     PalletVaultsHoldReason: PalletVaultsHoldReason;
+    PalletVaultsRecentCapacityDrop: PalletVaultsRecentCapacityDrop;
     PalletVaultsVaultConfig: PalletVaultsVaultConfig;
     PalletVaultsVaultFrameRevenue: PalletVaultsVaultFrameRevenue;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;

@@ -15,11 +15,12 @@
 
 use super::*;
 use crate::mock::{
-	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, RuntimeCall, Test,
-	TipAmount, ValidateCount, new_test_ext,
+	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy, ProxyType,
+	RuntimeCall, Test, TipAmount, ValidateCount, new_test_ext,
 	pallet_dummy::{Call, OneUseCodes},
 };
 use frame_support::dispatch::DispatchInfo;
+use frame_system::RawOrigin;
 use pallet_prelude::frame_support::traits::Currency;
 use sp_runtime::{traits::DispatchTransaction, transaction_validity::TransactionSource};
 
@@ -80,6 +81,166 @@ fn validate_works() {
 		assert_eq!(ValidateCount::get(), 1);
 		assert_eq!(PrepareCount::get(), 0);
 		assert_eq!(res2.provides[0], 1.encode());
+
+		let call = RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 });
+		let (res3, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(0).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+		assert_eq!(ValidateCount::get(), 2);
+		assert_eq!(PrepareCount::get(), 0);
+		assert_eq!(res3.provides[0], (b"general", 7u32).encode());
+	});
+}
+
+#[test]
+fn validate_keeps_feeless_and_general_pool_keys() {
+	new_test_ext().execute_with(|| {
+		let call = RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 9 });
+		let (res, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(0).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		assert_eq!(res.provides.len(), 2);
+		assert!(res.provides.contains(&(b"general", 9u32).encode()));
+		assert!(res.provides.contains(&(b"feeless", 9u32).encode()));
+	});
+}
+
+#[test]
+fn validate_feeless_keys_without_a_signer() {
+	new_test_ext().execute_with(|| {
+		let call = RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 12 });
+		let unsigned =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					None.into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				);
+		assert!(matches!(
+			unsigned,
+			Err(TransactionValidityError::Invalid(InvalidTransaction::UnknownOrigin))
+		));
+
+		let (root, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					RawOrigin::Root.into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		assert_eq!(root.provides.len(), 2);
+		assert!(root.provides.contains(&(b"general", 12u32).encode()));
+		assert!(root.provides.contains(&(b"feeless", 12u32).encode()));
+	});
+}
+
+#[test]
+fn validate_keeps_sponsor_and_general_pool_keys() {
+	new_test_ext().execute_with(|| {
+		let sponsor_id = 7u64;
+		let signer_id = 1u64;
+		let key = 11u32;
+		set_argons(sponsor_id, 1_000_000u128);
+		OneUseCodes::<Test>::insert(key, (sponsor_id, 5000));
+
+		let call = RuntimeCall::DummyPallet(Call::<Test>::sponsored_pooled { key });
+		let (res, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(signer_id).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		assert_eq!(res.provides.len(), 2);
+		assert!(res.provides.contains(&key.encode()));
+		assert!(res.provides.contains(&(b"general", key).encode()));
+	});
+}
+
+#[test]
+fn validate_ignores_general_pool_key_for_invalid_proxy() {
+	new_test_ext().execute_with(|| {
+		let delegate = 1u64;
+		set_argons(delegate, 1_000_000u128);
+
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real: 7u64,
+			force_proxy_type: None,
+			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 })),
+		});
+		let (res, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(delegate).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		assert!(res.provides.is_empty());
+	});
+}
+
+#[test]
+fn validate_keeps_general_pool_key_for_valid_proxy() {
+	new_test_ext().execute_with(|| {
+		let real = 7u64;
+		let delegate = 1u64;
+		set_argons(real, 1_000_000u128);
+		set_argons(delegate, 1_000_000u128);
+		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::Any, 0,));
+
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real,
+			force_proxy_type: None,
+			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 })),
+		});
+		let (res, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(delegate).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		assert_eq!(res.provides, vec![(b"general", 7u32).encode()]);
 	});
 }
 

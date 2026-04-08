@@ -47,6 +47,7 @@ pub mod pallet {
 		OnNewSlot, OperationalAccountsHook,
 		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
 	};
+	use sp_runtime::traits::SaturatedConversion;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(14);
 
@@ -111,6 +112,16 @@ pub mod pallet {
 		/// Duration to keep the operational minimum securitization locked from vault creation.
 		#[pallet::constant]
 		type OperationalMinimumVaultLockTicks: Get<Tick>;
+		/// Number of Argon blocks to keep recent `available_for_lock` drops for stale init checks.
+		#[pallet::constant]
+		type RecentCapacityDropBlockWindow: Get<u32>;
+		/// Maximum number of recent `available_for_lock` drops retained per vault.
+		#[pallet::constant]
+		type MaxRecentCapacityDropsPerVault: Get<u32>;
+		/// One no-fee stale `initialize_for` failure is allowed for each this-many units of lost
+		/// `available_for_lock`.
+		#[pallet::constant]
+		type CapacityDropAttemptUnit: Get<Self::Balance>;
 
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
@@ -199,6 +210,19 @@ pub mod pallet {
 		Twox64Concat,
 		VaultId,
 		BoundedVec<VaultFrameRevenue<T>, ConstU32<12>>,
+		ValueQuery,
+	>;
+
+	/// Recent reductions in `available_for_lock`, grouped by vault.
+	#[pallet::storage]
+	pub type RecentCapacityDropsByVault<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		BoundedVec<
+			RecentCapacityDrop<T::Balance, BlockNumberFor<T>>,
+			T::MaxRecentCapacityDropsPerVault,
+		>,
 		ValueQuery,
 	>;
 
@@ -342,6 +366,28 @@ pub mod pallet {
 		PendingOrphanedUtxoCosignsBeforeCollect,
 		/// An account may only be associated with a single vault
 		AccountAlreadyHasVault,
+	}
+
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+	)]
+	pub struct RecentCapacityDrop<Balance, BlockNumber>
+	where
+		Balance: Codec + MaxEncodedLen,
+		BlockNumber: Codec + MaxEncodedLen,
+	{
+		/// The Argon block when this loss of available lock capacity was recorded.
+		#[codec(compact)]
+		pub block_number: BlockNumber,
+		/// `available_for_lock` immediately before this drop.
+		#[codec(compact)]
+		pub available_before_drop: Balance,
+		/// `available_for_lock` immediately after this drop.
+		#[codec(compact)]
+		pub available_after_drop: Balance,
+		/// The number of no-fee stale `initialize_for` failures already consumed by this drop.
+		#[codec(compact)]
+		pub no_fee_failures_used: u32,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -570,7 +616,8 @@ pub mod pallet {
 				},
 				x if x < 0 => {
 					// decreasing securitization
-					Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
+					Self::shrink_vault_securitization(vault_id, &mut vault)
+						.map_err(Error::<T>::from)?;
 				},
 				_ => { /* no change */ },
 			}
@@ -637,7 +684,7 @@ pub mod pallet {
 			vault.is_closed = true;
 			vault.securitization_target = T::Balance::zero();
 			let start_securitization = vault.securitization;
-			Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
+			Self::shrink_vault_securitization(vault_id, &mut vault).map_err(Error::<T>::from)?;
 			let securitization_remaining = vault.securitization;
 
 			Self::deposit_event(Event::VaultClosed {
@@ -647,6 +694,7 @@ pub mod pallet {
 					.saturating_sub(securitization_remaining),
 			});
 			VaultsById::<T>::insert(vault_id, vault);
+			RecentCapacityDropsByVault::<T>::remove(vault_id);
 
 			Ok(())
 		}
@@ -755,6 +803,61 @@ pub mod pallet {
 			T::Balance::zero()
 		}
 
+		fn recent_capacity_drop_window() -> BlockNumberFor<T> {
+			T::RecentCapacityDropBlockWindow::get().saturated_into()
+		}
+
+		fn prune_recent_capacity_drops(
+			current_block: BlockNumberFor<T>,
+			drops: &mut BoundedVec<
+				RecentCapacityDrop<T::Balance, BlockNumberFor<T>>,
+				T::MaxRecentCapacityDropsPerVault,
+			>,
+		) {
+			let window = Self::recent_capacity_drop_window();
+			drops.retain(|drop| current_block.saturating_sub(drop.block_number) <= window);
+		}
+
+		fn max_no_fee_failures_for_drop(
+			drop: &RecentCapacityDrop<T::Balance, BlockNumberFor<T>>,
+		) -> u32 {
+			let drop_amount: u128 = drop
+				.available_before_drop
+				.saturating_sub(drop.available_after_drop)
+				.try_into()
+				.unwrap_or(u128::MAX);
+			let attempt_unit: u128 =
+				T::CapacityDropAttemptUnit::get().try_into().unwrap_or(u128::MAX);
+			let failures = drop_amount / attempt_unit.max(1);
+			failures.min(u32::MAX as u128) as u32
+		}
+
+		fn record_recent_capacity_drop(
+			vault_id: VaultId,
+			available_before_drop: T::Balance,
+			available_after_drop: T::Balance,
+		) {
+			if available_after_drop >= available_before_drop {
+				return;
+			}
+
+			let current_block = <frame_system::Pallet<T>>::block_number();
+			RecentCapacityDropsByVault::<T>::mutate(vault_id, |drops| {
+				Self::prune_recent_capacity_drops(current_block, drops);
+
+				if drops.is_full() {
+					drops.remove(0);
+				}
+
+				let _ = drops.try_push(RecentCapacityDrop {
+					block_number: current_block,
+					available_before_drop,
+					available_after_drop,
+					no_fee_failures_used: 0,
+				});
+			});
+		}
+
 		fn clear_expired_operational_minimums(previous_tick: Tick, current_tick: Tick) -> u32 {
 			if current_tick <= previous_tick {
 				return 0;
@@ -777,7 +880,7 @@ pub mod pallet {
 						}
 
 						vault.operational_minimum_release_tick = None;
-						Self::shrink_vault_securitization(vault)
+						Self::shrink_vault_securitization(vault_id, vault)
 					});
 					if let Err(error) = release_result {
 						log::error!(
@@ -845,14 +948,16 @@ pub mod pallet {
 
 			let swept = vault.sweep_released(block_height);
 			Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
-			Self::shrink_vault_securitization(&mut vault)?;
+			Self::shrink_vault_securitization(vault_id, &mut vault)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Ok(())
 		}
 
 		fn shrink_vault_securitization(
+			vault_id: VaultId,
 			vault: &mut Vault<T::AccountId, T::Balance>,
 		) -> Result<(), VaultError> {
+			let available_before_drop = vault.available_for_lock();
 			let uninhibited_securitization = vault.uninhibited_securitization();
 			let minimum_remaining_securitization =
 				vault.securitization_target.max(Self::minimum_reducible_securitization(vault));
@@ -881,6 +986,11 @@ pub mod pallet {
 			)
 			.map_err(|_| VaultError::UnrecoverableHold)?;
 			vault.securitization.saturating_reduce(free_securitization);
+			Self::record_recent_capacity_drop(
+				vault_id,
+				available_before_drop,
+				vault.available_for_lock(),
+			);
 			Ok(())
 		}
 
@@ -1228,6 +1338,34 @@ pub mod pallet {
 			})
 		}
 
+		fn consume_recent_capacity_drop_budget(
+			vault_id: VaultId,
+			required_collateral: Self::Balance,
+		) -> Result<bool, VaultError> {
+			let current_block = <frame_system::Pallet<T>>::block_number();
+			RecentCapacityDropsByVault::<T>::try_mutate(vault_id, |drops| {
+				Self::prune_recent_capacity_drops(current_block, drops);
+
+				for drop in drops.iter_mut().rev() {
+					if drop.available_before_drop < required_collateral ||
+						drop.available_after_drop >= required_collateral
+					{
+						continue;
+					}
+
+					let max_failures = Self::max_no_fee_failures_for_drop(drop);
+					if drop.no_fee_failures_used >= max_failures {
+						continue;
+					}
+
+					drop.no_fee_failures_used = drop.no_fee_failures_used.saturating_add(1);
+					return Ok(true);
+				}
+
+				Ok(false)
+			})
+		}
+
 		fn lock(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
@@ -1238,6 +1376,7 @@ pub mod pallet {
 		) -> Result<T::Balance, VaultError> {
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
+			let available_before_drop = vault.available_for_lock();
 
 			ensure!(
 				vault.opened_tick <= T::TickProvider::current_tick(),
@@ -1316,6 +1455,11 @@ pub mod pallet {
 				did_use_fee_coupon: vault_covers_fee,
 				is_ratchet,
 			});
+			Self::record_recent_capacity_drop(
+				vault_id,
+				available_before_drop,
+				vault.available_for_lock(),
+			);
 			VaultsById::<T>::insert(vault_id, vault);
 			Ok(total_fee)
 		}
@@ -1510,7 +1654,7 @@ pub mod pallet {
 				vault.release_lock(securitization);
 
 				// after reducing the bonded, we can check the minimum securitization needed
-				Self::shrink_vault_securitization(vault)?;
+				Self::shrink_vault_securitization(vault_id, vault)?;
 				Ok::<(), VaultError>(())
 			})?;
 			Self::deposit_event(Event::FundLockCanceled {

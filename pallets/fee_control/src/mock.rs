@@ -43,6 +43,7 @@ impl pallet_fee_control::Config for Test {
 	type TransactionSponsorProviders = DummyPallet;
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = DummyPallet;
+	type CallTxPoolKeyProviders = DummyPallet;
 }
 parameter_types! {
 	pub(crate) static TipUnbalancedAmount: Balance = 0;
@@ -253,7 +254,10 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 pub mod pallet_dummy {
 	use crate::mock::{RuntimeCall, pallet_dummy};
 	use pallet_prelude::{
-		argon_primitives::{FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor},
+		argon_primitives::{
+			CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
+			TxSponsor,
+		},
 		*,
 	};
 
@@ -279,13 +283,43 @@ pub mod pallet_dummy {
 			let _who = ensure_signed(_origin)?;
 			Ok(())
 		}
+
+		#[pallet::feeless_if(|_origin: &OriginFor<T>, _key: &u32| -> bool { true })]
+		pub fn stacked(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			Ok(())
+		}
+
+		pub fn pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			Ok(())
+		}
+
+		pub fn sponsored_pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			Ok(())
+		}
 	}
 	impl<T: Config> FeelessCallTxPoolKeyProvider<RuntimeCall> for Pallet<T> {
 		fn key_for(call: &RuntimeCall) -> Option<Vec<u8>> {
-			if let RuntimeCall::DummyPallet(pallet_dummy::Call::aux { key, .. }) = call {
-				Some(key.encode())
-			} else {
-				None
+			match call {
+				RuntimeCall::DummyPallet(pallet_dummy::Call::aux { key, .. }) => Some(key.encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { key }) =>
+					Some((b"feeless", key).encode()),
+				_ => None,
+			}
+		}
+	}
+	impl<T: Config> CallTxPoolKeyProvider<RuntimeCall, u64> for Pallet<T> {
+		fn key_for(call: &RuntimeCall, _signer: Option<&u64>) -> Option<Vec<u8>> {
+			match call {
+				RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =>
+					Some((b"general", key).encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { key }) =>
+					Some((b"general", key).encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::sponsored_pooled { key }) =>
+					Some((b"general", key).encode()),
+				_ => None,
 			}
 		}
 	}
@@ -294,7 +328,11 @@ pub mod pallet_dummy {
 			_signer: &u64,
 			call: &RuntimeCall,
 		) -> Option<TxSponsor<u64, Balance>> {
-			if let RuntimeCall::DummyPallet(pallet_dummy::Call::sponsored { key, .. }) = call {
+			if let RuntimeCall::DummyPallet(
+				pallet_dummy::Call::sponsored { key } |
+				pallet_dummy::Call::sponsored_pooled { key },
+			) = call
+			{
 				return OneUseCodes::<T>::get(key).map(|(sponsor, max_fee_with_tip)| TxSponsor {
 					payer: sponsor,
 					max_fee_with_tip: Some(max_fee_with_tip),
