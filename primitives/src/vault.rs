@@ -6,7 +6,7 @@ use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
 use sp_debug_derive::RuntimeDebug;
-use sp_runtime::traits::AtLeast32BitUnsigned;
+use sp_runtime::{BoundedVec, traits::AtLeast32BitUnsigned};
 
 use crate::{
 	VaultId,
@@ -41,6 +41,8 @@ impl BitcoinVaultProviderWeightInfo for () {
 		Weight::zero()
 	}
 }
+
+pub type VaultName = BoundedVec<u8, ConstU32<18>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegistrationVaultData<Balance> {
@@ -296,6 +298,10 @@ where
 	pub operator_account_id: AccountId,
 	/// Optional delegated hot account allowed to initialize bitcoin locks for this vault
 	pub bitcoin_lock_delegate_account: Option<AccountId>,
+	/// Optional display name for the vault.
+	pub name: Option<VaultName>,
+	/// Tick of the most recent vault name change.
+	pub last_name_change_tick: Option<Tick>,
 	/// The securitization in the vault
 	#[codec(compact)]
 	pub securitization: Balance,

@@ -616,6 +616,8 @@ fn benchmark_vault<T: Config>(
 	Vault {
 		operator_account_id: operator,
 		bitcoin_lock_delegate_account: None,
+		name: None,
+		last_name_change_tick: None,
 		securitization: TreasuryBalanceOf::<T>::zero(),
 		securitization_target: TreasuryBalanceOf::<T>::zero(),
 		securitization_locked: TreasuryBalanceOf::<T>::zero(),

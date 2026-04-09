@@ -38,7 +38,7 @@ pub mod pallet {
 		},
 		vault::{
 			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault, VaultError,
-			VaultTerms,
+			VaultName, VaultTerms,
 		},
 	};
 	use core::iter::Sum;
@@ -360,6 +360,9 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
+		/// Vault names must start with an uppercase ASCII letter and otherwise be ASCII
+		/// alphanumeric.
+		InvalidVaultName,
 		/// A vault must clear out all pending cosigns before it can collect
 		PendingCosignsBeforeCollect,
 		/// A vault must clear out all pending orphan cosigns before it can collect
@@ -428,6 +431,8 @@ pub mod pallet {
 	{
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
+		/// Optional display name for the vault.
+		pub name: Option<VaultName>,
 		/// The amount of argons to be vaulted for bitcoin locks
 		#[codec(compact)]
 		pub securitization: Balance,
@@ -505,8 +510,12 @@ pub mod pallet {
 			vault_config: VaultConfig<T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let VaultConfig { securitization_ratio, securitization, terms, bitcoin_xpubkey } =
+			let VaultConfig { name, securitization_ratio, securitization, terms, bitcoin_xpubkey } =
 				vault_config;
+
+			if let Some(name) = name.as_ref() {
+				Self::ensure_valid_name(name)?;
+			}
 
 			ensure!(
 				securitization_ratio >= FixedU128::one() &&
@@ -543,6 +552,8 @@ pub mod pallet {
 			let vault = Vault {
 				operator_account_id: who.clone(),
 				bitcoin_lock_delegate_account: None,
+				last_name_change_tick: name.as_ref().map(|_| opened_tick),
+				name,
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
@@ -771,21 +782,52 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::set_bitcoin_lock_delegate())]
 		pub fn set_bitcoin_lock_delegate(
 			origin: OriginFor<T>,
-			vault_id: VaultId,
 			delegate_account_id: Option<T::AccountId>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
-				ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 				vault.bitcoin_lock_delegate_account = delegate_account_id.clone();
 				Ok::<(), Error<T>>(())
 			})?;
 			Ok(())
 		}
+
+		#[pallet::call_index(7)]
+		#[pallet::weight(T::WeightInfo::set_name())]
+		pub fn set_name(origin: OriginFor<T>, name: Option<VaultName>) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			if let Some(name) = name.as_ref() {
+				Self::ensure_valid_name(name)?;
+			}
+			let current_tick = T::TickProvider::current_tick();
+			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
+
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+				if vault.name != name {
+					vault.name = name.clone();
+					vault.last_name_change_tick = Some(current_tick);
+				}
+				Ok::<(), Error<T>>(())
+			})?;
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn ensure_valid_name(name: &VaultName) -> Result<(), Error<T>> {
+			ensure!(!name.is_empty(), Error::<T>::InvalidVaultName);
+			ensure!(name[0].is_ascii_uppercase(), Error::<T>::InvalidVaultName);
+			ensure!(
+				name.iter().all(|char| char.is_ascii_alphanumeric()),
+				Error::<T>::InvalidVaultName
+			);
+			Ok(())
+		}
+
 		pub(crate) fn get_terms_active_tick() -> Tick {
 			if T::MiningFrameProvider::is_seat_bidding_started() {
 				return T::MiningFrameProvider::get_next_frame_tick();

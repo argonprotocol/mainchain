@@ -4,7 +4,7 @@ use super::*;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
-	vault::VaultTerms,
+	vault::{VaultName, VaultTerms},
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -38,6 +38,7 @@ fn benchmark_vault_config<T: Config>(
 ) -> VaultConfig<T::Balance> {
 	VaultConfig {
 		terms: benchmark_terms::<T>(),
+		name: None,
 		securitization: securitization.into(),
 		bitcoin_xpubkey: benchmark_xpub::<T>(seed_hint),
 		securitization_ratio: FixedU128::one(),
@@ -218,9 +219,39 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn set_bitcoin_lock_delegate() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_delegate_caller", 0, 0);
+		let delegate: T::AccountId = account("set_delegate_target", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 6, 100_000)?;
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), Some(delegate.clone()));
+
+		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
+		assert_eq!(vault.bitcoin_lock_delegate_account, Some(delegate));
+		Ok(())
+	}
+
+	#[benchmark]
+	fn set_name() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_name_caller", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 7, 100_000)?;
+		let name: VaultName = BoundedVec::truncate_from(b"VaultAlpha1".to_vec());
+		let current_tick = T::TickProvider::current_tick();
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), Some(name.clone()));
+
+		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
+		assert_eq!(vault.name, Some(name));
+		assert_eq!(vault.last_name_change_tick, Some(current_tick));
+		Ok(())
+	}
+
+	#[benchmark]
 	fn collect() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("collect_caller", 0, 0);
-		let vault_id = create_vault::<T>(&caller, 7, 100_000)?;
+		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
 		let source: T::AccountId = account("source", 0, 0);
 		let earnings_for_vault: T::Balance = 50_000u128.into();
 		let _ = T::Currency::mint_into(&source, 1_000_000_000u128.into());

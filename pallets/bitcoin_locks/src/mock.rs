@@ -78,6 +78,8 @@ parameter_types! {
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		operator_account_id: 1,
 		bitcoin_lock_delegate_account: None,
+		name: None,
+		last_name_change_tick: None,
 		securitization:  200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
@@ -537,6 +539,8 @@ pub fn new_test_ext() -> TestState {
 	DefaultVault::set(Vault {
 		operator_account_id: 1,
 		bitcoin_lock_delegate_account: None,
+		name: None,
+		last_name_change_tick: None,
 		securitization: 200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,

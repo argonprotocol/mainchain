@@ -53,6 +53,8 @@ export class Vault {
 
   public lockedSatoshis!: number;
   public securitizedSatoshis!: number;
+  public name?: string;
+  public lastNameChangeTick?: number;
   public bitcoinLockDelegateAccount?: string;
 
   constructor(
@@ -111,6 +113,11 @@ export class Vault {
 
     this.operatorAccountId = vault.operatorAccountId.toString();
     this.isClosed = vault.isClosed.valueOf();
+    this.pendingTerms = undefined;
+    this.pendingTermsChangeTick = undefined;
+    this.name = undefined;
+    this.lastNameChangeTick = undefined;
+    this.bitcoinLockDelegateAccount = undefined;
     if (vault.pendingTerms.isSome) {
       const [tickApply, terms] = vault.pendingTerms.value;
       this.pendingTermsChangeTick = tickApply.toNumber();
@@ -125,6 +132,12 @@ export class Vault {
           PERMILL_DECIMALS,
         ),
       };
+    }
+    if ('name' in vault && vault.name.isSome) {
+      this.name = decodeVaultName(vault.name.unwrap());
+    }
+    if ('lastNameChangeTick' in vault && vault.lastNameChangeTick.isSome) {
+      this.lastNameChangeTick = vault.lastNameChangeTick.unwrap().toNumber();
     }
     if ('bitcoinLockDelegateAccount' in vault && vault.bitcoinLockDelegateAccount.isSome) {
       this.bitcoinLockDelegateAccount = vault.bitcoinLockDelegateAccount.unwrap().toHuman();
@@ -192,6 +205,7 @@ export class Vault {
       annualPercentRate: number;
       baseFee: bigint | number;
       bitcoinXpub: string;
+      name?: string;
       treasuryProfitSharing: number;
       doNotExceedBalance?: bigint;
     } & ISubmittableOptions,
@@ -203,6 +217,7 @@ export class Vault {
       annualPercentRate,
       baseFee,
       bitcoinXpub,
+      name,
       tip,
       doNotExceedBalance,
     } = args;
@@ -223,6 +238,7 @@ export class Vault {
     if (securitizationRatio < 1 || securitizationRatio > 2) {
       throw new Error('Securitization ratio must be between 1 and 2');
     }
+    const encodedName = encodeVaultName(name);
     const vaultParams = {
       terms: {
         // convert to fixed u128
@@ -233,6 +249,7 @@ export class Vault {
       securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
       bitcoinXpubkey: xpubBytes,
+      name: encodedName,
     };
     const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), keypair);
     if (doNotExceedBalance) {
@@ -272,6 +289,25 @@ export class Vault {
     }
     return { getVault, txResult: result };
   }
+
+  public static async setName(
+    client: ArgonClient,
+    keypair: KeyringPair,
+    args: {
+      name?: string | null;
+    } & ISubmittableOptions,
+  ): Promise<TxResult> {
+    const tx = new TxSubmitter(
+      client,
+      client.tx.vaults.setName(encodeVaultName(args.name)),
+      keypair,
+    );
+
+    return tx.submit({
+      ...args,
+      useLatestNonce: true,
+    });
+  }
 }
 
 export interface ITerms {
@@ -281,4 +317,21 @@ export interface ITerms {
 }
 function bigNumberToBigInt(bn: BigNumber): bigint {
   return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());
+}
+
+function decodeVaultName(name: { toU8a(): Uint8Array }): string {
+  return new TextDecoder().decode(name.toU8a());
+}
+
+function encodeVaultName(name?: string | null): Uint8Array | null {
+  if (name === undefined || name === null) {
+    return null;
+  }
+  if (!/^[A-Z][A-Za-z0-9]{0,17}$/.test(name)) {
+    throw new Error(
+      'Vault name must start with a capital letter and contain at most 18 alphanumeric characters',
+    );
+  }
+
+  return new TextEncoder().encode(name);
 }
