@@ -3,8 +3,9 @@ use crate::{
 	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 	mock::{Vaults, *},
 	pallet::{
-		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick, RevenuePerFrameByVault,
-		VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
+		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick,
+		RecentCapacityDropsByVault, RevenuePerFrameByVault, VaultFundsReleasingByHeight,
+		VaultXPubById, VaultsById,
 	},
 };
 use argon_primitives::{
@@ -556,6 +557,82 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
 		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
+	});
+}
+
+#[test]
+fn it_consumes_recent_capacity_drop_budget_for_stale_initialize_for_failures() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_000);
+		set_argons(2, 100_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+
+		let lock_amount = 500;
+		assert_ok!(Vaults::lock(1, &2, &securitization(lock_amount), 500, None, false));
+
+		let drops = RecentCapacityDropsByVault::<Test>::get(1);
+		assert_eq!(drops.len(), 1);
+		assert_eq!(drops[0].available_before_drop, 50_000);
+		assert_eq!(drops[0].available_after_drop, 49_500);
+		assert_eq!(drops[0].no_fee_failures_used, 0);
+
+		assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
+
+		let drops = RecentCapacityDropsByVault::<Test>::get(1);
+		assert_eq!(drops[0].no_fee_failures_used, 1);
+		for expected in 2..=5 {
+			assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
+			assert_eq!(
+				RecentCapacityDropsByVault::<Test>::get(1)[0].no_fee_failures_used,
+				expected
+			);
+		}
+		assert!(!Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
+	});
+}
+
+#[test]
+fn it_tracks_same_block_capacity_drops_separately() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_000);
+		set_argons(2, 100_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+
+		assert_ok!(Vaults::lock(1, &2, &securitization(150), 500, None, false));
+		assert_ok!(Vaults::lock(1, &2, &securitization(200), 500, None, false));
+
+		let drops = RecentCapacityDropsByVault::<Test>::get(1);
+		assert_eq!(drops.len(), 2);
+		assert_eq!(drops[0].available_before_drop, 50_000);
+		assert_eq!(drops[0].available_after_drop, 49_850);
+		assert_eq!(drops[1].available_before_drop, 49_850);
+		assert_eq!(drops[1].available_after_drop, 49_650);
+
+		assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_700).unwrap());
+
+		let drops = RecentCapacityDropsByVault::<Test>::get(1);
+		assert_eq!(drops[0].no_fee_failures_used, 0);
+		assert_eq!(drops[1].no_fee_failures_used, 1);
+	});
+}
+
+#[test]
+fn close_clears_recent_capacity_drops() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		set_argons(1, 100_000);
+		set_argons(2, 100_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		assert_ok!(Vaults::lock(1, &2, &securitization(500), 500, None, false));
+		assert!(!RecentCapacityDropsByVault::<Test>::get(1).is_empty());
+
+		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
+		assert!(RecentCapacityDropsByVault::<Test>::get(1).is_empty());
 	});
 }
 

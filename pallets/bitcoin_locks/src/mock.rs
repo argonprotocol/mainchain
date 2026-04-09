@@ -119,6 +119,9 @@ parameter_types! {
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
 	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
+	pub static CanConsumeRecentCapacityDropBudget: bool = false;
+	pub static ConsumedRecentCapacityDropBudget:
+		Vec<(VaultId, Balance)> = Vec::new();
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
@@ -416,6 +419,16 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			Ok(())
 		})
 	}
+
+	fn consume_recent_capacity_drop_budget(
+		vault_id: VaultId,
+		required_collateral: Self::Balance,
+	) -> Result<bool, VaultError> {
+		ConsumedRecentCapacityDropBudget::mutate(|entries| {
+			entries.push((vault_id, required_collateral));
+		});
+		Ok(CanConsumeRecentCapacityDropBudget::get())
+	}
 }
 
 pub struct StaticBitcoinVerifier;
@@ -521,6 +534,30 @@ impl pallet_bitcoin_locks::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> TestState {
+	DefaultVault::set(Vault {
+		operator_account_id: 1,
+		bitcoin_lock_delegate_account: None,
+		securitization: 200_000_000_000,
+		securitization_target: 200_000_000_000,
+		securitization_locked: 0,
+		locked_satoshis: 0,
+		securitized_satoshis: 0,
+		terms: VaultTerms {
+			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
+			bitcoin_base_fee: 0,
+			treasury_profit_sharing: Permill::from_float(0.0),
+		},
+		opened_tick: 1,
+		securitization_ratio: FixedU128::from_float(1.0),
+		securitization_release_schedule: BoundedBTreeMap::new(),
+		is_closed: false,
+		pending_terms: None,
+		securitization_pending_activation: 0,
+		operational_minimum_release_tick: None,
+	});
+	CanConsumeRecentCapacityDropBudget::set(false);
+	ConsumedRecentCapacityDropBudget::set(Vec::new());
+
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_bitcoin_locks::GenesisConfig::<Test> {
 			minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),

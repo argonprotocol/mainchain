@@ -245,6 +245,13 @@ where
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
+
+	fn consume_recent_capacity_drop_budget(
+		_vault_id: VaultId,
+		_required_collateral: Self::Balance,
+	) -> Result<bool, VaultError> {
+		Ok(false)
+	}
 }
 
 pub struct BenchmarkOperationalAccountsMiningSlotProvider<AccountId>(PhantomData<AccountId>);

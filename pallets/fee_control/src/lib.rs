@@ -18,7 +18,7 @@ use pallet_prelude::*;
 pub mod pallet {
 	use super::*;
 	use pallet_prelude::argon_primitives::{
-		FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
+		CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
 	};
 
 	#[pallet::config]
@@ -38,6 +38,10 @@ pub mod pallet {
 		/// Provides DoS protection for Feeless keys where you can supply a unique key to each type
 		/// to prevent multiple instances from entering the tx pool
 		type FeelessCallTxPoolKeyProviders: FeelessCallTxPoolKeyProvider<Self::RuntimeCall>;
+
+		/// Provides call-level tx pool keys for requests that should be mutually exclusive in the
+		/// pool even when they are not statically feeless or sponsor delegated.
+		type CallTxPoolKeyProviders: CallTxPoolKeyProvider<Self::RuntimeCall, Self::AccountId>;
 
 		/// Provides transaction sponsors for transactions
 		type TransactionSponsorProviders: TransactionSponsorProvider<Self::AccountId, Self::RuntimeCall, Self::Balance>;

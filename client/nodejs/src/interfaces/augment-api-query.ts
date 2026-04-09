@@ -90,6 +90,7 @@ import type {
   PalletTreasuryPendingUnlock,
   PalletTreasuryTreasuryCapital,
   PalletTreasuryTreasuryPool,
+  PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
@@ -1590,6 +1591,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>,
         [u64]
+      >;
+      /**
+       * Recent reductions in `available_for_lock`, grouped by vault.
+       **/
+      recentCapacityDropsByVault: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsRecentCapacityDrop>>,
+        [u32]
       >;
       /**
        * Tracks revenue from Bitcoin Locks and Treasury Pools for the trailing frames for each vault

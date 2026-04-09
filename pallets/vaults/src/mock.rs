@@ -98,6 +98,9 @@ parameter_types! {
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
 	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
+	pub const RecentCapacityDropBlockWindow: u32 = 8;
+	pub const MaxRecentCapacityDropsPerVault: u32 = 64;
+	pub const CapacityDropAttemptUnit: Balance = 100;
 
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 
@@ -165,6 +168,9 @@ impl pallet_vaults::Config for Test {
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
+	type RecentCapacityDropBlockWindow = RecentCapacityDropBlockWindow;
+	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
+	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = ();
 }
 

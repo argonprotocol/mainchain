@@ -2,6 +2,7 @@
 #![allow(clippy::multiple_bound_locations)]
 #![allow(clippy::inconsistent_digit_grouping)]
 
+use codec::Encode;
 use pallet_prelude::*;
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
 };
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
-	BitcoinUtxoEvents, MICROGONS_PER_ARGON, PriceProvider,
+	BitcoinUtxoEvents, CallTxPoolKeyProvider, MICROGONS_PER_ARGON, PriceProvider,
 	bitcoin::{
 		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
 		SATOSHIS_PER_BITCOIN, UtxoRef,
@@ -203,6 +204,118 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 		assert_eq!(lock.coupon_paid_fees, fee);
 	});
 	set_bitcoin_height(12);
+}
+
+#[test]
+fn initialize_for_stale_vault_capacity_failure_is_no_fee() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let required_collateral =
+			StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+				.expect("should have price");
+
+		DefaultVault::mutate(|vault| {
+			vault.securitization = required_collateral.saturating_sub(1);
+			vault.securitization_target = vault.securitization;
+		});
+		CanConsumeRecentCapacityDropBudget::set(true);
+
+		let error = BitcoinLocks::initialize_for(
+			RuntimeOrigin::signed(1),
+			2,
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			Some(LockOptions::V1 { microgons_per_btc: None }),
+		)
+		.unwrap_err();
+
+		assert_eq!(error.error, Error::<Test>::InsufficientVaultFunds.into());
+		assert_eq!(error.post_info.pays_fee, Pays::No);
+		assert_eq!(ConsumedRecentCapacityDropBudget::get(), vec![(1, required_collateral)]);
+	});
+}
+
+#[test]
+fn initialize_for_non_stale_vault_capacity_failure_still_pays_fees() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let required_collateral =
+			StaticPriceProvider::get_bitcoin_argon_price(SATOSHIS_PER_BITCOIN)
+				.expect("should have price");
+
+		DefaultVault::mutate(|vault| {
+			vault.securitization = required_collateral.saturating_sub(1);
+			vault.securitization_target = vault.securitization;
+		});
+
+		let error = BitcoinLocks::initialize_for(
+			RuntimeOrigin::signed(1),
+			2,
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			Some(LockOptions::V1 { microgons_per_btc: None }),
+		)
+		.unwrap_err();
+
+		assert_eq!(error.error, Error::<Test>::InsufficientVaultFunds.into());
+		assert_eq!(error.post_info.pays_fee, Pays::Yes);
+		assert_eq!(ConsumedRecentCapacityDropBudget::get(), vec![(1, required_collateral)]);
+	});
+}
+
+#[test]
+fn initialize_for_has_a_pool_key_per_vault_and_account() {
+	new_test_ext().execute_with(|| {
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let first_call = RuntimeCall::BitcoinLocks(crate::Call::<Test>::initialize_for {
+			account_id: 2,
+			vault_id: 1,
+			satoshis: SATOSHIS_PER_BITCOIN,
+			bitcoin_pubkey: pubkey,
+			options: Some(LockOptions::V1 { microgons_per_btc: None }),
+		});
+		let second_call = RuntimeCall::BitcoinLocks(crate::Call::<Test>::initialize_for {
+			account_id: 3,
+			vault_id: 1,
+			satoshis: SATOSHIS_PER_BITCOIN,
+			bitcoin_pubkey: pubkey,
+			options: Some(LockOptions::V1 { microgons_per_btc: None }),
+		});
+
+		let first_key = <BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
+			&first_call,
+			Some(&1),
+		)
+		.expect("initialize_for should publish a pool key");
+		let second_key = <BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
+			&second_call,
+			Some(&1),
+		)
+		.expect("initialize_for should publish a pool key");
+
+		assert_ne!(first_key, second_key);
+		assert_eq!(
+			first_key,
+			(b"bitcoin_locks:init_for", 1u32, 2u64)
+				.using_encoded(sp_crypto_hashing::blake2_256)
+				.to_vec()
+		);
+		assert!(
+			<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
+				&first_call,
+				Some(&99),
+			)
+			.is_none()
+		);
+		assert!(
+			<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(&first_call, None)
+				.is_none()
+		);
+	});
 }
 
 /// Records orphaned UTXOs without funding the lock.
