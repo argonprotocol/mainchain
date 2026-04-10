@@ -572,6 +572,8 @@ where
 	let vault = Vault {
 		operator_account_id: operator.clone(),
 		bitcoin_lock_delegate_account: None,
+		name: None,
+		last_name_change_tick: None,
 		securitization: securitization.into(),
 		securitization_target: securitization.into(),
 		securitization_locked: T::Balance::zero(),

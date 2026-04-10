@@ -74,6 +74,8 @@ where
 			Some(Vault {
 				operator_account_id: vault.operator_account_id,
 				bitcoin_lock_delegate_account: None,
+				name: None,
+				last_name_change_tick: None,
 				securitization: vault.securitization,
 				securitization_target: vault.securitization_target,
 				securitization_locked: vault.securitization_locked,
@@ -109,6 +111,11 @@ where
 			ensure!(
 				vault.operational_minimum_release_tick.is_none(),
 				"migrated vault unexpectedly had operational minimum release tick set"
+			);
+			ensure!(vault.name.is_none(), "migrated vault unexpectedly had a name set");
+			ensure!(
+				vault.last_name_change_tick.is_none(),
+				"migrated vault unexpectedly had a last name change tick set"
 			);
 			migrated = migrated.saturating_add(1);
 		}

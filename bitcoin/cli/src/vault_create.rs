@@ -84,6 +84,7 @@ impl VaultConfig {
 			.expect("Invalid xpub");
 
 		api::vaults::calls::types::create::VaultConfig {
+			name: None,
 			bitcoin_xpubkey: opaque_xpub.0.into(),
 			terms: runtime_types::argon_primitives::vault::VaultTerms::<u128> {
 				bitcoin_base_fee: (self.bitcoin_base_fee.unwrap_or(0.0) * 1_000_000.0) as u128,

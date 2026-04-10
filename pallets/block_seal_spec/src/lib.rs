@@ -491,7 +491,7 @@ pub mod pallet {
 		type Weights = crate::weights::ProviderWeightAdapter<T>;
 
 		fn grandparent_vote_minimum() -> Option<VoteMinimum> {
-			<VoteMinimumHistory<T>>::get().first().cloned()
+			<VoteMinimumHistory<T>>::get().get(2).cloned()
 		}
 		fn compute_difficulty() -> ComputeDifficulty {
 			<CurrentComputeDifficulty<T>>::get()

@@ -1086,6 +1086,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
       /**
+       * Vault names must start with an uppercase ASCII letter and otherwise be ASCII
+       * alphanumeric.
+       **/
+      InvalidVaultName: AugmentedError<ApiType>;
+      /**
        * Unable to decode xpubkey
        **/
       InvalidXpubkey: AugmentedError<ApiType>;

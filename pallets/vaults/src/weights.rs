@@ -13,6 +13,7 @@ pub trait WeightInfo {
 	fn close() -> Weight;
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_bitcoin_lock_delegate() -> Weight;
+	fn set_name() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -59,6 +60,10 @@ where
 
 	fn set_bitcoin_lock_delegate() -> Weight {
 		Base::set_bitcoin_lock_delegate()
+	}
+
+	fn set_name() -> Weight {
+		Base::set_name().saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn on_initialize_with_vault_releases(
@@ -122,6 +127,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn set_bitcoin_lock_delegate() -> Weight {
+		Weight::zero()
+	}
+	fn set_name() -> Weight {
 		Weight::zero()
 	}
 	fn on_initialize_with_vault_releases(

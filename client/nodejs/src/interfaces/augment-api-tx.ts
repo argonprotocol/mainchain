@@ -2183,7 +2183,13 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultConfig:
             | PalletVaultsVaultConfig
-            | { terms?: any; securitization?: any; bitcoinXpubkey?: any; securitizationRatio?: any }
+            | {
+                terms?: any;
+                name?: any;
+                securitization?: any;
+                bitcoinXpubkey?: any;
+                securitizationRatio?: any;
+              }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -2236,10 +2242,13 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       setBitcoinLockDelegate: AugmentedSubmittable<
         (
-          vaultId: u32 | AnyNumber | Uint8Array,
           delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, Option<AccountId32>]
+        [Option<AccountId32>]
+      >;
+      setName: AugmentedSubmittable<
+        (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,
+        [Option<Bytes>]
       >;
     };
   } // AugmentedSubmittables
