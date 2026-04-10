@@ -15,7 +15,16 @@ import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxResult';
 import { ISubmittableOptions } from './TxSubmitter';
 import { ApiDecoration } from '@polkadot/api/types';
-import type { bool, BTreeMap, Compact, Option, Struct, u128, u64 } from '@polkadot/types-codec';
+import type {
+  bool,
+  BTreeMap,
+  Bytes,
+  Compact,
+  Option,
+  Struct,
+  u128,
+  u64,
+} from '@polkadot/types-codec';
 import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
 import type { ITuple } from '@polkadot/types-codec/types';
 import { ArgonPrimitivesVaultVaultTerms } from '@polkadot/types/lookup';
@@ -319,8 +328,8 @@ function bigNumberToBigInt(bn: BigNumber): bigint {
   return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());
 }
 
-function decodeVaultName(name: { toU8a(): Uint8Array }): string {
-  return new TextDecoder().decode(name.toU8a());
+function decodeVaultName(name: Bytes): string {
+  return new TextDecoder().decode(Uint8Array.from(name));
 }
 
 function encodeVaultName(name?: string | null): Uint8Array | null {

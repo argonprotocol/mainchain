@@ -869,6 +869,8 @@ mod test {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
 			bitcoin_lock_delegate_account: None,
+			name: None,
+			last_name_change_tick: None,
 			securitization,
 			securitization_target: securitization,
 			securitization_locked: 0,

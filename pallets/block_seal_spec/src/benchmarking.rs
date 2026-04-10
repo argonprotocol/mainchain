@@ -173,7 +173,11 @@ mod benchmarks {
 		reset_benchmark_notebook_provider_state();
 		reset_benchmark_notebook_provider_call_counters();
 		let vote_minimum: VoteMinimum = 123u128;
-		VoteMinimumHistory::<T>::put(BoundedVec::truncate_from(vec![vote_minimum]));
+		VoteMinimumHistory::<T>::put(BoundedVec::truncate_from(vec![
+			456u128,
+			234u128,
+			vote_minimum,
+		]));
 
 		#[block]
 		{
