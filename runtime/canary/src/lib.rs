@@ -736,6 +736,10 @@ impl pallet_operational_accounts::Config for Runtime {
 		Treasury,
 		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
 	);
+	type UniswapTransferRequirementProvider = use_unless_benchmark!(
+		InboundTransferLog,
+		benchmarking::BenchmarkOperationalAccountsUniswapTransferRequirementProvider
+	);
 	type RecentArgonTransferLookup = InboundTransferLog;
 	type OperationalRewardsPayer = Treasury;
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<

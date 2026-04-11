@@ -1,6 +1,7 @@
 use argon_primitives::{
 	MiningSlotProvider, MiningSlotProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo,
+	TreasuryPoolProviderWeightInfo, UniswapTransferRequirementProvider,
+	UniswapTransferRequirementProviderWeightInfo,
 	providers::OperationalRewardsProviderWeightInfo,
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 };
@@ -29,6 +30,7 @@ type MiningSlotProviderWeights<T> =
 	<<T as crate::Config>::MiningSlotProvider as MiningSlotProvider<
 		<T as frame_system::Config>::AccountId,
 	>>::Weights;
+type UniswapTransferRequirementProviderWeights<T> = <<T as crate::Config>::UniswapTransferRequirementProvider as UniswapTransferRequirementProvider>::Weights;
 type TreasuryPoolProviderWeights<T> =
 	<<T as crate::Config>::TreasuryPoolProvider as TreasuryPoolProvider<
 		<T as frame_system::Config>::AccountId,
@@ -39,6 +41,7 @@ pub struct WithProviderWeights<
 	Base,
 	VaultProviderWeight = VaultProviderWeights<T>,
 	MiningSlotProviderWeight = MiningSlotProviderWeights<T>,
+	UniswapTransferRequirementWeight = UniswapTransferRequirementProviderWeights<T>,
 	TreasuryPoolProviderWeight = TreasuryPoolProviderWeights<T>,
 >(
 	PhantomData<(
@@ -46,15 +49,24 @@ pub struct WithProviderWeights<
 		Base,
 		VaultProviderWeight,
 		MiningSlotProviderWeight,
+		UniswapTransferRequirementWeight,
 		TreasuryPoolProviderWeight,
 	)>,
 );
-impl<T, Base, VaultProviderWeight, MiningSlotProviderWeight, TreasuryPoolProviderWeight> WeightInfo
+impl<
+	T,
+	Base,
+	VaultProviderWeight,
+	MiningSlotProviderWeight,
+	UniswapTransferRequirementWeight,
+	TreasuryPoolProviderWeight,
+> WeightInfo
 	for WithProviderWeights<
 		T,
 		Base,
 		VaultProviderWeight,
 		MiningSlotProviderWeight,
+		UniswapTransferRequirementWeight,
 		TreasuryPoolProviderWeight,
 	>
 where
@@ -62,6 +74,7 @@ where
 	Base: WeightInfo,
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	MiningSlotProviderWeight: MiningSlotProviderWeightInfo,
+	UniswapTransferRequirementWeight: UniswapTransferRequirementProviderWeightInfo,
 	TreasuryPoolProviderWeight: TreasuryPoolProviderWeightInfo,
 {
 	fn register() -> Weight {
@@ -69,6 +82,7 @@ where
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
+			.saturating_add(UniswapTransferRequirementWeight::requires_uniswap_transfer())
 			.saturating_add(TreasuryPoolProviderWeight::has_pool_participation())
 			.saturating_add(VaultProviderWeight::account_became_operational())
 	}

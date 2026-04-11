@@ -52,6 +52,7 @@ parameter_types! {
 	pub const MinimumTransferMicrogonsToRecord: Balance = 1;
 	pub const MaxInboundTransferBytes: u32 = 10 * 1024;
 	pub const OwnershipAssetId: u32 = 2;
+	pub static RequiresUniswapTransfer: bool = true;
 	pub static RegistrationVaultDataByAccount:
 		BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
 	pub static TreasuryPoolParticipantsByVaultId:
@@ -263,6 +264,7 @@ impl pallet_operational_accounts::Config for Test {
 	type VaultProvider = MockVaultProvider;
 	type MiningSlotProvider = MockMiningSlotProvider;
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
+	type UniswapTransferRequirementProvider = RequiresUniswapTransfer;
 	type RecentArgonTransferLookup = InboundTransferLog;
 	type OperationalRewardsPayer = ();
 	type WeightInfo = ();
@@ -279,16 +281,17 @@ impl inbound_transfer_log::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
-	let mut ext = new_test_with_genesis::<Test>(|_t: &mut Storage| {});
+	let mut ext = new_test_with_genesis::<Test>(|t: &mut Storage| {
+		pallet_operational_accounts::GenesisConfig::<Test>::default()
+			.assimilate_storage(t)
+			.unwrap();
+	});
 	ext.execute_with(|| {
+		RequiresUniswapTransfer::set(true);
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
 		OperationalVaultsMarkedOperational::set(BTreeSet::new());
-		pallet_operational_accounts::Rewards::<Test>::put(crate::RewardsConfig {
-			operational_referral_reward: OperationalReferralReward::get(),
-			referral_bonus_reward: OperationalReferralBonusReward::get(),
-		});
 	});
 	ext
 }

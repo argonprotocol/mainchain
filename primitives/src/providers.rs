@@ -12,7 +12,10 @@ use crate::{
 	tick::{Tick, Ticker},
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
-use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
+use polkadot_sdk::{
+	frame_support::{traits::Get, weights::Weight},
+	sp_runtime::Permill,
+};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
@@ -159,6 +162,30 @@ impl BitcoinUtxoEventsWeightInfo for () {
 
 	fn spent() -> Weight {
 		Weight::zero()
+	}
+}
+
+pub trait UniswapTransferRequirementProviderWeightInfo {
+	fn requires_uniswap_transfer() -> Weight;
+}
+
+impl UniswapTransferRequirementProviderWeightInfo for () {
+	fn requires_uniswap_transfer() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait UniswapTransferRequirementProvider {
+	type Weights: UniswapTransferRequirementProviderWeightInfo;
+
+	fn requires_uniswap_transfer() -> bool;
+}
+
+impl<T: Get<bool>> UniswapTransferRequirementProvider for T {
+	type Weights = ();
+
+	fn requires_uniswap_transfer() -> bool {
+		T::get()
 	}
 }
 

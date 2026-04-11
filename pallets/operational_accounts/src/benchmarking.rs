@@ -120,6 +120,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -180,9 +181,10 @@ mod benchmarks {
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
 		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
-			get_registration_vault_data: 2,
+			get_registration_vault_data: 1,
 			has_active_rewards_account_seat: 1,
 			has_pool_participation: 1,
+			requires_uniswap_transfer: 1,
 			account_became_operational: 0,
 		});
 	}
@@ -199,6 +201,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -235,6 +238,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -272,6 +276,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -309,6 +314,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -348,6 +354,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -494,6 +501,7 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_pool_participation: true,
+				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
