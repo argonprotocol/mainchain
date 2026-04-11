@@ -15,7 +15,7 @@ use polkadot_sdk::{
 
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
-	MiningSlotProvider, TreasuryPoolProvider, VaultId,
+	MiningSlotProvider, TreasuryPoolProvider, UniswapTransferRequirementProvider, VaultId,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, UtxoId,
@@ -283,6 +283,23 @@ impl<AccountId> TreasuryPoolProvider<AccountId>
 		state.call_counters.has_pool_participation =
 			state.call_counters.has_pool_participation.saturating_add(1);
 		let result = state.has_pool_participation;
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+}
+
+pub struct BenchmarkOperationalAccountsUniswapTransferRequirementProvider;
+
+impl UniswapTransferRequirementProvider
+	for BenchmarkOperationalAccountsUniswapTransferRequirementProvider
+{
+	type Weights = ();
+
+	fn requires_uniswap_transfer() -> bool {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.requires_uniswap_transfer =
+			state.call_counters.requires_uniswap_transfer.saturating_add(1);
+		let result = state.requires_uniswap_transfer;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}

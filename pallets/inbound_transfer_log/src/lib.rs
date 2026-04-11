@@ -80,7 +80,10 @@ pub mod pallet {
 	use sp_runtime::traits::Saturating;
 
 	use alloy_sol_types::SolValue;
-	use argon_primitives::{OperationalAccountsHook, RecentArgonTransferLookup};
+	use argon_primitives::{
+		OperationalAccountsHook, RecentArgonTransferLookup, UniswapTransferRequirementProvider,
+		UniswapTransferRequirementProviderWeightInfo,
+	};
 	use ismp::{host::StateMachine, router::PostRequest};
 	use pallet_token_gateway::{
 		impls::convert_to_balance,
@@ -409,6 +412,27 @@ pub mod pallet {
 	impl<T: Config> RecentArgonTransferLookup<T::AccountId> for Pallet<T> {
 		fn has_recent_argon_transfer(account_id: &T::AccountId) -> bool {
 			RecentArgonTransfersByAccount::<T>::get(account_id) > 0
+		}
+	}
+
+	pub struct UniswapTransferRequirementWeights<T>(core::marker::PhantomData<T>);
+
+	impl<T: Config> UniswapTransferRequirementProviderWeightInfo
+		for UniswapTransferRequirementWeights<T>
+	{
+		fn requires_uniswap_transfer() -> Weight {
+			T::DbWeight::get().reads(1)
+		}
+	}
+
+	impl<T> UniswapTransferRequirementProvider for Pallet<T>
+	where
+		T: Config + pallet_token_gateway::Config,
+	{
+		type Weights = UniswapTransferRequirementWeights<T>;
+
+		fn requires_uniswap_transfer() -> bool {
+			pallet_token_gateway::SupportedAssets::<T>::contains_key(T::NativeAssetId::get())
 		}
 	}
 }

@@ -4,7 +4,7 @@ use crate::{
 };
 use alloy_primitives::U256;
 use alloy_sol_types::SolValue;
-use argon_primitives::RecentArgonTransferLookup;
+use argon_primitives::{RecentArgonTransferLookup, UniswapTransferRequirementProvider};
 use codec::Encode;
 use ismp::{host::StateMachine, router::PostRequest};
 use pallet_prelude::*;
@@ -341,6 +341,27 @@ fn test_on_token_gateway_request_records_transfer() {
 			!<GatewayInboundTransferLog as RecentArgonTransferLookup<_>>::has_recent_argon_transfer(
 				&to
 			)
+		);
+	});
+}
+
+#[test]
+fn test_requires_uniswap_transfer_tracks_native_asset_registration() {
+	new_gateway_test_ext().execute_with(|| {
+		pallet_token_gateway::SupportedAssets::<GatewayTest>::insert(
+			crate::mock::OwnershipAssetId::get(),
+			H256::repeat_byte(1),
+		);
+		assert!(
+			!<GatewayInboundTransferLog as UniswapTransferRequirementProvider>::requires_uniswap_transfer()
+		);
+
+		pallet_token_gateway::SupportedAssets::<GatewayTest>::insert(
+			crate::mock::gateway::NativeAssetId::get(),
+			H256::repeat_byte(2),
+		);
+		assert!(
+			<GatewayInboundTransferLog as UniswapTransferRequirementProvider>::requires_uniswap_transfer()
 		);
 	});
 }

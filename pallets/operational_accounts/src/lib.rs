@@ -25,9 +25,10 @@ pub mod pallet {
 		MiningFrameTransitionProvider, MiningSlotProvider, OperationalAccountsHook,
 		OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer,
 		OperationalRewardsProvider, RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
-		vault::BitcoinVaultProvider,
+		UniswapTransferRequirementProvider, vault::BitcoinVaultProvider,
 	};
 	use codec::{Decode, Encode, EncodeLike};
+	use core::marker::PhantomData;
 	use pallet_prelude::*;
 	use polkadot_sdk::frame_system::ensure_root;
 	use sp_core::sr25519;
@@ -113,6 +114,8 @@ pub mod pallet {
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
 		/// Provider for whether a linked vault account currently has treasury pool participation.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId>;
+		/// Provider for whether new operational accounts should require a Uniswap-backed transfer.
+		type UniswapTransferRequirementProvider: UniswapTransferRequirementProvider;
 		/// Provider for recent qualifying inbound Argon transfer lookup.
 		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
 		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
@@ -419,6 +422,23 @@ pub mod pallet {
 		pub referral_bonus_reward: Balance,
 	}
 
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		#[serde(skip)]
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			Rewards::<T>::put(RewardsConfig {
+				operational_referral_reward: T::OperationalReferralReward::get(),
+				referral_bonus_reward: T::OperationalReferralBonusReward::get(),
+			});
+		}
+	}
+
 	#[pallet::storage]
 	/// Configured reward amounts for operational accounts.
 	pub type Rewards<T: Config> = StorageValue<_, RewardsConfig<T::Balance>, ValueQuery>;
@@ -522,17 +542,6 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_runtime_upgrade() -> Weight {
-			if Rewards::<T>::exists() {
-				return T::DbWeight::get().reads(1);
-			}
-			Rewards::<T>::put(RewardsConfig {
-				operational_referral_reward: T::OperationalReferralReward::get(),
-				referral_bonus_reward: T::OperationalReferralBonusReward::get(),
-			});
-			T::DbWeight::get().reads_writes(1, 1)
-		}
-
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let current_frame = T::FrameProvider::get_current_frame_id();
 			let expiring_codes = AccessCodesExpiringByFrame::<T>::take(current_frame);
@@ -654,11 +663,18 @@ pub mod pallet {
 				T::MiningSlotProvider::has_active_rewards_account_seat(&mining_funding_account),
 			);
 			let has_uniswap_transfer =
-				T::RecentArgonTransferLookup::has_recent_argon_transfer(&operational_account) ||
-					T::RecentArgonTransferLookup::has_recent_argon_transfer(&vault_account) ||
-					T::RecentArgonTransferLookup::has_recent_argon_transfer(
+				!T::UniswapTransferRequirementProvider::requires_uniswap_transfer() ||
+					[
+						&operational_account,
+						&vault_account,
 						&mining_funding_account,
-					) || T::RecentArgonTransferLookup::has_recent_argon_transfer(&mining_bot_account);
+						&mining_bot_account,
+					]
+					.iter()
+					.copied()
+					.any(|account_id| {
+						T::RecentArgonTransferLookup::has_recent_argon_transfer(account_id)
+					});
 
 			OperationalAccounts::<T>::insert(
 				&operational_account,

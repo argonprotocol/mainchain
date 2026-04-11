@@ -20,9 +20,9 @@ use crate::mock::{
 	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
 	MaxEncryptedServerLen, MaxIssuableAccessCodes, MaxOperationalRewardsQueued,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
-	OperationalReferralBonusReward, OperationalReferralReward, RuntimeOrigin, System, Test,
-	TestAccountId, ensure_registration_lookup, has_vault_operational_mark, new_test_ext,
-	set_registration_lookup,
+	OperationalReferralBonusReward, OperationalReferralReward, RequiresUniswapTransfer,
+	RuntimeOrigin, System, Test, TestAccountId, ensure_registration_lookup,
+	has_vault_operational_mark, new_test_ext, set_registration_lookup,
 };
 
 #[test]
@@ -191,6 +191,19 @@ fn test_register_hydrates_recent_argon_transfer_on_linked_account() {
 			account_set.mining_funding.clone(),
 			1,
 		);
+
+		register_account(&account_set, None);
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(account.has_uniswap_transfer);
+	});
+}
+
+#[test]
+fn test_register_marks_uniswap_transfer_satisfied_when_uniswap_is_not_required() {
+	new_test_ext().execute_with(|| {
+		RequiresUniswapTransfer::set(false);
+		let account_set = make_account_set(28, 29, 30, 31);
 
 		register_account(&account_set, None);
 
@@ -510,18 +523,9 @@ fn test_access_code_expiration_cleanup() {
 }
 
 #[test]
-fn test_runtime_setup_runs_only_once() {
+fn test_set_reward_config_updates_stored_rewards() {
 	new_test_ext().execute_with(|| {
-		Rewards::<Test>::kill();
-		OperationalAccountsPallet::on_runtime_upgrade();
-		let rewards = Rewards::<Test>::get();
-		assert_eq!(rewards.operational_referral_reward, OperationalReferralReward::get());
-		assert_eq!(rewards.referral_bonus_reward, OperationalReferralBonusReward::get());
-		Rewards::<Test>::put(crate::RewardsConfig {
-			operational_referral_reward: 123,
-			referral_bonus_reward: 45,
-		});
-		OperationalAccountsPallet::on_runtime_upgrade();
+		assert_ok!(OperationalAccountsPallet::set_reward_config(RuntimeOrigin::root(), 123, 45,));
 		let rewards = Rewards::<Test>::get();
 		assert_eq!(rewards.operational_referral_reward, 123);
 		assert_eq!(rewards.referral_bonus_reward, 45);
@@ -624,6 +628,20 @@ fn test_activation_queues_reward_when_requirements_met() {
 }
 
 #[test]
+fn test_genesis_initializes_reward_config() {
+	new_test_ext().execute_with(|| {
+		assert!(Rewards::<Test>::exists());
+		assert_eq!(
+			Rewards::<Test>::get(),
+			crate::RewardsConfig {
+				operational_referral_reward: OperationalReferralReward::get(),
+				referral_bonus_reward: OperationalReferralBonusReward::get(),
+			}
+		);
+	});
+}
+
+#[test]
 fn test_activation_requires_positive_bitcoin() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(31, 32, 33, 34);
@@ -664,6 +682,27 @@ fn test_activation_requires_minimum_vault_securitization() {
 		assert!(!account.is_operational);
 		assert!(!has_vault_operational_mark(&account_set.vault));
 		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+	});
+}
+
+#[test]
+fn test_activation_skips_uniswap_transfer_when_it_is_not_required() {
+	new_test_ext().execute_with(|| {
+		RequiresUniswapTransfer::set(false);
+		let account_set = make_account_set(39, 40, 41, 42);
+		register_account(&account_set, None);
+		ensure_registration_lookup(account_set.vault.clone(), account_set.mining_funding.clone());
+
+		OperationalAccountsPallet::vault_created(&account_set.vault);
+		OperationalAccountsPallet::bitcoin_lock_funded(&account_set.vault, 1);
+		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
+		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
+		OperationalAccountsPallet::treasury_pool_participated(&account_set.vault, 1);
+
+		let account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(account.is_operational);
+		assert!(has_vault_operational_mark(&account_set.vault));
 	});
 }
 
