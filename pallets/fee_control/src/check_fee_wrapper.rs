@@ -19,7 +19,7 @@ use pallet_prelude::{
 use pallet_transaction_payment::OnChargeTransaction;
 use polkadot_sdk::frame_support::traits::IsSubType;
 use scale_info::{StaticTypeInfo, TypeInfo};
-use sp_runtime::traits;
+use sp_runtime::traits::{self, BlockNumberProvider, Hash};
 
 /// A [`TransactionExtension`] that checks if a call can be feeless and allows protecting against
 /// dos by providing a unique tx pool key
@@ -58,6 +58,13 @@ pub enum Intermediate<T, O, A> {
 	Feeless(O),
 }
 
+#[derive(Decode)]
+struct AnnouncementRecord<AccountId, CallHash, BlockNumber> {
+	real: AccountId,
+	call_hash: CallHash,
+	height: BlockNumber,
+}
+
 impl<T, S> CheckFeeWrapper<T, S>
 where
 	T: Config + pallet_transaction_payment::Config + pallet_proxy::Config,
@@ -86,25 +93,105 @@ where
 			return (call, None);
 		};
 
-		if let Some(pallet_proxy::Call::proxy { real, force_proxy_type, call: inner_call }) =
+		if let Some(proxy_call) =
 			<RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call)
 		{
-			let Ok(real) = T::Lookup::lookup(real.clone()) else {
-				return (call, Some(signer));
-			};
-			let Ok(def) =
-				pallet_proxy::Pallet::<T>::find_proxy(&real, &signer, force_proxy_type.clone())
-			else {
-				return (call, Some(signer));
-			};
-			if !def.delay.is_zero() || !Self::proxy_call_is_allowed(&def, inner_call.as_ref()) {
-				return (call, Some(signer));
-			}
+			match proxy_call {
+				pallet_proxy::Call::proxy { real, force_proxy_type, call: inner_call } => {
+					let Ok(real) = T::Lookup::lookup(real.clone()) else {
+						return (call, Some(signer));
+					};
 
-			return Self::validated_pool_key_context(inner_call.as_ref(), Some(real));
+					return Self::validated_proxy_pool_key_context(
+						call,
+						Some(signer.clone()),
+						real,
+						signer,
+						false,
+						force_proxy_type.clone(),
+						inner_call.as_ref(),
+					);
+				},
+				pallet_proxy::Call::proxy_announced {
+					delegate,
+					real,
+					force_proxy_type,
+					call: inner_call,
+				} => {
+					let Ok(delegate) = T::Lookup::lookup(delegate.clone()) else {
+						return (call, Some(signer));
+					};
+					let Ok(real) = T::Lookup::lookup(real.clone()) else {
+						return (call, Some(signer));
+					};
+
+					return Self::validated_proxy_pool_key_context(
+						call,
+						Some(signer),
+						real,
+						delegate,
+						true,
+						force_proxy_type.clone(),
+						inner_call.as_ref(),
+					);
+				},
+				_ => {},
+			}
 		}
 
 		(call, Some(signer))
+	}
+
+	fn validated_proxy_pool_key_context<'a>(
+		call: &'a RuntimeCallOf<T>,
+		fallback_signer: Option<T::AccountId>,
+		real: <T as frame_system::Config>::AccountId,
+		delegate: <T as frame_system::Config>::AccountId,
+		require_mature_announcement: bool,
+		force_proxy_type: Option<T::ProxyType>,
+		inner_call: &'a RuntimeCallOf<T>,
+	) -> (&'a RuntimeCallOf<T>, Option<T::AccountId>) {
+		let Ok(def) = pallet_proxy::Pallet::<T>::find_proxy(&real, &delegate, force_proxy_type)
+		else {
+			return (call, fallback_signer);
+		};
+		if require_mature_announcement &&
+			!Self::has_mature_announcement(&delegate, &real, inner_call, def.delay)
+		{
+			return (call, fallback_signer);
+		}
+		if (!require_mature_announcement && !def.delay.is_zero()) ||
+			!Self::proxy_call_is_allowed(&def, inner_call)
+		{
+			return (call, fallback_signer);
+		}
+
+		Self::validated_pool_key_context(inner_call, Some(real))
+	}
+
+	fn has_mature_announcement(
+		delegate: &T::AccountId,
+		real: &T::AccountId,
+		inner_call: &RuntimeCallOf<T>,
+		delay: <<T as pallet_proxy::Config>::BlockNumberProvider as sp_runtime::traits::BlockNumberProvider>::BlockNumber,
+	) -> bool {
+		let now = T::BlockNumberProvider::current_block_number();
+		let call_hash = T::CallHasher::hash_of(inner_call);
+		let (announcements, _) = pallet_proxy::Pallet::<T>::announcements(delegate.clone());
+
+		announcements.iter().any(|announcement| {
+			let Ok(announcement) = AnnouncementRecord::<
+				T::AccountId,
+				<T::CallHasher as Hash>::Output,
+				<<T as pallet_proxy::Config>::BlockNumberProvider as BlockNumberProvider>::BlockNumber,
+			>::decode(&mut &announcement.encode()[..]) else {
+				return false;
+			};
+
+			announcement.real == *real &&
+				announcement.call_hash == call_hash &&
+				now.saturating_sub(announcement.height) >= delay
+		})
 	}
 
 	fn proxy_call_is_allowed(
