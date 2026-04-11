@@ -86,25 +86,70 @@ where
 			return (call, None);
 		};
 
-		if let Some(pallet_proxy::Call::proxy { real, force_proxy_type, call: inner_call }) =
+		if let Some(proxy_call) =
 			<RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call)
 		{
-			let Ok(real) = T::Lookup::lookup(real.clone()) else {
-				return (call, Some(signer));
-			};
-			let Ok(def) =
-				pallet_proxy::Pallet::<T>::find_proxy(&real, &signer, force_proxy_type.clone())
-			else {
-				return (call, Some(signer));
-			};
-			if !def.delay.is_zero() || !Self::proxy_call_is_allowed(&def, inner_call.as_ref()) {
-				return (call, Some(signer));
-			}
+			match proxy_call {
+				pallet_proxy::Call::proxy { real, force_proxy_type, call: inner_call } => {
+					let Ok(real) = T::Lookup::lookup(real.clone()) else {
+						return (call, Some(signer));
+					};
 
-			return Self::validated_pool_key_context(inner_call.as_ref(), Some(real));
+					return Self::validated_proxy_pool_key_context(
+						call,
+						Some(signer.clone()),
+						real,
+						signer,
+						force_proxy_type.clone(),
+						inner_call.as_ref(),
+					);
+				},
+				pallet_proxy::Call::proxy_announced {
+					delegate,
+					real,
+					force_proxy_type,
+					call: inner_call,
+				} => {
+					let Ok(delegate) = T::Lookup::lookup(delegate.clone()) else {
+						return (call, Some(signer));
+					};
+					let Ok(real) = T::Lookup::lookup(real.clone()) else {
+						return (call, Some(signer));
+					};
+
+					return Self::validated_proxy_pool_key_context(
+						call,
+						Some(signer),
+						real,
+						delegate,
+						force_proxy_type.clone(),
+						inner_call.as_ref(),
+					);
+				},
+				_ => {},
+			}
 		}
 
 		(call, Some(signer))
+	}
+
+	fn validated_proxy_pool_key_context<'a>(
+		call: &'a RuntimeCallOf<T>,
+		fallback_signer: Option<T::AccountId>,
+		real: <T as frame_system::Config>::AccountId,
+		delegate: <T as frame_system::Config>::AccountId,
+		force_proxy_type: Option<T::ProxyType>,
+		inner_call: &'a RuntimeCallOf<T>,
+	) -> (&'a RuntimeCallOf<T>, Option<T::AccountId>) {
+		let Ok(def) = pallet_proxy::Pallet::<T>::find_proxy(&real, &delegate, force_proxy_type)
+		else {
+			return (call, fallback_signer);
+		};
+		if !def.delay.is_zero() || !Self::proxy_call_is_allowed(&def, inner_call) {
+			return (call, fallback_signer);
+		}
+
+		Self::validated_pool_key_context(inner_call, Some(real))
 	}
 
 	fn proxy_call_is_allowed(
