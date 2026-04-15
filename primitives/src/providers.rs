@@ -76,11 +76,11 @@ impl MiningSlotProviderWeightInfo for () {
 }
 
 pub trait TreasuryPoolProviderWeightInfo {
-	fn has_pool_participation() -> Weight;
+	fn has_bond_participation() -> Weight;
 }
 
 impl TreasuryPoolProviderWeightInfo for () {
-	fn has_pool_participation() -> Weight {
+	fn has_bond_participation() -> Weight {
 		Weight::zero()
 	}
 }
@@ -222,7 +222,7 @@ pub trait MiningSlotProvider<AccountId> {
 pub trait TreasuryPoolProvider<AccountId> {
 	type Weights: TreasuryPoolProviderWeightInfo;
 
-	fn has_pool_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
+	fn has_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
 }
 
 pub trait BlockSealSpecProviderWeightInfo {

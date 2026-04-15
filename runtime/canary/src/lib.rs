@@ -422,7 +422,6 @@ impl pallet_treasury::Config for Runtime {
 	type PriceProvider =
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type MaxTreasuryContributors = MaxTreasuryContributors;
-	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;

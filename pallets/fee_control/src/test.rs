@@ -265,8 +265,8 @@ fn validate_keeps_general_pool_key_for_valid_announced_proxy() {
 		frame_system::Pallet::<Test>::set_block_number(2);
 
 		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy_announced {
-			delegate: delegate.into(),
-			real: real.into(),
+			delegate,
+			real,
 			force_proxy_type: None,
 			call: Box::new(inner_call),
 		});
@@ -300,8 +300,8 @@ fn validate_ignores_general_pool_key_for_unannounced_proxy_announced() {
 		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::Any, 1,));
 
 		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy_announced {
-			delegate: delegate.into(),
-			real: real.into(),
+			delegate,
+			real,
 			force_proxy_type: None,
 			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 })),
 		});
@@ -338,8 +338,8 @@ fn validate_ignores_general_pool_key_for_too_early_proxy_announced() {
 		assert_ok!(Proxy::announce(Some(delegate).into(), real, call_hash));
 
 		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy_announced {
-			delegate: delegate.into(),
-			real: real.into(),
+			delegate,
+			real,
 			force_proxy_type: None,
 			call: Box::new(inner_call),
 		});

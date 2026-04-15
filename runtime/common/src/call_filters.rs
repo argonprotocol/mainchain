@@ -90,8 +90,14 @@ macro_rules! call_filters {
 					},
 					ProxyType::VaultAdmin => match c {
 						RuntimeCall::Vaults(..) |
-						RuntimeCall::Treasury(pallet_treasury::Call::set_allocation { .. }) |
+						RuntimeCall::Treasury(pallet_treasury::Call::buy_bonds { .. }) |
+						RuntimeCall::Treasury(pallet_treasury::Call::liquidate_bond_lot {
+							..
+						}) |
 						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize {
+							..
+						}) => true,
+						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::cosign_release {
 							..
 						}) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
@@ -102,9 +108,13 @@ macro_rules! call_filters {
 									sc,
 									RuntimeCall::Vaults(..) |
 										RuntimeCall::Treasury(
-											pallet_treasury::Call::set_allocation { .. }
-										) | RuntimeCall::BitcoinLocks(
+											pallet_treasury::Call::buy_bonds { .. }
+										) | RuntimeCall::Treasury(
+										pallet_treasury::Call::liquidate_bond_lot { .. }
+									) | RuntimeCall::BitcoinLocks(
 										pallet_bitcoin_locks::Call::initialize { .. }
+									) | RuntimeCall::BitcoinLocks(
+										pallet_bitcoin_locks::Call::cosign_release { .. }
 									)
 								)
 							}),

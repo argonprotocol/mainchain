@@ -2,16 +2,15 @@
 
 use super::*;
 use argon_primitives::{
-	OperationalRewardKind, OperationalRewardPayout, TreasuryPoolProvider, VaultId,
+	MICROGONS_PER_ARGON, OperationalRewardKind, OperationalRewardPayout, TreasuryPoolProvider,
+	VaultId,
 	bitcoin::Satoshis,
 	vault::{Vault, VaultTerms},
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use pallet_prelude::{
-	argon_primitives::{
-		MiningFrameTransitionProvider, OperationalRewardsPayer, OperationalRewardsProvider,
-	},
+	argon_primitives::{OperationalRewardsPayer, OperationalRewardsProvider},
 	benchmarking::{
 		BenchmarkBitcoinVaultProviderState, BenchmarkOperationalRewardsProviderState,
 		BenchmarkPriceProviderState, benchmark_bitcoin_vault_provider_state,
@@ -23,71 +22,89 @@ use pallet_prelude::{
 };
 use polkadot_sdk::{
 	frame_support::{
-		BoundedBTreeMap, BoundedVec,
-		traits::fungible::{Inspect, InspectHold, Mutate},
+		BoundedVec,
+		traits::fungible::{InspectHold, Mutate},
 	},
 	sp_arithmetic::FixedU128,
 	sp_runtime::Permill,
 };
 
 const BENCHMARK_FRAME_ID: FrameId = 20;
+
 type TreasuryBalanceOf<T> = <T as Config>::Balance;
 
 #[benchmarks(
 	where
-		T::AccountId: Ord
+		T::AccountId: Ord,
+		T::Currency: Mutate<T::AccountId, Balance = T::Balance>
 )]
 mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn set_allocation() -> Result<(), BenchmarkError> {
-		let caller: T::AccountId = account("allocation-caller", 0, 0);
-		let vault_id: VaultId = 1;
-		let current_frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
-		let principal = balance::<T>(3_000_000_000);
-		let new_commitment = balance::<T>(3_500_000_000);
-		let expected_additional_hold = balance::<T>(500_000_000);
+	fn buy_bonds() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
 
-		T::Currency::mint_into(&caller, balance::<T>(5_000_000_000))
-			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark caller"))?;
-		Pallet::<T>::create_hold(&caller, principal)
-			.map_err(|_| BenchmarkError::Stop("failed to create existing hold"))?;
+		let caller = account("buy-bonds-caller", 0, 0);
+		let vault_id = 1;
+		let lot_bonds = minimum_purchase_bonds::<T>();
+		let purchase_bonds = lot_bonds.saturating_add(1);
+		let security_bonds = scaled_bonds(lot_bonds, T::MaxTreasuryContributors::get())
+			.saturating_add(purchase_bonds.saturating_sub(lot_bonds));
+		let next_bond_lot_id = seed_accepted_vault_state::<T>(
+			1,
+			T::MaxTreasuryContributors::get(),
+			lot_bonds,
+			security_bonds,
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let evicted_bond_lot_id = next_bond_lot_id.saturating_sub(1);
+		let purchase_amount = bonds_to_balance::<T>(purchase_bonds.saturating_mul(2));
 
-		FunderStateByVaultAndAccount::<T>::insert(
-			vault_id,
-			&caller,
-			FunderState {
-				held_principal: principal,
-				lifetime_principal_last_basis_frame: current_frame_id,
-				..Default::default()
-			},
-		);
-		Pallet::<T>::refresh_funder_index(vault_id, &caller, principal);
-		seed_competing_funders_for_set_allocation::<T>(vault_id, &caller, current_frame_id)?;
-		seed_pending_unlocks_for_set_allocation::<T>(vault_id, &caller, current_frame_id)?;
+		T::Currency::mint_into(&caller, purchase_amount)
+			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark buyer"))?;
 		whitelist_account!(caller);
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), vault_id, new_commitment);
+		_(RawOrigin::Signed(caller.clone()), vault_id, purchase_bonds);
 
-		let state = FunderStateByVaultAndAccount::<T>::get(vault_id, &caller)
-			.ok_or(BenchmarkError::Stop("missing funder state after set_allocation"))?;
+		assert!(BondLotById::<T>::contains_key(next_bond_lot_id));
 		assert_eq!(
-			state.held_principal,
-			principal.saturating_add(expected_additional_hold),
-			"expected set_allocation benchmark to add hold after canceling pending unlocks",
+			BondLotsByVault::<T>::get(vault_id).len(),
+			T::MaxTreasuryContributors::get() as usize,
+			"expected accepted bond-lot list to stay full after purchase",
 		);
 		assert_eq!(
-			state.pending_unlock_amount,
-			TreasuryBalanceOf::<T>::zero(),
-			"expected benchmark to cancel the queued unlock",
+			BondLotById::<T>::get(evicted_bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
+			Some(BondReleaseReason::Bumped),
 		);
-		assert_eq!(state.pending_unlock_at_frame, None);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn liquidate_bond_lot() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let lot_bonds = minimum_purchase_bonds::<T>();
+		let _ = seed_accepted_vault_state::<T>(
+			1,
+			1,
+			lot_bonds,
+			lot_bonds,
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let caller = benchmark_operator::<T>(0);
+		let bond_lot_id = 0;
+
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), bond_lot_id);
+
+		assert!(BondLotsByVault::<T>::get(1).is_empty());
 		assert_eq!(
-			T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), &caller),
-			principal.saturating_add(expected_additional_hold),
-			"expected benchmark caller hold to include the additional commitment",
+			BondLotById::<T>::get(bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
+			Some(BondReleaseReason::UserLiquidation),
 		);
 		Ok(())
 	}
@@ -124,6 +141,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn pay_operational_rewards() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
 		seed_pay_operational_rewards_state::<T>()?;
 
 		#[block]
@@ -142,19 +160,23 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_has_pool_participation() -> Result<(), BenchmarkError> {
-		let account_id: T::AccountId = account("treasury_pool_participant", 0, 0);
-		let vault_id: VaultId = 1;
-		FunderStateByVaultAndAccount::<T>::insert(
-			vault_id,
-			&account_id,
-			FunderState { held_principal: balance::<T>(1_000_000_000), ..Default::default() },
-		);
+	fn provider_has_bond_participation() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let lot_bonds = minimum_purchase_bonds::<T>();
+		let _ = seed_accepted_vault_state::<T>(
+			1,
+			T::MaxTreasuryContributors::get(),
+			lot_bonds,
+			scaled_bonds(lot_bonds, T::MaxTreasuryContributors::get()),
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let account_id = account("missing-bond-holder", 0, 0);
 
 		#[block]
 		{
-			assert!(<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::has_pool_participation(
-				vault_id,
+			assert!(!<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::has_bond_participation(
+				1,
 				&account_id,
 			));
 		}
@@ -163,45 +185,48 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn release_pending_unlocks() -> Result<(), BenchmarkError> {
-		seed_release_pending_unlocks_state::<T>(BENCHMARK_FRAME_ID)?;
+	fn release_pending_bond_lots() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+		seed_pending_bond_releases::<T>(BENCHMARK_FRAME_ID)?;
 
 		#[block]
 		{
-			Pallet::<T>::release_pending_unlocks(BENCHMARK_FRAME_ID);
+			Pallet::<T>::release_pending_bond_lots(BENCHMARK_FRAME_ID);
 		}
 
-		let sample_account: T::AccountId = account("pending-unlock", 0, 0);
+		let sample_account = account("pending-liquidation", 0, 0);
 		assert!(
-			PendingUnlocksByFrame::<T>::get(BENCHMARK_FRAME_ID).is_empty(),
-			"expected benchmark frame unlock queue to be emptied",
+			PendingBondReleasesByFrame::<T>::get(BENCHMARK_FRAME_ID).is_empty(),
+			"expected benchmark frame release queue to be emptied",
 		);
 		assert!(
-			FunderStateByVaultAndAccount::<T>::get(10_000, &sample_account).is_none(),
-			"expected sample pending unlock funder state to be removed after release",
+			!BondLotById::<T>::contains_key(0),
+			"expected sample pending bond lot to be removed after release",
 		);
-		assert!(
-			!VaultPoolsByFrame::<T>::contains_key(
-				BENCHMARK_FRAME_ID.saturating_sub(benchmark_exit_delay_frames::<T>()),
+		assert_eq!(
+			T::Currency::balance_on_hold(
+				&HoldReason::ContributedToTreasury.into(),
+				&sample_account
 			),
-			"expected matured historical pool snapshot to be removed",
+			T::Balance::zero(),
+			"expected sample pending bond lot hold to be released",
 		);
 		Ok(())
 	}
 
 	#[benchmark]
 	fn distribute_bid_pool() -> Result<(), BenchmarkError> {
-		seed_bid_pool_distribution_state::<T>(BENCHMARK_FRAME_ID)?;
-		let payout_frame = BENCHMARK_FRAME_ID.saturating_sub(1);
+		reset_benchmark_state::<T>();
+		seed_distribution_state::<T>(BENCHMARK_FRAME_ID)?;
 
 		#[block]
 		{
-			Pallet::<T>::distribute_bid_pool(payout_frame);
+			Pallet::<T>::distribute_bid_pool(BENCHMARK_FRAME_ID);
 		}
 
 		assert!(
-			CapitalActive::<T>::get().is_empty(),
-			"expected capital snapshot to be consumed during distribution",
+			CurrentFrameVaultCapital::<T>::get().is_none(),
+			"expected current frame capital to be consumed during distribution",
 		);
 		assert_eq!(
 			benchmark_bitcoin_vault_provider_state::<T::AccountId, TreasuryBalanceOf<T>>()
@@ -215,6 +240,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn lock_in_vault_capital() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
 		seed_lock_in_vault_capital_state::<T>(BENCHMARK_FRAME_ID)?;
 
 		#[block]
@@ -222,21 +248,21 @@ mod benchmarks {
 			Pallet::<T>::lock_in_vault_capital(BENCHMARK_FRAME_ID);
 		}
 
-		assert!(
-			VaultPoolsByFrame::<T>::contains_key(BENCHMARK_FRAME_ID),
-			"expected current frame vault pools to be stored",
-		);
+		let current_frame_capital = CurrentFrameVaultCapital::<T>::get()
+			.ok_or(BenchmarkError::Stop("missing current frame capital"))?;
+		assert_eq!(current_frame_capital.frame_id, BENCHMARK_FRAME_ID);
 		assert_eq!(
-			CapitalActive::<T>::get().len(),
+			current_frame_capital.vaults.len(),
 			T::MaxVaultsPerPool::get() as usize,
-			"expected benchmark to fill the next frame capital snapshot",
+			"expected benchmark to fill the current frame capital snapshot",
 		);
 		Ok(())
 	}
 
 	#[benchmark]
 	fn on_frame_transition() -> Result<(), BenchmarkError> {
-		seed_on_frame_transition::<T>(BENCHMARK_FRAME_ID)?;
+		reset_benchmark_state::<T>();
+		seed_on_frame_transition_state::<T>(BENCHMARK_FRAME_ID)?;
 
 		#[block]
 		{
@@ -244,65 +270,21 @@ mod benchmarks {
 		}
 
 		assert!(
-			PendingUnlocksByFrame::<T>::get(BENCHMARK_FRAME_ID).is_empty(),
-			"expected benchmark frame unlock queue to be emptied",
-		);
-		assert!(
-			VaultPoolsByFrame::<T>::contains_key(BENCHMARK_FRAME_ID),
-			"expected next frame vault pools to be stored",
+			PendingBondReleasesByFrame::<T>::get(BENCHMARK_FRAME_ID).is_empty(),
+			"expected benchmark frame release queue to be emptied",
 		);
 		assert_eq!(
-			CapitalActive::<T>::get().len(),
-			T::MaxVaultsPerPool::get() as usize,
-			"expected benchmark to fill the next frame capital snapshot",
+			CurrentFrameVaultCapital::<T>::get()
+				.ok_or(BenchmarkError::Stop("missing current frame capital"))?
+				.frame_id,
+			BENCHMARK_FRAME_ID,
+			"expected next frame capital to be locked in",
 		);
 		Ok(())
 	}
 }
 
-fn seed_on_frame_transition<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	reset_transition_benchmark_state::<T>();
-	seed_transition_vault_state::<T>(frame_id, true, true)?;
-	seed_release_pending_unlock_entries::<T>(frame_id)?;
-
-	Ok(())
-}
-
-fn seed_release_pending_unlocks_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	reset_transition_benchmark_state::<T>();
-	seed_historical_pool_frames::<T>(frame_id)?;
-	seed_release_pending_unlock_entries::<T>(frame_id)?;
-
-	Ok(())
-}
-
-fn seed_bid_pool_distribution_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	reset_transition_benchmark_state::<T>();
-	seed_transition_vault_state::<T>(frame_id, true, false)?;
-
-	Ok(())
-}
-
-fn seed_lock_in_vault_capital_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	reset_transition_benchmark_state::<T>();
-	seed_transition_vault_state::<T>(frame_id, false, true)?;
-
-	Ok(())
-}
-
-fn reset_transition_benchmark_state<T: Config>() {
+fn reset_benchmark_state<T: Config>() {
 	reset_benchmark_bitcoin_vault_provider_state();
 	reset_benchmark_operational_rewards_provider_state();
 	reset_benchmark_price_provider_state();
@@ -314,72 +296,185 @@ fn reset_transition_benchmark_state<T: Config>() {
 	});
 }
 
-fn seed_transition_vault_state<T: Config>(
-	frame_id: FrameId,
-	include_distribution_state: bool,
-	include_historical_state: bool,
-) -> Result<(), BenchmarkError>
+fn seed_lock_in_vault_capital_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
 where
 	T::AccountId: Ord,
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
 {
-	let vault_count = T::MaxVaultsPerPool::get();
-	let contributor_principal = balance::<T>(1_000_000_000);
-	let payout_frame = frame_id.saturating_sub(1);
+	let lot_bonds = minimum_purchase_bonds::<T>();
+	let security_bonds =
+		scaled_bonds(lot_bonds, T::MaxTreasuryContributors::get().saturating_mul(2));
 
-	let mut benchmark_vault_state =
-		BenchmarkBitcoinVaultProviderState::<T::AccountId, TreasuryBalanceOf<T>>::default();
-	let mut active_capital = include_distribution_state
-		.then(BoundedVec::<TreasuryCapital<T>, T::MaxVaultsPerPool>::default);
-	let mut payout_pools = include_distribution_state
-		.then(BoundedBTreeMap::<VaultId, TreasuryPool<T>, T::MaxVaultsPerPool>::new);
-
-	for vault_index in 0..vault_count {
-		let vault_id = vault_index.saturating_add(1);
-		let operator: T::AccountId = account("treasury-operator", vault_index, 0);
-		let (pool, raised) =
-			seed_vault_funders::<T>(vault_id, &operator, vault_index, contributor_principal)?;
-
-		let securitized_satoshis = raised.into().min(u64::MAX as u128) as Satoshis;
-		let vault = benchmark_vault::<T>(operator, securitized_satoshis);
-		benchmark_vault_state.vaults.insert(vault_id, vault);
-
-		if let Some(active_capital) = active_capital.as_mut() {
-			active_capital
-				.try_push(TreasuryCapital {
-					vault_id,
-					activated_capital: raised,
-					frame_id: payout_frame,
-				})
-				.map_err(|_| BenchmarkError::Stop("failed to seed active capital"))?;
-		}
-		if let Some(payout_pools) = payout_pools.as_mut() {
-			payout_pools
-				.try_insert(vault_id, pool)
-				.map_err(|_| BenchmarkError::Stop("failed to seed payout pools"))?;
-		}
-	}
-
-	set_benchmark_bitcoin_vault_provider_state(benchmark_vault_state);
-
-	if let Some(payout_pools) = payout_pools {
-		VaultPoolsByFrame::<T>::insert(payout_frame, payout_pools);
-	}
-	if let Some(active_capital) = active_capital {
-		CapitalActive::<T>::put(active_capital);
-
-		let bid_pool_account = Pallet::<T>::get_bid_pool_account();
-		T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
-			.map_err(|_| BenchmarkError::Stop("failed to fund bid pool"))?;
-	}
-	if include_historical_state {
-		seed_historical_pool_frames::<T>(frame_id)?;
-	}
+	let _ = seed_accepted_vault_state::<T>(
+		T::MaxVaultsPerPool::get().saturating_add(1),
+		T::MaxTreasuryContributors::get(),
+		lot_bonds,
+		security_bonds,
+		frame_id.saturating_sub(1),
+	)?;
 
 	Ok(())
 }
 
-fn seed_pay_operational_rewards_state<T: Config>() -> Result<(), BenchmarkError> {
-	reset_benchmark_operational_rewards_provider_state();
+fn seed_distribution_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
+where
+	T::AccountId: Ord,
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	seed_lock_in_vault_capital_state::<T>(frame_id)?;
+	Pallet::<T>::lock_in_vault_capital(frame_id);
+
+	let bid_pool_account = Pallet::<T>::get_bid_pool_account();
+	T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
+		.map_err(|_| BenchmarkError::Stop("failed to fund bid pool"))?;
+
+	Ok(())
+}
+
+fn seed_on_frame_transition_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
+where
+	T::AccountId: Ord,
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	seed_distribution_state::<T>(frame_id.saturating_sub(1))?;
+	seed_pending_bond_releases::<T>(frame_id)?;
+
+	Ok(())
+}
+
+fn seed_pending_bond_releases<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
+where
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	let lot_bonds = minimum_purchase_bonds::<T>();
+	let mut pending_releases = BoundedVec::default();
+
+	for liquidation_index in 0..T::MaxPendingUnlocksPerFrame::get() {
+		let owner: T::AccountId = account("pending-liquidation", liquidation_index, 0);
+		let bond_lot_id = liquidation_index as BondLotId;
+		let vault_id = 10_000u32.saturating_add(liquidation_index);
+		insert_bond_lot::<T>(
+			bond_lot_id,
+			&owner,
+			vault_id,
+			lot_bonds,
+			frame_id.saturating_sub(1),
+			Some(frame_id),
+			Some(BondReleaseReason::UserLiquidation),
+			true,
+		)?;
+		pending_releases
+			.try_push(bond_lot_id)
+			.map_err(|_| BenchmarkError::Stop("failed to seed pending bond release"))?;
+	}
+
+	PendingBondReleasesByFrame::<T>::insert(frame_id, pending_releases);
+	NextBondLotId::<T>::put(T::MaxPendingUnlocksPerFrame::get() as BondLotId);
+
+	Ok(())
+}
+
+fn seed_accepted_vault_state<T: Config>(
+	vault_count: u32,
+	contributor_count: u32,
+	lot_bonds: Bonds,
+	security_bonds: Bonds,
+	created_frame_id: FrameId,
+) -> Result<BondLotId, BenchmarkError>
+where
+	T::AccountId: Ord,
+{
+	let mut benchmark_vault_state =
+		BenchmarkBitcoinVaultProviderState::<T::AccountId, TreasuryBalanceOf<T>>::default();
+	let mut next_bond_lot_id = 0u64;
+
+	for vault_index in 0..vault_count {
+		let vault_id = vault_index.saturating_add(1);
+		let operator = benchmark_operator::<T>(vault_index);
+		benchmark_vault_state
+			.vaults
+			.insert(vault_id, benchmark_vault::<T>(operator.clone(), security_bonds));
+
+		let mut accepted_lots = BoundedVec::default();
+
+		for contributor_index in 0..contributor_count {
+			let owner = if contributor_index == 0 {
+				operator.clone()
+			} else {
+				benchmark_bond_holder::<T>(vault_index, contributor_index)
+			};
+
+			insert_bond_lot::<T>(
+				next_bond_lot_id,
+				&owner,
+				vault_id,
+				lot_bonds,
+				created_frame_id,
+				None,
+				None,
+				false,
+			)?;
+
+			accepted_lots
+				.try_push(BondLotSummary { bond_lot_id: next_bond_lot_id, bonds: lot_bonds })
+				.map_err(|_| BenchmarkError::Stop("failed to seed accepted bond-lot list"))?;
+			next_bond_lot_id = next_bond_lot_id.saturating_add(1);
+		}
+
+		BondLotsByVault::<T>::insert(vault_id, accepted_lots);
+	}
+
+	NextBondLotId::<T>::put(next_bond_lot_id);
+	set_benchmark_bitcoin_vault_provider_state(benchmark_vault_state);
+
+	Ok(next_bond_lot_id)
+}
+
+fn insert_bond_lot<T: Config>(
+	bond_lot_id: BondLotId,
+	owner: &T::AccountId,
+	vault_id: VaultId,
+	bonds: Bonds,
+	created_frame_id: FrameId,
+	release_frame_id: Option<FrameId>,
+	release_reason: Option<BondReleaseReason>,
+	hold_funds: bool,
+) -> Result<(), BenchmarkError>
+where
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	if hold_funds {
+		let held_amount = bonds_to_balance::<T>(bonds);
+		T::Currency::mint_into(owner, held_amount)
+			.map_err(|_| BenchmarkError::Stop("failed to fund held bond lot"))?;
+		Pallet::<T>::create_hold(owner, held_amount)
+			.map_err(|_| BenchmarkError::Stop("failed to create bond lot hold"))?;
+	}
+
+	BondLotById::<T>::insert(
+		bond_lot_id,
+		BondLot {
+			owner: owner.clone(),
+			vault_id,
+			bonds,
+			created_frame_id,
+			participated_frames: 0,
+			last_frame_earnings_frame_id: None,
+			last_frame_earnings: None,
+			cumulative_earnings: T::Balance::zero(),
+			release_frame_id,
+			release_reason,
+		},
+	);
+	BondLotIdsByAccount::<T>::insert(owner, bond_lot_id, ());
+
+	Ok(())
+}
+
+fn seed_pay_operational_rewards_state<T: Config>() -> Result<(), BenchmarkError>
+where
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
 	let max_rewards = T::OperationalRewardsProvider::max_pending_rewards();
 	let reward_amount = balance::<T>(1_000_000_000);
 	let total_rewards = reward_amount.saturating_mul((max_rewards as u128).into());
@@ -410,211 +505,29 @@ fn seed_pay_operational_rewards_state<T: Config>() -> Result<(), BenchmarkError>
 	Ok(())
 }
 
-fn seed_release_pending_unlock_entries<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError> {
-	let pending_unlock_amount = balance::<T>(100_000_000);
-
-	for unlock_index in 0..T::MaxPendingUnlocksPerFrame::get() {
-		let account_id: T::AccountId = account("pending-unlock", unlock_index, 0);
-		let vault_id = 10_000u32.saturating_add(unlock_index);
-
-		T::Currency::mint_into(&account_id, pending_unlock_amount)
-			.map_err(|_| BenchmarkError::Stop("failed to fund pending unlock account"))?;
-		Pallet::<T>::create_hold(&account_id, pending_unlock_amount)
-			.map_err(|_| BenchmarkError::Stop("failed to hold pending unlock principal"))?;
-
-		FunderStateByVaultAndAccount::<T>::insert(
-			vault_id,
-			&account_id,
-			FunderState {
-				held_principal: pending_unlock_amount,
-				pending_unlock_amount,
-				pending_unlock_at_frame: Some(frame_id),
-				lifetime_principal_last_basis_frame: frame_id.saturating_sub(1),
-				..Default::default()
-			},
-		);
-		PendingUnlocksByFrame::<T>::try_mutate(frame_id, |pending_unlocks| {
-			pending_unlocks
-				.try_push(PendingUnlock { vault_id, account_id: account_id.clone() })
-				.map_err(|_| BenchmarkError::Stop("failed to seed pending unlock"))
-		})?;
-	}
-
-	Ok(())
+fn benchmark_operator<T: Config>(vault_index: u32) -> T::AccountId {
+	account("treasury-operator", vault_index, 0)
 }
 
-fn seed_historical_pool_frames<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	let vault_count = T::MaxVaultsPerPool::get();
-	let contributor_count = T::MaxTreasuryContributors::get();
-	let contributor_principal = balance::<T>(1_000_000_000);
-	let retained_history_frames = benchmark_retained_history_frames::<T>();
-	let first_historical_frame = frame_id.saturating_sub(retained_history_frames + 1);
-
-	for frame_offset in 0..retained_history_frames {
-		let history_frame = first_historical_frame.saturating_add(frame_offset);
-		let history_frame_index =
-			u32::try_from(history_frame).expect("benchmark historical frame fits in u32");
-		let mut historical_pools =
-			BoundedBTreeMap::<VaultId, TreasuryPool<T>, T::MaxVaultsPerPool>::new();
-
-		for vault_index in 0..vault_count {
-			let vault_id = vault_index.saturating_add(1);
-			let history_operator: T::AccountId =
-				account("historical-operator", history_frame_index.saturating_add(vault_index), 0);
-			let mut historical_pool = TreasuryPool::<T> {
-				vault_sharing_percent: Permill::from_percent(20),
-				..Default::default()
-			};
-
-			for contributor_index in 0..contributor_count {
-				let account_id = if contributor_index == 0 {
-					history_operator.clone()
-				} else {
-					account(
-						"historical-funder",
-						history_frame_index
-							.saturating_mul(vault_count)
-							.saturating_mul(contributor_count)
-							.saturating_add(vault_index.saturating_mul(contributor_count))
-							.saturating_add(contributor_index),
-						0,
-					)
-				};
-				historical_pool
-					.try_insert_bond_holder(
-						account_id,
-						contributor_principal,
-						Some(&history_operator),
-					)
-					.map_err(|_| BenchmarkError::Stop("failed to seed historical pool"))?;
-			}
-
-			historical_pools
-				.try_insert(vault_id, historical_pool)
-				.map_err(|_| BenchmarkError::Stop("failed to insert historical pool"))?;
-		}
-
-		VaultPoolsByFrame::<T>::insert(history_frame, historical_pools);
-	}
-
-	Ok(())
-}
-
-fn seed_vault_funders<T: Config>(
-	vault_id: VaultId,
-	operator: &T::AccountId,
-	vault_seed: u32,
-	contributor_principal: TreasuryBalanceOf<T>,
-) -> Result<(TreasuryPool<T>, TreasuryBalanceOf<T>), BenchmarkError> {
-	let mut pool = TreasuryPool::<T> {
-		vault_sharing_percent: Permill::from_percent(20),
-		..Default::default()
-	};
-	let tracked_count = T::MaxTrackedTreasuryFunders::get();
-
-	for contributor_index in 0..tracked_count {
-		let account_id = if contributor_index == 0 {
-			operator.clone()
-		} else {
-			account(
-				"treasury-funder",
-				vault_seed.saturating_mul(tracked_count).saturating_add(contributor_index),
-				0,
-			)
-		};
-
-		FunderStateByVaultAndAccount::<T>::insert(
-			vault_id,
-			&account_id,
-			FunderState { held_principal: contributor_principal, ..Default::default() },
-		);
-		Pallet::<T>::refresh_funder_index(vault_id, &account_id, contributor_principal);
-		pool.try_insert_bond_holder(account_id, contributor_principal, Some(operator))
-			.map_err(|_| BenchmarkError::Stop("failed to seed payout pool"))?;
-	}
-
-	Ok((pool.clone(), pool.raised_capital()))
-}
-
-fn seed_competing_funders_for_set_allocation<T: Config>(
-	vault_id: VaultId,
-	caller: &T::AccountId,
-	current_frame_id: FrameId,
-) -> Result<(), BenchmarkError>
-where
-	T::AccountId: Ord,
-{
-	let tracked_slots = T::MaxTrackedTreasuryFunders::get();
-	let competing_principal = balance::<T>(2_000_000_000);
-
-	for competitor_index in 0..tracked_slots.saturating_sub(1) {
-		let account_id: T::AccountId = account("allocation-competitor", competitor_index, 0);
-		if account_id == *caller {
-			continue;
-		}
-
-		T::Currency::mint_into(&account_id, competing_principal)
-			.map_err(|_| BenchmarkError::Stop("failed to fund competitor"))?;
-		Pallet::<T>::create_hold(&account_id, competing_principal)
-			.map_err(|_| BenchmarkError::Stop("failed to hold competitor principal"))?;
-		FunderStateByVaultAndAccount::<T>::insert(
-			vault_id,
-			&account_id,
-			FunderState {
-				held_principal: competing_principal,
-				lifetime_principal_last_basis_frame: current_frame_id,
-				..Default::default()
-			},
-		);
-		Pallet::<T>::refresh_funder_index(vault_id, &account_id, competing_principal);
-	}
-
-	Ok(())
-}
-
-fn seed_pending_unlocks_for_set_allocation<T: Config>(
-	vault_id: VaultId,
-	account_id: &T::AccountId,
-	current_frame_id: FrameId,
-) -> Result<(), BenchmarkError> {
-	let unlock_frame = current_frame_id.saturating_add(benchmark_exit_delay_frames::<T>());
-	let unrelated_account: T::AccountId = account("unrelated-pending", 0, 0);
-	let target_amount = balance::<T>(1_000_000_000);
-
-	FunderStateByVaultAndAccount::<T>::mutate(vault_id, account_id, |entry| {
-		let mut state = entry.take().unwrap_or_default();
-		state.pending_unlock_amount = target_amount;
-		state.pending_unlock_at_frame = Some(unlock_frame);
-		*entry = Some(state);
-	});
-
-	PendingUnlocksByFrame::<T>::try_mutate(unlock_frame, |pending_unlocks| {
-		for unrelated_index in 0..T::MaxPendingUnlocksPerFrame::get().saturating_sub(1) {
-			pending_unlocks
-				.try_push(PendingUnlock {
-					vault_id: vault_id.saturating_add(10_000).saturating_add(unrelated_index),
-					account_id: unrelated_account.clone(),
-				})
-				.map_err(|_| BenchmarkError::Stop("failed to seed unrelated pending unlock"))?;
-		}
-		pending_unlocks
-			.try_push(PendingUnlock { vault_id, account_id: account_id.clone() })
-			.map_err(|_| BenchmarkError::Stop("failed to seed target pending unlock"))?;
-		Ok::<(), BenchmarkError>(())
-	})?;
-
-	Ok(())
+fn benchmark_bond_holder<T: Config>(vault_index: u32, contributor_index: u32) -> T::AccountId {
+	account(
+		"bond-holder",
+		vault_index
+			.saturating_mul(T::MaxTreasuryContributors::get())
+			.saturating_add(contributor_index),
+		0,
+	)
 }
 
 fn benchmark_vault<T: Config>(
-	operator: T::AccountId,
-	securitized_satoshis: Satoshis,
-) -> Vault<T::AccountId, TreasuryBalanceOf<T>> {
+	operator_account_id: T::AccountId,
+	securitized_bonds: Bonds,
+) -> Vault<T::AccountId, T::Balance> {
+	let securitized_satoshis = ((securitized_bonds as u128).saturating_mul(MICROGONS_PER_ARGON))
+		.min(u64::MAX as u128) as Satoshis;
+
 	Vault {
-		operator_account_id: operator,
+		operator_account_id,
 		bitcoin_lock_delegate_account: None,
 		name: None,
 		last_name_change_tick: None,
@@ -638,14 +551,20 @@ fn benchmark_vault<T: Config>(
 	}
 }
 
+fn scaled_bonds(base_bonds: Bonds, multiplier: u32) -> Bonds {
+	((base_bonds as u128).saturating_mul(multiplier as u128)).min(Bonds::MAX as u128) as Bonds
+}
+
+fn minimum_purchase_bonds<T: Config>() -> Bonds {
+	let minimum = T::MinimumArgonsPerContributor::get().into();
+	let minimum_bonds = minimum.div_ceil(MICROGONS_PER_ARGON).max(1);
+	minimum_bonds.min(Bonds::MAX as u128) as Bonds
+}
+
+fn bonds_to_balance<T: Config>(bonds: Bonds) -> TreasuryBalanceOf<T> {
+	(bonds as u128).saturating_mul(MICROGONS_PER_ARGON).into()
+}
+
 fn balance<T: Config>(amount: u128) -> TreasuryBalanceOf<T> {
 	amount.into()
-}
-
-fn benchmark_exit_delay_frames<T: Config>() -> FrameId {
-	T::TreasuryExitDelayFrames::get()
-}
-
-fn benchmark_retained_history_frames<T: Config>() -> FrameId {
-	benchmark_exit_delay_frames::<T>().saturating_sub(1)
 }

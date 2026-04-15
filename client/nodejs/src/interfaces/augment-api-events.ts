@@ -51,6 +51,7 @@ import type {
   PalletMintMintType,
   PalletMultisigTimepoint,
   PalletProxyDepositKind,
+  PalletTreasuryBondReleaseReason,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDispatchError,
 } from '@polkadot/types/lookup';
@@ -1705,87 +1706,110 @@ declare module '@polkadot/api-base/types/events' {
     };
     treasury: {
       /**
-       * Funds from the active bid pool have been distributed
+       * A bond purchase entered a vault's accepted list.
        **/
-      BidPoolDistributed: AugmentedEvent<
+      BondLotPurchased: AugmentedEvent<
         ApiType,
-        [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, bidPoolShares: u32],
-        { frameId: u64; bidPoolDistributed: u128; treasuryReserves: u128; bidPoolShares: u32 }
+        [vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
+        { vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
       >;
       /**
-       * An error occurred distributing a bid pool
+       * A bond lot was released.
        **/
-      CouldNotDistributeBidPool: AugmentedEvent<
+      BondLotReleased: AugmentedEvent<
+        ApiType,
+        [frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
+        { frameId: u64; vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
+      >;
+      /**
+       * A bond lot was removed from future frames and scheduled for release.
+       **/
+      BondLotReleaseScheduled: AugmentedEvent<
         ApiType,
         [
-          accountId: AccountId32,
-          frameId: u64,
           vaultId: u32,
-          amount: u128,
-          dispatchError: SpRuntimeDispatchError,
-          isForVault: bool,
+          bondLotId: u64,
+          accountId: AccountId32,
+          bonds: u32,
+          releaseFrameId: u64,
+          reason: PalletTreasuryBondReleaseReason,
         ],
         {
-          accountId: AccountId32;
-          frameId: u64;
           vaultId: u32;
-          amount: u128;
-          dispatchError: SpRuntimeDispatchError;
-          isForVault: bool;
+          bondLotId: u64;
+          accountId: AccountId32;
+          bonds: u32;
+          releaseFrameId: u64;
+          reason: PalletTreasuryBondReleaseReason;
         }
       >;
       /**
-       * An error occurred reserving treasury reserves from the bid pool.
+       * An error occurred while paying frame earnings for a bond lot.
        **/
-      CouldNotFundTreasury: AugmentedEvent<
+      CouldNotDistributeEarningsToBondLot: AugmentedEvent<
+        ApiType,
+        [
+          frameId: u64,
+          vaultId: u32,
+          bondLotId: u64,
+          accountId: AccountId32,
+          amount: u128,
+          dispatchError: SpRuntimeDispatchError,
+        ],
+        {
+          frameId: u64;
+          vaultId: u32;
+          bondLotId: u64;
+          accountId: AccountId32;
+          amount: u128;
+          dispatchError: SpRuntimeDispatchError;
+        }
+      >;
+      /**
+       * An error occurred while releasing a bond lot.
+       **/
+      CouldNotReleaseBondLot: AugmentedEvent<
+        ApiType,
+        [
+          frameId: u64,
+          vaultId: u32,
+          bondLotId: u64,
+          amount: u128,
+          accountId: AccountId32,
+          dispatchError: SpRuntimeDispatchError,
+        ],
+        {
+          frameId: u64;
+          vaultId: u32;
+          bondLotId: u64;
+          amount: u128;
+          accountId: AccountId32;
+          dispatchError: SpRuntimeDispatchError;
+        }
+      >;
+      /**
+       * An error occurred while moving bid-pool funds into treasury reserves.
+       **/
+      CouldNotTransferToTreasuryReserves: AugmentedEvent<
         ApiType,
         [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
         { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
-       * An error occurred releasing a contributor hold
+       * Frame earnings were distributed.
        **/
-      ErrorRefundingTreasuryCapital: AugmentedEvent<
+      FrameEarningsDistributed: AugmentedEvent<
         ApiType,
-        [
-          frameId: u64,
-          vaultId: u32,
-          amount: u128,
-          accountId: AccountId32,
-          dispatchError: SpRuntimeDispatchError,
-        ],
-        {
-          frameId: u64;
-          vaultId: u32;
-          amount: u128;
-          accountId: AccountId32;
-          dispatchError: SpRuntimeDispatchError;
-        }
+        [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, participatingVaults: u32],
+        { frameId: u64; bidPoolDistributed: u128; treasuryReserves: u128; participatingVaults: u32 }
       >;
       /**
-       * The next bid pool has been locked in
+       * The current frame's vault capital was locked in.
        **/
-      NextBidPoolCapitalLocked: AugmentedEvent<
+      FrameVaultCapitalLocked: AugmentedEvent<
         ApiType,
-        [frameId: u64, totalActivatedCapital: u128, participatingVaults: u32],
-        { frameId: u64; totalActivatedCapital: u128; participatingVaults: u32 }
-      >;
-      /**
-       * Some mining bond capital was refunded because vault securitized satoshis (`sats *
-       * securitization ratio`) were lower than bond capital
-       **/
-      RefundedTreasuryCapital: AugmentedEvent<
-        ApiType,
-        [frameId: u64, vaultId: u32, amount: u128, accountId: AccountId32],
-        { frameId: u64; vaultId: u32; amount: u128; accountId: AccountId32 }
-      >;
-      /**
-       * A funder has set their allocation for a vault
-       **/
-      VaultFunderAllocation: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, accountId: AccountId32, amount: u128, previousAmount: Option<u128>],
-        { vaultId: u32; accountId: AccountId32; amount: u128; previousAmount: Option<u128> }
+        [frameId: u64, totalEligibleBonds: u128, participatingVaults: u32],
+        { frameId: u64; totalEligibleBonds: u128; participatingVaults: u32 }
       >;
     };
     txPause: {

@@ -90,7 +90,6 @@ parameter_types! {
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxTreasuryContributors: u32 = 10;
-	pub static MaxTrackedTreasuryFunders: u32 = 15;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
@@ -181,7 +180,6 @@ impl pallet_treasury::Config for Test {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = Vaults;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
-	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;

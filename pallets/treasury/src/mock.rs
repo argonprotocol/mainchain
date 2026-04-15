@@ -134,7 +134,6 @@ parameter_types! {
 	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
 	pub static MaxTreasuryContributors: u32 = 10;
-	pub static MaxTrackedTreasuryFunders: u32 = 15;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
@@ -168,14 +167,6 @@ pub struct TestVault {
 pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	VaultsById::mutate(|x| {
 		x.insert(vault_id, vault);
-	});
-}
-
-pub fn set_vault_securitized_satoshis(vault_id: VaultId, satoshis: Satoshis) {
-	VaultsById::mutate(|x| {
-		if let Some(vault) = x.get_mut(&vault_id) {
-			vault.securitized_satoshis = satoshis;
-		}
 	});
 }
 
@@ -259,7 +250,6 @@ impl pallet_treasury::Config for Test {
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
 	type PriceProvider = StaticPriceProvider;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
-	type MaxTrackedTreasuryFunders = MaxTrackedTreasuryFunders;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;

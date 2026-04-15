@@ -52,15 +52,16 @@ impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
 	/// Proof: `MiningSlot::NextCohortSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::HistoricalBidsPerSlot` (r:1 w:1)
 	/// Proof: `MiningSlot::HistoricalBidsPerSlot` (`max_values`: Some(1), `max_size`: Some(521), added: 1016, mode: `MaxEncodedLen`)
-	fn bid() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `18494`
-		//  Estimated: `26975`
-		// Minimum execution time: 231_000_000 picoseconds.
-		Weight::from_parts(247_000_000, 26975)
-			.saturating_add(T::DbWeight::get().reads(14))
-			.saturating_add(T::DbWeight::get().writes(8))
-		}
+		fn bid() -> Weight {
+			// Proof Size summary in bytes:
+			//  Measured:  `18494`
+			//  Estimated: `26975`
+			// Minimum execution time: 231_000_000 picoseconds.
+			// Conservatively bumped for the extra bid-pool provider pin before Expendable transfers.
+			Weight::from_parts(255_000_000, 26975)
+				.saturating_add(T::DbWeight::get().reads(15))
+				.saturating_add(T::DbWeight::get().writes(9))
+			}
 	/// Storage: `MiningSlot::MiningConfig` (r:1 w:1)
 	/// Proof: `MiningSlot::MiningConfig` (`max_values`: Some(1), `max_size`: Some(24), added: 519, mode: `MaxEncodedLen`)
 	fn configure_mining_slot_delay() -> Weight {

@@ -1954,14 +1954,25 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     treasury: {
       /**
-       * All funders can set their committed principal for a vault.
+       * Buy whole `1 ARGON` bonds for a vault.
+       *
+       * The purchase either enters the accepted list or fails.
        **/
-      setAllocation: AugmentedSubmittable<
+      buyBonds: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
-          amount: u128 | AnyNumber | Uint8Array,
+          bonds: u32 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128]
+        [u32, u32]
+      >;
+      /**
+       * Liquidate one full bond lot.
+       *
+       * The lot stops participating right away and is released after the delay.
+       **/
+      liquidateBondLot: AugmentedSubmittable<
+        (bondLotId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [u64]
       >;
     };
     txPause: {
