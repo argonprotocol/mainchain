@@ -983,6 +983,9 @@ impl NotaryWorker {
 		if *worker_context.pause_notebook_audits.read().await {
 			return false;
 		}
+		if self.pending.lock().await.len() == 0 {
+			return false;
+		}
 		let Some(best_hash) = resolve_client_stateful_hash::<B, _, AC>(
 			worker_context.client.as_ref(),
 			worker_context.client.best_hash(),
@@ -1356,15 +1359,11 @@ impl NotaryWorker {
 		if !missing_notebooks.is_empty() {
 			let first_missing = missing_notebooks[0];
 			let last_missing = missing_notebooks[missing_notebooks.len() - 1];
+			let notebook_range = first_missing..=last_missing;
 			trace!(
-				"Tracking notebook range {}..{} for notary {}",
-				first_missing, last_missing, self.notary_id,
-			);
-			self.pending.lock().await.track_range(first_missing, last_missing);
-			let notebook_range = first_missing..last_missing;
-			info!(
 				"Missing notebooks for notary {notary_id}. Tracking dependency catchup range: {notebook_range:?}",
 			);
+			self.pending.lock().await.track_range(first_missing, last_missing);
 			return Err(Error::MissingNotebooksError(format!(
 				"Missing notebooks #{notebook_range:?} to audit {notebook_number} for notary {notary_id}"
 			)));
@@ -2583,7 +2582,7 @@ mod test {
 		// still missing number 9
 		assert!(matches!(result, Error::MissingNotebooksError(_)),);
 		println!("result: {result}");
-		assert!(result.to_string().contains("#9..9"));
+		assert!(result.to_string().contains("#9..=9"));
 
 		for _ in 0..9 {
 			notary_client
