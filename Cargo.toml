@@ -254,6 +254,7 @@ uniswap-v3-sdk = { version = "5.2.1", default-features = false }
 uniswap-lens = { version = "0.15.0" }
 alloy-primitives = { version = "1.3", default-features = false }
 alloy-sol-types = { version = "1.5", default-features = false }
+alloy-contract = { version = "1.0.42" }
 alloy-provider = { version = "1.0.42" }
 alloy-transport = { version = "1.0.42" }
 alloy-eips = { version = "1.0.42" }

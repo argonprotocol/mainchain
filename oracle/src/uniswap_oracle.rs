@@ -1,3 +1,4 @@
+use alloy_contract::Error as ContractError;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{address, aliases::I56};
 use alloy_provider::{RootProvider, network::Ethereum};
@@ -9,7 +10,7 @@ use argon_primitives::{
 use polkadot_sdk::*;
 use sdk_core::prelude::*;
 use sp_runtime::FixedU128;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::{error, trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
@@ -51,6 +52,23 @@ pub struct PriceAndLiquidity {
 	pub price: FixedU128,
 	pub liquidity: Balance,
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum UniswapOracleError {
+	NoPoolData,
+	NoActiveLiquidity,
+}
+
+impl fmt::Display for UniswapOracleError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::NoPoolData => write!(f, "No pool data across available fee tiers"),
+			Self::NoActiveLiquidity => write!(f, "No active liquidity across available fee tiers"),
+		}
+	}
+}
+
+impl std::error::Error for UniswapOracleError {}
 
 impl UniswapOracle {
 	pub async fn new(project_id: String, usd_token: Token, lookup_token: Token) -> Result<Self> {
@@ -105,10 +123,18 @@ impl UniswapOracle {
 
 	async fn get_active_liquidity_reserves(&self, fee: FeeAmount) -> Result<(U256, U256)> {
 		let pool = self.get_cached_pool_contract(fee).await?;
-		let slot0 = pool.slot0().call().await?;
+		let slot0 = match pool.slot0().call().await {
+			Ok(slot0) => slot0,
+			Err(ContractError::ZeroData(..)) => return Err(UniswapOracleError::NoPoolData.into()),
+			Err(e) => return Err(e.into()),
+		};
 
 		let tick = slot0.tick;
-		let liquidity_u128: u128 = pool.liquidity().call().await?;
+		let liquidity_u128: u128 = match pool.liquidity().call().await {
+			Ok(liquidity) => liquidity,
+			Err(ContractError::ZeroData(..)) => return Err(UniswapOracleError::NoPoolData.into()),
+			Err(e) => return Err(e.into()),
+		};
 
 		let spacing = fee.tick_spacing();
 		let tick_lower = tick - (tick % spacing);
@@ -146,11 +172,10 @@ impl UniswapOracle {
 		let result = loop {
 			match pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await {
 				Ok(res) => break res,
+				Err(ContractError::ZeroData(..)) =>
+					return Err(UniswapOracleError::NoPoolData.into()),
 				Err(e) => {
 					let error_msg = format!("{e:?}");
-					if error_msg.contains("ZeroData") {
-						return Err(anyhow!("No data for fee tier {fee:?}: {e:?}"));
-					}
 					if error_msg.contains("execution reverted: OLD") {
 						if backup_second_options.is_empty() {
 							return Err(anyhow!("All time windows exhausted for fee tier {fee:?}"));
@@ -203,14 +228,25 @@ impl UniswapOracle {
 		let mut total_numerator = BigInt::zero();
 		let mut total_denominator = BigInt::zero();
 		let mut total_liquidity = BigInt::zero();
+		let mut no_pool_data_fee_tiers = 0usize;
+		let mut successful_fee_tiers = 0usize;
+		let mut had_other_errors = false;
 
 		for &fee in &self.fee_tiers {
 			match self.get_twap_and_liquidity_basis(fee).await {
 				Err(e) => {
+					let oracle_error =
+						e.chain().find_map(|cause| cause.downcast_ref::<UniswapOracleError>());
+					if matches!(oracle_error, Some(UniswapOracleError::NoPoolData)) {
+						no_pool_data_fee_tiers += 1;
+						continue;
+					}
+					had_other_errors = true;
 					warn!(fee = ?fee, message = e.to_string(), "Could not get TWAP and liquidity basis for fee tier, skipping");
 					continue;
 				},
 				Ok((price, current_liquidity)) => {
+					successful_fee_tiers += 1;
 					trace!(
 						fee = ?fee,
 						price = %price.to_fixed(3, None),
@@ -225,6 +261,12 @@ impl UniswapOracle {
 		}
 
 		if total_denominator == BigInt::zero() {
+			if no_pool_data_fee_tiers == self.fee_tiers.len() {
+				return Err(UniswapOracleError::NoPoolData.into());
+			}
+			if !had_other_errors && successful_fee_tiers > 0 && total_liquidity == BigInt::zero() {
+				return Err(UniswapOracleError::NoActiveLiquidity.into());
+			}
 			return Ok(None);
 		}
 

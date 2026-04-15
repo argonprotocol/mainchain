@@ -11,8 +11,10 @@ use tokio::{join, time::sleep};
 use tracing::info;
 
 use crate::{
-	argon_price, argonot_price, coin_usd_prices, coin_usd_prices::PriceProviderKind,
-	uniswap_oracle::PriceAndLiquidity, us_cpi::UsCpiRetriever,
+	argon_price, argonot_price, coin_usd_prices,
+	coin_usd_prices::PriceProviderKind,
+	uniswap_oracle::{PriceAndLiquidity, UniswapOracleError},
+	us_cpi::UsCpiRetriever,
 };
 use argon_client::{
 	FetchAt, MainchainClient, ReconnectingClient,
@@ -88,6 +90,10 @@ pub async fn price_index_loop(
 		.as_ref()
 		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
 		.unwrap_or(FixedU128::one());
+	let last_argonot_price = last_price
+		.as_ref()
+		.map(|a| from_api_fixed_u128(a.argonot_usd_price.clone()))
+		.unwrap_or(FixedU128::zero());
 
 	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
@@ -102,7 +108,8 @@ pub async fn price_index_loop(
 
 	let mut argon_price_lookup =
 		argon_price::ArgonPriceLookup::from_env(&ticker, last_price).await?;
-	let argonot_price_lookup = argonot_price::ArgonotPriceLookup::from_env().await?;
+	let mut argonot_price_lookup =
+		argonot_price::ArgonotPriceLookup::from_env(last_argonot_price).await?;
 
 	info!("Oracle Started.");
 	let account_id = signer.account_id();
@@ -140,7 +147,16 @@ pub async fn price_index_loop(
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
 			Err(e) =>
-				if is_test {
+				if should_use_argon_pool_fallback(&e) {
+					let fallback_price =
+						target_price.saturating_sub(FixedU128::from_rational(2, 1000));
+					tracing::warn!(
+						"Couldn't update argon prices because no usable pool liquidity was available. Using target fallback {:?} with zero liquidity: {:?}",
+						fallback_price,
+						e
+					);
+					PriceAndLiquidity { price: fallback_price, liquidity: 0 }
+				} else if is_test {
 					tracing::warn!(
 						"Couldn't update argon prices. Using target {} {:?}",
 						target_price,
@@ -163,8 +179,13 @@ pub async fn price_index_loop(
 					tracing::warn!("Couldn't update argonot prices, using default of 0 {:?}", e);
 					FixedU128::zero()
 				} else {
-					tracing::warn!("Couldn't update argonot prices {:?}", e);
-					continue;
+					let held_price = argonot_price_lookup.hold_last_price();
+					tracing::warn!(
+						"Couldn't update argonot prices, using last price {:?}: {:?}",
+						held_price,
+						e
+					);
+					held_price
 				},
 		};
 
@@ -290,6 +311,15 @@ pub async fn price_index_loop_from_file(
 	}
 }
 
+fn should_use_argon_pool_fallback(error: &anyhow::Error) -> bool {
+	error.chain().any(|cause| {
+		matches!(
+			cause.downcast_ref::<UniswapOracleError>(),
+			Some(UniswapOracleError::NoPoolData | UniswapOracleError::NoActiveLiquidity)
+		)
+	})
+}
+
 /// Truncates a FixedU128 value to the specified number of decimal places.
 /// For example, trunc_fixed_u128(value, 3) will truncate to 3 decimal places.
 fn trunc_fixed_u128(value: FixedU128, decimals: u16) -> FixedU128 {
@@ -318,7 +348,7 @@ mod tests {
 	use crate::{
 		coin_usd_prices::{PriceLookups, use_mock_price_lookups},
 		price_index_loop,
-		uniswap_oracle::{PriceAndLiquidity, use_mock_uniswap_prices},
+		uniswap_oracle::{PriceAndLiquidity, UniswapOracleError, use_mock_uniswap_prices},
 		us_cpi::use_mock_cpi_values,
 	};
 
@@ -397,5 +427,19 @@ mod tests {
 			}
 		}
 		assert!(counter >= 3);
+	}
+
+	#[test]
+	fn only_uses_pool_fallback_for_pool_down_errors() {
+		let no_pool_data = anyhow::Error::new(UniswapOracleError::NoPoolData)
+			.context("wrapped higher in the price pipeline");
+		assert!(super::should_use_argon_pool_fallback(&no_pool_data));
+
+		let no_active_liquidity = anyhow::Error::new(UniswapOracleError::NoActiveLiquidity)
+			.context("wrapped higher in the price pipeline");
+		assert!(super::should_use_argon_pool_fallback(&no_active_liquidity));
+
+		let other_error = anyhow::anyhow!("some other uniswap failure");
+		assert!(!super::should_use_argon_pool_fallback(&other_error));
 	}
 }
