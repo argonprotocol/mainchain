@@ -84,7 +84,8 @@ impl NotebookStatusStore {
 		db: &mut PgConnection,
 		notebook_number: NotebookNumber,
 	) -> anyhow::Result<(), Error> {
-		db.execute("SET statement_timeout = 5000").await?;
+		// Only cap lock waits. Closing a large notebook can legitimately take more than 5s.
+		db.execute("SET LOCAL lock_timeout = '5s'").await?;
 		sqlx::query!(
 			r#"
 			SELECT 1 as exists FROM notebook_status WHERE notebook_number = $1 FOR UPDATE NOWAIT LIMIT 1
@@ -334,6 +335,34 @@ mod tests {
 			NotebookStatusStore::next_step(&mut *tx, 1, NotebookFinalizationStep::ReadyForClose)
 				.await
 		);
+		tx.commit().await?;
+		Ok(())
+	}
+
+	#[sqlx::test]
+	async fn test_ready_lock_does_not_set_statement_timeout(pool: PgPool) -> anyhow::Result<()> {
+		sqlx::query!(
+			"ALTER TABLE notebook_status DROP CONSTRAINT IF EXISTS notebook_status_notebook_number_fkey"
+		)
+		.execute(&pool)
+		.await?;
+
+		let mut tx = pool.begin().await?;
+		NotebookStatusStore::create(&mut *tx, 1, 1, Utc::now()).await?;
+		let _ = NotebookStatusStore::step_up_expired_open(&mut tx).await?;
+
+		let statement_timeout_before: String =
+			sqlx::query_scalar("SHOW statement_timeout").fetch_one(&mut *tx).await?;
+
+		assert_eq!(
+			NotebookStatusStore::find_and_lock_ready_for_close(&mut tx).await?,
+			Some((1, 1))
+		);
+
+		let statement_timeout_after: String =
+			sqlx::query_scalar("SHOW statement_timeout").fetch_one(&mut *tx).await?;
+		assert_eq!(statement_timeout_after, statement_timeout_before);
+
 		tx.commit().await?;
 		Ok(())
 	}
