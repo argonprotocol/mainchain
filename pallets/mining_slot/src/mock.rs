@@ -2,7 +2,6 @@ use crate as pallet_mining_slot;
 use argon_primitives::{
 	BlockNumber, BlockSealerInfo, BlockSealerProvider, OperationalAccountsHook, TickProvider,
 	VotingSchedule, block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker,
-	vault::MiningBidPoolProvider,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::*;
@@ -124,16 +123,6 @@ parameter_types! {
 		block_author_account_id: 1,
 	};
 	pub static IsBlockVoteSeal: bool = false;
-}
-
-pub struct StaticBondProvider;
-impl MiningBidPoolProvider for StaticBondProvider {
-	type Balance = Balance;
-	type AccountId = u64;
-
-	fn get_bid_pool_account() -> Self::AccountId {
-		BidPoolAccountId::get()
-	}
 }
 
 pub struct StaticNewSlotEvent;
@@ -258,7 +247,7 @@ impl pallet_mining_slot::Config for Test {
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BidPoolProvider = StaticBondProvider;
+	type MiningBidPoolAccount = BidPoolAccountId;
 	type OperationalAccountsHook = StaticOperationalAccountsHook;
 	type SlotEvents = (StaticNewSlotEvent,);
 	type GrandpaRotationBlocks = GrandpaRotationFrequency;

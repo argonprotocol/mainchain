@@ -2,22 +2,18 @@
 
 use super::*;
 use argon_primitives::{
-	MICROGONS_PER_ARGON, OperationalRewardKind, OperationalRewardPayout, TreasuryPoolProvider,
-	VaultId,
-	bitcoin::Satoshis,
+	MICROGONS_PER_ARGON, TreasuryPoolProvider, VaultId, bitcoin::Satoshis,
 	vault::{Vault, VaultTerms},
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use pallet_prelude::{
-	argon_primitives::{OperationalRewardsPayer, OperationalRewardsProvider},
+	argon_primitives::OperationalRewardsPayer,
 	benchmarking::{
-		BenchmarkBitcoinVaultProviderState, BenchmarkOperationalRewardsProviderState,
-		BenchmarkPriceProviderState, benchmark_bitcoin_vault_provider_state,
-		benchmark_operational_rewards_provider_state, reset_benchmark_bitcoin_vault_provider_state,
-		reset_benchmark_operational_rewards_provider_state, reset_benchmark_price_provider_state,
-		set_benchmark_bitcoin_vault_provider_state,
-		set_benchmark_operational_rewards_provider_state, set_benchmark_price_provider_state,
+		BenchmarkBitcoinVaultProviderState, BenchmarkPriceProviderState,
+		benchmark_bitcoin_vault_provider_state, reset_benchmark_bitcoin_vault_provider_state,
+		reset_benchmark_price_provider_state, set_benchmark_bitcoin_vault_provider_state,
+		set_benchmark_price_provider_state,
 	},
 };
 use polkadot_sdk::{
@@ -110,18 +106,12 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn try_pay_reward() -> Result<(), BenchmarkError> {
+	fn claim_reward() -> Result<(), BenchmarkError> {
 		let payout_account: T::AccountId = account("reward-payout", 0, 0);
-		let operational_account: T::AccountId = account("reward-operational", 0, 0);
 		let reward_amount = balance::<T>(1_000_000_000);
-		let reserves_funding = balance::<T>(2_000_000_000);
-		let reserves_account = Pallet::<T>::get_treasury_reserves_account();
-		let reward = OperationalRewardPayout {
-			operational_account,
-			payout_account: payout_account.clone(),
-			reward_kind: OperationalRewardKind::Activation,
-			amount: reward_amount,
-		};
+		let minimum_balance = T::Currency::minimum_balance();
+		let reserves_funding = reward_amount.saturating_add(minimum_balance);
+		let reserves_account = T::TreasuryReservesAccount::get();
 
 		T::Currency::mint_into(&reserves_account, reserves_funding)
 			.map_err(|_| BenchmarkError::Stop("failed to fund treasury reserves"))?;
@@ -129,33 +119,16 @@ mod benchmarks {
 		#[block]
 		{
 			assert!(
-				<Pallet<T> as OperationalRewardsPayer<T::AccountId, TreasuryBalanceOf<T>>>::try_pay_reward(
-					&reward,
+				<Pallet<T> as OperationalRewardsPayer<T::AccountId, TreasuryBalanceOf<T>>>::claim_reward(
+					&payout_account,
+					reward_amount,
 				)
+				.is_ok()
 			);
 		}
 
 		assert_eq!(T::Currency::balance(&payout_account), reward_amount);
-		Ok(())
-	}
-
-	#[benchmark]
-	fn pay_operational_rewards() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
-		seed_pay_operational_rewards_state::<T>()?;
-
-		#[block]
-		{
-			let payouts = T::OperationalRewardsProvider::pending_rewards();
-			Pallet::<T>::pay_operational_rewards(payouts);
-		}
-
-		assert!(
-			benchmark_operational_rewards_provider_state::<T::AccountId, TreasuryBalanceOf<T>>()
-				.pending_rewards
-				.is_empty(),
-			"expected all queued rewards to be marked paid",
-		);
+		assert_eq!(T::Currency::balance(&reserves_account), minimum_balance);
 		Ok(())
 	}
 
@@ -286,7 +259,6 @@ mod benchmarks {
 
 fn reset_benchmark_state<T: Config>() {
 	reset_benchmark_bitcoin_vault_provider_state();
-	reset_benchmark_operational_rewards_provider_state();
 	reset_benchmark_price_provider_state();
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
 		btc_price_in_usd: Some(FixedU128::saturating_from_integer(100u128)),
@@ -324,7 +296,7 @@ where
 	seed_lock_in_vault_capital_state::<T>(frame_id)?;
 	Pallet::<T>::lock_in_vault_capital(frame_id);
 
-	let bid_pool_account = Pallet::<T>::get_bid_pool_account();
+	let bid_pool_account = T::MiningBidPoolAccount::get();
 	T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
 		.map_err(|_| BenchmarkError::Stop("failed to fund bid pool"))?;
 
@@ -467,40 +439,6 @@ where
 		},
 	);
 	BondLotIdsByAccount::<T>::insert(owner, bond_lot_id, ());
-
-	Ok(())
-}
-
-fn seed_pay_operational_rewards_state<T: Config>() -> Result<(), BenchmarkError>
-where
-	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
-{
-	let max_rewards = T::OperationalRewardsProvider::max_pending_rewards();
-	let reward_amount = balance::<T>(1_000_000_000);
-	let total_rewards = reward_amount.saturating_mul((max_rewards as u128).into());
-	let reserves_account = Pallet::<T>::get_treasury_reserves_account();
-
-	T::Currency::mint_into(&reserves_account, total_rewards)
-		.map_err(|_| BenchmarkError::Stop("failed to fund treasury reserves"))?;
-
-	let mut pending_rewards = Vec::with_capacity(max_rewards as usize);
-
-	for reward_index in 0..max_rewards {
-		let operational_account: T::AccountId = account("operational-reward", reward_index, 0);
-		let payout_account: T::AccountId = account("operational-payout", reward_index, 0);
-		pending_rewards.push(OperationalRewardPayout {
-			operational_account,
-			payout_account,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: reward_amount,
-		});
-	}
-
-	set_benchmark_operational_rewards_provider_state(BenchmarkOperationalRewardsProviderState {
-		pending_rewards,
-		paid_rewards: Vec::new(),
-		max_pending_rewards: max_rewards,
-	});
 
 	Ok(())
 }

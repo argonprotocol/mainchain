@@ -424,20 +424,14 @@ impl pallet_treasury::Config for Runtime {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = TreasuryInternalPalletId;
+	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
+	type TreasuryReservesAccount = TreasuryReservesAccount;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
 	type MiningFrameTransitionProvider = MiningSlot;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type OperationalRewardsProvider = use_unless_benchmark!(
-		OperationalAccounts,
-		benchmarking::BenchmarkOperationalRewardsProvider<
-			AccountId,
-			Balance,
-			OperationalMaxRewardsQueued
-		>
-	);
 }
 
 impl pallet_mining_slot::Config for Runtime {
@@ -458,7 +452,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type BidPoolProvider = Treasury;
+	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Treasury, Vaults);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
@@ -715,7 +709,6 @@ impl pallet_operational_accounts::Config for Runtime {
 	type MaxUnactivatedAccessCodes = MaxIssuableOperationalAccessCodes;
 	type MaxIssuableAccessCodes = MaxIssuableOperationalAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
-	type MaxOperationalRewardsQueued = OperationalMaxRewardsQueued;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
@@ -740,7 +733,8 @@ impl pallet_operational_accounts::Config for Runtime {
 		benchmarking::BenchmarkOperationalAccountsUniswapTransferRequirementProvider
 	);
 	type RecentArgonTransferLookup = InboundTransferLog;
-	type OperationalRewardsPayer = Treasury;
+	type OperationalRewardsPayer =
+		use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalRewardsPayer);
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<
 		Runtime,
 		weights::pallet_operational_accounts::WeightInfo<Runtime>,

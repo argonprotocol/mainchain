@@ -1,7 +1,7 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardPayout, OperationalRewardsProvider,
-	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
+	OperationalAccountsHook, bitcoin::Satoshis, providers::PriceProvider,
+	vault::TreasuryVaultProvider,
 };
 use frame_support::traits::Currency;
 use pallet_prelude::{
@@ -37,46 +37,6 @@ impl OperationalAccountsHook<u64, Balance> for TestOperationalAccountsHook {
 
 	fn treasury_pool_participated(vault_operator_account: &u64, amount: Balance) {
 		TreasuryPoolParticipated::mutate(|calls| calls.push((*vault_operator_account, amount)));
-		TreasuryPoolParticipationRewardsToQueue::mutate(|queued_rewards| {
-			if queued_rewards.is_empty() {
-				return;
-			}
-			PendingOperationalRewards::mutate(|pending_rewards| {
-				pending_rewards.append(queued_rewards);
-			});
-		});
-	}
-}
-
-pub struct TestOperationalRewardsProvider;
-
-impl OperationalRewardsProvider<u64, Balance> for TestOperationalRewardsProvider {
-	type Weights = ();
-
-	fn pending_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
-		PendingOperationalRewards::get()
-	}
-
-	fn max_pending_rewards() -> u32 {
-		PendingOperationalRewards::get().len() as u32
-	}
-
-	fn mark_reward_paid(reward: &OperationalRewardPayout<u64, Balance>, amount_paid: Balance) {
-		let mut paid_amount = 0;
-		PendingOperationalRewards::mutate(|pending| {
-			let Some(pos) = pending.iter().position(|entry| entry == reward) else {
-				return;
-			};
-			let queued_amount = pending[pos].amount;
-			paid_amount = amount_paid.min(queued_amount);
-			pending.remove(pos);
-		});
-		if paid_amount.is_zero() {
-			return;
-		}
-		let mut paid_reward = reward.clone();
-		paid_reward.amount = paid_amount;
-		PaidOperationalRewards::mutate(|paid| paid.push(paid_reward));
 	}
 }
 
@@ -130,6 +90,7 @@ parameter_types! {
 	pub const MiningWindowBlocks: BlockNumberFor<Test> = 100;
 
 	pub const BidPoolAccountId: u64 = 10000;
+	pub const TreasuryReservesAccountId: u64 = 10001;
 
 	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
@@ -151,9 +112,6 @@ parameter_types! {
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
 	pub static TreasuryPoolParticipated: Vec<(u64, Balance)> = vec![];
-	pub static TreasuryPoolParticipationRewardsToQueue: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
-	pub static PendingOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
-	pub static PaidOperationalRewards: Vec<OperationalRewardPayout<u64, Balance>> = vec![];
 }
 
 #[derive(Clone)]
@@ -221,7 +179,7 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) {
 		let _ = Balances::burn_from(
-			&Treasury::get_bid_pool_account(),
+			&BidPoolAccountId::get(),
 			profit.earnings_for_vault,
 			Preservation::Expendable,
 			Precision::Exact,
@@ -231,8 +189,8 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	}
 }
 
-pub struct StaticMiningBidPoolProvider;
-impl MiningFrameTransitionProvider for StaticMiningBidPoolProvider {
+pub struct StaticMiningFrameTransitionProvider;
+impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	fn get_current_frame_id() -> FrameId {
 		CurrentFrameId::get()
 	}
@@ -252,21 +210,18 @@ impl pallet_treasury::Config for Test {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
+	type MiningBidPoolAccount = BidPoolAccountId;
+	type TreasuryReservesAccount = TreasuryReservesAccountId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
-	type MiningFrameTransitionProvider = StaticMiningBidPoolProvider;
+	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
 	type OperationalAccountsHook = TestOperationalAccountsHook;
-	type OperationalRewardsProvider = TestOperationalRewardsProvider;
 }
 
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
-}
-
-pub fn queue_treasury_participation_rewards(rewards: Vec<OperationalRewardPayout<u64, Balance>>) {
-	TreasuryPoolParticipationRewardsToQueue::set(rewards);
 }
 
 pub fn reset_treasury_pool_participated() {
@@ -276,19 +231,5 @@ pub fn reset_treasury_pool_participated() {
 pub fn take_treasury_pool_participated() -> Vec<(u64, Balance)> {
 	let values = TreasuryPoolParticipated::get();
 	TreasuryPoolParticipated::set(vec![]);
-	values
-}
-
-pub fn set_pending_operational_rewards(rewards: Vec<OperationalRewardPayout<u64, Balance>>) {
-	PendingOperationalRewards::set(rewards);
-}
-
-pub fn pending_operational_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
-	PendingOperationalRewards::get()
-}
-
-pub fn take_paid_operational_rewards() -> Vec<OperationalRewardPayout<u64, Balance>> {
-	let values = PaidOperationalRewards::get();
-	PaidOperationalRewards::set(vec![]);
 	values
 }

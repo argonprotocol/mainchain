@@ -21,7 +21,7 @@ use argon_primitives::{
 	notary::{NotaryProvider, NotarySignature},
 	providers::{
 		AuthorityProvider, BitcoinUtxoTracker, BlockRewardAccountsProvider, BlockSealerInfo,
-		BlockSealerProvider, NotebookProvider, OperationalRewardsProvider,
+		BlockSealerProvider, NotebookProvider, OperationalRewardsPayer, OperationalRewardsProvider,
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
@@ -556,6 +556,19 @@ where
 			paid_reward.amount = paid_reward.amount.min(amount_paid);
 			state.paid_rewards.push(paid_reward);
 		});
+	}
+}
+
+pub struct BenchmarkOperationalRewardsPayer;
+
+impl<AccountId, Balance> OperationalRewardsPayer<AccountId, Balance>
+	for BenchmarkOperationalRewardsPayer
+where
+	AccountId: FullCodec,
+	Balance: FullCodec,
+{
+	fn claim_reward(_account_id: &AccountId, _amount: Balance) -> DispatchResult {
+		Ok(())
 	}
 }
 

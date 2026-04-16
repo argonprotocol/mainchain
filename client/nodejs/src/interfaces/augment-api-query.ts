@@ -47,7 +47,6 @@ import type {
   ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails,
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesProvidersBlockSealerInfo,
-  ArgonPrimitivesProvidersOperationalRewardPayout,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   FrameSupportDispatchPerDispatchClassWeight,
@@ -1087,14 +1086,6 @@ declare module '@polkadot/api-base/types/storage' {
           arg: AccountId32 | string | Uint8Array,
         ) => Observable<Option<PalletOperationalAccountsOperationalAccount>>,
         [AccountId32]
-      >;
-      /**
-       * Pending operational account rewards waiting on treasury payout (FIFO queue).
-       **/
-      operationalRewardsQueue: AugmentedQuery<
-        ApiType,
-        () => Observable<Vec<ArgonPrimitivesProvidersOperationalRewardPayout>>,
-        []
       >;
       /**
        * Configured reward amounts for operational accounts.

@@ -4,11 +4,10 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
-	OperationalRewardsProvider,
-};
+use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook};
 use codec::Decode;
+#[cfg(test)]
+use codec::Encode;
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	benchmarking::{
@@ -109,7 +108,12 @@ mod benchmarks {
 		let mining_funding_proof = benchmark_account_proof(BENCH_MINING_FUNDING_SIGNATURE);
 		let mining_bot_proof = benchmark_account_proof(BENCH_MINING_BOT_SIGNATURE);
 		#[cfg(test)]
-		seed_mock_registration_lookup();
+		seed_mock_registration_lookup(&LinkedAccounts::<T> {
+			owner: caller.clone(),
+			vault: vault.clone(),
+			mining_funding: mining_funding.clone(),
+			mining_bot: mining_bot.clone(),
+		});
 		set_benchmark_operational_accounts_provider_state(
 			BenchmarkOperationalAccountsProviderState {
 				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
@@ -213,6 +217,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -250,6 +256,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -289,6 +297,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get().saturating_sub(1);
 		insert_operational_account::<T>(&linked, account);
 		link_mining_funding_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -326,6 +336,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -366,6 +378,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -379,80 +393,6 @@ mod benchmarks {
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
 				.is_operational
-		);
-	}
-
-	#[benchmark]
-	fn provider_pending_rewards() {
-		OperationalRewardsQueue::<T>::kill();
-		let max_rewards = T::MaxOperationalRewardsQueued::get();
-
-		for reward_index in 0..max_rewards {
-			let operational_account: T::AccountId =
-				account("reward-owner", reward_index, USER_SEED);
-			let payout_account: T::AccountId = account("reward-payout", reward_index, USER_SEED);
-			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| {
-				queue.try_push(OperationalRewardPayout {
-					operational_account,
-					payout_account,
-					reward_kind: OperationalRewardKind::Activation,
-					amount: T::Balance::from(1_000u128),
-				})
-			});
-		}
-
-		#[block]
-		{
-			let payouts = <OperationalAccountsPallet<T> as OperationalRewardsProvider<
-				T::AccountId,
-				T::Balance,
-			>>::pending_rewards();
-			assert_eq!(payouts.len(), max_rewards as usize);
-		}
-	}
-
-	#[benchmark]
-	fn provider_mark_reward_paid() {
-		OperationalRewardsQueue::<T>::kill();
-		let max_rewards = T::MaxOperationalRewardsQueued::get().max(1);
-		let target_links = linked_accounts::<T>();
-		let mut target_account = default_operational_account::<T>(&target_links);
-		target_account.is_operational = true;
-		insert_operational_account::<T>(&target_links, target_account);
-
-		let mut target_reward = None;
-		for reward_index in 0..max_rewards {
-			let reward = OperationalRewardPayout {
-				operational_account: if reward_index + 1 == max_rewards {
-					target_links.owner.clone()
-				} else {
-					account("reward-owner", reward_index, USER_SEED)
-				},
-				payout_account: account("reward-payout", reward_index, USER_SEED),
-				reward_kind: OperationalRewardKind::Activation,
-				amount: T::Balance::from(1_000u128),
-			};
-			if reward_index + 1 == max_rewards {
-				target_reward = Some(reward.clone());
-			}
-			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| queue.try_push(reward));
-		}
-		let target_reward = target_reward.expect("target reward seeded");
-
-		#[block]
-		{
-			<OperationalAccountsPallet<T> as OperationalRewardsProvider<
-				T::AccountId,
-				T::Balance,
-			>>::mark_reward_paid(&target_reward, target_reward.amount);
-		}
-
-		assert!(!OperationalRewardsQueue::<T>::get().contains(&target_reward));
-		assert_eq!(
-			OperationalAccounts::<T>::get(&target_links.owner)
-				.expect("operational account should exist")
-				.rewards_collected_amount,
-			target_reward.amount,
 		);
 	}
 
@@ -490,6 +430,30 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn claim_rewards() {
+		let linked = linked_accounts::<T>();
+		let mut operational_account = default_operational_account::<T>(&linked);
+		let claim_amount = T::Balance::from(MICROGONS_PER_ARGON);
+		operational_account.rewards_earned_amount = claim_amount;
+		insert_operational_account::<T>(&linked, operational_account);
+		link_mining_funding_to_owner::<T>(&linked);
+		let claimant = linked.mining_funding.clone();
+		#[cfg(test)]
+		crate::mock::ClaimableTreasuryBalance::set(claim_amount.into());
+		whitelist_account!(claimant);
+
+		#[extrinsic_call]
+		claim_rewards(RawOrigin::Signed(claimant.clone()), claim_amount);
+
+		assert_eq!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("operational account should exist")
+				.rewards_collected_amount,
+			claim_amount,
+		);
+	}
+
+	#[benchmark]
 	fn force_set_progress() {
 		set_benchmark_operational_accounts_provider_state(
 			BenchmarkOperationalAccountsProviderState {
@@ -515,6 +479,8 @@ mod benchmarks {
 			observed_bitcoin_total: Some(1u128.into()),
 			observed_mining_seat_total: Some(T::MiningSeatsForOperational::get()),
 		};
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[extrinsic_call]
 		force_set_progress(RawOrigin::Root, linked.owner.clone(), patch, true);
@@ -639,11 +605,11 @@ mod benchmarks {
 	}
 
 	#[cfg(test)]
-	fn seed_mock_registration_lookup() {
-		let vault_account = crate::mock::TestAccountId::decode(&mut &BENCH_VAULT_ACCOUNT[..])
+	fn seed_mock_registration_lookup<T: Config>(linked: &LinkedAccounts<T>) {
+		let vault_account = crate::mock::TestAccountId::decode(&mut &linked.vault.encode()[..])
 			.expect("benchmark vault account should decode");
 		let mining_funding_account =
-			crate::mock::TestAccountId::decode(&mut &BENCH_MINING_FUNDING_ACCOUNT[..])
+			crate::mock::TestAccountId::decode(&mut &linked.mining_funding.encode()[..])
 				.expect("benchmark mining funding account should decode");
 		crate::mock::set_registration_lookup(
 			vault_account,

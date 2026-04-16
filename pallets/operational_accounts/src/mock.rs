@@ -1,6 +1,7 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
-	MiningFrameTransitionProvider, MiningSlotProvider, TreasuryPoolProvider,
+	MiningFrameTransitionProvider, MiningSlotProvider, OperationalRewardsPayer,
+	TreasuryPoolProvider,
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
 };
 use pallet_inbound_transfer_log as inbound_transfer_log;
@@ -38,7 +39,6 @@ parameter_types! {
 	pub const MaxUnactivatedAccessCodes: u32 = 2;
 	pub const MaxIssuableAccessCodes: u32 = 2;
 	pub const MaxEncryptedServerLen: u32 = 256;
-	pub const MaxOperationalRewardsQueued: u32 = 100;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
@@ -59,6 +59,8 @@ parameter_types! {
 		BTreeMap<VaultId, BTreeSet<TestAccountId>> = BTreeMap::new();
 	pub static ActiveMiningRewardsAccounts: BTreeSet<TestAccountId> = BTreeSet::new();
 	pub static OperationalVaultsMarkedOperational: BTreeSet<TestAccountId> = BTreeSet::new();
+	pub static ClaimableTreasuryBalance: Balance = 0;
+	pub static ClaimedOperationalRewards: Vec<(TestAccountId, Balance)> = Vec::new();
 }
 
 pub struct StaticFrameProvider;
@@ -245,6 +247,20 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	}
 }
 
+pub struct MockOperationalRewardsPayer;
+impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsPayer {
+	fn claim_reward(account_id: &TestAccountId, amount: Balance) -> DispatchResult {
+		let available = ClaimableTreasuryBalance::get();
+		if amount > available {
+			return Err(DispatchError::Other("insufficient mock treasury balance"));
+		}
+
+		ClaimableTreasuryBalance::set(available.saturating_sub(amount));
+		ClaimedOperationalRewards::mutate(|claimed| claimed.push((account_id.clone(), amount)));
+		Ok(())
+	}
+}
+
 impl pallet_operational_accounts::Config for Test {
 	type Balance = Balance;
 	type FrameProvider = StaticFrameProvider;
@@ -253,7 +269,6 @@ impl pallet_operational_accounts::Config for Test {
 	type MaxUnactivatedAccessCodes = MaxUnactivatedAccessCodes;
 	type MaxIssuableAccessCodes = MaxIssuableAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
-	type MaxOperationalRewardsQueued = MaxOperationalRewardsQueued;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
@@ -266,7 +281,7 @@ impl pallet_operational_accounts::Config for Test {
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
 	type UniswapTransferRequirementProvider = RequiresUniswapTransfer;
 	type RecentArgonTransferLookup = InboundTransferLog;
-	type OperationalRewardsPayer = ();
+	type OperationalRewardsPayer = MockOperationalRewardsPayer;
 	type WeightInfo = ();
 }
 
@@ -292,6 +307,8 @@ pub fn new_test_ext() -> TestState {
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
 		OperationalVaultsMarkedOperational::set(BTreeSet::new());
+		ClaimableTreasuryBalance::set(0);
+		ClaimedOperationalRewards::set(Vec::new());
 	});
 	ext
 }

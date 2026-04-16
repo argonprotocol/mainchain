@@ -86,6 +86,7 @@ parameter_types! {
 	pub static IsSlotBiddingStarted: bool = false;
 
 	pub const BidPoolAccountId: u64 = 10000;
+	pub const TreasuryReservesAccountId: u64 = 10001;
 
 	pub static LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
@@ -182,13 +183,14 @@ impl pallet_treasury::Config for Test {
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type PalletId = VaultPalletId;
+	type MiningBidPoolAccount = BidPoolAccountId;
+	type TreasuryReservesAccount = TreasuryReservesAccountId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
 	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
 	type OperationalAccountsHook = ();
-	type OperationalRewardsProvider = ();
 	type PriceProvider = StaticPriceProvider;
 }
 

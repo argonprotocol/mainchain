@@ -774,6 +774,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoIssuableAccessCodes: AugmentedError<ApiType>;
       /**
+       * The operational account has no pending rewards to claim.
+       **/
+      NoPendingRewards: AugmentedError<ApiType>;
+      /**
        * The requested progress patch does not contain any updates.
        **/
       NoProgressUpdateProvided: AugmentedError<ApiType>;
@@ -785,6 +789,22 @@ declare module '@polkadot/api-base/types/errors' {
        * The caller is not the sponsor of the requested sponsee.
        **/
       NotSponsorOfSponsee: AugmentedError<ApiType>;
+      /**
+       * Reward claims must be at least one Argon.
+       **/
+      RewardClaimBelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The requested reward claim exceeds pending rewards.
+       **/
+      RewardClaimExceedsPending: AugmentedError<ApiType>;
+      /**
+       * Reward claims must be whole Argon increments.
+       **/
+      RewardClaimNotWholeArgon: AugmentedError<ApiType>;
+      /**
+       * The treasury does not currently have enough available reserves for the claim.
+       **/
+      TreasuryInsufficientFunds: AugmentedError<ApiType>;
     };
     ownership: {
       /**

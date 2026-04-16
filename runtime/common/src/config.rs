@@ -3,7 +3,7 @@ use argon_primitives::MICROGONS_PER_ARGON;
 use ismp::host::StateMachine;
 use pallet_transaction_payment::Multiplier;
 use smallvec::smallvec;
-use sp_runtime::traits::One;
+use sp_runtime::traits::{AccountIdConversion, One};
 
 pub type AccountData = pallet_balances::AccountData<Balance>;
 
@@ -91,6 +91,10 @@ parameter_types! {
 	pub const MaxTreasuryContributors: u32 = 100;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
+	pub TreasuryMiningBidPoolAccount: AccountId =
+		TreasuryInternalPalletId::get().into_account_truncating();
+	pub TreasuryReservesAccount: AccountId =
+		TreasuryInternalPalletId::get().into_sub_account_truncating(*b"treasury-reserve");
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 
 	// ### pallet_mining_slot

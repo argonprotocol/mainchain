@@ -1028,6 +1028,13 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     operationalAccounts: {
       /**
+       * Claim pending operational rewards to any managed account.
+       **/
+      claimRewards: AugmentedSubmittable<
+        (amount: u128 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [u128]
+      >;
+      /**
        * Force-update operational progress markers for an account.
        **/
       forceSetProgress: AugmentedSubmittable<

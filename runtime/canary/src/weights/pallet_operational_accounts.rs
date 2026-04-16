@@ -126,28 +126,18 @@ impl<T: frame_system::Config> pallet_operational_accounts::WeightInfo for Weight
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
-	/// Storage: `OperationalAccounts::OperationalRewardsQueue` (r:1 w:0)
-	/// Proof: `OperationalAccounts::OperationalRewardsQueue` (`max_values`: Some(1), `max_size`: Some(81002), added: 81497, mode: `MaxEncodedLen`)
-	fn provider_pending_rewards() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `81011`
-		//  Estimated: `82487`
-		// Minimum execution time: 36_000_000 picoseconds.
-		Weight::from_parts(43_000_000, 82487)
-			.saturating_add(T::DbWeight::get().reads(1))
-		}
-	/// Storage: `OperationalAccounts::OperationalRewardsQueue` (r:1 w:1)
-	/// Proof: `OperationalAccounts::OperationalRewardsQueue` (`max_values`: Some(1), `max_size`: Some(81002), added: 81497, mode: `MaxEncodedLen`)
+	/// Storage: `OperationalAccounts::OperationalAccountBySubAccount` (r:1 w:0)
+	/// Proof: `OperationalAccounts::OperationalAccountBySubAccount` (`max_values`: None, `max_size`: Some(80), added: 2555, mode: `MaxEncodedLen`)
 	/// Storage: `OperationalAccounts::OperationalAccounts` (r:1 w:1)
 	/// Proof: `OperationalAccounts::OperationalAccounts` (`max_values`: None, `max_size`: Some(302), added: 2777, mode: `MaxEncodedLen`)
-	fn provider_mark_reward_paid() -> Weight {
+	fn claim_rewards() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `81292`
-		//  Estimated: `82487`
-		// Minimum execution time: 53_000_000 picoseconds.
-		Weight::from_parts(68_000_000, 82487)
+		//  Measured:  `260`
+		//  Estimated: `6544`
+		// Minimum execution time: 14_000_000 picoseconds.
+		Weight::from_parts(15_000_000, 6544)
 			.saturating_add(T::DbWeight::get().reads(2))
-			.saturating_add(T::DbWeight::get().writes(2))
+			.saturating_add(T::DbWeight::get().writes(1))
 		}
 	/// Storage: `OperationalAccounts::AccessCodesByPublic` (r:1 w:1)
 	/// Proof: `OperationalAccounts::AccessCodesByPublic` (`max_values`: None, `max_size`: Some(88), added: 2563, mode: `MaxEncodedLen`)

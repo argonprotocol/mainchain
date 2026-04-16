@@ -52,7 +52,6 @@ import type {
   ArgonPrimitivesNotebookSignedNotebookHeader,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
-  ArgonPrimitivesProvidersOperationalRewardPayout,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultVaultError,
@@ -340,7 +339,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesNotebookSignedNotebookHeader: ArgonPrimitivesNotebookSignedNotebookHeader;
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
-    ArgonPrimitivesProvidersOperationalRewardPayout: ArgonPrimitivesProvidersOperationalRewardPayout;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;

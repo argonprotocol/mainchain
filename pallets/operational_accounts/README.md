@@ -51,3 +51,6 @@ not stack into a second pending code until the pending one is materialized.
 Operational rewards are triggered when an account becomes operational for both the new operational
 account and its operational sponsor (if present). Referral bonus rewards are paid each time
 `ReferralBonusEveryXOperationalSponsees` sponsored accounts become operational.
+
+Rewards accrue to the operational account and can be claimed in whole-Argon increments from any
+managed account. The claimed funds are paid to the managed account that submits the claim.

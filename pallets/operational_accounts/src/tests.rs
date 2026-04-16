@@ -3,13 +3,10 @@ use crate::{
 	AccessCodesExpiringByFrame, AccountOwnershipProof, EncryptedServerBySponsee,
 	MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY, MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
 	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, OpaqueEncryptionPubkey, OperationalAccountBySubAccount,
-	OperationalAccounts, OperationalProgressPatch, OperationalRewardsQueue, Registration,
-	RegistrationV1, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	OperationalAccounts, OperationalProgressPatch, Registration, RegistrationV1, Rewards,
+	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
-use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
-	OperationalRewardsProvider, Signature,
-};
+use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook, Signature};
 use frame_support::{assert_err, assert_noop, assert_ok};
 use pallet_prelude::*;
 use sp_core::{Pair, sr25519};
@@ -17,12 +14,12 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::{AccountId32, DispatchError, MultiSigner, traits::IdentifyAccount};
 
 use crate::mock::{
-	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
-	MaxEncryptedServerLen, MaxIssuableAccessCodes, MaxOperationalRewardsQueued,
+	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards,
+	CurrentFrameId, MaxAccessCodesExpiringPerFrame, MaxEncryptedServerLen, MaxIssuableAccessCodes,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
 	OperationalReferralBonusReward, OperationalReferralReward, RequiresUniswapTransfer,
-	RuntimeOrigin, System, Test, TestAccountId, ensure_registration_lookup,
-	has_vault_operational_mark, new_test_ext, set_registration_lookup,
+	RuntimeOrigin, Test, TestAccountId, ensure_registration_lookup, has_vault_operational_mark,
+	new_test_ext, set_registration_lookup,
 };
 
 #[test]
@@ -370,7 +367,7 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 			OperationalAccounts::<Test>::get(&no_recompute_set.owner).expect("account");
 		assert!(!no_recompute.is_operational);
 		assert_eq!(no_recompute.issuable_access_codes, 0);
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert_eq!(no_recompute.rewards_earned_amount, 0);
 
 		let recompute_set = make_account_set(21, 22, 23, 24);
 		register_account(&recompute_set, None);
@@ -394,9 +391,7 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
 		assert!(recompute.is_operational);
 		assert_eq!(recompute.issuable_access_codes, 1);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 1);
-		assert_eq!(queue[0].operational_account, recompute_set.owner);
+		assert_eq!(recompute.rewards_earned_amount, OperationalReferralReward::get());
 	});
 }
 
@@ -597,7 +592,7 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 }
 
 #[test]
-fn test_activation_queues_reward_when_requirements_met() {
+fn test_activation_records_pending_reward_when_requirements_met() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(1, 2, 3, 4);
 		register_account(&account_set, None);
@@ -608,22 +603,9 @@ fn test_activation_queues_reward_when_requirements_met() {
 		assert!(operational_account.is_operational);
 		assert!(has_vault_operational_mark(&account_set.vault));
 		assert_eq!(operational_account.issuable_access_codes, 1);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 1);
-		let reward = queue[0].clone();
-		assert_eq!(reward.operational_account, account_set.owner);
-		assert_eq!(reward.payout_account, account_set.mining_funding);
-		assert_eq!(reward.reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(reward.amount, 1_000);
-
 		assert_eq!(operational_account.rewards_earned_count, 1);
 		assert_eq!(operational_account.rewards_earned_amount, 1_000);
-
-		OperationalAccountsPallet::mark_reward_paid(&reward, reward.amount);
-		let operational_account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.rewards_collected_amount, 1_000);
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert_eq!(pending_rewards_amount(&operational_account), 1_000);
 	});
 }
 
@@ -658,7 +640,7 @@ fn test_activation_requires_positive_bitcoin() {
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert!(!account.is_operational);
 		assert!(!has_vault_operational_mark(&account_set.vault));
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert_eq!(account.rewards_earned_amount, 0);
 	});
 }
 
@@ -681,7 +663,7 @@ fn test_activation_requires_minimum_vault_securitization() {
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert!(!account.is_operational);
 		assert!(!has_vault_operational_mark(&account_set.vault));
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert_eq!(account.rewards_earned_amount, 0);
 	});
 }
 
@@ -707,68 +689,6 @@ fn test_activation_skips_uniswap_transfer_when_it_is_not_required() {
 }
 
 #[test]
-fn test_mark_reward_paid_consumes_queue_on_partial_payment() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(61, 62, 63, 64);
-		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
-
-		let reward = OperationalRewardsQueue::<Test>::get()[0].clone();
-		OperationalAccountsPallet::mark_reward_paid(&reward, 250);
-
-		let operational_account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.rewards_collected_amount, 250);
-
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert!(queue.is_empty());
-	});
-}
-
-#[test]
-fn test_operational_referral_reward_enqueue_failed_emits_event() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(101, 102, 103, 104);
-		register_account(&account_set, None);
-		System::set_block_number(1);
-
-		let filler = make_account_set(111, 112, 113, 114);
-		let reward = OperationalRewardPayout {
-			operational_account: filler.owner,
-			payout_account: filler.mining_funding,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 1,
-		};
-		OperationalRewardsQueue::<Test>::mutate(|queue| {
-			for _ in 0..MaxOperationalRewardsQueued::get() {
-				assert!(queue.try_push(reward.clone()).is_ok());
-			}
-		});
-
-		System::reset_events();
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
-
-		System::assert_has_event(
-			crate::Event::<Test>::OperationalRewardEnqueueFailed {
-				account: account_set.owner.clone(),
-				reward_kind: OperationalRewardKind::Activation,
-				amount: 1_000,
-			}
-			.into(),
-		);
-
-		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
-		assert!(account.is_operational);
-		assert_eq!(account.rewards_earned_count, 0);
-		assert_eq!(account.rewards_earned_amount, 0);
-		assert_eq!(
-			OperationalRewardsQueue::<Test>::get().len() as u32,
-			MaxOperationalRewardsQueued::get()
-		);
-	});
-}
-
-#[test]
 fn test_referral_bonus_awarded_on_threshold() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
@@ -778,8 +698,9 @@ fn test_referral_bonus_awarded_on_threshold() {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
 			sponsor_account.operational_referrals_count = 4;
 			sponsor_account.unactivated_access_codes = 1;
+			sponsor_account.rewards_earned_count = 0;
+			sponsor_account.rewards_earned_amount = 0;
 		});
-		OperationalRewardsQueue::<Test>::kill();
 
 		Rewards::<Test>::put(crate::RewardsConfig {
 			operational_referral_reward: 1_000,
@@ -800,16 +721,13 @@ fn test_referral_bonus_awarded_on_threshold() {
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.operational_referrals_count, 5);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 3);
-		assert_eq!(queue[0].operational_account, recruit_set.owner);
-		assert_eq!(queue[0].reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(queue[1].operational_account, sponsor_set.owner);
-		assert_eq!(queue[1].reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(queue[1].amount, 1_000);
-		assert_eq!(queue[2].operational_account, sponsor_set.owner);
-		assert_eq!(queue[2].reward_kind, OperationalRewardKind::ReferralBonus);
-		assert_eq!(queue[2].amount, 250);
+		assert_eq!(sponsor_account.rewards_earned_count, 2);
+		assert_eq!(pending_rewards_amount(&sponsor_account), 1_250);
+
+		let recruit_account =
+			OperationalAccounts::<Test>::get(&recruit_set.owner).expect("recruit account");
+		assert_eq!(recruit_account.rewards_earned_count, 1);
+		assert_eq!(pending_rewards_amount(&recruit_account), 1_000);
 	});
 }
 
@@ -1000,30 +918,82 @@ fn test_access_codes_awarded_for_mining_seats() {
 }
 
 #[test]
-fn test_pending_rewards_returns_all_queued_rewards() {
+fn test_claim_rewards_pays_to_managed_signer_and_decrements_pending() {
 	new_test_ext().execute_with(|| {
-		OperationalRewardsQueue::<Test>::mutate(|queue| {
-			for i in 0..5u8 {
-				assert!(
-					queue
-						.try_push(OperationalRewardPayout {
-							operational_account: account_id_from_seed(i.saturating_add(1)),
-							payout_account: account_id_from_seed(i.saturating_add(100)),
-							reward_kind: OperationalRewardKind::Activation,
-							amount: 1,
-						})
-						.is_ok()
-				);
-			}
-		});
+		let account_set = make_account_set(80, 81, 82, 83);
+		register_account(&account_set, None);
+		seed_pending_rewards(&account_set.owner, 3 * MICROGONS_PER_ARGON);
+		ClaimableTreasuryBalance::set(2 * MICROGONS_PER_ARGON);
 
-		let rewards = <OperationalAccountsPallet as OperationalRewardsProvider<
-			TestAccountId,
-			Balance,
-		>>::pending_rewards();
-		assert_eq!(rewards.len(), 5);
-		assert_eq!(rewards[0].operational_account, account_id_from_seed(1));
-		assert_eq!(rewards[4].operational_account, account_id_from_seed(5));
+		assert_ok!(OperationalAccountsPallet::claim_rewards(
+			RuntimeOrigin::signed(account_set.vault.clone()),
+			MICROGONS_PER_ARGON,
+		));
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert_eq!(operational_account.rewards_collected_amount, MICROGONS_PER_ARGON);
+		assert_eq!(pending_rewards_amount(&operational_account), 2 * MICROGONS_PER_ARGON);
+		assert_eq!(
+			ClaimedOperationalRewards::get(),
+			vec![(account_set.vault, MICROGONS_PER_ARGON)]
+		);
+		assert_eq!(ClaimableTreasuryBalance::get(), MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn test_claim_rewards_rejects_invalid_claims() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(80, 81, 82, 83);
+		register_account(&account_set, None);
+		seed_pending_rewards(&account_set.owner, 2 * MICROGONS_PER_ARGON);
+		ClaimableTreasuryBalance::set(2 * MICROGONS_PER_ARGON);
+
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_id_from_seed(84)),
+				MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::NotOperationalAccount
+		);
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				MICROGONS_PER_ARGON.saturating_sub(1),
+			),
+			crate::Error::<Test>::RewardClaimBelowMinimum
+		);
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				MICROGONS_PER_ARGON.saturating_add(1),
+			),
+			crate::Error::<Test>::RewardClaimNotWholeArgon
+		);
+
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.mining_funding.clone()),
+				3 * MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::RewardClaimExceedsPending
+		);
+
+		ClaimableTreasuryBalance::set(MICROGONS_PER_ARGON.saturating_sub(1));
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.mining_funding),
+				MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::TreasuryInsufficientFunds
+		);
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert_eq!(operational_account.rewards_collected_amount, 0);
+		assert_eq!(pending_rewards_amount(&operational_account), 2 * MICROGONS_PER_ARGON);
+		assert!(ClaimedOperationalRewards::get().is_empty());
 	});
 }
 
@@ -1143,6 +1113,17 @@ impl AccountSet {
 			access_code,
 		})
 	}
+}
+
+fn seed_pending_rewards(owner: &TestAccountId, amount: Balance) {
+	OperationalAccounts::<Test>::mutate(owner, |maybe| {
+		let account = maybe.as_mut().expect("operational account");
+		account.rewards_earned_amount = account.rewards_collected_amount.saturating_add(amount);
+	});
+}
+
+fn pending_rewards_amount(account: &crate::OperationalAccount<Test>) -> Balance {
+	account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount)
 }
 
 fn make_access_code_proof(account: &TestAccountId, seed: u8) -> AccessCodeProof {

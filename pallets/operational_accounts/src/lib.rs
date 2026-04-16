@@ -22,9 +22,9 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		MiningFrameTransitionProvider, MiningSlotProvider, OperationalAccountsHook,
-		OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer,
-		OperationalRewardsProvider, RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
+		MICROGONS_PER_ARGON, MiningFrameTransitionProvider, MiningSlotProvider,
+		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer,
+		RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
 		UniswapTransferRequirementProvider, vault::BitcoinVaultProvider,
 	};
 	use codec::{Decode, Encode, EncodeLike};
@@ -89,9 +89,6 @@ pub mod pallet {
 		/// Maximum number of issuable access codes allowed at once.
 		#[pallet::constant]
 		type MaxIssuableAccessCodes: Get<u32>;
-		/// Maximum number of queued operational rewards.
-		#[pallet::constant]
-		type MaxOperationalRewardsQueued: Get<u32>;
 		/// Maximum number of unactivated (issued but unused) access codes allowed at once.
 		#[pallet::constant]
 		type MaxUnactivatedAccessCodes: Get<u32>;
@@ -444,17 +441,6 @@ pub mod pallet {
 	pub type Rewards<T: Config> = StorageValue<_, RewardsConfig<T::Balance>, ValueQuery>;
 
 	#[pallet::storage]
-	/// Pending operational account rewards waiting on treasury payout (FIFO queue).
-	pub type OperationalRewardsQueue<T: Config> = StorageValue<
-		_,
-		BoundedVec<
-			OperationalRewardPayout<T::AccountId, T::Balance>,
-			T::MaxOperationalRewardsQueued,
-		>,
-		ValueQuery,
-	>;
-
-	#[pallet::storage]
 	/// Opaque encrypted sponsor server payload keyed by the sponsee operational account.
 	pub type EncryptedServerBySponsee<T: Config> = StorageMap<
 		_,
@@ -483,11 +469,12 @@ pub mod pallet {
 			reward_kind: OperationalRewardKind,
 			amount: T::Balance,
 		},
-		/// Reward enqueue failed because the pending queue is full.
-		OperationalRewardEnqueueFailed {
-			account: T::AccountId,
-			reward_kind: OperationalRewardKind,
+		/// Claimable operational rewards were paid to a managed account.
+		OperationalRewardsClaimed {
+			operational_account: T::AccountId,
+			claimant: T::AccountId,
 			amount: T::Balance,
+			remaining_pending: T::Balance,
 		},
 		/// Reward config values were updated.
 		RewardsConfigUpdated {
@@ -538,6 +525,16 @@ pub mod pallet {
 		EncryptedServerTooLong,
 		/// The caller is not the sponsor of the requested sponsee.
 		NotSponsorOfSponsee,
+		/// The operational account has no pending rewards to claim.
+		NoPendingRewards,
+		/// Reward claims must be at least one Argon.
+		RewardClaimBelowMinimum,
+		/// Reward claims must be whole Argon increments.
+		RewardClaimNotWholeArgon,
+		/// The requested reward claim exceeds pending rewards.
+		RewardClaimExceedsPending,
+		/// The treasury does not currently have enough available reserves for the claim.
+		TreasuryInsufficientFunds,
 	}
 
 	#[pallet::hooks]
@@ -896,6 +893,43 @@ pub mod pallet {
 			Self::deposit_event(Event::EncryptedServerUpdated { sponsor, sponsee });
 			Ok(())
 		}
+
+		/// Claim pending operational rewards to any managed account.
+		#[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::claim_rewards())]
+		pub fn claim_rewards(origin: OriginFor<T>, amount: T::Balance) -> DispatchResult {
+			let claimant = ensure_signed(origin)?;
+			let owner = OperationalAccountBySubAccount::<T>::get(&claimant)
+				.unwrap_or_else(|| claimant.clone());
+			let claim_increment = T::Balance::from(MICROGONS_PER_ARGON);
+			let amount_u128: u128 = amount.into();
+
+			ensure!(amount >= claim_increment, Error::<T>::RewardClaimBelowMinimum);
+			ensure!(amount_u128 % MICROGONS_PER_ARGON == 0, Error::<T>::RewardClaimNotWholeArgon);
+
+			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
+				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+				let pending_rewards =
+					account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount);
+				ensure!(!pending_rewards.is_zero(), Error::<T>::NoPendingRewards);
+				ensure!(amount <= pending_rewards, Error::<T>::RewardClaimExceedsPending);
+
+				T::OperationalRewardsPayer::claim_reward(&claimant, amount)
+					.map_err(|_| Error::<T>::TreasuryInsufficientFunds)?;
+
+				account.rewards_collected_amount.saturating_accrue(amount);
+				let remaining_pending =
+					account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount);
+
+				Self::deposit_event(Event::OperationalRewardsClaimed {
+					operational_account: owner.clone(),
+					claimant,
+					amount,
+					remaining_pending,
+				});
+				Ok(())
+			})
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -919,40 +953,21 @@ pub mod pallet {
 			account.unactivated_access_codes.saturating_reduce(1);
 		}
 
-		fn enqueue_reward(
+		fn record_reward(
 			operational_account: &mut OperationalAccount<T>,
 			owner: &T::AccountId,
-			payout_account: &T::AccountId,
 			reward_kind: OperationalRewardKind,
 			amount: T::Balance,
 		) {
 			if amount.is_zero() {
 				return;
 			}
-			let reward_kind_event = reward_kind.clone();
-			let payout = OperationalRewardPayout {
-				operational_account: owner.clone(),
-				payout_account: payout_account.clone(),
-				reward_kind,
-				amount,
-			};
-			let pushed = OperationalRewardsQueue::<T>::try_mutate(|queue| {
-				queue.try_push(payout.clone()).map_err(|_| ())
-			})
-			.is_ok();
-			if !pushed {
-				Self::deposit_event(Event::OperationalRewardEnqueueFailed {
-					account: owner.clone(),
-					reward_kind: reward_kind_event,
-					amount,
-				});
-				return;
-			}
+
 			operational_account.rewards_earned_count.saturating_accrue(1);
 			operational_account.rewards_earned_amount.saturating_accrue(amount);
 			Self::deposit_event(Event::OperationalRewardEarned {
 				account: owner.clone(),
-				reward_kind: reward_kind_event,
+				reward_kind,
 				amount,
 			});
 		}
@@ -1029,11 +1044,9 @@ pub mod pallet {
 			Self::materialize_issuable_access_codes(operational_account);
 			T::VaultProvider::account_became_operational(&operational_account.vault_account);
 			Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
-			let payout_account = operational_account.mining_funding_account.clone();
-			Self::enqueue_reward(
+			Self::record_reward(
 				operational_account,
 				owner,
-				&payout_account,
 				OperationalRewardKind::Activation,
 				reward_config.operational_referral_reward,
 			);
@@ -1049,11 +1062,9 @@ pub mod pallet {
 					sponsor_account.referral_access_code_pending = true;
 					Self::materialize_issuable_access_codes(sponsor_account);
 					sponsor_account.operational_referrals_count.saturating_accrue(1);
-					let payout_account = sponsor_account.mining_funding_account.clone();
-					Self::enqueue_reward(
+					Self::record_reward(
 						sponsor_account,
 						sponsor,
-						&payout_account,
 						OperationalRewardKind::Activation,
 						reward_config.operational_referral_reward,
 					);
@@ -1061,10 +1072,9 @@ pub mod pallet {
 					if bonus_every > 0 &&
 						sponsor_account.operational_referrals_count % bonus_every == 0
 					{
-						Self::enqueue_reward(
+						Self::record_reward(
 							sponsor_account,
 							sponsor,
-							&payout_account,
 							OperationalRewardKind::ReferralBonus,
 							reward_config.referral_bonus_reward,
 						);
@@ -1097,22 +1107,6 @@ pub mod pallet {
 			total_locked: T::Balance,
 		) {
 			account.bitcoin_accrual = total_locked.saturating_sub(account.bitcoin_applied_total);
-		}
-
-		fn apply_reward_payment(
-			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
-			amount_paid: T::Balance,
-		) -> T::Balance {
-			OperationalRewardsQueue::<T>::mutate(|queue| {
-				// `reward` comes from a copied snapshot; resolve its live queue index before
-				// removal.
-				let Some(queue_index) = queue.iter().position(|entry| entry == reward) else {
-					return T::Balance::zero();
-				};
-				let queued_amount = queue[queue_index].amount;
-				queue.remove(queue_index);
-				amount_paid.min(queued_amount)
-			})
 		}
 	}
 
@@ -1198,33 +1192,6 @@ pub mod pallet {
 
 		fn uniswap_transfer_confirmed(account_id: &T::AccountId, amount: T::Balance) {
 			Self::on_uniswap_transfer(account_id, amount)
-		}
-	}
-
-	impl<T: Config> OperationalRewardsProvider<T::AccountId, T::Balance> for Pallet<T> {
-		type Weights = crate::weights::ProviderWeightAdapter<T>;
-
-		fn pending_rewards() -> Vec<OperationalRewardPayout<T::AccountId, T::Balance>> {
-			OperationalRewardsQueue::<T>::get().into_iter().collect()
-		}
-
-		fn max_pending_rewards() -> u32 {
-			T::MaxOperationalRewardsQueued::get()
-		}
-
-		fn mark_reward_paid(
-			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
-			amount_paid: T::Balance,
-		) {
-			let amount_paid = Self::apply_reward_payment(reward, amount_paid);
-			if amount_paid.is_zero() {
-				return;
-			}
-			OperationalAccounts::<T>::mutate(&reward.operational_account, |maybe_account| {
-				if let Some(account) = maybe_account {
-					account.rewards_collected_amount.saturating_accrue(amount_paid);
-				}
-			});
 		}
 	}
 }
