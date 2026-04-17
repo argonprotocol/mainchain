@@ -1,8 +1,8 @@
 # Operational Accounts
 
-## Operational Status
+## Operational Eligibility
 
-An account is considered **operational** once it satisfies all of the following:
+An account is eligible to become **operational** once it satisfies all of the following:
 
 - The vault has been created.
 - The vault securitization is at least `OperationalMinimumVaultSecuritization`.
@@ -11,7 +11,9 @@ An account is considered **operational** once it satisfies all of the following:
 - At least `MiningSeatsForOperational` mining seats have been won.
 - The account has participated in at least one treasury pool.
 
-When an account becomes operational for the first time, it is awarded **one access code**.
+Once eligible, any managed account may call `activate` to make the account operational. Activation
+awards the first access code, starts the vault operational-minimum lock, and records any activation
+rewards.
 
 ## Access Code Lifecycle
 

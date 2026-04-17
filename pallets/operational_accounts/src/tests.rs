@@ -389,6 +389,12 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 		));
 
 		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
+		assert!(!recompute.is_operational);
+		assert_eq!(recompute.issuable_access_codes, 0);
+		assert_eq!(recompute.rewards_earned_amount, 0);
+
+		activate_account(&recompute_set);
+		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
 		assert!(recompute.is_operational);
 		assert_eq!(recompute.issuable_access_codes, 1);
 		assert_eq!(recompute.rewards_earned_amount, OperationalReferralReward::get());
@@ -396,11 +402,11 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 }
 
 #[test]
-fn test_access_code_activation_materializes_pending_sponsor_issuance() {
+fn test_access_code_activation_decrements_unactivated_and_materializes_ready_code() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(30, 31, 32, 33);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		let bitcoin_threshold = BitcoinLockSizeForAccessCode::get();
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
@@ -554,6 +560,11 @@ fn test_registration_lookup_hydrates_current_mining_registration() {
 
 		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(!account.is_operational);
+		assert_eq!(account.issuable_access_codes, 0);
+
+		activate_account(&account_set);
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert!(account.is_operational);
 		assert_eq!(account.issuable_access_codes, 1);
 	});
@@ -583,6 +594,11 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 
 		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(!account.is_operational);
+		assert_eq!(account.issuable_access_codes, 0);
+
+		activate_account(&account_set);
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert!(account.is_operational);
 		assert_eq!(account.issuable_access_codes, 2);
 		assert_eq!(account.bitcoin_applied_total, BitcoinLockSizeForAccessCode::get());
@@ -592,11 +608,22 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 }
 
 #[test]
-fn test_activation_records_pending_reward_when_requirements_met() {
+fn test_activate_from_managed_accounts_records_rewards_and_rejects_invalid_calls() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(1, 2, 3, 4);
 		register_account(&account_set, None);
 		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(!operational_account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
+		assert_eq!(operational_account.issuable_access_codes, 0);
+		assert_eq!(operational_account.rewards_earned_amount, 0);
+
+		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+			account_set.mining_funding.clone()
+		)));
 
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
@@ -606,6 +633,37 @@ fn test_activation_records_pending_reward_when_requirements_met() {
 		assert_eq!(operational_account.rewards_earned_count, 1);
 		assert_eq!(operational_account.rewards_earned_amount, 1_000);
 		assert_eq!(pending_rewards_amount(&operational_account), 1_000);
+
+		let activation_cases = [
+			make_account_set(10, 11, 12, 13),
+			make_account_set(20, 21, 22, 23),
+			make_account_set(30, 31, 32, 33),
+			make_account_set(40, 41, 42, 43),
+		];
+		for (index, account_set) in activation_cases.into_iter().enumerate() {
+			register_account(&account_set, None);
+			satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+			let signer = match index {
+				0 => account_set.owner.clone(),
+				1 => account_set.vault.clone(),
+				2 => account_set.mining_funding.clone(),
+				_ => account_set.mining_bot.clone(),
+			};
+			assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(signer)));
+
+			let operational_account =
+				OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+			assert!(operational_account.is_operational);
+			assert!(has_vault_operational_mark(&account_set.vault));
+		}
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(account_id_from_seed(54))),
+			crate::Error::<Test>::NotOperationalAccount
+		);
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(account_set.vault.clone())),
+			crate::Error::<Test>::AlreadyOperational
+		);
 	});
 }
 
@@ -624,46 +682,59 @@ fn test_genesis_initializes_reward_config() {
 }
 
 #[test]
-fn test_activation_requires_positive_bitcoin() {
+fn test_activate_requires_eligibility() {
 	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(31, 32, 33, 34);
-		register_account(&account_set, None);
-		ensure_registration_lookup(account_set.vault.clone(), account_set.mining_funding.clone());
+		let missing_bitcoin_set = make_account_set(31, 32, 33, 34);
+		register_account(&missing_bitcoin_set, None);
+		ensure_registration_lookup(
+			missing_bitcoin_set.vault.clone(),
+			missing_bitcoin_set.mining_funding.clone(),
+		);
 
-		OperationalAccountsPallet::vault_created(&account_set.vault);
-		record_uniswap_transfer(&account_set.vault, 1_000);
-		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
-		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
-		OperationalAccountsPallet::treasury_pool_participated(&account_set.vault, 1);
+		OperationalAccountsPallet::vault_created(&missing_bitcoin_set.vault);
+		record_uniswap_transfer(&missing_bitcoin_set.vault, 1_000);
+		OperationalAccountsPallet::mining_seat_won(&missing_bitcoin_set.mining_funding);
+		OperationalAccountsPallet::mining_seat_won(&missing_bitcoin_set.mining_funding);
+		OperationalAccountsPallet::treasury_pool_participated(&missing_bitcoin_set.vault, 1);
 
-		let account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		let account = OperationalAccounts::<Test>::get(&missing_bitcoin_set.owner)
+			.expect("operational account");
 		assert!(!account.is_operational);
-		assert!(!has_vault_operational_mark(&account_set.vault));
+		assert!(!has_vault_operational_mark(&missing_bitcoin_set.vault));
 		assert_eq!(account.rewards_earned_amount, 0);
-	});
-}
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+				missing_bitcoin_set.owner.clone()
+			)),
+			crate::Error::<Test>::NotEligibleForActivation
+		);
 
-#[test]
-fn test_activation_requires_minimum_vault_securitization() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(35, 36, 37, 38);
+		let insufficient_vault_set = make_account_set(35, 36, 37, 38);
 		set_registration_lookup(
-			account_set.vault.clone(),
-			account_set.mining_funding.clone(),
+			insufficient_vault_set.vault.clone(),
+			insufficient_vault_set.mining_funding.clone(),
 			0,
 			OperationalMinimumVaultSecuritization::get().saturating_sub(1),
 			false,
 			0,
 		);
-		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		register_account(&insufficient_vault_set, None);
+		satisfy_operational_requirements(
+			&insufficient_vault_set.mining_funding,
+			&insufficient_vault_set.vault,
+		);
 
-		let account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		let account = OperationalAccounts::<Test>::get(&insufficient_vault_set.owner)
+			.expect("operational account");
 		assert!(!account.is_operational);
-		assert!(!has_vault_operational_mark(&account_set.vault));
+		assert!(!has_vault_operational_mark(&insufficient_vault_set.vault));
 		assert_eq!(account.rewards_earned_amount, 0);
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+				insufficient_vault_set.owner.clone()
+			)),
+			crate::Error::<Test>::NotEligibleForActivation
+		);
 	});
 }
 
@@ -683,6 +754,12 @@ fn test_activation_skips_uniswap_transfer_when_it_is_not_required() {
 
 		let account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(!account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
+
+		activate_account(&account_set);
+		let account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert!(account.is_operational);
 		assert!(has_vault_operational_mark(&account_set.vault));
 	});
@@ -693,7 +770,7 @@ fn test_referral_bonus_awarded_on_threshold() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
 			sponsor_account.operational_referrals_count = 4;
@@ -716,7 +793,7 @@ fn test_referral_bonus_awarded_on_threshold() {
 
 		register_account(&recruit_set, Some(access_code));
 
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
@@ -736,7 +813,7 @@ fn test_recruit_operational_awards_sponsor_access_code() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
 			sponsor_account.unactivated_access_codes = 1;
@@ -759,7 +836,7 @@ fn test_recruit_operational_awards_sponsor_access_code() {
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.issuable_access_codes, 0);
 
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
@@ -772,7 +849,7 @@ fn test_pending_referral_access_code_materializes_when_issuance_room_opens() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(50, 51, 52, 53);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
 			sponsor_account.issuable_access_codes = MaxIssuableAccessCodes::get();
@@ -789,7 +866,7 @@ fn test_pending_referral_access_code_materializes_when_issuance_room_opens() {
 			assert!(expiring_codes.try_push(access_code.public).is_ok());
 		});
 		register_account(&recruit_set, Some(access_code));
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
@@ -812,7 +889,7 @@ fn test_bitcoin_progress_is_single_pending_and_resets_on_issuance() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(1, 2, 3, 4);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert_eq!(operational_account.issuable_access_codes, 1);
@@ -861,7 +938,7 @@ fn test_bitcoin_recovery_to_old_total_does_not_reaward_access_code() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(70, 71, 72, 73);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 
 		let min_lock = 1;
 		let access_code_threshold = BitcoinLockSizeForAccessCode::get();
@@ -902,7 +979,7 @@ fn test_access_codes_awarded_for_mining_seats() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(5, 6, 7, 8);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert_eq!(operational_account.issuable_access_codes, 1);
@@ -1219,6 +1296,17 @@ fn satisfy_operational_requirements(mining_account: &TestAccountId, vault_accoun
 	OperationalAccountsPallet::mining_seat_won(mining_account);
 	OperationalAccountsPallet::mining_seat_won(mining_account);
 	OperationalAccountsPallet::treasury_pool_participated(vault_account, 1);
+}
+
+fn activate_account(set: &AccountSet) {
+	assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+		set.mining_funding.clone()
+	)));
+}
+
+fn satisfy_and_activate(set: &AccountSet) {
+	satisfy_operational_requirements(&set.mining_funding, &set.vault);
+	activate_account(set);
 }
 
 fn set_issuable_access_codes(owner: &TestAccountId, count: u32) {

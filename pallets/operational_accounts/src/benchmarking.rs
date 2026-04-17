@@ -180,6 +180,7 @@ mod benchmarks {
 		assert!(account.vault_created);
 		assert!(account.has_treasury_pool_participation);
 		assert_eq!(account.mining_seat_accrual, 1);
+		assert!(!account.is_operational);
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_funding));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
@@ -228,7 +229,7 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.vault_created
 		);
 	}
 
@@ -265,10 +266,11 @@ mod benchmarks {
 				OperationalAccountsPallet::<T>::bitcoin_lock_funded(&linked.vault, 1u128.into());
 		}
 
-		assert!(
+		assert_eq!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.bitcoin_accrual,
+			1u128.into()
 		);
 	}
 
@@ -305,10 +307,11 @@ mod benchmarks {
 			let _ = OperationalAccountsPallet::<T>::mining_seat_won(&linked.mining_funding);
 		}
 
-		assert!(
+		assert_eq!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.mining_seat_accrual,
+			T::MiningSeatsForOperational::get()
 		);
 	}
 
@@ -350,7 +353,7 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.has_treasury_pool_participation
 		);
 	}
 
@@ -392,8 +395,58 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
+				.has_uniswap_transfer
+		);
+	}
+
+	#[benchmark]
+	fn activate() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_pool_participation: true,
+				requires_uniswap_transfer: true,
+				call_counters: Default::default(),
+			},
+		);
+		let linked = linked_accounts::<T>();
+		let sponsor = linked_accounts_with_seed::<T>(1);
+		let mut sponsor_account = default_operational_account::<T>(&sponsor);
+		sponsor_account.is_operational = true;
+		sponsor_account.operational_referrals_count =
+			T::ReferralBonusEveryXOperationalSponsees::get().saturating_sub(1);
+		insert_operational_account::<T>(&sponsor, sponsor_account);
+		let mut account = default_operational_account::<T>(&linked);
+		account.sponsor = Some(sponsor.owner.clone());
+		account.has_uniswap_transfer = true;
+		account.vault_created = true;
+		account.bitcoin_accrual = 1u128.into();
+		account.has_treasury_pool_participation = true;
+		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
+		insert_operational_account::<T>(&linked, account);
+		link_mining_funding_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
+		let caller = linked.mining_funding.clone();
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		activate(RawOrigin::Signed(caller.clone()));
+
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
 				.is_operational
 		);
+		let sponsor_account =
+			OperationalAccounts::<T>::get(&sponsor.owner).expect("sponsor account should exist");
+		assert!(sponsor_account.operational_referrals_count > 0);
 	}
 
 	#[benchmark]
@@ -486,7 +539,7 @@ mod benchmarks {
 		force_set_progress(RawOrigin::Root, linked.owner.clone(), patch, true);
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
-		assert!(account.is_operational);
+		assert!(!account.is_operational);
 	}
 
 	#[benchmark]
@@ -541,11 +594,15 @@ mod benchmarks {
 	}
 
 	fn linked_accounts<T: Config>() -> LinkedAccounts<T> {
+		linked_accounts_with_seed::<T>(0)
+	}
+
+	fn linked_accounts_with_seed<T: Config>(seed: u32) -> LinkedAccounts<T> {
 		LinkedAccounts {
-			owner: account("owner", 0, USER_SEED),
-			vault: account("vault", 0, USER_SEED),
-			mining_funding: account("mining_funding", 0, USER_SEED),
-			mining_bot: account("mining_bot", 0, USER_SEED),
+			owner: account("owner", seed, USER_SEED),
+			vault: account("vault", seed, USER_SEED),
+			mining_funding: account("mining_funding", seed, USER_SEED),
+			mining_bot: account("mining_bot", seed, USER_SEED),
 		}
 	}
 

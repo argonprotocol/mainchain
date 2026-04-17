@@ -738,6 +738,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountAlreadyLinked: AugmentedError<ApiType>;
       /**
+       * The account is already operational.
+       **/
+      AlreadyOperational: AugmentedError<ApiType>;
+      /**
        * The caller already registered an operational account.
        **/
       AlreadyRegistered: AugmentedError<ApiType>;
@@ -781,6 +785,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The requested progress patch does not contain any updates.
        **/
       NoProgressUpdateProvided: AugmentedError<ApiType>;
+      /**
+       * The account has not satisfied operational requirements yet.
+       **/
+      NotEligibleForActivation: AugmentedError<ApiType>;
       /**
        * The caller has not registered an operational account.
        **/

@@ -1028,6 +1028,10 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     operationalAccounts: {
       /**
+       * Activate an eligible operational account from any managed account.
+       **/
+      activate: AugmentedSubmittable<() => SubmittableExtrinsic<ApiType>, []>;
+      /**
        * Claim pending operational rewards to any managed account.
        **/
       claimRewards: AugmentedSubmittable<

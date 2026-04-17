@@ -14,6 +14,7 @@ pub trait WeightInfo {
 	fn set_reward_config() -> Weight;
 	fn force_set_progress() -> Weight;
 	fn set_encrypted_server_for_sponsee() -> Weight;
+	fn activate() -> Weight;
 	fn claim_rewards() -> Weight;
 	fn on_vault_created() -> Weight;
 	fn on_bitcoin_lock_funded() -> Weight;
@@ -82,7 +83,6 @@ where
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
 			.saturating_add(UniswapTransferRequirementWeight::requires_uniswap_transfer())
 			.saturating_add(TreasuryPoolProviderWeight::has_bond_participation())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn issue_access_code() -> Weight {
@@ -95,12 +95,16 @@ where
 
 	fn force_set_progress() -> Weight {
 		Base::force_set_progress()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn set_encrypted_server_for_sponsee() -> Weight {
 		Base::set_encrypted_server_for_sponsee()
+	}
+
+	fn activate() -> Weight {
+		Base::activate()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn claim_rewards() -> Weight {
@@ -114,32 +118,22 @@ where
 
 	fn on_vault_created() -> Weight {
 		Base::on_vault_created()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_bitcoin_lock_funded() -> Weight {
 		Base::on_bitcoin_lock_funded()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_mining_seat_won() -> Weight {
 		Base::on_mining_seat_won()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_treasury_pool_participated() -> Weight {
 		Base::on_treasury_pool_participated()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 
 	fn on_uniswap_transfer() -> Weight {
 		Base::on_uniswap_transfer()
-			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 }
 
@@ -158,6 +152,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn set_encrypted_server_for_sponsee() -> Weight {
+		Weight::zero()
+	}
+	fn activate() -> Weight {
 		Weight::zero()
 	}
 	fn claim_rewards() -> Weight {

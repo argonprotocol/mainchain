@@ -115,8 +115,7 @@ pub mod pallet {
 		type UniswapTransferRequirementProvider: UniswapTransferRequirementProvider;
 		/// Provider for recent qualifying inbound Argon transfer lookup.
 		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
-		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
-		/// transition via treasury queue processing).
+		/// Payout adapter for explicitly claimed operational rewards.
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
 
 		/// Weight information for this pallet.
@@ -463,7 +462,7 @@ pub mod pallet {
 		},
 		/// Account has become operational.
 		AccountWentOperational { account: T::AccountId },
-		/// A reward has been queued for treasury payout.
+		/// A reward is earned for an operational account, but not yet claimed.
 		OperationalRewardEarned {
 			account: T::AccountId,
 			reward_kind: OperationalRewardKind,
@@ -535,6 +534,10 @@ pub mod pallet {
 		RewardClaimExceedsPending,
 		/// The treasury does not currently have enough available reserves for the claim.
 		TreasuryInsufficientFunds,
+		/// The account is already operational.
+		AlreadyOperational,
+		/// The account has not satisfied operational requirements yet.
+		NotEligibleForActivation,
 	}
 
 	#[pallet::hooks]
@@ -709,11 +712,6 @@ pub mod pallet {
 				&operational_account,
 			);
 			OperationalAccountBySubAccount::<T>::insert(&mining_bot_account, &operational_account);
-			OperationalAccounts::<T>::mutate(&operational_account, |maybe_account| {
-				if let Some(stored_account) = maybe_account {
-					Self::maybe_activate_operational(&operational_account, stored_account);
-				}
-			});
 
 			Self::deposit_event(Event::OperationalAccountRegistered {
 				operational_account: operational_account.clone(),
@@ -840,10 +838,7 @@ pub mod pallet {
 					}
 
 					if update_operational_progress {
-						let activated = Self::maybe_activate_operational(&owner, account);
-						if !activated {
-							Self::materialize_issuable_access_codes(account);
-						}
+						Self::materialize_issuable_access_codes(account);
 					}
 
 					has_uniswap_transfer = account.has_uniswap_transfer;
@@ -894,13 +889,75 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Claim pending operational rewards to any managed account.
+		/// Activate an eligible operational account from any managed account.
 		#[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::activate())]
+		pub fn activate(origin: OriginFor<T>) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			let owner = Self::operational_owner_for(&signer);
+
+			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
+				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+				ensure!(!account.is_operational, Error::<T>::AlreadyOperational);
+				ensure!(
+					Self::has_achieved_operational(account),
+					Error::<T>::NotEligibleForActivation
+				);
+
+				let reward_config = Rewards::<T>::get();
+				account.is_operational = true;
+				Self::increment_issuable_access_codes(account);
+				Self::materialize_issuable_access_codes(account);
+				T::VaultProvider::account_became_operational(&account.vault_account);
+				Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
+				Self::record_reward(
+					account,
+					&owner,
+					OperationalRewardKind::Activation,
+					reward_config.operational_referral_reward,
+				);
+
+				if let Some(sponsor) = account.sponsor.as_ref() {
+					OperationalAccounts::<T>::mutate(sponsor, |maybe_account| {
+						let Some(sponsor_account) = maybe_account else {
+							return;
+						};
+						if !sponsor_account.is_operational {
+							return;
+						}
+						sponsor_account.referral_access_code_pending = true;
+						Self::materialize_issuable_access_codes(sponsor_account);
+						sponsor_account.operational_referrals_count.saturating_accrue(1);
+						Self::record_reward(
+							sponsor_account,
+							sponsor,
+							OperationalRewardKind::Activation,
+							reward_config.operational_referral_reward,
+						);
+						let bonus_every = T::ReferralBonusEveryXOperationalSponsees::get();
+						if bonus_every > 0 &&
+							sponsor_account.operational_referrals_count % bonus_every == 0
+						{
+							Self::record_reward(
+								sponsor_account,
+								sponsor,
+								OperationalRewardKind::ReferralBonus,
+								reward_config.referral_bonus_reward,
+							);
+						}
+					});
+				}
+
+				Ok(())
+			})
+		}
+
+		/// Claim pending operational rewards to any managed account.
+		#[pallet::call_index(6)]
 		#[pallet::weight(T::WeightInfo::claim_rewards())]
 		pub fn claim_rewards(origin: OriginFor<T>, amount: T::Balance) -> DispatchResult {
 			let claimant = ensure_signed(origin)?;
-			let owner = OperationalAccountBySubAccount::<T>::get(&claimant)
-				.unwrap_or_else(|| claimant.clone());
+			let owner = Self::operational_owner_for(&claimant);
 			let claim_increment = T::Balance::from(MICROGONS_PER_ARGON);
 			let amount_u128: u128 = amount.into();
 
@@ -945,8 +1002,12 @@ pub mod pallet {
 				};
 
 				account.has_uniswap_transfer = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
+		}
+
+		fn operational_owner_for(account_id: &T::AccountId) -> T::AccountId {
+			OperationalAccountBySubAccount::<T>::get(account_id)
+				.unwrap_or_else(|| account_id.clone())
 		}
 
 		fn decrement_unactivated_access_codes(account: &mut OperationalAccount<T>) {
@@ -1028,62 +1089,6 @@ pub mod pallet {
 			}
 		}
 
-		fn maybe_activate_operational(
-			owner: &T::AccountId,
-			operational_account: &mut OperationalAccount<T>,
-		) -> bool {
-			if operational_account.is_operational ||
-				!Self::has_achieved_operational(operational_account)
-			{
-				return false;
-			}
-
-			let reward_config = Rewards::<T>::get();
-			operational_account.is_operational = true;
-			Self::increment_issuable_access_codes(operational_account);
-			Self::materialize_issuable_access_codes(operational_account);
-			T::VaultProvider::account_became_operational(&operational_account.vault_account);
-			Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
-			Self::record_reward(
-				operational_account,
-				owner,
-				OperationalRewardKind::Activation,
-				reward_config.operational_referral_reward,
-			);
-
-			if let Some(sponsor) = operational_account.sponsor.as_ref() {
-				OperationalAccounts::<T>::mutate(sponsor, |maybe_account| {
-					let Some(sponsor_account) = maybe_account else {
-						return;
-					};
-					if !sponsor_account.is_operational {
-						return;
-					}
-					sponsor_account.referral_access_code_pending = true;
-					Self::materialize_issuable_access_codes(sponsor_account);
-					sponsor_account.operational_referrals_count.saturating_accrue(1);
-					Self::record_reward(
-						sponsor_account,
-						sponsor,
-						OperationalRewardKind::Activation,
-						reward_config.operational_referral_reward,
-					);
-					let bonus_every = T::ReferralBonusEveryXOperationalSponsees::get();
-					if bonus_every > 0 &&
-						sponsor_account.operational_referrals_count % bonus_every == 0
-					{
-						Self::record_reward(
-							sponsor_account,
-							sponsor,
-							OperationalRewardKind::ReferralBonus,
-							reward_config.referral_bonus_reward,
-						);
-					}
-				});
-			}
-			true
-		}
-
 		fn observed_bitcoin_total(account: &OperationalAccount<T>) -> T::Balance {
 			account.bitcoin_applied_total.saturating_add(account.bitcoin_accrual)
 		}
@@ -1126,7 +1131,6 @@ pub mod pallet {
 				};
 
 				account.vault_created = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
 		}
 
@@ -1145,7 +1149,6 @@ pub mod pallet {
 					return;
 				};
 				Self::recalculate_bitcoin_accrual(account, total_locked);
-				Self::maybe_activate_operational(&owner, account);
 				Self::materialize_issuable_access_codes(account);
 			});
 		}
@@ -1163,7 +1166,6 @@ pub mod pallet {
 					return;
 				};
 				account.mining_seat_accrual.saturating_accrue(1);
-				Self::maybe_activate_operational(&owner, account);
 				Self::materialize_issuable_access_codes(account);
 			});
 		}
@@ -1182,7 +1184,6 @@ pub mod pallet {
 					return;
 				};
 				account.has_treasury_pool_participation = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
 		}
 
