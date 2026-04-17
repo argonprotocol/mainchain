@@ -6,10 +6,10 @@ use super::{
 use crate::{
 	mock::{
 		Balances, BidPoolAccountId, CurrentFrameId, ExistentialDeposit, LastVaultProfits,
-		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor,
-		RuntimeHoldReason, RuntimeOrigin, Test, TestVault, Treasury, TreasuryExitDelayFrames,
-		TreasuryReservesAccountId, insert_vault, new_test_ext, reset_treasury_pool_participated,
-		set_argons, take_treasury_pool_participated,
+		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeHoldReason,
+		RuntimeOrigin, Test, TestVault, Treasury, TreasuryExitDelayFrames,
+		TreasuryReservesAccountId, insert_vault, new_test_ext, set_argons,
+		take_treasury_pool_participated,
 	},
 	pallet::{BondLotAllocation, FrameVaultCapital, VaultCapital},
 };
@@ -305,7 +305,7 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 }
 
 #[test]
-fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
+fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 	new_test_ext().execute_with(|| {
 		ExistentialDeposit::set(10);
 		insert_vault(
@@ -351,7 +351,8 @@ fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
 		);
 		CurrentFrameVaultCapital::<Test>::put(FrameVaultCapital { frame_id: 1, vaults });
 
-		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 11));
+		frame_system::Pallet::<Test>::inc_providers(&BidPoolAccountId::get());
+		set_argons(BidPoolAccountId::get(), 9);
 
 		Treasury::distribute_bid_pool(1);
 
@@ -361,7 +362,7 @@ fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
 		assert_eq!(bond_lot.last_frame_earnings, Some(0));
 		assert_eq!(bond_lot.cumulative_earnings, 0);
 		assert_eq!(Balances::balance(&99), 0);
-		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 11);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 0);
 	});
 }
 

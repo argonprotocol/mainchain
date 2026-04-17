@@ -174,7 +174,6 @@ pub mod pallet {
 
 		/// Optional hook for operational account state updates.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
-
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -924,11 +923,10 @@ pub mod pallet {
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			T::WeightInfo::on_frame_transition()
-				.saturating_add(
-					T::OperationalAccountsHook::treasury_pool_participated_weight()
-						.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
-				)
+			T::WeightInfo::on_frame_transition().saturating_add(
+				T::OperationalAccountsHook::treasury_pool_participated_weight()
+					.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
+			)
 		}
 	}
 

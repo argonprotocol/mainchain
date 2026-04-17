@@ -2011,11 +2011,12 @@ declare module '@polkadot/types/lookup' {
       readonly rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
       readonly amount: u128;
     } & Struct;
-    readonly isOperationalRewardEnqueueFailed: boolean;
-    readonly asOperationalRewardEnqueueFailed: {
-      readonly account: AccountId32;
-      readonly rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
+    readonly isOperationalRewardsClaimed: boolean;
+    readonly asOperationalRewardsClaimed: {
+      readonly operationalAccount: AccountId32;
+      readonly claimant: AccountId32;
       readonly amount: u128;
+      readonly remainingPending: u128;
     } & Struct;
     readonly isRewardsConfigUpdated: boolean;
     readonly asRewardsConfigUpdated: {
@@ -2041,7 +2042,7 @@ declare module '@polkadot/types/lookup' {
       | 'OperationalAccountRegistered'
       | 'AccountWentOperational'
       | 'OperationalRewardEarned'
-      | 'OperationalRewardEnqueueFailed'
+      | 'OperationalRewardsClaimed'
       | 'RewardsConfigUpdated'
       | 'OperationalProgressForced'
       | 'EncryptedServerUpdated';
@@ -3383,10 +3384,6 @@ declare module '@polkadot/types/lookup' {
     readonly asRegister: {
       readonly registration: PalletOperationalAccountsRegistration;
     } & Struct;
-    readonly isIssueAccessCode: boolean;
-    readonly asIssueAccessCode: {
-      readonly accessCodePublic: U8aFixed;
-    } & Struct;
     readonly isSetRewardConfig: boolean;
     readonly asSetRewardConfig: {
       readonly operationalReferralReward: u128;
@@ -3403,12 +3400,18 @@ declare module '@polkadot/types/lookup' {
       readonly sponsee: AccountId32;
       readonly encryptedServer: Bytes;
     } & Struct;
+    readonly isActivate: boolean;
+    readonly isClaimRewards: boolean;
+    readonly asClaimRewards: {
+      readonly amount: u128;
+    } & Struct;
     readonly type:
       | 'Register'
-      | 'IssueAccessCode'
       | 'SetRewardConfig'
       | 'ForceSetProgress'
-      | 'SetEncryptedServerForSponsee';
+      | 'SetEncryptedServerForSponsee'
+      | 'Activate'
+      | 'ClaimRewards';
   }
 
   /** @name PalletOperationalAccountsRegistration (332) */
@@ -3429,7 +3432,7 @@ declare module '@polkadot/types/lookup' {
     readonly vaultAccountProof: PalletOperationalAccountsAccountOwnershipProof;
     readonly miningFundingAccountProof: PalletOperationalAccountsAccountOwnershipProof;
     readonly miningBotAccountProof: PalletOperationalAccountsAccountOwnershipProof;
-    readonly accessCode: Option<PalletOperationalAccountsAccessCodeProof>;
+    readonly referralProof: Option<PalletOperationalAccountsReferralProof>;
   }
 
   /** @name PalletOperationalAccountsOpaqueEncryptionPubkey (334) */
@@ -3440,10 +3443,13 @@ declare module '@polkadot/types/lookup' {
     readonly signature: SpRuntimeMultiSignature;
   }
 
-  /** @name PalletOperationalAccountsAccessCodeProof (337) */
-  interface PalletOperationalAccountsAccessCodeProof extends Struct {
-    readonly public: U8aFixed;
-    readonly signature: U8aFixed;
+  /** @name PalletOperationalAccountsReferralProof (337) */
+  interface PalletOperationalAccountsReferralProof extends Struct {
+    readonly referralCode: U8aFixed;
+    readonly referralSignature: U8aFixed;
+    readonly sponsor: AccountId32;
+    readonly expiresAtFrame: Compact<u64>;
+    readonly sponsorSignature: SpRuntimeMultiSignature;
   }
 
   /** @name PalletOperationalAccountsOperationalProgressPatch (338) */
@@ -4430,107 +4436,98 @@ declare module '@polkadot/types/lookup' {
     readonly miningSeatAccrual: Compact<u32>;
     readonly miningSeatAppliedTotal: Compact<u32>;
     readonly operationalReferralsCount: Compact<u32>;
-    readonly referralAccessCodePending: bool;
-    readonly issuableAccessCodes: Compact<u32>;
-    readonly unactivatedAccessCodes: Compact<u32>;
+    readonly referralPending: bool;
+    readonly availableReferrals: Compact<u32>;
     readonly rewardsEarnedCount: Compact<u32>;
     readonly rewardsEarnedAmount: u128;
     readonly rewardsCollectedAmount: u128;
     readonly isOperational: bool;
   }
 
-  /** @name PalletOperationalAccountsAccessCodeMetadata (541) */
-  interface PalletOperationalAccountsAccessCodeMetadata extends Struct {
-    readonly sponsor: AccountId32;
-    readonly expirationFrame: Compact<u64>;
-  }
-
-  /** @name PalletOperationalAccountsRewardsConfig (544) */
+  /** @name PalletOperationalAccountsRewardsConfig (542) */
   interface PalletOperationalAccountsRewardsConfig extends Struct {
     readonly operationalReferralReward: Compact<u128>;
     readonly referralBonusReward: Compact<u128>;
   }
 
-  /** @name ArgonPrimitivesProvidersOperationalRewardPayout (546) */
-  interface ArgonPrimitivesProvidersOperationalRewardPayout extends Struct {
-    readonly operationalAccount: AccountId32;
-    readonly payoutAccount: AccountId32;
-    readonly rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
-    readonly amount: u128;
-  }
-
-  /** @name PalletOperationalAccountsError (549) */
+  /** @name PalletOperationalAccountsError (544) */
   interface PalletOperationalAccountsError extends Enum {
     readonly isAlreadyRegistered: boolean;
     readonly isInvalidRegistrationSubmitter: boolean;
     readonly isAccountAlreadyLinked: boolean;
     readonly isInvalidAccountProof: boolean;
     readonly isNotOperationalAccount: boolean;
-    readonly isAccessCodeAlreadyRegistered: boolean;
-    readonly isInvalidAccessCode: boolean;
-    readonly isInvalidAccessCodeProof: boolean;
-    readonly isNoIssuableAccessCodes: boolean;
-    readonly isMaxUnactivatedAccessCodesReached: boolean;
-    readonly isMaxAccessCodesExpiringPerFrameReached: boolean;
+    readonly isInvalidReferralProof: boolean;
+    readonly isReferralProofExpired: boolean;
     readonly isNoProgressUpdateProvided: boolean;
     readonly isEncryptedServerTooLong: boolean;
     readonly isNotSponsorOfSponsee: boolean;
+    readonly isNoPendingRewards: boolean;
+    readonly isRewardClaimBelowMinimum: boolean;
+    readonly isRewardClaimNotWholeArgon: boolean;
+    readonly isRewardClaimExceedsPending: boolean;
+    readonly isTreasuryInsufficientFunds: boolean;
+    readonly isAlreadyOperational: boolean;
+    readonly isNotEligibleForActivation: boolean;
     readonly type:
       | 'AlreadyRegistered'
       | 'InvalidRegistrationSubmitter'
       | 'AccountAlreadyLinked'
       | 'InvalidAccountProof'
       | 'NotOperationalAccount'
-      | 'AccessCodeAlreadyRegistered'
-      | 'InvalidAccessCode'
-      | 'InvalidAccessCodeProof'
-      | 'NoIssuableAccessCodes'
-      | 'MaxUnactivatedAccessCodesReached'
-      | 'MaxAccessCodesExpiringPerFrameReached'
+      | 'InvalidReferralProof'
+      | 'ReferralProofExpired'
       | 'NoProgressUpdateProvided'
       | 'EncryptedServerTooLong'
-      | 'NotSponsorOfSponsee';
+      | 'NotSponsorOfSponsee'
+      | 'NoPendingRewards'
+      | 'RewardClaimBelowMinimum'
+      | 'RewardClaimNotWholeArgon'
+      | 'RewardClaimExceedsPending'
+      | 'TreasuryInsufficientFunds'
+      | 'AlreadyOperational'
+      | 'NotEligibleForActivation';
   }
 
-  /** @name FrameSystemExtensionsAuthorizeCall (552) */
+  /** @name FrameSystemExtensionsAuthorizeCall (547) */
   type FrameSystemExtensionsAuthorizeCall = Null;
 
-  /** @name FrameSystemExtensionsCheckNonZeroSender (553) */
+  /** @name FrameSystemExtensionsCheckNonZeroSender (548) */
   type FrameSystemExtensionsCheckNonZeroSender = Null;
 
-  /** @name FrameSystemExtensionsCheckSpecVersion (554) */
+  /** @name FrameSystemExtensionsCheckSpecVersion (549) */
   type FrameSystemExtensionsCheckSpecVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckTxVersion (555) */
+  /** @name FrameSystemExtensionsCheckTxVersion (550) */
   type FrameSystemExtensionsCheckTxVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckGenesis (556) */
+  /** @name FrameSystemExtensionsCheckGenesis (551) */
   type FrameSystemExtensionsCheckGenesis = Null;
 
-  /** @name FrameSystemExtensionsCheckNonce (559) */
+  /** @name FrameSystemExtensionsCheckNonce (554) */
   interface FrameSystemExtensionsCheckNonce extends Compact<u32> {}
 
-  /** @name FrameSystemExtensionsCheckWeight (560) */
+  /** @name FrameSystemExtensionsCheckWeight (555) */
   type FrameSystemExtensionsCheckWeight = Null;
 
-  /** @name PalletTransactionPaymentChargeTransactionPayment (561) */
+  /** @name PalletTransactionPaymentChargeTransactionPayment (556) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name FrameMetadataHashExtensionCheckMetadataHash (562) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (557) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
     readonly mode: FrameMetadataHashExtensionMode;
   }
 
-  /** @name FrameMetadataHashExtensionMode (563) */
+  /** @name FrameMetadataHashExtensionMode (558) */
   interface FrameMetadataHashExtensionMode extends Enum {
     readonly isDisabled: boolean;
     readonly isEnabled: boolean;
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name FrameSystemExtensionsWeightReclaim (564) */
+  /** @name FrameSystemExtensionsWeightReclaim (559) */
   type FrameSystemExtensionsWeightReclaim = Null;
 
-  /** @name ArgonRuntimeRuntime (566) */
+  /** @name ArgonRuntimeRuntime (561) */
   type ArgonRuntimeRuntime = Null;
 } // declare module

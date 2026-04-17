@@ -214,12 +214,10 @@ parameter_types! {
 	pub const MinimumTransferMicrogonsToRecord: Balance = 1_000 * MICROGONS_PER_ARGON;
 
 	// ## pallet_operational_accounts
-	/// How many mining frames an access code remains valid.
-	pub const OperationalAccessCodeExpirationFrames: FrameId = 2;
-	/// Maximum number of access codes that may expire in the same frame.
-	pub const MaxAccessCodesExpiringPerFrame: u32 = 1_000;
-	/// Maximum number of issuable operational access codes allowed at once.
-	pub const MaxIssuableOperationalAccessCodes: u32 = 3;
+	/// Maximum number of available operational referrals allowed at once.
+	pub const MaxAvailableOperationalReferrals: u32 = 3;
+	/// Maximum number of expired referral codes cleaned per block.
+	pub const MaxExpiredReferralCodeCleanupsPerBlock: u32 = 1_000;
 	/// Maximum number of queued operational rewards.
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
 	/// Maximum number of opaque encrypted sponsor server bytes stored per sponsee.
@@ -235,12 +233,12 @@ parameter_types! {
 	/// One no-fee stale `initialize_for` failure is allowed for each this-many units of lost
 	/// `available_for_lock`.
 	pub const CapacityDropAttemptUnit: Balance = 100 * MICROGONS_PER_ARGON;
-	/// Additional argon amount (base units) required per access code after operational.
-	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
+	/// Additional argon amount (base units) required per referral after operational.
+	pub const BitcoinLockSizeForReferral: Balance = 5_000 * MICROGONS_PER_ARGON;
 	/// Mining seats required to become operational.
 	pub const MiningSeatsForOperational: u32 = 2;
-	/// Mining seats required per access code after operational.
-	pub const MiningSeatsPerAccessCode: u32 = 5;
+	/// Mining seats required per referral after operational.
+	pub const MiningSeatsPerReferral: u32 = 5;
 	/// Number of operational sponsees required per referral bonus reward.
 	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
 	/// Default reward paid when an account becomes operational.

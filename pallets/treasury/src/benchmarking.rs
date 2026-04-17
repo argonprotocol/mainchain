@@ -2,7 +2,8 @@
 
 use super::*;
 use argon_primitives::{
-	MICROGONS_PER_ARGON, TreasuryPoolProvider, VaultId, bitcoin::Satoshis,
+	MICROGONS_PER_ARGON, TreasuryPoolProvider, VaultId,
+	bitcoin::Satoshis,
 	vault::{Vault, VaultTerms},
 };
 use frame_benchmarking::v2::*;

@@ -1163,7 +1163,7 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * A reward has been queued for treasury payout.
+       * A reward is earned for an operational account, but not yet claimed.
        **/
       OperationalRewardEarned: AugmentedEvent<
         ApiType,

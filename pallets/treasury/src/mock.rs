@@ -224,10 +224,6 @@ pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
 }
 
-pub fn reset_treasury_pool_participated() {
-	TreasuryPoolParticipated::set(vec![]);
-}
-
 pub fn take_treasury_pool_participated() -> Vec<(u64, Balance)> {
 	let values = TreasuryPoolParticipated::get();
 	TreasuryPoolParticipated::set(vec![]);

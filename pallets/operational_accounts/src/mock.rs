@@ -34,15 +34,13 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static CurrentFrameId: FrameId = 1;
-	pub const AccessCodeExpirationFrames: FrameId = 2;
-	pub const MaxAccessCodesExpiringPerFrame: u32 = 16;
-	pub const MaxUnactivatedAccessCodes: u32 = 2;
-	pub const MaxIssuableAccessCodes: u32 = 2;
+	pub const MaxAvailableReferrals: u32 = 2;
+	pub const MaxExpiredReferralCodeCleanupsPerBlock: u32 = 2;
 	pub const MaxEncryptedServerLen: u32 = 256;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
-	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
+	pub const BitcoinLockSizeForReferral: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
-	pub const MiningSeatsPerAccessCode: u32 = 5;
+	pub const MiningSeatsPerReferral: u32 = 5;
 	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
 	pub const OperationalReferralReward: Balance = 1_000;
 	pub const OperationalReferralBonusReward: Balance = 500;
@@ -264,15 +262,13 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 impl pallet_operational_accounts::Config for Test {
 	type Balance = Balance;
 	type FrameProvider = StaticFrameProvider;
-	type AccessCodeExpirationFrames = AccessCodeExpirationFrames;
-	type MaxAccessCodesExpiringPerFrame = MaxAccessCodesExpiringPerFrame;
-	type MaxUnactivatedAccessCodes = MaxUnactivatedAccessCodes;
-	type MaxIssuableAccessCodes = MaxIssuableAccessCodes;
+	type MaxAvailableReferrals = MaxAvailableReferrals;
+	type MaxExpiredReferralCodeCleanupsPerBlock = MaxExpiredReferralCodeCleanupsPerBlock;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
+	type BitcoinLockSizeForReferral = BitcoinLockSizeForReferral;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type MiningSeatsPerReferral = MiningSeatsPerReferral;
 	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
 	type OperationalReferralReward = OperationalReferralReward;
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
@@ -302,6 +298,7 @@ pub fn new_test_ext() -> TestState {
 			.unwrap();
 	});
 	ext.execute_with(|| {
+		CurrentFrameId::set(1);
 		RequiresUniswapTransfer::set(true);
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());

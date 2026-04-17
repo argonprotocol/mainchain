@@ -1060,17 +1060,9 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32, PalletOperationalAccountsOperationalProgressPatch, bool]
       >;
       /**
-       * Issue an access code (the public key itself) for this operational account.
-       * The access code expires after `AccessCodeExpirationFrames`.
-       **/
-      issueAccessCode: AugmentedSubmittable<
-        (accessCodePublic: U8aFixed | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
-        [U8aFixed]
-      >;
-      /**
        * Register vault, mining funding, and bot accounts for an operational account.
        * Any account in the registration may submit the transaction.
-       * If an access code is provided, the registration records the sponsor relationship.
+       * If a referral proof is provided, the registration records the sponsor relationship.
        **/
       register: AugmentedSubmittable<
         (

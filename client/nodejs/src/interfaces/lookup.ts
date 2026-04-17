@@ -1640,10 +1640,11 @@ export default {
         rewardKind: 'ArgonPrimitivesProvidersOperationalRewardKind',
         amount: 'u128',
       },
-      OperationalRewardEnqueueFailed: {
-        account: 'AccountId32',
-        rewardKind: 'ArgonPrimitivesProvidersOperationalRewardKind',
+      OperationalRewardsClaimed: {
+        operationalAccount: 'AccountId32',
+        claimant: 'AccountId32',
         amount: 'u128',
+        remainingPending: 'u128',
       },
       RewardsConfigUpdated: {
         operationalReferralReward: 'u128',
@@ -2936,9 +2937,7 @@ export default {
       register: {
         registration: 'PalletOperationalAccountsRegistration',
       },
-      issue_access_code: {
-        accessCodePublic: '[u8;32]',
-      },
+      __Unused1: 'Null',
       set_reward_config: {
         operationalReferralReward: 'u128',
         referralBonusReward: 'u128',
@@ -2951,6 +2950,10 @@ export default {
       set_encrypted_server_for_sponsee: {
         sponsee: 'AccountId32',
         encryptedServer: 'Bytes',
+      },
+      activate: 'Null',
+      claim_rewards: {
+        amount: 'u128',
       },
     },
   },
@@ -2975,7 +2978,7 @@ export default {
     vaultAccountProof: 'PalletOperationalAccountsAccountOwnershipProof',
     miningFundingAccountProof: 'PalletOperationalAccountsAccountOwnershipProof',
     miningBotAccountProof: 'PalletOperationalAccountsAccountOwnershipProof',
-    accessCode: 'Option<PalletOperationalAccountsAccessCodeProof>',
+    referralProof: 'Option<PalletOperationalAccountsReferralProof>',
   },
   /**
    * Lookup334: pallet_operational_accounts::pallet::OpaqueEncryptionPubkey
@@ -2988,11 +2991,14 @@ export default {
     signature: 'SpRuntimeMultiSignature',
   },
   /**
-   * Lookup337: pallet_operational_accounts::pallet::AccessCodeProof
+   * Lookup337: pallet_operational_accounts::pallet::ReferralProof<sp_core::crypto::AccountId32>
    **/
-  PalletOperationalAccountsAccessCodeProof: {
-    public: '[u8;32]',
-    signature: '[u8;64]',
+  PalletOperationalAccountsReferralProof: {
+    referralCode: '[u8;32]',
+    referralSignature: '[u8;64]',
+    sponsor: 'AccountId32',
+    expiresAtFrame: 'Compact<u64>',
+    sponsorSignature: 'SpRuntimeMultiSignature',
   },
   /**
    * Lookup338: pallet_operational_accounts::pallet::OperationalProgressPatch<Balance>
@@ -3834,39 +3840,22 @@ export default {
     miningSeatAccrual: 'Compact<u32>',
     miningSeatAppliedTotal: 'Compact<u32>',
     operationalReferralsCount: 'Compact<u32>',
-    referralAccessCodePending: 'bool',
-    issuableAccessCodes: 'Compact<u32>',
-    unactivatedAccessCodes: 'Compact<u32>',
+    referralPending: 'bool',
+    availableReferrals: 'Compact<u32>',
     rewardsEarnedCount: 'Compact<u32>',
     rewardsEarnedAmount: 'u128',
     rewardsCollectedAmount: 'u128',
     isOperational: 'bool',
   },
   /**
-   * Lookup541: pallet_operational_accounts::pallet::AccessCodeMetadata<T>
-   **/
-  PalletOperationalAccountsAccessCodeMetadata: {
-    sponsor: 'AccountId32',
-    expirationFrame: 'Compact<u64>',
-  },
-  /**
-   * Lookup544: pallet_operational_accounts::pallet::RewardsConfig<Balance>
+   * Lookup542: pallet_operational_accounts::pallet::RewardsConfig<Balance>
    **/
   PalletOperationalAccountsRewardsConfig: {
     operationalReferralReward: 'Compact<u128>',
     referralBonusReward: 'Compact<u128>',
   },
   /**
-   * Lookup546: argon_primitives::providers::OperationalRewardPayout<sp_core::crypto::AccountId32, Balance>
-   **/
-  ArgonPrimitivesProvidersOperationalRewardPayout: {
-    operationalAccount: 'AccountId32',
-    payoutAccount: 'AccountId32',
-    rewardKind: 'ArgonPrimitivesProvidersOperationalRewardKind',
-    amount: 'u128',
-  },
-  /**
-   * Lookup549: pallet_operational_accounts::pallet::Error<T>
+   * Lookup544: pallet_operational_accounts::pallet::Error<T>
    **/
   PalletOperationalAccountsError: {
     _enum: [
@@ -3875,67 +3864,70 @@ export default {
       'AccountAlreadyLinked',
       'InvalidAccountProof',
       'NotOperationalAccount',
-      'AccessCodeAlreadyRegistered',
-      'InvalidAccessCode',
-      'InvalidAccessCodeProof',
-      'NoIssuableAccessCodes',
-      'MaxUnactivatedAccessCodesReached',
-      'MaxAccessCodesExpiringPerFrameReached',
+      'InvalidReferralProof',
+      'ReferralProofExpired',
       'NoProgressUpdateProvided',
       'EncryptedServerTooLong',
       'NotSponsorOfSponsee',
+      'NoPendingRewards',
+      'RewardClaimBelowMinimum',
+      'RewardClaimNotWholeArgon',
+      'RewardClaimExceedsPending',
+      'TreasuryInsufficientFunds',
+      'AlreadyOperational',
+      'NotEligibleForActivation',
     ],
   },
   /**
-   * Lookup552: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup547: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup553: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup548: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup554: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup549: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup555: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup550: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup556: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup551: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup559: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup554: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup560: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup555: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup561: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup556: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup562: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup557: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup563: frame_metadata_hash_extension::Mode
+   * Lookup558: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup564: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup559: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup566: argon_runtime::Runtime
+   * Lookup561: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

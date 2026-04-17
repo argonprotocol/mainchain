@@ -12,41 +12,40 @@ An account is eligible to become **operational** once it satisfies all of the fo
 - The account has participated in at least one treasury pool.
 
 Once eligible, any managed account may call `activate` to make the account operational. Activation
-awards the first access code, starts the vault operational-minimum lock, and records any activation
+awards the first referral, starts the vault operational-minimum lock, and records any activation
 rewards.
 
-## Access Code Lifecycle
+## Referral Proof Lifecycle
 
-1. A sponsor issues an access code by calling `issue_access_code` with a public key.
-2. The sponsor sends the access code link to a recruit.
-3. The recruit **activates** the access code by calling `register` with the access code proof.
+1. A sponsor signs a referral grant over a referral code public key and expiry frame off-chain.
+2. The sponsor sends the referral secret to a recruit.
+3. The recruit registers with a `ReferralProof` containing the referral claim and sponsor grant.
 
-Registering a code issues one **unactivated access code** (issued but not yet activated). Activating
-a code consumes one unactivated access code for the sponsor and may materialize one already-earned
-pending code if issuance room is available.
+Registering with a referral proof links the sponsor only if the sponsor currently has referral
+capacity. A linked referral consumes one available referral and may materialize one already-earned
+pending referral if capacity is available. Linked referral codes are tracked so the same referral
+code cannot sponsor more than one registration before the referral proof expires; repeat uses
+register without a sponsor link. Referral codes are cleaned up after expiration.
 
-## How Access Codes Are Earned
+## How Referrals Are Earned
 
-After an account is operational, it can earn additional access codes through:
+After an account is operational, it can earn additional referrals through:
 
 - **Sponsored operational recruit:** when a sponsored account becomes operational, the sponsor earns
-  one access code (only if the sponsor is operational).
-- **Bitcoin lock progress:** total locked increases accumulate toward
-  `BitcoinLockSizeForAccessCode`. Progress decreases if total locked falls. Once a code is earned,
-  bitcoin progress resets to zero.
-- **Mining seats:** after operational, mining seat wins accumulate toward `MiningSeatsPerAccessCode`
-  and award an access code. The seats used to become operational count toward this progress.
-- **Expired access codes:** if an unactivated access code expires (issued but not yet activated),
-  the sponsor regains one issuable access code.
-
-Each earning category keeps at most one pending access code. Additional progress in a category does
-not stack into a second pending code until the pending one is materialized.
+  one referral (only if the sponsor is operational).
+- **Bitcoin lock progress:** total locked increases accumulate toward `BitcoinLockSizeForReferral`.
+  Progress decreases if total locked falls. Once a referral is earned, bitcoin progress resets to
+  zero.
+- **Mining seats:** after operational, mining seat wins accumulate toward `MiningSeatsPerReferral`
+  and award a referral. The seats used to become operational count toward this progress. Each
+  earning category keeps at most one pending referral. Additional progress in a category does not
+  stack into a second pending referral until the pending one is materialized.
 
 ## Limits
 
-- **Issuable access codes** are capped by `MaxIssuableAccessCodes`.
-- **Unactivated access codes** (issued but not yet activated) are capped by
-  `MaxUnactivatedAccessCodes`.
+- **Available referrals** are capped by `MaxAvailableReferrals`.
+- **Expired referral cleanup work** is capped by `MaxExpiredReferralCodeCleanupsPerBlock` per block.
+  The number of referrals that can expire in the same frame is not capped.
 
 ## Rewards
 

@@ -44,7 +44,7 @@ const BENCH_MINING_BOT_ACCOUNT: [u8; 32] = [
 	142, 229, 4, 20, 142, 117, 195, 78, 143, 5, 24, 153, 179, 198, 228, 36, 31, 241, 141, 193, 201,
 	33, 18, 96, 182, 166, 164, 52, 190, 219, 72, 95,
 ];
-const BENCH_ACCESS_CODE_PUBLIC: [u8; 32] = [
+const BENCH_REFERRAL_CODE_PUBLIC: [u8; 32] = [
 	194, 226, 189, 113, 224, 74, 106, 242, 137, 124, 52, 20, 214, 253, 64, 52, 119, 36, 80, 96,
 	253, 34, 218, 170, 65, 47, 245, 27, 131, 192, 194, 46,
 ];
@@ -72,7 +72,7 @@ const BENCH_MINING_BOT_SIGNATURE: [u8; 64] = [
 	135, 111, 189, 98, 83, 208, 56, 143, 194, 77, 72, 165, 46, 134, 218, 194, 69, 34, 97, 215, 124,
 	158, 129,
 ];
-const BENCH_ACCESS_CODE_SIGNATURE: [u8; 64] = [
+const BENCH_REFERRAL_SIGNATURE: [u8; 64] = [
 	170, 36, 183, 56, 107, 58, 13, 16, 115, 132, 63, 37, 140, 27, 84, 40, 81, 152, 48, 54, 147, 83,
 	164, 193, 205, 195, 202, 61, 245, 88, 99, 30, 55, 196, 28, 150, 3, 169, 10, 7, 123, 188, 204,
 	42, 23, 162, 235, 99, 46, 221, 130, 45, 74, 84, 84, 251, 236, 101, 89, 190, 23, 115, 251, 139,
@@ -89,18 +89,11 @@ mod benchmarks {
 		let caller = benchmark_account_id::<T>(BENCH_OPERATIONAL_ACCOUNT);
 		let operational_account_proof = benchmark_account_proof(BENCH_OPERATIONAL_SIGNATURE);
 		let sponsor = linked_accounts::<T>();
-		let access_code = benchmark_access_code_proof();
+		let referral_proof = benchmark_referral_proof::<T>(sponsor.owner.clone());
 		let mut sponsor_account = default_operational_account::<T>(&sponsor);
 		sponsor_account.is_operational = true;
-		sponsor_account.unactivated_access_codes = 1;
+		sponsor_account.available_referrals = 1;
 		insert_operational_account::<T>(&sponsor, sponsor_account);
-		AccessCodesByPublic::<T>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor.owner.clone(), expiration_frame: 1 },
-		);
-		AccessCodesExpiringByFrame::<T>::mutate(1, |expiring_codes| {
-			let _ = expiring_codes.try_push(access_code.public);
-		});
 		let vault = benchmark_account_id::<T>(BENCH_VAULT_ACCOUNT);
 		let mining_funding = benchmark_account_id::<T>(BENCH_MINING_FUNDING_ACCOUNT);
 		let mining_bot = benchmark_account_id::<T>(BENCH_MINING_BOT_ACCOUNT);
@@ -138,7 +131,7 @@ mod benchmarks {
 			vault_account_proof: vault_proof,
 			mining_funding_account_proof: mining_funding_proof,
 			mining_bot_account_proof: mining_bot_proof,
-			access_code: Some(access_code.clone()),
+			referral_proof: Some(referral_proof.clone()),
 		});
 		let Registration::V1(RegistrationV1 {
 			operational_account,
@@ -184,7 +177,6 @@ mod benchmarks {
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_funding));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
-		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
 			get_registration_vault_data: 1,
 			has_active_rewards_account_seat: 1,
@@ -410,7 +402,7 @@ mod benchmarks {
 						.saturated_into(),
 				}),
 				has_active_rewards_account_seat: true,
-				has_pool_participation: true,
+				has_bond_participation: true,
 				requires_uniswap_transfer: true,
 				call_counters: Default::default(),
 			},
@@ -447,27 +439,6 @@ mod benchmarks {
 		let sponsor_account =
 			OperationalAccounts::<T>::get(&sponsor.owner).expect("sponsor account should exist");
 		assert!(sponsor_account.operational_referrals_count > 0);
-	}
-
-	#[benchmark]
-	fn issue_access_code() {
-		let sponsor: T::AccountId = account("sponsor", 0, USER_SEED);
-		let sponsor_links = LinkedAccounts {
-			owner: sponsor.clone(),
-			vault: sponsor.clone(),
-			mining_funding: sponsor.clone(),
-			mining_bot: sponsor.clone(),
-		};
-		let mut sponsor_account = default_operational_account::<T>(&sponsor_links);
-		sponsor_account.issuable_access_codes = 1;
-		insert_operational_account::<T>(&sponsor_links, sponsor_account);
-
-		let access_code_public = sr25519::Public::from_raw([5u8; 32]);
-		whitelist_account!(sponsor);
-		#[extrinsic_call]
-		issue_access_code(RawOrigin::Signed(sponsor.clone()), access_code_public);
-
-		assert!(AccessCodesByPublic::<T>::contains_key(access_code_public));
 	}
 
 	#[benchmark]
@@ -621,9 +592,8 @@ mod benchmarks {
 			mining_seat_accrual: 0,
 			mining_seat_applied_total: 0,
 			operational_referrals_count: 0,
-			referral_access_code_pending: false,
-			issuable_access_codes: 0,
-			unactivated_access_codes: 0,
+			referral_pending: false,
+			available_referrals: 0,
 			rewards_earned_count: 0,
 			rewards_earned_amount: <T::Balance as Zero>::zero(),
 			rewards_collected_amount: <T::Balance as Zero>::zero(),
@@ -654,10 +624,13 @@ mod benchmarks {
 		AccountOwnershipProof { signature: sr25519::Signature::from_raw(signature).into() }
 	}
 
-	fn benchmark_access_code_proof() -> AccessCodeProof {
-		AccessCodeProof {
-			public: sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC),
-			signature: sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE),
+	fn benchmark_referral_proof<T: Config>(sponsor: T::AccountId) -> ReferralProof<T::AccountId> {
+		ReferralProof {
+			referral_code: sr25519::Public::from_raw(BENCH_REFERRAL_CODE_PUBLIC),
+			referral_signature: sr25519::Signature::from_raw(BENCH_REFERRAL_SIGNATURE),
+			sponsor,
+			expires_at_frame: FrameId::MAX,
+			sponsor_signature: sr25519::Signature::from_raw(BENCH_REFERRAL_SIGNATURE).into(),
 		}
 	}
 
@@ -693,8 +666,6 @@ mod benchmarks {
 			let vault_account = AccountId32::new(BENCH_VAULT_ACCOUNT);
 			let mining_funding_account = AccountId32::new(BENCH_MINING_FUNDING_ACCOUNT);
 			let mining_bot_account = AccountId32::new(BENCH_MINING_BOT_ACCOUNT);
-			let access_code_public = sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC);
-
 			let operational_signature: Signature =
 				sr25519::Signature::from_raw(BENCH_OPERATIONAL_SIGNATURE).into();
 			let vault_signature: Signature =
@@ -703,7 +674,6 @@ mod benchmarks {
 				sr25519::Signature::from_raw(BENCH_MINING_FUNDING_SIGNATURE).into();
 			let mining_bot_signature: Signature =
 				sr25519::Signature::from_raw(BENCH_MINING_BOT_SIGNATURE).into();
-			let access_code_signature = sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE);
 
 			assert!(
 				operational_signature.verify(
@@ -749,14 +719,6 @@ mod benchmarks {
 					&mining_bot_account,
 				)
 			);
-			assert!(
-				access_code_signature.verify(
-					(ACCESS_CODE_PROOF_MESSAGE_KEY, access_code_public, &operational_account,)
-						.using_encoded(blake2_256)
-						.as_slice(),
-					&access_code_public,
-				)
-			);
 		}
 
 		#[test]
@@ -766,12 +728,12 @@ mod benchmarks {
 			println!("vault_account={:?}", BENCH_VAULT_ACCOUNT);
 			println!("mining_funding_account={:?}", BENCH_MINING_FUNDING_ACCOUNT);
 			println!("mining_bot_account={:?}", BENCH_MINING_BOT_ACCOUNT);
-			println!("access_code_public={:?}", BENCH_ACCESS_CODE_PUBLIC);
+			println!("referral_code_public={:?}", BENCH_REFERRAL_CODE_PUBLIC);
 			println!("operational_signature={:?}", BENCH_OPERATIONAL_SIGNATURE);
 			println!("vault_signature={:?}", BENCH_VAULT_SIGNATURE);
 			println!("mining_funding_signature={:?}", BENCH_MINING_FUNDING_SIGNATURE);
 			println!("mining_bot_signature={:?}", BENCH_MINING_BOT_SIGNATURE);
-			println!("access_code_signature={:?}", BENCH_ACCESS_CODE_SIGNATURE);
+			println!("referral_signature={:?}", BENCH_REFERRAL_SIGNATURE);
 		}
 	}
 }

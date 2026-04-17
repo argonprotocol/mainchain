@@ -730,10 +730,6 @@ declare module '@polkadot/api-base/types/errors' {
     };
     operationalAccounts: {
       /**
-       * The access code is already registered.
-       **/
-      AccessCodeAlreadyRegistered: AugmentedError<ApiType>;
-      /**
        * One of the provided accounts is already linked to an operational account.
        **/
       AccountAlreadyLinked: AugmentedError<ApiType>;
@@ -750,33 +746,17 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       EncryptedServerTooLong: AugmentedError<ApiType>;
       /**
-       * The access code provided is not registered.
-       **/
-      InvalidAccessCode: AugmentedError<ApiType>;
-      /**
-       * The access code activation proof is invalid.
-       **/
-      InvalidAccessCodeProof: AugmentedError<ApiType>;
-      /**
        * One of the linked account ownership proofs is invalid.
        **/
       InvalidAccountProof: AugmentedError<ApiType>;
       /**
+       * The referral proof or sponsor proof is invalid.
+       **/
+      InvalidReferralProof: AugmentedError<ApiType>;
+      /**
        * The caller is not one of the accounts included in the registration.
        **/
       InvalidRegistrationSubmitter: AugmentedError<ApiType>;
-      /**
-       * Too many access codes are already scheduled to expire in this frame.
-       **/
-      MaxAccessCodesExpiringPerFrameReached: AugmentedError<ApiType>;
-      /**
-       * Too many unactivated access codes are outstanding.
-       **/
-      MaxUnactivatedAccessCodesReached: AugmentedError<ApiType>;
-      /**
-       * No access codes are currently issuable.
-       **/
-      NoIssuableAccessCodes: AugmentedError<ApiType>;
       /**
        * The operational account has no pending rewards to claim.
        **/
@@ -797,6 +777,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The caller is not the sponsor of the requested sponsee.
        **/
       NotSponsorOfSponsee: AugmentedError<ApiType>;
+      /**
+       * The referral proof has expired.
+       **/
+      ReferralProofExpired: AugmentedError<ApiType>;
       /**
        * Reward claims must be at least one Argon.
        **/

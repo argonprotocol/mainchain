@@ -77,7 +77,6 @@ import type {
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMultisigMultisig,
-  PalletOperationalAccountsAccessCodeMetadata,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexCpiMeasurementBucket,
@@ -1044,22 +1043,23 @@ declare module '@polkadot/api-base/types/storage' {
     };
     operationalAccounts: {
       /**
-       * Registered access codes keyed by their public key.
+       * Referral codes that have already been linked, keyed to their proof expiration frame.
        **/
-      accessCodesByPublic: AugmentedQuery<
+      consumedReferralCodes: AugmentedQuery<
         ApiType,
-        (
-          arg: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<PalletOperationalAccountsAccessCodeMetadata>>,
+        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
         [U8aFixed]
       >;
       /**
-       * Registered access codes expiring at a given mining frame.
+       * Referral codes to clear after their referral proof expiration frame.
        **/
-      accessCodesExpiringByFrame: AugmentedQuery<
+      consumedReferralCodesByExpiration: AugmentedQuery<
         ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<U8aFixed>>,
-        [u64]
+        (
+          arg1: u64 | AnyNumber | Uint8Array,
+          arg2: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [u64, U8aFixed]
       >;
       /**
        * Opaque encrypted sponsor server payload keyed by the sponsee operational account.
@@ -1069,6 +1069,10 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: AccountId32 | string | Uint8Array) => Observable<Option<Bytes>>,
         [AccountId32]
       >;
+      /**
+       * Oldest referral expiration frame that still has cleanup work to resume.
+       **/
+      expiredReferralCodeCleanupFrame: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
        * Reverse lookup of any linked account to its operational account id.
        **/

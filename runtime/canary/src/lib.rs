@@ -704,15 +704,13 @@ impl pallet_inbound_transfer_log::Config for Runtime {
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type FrameProvider = MiningSlot;
-	type AccessCodeExpirationFrames = OperationalAccessCodeExpirationFrames;
-	type MaxAccessCodesExpiringPerFrame = MaxAccessCodesExpiringPerFrame;
-	type MaxUnactivatedAccessCodes = MaxIssuableOperationalAccessCodes;
-	type MaxIssuableAccessCodes = MaxIssuableOperationalAccessCodes;
+	type MaxAvailableReferrals = MaxAvailableOperationalReferrals;
+	type MaxExpiredReferralCodeCleanupsPerBlock = MaxExpiredReferralCodeCleanupsPerBlock;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
+	type BitcoinLockSizeForReferral = BitcoinLockSizeForReferral;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type MiningSeatsPerReferral = MiningSeatsPerReferral;
 	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
 	type OperationalReferralReward = OperationalActivationReward;
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;

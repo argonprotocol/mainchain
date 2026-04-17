@@ -8,7 +8,7 @@ import '@polkadot/api-base/types/consts';
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   FrameSupportPalletId,
   FrameSystemLimitsBlockLength,
@@ -245,6 +245,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minimumArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
       /**
+       * Account that receives mining bid funds before treasury distribution.
+       **/
+      miningBidPoolAccount: AccountId32 & AugmentedConst<ApiType>;
+      /**
        * The damper on the price per seat adjustment (from the last price)
        **/
       pricePerSeatAdjustmentDamper: u128 & AugmentedConst<ApiType>;
@@ -317,41 +321,29 @@ declare module '@polkadot/api-base/types/consts' {
     };
     operationalAccounts: {
       /**
-       * How many frames an access code remains valid.
+       * Additional argon amount (base units) required per referral after operational.
        **/
-      accessCodeExpirationFrames: u64 & AugmentedConst<ApiType>;
+      bitcoinLockSizeForReferral: u128 & AugmentedConst<ApiType>;
       /**
-       * Additional argon amount (base units) required per access code after operational.
+       * Maximum number of available referrals allowed at once.
        **/
-      bitcoinLockSizeForAccessCode: u128 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of access codes that may expire in the same frame.
-       **/
-      maxAccessCodesExpiringPerFrame: u32 & AugmentedConst<ApiType>;
+      maxAvailableReferrals: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of encrypted server bytes stored per sponsee.
        **/
       maxEncryptedServerLen: u32 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of issuable access codes allowed at once.
+       * Maximum number of expired referral codes cleared per block.
        **/
-      maxIssuableAccessCodes: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of queued operational rewards.
-       **/
-      maxOperationalRewardsQueued: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of unactivated (issued but unused) access codes allowed at once.
-       **/
-      maxUnactivatedAccessCodes: u32 & AugmentedConst<ApiType>;
+      maxExpiredReferralCodeCleanupsPerBlock: u32 & AugmentedConst<ApiType>;
       /**
        * Mining seats required to become operational.
        **/
       miningSeatsForOperational: u32 & AugmentedConst<ApiType>;
       /**
-       * Mining seats required per access code after operational.
+       * Mining seats required per referral after operational.
        **/
-      miningSeatsPerAccessCode: u32 & AugmentedConst<ApiType>;
+      miningSeatsPerReferral: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum vault securitization required to become operational.
        **/
@@ -545,8 +537,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
       /**
-       * A pallet id used for treasury-held funds. The bid pool lives on the pallet account and
-       * treasury reserves accumulate in the treasury reserves sub-account.
+       * Treasury pallet id retained in metadata for account derivation.
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
@@ -557,6 +548,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The number of frames a releasing bond lot remains held before release.
        **/
       treasuryExitDelayFrames: u64 & AugmentedConst<ApiType>;
+      /**
+       * Account that holds treasury reserves for claims and reserve-funded payouts.
+       **/
+      treasuryReservesAccount: AccountId32 & AugmentedConst<ApiType>;
     };
     txPause: {
       /**
