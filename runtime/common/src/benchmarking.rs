@@ -278,11 +278,11 @@ impl<AccountId> TreasuryPoolProvider<AccountId>
 {
 	type Weights = ();
 
-	fn has_pool_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
+	fn has_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();
-		state.call_counters.has_pool_participation =
-			state.call_counters.has_pool_participation.saturating_add(1);
-		let result = state.has_pool_participation;
+		state.call_counters.has_bond_participation =
+			state.call_counters.has_bond_participation.saturating_add(1);
+		let result = state.has_bond_participation;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}

@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -248,14 +249,16 @@ import type {
   PalletTransactionPaymentChargeTransactionPayment,
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
+  PalletTreasuryBondLot,
+  PalletTreasuryBondLotAllocation,
+  PalletTreasuryBondLotSummary,
+  PalletTreasuryBondReleaseReason,
   PalletTreasuryCall,
   PalletTreasuryError,
   PalletTreasuryEvent,
-  PalletTreasuryFunderState,
+  PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
-  PalletTreasuryPendingUnlock,
-  PalletTreasuryTreasuryCapital,
-  PalletTreasuryTreasuryPool,
+  PalletTreasuryVaultCapital,
   PalletTxPauseCall,
   PalletTxPauseError,
   PalletTxPauseEvent,
@@ -534,14 +537,16 @@ declare module '@polkadot/types/types/registry' {
     PalletTransactionPaymentChargeTransactionPayment: PalletTransactionPaymentChargeTransactionPayment;
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
+    PalletTreasuryBondLot: PalletTreasuryBondLot;
+    PalletTreasuryBondLotAllocation: PalletTreasuryBondLotAllocation;
+    PalletTreasuryBondLotSummary: PalletTreasuryBondLotSummary;
+    PalletTreasuryBondReleaseReason: PalletTreasuryBondReleaseReason;
     PalletTreasuryCall: PalletTreasuryCall;
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;
-    PalletTreasuryFunderState: PalletTreasuryFunderState;
+    PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
-    PalletTreasuryPendingUnlock: PalletTreasuryPendingUnlock;
-    PalletTreasuryTreasuryCapital: PalletTreasuryTreasuryCapital;
-    PalletTreasuryTreasuryPool: PalletTreasuryTreasuryPool;
+    PalletTreasuryVaultCapital: PalletTreasuryVaultCapital;
     PalletTxPauseCall: PalletTxPauseCall;
     PalletTxPauseError: PalletTxPauseError;
     PalletTxPauseEvent: PalletTxPauseEvent;

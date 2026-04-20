@@ -656,7 +656,7 @@ pub mod pallet {
 			let has_treasury_pool_participation = vault_registration
 				.as_ref()
 				.map(|vault| {
-					T::TreasuryPoolProvider::has_pool_participation(vault.vault_id, &vault_account)
+					T::TreasuryPoolProvider::has_bond_participation(vault.vault_id, &vault_account)
 				})
 				.unwrap_or(false);
 			let observed_mining_seat_total = u32::from(

@@ -155,7 +155,7 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_treasury::migrations::SimplifyFunderStateMigration<Runtime>,
+			pallet_treasury::migrations::BondLotsMigration<Runtime>,
 			pallet_vaults::migrations::MigrateVaultV13ToV14Migration<Runtime>,
 		);
 

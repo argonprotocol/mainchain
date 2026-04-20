@@ -977,49 +977,45 @@ declare module '@polkadot/api-base/types/errors' {
     };
     treasury: {
       /**
-       * This fund has already been renewed
+       * The bond lot is already scheduled for release.
        **/
-      AlreadyRenewed: AugmentedError<ApiType>;
+      BondLotAlreadyReleasing: AugmentedError<ApiType>;
       /**
-       * Below the minimum amount of argons per contributor
+       * The bond lot could not be found.
        **/
-      BelowMinimum: AugmentedError<ApiType>;
+      BondLotNotFound: AugmentedError<ApiType>;
       /**
-       * The contributed amount would not make this account a contributor
+       * The vault doesn't have enough bitcoin security to support this bond purchase
        **/
-      ContributionTooLow: AugmentedError<ApiType>;
+      BondPurchaseAboveSecurity: AugmentedError<ApiType>;
       /**
-       * Unable to update the vault fund
+       * The purchase is below the minimum amount.
        **/
-      CouldNotFindTreasury: AugmentedError<ApiType>;
+      BondPurchaseBelowMinimum: AugmentedError<ApiType>;
       /**
-       * An internal error occurred (like an overflow)
+       * The purchase would not enter the vault's accepted list.
+       **/
+      BondPurchaseRejected: AugmentedError<ApiType>;
+      /**
+       * An internal error occurred.
        **/
       InternalError: AugmentedError<ApiType>;
       /**
-       * Max contributors for a fund exceeded
+       * The vault already has the maximum number of accepted bond lots.
        **/
-      MaxContributorsExceeded: AugmentedError<ApiType>;
+      MaxAcceptedBondLotsExceeded: AugmentedError<ApiType>;
       /**
-       * Max pending unlocks scheduled for a frame exceeded
+       * Too many bond lot releases are scheduled for the same frame.
        **/
-      MaxPendingUnlocksExceeded: AugmentedError<ApiType>;
+      MaxPendingBondReleasesExceeded: AugmentedError<ApiType>;
       /**
-       * Max Vaults exceeded
+       * The caller does not own the bond lot.
        **/
-      MaxVaultsExceeded: AugmentedError<ApiType>;
+      NotBondLotOwner: AugmentedError<ApiType>;
       /**
-       * This account is not an active mining fund contributor
+       * The vault is not accepting bond purchases.
        **/
-      NotAFundContributor: AugmentedError<ApiType>;
-      /**
-       * Vault operator only
-       **/
-      NotAVaultOperator: AugmentedError<ApiType>;
-      /**
-       * The given vault is not accepting mining bonds
-       **/
-      VaultNotAcceptingMiningBonds: AugmentedError<ApiType>;
+      VaultNotAcceptingBondPurchases: AugmentedError<ApiType>;
     };
     txPause: {
       /**

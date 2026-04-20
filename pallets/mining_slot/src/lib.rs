@@ -1250,6 +1250,7 @@ impl<T: Config> Pallet<T> {
 		}
 		if needed > 0u32.into() {
 			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			Self::ensure_bid_pool_unreapable(&pool_account);
 			ensure!(
 				T::ArgonCurrency::reducible_balance(
 					miner_funding_account,
@@ -1362,6 +1363,7 @@ impl<T: Config> Pallet<T> {
 
 		if bid_registration.bid > T::Balance::zero() {
 			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			Self::ensure_bid_pool_unreapable(&pool_account);
 			T::ArgonCurrency::transfer(
 				&pool_account,
 				funding_account,
@@ -1394,6 +1396,13 @@ impl<T: Config> Pallet<T> {
 	pub fn bid_pool_balance() -> T::Balance {
 		let account_id = T::BidPoolProvider::get_bid_pool_account();
 		T::ArgonCurrency::balance(&account_id)
+	}
+
+	fn ensure_bid_pool_unreapable(account_id: &T::AccountId) {
+		let providers = frame_system::Pallet::<T>::providers(account_id);
+		for _ in providers..2 {
+			frame_system::Pallet::<T>::inc_providers(account_id);
+		}
 	}
 }
 

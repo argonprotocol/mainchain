@@ -83,7 +83,7 @@ where
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
 			.saturating_add(UniswapTransferRequirementWeight::requires_uniswap_transfer())
-			.saturating_add(TreasuryPoolProviderWeight::has_pool_participation())
+			.saturating_add(TreasuryPoolProviderWeight::has_bond_participation())
 			.saturating_add(VaultProviderWeight::account_became_operational())
 	}
 

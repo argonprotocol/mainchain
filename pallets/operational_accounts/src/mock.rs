@@ -238,7 +238,7 @@ pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 
-	fn has_pool_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
+	fn has_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		TreasuryPoolParticipantsByVaultId::get()
 			.get(&vault_id)
 			.is_some_and(|accounts| accounts.contains(account_id))

@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -85,10 +86,9 @@ import type {
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
   PalletTransactionPaymentReleases,
-  PalletTreasuryFunderState,
-  PalletTreasuryPendingUnlock,
-  PalletTreasuryTreasuryCapital,
-  PalletTreasuryTreasuryPool,
+  PalletTreasuryBondLot,
+  PalletTreasuryBondLotSummary,
+  PalletTreasuryFrameVaultCapital,
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
@@ -1485,59 +1485,58 @@ declare module '@polkadot/api-base/types/storage' {
     };
     treasury: {
       /**
-       * The treasury pool for the current frame. This correlates with the bids coming in for the
-       * current frame. Sorted with the biggest share first. (current frame)
+       * The stored state for each bond lot.
        **/
-      capitalActive: AugmentedQuery<
+      bondLotById: AugmentedQuery<
         ApiType,
-        () => Observable<Vec<PalletTreasuryTreasuryCapital>>,
-        []
-      >;
-      /**
-       * Bounded, sorted working set for a vault's treasury pool construction.
-       *
-       * `FunderStateByVaultAndAccount` stores every funder's state. This index only keeps the top
-       * funded contributors plus a small standby window so treasury can recover from a few exits
-       * without a global scan. Entries are stored with the operator first while funded, then the
-       * remaining accounts sorted by held principal descending.
-       **/
-      fundersByVaultId: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<ITuple<[AccountId32, u128]>>>,
-        [u32]
-      >;
-      /**
-       * Per-vault per-account commitment and held principal (long-lived source of truth).
-       **/
-      funderStateByVaultAndAccount: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2: AccountId32 | string | Uint8Array,
-        ) => Observable<Option<PalletTreasuryFunderState>>,
-        [u32, AccountId32]
-      >;
-      /**
-       * Oldest matured unlock frame that still has entries to retry.
-       **/
-      pendingUnlockRetryCursor: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
-      /**
-       * Index of delayed unlocks that mature at the given frame.
-       **/
-      pendingUnlocksByFrame: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<PalletTreasuryPendingUnlock>>,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletTreasuryBondLot>>,
         [u64]
       >;
       /**
-       * The currently earning contributors for the current epoch's bond funds. Sorted by highest
-       * bids first
+       * The bond lot ids that belong to an account.
        **/
-      vaultPoolsByFrame: AugmentedQuery<
+      bondLotIdsByAccount: AugmentedQuery<
         ApiType,
         (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<BTreeMap<u32, PalletTreasuryTreasuryPool>>,
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [AccountId32, u64]
+      >;
+      /**
+       * The accepted bond lots for a vault.
+       *
+       * Lots are kept in descending bond order, then lower `bond_lot_id` first for ties.
+       **/
+      bondLotsByVault: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletTreasuryBondLotSummary>>,
+        [u32]
+      >;
+      /**
+       * The vault capital locked for the current frame.
+       *
+       * Payout uses this to see which vaults and bond lots are participating in the frame.
+       **/
+      currentFrameVaultCapital: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletTreasuryFrameVaultCapital>>,
+        []
+      >;
+      /**
+       * The next bond lot id.
+       **/
+      nextBondLotId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * The oldest frame that still has bond lots to retry releasing.
+       **/
+      pendingBondReleaseRetryCursor: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
+      /**
+       * Bond lots to release at the given frame.
+       **/
+      pendingBondReleasesByFrame: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
       >;
     };

@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -528,28 +529,24 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
-       * The maximum number of pending unlock entries that may mature in a single frame.
+       * The maximum number of bond lots whose release delay may mature in a single frame.
        **/
       maxPendingUnlocksPerFrame: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of tracked funded contributors kept per vault, including standby
-       * entries beyond the active pool size.
-       **/
-      maxTrackedTreasuryFunders: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of contributors in a vault's treasury pool
+       * The maximum number of accepted bond lots in a vault's accepted bond-lot list.
        **/
       maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
       /**
-       * The number of vaults that can participate in each bond. This is a substrate limit.
+       * The maximum number of vaults that can participate in one frame's locked vault capital.
        **/
       maxVaultsPerPool: u32 & AugmentedConst<ApiType>;
       /**
-       * The minimum argons per fund contributor
+       * The minimum whole-bond purchase amount.
        **/
       minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
       /**
-       * A pallet id that is used to hold the bid pool
+       * A pallet id used for treasury-held funds. The bid pool lives on the pallet account and
+       * treasury reserves accumulate in the treasury reserves sub-account.
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
@@ -557,7 +554,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       percentForTreasuryReserves: Percent & AugmentedConst<ApiType>;
       /**
-       * The number of frames an allocation decrease remains locked before release.
+       * The number of frames a releasing bond lot remains held before release.
        **/
       treasuryExitDelayFrames: u64 & AugmentedConst<ApiType>;
     };

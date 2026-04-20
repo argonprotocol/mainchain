@@ -2057,3 +2057,29 @@ fn it_allows_a_bidder_to_use_their_full_balance() {
 		assert_eq!(MiningSlots::bid_pool_balance(), 1_900_000);
 	});
 }
+
+#[test]
+fn bid_pool_account_survives_full_refund() {
+	ExistentialDeposit::set(10_000);
+	let bid_pool_account_id = BidPoolAccountId::get();
+
+	new_test_ext().execute_with(|| {
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ArgonotsPerMiningSeat::<Test>::set(10_000);
+
+		set_argons(1, 1_000_000);
+		set_ownership(1, 10_000);
+
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
+		assert_eq!(Balances::free_balance(bid_pool_account_id), 1_000_000);
+		let provider_count = System::providers(&bid_pool_account_id);
+		assert!(provider_count >= 2);
+
+		let registration = BidsForNextSlotCohort::<Test>::get()[0].clone();
+		assert_ok!(MiningSlots::release_failed_bid(&registration));
+
+		assert_eq!(Balances::free_balance(bid_pool_account_id), 0);
+		assert!(System::account_exists(&bid_pool_account_id));
+		assert!(System::providers(&bid_pool_account_id) >= 2);
+	});
+}

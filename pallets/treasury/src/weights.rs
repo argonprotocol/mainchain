@@ -8,13 +8,14 @@ use pallet_prelude::*;
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
 	fn on_frame_transition() -> Weight;
-	fn release_pending_unlocks() -> Weight;
+	fn release_pending_bond_lots() -> Weight;
 	fn distribute_bid_pool() -> Weight;
 	fn lock_in_vault_capital() -> Weight;
 	fn pay_operational_rewards() -> Weight;
 	fn try_pay_reward() -> Weight;
-	fn set_allocation() -> Weight;
-	fn provider_has_pool_participation() -> Weight;
+	fn buy_bonds() -> Weight;
+	fn liquidate_bond_lot() -> Weight;
+	fn provider_has_bond_participation() -> Weight;
 }
 
 type OperationalRewardsProviderWeights<T> =
@@ -40,8 +41,8 @@ where
 		Base::on_frame_transition()
 	}
 
-	fn release_pending_unlocks() -> Weight {
-		Base::release_pending_unlocks()
+	fn release_pending_bond_lots() -> Weight {
+		Base::release_pending_bond_lots()
 	}
 
 	fn distribute_bid_pool() -> Weight {
@@ -63,19 +64,23 @@ where
 		Base::try_pay_reward()
 	}
 
-	fn set_allocation() -> Weight {
-		Base::set_allocation()
+	fn buy_bonds() -> Weight {
+		Base::buy_bonds()
 	}
 
-	fn provider_has_pool_participation() -> Weight {
-		Base::provider_has_pool_participation()
+	fn liquidate_bond_lot() -> Weight {
+		Base::liquidate_bond_lot()
+	}
+
+	fn provider_has_bond_participation() -> Weight {
+		Base::provider_has_bond_participation()
 	}
 }
 
 pub struct ProviderWeightAdapter<T>(core::marker::PhantomData<T>);
 impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
-	fn has_pool_participation() -> Weight {
-		<T as Config>::WeightInfo::provider_has_pool_participation()
+	fn has_bond_participation() -> Weight {
+		<T as Config>::WeightInfo::provider_has_bond_participation()
 	}
 }
 
@@ -84,7 +89,7 @@ impl WeightInfo for () {
 	fn on_frame_transition() -> Weight {
 		Weight::zero()
 	}
-	fn release_pending_unlocks() -> Weight {
+	fn release_pending_bond_lots() -> Weight {
 		Weight::zero()
 	}
 	fn distribute_bid_pool() -> Weight {
@@ -100,10 +105,13 @@ impl WeightInfo for () {
 		// Conservative placeholder until pallet_treasury runtime benchmarks are wired.
 		Weight::from_parts(100_000_000, 0)
 	}
-	fn set_allocation() -> Weight {
+	fn buy_bonds() -> Weight {
 		Weight::zero()
 	}
-	fn provider_has_pool_participation() -> Weight {
+	fn liquidate_bond_lot() -> Weight {
+		Weight::zero()
+	}
+	fn provider_has_bond_participation() -> Weight {
 		Weight::zero()
 	}
 }
