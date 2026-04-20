@@ -877,7 +877,7 @@ impl NotaryWorker {
 		let idle_delay = background_idle_delay;
 
 		spawn_handle.spawn("notary_worker_task", "notary_worker", async move {
-			let mut delay = idle_delay;
+			let mut delay = Duration::ZERO;
 			loop {
 				time::sleep(delay).await;
 				delay = match worker.run_background_pass(worker_context.as_ref()).await {
@@ -2708,7 +2708,6 @@ mod test {
 
 		// still missing number 9
 		assert!(matches!(result, Error::MissingNotebooksError(_)),);
-		println!("result: {result}");
 		assert!(result.to_string().contains("#9..=9"));
 
 		for _ in 0..9 {
@@ -2986,7 +2985,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn paused_queue_processing_drops_subscription_backlog() {
+	async fn paused_notebook_audits_disable_subscriptions_until_resumed() {
 		let (test_notary, client, notary_client) = system().await;
 		notary_client
 			.update_notaries(&client.best_hash())
