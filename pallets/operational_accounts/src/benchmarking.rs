@@ -4,11 +4,10 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
-	OperationalRewardsProvider,
-};
+use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook};
 use codec::Decode;
+#[cfg(test)]
+use codec::Encode;
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	benchmarking::{
@@ -45,7 +44,7 @@ const BENCH_MINING_BOT_ACCOUNT: [u8; 32] = [
 	142, 229, 4, 20, 142, 117, 195, 78, 143, 5, 24, 153, 179, 198, 228, 36, 31, 241, 141, 193, 201,
 	33, 18, 96, 182, 166, 164, 52, 190, 219, 72, 95,
 ];
-const BENCH_ACCESS_CODE_PUBLIC: [u8; 32] = [
+const BENCH_REFERRAL_CODE_PUBLIC: [u8; 32] = [
 	194, 226, 189, 113, 224, 74, 106, 242, 137, 124, 52, 20, 214, 253, 64, 52, 119, 36, 80, 96,
 	253, 34, 218, 170, 65, 47, 245, 27, 131, 192, 194, 46,
 ];
@@ -73,7 +72,7 @@ const BENCH_MINING_BOT_SIGNATURE: [u8; 64] = [
 	135, 111, 189, 98, 83, 208, 56, 143, 194, 77, 72, 165, 46, 134, 218, 194, 69, 34, 97, 215, 124,
 	158, 129,
 ];
-const BENCH_ACCESS_CODE_SIGNATURE: [u8; 64] = [
+const BENCH_REFERRAL_SIGNATURE: [u8; 64] = [
 	170, 36, 183, 56, 107, 58, 13, 16, 115, 132, 63, 37, 140, 27, 84, 40, 81, 152, 48, 54, 147, 83,
 	164, 193, 205, 195, 202, 61, 245, 88, 99, 30, 55, 196, 28, 150, 3, 169, 10, 7, 123, 188, 204,
 	42, 23, 162, 235, 99, 46, 221, 130, 45, 74, 84, 84, 251, 236, 101, 89, 190, 23, 115, 251, 139,
@@ -90,18 +89,11 @@ mod benchmarks {
 		let caller = benchmark_account_id::<T>(BENCH_OPERATIONAL_ACCOUNT);
 		let operational_account_proof = benchmark_account_proof(BENCH_OPERATIONAL_SIGNATURE);
 		let sponsor = linked_accounts::<T>();
-		let access_code = benchmark_access_code_proof();
+		let referral_proof = benchmark_referral_proof::<T>(sponsor.owner.clone());
 		let mut sponsor_account = default_operational_account::<T>(&sponsor);
 		sponsor_account.is_operational = true;
-		sponsor_account.unactivated_access_codes = 1;
+		sponsor_account.available_referrals = 1;
 		insert_operational_account::<T>(&sponsor, sponsor_account);
-		AccessCodesByPublic::<T>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor.owner.clone(), expiration_frame: 1 },
-		);
-		AccessCodesExpiringByFrame::<T>::mutate(1, |expiring_codes| {
-			let _ = expiring_codes.try_push(access_code.public);
-		});
 		let vault = benchmark_account_id::<T>(BENCH_VAULT_ACCOUNT);
 		let mining_funding = benchmark_account_id::<T>(BENCH_MINING_FUNDING_ACCOUNT);
 		let mining_bot = benchmark_account_id::<T>(BENCH_MINING_BOT_ACCOUNT);
@@ -109,7 +101,12 @@ mod benchmarks {
 		let mining_funding_proof = benchmark_account_proof(BENCH_MINING_FUNDING_SIGNATURE);
 		let mining_bot_proof = benchmark_account_proof(BENCH_MINING_BOT_SIGNATURE);
 		#[cfg(test)]
-		seed_mock_registration_lookup();
+		seed_mock_registration_lookup(&LinkedAccounts::<T> {
+			owner: caller.clone(),
+			vault: vault.clone(),
+			mining_funding: mining_funding.clone(),
+			mining_bot: mining_bot.clone(),
+		});
 		set_benchmark_operational_accounts_provider_state(
 			BenchmarkOperationalAccountsProviderState {
 				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
@@ -134,7 +131,7 @@ mod benchmarks {
 			vault_account_proof: vault_proof,
 			mining_funding_account_proof: mining_funding_proof,
 			mining_bot_account_proof: mining_bot_proof,
-			access_code: Some(access_code.clone()),
+			referral_proof: Some(referral_proof.clone()),
 		});
 		let Registration::V1(RegistrationV1 {
 			operational_account,
@@ -176,10 +173,10 @@ mod benchmarks {
 		assert!(account.vault_created);
 		assert!(account.has_treasury_pool_participation);
 		assert_eq!(account.mining_seat_accrual, 1);
+		assert!(!account.is_operational);
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_funding));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
-		assert!(!AccessCodesByPublic::<T>::contains_key(access_code.public));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
 			get_registration_vault_data: 1,
 			has_active_rewards_account_seat: 1,
@@ -213,6 +210,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -222,7 +221,7 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.vault_created
 		);
 	}
 
@@ -250,6 +249,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -257,10 +258,11 @@ mod benchmarks {
 				OperationalAccountsPallet::<T>::bitcoin_lock_funded(&linked.vault, 1u128.into());
 		}
 
-		assert!(
+		assert_eq!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.bitcoin_accrual,
+			1u128.into()
 		);
 	}
 
@@ -289,16 +291,19 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get().saturating_sub(1);
 		insert_operational_account::<T>(&linked, account);
 		link_mining_funding_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
 			let _ = OperationalAccountsPallet::<T>::mining_seat_won(&linked.mining_funding);
 		}
 
-		assert!(
+		assert_eq!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.mining_seat_accrual,
+			T::MiningSeatsForOperational::get()
 		);
 	}
 
@@ -326,6 +331,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -338,7 +345,7 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
-				.is_operational
+				.has_treasury_pool_participation
 		);
 	}
 
@@ -366,6 +373,8 @@ mod benchmarks {
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[block]
 		{
@@ -378,103 +387,58 @@ mod benchmarks {
 		assert!(
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
+				.has_uniswap_transfer
+		);
+	}
+
+	#[benchmark]
+	fn activate() {
+		set_benchmark_operational_accounts_provider_state(
+			BenchmarkOperationalAccountsProviderState {
+				vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
+					vault_id: 1,
+					activated_securitization: 1u128,
+					securitization: T::OperationalMinimumVaultSecuritization::get()
+						.saturated_into(),
+				}),
+				has_active_rewards_account_seat: true,
+				has_bond_participation: true,
+				requires_uniswap_transfer: true,
+				call_counters: Default::default(),
+			},
+		);
+		let linked = linked_accounts::<T>();
+		let sponsor = linked_accounts_with_seed::<T>(1);
+		let mut sponsor_account = default_operational_account::<T>(&sponsor);
+		sponsor_account.is_operational = true;
+		sponsor_account.operational_referrals_count =
+			T::ReferralBonusEveryXOperationalSponsees::get().saturating_sub(1);
+		insert_operational_account::<T>(&sponsor, sponsor_account);
+		let mut account = default_operational_account::<T>(&linked);
+		account.sponsor = Some(sponsor.owner.clone());
+		account.has_uniswap_transfer = true;
+		account.vault_created = true;
+		account.bitcoin_accrual = 1u128.into();
+		account.has_treasury_pool_participation = true;
+		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
+		insert_operational_account::<T>(&linked, account);
+		link_mining_funding_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
+		let caller = linked.mining_funding.clone();
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		activate(RawOrigin::Signed(caller.clone()));
+
+		assert!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("account should exist")
 				.is_operational
 		);
-	}
-
-	#[benchmark]
-	fn provider_pending_rewards() {
-		OperationalRewardsQueue::<T>::kill();
-		let max_rewards = T::MaxOperationalRewardsQueued::get();
-
-		for reward_index in 0..max_rewards {
-			let operational_account: T::AccountId =
-				account("reward-owner", reward_index, USER_SEED);
-			let payout_account: T::AccountId = account("reward-payout", reward_index, USER_SEED);
-			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| {
-				queue.try_push(OperationalRewardPayout {
-					operational_account,
-					payout_account,
-					reward_kind: OperationalRewardKind::Activation,
-					amount: T::Balance::from(1_000u128),
-				})
-			});
-		}
-
-		#[block]
-		{
-			let payouts = <OperationalAccountsPallet<T> as OperationalRewardsProvider<
-				T::AccountId,
-				T::Balance,
-			>>::pending_rewards();
-			assert_eq!(payouts.len(), max_rewards as usize);
-		}
-	}
-
-	#[benchmark]
-	fn provider_mark_reward_paid() {
-		OperationalRewardsQueue::<T>::kill();
-		let max_rewards = T::MaxOperationalRewardsQueued::get().max(1);
-		let target_links = linked_accounts::<T>();
-		let mut target_account = default_operational_account::<T>(&target_links);
-		target_account.is_operational = true;
-		insert_operational_account::<T>(&target_links, target_account);
-
-		let mut target_reward = None;
-		for reward_index in 0..max_rewards {
-			let reward = OperationalRewardPayout {
-				operational_account: if reward_index + 1 == max_rewards {
-					target_links.owner.clone()
-				} else {
-					account("reward-owner", reward_index, USER_SEED)
-				},
-				payout_account: account("reward-payout", reward_index, USER_SEED),
-				reward_kind: OperationalRewardKind::Activation,
-				amount: T::Balance::from(1_000u128),
-			};
-			if reward_index + 1 == max_rewards {
-				target_reward = Some(reward.clone());
-			}
-			let _ = OperationalRewardsQueue::<T>::try_mutate(|queue| queue.try_push(reward));
-		}
-		let target_reward = target_reward.expect("target reward seeded");
-
-		#[block]
-		{
-			<OperationalAccountsPallet<T> as OperationalRewardsProvider<
-				T::AccountId,
-				T::Balance,
-			>>::mark_reward_paid(&target_reward, target_reward.amount);
-		}
-
-		assert!(!OperationalRewardsQueue::<T>::get().contains(&target_reward));
-		assert_eq!(
-			OperationalAccounts::<T>::get(&target_links.owner)
-				.expect("operational account should exist")
-				.rewards_collected_amount,
-			target_reward.amount,
-		);
-	}
-
-	#[benchmark]
-	fn issue_access_code() {
-		let sponsor: T::AccountId = account("sponsor", 0, USER_SEED);
-		let sponsor_links = LinkedAccounts {
-			owner: sponsor.clone(),
-			vault: sponsor.clone(),
-			mining_funding: sponsor.clone(),
-			mining_bot: sponsor.clone(),
-		};
-		let mut sponsor_account = default_operational_account::<T>(&sponsor_links);
-		sponsor_account.issuable_access_codes = 1;
-		insert_operational_account::<T>(&sponsor_links, sponsor_account);
-
-		let access_code_public = sr25519::Public::from_raw([5u8; 32]);
-		whitelist_account!(sponsor);
-		#[extrinsic_call]
-		issue_access_code(RawOrigin::Signed(sponsor.clone()), access_code_public);
-
-		assert!(AccessCodesByPublic::<T>::contains_key(access_code_public));
+		let sponsor_account =
+			OperationalAccounts::<T>::get(&sponsor.owner).expect("sponsor account should exist");
+		assert!(sponsor_account.operational_referrals_count > 0);
 	}
 
 	#[benchmark]
@@ -487,6 +451,30 @@ mod benchmarks {
 		let config = Rewards::<T>::get();
 		assert_eq!(config.operational_referral_reward, operational_referral_reward);
 		assert_eq!(config.referral_bonus_reward, referral_bonus_reward);
+	}
+
+	#[benchmark]
+	fn claim_rewards() {
+		let linked = linked_accounts::<T>();
+		let mut operational_account = default_operational_account::<T>(&linked);
+		let claim_amount = T::Balance::from(MICROGONS_PER_ARGON);
+		operational_account.rewards_earned_amount = claim_amount;
+		insert_operational_account::<T>(&linked, operational_account);
+		link_mining_funding_to_owner::<T>(&linked);
+		let claimant = linked.mining_funding.clone();
+		#[cfg(test)]
+		crate::mock::ClaimableTreasuryBalance::set(claim_amount.into());
+		whitelist_account!(claimant);
+
+		#[extrinsic_call]
+		claim_rewards(RawOrigin::Signed(claimant.clone()), claim_amount);
+
+		assert_eq!(
+			OperationalAccounts::<T>::get(&linked.owner)
+				.expect("operational account should exist")
+				.rewards_collected_amount,
+			claim_amount,
+		);
 	}
 
 	#[benchmark]
@@ -515,12 +503,14 @@ mod benchmarks {
 			observed_bitcoin_total: Some(1u128.into()),
 			observed_mining_seat_total: Some(T::MiningSeatsForOperational::get()),
 		};
+		#[cfg(test)]
+		seed_mock_registration_lookup(&linked);
 
 		#[extrinsic_call]
 		force_set_progress(RawOrigin::Root, linked.owner.clone(), patch, true);
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
-		assert!(account.is_operational);
+		assert!(!account.is_operational);
 	}
 
 	#[benchmark]
@@ -575,11 +565,15 @@ mod benchmarks {
 	}
 
 	fn linked_accounts<T: Config>() -> LinkedAccounts<T> {
+		linked_accounts_with_seed::<T>(0)
+	}
+
+	fn linked_accounts_with_seed<T: Config>(seed: u32) -> LinkedAccounts<T> {
 		LinkedAccounts {
-			owner: account("owner", 0, USER_SEED),
-			vault: account("vault", 0, USER_SEED),
-			mining_funding: account("mining_funding", 0, USER_SEED),
-			mining_bot: account("mining_bot", 0, USER_SEED),
+			owner: account("owner", seed, USER_SEED),
+			vault: account("vault", seed, USER_SEED),
+			mining_funding: account("mining_funding", seed, USER_SEED),
+			mining_bot: account("mining_bot", seed, USER_SEED),
 		}
 	}
 
@@ -598,9 +592,8 @@ mod benchmarks {
 			mining_seat_accrual: 0,
 			mining_seat_applied_total: 0,
 			operational_referrals_count: 0,
-			referral_access_code_pending: false,
-			issuable_access_codes: 0,
-			unactivated_access_codes: 0,
+			referral_pending: false,
+			available_referrals: 0,
 			rewards_earned_count: 0,
 			rewards_earned_amount: <T::Balance as Zero>::zero(),
 			rewards_collected_amount: <T::Balance as Zero>::zero(),
@@ -631,19 +624,22 @@ mod benchmarks {
 		AccountOwnershipProof { signature: sr25519::Signature::from_raw(signature).into() }
 	}
 
-	fn benchmark_access_code_proof() -> AccessCodeProof {
-		AccessCodeProof {
-			public: sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC),
-			signature: sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE),
+	fn benchmark_referral_proof<T: Config>(sponsor: T::AccountId) -> ReferralProof<T::AccountId> {
+		ReferralProof {
+			referral_code: sr25519::Public::from_raw(BENCH_REFERRAL_CODE_PUBLIC),
+			referral_signature: sr25519::Signature::from_raw(BENCH_REFERRAL_SIGNATURE),
+			sponsor,
+			expires_at_frame: FrameId::MAX,
+			sponsor_signature: sr25519::Signature::from_raw(BENCH_REFERRAL_SIGNATURE).into(),
 		}
 	}
 
 	#[cfg(test)]
-	fn seed_mock_registration_lookup() {
-		let vault_account = crate::mock::TestAccountId::decode(&mut &BENCH_VAULT_ACCOUNT[..])
+	fn seed_mock_registration_lookup<T: Config>(linked: &LinkedAccounts<T>) {
+		let vault_account = crate::mock::TestAccountId::decode(&mut &linked.vault.encode()[..])
 			.expect("benchmark vault account should decode");
 		let mining_funding_account =
-			crate::mock::TestAccountId::decode(&mut &BENCH_MINING_FUNDING_ACCOUNT[..])
+			crate::mock::TestAccountId::decode(&mut &linked.mining_funding.encode()[..])
 				.expect("benchmark mining funding account should decode");
 		crate::mock::set_registration_lookup(
 			vault_account,
@@ -670,8 +666,6 @@ mod benchmarks {
 			let vault_account = AccountId32::new(BENCH_VAULT_ACCOUNT);
 			let mining_funding_account = AccountId32::new(BENCH_MINING_FUNDING_ACCOUNT);
 			let mining_bot_account = AccountId32::new(BENCH_MINING_BOT_ACCOUNT);
-			let access_code_public = sr25519::Public::from_raw(BENCH_ACCESS_CODE_PUBLIC);
-
 			let operational_signature: Signature =
 				sr25519::Signature::from_raw(BENCH_OPERATIONAL_SIGNATURE).into();
 			let vault_signature: Signature =
@@ -680,7 +674,6 @@ mod benchmarks {
 				sr25519::Signature::from_raw(BENCH_MINING_FUNDING_SIGNATURE).into();
 			let mining_bot_signature: Signature =
 				sr25519::Signature::from_raw(BENCH_MINING_BOT_SIGNATURE).into();
-			let access_code_signature = sr25519::Signature::from_raw(BENCH_ACCESS_CODE_SIGNATURE);
 
 			assert!(
 				operational_signature.verify(
@@ -726,14 +719,6 @@ mod benchmarks {
 					&mining_bot_account,
 				)
 			);
-			assert!(
-				access_code_signature.verify(
-					(ACCESS_CODE_PROOF_MESSAGE_KEY, access_code_public, &operational_account,)
-						.using_encoded(blake2_256)
-						.as_slice(),
-					&access_code_public,
-				)
-			);
 		}
 
 		#[test]
@@ -743,12 +728,12 @@ mod benchmarks {
 			println!("vault_account={:?}", BENCH_VAULT_ACCOUNT);
 			println!("mining_funding_account={:?}", BENCH_MINING_FUNDING_ACCOUNT);
 			println!("mining_bot_account={:?}", BENCH_MINING_BOT_ACCOUNT);
-			println!("access_code_public={:?}", BENCH_ACCESS_CODE_PUBLIC);
+			println!("referral_code_public={:?}", BENCH_REFERRAL_CODE_PUBLIC);
 			println!("operational_signature={:?}", BENCH_OPERATIONAL_SIGNATURE);
 			println!("vault_signature={:?}", BENCH_VAULT_SIGNATURE);
 			println!("mining_funding_signature={:?}", BENCH_MINING_FUNDING_SIGNATURE);
 			println!("mining_bot_signature={:?}", BENCH_MINING_BOT_SIGNATURE);
-			println!("access_code_signature={:?}", BENCH_ACCESS_CODE_SIGNATURE);
+			println!("referral_signature={:?}", BENCH_REFERRAL_SIGNATURE);
 		}
 	}
 }

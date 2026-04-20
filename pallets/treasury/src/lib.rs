@@ -80,26 +80,17 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		BlockSealAuthorityId, MICROGONS_PER_ARGON, OnNewSlot, OperationalRewardPayout,
-		TreasuryPoolProvider,
-		providers::{OperationalRewardsProviderWeightInfo, PriceProvider},
-		vault::{MiningBidPoolProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		BlockSealAuthorityId, MICROGONS_PER_ARGON, OnNewSlot, TreasuryPoolProvider,
+		providers::PriceProvider,
+		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
-		OperationalRewardsProvider,
 	};
-	use sp_runtime::{BoundedBTreeMap, FixedU128, traits::AccountIdConversion};
+	use sp_runtime::{BoundedBTreeMap, FixedU128, TokenError};
 	use tracing::info;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
-	const TREASURY_RESERVES_SUB_ACCOUNT: [u8; 16] = *b"treasury-reserve";
-
-	type OperationalRewardsProviderWeights<T> =
-		<<T as Config>::OperationalRewardsProvider as OperationalRewardsProvider<
-			<T as frame_system::Config>::AccountId,
-			<T as Config>::Balance,
-		>>::Weights;
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -151,10 +142,16 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumArgonsPerContributor: Get<Self::Balance>;
 
-		/// A pallet id used for treasury-held funds. The bid pool lives on the pallet account and
-		/// treasury reserves accumulate in the treasury reserves sub-account.
+		/// Treasury pallet id retained in metadata for account derivation.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
+
+		/// Account that receives mining bid funds before frame distribution.
+		type MiningBidPoolAccount: Get<Self::AccountId>;
+
+		/// Account that holds treasury reserves for claims and reserve-funded payouts.
+		#[pallet::constant]
+		type TreasuryReservesAccount: Get<Self::AccountId>;
 
 		/// Percent of the bid pool reserved for treasury reserves.
 		#[pallet::constant]
@@ -177,9 +174,6 @@ pub mod pallet {
 
 		/// Optional hook for operational account state updates.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
-
-		/// Provider of pending operational rewards for payout from treasury reserves.
-		type OperationalRewardsProvider: OperationalRewardsProvider<Self::AccountId, Self::Balance>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -448,14 +442,6 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		pub fn get_bid_pool_account() -> T::AccountId {
-			T::PalletId::get().into_account_truncating()
-		}
-
-		pub fn get_treasury_reserves_account() -> T::AccountId {
-			T::PalletId::get().into_sub_account_truncating(TREASURY_RESERVES_SUB_ACCOUNT)
-		}
-
 		fn ensure_account_provider(account_id: &T::AccountId) {
 			let providers = frame_system::Pallet::<T>::providers(account_id);
 			for _ in providers..2 {
@@ -501,13 +487,13 @@ pub mod pallet {
 				return;
 			}
 
-			let bid_pool_account = Self::get_bid_pool_account();
+			let bid_pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_account_provider(&bid_pool_account);
 			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
 
 			let initial_reserves_amount =
 				T::PercentForTreasuryReserves::get().mul_ceil(total_bid_pool_amount);
-			let reserves_account = Self::get_treasury_reserves_account();
+			let reserves_account = T::TreasuryReservesAccount::get();
 			Self::ensure_account_provider(&reserves_account);
 
 			let mut total_treasury_reserves = T::Balance::zero();
@@ -729,79 +715,18 @@ pub mod pallet {
 			});
 		}
 
-		pub(crate) fn pay_operational_rewards(
-			payouts: Vec<OperationalRewardPayout<T::AccountId, T::Balance>>,
-		) {
-			if payouts.is_empty() {
-				return;
-			}
-			let treasury_reserves_account = Self::get_treasury_reserves_account();
-			Self::ensure_account_provider(&treasury_reserves_account);
-			let available = T::Currency::reducible_balance(
-				&treasury_reserves_account,
-				Preservation::Expendable,
-				Fortitude::Polite,
-			);
-			let total_pending = payouts
-				.iter()
-				.fold(T::Balance::zero(), |acc, payout| acc.saturating_add(payout.amount));
-
-			let pay_in_full = !total_pending.is_zero() && available >= total_pending;
-			let payout_budget = if pay_in_full { total_pending } else { available };
-			let mut remaining_budget = payout_budget;
-			for payout in payouts {
-				let mut payout_amount = if pay_in_full {
-					payout.amount
-				} else if total_pending.is_zero() ||
-					payout.amount.is_zero() ||
-					remaining_budget.is_zero()
-				{
-					T::Balance::zero()
-				} else {
-					Perbill::from_rational(payout.amount, total_pending).mul_floor(payout_budget)
-				};
-				if payout_amount > remaining_budget {
-					payout_amount = remaining_budget;
-				}
-				if payout_amount.is_zero() {
-					T::OperationalRewardsProvider::mark_reward_paid(&payout, T::Balance::zero());
-					continue;
-				}
-
-				if let Err(e) = T::Currency::transfer(
-					&treasury_reserves_account,
-					&payout.payout_account,
-					payout_amount,
-					Preservation::Expendable,
-				) {
-					log::error!(
-						"Failed to pay operational reward {:?} to {:?}: {:?}",
-						payout.reward_kind,
-						payout.payout_account,
-						e
-					);
-					T::OperationalRewardsProvider::mark_reward_paid(&payout, T::Balance::zero());
-					continue;
-				}
-				remaining_budget.saturating_reduce(payout_amount);
-				T::OperationalRewardsProvider::mark_reward_paid(&payout, payout_amount);
-			}
-		}
-
 		/// Runs the treasury frame transition in the current pallet order: release, distribute,
-		/// lock in, then pay operational rewards.
+		/// then lock in next-frame capital.
 		pub(crate) fn run_frame_transition(frame_id: FrameId) {
 			if frame_id == 0 {
 				return;
 			}
 
-			let pending_rewards = T::OperationalRewardsProvider::pending_rewards();
 			let payout_frame = frame_id - 1;
 			info!("Starting treasury bond frame {frame_id}. Distributing frame {payout_frame}.");
 			Self::release_pending_bond_lots(frame_id);
 			Self::distribute_bid_pool(payout_frame);
 			Self::lock_in_vault_capital(frame_id);
-			Self::pay_operational_rewards(pending_rewards);
 		}
 
 		/// Releases bond lots whose release delay has matured.
@@ -963,48 +888,30 @@ pub mod pallet {
 	}
 
 	impl<T: Config> OperationalRewardsPayer<T::AccountId, T::Balance> for Pallet<T> {
-		fn try_pay_reward_weight() -> Weight {
-			T::WeightInfo::try_pay_reward()
+		fn claim_reward_weight() -> Weight {
+			T::WeightInfo::claim_reward()
 		}
 
-		fn try_pay_reward(reward: &OperationalRewardPayout<T::AccountId, T::Balance>) -> bool {
-			if reward.amount.is_zero() {
-				return true;
+		fn claim_reward(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(());
 			}
-			let treasury_reserves_account = Self::get_treasury_reserves_account();
+			let treasury_reserves_account = T::TreasuryReservesAccount::get();
 			Self::ensure_account_provider(&treasury_reserves_account);
 			let available = T::Currency::reducible_balance(
 				&treasury_reserves_account,
-				Preservation::Expendable,
+				Preservation::Preserve,
 				Fortitude::Polite,
 			);
-			if reward.amount > available {
-				return false;
-			}
-			if let Err(e) = T::Currency::transfer(
+			ensure!(amount <= available, TokenError::FundsUnavailable);
+
+			T::Currency::transfer(
 				&treasury_reserves_account,
-				&reward.payout_account,
-				reward.amount,
-				Preservation::Expendable,
-			) {
-				log::error!(
-					"Failed to pay operational reward {:?} to {:?}: {:?}",
-					reward.reward_kind,
-					reward.payout_account,
-					e
-				);
-				return false;
-			}
-			true
-		}
-	}
-
-	impl<T: Config> MiningBidPoolProvider for Pallet<T> {
-		type Balance = T::Balance;
-		type AccountId = T::AccountId;
-
-		fn get_bid_pool_account() -> Self::AccountId {
-			T::PalletId::get().into_account_truncating()
+				account_id,
+				amount,
+				Preservation::Preserve,
+			)?;
+			Ok(())
 		}
 	}
 
@@ -1016,13 +923,10 @@ pub mod pallet {
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			T::WeightInfo::on_frame_transition()
-				.saturating_add(
-					T::OperationalAccountsHook::treasury_pool_participated_weight()
-						.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
-				)
-				.saturating_add(OperationalRewardsProviderWeights::<T>::pending_rewards())
-				.saturating_add(T::WeightInfo::pay_operational_rewards())
+			T::WeightInfo::on_frame_transition().saturating_add(
+				T::OperationalAccountsHook::treasury_pool_participated_weight()
+					.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
+			)
 		}
 	}
 

@@ -5,24 +5,21 @@ use super::{
 };
 use crate::{
 	mock::{
-		Balances, CurrentFrameId, ExistentialDeposit, LastVaultProfits, MaxTreasuryContributors,
-		MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeHoldReason, RuntimeOrigin, Test,
-		TestVault, Treasury, TreasuryExitDelayFrames, insert_vault, new_test_ext,
-		pending_operational_rewards, queue_treasury_participation_rewards,
-		reset_treasury_pool_participated, set_argons, set_pending_operational_rewards,
-		take_paid_operational_rewards, take_treasury_pool_participated,
+		Balances, BidPoolAccountId, CurrentFrameId, ExistentialDeposit, LastVaultProfits,
+		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeHoldReason,
+		RuntimeOrigin, Test, TestVault, Treasury, TreasuryExitDelayFrames,
+		TreasuryReservesAccountId, insert_vault, new_test_ext, set_argons,
+		take_treasury_pool_participated,
 	},
 	pallet::{BondLotAllocation, FrameVaultCapital, VaultCapital},
 };
-use argon_primitives::{
-	MICROGONS_PER_ARGON, OperationalRewardKind, OperationalRewardPayout, TreasuryPoolProvider,
-};
+use argon_primitives::{MICROGONS_PER_ARGON, OperationalRewardsPayer, TreasuryPoolProvider};
 use frame_support::{
-	assert_ok,
+	assert_err, assert_ok,
 	traits::fungible::{Inspect, InspectHold},
 };
 use pallet_prelude::*;
-use sp_runtime::{BoundedBTreeMap, FixedU128, Permill};
+use sp_runtime::{BoundedBTreeMap, FixedU128, Permill, TokenError};
 
 fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {
 	BondLotIdsByAccount::<Test>::iter_key_prefix(account_id).collect()
@@ -183,7 +180,7 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 			FixedU128::from_rational(4u128, 10u128),
 		);
 
-		let bid_pool_account = Treasury::get_bid_pool_account();
+		let bid_pool_account = BidPoolAccountId::get();
 		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
 
 		Treasury::distribute_bid_pool(1);
@@ -196,7 +193,7 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 		assert_eq!(bond_lot.last_frame_earnings, Some(25_600_000));
 		assert_eq!(bond_lot.cumulative_earnings, 25_600_000);
 		assert_eq!(Balances::balance(&2), balance_before + 25_600_000);
-		assert_eq!(Balances::balance(&Treasury::get_treasury_reserves_account()), 58_400_000);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 58_400_000);
 
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].vault_id, 1);
@@ -292,7 +289,7 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 		assert_ok!(Treasury::liquidate_bond_lot(RuntimeOrigin::signed(2), bond_lot_id));
 		assert!(BondLotsByVault::<Test>::get(1).is_empty());
 
-		let bid_pool_account = Treasury::get_bid_pool_account();
+		let bid_pool_account = BidPoolAccountId::get();
 		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
 
 		Treasury::distribute_bid_pool(1);
@@ -308,7 +305,7 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 }
 
 #[test]
-fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
+fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 	new_test_ext().execute_with(|| {
 		ExistentialDeposit::set(10);
 		insert_vault(
@@ -354,7 +351,8 @@ fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
 		);
 		CurrentFrameVaultCapital::<Test>::put(FrameVaultCapital { frame_id: 1, vaults });
 
-		assert_ok!(Balances::mint_into(&Treasury::get_bid_pool_account(), 11));
+		frame_system::Pallet::<Test>::inc_providers(&BidPoolAccountId::get());
+		set_argons(BidPoolAccountId::get(), 9);
 
 		Treasury::distribute_bid_pool(1);
 
@@ -364,12 +362,12 @@ fn failed_bond_lot_payout_is_refunded_to_treasury_and_not_recorded_as_earned() {
 		assert_eq!(bond_lot.last_frame_earnings, Some(0));
 		assert_eq!(bond_lot.cumulative_earnings, 0);
 		assert_eq!(Balances::balance(&99), 0);
-		assert_eq!(Balances::balance(&Treasury::get_treasury_reserves_account()), 11);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 0);
 	});
 }
 
 #[test]
-fn run_frame_transition_releases_distributes_locks_and_pays_rewards() {
+fn run_frame_transition_releases_distributes_and_locks_without_paying_operational_rewards() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		TreasuryExitDelayFrames::set(1);
@@ -399,21 +397,13 @@ fn run_frame_transition_releases_distributes_locks_and_pays_rewards() {
 		let payout_bond_lot_id = account_bond_lot_ids(2)[0];
 		Treasury::lock_in_vault_capital(1);
 
-		let bid_pool_account = Treasury::get_bid_pool_account();
+		let bid_pool_account = BidPoolAccountId::get();
 		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
 
 		set_argons(3, 20 * MICROGONS_PER_ARGON);
 		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(3), 2, 2));
 		let released_bond_lot_id = account_bond_lot_ids(3)[0];
 		assert_ok!(Treasury::liquidate_bond_lot(RuntimeOrigin::signed(3), released_bond_lot_id,));
-
-		let reward = OperationalRewardPayout {
-			operational_account: 99,
-			payout_account: 42,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 5 * MICROGONS_PER_ARGON,
-		};
-		set_pending_operational_rewards(vec![reward.clone()]);
 		set_argons(42, 0);
 
 		Treasury::run_frame_transition(2);
@@ -431,10 +421,7 @@ fn run_frame_transition_releases_distributes_locks_and_pays_rewards() {
 		let current = CurrentFrameVaultCapital::<Test>::get().expect("current frame capital");
 		assert_eq!(current.frame_id, 2);
 		assert!(current.vaults.get(&2).is_none());
-
-		assert_eq!(Balances::balance(&42), reward.amount);
-		assert!(pending_operational_rewards().is_empty());
-		assert_eq!(take_paid_operational_rewards(), vec![reward]);
+		assert_eq!(Balances::balance(&42), 0);
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].vault_id, 1);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed, 4 * MICROGONS_PER_ARGON);
@@ -447,87 +434,30 @@ fn run_frame_transition_releases_distributes_locks_and_pays_rewards() {
 }
 
 #[test]
-fn transition_defers_rewards_queued_during_lock_in_until_next_frame() {
+fn claim_operational_reward_pays_immediately_when_funded() {
 	new_test_ext().execute_with(|| {
-		MinimumArgonsPerContributor::set(1);
-		CurrentFrameId::set(1);
-		reset_treasury_pool_participated();
-		set_pending_operational_rewards(vec![]);
-
-		insert_vault(
-			1,
-			TestVault {
-				account_id: 10,
-				securitized_satoshis: (10 * MICROGONS_PER_ARGON) as u64,
-				sharing_percent: Permill::from_percent(20),
-				is_closed: false,
-			},
-		);
-
-		set_argons(10, 20 * MICROGONS_PER_ARGON);
-		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(10), 1, 4));
-
-		let reward = OperationalRewardPayout {
-			operational_account: 99,
-			payout_account: 42,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 5 * MICROGONS_PER_ARGON,
-		};
-		queue_treasury_participation_rewards(vec![reward.clone()]);
-		set_argons(Treasury::get_treasury_reserves_account(), reward.amount);
+		let reserves_account = TreasuryReservesAccountId::get();
+		set_argons(reserves_account, 1_000_000);
 		set_argons(42, 0);
 
-		Treasury::run_frame_transition(2);
-
-		assert_eq!(take_treasury_pool_participated(), vec![(10, 4 * MICROGONS_PER_ARGON)]);
-		assert!(take_paid_operational_rewards().is_empty());
-		assert_eq!(pending_operational_rewards(), vec![reward.clone()]);
-		assert_eq!(Balances::balance(&42), 0);
-
-		CurrentFrameVaultCapital::<Test>::kill();
-		set_argons(Treasury::get_treasury_reserves_account(), reward.amount);
-
-		Treasury::run_frame_transition(3);
-
-		assert!(pending_operational_rewards().is_empty());
-		assert_eq!(take_paid_operational_rewards(), vec![reward.clone()]);
-		assert_eq!(Balances::balance(&42), reward.amount);
+		assert_ok!(<Treasury as OperationalRewardsPayer<u64, u128>>::claim_reward(&42, 250_000,));
+		assert_eq!(Balances::balance(&42), 250_000);
+		assert_eq!(Balances::balance(&reserves_account), 750_000);
 	});
 }
 
 #[test]
-fn operational_rewards_prorate_when_reserves_are_short() {
+fn claim_operational_reward_fails_when_insufficient() {
 	new_test_ext().execute_with(|| {
-		let reward_a = OperationalRewardPayout {
-			operational_account: 99,
-			payout_account: 42,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 80,
-		};
-		let reward_b = OperationalRewardPayout {
-			operational_account: 100,
-			payout_account: 43,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 20,
-		};
-
-		set_argons(Treasury::get_treasury_reserves_account(), 50);
-		set_pending_operational_rewards(vec![reward_a.clone(), reward_b.clone()]);
+		let reserves_account = TreasuryReservesAccountId::get();
+		set_argons(reserves_account, 10);
 		set_argons(42, 0);
-		set_argons(43, 0);
 
-		Treasury::pay_operational_rewards(pending_operational_rewards());
-
-		let mut paid_a = reward_a.clone();
-		paid_a.amount = 40;
-		let mut paid_b = reward_b.clone();
-		paid_b.amount = 10;
-
-		assert!(pending_operational_rewards().is_empty());
-		assert_eq!(take_paid_operational_rewards(), vec![paid_a, paid_b]);
-		assert_eq!(Balances::balance(&42), 40);
-		assert_eq!(Balances::balance(&43), 10);
-		assert_eq!(Balances::balance(&Treasury::get_treasury_reserves_account()), 0);
+		assert_err!(
+			<Treasury as OperationalRewardsPayer<u64, u128>>::claim_reward(&42, 250),
+			TokenError::FundsUnavailable
+		);
+		assert_eq!(Balances::balance(&42), 0);
 	});
 }
 

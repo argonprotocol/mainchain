@@ -15,6 +15,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 mod weights;
 
 #[frame_support::pallet]
@@ -22,9 +23,9 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		MiningFrameTransitionProvider, MiningSlotProvider, OperationalAccountsHook,
-		OperationalRewardKind, OperationalRewardPayout, OperationalRewardsPayer,
-		OperationalRewardsProvider, RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
+		MICROGONS_PER_ARGON, MiningFrameTransitionProvider, MiningSlotProvider,
+		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer,
+		RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
 		UniswapTransferRequirementProvider, vault::BitcoinVaultProvider,
 	};
 	use codec::{Decode, Encode, EncodeLike};
@@ -37,14 +38,17 @@ pub mod pallet {
 		traits::{Verify, Zero},
 	};
 
-	/// Domain separator for access code activation proofs.
-	pub const ACCESS_CODE_PROOF_MESSAGE_KEY: &[u8; 17] = b"access_code_claim";
+	/// Domain separator for referral claim proofs.
+	pub const REFERRAL_CLAIM_PROOF_MESSAGE_KEY: &[u8; 14] = b"referral_claim";
+	pub const REFERRAL_SPONSOR_GRANT_MESSAGE_KEY: &[u8; 22] = b"referral_sponsor_grant";
 	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_funding";
 	pub const MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 22] = b"operational_mining_bot";
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
@@ -67,16 +71,9 @@ pub mod pallet {
 		/// Provides access to the current mining frame id.
 		type FrameProvider: MiningFrameTransitionProvider;
 
-		/// How many frames an access code remains valid.
+		/// Additional argon amount (base units) required per referral after operational.
 		#[pallet::constant]
-		type AccessCodeExpirationFrames: Get<FrameId>;
-		/// Maximum number of access codes that may expire in the same frame.
-		#[pallet::constant]
-		type MaxAccessCodesExpiringPerFrame: Get<u32>;
-
-		/// Additional argon amount (base units) required per access code after operational.
-		#[pallet::constant]
-		type BitcoinLockSizeForAccessCode: Get<Self::Balance>;
+		type BitcoinLockSizeForReferral: Get<Self::Balance>;
 		/// Default reward paid when an account becomes operational.
 		#[pallet::constant]
 		type OperationalReferralReward: Get<Self::Balance>;
@@ -86,15 +83,12 @@ pub mod pallet {
 		/// Number of operational sponsees required per referral bonus reward.
 		#[pallet::constant]
 		type ReferralBonusEveryXOperationalSponsees: Get<u32>;
-		/// Maximum number of issuable access codes allowed at once.
+		/// Maximum number of available referrals allowed at once.
 		#[pallet::constant]
-		type MaxIssuableAccessCodes: Get<u32>;
-		/// Maximum number of queued operational rewards.
+		type MaxAvailableReferrals: Get<u32>;
+		/// Maximum number of expired referral codes cleared per block.
 		#[pallet::constant]
-		type MaxOperationalRewardsQueued: Get<u32>;
-		/// Maximum number of unactivated (issued but unused) access codes allowed at once.
-		#[pallet::constant]
-		type MaxUnactivatedAccessCodes: Get<u32>;
+		type MaxExpiredReferralCodeCleanupsPerBlock: Get<u32>;
 		/// Maximum number of encrypted server bytes stored per sponsee.
 		#[pallet::constant]
 		type MaxEncryptedServerLen: Get<u32>;
@@ -104,9 +98,9 @@ pub mod pallet {
 		/// Mining seats required to become operational.
 		#[pallet::constant]
 		type MiningSeatsForOperational: Get<u32>;
-		/// Mining seats required per access code after operational.
+		/// Mining seats required per referral after operational.
 		#[pallet::constant]
-		type MiningSeatsPerAccessCode: Get<u32>;
+		type MiningSeatsPerReferral: Get<u32>;
 
 		/// Provider for current vault state used to initialize registration.
 		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
@@ -118,8 +112,7 @@ pub mod pallet {
 		type UniswapTransferRequirementProvider: UniswapTransferRequirementProvider;
 		/// Provider for recent qualifying inbound Argon transfer lookup.
 		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
-		/// Reserved payout adapter for runtime compatibility (rewards are settled on frame
-		/// transition via treasury queue processing).
+		/// Payout adapter for explicitly claimed operational rewards.
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
 
 		/// Weight information for this pallet.
@@ -137,18 +130,54 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	pub struct AccessCodeProof {
-		/// The public key that serves as the access code.
-		pub public: sr25519::Public,
-		/// Signature over the activation message.
-		pub signature: sr25519::Signature,
+	pub struct ReferralProof<AccountId>
+	where
+		AccountId: Clone + PartialEq + Eq,
+	{
+		/// Public referral code shared by the sponsor.
+		pub referral_code: sr25519::Public,
+		/// Signature from the referral code over the registration claim.
+		pub referral_signature: sr25519::Signature,
+		/// Operational account sponsoring this referral.
+		pub sponsor: AccountId,
+		/// Mining frame where this referral grant expires.
+		#[codec(compact)]
+		pub expires_at_frame: FrameId,
+		/// Signature from the sponsor over the referral grant.
+		pub sponsor_signature: Signature,
 	}
 
-	impl AccessCodeProof {
-		pub fn verify<AccountId: EncodeLike>(&self, account_id: &AccountId) -> bool {
-			let message =
-				(ACCESS_CODE_PROOF_MESSAGE_KEY, self.public, account_id).using_encoded(blake2_256);
-			let verified = self.signature.verify(message.as_slice(), &self.public);
+	impl<AccountId> ReferralProof<AccountId>
+	where
+		AccountId: Clone + Encode + Eq + PartialEq,
+	{
+		pub fn verify_claim<Owner: EncodeLike>(&self, account_id: &Owner) -> bool {
+			let message = (REFERRAL_CLAIM_PROOF_MESSAGE_KEY, self.referral_code, account_id)
+				.using_encoded(blake2_256);
+			let verified = self.referral_signature.verify(message.as_slice(), &self.referral_code);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				return true;
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
+		}
+
+		pub fn verify_sponsor(&self) -> bool {
+			let Ok(sponsor) = AccountId32::decode(&mut self.sponsor.encode().as_slice()) else {
+				return false;
+			};
+			let message = (
+				REFERRAL_SPONSOR_GRANT_MESSAGE_KEY,
+				&self.sponsor,
+				self.referral_code,
+				self.expires_at_frame,
+			)
+				.using_encoded(blake2_256);
+			let verified = self.sponsor_signature.verify(message.as_slice(), &sponsor);
 			#[cfg(feature = "runtime-benchmarks")]
 			{
 				let _ = verified;
@@ -245,8 +274,8 @@ pub mod pallet {
 		pub mining_funding_account_proof: AccountOwnershipProof,
 		/// Proof that the mining bot account is controlled by the registrant.
 		pub mining_bot_account_proof: AccountOwnershipProof,
-		/// Optional sponsor access code used to link this registration to a sponsor.
-		pub access_code: Option<AccessCodeProof>,
+		/// Optional referral proof used to link this registration to a sponsor.
+		pub referral_proof: Option<ReferralProof<T::AccountId>>,
 	}
 
 	#[derive(
@@ -285,29 +314,26 @@ pub mod pallet {
 		pub has_uniswap_transfer: bool,
 		/// Whether the vault has been created for this operational account.
 		pub vault_created: bool,
-		/// Bitcoin amount accrued above the bitcoin already applied to access code issuance.
+		/// Bitcoin amount accrued above the bitcoin already applied to referral issuance.
 		pub bitcoin_accrual: T::Balance,
-		/// Bitcoin already applied to previously issued bitcoin access codes.
+		/// Bitcoin already applied to previously issued referrals.
 		pub bitcoin_applied_total: T::Balance,
 		/// Whether the account has participated in a treasury pool.
 		pub has_treasury_pool_participation: bool,
-		/// Mining seats accrued since the last mining access code issuance.
+		/// Mining seats accrued since the last mining referral issuance.
 		#[codec(compact)]
 		pub mining_seat_accrual: u32,
-		/// Mining seats already applied to previously issued mining access codes.
+		/// Mining seats already applied to previously issued referrals.
 		#[codec(compact)]
 		pub mining_seat_applied_total: u32,
 		/// Number of sponsored accounts that have become operational.
 		#[codec(compact)]
 		pub operational_referrals_count: u32,
-		/// Whether one referral-earned access code is pending materialization.
-		pub referral_access_code_pending: bool,
-		/// Number of access codes this account can issue right now.
+		/// Whether one earned referral is pending materialization.
+		pub referral_pending: bool,
+		/// Number of referrals this account can still have redeemed.
 		#[codec(compact)]
-		pub issuable_access_codes: u32,
-		/// Number of issued access codes that have not yet been activated.
-		#[codec(compact)]
-		pub unactivated_access_codes: u32,
+		pub available_referrals: u32,
 		/// Number of rewards earned.
 		#[codec(compact)]
 		pub rewards_earned_count: u32,
@@ -341,14 +367,14 @@ pub mod pallet {
 		///
 		/// This is treated as a monotonic applied-total override: the effective stored
 		/// `observed_bitcoin_total` will be at least this value, while preserving the
-		/// bitcoin already applied to issued access codes. If the provided value is
+		/// bitcoin already applied to issued referrals. If the provided value is
 		/// lower than the applied total, the current total is retained.
 		pub observed_bitcoin_total: Option<Balance>,
 		/// Requested minimum for the total observed mining seats won.
 		///
 		/// This is treated as a monotonic applied-total override: the effective stored
 		/// `observed_mining_seat_total` will be at least this value, while preserving
-		/// the seats already applied to issued access codes. If the provided value is
+		/// the seats already applied to issued referrals. If the provided value is
 		/// lower than the applied total, the current total is retained.
 		pub observed_mining_seat_total: Option<u32>,
 	}
@@ -374,31 +400,25 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, T::AccountId, T::AccountId, OptionQuery>;
 
 	#[pallet::storage]
-	/// Registered access codes keyed by their public key.
-	pub type AccessCodesByPublic<T: Config> =
-		StorageMap<_, Blake2_128Concat, sr25519::Public, AccessCodeMetadata<T>, OptionQuery>;
+	/// Referral codes that have already been linked, keyed to their proof expiration frame.
+	pub type ConsumedReferralCodes<T: Config> =
+		StorageMap<_, Blake2_128Concat, sr25519::Public, FrameId, OptionQuery>;
 
 	#[pallet::storage]
-	/// Registered access codes expiring at a given mining frame.
-	pub type AccessCodesExpiringByFrame<T: Config> = StorageMap<
+	/// Referral codes to clear after their referral proof expiration frame.
+	pub type ConsumedReferralCodesByExpiration<T: Config> = StorageDoubleMap<
 		_,
 		Twox64Concat,
 		FrameId,
-		BoundedVec<sr25519::Public, T::MaxAccessCodesExpiringPerFrame>,
-		ValueQuery,
+		Blake2_128Concat,
+		sr25519::Public,
+		(),
+		OptionQuery,
 	>;
 
-	#[derive(
-		Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen,
-	)]
-	#[scale_info(skip_type_params(T))]
-	pub struct AccessCodeMetadata<T: Config> {
-		/// Operational account that sponsored this access code.
-		pub sponsor: T::AccountId,
-		/// Expiration frame for this access code.
-		#[codec(compact)]
-		pub expiration_frame: FrameId,
-	}
+	#[pallet::storage]
+	/// Oldest referral expiration frame that still has cleanup work to resume.
+	pub type ExpiredReferralCodeCleanupFrame<T: Config> = StorageValue<_, FrameId, OptionQuery>;
 
 	#[derive(
 		Encode,
@@ -444,17 +464,6 @@ pub mod pallet {
 	pub type Rewards<T: Config> = StorageValue<_, RewardsConfig<T::Balance>, ValueQuery>;
 
 	#[pallet::storage]
-	/// Pending operational account rewards waiting on treasury payout (FIFO queue).
-	pub type OperationalRewardsQueue<T: Config> = StorageValue<
-		_,
-		BoundedVec<
-			OperationalRewardPayout<T::AccountId, T::Balance>,
-			T::MaxOperationalRewardsQueued,
-		>,
-		ValueQuery,
-	>;
-
-	#[pallet::storage]
 	/// Opaque encrypted sponsor server payload keyed by the sponsee operational account.
 	pub type EncryptedServerBySponsee<T: Config> = StorageMap<
 		_,
@@ -477,17 +486,18 @@ pub mod pallet {
 		},
 		/// Account has become operational.
 		AccountWentOperational { account: T::AccountId },
-		/// A reward has been queued for treasury payout.
+		/// A reward is earned for an operational account, but not yet claimed.
 		OperationalRewardEarned {
 			account: T::AccountId,
 			reward_kind: OperationalRewardKind,
 			amount: T::Balance,
 		},
-		/// Reward enqueue failed because the pending queue is full.
-		OperationalRewardEnqueueFailed {
-			account: T::AccountId,
-			reward_kind: OperationalRewardKind,
+		/// Claimable operational rewards were paid to a managed account.
+		OperationalRewardsClaimed {
+			operational_account: T::AccountId,
+			claimant: T::AccountId,
 			amount: T::Balance,
+			remaining_pending: T::Balance,
 		},
 		/// Reward config values were updated.
 		RewardsConfigUpdated {
@@ -520,48 +530,67 @@ pub mod pallet {
 		InvalidAccountProof,
 		/// The caller has not registered an operational account.
 		NotOperationalAccount,
-		/// The access code is already registered.
-		AccessCodeAlreadyRegistered,
-		/// The access code provided is not registered.
-		InvalidAccessCode,
-		/// The access code activation proof is invalid.
-		InvalidAccessCodeProof,
-		/// No access codes are currently issuable.
-		NoIssuableAccessCodes,
-		/// Too many unactivated access codes are outstanding.
-		MaxUnactivatedAccessCodesReached,
-		/// Too many access codes are already scheduled to expire in this frame.
-		MaxAccessCodesExpiringPerFrameReached,
+		/// The referral proof or sponsor proof is invalid.
+		InvalidReferralProof,
+		/// The referral proof has expired.
+		ReferralProofExpired,
 		/// The requested progress patch does not contain any updates.
 		NoProgressUpdateProvided,
 		/// The encrypted server payload exceeds the configured max length.
 		EncryptedServerTooLong,
 		/// The caller is not the sponsor of the requested sponsee.
 		NotSponsorOfSponsee,
+		/// The operational account has no pending rewards to claim.
+		NoPendingRewards,
+		/// Reward claims must be at least one Argon.
+		RewardClaimBelowMinimum,
+		/// Reward claims must be whole Argon increments.
+		RewardClaimNotWholeArgon,
+		/// The requested reward claim exceeds pending rewards.
+		RewardClaimExceedsPending,
+		/// The treasury does not currently have enough available reserves for the claim.
+		TreasuryInsufficientFunds,
+		/// The account is already operational.
+		AlreadyOperational,
+		/// The account has not satisfied operational requirements yet.
+		NotEligibleForActivation,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let current_frame = T::FrameProvider::get_current_frame_id();
-			let expiring_codes = AccessCodesExpiringByFrame::<T>::take(current_frame);
-			let processed = expiring_codes.len() as u64;
-			for public in expiring_codes {
-				if let Some(access_code_metadata) = AccessCodesByPublic::<T>::take(public) {
-					OperationalAccounts::<T>::mutate(
-						&access_code_metadata.sponsor,
-						|maybe_account| {
-							if let Some(account) = maybe_account {
-								Self::decrement_unactivated_access_codes(account);
-								Self::increment_issuable_access_codes(account);
-							}
-						},
-					);
+			let cleanup_limit = T::MaxExpiredReferralCodeCleanupsPerBlock::get() as usize;
+			let mut cleaned = 0u64;
+			let mut reads = 2u64;
+
+			let start_frame = ExpiredReferralCodeCleanupFrame::<T>::get().unwrap_or(current_frame);
+
+			for frame in start_frame..=current_frame {
+				let remaining = cleanup_limit.saturating_sub(cleaned as usize);
+				reads.saturating_accrue(1);
+
+				let referral_codes = ConsumedReferralCodesByExpiration::<T>::iter_key_prefix(frame)
+					.take(remaining.saturating_add(1))
+					.collect::<Vec<_>>();
+
+				reads.saturating_accrue(referral_codes.len() as u64);
+
+				for referral_code in referral_codes.iter().take(remaining) {
+					ConsumedReferralCodes::<T>::remove(referral_code);
+					ConsumedReferralCodesByExpiration::<T>::remove(frame, referral_code);
+					cleaned.saturating_accrue(1);
+				}
+
+				if referral_codes.len() > remaining {
+					ExpiredReferralCodeCleanupFrame::<T>::put(frame);
+					return T::DbWeight::get()
+						.reads_writes(reads, cleaned.saturating_mul(2).saturating_add(1));
 				}
 			}
-			T::DbWeight::get()
-				.reads_writes(1, 1)
-				.saturating_add(T::DbWeight::get().reads_writes(2, 2).saturating_mul(processed))
+
+			ExpiredReferralCodeCleanupFrame::<T>::kill();
+			T::DbWeight::get().reads_writes(reads, cleaned.saturating_mul(2).saturating_add(1))
 		}
 	}
 
@@ -569,7 +598,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Register vault, mining funding, and bot accounts for an operational account.
 		/// Any account in the registration may submit the transaction.
-		/// If an access code is provided, the registration records the sponsor relationship.
+		/// If a referral proof is provided, the registration records the sponsor relationship.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
 		pub fn register(origin: OriginFor<T>, registration: Registration<T>) -> DispatchResult {
@@ -583,7 +612,7 @@ pub mod pallet {
 				vault_account_proof,
 				mining_funding_account_proof,
 				mining_bot_account_proof,
-				access_code,
+				referral_proof,
 			}) = registration;
 			let submitter = ensure_signed(origin)?;
 			ensure!(
@@ -634,21 +663,44 @@ pub mod pallet {
 				Error::<T>::InvalidAccountProof
 			);
 
-			let sponsor = if let Some(access_code) = access_code.as_ref() {
-				let code = AccessCodesByPublic::<T>::take(access_code.public)
-					.ok_or(Error::<T>::InvalidAccessCode)?;
+			let current_frame = T::FrameProvider::get_current_frame_id();
+			let sponsor = if let Some(referral_proof) = referral_proof.as_ref() {
 				ensure!(
-					access_code.verify(&operational_account),
-					Error::<T>::InvalidAccessCodeProof
+					current_frame < referral_proof.expires_at_frame,
+					Error::<T>::ReferralProofExpired
 				);
-				AccessCodesExpiringByFrame::<T>::mutate(code.expiration_frame, |expiring_codes| {
-					if let Some(index) =
-						expiring_codes.iter().position(|public| *public == access_code.public)
-					{
-						expiring_codes.remove(index);
-					}
-				});
-				Some(code.sponsor)
+				ensure!(
+					referral_proof.verify_claim(&operational_account) &&
+						referral_proof.verify_sponsor(),
+					Error::<T>::InvalidReferralProof
+				);
+				let referral_code = referral_proof.referral_code;
+				OperationalAccounts::<T>::try_mutate(
+					&referral_proof.sponsor,
+					|maybe_account| -> Result<Option<T::AccountId>, Error<T>> {
+						let Some(sponsor_account) = maybe_account else {
+							return Ok(None);
+						};
+						if sponsor_account.available_referrals == 0 {
+							return Ok(None);
+						}
+						if ConsumedReferralCodes::<T>::contains_key(referral_code) {
+							return Ok(None);
+						}
+						sponsor_account.available_referrals.saturating_reduce(1);
+						Self::materialize_available_referrals(sponsor_account);
+						ConsumedReferralCodes::<T>::insert(
+							referral_code,
+							referral_proof.expires_at_frame,
+						);
+						ConsumedReferralCodesByExpiration::<T>::insert(
+							referral_proof.expires_at_frame,
+							referral_code,
+							(),
+						);
+						Ok(Some(referral_proof.sponsor.clone()))
+					},
+				)?
 			} else {
 				None
 			};
@@ -696,9 +748,8 @@ pub mod pallet {
 					mining_seat_accrual: observed_mining_seat_total,
 					mining_seat_applied_total: 0,
 					operational_referrals_count: 0,
-					referral_access_code_pending: false,
-					issuable_access_codes: 0,
-					unactivated_access_codes: 0,
+					referral_pending: false,
+					available_referrals: 0,
 					rewards_earned_count: 0,
 					rewards_earned_amount: T::Balance::zero(),
 					rewards_collected_amount: T::Balance::zero(),
@@ -712,11 +763,6 @@ pub mod pallet {
 				&operational_account,
 			);
 			OperationalAccountBySubAccount::<T>::insert(&mining_bot_account, &operational_account);
-			OperationalAccounts::<T>::mutate(&operational_account, |maybe_account| {
-				if let Some(stored_account) = maybe_account {
-					Self::maybe_activate_operational(&operational_account, stored_account);
-				}
-			});
 
 			Self::deposit_event(Event::OperationalAccountRegistered {
 				operational_account: operational_account.clone(),
@@ -725,63 +771,6 @@ pub mod pallet {
 				mining_bot_account: mining_bot_account.clone(),
 				sponsor: sponsor.clone(),
 			});
-			if let Some(sponsor) = sponsor {
-				OperationalAccounts::<T>::mutate(&sponsor, |maybe_account| {
-					if let Some(sponsor_account) = maybe_account {
-						sponsor_account.unactivated_access_codes.saturating_reduce(1);
-						Self::materialize_issuable_access_codes(sponsor_account);
-					}
-				});
-			}
-			Ok(())
-		}
-
-		/// Issue an access code (the public key itself) for this operational account.
-		/// The access code expires after `AccessCodeExpirationFrames`.
-		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::issue_access_code())]
-		pub fn issue_access_code(
-			origin: OriginFor<T>,
-			access_code_public: sr25519::Public,
-		) -> DispatchResult {
-			let sponsor = ensure_signed(origin)?;
-			ensure!(
-				!AccessCodesByPublic::<T>::contains_key(access_code_public),
-				Error::<T>::AccessCodeAlreadyRegistered
-			);
-			OperationalAccounts::<T>::try_mutate(
-				&sponsor,
-				|maybe_account| -> Result<(), Error<T>> {
-					let account =
-						maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
-					ensure!(account.issuable_access_codes > 0, Error::<T>::NoIssuableAccessCodes);
-					ensure!(
-						account.unactivated_access_codes < T::MaxUnactivatedAccessCodes::get(),
-						Error::<T>::MaxUnactivatedAccessCodesReached
-					);
-					account.issuable_access_codes.saturating_reduce(1);
-					account.unactivated_access_codes.saturating_accrue(1);
-					Self::materialize_issuable_access_codes(account);
-					Ok(())
-				},
-			)?;
-
-			let current_frame = T::FrameProvider::get_current_frame_id();
-			let mut expiration_frame = current_frame;
-			expiration_frame.saturating_accrue(T::AccessCodeExpirationFrames::get());
-			AccessCodesExpiringByFrame::<T>::try_mutate(
-				expiration_frame,
-				|expiring_codes| -> Result<(), Error<T>> {
-					expiring_codes
-						.try_push(access_code_public)
-						.map_err(|_| Error::<T>::MaxAccessCodesExpiringPerFrameReached)
-				},
-			)?;
-
-			AccessCodesByPublic::<T>::insert(
-				access_code_public,
-				AccessCodeMetadata { sponsor: sponsor.clone(), expiration_frame },
-			);
 			Ok(())
 		}
 
@@ -843,10 +832,7 @@ pub mod pallet {
 					}
 
 					if update_operational_progress {
-						let activated = Self::maybe_activate_operational(&owner, account);
-						if !activated {
-							Self::materialize_issuable_access_codes(account);
-						}
+						Self::materialize_available_referrals(account);
 					}
 
 					has_uniswap_transfer = account.has_uniswap_transfer;
@@ -896,6 +882,105 @@ pub mod pallet {
 			Self::deposit_event(Event::EncryptedServerUpdated { sponsor, sponsee });
 			Ok(())
 		}
+
+		/// Activate an eligible operational account from any managed account.
+		#[pallet::call_index(5)]
+		#[pallet::weight(T::WeightInfo::activate())]
+		pub fn activate(origin: OriginFor<T>) -> DispatchResult {
+			let signer = ensure_signed(origin)?;
+			let owner = Self::operational_owner_for(&signer);
+
+			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
+				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+				ensure!(!account.is_operational, Error::<T>::AlreadyOperational);
+				ensure!(
+					Self::has_achieved_operational(account),
+					Error::<T>::NotEligibleForActivation
+				);
+
+				let reward_config = Rewards::<T>::get();
+				account.is_operational = true;
+				Self::increment_available_referrals(account);
+				Self::materialize_available_referrals(account);
+				T::VaultProvider::account_became_operational(&account.vault_account);
+				Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
+				Self::record_reward(
+					account,
+					&owner,
+					OperationalRewardKind::Activation,
+					reward_config.operational_referral_reward,
+				);
+
+				if let Some(sponsor) = account.sponsor.as_ref() {
+					OperationalAccounts::<T>::mutate(sponsor, |maybe_account| {
+						let Some(sponsor_account) = maybe_account else {
+							return;
+						};
+						if !sponsor_account.is_operational {
+							return;
+						}
+						sponsor_account.referral_pending = true;
+						Self::materialize_available_referrals(sponsor_account);
+						sponsor_account.operational_referrals_count.saturating_accrue(1);
+						Self::record_reward(
+							sponsor_account,
+							sponsor,
+							OperationalRewardKind::Activation,
+							reward_config.operational_referral_reward,
+						);
+						let bonus_every = T::ReferralBonusEveryXOperationalSponsees::get();
+						if bonus_every > 0 &&
+							sponsor_account.operational_referrals_count % bonus_every == 0
+						{
+							Self::record_reward(
+								sponsor_account,
+								sponsor,
+								OperationalRewardKind::ReferralBonus,
+								reward_config.referral_bonus_reward,
+							);
+						}
+					});
+				}
+
+				Ok(())
+			})
+		}
+
+		/// Claim pending operational rewards to any managed account.
+		#[pallet::call_index(6)]
+		#[pallet::weight(T::WeightInfo::claim_rewards())]
+		pub fn claim_rewards(origin: OriginFor<T>, amount: T::Balance) -> DispatchResult {
+			let claimant = ensure_signed(origin)?;
+			let owner = Self::operational_owner_for(&claimant);
+			let claim_increment = T::Balance::from(MICROGONS_PER_ARGON);
+			let amount_u128: u128 = amount.into();
+
+			ensure!(amount >= claim_increment, Error::<T>::RewardClaimBelowMinimum);
+			ensure!(amount_u128 % MICROGONS_PER_ARGON == 0, Error::<T>::RewardClaimNotWholeArgon);
+
+			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
+				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+				let pending_rewards =
+					account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount);
+				ensure!(!pending_rewards.is_zero(), Error::<T>::NoPendingRewards);
+				ensure!(amount <= pending_rewards, Error::<T>::RewardClaimExceedsPending);
+
+				T::OperationalRewardsPayer::claim_reward(&claimant, amount)
+					.map_err(|_| Error::<T>::TreasuryInsufficientFunds)?;
+
+				account.rewards_collected_amount.saturating_accrue(amount);
+				let remaining_pending =
+					account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount);
+
+				Self::deposit_event(Event::OperationalRewardsClaimed {
+					operational_account: owner.clone(),
+					claimant,
+					amount,
+					remaining_pending,
+				});
+				Ok(())
+			})
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -911,48 +996,29 @@ pub mod pallet {
 				};
 
 				account.has_uniswap_transfer = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
 		}
 
-		fn decrement_unactivated_access_codes(account: &mut OperationalAccount<T>) {
-			account.unactivated_access_codes.saturating_reduce(1);
+		fn operational_owner_for(account_id: &T::AccountId) -> T::AccountId {
+			OperationalAccountBySubAccount::<T>::get(account_id)
+				.unwrap_or_else(|| account_id.clone())
 		}
 
-		fn enqueue_reward(
+		fn record_reward(
 			operational_account: &mut OperationalAccount<T>,
 			owner: &T::AccountId,
-			payout_account: &T::AccountId,
 			reward_kind: OperationalRewardKind,
 			amount: T::Balance,
 		) {
 			if amount.is_zero() {
 				return;
 			}
-			let reward_kind_event = reward_kind.clone();
-			let payout = OperationalRewardPayout {
-				operational_account: owner.clone(),
-				payout_account: payout_account.clone(),
-				reward_kind,
-				amount,
-			};
-			let pushed = OperationalRewardsQueue::<T>::try_mutate(|queue| {
-				queue.try_push(payout.clone()).map_err(|_| ())
-			})
-			.is_ok();
-			if !pushed {
-				Self::deposit_event(Event::OperationalRewardEnqueueFailed {
-					account: owner.clone(),
-					reward_kind: reward_kind_event,
-					amount,
-				});
-				return;
-			}
+
 			operational_account.rewards_earned_count.saturating_accrue(1);
 			operational_account.rewards_earned_amount.saturating_accrue(amount);
 			Self::deposit_event(Event::OperationalRewardEarned {
 				account: owner.clone(),
-				reward_kind: reward_kind_event,
+				reward_kind,
 				amount,
 			});
 		}
@@ -975,23 +1041,23 @@ pub mod pallet {
 				.unwrap_or(false)
 		}
 
-		fn increment_issuable_access_codes(account: &mut OperationalAccount<T>) {
-			if account.issuable_access_codes < T::MaxIssuableAccessCodes::get() {
-				account.issuable_access_codes.saturating_accrue(1);
+		fn increment_available_referrals(account: &mut OperationalAccount<T>) {
+			if account.available_referrals < T::MaxAvailableReferrals::get() {
+				account.available_referrals.saturating_accrue(1);
 			}
 		}
 
-		fn materialize_issuable_access_codes(account: &mut OperationalAccount<T>) {
+		fn materialize_available_referrals(account: &mut OperationalAccount<T>) {
 			if !account.is_operational {
 				return;
 			}
-			let max_issuable_access_codes = T::MaxIssuableAccessCodes::get();
-			let bitcoin_threshold = T::BitcoinLockSizeForAccessCode::get();
-			let mining_seat_threshold = T::MiningSeatsPerAccessCode::get();
-			while account.issuable_access_codes < max_issuable_access_codes {
-				if account.referral_access_code_pending {
-					account.referral_access_code_pending = false;
-					account.issuable_access_codes.saturating_accrue(1);
+			let max_available_referrals = T::MaxAvailableReferrals::get();
+			let bitcoin_threshold = T::BitcoinLockSizeForReferral::get();
+			let mining_seat_threshold = T::MiningSeatsPerReferral::get();
+			while account.available_referrals < max_available_referrals {
+				if account.referral_pending {
+					account.referral_pending = false;
+					account.available_referrals.saturating_accrue(1);
 					continue;
 				}
 				if bitcoin_threshold > T::Balance::zero() &&
@@ -999,79 +1065,18 @@ pub mod pallet {
 				{
 					account.bitcoin_applied_total = Self::observed_bitcoin_total(account);
 					account.bitcoin_accrual = T::Balance::zero();
-					account.issuable_access_codes.saturating_accrue(1);
+					account.available_referrals.saturating_accrue(1);
 					continue;
 				}
 				if mining_seat_threshold > 0 && account.mining_seat_accrual >= mining_seat_threshold
 				{
 					account.mining_seat_applied_total = Self::observed_mining_seat_total(account);
 					account.mining_seat_accrual = 0;
-					account.issuable_access_codes.saturating_accrue(1);
+					account.available_referrals.saturating_accrue(1);
 					continue;
 				}
 				break;
 			}
-		}
-
-		fn maybe_activate_operational(
-			owner: &T::AccountId,
-			operational_account: &mut OperationalAccount<T>,
-		) -> bool {
-			if operational_account.is_operational ||
-				!Self::has_achieved_operational(operational_account)
-			{
-				return false;
-			}
-
-			let reward_config = Rewards::<T>::get();
-			operational_account.is_operational = true;
-			Self::increment_issuable_access_codes(operational_account);
-			Self::materialize_issuable_access_codes(operational_account);
-			T::VaultProvider::account_became_operational(&operational_account.vault_account);
-			Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
-			let payout_account = operational_account.mining_funding_account.clone();
-			Self::enqueue_reward(
-				operational_account,
-				owner,
-				&payout_account,
-				OperationalRewardKind::Activation,
-				reward_config.operational_referral_reward,
-			);
-
-			if let Some(sponsor) = operational_account.sponsor.as_ref() {
-				OperationalAccounts::<T>::mutate(sponsor, |maybe_account| {
-					let Some(sponsor_account) = maybe_account else {
-						return;
-					};
-					if !sponsor_account.is_operational {
-						return;
-					}
-					sponsor_account.referral_access_code_pending = true;
-					Self::materialize_issuable_access_codes(sponsor_account);
-					sponsor_account.operational_referrals_count.saturating_accrue(1);
-					let payout_account = sponsor_account.mining_funding_account.clone();
-					Self::enqueue_reward(
-						sponsor_account,
-						sponsor,
-						&payout_account,
-						OperationalRewardKind::Activation,
-						reward_config.operational_referral_reward,
-					);
-					let bonus_every = T::ReferralBonusEveryXOperationalSponsees::get();
-					if bonus_every > 0 &&
-						sponsor_account.operational_referrals_count % bonus_every == 0
-					{
-						Self::enqueue_reward(
-							sponsor_account,
-							sponsor,
-							&payout_account,
-							OperationalRewardKind::ReferralBonus,
-							reward_config.referral_bonus_reward,
-						);
-					}
-				});
-			}
-			true
 		}
 
 		fn observed_bitcoin_total(account: &OperationalAccount<T>) -> T::Balance {
@@ -1098,22 +1103,6 @@ pub mod pallet {
 		) {
 			account.bitcoin_accrual = total_locked.saturating_sub(account.bitcoin_applied_total);
 		}
-
-		fn apply_reward_payment(
-			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
-			amount_paid: T::Balance,
-		) -> T::Balance {
-			OperationalRewardsQueue::<T>::mutate(|queue| {
-				// `reward` comes from a copied snapshot; resolve its live queue index before
-				// removal.
-				let Some(queue_index) = queue.iter().position(|entry| entry == reward) else {
-					return T::Balance::zero();
-				};
-				let queued_amount = queue[queue_index].amount;
-				queue.remove(queue_index);
-				amount_paid.min(queued_amount)
-			})
-		}
 	}
 
 	impl<T: Config> OperationalAccountsHook<T::AccountId, T::Balance> for Pallet<T> {
@@ -1132,7 +1121,6 @@ pub mod pallet {
 				};
 
 				account.vault_created = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
 		}
 
@@ -1151,8 +1139,7 @@ pub mod pallet {
 					return;
 				};
 				Self::recalculate_bitcoin_accrual(account, total_locked);
-				Self::maybe_activate_operational(&owner, account);
-				Self::materialize_issuable_access_codes(account);
+				Self::materialize_available_referrals(account);
 			});
 		}
 
@@ -1169,8 +1156,7 @@ pub mod pallet {
 					return;
 				};
 				account.mining_seat_accrual.saturating_accrue(1);
-				Self::maybe_activate_operational(&owner, account);
-				Self::materialize_issuable_access_codes(account);
+				Self::materialize_available_referrals(account);
 			});
 		}
 
@@ -1188,7 +1174,6 @@ pub mod pallet {
 					return;
 				};
 				account.has_treasury_pool_participation = true;
-				Self::maybe_activate_operational(&owner, account);
 			});
 		}
 
@@ -1198,33 +1183,6 @@ pub mod pallet {
 
 		fn uniswap_transfer_confirmed(account_id: &T::AccountId, amount: T::Balance) {
 			Self::on_uniswap_transfer(account_id, amount)
-		}
-	}
-
-	impl<T: Config> OperationalRewardsProvider<T::AccountId, T::Balance> for Pallet<T> {
-		type Weights = crate::weights::ProviderWeightAdapter<T>;
-
-		fn pending_rewards() -> Vec<OperationalRewardPayout<T::AccountId, T::Balance>> {
-			OperationalRewardsQueue::<T>::get().into_iter().collect()
-		}
-
-		fn max_pending_rewards() -> u32 {
-			T::MaxOperationalRewardsQueued::get()
-		}
-
-		fn mark_reward_paid(
-			reward: &OperationalRewardPayout<T::AccountId, T::Balance>,
-			amount_paid: T::Balance,
-		) {
-			let amount_paid = Self::apply_reward_payment(reward, amount_paid);
-			if amount_paid.is_zero() {
-				return;
-			}
-			OperationalAccounts::<T>::mutate(&reward.operational_account, |maybe_account| {
-				if let Some(account) = maybe_account {
-					account.rewards_collected_amount.saturating_accrue(amount_paid);
-				}
-			});
 		}
 	}
 }

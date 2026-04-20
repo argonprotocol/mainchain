@@ -52,7 +52,6 @@ import type {
   ArgonPrimitivesNotebookSignedNotebookHeader,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
-  ArgonPrimitivesProvidersOperationalRewardPayout,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultVaultError,
@@ -211,8 +210,6 @@ import type {
   PalletNotebookCall,
   PalletNotebookError,
   PalletNotebookEvent,
-  PalletOperationalAccountsAccessCodeMetadata,
-  PalletOperationalAccountsAccessCodeProof,
   PalletOperationalAccountsAccountOwnershipProof,
   PalletOperationalAccountsCall,
   PalletOperationalAccountsError,
@@ -220,6 +217,7 @@ import type {
   PalletOperationalAccountsOpaqueEncryptionPubkey,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsOperationalProgressPatch,
+  PalletOperationalAccountsReferralProof,
   PalletOperationalAccountsRegistration,
   PalletOperationalAccountsRegistrationV1,
   PalletOperationalAccountsRewardsConfig,
@@ -340,7 +338,6 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesNotebookSignedNotebookHeader: ArgonPrimitivesNotebookSignedNotebookHeader;
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
-    ArgonPrimitivesProvidersOperationalRewardPayout: ArgonPrimitivesProvidersOperationalRewardPayout;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
@@ -499,8 +496,6 @@ declare module '@polkadot/types/types/registry' {
     PalletNotebookCall: PalletNotebookCall;
     PalletNotebookError: PalletNotebookError;
     PalletNotebookEvent: PalletNotebookEvent;
-    PalletOperationalAccountsAccessCodeMetadata: PalletOperationalAccountsAccessCodeMetadata;
-    PalletOperationalAccountsAccessCodeProof: PalletOperationalAccountsAccessCodeProof;
     PalletOperationalAccountsAccountOwnershipProof: PalletOperationalAccountsAccountOwnershipProof;
     PalletOperationalAccountsCall: PalletOperationalAccountsCall;
     PalletOperationalAccountsError: PalletOperationalAccountsError;
@@ -508,6 +503,7 @@ declare module '@polkadot/types/types/registry' {
     PalletOperationalAccountsOpaqueEncryptionPubkey: PalletOperationalAccountsOpaqueEncryptionPubkey;
     PalletOperationalAccountsOperationalAccount: PalletOperationalAccountsOperationalAccount;
     PalletOperationalAccountsOperationalProgressPatch: PalletOperationalAccountsOperationalProgressPatch;
+    PalletOperationalAccountsReferralProof: PalletOperationalAccountsReferralProof;
     PalletOperationalAccountsRegistration: PalletOperationalAccountsRegistration;
     PalletOperationalAccountsRegistrationV1: PalletOperationalAccountsRegistrationV1;
     PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;

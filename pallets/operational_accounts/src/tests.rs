@@ -1,28 +1,26 @@
 use crate::{
-	ACCESS_CODE_PROOF_MESSAGE_KEY, AccessCodeMetadata, AccessCodeProof, AccessCodesByPublic,
-	AccessCodesExpiringByFrame, AccountOwnershipProof, EncryptedServerBySponsee,
+	AccountOwnershipProof, ConsumedReferralCodes, ConsumedReferralCodesByExpiration,
+	EncryptedServerBySponsee, ExpiredReferralCodeCleanupFrame,
 	MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY, MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
 	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, OpaqueEncryptionPubkey, OperationalAccountBySubAccount,
-	OperationalAccounts, OperationalProgressPatch, OperationalRewardsQueue, Registration,
-	RegistrationV1, Rewards, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	OperationalAccounts, OperationalProgressPatch, REFERRAL_CLAIM_PROOF_MESSAGE_KEY,
+	REFERRAL_SPONSOR_GRANT_MESSAGE_KEY, ReferralProof, Registration, RegistrationV1, Rewards,
+	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
-use argon_primitives::{
-	OperationalAccountsHook, OperationalRewardKind, OperationalRewardPayout,
-	OperationalRewardsProvider, Signature,
-};
-use frame_support::{assert_err, assert_noop, assert_ok};
+use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook, Signature};
+use frame_support::{assert_err, assert_noop, assert_ok, traits::Hooks};
 use pallet_prelude::*;
 use sp_core::{Pair, sr25519};
 use sp_io::hashing::blake2_256;
 use sp_runtime::{AccountId32, DispatchError, MultiSigner, traits::IdentifyAccount};
 
 use crate::mock::{
-	BitcoinLockSizeForAccessCode, CurrentFrameId, MaxAccessCodesExpiringPerFrame,
-	MaxEncryptedServerLen, MaxIssuableAccessCodes, MaxOperationalRewardsQueued,
+	BitcoinLockSizeForReferral, ClaimableTreasuryBalance, ClaimedOperationalRewards,
+	CurrentFrameId, MaxAvailableReferrals, MaxEncryptedServerLen,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
 	OperationalReferralBonusReward, OperationalReferralReward, RequiresUniswapTransfer,
-	RuntimeOrigin, System, Test, TestAccountId, ensure_registration_lookup,
-	has_vault_operational_mark, new_test_ext, set_registration_lookup,
+	RuntimeOrigin, Test, TestAccountId, ensure_registration_lookup, has_vault_operational_mark,
+	new_test_ext, set_registration_lookup,
 };
 
 #[test]
@@ -152,34 +150,52 @@ fn test_register_rejects_outsider_submitter() {
 }
 
 #[test]
-fn test_register_with_access_code_sets_sponsor_and_decrements_unactivated() {
+fn test_register_rejects_invalid_referral_proof_and_ignores_sponsor_without_capacity() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
-			let sponsor_account = maybe.as_mut().expect("sponsor account");
-			sponsor_account.unactivated_access_codes = 1;
-		});
+		set_available_referrals(&sponsor_set.owner, 1);
 
-		let recruit_set = make_account_set(20, 21, 22, 23);
-		let access_code = make_access_code_proof(&recruit_set.owner, 1);
-		AccessCodesByPublic::<Test>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
+		#[cfg(not(feature = "runtime-benchmarks"))]
+		{
+			let invalid_signature_set = make_account_set(20, 21, 22, 23);
+			let invalid_signature =
+				make_referral_proof(&invalid_signature_set.owner, &sponsor_set.owner, 1, 11);
+			assert_noop!(
+				OperationalAccountsPallet::register(
+					RuntimeOrigin::signed(invalid_signature_set.owner.clone()),
+					invalid_signature_set.registration(Some(invalid_signature)),
+				),
+				crate::Error::<Test>::InvalidReferralProof
+			);
+		}
+
+		let expired_set = make_account_set(30, 31, 32, 33);
+		let expired = make_referral_proof_expiring_at(
+			&expired_set.owner,
+			&sponsor_set.owner,
+			2,
+			10,
+			CurrentFrameId::get(),
 		);
-		AccessCodesExpiringByFrame::<Test>::mutate(5, |expiring_codes| {
-			assert!(expiring_codes.try_push(access_code.public).is_ok());
-		});
+		assert_noop!(
+			OperationalAccountsPallet::register(
+				RuntimeOrigin::signed(expired_set.owner.clone()),
+				expired_set.registration(Some(expired)),
+			),
+			crate::Error::<Test>::ReferralProofExpired
+		);
 
-		register_account_with_submitter(&recruit_set, &recruit_set.vault, Some(access_code));
+		let no_referrals_set = make_account_set(40, 41, 42, 43);
+		let no_referrals = make_referral_proof(&no_referrals_set.owner, &sponsor_set.owner, 2, 10);
+		set_available_referrals(&sponsor_set.owner, 0);
+		register_account(&no_referrals_set, Some(no_referrals));
 
-		let recruit_account =
-			OperationalAccounts::<Test>::get(&recruit_set.owner).expect("recruit account");
-		assert_eq!(recruit_account.sponsor, Some(sponsor_set.owner.clone()));
+		let account = OperationalAccounts::<Test>::get(&no_referrals_set.owner).expect("account");
+		assert!(account.sponsor.is_none());
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.unactivated_access_codes, 0);
-		assert_eq!(sponsor_account.issuable_access_codes, 0);
+		assert_eq!(sponsor_account.available_referrals, 0);
 	});
 }
 
@@ -369,8 +385,8 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 		let no_recompute =
 			OperationalAccounts::<Test>::get(&no_recompute_set.owner).expect("account");
 		assert!(!no_recompute.is_operational);
-		assert_eq!(no_recompute.issuable_access_codes, 0);
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert_eq!(no_recompute.available_referrals, 0);
+		assert_eq!(no_recompute.rewards_earned_amount, 0);
 
 		let recompute_set = make_account_set(21, 22, 23, 24);
 		register_account(&recompute_set, None);
@@ -392,133 +408,146 @@ fn test_force_set_progress_recompute_flag_controls_side_effects() {
 		));
 
 		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
+		assert!(!recompute.is_operational);
+		assert_eq!(recompute.available_referrals, 0);
+		assert_eq!(recompute.rewards_earned_amount, 0);
+
+		activate_account(&recompute_set);
+		let recompute = OperationalAccounts::<Test>::get(&recompute_set.owner).expect("account");
 		assert!(recompute.is_operational);
-		assert_eq!(recompute.issuable_access_codes, 1);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 1);
-		assert_eq!(queue[0].operational_account, recompute_set.owner);
+		assert_eq!(recompute.available_referrals, 1);
+		assert_eq!(recompute.rewards_earned_amount, OperationalReferralReward::get());
 	});
 }
 
 #[test]
-fn test_access_code_activation_materializes_pending_sponsor_issuance() {
+fn test_referral_registration_consumes_available_and_materializes_ready_referral() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(30, 31, 32, 33);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
-		let bitcoin_threshold = BitcoinLockSizeForAccessCode::get();
+		satisfy_and_activate(&sponsor_set);
+		let bitcoin_threshold = BitcoinLockSizeForReferral::get();
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
-			sponsor_account.issuable_access_codes = 1;
-			sponsor_account.unactivated_access_codes = 1;
+			sponsor_account.available_referrals = 1;
 			sponsor_account.bitcoin_accrual = bitcoin_threshold;
 		});
 
 		let recruit_set = make_account_set(40, 41, 42, 43);
-		let access_code = make_access_code_proof(&recruit_set.owner, 8);
-		AccessCodesByPublic::<Test>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
-		);
-		AccessCodesExpiringByFrame::<Test>::mutate(5, |expiring_codes| {
-			assert!(expiring_codes.try_push(access_code.public).is_ok());
-		});
+		let referral_proof = make_referral_proof(&recruit_set.owner, &sponsor_set.owner, 8, 30);
 
-		register_account(&recruit_set, Some(access_code));
+		register_account(&recruit_set, Some(referral_proof));
+
+		let recruit_account =
+			OperationalAccounts::<Test>::get(&recruit_set.owner).expect("recruit account");
+		assert_eq!(recruit_account.sponsor, Some(sponsor_set.owner.clone()));
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.unactivated_access_codes, 0);
-		assert_eq!(sponsor_account.issuable_access_codes, 2);
+		assert_eq!(sponsor_account.available_referrals, 1);
 		assert_eq!(sponsor_account.bitcoin_accrual, 0);
 	});
 }
 
 #[test]
-fn test_issue_access_code_tracks_expiration_and_counts() {
+fn test_reused_referral_code_registers_without_sponsor_until_expiration() {
 	new_test_ext().execute_with(|| {
-		let sponsor_set = make_account_set(1, 2, 3, 4);
+		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		set_issuable_access_codes(&sponsor_set.owner, 1);
+		set_available_referrals(&sponsor_set.owner, 2);
 
-		CurrentFrameId::set(10);
-		let access_code = sr25519::Public::from_raw([7u8; 32]);
-		assert_ok!(OperationalAccountsPallet::issue_access_code(
-			RuntimeOrigin::signed(sponsor_set.owner.clone()),
-			access_code,
+		let first_recruit = make_account_set(20, 21, 22, 23);
+		let expires_at_frame = CurrentFrameId::get().saturating_add(1);
+		let first_referral = make_referral_proof_expiring_at(
+			&first_recruit.owner,
+			&sponsor_set.owner,
+			1,
+			10,
+			expires_at_frame,
+		);
+		let referral_code = first_referral.referral_code;
+		register_account(&first_recruit, Some(first_referral));
+
+		assert_eq!(ConsumedReferralCodes::<Test>::get(referral_code), Some(expires_at_frame));
+		assert!(ConsumedReferralCodesByExpiration::<Test>::contains_key(
+			expires_at_frame,
+			referral_code
 		));
 
+		let reused_recruit = make_account_set(30, 31, 32, 33);
+		let reused_referral = make_referral_proof(&reused_recruit.owner, &sponsor_set.owner, 1, 10);
+		register_account(&reused_recruit, Some(reused_referral));
+
+		let reused_account =
+			OperationalAccounts::<Test>::get(&reused_recruit.owner).expect("reused account");
+		assert!(reused_account.sponsor.is_none());
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.issuable_access_codes, 0);
-		assert_eq!(sponsor_account.unactivated_access_codes, 1);
+		assert_eq!(sponsor_account.available_referrals, 1);
 
-		let code_metadata = AccessCodesByPublic::<Test>::get(access_code).expect("code");
-		assert_eq!(code_metadata.sponsor, sponsor_set.owner);
-		assert_eq!(code_metadata.expiration_frame, 12);
-		let expiring_codes = AccessCodesExpiringByFrame::<Test>::get(12);
-		assert_eq!(expiring_codes.len(), 1);
-		assert_eq!(expiring_codes[0], access_code);
+		CurrentFrameId::set(expires_at_frame);
+		OperationalAccountsPallet::on_initialize(1);
+		assert!(!ConsumedReferralCodes::<Test>::contains_key(referral_code));
+		assert!(!ConsumedReferralCodesByExpiration::<Test>::contains_key(
+			expires_at_frame,
+			referral_code
+		));
+
+		let second_recruit = make_account_set(40, 41, 42, 43);
+		let second_referral = make_referral_proof(&second_recruit.owner, &sponsor_set.owner, 1, 10);
+		let second_expires_at_frame = second_referral.expires_at_frame;
+		register_account(&second_recruit, Some(second_referral));
+
+		let second_account =
+			OperationalAccounts::<Test>::get(&second_recruit.owner).expect("second account");
+		assert_eq!(second_account.sponsor, Some(sponsor_set.owner.clone()));
+		assert_eq!(
+			ConsumedReferralCodes::<Test>::get(referral_code),
+			Some(second_expires_at_frame)
+		);
+		let sponsor_account =
+			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
+		assert_eq!(sponsor_account.available_referrals, 0);
 	});
 }
 
 #[test]
-fn test_issue_access_code_rejects_full_expiration_frame() {
-	new_test_ext().execute_with(|| {
-		let sponsor_set = make_account_set(1, 2, 3, 4);
-		register_account(&sponsor_set, None);
-		set_issuable_access_codes(&sponsor_set.owner, 1);
+fn test_expired_referral_cleanup_is_bounded_across_blocks() {
+	let mut ext = new_test_ext();
+	ext.execute_with(|| {
+		let expires_at_frame = CurrentFrameId::get();
+		let referral_codes = [
+			sr25519::Public::from_raw([1u8; 32]),
+			sr25519::Public::from_raw([2u8; 32]),
+			sr25519::Public::from_raw([3u8; 32]),
+		];
 
-		CurrentFrameId::set(10);
-		let expiration_frame = 12;
-		AccessCodesExpiringByFrame::<Test>::mutate(expiration_frame, |expiring_codes| {
-			for seed in 0..MaxAccessCodesExpiringPerFrame::get() {
-				let mut bytes = [0u8; 32];
-				bytes[0] = seed as u8;
-				assert!(expiring_codes.try_push(sr25519::Public::from_raw(bytes)).is_ok());
-			}
-		});
-
-		assert_noop!(
-			OperationalAccountsPallet::issue_access_code(
-				RuntimeOrigin::signed(sponsor_set.owner.clone()),
-				sr25519::Public::from_raw([8u8; 32]),
-			),
-			crate::Error::<Test>::MaxAccessCodesExpiringPerFrameReached
-		);
+		for referral_code in referral_codes {
+			ConsumedReferralCodes::<Test>::insert(referral_code, expires_at_frame);
+			ConsumedReferralCodesByExpiration::<Test>::insert(expires_at_frame, referral_code, ());
+		}
 	});
-}
+	ext.commit_all().expect("seeded referral codes should commit");
 
-#[test]
-fn test_access_code_expiration_cleanup() {
-	new_test_ext().execute_with(|| {
-		let sponsor_set = make_account_set(1, 2, 3, 4);
-		register_account(&sponsor_set, None);
-		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
-			let sponsor_account = maybe.as_mut().expect("sponsor account");
-			sponsor_account.unactivated_access_codes = 1;
-			sponsor_account.is_operational = true;
-			sponsor_account.issuable_access_codes = 0;
-		});
+	ext.execute_with(|| {
+		let expires_at_frame = CurrentFrameId::get();
+		OperationalAccountsPallet::on_initialize(1);
 
-		CurrentFrameId::set(5);
-		let access_code = sr25519::Public::from_raw([9u8; 32]);
-		AccessCodesByPublic::<Test>::insert(
-			access_code,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
+		assert_eq!(
+			ConsumedReferralCodesByExpiration::<Test>::iter_key_prefix(expires_at_frame).count(),
+			1
 		);
-		AccessCodesExpiringByFrame::<Test>::mutate(5, |expiring_codes| {
-			assert!(expiring_codes.try_push(access_code).is_ok());
-		});
+		assert_eq!(ConsumedReferralCodes::<Test>::iter().count(), 1);
+		assert_eq!(ExpiredReferralCodeCleanupFrame::<Test>::get(), Some(expires_at_frame));
 
-		OperationalAccountsPallet::on_initialize(1u32.into());
+		OperationalAccountsPallet::on_initialize(2);
 
-		assert!(AccessCodesByPublic::<Test>::get(access_code).is_none());
-		assert!(AccessCodesExpiringByFrame::<Test>::get(5).is_empty());
-		let sponsor_account =
-			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.unactivated_access_codes, 0);
-		assert_eq!(sponsor_account.issuable_access_codes, 1);
+		assert_eq!(
+			ConsumedReferralCodesByExpiration::<Test>::iter_key_prefix(expires_at_frame).count(),
+			0
+		);
+		assert_eq!(ConsumedReferralCodes::<Test>::iter().count(), 0);
+		assert_eq!(ExpiredReferralCodeCleanupFrame::<Test>::get(), None);
 	});
 }
 
@@ -555,12 +584,17 @@ fn test_registration_lookup_hydrates_current_mining_registration() {
 		assert!(account.has_treasury_pool_participation);
 		assert_eq!(account.bitcoin_accrual, 1);
 		assert_eq!(account.mining_seat_accrual, 1);
-		assert_eq!(account.issuable_access_codes, 0);
+		assert_eq!(account.available_referrals, 0);
 
 		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(!account.is_operational);
+		assert_eq!(account.available_referrals, 0);
+
+		activate_account(&account_set);
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert!(account.is_operational);
-		assert_eq!(account.issuable_access_codes, 1);
+		assert_eq!(account.available_referrals, 1);
 	});
 }
 
@@ -571,7 +605,7 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 		set_registration_lookup(
 			account_set.vault.clone(),
 			account_set.mining_funding.clone(),
-			BitcoinLockSizeForAccessCode::get(),
+			BitcoinLockSizeForReferral::get(),
 			OperationalMinimumVaultSecuritization::get(),
 			true,
 			1,
@@ -582,22 +616,27 @@ fn test_registration_lookup_preserves_pre_registration_bitcoin_progress() {
 
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert!(!account.is_operational);
-		assert_eq!(account.issuable_access_codes, 0);
-		assert_eq!(account.bitcoin_accrual, BitcoinLockSizeForAccessCode::get());
+		assert_eq!(account.available_referrals, 0);
+		assert_eq!(account.bitcoin_accrual, BitcoinLockSizeForReferral::get());
 		assert_eq!(account.mining_seat_accrual, 1);
 
 		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert!(!account.is_operational);
+		assert_eq!(account.available_referrals, 0);
+
+		activate_account(&account_set);
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert!(account.is_operational);
-		assert_eq!(account.issuable_access_codes, 2);
-		assert_eq!(account.bitcoin_applied_total, BitcoinLockSizeForAccessCode::get());
+		assert_eq!(account.available_referrals, 2);
+		assert_eq!(account.bitcoin_applied_total, BitcoinLockSizeForReferral::get());
 		assert_eq!(account.bitcoin_accrual, 0);
 		assert_eq!(account.mining_seat_accrual, 2);
 	});
 }
 
 #[test]
-fn test_activation_queues_reward_when_requirements_met() {
+fn test_activate_from_managed_accounts_records_rewards_and_rejects_invalid_calls() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(1, 2, 3, 4);
 		register_account(&account_set, None);
@@ -605,25 +644,54 @@ fn test_activation_queues_reward_when_requirements_met() {
 
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert!(operational_account.is_operational);
-		assert!(has_vault_operational_mark(&account_set.vault));
-		assert_eq!(operational_account.issuable_access_codes, 1);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 1);
-		let reward = queue[0].clone();
-		assert_eq!(reward.operational_account, account_set.owner);
-		assert_eq!(reward.payout_account, account_set.mining_funding);
-		assert_eq!(reward.reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(reward.amount, 1_000);
+		assert!(!operational_account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
+		assert_eq!(operational_account.available_referrals, 0);
+		assert_eq!(operational_account.rewards_earned_amount, 0);
 
-		assert_eq!(operational_account.rewards_earned_count, 1);
-		assert_eq!(operational_account.rewards_earned_amount, 1_000);
+		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+			account_set.mining_funding.clone()
+		)));
 
-		OperationalAccountsPallet::mark_reward_paid(&reward, reward.amount);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.rewards_collected_amount, 1_000);
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert!(operational_account.is_operational);
+		assert!(has_vault_operational_mark(&account_set.vault));
+		assert_eq!(operational_account.available_referrals, 1);
+		assert_eq!(operational_account.rewards_earned_count, 1);
+		assert_eq!(operational_account.rewards_earned_amount, 1_000);
+		assert_eq!(pending_rewards_amount(&operational_account), 1_000);
+
+		let activation_cases = [
+			make_account_set(10, 11, 12, 13),
+			make_account_set(20, 21, 22, 23),
+			make_account_set(30, 31, 32, 33),
+			make_account_set(40, 41, 42, 43),
+		];
+		for (index, account_set) in activation_cases.into_iter().enumerate() {
+			register_account(&account_set, None);
+			satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+			let signer = match index {
+				0 => account_set.owner.clone(),
+				1 => account_set.vault.clone(),
+				2 => account_set.mining_funding.clone(),
+				_ => account_set.mining_bot.clone(),
+			};
+			assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(signer)));
+
+			let operational_account =
+				OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+			assert!(operational_account.is_operational);
+			assert!(has_vault_operational_mark(&account_set.vault));
+		}
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(account_id_from_seed(54))),
+			crate::Error::<Test>::NotOperationalAccount
+		);
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(account_set.vault.clone())),
+			crate::Error::<Test>::AlreadyOperational
+		);
 	});
 }
 
@@ -642,46 +710,59 @@ fn test_genesis_initializes_reward_config() {
 }
 
 #[test]
-fn test_activation_requires_positive_bitcoin() {
+fn test_activate_requires_eligibility() {
 	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(31, 32, 33, 34);
-		register_account(&account_set, None);
-		ensure_registration_lookup(account_set.vault.clone(), account_set.mining_funding.clone());
+		let missing_bitcoin_set = make_account_set(31, 32, 33, 34);
+		register_account(&missing_bitcoin_set, None);
+		ensure_registration_lookup(
+			missing_bitcoin_set.vault.clone(),
+			missing_bitcoin_set.mining_funding.clone(),
+		);
 
-		OperationalAccountsPallet::vault_created(&account_set.vault);
-		record_uniswap_transfer(&account_set.vault, 1_000);
-		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
-		OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
-		OperationalAccountsPallet::treasury_pool_participated(&account_set.vault, 1);
+		OperationalAccountsPallet::vault_created(&missing_bitcoin_set.vault);
+		record_uniswap_transfer(&missing_bitcoin_set.vault, 1_000);
+		OperationalAccountsPallet::mining_seat_won(&missing_bitcoin_set.mining_funding);
+		OperationalAccountsPallet::mining_seat_won(&missing_bitcoin_set.mining_funding);
+		OperationalAccountsPallet::treasury_pool_participated(&missing_bitcoin_set.vault, 1);
 
-		let account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		let account = OperationalAccounts::<Test>::get(&missing_bitcoin_set.owner)
+			.expect("operational account");
 		assert!(!account.is_operational);
-		assert!(!has_vault_operational_mark(&account_set.vault));
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
-	});
-}
+		assert!(!has_vault_operational_mark(&missing_bitcoin_set.vault));
+		assert_eq!(account.rewards_earned_amount, 0);
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+				missing_bitcoin_set.owner.clone()
+			)),
+			crate::Error::<Test>::NotEligibleForActivation
+		);
 
-#[test]
-fn test_activation_requires_minimum_vault_securitization() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(35, 36, 37, 38);
+		let insufficient_vault_set = make_account_set(35, 36, 37, 38);
 		set_registration_lookup(
-			account_set.vault.clone(),
-			account_set.mining_funding.clone(),
+			insufficient_vault_set.vault.clone(),
+			insufficient_vault_set.mining_funding.clone(),
 			0,
 			OperationalMinimumVaultSecuritization::get().saturating_sub(1),
 			false,
 			0,
 		);
-		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		register_account(&insufficient_vault_set, None);
+		satisfy_operational_requirements(
+			&insufficient_vault_set.mining_funding,
+			&insufficient_vault_set.vault,
+		);
 
-		let account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		let account = OperationalAccounts::<Test>::get(&insufficient_vault_set.owner)
+			.expect("operational account");
 		assert!(!account.is_operational);
-		assert!(!has_vault_operational_mark(&account_set.vault));
-		assert!(OperationalRewardsQueue::<Test>::get().is_empty());
+		assert!(!has_vault_operational_mark(&insufficient_vault_set.vault));
+		assert_eq!(account.rewards_earned_amount, 0);
+		assert_noop!(
+			OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+				insufficient_vault_set.owner.clone()
+			)),
+			crate::Error::<Test>::NotEligibleForActivation
+		);
 	});
 }
 
@@ -701,70 +782,14 @@ fn test_activation_skips_uniswap_transfer_when_it_is_not_required() {
 
 		let account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert!(!account.is_operational);
+		assert!(!has_vault_operational_mark(&account_set.vault));
+
+		activate_account(&account_set);
+		let account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
 		assert!(account.is_operational);
 		assert!(has_vault_operational_mark(&account_set.vault));
-	});
-}
-
-#[test]
-fn test_mark_reward_paid_consumes_queue_on_partial_payment() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(61, 62, 63, 64);
-		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
-
-		let reward = OperationalRewardsQueue::<Test>::get()[0].clone();
-		OperationalAccountsPallet::mark_reward_paid(&reward, 250);
-
-		let operational_account =
-			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.rewards_collected_amount, 250);
-
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert!(queue.is_empty());
-	});
-}
-
-#[test]
-fn test_operational_referral_reward_enqueue_failed_emits_event() {
-	new_test_ext().execute_with(|| {
-		let account_set = make_account_set(101, 102, 103, 104);
-		register_account(&account_set, None);
-		System::set_block_number(1);
-
-		let filler = make_account_set(111, 112, 113, 114);
-		let reward = OperationalRewardPayout {
-			operational_account: filler.owner,
-			payout_account: filler.mining_funding,
-			reward_kind: OperationalRewardKind::Activation,
-			amount: 1,
-		};
-		OperationalRewardsQueue::<Test>::mutate(|queue| {
-			for _ in 0..MaxOperationalRewardsQueued::get() {
-				assert!(queue.try_push(reward.clone()).is_ok());
-			}
-		});
-
-		System::reset_events();
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
-
-		System::assert_has_event(
-			crate::Event::<Test>::OperationalRewardEnqueueFailed {
-				account: account_set.owner.clone(),
-				reward_kind: OperationalRewardKind::Activation,
-				amount: 1_000,
-			}
-			.into(),
-		);
-
-		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
-		assert!(account.is_operational);
-		assert_eq!(account.rewards_earned_count, 0);
-		assert_eq!(account.rewards_earned_amount, 0);
-		assert_eq!(
-			OperationalRewardsQueue::<Test>::get().len() as u32,
-			MaxOperationalRewardsQueued::get()
-		);
 	});
 }
 
@@ -773,13 +798,14 @@ fn test_referral_bonus_awarded_on_threshold() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
 			sponsor_account.operational_referrals_count = 4;
-			sponsor_account.unactivated_access_codes = 1;
+			sponsor_account.available_referrals = 1;
+			sponsor_account.rewards_earned_count = 0;
+			sponsor_account.rewards_earned_amount = 0;
 		});
-		OperationalRewardsQueue::<Test>::kill();
 
 		Rewards::<Test>::put(crate::RewardsConfig {
 			operational_referral_reward: 1_000,
@@ -787,105 +813,73 @@ fn test_referral_bonus_awarded_on_threshold() {
 		});
 
 		let recruit_set = make_account_set(20, 21, 22, 23);
-		let access_code = make_access_code_proof(&recruit_set.owner, 2);
-		AccessCodesByPublic::<Test>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
-		);
+		let referral_proof = make_referral_proof(&recruit_set.owner, &sponsor_set.owner, 2, 10);
 
-		register_account(&recruit_set, Some(access_code));
+		register_account(&recruit_set, Some(referral_proof));
 
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.operational_referrals_count, 5);
-		let queue = OperationalRewardsQueue::<Test>::get();
-		assert_eq!(queue.len(), 3);
-		assert_eq!(queue[0].operational_account, recruit_set.owner);
-		assert_eq!(queue[0].reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(queue[1].operational_account, sponsor_set.owner);
-		assert_eq!(queue[1].reward_kind, OperationalRewardKind::Activation);
-		assert_eq!(queue[1].amount, 1_000);
-		assert_eq!(queue[2].operational_account, sponsor_set.owner);
-		assert_eq!(queue[2].reward_kind, OperationalRewardKind::ReferralBonus);
-		assert_eq!(queue[2].amount, 250);
+		assert_eq!(sponsor_account.rewards_earned_count, 2);
+		assert_eq!(pending_rewards_amount(&sponsor_account), 1_250);
+
+		let recruit_account =
+			OperationalAccounts::<Test>::get(&recruit_set.owner).expect("recruit account");
+		assert_eq!(recruit_account.rewards_earned_count, 1);
+		assert_eq!(pending_rewards_amount(&recruit_account), 1_000);
 	});
 }
 
 #[test]
-fn test_recruit_operational_awards_sponsor_access_code() {
+fn test_recruit_operational_awards_sponsor_referral() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
-			sponsor_account.unactivated_access_codes = 1;
-			sponsor_account.issuable_access_codes = 0;
+			sponsor_account.available_referrals = 1;
 		});
 
 		let recruit_set = make_account_set(20, 21, 22, 23);
-		let access_code = make_access_code_proof(&recruit_set.owner, 3);
-		AccessCodesByPublic::<Test>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
-		);
-		AccessCodesExpiringByFrame::<Test>::mutate(5, |expiring_codes| {
-			assert!(expiring_codes.try_push(access_code.public).is_ok());
-		});
+		let referral_proof = make_referral_proof(&recruit_set.owner, &sponsor_set.owner, 3, 10);
 
-		register_account(&recruit_set, Some(access_code));
+		register_account(&recruit_set, Some(referral_proof));
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.issuable_access_codes, 0);
+		assert_eq!(sponsor_account.available_referrals, 0);
 
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert_eq!(sponsor_account.issuable_access_codes, 1);
+		assert_eq!(sponsor_account.available_referrals, 1);
 	});
 }
 
 #[test]
-fn test_pending_referral_access_code_materializes_when_issuance_room_opens() {
+fn test_pending_referral_materializes_when_referral_consumes_room() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(50, 51, 52, 53);
 		register_account(&sponsor_set, None);
-		satisfy_operational_requirements(&sponsor_set.mining_funding, &sponsor_set.vault);
+		satisfy_and_activate(&sponsor_set);
 		OperationalAccounts::<Test>::mutate(&sponsor_set.owner, |maybe| {
 			let sponsor_account = maybe.as_mut().expect("sponsor account");
-			sponsor_account.issuable_access_codes = MaxIssuableAccessCodes::get();
-			sponsor_account.unactivated_access_codes = 1;
+			sponsor_account.available_referrals = MaxAvailableReferrals::get();
 		});
 
 		let recruit_set = make_account_set(60, 61, 62, 63);
-		let access_code = make_access_code_proof(&recruit_set.owner, 4);
-		AccessCodesByPublic::<Test>::insert(
-			access_code.public,
-			AccessCodeMetadata { sponsor: sponsor_set.owner.clone(), expiration_frame: 5 },
-		);
-		AccessCodesExpiringByFrame::<Test>::mutate(5, |expiring_codes| {
-			assert!(expiring_codes.try_push(access_code.public).is_ok());
-		});
-		register_account(&recruit_set, Some(access_code));
-		satisfy_operational_requirements(&recruit_set.mining_funding, &recruit_set.vault);
+		let referral_proof = make_referral_proof(&recruit_set.owner, &sponsor_set.owner, 4, 50);
+		register_account(&recruit_set, Some(referral_proof));
+		satisfy_and_activate(&recruit_set);
 
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert!(sponsor_account.referral_access_code_pending);
-		assert_eq!(sponsor_account.issuable_access_codes, MaxIssuableAccessCodes::get());
-
-		assert_ok!(OperationalAccountsPallet::issue_access_code(
-			RuntimeOrigin::signed(sponsor_set.owner.clone()),
-			sr25519::Public::from_raw([44u8; 32]),
-		));
-		let sponsor_account =
-			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
-		assert!(!sponsor_account.referral_access_code_pending);
-		assert_eq!(sponsor_account.issuable_access_codes, MaxIssuableAccessCodes::get());
+		assert!(!sponsor_account.referral_pending);
+		assert_eq!(sponsor_account.available_referrals, MaxAvailableReferrals::get());
 	});
 }
 
@@ -894,29 +888,29 @@ fn test_bitcoin_progress_is_single_pending_and_resets_on_issuance() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(1, 2, 3, 4);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 1);
+		assert_eq!(operational_account.available_referrals, 1);
 
 		let min_lock = 1;
-		let access_code_threshold = BitcoinLockSizeForAccessCode::get();
-		set_issuable_access_codes(&account_set.owner, MaxIssuableAccessCodes::get());
+		let referral_threshold = BitcoinLockSizeForReferral::get();
+		set_available_referrals(&account_set.owner, MaxAvailableReferrals::get());
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
 			min_lock.saturating_add(7_000),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, MaxIssuableAccessCodes::get());
-		assert!(operational_account.bitcoin_accrual > access_code_threshold);
+		assert_eq!(operational_account.available_referrals, MaxAvailableReferrals::get());
+		assert!(operational_account.bitcoin_accrual > referral_threshold);
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
 			min_lock.saturating_add(6_000),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert!(operational_account.bitcoin_accrual >= access_code_threshold);
+		assert!(operational_account.bitcoin_accrual >= referral_threshold);
 
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
@@ -924,70 +918,70 @@ fn test_bitcoin_progress_is_single_pending_and_resets_on_issuance() {
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert!(operational_account.bitcoin_accrual < access_code_threshold);
+		assert!(operational_account.bitcoin_accrual < referral_threshold);
 
-		set_issuable_access_codes(&account_set.owner, 1);
+		set_available_referrals(&account_set.owner, 1);
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
 			min_lock.saturating_add(5_000),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 2);
+		assert_eq!(operational_account.available_referrals, 2);
 		assert_eq!(operational_account.bitcoin_accrual, 0);
 	});
 }
 
 #[test]
-fn test_bitcoin_recovery_to_old_total_does_not_reaward_access_code() {
+fn test_bitcoin_recovery_to_old_total_does_not_reaward_referral() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(70, 71, 72, 73);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 
 		let min_lock = 1;
-		let access_code_threshold = BitcoinLockSizeForAccessCode::get();
+		let referral_threshold = BitcoinLockSizeForReferral::get();
 
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(access_code_threshold),
+			min_lock.saturating_add(referral_threshold),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 2);
+		assert_eq!(operational_account.available_referrals, 2);
 		assert_eq!(operational_account.bitcoin_accrual, 0);
 
-		set_issuable_access_codes(&account_set.owner, 1);
+		set_available_referrals(&account_set.owner, 1);
 		OperationalAccountsPallet::bitcoin_lock_funded(&account_set.vault, min_lock);
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(access_code_threshold),
+			min_lock.saturating_add(referral_threshold),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 1);
+		assert_eq!(operational_account.available_referrals, 1);
 		assert_eq!(operational_account.bitcoin_accrual, 0);
 
 		OperationalAccountsPallet::bitcoin_lock_funded(
 			&account_set.vault,
-			min_lock.saturating_add(access_code_threshold.saturating_mul(2)),
+			min_lock.saturating_add(referral_threshold.saturating_mul(2)),
 		);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 2);
+		assert_eq!(operational_account.available_referrals, 2);
 		assert_eq!(operational_account.bitcoin_accrual, 0);
 	});
 }
 
 #[test]
-fn test_access_codes_awarded_for_mining_seats() {
+fn test_referrals_awarded_for_mining_seats() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(5, 6, 7, 8);
 		register_account(&account_set, None);
-		satisfy_operational_requirements(&account_set.mining_funding, &account_set.vault);
+		satisfy_and_activate(&account_set);
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 1);
+		assert_eq!(operational_account.available_referrals, 1);
 
 		for _ in 0..3 {
 			OperationalAccountsPallet::mining_seat_won(&account_set.mining_funding);
@@ -995,35 +989,87 @@ fn test_access_codes_awarded_for_mining_seats() {
 
 		let operational_account =
 			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
-		assert_eq!(operational_account.issuable_access_codes, 2);
+		assert_eq!(operational_account.available_referrals, 2);
 	});
 }
 
 #[test]
-fn test_pending_rewards_returns_all_queued_rewards() {
+fn test_claim_rewards_pays_to_managed_signer_and_decrements_pending() {
 	new_test_ext().execute_with(|| {
-		OperationalRewardsQueue::<Test>::mutate(|queue| {
-			for i in 0..5u8 {
-				assert!(
-					queue
-						.try_push(OperationalRewardPayout {
-							operational_account: account_id_from_seed(i.saturating_add(1)),
-							payout_account: account_id_from_seed(i.saturating_add(100)),
-							reward_kind: OperationalRewardKind::Activation,
-							amount: 1,
-						})
-						.is_ok()
-				);
-			}
-		});
+		let account_set = make_account_set(80, 81, 82, 83);
+		register_account(&account_set, None);
+		seed_pending_rewards(&account_set.owner, 3 * MICROGONS_PER_ARGON);
+		ClaimableTreasuryBalance::set(2 * MICROGONS_PER_ARGON);
 
-		let rewards = <OperationalAccountsPallet as OperationalRewardsProvider<
-			TestAccountId,
-			Balance,
-		>>::pending_rewards();
-		assert_eq!(rewards.len(), 5);
-		assert_eq!(rewards[0].operational_account, account_id_from_seed(1));
-		assert_eq!(rewards[4].operational_account, account_id_from_seed(5));
+		assert_ok!(OperationalAccountsPallet::claim_rewards(
+			RuntimeOrigin::signed(account_set.vault.clone()),
+			MICROGONS_PER_ARGON,
+		));
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert_eq!(operational_account.rewards_collected_amount, MICROGONS_PER_ARGON);
+		assert_eq!(pending_rewards_amount(&operational_account), 2 * MICROGONS_PER_ARGON);
+		assert_eq!(
+			ClaimedOperationalRewards::get(),
+			vec![(account_set.vault, MICROGONS_PER_ARGON)]
+		);
+		assert_eq!(ClaimableTreasuryBalance::get(), MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn test_claim_rewards_rejects_invalid_claims() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(80, 81, 82, 83);
+		register_account(&account_set, None);
+		seed_pending_rewards(&account_set.owner, 2 * MICROGONS_PER_ARGON);
+		ClaimableTreasuryBalance::set(2 * MICROGONS_PER_ARGON);
+
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_id_from_seed(84)),
+				MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::NotOperationalAccount
+		);
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				MICROGONS_PER_ARGON.saturating_sub(1),
+			),
+			crate::Error::<Test>::RewardClaimBelowMinimum
+		);
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				MICROGONS_PER_ARGON.saturating_add(1),
+			),
+			crate::Error::<Test>::RewardClaimNotWholeArgon
+		);
+
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.mining_funding.clone()),
+				3 * MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::RewardClaimExceedsPending
+		);
+
+		ClaimableTreasuryBalance::set(MICROGONS_PER_ARGON.saturating_sub(1));
+		assert_noop!(
+			OperationalAccountsPallet::claim_rewards(
+				RuntimeOrigin::signed(account_set.mining_funding),
+				MICROGONS_PER_ARGON,
+			),
+			crate::Error::<Test>::TreasuryInsufficientFunds
+		);
+
+		let operational_account =
+			OperationalAccounts::<Test>::get(&account_set.owner).expect("operational account");
+		assert_eq!(operational_account.rewards_collected_amount, 0);
+		assert_eq!(pending_rewards_amount(&operational_account), 2 * MICROGONS_PER_ARGON);
+		assert!(ClaimedOperationalRewards::get().is_empty());
 	});
 }
 
@@ -1129,7 +1175,10 @@ struct AccountSet {
 }
 
 impl AccountSet {
-	fn registration(&self, access_code: Option<AccessCodeProof>) -> Registration<Test> {
+	fn registration(
+		&self,
+		referral_proof: Option<ReferralProof<TestAccountId>>,
+	) -> Registration<Test> {
 		Registration::V1(RegistrationV1 {
 			operational_account: self.owner.clone(),
 			encryption_pubkey: self.encryption_pubkey.clone(),
@@ -1140,17 +1189,61 @@ impl AccountSet {
 			vault_account_proof: self.vault_proof.clone(),
 			mining_funding_account_proof: self.mining_funding_proof.clone(),
 			mining_bot_account_proof: self.mining_bot_proof.clone(),
-			access_code,
+			referral_proof,
 		})
 	}
 }
 
-fn make_access_code_proof(account: &TestAccountId, seed: u8) -> AccessCodeProof {
-	let pair = sr25519::Pair::from_seed(&[seed; 32]);
-	let public = pair.public();
-	let message = (ACCESS_CODE_PROOF_MESSAGE_KEY, public, account).using_encoded(blake2_256);
-	let signature = pair.sign(message.as_slice());
-	AccessCodeProof { public, signature }
+fn seed_pending_rewards(owner: &TestAccountId, amount: Balance) {
+	OperationalAccounts::<Test>::mutate(owner, |maybe| {
+		let account = maybe.as_mut().expect("operational account");
+		account.rewards_earned_amount = account.rewards_collected_amount.saturating_add(amount);
+	});
+}
+
+fn pending_rewards_amount(account: &crate::OperationalAccount<Test>) -> Balance {
+	account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount)
+}
+
+fn make_referral_proof(
+	account: &TestAccountId,
+	sponsor: &TestAccountId,
+	referral_seed: u8,
+	sponsor_seed: u8,
+) -> ReferralProof<TestAccountId> {
+	make_referral_proof_expiring_at(
+		account,
+		sponsor,
+		referral_seed,
+		sponsor_seed,
+		CurrentFrameId::get().saturating_add(10),
+	)
+}
+
+fn make_referral_proof_expiring_at(
+	account: &TestAccountId,
+	sponsor: &TestAccountId,
+	referral_seed: u8,
+	sponsor_seed: u8,
+	expires_at_frame: FrameId,
+) -> ReferralProof<TestAccountId> {
+	let pair = sr25519::Pair::from_seed(&[referral_seed; 32]);
+	let referral_code = pair.public();
+	let message =
+		(REFERRAL_CLAIM_PROOF_MESSAGE_KEY, referral_code, account).using_encoded(blake2_256);
+	let referral_signature = pair.sign(message.as_slice());
+	let sponsor_pair = sr25519::Pair::from_seed(&[sponsor_seed; 32]);
+	let sponsor_message =
+		(REFERRAL_SPONSOR_GRANT_MESSAGE_KEY, sponsor, referral_code, expires_at_frame)
+			.using_encoded(blake2_256);
+	let sponsor_signature: Signature = sponsor_pair.sign(sponsor_message.as_slice()).into();
+	ReferralProof {
+		referral_code,
+		referral_signature,
+		sponsor: sponsor.clone(),
+		expires_at_frame,
+		sponsor_signature,
+	}
 }
 
 fn make_linked_account(
@@ -1207,18 +1300,18 @@ fn make_account_set(owner_seed: u8, vault_seed: u8, funding_seed: u8, bot_seed: 
 	}
 }
 
-fn register_account(set: &AccountSet, access_code: Option<AccessCodeProof>) {
-	register_account_with_submitter(set, &set.owner, access_code);
+fn register_account(set: &AccountSet, referral_proof: Option<ReferralProof<TestAccountId>>) {
+	register_account_with_submitter(set, &set.owner, referral_proof);
 }
 
 fn register_account_with_submitter(
 	set: &AccountSet,
 	submitter: &TestAccountId,
-	access_code: Option<AccessCodeProof>,
+	referral_proof: Option<ReferralProof<TestAccountId>>,
 ) {
 	assert_ok!(OperationalAccountsPallet::register(
 		RuntimeOrigin::signed(submitter.clone()),
-		set.registration(access_code),
+		set.registration(referral_proof),
 	));
 }
 
@@ -1240,9 +1333,20 @@ fn satisfy_operational_requirements(mining_account: &TestAccountId, vault_accoun
 	OperationalAccountsPallet::treasury_pool_participated(vault_account, 1);
 }
 
-fn set_issuable_access_codes(owner: &TestAccountId, count: u32) {
+fn activate_account(set: &AccountSet) {
+	assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+		set.mining_funding.clone()
+	)));
+}
+
+fn satisfy_and_activate(set: &AccountSet) {
+	satisfy_operational_requirements(&set.mining_funding, &set.vault);
+	activate_account(set);
+}
+
+fn set_available_referrals(owner: &TestAccountId, count: u32) {
 	OperationalAccounts::<Test>::mutate(owner, |maybe| {
 		let account = maybe.as_mut().expect("operational account");
-		account.issuable_access_codes = count;
+		account.available_referrals = count;
 	});
 }

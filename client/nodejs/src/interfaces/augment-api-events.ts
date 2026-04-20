@@ -1163,7 +1163,7 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * A reward has been queued for treasury payout.
+       * A reward is earned for an operational account, but not yet claimed.
        **/
       OperationalRewardEarned: AugmentedEvent<
         ApiType,
@@ -1179,19 +1179,21 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * Reward enqueue failed because the pending queue is full.
+       * Claimable operational rewards were paid to a managed account.
        **/
-      OperationalRewardEnqueueFailed: AugmentedEvent<
+      OperationalRewardsClaimed: AugmentedEvent<
         ApiType,
         [
-          account: AccountId32,
-          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind,
+          operationalAccount: AccountId32,
+          claimant: AccountId32,
           amount: u128,
+          remainingPending: u128,
         ],
         {
-          account: AccountId32;
-          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
+          operationalAccount: AccountId32;
+          claimant: AccountId32;
           amount: u128;
+          remainingPending: u128;
         }
       >;
       /**

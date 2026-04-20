@@ -19,14 +19,6 @@ use crate::{
 	tick::Tick,
 };
 
-pub trait MiningBidPoolProvider {
-	type Balance: Codec;
-	type AccountId: Codec;
-
-	/// Transfer funds to the bid pool and hold
-	fn get_bid_pool_account() -> Self::AccountId;
-}
-
 pub trait BitcoinVaultProviderWeightInfo {
 	fn get_registration_vault_data() -> Weight;
 	fn account_became_operational() -> Weight;

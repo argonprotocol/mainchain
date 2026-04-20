@@ -583,12 +583,12 @@ impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<Accoun
 }
 
 pub trait OperationalRewardsPayer<AccountId: FullCodec, Balance: FullCodec> {
-	fn try_pay_reward_weight() -> Weight {
+	fn claim_reward_weight() -> Weight {
 		Weight::zero()
 	}
 
-	fn try_pay_reward(_reward: &OperationalRewardPayout<AccountId, Balance>) -> bool {
-		false
+	fn claim_reward(_account_id: &AccountId, _amount: Balance) -> DispatchResult {
+		Err(DispatchError::Other("operational reward payer unavailable"))
 	}
 }
 

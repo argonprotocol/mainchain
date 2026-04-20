@@ -147,21 +147,6 @@ Upstream / runtime pallets:
 benchmark runtimes use `BenchmarkTickProvider`. Without provider-weight composition, consumer
 benchmarks would miss the real tick-storage reads that production wiring performs.
 
-### Validation status
-
-- targeted benchmark regeneration has been run for `pallet_block_seal`, `pallet_block_seal_spec`,
-  `pallet_chain_transfer`, `pallet_notebook`, `pallet_bitcoin_utxos`, `pallet_bitcoin_locks`,
-  `pallet_operational_accounts`, `pallet_treasury`, `pallet_ticks`, `pallet_multisig`,
-  `pallet_proxy`, `pallet_sudo`, `pallet_utility`, `pallet_tx_pause`,
-  `pallet_transaction_payment`, `pallet_grandpa`, `ismp_grandpa`, and
-  `pallet_token_gateway`,
-- `cargo check -p argon-runtime --features runtime-benchmarks`,
-- `cargo check -p argon-canary-runtime --features runtime-benchmarks`,
-- `cargo make fmt`,
-- no `:argon:bench:` artifacts in targeted generated weight files;
-- `pallet_token_gateway` still has generated `UNKNOWN KEY` entries for request-commitment
-  storage, so the key mapping cleanup there remains follow-up work.
-
 ### Benchmark-only fee routing note
 
 `pallet_transaction_payment` benchmarks exercise the runtime `OnUnbalanced` fee path. In this repo,
@@ -175,8 +160,8 @@ benchmark measures cleanly without production block-author state.
 `pallet_token_gateway` benchmarks call `T::CreateOrigin::try_successful_origin()`. In production
 that origin is derived from the singleton token-admin wiring, which in this repo resolves through
 `ChainTransfer::hyperbridge_token_admin()`. Benchmark runtimes therefore provide a minimal
-benchmark-only token-admin account and `SortedMembers` implementation so token-gateway benchmarks
-do not depend on chain-transfer genesis initialization.
+benchmark-only token-admin account and `SortedMembers` implementation so token-gateway benchmarks do
+not depend on chain-transfer genesis initialization.
 
 ### Notebook inherent event handler weight composition
 

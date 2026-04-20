@@ -50,7 +50,7 @@ mod benchmarks {
 		let _ = T::OwnershipCurrency::mint_into(&caller, 5_000_000u128.into());
 
 		// Inline bid pool setup
-		let bid_pool_account = T::BidPoolProvider::get_bid_pool_account();
+		let bid_pool_account = T::MiningBidPoolAccount::get();
 		let _ = T::ArgonCurrency::mint_into(&bid_pool_account, 10_000_000u128.into());
 
 		// Pre-fill the cohort so the new bid bumps the lowest bidder.
@@ -150,7 +150,7 @@ mod benchmarks {
 
 		// Inline bid pool setup
 		use frame_support::traits::fungible::Mutate;
-		let bid_pool_account = T::BidPoolProvider::get_bid_pool_account();
+		let bid_pool_account = T::MiningBidPoolAccount::get();
 		let _ = T::ArgonCurrency::mint_into(&bid_pool_account, 100_000_000u128.into());
 
 		// Create more bidders than slots
@@ -240,7 +240,7 @@ mod benchmarks {
 
 		// Inline bid pool setup
 		use frame_support::traits::fungible::Mutate;
-		let bid_pool_account = T::BidPoolProvider::get_bid_pool_account();
+		let bid_pool_account = T::MiningBidPoolAccount::get();
 		let _ = T::ArgonCurrency::mint_into(&bid_pool_account, 100_000_000u128.into());
 
 		// Seed a retiring cohort to exercise rotation logic.

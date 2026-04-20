@@ -7,7 +7,6 @@ use argon_primitives::{
 	block_seal::{MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig},
 	inherents::BlockSealInherent,
 	providers::*,
-	vault::MiningBidPoolProvider,
 };
 pub use pallet::*;
 use pallet_prelude::*;
@@ -58,7 +57,6 @@ pub mod pallet {
 	use super::*;
 	use argon_primitives::{
 		ArgonDigests, SlotEvents, TickProvider, block_seal::MiningRegistration, digests::FrameInfo,
-		vault::MiningBidPoolProvider,
 	};
 	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
@@ -142,7 +140,9 @@ pub mod pallet {
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
 
-		type BidPoolProvider: MiningBidPoolProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+		/// Account that receives mining bid funds before treasury distribution.
+		#[pallet::constant]
+		type MiningBidPoolAccount: Get<Self::AccountId>;
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
@@ -1249,7 +1249,7 @@ impl<T: Config> Pallet<T> {
 			needed -= existing.bid;
 		}
 		if needed > 0u32.into() {
-			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			let pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_bid_pool_unreapable(&pool_account);
 			ensure!(
 				T::ArgonCurrency::reducible_balance(
@@ -1362,7 +1362,7 @@ impl<T: Config> Pallet<T> {
 		let account_id = &bid_registration.account_id;
 
 		if bid_registration.bid > T::Balance::zero() {
-			let pool_account = T::BidPoolProvider::get_bid_pool_account();
+			let pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_bid_pool_unreapable(&pool_account);
 			T::ArgonCurrency::transfer(
 				&pool_account,
@@ -1394,7 +1394,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn bid_pool_balance() -> T::Balance {
-		let account_id = T::BidPoolProvider::get_bid_pool_account();
+		let account_id = T::MiningBidPoolAccount::get();
 		T::ArgonCurrency::balance(&account_id)
 	}
 

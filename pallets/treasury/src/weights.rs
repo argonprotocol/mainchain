@@ -1,8 +1,5 @@
 use super::Config;
-use argon_primitives::{
-	OperationalRewardsProvider, TreasuryPoolProviderWeightInfo,
-	providers::OperationalRewardsProviderWeightInfo,
-};
+use argon_primitives::TreasuryPoolProviderWeightInfo;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -11,31 +8,18 @@ pub trait WeightInfo {
 	fn release_pending_bond_lots() -> Weight;
 	fn distribute_bid_pool() -> Weight;
 	fn lock_in_vault_capital() -> Weight;
-	fn pay_operational_rewards() -> Weight;
-	fn try_pay_reward() -> Weight;
+	fn claim_reward() -> Weight;
 	fn buy_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
 	fn provider_has_bond_participation() -> Weight;
 }
 
-type OperationalRewardsProviderWeights<T> =
-	<<T as Config>::OperationalRewardsProvider as OperationalRewardsProvider<
-		<T as frame_system::Config>::AccountId,
-		<T as Config>::Balance,
-	>>::Weights;
+pub struct WithProviderWeights<T, Base>(core::marker::PhantomData<(T, Base)>);
 
-pub struct WithProviderWeights<
-	T,
-	Base,
-	OperationalRewardsProviderWeight = OperationalRewardsProviderWeights<T>,
->(core::marker::PhantomData<(T, Base, OperationalRewardsProviderWeight)>);
-
-impl<T, Base, OperationalRewardsProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, OperationalRewardsProviderWeight>
+impl<T, Base> WeightInfo for WithProviderWeights<T, Base>
 where
 	T: Config,
 	Base: WeightInfo,
-	OperationalRewardsProviderWeight: OperationalRewardsProviderWeightInfo,
 {
 	fn on_frame_transition() -> Weight {
 		Base::on_frame_transition()
@@ -53,15 +37,8 @@ where
 		Base::lock_in_vault_capital()
 	}
 
-	fn pay_operational_rewards() -> Weight {
-		Base::pay_operational_rewards().saturating_add(
-			OperationalRewardsProviderWeight::mark_reward_paid()
-				.saturating_mul(u64::from(T::OperationalRewardsProvider::max_pending_rewards())),
-		)
-	}
-
-	fn try_pay_reward() -> Weight {
-		Base::try_pay_reward()
+	fn claim_reward() -> Weight {
+		Base::claim_reward()
 	}
 
 	fn buy_bonds() -> Weight {
@@ -98,10 +75,7 @@ impl WeightInfo for () {
 	fn lock_in_vault_capital() -> Weight {
 		Weight::zero()
 	}
-	fn pay_operational_rewards() -> Weight {
-		Weight::zero()
-	}
-	fn try_pay_reward() -> Weight {
+	fn claim_reward() -> Weight {
 		// Conservative placeholder until pallet_treasury runtime benchmarks are wired.
 		Weight::from_parts(100_000_000, 0)
 	}

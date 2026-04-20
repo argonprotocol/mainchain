@@ -74,7 +74,7 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		}
 	/// Storage: `System::Account` (r:2 w:2)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	fn try_pay_reward() -> Weight {
+	fn claim_reward() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `52`
 		//  Estimated: `6196`
@@ -82,17 +82,6 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		Weight::from_parts(43_000_000, 6196)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
-		}
-	/// Storage: `System::Account` (r:1001 w:1001)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	fn pay_operational_rewards() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `52`
-		//  Estimated: `2606593`
-		// Minimum execution time: 75_039_000_000 picoseconds.
-		Weight::from_parts(78_356_000_000, 2606593)
-			.saturating_add(T::DbWeight::get().reads(1001))
-			.saturating_add(T::DbWeight::get().writes(1001))
 		}
 	/// Storage: `Treasury::BondLotsByVault` (r:1 w:0)
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1214), added: 3689, mode: `MaxEncodedLen`)
