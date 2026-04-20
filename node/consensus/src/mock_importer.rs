@@ -1,18 +1,22 @@
 use crate::{
+	NotaryClient,
 	aux_client::ArgonAux,
+	error::Error,
 	import_queue::{ArgonBlockImport, ImportApisExt},
+	notary_client::{NotaryApisExt, NotebookDownloader},
 };
+use argon_notary_apis::DownloadTrustMode;
 use argon_primitives::{
 	BlockSealAuthoritySignature, BlockSealDigest, ComputeDifficulty, Digestset, FORK_POWER_DIGEST,
-	HashOutput as BlockHash, NotebookDigest, PARENT_VOTING_KEY_DIGEST, ParentVotingKeyDigest,
-	VotingKey,
+	HashOutput as BlockHash, NotebookAuditResult, NotebookDigest, PARENT_VOTING_KEY_DIGEST,
+	ParentVotingKeyDigest, VotingKey,
 	fork_power::ForkPower,
 	prelude::{
 		sp_runtime::{generic::SignedBlock, traits::BlakeTwo256},
 		*,
 	},
 };
-use argon_runtime::NotebookVerifyError;
+use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use async_trait::async_trait;
 use codec::Encode;
 use polkadot_sdk::{
@@ -24,7 +28,7 @@ use sc_client_api::{BlockBackend, backend::AuxStore};
 use sc_consensus::{
 	BlockCheckParams, BlockImportParams, ImportResult, ImportedAux, StateAction, StateAction::*,
 };
-use sp_blockchain::{BlockGap, BlockStatus, Error as BlockchainError, HeaderBackend};
+use sp_blockchain::{BlockStatus, Error as BlockchainError, HeaderBackend};
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_runtime::{
 	Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
@@ -33,7 +37,14 @@ use sp_runtime::{
 use std::{
 	collections::{BTreeMap, HashMap},
 	sync::{Arc, Mutex},
+	time::Duration,
 };
+
+impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
+	pub(crate) async fn pending_import_count_for_tests(&self) -> usize {
+		self.pending_full_imports_len().await
+	}
+}
 // -------------------------------------------
 // Tiny in–memory client & mini importer
 // -------------------------------------------
@@ -42,7 +53,9 @@ use std::{
 pub(crate) struct MemChain {
 	headers: Arc<Mutex<HashMap<BlockHash, Header>>>,
 	block_state: Arc<Mutex<HashMap<BlockHash, sp_consensus::BlockStatus>>>,
-	block_gap: Arc<Mutex<Option<BlockGap<BlockNumber>>>>,
+	runtime_notebooks:
+		Arc<Mutex<HashMap<BlockHash, Vec<NotebookAuditResult<NotebookVerifyError>>>>>,
+	block_gap: Arc<Mutex<Option<sp_blockchain::BlockGap<BlockNumber>>>>,
 	genesis_hash: BlockHash,
 	best: Arc<Mutex<(BlockNumber, BlockHash)>>,
 	finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
@@ -56,6 +69,7 @@ impl MemChain {
 			block_state: Arc::new(Mutex::new(
 				[(h, sp_consensus::BlockStatus::InChainWithState)].into(),
 			)),
+			runtime_notebooks: Arc::new(Mutex::new(HashMap::new())),
 			block_gap: Arc::new(Mutex::new(None)),
 			genesis_hash: h,
 			best: Arc::new(Mutex::new((0u32, h))),
@@ -75,12 +89,21 @@ impl MemChain {
 	pub(crate) fn set_state(&self, h: BlockHash, state: sp_consensus::BlockStatus) {
 		self.block_state.lock().unwrap().insert(h, state);
 	}
+
+	pub(crate) fn set_runtime_notebooks(
+		&self,
+		parent_hash: BlockHash,
+		notebooks: Vec<NotebookAuditResult<NotebookVerifyError>>,
+	) {
+		self.runtime_notebooks.lock().unwrap().insert(parent_hash, notebooks);
+	}
+
 	pub(crate) fn force_best(&self, best_number: BlockNumber, best_hash: BlockHash) {
 		*self.best.lock().unwrap() = (best_number, best_hash);
 	}
 
-	pub(crate) fn set_block_gap(&self, gap: Option<BlockGap<BlockNumber>>) {
-		*self.block_gap.lock().unwrap() = gap;
+	pub(crate) fn set_block_gap(&self, block_gap: Option<sp_blockchain::BlockGap<BlockNumber>>) {
+		*self.block_gap.lock().unwrap() = block_gap;
 	}
 }
 impl HeaderBackend<Block> for MemChain {
@@ -90,14 +113,13 @@ impl HeaderBackend<Block> for MemChain {
 	fn info(&self) -> sp_blockchain::Info<Block> {
 		let best = *self.best.lock().unwrap();
 		let fin = *self.finalized.lock().unwrap();
-		let block_gap = *self.block_gap.lock().unwrap();
 		sp_blockchain::Info {
 			finalized_hash: fin.1,
 			finalized_number: fin.0,
 			finalized_state: None,
 			best_hash: best.1,
 			best_number: best.0,
-			block_gap,
+			block_gap: *self.block_gap.lock().unwrap(),
 			genesis_hash: self.genesis_hash,
 			number_leaves: 0,
 		}
@@ -125,13 +147,104 @@ impl HeaderBackend<Block> for MemChain {
 	}
 }
 
-impl ImportApisExt<Block> for MemChain {
+impl ImportApisExt<Block, H256> for MemChain {
 	fn has_new_bitcoin_tip(&self, _hash: BlockHash) -> bool {
 		false
 	}
 
 	fn has_new_price_index(&self, _hash: BlockHash) -> bool {
 		false
+	}
+
+	fn runtime_digest_notebooks(
+		&self,
+		parent_hash: BlockHash,
+		_digest: &sp_runtime::Digest,
+	) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, Error> {
+		Ok(self
+			.runtime_notebooks
+			.lock()
+			.unwrap()
+			.get(&parent_hash)
+			.cloned()
+			.unwrap_or_default())
+	}
+}
+
+impl NotaryApisExt<Block, H256> for MemChain {
+	fn has_block_state(&self, block_hash: BlockHash) -> bool {
+		matches!(self.block_status(block_hash), Ok(sp_consensus::BlockStatus::InChainWithState))
+	}
+
+	fn notaries(&self, _block_hash: BlockHash) -> Result<Vec<NotaryRecordT>, Error> {
+		Ok(Vec::new())
+	}
+
+	fn latest_notebook_by_notary(
+		&self,
+		_block_hash: BlockHash,
+	) -> Result<
+		BTreeMap<
+			argon_primitives::NotaryId,
+			(argon_primitives::notebook::NotebookNumber, argon_primitives::tick::Tick),
+		>,
+		Error,
+	> {
+		Ok(BTreeMap::new())
+	}
+
+	fn current_tick(&self, _block_hash: BlockHash) -> Result<argon_primitives::tick::Tick, Error> {
+		Ok(0)
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	fn audit_notebook_and_get_votes(
+		&self,
+		_block_hash: BlockHash,
+		_version: u32,
+		_notary_id: argon_primitives::NotaryId,
+		_notebook_number: argon_primitives::notebook::NotebookNumber,
+		_notebook_tick: argon_primitives::tick::Tick,
+		_header_hash: H256,
+		_notebook: &[u8],
+		_notebook_dependencies: Vec<argon_primitives::notary::NotaryNotebookAuditSummary>,
+		_block_hashes: &[BlockHash],
+	) -> Result<Result<argon_primitives::notary::NotaryNotebookRawVotes, NotebookVerifyError>, Error>
+	{
+		Err(Error::StringError("not used in import queue unit tests".into()))
+	}
+
+	fn vote_minimum(&self, _block_hash: BlockHash) -> Result<argon_primitives::VoteMinimum, Error> {
+		Err(Error::StringError("not used in import queue unit tests".into()))
+	}
+
+	fn decode_signed_raw_notebook_header(
+		&self,
+		_block_hash: &BlockHash,
+		_raw_header: Vec<u8>,
+	) -> Result<
+		Result<
+			argon_primitives::notary::NotaryNotebookDetails<BlockHash>,
+			sp_runtime::DispatchError,
+		>,
+		Error,
+	> {
+		Err(Error::StringError("not used in import queue unit tests".into()))
+	}
+
+	fn best_hash(&self) -> BlockHash {
+		self.info().best_hash
+	}
+
+	fn finalized_hash(&self) -> BlockHash {
+		self.info().finalized_hash
+	}
+
+	fn parent_hash(&self, hash: &BlockHash) -> Result<BlockHash, Error> {
+		let header = self
+			.header(*hash)?
+			.ok_or_else(|| Error::StringError("Parent not found".into()))?;
+		Ok(*header.parent_hash())
 	}
 }
 
@@ -341,13 +454,53 @@ fn create_digest(
 pub(crate) fn new_importer() -> (ArgonBlockImport<Block, MemChain, MemChain, H256>, MemChain) {
 	let genesis = Header::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
 	let client = MemChain::new(genesis.clone());
+	let importer = new_importer_from_client(client.clone());
+	(importer, client)
+}
+
+pub(crate) fn new_importer_with_notary()
+-> (ArgonBlockImport<Block, MemChain, MemChain, H256>, MemChain) {
+	let genesis = Header::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
+	let client = MemChain::new(genesis.clone());
+	let importer = new_importer_with_notary_from_client(client.clone());
+	(importer, client)
+}
+
+pub(crate) fn new_importer_from_client(
+	client: MemChain,
+) -> ArgonBlockImport<Block, MemChain, MemChain, H256> {
 	let db_arc = Arc::new(client.clone());
-	let importer = ArgonBlockImport::<Block, _, _, _>::new_for_tests(
-		client.clone(),
+	let notary_client = new_notary_client_for_tests(&db_arc);
+	ArgonBlockImport::<Block, _, _, _>::new_with_components(
+		client,
 		db_arc.clone(),
 		ArgonAux::new(db_arc.clone()),
-	);
-	(importer, client)
+		notary_client,
+		Arc::new(None),
+	)
+}
+
+pub(crate) fn new_importer_with_notary_from_client(
+	client: MemChain,
+) -> ArgonBlockImport<Block, MemChain, MemChain, H256> {
+	new_importer_from_client(client)
+}
+
+fn new_notary_client_for_tests(client: &Arc<MemChain>) -> Arc<NotaryClient<Block, MemChain, H256>> {
+	let notebook_downloader =
+		NotebookDownloader::new(Vec::<String>::new(), DownloadTrustMode::Dev, None, None)
+			.expect("notebook downloader should initialize");
+	let ticker = argon_primitives::tick::Ticker::new(2_000, 2);
+	Arc::new(NotaryClient::new(
+		client.clone(),
+		ArgonAux::new(client.clone()),
+		notebook_downloader,
+		Arc::new(None),
+		ticker,
+		None,
+		Duration::from_millis(250),
+		true,
+	))
 }
 
 pub(crate) fn create_params(
@@ -367,4 +520,10 @@ pub(crate) fn create_params(
 	params.post_digests.push(post_digest);
 	params.post_hash = Some(header.hash());
 	params
+}
+
+pub(crate) async fn pending_import_count(
+	importer: &ArgonBlockImport<Block, MemChain, MemChain, H256>,
+) -> usize {
+	importer.pending_import_count_for_tests().await
 }

@@ -1,8 +1,15 @@
-use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
+use crate::{
+	NotaryClient,
+	aux_client::ArgonAux,
+	compute_worker::BlockComputeNonce,
+	error::Error,
+	notary_client::{NotaryApisExt, NotebookAuditMode},
+	pending_import_replay::{PendingImportReplayQueue, spawn_pending_import_replay_task},
+};
 use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
 	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
-	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
+	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, NotebookAuditResult, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
@@ -31,8 +38,10 @@ use sp_runtime::{
 	Justification,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
-use std::{fmt, marker::PhantomData, sync::Arc};
-use tracing::error;
+use std::{collections::HashSet, fmt, marker::PhantomData, sync::Arc, time::Duration};
+use tracing::{error, warn};
+
+const IMPORT_NOTEBOOK_AUDIT_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub struct ImportMetrics {
@@ -81,16 +90,22 @@ impl ImportMetrics {
 	}
 }
 
-pub trait ImportApisExt<B: BlockT>: HeaderBackend<B> + BlockBackend<B> {
+pub trait ImportApisExt<B: BlockT, AC>: HeaderBackend<B> + BlockBackend<B> {
 	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool;
 	fn has_new_price_index(&self, hash: B::Hash) -> bool;
+	fn runtime_digest_notebooks(
+		&self,
+		parent_hash: B::Hash,
+		digest: &sp_runtime::Digest,
+	) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, Error>;
 }
 
-impl<B: BlockT, C> ImportApisExt<B> for C
+impl<B: BlockT, C, AC> ImportApisExt<B, AC> for C
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + BlockBackend<B>,
-	C::Api: BlockImportApis<B>,
+	C::Api: BlockImportApis<B> + BlockCreatorApis<B, AC, NotebookVerifyError>,
+	AC: Codec + Clone,
 {
 	fn has_new_bitcoin_tip(&self, hash: B::Hash) -> bool {
 		self.runtime_api().has_new_bitcoin_tip(hash).unwrap_or(false)
@@ -99,20 +114,37 @@ where
 	fn has_new_price_index(&self, hash: B::Hash) -> bool {
 		self.runtime_api().has_new_price_index(hash).unwrap_or(false)
 	}
+
+	fn runtime_digest_notebooks(
+		&self,
+		parent_hash: B::Hash,
+		digest: &sp_runtime::Digest,
+	) -> Result<Vec<NotebookAuditResult<NotebookVerifyError>>, Error> {
+		self.runtime_api()
+			.digest_notebooks(parent_hash, digest)
+			.map_err(|e| {
+				Error::MissingRuntimeData(format!("Error calling digest notebooks api: {e:?}"))
+			})?
+			.map_err(|e| {
+				Error::MissingRuntimeData(format!("Failed to get digest notebooks: {e:?}"))
+			})
+	}
 }
 
 /// A block importer for argon.
 pub struct ArgonBlockImport<B: BlockT, I, C: AuxStore, AC> {
 	inner: I,
-	client: Arc<C>,
+	pub(crate) client: Arc<C>,
 	aux_client: ArgonAux<B, C>,
+	pub(crate) notary_client: Arc<NotaryClient<B, C, AC>>,
 	import_lock: Arc<tokio::sync::Mutex<()>>,
+	pub(crate) pending_full_import_queue: PendingImportReplayQueue<B, C>,
 	metrics: Arc<Option<ImportMetrics>>,
 	_phantom: PhantomData<AC>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ImportContext<B: BlockT> {
 	hash: B::Hash,
 	number: NumberFor<B>,
@@ -123,6 +155,7 @@ struct ImportContext<B: BlockT> {
 	block_header_status: sp_blockchain::BlockStatus,
 	state_action: ImportStateAction,
 	skip_execution_checks: bool,
+	has_body: bool,
 	origin: BlockOrigin,
 	finalized: bool,
 }
@@ -183,21 +216,33 @@ impl<B: BlockT> ImportContext<B> {
 			block_header_status,
 			state_action,
 			skip_execution_checks: block.state_action.skip_execution_checks(),
+			has_body: block.body.is_some(),
 			origin: block.origin,
 			finalized: block.finalized,
 		}
+	}
+
+	fn refresh<C>(&mut self, client: &C, block: &mut BlockImportParams<B>)
+	where
+		C: HeaderBackend<B> + BlockBackend<B>,
+	{
+		*self = Self::from_block(client, block);
 	}
 
 	fn is_parent_state_available(&self) -> bool {
 		self.parent_block_state == BlockStatus::InChainWithState
 	}
 
-	fn parent_is_genesis(&self) -> bool {
-		self.parent_hash == self.info.genesis_hash
+	fn is_parent_unknown(&self) -> bool {
+		self.parent_block_state == BlockStatus::Unknown
 	}
 
 	fn is_initial_sync(&self) -> bool {
 		self.origin == BlockOrigin::NetworkInitialSync
+	}
+
+	fn is_my_block(&self) -> bool {
+		self.origin == BlockOrigin::Own
 	}
 
 	fn is_header_already_imported(&self) -> bool {
@@ -208,18 +253,48 @@ impl<B: BlockT> ImportContext<B> {
 		!self.skip_execution_checks
 	}
 
-	fn should_return_missing_state_for_execution(&self) -> bool {
-		self.state_action == ImportStateAction::ExecuteIfPossible &&
-			!self.is_parent_state_available() &&
-			!self.is_initial_sync() &&
-			!self.parent_is_genesis()
+	fn can_defer_full_import(&self) -> bool {
+		self.has_body && !self.finalized && !self.is_my_block()
 	}
 
-	fn should_short_circuit_known_header(&self) -> bool {
-		self.is_header_already_imported() &&
-			!self.has_state_or_block() &&
+	fn supports_deferred_full_import(&self) -> bool {
+		matches!(
+			self.state_action,
+			ImportStateAction::Execute | ImportStateAction::ExecuteIfPossible
+		)
+	}
+
+	fn can_defer_notebook_verification(&self) -> bool {
+		self.supports_deferred_full_import() && self.can_defer_full_import()
+	}
+
+	fn are_import_details_already_queued(
+		&self,
+		is_full_import_already_queued: bool,
+		has_justifications: bool,
+	) -> bool {
+		self.has_body &&
 			!self.finalized &&
-			!self.is_block_gap
+			!has_justifications &&
+			self.supports_deferred_full_import() &&
+			self.is_header_already_imported() &&
+			is_full_import_already_queued
+	}
+
+	fn can_execute_if_possible_now(&self) -> bool {
+		if self.state_action == ImportStateAction::ExecuteIfPossible {
+			self.is_parent_state_available()
+		} else {
+			true
+		}
+	}
+
+	fn should_verify_notebooks(&self) -> bool {
+		!self.skip_execution_checks &&
+			!self.is_initial_sync() &&
+			!self.is_my_block() &&
+			self.number > self.info.finalized_number &&
+			!self.finalized
 	}
 
 	fn can_finalize_import(&self, is_finalized_descendent: bool) -> bool {
@@ -227,8 +302,9 @@ impl<B: BlockT> ImportContext<B> {
 	}
 }
 
+#[allow(clippy::large_enum_variant)]
 enum PreImportOutcome<B: BlockT> {
-	ContinueImport { import_context: ImportContext<B> },
+	ContinueImport { block: BlockImportParams<B>, import_context: ImportContext<B> },
 	ReturnResult(ImportResult),
 }
 
@@ -238,10 +314,38 @@ impl<B: BlockT, I: Clone, C: AuxStore, AC: Codec> Clone for ArgonBlockImport<B, 
 			inner: self.inner.clone(),
 			client: self.client.clone(),
 			aux_client: self.aux_client.clone(),
+			notary_client: self.notary_client.clone(),
 			import_lock: self.import_lock.clone(),
+			pending_full_import_queue: self.pending_full_import_queue.clone(),
 			metrics: self.metrics.clone(),
 			_phantom: PhantomData,
 		}
+	}
+}
+
+impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
+	pub(crate) fn new_with_components(
+		inner: I,
+		client: Arc<C>,
+		aux_client: ArgonAux<B, C>,
+		notary_client: Arc<NotaryClient<B, C, AC>>,
+		metrics: Arc<Option<ImportMetrics>>,
+	) -> Self {
+		Self {
+			inner,
+			client: client.clone(),
+			aux_client,
+			notary_client,
+			import_lock: Default::default(),
+			pending_full_import_queue: PendingImportReplayQueue::new(client),
+			metrics,
+			_phantom: PhantomData,
+		}
+	}
+
+	#[cfg(test)]
+	pub(crate) async fn pending_full_imports_len(&self) -> usize {
+		self.pending_full_import_queue.len().await
 	}
 }
 
@@ -250,11 +354,23 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ImportApisExt<B> + AuxStore + Send + Sync + 'static,
+	C: ImportApisExt<B, AC> + NotaryApisExt<B, AC> + AuxStore + Send + Sync + 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
-	fn finish_pre_import(import_context: ImportContext<B>) -> PreImportOutcome<B> {
-		if import_context.should_short_circuit_known_header() {
+	fn finish_pre_import(
+		block: BlockImportParams<B>,
+		import_context: ImportContext<B>,
+	) -> PreImportOutcome<B> {
+		let has_justifications = block
+			.justifications
+			.as_ref()
+			.is_some_and(|justifications| justifications.iter().next().is_some());
+		if import_context.is_header_already_imported() &&
+			!import_context.has_state_or_block() &&
+			!import_context.finalized &&
+			!import_context.is_block_gap &&
+			!has_justifications
+		{
 			tracing::debug!(
 				context = ?import_context,
 				"Skipping reimport of known block without state or finalization"
@@ -262,33 +378,174 @@ where
 			return PreImportOutcome::ReturnResult(ImportResult::AlreadyInChain);
 		}
 
-		PreImportOutcome::ContinueImport { import_context }
+		PreImportOutcome::ContinueImport { block, import_context }
 	}
 
-	fn evaluate_pre_import(import_context: ImportContext<B>) -> PreImportOutcome<B> {
-		if import_context.should_return_missing_state_for_execution() {
-			tracing::debug!(
-				context = ?import_context,
-				"Parent state missing; returning missing state action"
-			);
-			return PreImportOutcome::ReturnResult(ImportResult::MissingState);
+	async fn defer_or_return_missing_state(
+		&self,
+		block: BlockImportParams<B>,
+		import_context: &mut ImportContext<B>,
+	) -> Result<PreImportOutcome<B>, Error> {
+		match self.pending_full_import_queue.defer_full_import(block).await {
+			Ok(mut queued_block) => {
+				import_context.refresh(&*self.client, &mut queued_block);
+				Ok(Self::finish_pre_import(queued_block, import_context.clone()))
+			},
+			Err(Error::PendingImportUnsupported(reason)) => {
+				warn!(
+					context = ?import_context,
+					?reason,
+					"Deferred replay unsupported for this block; returning MissingState"
+				);
+				Ok(PreImportOutcome::ReturnResult(ImportResult::MissingState))
+			},
+			Err(err) => Err(err),
 		}
-
-		Self::finish_pre_import(import_context)
 	}
-}
 
-#[cfg(test)]
-impl<B: BlockT, I, C: AuxStore, AC> ArgonBlockImport<B, I, C, AC> {
-	pub(crate) fn new_for_tests(inner: I, client: Arc<C>, aux_client: ArgonAux<B, C>) -> Self {
-		Self {
-			inner,
-			client,
-			aux_client,
-			import_lock: Default::default(),
-			metrics: Default::default(),
-			_phantom: PhantomData,
+	async fn evaluate_pre_import(
+		&self,
+		block: BlockImportParams<B>,
+		mut import_context: ImportContext<B>,
+	) -> Result<PreImportOutcome<B>, Error> {
+		let has_justifications = block
+			.justifications
+			.as_ref()
+			.is_some_and(|justifications| justifications.iter().next().is_some());
+		let queued_before_import =
+			self.pending_full_import_queue.has_hash(import_context.hash).await;
+
+		if import_context
+			.are_import_details_already_queued(queued_before_import, has_justifications)
+		{
+			return Ok(PreImportOutcome::ReturnResult(ImportResult::AlreadyInChain));
 		}
+
+		if !import_context.can_execute_if_possible_now() {
+			if import_context.is_parent_unknown() || !import_context.can_defer_full_import() {
+				tracing::debug!(
+					context = ?import_context,
+					"Parent state missing; returning missing state action"
+				);
+				return Ok(PreImportOutcome::ReturnResult(ImportResult::MissingState));
+			}
+			return self.defer_or_return_missing_state(block, &mut import_context).await;
+		}
+
+		if !import_context.should_verify_notebooks() {
+			return Ok(Self::finish_pre_import(block, import_context));
+		}
+
+		if !import_context.is_parent_state_available() {
+			if import_context.is_parent_unknown() ||
+				!import_context.can_defer_notebook_verification()
+			{
+				return Ok(PreImportOutcome::ReturnResult(ImportResult::MissingState));
+			}
+			return self.defer_or_return_missing_state(block, &mut import_context).await;
+		}
+
+		let digest_notebooks = self
+			.client
+			.runtime_digest_notebooks(import_context.parent_hash, block.header.digest())?;
+		if digest_notebooks.is_empty() {
+			return Ok(Self::finish_pre_import(block, import_context));
+		}
+
+		if let Err(err) = self
+			.notary_client
+			.verify_notebook_audits(
+				&import_context.parent_hash,
+				digest_notebooks,
+				NotebookAuditMode::Import { max_wait: IMPORT_NOTEBOOK_AUDIT_TIMEOUT },
+			)
+			.await
+		{
+			match err {
+				err if err.is_retryable_notebook_audit_error() =>
+					if import_context.can_defer_notebook_verification() {
+						return self.defer_or_return_missing_state(block, &mut import_context).await;
+					} else {
+						return Err(err);
+					},
+				Error::InvalidNotebookDigest(_) => {
+					warn!(
+						number = ?import_context.number,
+						block_hash = ?import_context.hash,
+						parent_hash = ?import_context.parent_hash,
+						origin = ?import_context.origin,
+						"Rejecting block with invalid notebook digest: {err}"
+					);
+					return Ok(PreImportOutcome::ReturnResult(ImportResult::KnownBad));
+				},
+				err => return Err(err),
+			}
+		}
+
+		Ok(Self::finish_pre_import(block, import_context))
+	}
+
+	pub(crate) async fn replay_pending_full_imports(&self) -> Result<(), Error> {
+		let mut attempted_hashes = HashSet::new();
+		while let Some((pending_import, replay_context)) = self
+			.pending_full_import_queue
+			.dequeue_ready_for_replay_excluding(&self.notary_client, &attempted_hashes)
+			.await?
+		{
+			attempted_hashes.insert(replay_context.hash);
+			let mut replay_retry_block =
+				PendingImportReplayQueue::<B, C>::retry_block_from_pending(&pending_import);
+			match <Self as BlockImport<B>>::import_block(self, pending_import.block).await {
+				Ok(ImportResult::KnownBad) => {
+					warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						"Pending full block import replay resolved as known-bad"
+					);
+				},
+				Ok(ImportResult::MissingState) => {
+					warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						"Pending full block replay still missing state; requeueing"
+					);
+					if let Some(block) = replay_retry_block.take() {
+						self.pending_full_import_queue.requeue_retry_block(block).await?;
+					}
+				},
+				Ok(ImportResult::AlreadyInChain) => {
+					let state_status = self
+						.client
+						.block_status(replay_context.hash)
+						.unwrap_or(BlockStatus::Unknown);
+					if state_status != BlockStatus::InChainWithState {
+						warn!(
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						?state_status,
+						"Pending full block replay returned AlreadyInChain without state; requeueing"
+						);
+						if let Some(block) = replay_retry_block.take() {
+							self.pending_full_import_queue.requeue_retry_block(block).await?;
+						}
+					}
+				},
+				Ok(_) => {},
+				Err(err) => {
+					warn!(
+					block_hash = ?replay_context.hash,
+					number = ?replay_context.number,
+					error = ?err,
+					"Pending full block replay failed; requeueing"
+					);
+					if let Some(block) = replay_retry_block.take() {
+						self.pending_full_import_queue.requeue_retry_block(block).await?;
+					}
+				},
+			}
+			tokio::task::yield_now().await;
+		}
+		Ok(())
 	}
 }
 
@@ -298,7 +555,7 @@ where
 	B: BlockT,
 	I: BlockImport<B> + Send + Sync,
 	I::Error: Into<ConsensusError>,
-	C: ImportApisExt<B> + AuxStore + Send + Sync + 'static,
+	C: ImportApisExt<B, AC> + NotaryApisExt<B, AC> + AuxStore + Send + Sync + 'static,
 	AC: Clone + Codec + Send + Sync + 'static,
 {
 	type Error = ConsensusError;
@@ -377,8 +634,11 @@ where
 		// imported. Various sync strategies will access this path without state set yet
 		tracing::trace!(context = ?import_context, "Begin import.");
 
-		let import_context = match Self::evaluate_pre_import(import_context) {
-			PreImportOutcome::ContinueImport { import_context } => import_context,
+		let import_context = match self.evaluate_pre_import(block, import_context).await? {
+			PreImportOutcome::ContinueImport { block: next_block, import_context } => {
+				block = next_block;
+				import_context
+			},
 			PreImportOutcome::ReturnResult(result) => return Ok(result),
 		};
 		let info = &import_context.info;
@@ -593,10 +853,9 @@ where
 #[allow(dead_code)]
 struct Verifier<B: BlockT, C: AuxStore, AC> {
 	client: Arc<C>,
-	notary_client: Arc<NotaryClient<B, C, AC>>,
 	utxo_tracker: Arc<UtxoTracker>,
 	telemetry: Option<TelemetryHandle>,
-	_phantom: PhantomData<AC>,
+	_phantom: PhantomData<(B, AC)>,
 }
 
 #[async_trait::async_trait]
@@ -705,33 +964,6 @@ where
 				}
 			}
 
-			// if we're importing a non-finalized block from someone else, verify the notebook
-			// audits
-			let latest_verified_finalized = self.client.info().finalized_number;
-			if !matches!(block_params.origin, BlockOrigin::Own | BlockOrigin::NetworkInitialSync) &&
-				block_number > latest_verified_finalized &&
-				!block_params.finalized
-			{
-				let digest_notebooks = runtime_api
-					.digest_notebooks(parent_hash, digest)
-					.map_err(|e| format!("Error calling digest notebooks api {e:?}"))?
-					.map_err(|e| format!("Failed to get digest notebooks: {e:?}"))?;
-				self.notary_client
-					.verify_notebook_audits(&parent_hash, digest_notebooks)
-					.await
-					.inspect_err(|e| {
-						error!(
-						?block_number,
-						block_hash=?post_hash,
-						?parent_hash,
-						origin = ?block_params.origin,
-						import_existing = block_params.import_existing,
-						finalized = block_params.finalized,
-						has_justification = block_params.justifications.is_some(),
-						"Failed to verify notebook audits {}", e.to_string())
-					})?;
-			}
-
 			let check_block = B::new(block_params.header.clone(), inner_body);
 
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
@@ -804,18 +1036,21 @@ where
 	let metrics = registry.and_then(|r| ImportMetrics::new(r).ok());
 	let metrics = Arc::new(metrics);
 
-	let importer = ArgonBlockImport {
-		inner: block_import,
-		client: client.clone(),
+	let importer = ArgonBlockImport::new_with_components(
+		block_import,
+		client.clone(),
 		aux_client,
-		import_lock: Default::default(),
+		notary_client.clone(),
 		metrics,
-		_phantom: PhantomData,
-	};
+	);
+	let replay_importer = importer.clone();
+	spawn_pending_import_replay_task(spawner, move || {
+		let replay_importer = replay_importer.clone();
+		async move { replay_importer.replay_pending_full_imports().await }
+	});
 	let verifier = Verifier::<B, C, AC> {
 		client: client.clone(),
 		utxo_tracker,
-		notary_client,
 		telemetry,
 		_phantom: PhantomData,
 	};

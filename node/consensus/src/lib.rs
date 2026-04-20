@@ -47,6 +47,7 @@ pub mod import_queue;
 pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
+pub(crate) mod pending_import_replay;
 pub mod state_anchor;
 
 pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
@@ -247,7 +248,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	let consensus_metrics_finder = consensus_metrics.clone();
 
 	let block_finder_task = async move {
-		*notary_client.pause_queue_processing.write().await = true;
+		*notary_client.pause_notebook_audits.write().await = true;
 		let mut import_stream = client.every_import_notification_stream();
 		let mut finalized_stream = client.finality_notification_stream();
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
@@ -332,7 +333,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 
 			// don't try to check for blocks during a sync
 			if sync_oracle.is_major_syncing() {
-				*notary_client.pause_queue_processing.write().await = true;
+				*notary_client.pause_notebook_audits.write().await = true;
 				continue;
 			}
 
@@ -343,7 +344,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			let state_status =
 				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown);
 			if state_status != sp_consensus::BlockStatus::InChainWithState {
-				*notary_client.pause_queue_processing.write().await = true;
+				*notary_client.pause_notebook_audits.write().await = true;
 				debug!(
 					?best_hash,
 					?state_status,
@@ -352,13 +353,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				continue;
 			}
 
-			if *notary_client.pause_queue_processing.read().await {
+			if *notary_client.pause_notebook_audits.read().await {
 				info!(
 					?best_hash,
 					?best_number,
 					"🏁 Node state is synched. Activating notary sync."
 				);
-				*notary_client.pause_queue_processing.write().await = false;
+				*notary_client.pause_notebook_audits.write().await = false;
 			}
 
 			let mut notebooks_to_check = notebook_ticks_recheck.get_ready();
