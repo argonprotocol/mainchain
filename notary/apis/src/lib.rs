@@ -8,7 +8,7 @@ use argon_primitives::{
 };
 use codec::Decode;
 use jsonrpsee::{
-	async_client::ClientBuilder,
+	async_client::{ClientBuilder, PingConfig},
 	client_transport::ws::{Url, WsTransportClientBuilder},
 };
 use std::{fmt::Debug, sync::OnceLock, time::Duration};
@@ -398,7 +398,9 @@ pub async fn create_client(url: &str) -> anyhow::Result<Client> {
 	let url = Url::parse(url).map_err(|e| anyhow!("Invalid URL: {url:?} -> {e}"))?;
 
 	let (sender, receiver) = transport_builder.build(url).await?;
-	let client = ClientBuilder::default().build_with_tokio(sender, receiver);
+	let client = ClientBuilder::default()
+		.enable_ws_ping(PingConfig::default())
+		.build_with_tokio(sender, receiver);
 	Ok(client)
 }
 

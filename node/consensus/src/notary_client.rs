@@ -56,6 +56,7 @@ use tracing::error;
 const MAX_PARALLEL_NOTARY_DOWNLOADS: usize = 8;
 const MAX_PARALLEL_NOTARY_AUDITS: usize = 4;
 const HEADER_PREFETCH_WINDOW: usize = MAX_PARALLEL_NOTARY_DOWNLOADS;
+const MAX_NOTEBOOK_SUBSCRIPTION_TICK_LAG: Tick = 2;
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
@@ -605,6 +606,8 @@ struct NotaryWorker {
 	archive_host: RwLock<Option<String>>,
 	subscription: Mutex<Option<Pin<Box<RawHeadersSubscription>>>>,
 	pending: Mutex<NotebookAuditState>,
+	last_notebook_tick: RwLock<Option<Tick>>,
+	last_connection_attempt_tick: RwLock<Option<Tick>>,
 	connection_lock: Arc<Mutex<()>>,
 	processing_lock: Arc<Mutex<()>>,
 	background_task_started: AtomicBool,
@@ -619,6 +622,8 @@ impl NotaryWorker {
 			archive_host: Default::default(),
 			subscription: Default::default(),
 			pending: Default::default(),
+			last_notebook_tick: Default::default(),
+			last_connection_attempt_tick: Default::default(),
 			connection_lock: Arc::new(Mutex::new(())),
 			processing_lock: Arc::new(Mutex::new(())),
 			background_task_started: AtomicBool::new(false),
@@ -688,6 +693,7 @@ impl NotaryWorker {
 		let _connection_guard = self.connection_lock.lock().await;
 		self.client.write().await.take();
 		self.clear_subscription().await;
+		self.last_notebook_tick.write().await.take();
 	}
 
 	async fn has_client(&self) -> bool {
@@ -698,7 +704,7 @@ impl NotaryWorker {
 		self.subscription.lock().await.is_some()
 	}
 
-	async fn ensure_connected_subscription(&self) -> Result<(), Error> {
+	async fn ensure_connected_subscription(&self, current_tick: Tick) -> Result<(), Error> {
 		let _connection_guard = self.connection_lock.lock().await;
 		let can_connect = {
 			let record = self.record.read().await;
@@ -712,16 +718,54 @@ impl NotaryWorker {
 		}
 
 		let notary_id = self.notary_id;
-		if !self.has_client().await {
+		let needs_client = !self.has_client().await;
+		let needs_subscription = !self.has_subscription().await;
+		if !needs_client && !needs_subscription {
+			return Ok(());
+		}
+
+		{
+			let mut last_connection_attempt_tick = self.last_connection_attempt_tick.write().await;
+			if *last_connection_attempt_tick == Some(current_tick) {
+				trace!(
+					"Skipping notary connection attempt. notary_id={notary_id} current_tick={current_tick}"
+				);
+				return Ok(());
+			}
+			*last_connection_attempt_tick = Some(current_tick);
+		}
+
+		if needs_client {
 			info!("Connecting to notary id={notary_id}");
 			self.connect().await?;
 		}
 
-		if !self.has_subscription().await {
+		if needs_subscription {
 			self.subscribe().await?;
 		}
 
 		Ok(())
+	}
+
+	async fn disconnect_if_subscription_stale(&self, current_tick: Tick) {
+		if !self.has_subscription().await {
+			return;
+		}
+
+		let Some(last_notebook_tick) = *self.last_notebook_tick.read().await else {
+			return;
+		};
+
+		let tick_lag = current_tick.saturating_sub(last_notebook_tick);
+		if tick_lag <= MAX_NOTEBOOK_SUBSCRIPTION_TICK_LAG {
+			return;
+		}
+
+		warn!(
+			"Disconnecting stale notary subscription. notary_id={} last_notebook_tick={last_notebook_tick} current_tick={current_tick} tick_lag={tick_lag}",
+			self.notary_id,
+		);
+		self.clear_connection().await;
 	}
 
 	async fn poll_subscription<B, C, AC>(
@@ -741,6 +785,7 @@ impl NotaryWorker {
 
 		match next {
 			Poll::Ready(Some(Ok(download_info))) => {
+				*self.last_notebook_tick.write().await = Some(download_info.tick);
 				if let Some(metrics) = worker_context.metrics.as_ref() {
 					metrics.notebook_notification_received(
 						self.notary_id,
@@ -792,7 +837,20 @@ impl NotaryWorker {
 			self.clear_subscription().await;
 			return Ok(false);
 		}
-		self.ensure_connected_subscription().await?;
+		let current_tick = if let Some(block_hash) = resolve_client_stateful_hash::<B, _, AC>(
+			worker_context.client.as_ref(),
+			worker_context.client.best_hash(),
+		)? {
+			Some(worker_context.client.current_tick(block_hash)?)
+		} else {
+			None
+		};
+		if let Some(current_tick) = current_tick {
+			self.disconnect_if_subscription_stale(current_tick).await;
+			self.ensure_connected_subscription(current_tick).await?;
+		} else if !self.has_client().await || !self.has_subscription().await {
+			return Ok(false);
+		}
 		let saw_subscription = self.poll_subscription(worker_context).await.is_some();
 		let has_more_work = self.process_background_work(worker_context).await;
 		Ok(saw_subscription || has_more_work)
@@ -848,6 +906,7 @@ impl NotaryWorker {
 		})?;
 		*self.archive_host.write().await = Some(archive_host);
 		if notebook_meta.last_closed_notebook_number > 0 {
+			*self.last_notebook_tick.write().await = Some(notebook_meta.last_closed_notebook_tick);
 			trace!(
 				"Tracking latest notebook {} for notary {}",
 				notebook_meta.last_closed_notebook_number, self.notary_id
@@ -1472,6 +1531,7 @@ where
 			return Ok(());
 		};
 		let notaries = self.worker_context.client.notaries(block_hash)?;
+		let current_tick = self.worker_context.client.current_tick(block_hash)?;
 		let active_ids = notaries.iter().map(|notary| notary.notary_id).collect::<BTreeSet<_>>();
 		let existing_workers = self
 			.workers_by_id
@@ -1521,10 +1581,11 @@ where
 				continue;
 			}
 
+			worker.disconnect_if_subscription_stale(current_tick).await;
 			let is_connected = worker.has_client().await && worker.has_subscription().await;
 
 			if !is_connected || host_changed {
-				if let Err(e) = worker.ensure_connected_subscription().await {
+				if let Err(e) = worker.ensure_connected_subscription(current_tick).await {
 					self.disconnect(
 						&notary_id,
 						Some(format!("Notary {notary_id} sync failed. {e:?}")),
@@ -2517,7 +2578,16 @@ mod test {
 		assert!(!has_worker_client(&notary_client, 1).await);
 		assert!(!has_worker_subscription(&notary_client, 1).await);
 
-		// Periodic notary refreshes reuse the same best hash when no new block has arrived.
+		// Periodic notary refreshes reuse the same best hash when no new block has arrived,
+		// but connection attempts are limited to once per tick.
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not refresh notaries");
+		assert!(!has_worker_client(&notary_client, 1).await);
+		assert!(!has_worker_subscription(&notary_client, 1).await);
+
+		*client.current_tick.lock() = 1;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await
@@ -2530,6 +2600,63 @@ mod test {
 			.await
 			.expect("worker should resubscribe without a new block");
 		assert_eq!(next, (1, 1));
+	}
+
+	#[tokio::test]
+	async fn disconnects_stale_worker_subscription_after_missing_ticks() {
+		let (mut test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		let next = wait_for_subscription(&notary_client, Duration::from_millis(500)).await.unwrap();
+		assert_eq!(next, (1, 1));
+
+		let worker = worker(&notary_client, 1).await.expect("worker should exist");
+		assert_eq!(*worker.last_notebook_tick.read().await, Some(1));
+
+		*client.current_tick.lock() = 3;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+		assert_eq!(*worker.last_notebook_tick.read().await, Some(1));
+		assert!(worker.has_client().await);
+		assert!(worker.has_subscription().await);
+
+		test_notary.stop().await;
+		*client.current_tick.lock() = 4;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		assert_eq!(*worker.last_notebook_tick.read().await, None);
+		assert!(!worker.has_client().await);
+		assert!(!worker.has_subscription().await);
+		assert_eq!(*worker.last_connection_attempt_tick.read().await, Some(4));
+
+		test_notary.start().await.expect("could not restart notary");
+		client.notaries.lock()[0].meta.hosts = bounded_vec![test_notary.addr.clone().into()];
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		assert!(!worker.has_client().await);
+		assert!(!worker.has_subscription().await);
+
+		*client.current_tick.lock() = 5;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		assert_eq!(*worker.last_connection_attempt_tick.read().await, Some(5));
+		assert!(worker.has_client().await);
+		assert!(worker.has_subscription().await);
 	}
 
 	#[tokio::test]
@@ -2880,6 +3007,7 @@ mod test {
 		assert_eq!(worker_tracked_notebook_count(&notary_client, 1).await, 0);
 
 		*notary_client.pause_notebook_audits.write().await = false;
+		*client.current_tick.lock() = 1;
 		notary_client
 			.update_notaries(&client.best_hash())
 			.await

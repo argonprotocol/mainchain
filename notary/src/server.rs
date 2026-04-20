@@ -176,7 +176,6 @@ impl NotaryServer {
 			.set_message_buffer_capacity(max_buffer_capacity_per_connection)
 			.set_batch_request_config(batch_config.unwrap_or(BatchRequestConfig::Disabled))
 			.set_rpc_middleware(rpc_middleware)
-			.enable_ws_ping(PingConfig::default())
 			.build(addrs)
 			.await?;
 		Ok(server)
