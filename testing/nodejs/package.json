@@ -36,7 +36,6 @@
   },
   "dependencies": {
     "@argonprotocol/mainchain": "1.4.3",
-    "bitcoin-core": "^5.0.0",
     "detect-port": "^2.1.0",
     "docker-compose": "^1.2.0",
     "http-proxy": "^1.18.1",

@@ -13,7 +13,6 @@ import {
 } from './index';
 import { detectPort } from 'detect-port';
 import { customAlphabet } from 'nanoid';
-import Client from 'bitcoin-core';
 import * as lockfile from 'proper-lockfile';
 import { createUid } from './TestNotary';
 import { type ArgonClient, getClient } from '@argonprotocol/mainchain';
@@ -55,12 +54,8 @@ export default class TestMainchain implements ITeardownable {
     addTeardown(this);
   }
 
-  public getBitcoinClient(): Client {
-    return new Client({
-      username: 'bitcoin',
-      password: 'bitcoin',
-      host: `http://localhost:${this.bitcoinPort}`,
-    });
+  public getBitcoinClient(): BitcoinRpcClient {
+    return new BitcoinRpcClient(`http://localhost:${this.bitcoinPort}`, 'bitcoin', 'bitcoin');
   }
 
   /**
@@ -264,3 +259,107 @@ export default class TestMainchain implements ITeardownable {
     return cleanHostForDocker(`http://bitcoin:bitcoin@localhost:${rpcPort}`);
   }
 }
+
+class BitcoinRpcClient {
+  #rpcUrl: string;
+  #authorization: string;
+
+  constructor(rpcUrl: string, username: string, password: string) {
+    this.#rpcUrl = rpcUrl;
+    this.#authorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
+  }
+
+  public async command<TMethod extends BitcoinRpcMethod>(
+    method: TMethod,
+    ...params: Parameters<BitcoinRpcMethods[TMethod]>
+  ): Promise<ReturnType<BitcoinRpcMethods[TMethod]>>;
+
+  public async command<TResult = unknown>(method: string, ...params: unknown[]): Promise<TResult>;
+
+  public async command(method: string, ...params: unknown[]): Promise<unknown> {
+    const response = await fetch(this.#rpcUrl, {
+      method: 'POST',
+      headers: {
+        authorization: this.#authorization,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '1.0',
+        id: `${method}-${Date.now()}`,
+        method,
+        params,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Bitcoin RPC ${method} failed with HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as BitcoinRpcPayload<unknown>;
+
+    if (payload.error) {
+      throw new Error(
+        `Bitcoin RPC ${method} failed (${payload.error.code}): ${payload.error.message}`,
+      );
+    }
+
+    return payload.result;
+  }
+}
+
+type BitcoinRpcMethod = keyof BitcoinRpcMethods;
+
+// bitcoin-core@5.0.0 only types `command()` as generic `any`, so we keep a
+// narrow local signature map for the handful of Bitcoin Core RPC fields our tests
+// actually read. Uninspected responses stay `unknown`.
+type BitcoinRpcMethods = {
+  createwallet(walletName: string): unknown;
+  loadwallet(walletName: string): unknown;
+  getnewaddress(): string;
+  generatetoaddress(blockCount: number, address: string): unknown;
+  getbalances(): unknown;
+  walletcreatefundedpsbt(
+    inputs: unknown[],
+    outputs: Record<string, number>,
+    locktime: number,
+    options: BitcoinWalletCreateFundedPsbtOptions,
+  ): BitcoinFundedPsbtResult;
+  walletprocesspsbt(psbt: string): BitcoinProcessedPsbtResult;
+  decodepsbt(psbt: string): BitcoinDecodedPsbtResult;
+  finalizepsbt(psbt: string): BitcoinFinalizedPsbtResult;
+  sendrawtransaction(transactionHex: string): string;
+  getrawtransaction(txid: string, verbose: true): BitcoinRawTransactionResult;
+  gettransaction(txid: string): unknown;
+};
+
+type BitcoinRpcPayload<TResult> = {
+  result: TResult;
+  error?: { code: number; message: string } | null;
+};
+
+type BitcoinWalletCreateFundedPsbtOptions = {
+  lockUnspents?: boolean;
+  feeRate?: number;
+};
+
+type BitcoinFundedPsbtResult = {
+  psbt: string;
+};
+
+type BitcoinProcessedPsbtResult = {
+  psbt: string;
+  complete: boolean;
+};
+
+type BitcoinDecodedPsbtResult = {
+  inputs?: unknown[];
+};
+
+type BitcoinFinalizedPsbtResult = {
+  hex: string;
+  txid?: string;
+};
+
+type BitcoinRawTransactionResult = {
+  txid: string;
+};

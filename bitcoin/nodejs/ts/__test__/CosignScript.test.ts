@@ -153,7 +153,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       priceIndex,
       satoshis: 2000n,
       ownerBitcoinPubkey,
-      argonKeyring: bitcoinLocker,
+      txSigner: bitcoinLocker,
     });
     const { lock } = await result.getLock();
     console.log('Locked bitcoin', lock);
@@ -254,7 +254,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       client: vaulterClient,
       priceIndex,
       releaseRequest: { bitcoinNetworkFee: networkFee, toScriptPubkey },
-      argonKeyring: bitcoinLocker,
+      txSigner: bitcoinLocker,
     });
     await result.waitForFinalizedBlock;
     console.log('Release request result:', result);
@@ -289,7 +289,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       client: vaulterClient,
       utxoId: lock.utxoId,
       vaultSignature: signature,
-      argonKeyring: vaulter,
+      txSigner: vaulter,
     });
     await tx.waitForFinalizedBlock;
     expect(tx.blockHash).toBeTruthy();
