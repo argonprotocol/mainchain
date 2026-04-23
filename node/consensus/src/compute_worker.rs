@@ -16,7 +16,7 @@ use frame_support::CloneNoBound;
 use futures::prelude::*;
 use log::*;
 use parking_lot::Mutex;
-use rand::Rng;
+use rand::RngExt;
 use sc_client_api::AuxStore;
 use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;

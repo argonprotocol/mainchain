@@ -14,7 +14,7 @@ use argon_primitives::{
 };
 use chrono::{DateTime, TimeZone, Utc};
 use codec::Encode;
-use rand::RngCore;
+use rand::Rng;
 use serde_json::{from_value, json};
 use sp_core::{H256, bounded::BoundedVec};
 use sqlx::{FromRow, PgConnection, query, types::JsonValue};

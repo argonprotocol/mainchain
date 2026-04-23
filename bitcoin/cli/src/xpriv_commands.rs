@@ -3,7 +3,7 @@ use anyhow::bail;
 use argon_bitcoin::{derive_pubkey, derive_xpub, xpriv_from_mnemonic, xpriv_from_seed};
 use argon_primitives::{bitcoin::BitcoinNetwork, read_secret_text_input};
 use clap::Subcommand;
-use rand::Rng;
+use rand::RngExt;
 use std::path::PathBuf;
 
 /// Create, secure, and manage your Bitcoin Master XPriv Key

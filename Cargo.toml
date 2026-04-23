@@ -139,7 +139,7 @@ tokio = { version = "1.44", features = ["sync", "time", "rt"] }
 schnellru = { version = "0.2" }
 lru-cache = { version = "0.1.2" }
 getrandom = { version = "0.3.2" }
-rand = { version = "0.9.3" }
+rand = { version = "0.10.1" }
 lazy_static = "1.4.0"
 smallvec = { version = "1.13" }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }

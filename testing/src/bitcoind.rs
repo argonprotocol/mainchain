@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use bitcoind::{BitcoinD, Conf, downloaded_exe_path};
 use fs2::FileExt;
 use lazy_static::lazy_static;
-use rand::RngCore;
+use rand::Rng;
 
 use argon_primitives::bitcoin::Satoshis;
 use bitcoin::{
