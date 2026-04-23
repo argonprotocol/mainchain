@@ -33,7 +33,9 @@ polkadot-sdk.features = [
     "sp-blockchain",
     "sp-block-builder",
     "sc-client-api",
+    "sc-consensus-grandpa",
     "sp-runtime",
+    "sp-consensus-grandpa",
     "sp-inherents",
     'sp-arithmetic',
     "sc-transaction-pool",
@@ -53,6 +55,7 @@ serde = { workspace = true, features = ["default"] }
 schnellru = { workspace = true }
 sp-application-crypto = { workspace = true }
 humantime = { workspace = true }
+hex-literal = { workspace = true }
 
 # Local Dependencies
 argon-primitives = { workspace = true, features = ["default"] }

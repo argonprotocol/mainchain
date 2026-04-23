@@ -43,6 +43,7 @@ mod aux_data;
 pub(crate) mod block_creator;
 pub(crate) mod compute_worker;
 pub mod error;
+pub mod grandpa_hard_forks;
 pub mod import_queue;
 pub(crate) mod metrics;
 pub(crate) mod notary_client;

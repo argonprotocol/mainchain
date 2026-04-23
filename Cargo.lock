@@ -1114,6 +1114,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "hex",
+ "hex-literal",
  "humantime",
  "jsonrpsee",
  "lazy_static",

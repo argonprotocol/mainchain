@@ -60,6 +60,7 @@ pub(crate) struct MemChain {
 	best: Arc<Mutex<(BlockNumber, BlockHash)>>,
 	finalized: Arc<Mutex<(BlockNumber, BlockHash)>>,
 	aux: Arc<Mutex<BTreeMap<Vec<u8>, Vec<u8>>>>,
+	last_import_had_empty_justifications: Arc<Mutex<Option<bool>>>,
 }
 impl MemChain {
 	pub(crate) fn new(genesis: Header) -> Self {
@@ -75,6 +76,7 @@ impl MemChain {
 			best: Arc::new(Mutex::new((0u32, h))),
 			finalized: Arc::new(Mutex::new((0u32, h))),
 			aux: Arc::new(Mutex::new(BTreeMap::new())),
+			last_import_had_empty_justifications: Arc::new(Mutex::new(None)),
 		}
 	}
 	pub(crate) fn insert(&self, hdr: Header) {
@@ -104,6 +106,10 @@ impl MemChain {
 
 	pub(crate) fn set_block_gap(&self, block_gap: Option<sp_blockchain::BlockGap<BlockNumber>>) {
 		*self.block_gap.lock().unwrap() = block_gap;
+	}
+
+	pub(crate) fn last_import_had_empty_justifications(&self) -> Option<bool> {
+		*self.last_import_had_empty_justifications.lock().unwrap()
 	}
 }
 impl HeaderBackend<Block> for MemChain {
@@ -351,8 +357,22 @@ impl sc_consensus::BlockImport<Block> for MemChain {
 		&self,
 		params: BlockImportParams<Block>,
 	) -> Result<ImportResult, Self::Error> {
+		*self.last_import_had_empty_justifications.lock().unwrap() = Some(
+			params
+				.justifications
+				.as_ref()
+				.is_some_and(|justifications| justifications.iter().next().is_none()),
+		);
+
 		let num = *params.header.number();
 		let hash = params.header.hash();
+		if !params.import_existing &&
+			self.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown) ==
+				sp_blockchain::BlockStatus::InChain
+		{
+			return Ok(ImportResult::AlreadyInChain);
+		}
+
 		// store/overwrite header so later calls see it in MemChain
 		self.insert(params.header.clone());
 		match params.state_action {
@@ -393,6 +413,25 @@ impl sc_consensus::BlockImport<Block> for MemChain {
 			}
 		}
 		Ok(ImportResult::Imported(ImportedAux::default()))
+	}
+}
+
+#[async_trait]
+impl sc_consensus::BlockImport<Block> for &MemChain {
+	type Error = ConsensusError;
+
+	async fn check_block(
+		&self,
+		block: BlockCheckParams<Block>,
+	) -> Result<ImportResult, Self::Error> {
+		<MemChain as sc_consensus::BlockImport<Block>>::check_block(*self, block).await
+	}
+
+	async fn import_block(
+		&self,
+		params: BlockImportParams<Block>,
+	) -> Result<ImportResult, Self::Error> {
+		<MemChain as sc_consensus::BlockImport<Block>>::import_block(*self, params).await
 	}
 }
 

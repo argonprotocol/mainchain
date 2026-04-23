@@ -177,14 +177,12 @@ where
 					None
 				},
 			);
-		if let Some(bitcoin_utxo_sync) = bitcoin_utxo_sync {
-			BitcoinInherentDataProvider { bitcoin_utxo_sync }
-				.provide_inherent_data(&mut inherent_data)
-				.await
-				.inspect_err(|err| {
-					tracing::warn!(?err, "Unable to provide bitcoin inherent data");
-				})?;
-		}
+		BitcoinInherentDataProvider { bitcoin_utxo_sync }
+			.provide_inherent_data(&mut inherent_data)
+			.await
+			.inspect_err(|err| {
+				tracing::warn!(?err, "Unable to provide bitcoin inherent data");
+			})?;
 
 		let inherent_digest = Digestset {
 			author,
