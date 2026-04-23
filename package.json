@@ -42,7 +42,6 @@
   "resolutions": {
     "axios": "^1.15.0",
     "@octokit/plugin-paginate-rest": "^11.4.1",
-    "form-data": "^2.5.4",
     "glob@npm:^10.2.2": "^10.5.0",
     "glob@npm:^10.3.10": "^10.5.0",
     "minimatch@npm:9.0.3": "9.0.9",
