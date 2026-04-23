@@ -1,9 +1,15 @@
-import { ArgonClient, KeyringPair, waitForLoad } from './index';
+import { waitForLoad } from './index';
+import type { ArgonClient } from './index';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import type { SignerOptions } from '@polkadot/api/types';
+import type { KeyringPair } from '@polkadot/keyring/types';
 import { ITxProgressCallback, TxResult } from './TxResult';
 
-export type ISubmittableOptions = Partial<SignerOptions> & {
+export type TxSigningAccount =
+  | KeyringPair
+  | { address: string; signer: NonNullable<SignerOptions['signer']> };
+
+export type ISubmittableOptions = Partial<Omit<SignerOptions, 'signer'>> & {
   tip?: bigint;
   logResults?: boolean;
   useLatestNonce?: boolean;
@@ -12,14 +18,18 @@ export type ISubmittableOptions = Partial<SignerOptions> & {
 };
 
 export class TxSubmitter {
+  public readonly address: string;
+
   constructor(
     public readonly client: ArgonClient,
     public tx: SubmittableExtrinsic,
-    public pair: KeyringPair,
-  ) {}
+    public readonly account: TxSigningAccount,
+  ) {
+    this.address = account.address;
+  }
 
   public async feeEstimate(tip?: bigint): Promise<bigint> {
-    const { partialFee } = await this.tx.paymentInfo(this.pair, { tip });
+    const { partialFee } = await this.tx.paymentInfo(this.address, { tip });
     return partialFee.toBigInt();
   }
 
@@ -31,7 +41,7 @@ export class TxSubmitter {
     } = {},
   ): Promise<{ canAfford: boolean; availableBalance: bigint; txFee: bigint }> {
     const { tip, unavailableBalance } = options;
-    const account = await this.client.query.system.account(this.pair.address);
+    const account = await this.client.query.system.account(this.address);
     let availableBalance = account.data.free.toBigInt();
     const userBalance = availableBalance;
     if (unavailableBalance) {
@@ -46,27 +56,38 @@ export class TxSubmitter {
     return { canAfford, availableBalance: userBalance, txFee: fees };
   }
 
-  public async submit(options: ISubmittableOptions = {}): Promise<TxResult> {
+  public async sign(options: ISubmittableOptions = {}): Promise<SubmittableExtrinsic> {
     const { useLatestNonce, ...apiOptions } = options;
     await waitForLoad();
+    if (useLatestNonce && apiOptions.nonce === undefined) {
+      apiOptions.nonce = await this.client.rpc.system.accountNextIndex(this.address);
+    }
+
+    if ('signer' in this.account) {
+      return await this.tx.signAsync(this.address, { ...apiOptions, signer: this.account.signer });
+    }
+
+    return await this.tx.signAsync(this.account, apiOptions);
+  }
+
+  public async submitSigned(
+    signedTx: SubmittableExtrinsic,
+    options: ISubmittableOptions = {},
+  ): Promise<TxResult> {
     const blockHeight = await this.client.rpc.chain.getHeader().then(h => h.number.toNumber());
     if (options.logResults) {
       this.logRequest();
     }
-    if (useLatestNonce && !apiOptions.nonce) {
-      apiOptions.nonce = await this.client.rpc.system.accountNextIndex(this.pair.address);
-    }
-
-    const signedTx = await this.tx.signAsync(this.pair, apiOptions);
     const txHash = signedTx.hash.toHex();
     const result = new TxResult(this.client, {
       signedHash: txHash,
       method: signedTx.method.toHuman(),
-      accountAddress: this.pair.address,
+      accountAddress: this.address,
       submittedTime: new Date(),
       submittedAtBlockNumber: blockHeight,
       nonce: signedTx.nonce.toNumber(),
     });
+    result.txProgressCallback = options.txProgressCallback;
     if (options.disableAutomaticTxTracking !== true) {
       await signedTx.send(result.onSubscriptionResult.bind(result));
     } else {
@@ -78,6 +99,11 @@ export class TxSubmitter {
       }
     }
     return result;
+  }
+
+  public async submit(options: ISubmittableOptions = {}): Promise<TxResult> {
+    const signedTx = await this.sign(options);
+    return await this.submitSigned(signedTx, options);
   }
 
   private logRequest() {
@@ -99,7 +125,7 @@ export class TxSubmitter {
       args.push(toHuman.args);
     }
     args.unshift(txString.join('->'));
-    console.log('Submitting transaction from %s:', this.pair.address, ...args);
+    console.log('Submitting transaction from %s:', this.address, ...args);
   }
 }
 

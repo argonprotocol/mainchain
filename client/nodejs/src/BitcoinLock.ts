@@ -1,16 +1,15 @@
 import {
-  ArgonClient,
+  type ArgonClient,
   type ArgonPrimitivesBitcoinBitcoinNetwork,
   type ArgonPrimitivesBitcoinUtxoRef,
   formatArgons,
-  type KeyringPair,
   MICROGONS_PER_ARGON,
   type SubmittableExtrinsic,
   TxSubmitter,
-  Vault,
+  type Vault,
 } from './index';
 import { GenericEvent } from '@polkadot/types';
-import { ISubmittableOptions } from './TxSubmitter';
+import type { ISubmittableOptions, TxSigningAccount } from './TxSubmitter';
 import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
@@ -169,7 +168,7 @@ export class BitcoinLock implements IBitcoinLock {
     args: {
       client: ArgonClient;
       priceIndex: PriceIndex;
-      argonKeyring: KeyringPair;
+      txSigner: TxSigningAccount;
       vault: Vault;
       microgonsPerBtc?: bigint;
     } & ISubmittableOptions,
@@ -186,11 +185,11 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinBlockHeight: number;
     }>;
   }> {
-    const { priceIndex, argonKeyring, tip = 0n, vault, client, microgonsPerBtc = null } = args;
+    const { priceIndex, txSigner, tip = 0n, vault, client, microgonsPerBtc = null } = args;
 
     const ratchetPrice = await this.getRatchetPrice(client, priceIndex, vault);
     const tx = client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsPerBtc } });
-    const txSubmitter = new TxSubmitter(client, tx, argonKeyring);
+    const txSubmitter = new TxSubmitter(client, tx, txSigner);
     const canAfford = await txSubmitter.canAfford({
       tip,
       unavailableBalance: BigInt(ratchetPrice.burnAmount + ratchetPrice.ratchetingFee),
@@ -254,13 +253,13 @@ export class BitcoinLock implements IBitcoinLock {
       client: ArgonClient;
       priceIndex: PriceIndex;
       releaseRequest: IReleaseRequest;
-      argonKeyring: KeyringPair;
+      txSigner: TxSigningAccount;
     } & ISubmittableOptions,
   ): Promise<TxResult> {
     const {
       priceIndex,
       releaseRequest: { bitcoinNetworkFee, toScriptPubkey },
-      argonKeyring,
+      txSigner,
       tip = 0n,
       client,
     } = args;
@@ -272,7 +271,7 @@ export class BitcoinLock implements IBitcoinLock {
     const submitter = new TxSubmitter(
       client,
       client.tx.bitcoinLocks.requestRelease(this.utxoId, toScriptPubkey, bitcoinNetworkFee),
-      argonKeyring,
+      txSigner,
     );
 
     const redemptionPrice = await BitcoinLock.getRedemptionRate(priceIndex, this);
@@ -469,10 +468,10 @@ export class BitcoinLock implements IBitcoinLock {
       client: ArgonClient;
       utxoId: number;
       vaultSignature: Uint8Array;
-      argonKeyring: KeyringPair;
+      txSigner: TxSigningAccount;
     } & ISubmittableOptions,
   ): Promise<TxResult> {
-    const { utxoId, vaultSignature, argonKeyring, client } = args;
+    const { utxoId, vaultSignature, txSigner, client } = args;
     if (!vaultSignature || vaultSignature.byteLength < 70 || vaultSignature.byteLength > 73) {
       throw new Error(
         `Invalid vault signature length: ${vaultSignature.byteLength}. Must be 70-73 bytes.`,
@@ -480,7 +479,7 @@ export class BitcoinLock implements IBitcoinLock {
     }
     const signature = u8aToHex(vaultSignature);
     const tx = client.tx.bitcoinLocks.cosignRelease(utxoId, signature);
-    const submitter = new TxSubmitter(client, tx, argonKeyring);
+    const submitter = new TxSubmitter(client, tx, txSigner);
 
     return await submitter.submit(args);
   }
@@ -658,7 +657,7 @@ export class BitcoinLock implements IBitcoinLock {
     priceIndex: PriceIndex;
     ownerBitcoinPubkey: Uint8Array;
     satoshis: bigint;
-    argonKeyring: KeyringPair;
+    txSigner: TxSigningAccount;
     reducedBalanceBy?: bigint;
     microgonsPerBtc?: bigint;
     tip?: bigint;
@@ -667,7 +666,7 @@ export class BitcoinLock implements IBitcoinLock {
     const {
       vault,
       priceIndex,
-      argonKeyring,
+      txSigner,
       satoshis,
       tip = 0n,
       ownerBitcoinPubkey,
@@ -701,9 +700,9 @@ export class BitcoinLock implements IBitcoinLock {
         },
       });
     }
-    const submitter = new TxSubmitter(client, tx, argonKeyring);
+    const submitter = new TxSubmitter(client, tx, txSigner);
     const marketPrice = await this.getMarketRate(priceIndex, satoshis);
-    const isVaultOwner = argonKeyring.address === vault.operatorAccountId;
+    const isVaultOwner = txSigner.address === vault.operatorAccountId;
     const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(marketPrice);
 
     const { canAfford, availableBalance, txFee } = await submitter.canAfford({
@@ -727,7 +726,7 @@ export class BitcoinLock implements IBitcoinLock {
       vault: Vault;
       priceIndex: PriceIndex;
       ownerBitcoinPubkey: Uint8Array;
-      argonKeyring: KeyringPair;
+      txSigner: TxSigningAccount;
       satoshis: bigint;
     } & ISubmittableOptions,
   ): Promise<{
@@ -735,7 +734,7 @@ export class BitcoinLock implements IBitcoinLock {
     txResult: TxResult;
     securityFee: bigint;
   }> {
-    const { argonKeyring, client } = args;
+    const { txSigner, client } = args;
 
     const { tx, securityFee, canAfford, txFeePlusTip } = await this.createInitializeTx(args);
     if (!canAfford) {
@@ -743,7 +742,7 @@ export class BitcoinLock implements IBitcoinLock {
         `Insufficient funds to initialize bitcoin lock. Required security fee: ${formatArgons(securityFee)}, Tx fee plus tip: ${formatArgons(txFeePlusTip)}`,
       );
     }
-    const submitter = new TxSubmitter(client, tx, argonKeyring);
+    const submitter = new TxSubmitter(client, tx, txSigner);
     const txResult = await submitter.submit({ logResults: true, ...args });
 
     return {

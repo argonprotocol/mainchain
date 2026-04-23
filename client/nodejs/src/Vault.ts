@@ -1,10 +1,9 @@
 import {
-  ArgonClient,
+  type ArgonClient,
   type ArgonPrimitivesVault,
   FIXED_U128_DECIMALS,
   formatArgons,
   fromFixedNumber,
-  KeyringPair,
   PERMILL_DECIMALS,
   toFixedNumber,
   TxSubmitter,
@@ -13,7 +12,7 @@ import BigNumber from 'bignumber.js';
 import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxResult';
-import { ISubmittableOptions } from './TxSubmitter';
+import type { ISubmittableOptions, TxSigningAccount } from './TxSubmitter';
 import { ApiDecoration } from '@polkadot/api/types';
 import type {
   bool,
@@ -207,7 +206,7 @@ export class Vault {
 
   public static async create(
     client: ArgonClient,
-    keypair: KeyringPair,
+    txSigner: TxSigningAccount,
     args: {
       securitization: bigint | number;
       securitizationRatio: number;
@@ -260,7 +259,7 @@ export class Vault {
       bitcoinXpubkey: xpubBytes,
       name: encodedName,
     };
-    const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), keypair);
+    const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), txSigner);
     if (doNotExceedBalance) {
       const finalTip = tip ?? 0n;
       let txFee = await tx.feeEstimate(finalTip);
@@ -301,7 +300,7 @@ export class Vault {
 
   public static async setName(
     client: ArgonClient,
-    keypair: KeyringPair,
+    txSigner: TxSigningAccount,
     args: {
       name?: string | null;
     } & ISubmittableOptions,
@@ -309,7 +308,7 @@ export class Vault {
     const tx = new TxSubmitter(
       client,
       client.tx.vaults.setName(encodeVaultName(args.name)),
-      keypair,
+      txSigner,
     );
 
     return tx.submit({
@@ -332,7 +331,7 @@ function decodeVaultName(name: Bytes): string {
   return new TextDecoder().decode(Uint8Array.from(name));
 }
 
-function encodeVaultName(name?: string | null): Uint8Array | null {
+function encodeVaultName(name?: string | null): string | null {
   if (name === undefined || name === null) {
     return null;
   }
@@ -341,6 +340,5 @@ function encodeVaultName(name?: string | null): Uint8Array | null {
       'Vault name must start with a capital letter and contain at most 18 alphanumeric characters',
     );
   }
-
-  return new TextEncoder().encode(name);
+  return name;
 }

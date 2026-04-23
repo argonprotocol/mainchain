@@ -23,7 +23,7 @@ import { HexString } from '@polkadot/util/types';
 export type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 export { ApiDecoration };
 export { WageProtector } from './WageProtector';
-export { TxSubmitter, type ISubmittableOptions } from './TxSubmitter';
+export { TxSubmitter, type ISubmittableOptions, type TxSigningAccount } from './TxSubmitter';
 export { TxResult, type ITxProgressCallback } from './TxResult';
 export * from './utils';
 export * from './keyringUtils';
