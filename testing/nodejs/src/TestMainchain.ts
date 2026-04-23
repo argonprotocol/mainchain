@@ -291,16 +291,30 @@ class BitcoinRpcClient {
       }),
     });
 
+    const body = await response.text();
+
+    let payload: BitcoinRpcPayload<unknown> | undefined;
+    if (body) {
+      try {
+        payload = JSON.parse(body) as BitcoinRpcPayload<unknown>;
+      } catch {
+        payload = undefined;
+      }
+    }
+
+    if (payload?.error) {
+      const httpStatus = response.ok ? '' : ` with HTTP ${response.status}`;
+      throw new Error(
+        `Bitcoin RPC ${method} failed${httpStatus} (${payload.error.code}): ${payload.error.message}`,
+      );
+    }
+
     if (!response.ok) {
       throw new Error(`Bitcoin RPC ${method} failed with HTTP ${response.status}`);
     }
 
-    const payload = (await response.json()) as BitcoinRpcPayload<unknown>;
-
-    if (payload.error) {
-      throw new Error(
-        `Bitcoin RPC ${method} failed (${payload.error.code}): ${payload.error.message}`,
-      );
+    if (!payload) {
+      throw new Error(`Bitcoin RPC ${method} returned an invalid JSON response`);
     }
 
     return payload.result;
