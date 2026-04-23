@@ -540,6 +540,11 @@ async fn test_execute_if_possible_initial_sync_block_with_pruned_parent_is_not_d
 	assert_eq!(pending_import_count(&importer).await, 0);
 	assert_eq!(client.status(child_hash).unwrap(), BlockStatus::InChain);
 	assert!(!has_state(&client, child_hash));
+	assert_eq!(
+		client.info().best_hash,
+		genesis_hash,
+		"pruned initial-sync import should not become best before state is available",
+	);
 }
 
 #[tokio::test]

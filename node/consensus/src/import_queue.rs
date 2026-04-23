@@ -254,7 +254,15 @@ impl<B: BlockT> ImportContext<B> {
 	}
 
 	fn has_state_or_block(&self) -> bool {
-		!self.skip_execution_checks
+		if self.skip_execution_checks {
+			return false;
+		}
+
+		if self.state_action == ImportStateAction::ExecuteIfPossible {
+			return self.is_parent_state_available();
+		}
+
+		true
 	}
 
 	fn has_state_import(&self) -> bool {
