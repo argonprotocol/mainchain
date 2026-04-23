@@ -15,3 +15,11 @@ updates:
     security-updates-only: true
     allow:
       - dependency-type: "security"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    security-updates-only: true
+    allow:
+      - dependency-type: "security"
