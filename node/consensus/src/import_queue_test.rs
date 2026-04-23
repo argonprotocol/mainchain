@@ -6,6 +6,7 @@ use crate::{
 	pending_import_replay::PENDING_IMPORTS_ADVISORY_LIMIT,
 };
 use argon_primitives::{NotebookAuditResult, prelude::*};
+use hex_literal::hex;
 use polkadot_sdk::{
 	frame_support::assert_ok,
 	sc_client_api::{BlockBackend, KeyValueStates},
@@ -113,6 +114,68 @@ async fn test_state_upgrade() {
 }
 
 #[tokio::test]
+async fn test_known_initial_sync_authority_change_uses_empty_justification_marker() {
+	let (importer, client) = new_importer();
+	let parent = client.info().best_hash;
+
+	let mut finalized = create_params(
+		40_000,
+		parent,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::Skip,
+		None,
+	);
+	finalized.finalized = true;
+	importer.import_block(finalized).await.unwrap();
+
+	let mut hard_fork_params = create_params(
+		30_269,
+		parent,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::Skip,
+		None,
+	);
+	hard_fork_params.post_hash =
+		Some(H256::from(hex!("1f1f857295b01455051c70c2e3f8c31aa9bead6f8384d26f94b5555d6f3aa62c")));
+
+	assert_ok!(importer.import_block(hard_fork_params).await);
+	assert_eq!(client.last_import_had_empty_justifications(), Some(true));
+}
+
+#[tokio::test]
+async fn test_state_upgrade_reimports_known_header_with_unknown_block_state() {
+	let (importer, client) = new_importer();
+	let parent = client.info().best_hash;
+	let gap =
+		create_params(1, parent, 1, None, BlockOrigin::NetworkInitialSync, StateAction::Skip, None);
+	let hash = gap.header.hash();
+
+	importer.import_block(gap).await.unwrap();
+	client.set_state(hash, sp_consensus::BlockStatus::Unknown);
+
+	let state = create_params(
+		1,
+		parent,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+			block: H256::zero(),
+			state: KeyValueStates(Vec::new()),
+		})),
+		None,
+	);
+	let result = importer.import_block(state).await.unwrap();
+
+	assert!(matches!(result, ImportResult::Imported(_)));
+	assert!(has_state(&client, hash));
+}
+
+#[tokio::test]
 async fn test_finalized_upgrade_reimports() {
 	let (importer, client) = new_importer();
 	let parent = client.info().best_hash;
@@ -172,6 +235,33 @@ async fn test_block_gap_reimport_does_not_short_circuit_known_header() {
 	params.body = Some(Vec::new());
 	let result = importer.import_block(params).await.unwrap();
 	assert!(matches!(result, ImportResult::Imported(_)));
+}
+
+#[tokio::test]
+async fn test_known_header_full_import_restores_pruned_state() {
+	let (importer, client) = new_importer();
+	let parent = client.info().best_hash;
+	let header_only =
+		create_params(1, parent, 1, None, BlockOrigin::NetworkBroadcast, StateAction::Skip, None);
+	let block_hash = header_only.header.hash();
+
+	let _ = importer.import_block(header_only).await.unwrap();
+	assert_eq!(client.block_status(block_hash).unwrap(), sp_consensus::BlockStatus::InChainPruned);
+
+	let mut full_block = create_params(
+		1,
+		parent,
+		1,
+		None,
+		BlockOrigin::NetworkBroadcast,
+		StateAction::ExecuteIfPossible,
+		None,
+	);
+	full_block.body = Some(Vec::new());
+
+	let result = importer.import_block(full_block).await.unwrap();
+	assert!(matches!(result, ImportResult::Imported(_)));
+	assert!(has_state(&client, block_hash));
 }
 
 #[tokio::test]
@@ -416,7 +506,7 @@ async fn test_missing_parent_state_returns_missing_state_for_execute_if_possible
 }
 
 #[tokio::test]
-async fn test_execute_if_possible_sync_block_with_pruned_parent_is_deferred_header_only() {
+async fn test_execute_if_possible_initial_sync_block_with_pruned_parent_is_not_deferred() {
 	let (importer, client) = new_importer();
 	let genesis_hash = client.info().best_hash;
 
@@ -447,7 +537,7 @@ async fn test_execute_if_possible_sync_block_with_pruned_parent_is_deferred_head
 
 	let result = importer.import_block(child).await.unwrap();
 	assert!(matches!(result, ImportResult::Imported(_)));
-	assert_eq!(pending_import_count(&importer).await, 1);
+	assert_eq!(pending_import_count(&importer).await, 0);
 	assert_eq!(client.status(child_hash).unwrap(), BlockStatus::InChain);
 	assert!(!has_state(&client, child_hash));
 }
@@ -501,7 +591,7 @@ async fn test_deferred_execute_if_possible_recovers_after_importer_restart() {
 }
 
 #[tokio::test]
-async fn test_replay_initial_sync_with_pruned_parent_state_does_not_spin() {
+async fn test_replay_initial_sync_with_pruned_parent_state_does_not_queue() {
 	let (importer, client) = new_importer();
 	let genesis_hash = client.info().best_hash;
 
@@ -531,7 +621,7 @@ async fn test_replay_initial_sync_with_pruned_parent_state_does_not_spin() {
 	let child_hash = child.post_hash();
 	let result = importer.import_block(child).await.unwrap();
 	assert!(matches!(result, ImportResult::Imported(_)));
-	assert_eq!(pending_import_count(&importer).await, 1);
+	assert_eq!(pending_import_count(&importer).await, 0);
 
 	let replay_result = tokio::time::timeout(
 		std::time::Duration::from_millis(100),
@@ -540,8 +630,14 @@ async fn test_replay_initial_sync_with_pruned_parent_state_does_not_spin() {
 	.await;
 
 	assert!(matches!(replay_result, Ok(Ok(()))));
-	assert_eq!(pending_import_count(&importer).await, 1);
+	assert_eq!(pending_import_count(&importer).await, 0);
 	assert!(!has_state(&client, child_hash));
+
+	client.set_state(parent_hash, sp_consensus::BlockStatus::InChainWithState);
+	importer.replay_pending_full_imports().await.unwrap();
+
+	assert!(!has_state(&client, child_hash));
+	assert_eq!(pending_import_count(&importer).await, 0);
 }
 
 #[tokio::test]
@@ -563,14 +659,17 @@ async fn test_queue_growth_persists_over_advisory_capacity() {
 	assert!(!has_state(&client, parent_hash));
 
 	for n in 2..=(PENDING_IMPORTS_ADVISORY_LIMIT as u32 + 1) {
+		let mut author = [0u8; 32];
+		author[..4].copy_from_slice(&n.to_le_bytes());
+
 		let mut child = create_params(
 			n,
 			parent_hash,
 			1,
 			None,
-			BlockOrigin::NetworkInitialSync,
+			BlockOrigin::NetworkBroadcast,
 			StateAction::ExecuteIfPossible,
-			None,
+			Some(AccountId::from(author)),
 		);
 		child.body = Some(Vec::new());
 		let result = importer.import_block(child).await.unwrap();
@@ -578,14 +677,18 @@ async fn test_queue_growth_persists_over_advisory_capacity() {
 	}
 	assert_eq!(pending_import_count(&importer).await, PENDING_IMPORTS_ADVISORY_LIMIT);
 
+	let mut overflow_author = [0u8; 32];
+	overflow_author[..4]
+		.copy_from_slice(&(PENDING_IMPORTS_ADVISORY_LIMIT as u32 + 2).to_le_bytes());
+
 	let mut overflow = create_params(
 		PENDING_IMPORTS_ADVISORY_LIMIT as u32 + 2,
 		parent_hash,
 		1,
 		None,
-		BlockOrigin::NetworkInitialSync,
+		BlockOrigin::NetworkBroadcast,
 		StateAction::ExecuteIfPossible,
-		None,
+		Some(AccountId::from(overflow_author)),
 	);
 	overflow.body = Some(Vec::new());
 	let overflow_hash = overflow.post_hash();

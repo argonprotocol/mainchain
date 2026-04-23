@@ -1,7 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 use crate::{
 	command::MiningConfig,
-	grandpa_hard_forks,
 	grandpa_warp_sync::ArgonWarpSyncProvider,
 	rpc,
 	rpc::GrandpaDeps,
@@ -12,8 +11,8 @@ use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_node_consensus::read_chain_spec_bitcoin_network;
 use argon_node_consensus::{
 	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
-	create_import_queue, read_chain_spec_grandpa_authorities, read_chain_spec_ticker,
-	run_block_builder_task, run_notary_sync,
+	create_import_queue, grandpa_hard_forks, read_chain_spec_grandpa_authorities,
+	read_chain_spec_ticker, run_block_builder_task, run_notary_sync,
 };
 use argon_primitives::{AccountId, TickApis, digests::ArgonDigests, tick::Tick};
 use polkadot_sdk::*;

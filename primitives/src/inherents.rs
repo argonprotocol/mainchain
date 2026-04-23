@@ -344,7 +344,7 @@ pub struct BitcoinUtxoFunding {
 
 #[cfg(feature = "std")]
 pub struct BitcoinInherentDataProvider {
-	pub bitcoin_utxo_sync: BitcoinUtxoSync,
+	pub bitcoin_utxo_sync: Option<BitcoinUtxoSync>,
 }
 
 impl From<BitcoinUtxoSyncV1> for BitcoinUtxoSyncV0 {
@@ -412,9 +412,13 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 		&self,
 		inherent_data: &mut InherentData,
 	) -> Result<(), sp_inherents::Error> {
+		let Some(bitcoin_utxo_sync) = self.bitcoin_utxo_sync.as_ref() else {
+			return Ok(());
+		};
+
 		// Provide both v1 and v2 so older runtimes can still decode the inherent.
-		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER_V2, &self.bitcoin_utxo_sync)?;
-		let legacy_v1: BitcoinUtxoSyncV1 = self.bitcoin_utxo_sync.clone().into();
+		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER_V2, bitcoin_utxo_sync)?;
+		let legacy_v1: BitcoinUtxoSyncV1 = bitcoin_utxo_sync.clone().into();
 		inherent_data.put_data(BITCOIN_INHERENT_IDENTIFIER_V1, &legacy_v1)?;
 		Ok(())
 	}

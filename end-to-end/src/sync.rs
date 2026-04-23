@@ -24,9 +24,44 @@ async fn test_fast_sync_catches_up_to_mixed_history() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "baseline main warp sync panic in sc-network-sync"]
+#[ignore = "slow warp sync scenario"]
 async fn test_warp_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("warp").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "slow sync recovery scenario"]
+async fn test_fast_sync_recovers_after_notebook_archive_delay() {
+	assert_sync_mode_recovers_after_notebook_archive_delay("fast").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "slow sync recovery scenario"]
+async fn test_warp_sync_recovers_after_notebook_archive_delay() {
+	assert_sync_mode_recovers_after_notebook_archive_delay("warp").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "slow sync recovery scenario"]
+async fn test_fast_sync_recovers_after_peer_stall() {
+	assert_sync_mode_recovers_after_peer_stall("fast").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "slow sync recovery scenario"]
+async fn test_warp_sync_recovers_after_peer_stall() {
+	assert_sync_mode_recovers_after_peer_stall("warp").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "slow warp sync recovery scenario"]
+async fn test_warp_sync_recovers_after_state_sync_restart() {
+	assert_warp_sync_recovers_after_state_sync_restart().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -100,6 +135,7 @@ struct SyncHarness {
 	vote_miner_2: ArgonTestNode,
 	test_notary: ArgonTestNotary,
 	state_cache: Option<SyncStateCache>,
+	archive_host: String,
 	reused_state: bool,
 }
 
@@ -186,6 +222,42 @@ async fn assert_node_matches_snapshot(
 		Some(latest_finalized.hash()),
 		"{context}",
 	);
+
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+	let mut last_state_error = None;
+	loop {
+		let best_hash = node.client.best_block_hash().await.unwrap();
+		let best_number = node.client.block_number(best_hash).await.unwrap();
+		let source_best_at_height = source.client.block_at_height(best_number).await.unwrap();
+
+		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
+			match node
+				.client
+				.fetch_storage(&storage().system().number(), FetchAt::Block(best_hash))
+				.await
+			{
+				Ok(Some(state_number)) => {
+					assert_eq!(
+						state_number, best_number,
+						"{context}: best state should match best block"
+					);
+					break;
+				},
+				Ok(None) => last_state_error = Some("storage returned None".to_string()),
+				Err(err) => last_state_error = Some(err.to_string()),
+			}
+		}
+
+		assert!(
+			tokio::time::Instant::now() < deadline,
+			"{context}: synced node did not recover state for its best block. best={best_number}, source_at_height={source_best_at_height:?}, last_state_error={last_state_error:?}",
+		);
+
+		println!(
+			"Waiting for synced node to recover state at best block {best_number}. Last state error: {last_state_error:?}"
+		);
+		tokio::time::sleep(Duration::from_millis(250)).await;
+	}
 }
 
 async fn assert_basic_sync_mode_catches_up(sync_mode: &str) {
@@ -202,8 +274,122 @@ async fn assert_basic_sync_mode_catches_up(sync_mode: &str) {
 		&format!("{sync_mode} sync node should catch up to mixed finalized history"),
 	)
 	.await;
+	if sync_mode == "warp" {
+		assert_block_history_gap_fill_completes(
+			&sync_node,
+			"warp sync should complete historical block gap fill after state sync",
+		)
+		.await;
+	}
 	drop(sync_node);
 	drop(harness);
+}
+
+async fn assert_sync_mode_recovers_after_notebook_archive_delay(sync_mode: &str) {
+	let mut harness = SyncHarness::start().await;
+	harness.assert_warmup_history_window(40).await;
+
+	let target = finalized_snapshot(&harness.source).await;
+	let missing_archive_host = "http://127.0.0.1:9/missing-notebook-archive".to_string();
+	let mut sync_node = harness
+		.start_sync_node_with("eve", Some(sync_mode), |args| {
+			args.notebook_archive_urls = vec![missing_archive_host];
+		})
+		.await;
+
+	tokio::time::sleep(Duration::from_secs(5)).await;
+	sync_node.start_args.notebook_archive_urls = vec![harness.archive_host.clone()];
+	sync_node.restart(Duration::from_secs(1)).await.unwrap();
+
+	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
+	assert_node_matches_snapshot(
+		&sync_node,
+		&harness.source,
+		target,
+		&format!("{sync_mode} sync should recover after notebook archive delay"),
+	)
+	.await;
+	if sync_mode == "warp" {
+		assert_block_history_gap_fill_completes(
+			&sync_node,
+			"warp sync should complete block history after notebook archive delay",
+		)
+		.await;
+	}
+}
+
+async fn assert_sync_mode_recovers_after_peer_stall(sync_mode: &str) {
+	let mut harness = SyncHarness::start().await;
+	harness.assert_warmup_history_window(40).await;
+
+	let target = finalized_snapshot(&harness.source).await;
+	let mut sync_node = harness
+		.start_sync_node_with("ferdie", Some(sync_mode), |args| {
+			args.bootnodes.clear();
+		})
+		.await;
+
+	tokio::time::sleep(Duration::from_secs(5)).await;
+	let stalled_finalized = sync_node.client.latest_finalized_block().await.unwrap();
+	assert!(
+		stalled_finalized < target.number,
+		"{sync_mode} sync unexpectedly reached finalized target without peers: finalized={stalled_finalized}, target={}",
+		target.number,
+	);
+
+	sync_node.start_args.bootnodes = harness.source.boot_url.clone();
+	sync_node.restart(Duration::from_secs(1)).await.unwrap();
+
+	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
+	assert_node_matches_snapshot(
+		&sync_node,
+		&harness.source,
+		target,
+		&format!("{sync_mode} sync should recover after peer stall"),
+	)
+	.await;
+	if sync_mode == "warp" {
+		assert_block_history_gap_fill_completes(
+			&sync_node,
+			"warp sync should complete block history after peer stall",
+		)
+		.await;
+	}
+}
+
+async fn assert_warp_sync_recovers_after_state_sync_restart() {
+	let mut harness = SyncHarness::start().await;
+	harness.assert_warmup_history_window(40).await;
+
+	let target = finalized_snapshot(&harness.source).await;
+	let mut sync_node = harness.start_sync_node("ferdie", Some("warp")).await;
+	sync_node
+		.log_watcher
+		.wait_for_log_for_secs("Warp sync is complete, continuing with state sync", 1, 30)
+		.await
+		.unwrap();
+	sync_node.restart(Duration::from_secs(1)).await.unwrap();
+
+	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
+	assert_node_matches_snapshot(
+		&sync_node,
+		&harness.source,
+		target,
+		"warp sync should recover after restart during state sync",
+	)
+	.await;
+	assert_block_history_gap_fill_completes(
+		&sync_node,
+		"warp sync should complete block history after state-sync restart",
+	)
+	.await;
+}
+
+async fn assert_block_history_gap_fill_completes(node: &ArgonTestNode, context: &str) {
+	node.log_watcher
+		.wait_for_log_for_secs("Block history download is complete", 1, 60)
+		.await
+		.unwrap_or_else(|err| panic!("{context}: {err:?}"));
 }
 
 impl SyncHarness {
@@ -220,7 +406,7 @@ impl SyncHarness {
 			.unwrap_or_else(ArgonTestNotary::create_archive_bucket);
 		let archive_host =
 			format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
-		source_args.notebook_archive_urls.push(archive_host);
+		source_args.notebook_archive_urls.push(archive_host.clone());
 		if let Some(cache) = &state_cache {
 			source_args.base_data_path = cache.run_node_path("alice");
 			source_args.cleanup_base_data_path = false;
@@ -281,7 +467,15 @@ impl SyncHarness {
 			activate_vote_mining(&source, &vote_miner_1, &vote_miner_2).await.unwrap();
 		}
 
-		Self { source, vote_miner_1, vote_miner_2, test_notary, state_cache, reused_state }
+		Self {
+			source,
+			vote_miner_1,
+			vote_miner_2,
+			test_notary,
+			state_cache,
+			archive_host,
+			reused_state,
+		}
 	}
 
 	async fn assert_mixed_history_window(&self, additional_finalized_blocks: u32, context: &str) {
@@ -316,12 +510,22 @@ impl SyncHarness {
 	}
 
 	async fn start_sync_node(&self, authority: &str, sync_mode: Option<&str>) -> ArgonTestNode {
+		self.start_sync_node_with(authority, sync_mode, |_| {}).await
+	}
+
+	async fn start_sync_node_with(
+		&self,
+		authority: &str,
+		sync_mode: Option<&str>,
+		configure: impl FnOnce(&mut ArgonNodeStartArgs),
+	) -> ArgonTestNode {
 		let mut sync_args = self.source.get_fork_args(authority, 0);
 		sync_args.is_validator = false;
 		sync_args.is_archive_node = false;
 		if let Some(sync_mode) = sync_mode {
 			sync_args.extra_flags.push(format!("--sync={sync_mode}"));
 		}
+		configure(&mut sync_args);
 		self.source.fork_node_with(sync_args).await.unwrap()
 	}
 

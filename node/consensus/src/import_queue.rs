@@ -3,6 +3,7 @@ use crate::{
 	aux_client::ArgonAux,
 	compute_worker::BlockComputeNonce,
 	error::Error,
+	grandpa_hard_forks::is_known_grandpa_authority_change_block,
 	notary_client::{NotaryApisExt, NotebookAuditMode},
 	pending_import_replay::{PendingImportReplayQueue, spawn_pending_import_replay_task},
 };
@@ -29,13 +30,13 @@ use sc_consensus::{
 };
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
-use sp_arithmetic::traits::Zero;
+use sp_arithmetic::traits::{UniqueSaturatedInto, Zero};
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
-	Justification,
+	Justification, Justifications,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
 use std::{collections::HashSet, fmt, marker::PhantomData, sync::Arc, time::Duration};
@@ -152,6 +153,7 @@ struct ImportContext<B: BlockT> {
 	info: sp_blockchain::Info<B>,
 	is_block_gap: bool,
 	parent_block_state: BlockStatus,
+	block_state: BlockStatus,
 	block_header_status: sp_blockchain::BlockStatus,
 	state_action: ImportStateAction,
 	skip_execution_checks: bool,
@@ -196,6 +198,7 @@ impl<B: BlockT> ImportContext<B> {
 		let is_block_gap =
 			info.block_gap.is_some_and(|gap| gap.start <= number && number <= gap.end);
 		let parent_block_state = client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown);
+		let block_state = client.block_status(hash).unwrap_or(BlockStatus::Unknown);
 		let block_header_status =
 			client.status(hash).unwrap_or(sp_blockchain::BlockStatus::Unknown);
 		let state_action = match block.state_action {
@@ -213,6 +216,7 @@ impl<B: BlockT> ImportContext<B> {
 			info,
 			is_block_gap,
 			parent_block_state,
+			block_state,
 			block_header_status,
 			state_action,
 			skip_execution_checks: block.state_action.skip_execution_checks(),
@@ -253,8 +257,12 @@ impl<B: BlockT> ImportContext<B> {
 		!self.skip_execution_checks
 	}
 
+	fn has_state_import(&self) -> bool {
+		matches!(self.state_action, ImportStateAction::StateApply | ImportStateAction::StateImport)
+	}
+
 	fn can_defer_full_import(&self) -> bool {
-		self.has_body && !self.finalized && !self.is_my_block()
+		self.has_body && !self.finalized && !self.is_initial_sync() && !self.is_my_block()
 	}
 
 	fn supports_deferred_full_import(&self) -> bool {
@@ -268,22 +276,17 @@ impl<B: BlockT> ImportContext<B> {
 		self.supports_deferred_full_import() && self.can_defer_full_import()
 	}
 
-	fn are_import_details_already_queued(
-		&self,
-		is_full_import_already_queued: bool,
-		has_justifications: bool,
-	) -> bool {
+	fn should_check_pending_full_import_queue(&self, has_justifications: bool) -> bool {
 		self.has_body &&
 			!self.finalized &&
 			!has_justifications &&
 			self.supports_deferred_full_import() &&
-			self.is_header_already_imported() &&
-			is_full_import_already_queued
+			self.is_header_already_imported()
 	}
 
 	fn can_execute_if_possible_now(&self) -> bool {
 		if self.state_action == ImportStateAction::ExecuteIfPossible {
-			self.is_parent_state_available()
+			self.is_initial_sync() || self.is_parent_state_available()
 		} else {
 			true
 		}
@@ -299,6 +302,19 @@ impl<B: BlockT> ImportContext<B> {
 
 	fn can_finalize_import(&self, is_finalized_descendent: bool) -> bool {
 		is_finalized_descendent || self.is_initial_sync() || self.finalized
+	}
+
+	fn should_import_existing(&self, has_justifications: bool) -> bool {
+		if !self.is_header_already_imported() {
+			return false;
+		}
+
+		if self.finalized || has_justifications {
+			return true;
+		}
+
+		self.has_state_import() ||
+			(self.block_state == BlockStatus::InChainPruned && self.has_state_or_block())
 	}
 }
 
@@ -412,11 +428,8 @@ where
 			.justifications
 			.as_ref()
 			.is_some_and(|justifications| justifications.iter().next().is_some());
-		let queued_before_import =
-			self.pending_full_import_queue.has_hash(import_context.hash).await;
-
-		if import_context
-			.are_import_details_already_queued(queued_before_import, has_justifications)
+		if import_context.should_check_pending_full_import_queue(has_justifications) &&
+			self.pending_full_import_queue.has_hash(import_context.hash).await
 		{
 			return Ok(PreImportOutcome::ReturnResult(ImportResult::AlreadyInChain));
 		}
@@ -503,40 +516,32 @@ where
 						"Pending full block import replay resolved as known-bad"
 					);
 				},
-				Ok(ImportResult::MissingState) => {
-					warn!(
-						block_hash = ?replay_context.hash,
-						number = ?replay_context.number,
-						"Pending full block replay still missing state; requeueing"
-					);
-					if let Some(block) = replay_retry_block.take() {
-						self.pending_full_import_queue.requeue_retry_block(block).await?;
-					}
-				},
-				Ok(ImportResult::AlreadyInChain) => {
+				Ok(result) => {
 					let state_status = self
 						.client
 						.block_status(replay_context.hash)
 						.unwrap_or(BlockStatus::Unknown);
-					if state_status != BlockStatus::InChainWithState {
+					if matches!(result, ImportResult::MissingState) ||
+						state_status != BlockStatus::InChainWithState
+					{
 						warn!(
-						block_hash = ?replay_context.hash,
-						number = ?replay_context.number,
-						?state_status,
-						"Pending full block replay returned AlreadyInChain without state; requeueing"
+							block_hash = ?replay_context.hash,
+							number = ?replay_context.number,
+							?result,
+							?state_status,
+							"Pending full block replay did not recover state; requeueing"
 						);
 						if let Some(block) = replay_retry_block.take() {
 							self.pending_full_import_queue.requeue_retry_block(block).await?;
 						}
 					}
 				},
-				Ok(_) => {},
 				Err(err) => {
 					warn!(
-					block_hash = ?replay_context.hash,
-					number = ?replay_context.number,
-					error = ?err,
-					"Pending full block replay failed; requeueing"
+						block_hash = ?replay_context.hash,
+						number = ?replay_context.number,
+						error = ?err,
+						"Pending full block replay failed; requeueing"
 					);
 					if let Some(block) = replay_retry_block.take() {
 						self.pending_full_import_queue.requeue_retry_block(block).await?;
@@ -656,6 +661,15 @@ where
 		let can_finalize = import_context.can_finalize_import(is_finalized_descendent);
 		let is_block_header_already_imported = import_context.is_header_already_imported();
 		let has_state_or_block = import_context.has_state_or_block();
+		let block_number_u32: u32 = block_number.unique_saturated_into();
+		let has_justifications = block
+			.justifications
+			.as_ref()
+			.is_some_and(|justifications| justifications.iter().next().is_some());
+
+		if import_context.should_import_existing(has_justifications) {
+			block.import_existing = true;
+		}
 
 		let best_header = self
 			.client
@@ -767,6 +781,24 @@ where
 				)
 				.into());
 			}
+		}
+
+		if import_context.is_initial_sync() &&
+			block_number <= info.finalized_number &&
+			!has_justifications &&
+			is_known_grandpa_authority_change_block(block_hash.as_ref(), block_number_u32)
+		{
+			// The upstream GRANDPA importer has a special old-block path that records configured
+			// authority-set hard forks, but it rejects that path when `justifications` is `None`.
+			// It only needs presence here; no proof is processed before delegating to the inner
+			// importer.
+			tracing::debug!(
+				number = ?block_number,
+				block_hash = ?block_hash,
+				finalized_number = ?info.finalized_number,
+				"Importing configured historical GRANDPA authority-change block through GRANDPA old-block path"
+			);
+			block.justifications = Some(Justifications::default());
 		}
 
 		let res = self.inner.import_block(block).await.map_err(Into::into)?;
@@ -969,21 +1001,22 @@ where
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 			let seal =
 				BlockSealInherentDataProvider { seal: None, digest: Some(seal_digest.clone()) };
-			let inherent_data_providers = (timestamp, seal);
+			let bitcoin = BitcoinInherentDataProvider {
+				bitcoin_utxo_sync: get_bitcoin_inherent(
+					&self.utxo_tracker,
+					&self.client,
+					&parent_hash,
+				)
+				.map_err(|err| {
+					Error::StringError(format!("Unable to get bitcoin inherent: {err:?}"))
+				})?,
+			};
+			let inherent_data_providers = (timestamp, seal, bitcoin);
 
-			let mut inherent_data = inherent_data_providers
+			let inherent_data = inherent_data_providers
 				.create_inherent_data()
 				.await
 				.map_err(Error::CreateInherents)?;
-
-			if let Ok(Some(bitcoin_utxo_sync)) =
-				get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash)
-			{
-				BitcoinInherentDataProvider { bitcoin_utxo_sync }
-					.provide_inherent_data(&mut inherent_data)
-					.await
-					.map_err(Error::CreateInherents)?;
-			}
 
 			// inherent data passed in is what we would have generated...
 			let inherent_res = runtime_api

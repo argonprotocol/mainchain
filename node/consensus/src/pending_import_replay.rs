@@ -646,6 +646,19 @@ mod tests {
 		let _ = importer.import_block(parent).await.unwrap();
 		assert!(!has_state(&client, parent_hash));
 
+		let ready_parent = create_params(
+			2,
+			genesis_hash,
+			2,
+			None,
+			BlockOrigin::NetworkInitialSync,
+			StateAction::Skip,
+			Some(AccountId::from([9u8; 32])),
+		);
+		let ready_parent_hash = ready_parent.post_hash();
+		let _ = importer.import_block(ready_parent).await.unwrap();
+		assert!(!has_state(&client, ready_parent_hash));
+
 		client.set_runtime_notebooks(
 			parent_hash,
 			vec![NotebookAuditResult {
@@ -671,11 +684,11 @@ mod tests {
 		assert!(matches!(blocked_result, ImportResult::Imported(_)));
 
 		let mut ready = create_params(
-			2,
-			parent_hash,
+			3,
+			ready_parent_hash,
 			1,
 			None,
-			BlockOrigin::NetworkInitialSync,
+			BlockOrigin::NetworkBroadcast,
 			StateAction::ExecuteIfPossible,
 			Some(AccountId::from([2u8; 32])),
 		);
@@ -686,6 +699,7 @@ mod tests {
 
 		assert_eq!(pending_import_count(&importer).await, 2);
 		client.set_state(parent_hash, sp_consensus::BlockStatus::InChainWithState);
+		client.set_state(ready_parent_hash, sp_consensus::BlockStatus::InChainWithState);
 
 		importer.replay_pending_full_imports().await.unwrap();
 
