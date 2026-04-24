@@ -1,4 +1,7 @@
-use crate::{NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error};
+use crate::{
+	NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error,
+	grandpa_hard_forks::is_known_grandpa_authority_change_block,
+};
 use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
 use argon_primitives::{
 	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
@@ -22,13 +25,13 @@ use sc_consensus::{
 };
 use sc_telemetry::TelemetryHandle;
 use sp_api::ProvideRuntimeApi;
-use sp_arithmetic::traits::Zero;
+use sp_arithmetic::traits::{UniqueSaturatedInto, Zero};
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
-	Justification,
+	Justification, Justifications,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
 };
 use std::{fmt, marker::PhantomData, sync::Arc};
@@ -125,6 +128,7 @@ struct ImportContext<B: BlockT> {
 	skip_execution_checks: bool,
 	origin: BlockOrigin,
 	finalized: bool,
+	has_justifications: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -185,6 +189,7 @@ impl<B: BlockT> ImportContext<B> {
 			skip_execution_checks: block.state_action.skip_execution_checks(),
 			origin: block.origin,
 			finalized: block.finalized,
+			has_justifications: block.justifications.is_some(),
 		}
 	}
 
@@ -205,7 +210,14 @@ impl<B: BlockT> ImportContext<B> {
 	}
 
 	fn has_state_or_block(&self) -> bool {
-		!self.skip_execution_checks
+		if self.skip_execution_checks {
+			return false;
+		}
+		if self.state_action == ImportStateAction::ExecuteIfPossible {
+			return self.is_parent_state_available();
+		}
+
+		true
 	}
 
 	fn should_return_missing_state_for_execution(&self) -> bool {
@@ -218,6 +230,7 @@ impl<B: BlockT> ImportContext<B> {
 	fn should_short_circuit_known_header(&self) -> bool {
 		self.is_header_already_imported() &&
 			!self.has_state_or_block() &&
+			!self.has_justifications &&
 			!self.finalized &&
 			!self.is_block_gap
 	}
@@ -396,7 +409,7 @@ where
 		let can_finalize = import_context.can_finalize_import(is_finalized_descendent);
 		let is_block_header_already_imported = import_context.is_header_already_imported();
 		let has_state_or_block = import_context.has_state_or_block();
-
+		let block_number_u32: u32 = block_number.unique_saturated_into();
 		let best_header = self
 			.client
 			.header(info.best_hash)
@@ -507,6 +520,20 @@ where
 				)
 				.into());
 			}
+		}
+
+		if import_context.is_initial_sync() &&
+			block_number <= info.finalized_number &&
+			!import_context.has_justifications &&
+			is_known_grandpa_authority_change_block(block_hash.as_ref(), block_number_u32)
+		{
+			tracing::debug!(
+				number = ?block_number,
+				block_hash = ?block_hash,
+				finalized_number = ?info.finalized_number,
+				"Importing configured historical GRANDPA authority-change block through GRANDPA old-block path"
+			);
+			block.justifications = Some(Justifications::default());
 		}
 
 		let res = self.inner.import_block(block).await.map_err(Into::into)?;
@@ -737,21 +764,22 @@ where
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 			let seal =
 				BlockSealInherentDataProvider { seal: None, digest: Some(seal_digest.clone()) };
-			let inherent_data_providers = (timestamp, seal);
+			let bitcoin = BitcoinInherentDataProvider {
+				bitcoin_utxo_sync: get_bitcoin_inherent(
+					&self.utxo_tracker,
+					&self.client,
+					&parent_hash,
+				)
+				.map_err(|err| {
+					Error::StringError(format!("Unable to get bitcoin inherent: {err:?}"))
+				})?,
+			};
+			let inherent_data_providers = (timestamp, seal, bitcoin);
 
-			let mut inherent_data = inherent_data_providers
+			let inherent_data = inherent_data_providers
 				.create_inherent_data()
 				.await
 				.map_err(Error::CreateInherents)?;
-
-			if let Ok(Some(bitcoin_utxo_sync)) =
-				get_bitcoin_inherent(&self.utxo_tracker, &self.client, &parent_hash)
-			{
-				BitcoinInherentDataProvider { bitcoin_utxo_sync: Some(bitcoin_utxo_sync) }
-					.provide_inherent_data(&mut inherent_data)
-					.await
-					.map_err(Error::CreateInherents)?;
-			}
 
 			// inherent data passed in is what we would have generated...
 			let inherent_res = runtime_api

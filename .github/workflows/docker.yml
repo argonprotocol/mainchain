@@ -71,7 +71,7 @@ jobs:
       - name: Install sqlx-cli
         uses: taiki-e/install-action@v2
         with:
-          tool: sqlx-cli@0.8.5
+          tool: sqlx-cli@0.8.3
 
       - name: Migrate Notary Db
         working-directory: notary

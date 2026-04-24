@@ -5,7 +5,7 @@ use argon_client::{FetchAt, api::storage, conversion::SubxtRuntime};
 use argon_notary_audit::VerifyError;
 use argon_primitives::{ArgonDigests, BlockSealDigest};
 use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
-use polkadot_sdk::sp_core::{DeriveJunction, Pair};
+use polkadot_sdk::sp_core::{DeriveJunction, H256, Pair};
 use serial_test::serial;
 use std::{
 	env,
@@ -24,42 +24,36 @@ async fn test_fast_sync_catches_up_to_mixed_history() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow warp sync scenario"]
 async fn test_warp_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("warp").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow sync recovery scenario"]
 async fn test_fast_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow sync recovery scenario"]
 async fn test_warp_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("warp").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow sync recovery scenario"]
 async fn test_fast_sync_recovers_after_peer_stall() {
 	assert_sync_mode_recovers_after_peer_stall("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow sync recovery scenario"]
 async fn test_warp_sync_recovers_after_peer_stall() {
 	assert_sync_mode_recovers_after_peer_stall("warp").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "slow warp sync recovery scenario"]
 async fn test_warp_sync_recovers_after_state_sync_restart() {
 	assert_warp_sync_recovers_after_state_sync_restart().await;
 }
@@ -121,6 +115,7 @@ async fn test_long_running_network_recovers_after_notary_outage() {
 #[derive(Clone, Copy)]
 struct FinalizedSnapshot {
 	number: u32,
+	hash: H256,
 }
 
 struct SyncSoakSettings {
@@ -149,7 +144,11 @@ struct FinalizedHistoryWindow {
 async fn finalized_snapshot(node: &ArgonTestNode) -> FinalizedSnapshot {
 	let finalized_hash = node.client.latest_finalized_block_hash().await.unwrap();
 	let finalized_number = node.client.block_number(finalized_hash.hash()).await.unwrap();
-	FinalizedSnapshot { number: finalized_number }
+	FinalizedSnapshot { number: finalized_number, hash: finalized_hash.hash() }
+}
+
+async fn header_hash_at_height(node: &ArgonTestNode, height: u32) -> Option<H256> {
+	node.client.methods.chain_get_block_hash(Some(height.into())).await.unwrap()
 }
 
 async fn observe_finalized_history_window(
@@ -217,44 +216,72 @@ async fn assert_node_matches_snapshot(
 		snapshot.number,
 		latest_finalized_number,
 	);
+
+	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
+	assert_eq!(source_finalized_hash, Some(latest_finalized.hash()), "{context}",);
+
+	let synced_target_hash = header_hash_at_height(node, snapshot.number).await;
 	assert_eq!(
-		source.client.block_at_height(latest_finalized_number).await.unwrap(),
-		Some(latest_finalized.hash()),
-		"{context}",
+		synced_target_hash,
+		Some(snapshot.hash),
+		"{context}: synced node should retain the target finalized block hash",
 	);
 
 	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-	let mut last_state_error = None;
 	loop {
 		let best_hash = node.client.best_block_hash().await.unwrap();
 		let best_number = node.client.block_number(best_hash).await.unwrap();
-		let source_best_at_height = source.client.block_at_height(best_number).await.unwrap();
+		let source_best_at_height = header_hash_at_height(source, best_number).await;
 
 		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
-			match node
-				.client
-				.fetch_storage(&storage().system().number(), FetchAt::Block(best_hash))
-				.await
-			{
-				Ok(Some(state_number)) => {
-					assert_eq!(
-						state_number, best_number,
-						"{context}: best state should match best block"
-					);
-					break;
-				},
-				Ok(None) => last_state_error = Some("storage returned None".to_string()),
-				Err(err) => last_state_error = Some(err.to_string()),
-			}
+			assert_state_available_at(node, best_hash, best_number, context).await;
+			break;
 		}
 
 		assert!(
 			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover state for its best block. best={best_number}, source_at_height={source_best_at_height:?}, last_state_error={last_state_error:?}",
+			"{context}: synced node did not recover a source-matching best block. best={best_number}, source_at_height={source_best_at_height:?}",
 		);
 
 		println!(
-			"Waiting for synced node to recover state at best block {best_number}. Last state error: {last_state_error:?}"
+			"Waiting for synced node to recover a source-matching best block. best={best_number}"
+		);
+		tokio::time::sleep(Duration::from_millis(250)).await;
+	}
+}
+
+async fn assert_state_available_at(
+	node: &ArgonTestNode,
+	block_hash: H256,
+	expected_number: u32,
+	context: &str,
+) {
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+	loop {
+		let last_state_error = match node
+			.client
+			.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
+			.await
+		{
+			Ok(Some(state_number)) => {
+				assert_eq!(
+					state_number, expected_number,
+					"{context}: state should match block number at {block_hash:?}"
+				);
+				return;
+			},
+			Ok(None) => "storage returned None".to_string(),
+			Err(err) => err.to_string(),
+		};
+
+		assert!(
+			tokio::time::Instant::now() < deadline,
+			"{context}: synced node did not recover state for block {expected_number} ({block_hash:?}). last_state_error={last_state_error}",
+		);
+
+		println!(
+			"Waiting for synced node to recover state for block {expected_number} ({block_hash:?}). Last state error: {last_state_error}"
 		);
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
@@ -277,6 +304,8 @@ async fn assert_basic_sync_mode_catches_up(sync_mode: &str) {
 	if sync_mode == "warp" {
 		assert_block_history_gap_fill_completes(
 			&sync_node,
+			&harness.source,
+			target,
 			"warp sync should complete historical block gap fill after state sync",
 		)
 		.await;
@@ -312,6 +341,8 @@ async fn assert_sync_mode_recovers_after_notebook_archive_delay(sync_mode: &str)
 	if sync_mode == "warp" {
 		assert_block_history_gap_fill_completes(
 			&sync_node,
+			&harness.source,
+			target,
 			"warp sync should complete block history after notebook archive delay",
 		)
 		.await;
@@ -351,6 +382,8 @@ async fn assert_sync_mode_recovers_after_peer_stall(sync_mode: &str) {
 	if sync_mode == "warp" {
 		assert_block_history_gap_fill_completes(
 			&sync_node,
+			&harness.source,
+			target,
 			"warp sync should complete block history after peer stall",
 		)
 		.await;
@@ -380,16 +413,38 @@ async fn assert_warp_sync_recovers_after_state_sync_restart() {
 	.await;
 	assert_block_history_gap_fill_completes(
 		&sync_node,
+		&harness.source,
+		target,
 		"warp sync should complete block history after state-sync restart",
 	)
 	.await;
 }
 
-async fn assert_block_history_gap_fill_completes(node: &ArgonTestNode, context: &str) {
+async fn assert_block_history_gap_fill_completes(
+	node: &ArgonTestNode,
+	source: &ArgonTestNode,
+	snapshot: FinalizedSnapshot,
+	context: &str,
+) {
 	node.log_watcher
 		.wait_for_log_for_secs("Block history download is complete", 1, 60)
 		.await
 		.unwrap_or_else(|err| panic!("{context}: {err:?}"));
+
+	let mut checked_heights = Vec::new();
+	for height in [1, snapshot.number / 2, snapshot.number.saturating_sub(1)] {
+		if height == 0 || checked_heights.contains(&height) {
+			continue;
+		}
+		checked_heights.push(height);
+
+		let source_hash = header_hash_at_height(source, height).await;
+		let node_hash = header_hash_at_height(node, height).await;
+		assert_eq!(
+			node_hash, source_hash,
+			"{context}: historical block mismatch at height {height}"
+		);
+	}
 }
 
 impl SyncHarness {

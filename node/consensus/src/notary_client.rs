@@ -57,6 +57,7 @@ use tokio::{
 use tracing::error;
 
 const MAX_QUEUE_DEPTH: usize = 1440 * 2; // a notary can be down 2 days before we start dropping history
+const MAX_NOTEBOOK_SUBSCRIPTION_TICK_LAG: Tick = 2;
 
 pub trait NotaryApisExt<B: BlockT, AC> {
 	fn has_block_state(&self, block_hash: B::Hash) -> bool;
@@ -87,7 +88,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 	) -> Result<Result<NotaryNotebookDetails<B::Hash>, DispatchError>, Error>;
 	fn best_hash(&self) -> B::Hash;
 	fn finalized_hash(&self) -> B::Hash;
-	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error>;
+	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Error>;
 }
 
 impl<B, C, AC> NotaryApisExt<B, AC> for C
@@ -160,11 +161,15 @@ where
 	fn finalized_hash(&self) -> B::Hash {
 		self.info().finalized_hash
 	}
-	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error> {
+	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Error> {
+		if *hash == self.info().genesis_hash {
+			return Ok(None);
+		}
+
 		let header = self.header(*hash)?.ok_or_else(|| {
 			Error::BlockNotFound(format!("Unable to find parent block: {hash:?}"))
 		})?;
-		Ok(*header.parent_hash())
+		Ok(Some(*header.parent_hash()))
 	}
 }
 
@@ -315,6 +320,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	tick_voting_power_sender: Arc<Mutex<TracingUnboundedSender<VotingPowerInfo>>>,
 	pub tick_voting_power_receiver: Arc<Mutex<TracingUnboundedReceiver<VotingPowerInfo>>>,
 	notebook_queue_by_id: Arc<RwLock<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
+	last_notebook_tick_by_id: Arc<RwLock<BTreeMap<NotaryId, Tick>>>,
 	aux_client: ArgonAux<B, C>,
 	notebook_downloader: NotebookDownloader,
 	pub(crate) metrics: Arc<Option<ConsensusMetrics<C>>>,
@@ -338,11 +344,7 @@ where
 	}
 
 	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Self::Error> {
-		match self.client.parent_hash(hash) {
-			Ok(parent_hash) => Ok(Some(parent_hash)),
-			Err(Error::BlockNotFound(_)) => Ok(None),
-			Err(error) => Err(error),
-		}
+		self.client.parent_hash(hash)
 	}
 }
 
@@ -370,6 +372,7 @@ where
 			notary_archive_host_by_id: Default::default(),
 			notaries_by_id: Default::default(),
 			notebook_queue_by_id: Default::default(),
+			last_notebook_tick_by_id: Default::default(),
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
 			pause_queue_processing: Default::default(),
@@ -385,6 +388,7 @@ where
 
 	pub async fn update_notaries(&self, block_hash: &B::Hash) -> Result<(), Error> {
 		let notaries = self.client.notaries(*block_hash)?;
+		let current_tick = self.client.current_tick(*block_hash)?;
 		let mut reconnect_ids = BTreeSet::new();
 
 		{
@@ -440,6 +444,8 @@ where
 			if self.queue_depth(notary_id).await > MAX_QUEUE_DEPTH {
 				continue;
 			}
+
+			self.disconnect_if_subscription_stale(notary_id, current_tick).await;
 
 			let is_connected =
 				self.has_client(notary_id).await && self.has_subscription(notary_id).await;
@@ -511,6 +517,10 @@ where
 			match next {
 				Poll::Ready(Some(Ok(download_info))) => {
 					let notebook_number = download_info.notebook_number;
+					self.last_notebook_tick_by_id
+						.write()
+						.await
+						.insert(notary_id, download_info.tick);
 					if let Some(metrics) = self.metrics.as_ref() {
 						metrics.notebook_notification_received(
 							notary_id,
@@ -810,6 +820,10 @@ where
 		})?;
 		self.notary_archive_host_by_id.write().await.insert(id, archive_host.clone());
 		if notebook_meta.last_closed_notebook_number > 0 {
+			self.last_notebook_tick_by_id
+				.write()
+				.await
+				.insert(id, notebook_meta.last_closed_notebook_tick);
 			self.enqueue_notebook(id, notebook_meta.last_closed_notebook_number, None, None)
 				.await?;
 		}
@@ -822,6 +836,30 @@ where
 		);
 		self.notary_client_by_id.write().await.remove(notary_id);
 		self.subscriptions_by_id.write().await.remove(notary_id);
+		self.last_notebook_tick_by_id.write().await.remove(notary_id);
+	}
+
+	async fn disconnect_if_subscription_stale(&self, notary_id: NotaryId, current_tick: Tick) {
+		if !self.has_subscription(notary_id).await {
+			return;
+		}
+
+		let Some(last_notebook_tick) =
+			self.last_notebook_tick_by_id.read().await.get(&notary_id).copied()
+		else {
+			return;
+		};
+
+		let tick_lag = current_tick.saturating_sub(last_notebook_tick);
+		if tick_lag <= MAX_NOTEBOOK_SUBSCRIPTION_TICK_LAG {
+			return;
+		}
+
+		warn!(
+			"Disconnecting stale notary subscription. notary_id={notary_id} last_notebook_tick={last_notebook_tick} current_tick={current_tick} tick_lag={tick_lag}",
+		);
+		self.disconnect(&notary_id, Some("stale notebook subscription".to_string()))
+			.await;
 	}
 
 	async fn subscribe_to_notebooks(&self, id: NotaryId) -> Result<(), Error> {
@@ -873,14 +911,15 @@ where
 					trying_block_hash = ?best_hash,
 					"Checking if we can audit at parent block",
 				);
-				let parent_hash = self.client.parent_hash(&best_hash)?;
-				if parent_hash == best_hash {
+				let Some(parent_hash) = self.client.parent_hash(&best_hash)? else {
+					return Err(Error::StateUnavailableError);
+				};
+
+				if !self.client.has_block_state(parent_hash) {
 					return Err(Error::StateUnavailableError);
 				}
+
 				best_hash = parent_hash;
-				if !self.client.has_block_state(best_hash) {
-					return Err(Error::StateUnavailableError);
-				}
 				latest_notebook_in_runtime = self.latest_notebook_in_runtime(best_hash, notary_id);
 			}
 			tracing::info!(
@@ -996,10 +1035,9 @@ where
 				self.update_notaries(parent_hash).await?;
 			}
 
-			// drain queues
-			// NOTE: only do this for 10 seconds
+			// Drain queues while missing audits catch up. Keep the old generous lower bound so
+			// import verification has time to download and audit notebooks after reconnects.
 			let start = Instant::now();
-			// wait a max of 5 seconds per notebook.
 			let wait_time = (missing_audits_by_notary.len() * 5).max(120);
 
 			// if we're importing a specific block, then network syncing should be off
@@ -1059,7 +1097,7 @@ where
 				self.enqueue_notebook(notary_id, *missing, None, None).await?;
 			}
 			let notebook_range =
-				missing_notebooks[0]..missing_notebooks[missing_notebooks.len() - 1];
+				missing_notebooks[0]..=missing_notebooks[missing_notebooks.len() - 1];
 			info!("Missing notebooks for notary {notary_id}. Enqueued: {notebook_range:?}");
 			return Err(Error::MissingNotebooksError(format!(
 				"Missing notebooks #{notebook_range:?} to audit {notebook_number} for notary {notary_id}"
@@ -1620,14 +1658,15 @@ mod test {
 		fn parent_hash(
 			&self,
 			hash: &<Block as BlockT>::Hash,
-		) -> Result<<Block as BlockT>::Hash, Error> {
+		) -> Result<Option<<Block as BlockT>::Hash>, Error> {
 			let block_chain = self.block_chain.lock();
 			if let Some(pos) = block_chain.iter().position(|h| h == hash) {
 				if pos > 0 {
-					return Ok(block_chain[pos - 1]);
+					return Ok(Some(block_chain[pos - 1]));
 				}
+				return Ok(None);
 			}
-			Ok(H256::from_slice(&[3; 32]))
+			Ok(Some(H256::from_slice(&[3; 32])))
 		}
 	}
 
@@ -1828,6 +1867,49 @@ mod test {
 			)
 			.await
 			.expect("Could not retrieve missing notebooks");
+	}
+
+	#[tokio::test]
+	async fn disconnects_stale_subscription_after_missing_ticks() {
+		setup_logs();
+		let (mut test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		let next = notary_client.next_subscription(Duration::from_millis(500)).await.unwrap();
+		assert_eq!(next, (1, 1));
+		assert_eq!(notary_client.last_notebook_tick_by_id.read().await.get(&1).copied(), Some(1));
+
+		*client.current_tick.lock() = 3;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 1);
+		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 1);
+		assert_eq!(notary_client.last_notebook_tick_by_id.read().await.get(&1).copied(), Some(1));
+
+		test_notary.stop().await;
+		*client.current_tick.lock() = 4;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 0);
+		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 0);
+		assert!(notary_client.last_notebook_tick_by_id.read().await.get(&1).is_none());
+
+		test_notary.start().await.expect("could not restart notary");
+		client.notaries.lock()[0].meta.hosts = bounded_vec![test_notary.addr.clone().into()];
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+		assert_eq!(notary_client.notary_client_by_id.read().await.len(), 1);
+		assert_eq!(notary_client.subscriptions_by_id.read().await.len(), 1);
 	}
 
 	#[tokio::test]
