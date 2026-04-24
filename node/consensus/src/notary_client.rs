@@ -94,7 +94,7 @@ pub trait NotaryApisExt<B: BlockT, AC> {
 	) -> Result<Result<NotaryNotebookDetails<B::Hash>, DispatchError>, Error>;
 	fn best_hash(&self) -> B::Hash;
 	fn finalized_hash(&self) -> B::Hash;
-	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error>;
+	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Error>;
 }
 
 impl<B, C, AC> NotaryApisExt<B, AC> for C
@@ -167,11 +167,15 @@ where
 	fn finalized_hash(&self) -> B::Hash {
 		self.info().finalized_hash
 	}
-	fn parent_hash(&self, hash: &B::Hash) -> Result<B::Hash, Error> {
+	fn parent_hash(&self, hash: &B::Hash) -> Result<Option<B::Hash>, Error> {
+		if *hash == self.info().genesis_hash {
+			return Ok(None);
+		}
+
 		let header = self.header(*hash)?.ok_or_else(|| {
 			Error::BlockNotFound(format!("Unable to find parent block: {hash:?}"))
 		})?;
-		Ok(*header.parent_hash())
+		Ok(Some(*header.parent_hash()))
 	}
 }
 
@@ -1128,12 +1132,11 @@ impl NotaryWorker {
 					trying_block_hash = ?best_hash,
 					"Checking if we can audit at parent block",
 				);
-				let parent_hash = worker_context.client.parent_hash(&best_hash)?;
-				if parent_hash == best_hash {
+				let Some(parent_hash) = worker_context.client.parent_hash(&best_hash)? else {
 					return Err(Error::NotaryAuditDeferred(format!(
 						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={best_hash:?}"
 					)));
-				}
+				};
 				if !worker_context.client.has_block_state(parent_hash) {
 					return Err(Error::NotaryAuditDeferred(format!(
 						"Missing state while locating audit parent. Notary={notary_id}, notebook={notebook_number}, block={parent_hash:?}"
@@ -1899,10 +1902,9 @@ where
 			return Ok(Some(cursor));
 		}
 
-		let parent_hash = client.parent_hash(&cursor)?;
-		if parent_hash == cursor {
+		let Some(parent_hash) = client.parent_hash(&cursor)? else {
 			return Ok(None);
-		}
+		};
 		cursor = parent_hash;
 	}
 
@@ -2296,14 +2298,15 @@ mod test {
 		fn parent_hash(
 			&self,
 			hash: &<Block as BlockT>::Hash,
-		) -> Result<<Block as BlockT>::Hash, Error> {
+		) -> Result<Option<<Block as BlockT>::Hash>, Error> {
 			let block_chain = self.block_chain.lock();
 			if let Some(pos) = block_chain.iter().position(|h| h == hash) {
 				if pos > 0 {
-					return Ok(block_chain[pos - 1]);
+					return Ok(Some(block_chain[pos - 1]));
 				}
+				return Ok(None);
 			}
-			Ok(H256::from_slice(&[3; 32]))
+			Ok(Some(H256::from_slice(&[3; 32])))
 		}
 	}
 

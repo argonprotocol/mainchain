@@ -32,7 +32,7 @@ use sp_blockchain::{BlockStatus, Error as BlockchainError, HeaderBackend};
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_runtime::{
 	Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
-	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	traits::{Block as BlockT, Header as HeaderT, NumberFor, Zero},
 };
 use std::{
 	collections::{BTreeMap, HashMap},
@@ -104,6 +104,10 @@ impl MemChain {
 		*self.best.lock().unwrap() = (best_number, best_hash);
 	}
 
+	pub(crate) fn force_finalized(&self, finalized_number: BlockNumber, finalized_hash: BlockHash) {
+		*self.finalized.lock().unwrap() = (finalized_number, finalized_hash);
+	}
+
 	pub(crate) fn set_block_gap(&self, block_gap: Option<sp_blockchain::BlockGap<BlockNumber>>) {
 		*self.block_gap.lock().unwrap() = block_gap;
 	}
@@ -119,10 +123,30 @@ impl HeaderBackend<Block> for MemChain {
 	fn info(&self) -> sp_blockchain::Info<Block> {
 		let best = *self.best.lock().unwrap();
 		let fin = *self.finalized.lock().unwrap();
+		let finalized_state = {
+			let headers = self.headers.lock().unwrap();
+			let block_state = self.block_state.lock().unwrap();
+			let mut cursor = Some(fin.1);
+			let mut state = None;
+			while let Some(hash) = cursor {
+				if matches!(
+					block_state.get(&hash),
+					Some(sp_consensus::BlockStatus::InChainWithState)
+				) {
+					let number = headers.get(&hash).map(|header| *header.number()).unwrap_or(fin.0);
+					state = Some((hash, number));
+					break;
+				}
+				cursor = headers.get(&hash).and_then(|header| {
+					if header.number().is_zero() { None } else { Some(*header.parent_hash()) }
+				});
+			}
+			state
+		};
 		sp_blockchain::Info {
 			finalized_hash: fin.1,
 			finalized_number: fin.0,
-			finalized_state: None,
+			finalized_state,
 			best_hash: best.1,
 			best_number: best.0,
 			block_gap: *self.block_gap.lock().unwrap(),
@@ -246,11 +270,15 @@ impl NotaryApisExt<Block, H256> for MemChain {
 		self.info().finalized_hash
 	}
 
-	fn parent_hash(&self, hash: &BlockHash) -> Result<BlockHash, Error> {
-		let header = self
-			.header(*hash)?
-			.ok_or_else(|| Error::StringError("Parent not found".into()))?;
-		Ok(*header.parent_hash())
+	fn parent_hash(&self, hash: &BlockHash) -> Result<Option<BlockHash>, Error> {
+		if *hash == self.info().genesis_hash {
+			return Ok(None);
+		}
+
+		let header = self.header(*hash)?.ok_or_else(|| {
+			Error::BlockNotFound(format!("Unable to find parent block: {hash:?}"))
+		})?;
+		Ok(Some(*header.parent_hash()))
 	}
 }
 
