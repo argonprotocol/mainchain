@@ -14,11 +14,7 @@ use argon_node_consensus::{
 	create_import_queue, grandpa_hard_forks, read_chain_spec_grandpa_authorities,
 	read_chain_spec_ticker, run_block_builder_task, run_notary_sync,
 };
-use argon_primitives::{
-	AccountId, TickApis,
-	digests::ArgonDigests,
-	tick::{Tick, Ticker},
-};
+use argon_primitives::{AccountId, TickApis, digests::ArgonDigests, tick::Tick};
 use polkadot_sdk::*;
 use sc_client_api::{BlockBackend, HeaderBackend};
 use sc_consensus::BasicQueue;
@@ -28,7 +24,7 @@ use sc_consensus_grandpa::{
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
-	ChainType, TaskManager, WarpSyncConfig, config::Configuration, error::Error as ServiceError,
+	TaskManager, WarpSyncConfig, config::Configuration, error::Error as ServiceError,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
@@ -64,7 +60,6 @@ pub type Service<Runtime> = sc_service::PartialComponents<
 		ArgonBlockImport<Runtime>,
 		Arc<NotaryClient<Block, FullClient<Runtime>, AccountId>>,
 		ArgonAux<Block, FullClient<Runtime>>,
-		Ticker,
 		Arc<UtxoTracker>,
 		sc_consensus_grandpa::LinkHalf<Block, FullClient<Runtime>, FullSelectChain>,
 		Option<Telemetry>,
@@ -204,7 +199,6 @@ where
 			argon_block_import,
 			notary_client,
 			aux_client,
-			ticker,
 			utxo_tracker,
 			grandpa_link,
 			telemetry,
@@ -214,7 +208,7 @@ where
 
 /// Builds a new service for a full client.
 pub fn new_full<Runtime, N>(
-	mut config: Configuration,
+	config: Configuration,
 	mining_config: MiningConfig,
 ) -> sc_service::error::Result<TaskManager>
 where
@@ -222,13 +216,6 @@ where
 	Runtime::RuntimeApi: BaseHostRuntimeApis,
 	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 {
-	if config.network.sync_mode.is_warp() &&
-		matches!(config.chain_spec.chain_type(), ChainType::Development | ChainType::Local) &&
-		config.network.min_peers_to_start_warp_sync.is_none()
-	{
-		config.network.min_peers_to_start_warp_sync = Some(1);
-	}
-
 	let params = new_partial::<Runtime>(&config, &mining_config)?;
 	let Service {
 		select_chain,
@@ -240,15 +227,8 @@ where
 		keystore_container,
 		other,
 	} = params;
-	let (
-		argon_block_import,
-		notary_client,
-		aux_client,
-		ticker,
-		utxo_tracker,
-		grandpa_link,
-		mut telemetry,
-	) = other;
+	let (argon_block_import, notary_client, aux_client, utxo_tracker, grandpa_link, mut telemetry) =
+		other;
 
 	let metrics = N::register_notification_metrics(config.prometheus_registry());
 	let mut net_config = sc_network::config::FullNetworkConfiguration::<
@@ -380,7 +360,6 @@ where
 				select_chain: select_chain.clone(),
 				proposer: proposer_factory,
 				authoring_duration: Duration::from_secs(10),
-				ticker,
 				utxo_tracker,
 				aux_client: aux_client.clone(),
 				justification_sync_link: sync_service.clone(),
