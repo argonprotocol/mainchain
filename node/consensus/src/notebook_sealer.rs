@@ -5,6 +5,7 @@ use argon_primitives::{
 	BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
 	BlockVote, TickApis, VotingSchedule,
 	block_seal::{BLOCK_SEAL_CRYPTO_ID, BLOCK_SEAL_KEY_TYPE},
+	digests::ArgonDigests,
 	fork_power::ForkPower,
 	notary::NotaryNotebookRawVotes,
 	tick::{Tick, Ticker},
@@ -20,7 +21,7 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{Error as ConsensusError, SelectChain};
 use sp_core::{ByteArray, U256};
 use sp_keystore::{Keystore, KeystorePtr};
-use sp_runtime::traits::{Block as BlockT, Header};
+use sp_runtime::traits::{Block as BlockT, Header, Zero};
 use std::{marker::PhantomData, sync::Arc};
 use tokio::time::Instant;
 
@@ -135,8 +136,21 @@ where
 			return Ok(result);
 		}
 
-		let finalized_hash = self.client.info().finalized_hash;
-		let finalized_tick = self.client.runtime_api().current_tick(finalized_hash)?;
+		let info = self.client.info();
+		let finalized_hash = info.finalized_hash;
+		let finalized_header = self.client.header(finalized_hash)?.ok_or_else(|| {
+			Error::MissingRuntimeData(format!("Could not find finalized header {finalized_hash:?}"))
+		})?;
+		// Finalized state may be pruned; the header digest still carries the tick we need here.
+		let finalized_tick = if finalized_header.number().is_zero() {
+			0
+		} else {
+			finalized_header
+				.digest()
+				.convert_first(|a| a.as_tick())
+				.map(|tick| tick.0)
+				.ok_or_else(|| Error::UnableToDecodeDigest("finalized tick".to_string()))?
+		};
 		if voting_schedule.block_tick() <= finalized_tick {
 			tracing::trace!(
 				notebook_tick,

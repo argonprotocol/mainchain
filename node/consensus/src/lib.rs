@@ -48,7 +48,6 @@ pub mod import_queue;
 pub(crate) mod metrics;
 pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
-pub(crate) mod pending_import_replay;
 pub mod state_anchor;
 
 pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
@@ -84,6 +83,11 @@ pub struct BlockBuilderParams<
 	pub proposer: Proposer,
 	/// The amount of time to spend authoring each block.
 	pub authoring_duration: Duration,
+	/// Chain ticker decoded from the chain spec.
+	///
+	/// Do not read this from the runtime at best hash during startup. Sync can mark a header
+	/// as best before the target state has finished syncing.
+	pub ticker: Ticker,
 	/// The aux client used to interact with the local auxillary storage
 	pub aux_client: ArgonAux<Block, Client>,
 	/// The Bitcoin UTXO tracker
@@ -141,6 +145,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		proposer,
 		notary_client,
 		authoring_duration,
+		ticker,
 		keystore,
 		backend,
 		aux_client,
@@ -163,11 +168,6 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 		utxo_tracker,
 		metrics: consensus_metrics.clone(),
 		_phantom: Default::default(),
-	};
-
-	let ticker = {
-		let best_hash = client.info().best_hash;
-		client.runtime_api().ticker(best_hash).expect("Ticker not available")
 	};
 
 	let compute_handle = ComputeHandle::new(compute_block_tx);
@@ -249,7 +249,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 	let consensus_metrics_finder = consensus_metrics.clone();
 
 	let block_finder_task = async move {
-		*notary_client.pause_notebook_audits.write().await = true;
+		*notary_client.pause_queue_processing.write().await = true;
 		let mut import_stream = client.every_import_notification_stream();
 		let mut finalized_stream = client.finality_notification_stream();
 		let idle_delay = if ticker.tick_duration_millis <= 10_000 { 100 } else { 1000 };
@@ -334,18 +334,20 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 
 			// don't try to check for blocks during a sync
 			if sync_oracle.is_major_syncing() {
-				*notary_client.pause_notebook_audits.write().await = true;
+				*notary_client.pause_queue_processing.write().await = true;
 				continue;
 			}
 
-			// make sure best hash is synched (there's a delay in some sync modes between the block
-			// being imported and state synched)
-			let best_hash = client.info().best_hash;
-			let best_number = client.info().best_number;
+			// make sure the working best block has state (there's a delay in some sync modes
+			// between the header being imported and state being synced).
+			let info = client.info();
+			let best_hash = info.best_hash;
+			let best_number = info.best_number;
+
 			let state_status =
 				client.block_status(best_hash).unwrap_or(sp_consensus::BlockStatus::Unknown);
 			if state_status != sp_consensus::BlockStatus::InChainWithState {
-				*notary_client.pause_notebook_audits.write().await = true;
+				*notary_client.pause_queue_processing.write().await = true;
 				debug!(
 					?best_hash,
 					?state_status,
@@ -354,13 +356,13 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				continue;
 			}
 
-			if *notary_client.pause_notebook_audits.read().await {
+			if *notary_client.pause_queue_processing.read().await {
 				info!(
 					?best_hash,
 					?best_number,
 					"🏁 Node state is synched. Activating notary sync."
 				);
-				*notary_client.pause_notebook_audits.write().await = false;
+				*notary_client.pause_queue_processing.write().await = false;
 			}
 
 			let mut notebooks_to_check = notebook_ticks_recheck.get_ready();

@@ -56,7 +56,7 @@ script = [
 install_crate_args = ["--no-confirm"]
 
 [tasks.sqlx-setup.install_crate]
-crate_name = "sqlx-cli@0.8.5"
+crate_name = "sqlx-cli@0.8.3"
 binary = "sqlx"
 test_arg = "--version"
 install_command = "binstall"

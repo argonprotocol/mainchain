@@ -97,7 +97,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: sqlx-cli@0.8.5
+          tool: sqlx-cli@0.8.3
 
       - name: Migrate Notary Db
         working-directory: notary
@@ -137,3 +137,11 @@ jobs:
           RUST_LOG: info
           CI: true
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
+
+      - name: Run sync soak tests
+        if: github.ref == 'refs/heads/main' && startsWith(matrix.os, 'ubuntu')
+        run: cargo test -p end-to-end test_long_running_network -- --ignored --nocapture
+        env:
+          ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -115,6 +115,7 @@ primitive-types = { opt-level = 3 }
 reed-solomon-novelpoly = { opt-level = 3 }
 ring = { opt-level = 3, debug = false }
 rustls = { opt-level = 3 }
+sc-network-sync = { opt-level = 3, debug-assertions = false }
 sha2 = { opt-level = 3 }
 sha3 = { opt-level = 3 }
 smallvec = { opt-level = 3 }
