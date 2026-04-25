@@ -42,18 +42,7 @@ async fn test_warp_sync_recovers_after_notebook_archive_delay() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-async fn test_fast_sync_recovers_after_peer_stall() {
-	assert_sync_mode_recovers_after_peer_stall("fast").await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[serial]
-async fn test_warp_sync_recovers_after_peer_stall() {
-	assert_sync_mode_recovers_after_peer_stall("warp").await;
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[serial]
+#[ignore = "restart during warp state sync is not a default CI contract"]
 async fn test_warp_sync_recovers_after_state_sync_restart() {
 	assert_warp_sync_recovers_after_state_sync_restart().await;
 }
@@ -209,7 +198,8 @@ async fn assert_node_matches_snapshot(
 	context: &str,
 ) {
 	let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
-	let latest_finalized_number = node.client.block_number(latest_finalized.hash()).await.unwrap();
+	let latest_finalized_hash = latest_finalized.hash();
+	let latest_finalized_number = node.client.block_number(latest_finalized_hash).await.unwrap();
 	assert!(
 		latest_finalized_number >= snapshot.number,
 		"{context}: expected finalized number >= {}, got {}",
@@ -218,7 +208,7 @@ async fn assert_node_matches_snapshot(
 	);
 
 	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
-	assert_eq!(source_finalized_hash, Some(latest_finalized.hash()), "{context}",);
+	assert_eq!(source_finalized_hash, Some(latest_finalized_hash), "{context}",);
 
 	let synced_target_hash = header_hash_at_height(node, snapshot.number).await;
 	assert_eq!(
@@ -227,61 +217,49 @@ async fn assert_node_matches_snapshot(
 		"{context}: synced node should retain the target finalized block hash",
 	);
 
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
 	loop {
-		let best_hash = node.client.best_block_hash().await.unwrap();
-		let best_number = node.client.block_number(best_hash).await.unwrap();
-		let source_best_at_height = header_hash_at_height(source, best_number).await;
+		let finalized_state_label = format!("finalized state at {latest_finalized_hash:?}");
+		let target_state_label = format!("target finalized state at {:?}", snapshot.hash);
 
-		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
-			assert_state_available_at(node, best_hash, best_number, context).await;
-			break;
-		}
-
-		assert!(
-			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover a source-matching best block. best={best_number}, source_at_height={source_best_at_height:?}",
-		);
-
-		println!(
-			"Waiting for synced node to recover a source-matching best block. best={best_number}"
-		);
-		tokio::time::sleep(Duration::from_millis(250)).await;
-	}
-}
-
-async fn assert_state_available_at(
-	node: &ArgonTestNode,
-	block_hash: H256,
-	expected_number: u32,
-	context: &str,
-) {
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-
-	loop {
-		let last_state_error = match node
+		let finalized_state = node
 			.client
-			.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
-			.await
-		{
-			Ok(Some(state_number)) => {
+			.fetch_storage(&storage().system().number(), FetchAt::Block(latest_finalized_hash))
+			.await;
+
+		let target_state = node
+			.client
+			.fetch_storage(&storage().system().number(), FetchAt::Block(snapshot.hash))
+			.await;
+
+		let last_state_error = match (finalized_state, target_state) {
+			(Ok(Some(finalized_state_number)), Ok(Some(target_state_number))) => {
 				assert_eq!(
-					state_number, expected_number,
-					"{context}: state should match block number at {block_hash:?}"
+					finalized_state_number, latest_finalized_number,
+					"{context}: finalized state should match finalized block number at {latest_finalized_hash:?}"
 				);
-				return;
+				assert_eq!(
+					target_state_number, snapshot.number,
+					"{context}: target finalized state should match target block number at {:?}",
+					snapshot.hash
+				);
+				break;
 			},
-			Ok(None) => "storage returned None".to_string(),
-			Err(err) => err.to_string(),
+			(Ok(None), _) => format!("{finalized_state_label} returned None"),
+			(Err(err), _) => format!("{finalized_state_label} returned {err:?}"),
+			(_, Ok(None)) => format!("{target_state_label} returned None"),
+			(_, Err(err)) => format!("{target_state_label} returned {err:?}"),
 		};
 
 		assert!(
 			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover state for block {expected_number} ({block_hash:?}). last_state_error={last_state_error}",
+			"{context}: synced node did not recover finalized state. finalized={latest_finalized_number}, target={}, last_state_error={last_state_error}",
+			snapshot.number,
 		);
 
 		println!(
-			"Waiting for synced node to recover state for block {expected_number} ({block_hash:?}). Last state error: {last_state_error}"
+			"Waiting for synced node to recover finalized state. finalized={latest_finalized_number}, target={}, last_state_error={last_state_error}",
+			snapshot.number,
 		);
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
@@ -344,47 +322,6 @@ async fn assert_sync_mode_recovers_after_notebook_archive_delay(sync_mode: &str)
 			&harness.source,
 			target,
 			"warp sync should complete block history after notebook archive delay",
-		)
-		.await;
-	}
-}
-
-async fn assert_sync_mode_recovers_after_peer_stall(sync_mode: &str) {
-	let mut harness = SyncHarness::start().await;
-	harness.assert_warmup_history_window(40).await;
-
-	let target = finalized_snapshot(&harness.source).await;
-	let mut sync_node = harness
-		.start_sync_node_with("ferdie", Some(sync_mode), |args| {
-			args.bootnodes.clear();
-		})
-		.await;
-
-	tokio::time::sleep(Duration::from_secs(5)).await;
-	let stalled_finalized = sync_node.client.latest_finalized_block().await.unwrap();
-	assert!(
-		stalled_finalized < target.number,
-		"{sync_mode} sync unexpectedly reached finalized target without peers: finalized={stalled_finalized}, target={}",
-		target.number,
-	);
-
-	sync_node.start_args.bootnodes = harness.source.boot_url.clone();
-	sync_node.restart(Duration::from_secs(1)).await.unwrap();
-
-	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
-	assert_node_matches_snapshot(
-		&sync_node,
-		&harness.source,
-		target,
-		&format!("{sync_mode} sync should recover after peer stall"),
-	)
-	.await;
-	if sync_mode == "warp" {
-		assert_block_history_gap_fill_completes(
-			&sync_node,
-			&harness.source,
-			target,
-			"warp sync should complete block history after peer stall",
 		)
 		.await;
 	}

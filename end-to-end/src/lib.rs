@@ -13,6 +13,8 @@ mod vote_mining;
 
 #[cfg(test)]
 pub(crate) mod utils {
+	use std::time::Duration;
+
 	use anyhow::Context;
 	use argon_client::{
 		FetchAt, MainchainClient, TxInBlockWithEvents, api,
@@ -157,8 +159,29 @@ pub(crate) mod utils {
 		}
 
 		let mut catchup_sub = node.client.live.blocks().subscribe_finalized().await?;
-		while let Some(next) = catchup_sub.next().await {
-			let next = next?;
+		let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
+		let mut last_node_number = latest_node_number;
+
+		loop {
+			let now = tokio::time::Instant::now();
+			if now >= deadline {
+				anyhow::bail!(
+					"timed out waiting for node catchup to finalized block {block_number}; last node finalized block was {last_node_number}",
+				);
+			}
+
+			let remaining = deadline.saturating_duration_since(now);
+			let next = match tokio::time::timeout(remaining, catchup_sub.next()).await {
+				Ok(Some(next)) => next?,
+				Ok(None) => anyhow::bail!(
+					"finalized block subscription ended before node caught up to block {block_number}; last node finalized block was {last_node_number}",
+				),
+				Err(_) => anyhow::bail!(
+					"timed out waiting for node catchup to finalized block {block_number}; last node finalized block was {last_node_number}",
+				),
+			};
+			last_node_number = next.number();
+
 			println!(
 				"Waiting for node catchup to finalized block {:?}. At {:?}",
 				block_number,
@@ -168,6 +191,7 @@ pub(crate) mod utils {
 				break;
 			}
 		}
+
 		Ok(())
 	}
 
