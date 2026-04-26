@@ -138,9 +138,9 @@ jobs:
           CI: true
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
 
-      - name: Run sync soak tests
+      - name: Run sync tests
         if: github.ref == 'refs/heads/main' && startsWith(matrix.os, 'ubuntu')
-        run: cargo test -p end-to-end test_long_running_network -- --ignored --nocapture
+        run: "cargo test -p end-to-end sync:: -- --ignored --nocapture"
         env:
           ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
           CI: true

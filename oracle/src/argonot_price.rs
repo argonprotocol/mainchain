@@ -54,14 +54,14 @@ mod test {
 	use crate::uniswap_oracle::{PriceAndLiquidity, use_mock_uniswap_prices};
 	use std::str::FromStr;
 
-	const DAI_ADDRESS_SEPOLIA: &str = "6b175474e89094c44da98b954eedeac495271d0f";
+	const MOCK_ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
 
 	fn before_each() {
 		dotenv::dotenv().ok();
 		unsafe {
 			env::set_var("USE_SEPOLIA", "true");
 			env::set_var("INFURA_PROJECT_ID", "test");
-			env::set_var("ARGONOT_TOKEN_ADDRESS", DAI_ADDRESS_SEPOLIA);
+			env::set_var("ARGONOT_TOKEN_ADDRESS", MOCK_ARGONOT_TOKEN_ADDRESS);
 		}
 	}
 
@@ -72,7 +72,7 @@ mod test {
 			ArgonotPriceLookup::from_env(FixedU128::from_float(0.017)).await.unwrap();
 
 		let argonot_usdc_price = FixedU128::from_float(0.02);
-		let address = Address::from_str(DAI_ADDRESS_SEPOLIA).unwrap();
+		let address = Address::from_str(MOCK_ARGONOT_TOKEN_ADDRESS).unwrap();
 		use_mock_uniswap_prices(
 			address,
 			vec![PriceAndLiquidity { price: argonot_usdc_price, liquidity: 100_000_000 }],

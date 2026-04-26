@@ -18,24 +18,60 @@ use std::{
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+async fn test_fast_sync_smoke_catches_up_to_notebook_history() {
+	let mut source_args = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
+	let archive_bucket = ArgonTestNotary::create_archive_bucket();
+	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
+	source_args.notebook_archive_urls.push(archive_host);
+
+	let source = ArgonTestNode::start(source_args).await.unwrap();
+	let miner_threads = test_miner_count();
+	let _miner = source.fork_node("bob", miner_threads).await.unwrap();
+	let _test_notary = create_active_notary_with_archive_bucket(&source, archive_bucket)
+		.await
+		.expect("Notary registered");
+
+	let target = wait_for_finalized_notebook_snapshot(&source, 4, 40).await;
+	let mut sync_args = source.get_fork_args("charlie", 0);
+	sync_args.is_validator = false;
+	sync_args.is_archive_node = false;
+	sync_args.extra_flags.push("--sync=fast".to_string());
+	let sync_node = source.fork_node_with(sync_args).await.unwrap();
+
+	wait_for_finalized_catchup(&source, &sync_node).await.unwrap();
+	assert_node_matches_snapshot(
+		&sync_node,
+		&source,
+		target,
+		"fast sync node should catch up to recent notebook history",
+	)
+	.await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "sync recovery scenario runs in the sync action"]
 async fn test_fast_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "sync recovery scenario runs in the sync action"]
 async fn test_warp_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("warp").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "sync recovery scenario runs in the sync action"]
 async fn test_fast_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "sync recovery scenario runs in the sync action"]
 async fn test_warp_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("warp").await;
 }
@@ -136,6 +172,43 @@ async fn finalized_snapshot(node: &ArgonTestNode) -> FinalizedSnapshot {
 	FinalizedSnapshot { number: finalized_number, hash: finalized_hash.hash() }
 }
 
+async fn wait_for_finalized_notebook_snapshot(
+	node: &ArgonTestNode,
+	min_notebook_blocks: u32,
+	max_finalized_blocks: u32,
+) -> FinalizedSnapshot {
+	let start_finalized = node.client.latest_finalized_block().await.unwrap();
+	let mut blocks_sub = node.client.live.blocks().subscribe_finalized().await.unwrap();
+	let mut notebook_blocks_seen = 0;
+	let mut finalized_seen = 0;
+
+	while let Some(Ok(block)) = blocks_sub.next().await {
+		if block.number() <= start_finalized {
+			continue;
+		}
+		finalized_seen += 1;
+
+		let has_notebooks = block.header().runtime_digest().logs.iter().any(|digest| {
+			digest
+				.as_notebooks::<VerifyError>()
+				.is_some_and(|notebooks| !notebooks.notebooks.is_empty())
+		});
+		if has_notebooks {
+			notebook_blocks_seen += 1;
+			if notebook_blocks_seen >= min_notebook_blocks {
+				return FinalizedSnapshot { number: block.number(), hash: block.hash() };
+			}
+		}
+
+		assert!(
+			finalized_seen < max_finalized_blocks,
+			"only saw {notebook_blocks_seen} notebook block(s) after {finalized_seen} finalized blocks",
+		);
+	}
+
+	panic!("finalized block subscription ended before enough notebook blocks were observed");
+}
+
 async fn header_hash_at_height(node: &ArgonTestNode, height: u32) -> Option<H256> {
 	node.client.methods.chain_get_block_hash(Some(height.into())).await.unwrap()
 }
@@ -198,8 +271,7 @@ async fn assert_node_matches_snapshot(
 	context: &str,
 ) {
 	let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
-	let latest_finalized_hash = latest_finalized.hash();
-	let latest_finalized_number = node.client.block_number(latest_finalized_hash).await.unwrap();
+	let latest_finalized_number = node.client.block_number(latest_finalized.hash()).await.unwrap();
 	assert!(
 		latest_finalized_number >= snapshot.number,
 		"{context}: expected finalized number >= {}, got {}",
@@ -208,7 +280,7 @@ async fn assert_node_matches_snapshot(
 	);
 
 	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
-	assert_eq!(source_finalized_hash, Some(latest_finalized_hash), "{context}",);
+	assert_eq!(source_finalized_hash, Some(latest_finalized.hash()), "{context}",);
 
 	let synced_target_hash = header_hash_at_height(node, snapshot.number).await;
 	assert_eq!(
@@ -217,49 +289,61 @@ async fn assert_node_matches_snapshot(
 		"{context}: synced node should retain the target finalized block hash",
 	);
 
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
 	loop {
-		let finalized_state_label = format!("finalized state at {latest_finalized_hash:?}");
-		let target_state_label = format!("target finalized state at {:?}", snapshot.hash);
+		let best_hash = node.client.best_block_hash().await.unwrap();
+		let best_number = node.client.block_number(best_hash).await.unwrap();
+		let source_best_at_height = header_hash_at_height(source, best_number).await;
 
-		let finalized_state = node
+		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
+			assert_state_available_at(node, best_hash, best_number, context).await;
+			break;
+		}
+
+		assert!(
+			tokio::time::Instant::now() < deadline,
+			"{context}: synced node did not recover a source-matching best block. best={best_number}, source_at_height={source_best_at_height:?}",
+		);
+
+		println!(
+			"Waiting for synced node to recover a source-matching best block. best={best_number}"
+		);
+		tokio::time::sleep(Duration::from_millis(250)).await;
+	}
+}
+
+async fn assert_state_available_at(
+	node: &ArgonTestNode,
+	block_hash: H256,
+	expected_number: u32,
+	context: &str,
+) {
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+	loop {
+		let last_state_error = match node
 			.client
-			.fetch_storage(&storage().system().number(), FetchAt::Block(latest_finalized_hash))
-			.await;
-
-		let target_state = node
-			.client
-			.fetch_storage(&storage().system().number(), FetchAt::Block(snapshot.hash))
-			.await;
-
-		let last_state_error = match (finalized_state, target_state) {
-			(Ok(Some(finalized_state_number)), Ok(Some(target_state_number))) => {
+			.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
+			.await
+		{
+			Ok(Some(state_number)) => {
 				assert_eq!(
-					finalized_state_number, latest_finalized_number,
-					"{context}: finalized state should match finalized block number at {latest_finalized_hash:?}"
+					state_number, expected_number,
+					"{context}: state should match block number at {block_hash:?}"
 				);
-				assert_eq!(
-					target_state_number, snapshot.number,
-					"{context}: target finalized state should match target block number at {:?}",
-					snapshot.hash
-				);
-				break;
+				return;
 			},
-			(Ok(None), _) => format!("{finalized_state_label} returned None"),
-			(Err(err), _) => format!("{finalized_state_label} returned {err:?}"),
-			(_, Ok(None)) => format!("{target_state_label} returned None"),
-			(_, Err(err)) => format!("{target_state_label} returned {err:?}"),
+			Ok(None) => "storage returned None".to_string(),
+			Err(err) => err.to_string(),
 		};
 
 		assert!(
 			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover finalized state. finalized={latest_finalized_number}, target={}, last_state_error={last_state_error}",
-			snapshot.number,
+			"{context}: synced node did not recover state for block {expected_number} ({block_hash:?}). last_state_error={last_state_error}",
 		);
 
 		println!(
-			"Waiting for synced node to recover finalized state. finalized={latest_finalized_number}, target={}, last_state_error={last_state_error}",
-			snapshot.number,
+			"Waiting for synced node to recover state for block {expected_number} ({block_hash:?}). Last state error: {last_state_error}"
 		);
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
