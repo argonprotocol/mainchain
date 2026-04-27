@@ -1956,7 +1956,7 @@ mod test {
 		// still missing number 9
 		assert!(matches!(result, Error::MissingNotebooksError(_)),);
 		println!("result: {result}");
-		assert!(result.to_string().contains("#9..9"));
+		assert!(result.to_string().contains("#9..=9"));
 
 		for _ in 0..9 {
 			notary_client.process_queues(None).await.expect("Could not process queues");
