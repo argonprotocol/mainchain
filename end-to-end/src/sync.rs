@@ -39,13 +39,23 @@ async fn test_fast_sync_smoke_catches_up_to_notebook_history() {
 	let sync_node = source.fork_node_with(sync_args).await.unwrap();
 
 	wait_for_finalized_catchup(&source, &sync_node).await.unwrap();
-	assert_node_matches_snapshot(
-		&sync_node,
-		&source,
-		target,
-		"fast sync node should catch up to recent notebook history",
-	)
-	.await;
+
+	let latest_finalized = sync_node.client.latest_finalized_block_hash().await.unwrap();
+	let latest_finalized_number =
+		sync_node.client.block_number(latest_finalized.hash()).await.unwrap();
+	assert!(
+		latest_finalized_number >= target.number,
+		"fast sync node should catch up to recent notebook history: expected finalized number >= {}, got {}",
+		target.number,
+		latest_finalized_number,
+	);
+
+	let synced_target_hash = header_hash_at_height(&sync_node, target.number).await;
+	assert_eq!(
+		synced_target_hash,
+		Some(target.hash),
+		"fast sync node should catch up to recent notebook history: synced node should retain the target finalized block hash",
+	);
 }
 
 #[tokio::test(flavor = "multi_thread")]
