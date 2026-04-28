@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "argon-bitcoin-wasm-bindgen"
 path = "src/bin/bindgen.rs"
+required-features = ["std"]
 
 [profile.release]
 lto = true
