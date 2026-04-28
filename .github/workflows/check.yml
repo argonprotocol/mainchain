@@ -140,7 +140,7 @@ jobs:
 
       - name: Run sync tests
         if: github.ref == 'refs/heads/main' && startsWith(matrix.os, 'ubuntu')
-        run: "cargo test -p end-to-end sync:: -- --ignored --nocapture"
+        run: "cargo test -p end-to-end sync:: -- --ignored --test-threads=1 --nocapture"
         env:
           ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
           CI: true
