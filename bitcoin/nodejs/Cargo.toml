@@ -13,6 +13,10 @@ documentation.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[[bin]]
+name = "argon-bitcoin-wasm-bindgen"
+path = "src/bin/bindgen.rs"
+
 [profile.release]
 lto = true
 opt-level = "z"  # or "s"
@@ -27,8 +31,12 @@ hex = { workspace = true, default-features = false }
 argon-primitives = { workspace = true, default-features = false, features = ["wasm"] }
 sp-io = { workspace = true, default-features = false}
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+wasm-bindgen-cli-support = { workspace = true }
+wasm-opt = { workspace = true }
+
 [features]
-default = []
+default = [ "std" ]
 std = [
 	"anyhow/std",
 	"argon-bitcoin/std",

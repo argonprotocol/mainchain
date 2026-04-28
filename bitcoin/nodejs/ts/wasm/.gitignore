@@ -1,0 +1,3 @@
+*
+!.gitignore
+!bitcoin_bindings.d.ts

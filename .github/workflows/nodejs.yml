@@ -356,6 +356,7 @@ jobs:
           commit_user_name: github-actions[bot]
           commit_user_email: github-actions[bot]@users.noreply.github.com
           file_pattern: ./localchain/npm/**/*.node,./bitcoin/nodejs/ts/wasm/*
+          add_options: '-f'
           create_branch: true
           push_options: '--force-with-lease'
 

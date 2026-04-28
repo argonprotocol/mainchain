@@ -13,9 +13,9 @@
   },
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "wasm-pack": "RUSTFLAGS=\"--cfg substrate_runtime\" wasm-pack build --target bundler --release --out-dir ts/wasm --out-name bitcoin_bindings --no-pack -- --features=build",
+    "build:wasm": "RUSTFLAGS=\"--cfg substrate_runtime\" cargo build --lib --target wasm32-unknown-unknown --release --no-default-features --features build && cargo run --bin argon-bitcoin-wasm-bindgen --features std",
     "prebuild": "yarn workspace @argonprotocol/mainchain run build",
-    "build": "yarn wasm-pack && yarn tsc",
+    "build": "yarn build:wasm && yarn tsc",
     "pretsc": "yarn workspace @argonprotocol/mainchain run tsc",
     "tsc": "yarn pretsc && tsup",
     "typecheck": "tsc --noEmit",
@@ -64,8 +64,7 @@
     "esbuild-plugin-wasm": "^1.1.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.4",
-    "typescript": "^5.9.2",
-    "wasm-pack": "^0.13.1"
+    "typescript": "^5.9.2"
   },
   "packageManager": "yarn@4.1.0"
 }

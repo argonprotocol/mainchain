@@ -221,6 +221,8 @@ napi-derive = { version = "2.16" }
 napi = { version = "2.16", features = ["napi9", "async", "error_anyhow"] }
 napi-build = { version = "2.1" }
 wasm-bindgen = { version = "0.2", default-features = false }
+wasm-bindgen-cli-support = { version = "=0.2.108" }
+wasm-opt = { version = "0.116.1" }
 console_error_panic_hook = { version = "0.1", default-features = false }
 uniffi = { version = "0.29", features = ["tokio"] }
 randomx-rs = { git = "https://github.com/argonprotocol/randomx-rs", rev = "4bea9f8c9d01152eff7431eeae49ef2b22af84e1" }
