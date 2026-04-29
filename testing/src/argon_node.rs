@@ -158,11 +158,7 @@ impl ArgonTestNode {
 		Ok(())
 	}
 
-	/// Restart the node with the same rpc port. NOTE: does not currently support the p2p address
-	/// too
-	///
-	/// If you want to add that, you need to capture the boot url, and also probably use
-	/// pre-generated libp2p nodeIds.
+	/// Restart the node with the same RPC port and refresh the local bootnode address.
 	pub async fn restart(&mut self, wait_duration: Duration) -> anyhow::Result<()> {
 		self.stop()?;
 		tokio::time::sleep(wait_duration).await;
@@ -170,6 +166,15 @@ impl ArgonTestNode {
 		self.proc = Some(proc);
 		self.log_watcher = log_watcher;
 		self.client = MainchainClient::from_url(self.client.url.as_str()).await?;
+		let listen_urls = self
+			.client
+			.rpc
+			.request::<Vec<String>>("system_localListenAddresses", RpcParams::new())
+			.await?;
+		self.boot_url = listen_urls
+			.into_iter()
+			.find(|address| address.contains("127.0.0.1"))
+			.expect("should have a localhost ip");
 		Ok(())
 	}
 

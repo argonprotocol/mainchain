@@ -1,0 +1,89 @@
+name: Sync
+on:
+  workflow_run:
+    workflows:
+      - Build Edge Docker Images
+    types:
+      - completed
+    branches:
+      - main
+      - 'fix_sync_*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  sync:
+    name: Sync
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Free Disk Space
+        uses: ./.github/templates/clear-space
+
+      - uses: ikalnytskyi/action-setup-postgres@v7
+      - uses: ./.github/templates/minio
+
+      - name: Install linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
+
+      - uses: ./.github/templates/rust-cache
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-x86_64-unknown-linux-gnu
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: 'false'
+          target: x86_64-unknown-linux-gnu
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli@0.8.3
+
+      - name: Migrate Notary Db
+        working-directory: notary
+        run: cargo sqlx database setup
+
+      - name: Create and Set Database URL
+        working-directory: localchain
+        run: |
+          touch ${{ runner.temp }}/temp.db
+          chmod 777 ${{ runner.temp }}/temp.db
+          echo "DATABASE_URL=sqlite://${{ runner.temp }}/temp.db" > .env
+          cat .env
+
+      - name: Migrate Localchain Db
+        working-directory: localchain
+        run: cargo sqlx database setup
+
+      - name: Run normal sync tests
+        run: cargo test -p end-to-end sync::test_normal_ -- --ignored --test-threads=1 --nocapture
+        env:
+          ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run soak sync tests
+        run: cargo test -p end-to-end sync::test_soak_ -- --ignored --test-threads=1 --nocapture
+        env:
+          ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
