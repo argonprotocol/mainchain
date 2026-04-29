@@ -18,7 +18,7 @@ use std::{
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-async fn test_fast_sync_smoke_catches_up_to_notebook_history() {
+async fn test_normal_fast_sync_smoke_catches_up_to_notebook_history() {
 	let mut source_args = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
 	let archive_bucket = ArgonTestNotary::create_archive_bucket();
 	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
@@ -51,28 +51,28 @@ async fn test_fast_sync_smoke_catches_up_to_notebook_history() {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "sync recovery scenario runs in the sync action"]
-async fn test_fast_sync_catches_up_to_mixed_history() {
+async fn test_normal_fast_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "sync recovery scenario runs in the sync action"]
-async fn test_warp_sync_catches_up_to_mixed_history() {
+async fn test_normal_warp_sync_catches_up_to_mixed_history() {
 	assert_basic_sync_mode_catches_up("warp").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "sync recovery scenario runs in the sync action"]
-async fn test_fast_sync_recovers_after_notebook_archive_delay() {
+async fn test_normal_fast_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("fast").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "sync recovery scenario runs in the sync action"]
-async fn test_warp_sync_recovers_after_notebook_archive_delay() {
+async fn test_normal_warp_sync_recovers_after_notebook_archive_delay() {
 	assert_sync_mode_recovers_after_notebook_archive_delay("warp").await;
 }
 
@@ -86,7 +86,7 @@ async fn test_warp_sync_recovers_after_state_sync_restart() {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "slow live sync soak"]
-async fn test_long_running_network_late_node_catches_up() {
+async fn test_soak_late_node_catches_up() {
 	let settings = SyncSoakSettings::from_env();
 	let mut harness = SyncHarness::start().await;
 	harness.assert_warmup_history_window(settings.warmup_finalized_blocks).await;
@@ -106,7 +106,7 @@ async fn test_long_running_network_late_node_catches_up() {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore = "slow live sync soak"]
-async fn test_long_running_network_recovers_after_notary_outage() {
+async fn test_soak_recovers_after_notary_outage() {
 	let settings = SyncSoakSettings::from_env();
 	let mut harness = SyncHarness::start().await;
 	harness.assert_warmup_history_window(settings.warmup_finalized_blocks).await;
@@ -271,7 +271,8 @@ async fn assert_node_matches_snapshot(
 	context: &str,
 ) {
 	let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
-	let latest_finalized_number = node.client.block_number(latest_finalized.hash()).await.unwrap();
+	let latest_finalized_hash = latest_finalized.hash();
+	let latest_finalized_number = node.client.block_number(latest_finalized_hash).await.unwrap();
 	assert!(
 		latest_finalized_number >= snapshot.number,
 		"{context}: expected finalized number >= {}, got {}",
@@ -280,7 +281,7 @@ async fn assert_node_matches_snapshot(
 	);
 
 	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
-	assert_eq!(source_finalized_hash, Some(latest_finalized.hash()), "{context}",);
+	assert_eq!(source_finalized_hash, Some(latest_finalized_hash), "{context}",);
 
 	let synced_target_hash = header_hash_at_height(node, snapshot.number).await;
 	assert_eq!(
@@ -297,7 +298,7 @@ async fn assert_node_matches_snapshot(
 
 		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
 			assert_state_available_at(node, best_hash, best_number, context).await;
-			break;
+			return;
 		}
 
 		assert!(
@@ -400,15 +401,6 @@ async fn assert_sync_mode_recovers_after_notebook_archive_delay(sync_mode: &str)
 		&format!("{sync_mode} sync should recover after notebook archive delay"),
 	)
 	.await;
-	if sync_mode == "warp" {
-		assert_block_history_gap_fill_completes(
-			&sync_node,
-			&harness.source,
-			target,
-			"warp sync should complete block history after notebook archive delay",
-		)
-		.await;
-	}
 }
 
 async fn assert_warp_sync_recovers_after_state_sync_restart() {

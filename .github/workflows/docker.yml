@@ -3,6 +3,7 @@ name: Build Edge Docker Images
   push:
     branches:
       - main
+      - 'fix_sync_*'
   workflow_dispatch:
 
 concurrency:
