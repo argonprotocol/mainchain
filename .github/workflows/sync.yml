@@ -87,7 +87,6 @@ jobs:
       - name: Run normal sync tests
         run: cargo test -p end-to-end sync::test_normal_ -- --ignored --test-threads=1 --nocapture
         env:
-          ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
