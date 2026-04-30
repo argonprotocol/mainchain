@@ -1,5 +1,8 @@
 name: Sync
 on:
+  push:
+    branches:
+      - 'fix_sync_*'
   workflow_run:
     workflows:
       - Build Edge Docker Images
@@ -23,6 +26,7 @@ jobs:
     name: Sync
     if: >
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 180
@@ -74,10 +78,15 @@ jobs:
         working-directory: localchain
         run: cargo sqlx database setup
 
+      - name: Build node binaries
+        run: cargo build --bins
+        env:
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run normal sync tests
         run: cargo test -p end-to-end sync::test_normal_ -- --ignored --test-threads=1 --nocapture
         env:
-          ARGON_LONG_SYNC_STATE_DIR: ${{ runner.temp }}/argon-long-sync-state
           CI: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

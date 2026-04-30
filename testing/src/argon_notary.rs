@@ -48,6 +48,7 @@ struct Args {
 	db_url: String,
 	mainchain_url: String,
 	archive_bucket: String,
+	archive_endpoint: Option<String>,
 }
 
 impl Drop for ArgonTestNotary {
@@ -113,26 +114,32 @@ impl ArgonTestNotary {
 
 	async fn start_process(target_dir: PathBuf, args: &Args) -> anyhow::Result<process::Child> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
+		let mut command_args = vec![
+			"run".to_string(),
+			"--db-url".to_string(),
+			args.db_url.clone(),
+			"--dev".to_string(),
+			"--operator-address".to_string(),
+			args.operator_address.clone(),
+			"-t".to_string(),
+			args.mainchain_url.clone(),
+			"--bind-addr".to_string(),
+			format!("127.0.0.1:{}", args.port),
+			"--prometheus-port".to_string(),
+			args.prometheus_port.to_string(),
+			"--archive-bucket".to_string(),
+			args.archive_bucket.clone(),
+		];
+		if let Some(archive_endpoint) = args.archive_endpoint.as_ref() {
+			command_args.push("--archive-endpoint".to_string());
+			command_args.push(archive_endpoint.clone());
+		}
+
 		let proc = Command::new("./argon-notary")
 			.current_dir(&target_dir)
 			.env("RUST_LOG", rust_log)
 			.stdout(process::Stdio::piped())
-			.args(vec![
-				"run",
-				"--db-url",
-				&args.db_url,
-				"--dev",
-				"--operator-address",
-				&args.operator_address,
-				"-t",
-				&args.mainchain_url,
-				"--bind-addr",
-				&format!("127.0.0.1:{}", args.port),
-				"--prometheus-port",
-				&args.prometheus_port.to_string(),
-				"--archive-bucket",
-				&args.archive_bucket,
-			])
+			.args(command_args)
 			.spawn()?;
 		Ok(proc)
 	}
@@ -146,6 +153,25 @@ impl ArgonTestNotary {
 	pub async fn start_with_archive(
 		node: &ArgonTestNode,
 		archive_bucket: String,
+		fixed_port: Option<u16>,
+		existing_db_name: Option<String>,
+		cleanup_db: bool,
+	) -> anyhow::Result<Self> {
+		Self::start_with_archive_endpoint(
+			node,
+			archive_bucket,
+			None,
+			fixed_port,
+			existing_db_name,
+			cleanup_db,
+		)
+		.await
+	}
+
+	pub async fn start_with_archive_endpoint(
+		node: &ArgonTestNode,
+		archive_bucket: String,
+		archive_endpoint: Option<String>,
 		fixed_port: Option<u16>,
 		existing_db_name: Option<String>,
 		cleanup_db: bool,
@@ -208,6 +234,7 @@ impl ArgonTestNotary {
 			db_url: db_url.clone(),
 			mainchain_url: node.client.url.clone(),
 			archive_bucket,
+			archive_endpoint,
 		};
 		if args.port != 0 {
 			Self::prepare_fixed_port(args.port).await?;

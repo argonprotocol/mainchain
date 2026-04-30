@@ -301,6 +301,7 @@ pub(crate) mod utils {
 			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
 			.await?
 			.unwrap_or_default();
+		let deadline = tokio::time::Instant::now() + Duration::from_secs(180);
 		// wait for next cohort to start
 		let lookup = storage().mining_slot().account_index_lookup(first_account);
 		let mut block_sub = client.live.blocks().subscribe_best().await?;
@@ -323,6 +324,16 @@ pub(crate) mod utils {
 				.fetch_storage(&storage().mining_slot().next_frame_id(), fetch_at)
 				.await?
 				.unwrap_or_default();
+			if tokio::time::Instant::now() >= deadline {
+				anyhow::bail!(
+					"timed out waiting for cohort registration for {miner_count} miner(s); currently registered {registered_miners}; pending cohort: {:?}",
+					bids_for_next_cohort
+						.0
+						.iter()
+						.map(|a| a.account_id.to_address())
+						.collect::<Vec<_>>()
+				);
+			}
 			println!(
 				"Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}",
 				bids_for_next_cohort
