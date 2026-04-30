@@ -1,5 +1,6 @@
 use crate::utils::{
-	activate_vote_mining, create_active_notary_with_archive_bucket, wait_for_finalized_catchup,
+	activate_notary, activate_vote_mining, create_active_notary_with_archive_bucket,
+	wait_for_finalized_catchup,
 };
 use argon_client::{FetchAt, api::storage, conversion::SubxtRuntime};
 use argon_notary_audit::VerifyError;
@@ -306,56 +307,33 @@ async fn assert_node_matches_snapshot(
 		let best_hash = node.client.best_block_hash().await.unwrap();
 		let best_number = node.client.block_number(best_hash).await.unwrap();
 		let source_best_at_height = header_hash_at_height(source, best_number).await;
+		let mut last_state_error = None;
 
 		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
-			assert_state_available_at(node, best_hash, best_number, context).await;
-			return;
+			match node
+				.client
+				.fetch_storage(&storage().system().number(), FetchAt::Block(best_hash))
+				.await
+			{
+				Ok(Some(state_number)) => {
+					assert_eq!(
+						state_number, best_number,
+						"{context}: state should match block number at {best_hash:?}"
+					);
+					return;
+				},
+				Ok(None) => last_state_error = Some("storage returned None".to_string()),
+				Err(err) => last_state_error = Some(err.to_string()),
+			}
 		}
 
 		assert!(
 			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover a source-matching best block. best={best_number}, source_at_height={source_best_at_height:?}",
+			"{context}: synced node did not recover a source-matching best block with state. best={best_number}, source_at_height={source_best_at_height:?}, last_state_error={last_state_error:?}",
 		);
 
 		println!(
-			"Waiting for synced node to recover a source-matching best block. best={best_number}"
-		);
-		tokio::time::sleep(Duration::from_millis(250)).await;
-	}
-}
-
-async fn assert_state_available_at(
-	node: &ArgonTestNode,
-	block_hash: H256,
-	expected_number: u32,
-	context: &str,
-) {
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-
-	loop {
-		let last_state_error = match node
-			.client
-			.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
-			.await
-		{
-			Ok(Some(state_number)) => {
-				assert_eq!(
-					state_number, expected_number,
-					"{context}: state should match block number at {block_hash:?}"
-				);
-				return;
-			},
-			Ok(None) => "storage returned None".to_string(),
-			Err(err) => err.to_string(),
-		};
-
-		assert!(
-			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover state for block {expected_number} ({block_hash:?}). last_state_error={last_state_error}",
-		);
-
-		println!(
-			"Waiting for synced node to recover state for block {expected_number} ({block_hash:?}). Last state error: {last_state_error}"
+			"Waiting for synced node to recover a source-matching best block with state. best={best_number}, last_state_error={last_state_error:?}"
 		);
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
@@ -561,16 +539,25 @@ impl SyncHarness {
 			.await
 			.expect("Notary restarted from preserved sync state")
 		} else {
-			ArgonTestNotary::start_with_archive_endpoint(
-				&source,
-				archive_bucket.clone(),
-				archive_endpoint.clone(),
-				None,
-				None,
-				true,
-			)
-			.await
-			.expect("Notary registered")
+			match archive_endpoint {
+				Some(archive_endpoint) => {
+					let test_notary = ArgonTestNotary::start_with_archive_endpoint(
+						&source,
+						archive_bucket.clone(),
+						Some(archive_endpoint),
+						None,
+						None,
+						true,
+					)
+					.await
+					.expect("Notary started with archive endpoint");
+					activate_notary(&source, &test_notary).await.expect("Notary registered");
+					test_notary
+				},
+				None => create_active_notary_with_archive_bucket(&source, archive_bucket.clone())
+					.await
+					.expect("Notary registered"),
+			}
 		};
 		if let Some(cache) = &state_cache {
 			let notary_port = test_notary
