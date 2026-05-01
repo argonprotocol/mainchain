@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'fix_sync_*'
+      - 'pr/fix-sync-*'
   workflow_run:
     workflows:
       - Build Edge Docker Images
@@ -11,6 +12,7 @@ on:
     branches:
       - main
       - 'fix_sync_*'
+      - 'pr/fix-sync-*'
   workflow_dispatch:
 
 concurrency:

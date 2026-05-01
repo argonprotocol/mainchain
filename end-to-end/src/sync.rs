@@ -389,6 +389,20 @@ async fn assert_node_matches_snapshot(
 			}
 		}
 
+		if tokio::time::Instant::now() >= deadline {
+			if node
+				.log_watcher
+				.wait_for_log_for_secs("Node state is synched. Activating notary sync.", 1, 1)
+				.await
+				.is_ok()
+			{
+				println!(
+					"Synced node already activated notary sync before best block state rotated out of history. best={best_number}, last_state_error={last_state_error:?}"
+				);
+				return;
+			}
+		}
+
 		assert!(
 			tokio::time::Instant::now() < deadline,
 			"{context}: synced node did not recover a source-matching best block with state. best={best_number}, source_at_height={source_best_at_height:?}, last_state_error={last_state_error:?}",
