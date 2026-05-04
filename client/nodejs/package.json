@@ -15,14 +15,18 @@
   "scripts": {
     "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn tsc",
     "generate:defs": "tsx node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
-    "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --strict",
+    "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --package @argonprotocol/mainchain/interfaces --strict",
+    "pretest": "yarn build && yarn workspace @argonprotocol/testing run build",
+    "pretest:ci": "yarn build && yarn workspace @argonprotocol/testing run build",
+    "test": "vitest --run --config vitest.config.ts",
     "tsc": "tsup",
     "watch": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },
   "files": [
     "lib/",
-    "browser/"
+    "browser/",
+    "src/interfaces/"
   ],
   "type": "module",
   "module": "./lib/index.js",
@@ -40,16 +44,16 @@
         "default": "./lib/index.cjs"
       }
     },
-    "./clis": {
-      "types": "./lib/clis/index.d.ts",
-      "import": "./lib/clis/index.js",
-      "require": {
-        "types": "./lib/clis/index.d.cts",
-        "default": "./lib/clis/index.cjs"
-      }
+    "./interfaces/*": {
+      "types": "./src/interfaces/*/index.ts"
     }
   },
   "dependencies": {
+    "@chainsafe/persistent-merkle-tree": "1.2.5",
+    "@ethereumjs/block": "^10.1.1",
+    "@ethereumjs/mpt": "^10.1.1",
+    "@lodestar/params": "1.42.0",
+    "@lodestar/types": "1.42.0",
     "@polkadot/api": "^16.4.4",
     "@polkadot/api-base": "^16.4.4",
     "@polkadot/keyring": "^13.5.5",
@@ -60,7 +64,9 @@
     "@polkadot/util": "^13.5.5",
     "@polkadot/util-crypto": "^13.5.5",
     "bignumber.js": "^9.3.1",
-    "bs58check": "^4.0.0"
+    "bs58check": "^4.0.0",
+    "camelcase-keys": "^9.1.3",
+    "viem": "^2.38.5"
   },
   "devDependencies": {
     "@argonprotocol/testing": "1.4.3",
@@ -70,7 +76,8 @@
     "shx": "^0.4.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.4",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.5"
   },
   "packageManager": "yarn@4.1.0"
 }

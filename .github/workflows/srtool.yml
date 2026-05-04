@@ -23,7 +23,7 @@ jobs:
             package: argon-canary-runtime
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Get Rust version from rust-toolchain.toml
         id: rustver
@@ -49,13 +49,13 @@ jobs:
             -e PROFILE=release \
             -v ${{ github.workspace }}:/build \
             srtool build --app --json -cM"
-          
+
           echo ::debug::build::docker_run $CMD
           JSON=$($CMD | tee /dev/stderr | tail -1)
           echo "json=$JSON" >> $GITHUB_OUTPUT
           echo $JSON | jq . > ${{ matrix.runtime }}-srtool-digest.json
           cat ${{ matrix.runtime }}-srtool-digest.json
-        
+
           PROP=`echo $JSON | jq -r .runtimes.compact.prop`
           echo "proposal_hash=$PROP" >> $GITHUB_OUTPUT
 
@@ -73,7 +73,7 @@ jobs:
 
       - name: Archive Runtime
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.runtime }}-runtime
           path: |
@@ -103,7 +103,7 @@ jobs:
 
       - name: Archive Subwasm results
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.runtime }}-results
           path: |

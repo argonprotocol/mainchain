@@ -27,6 +27,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment,
 		Proxy: pallet_proxy,
+		Utility: pallet_utility,
 		FeeControl: pallet_fee_control,
 		DummyPallet: pallet_dummy,
 	}
@@ -44,6 +45,7 @@ impl pallet_fee_control::Config for Test {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = DummyPallet;
 	type CallTxPoolKeyProviders = DummyPallet;
+	type CallTxValidityProviders = DummyPallet;
 }
 parameter_types! {
 	pub(crate) static TipUnbalancedAmount: Balance = 0;
@@ -134,6 +136,13 @@ impl pallet_proxy::Config for Test {
 	type AnnouncementDepositBase = AnnouncementDepositBase;
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
 	type BlockNumberProvider = frame_system::Pallet<Test>;
+}
+
+impl pallet_utility::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = ();
 }
 
 impl pallet_transaction_payment::Config for Test {
@@ -255,8 +264,8 @@ pub mod pallet_dummy {
 	use crate::mock::{pallet_dummy, RuntimeCall};
 	use pallet_prelude::{
 		argon_primitives::{
-			CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
-			TxSponsor,
+			CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
+			TransactionSponsorProvider, TxSponsor,
 		},
 		*,
 	};
@@ -266,6 +275,9 @@ pub mod pallet_dummy {
 
 	#[pallet::storage]
 	pub type OneUseCodes<T> = StorageMap<_, Blake2_128Concat, u32, (u64, Balance), OptionQuery>;
+
+	#[pallet::storage]
+	pub type ConsumedPoolKeys<T> = StorageMap<_, Blake2_128Concat, u32, (), OptionQuery>;
 
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {}
@@ -320,6 +332,22 @@ pub mod pallet_dummy {
 				RuntimeCall::DummyPallet(pallet_dummy::Call::sponsored_pooled { key }) =>
 					Some((b"general", key).encode()),
 				_ => None,
+			}
+		}
+	}
+	impl<T: Config> CallTxValidityProvider<RuntimeCall, u64> for Pallet<T> {
+		fn validate(
+			call: &RuntimeCall,
+			_signer: Option<&u64>,
+		) -> Result<(), TransactionValidityError> {
+			match call {
+				RuntimeCall::DummyPallet(
+					pallet_dummy::Call::pooled { key } |
+					pallet_dummy::Call::sponsored_pooled { key } |
+					pallet_dummy::Call::stacked { key },
+				) if ConsumedPoolKeys::<T>::contains_key(key) =>
+					Err(TransactionValidityError::Invalid(InvalidTransaction::Stale)),
+				_ => Ok(()),
 			}
 		}
 	}

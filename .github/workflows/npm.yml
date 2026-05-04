@@ -66,13 +66,13 @@ jobs:
           echo "source_run_id=$SOURCE_RUN_ID" >> "$GITHUB_OUTPUT"
           echo "head_sha=$RUN_SHA" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'repository_dispatch' && steps.validate_dispatch.outputs.head_sha || github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
           fetch-depth: 0
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: yarn
@@ -83,7 +83,7 @@ jobs:
 
       - name: Download localchain bindings
         if: github.event_name == 'repository_dispatch'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           run-id: ${{ steps.validate_dispatch.outputs.source_run_id }}
           pattern: bindings-*
@@ -92,7 +92,7 @@ jobs:
 
       - name: Download bitcoin artifacts
         if: github.event_name == 'repository_dispatch'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           run-id: ${{ steps.validate_dispatch.outputs.source_run_id }}
           name: bitcoin-wasm

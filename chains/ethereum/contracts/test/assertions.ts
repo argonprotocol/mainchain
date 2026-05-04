@@ -2,7 +2,9 @@ import { expect } from 'vitest';
 
 export async function expectCustomError(
   action: Promise<unknown>,
-  contract: { interface: { parseError(data: string): { name: string; args: Iterable<unknown> } | null } },
+  contract: {
+    interface: { parseError(data: string): { name: string; args: Iterable<unknown> } | null };
+  },
   errorName: string,
   expectedArgs: unknown[] = [],
 ) {
@@ -21,12 +23,16 @@ export async function expectCustomError(
 }
 
 export async function expectEvent(
-  action: Promise<{ wait(): Promise<{ logs: Array<{ address: string; data: string; topics: string[] }> }> }>,
+  action: Promise<{
+    wait(): Promise<{ logs: Array<{ address: string; data: string; topics: string[] }> }>;
+  }>,
   contract: {
     interface: {
-      parseLog(log: { address: string; data: string; topics: string[] }):
-        | { name: string; args: Iterable<unknown> }
-        | null;
+      parseLog(log: {
+        address: string;
+        data: string;
+        topics: string[];
+      }): { name: string; args: Iterable<unknown> } | null;
     };
     getAddress(): Promise<string>;
   },

@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
     "paths": {
+      "@lodestar/params": ["node_modules/@lodestar/params/lib/index.d.ts"],
+      "@lodestar/params/setPreset": ["node_modules/@lodestar/params/lib/setPreset.d.ts"],
       "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
       "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
-      "@polkadot/types/augment": ["src/interfaces/augment-types.ts"]
+      "@polkadot/types/augment": ["src/interfaces/augment-types.ts"],
+      "@argonprotocol/mainchain/interfaces/*": ["src/interfaces/*/index.ts", "src/interfaces/*.ts"]
     },
     "target": "es2022",
     "module": "es2022",
@@ -30,10 +33,16 @@
   "include": [
     "./*.json",
     "src",
-    "src/interfaces/**/*.ts",
+    "src/**/*.ts",
     // if you have augment-api.ts etc.
-    "node_modules/@polkadot/**/*.d.ts",
-    "__test__"
+    "node_modules/@polkadot/**/*.d.ts"
   ],
-  "exclude": ["lib", "browser", "**/localchain", "build/**/*", "node_modules", "target"]
+  "exclude": [
+    "lib",
+    "browser",
+    "**/localchain",
+    "build/**/*",
+    "node_modules",
+    "target",
+  ]
 }

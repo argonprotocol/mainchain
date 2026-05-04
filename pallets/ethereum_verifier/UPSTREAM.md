@@ -16,27 +16,18 @@ Upstream source:
 - `tests/fixtures/`
 - `README.md`
 
-## Imported Verification Helpers
+## Imported Utility Sources
 
-The `src/upstream/` module contains local imports from `snowbridge-verification-primitives` so the
-pallet can avoid a direct dependency on that crate while keeping the imported verifier mechanics
-reviewable.
+- `src/receipt.rs`: `snowbridge-verification-primitives 0.9.0`, `src/receipt.rs`
+- `src/ring_buffer.rs`: `snowbridge-core 0.20.0`, `src/ringbuffer.rs`
 
-These files need their own check-in point when this work is committed:
-
-1. import the upstream helper files with their source versions recorded in the file headers
-2. commit that import before wiring Argon calls to the helpers
-3. keep later Argon edits separate so `git diff` can show exactly what changed from upstream
-
-Current imported helper sources:
-
-- `src/upstream/verification.rs`: `snowbridge-verification-primitives 0.8.1`, `src/lib.rs`
-- `src/upstream/receipt.rs`: `snowbridge-verification-primitives 0.8.1`, `src/receipt.rs`
-
-The indexed receipt helper is a security boundary. Runtime receipt verification should use
-`src/upstream/receipt.rs` so the proof is bound to the receipt trie key derived from the transaction
-index. Do not route runtime proof verification back through the older non-indexed
+The indexed receipt helper is a security boundary. Runtime receipt verification should continue to
+use the imported indexed helper so the proof is bound to the receipt trie key derived from the
+transaction index. Do not route runtime proof verification back through the older non-indexed
 `snowbridge_beacon_primitives::receipt::verify_receipt_proof` helper.
+
+The ring buffer implementation remains source-equivalent to the newer Snowbridge core line aside
+from local import-style and provenance-comment edits.
 
 ## Argon Delta Policy
 
@@ -68,16 +59,11 @@ The execution proof path has two different jobs:
 
 - execution header chain verification from a user burn block to a retained Argon anchor; this is
   Argon-specific, lives in `src/execution_proof.rs`, and is expected to stay local
-- indexed receipt proof verification against the target execution header receipts root; this is a
-  temporary imported helper in `src/upstream/receipt.rs` that should be replaced once a compatible
-  upstream Snowbridge helper is available in the dependency train Argon can use
+- indexed receipt proof verification against the target execution header receipts root; this uses
+  the imported `src/receipt.rs` helper from `snowbridge-verification-primitives`
 
-Keep the temporary receipt proof boundary narrow:
+Keep the receipt proof boundary narrow:
 
-- keep `alloy_trie::proof::verify_proof` usage inside `src/upstream/receipt.rs`
-- do not spread receipt trie decoding or value-extraction logic into the pallet call path
+- keep receipt trie decoding and proof verification out of the pallet call path
 - require receipt proofs to carry the transaction index needed to derive the receipt trie key
-- prefer delegating to an upstream helper that accepts
-  `(receipts_root, transaction_index, proof_nodes)` and returns a decoded receipt or equivalent
-  verified value
-- when replacing the local helper, record the upstream crate version and function here
+- prefer direct delegation to the upstream helper rather than re-embedding trie verification logic

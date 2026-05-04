@@ -23,8 +23,11 @@ use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
 use sp_core::{H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
+	transaction_validity::TransactionValidityError,
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
+
+use crate::ethereum::{EthereumLog, EthereumProof, EthereumVerifyError};
 
 pub trait NotebookProviderWeightInfo {
 	fn notebooks_in_block() -> Weight;
@@ -197,6 +200,36 @@ pub trait RecentArgonTransferLookup<AccountId> {
 impl<AccountId> RecentArgonTransferLookup<AccountId> for () {
 	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
 		false
+	}
+}
+
+pub trait EthereumVerifyProviderWeightInfo {
+	fn verify_event_log() -> Weight;
+}
+
+impl EthereumVerifyProviderWeightInfo for () {
+	fn verify_event_log() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait EthereumVerifyProvider {
+	type Weights: EthereumVerifyProviderWeightInfo;
+
+	fn verify_event_log(
+		event_log: &EthereumLog,
+		proof: &EthereumProof,
+	) -> Result<(), EthereumVerifyError>;
+}
+
+impl EthereumVerifyProvider for () {
+	type Weights = ();
+
+	fn verify_event_log(
+		_event_log: &EthereumLog,
+		_proof: &EthereumProof,
+	) -> Result<(), EthereumVerifyError> {
+		Err(EthereumVerifyError::VerifierUnavailable)
 	}
 }
 
@@ -839,6 +872,30 @@ impl<RuntimeCall, AccountId> CallTxPoolKeyProvider<RuntimeCall, AccountId> for T
 			)*
 		);
 		None
+	}
+}
+
+/// Provides transaction-validity checks for runtime calls that need best-state-aware stale
+/// rejection before they reach inclusion.
+pub trait CallTxValidityProvider<RuntimeCall, AccountId> {
+	fn validate(
+		call: &RuntimeCall,
+		signer: Option<&AccountId>,
+	) -> Result<(), TransactionValidityError>;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall, AccountId> CallTxValidityProvider<RuntimeCall, AccountId> for Tuple {
+	fn validate(
+		call: &RuntimeCall,
+		signer: Option<&AccountId>,
+	) -> Result<(), TransactionValidityError> {
+		for_tuples!(
+			#(
+			Tuple::validate(call, signer)?;
+			)*
+		);
+		Ok(())
 	}
 }
 

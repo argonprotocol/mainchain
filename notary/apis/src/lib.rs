@@ -317,9 +317,9 @@ fn validate_download_url(url: &reqwest::Url, policy: &DownloadPolicy) -> anyhow:
 		!url.path().ends_with(expected_path_suffix)
 	{
 		return Err(anyhow!(
-				"download policy reject: path mismatch, expected suffix `{expected_path_suffix}` got `{}`",
-				url.path()
-			));
+			"download policy reject: path mismatch, expected suffix `{expected_path_suffix}` got `{}`",
+			url.path()
+		));
 	}
 
 	Ok(())

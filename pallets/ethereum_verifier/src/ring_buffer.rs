@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
+//! Ring buffer utility imported from Snowbridge core.
+//!
+//! Upstream source:
+//! - crate: `snowbridge-core`
+//! - version: `0.20.0`
+//! - repository: `https://github.com/paritytech/polkadot-sdk`
+//! - path: `bridges/snowbridge/primitives/core/src/ringbuffer.rs`
+
 use codec::FullCodec;
 use core::{cmp::Ord, marker::PhantomData, ops::Add};
-use frame_support::storage::{StorageMap, StorageValue, types::QueryKindTrait};
-use sp_core::{Get, GetDefault};
-use sp_runtime::traits::{One, Zero};
+use polkadot_sdk::{
+	frame_support::storage::{types::QueryKindTrait, StorageMap, StorageValue},
+	sp_core::{Get, GetDefault},
+	sp_runtime::traits::{One, Zero},
+};
 
 pub trait RingBufferMap<Key, Value, QueryKind>
 where

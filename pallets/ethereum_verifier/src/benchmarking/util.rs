@@ -4,8 +4,8 @@ use crate::{
 	decompress_sync_committee_bits, Config, CurrentSyncCommittee, Pallet as EthereumBeaconClient,
 	Update, ValidatorsRoot, Vec,
 };
+use polkadot_sdk::sp_core::H256;
 use snowbridge_beacon_primitives::PublicKeyPrepared;
-use sp_core::H256;
 
 pub fn participant_pubkeys<T: Config>(
 	update: &Update,

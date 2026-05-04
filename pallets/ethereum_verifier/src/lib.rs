@@ -15,11 +15,18 @@
 //! ## Consensus Updates
 //!
 //! * [`Call::submit`]: Submit a finalized beacon header with an optional sync committee update
+//! * [`Call::import_execution_header_anchor`]: Submit a proven finalized execution header anchor
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate alloc;
+
+pub use polkadot_sdk::*;
+
 pub mod config;
+pub mod execution_proof;
 pub mod functions;
-pub mod impls;
+mod receipt;
+pub mod ring_buffer;
 pub mod types;
 pub mod weights;
 
@@ -32,30 +39,35 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use alloc::{boxed::Box, vec, vec::Vec};
+use argon_primitives::{EthereumLog, EthereumProof, EthereumVerifyError, EthereumVerifyProvider};
 use frame_support::{
-	dispatch::{DispatchResult, PostDispatchInfo},
+	dispatch::{DispatchResult, Pays, PostDispatchInfo},
 	pallet_prelude::OptionQuery,
-	traits::Get,
-	transactional,
+	traits::{Get, IsSubType},
 };
 use frame_system::ensure_signed;
 use snowbridge_beacon_primitives::{
 	fast_aggregate_verify,
 	merkle_proof::{generalized_index_length, subtree_index},
-	verify_merkle_branch, BeaconHeader, BlsError, CompactBeaconState, ForkData, ForkVersion,
-	ForkVersions, PublicKeyPrepared, SigningData,
+	verify_merkle_branch, BeaconHeader, ForkData, ForkVersion, PublicKeyPrepared, SigningData,
 };
-use snowbridge_core::{BasicOperatingMode, RingBufferMap};
-use sp_core::H256;
-use sp_std::prelude::*;
+use sp_core::{hashing::blake2_256, H256};
+use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError};
 pub use weights::WeightInfo;
 
 use functions::{
 	compute_epoch, compute_period, decompress_sync_committee_bits, sync_committee_sum,
 };
-use types::{CheckpointUpdate, FinalizedBeaconStateBuffer, SyncCommitteePrepared, Update};
+use ring_buffer::RingBufferMap;
+use types::{
+	CheckpointUpdate, ExecutionBlockHash, ExecutionBlockNumber, ExecutionHeaderAnchor,
+	ExecutionHeaderAnchorBuffer, FinalizedBeaconHeaderState, FinalizedBeaconStateBuffer,
+	SyncCommitteePrepared, Update,
+};
 
 pub use pallet::*;
+pub use types::{BasicOperatingMode, ExecutionProof, Fork, ForkVersions};
 
 pub use config::SLOTS_PER_HISTORICAL_ROOT;
 
@@ -63,6 +75,8 @@ pub const LOG_TARGET: &str = "ethereum-client";
 
 #[frame_support::pallet]
 pub mod pallet {
+	#![allow(clippy::large_enum_variant)]
+
 	use super::*;
 
 	use frame_support::pallet_prelude::*;
@@ -83,14 +97,13 @@ pub mod pallet {
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		#[allow(deprecated)]
-		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		#[pallet::constant]
-		type ForkVersions: Get<ForkVersions>;
+	pub trait Config: polkadot_sdk::frame_system::Config {
 		/// Minimum gap between finalized headers for an update to be free.
 		#[pallet::constant]
 		type FreeHeadersInterval: Get<u32>;
+		/// Whether the read-only event-log verification API is enabled.
+		#[pallet::constant]
+		type EventLogVerifierEnabled: Get<bool>;
 		type WeightInfo: WeightInfo;
 	}
 
@@ -100,6 +113,10 @@ pub mod pallet {
 		BeaconHeaderImported {
 			block_hash: H256,
 			slot: u64,
+		},
+		ExecutionHeaderAnchorImported {
+			block_hash: ExecutionBlockHash,
+			block_number: ExecutionBlockNumber,
 		},
 		SyncCommitteeUpdated {
 			period: u64,
@@ -121,27 +138,20 @@ pub mod pallet {
 		InvalidHeaderMerkleProof,
 		InvalidSyncCommitteeMerkleProof,
 		InvalidExecutionHeaderProof,
-		InvalidAncestryMerkleProof,
-		InvalidBlockRootsRootMerkleProof,
-		/// The gap between the finalized headers is larger than the sync committee period,
-		/// rendering execution headers unprovable using ancestry proofs (blocks root size is
-		/// the same as the sync committee period slots).
+		/// The gap between finalized headers is larger than the retained historical window.
 		InvalidFinalizedHeaderGap,
-		HeaderNotFinalized,
-		BlockBodyHashTreeRootFailed,
 		HeaderHashTreeRootFailed,
+		BlockBodyHashTreeRootFailed,
 		SyncCommitteeHashTreeRootFailed,
 		SigningRootHashTreeRootFailed,
 		ForkDataHashTreeRootFailed,
 		ExpectedFinalizedHeaderNotStored,
 		BLSPreparePublicKeysFailed,
-		BLSVerificationFailed(BlsError),
+		BLSVerificationFailed,
 		InvalidUpdateSlot,
 		/// The given update is not in the expected period, or the given next sync committee does
 		/// not match the next sync committee in storage.
 		InvalidSyncCommitteeUpdate,
-		ExecutionHeaderTooFarBehind,
-		ExecutionHeaderSkippedBlock,
 		Halted,
 	}
 
@@ -159,7 +169,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn finalized_beacon_state)]
 	pub type FinalizedBeaconState<T: Config> =
-		StorageMap<_, Identity, H256, CompactBeaconState, OptionQuery>;
+		StorageMap<_, Identity, H256, FinalizedBeaconHeaderState, OptionQuery>;
 
 	/// Finalized Headers: Current position in ring buffer
 	#[pallet::storage]
@@ -170,9 +180,32 @@ pub mod pallet {
 	pub type FinalizedBeaconStateMapping<T: Config> =
 		StorageMap<_, Identity, u32, H256, ValueQuery>;
 
+	/// Retained execution-layer header anchors by execution block hash.
+	#[pallet::storage]
+	pub type ExecutionHeaderAnchors<T: Config> =
+		StorageMap<_, Identity, ExecutionBlockHash, ExecutionHeaderAnchor, OptionQuery>;
+
+	/// Execution header anchors: current position in ring buffer.
+	#[pallet::storage]
+	pub type ExecutionHeaderAnchorIndex<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	/// Execution header anchors: mapping of ring buffer index to a pruning candidate.
+	#[pallet::storage]
+	pub type ExecutionHeaderAnchorMapping<T: Config> =
+		StorageMap<_, Identity, u32, ExecutionBlockHash, ValueQuery>;
+
+	/// Latest retained execution-layer anchor block hash.
+	#[pallet::storage]
+	pub type LatestExecutionHeaderAnchorBlockHash<T: Config> =
+		StorageValue<_, ExecutionBlockHash, OptionQuery>;
+
 	#[pallet::storage]
 	#[pallet::getter(fn validators_root)]
 	pub type ValidatorsRoot<T: Config> = StorageValue<_, H256, ValueQuery>;
+
+	/// Fork-version schedule used for sync-committee signing domains and beacon state paths.
+	#[pallet::storage]
+	pub type ForkVersionSchedule<T: Config> = StorageValue<_, ForkVersions, OptionQuery>;
 
 	/// Sync committee for current period
 	#[pallet::storage]
@@ -188,22 +221,21 @@ pub mod pallet {
 
 	/// The current operating mode of the pallet.
 	#[pallet::storage]
-	#[pallet::getter(fn operating_mode)]
 	pub type OperatingMode<T: Config> = StorageValue<_, BasicOperatingMode, ValueQuery>;
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::force_checkpoint())]
-		#[transactional]
 		/// Used for pallet initialization and light client resetting. Needs to be called by
 		/// the root origin.
 		pub fn force_checkpoint(
 			origin: OriginFor<T>,
 			update: Box<CheckpointUpdate>,
+			fork_versions: ForkVersions,
 		) -> DispatchResult {
 			ensure_root(origin)?;
-			Self::process_checkpoint_update(&update)?;
+			Self::process_checkpoint_update(&update, &fork_versions)?;
 			Ok(())
 		}
 
@@ -214,13 +246,48 @@ pub mod pallet {
 				Some(_) => T::WeightInfo::submit_with_sync_committee(),
 			}
 		})]
-		#[transactional]
 		/// Submits a new finalized beacon header update. The update may contain the next
 		/// sync committee.
 		pub fn submit(origin: OriginFor<T>, update: Box<Update>) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
-			ensure!(!Self::operating_mode().is_halted(), Error::<T>::Halted);
+			ensure!(!OperatingMode::<T>::get().is_halted(), Error::<T>::Halted);
 			Self::process_update(&update)
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::import_execution_header_anchor())]
+		/// Imports a proven execution header anchor against already-retained beacon state.
+		pub fn import_execution_header_anchor(
+			origin: OriginFor<T>,
+			execution_proof: ExecutionProof,
+		) -> DispatchResultWithPostInfo {
+			ensure_signed(origin)?;
+			ensure!(!OperatingMode::<T>::get().is_halted(), Error::<T>::Halted);
+
+			let anchor =
+				ExecutionHeaderAnchor::from_payload_header(&execution_proof.execution_header);
+			let mut pays_fee = Pays::Yes;
+
+			if !<ExecutionHeaderAnchorBuffer<T>>::contains_key(anchor.block_hash) {
+				Self::verify_execution_proof(&execution_proof)?;
+				<ExecutionHeaderAnchorBuffer<T>>::insert(anchor.block_hash, anchor);
+				<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
+
+				Self::deposit_event(Event::ExecutionHeaderAnchorImported {
+					block_hash: anchor.block_hash,
+					block_number: anchor.block_number,
+				});
+
+				if execution_proof.header.slot.is_multiple_of(T::FreeHeadersInterval::get() as u64)
+				{
+					pays_fee = Pays::No;
+				}
+			}
+
+			Ok(PostDispatchInfo {
+				actual_weight: Some(T::WeightInfo::import_execution_header_anchor()),
+				pays_fee,
+			})
 		}
 
 		/// Halt or resume all pallet operations. May only be called by root.
@@ -238,21 +305,28 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Verify an Ethereum event log proof without mutating verifier state.
+		pub fn verify_event_log(
+			event_log: EthereumLog,
+			proof: EthereumProof,
+		) -> Result<(), EthereumVerifyError> {
+			ensure!(T::EventLogVerifierEnabled::get(), EthereumVerifyError::VerifierUnavailable);
+			<Self as EthereumVerifyProvider>::verify_event_log(&event_log, &proof)
+		}
+
 		/// Forces a finalized beacon header checkpoint update. The current sync committee,
 		/// with a header attesting to the current sync committee, should be provided.
-		/// An `block_roots` proof should also be provided. This is used for ancestry proofs
-		/// for execution header updates.
-		pub(crate) fn process_checkpoint_update(update: &CheckpointUpdate) -> DispatchResult {
+		pub(crate) fn process_checkpoint_update(
+			update: &CheckpointUpdate,
+			fork_versions: &ForkVersions,
+		) -> DispatchResult {
 			let sync_committee_root = update
 				.current_sync_committee
 				.hash_tree_root()
 				.map_err(|_| Error::<T>::SyncCommitteeHashTreeRootFailed)?;
 
-			let fork_versions = T::ForkVersions::get();
-			let sync_committee_gindex = Self::current_sync_committee_gindex_at_slot(
-				update.header.slot,
-				fork_versions.clone(),
-			);
+			let sync_committee_gindex =
+				Self::current_sync_committee_gindex_at_slot(update.header.slot, fork_versions);
 			// Verifies the sync committee in the Beacon state.
 			ensure!(
 				verify_merkle_branch(
@@ -270,22 +344,6 @@ pub mod pallet {
 				.hash_tree_root()
 				.map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
 
-			// This is used for ancestry proofs in ExecutionHeader updates. This verifies the
-			// BeaconState: the beacon state root is the tree root; the `block_roots` hash is the
-			// tree leaf.
-			let block_roots_gindex =
-				Self::block_roots_gindex_at_slot(update.header.slot, fork_versions);
-			ensure!(
-				verify_merkle_branch(
-					update.block_roots_root,
-					&update.block_roots_branch,
-					subtree_index(block_roots_gindex),
-					generalized_index_length(block_roots_gindex),
-					update.header.state_root
-				),
-				Error::<T>::InvalidBlockRootsRootMerkleProof
-			);
-
 			let sync_committee_prepared: SyncCommitteePrepared = (&update.current_sync_committee)
 				.try_into()
 				.map_err(|_| <Error<T>>::BLSPreparePublicKeysFailed)?;
@@ -293,8 +351,9 @@ pub mod pallet {
 			<NextSyncCommittee<T>>::kill();
 			InitialCheckpointRoot::<T>::set(header_root);
 
+			<ForkVersionSchedule<T>>::put(*fork_versions);
 			Self::store_validators_root(update.validators_root);
-			Self::store_finalized_header(update.header, update.block_roots_root)?;
+			Self::store_finalized_header(update.header)?;
 
 			Ok(())
 		}
@@ -304,7 +363,7 @@ pub mod pallet {
 			Self::apply_update(update)
 		}
 
-		/// References and strictly follows <https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/light-client/sync-protocol.md#validate_light_client_update>
+		/// References and strictly follows <https://github.com/ethereum/consensus-specs/blob/ec42646/specs/altair/light-client/sync-protocol.md#validate_light_client_update>
 		/// Verifies that provided next sync committee is valid through a series of checks
 		/// (including checking that a sync committee period isn't skipped and that the header is
 		/// signed by the current sync committee.
@@ -358,11 +417,10 @@ pub mod pallet {
 				Error::<T>::InvalidFinalizedHeaderGap
 			);
 
-			let fork_versions = T::ForkVersions::get();
-			let finalized_root_gindex = Self::finalized_root_gindex_at_slot(
-				update.attested_header.slot,
-				fork_versions.clone(),
-			);
+			let fork_versions =
+				ForkVersionSchedule::<T>::get().ok_or(Error::<T>::NotBootstrapped)?;
+			let finalized_root_gindex =
+				Self::finalized_root_gindex_at_slot(update.attested_header.slot, &fork_versions);
 			// Verify that the `finality_branch`, if present, confirms `finalized_header` to match
 			// the finalized checkpoint root saved in the state of `attested_header`.
 			let finalized_block_root: H256 = update
@@ -378,24 +436,6 @@ pub mod pallet {
 					update.attested_header.state_root
 				),
 				Error::<T>::InvalidHeaderMerkleProof
-			);
-
-			// Though following check does not belong to ALC spec we verify block_roots_root to
-			// match the finalized checkpoint root saved in the state of `finalized_header` so to
-			// cache it for later use in `verify_ancestry_proof`.
-			let block_roots_gindex = Self::block_roots_gindex_at_slot(
-				update.finalized_header.slot,
-				fork_versions.clone(),
-			);
-			ensure!(
-				verify_merkle_branch(
-					update.block_roots_root,
-					&update.block_roots_branch,
-					subtree_index(block_roots_gindex),
-					generalized_index_length(block_roots_gindex),
-					update.finalized_header.state_root
-				),
-				Error::<T>::InvalidBlockRootsRootMerkleProof
 			);
 
 			// Verify that the `next_sync_committee`, if present, actually is the next sync
@@ -414,7 +454,7 @@ pub mod pallet {
 				}
 				let next_sync_committee_gindex = Self::next_sync_committee_gindex_at_slot(
 					update.attested_header.slot,
-					fork_versions,
+					&fork_versions,
 				);
 				ensure!(
 					verify_merkle_branch(
@@ -455,12 +495,12 @@ pub mod pallet {
 				signing_root,
 				&update.sync_aggregate.sync_committee_signature,
 			)
-			.map_err(|e| Error::<T>::BLSVerificationFailed(e))?;
+			.map_err(|_| Error::<T>::BLSVerificationFailed)?;
 
 			Ok(())
 		}
 
-		/// Reference and strictly follows <https://github.com/ethereum/consensus-specs/blob/master/specs/altair/light-client/sync-protocol.md#apply_light_client_update>
+		/// Reference and strictly follows <https://github.com/ethereum/consensus-specs/blob/ec42646/specs/altair/light-client/sync-protocol.md#apply_light_client_update>
 		/// Applies a finalized beacon header update to the beacon client. If a next sync committee
 		/// is present in the update, verify the sync committee by converting it to a
 		/// SyncCommitteePrepared type. Stores the provided finalized header. Updates are free
@@ -506,7 +546,7 @@ pub mod pallet {
 			};
 
 			if update.finalized_header.slot > latest_finalized_state.slot {
-				Self::store_finalized_header(update.finalized_header, update.block_roots_root)?;
+				Self::store_finalized_header(update.finalized_header)?;
 			}
 
 			Ok(PostDispatchInfo { actual_weight: Some(actual_weight), pays_fee })
@@ -530,13 +570,8 @@ pub mod pallet {
 			Ok(hash_root)
 		}
 
-		/// Stores a compacted (slot and block roots root (hash of the `block_roots` beacon state
-		/// field, used for ancestry proof)) beacon state in a ring buffer map, with the header root
-		/// as map key.
-		pub fn store_finalized_header(
-			header: BeaconHeader,
-			block_roots_root: H256,
-		) -> DispatchResult {
+		/// Stores the finalized beacon header slot keyed by the finalized header root.
+		pub fn store_finalized_header(header: BeaconHeader) -> DispatchResult {
 			let slot = header.slot;
 
 			let header_root: H256 =
@@ -544,7 +579,7 @@ pub mod pallet {
 
 			<FinalizedBeaconStateBuffer<T>>::insert(
 				header_root,
-				CompactBeaconState { slot: header.slot, block_roots_root },
+				FinalizedBeaconHeaderState { slot: header.slot },
 			);
 			<LatestFinalizedBlockRoot<T>>::set(header_root);
 
@@ -566,6 +601,37 @@ pub mod pallet {
 		/// <https://eth2book.info/capella/part3/containers/state/#genesis_validators_root>
 		fn store_validators_root(validators_root: H256) {
 			<ValidatorsRoot<T>>::set(validators_root);
+		}
+
+		fn verify_execution_proof(execution_proof: &ExecutionProof) -> DispatchResult {
+			let beacon_block_root: H256 = execution_proof
+				.header
+				.hash_tree_root()
+				.map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
+			let state = <FinalizedBeaconState<T>>::get(beacon_block_root)
+				.ok_or(Error::<T>::ExpectedFinalizedHeaderNotStored)?;
+			ensure!(
+				execution_proof.header.slot == state.slot,
+				Error::<T>::ExpectedFinalizedHeaderNotStored
+			);
+
+			let execution_header_root: H256 = execution_proof
+				.execution_header
+				.hash_tree_root()
+				.map_err(|_| Error::<T>::BlockBodyHashTreeRootFailed)?;
+			let execution_header_gindex = Self::execution_header_gindex();
+			ensure!(
+				verify_merkle_branch(
+					execution_header_root,
+					&execution_proof.execution_branch,
+					subtree_index(execution_header_gindex),
+					generalized_index_length(execution_header_gindex),
+					execution_proof.header.body_root
+				),
+				Error::<T>::InvalidExecutionHeaderProof
+			);
+
+			Ok(())
 		}
 
 		/// Returns the domain for the domain_type and fork_version. The domain is used to
@@ -621,8 +687,10 @@ pub mod pallet {
 
 		/// Returns the fork version based on the current epoch. The hard fork versions
 		/// are defined in pallet config.
-		pub(super) fn compute_fork_version(epoch: u64) -> ForkVersion {
-			Self::select_fork_version(&T::ForkVersions::get(), epoch)
+		pub(super) fn compute_fork_version(epoch: u64) -> Result<ForkVersion, DispatchError> {
+			let fork_versions =
+				ForkVersionSchedule::<T>::get().ok_or(Error::<T>::NotBootstrapped)?;
+			Ok(Self::select_fork_version(&fork_versions, epoch))
 		}
 
 		/// Returns the fork version based on the current epoch.
@@ -676,12 +744,12 @@ pub mod pallet {
 			signature_slot: u64,
 		) -> Result<H256, DispatchError> {
 			// Per Ethereum Altair light-client spec, fork version is derived from signature_slot -
-			// 1. See: https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/light-client/sync-protocol.md#validate_light_client_update
+			// 1. See: https://github.com/ethereum/consensus-specs/blob/ec42646/specs/altair/light-client/sync-protocol.md#validate_light_client_update
 			// In validate_light_client_update: fork_version_slot = max(signature_slot, 1) - 1
 			let fork_version = Self::compute_fork_version(compute_epoch(
 				signature_slot.saturating_sub(1),
 				config::SLOTS_PER_EPOCH as u64,
-			));
+			))?;
 			let domain_type = config::DOMAIN_SYNC_COMMITTEE.to_vec();
 			// Domains are used for seeds, for signatures, and for selecting aggregators.
 			let domain = Self::compute_domain(domain_type, fork_version, validators_root)?;
@@ -717,7 +785,7 @@ pub mod pallet {
 			Pays::Yes
 		}
 
-		pub fn finalized_root_gindex_at_slot(slot: u64, fork_versions: ForkVersions) -> usize {
+		pub fn finalized_root_gindex_at_slot(slot: u64, fork_versions: &ForkVersions) -> usize {
 			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
 
 			if epoch >= fork_versions.electra.epoch {
@@ -729,7 +797,7 @@ pub mod pallet {
 
 		pub fn current_sync_committee_gindex_at_slot(
 			slot: u64,
-			fork_versions: ForkVersions,
+			fork_versions: &ForkVersions,
 		) -> usize {
 			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
 
@@ -740,7 +808,10 @@ pub mod pallet {
 			config::altair::CURRENT_SYNC_COMMITTEE_INDEX
 		}
 
-		pub fn next_sync_committee_gindex_at_slot(slot: u64, fork_versions: ForkVersions) -> usize {
+		pub fn next_sync_committee_gindex_at_slot(
+			slot: u64,
+			fork_versions: &ForkVersions,
+		) -> usize {
 			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
 
 			if epoch >= fork_versions.electra.epoch {
@@ -750,18 +821,88 @@ pub mod pallet {
 			config::altair::NEXT_SYNC_COMMITTEE_INDEX
 		}
 
-		pub fn block_roots_gindex_at_slot(slot: u64, fork_versions: ForkVersions) -> usize {
-			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
-
-			if epoch >= fork_versions.electra.epoch {
-				return config::electra::BLOCK_ROOTS_INDEX;
-			}
-
-			config::altair::BLOCK_ROOTS_INDEX
-		}
-
 		pub fn execution_header_gindex() -> usize {
 			config::altair::EXECUTION_HEADER_INDEX
+		}
+	}
+
+	type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
+
+	impl<T: Config> argon_primitives::CallTxPoolKeyProvider<RuntimeCallOf<T>, T::AccountId>
+		for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		fn key_for(call: &RuntimeCallOf<T>, _signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
+			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
+
+			// These calls can be refunded after dispatch when they advance verifier state, so the
+			// tx pool needs a stable key to collapse repeated submissions before they become spam.
+			// The key uses the exact payload so a bad proof for the same target cannot suppress a
+			// valid update before dispatch. Deterministic relayers still collide when they submit
+			// the same encoded payload.
+			match call {
+				Call::submit { update } => Some(
+					(b"ethereum_verifier:submit".as_slice(), update.using_encoded(blake2_256))
+						.using_encoded(blake2_256)
+						.to_vec(),
+				),
+				Call::import_execution_header_anchor { execution_proof } => Some(
+					(
+						b"ethereum_verifier:execution_header_anchor".as_slice(),
+						execution_proof.execution_header.block_hash(),
+						execution_proof.using_encoded(blake2_256),
+					)
+						.using_encoded(blake2_256)
+						.to_vec(),
+				),
+				_ => None,
+			}
+		}
+	}
+
+	impl<T: Config> argon_primitives::CallTxValidityProvider<RuntimeCallOf<T>, T::AccountId>
+		for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		fn validate(
+			call: &RuntimeCallOf<T>,
+			_signer: Option<&T::AccountId>,
+		) -> Result<(), TransactionValidityError> {
+			let Some(call) = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call) else {
+				return Ok(());
+			};
+
+			match call {
+				Call::submit { update } => {
+					let Some(latest_finalized_state) =
+						FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
+					else {
+						return Ok(());
+					};
+					let store_period = compute_period(latest_finalized_state.slot);
+					let update_attested_period = compute_period(update.attested_header.slot);
+					let can_advance_finalized =
+						update.finalized_header.slot > latest_finalized_state.slot;
+					let can_set_missing_next_sync = !<NextSyncCommittee<T>>::exists() &&
+						update.next_sync_committee_update.is_some() &&
+						update_attested_period == store_period;
+
+					if !can_advance_finalized && !can_set_missing_next_sync {
+						return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
+					}
+				},
+				Call::import_execution_header_anchor { execution_proof } =>
+					if <ExecutionHeaderAnchors<T>>::contains_key(
+						execution_proof.execution_header.block_hash(),
+					) {
+						return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
+					},
+				_ => {},
+			}
+
+			Ok(())
 		}
 	}
 }

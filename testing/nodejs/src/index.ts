@@ -10,9 +10,12 @@ import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
 import TestBitcoinCli from './TestBitcoinCli';
 import TestOracle from './TestOracle';
+import TestEthereum from './TestEthereum';
 import { startNetwork } from './TestNetwork';
+import { argonTokenArtifact, mintingGatewayArtifact } from './ethereumContracts';
 
-export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle, startNetwork };
+export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle, TestEthereum, startNetwork };
+export { argonTokenArtifact, mintingGatewayArtifact };
 
 export interface ITeardownable {
   teardown(): Promise<void>;

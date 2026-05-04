@@ -43,7 +43,7 @@ runs:
           echo "version=windows-$(echo $ver_str | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> $GITHUB_OUTPUT
         fi
     - name: Cache cargo
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/registry/index/

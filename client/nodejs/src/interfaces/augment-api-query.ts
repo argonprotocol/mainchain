@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -65,6 +64,10 @@ import type {
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
   PalletDomainsDomainRegistration,
+  PalletEthereumVerifierBasicOperatingMode,
+  PalletEthereumVerifierExecutionHeaderAnchor,
+  PalletEthereumVerifierFinalizedBeaconHeaderState,
+  PalletEthereumVerifierForkVersions,
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
@@ -83,6 +86,7 @@ import type {
   PalletTreasuryFrameVaultCapital,
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
+  SnowbridgeBeaconPrimitivesSyncCommitteePrepared,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
   SpWeightsWeightV2Weight,
@@ -497,6 +501,105 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: H256 | string | Uint8Array) => Observable<Option<ArgonPrimitivesDomainZoneRecord>>,
         [H256]
       >;
+    };
+    ethereumVerifier: {
+      /**
+       * Sync committee for current period
+       **/
+      currentSyncCommittee: AugmentedQuery<
+        ApiType,
+        () => Observable<SnowbridgeBeaconPrimitivesSyncCommitteePrepared>,
+        []
+      >;
+      /**
+       * Execution header anchors: current position in ring buffer.
+       **/
+      executionHeaderAnchorIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Execution header anchors: mapping of ring buffer index to a pruning candidate.
+       **/
+      executionHeaderAnchorMapping: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
+        [u32]
+      >;
+      /**
+       * Retained execution-layer header anchors by execution block hash.
+       **/
+      executionHeaderAnchors: AugmentedQuery<
+        ApiType,
+        (
+          arg: H256 | string | Uint8Array,
+        ) => Observable<Option<PalletEthereumVerifierExecutionHeaderAnchor>>,
+        [H256]
+      >;
+      /**
+       * Beacon state by finalized block root
+       **/
+      finalizedBeaconState: AugmentedQuery<
+        ApiType,
+        (
+          arg: H256 | string | Uint8Array,
+        ) => Observable<Option<PalletEthereumVerifierFinalizedBeaconHeaderState>>,
+        [H256]
+      >;
+      /**
+       * Finalized Headers: Current position in ring buffer
+       **/
+      finalizedBeaconStateIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Finalized Headers: Mapping of ring buffer index to a pruning candidate
+       **/
+      finalizedBeaconStateMapping: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
+        [u32]
+      >;
+      /**
+       * Fork-version schedule used for sync-committee signing domains and beacon state paths.
+       **/
+      forkVersionSchedule: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletEthereumVerifierForkVersions>>,
+        []
+      >;
+      /**
+       * Latest imported checkpoint root
+       **/
+      initialCheckpointRoot: AugmentedQuery<ApiType, () => Observable<H256>, []>;
+      /**
+       * Latest retained execution-layer anchor block hash.
+       **/
+      latestExecutionHeaderAnchorBlockHash: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<H256>>,
+        []
+      >;
+      /**
+       * Latest imported finalized block root
+       **/
+      latestFinalizedBlockRoot: AugmentedQuery<ApiType, () => Observable<H256>, []>;
+      /**
+       * The last period where the next sync committee was updated for free.
+       **/
+      latestSyncCommitteeUpdatePeriod: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * Sync committee for next period
+       **/
+      nextSyncCommittee: AugmentedQuery<
+        ApiType,
+        () => Observable<SnowbridgeBeaconPrimitivesSyncCommitteePrepared>,
+        []
+      >;
+      /**
+       * The current operating mode of the pallet.
+       **/
+      operatingMode: AugmentedQuery<
+        ApiType,
+        () => Observable<PalletEthereumVerifierBasicOperatingMode>,
+        []
+      >;
+      validatorsRoot: AugmentedQuery<ApiType, () => Observable<H256>, []>;
     };
     grandpa: {
       /**

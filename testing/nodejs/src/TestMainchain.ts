@@ -159,9 +159,22 @@ export default class TestMainchain implements ITeardownable {
   }
 
   public async client(): Promise<ArgonClient> {
-    const client = await getClient(this.address);
-    disconnectOnTeardown(client);
-    return client;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        const client = await getClient(this.address);
+        disconnectOnTeardown(client);
+        return client;
+      } catch (error) {
+        lastError = error;
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+    }
+
+    throw new Error(`Unable to connect to mainchain client at ${this.address}`, {
+      cause: lastError instanceof Error ? lastError : undefined,
+    });
   }
 
   public async bootAddress(): Promise<string | undefined> {

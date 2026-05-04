@@ -1,12 +1,11 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
 import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
-import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
@@ -159,6 +158,16 @@ declare module '@polkadot/api-base/types/consts' {
        * The desired votes per block
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
+    };
+    ethereumVerifier: {
+      /**
+       * Whether the read-only event-log verification API is enabled.
+       **/
+      eventLogVerifierEnabled: bool & AugmentedConst<ApiType>;
+      /**
+       * Minimum gap between finalized headers for an update to be free.
+       **/
+      freeHeadersInterval: u32 & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**

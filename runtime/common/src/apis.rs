@@ -306,6 +306,15 @@ macro_rules! inject_common_apis {
             }
         }
 
+        impl argon_primitives::EthereumApis<Block> for Runtime {
+            fn verify_event_log(
+                event_log: argon_primitives::EthereumLog,
+                proof: argon_primitives::EthereumProof,
+            ) -> Result<(), argon_primitives::EthereumVerifyError> {
+                EthereumVerifier::verify_event_log(event_log, proof)
+            }
+        }
+
         impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
             fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {
                 Grandpa::grandpa_authorities()

@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 use crate as ethereum_beacon_client;
-use crate::config;
-use frame_support::{derive_impl, dispatch::DispatchResult, parameter_types};
-use pallet_timestamp;
-use snowbridge_beacon_primitives::{Fork, ForkVersions};
-use snowbridge_verification_primitives::{Log, Proof};
-use sp_std::default::Default;
+use crate::{
+	config, pallet_timestamp, sp_io, sp_runtime,
+	types::{CheckpointUpdate, Update},
+	Fork, ForkVersions,
+};
+use core::default::Default;
+use frame_support::{derive_impl, dispatch::DispatchResult, parameter_types, traits::ConstU32};
+use polkadot_sdk::*;
+use sp_runtime::BuildStorage;
 use std::{fs::File, path::PathBuf};
 
 type Block = frame_system::mocking::MockBlock<Test>;
-use frame_support::traits::ConstU32;
 use hex_literal::hex;
-use sp_runtime::BuildStorage;
+
+pub const INBOUND_FIXTURE_RECEIPT_INDEX: u64 = 0;
 
 fn load_fixture<T>(basename: String) -> Result<T, serde_json::Error>
 where
@@ -27,69 +30,66 @@ pub fn load_execution_proof_fixture() -> snowbridge_beacon_primitives::Execution
 	load_fixture("execution-proof.json".to_string()).unwrap()
 }
 
-pub fn load_checkpoint_update_fixture(
-) -> snowbridge_beacon_primitives::CheckpointUpdate<{ config::SYNC_COMMITTEE_SIZE }> {
-	load_fixture("initial-checkpoint.json".to_string()).unwrap()
+pub fn load_checkpoint_update_fixture() -> CheckpointUpdate {
+	let update: snowbridge_beacon_primitives::CheckpointUpdate<{ config::SYNC_COMMITTEE_SIZE }> =
+		load_fixture("initial-checkpoint.json".to_string()).unwrap();
+	update.into()
 }
 
-pub fn load_sync_committee_update_fixture() -> snowbridge_beacon_primitives::Update<
-	{ config::SYNC_COMMITTEE_SIZE },
-	{ config::SYNC_COMMITTEE_BITS_SIZE },
-> {
-	load_fixture("sync-committee-update.json".to_string()).unwrap()
-}
-
-pub fn load_finalized_header_update_fixture() -> snowbridge_beacon_primitives::Update<
-	{ config::SYNC_COMMITTEE_SIZE },
-	{ config::SYNC_COMMITTEE_BITS_SIZE },
-> {
-	load_fixture("finalized-header-update.json".to_string()).unwrap()
-}
-
-pub fn load_next_sync_committee_update_fixture() -> snowbridge_beacon_primitives::Update<
-	{ config::SYNC_COMMITTEE_SIZE },
-	{ config::SYNC_COMMITTEE_BITS_SIZE },
-> {
-	load_fixture("next-sync-committee-update.json".to_string()).unwrap()
-}
-
-pub fn load_next_finalized_header_update_fixture() -> snowbridge_beacon_primitives::Update<
-	{ config::SYNC_COMMITTEE_SIZE },
-	{ config::SYNC_COMMITTEE_BITS_SIZE },
-> {
-	load_fixture("next-finalized-header-update.json".to_string()).unwrap()
-}
-
-pub fn load_sync_committee_update_period_0() -> Box<
-	snowbridge_beacon_primitives::Update<
+pub fn load_sync_committee_update_fixture() -> Update {
+	let update: snowbridge_beacon_primitives::Update<
 		{ config::SYNC_COMMITTEE_SIZE },
 		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	>,
-> {
-	Box::new(load_fixture("sync-committee-update-period-0.json".to_string()).unwrap())
+	> = load_fixture("sync-committee-update.json".to_string()).unwrap();
+	update.into()
 }
 
-pub fn load_sync_committee_update_period_0_older_fixture() -> Box<
-	snowbridge_beacon_primitives::Update<
+pub fn load_finalized_header_update_fixture() -> Update {
+	let update: snowbridge_beacon_primitives::Update<
 		{ config::SYNC_COMMITTEE_SIZE },
 		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	>,
-> {
-	Box::new(load_fixture("sync-committee-update-period-0-older.json".to_string()).unwrap())
+	> = load_fixture("finalized-header-update.json".to_string()).unwrap();
+	update.into()
 }
 
-pub fn load_sync_committee_update_period_0_newer_fixture() -> Box<
-	snowbridge_beacon_primitives::Update<
+pub fn load_next_sync_committee_update_fixture() -> Update {
+	let update: snowbridge_beacon_primitives::Update<
 		{ config::SYNC_COMMITTEE_SIZE },
 		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	>,
-> {
-	Box::new(load_fixture("sync-committee-update-period-0-newer.json".to_string()).unwrap())
+	> = load_fixture("next-sync-committee-update.json".to_string()).unwrap();
+	update.into()
 }
 
-pub fn get_message_verification_payload() -> (Log, Proof) {
-	let inbound_fixture = snowbridge_pallet_ethereum_client_fixtures::make_inbound_fixture();
-	(inbound_fixture.event.event_log, inbound_fixture.event.proof)
+pub fn load_next_finalized_header_update_fixture() -> Update {
+	let update: snowbridge_beacon_primitives::Update<
+		{ config::SYNC_COMMITTEE_SIZE },
+		{ config::SYNC_COMMITTEE_BITS_SIZE },
+	> = load_fixture("next-finalized-header-update.json".to_string()).unwrap();
+	update.into()
+}
+
+pub fn load_sync_committee_update_period_0() -> Box<Update> {
+	let update: snowbridge_beacon_primitives::Update<
+		{ config::SYNC_COMMITTEE_SIZE },
+		{ config::SYNC_COMMITTEE_BITS_SIZE },
+	> = load_fixture("sync-committee-update-period-0.json".to_string()).unwrap();
+	Box::new(update.into())
+}
+
+pub fn load_sync_committee_update_period_0_older_fixture() -> Box<Update> {
+	let update: snowbridge_beacon_primitives::Update<
+		{ config::SYNC_COMMITTEE_SIZE },
+		{ config::SYNC_COMMITTEE_BITS_SIZE },
+	> = load_fixture("sync-committee-update-period-0-older.json".to_string()).unwrap();
+	Box::new(update.into())
+}
+
+pub fn load_sync_committee_update_period_0_newer_fixture() -> Box<Update> {
+	let update: snowbridge_beacon_primitives::Update<
+		{ config::SYNC_COMMITTEE_SIZE },
+		{ config::SYNC_COMMITTEE_BITS_SIZE },
+	> = load_fixture("sync-committee-update-period-0-newer.json".to_string()).unwrap();
+	Box::new(update.into())
 }
 
 frame_support::construct_runtime!(
@@ -143,28 +143,26 @@ parameter_types! {
 			epoch: 100000000,
 		}
 	};
+	pub static EventLogVerifierEnabled: bool = true;
 }
 
 pub const FREE_SLOTS_INTERVAL: u32 = config::SLOTS_PER_EPOCH as u32;
 
 impl ethereum_beacon_client::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type ForkVersions = ChainForkVersions;
 	type FreeHeadersInterval = ConstU32<FREE_SLOTS_INTERVAL>;
+	type EventLogVerifierEnabled = EventLogVerifierEnabled;
 	type WeightInfo = ();
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_tester() -> sp_io::TestExternalities {
 	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
-	let ext = sp_io::TestExternalities::new(t);
-	ext
+
+	sp_io::TestExternalities::new(t)
 }
 
 pub fn initialize_storage() -> DispatchResult {
 	let inbound_fixture = snowbridge_pallet_ethereum_client_fixtures::make_inbound_fixture();
-	EthereumBeaconClient::store_finalized_header(
-		inbound_fixture.finalized_header,
-		inbound_fixture.block_roots_root,
-	)
+	ethereum_beacon_client::ForkVersionSchedule::<Test>::put(ChainForkVersions::get());
+	EthereumBeaconClient::store_finalized_header(inbound_fixture.finalized_header)
 }

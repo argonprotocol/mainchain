@@ -44,7 +44,6 @@ use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::{http::StatusCode, routing::get, Router};
-use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
 /// Debug sqlite connections. This function is for sqlx unit tests. To activate, your test signature
@@ -137,10 +136,6 @@ pub struct MockNotary {
   pub state: Arc<Mutex<NotaryState>>,
   pub ticker: Arc<Mutex<Ticker>>,
   pub header_channel: (NotificationSender<NotebookHeaderInfo>, NotebookHeaderStream),
-}
-#[derive(Debug, Deserialize, Serialize)]
-struct NotebookParam {
-  notebook_number: NotebookNumber,
 }
 
 impl MockNotary {

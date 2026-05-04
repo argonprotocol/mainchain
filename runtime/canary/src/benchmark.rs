@@ -24,4 +24,5 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_vaults, Vaults]
 	[pallet_treasury, Treasury]
 	[pallet_operational_accounts, OperationalAccounts]
+	[pallet_ethereum_verifier, EthereumVerifier]
 );

@@ -33,6 +33,17 @@ export * from './convert';
 export * from './BitcoinLock';
 export * from './PriceIndex';
 export {
+  buildEthereumEventProof,
+  type EthereumEventLocator,
+  type EthereumEventProof,
+  type EthereumVerifyEventLogResult,
+} from './EthereumProof';
+export {
+  getEthereumBeaconSyncBootstrapTx,
+  getEthereumBeaconSyncState,
+  getNextEthereumBeaconSyncTxs,
+} from './EthereumBeaconSync';
+export {
   Keyring,
   KeyringPair,
   KeyringPair$Json,
@@ -96,6 +107,7 @@ export { type BlockHash } from '@polkadot/types/interfaces/chain';
 export { InterfaceTypes as interfaces };
 
 export type ArgonClient = ApiPromise;
+export type IArgonQueryable = ArgonClient | ApiDecoration<'promise'>;
 
 /**
  * Wait for the crypto library to be ready (requires wasm, which needs async loading in commonjs)

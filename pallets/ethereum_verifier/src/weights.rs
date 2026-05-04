@@ -28,14 +28,17 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
-use sp_std::marker::PhantomData;
+use argon_primitives::EthereumVerifyProviderWeightInfo;
+use core::marker::PhantomData;
+use polkadot_sdk::frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
 
 /// Weight functions needed for ethereum_beacon_client.
 pub trait WeightInfo {
 	fn force_checkpoint() -> Weight;
 	fn submit() -> Weight;
 	fn submit_with_sync_committee() -> Weight;
+	fn import_execution_header_anchor() -> Weight;
+	fn provider_verify_event_log() -> Weight;
 }
 
 // For backwards compatibility and tests
@@ -57,5 +60,21 @@ impl WeightInfo for () {
 			.saturating_add(Weight::from_parts(0, 93857))
 			.saturating_add(RocksDbWeight::get().reads(6))
 			.saturating_add(RocksDbWeight::get().writes(1))
+	}
+	fn import_execution_header_anchor() -> Weight {
+		Self::submit()
+	}
+	fn provider_verify_event_log() -> Weight {
+		Weight::from_parts(25_000_000_000_u64, 0)
+			.saturating_add(Weight::from_parts(0, 8192))
+			.saturating_add(RocksDbWeight::get().reads(1))
+	}
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+
+impl<T: crate::Config> EthereumVerifyProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn verify_event_log() -> Weight {
+		T::WeightInfo::provider_verify_event_log()
 	}
 }
