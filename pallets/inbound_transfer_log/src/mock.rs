@@ -66,6 +66,7 @@ pub mod gateway {
 	use pallet_token_gateway::types::EvmToSubstrate;
 	use sp_core::{H160, H256};
 	use sp_runtime::AccountId32;
+	use std::collections::BTreeMap;
 
 	type Block = frame_system::mocking::MockBlock<GatewayTest>;
 
@@ -334,8 +335,7 @@ pub mod gateway {
 			_keys: Vec<Vec<u8>>,
 			_root: ismp::consensus::StateCommitment,
 			_proof: &Proof,
-		) -> Result<sp_std::collections::btree_map::BTreeMap<Vec<u8>, Option<Vec<u8>>>, IsmpError>
-		{
+		) -> Result<BTreeMap<Vec<u8>, Option<Vec<u8>>>, IsmpError> {
 			unimplemented!("mock state proof")
 		}
 	}

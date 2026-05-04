@@ -1,0 +1,27 @@
+{
+  "name": "@argonprotocol/ethereum-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "hardhat compile",
+    "tsc": "hardhat compile",
+    "tsup": "hardhat compile",
+    "typecheck": "tsc --noEmit",
+    "pretest": "hardhat compile",
+    "pretest:ci": "hardhat compile",
+    "test": "yarn pretest && yarn --cwd ../../.. exec vitest --run --config vitest.config.ts --project ethereum-contracts",
+    "bootstrap:deploy": "node --import tsx script/bootstrap/deploy.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.10",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@openzeppelin/contracts-upgradeable": "^5.4.0",
+    "@types/node": "22.17.1",
+    "ethers": "^6.15.0",
+    "hardhat": "^3.4.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "yarn@4.1.1"
+}

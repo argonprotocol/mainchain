@@ -10,6 +10,7 @@ export default defineConfig({
     projects: [
       {
         test: {
+          name: 'bitcoin',
           testTimeout: 30_000,
           hookTimeout: 30_000,
           include: ['bitcoin/nodejs/ts/__test__/**/*.test.ts'],
@@ -18,6 +19,7 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'localchain',
           testTimeout: 120_000,
           hookTimeout: 120_000,
           retry: 2,
@@ -26,11 +28,24 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'mainchain-client',
           testTimeout: 120_000,
           hookTimeout: 120_000,
           retry: 0,
           maxConcurrency: 1,
           include: ['client/nodejs/src/__test__/**/*.test.ts'],
+        },
+      },
+      {
+        root: 'chains/ethereum/contracts',
+        test: {
+          name: 'ethereum-contracts',
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
+          retry: 0,
+          maxConcurrency: 1,
+          include: ['test/**/*.test.ts'],
+          setupFiles: ['test/setupVitest.ts'],
         },
       },
     ],
