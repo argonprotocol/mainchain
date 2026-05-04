@@ -93,7 +93,7 @@ Local pallets in this repo (`pallets/*`):
 | `pallet_block_rewards`        | [ ]              | [ ]           |
 | `pallet_block_seal`           | [x]              | [x]           |
 | `pallet_block_seal_spec`      | [x]              | [x]           |
-| `pallet_chain_transfer`       | [x]              | [x]           |
+| `pallet_localchain_transfer`  | [x]              | [x]           |
 | `pallet_digests`              | [ ]              | [ ]           |
 | `pallet_domains`              | [ ]              | [ ]           |
 | `pallet_fee_control`          | [ ]              | [ ]           |
@@ -134,7 +134,7 @@ Upstream / runtime pallets:
   - `pallet_block_seal`,
   - `pallet_block_seal_spec`,
   - `pallet_bitcoin_utxos`,
-  - `pallet_chain_transfer`,
+  - `pallet_localchain_transfer`,
   - `pallet_ticks`,
   - `pallet_notebook`,
   - `pallet_mining_slot`,
@@ -159,9 +159,9 @@ benchmark measures cleanly without production block-author state.
 
 `pallet_token_gateway` benchmarks call `T::CreateOrigin::try_successful_origin()`. In production
 that origin is derived from the singleton token-admin wiring, which in this repo resolves through
-`ChainTransfer::hyperbridge_token_admin()`. Benchmark runtimes therefore provide a minimal
+`LocalchainTransfer::hyperbridge_token_admin()`. Benchmark runtimes therefore provide a minimal
 benchmark-only token-admin account and `SortedMembers` implementation so token-gateway benchmarks do
-not depend on chain-transfer genesis initialization.
+not depend on localchain-transfer genesis initialization.
 
 ### Notebook inherent event handler weight composition
 
@@ -169,7 +169,7 @@ not depend on chain-transfer genesis initialization.
 pattern as `BlockSealEventHandler::block_seal_read_weight`). The notebook `submit` inherent includes
 this in its weight declaration so the block builder accounts for event handler costs.
 
-`pallet_chain_transfer` implements this as
+`pallet_localchain_transfer` implements this as
 `notebook_submitted_event_handler(chain_transfers) + process_expired_transfers(MaxPendingTransfersOutPerBlock)`.
 
 Measured cost at worst case (1000 expired transfers across 1000 ticks): ~44ms total ref_time, which

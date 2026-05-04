@@ -531,95 +531,6 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
     };
-    chainTransfer: {
-      /**
-       * A localchain transfer could not be cleaned up properly. Possible invalid transfer
-       * needing investigation.
-       **/
-      PossibleInvalidLocalchainTransferAllowed: AugmentedEvent<
-        ApiType,
-        [transferId: u32, notaryId: u32, notebookNumber: u32],
-        { transferId: u32; notaryId: u32; notebookNumber: u32 }
-      >;
-      /**
-       * Taxation failed
-       **/
-      TaxationError: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError],
-        { notaryId: u32; notebookNumber: u32; tax: u128; error: SpRuntimeDispatchError }
-      >;
-      /**
-       * Transfer from Localchain to Mainchain
-       **/
-      TransferFromLocalchain: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, amount: u128, notaryId: u32],
-        { accountId: AccountId32; amount: u128; notaryId: u32 }
-      >;
-      /**
-       * A transfer into the mainchain failed
-       **/
-      TransferFromLocalchainError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          amount: u128,
-          notaryId: u32,
-          notebookNumber: u32,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          amount: u128;
-          notaryId: u32;
-          notebookNumber: u32;
-          error: SpRuntimeDispatchError;
-        }
-      >;
-      /**
-       * Funds sent to a localchain
-       **/
-      TransferToLocalchain: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64],
-        {
-          accountId: AccountId32;
-          amount: u128;
-          transferId: u32;
-          notaryId: u32;
-          expirationTick: u64;
-        }
-      >;
-      /**
-       * Transfer to localchain expired and rolled back
-       **/
-      TransferToLocalchainExpired: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, transferId: u32, notaryId: u32],
-        { accountId: AccountId32; transferId: u32; notaryId: u32 }
-      >;
-      /**
-       * An expired transfer to localchain failed to be refunded
-       **/
-      TransferToLocalchainRefundError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          transferId: u32,
-          notaryId: u32,
-          notebookNumber: u32,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          transferId: u32;
-          notaryId: u32;
-          notebookNumber: u32;
-          error: SpRuntimeDispatchError;
-        }
-      >;
-    };
     digests: {};
     domains: {
       /**
@@ -864,6 +775,95 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [stateMachines: Vec<IsmpHostStateMachine>],
         { stateMachines: Vec<IsmpHostStateMachine> }
+      >;
+    };
+    localchainTransfer: {
+      /**
+       * A localchain transfer could not be cleaned up properly. Possible invalid transfer
+       * needing investigation.
+       **/
+      PossibleInvalidLocalchainTransferAllowed: AugmentedEvent<
+        ApiType,
+        [transferId: u32, notaryId: u32, notebookNumber: u32],
+        { transferId: u32; notaryId: u32; notebookNumber: u32 }
+      >;
+      /**
+       * Taxation failed
+       **/
+      TaxationError: AugmentedEvent<
+        ApiType,
+        [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError],
+        { notaryId: u32; notebookNumber: u32; tax: u128; error: SpRuntimeDispatchError }
+      >;
+      /**
+       * Transfer from Localchain to Mainchain
+       **/
+      TransferFromLocalchain: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, amount: u128, notaryId: u32],
+        { accountId: AccountId32; amount: u128; notaryId: u32 }
+      >;
+      /**
+       * A transfer into the mainchain failed
+       **/
+      TransferFromLocalchainError: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          amount: u128,
+          notaryId: u32,
+          notebookNumber: u32,
+          error: SpRuntimeDispatchError,
+        ],
+        {
+          accountId: AccountId32;
+          amount: u128;
+          notaryId: u32;
+          notebookNumber: u32;
+          error: SpRuntimeDispatchError;
+        }
+      >;
+      /**
+       * Funds sent to a localchain
+       **/
+      TransferToLocalchain: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64],
+        {
+          accountId: AccountId32;
+          amount: u128;
+          transferId: u32;
+          notaryId: u32;
+          expirationTick: u64;
+        }
+      >;
+      /**
+       * Transfer to localchain expired and rolled back
+       **/
+      TransferToLocalchainExpired: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, transferId: u32, notaryId: u32],
+        { accountId: AccountId32; transferId: u32; notaryId: u32 }
+      >;
+      /**
+       * An expired transfer to localchain failed to be refunded
+       **/
+      TransferToLocalchainRefundError: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          transferId: u32,
+          notaryId: u32,
+          notebookNumber: u32,
+          error: SpRuntimeDispatchError,
+        ],
+        {
+          accountId: AccountId32;
+          transferId: u32;
+          notaryId: u32;
+          notebookNumber: u32;
+          error: SpRuntimeDispatchError;
+        }
       >;
     };
     miningSlot: {

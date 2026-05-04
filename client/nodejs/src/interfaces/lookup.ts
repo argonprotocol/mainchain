@@ -803,9 +803,9 @@ export default {
     ],
   },
   /**
-   * Lookup76: pallet_chain_transfer::pallet::Event<T>
+   * Lookup76: pallet_localchain_transfer::pallet::Event<T>
    **/
-  PalletChainTransferEvent: {
+  PalletLocalchainTransferEvent: {
     _enum: {
       TransferToLocalchain: {
         accountId: 'AccountId32',
@@ -2287,9 +2287,9 @@ export default {
     accountUid: 'Compact<u32>',
   },
   /**
-   * Lookup249: pallet_chain_transfer::pallet::Call<T>
+   * Lookup249: pallet_localchain_transfer::pallet::Call<T>
    **/
-  PalletChainTransferCall: {
+  PalletLocalchainTransferCall: {
     _enum: {
       send_to_localchain: {
         amount: 'Compact<u128>',
@@ -3434,9 +3434,9 @@ export default {
     ],
   },
   /**
-   * Lookup457: pallet_chain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
+   * Lookup457: pallet_localchain_transfer::QueuedTransferOut<sp_core::crypto::AccountId32, Balance>
    **/
-  PalletChainTransferQueuedTransferOut: {
+  PalletLocalchainTransferQueuedTransferOut: {
     accountId: 'AccountId32',
     amount: 'u128',
     expirationTick: 'u64',
@@ -3447,9 +3447,9 @@ export default {
    **/
   FrameSupportPalletId: '[u8;8]',
   /**
-   * Lookup460: pallet_chain_transfer::pallet::Error<T>
+   * Lookup460: pallet_localchain_transfer::pallet::Error<T>
    **/
-  PalletChainTransferError: {
+  PalletLocalchainTransferError: {
     _enum: [
       'MaxBlockTransfersExceeded',
       'InsufficientFunds',

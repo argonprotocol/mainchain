@@ -3,7 +3,7 @@ use alloc::collections::btree_map::BTreeMap;
 use pallet_prelude::*;
 use sp_keyring::Sr25519Keyring::Alice;
 
-use crate as pallet_chain_transfer;
+use crate as pallet_localchain_transfer;
 use argon_primitives::{
 	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
 	notary::{NotaryProvider, NotarySignature},
@@ -20,7 +20,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
-		ChainTransfer: pallet_chain_transfer,
+		LocalchainTransfer: pallet_localchain_transfer,
 		Timestamp: pallet_timestamp,
 
 	}
@@ -163,7 +163,7 @@ impl pallet_timestamp::Config for Test {
 	type WeightInfo = ();
 }
 
-impl pallet_chain_transfer::Config for Test {
+impl pallet_localchain_transfer::Config for Test {
 	type WeightInfo = ();
 	type Argon = Balances;
 	type Balance = Balance;
@@ -179,7 +179,7 @@ impl pallet_chain_transfer::Config for Test {
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
-		pallet_chain_transfer::GenesisConfig::<Test> {
+		pallet_localchain_transfer::GenesisConfig::<Test> {
 			hyperbridge_token_admin: Some(Alice.to_account_id()),
 			..Default::default()
 		}

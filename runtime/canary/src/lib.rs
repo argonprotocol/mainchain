@@ -86,7 +86,7 @@ mod runtime {
 	#[runtime::pallet_index(11)]
 	pub type Notebook = pallet_notebook;
 	#[runtime::pallet_index(12)]
-	pub type ChainTransfer = pallet_chain_transfer;
+	pub type LocalchainTransfer = pallet_localchain_transfer;
 	#[runtime::pallet_index(13)]
 	pub type BlockSealSpec = pallet_block_seal_spec;
 	#[runtime::pallet_index(14)]
@@ -492,10 +492,10 @@ impl pallet_grandpa::Config for Runtime {
 	type EquivocationReportSystem = ();
 }
 
-impl pallet_chain_transfer::Config for Runtime {
-	type WeightInfo = pallet_chain_transfer::weights::WithProviderWeights<
+impl pallet_localchain_transfer::Config for Runtime {
+	type WeightInfo = pallet_localchain_transfer::weights::WithProviderWeights<
 		Runtime,
-		weights::pallet_chain_transfer::WeightInfo<Runtime>,
+		weights::pallet_localchain_transfer::WeightInfo<Runtime>,
 	>;
 	type Argon = Balances;
 	type Balance = Balance;
@@ -504,7 +504,7 @@ impl pallet_chain_transfer::Config for Runtime {
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type EventHandler = use_unless_benchmark!(Mint, ());
-	type PalletId = ChainTransferPalletId;
+	type PalletId = LocalchainTransferPalletId;
 	type TransferExpirationTicks = TransferExpirationTicks;
 	type MaxPendingTransfersOutPerBlock = MaxPendingTransfersOutPerBlock;
 }
@@ -514,9 +514,9 @@ impl pallet_notebook::Config for Runtime {
 		Runtime,
 		weights::pallet_notebook::WeightInfo<Runtime>,
 	>;
-	type EventHandler = use_unless_benchmark!((ChainTransfer, BlockSealSpec, Domains), ());
+	type EventHandler = use_unless_benchmark!((LocalchainTransfer, BlockSealSpec, Domains), ());
 	type NotaryProvider = use_unless_benchmark!(Notaries, benchmarking::BenchmarkNotaryProvider);
-	type ChainTransferLookup = ChainTransfer;
+	type ChainTransferLookup = LocalchainTransfer;
 	type BlockSealSpecProvider = BlockSealSpec;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type Digests = Digests;
@@ -802,4 +802,4 @@ impl IsmpRouter for Router {
 	}
 }
 
-argon_runtime_common::token_asset!(Ownership, ChainTransfer::hyperbridge_token_admin());
+argon_runtime_common::token_asset!(Ownership, LocalchainTransfer::hyperbridge_token_admin());

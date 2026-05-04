@@ -23,7 +23,7 @@ Testnet registration
 The following are where configs are set:
 
 1. `pallet_ismp::AdminOrigin`: This origin can whitelist return addresses. Initially set to sudo
-2. `pallet_chain_transfer::HyperbridgeTokenAdmin`: This origin can update token registrations.
+2. `pallet_localchain_transfer::HyperbridgeTokenAdmin`: This origin can update token registrations.
    Registered in genesis
 
 ### Batch submit

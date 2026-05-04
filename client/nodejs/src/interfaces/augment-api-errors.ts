@@ -352,37 +352,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxNotebooksAtTickExceeded: AugmentedError<ApiType>;
     };
-    chainTransfer: {
-      /**
-       * Insufficient balance to create this transfer
-       **/
-      InsufficientFunds: AugmentedError<ApiType>;
-      /**
-       * Insufficient balance to fulfill a mainchain transfer
-       **/
-      InsufficientNotarizedFunds: AugmentedError<ApiType>;
-      /**
-       * The notary id is not registered
-       **/
-      InvalidNotaryUsedForTransfer: AugmentedError<ApiType>;
-      /**
-       * The transfer was already submitted in a previous block
-       **/
-      InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
-      MaxBlockTransfersExceeded: AugmentedError<ApiType>;
-      /**
-       * No transfer IDs are currently available
-       **/
-      NoAvailableTransferId: AugmentedError<ApiType>;
-      /**
-       * The notary is currently locked and cannot process transfers
-       **/
-      NotaryLockedForTransfer: AugmentedError<ApiType>;
-      /**
-       * A transfer was submitted in a previous block but the expiration block has passed
-       **/
-      NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
-    };
     digests: {
       /**
        * Failed to decode digests
@@ -523,6 +492,37 @@ declare module '@polkadot/api-base/types/errors' {
        * Couldn't update unbonding period
        **/
       UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
+    };
+    localchainTransfer: {
+      /**
+       * Insufficient balance to create this transfer
+       **/
+      InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * Insufficient balance to fulfill a mainchain transfer
+       **/
+      InsufficientNotarizedFunds: AugmentedError<ApiType>;
+      /**
+       * The notary id is not registered
+       **/
+      InvalidNotaryUsedForTransfer: AugmentedError<ApiType>;
+      /**
+       * The transfer was already submitted in a previous block
+       **/
+      InvalidOrDuplicatedLocalchainTransfer: AugmentedError<ApiType>;
+      MaxBlockTransfersExceeded: AugmentedError<ApiType>;
+      /**
+       * No transfer IDs are currently available
+       **/
+      NoAvailableTransferId: AugmentedError<ApiType>;
+      /**
+       * The notary is currently locked and cannot process transfers
+       **/
+      NotaryLockedForTransfer: AugmentedError<ApiType>;
+      /**
+       * A transfer was submitted in a previous block but the expiration block has passed
+       **/
+      NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
     };
     miningSlot: {
       /**

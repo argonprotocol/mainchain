@@ -975,7 +975,6 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
- "pallet-chain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-fee-control",
@@ -983,6 +982,7 @@ dependencies = [
  "pallet-inbound-transfer-log",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
+ "pallet-localchain-transfer",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-notaries",
@@ -1318,7 +1318,6 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
- "pallet-chain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-fee-control",
@@ -1326,6 +1325,7 @@ dependencies = [
  "pallet-inbound-transfer-log",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
+ "pallet-localchain-transfer",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-notaries",
@@ -1362,13 +1362,13 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
- "pallet-chain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-fee-control",
  "pallet-hyperbridge",
  "pallet-ismp",
  "pallet-ismp-runtime-api",
+ "pallet-localchain-transfer",
  "pallet-mining-slot",
  "pallet-mint",
  "pallet-notaries",
@@ -11196,17 +11196,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-chain-transfer"
-version = "1.4.3"
-dependencies = [
- "argon-notary-audit",
- "pallet-prelude",
- "parity-scale-codec",
- "polkadot-sdk",
- "scale-info",
-]
-
-[[package]]
 name = "pallet-child-bounties"
 version = "44.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11828,6 +11817,17 @@ dependencies = [
  "polkadot-sdk",
  "primitive-types 0.13.1",
  "serde",
+]
+
+[[package]]
+name = "pallet-localchain-transfer"
+version = "1.4.3"
+dependencies = [
+ "argon-notary-audit",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
 ]
 
 [[package]]

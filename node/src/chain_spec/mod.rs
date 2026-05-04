@@ -7,8 +7,8 @@ use argon_primitives::{
 	tick::Ticker,
 };
 use argon_runtime::{
-	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig,
-	ChainTransferConfig, GrandpaConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig,
+	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig, GrandpaConfig,
+	LocalchainTransferConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig,
 	PriceIndexConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
 };
 use polkadot_sdk::*;
@@ -112,7 +112,7 @@ pub(crate) fn build_genesis_config(
 		},
 		notaries: NotariesConfig { list: initial_notaries },
 		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },
-		chain_transfer: ChainTransferConfig {
+		localchain_transfer: LocalchainTransferConfig {
 			hyperbridge_token_admin: Some(hyperbridge_token_admin),
 			..Default::default()
 		},

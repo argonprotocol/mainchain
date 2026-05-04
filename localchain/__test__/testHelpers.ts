@@ -70,14 +70,14 @@ export async function transferToLocalchain(
   client: ArgonClient,
 ): Promise<number> {
   return new Promise<number>((resolve, reject) => {
-    client.tx.chainTransfer
+    client.tx.localchainTransfer
       .sendToLocalchain(amount, viaNotaryId)
       .signAndSend(account, ({ events, status }) => {
         if (status.isFinalized) {
           checkForExtrinsicSuccess(events, client)
             .then(() => {
               for (const { event } of events) {
-                if (client.events.chainTransfer.TransferToLocalchain.is(event)) {
+                if (client.events.localchainTransfer.TransferToLocalchain.is(event)) {
                   const transferId = event.data.transferId.toPrimitive() as number;
                   resolve(transferId);
                 }

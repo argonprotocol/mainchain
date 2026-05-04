@@ -70,7 +70,7 @@ pallet-block-seal = { workspace = true }
 pallet-block-seal-spec = { workspace = true }
 pallet-block-rewards = { workspace = true }
 pallet-bitcoin-locks = { workspace = true }
-pallet-chain-transfer = { workspace = true }
+pallet-localchain-transfer = { workspace = true }
 pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
 pallet-notebook = { workspace = true }
@@ -107,7 +107,6 @@ std = [
 	"pallet-block-rewards/std",
 	"pallet-block-seal-spec/std",
 	"pallet-block-seal/std",
-	"pallet-chain-transfer/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
 	"pallet-fee-control/std",
@@ -115,6 +114,7 @@ std = [
 	"pallet-inbound-transfer-log/std",
 	"pallet-ismp-runtime-api/std",
 	"pallet-ismp/std",
+	"pallet-localchain-transfer/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
 	"pallet-notaries/std",
@@ -141,12 +141,12 @@ runtime-benchmarks = [
 	"pallet-block-rewards/runtime-benchmarks",
 	"pallet-block-seal-spec/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
-	"pallet-chain-transfer/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
 	"pallet-fee-control/runtime-benchmarks",
 	"pallet-inbound-transfer-log/runtime-benchmarks",
 	"pallet-ismp/runtime-benchmarks",
+	"pallet-localchain-transfer/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
@@ -168,13 +168,13 @@ try-runtime = [
 	"pallet-block-rewards/try-runtime",
 	"pallet-block-seal-spec/try-runtime",
 	"pallet-block-seal/try-runtime",
-	"pallet-chain-transfer/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
 	"pallet-fee-control/try-runtime",
 	"pallet-hyperbridge/try-runtime",
 	"pallet-inbound-transfer-log/try-runtime",
 	"pallet-ismp/try-runtime",
+	"pallet-localchain-transfer/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
 	"pallet-notaries/try-runtime",

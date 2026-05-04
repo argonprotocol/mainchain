@@ -127,8 +127,8 @@ parameter_types! {
 
 	pub const MaxPendingTermModificationsPerTick: u32 = 100;
 
-	// ### pallet chain transfer
-	pub const ChainTransferPalletId: PalletId = PalletId(*b"transfer");
+	// ### pallet localchain transfer
+	pub const LocalchainTransferPalletId: PalletId = PalletId(*b"transfer");
 
 	/// How long a transfer should remain in storage before returning.
 	pub const TransferExpirationTicks: u32 = 1400 * 10;

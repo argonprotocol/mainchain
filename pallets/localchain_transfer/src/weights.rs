@@ -7,7 +7,7 @@ use argon_primitives::{
 };
 use pallet_prelude::*;
 
-/// Weight functions needed for pallet_chain_transfer.
+/// Weight functions needed for pallet_localchain_transfer.
 pub trait WeightInfo {
 	// Actual extrinsics
 	fn send_to_localchain() -> Weight;

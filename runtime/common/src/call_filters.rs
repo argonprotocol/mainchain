@@ -63,7 +63,7 @@ macro_rules! call_filters {
 						c,
 						RuntimeCall::Balances(..) |
 							RuntimeCall::Ownership(..) |
-							RuntimeCall::ChainTransfer(..) |
+							RuntimeCall::LocalchainTransfer(..) |
 							RuntimeCall::TokenGateway(..)
 					),
 					ProxyType::MiningBidRealPaysFee | ProxyType::MiningBid => match c {

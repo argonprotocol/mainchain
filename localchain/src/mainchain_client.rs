@@ -346,7 +346,7 @@ impl MainchainClient {
     let Ok(Some(_)) = self
       .fetch_storage(
         &storage()
-          .chain_transfer()
+          .localchain_transfer()
           .pending_transfers_out(transfer_id),
         None,
       )
@@ -381,7 +381,9 @@ impl MainchainClient {
         .mortal_from_unchecked(mortality, current_block_number as u64, current_block)
         .build()
     };
-    let send_tx = tx().chain_transfer().send_to_localchain(amount, notary_id);
+    let send_tx = tx()
+      .localchain_transfer()
+      .send_to_localchain(amount, notary_id);
 
     let payload = {
       let tx_tmp = client
@@ -412,7 +414,7 @@ impl MainchainClient {
 
     let transfer = in_block.events.iter().find_map(|event| {
       if let Some(Ok(transfer)) = event
-        .as_event::<api::chain_transfer::events::TransferToLocalchain>()
+        .as_event::<api::localchain_transfer::events::TransferToLocalchain>()
         .transpose()
       {
         if transfer.account_id.0 == account_bytes {
@@ -444,7 +446,7 @@ impl MainchainClient {
     if let Some(transfer) = self
       .fetch_storage(
         &storage()
-          .chain_transfer()
+          .localchain_transfer()
           .pending_transfers_out(transfer_id),
         None,
       )
@@ -477,7 +479,7 @@ impl MainchainClient {
           continue;
         };
         if let Some(Ok(transfer)) = event
-          .as_event::<api::chain_transfer::events::TransferToLocalchain>()
+          .as_event::<api::localchain_transfer::events::TransferToLocalchain>()
           .transpose()
         {
           if transfer.transfer_id == transfer_id {
