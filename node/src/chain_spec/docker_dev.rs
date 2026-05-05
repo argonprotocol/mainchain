@@ -67,7 +67,6 @@ pub fn docker_dev_config() -> Result<ChainSpec, String> {
 			slot_bidding_start_after_ticks: 0,
 		},
 		minimum_bitcoin_lock_satoshis: 100,
-		hyperbridge_token_admin: get_account_id_from_seed::<sr25519::Public>("Alice"),
 	}))
 	.build())
 }

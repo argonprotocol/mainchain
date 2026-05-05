@@ -9,7 +9,6 @@ use sp_core::{
 	H256, OpaquePeerId,
 	crypto::{CryptoTypeId, KeyTypeId},
 };
-use sp_debug_derive::RuntimeDebug;
 use sp_runtime::traits::{Block, OpaqueKeys};
 
 pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
@@ -37,7 +36,7 @@ pub type ComputeDifficulty = u128;
 	CloneNoBound,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Deserialize,
@@ -65,7 +64,7 @@ pub type FrameId = u64;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Deserialize,
@@ -115,7 +114,7 @@ impl<A: Parameter, B: Parameter + MaxEncodedLen, K: OpaqueKeys + Parameter>
 	DecodeWithMemTracking,
 	Eq,
 	PartialEq,
-	RuntimeDebug,
+	Debug,
 	Default,
 	TypeInfo,
 	MaxEncodedLen,
@@ -140,7 +139,7 @@ pub struct MiningSlotConfig {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,
@@ -157,15 +156,7 @@ impl MaxEncodedLen for PeerId {
 pub type MinerIndex = (FrameId, u32);
 
 #[derive(
-	PartialEq,
-	Eq,
-	Clone,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct MiningAuthority<AuthorityId, AccountId> {
 	pub authority_index: MinerIndex,
@@ -193,15 +184,7 @@ pub struct MiningBidStats {
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	MaxEncodedLen,
-	RuntimeDebug,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug,
 )]
 pub struct BlockPayout<AccountId, Balance>
 where
@@ -218,15 +201,7 @@ where
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	MaxEncodedLen,
-	RuntimeDebug,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug,
 )]
 pub enum BlockRewardType {
 	Miner,

@@ -1,7 +1,6 @@
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_debug_derive::RuntimeDebug;
 
 #[derive(
 	PartialEq,
@@ -11,7 +10,7 @@ use sp_debug_derive::RuntimeDebug;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,

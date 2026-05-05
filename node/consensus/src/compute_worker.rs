@@ -59,8 +59,8 @@ pub(crate) struct MiningMetadata<H> {
 	pub solving_with_notebooks_at_tick: (Tick, u32),
 }
 
-pub(crate) struct SolvingBlock<B: BlockT, Proof> {
-	pub proposal: BlockProposal<B, Proof>,
+pub(crate) struct SolvingBlock<B: BlockT> {
+	pub proposal: BlockProposal<B>,
 	/// Mining pre-hash.
 	pub pre_hash: B::Hash,
 	/// Pre-runtime digest item.
@@ -71,19 +71,19 @@ pub(crate) struct SolvingBlock<B: BlockT, Proof> {
 
 /// Mining worker that exposes structs to query the current mining build and submit mined blocks.
 #[derive(CloneNoBound)]
-pub(crate) struct ComputeHandle<B: BlockT, Proof> {
+pub(crate) struct ComputeHandle<B: BlockT> {
 	version: Arc<AtomicUsize>,
 	metadata: Arc<Mutex<Option<MiningMetadata<B::Hash>>>>,
-	solving_block: Arc<Mutex<Option<SolvingBlock<B, Proof>>>>,
-	block_found_tx: TracingUnboundedSender<(SolvingBlock<B, Proof>, BlockSealDigest)>,
+	solving_block: Arc<Mutex<Option<SolvingBlock<B>>>>,
+	block_found_tx: TracingUnboundedSender<(SolvingBlock<B>, BlockSealDigest)>,
 }
 
-impl<B, Proof> ComputeHandle<B, Proof>
+impl<B> ComputeHandle<B>
 where
 	B: BlockT,
 {
 	pub(crate) fn new(
-		block_found_tx: TracingUnboundedSender<(SolvingBlock<B, Proof>, BlockSealDigest)>,
+		block_found_tx: TracingUnboundedSender<(SolvingBlock<B>, BlockSealDigest)>,
 	) -> Self {
 		Self {
 			version: Arc::new(AtomicUsize::new(0)),
@@ -130,7 +130,7 @@ where
 		*self.metadata.lock() = Some(metadata);
 	}
 
-	pub(crate) fn start_solving(&self, proposal: BlockProposal<B, Proof>) {
+	pub(crate) fn start_solving(&self, proposal: BlockProposal<B>) {
 		let best_hash = proposal.proposal.block.header().parent_hash();
 		if self.best_hash() != Some(*best_hash) {
 			self.stop_solving_current();
@@ -312,14 +312,13 @@ impl ComputeSolver {
 	}
 }
 
-pub fn run_compute_solver_threads<B, Proof, C>(
+pub fn run_compute_solver_threads<B, C>(
 	task_handle: &TaskManager,
-	worker: ComputeHandle<B, Proof>,
+	worker: ComputeHandle<B>,
 	threads: u32,
 	consensus_metrics: Arc<Option<ConsensusMetrics<C>>>,
 ) where
 	B: BlockT,
-	Proof: Send + 'static,
 	C: AuxStore + Send + Sync + 'static,
 {
 	let handle = task_handle.spawn_essential_handle();
@@ -418,8 +417,8 @@ where
 	}
 }
 
-pub struct ComputeState<B: BlockT, Proof, C, A> {
-	compute_handle: ComputeHandle<B, Proof>,
+pub struct ComputeState<B: BlockT, C, A> {
+	compute_handle: ComputeHandle<B>,
 	client: Arc<C>,
 	genesis_hash: B::Hash,
 	ticker: Ticker,
@@ -427,12 +426,12 @@ pub struct ComputeState<B: BlockT, Proof, C, A> {
 	_phantom: PhantomData<A>,
 }
 
-impl<B: BlockT, Proof, C, A> ComputeState<B, Proof, C, A>
+impl<B: BlockT, C, A> ComputeState<B, C, A>
 where
 	C: ComputeApisExt<B, A> + AuxStore + Send + Sync + 'static,
 	A: Codec + Clone,
 {
-	pub fn new(compute_handle: ComputeHandle<B, Proof>, client: Arc<C>, ticker: Ticker) -> Self {
+	pub fn new(compute_handle: ComputeHandle<B>, client: Arc<C>, ticker: Ticker) -> Self {
 		// wait a little before we start mining
 		let compute_delay = ticker.tick_duration_millis / 5;
 		let genesis_hash = client.genesis_hash();
@@ -654,7 +653,7 @@ mod tests {
 
 		let ticker = Ticker::new(1000, 2);
 		let (tx, _) = tracing_unbounded("node::consensus::compute_block_stream", 10);
-		let compute_handle = ComputeHandle::<Block, bool>::new(tx);
+		let compute_handle = ComputeHandle::<Block>::new(tx);
 
 		let state_best_hash = H256::from_slice(&[1u8; 32]);
 		let state = Arc::new(Mutex::new(ApiState {

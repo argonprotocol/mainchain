@@ -1,7 +1,6 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 #[cfg(feature = "std")]
 use core::time::Duration;
-use polkadot_sdk::sp_core::RuntimeDebug;
 #[cfg(feature = "std")]
 use rsntp::SntpClient;
 use scale_info::TypeInfo;
@@ -17,7 +16,7 @@ pub const MAX_BLOCKS_PER_TICK: u32 = 60;
 	Decode,
 	Serialize,
 	Deserialize,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Default,
 	Clone,

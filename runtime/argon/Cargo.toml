@@ -54,17 +54,8 @@ polkadot-sdk.features = [
     "pallet-transaction-payment",
     "pallet-transaction-payment-rpc-runtime-api",
 ]
+sp-api = { workspace = true }
 frame-benchmarking = { workspace = true, default-features = false, optional = true }
-sp-debug-derive = { workspace = true, features = ["force-debug"], default-features = false }
-
-pallet-token-gateway = { workspace = true }
-pallet-ismp = { workspace = true }
-pallet-ismp-runtime-api = { workspace = true }
-pallet-hyperbridge = { workspace = true }
-ismp-grandpa = { workspace = true }
-ismp = { workspace = true }
-anyhow = { workspace = true, default-features = false }
-
 
 # Local Dependencies
 pallet-bitcoin-utxos = { workspace = true }
@@ -80,7 +71,6 @@ pallet-notaries = { workspace = true }
 pallet-treasury = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
-pallet-inbound-transfer-log = { workspace = true }
 pallet-operational-accounts = { workspace = true }
 pallet-fee-control = { workspace = true }
 pallet-ticks = { workspace = true }
@@ -100,14 +90,11 @@ polkadot-sdk = { workspace = true, features = ["sp-io", "sp-arithmetic", "sp-run
 [features]
 default = [ "std" ]
 std = [
-	"anyhow/std",
 	"argon-bitcoin/std",
 	"argon-primitives/std",
 	"argon-runtime-common/std",
 	"codec/std",
 	"frame-benchmarking/std",
-	"ismp-grandpa/std",
-	"ismp/std",
 	"log/std",
 	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
@@ -117,10 +104,6 @@ std = [
 	"pallet-digests/std",
 	"pallet-domains/std",
 	"pallet-fee-control/std",
-	"pallet-hyperbridge/std",
-	"pallet-inbound-transfer-log/std",
-	"pallet-ismp-runtime-api/std",
-	"pallet-ismp/std",
 	"pallet-localchain-transfer/std",
 	"pallet-mining-slot/std",
 	"pallet-mint/std",
@@ -130,21 +113,18 @@ std = [
 	"pallet-prelude/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
-	"pallet-token-gateway/std",
 	"pallet-treasury/std",
 	"pallet-vaults/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 	"serde_json/std",
-	"sp-debug-derive/force-debug",
-	"sp-debug-derive/std",
+	"sp-api/std",
 	"substrate-wasm-builder",
 ]
 runtime-benchmarks = [
 	"argon-primitives/runtime-benchmarks",
 	"argon-runtime-common/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
-	"ismp-grandpa/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
 	"pallet-block-rewards/runtime-benchmarks",
@@ -153,8 +133,6 @@ runtime-benchmarks = [
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
 	"pallet-fee-control/runtime-benchmarks",
-	"pallet-inbound-transfer-log/runtime-benchmarks",
-	"pallet-ismp/runtime-benchmarks",
 	"pallet-localchain-transfer/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
 	"pallet-mint/runtime-benchmarks",
@@ -164,7 +142,6 @@ runtime-benchmarks = [
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
-	"pallet-token-gateway/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
 	"polkadot-sdk/frame-system-benchmarking",
@@ -172,7 +149,6 @@ runtime-benchmarks = [
 ]
 try-runtime = [
 	"argon-runtime-common/try-runtime",
-	"ismp-grandpa/try-runtime",
 	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",
 	"pallet-block-rewards/try-runtime",
@@ -181,9 +157,6 @@ try-runtime = [
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
 	"pallet-fee-control/try-runtime",
-	"pallet-hyperbridge/try-runtime",
-	"pallet-inbound-transfer-log/try-runtime",
-	"pallet-ismp/try-runtime",
 	"pallet-localchain-transfer/try-runtime",
 	"pallet-mining-slot/try-runtime",
 	"pallet-mint/try-runtime",
@@ -192,7 +165,6 @@ try-runtime = [
 	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-ticks/try-runtime",
-	"pallet-token-gateway/try-runtime",
 	"pallet-treasury/try-runtime",
 	"pallet-vaults/try-runtime",
 	"polkadot-sdk/try-runtime",
@@ -206,4 +178,4 @@ try-runtime = [
 # `RUNTIME_METADATA_HASH` environment variable set for the `CheckMetadataHash`
 # extension.
 metadata-hash = [ "substrate-wasm-builder/metadata-hash" ]
-on-chain-release-build = [ "metadata-hash" ]
+on-chain-release-build = [ "metadata-hash", "sp-api/disable-logging" ]

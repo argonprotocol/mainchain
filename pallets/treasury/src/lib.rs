@@ -945,15 +945,7 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Encode,
-		Decode,
-		DecodeWithMemTracking,
-		Clone,
-		PartialEq,
-		Eq,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
+		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub enum BondReleaseReason {
 		/// The owner requested full-lot liquidation.
@@ -966,7 +958,7 @@ pub mod pallet {
 
 	/// One purchase of `N` whole-argon bonds for one vault.
 	#[derive(
-		Encode, Decode, Clone, PartialEqNoBound, Eq, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen,
+		Encode, Decode, Clone, PartialEqNoBound, Eq, DebugNoBound, TypeInfo, MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
 	pub struct BondLot<T: Config> {
@@ -998,7 +990,7 @@ pub mod pallet {
 	}
 
 	/// The hot-path accepted-lot entry stored on a vault.
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct BondLotSummary {
 		/// The accepted lot id.
 		#[codec(compact)]
@@ -1009,7 +1001,7 @@ pub mod pallet {
 	}
 
 	/// A lot's stored frame allocation.
-	#[derive(Encode, Decode, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct BondLotAllocation {
 		/// The lot participating in this frame snapshot.
 		#[codec(compact)]
@@ -1020,7 +1012,7 @@ pub mod pallet {
 	}
 
 	/// One vault's locked capital state for a frame.
-	#[derive(Encode, Decode, PartialEqNoBound, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct VaultCapital<T: Config> {
 		/// The lots that share this vault's frame earnings after the vault-side cut.
@@ -1035,7 +1027,7 @@ pub mod pallet {
 	}
 
 	/// The frame-wide locked capital object.
-	#[derive(Encode, Decode, PartialEqNoBound, RuntimeDebugNoBound, TypeInfo, MaxEncodedLen)]
+	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct FrameVaultCapital<T: Config> {
 		/// The frame this locked capital object belongs to.

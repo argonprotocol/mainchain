@@ -12,7 +12,6 @@ import type {
   SubmittableExtrinsicFunction,
 } from '@polkadot/api-base/types';
 import type {
-  BTreeMap,
   Bytes,
   Compact,
   Option,
@@ -40,21 +39,12 @@ import type {
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   ArgonRuntimeSessionKeys,
-  IsmpGrandpaAddStateMachine,
-  IsmpHostStateMachine,
-  IsmpMessagingCreateConsensusState,
-  IsmpMessagingMessage,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
-  PalletIsmpUtilsFundMessageParams,
-  PalletIsmpUtilsUpdateConsensusState,
   PalletMultisigTimepoint,
   PalletOperationalAccountsOperationalProgressPatch,
   PalletOperationalAccountsRegistration,
   PalletPriceIndexPriceIndex,
-  PalletTokenGatewayAssetRegistration,
-  PalletTokenGatewayPrecisionUpdate,
-  PalletTokenGatewayTeleportParams,
   PalletVaultsVaultConfig,
   SpConsensusGrandpaEquivocationProof,
   SpCoreVoid,
@@ -598,134 +588,6 @@ declare module '@polkadot/api-base/types/submittable' {
         [SpConsensusGrandpaEquivocationProof, SpCoreVoid]
       >;
     };
-    ismp: {
-      /**
-       * Create a consensus client, using a subjectively chosen consensus state. This can also
-       * be used to overwrite an existing consensus state. The dispatch origin for this
-       * call must be `T::AdminOrigin`.
-       *
-       * - `message`: [`CreateConsensusState`] struct.
-       *
-       * Emits [`Event::ConsensusClientCreated`] if successful.
-       **/
-      createConsensusClient: AugmentedSubmittable<
-        (
-          message:
-            | IsmpMessagingCreateConsensusState
-            | {
-                consensusState?: any;
-                consensusClientId?: any;
-                consensusStateId?: any;
-                unbondingPeriod?: any;
-                challengePeriods?: any;
-                stateMachineCommitments?: any;
-              }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [IsmpMessagingCreateConsensusState]
-      >;
-      /**
-       * Add more funds to a message (request or response) to be used for delivery and execution.
-       *
-       * Should not be called on a message that has been completed (delivered or timed-out) as
-       * those funds will be lost forever.
-       **/
-      fundMessage: AugmentedSubmittable<
-        (
-          message:
-            | PalletIsmpUtilsFundMessageParams
-            | { commitment?: any; amount?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletIsmpUtilsFundMessageParams]
-      >;
-      /**
-       * Execute the provided batch of ISMP messages, this will short-circuit and revert if any
-       * of the provided messages are invalid. This is an unsigned extrinsic that permits anyone
-       * execute ISMP messages for free, provided they have valid proofs and the messages have
-       * not been previously processed.
-       *
-       * The dispatch origin for this call must be an unsigned one.
-       *
-       * - `messages`: the messages to handle or process.
-       *
-       * Emits different message events based on the Message received if successful.
-       **/
-      handleUnsigned: AugmentedSubmittable<
-        (
-          messages:
-            | Vec<IsmpMessagingMessage>
-            | (
-                | IsmpMessagingMessage
-                | { Consensus: any }
-                | { FraudProof: any }
-                | { Request: any }
-                | { Response: any }
-                | { Timeout: any }
-                | string
-                | Uint8Array
-              )[],
-        ) => SubmittableExtrinsic<ApiType>,
-        [Vec<IsmpMessagingMessage>]
-      >;
-      /**
-       * Modify the unbonding period and challenge period for a consensus state.
-       * The dispatch origin for this call must be `T::AdminOrigin`.
-       *
-       * - `message`: `UpdateConsensusState` struct.
-       **/
-      updateConsensusState: AugmentedSubmittable<
-        (
-          message:
-            | PalletIsmpUtilsUpdateConsensusState
-            | { consensusStateId?: any; unbondingPeriod?: any; challengePeriods?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletIsmpUtilsUpdateConsensusState]
-      >;
-    };
-    ismpGrandpa: {
-      /**
-       * Add some a state machine to the list of supported state machines
-       **/
-      addStateMachines: AugmentedSubmittable<
-        (
-          newStateMachines:
-            | Vec<IsmpGrandpaAddStateMachine>
-            | (
-                | IsmpGrandpaAddStateMachine
-                | { stateMachine?: any; slotDuration?: any }
-                | string
-                | Uint8Array
-              )[],
-        ) => SubmittableExtrinsic<ApiType>,
-        [Vec<IsmpGrandpaAddStateMachine>]
-      >;
-      /**
-       * Remove a state machine from the list of supported state machines
-       **/
-      removeStateMachines: AugmentedSubmittable<
-        (
-          stateMachines:
-            | Vec<IsmpHostStateMachine>
-            | (
-                | IsmpHostStateMachine
-                | { Evm: any }
-                | { Polkadot: any }
-                | { Kusama: any }
-                | { Substrate: any }
-                | { Tendermint: any }
-                | { Relay: any }
-                | string
-                | Uint8Array
-              )[],
-        ) => SubmittableExtrinsic<ApiType>,
-        [Vec<IsmpHostStateMachine>]
-      >;
-    };
     localchainTransfer: {
       sendToLocalchain: AugmentedSubmittable<
         (
@@ -789,6 +651,13 @@ declare module '@polkadot/api-base/types/submittable' {
        * Register approval for a dispatch to be made from a deterministic composite account if
        * approved by a total of `threshold - 1` of `other_signatories`.
        *
+       * **This function will NEVER execute the call, even if the approval threshold is
+       * reached.** It only registers approval. To actually execute the call, `as_multi` must
+       * be called with the full call data by any of the signatories.
+       *
+       * This function is more efficient than `as_multi` for intermediate approvals since it
+       * only requires the call hash, not the full call data.
+       *
        * Payment: `DepositBase` will be reserved if this is the first approval, plus
        * `threshold` times `DepositFactor`. It is returned once this dispatch happens or
        * is cancelled.
@@ -803,7 +672,8 @@ declare module '@polkadot/api-base/types/submittable' {
        * transaction index) of the first approval transaction.
        * - `call_hash`: The hash of the call to be executed.
        *
-       * NOTE: If this is the final approval, you will want to use `as_multi` instead.
+       * NOTE: To execute the call after approvals are gathered, any signatory must call
+       * `as_multi` with the full call data. This function cannot execute the call.
        *
        * ## Complexity
        * - `O(S)`.
@@ -841,7 +711,9 @@ declare module '@polkadot/api-base/types/submittable' {
        * Register approval for a dispatch to be made from a deterministic composite account if
        * approved by a total of `threshold - 1` of `other_signatories`.
        *
-       * If there are enough, then dispatch the call.
+       * **If the approval threshold is met (including the sender's approval), this will
+       * immediately execute the call.** This is the only way to execute a multisig call -
+       * `approve_as_multi` will never trigger execution.
        *
        * Payment: `DepositBase` will be reserved if this is the first approval, plus
        * `threshold` times `DepositFactor`. It is returned once this dispatch happens or
@@ -857,8 +729,9 @@ declare module '@polkadot/api-base/types/submittable' {
        * transaction index) of the first approval transaction.
        * - `call`: The call to be executed.
        *
-       * NOTE: Unless this is the final approval, you will generally want to use
-       * `approve_as_multi` instead, since it only requires a hash of the call.
+       * NOTE: For intermediate approvals (not the final approval), you should generally use
+       * `approve_as_multi` instead, since it only requires a hash of the call and is more
+       * efficient.
        *
        * Result is equivalent to the dispatched result if `threshold` is exactly `1`. Otherwise
        * on success, result is `Ok` and the result from the interior call, if it was executed,
@@ -1892,67 +1765,6 @@ declare module '@polkadot/api-base/types/submittable' {
       set: AugmentedSubmittable<
         (now: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Compact<u64>]
-      >;
-    };
-    tokenGateway: {
-      /**
-       * Registers a multi-chain ERC6160 asset without sending any dispatch request.
-       * You should use register_asset_locally when you want to enable token gateway transfers
-       * for an asset that already exists on an external chain.
-       **/
-      createErc6160Asset: AugmentedSubmittable<
-        (
-          asset:
-            | PalletTokenGatewayAssetRegistration
-            | { localId?: any; reg?: any; native?: any; precision?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletTokenGatewayAssetRegistration]
-      >;
-      /**
-       * Set the token gateway address for specified chains
-       **/
-      setTokenGatewayAddresses: AugmentedSubmittable<
-        (addresses: BTreeMap<IsmpHostStateMachine, Bytes>) => SubmittableExtrinsic<ApiType>,
-        [BTreeMap<IsmpHostStateMachine, Bytes>]
-      >;
-      /**
-       * Teleports a registered asset
-       * locks the asset and dispatches a request to token gateway on the destination
-       **/
-      teleport: AugmentedSubmittable<
-        (
-          params:
-            | PalletTokenGatewayTeleportParams
-            | {
-                assetId?: any;
-                destination?: any;
-                recepient?: any;
-                amount?: any;
-                timeout?: any;
-                tokenGateway?: any;
-                relayerFee?: any;
-                callData?: any;
-                redeem?: any;
-              }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletTokenGatewayTeleportParams]
-      >;
-      /**
-       * Update the precision for an existing asset
-       **/
-      updateAssetPrecision: AugmentedSubmittable<
-        (
-          update:
-            | PalletTokenGatewayPrecisionUpdate
-            | { assetId?: any; precisions?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletTokenGatewayPrecisionUpdate]
       >;
     };
     treasury: {

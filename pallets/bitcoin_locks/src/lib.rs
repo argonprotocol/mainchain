@@ -263,7 +263,7 @@ pub mod pallet {
 	pub type MicrogonPerBtcHistory<T: Config> =
 		StorageValue<_, BoundedVec<(Tick, T::Balance), T::MaxBtcPriceTickAge>, ValueQuery>;
 
-	#[derive(Decode, Encode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Decode, Encode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct LockedBitcoin<T: Config> {
 		#[codec(compact)]
@@ -337,14 +337,7 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Decode,
-		Encode,
-		CloneNoBound,
-		PartialEqNoBound,
-		EqNoBound,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
+		Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub struct LockReleaseRequest<
 		Balance: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
@@ -370,14 +363,7 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Decode,
-		Encode,
-		CloneNoBound,
-		PartialEqNoBound,
-		EqNoBound,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
+		Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub struct OrphanedUtxo<BlockNumber: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen> {
 		/// The utxo id this request is related to
@@ -397,14 +383,7 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Decode,
-		Encode,
-		CloneNoBound,
-		PartialEqNoBound,
-		EqNoBound,
-		RuntimeDebug,
-		TypeInfo,
-		MaxEncodedLen,
+		Decode, Encode, CloneNoBound, PartialEqNoBound, EqNoBound, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub struct OrphanedUtxoCosignRequest<
 		BlockNumber: Clone + Eq + PartialEq + TypeInfo + Codec + MaxEncodedLen,
@@ -666,7 +645,7 @@ pub mod pallet {
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		TypeInfo,
 		MaxEncodedLen,
 	)]

@@ -97,6 +97,7 @@ where
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
+			Vec::new(),
 		)?;
 	// let runtime_overrides =
 	// 	GrandpaStateOverrider::for_chain(Chain::from_str(config.chain_spec.name())?);
@@ -290,6 +291,7 @@ where
 			client: client.clone(),
 			transaction_pool: transaction_pool.clone(),
 			spawn_handle: task_manager.spawn_handle(),
+			spawn_essential_handle: task_manager.spawn_essential_handle(),
 			import_queue,
 			block_announce_validator_builder: None,
 			warp_sync_config: Some(WarpSyncConfig::WithProvider(warp_sync)),
@@ -327,8 +329,6 @@ where
 			let deps = rpc::FullDeps {
 				client: client.clone(),
 				pool: transaction_pool.clone(),
-				backend: backend.clone(),
-
 				grandpa: GrandpaDeps {
 					shared_voter_state: shared_voter_state.clone(),
 					shared_authority_set: shared_authority_set.clone(),

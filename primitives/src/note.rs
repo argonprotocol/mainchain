@@ -8,7 +8,7 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{
-	ConstU32, RuntimeDebug,
+	ConstU32,
 	crypto::{Ss58AddressFormat, Ss58Codec},
 };
 use sp_runtime::BoundedVec;
@@ -24,7 +24,7 @@ use crate::{ADDRESS_PREFIX, AccountId, Balance, DomainHash, TransferToLocalchain
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -99,7 +99,7 @@ pub const TRANSFER_TAX_CAP: Balance = 200_000;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,

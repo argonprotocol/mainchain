@@ -126,7 +126,7 @@ pub mod pallet {
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
-		RuntimeDebug,
+		Debug,
 		TypeInfo,
 		MaxEncodedLen,
 	)]
@@ -197,7 +197,7 @@ pub mod pallet {
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		TypeInfo,
 		MaxEncodedLen,
 	)]
@@ -237,7 +237,7 @@ pub mod pallet {
 		PartialEq,
 		Eq,
 		TypeInfo,
-		RuntimeDebug,
+		Debug,
 		MaxEncodedLen,
 		Default,
 	)]
@@ -251,7 +251,7 @@ pub mod pallet {
 		PartialEq,
 		Eq,
 		TypeInfo,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
@@ -286,7 +286,7 @@ pub mod pallet {
 		PartialEq,
 		Eq,
 		TypeInfo,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
@@ -294,9 +294,7 @@ pub mod pallet {
 		V1(RegistrationV1<T>),
 	}
 
-	#[derive(
-		Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen,
-	)]
+	#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, DebugNoBound, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct OperationalAccount<T: Config> {
 		/// Vault account associated with this operational account.
@@ -346,15 +344,7 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Decode,
-		DecodeWithMemTracking,
-		Encode,
-		Clone,
-		PartialEq,
-		Eq,
-		TypeInfo,
-		RuntimeDebug,
-		MaxEncodedLen,
+		Decode, DecodeWithMemTracking, Encode, Clone, PartialEq, Eq, TypeInfo, Debug, MaxEncodedLen,
 	)]
 	pub struct OperationalProgressPatch<Balance: Member + MaxEncodedLen + Default> {
 		/// Override for whether at least one qualifying Uniswap transfer has been observed.
@@ -426,7 +416,7 @@ pub mod pallet {
 		Clone,
 		PartialEq,
 		Eq,
-		RuntimeDebug,
+		Debug,
 		TypeInfo,
 		MaxEncodedLen,
 		Default,

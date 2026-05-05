@@ -18,6 +18,8 @@ use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use codec::Codec;
 use polkadot_sdk::*;
 use sp_core::{H256, U256};
+use sp_runtime::{Digest, DispatchError};
+
 sp_api::decl_runtime_apis! {
 	#[api_version(2)]
 	pub trait BlockSealApis<AccountId:Codec, BlockSealAuthorityId:Codec> {
@@ -37,8 +39,6 @@ sp_api::decl_runtime_apis! {
 		fn is_valid_signature(block_hash: Block::Hash, seal: &BlockSealDigest, digest: &Digest) -> bool;
 	}
 }
-
-use sp_runtime::{Digest, DispatchError};
 
 sp_api::decl_runtime_apis!(
 	pub trait BlockCreatorApis<AccountId: Codec, VerifyError: Codec> {

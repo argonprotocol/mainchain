@@ -421,7 +421,7 @@ pub mod pallet {
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		TypeInfo,
 		MaxEncodedLen,
 	)]
@@ -1755,7 +1755,7 @@ pub mod pallet {
 		CloneNoBound,
 		PartialEqNoBound,
 		EqNoBound,
-		RuntimeDebugNoBound,
+		DebugNoBound,
 		TypeInfo,
 		MaxEncodedLen,
 	)]

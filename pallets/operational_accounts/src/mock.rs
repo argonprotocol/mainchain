@@ -1,10 +1,9 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
 	MiningFrameTransitionProvider, MiningSlotProvider, OperationalRewardsPayer,
-	TreasuryPoolProvider,
+	RecentArgonTransferLookup, TreasuryPoolProvider,
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
 };
-use pallet_inbound_transfer_log as inbound_transfer_log;
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,7 +18,6 @@ frame_support::construct_runtime!(
 	pub enum Test {
 		System: frame_system,
 		OperationalAccounts: pallet_operational_accounts,
-		InboundTransferLog: inbound_transfer_log,
 	}
 );
 
@@ -44,13 +42,8 @@ parameter_types! {
 	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
 	pub const OperationalReferralReward: Balance = 1_000;
 	pub const OperationalReferralBonusReward: Balance = 500;
-
-	pub const InboundTransfersRetentionBlocks: BlockNumberFor<Test> = 10;
-	pub const MaxTransfersToRetainPerBlock: u32 = 10;
-	pub const MinimumTransferMicrogonsToRecord: Balance = 1;
-	pub const MaxInboundTransferBytes: u32 = 10 * 1024;
-	pub const OwnershipAssetId: u32 = 2;
 	pub static RequiresUniswapTransfer: bool = true;
+	pub static RecentArgonTransfers: BTreeSet<TestAccountId> = BTreeSet::new();
 	pub static RegistrationVaultDataByAccount:
 		BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
 	pub static TreasuryPoolParticipantsByVaultId:
@@ -245,6 +238,13 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	}
 }
 
+pub struct MockRecentArgonTransferLookup;
+impl RecentArgonTransferLookup<TestAccountId> for MockRecentArgonTransferLookup {
+	fn has_recent_argon_transfer(account_id: &TestAccountId) -> bool {
+		RecentArgonTransfers::get().contains(account_id)
+	}
+}
+
 pub struct MockOperationalRewardsPayer;
 impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsPayer {
 	fn claim_reward(account_id: &TestAccountId, amount: Balance) -> DispatchResult {
@@ -276,19 +276,9 @@ impl pallet_operational_accounts::Config for Test {
 	type MiningSlotProvider = MockMiningSlotProvider;
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
 	type UniswapTransferRequirementProvider = RequiresUniswapTransfer;
-	type RecentArgonTransferLookup = InboundTransferLog;
+	type RecentArgonTransferLookup = MockRecentArgonTransferLookup;
 	type OperationalRewardsPayer = MockOperationalRewardsPayer;
 	type WeightInfo = ();
-}
-
-impl inbound_transfer_log::Config for Test {
-	type InboundTransfersRetentionBlocks = InboundTransfersRetentionBlocks;
-	type MaxTransfersToRetainPerBlock = MaxTransfersToRetainPerBlock;
-	type MinimumTransferMicrogonsToRecord = MinimumTransferMicrogonsToRecord;
-	type MaxInboundTransferBytes = MaxInboundTransferBytes;
-	type OwnershipAssetId = OwnershipAssetId;
-	type WeightInfo = ();
-	type OperationalAccountsHook = OperationalAccounts;
 }
 
 pub fn new_test_ext() -> TestState {
@@ -300,6 +290,7 @@ pub fn new_test_ext() -> TestState {
 	ext.execute_with(|| {
 		CurrentFrameId::set(1);
 		RequiresUniswapTransfer::set(true);
+		RecentArgonTransfers::set(BTreeSet::new());
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());

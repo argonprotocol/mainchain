@@ -37,7 +37,7 @@ macro_rules! call_filters {
 			Encode,
 			Decode,
 			DecodeWithMemTracking,
-			RuntimeDebug,
+			Debug,
 			MaxEncodedLen,
 		)]
 		pub enum ProxyType {
@@ -63,8 +63,7 @@ macro_rules! call_filters {
 						c,
 						RuntimeCall::Balances(..) |
 							RuntimeCall::Ownership(..) |
-							RuntimeCall::LocalchainTransfer(..) |
-							RuntimeCall::TokenGateway(..)
+							RuntimeCall::LocalchainTransfer(..)
 					),
 					ProxyType::MiningBidRealPaysFee | ProxyType::MiningBid => match c {
 						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. }) => true,

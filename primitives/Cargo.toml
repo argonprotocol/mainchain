@@ -21,7 +21,6 @@ scale-info = { workspace = true }
 thiserror = { workspace = true, default-features = false }
 sp-application-crypto = { workspace = true, default-features = false, features = ["serde"] }
 sp-runtime = { workspace = true, default-features = false, features = ["serde"] }
-sp-debug-derive = { workspace = true, default-features = false }
 
 impl-trait-for-tuples = { workspace = true }
 napi-derive = { workspace = true, optional = true }
@@ -79,8 +78,6 @@ std = [
 	"serde/std",
 	"serde_json/std",
 	"sp-application-crypto/std",
-	"sp-debug-derive/force-debug",
-	"sp-debug-derive/std",
 	"sp-runtime/std",
 	"thiserror/std",
 	"wasm-bindgen?/std",

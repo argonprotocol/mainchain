@@ -78,7 +78,7 @@ impl OnUnbalanced<fungible::Credit<<Test as frame_system::Config>::AccountId, Ba
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	MaxEncodedLen,
 )]
 pub enum ProxyType {

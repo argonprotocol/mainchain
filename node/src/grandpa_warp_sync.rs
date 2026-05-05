@@ -8,7 +8,7 @@ use sc_consensus_grandpa::{
 };
 use sc_network_sync::strategy::warp::{EncodedProof, WarpSyncProvider};
 use sp_blockchain::{Backend as BlockchainBackend, HeaderBackend};
-use sp_consensus_grandpa::{AuthorityList, GRANDPA_ENGINE_ID, SetId};
+use sp_consensus_grandpa::GRANDPA_ENGINE_ID;
 use sp_runtime::{
 	generic::BlockId,
 	traits::{Block as BlockT, NumberFor, One},
@@ -70,20 +70,8 @@ where
 		Ok(EncodedProof(proof.encode()))
 	}
 
-	fn verify(
-		&self,
-		proof: &EncodedProof,
-		set_id: SetId,
-		authorities: AuthorityList,
-	) -> Result<
-		sc_network_sync::strategy::warp::VerificationResult<Block>,
-		Box<dyn StdError + Send + Sync>,
-	> {
-		self.inner.verify(proof, set_id, authorities)
-	}
-
-	fn current_authorities(&self) -> AuthorityList {
-		self.inner.current_authorities()
+	fn create_verifier(&self) -> Box<dyn sc_network_sync::strategy::warp::Verifier<Block>> {
+		self.inner.create_verifier()
 	}
 }
 

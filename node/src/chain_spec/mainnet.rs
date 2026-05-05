@@ -23,7 +23,6 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 	let sudo_account = AccountId::from_str("5FYxsYvmbTfWWsfGh9oYowAvEYvcGg1MBJG6g7NfmuMwZVN1")?;
 	let bitcoin_oracle = AccountId::from_str("5HQz9hkfF27nZ7hA4e1yuFNhmK2bp8Y8S7hSwZwU6hPHaY5Y")?;
 	let price_oracle = AccountId::from_str("5EUuhQGn1zDStAcfmJG8r9Sahj5mD7Va4Nxt64oeScjCvcKP")?;
-	let token_admin = sudo_account.clone();
 
 	let notary_account = AccountId::from_str("5EqLq7FdVERJVdzM2AjxQ3v2yP4BjU9tPsKGxtcao8Vq92J8")?;
 	let notary_public = NotaryPublic::from_str("5HENL2mzQABFLQaf8fWygpmxn1oHDSzssvQzd1BkWsJETstN")
@@ -99,7 +98,6 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_after_ticks: 14_400 - 1_440, // start at day 9
 			},
 			minimum_bitcoin_lock_satoshis: 1_000,
-			hyperbridge_token_admin: token_admin,
 		}))
 		.build())
 }

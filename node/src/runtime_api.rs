@@ -7,7 +7,6 @@ use pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi;
 use sp_api::{ApiExt, Metadata};
 use sp_block_builder::BlockBuilder;
 use sp_consensus_grandpa::GrandpaApi;
-use sp_core::H256;
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use substrate_frame_rpc_system::AccountNonceApi;
@@ -42,7 +41,6 @@ pub trait BaseHostRuntimeApis:
 	+ SessionKeys<opaque::Block>
 	+ TransactionPaymentRuntimeApi<opaque::Block, Balance>
 	+ GrandpaApi<opaque::Block>
-	+ pallet_ismp_runtime_api::IsmpRuntimeApi<opaque::Block, H256>
 	+ TickApis<opaque::Block>
 	+ NotebookApis<opaque::Block, NotebookVerifyError>
 	+ BlockSealApis<opaque::Block, AccountId, BlockSealAuthorityId>
@@ -63,7 +61,6 @@ impl<Api> BaseHostRuntimeApis for Api where
 		+ SessionKeys<opaque::Block>
 		+ TransactionPaymentRuntimeApi<opaque::Block, Balance>
 		+ GrandpaApi<opaque::Block>
-		+ pallet_ismp_runtime_api::IsmpRuntimeApi<opaque::Block, H256>
 		+ TickApis<opaque::Block>
 		+ NotebookApis<opaque::Block, NotebookVerifyError>
 		+ BlockSealApis<opaque::Block, AccountId, BlockSealAuthorityId>

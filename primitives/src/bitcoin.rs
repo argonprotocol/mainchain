@@ -5,10 +5,9 @@ use frame_support::pallet_prelude::TypeInfo;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
-use sp_debug_derive::RuntimeDebug;
 use sp_runtime::BoundedVec;
 
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, RuntimeDebug)]
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, Debug)]
 pub struct BitcoinSyncStatus {
 	pub confirmed_block: BitcoinBlock,
 	pub synched_block: Option<BitcoinBlock>,
@@ -16,15 +15,7 @@ pub struct BitcoinSyncStatus {
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	RuntimeDebug,
-	MaxEncodedLen,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, Debug, MaxEncodedLen,
 )]
 pub struct BitcoinBlock {
 	#[codec(compact)]
@@ -38,7 +29,7 @@ impl BitcoinBlock {
 	}
 }
 
-#[derive(RuntimeDebug, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo)]
+#[derive(Debug, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo)]
 pub enum BitcoinError {
 	InvalidLockTime,
 	InvalidByteLength,
@@ -56,7 +47,7 @@ pub enum BitcoinError {
 	Decode,
 	DecodeWithMemTracking,
 	TypeInfo,
-	RuntimeDebug,
+	Debug,
 	MaxEncodedLen,
 )]
 #[repr(transparent)]
@@ -68,15 +59,7 @@ impl From<[u8; 33]> for CompressedBitcoinPubkey {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	TypeInfo,
-	RuntimeDebug,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, MaxEncodedLen,
 )]
 #[repr(transparent)]
 pub struct BitcoinSignature(pub BoundedVec<u8, ConstU32<74>>); // max DER sig size is 73 bytes + 1 byte sighash type
@@ -98,7 +81,7 @@ impl TryFrom<Vec<u8>> for BitcoinSignature {
 	Decode,
 	DecodeWithMemTracking,
 	TypeInfo,
-	RuntimeDebug,
+	Debug,
 	Copy,
 	MaxEncodedLen,
 )]
@@ -109,15 +92,7 @@ pub enum BitcoinCosignScriptPubkey {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	TypeInfo,
-	RuntimeDebug,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug, MaxEncodedLen,
 )]
 #[repr(transparent)]
 pub struct BitcoinScriptPubkey(pub BoundedVec<u8, ConstU32<34>>); // allow p2wsh, p2tr max
@@ -135,7 +110,7 @@ impl TryFrom<Vec<u8>> for BitcoinScriptPubkey {
 	Decode,
 	DecodeWithMemTracking,
 	TypeInfo,
-	RuntimeDebug,
+	Debug,
 	Copy,
 	MaxEncodedLen,
 )]
@@ -149,7 +124,7 @@ impl TryFrom<Vec<u8>> for OpaqueBitcoinXpub {
 }
 
 /// A Bitcoin sighash. This is a 32-byte hash that is used to sign a Bitcoin transaction.
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, Debug)]
 #[repr(transparent)]
 pub struct BitcoinSighash(pub [u8; 32]);
 
@@ -161,7 +136,7 @@ pub struct BitcoinSighash(pub [u8; 32]);
 	PartialEq,
 	Eq,
 	TypeInfo,
-	RuntimeDebug,
+	Debug,
 	Ord,
 	PartialOrd,
 	MaxEncodedLen,
@@ -176,15 +151,7 @@ pub struct UtxoRef {
 
 pub type UtxoId = u64;
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct UtxoValue {
 	/// Tracking id for the BitcoinLock used across Bitcoin pallets
@@ -202,7 +169,7 @@ pub struct UtxoValue {
 	pub watch_for_spent_until_height: BitcoinHeight,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub enum BitcoinRejectedReason {
 	/// The UTXO has satoshis is outside the accepted range
 	SatoshisOutsideAcceptedRange,
@@ -214,7 +181,7 @@ pub enum BitcoinRejectedReason {
 	AlreadyVerified,
 }
 
-#[derive(Clone, PartialEq, Eq, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum XpubErrors {
 	InvalidXpubkey,
 	InvalidXpubkeyChild,
@@ -263,7 +230,7 @@ pub enum NetworkKind {
 	Copy,
 	PartialEq,
 	Eq,
-	RuntimeDebug,
+	Debug,
 	Default,
 	MaxEncodedLen,
 )]
@@ -285,15 +252,7 @@ pub type XPubFingerprint = [u8; 4];
 pub type XPubChildNumber = u32;
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	MaxEncodedLen,
-	TypeInfo,
-	Clone,
-	PartialEq,
-	Eq,
-	RuntimeDebug,
+	Encode, Decode, DecodeWithMemTracking, MaxEncodedLen, TypeInfo, Clone, PartialEq, Eq, Debug,
 )]
 pub struct BitcoinXPub {
 	pub public_key: CompressedBitcoinPubkey,
@@ -646,7 +605,7 @@ pub const SATOSHIS_PER_BITCOIN: u64 = 100_000_000;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Ord,
 	PartialOrd,

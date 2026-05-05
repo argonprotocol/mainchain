@@ -24,8 +24,6 @@ serde = { workspace = true, features = ["derive"] }
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
-ismp = { workspace = true, default-features = true }
-pallet-inbound-transfer-log = { workspace = true, default-features = true }
 
 [features]
 default = [ "std" ]

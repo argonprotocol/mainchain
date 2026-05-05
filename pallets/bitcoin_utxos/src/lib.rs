@@ -97,7 +97,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct CandidateUtxo {
 		#[codec(compact)]
 		pub utxo_id: UtxoId,

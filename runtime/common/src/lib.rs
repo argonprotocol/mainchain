@@ -9,7 +9,6 @@ pub mod benchmarking;
 mod call_filters;
 pub mod config;
 mod deal_with_fees;
-pub mod token_asset;
 
 pub mod prelude {
 	pub use crate::config::*;
@@ -59,7 +58,6 @@ pub mod prelude {
 		},
 	};
 	pub use frame_system::{EnsureRoot, limits::BlockWeights as BlockWeightsT, pallet_prelude::*};
-	pub use ismp::host::StateMachine;
 	pub use pallet_bitcoin_locks::BitcoinVerifier;
 	pub use pallet_block_rewards::GrowthPath;
 	pub use pallet_notebook::NotebookVerifyError;

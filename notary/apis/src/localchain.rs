@@ -3,7 +3,7 @@ use jsonrpsee::{proc_macros::rpc, types::ErrorObjectOwned};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{H256, RuntimeDebug};
+use sp_core::H256;
 
 use argon_primitives::{
 	AccountId, AccountOrigin, AccountType, NewAccountOrigin, NotarizationBalanceChangeset,
@@ -34,7 +34,7 @@ pub trait LocalchainRpc {
 		account_type: AccountType,
 	) -> Result<AccountOrigin, ErrorObjectOwned>;
 }
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceChangeResult {
 	pub notebook_number: NotebookNumber,
@@ -42,7 +42,7 @@ pub struct BalanceChangeResult {
 	pub new_account_origins: Vec<NewAccountOrigin>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceTipResult {
 	pub notebook_number: NotebookNumber,
