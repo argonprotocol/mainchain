@@ -1536,7 +1536,7 @@ fn it_should_allow_a_ratchet_up() {
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		let expiration_block = lock.vault_claim_height;
 		assert_eq!(lock.security_fees, 1000 + 620);
-		let middle_block = (current_block + (expiration_block - current_block) / 2) + 1;
+		let middle_block = current_block + (expiration_block - current_block) / 2;
 		BitcoinBlockHeightChange::set((middle_block, middle_block));
 
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(65000)));
@@ -1578,6 +1578,60 @@ fn it_should_allow_a_ratchet_up() {
 			}
 			.into(),
 		)
+	});
+}
+
+#[test]
+fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
+	ChargeFee::set(true);
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		let who = 1;
+		let satoshis = SATOSHIS_PER_BITCOIN;
+		let current_block = BitcoinBlockHeightChange::get().1;
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+		let apr = FixedU128::from_float(0.00000001);
+		let securitization = Securitization::new(8_000 * MICROGONS_PER_ARGON, FixedU128::one());
+		DefaultVault::mutate(|a| {
+			a.securitization = 70_000_000_000;
+			a.terms.bitcoin_base_fee = 1000;
+			a.terms.bitcoin_annual_percent_rate = apr;
+
+			a.lock(&securitization).unwrap();
+		});
+		set_argons(who, 5000);
+		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+
+		let balance_after_one = 5000 - 1000 - 620;
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		let expiration_block = lock.vault_claim_height;
+		let start_height = lock.created_at_height;
+		let quarter_block = current_block + (expiration_block - current_block) / 4;
+		let full_term = expiration_block.saturating_sub(start_height).max(1);
+		let elapsed_blocks = quarter_block.saturating_sub(start_height);
+		let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
+		let remaining_term = FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
+		BitcoinBlockHeightChange::set((quarter_block, quarter_block));
+
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(65_000)));
+		let extension = LockExtension::new(expiration_block + 144);
+		DefaultVault::mutate(|a| {
+			a.schedule_for_release(&securitization, &extension).unwrap();
+		});
+
+		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
+		let additional_liquidity = 3_000 * MICROGONS_PER_ARGON;
+		let expected_prorated_fee =
+			apr.saturating_mul(remaining_term).saturating_mul_int(additional_liquidity);
+		assert_eq!(
+			Balances::free_balance(who),
+			balance_after_one - 1000 - expected_prorated_fee,
+			"should charge the remaining-term prorated fee"
+		);
 	});
 }
 
@@ -1730,6 +1784,8 @@ fn it_should_use_the_locked_market_rate_during_a_ratchet() {
 		ArgonPriceInUsd::set(Some(FixedU128::from_float(1.00)));
 
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None,));
+		let additional_liquidity = (101_000 * MICROGONS_PER_ARGON) - 99_009_900_990;
+		let expected_security_fee = 1000 + apr.saturating_mul_int(additional_liquidity);
 		System::assert_last_event(
 			Event::BitcoinLockRatcheted {
 				vault_id: 1,
@@ -1739,7 +1795,7 @@ fn it_should_use_the_locked_market_rate_during_a_ratchet() {
 				new_locked_market_rate: 101_000 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
-				security_fee: 1000,
+				security_fee: expected_security_fee,
 			}
 			.into(),
 		);

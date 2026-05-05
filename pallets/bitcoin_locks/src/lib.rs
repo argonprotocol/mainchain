@@ -952,11 +952,12 @@ pub mod pallet {
 				to_mint = new_liquidity_promised - original_market_rate;
 
 				let start_height = lock.created_at_height;
-				let elapsed_blocks =
-					T::BitcoinBlockHeightChange::get().1.saturating_sub(start_height);
-				let full_term = expiration_height.saturating_sub(start_height);
+				let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
+				let elapsed_blocks = current_bitcoin_height.saturating_sub(start_height);
+				let full_term = expiration_height.saturating_sub(start_height).max(1);
+				let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
 				duration_for_new_funds =
-					FixedU128::from_rational(elapsed_blocks as u128, full_term as u128);
+					FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
 			} else {
 				let redemption_price =
 					Self::get_redemption_price(&lock.satoshis, Some(original_market_rate))
