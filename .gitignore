@@ -34,3 +34,6 @@ node_modules
 /.port-lock
 /state.raw
 /.claude/worktrees
+chains/ethereum/contracts/artifacts/
+chains/ethereum/contracts/cache/
+chains/ethereum/contracts/deployments/default/

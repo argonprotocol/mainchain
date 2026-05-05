@@ -295,7 +295,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(tx.blockHash).toBeTruthy();
     console.log('Cosign transaction included in block:', tx.blockHash);
     const blockHeight = await vaulterClient
-      .at(tx.blockHash!)
+      .at(tx.blockHash)
       .then(x => x.query.system.number())
       .then(x => x.toNumber());
     console.log('Cosign transaction block height:', blockHeight);
