@@ -381,7 +381,7 @@ pub trait PriceProvider<
 >
 {
 	/// Price of the given satoshis in argon microgons
-	fn get_bitcoin_argon_price(satoshis: Satoshis) -> Option<Balance> {
+	fn get_btc_market_price_in_microgons(satoshis: Satoshis) -> Option<Balance> {
 		let satoshis = FixedU128::saturating_from_integer(satoshis);
 		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
 		let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);

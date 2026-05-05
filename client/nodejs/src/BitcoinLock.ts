@@ -1,20 +1,20 @@
-import {
-  type ArgonClient,
-  type ArgonPrimitivesBitcoinBitcoinNetwork,
-  type ArgonPrimitivesBitcoinUtxoRef,
-  formatArgons,
-  MICROGONS_PER_ARGON,
-  type SubmittableExtrinsic,
-  TxSubmitter,
-  type Vault,
+import type {
+  ArgonClient,
+  ArgonPrimitivesBitcoinBitcoinNetwork,
+  ArgonPrimitivesBitcoinUtxoRef,
 } from './index';
 import { GenericEvent } from '@polkadot/types';
+import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import type { ISubmittableOptions, TxSigningAccount } from './TxSubmitter';
+import { TxSubmitter } from './TxSubmitter';
 import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
 import { bool, Option, u128 } from '@polkadot/types-codec';
+import { formatArgons } from './utils';
+import type { Vault } from './Vault';
+import BigNumber from 'bignumber.js';
 
 export const SATS_PER_BTC = 100_000_000n;
 
@@ -400,7 +400,7 @@ export class BitcoinLock implements IBitcoinLock {
     priceIndex: PriceIndex,
     satoshis: number | bigint,
   ): Promise<bigint> {
-    return priceIndex.getBtcMicrogonPrice(satoshis);
+    return priceIndex.getBtcPriceInMicrogons(satoshis);
   }
 
   public static async getRedemptionRate(
@@ -408,37 +408,39 @@ export class BitcoinLock implements IBitcoinLock {
     details: { satoshis: bigint; lockedMarketRate?: bigint },
   ): Promise<bigint> {
     const { satoshis, lockedMarketRate } = details;
-    // scale inputs
-    const satsPerArgon = Number(SATS_PER_BTC) / MICROGONS_PER_ARGON;
-    let price = Number(priceIndex.btcUsdPrice);
-    price = (price / satsPerArgon) * Number(satoshis);
+    let price = priceIndex.getBtcPriceInMicrogons(satoshis);
 
     if (lockedMarketRate !== undefined && lockedMarketRate < price) {
-      price = Number(lockedMarketRate);
+      price = lockedMarketRate;
     }
 
-    const r = Number(priceIndex.rValue);
+    const r = priceIndex.rValue;
 
-    let multiplier: number;
+    let multiplier: BigNumber;
 
-    if (r >= 1) {
+    if (r.gte(1)) {
       // Case 1: no penalty
-      multiplier = 1;
-    } else if (r >= 0.9) {
+      multiplier = new BigNumber(1);
+    } else if (r.gte(0.9)) {
       // Case 2: quadratic curve
       // Formula: 20r² - 38r + 19
-      multiplier = 20 * (r * r) - 38 * r + 19;
-    } else if (r >= 0.01) {
+      multiplier = new BigNumber(20).times(r.pow(2)).minus(new BigNumber(38).times(r)).plus(19);
+    } else if (r.gte(0.01)) {
       // Case 3: rational linear formula
       // Formula: (0.5618r + 0.3944) / r
-      multiplier = (0.5618 * r + 0.3944) / r;
+      multiplier = new BigNumber(0.5618).times(r).plus(0.3944).div(r);
     } else {
       // Case 4: extreme deviation
       // Formula: (1 / r) * (0.576r + 0.4)
-      multiplier = (1 / r) * (0.576 * r + 0.4);
+      multiplier = new BigNumber(1).div(r).times(new BigNumber(0.576).times(r).plus(0.4));
     }
 
-    return BigInt(Math.floor(price * multiplier));
+    return BigInt(
+      new BigNumber(price.toString())
+        .times(multiplier)
+        .integerValue(BigNumber.ROUND_DOWN)
+        .toFixed(0),
+    );
   }
 
   public static async getConfig(client: IQueryableClient): Promise<IBitcoinLockConfig> {
@@ -781,7 +783,7 @@ export class BitcoinLock implements IBitcoinLock {
      * If 1_000_000 microgons are available, and the market rate is 100 microgons per satoshi, then
      * 1_000_000 / 100 = 10_000 satoshis needed
      */
-    const marketRatePerBitcoin = priceIndex.getBtcMicrogonPrice(SATS_PER_BTC);
+    const marketRatePerBitcoin = priceIndex.getBtcPriceInMicrogons(SATS_PER_BTC);
     return (argonAmount * SATS_PER_BTC) / marketRatePerBitcoin;
   }
 }

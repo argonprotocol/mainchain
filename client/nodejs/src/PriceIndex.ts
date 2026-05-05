@@ -1,12 +1,10 @@
-import {
-  ArgonClient,
-  FIXED_U128_DECIMALS,
-  fromFixedNumber,
-  MICROGONS_PER_ARGON,
-  SATS_PER_BTC,
-} from './index';
+import type { ArgonClient } from './index';
+import { FIXED_U128_DECIMALS, fromFixedNumber } from './convert';
+import { MICROGONS_PER_ARGON } from './utils';
 import BigNumber from 'bignumber.js';
 import { ApiDecoration } from '@polkadot/api/types';
+
+const SATS_PER_BTC = 100_000_000n;
 
 export class PriceIndex {
   btcUsdPrice?: BigNumber;
@@ -44,7 +42,7 @@ export class PriceIndex {
     return this;
   }
 
-  getBtcMicrogonPrice(satoshis: bigint | number): bigint {
+  getBtcPriceInMicrogons(satoshis: bigint | number): bigint {
     if (this.btcUsdPrice === undefined || this.argonUsdPrice === undefined) {
       throw new Error('PriceIndex not loaded');
     }
