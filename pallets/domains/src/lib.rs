@@ -212,15 +212,7 @@ pub mod pallet {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct DomainRegistration<AccountId>
 where

@@ -179,28 +179,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxSetIdSessionEntries: u64 & AugmentedConst<ApiType>;
     };
-    inboundTransferLog: {
-      /**
-       * How many blocks to retain inbound transfer records.
-       **/
-      inboundTransfersRetentionBlocks: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of bytes allowed in a TokenGateway request body (0 disables the cap).
-       **/
-      maxInboundTransferBytes: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of records retained from a single block.
-       **/
-      maxTransfersToRetainPerBlock: u32 & AugmentedConst<ApiType>;
-      /**
-       * Minimum amount (in base units) to record an inbound transfer.
-       **/
-      minimumTransferMicrogonsToRecord: u128 & AugmentedConst<ApiType>;
-      /**
-       * Ownership token asset id (Argonot).
-       **/
-      ownershipAssetId: u32 & AugmentedConst<ApiType>;
-    };
     localchainTransfer: {
       /**
        * How many transfers out can be queued per block
@@ -486,12 +464,6 @@ declare module '@polkadot/api-base/types/consts' {
        * period on default settings.
        **/
       minimumPeriod: u64 & AugmentedConst<ApiType>;
-    };
-    tokenGateway: {
-      /**
-       * The decimals of the native currency
-       **/
-      decimals: u8 & AugmentedConst<ApiType>;
     };
     transactionPayment: {
       /**

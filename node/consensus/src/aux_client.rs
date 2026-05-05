@@ -18,7 +18,7 @@ use parking_lot::RwLock;
 use polkadot_sdk::*;
 use sc_client_api::{self, backend::AuxStore};
 use schnellru::{ByLength, LruMap};
-use sp_core::{H256, RuntimeDebug};
+use sp_core::H256;
 use sp_runtime::traits::Block as BlockT;
 use std::{
 	any::Any,
@@ -557,7 +557,7 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 	}
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, RuntimeDebug, Serialize, Deserialize, Default)]
+#[derive(Clone, PartialEq, Encode, Decode, Debug, Serialize, Deserialize, Default)]
 pub struct NotebookAuditAndRawHeader<E: Codec> {
 	#[codec(compact)]
 	pub notary_id: NotaryId,

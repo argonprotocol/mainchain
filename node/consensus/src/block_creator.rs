@@ -21,7 +21,7 @@ use sc_client_api::{AuxStore, TrieCacheContext};
 use sc_consensus::{BlockImport, BlockImportParams, ImportResult, StateAction, StorageChanges};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
-use sp_consensus::{BlockOrigin, Environment, Proposal, Proposer};
+use sp_consensus::{BlockOrigin, Environment, Proposal, ProposeArgs, Proposer};
 use sp_inherents::{InherentData, InherentDataProvider};
 use sp_runtime::{
 	Digest,
@@ -62,7 +62,7 @@ pub struct ProposalMeta {
 	pub is_compute: bool,
 }
 
-impl<Block: BlockT, BI, C, PF, JS, A, Proof, B> BlockCreator<Block, BI, C, PF, JS, A, B>
+impl<Block: BlockT, BI, C, PF, JS, A, B> BlockCreator<Block, BI, C, PF, JS, A, B>
 where
 	Block: BlockT + 'static,
 	Block::Hash: Send + 'static,
@@ -74,7 +74,7 @@ where
 		+ TickApis<Block>
 		+ BitcoinApis<Block, Balance>,
 	PF: Environment<Block> + Send + Sync + 'static,
-	PF::Proposer: Proposer<Block, Proof = Proof>,
+	PF::Proposer: Proposer<Block>,
 	A: Codec + MaxEncodedLen + Clone + Send + Sync + 'static,
 	JS: sc_consensus::JustificationSyncLink<Block> + Clone + Send + Sync + 'static,
 	B: sc_client_api::Backend<Block> + Send + Sync + 'static,
@@ -86,7 +86,7 @@ where
 		timestamp_millis: u64,
 		parent_hash: Block::Hash,
 		seal_inherent: BlockSealInherentNodeSide,
-	) -> Option<BlockProposal<Block, Proof>> {
+	) -> Option<BlockProposal<Block>> {
 		let parent_header = match self.client.header(parent_hash) {
 			Ok(Some(x)) => x,
 			Ok(None) => {
@@ -114,7 +114,13 @@ where
 		};
 		let size_limit = None;
 		let proposal = proposer
-			.propose(inherent_data, inherent_digest, self.authoring_duration, size_limit)
+			.propose(ProposeArgs {
+				inherent_data,
+				inherent_digests: inherent_digest,
+				max_duration: self.authoring_duration,
+				block_size_limit: size_limit,
+				..Default::default()
+			})
 			.await
 			.inspect_err(|err| {
 				tracing::warn!(?err, "Unable to propose. Creating proposer failed");
@@ -201,7 +207,7 @@ where
 
 	pub async fn submit_block(
 		&self,
-		block_proposal: BlockProposal<Block, Proof>,
+		block_proposal: BlockProposal<Block>,
 		block_seal_digest: BlockSealDigest,
 		ticker: &Ticker,
 	) {
@@ -271,7 +277,7 @@ where
 	}
 }
 
-pub struct BlockProposal<Block: BlockT, Proof> {
-	pub proposal: Proposal<Block, Proof>,
+pub struct BlockProposal<Block: BlockT> {
+	pub proposal: Proposal<Block>,
 	pub proposal_meta: ProposalMeta,
 }

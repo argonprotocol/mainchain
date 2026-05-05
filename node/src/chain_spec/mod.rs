@@ -72,7 +72,6 @@ pub struct GenesisSettings {
 	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
 	pub mining_config: MiningSlotConfig,
 	pub minimum_bitcoin_lock_satoshis: Satoshis,
-	pub hyperbridge_token_admin: AccountId,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -91,7 +90,6 @@ pub(crate) fn build_genesis_config(
 		initial_notaries,
 		mining_config,
 		minimum_bitcoin_lock_satoshis,
-		hyperbridge_token_admin,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let config = RuntimeGenesisConfig {
@@ -112,10 +110,7 @@ pub(crate) fn build_genesis_config(
 		},
 		notaries: NotariesConfig { list: initial_notaries },
 		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },
-		localchain_transfer: LocalchainTransferConfig {
-			hyperbridge_token_admin: Some(hyperbridge_token_admin),
-			..Default::default()
-		},
+		localchain_transfer: LocalchainTransferConfig::default(),
 		..Default::default()
 	};
 

@@ -17,9 +17,7 @@ pub struct RemoveStoredAccessCodes<T: Config>(core::marker::PhantomData<T>);
 mod v0 {
 	use super::*;
 
-	#[derive(
-		Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen,
-	)]
+	#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, DebugNoBound, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct AccessCodeMetadata<T: Config> {
 		pub sponsor: T::AccountId,
@@ -40,9 +38,7 @@ mod v0 {
 	pub type AccessCodesExpiringByFrame<T: Config> =
 		StorageMap<Pallet<T>, Twox64Concat, FrameId, Vec<sr25519::Public>, OptionQuery>;
 
-	#[derive(
-		Encode, Decode, DecodeWithMemTracking, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen,
-	)]
+	#[derive(Encode, Decode, DecodeWithMemTracking, TypeInfo, DebugNoBound, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct OperationalAccount<T: Config> {
 		pub vault_account: T::AccountId,

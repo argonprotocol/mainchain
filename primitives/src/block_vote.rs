@@ -9,7 +9,6 @@ use polkadot_sdk::sp_runtime::Permill;
 use serde::{Deserialize, Serialize};
 use sp_core::{H256, U256};
 use sp_crypto_hashing::blake2_256;
-use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{MultiSignature, scale_info::TypeInfo};
 
 pub type VoteMinimum = u128;
@@ -21,7 +20,7 @@ pub type VoteMinimum = u128;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -162,7 +161,7 @@ struct BlockVoteProofHashMessage {
 	pub voting_key: H256,
 }
 
-#[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BestBlockVoteSeal<AccountId: Codec, Authority: Codec> {
 	/// The seal strength (a smallest u256)

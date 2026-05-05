@@ -100,32 +100,6 @@ import type {
   FrameSystemLimitsBlockWeights,
   FrameSystemLimitsWeightsPerClass,
   FrameSystemPhase,
-  IsmpConsensusStateCommitment,
-  IsmpConsensusStateMachineHeight,
-  IsmpConsensusStateMachineId,
-  IsmpEventsRequestResponseHandled,
-  IsmpEventsTimeoutHandled,
-  IsmpGrandpaAddStateMachine,
-  IsmpGrandpaCall,
-  IsmpGrandpaEvent,
-  IsmpHostStateMachine,
-  IsmpMessagingConsensusMessage,
-  IsmpMessagingCreateConsensusState,
-  IsmpMessagingFraudProofMessage,
-  IsmpMessagingMessage,
-  IsmpMessagingProof,
-  IsmpMessagingRequestMessage,
-  IsmpMessagingResponseMessage,
-  IsmpMessagingStateCommitmentHeight,
-  IsmpMessagingTimeoutMessage,
-  IsmpRouterGetRequest,
-  IsmpRouterGetResponse,
-  IsmpRouterPostRequest,
-  IsmpRouterPostResponse,
-  IsmpRouterRequest,
-  IsmpRouterRequestResponse,
-  IsmpRouterResponse,
-  IsmpRouterStorageValue,
   PalletBalancesAccountData,
   PalletBalancesAdjustmentDirection,
   PalletBalancesBalanceLock,
@@ -170,21 +144,6 @@ import type {
   PalletGrandpaEvent,
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
-  PalletHyperbridgeError,
-  PalletHyperbridgeEvent,
-  PalletHyperbridgeSubstrateHostParams,
-  PalletHyperbridgeVersionedHostParams,
-  PalletInboundTransferLogAssetKind,
-  PalletInboundTransferLogEvent,
-  PalletInboundTransferLogInboundEvmTransfer,
-  PalletInboundTransferLogInboundTransferDropReason,
-  PalletIsmpCall,
-  PalletIsmpError,
-  PalletIsmpErrorsHandlingError,
-  PalletIsmpEvent,
-  PalletIsmpUtilsFundMessageParams,
-  PalletIsmpUtilsMessageCommitment,
-  PalletIsmpUtilsUpdateConsensusState,
   PalletLocalchainTransferCall,
   PalletLocalchainTransferError,
   PalletLocalchainTransferEvent,
@@ -238,12 +197,6 @@ import type {
   PalletTicksCall,
   PalletTicksError,
   PalletTimestampCall,
-  PalletTokenGatewayAssetRegistration,
-  PalletTokenGatewayCall,
-  PalletTokenGatewayError,
-  PalletTokenGatewayEvent,
-  PalletTokenGatewayPrecisionUpdate,
-  PalletTokenGatewayTeleportParams,
   PalletTransactionPaymentChargeTransactionPayment,
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
@@ -287,7 +240,6 @@ import type {
   SpVersionRuntimeVersion,
   SpWeightsRuntimeDbWeight,
   SpWeightsWeightV2Weight,
-  TokenGatewayPrimitivesGatewayAssetRegistration,
 } from '@polkadot/types/lookup';
 
 declare module '@polkadot/types/types/registry' {
@@ -386,32 +338,6 @@ declare module '@polkadot/types/types/registry' {
     FrameSystemLimitsBlockWeights: FrameSystemLimitsBlockWeights;
     FrameSystemLimitsWeightsPerClass: FrameSystemLimitsWeightsPerClass;
     FrameSystemPhase: FrameSystemPhase;
-    IsmpConsensusStateCommitment: IsmpConsensusStateCommitment;
-    IsmpConsensusStateMachineHeight: IsmpConsensusStateMachineHeight;
-    IsmpConsensusStateMachineId: IsmpConsensusStateMachineId;
-    IsmpEventsRequestResponseHandled: IsmpEventsRequestResponseHandled;
-    IsmpEventsTimeoutHandled: IsmpEventsTimeoutHandled;
-    IsmpGrandpaAddStateMachine: IsmpGrandpaAddStateMachine;
-    IsmpGrandpaCall: IsmpGrandpaCall;
-    IsmpGrandpaEvent: IsmpGrandpaEvent;
-    IsmpHostStateMachine: IsmpHostStateMachine;
-    IsmpMessagingConsensusMessage: IsmpMessagingConsensusMessage;
-    IsmpMessagingCreateConsensusState: IsmpMessagingCreateConsensusState;
-    IsmpMessagingFraudProofMessage: IsmpMessagingFraudProofMessage;
-    IsmpMessagingMessage: IsmpMessagingMessage;
-    IsmpMessagingProof: IsmpMessagingProof;
-    IsmpMessagingRequestMessage: IsmpMessagingRequestMessage;
-    IsmpMessagingResponseMessage: IsmpMessagingResponseMessage;
-    IsmpMessagingStateCommitmentHeight: IsmpMessagingStateCommitmentHeight;
-    IsmpMessagingTimeoutMessage: IsmpMessagingTimeoutMessage;
-    IsmpRouterGetRequest: IsmpRouterGetRequest;
-    IsmpRouterGetResponse: IsmpRouterGetResponse;
-    IsmpRouterPostRequest: IsmpRouterPostRequest;
-    IsmpRouterPostResponse: IsmpRouterPostResponse;
-    IsmpRouterRequest: IsmpRouterRequest;
-    IsmpRouterRequestResponse: IsmpRouterRequestResponse;
-    IsmpRouterResponse: IsmpRouterResponse;
-    IsmpRouterStorageValue: IsmpRouterStorageValue;
     PalletBalancesAccountData: PalletBalancesAccountData;
     PalletBalancesAdjustmentDirection: PalletBalancesAdjustmentDirection;
     PalletBalancesBalanceLock: PalletBalancesBalanceLock;
@@ -456,21 +382,6 @@ declare module '@polkadot/types/types/registry' {
     PalletGrandpaEvent: PalletGrandpaEvent;
     PalletGrandpaStoredPendingChange: PalletGrandpaStoredPendingChange;
     PalletGrandpaStoredState: PalletGrandpaStoredState;
-    PalletHyperbridgeError: PalletHyperbridgeError;
-    PalletHyperbridgeEvent: PalletHyperbridgeEvent;
-    PalletHyperbridgeSubstrateHostParams: PalletHyperbridgeSubstrateHostParams;
-    PalletHyperbridgeVersionedHostParams: PalletHyperbridgeVersionedHostParams;
-    PalletInboundTransferLogAssetKind: PalletInboundTransferLogAssetKind;
-    PalletInboundTransferLogEvent: PalletInboundTransferLogEvent;
-    PalletInboundTransferLogInboundEvmTransfer: PalletInboundTransferLogInboundEvmTransfer;
-    PalletInboundTransferLogInboundTransferDropReason: PalletInboundTransferLogInboundTransferDropReason;
-    PalletIsmpCall: PalletIsmpCall;
-    PalletIsmpError: PalletIsmpError;
-    PalletIsmpErrorsHandlingError: PalletIsmpErrorsHandlingError;
-    PalletIsmpEvent: PalletIsmpEvent;
-    PalletIsmpUtilsFundMessageParams: PalletIsmpUtilsFundMessageParams;
-    PalletIsmpUtilsMessageCommitment: PalletIsmpUtilsMessageCommitment;
-    PalletIsmpUtilsUpdateConsensusState: PalletIsmpUtilsUpdateConsensusState;
     PalletLocalchainTransferCall: PalletLocalchainTransferCall;
     PalletLocalchainTransferError: PalletLocalchainTransferError;
     PalletLocalchainTransferEvent: PalletLocalchainTransferEvent;
@@ -524,12 +435,6 @@ declare module '@polkadot/types/types/registry' {
     PalletTicksCall: PalletTicksCall;
     PalletTicksError: PalletTicksError;
     PalletTimestampCall: PalletTimestampCall;
-    PalletTokenGatewayAssetRegistration: PalletTokenGatewayAssetRegistration;
-    PalletTokenGatewayCall: PalletTokenGatewayCall;
-    PalletTokenGatewayError: PalletTokenGatewayError;
-    PalletTokenGatewayEvent: PalletTokenGatewayEvent;
-    PalletTokenGatewayPrecisionUpdate: PalletTokenGatewayPrecisionUpdate;
-    PalletTokenGatewayTeleportParams: PalletTokenGatewayTeleportParams;
     PalletTransactionPaymentChargeTransactionPayment: PalletTransactionPaymentChargeTransactionPayment;
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
@@ -573,6 +478,5 @@ declare module '@polkadot/types/types/registry' {
     SpVersionRuntimeVersion: SpVersionRuntimeVersion;
     SpWeightsRuntimeDbWeight: SpWeightsRuntimeDbWeight;
     SpWeightsWeightV2Weight: SpWeightsWeightV2Weight;
-    TokenGatewayPrimitivesGatewayAssetRegistration: TokenGatewayPrimitivesGatewayAssetRegistration;
   } // InterfaceTypes
 } // declare module

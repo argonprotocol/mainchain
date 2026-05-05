@@ -60,11 +60,6 @@ independently, but can connect into a shared ecosystem called "Parachains". Subs
 Rust and has a WebAssembly runtime that allows for upgrades to the blockchain without forks. Argon
 runs as a "solochain", which means our consensus is not shared with other chains.
 
-Cross-chain transfers are enabled via [Hyperbridge](https://hyperbridge.network), which is a
-zero-trust, decentralized bridge. Fees are payable in Argons when going Argon ->
-Ethereum/Base/Binance Chain/etc, and the native token of a source chain when transferring into
-Argon.
-
 A Uniswap treasury pool with USDC is used to create a price-point for the Argon. The main Uniswap
 contract initially in use is on Ethereum.
 
@@ -162,9 +157,6 @@ Argon makes use of a few runtime pallets that are useful to know about as a user
   [pallet](https://paritytech.github.io/polkadot-sdk/master/pallet_utility/index.html) allows you to
   batch multiple api calls into a single transaction. This is useful for creating a single
   transaction that performs multiple actions you want to all succeed or fail as one.
-- `Hyperbridge`. There are several pallets involved (`ismp`, `ismp_grandpa`, `hyperbridge`,
-  `token_gateway`) here to activate the Argon ability to move tokens cross-chain. Learn more about
-  hyperbridge [here](https://hyperbridge.network).
 
 ## Experimental Mainnet
 

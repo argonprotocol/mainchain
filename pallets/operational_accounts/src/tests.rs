@@ -18,9 +18,9 @@ use crate::mock::{
 	BitcoinLockSizeForReferral, ClaimableTreasuryBalance, ClaimedOperationalRewards,
 	CurrentFrameId, MaxAvailableReferrals, MaxEncryptedServerLen,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
-	OperationalReferralBonusReward, OperationalReferralReward, RequiresUniswapTransfer,
-	RuntimeOrigin, Test, TestAccountId, ensure_registration_lookup, has_vault_operational_mark,
-	new_test_ext, set_registration_lookup,
+	OperationalReferralBonusReward, OperationalReferralReward, RecentArgonTransfers,
+	RequiresUniswapTransfer, RuntimeOrigin, Test, TestAccountId, ensure_registration_lookup,
+	has_vault_operational_mark, new_test_ext, set_registration_lookup,
 };
 
 #[test]
@@ -203,10 +203,9 @@ fn test_register_rejects_invalid_referral_proof_and_ignores_sponsor_without_capa
 fn test_register_hydrates_recent_argon_transfer_on_linked_account() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(24, 25, 26, 27);
-		pallet_inbound_transfer_log::RecentArgonTransfersByAccount::<Test>::insert(
-			account_set.mining_funding.clone(),
-			1,
-		);
+		RecentArgonTransfers::mutate(|entries| {
+			entries.insert(account_set.mining_funding.clone());
+		});
 
 		register_account(&account_set, None);
 
@@ -1320,7 +1319,9 @@ fn record_uniswap_transfer(vault_account: &TestAccountId, amount: Balance) {
 }
 
 fn record_recent_argon_transfer(account_id: &TestAccountId) {
-	pallet_inbound_transfer_log::RecentArgonTransfersByAccount::<Test>::insert(account_id, 1);
+	RecentArgonTransfers::mutate(|entries| {
+		entries.insert(account_id.clone());
+	});
 }
 
 fn satisfy_operational_requirements(mining_account: &TestAccountId, vault_account: &TestAccountId) {

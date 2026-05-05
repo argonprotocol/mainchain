@@ -6,7 +6,6 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
-use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedBTreeMap, BoundedVec};
 
 use crate::{Balance, NotaryId, domain_top_level::DomainTopLevel, host::Host};
@@ -26,7 +25,7 @@ pub type DomainHash = H256;
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,
@@ -102,7 +101,7 @@ impl Domain {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,
@@ -122,15 +121,7 @@ where
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 /// ZoneRecords track versions of a domain and the host addresses where they can be accessed.
 pub struct BoundZoneRecord {
@@ -151,7 +142,7 @@ impl<A: Codec> ZoneRecord<A> {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -172,7 +163,7 @@ pub struct VersionHost {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,

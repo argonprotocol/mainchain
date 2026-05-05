@@ -1406,7 +1406,7 @@ impl<T: Config> Pallet<T> {
 	}
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, RuntimeDebugNoBound, MaxEncodedLen)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, DebugNoBound, MaxEncodedLen)]
 #[scale_info(skip_type_params(T))]
 pub struct MinerNonceScoring<T: Config> {
 	pub nonce: U256,
@@ -1417,7 +1417,7 @@ pub struct MinerNonceScoring<T: Config> {
 	pub frame_start_blocks_won_surplus: i16,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebugNoBound)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, DebugNoBound)]
 pub struct MinerNonce<T: Config> {
 	pub account_id: T::AccountId,
 	pub block_hash: T::Hash,
@@ -1436,7 +1436,7 @@ impl<T: Config> MinerNonce<T> {
 /// chosen given that normal usage stays within a 3-4% threshold and the max miners is 144.
 const MAX_BLOCK_OFFSET: i16 = 5;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
 pub struct ClosestMiner<T: Config> {
 	pub seal_proof: U256,
 	pub miner_nonce: U256,

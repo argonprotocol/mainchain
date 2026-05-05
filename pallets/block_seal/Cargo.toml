@@ -17,7 +17,6 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { workspace = true }
 scale-info = { workspace = true }
 argon-notary-audit = { workspace = true }
-#sp-debug-derive = { workspace = true, features = ["force-debug"] }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "binary-merkle-tree"] }
 pallet-prelude = { workspace = true, default-features = false }
 

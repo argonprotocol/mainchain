@@ -19,7 +19,7 @@ use polkadot_sdk::{
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
-use sp_core::{H256, RuntimeDebug, U256};
+use sp_core::{H256, U256};
 use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
@@ -520,15 +520,7 @@ where
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	MaxEncodedLen,
-	RuntimeDebug,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug,
 )]
 pub enum OperationalRewardKind {
 	Activation,
@@ -536,15 +528,7 @@ pub enum OperationalRewardKind {
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	MaxEncodedLen,
-	RuntimeDebug,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug,
 )]
 pub struct OperationalRewardPayout<AccountId, Balance> {
 	pub operational_account: AccountId,
@@ -617,7 +601,7 @@ pub trait BlockSealSpecProvider<Block: BlockT> {
 	fn compute_key_block_hash() -> Option<Block::Hash>;
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, RuntimeDebug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug)]
 pub struct BlockSealerInfo<AccountId: FullCodec, AuthorityId: FullCodec = BlockSealAuthorityId> {
 	pub block_author_account_id: AccountId,
 	/// The voting account, if a block seal
@@ -857,7 +841,7 @@ impl<RuntimeCall, AccountId> CallTxPoolKeyProvider<RuntimeCall, AccountId> for T
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, RuntimeDebug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TxSponsor<AccountId, Balance> {
 	/// The account that will pay for the transaction fee
 	pub payer: AccountId,

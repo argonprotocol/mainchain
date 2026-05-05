@@ -10,8 +10,6 @@ mod migrations;
 pub mod weights;
 
 use frame_support::weights::ConstantMultiplier;
-use frame_system::EnsureSignedBy;
-use ismp::{Error, module::IsmpModule, router::IsmpRouter};
 pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
 use polkadot_sdk::*;
@@ -119,22 +117,11 @@ mod runtime {
 	#[runtime::pallet_index(26)]
 	pub type Sudo = pallet_sudo;
 
-	#[runtime::pallet_index(27)]
-	pub type Ismp = pallet_ismp;
-	#[runtime::pallet_index(28)]
-	pub type IsmpGrandpa = ismp_grandpa;
-	#[runtime::pallet_index(29)]
-	pub type Hyperbridge = pallet_hyperbridge;
-	#[runtime::pallet_index(30)]
-	pub type TokenGateway = pallet_token_gateway;
-
 	#[runtime::pallet_index(31)]
 	pub type Treasury = pallet_treasury;
 
 	#[runtime::pallet_index(32)]
 	pub type FeelessTransaction = pallet_fee_control;
-	#[runtime::pallet_index(33)]
-	pub type InboundTransferLog = pallet_inbound_transfer_log;
 	#[runtime::pallet_index(34)]
 	pub type OperationalAccounts = pallet_operational_accounts;
 }
@@ -143,11 +130,6 @@ argon_runtime_common::inject_runtime_vars!();
 argon_runtime_common::inject_common_apis!();
 argon_runtime_common::call_filters!();
 argon_runtime_common::deal_with_fees!();
-
-parameter_types! {
-	// The hyperbridge parachain on Polkadot
-	pub const Coprocessor: Option<StateMachine> = Some(StateMachine::Kusama(4009));
-}
 
 #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
 impl frame_system::Config for Runtime {
@@ -669,38 +651,6 @@ impl pallet_transaction_payment::Config for Runtime {
 	type WeightInfo = weights::pallet_transaction_payment::WeightInfo<Runtime>;
 }
 
-impl pallet_token_gateway::Config for Runtime {
-	// Configured as Pallet Ismp
-	type Dispatcher = Ismp;
-	// Configured as Pallet balances
-	type NativeCurrency = Balances;
-	// AssetAdmin account to register new assets on the chain. We don't use this
-	type AssetAdmin =
-		use_unless_benchmark!(TokenAdmin, benchmarking::BenchmarkTokenAdmin<AccountId>);
-	// Configured as Pallet Assets
-	type Assets = OwnershipTokenAsset;
-	// The Native asset Id
-	type NativeAssetId = NativeAssetId;
-	// The precision of the native asset
-	type Decimals = Decimals;
-	type CreateOrigin = use_unless_benchmark!(
-		EnsureSignedBy<TokenAdmins, AccountId>,
-		EnsureSignedBy<benchmarking::BenchmarkTokenAdmins<AccountId>, AccountId>
-	);
-	type WeightInfo = weights::pallet_token_gateway::WeightInfo<Runtime>;
-	type EvmToSubstrate = ();
-}
-
-impl pallet_inbound_transfer_log::Config for Runtime {
-	type InboundTransfersRetentionBlocks = InboundTransfersRetentionBlocks;
-	type MaxTransfersToRetainPerBlock = MaxTransfersToRetainPerBlock;
-	type MaxInboundTransferBytes = MaxInboundTransferBytes;
-	type MinimumTransferMicrogonsToRecord = MinimumTransferMicrogonsToRecord;
-	type OwnershipAssetId = OwnershipTokenAssetId;
-	type WeightInfo = weights::pallet_inbound_transfer_log::WeightInfo<Runtime>;
-	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-}
-
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type FrameProvider = MiningSlot;
@@ -727,10 +677,10 @@ impl pallet_operational_accounts::Config for Runtime {
 		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
 	);
 	type UniswapTransferRequirementProvider = use_unless_benchmark!(
-		InboundTransferLog,
+		ConstBool<false>,
 		benchmarking::BenchmarkOperationalAccountsUniswapTransferRequirementProvider
 	);
-	type RecentArgonTransferLookup = InboundTransferLog;
+	type RecentArgonTransferLookup = ();
 	type OperationalRewardsPayer =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalRewardsPayer);
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<
@@ -739,67 +689,9 @@ impl pallet_operational_accounts::Config for Runtime {
 	>;
 }
 
-impl pallet_ismp::Config for Runtime {
-	// configure the runtime event
-	// Permissioned origin who can create or update consensus clients
-	type AdminOrigin = EnsureRoot<AccountId>;
-	// The pallet_timestamp pallet
-	type TimestampProvider = Timestamp;
-	// The balance type for the currency implementation
-	type Balance = Balance;
-	// The currency implementation that is offered to relayers
-	type Currency = Balances;
-	// The state machine identifier for this state machine
-	type HostStateMachine = HostStateMachine;
-	// Optional coprocessor for incoming requests/responses
-	type Coprocessor = Coprocessor;
-	// Router implementation for routing requests/responses to their respective modules
-	type Router = Router;
-	// Supported consensus clients
-	type ConsensusClients = (
-		// Add the grandpa or beefy consensus client here
-		ismp_grandpa::consensus::GrandpaConsensusClient<Runtime>,
-	);
-	// Optional merkle mountain range overlay tree, for cheaper outgoing request proofs.
-	// You most likely don't need it, just use the `NoOpMmrTree`
-	type OffchainDB = ();
-	type FeeHandler = pallet_ismp::fee_handler::WeightFeeHandler<
-		AccountId,
-		Balances,
-		ArgonWeightToFee,
-		TreasuryInternalPalletId,
-		false,
-	>;
-}
-
-impl ismp_grandpa::Config for Runtime {
-	type IsmpHost = Ismp;
-	type WeightInfo = weights::ismp_grandpa::WeightInfo<Runtime>;
-	type RootOrigin = EnsureRoot<AccountId>;
-}
-
-impl pallet_hyperbridge::Config for Runtime {
-	type IsmpHost = Ismp;
-}
-
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
 	type CallTxPoolKeyProviders = BitcoinLocks;
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }
-
-#[derive(Default)]
-pub struct Router;
-
-impl IsmpRouter for Router {
-	fn module_for_id(&self, id: Vec<u8>) -> Result<Box<dyn IsmpModule>, anyhow::Error> {
-		match id.as_slice() {
-			id if TokenGateway::is_token_gateway(id) =>
-				Ok(Box::new(pallet_inbound_transfer_log::TokenGatewayHook::<Runtime>::default())),
-			_ => Err(Error::ModuleNotFound(id))?,
-		}
-	}
-}
-
-argon_runtime_common::token_asset!(Ownership, LocalchainTransfer::hyperbridge_token_admin());

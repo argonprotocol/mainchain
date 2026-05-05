@@ -3,13 +3,6 @@
 #[macro_export]
 macro_rules! inject_common_apis {
     () => {
-    decl_runtime_apis! {
-        /// Configuration items exposed via rpc so they can be confirmed externally
-        pub trait ConfigurationApis {
-            fn ismp_coprocessor() -> Option<StateMachine>;
-        }
-    }
-
     impl_runtime_apis! {
         impl sp_api::Core<Block> for Runtime {
             fn version() -> RuntimeVersion {
@@ -88,8 +81,11 @@ macro_rules! inject_common_apis {
         }
 
         impl sp_session::SessionKeys<Block> for Runtime {
-            fn generate_session_keys(seed: Option<Vec<u8>>) -> Vec<u8> {
-                SessionKeys::generate(seed)
+            fn generate_session_keys(
+                owner: Vec<u8>,
+                seed: Option<Vec<u8>>,
+            ) -> sp_session::OpaqueGeneratedSessionKeys {
+                SessionKeys::generate(&owner, seed).into()
             }
 
             fn decode_session_keys(
@@ -414,58 +410,6 @@ macro_rules! inject_common_apis {
 
             fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
                 vec![]
-            }
-        }
-
-        impl pallet_ismp_runtime_api::IsmpRuntimeApi<Block, <Block as BlockT>::Hash> for Runtime {
-            fn host_state_machine() -> ismp::host::StateMachine {
-                <Runtime as pallet_ismp::Config>::HostStateMachine::get()
-            }
-
-            fn challenge_period(state_machine_id: ismp::consensus::StateMachineId) -> Option<u64> {
-                Ismp::challenge_period(state_machine_id)
-            }
-
-            /// Fetch all ISMP events in the block, should only be called from runtime-api.
-            fn block_events() -> Vec<::ismp::events::Event> {
-                Ismp::block_events()
-            }
-
-            /// Fetch all ISMP events and their extrinsic metadata, should only be called from runtime-api.
-            fn block_events_with_metadata() -> Vec<(::ismp::events::Event, Option<u32>)> {
-                Ismp::block_events_with_metadata()
-            }
-
-            /// Return the scale encoded consensus state
-            fn consensus_state(id: ismp::consensus::ConsensusClientId) -> Option<Vec<u8>> {
-                Ismp::consensus_states(id)
-            }
-
-            /// Return the timestamp this client was last updated in seconds
-            fn state_machine_update_time(height: ismp::consensus::StateMachineHeight) -> Option<u64> {
-                Ismp::state_machine_update_time(height)
-            }
-
-            /// Return the latest height of the state machine
-            fn latest_state_machine_height(id: ismp::consensus::StateMachineId) -> Option<u64> {
-                Ismp::latest_state_machine_height(id)
-            }
-
-
-            /// Get actual requests
-            fn requests(commitments: Vec<H256>) -> Vec<ismp::router::Request> {
-                Ismp::requests(commitments)
-            }
-
-            /// Get actual requests
-            fn responses(commitments: Vec<H256>) -> Vec<ismp::router::Response> {
-                Ismp::responses(commitments)
-            }
-        }
-
-        impl crate::ConfigurationApis<Block> for Runtime {
-            fn ismp_coprocessor() -> Option<StateMachine> {
-                <Runtime as pallet_ismp::Config>::Coprocessor::get()
             }
         }
     }

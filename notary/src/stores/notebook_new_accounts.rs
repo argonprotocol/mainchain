@@ -2,7 +2,7 @@ use codec::{Decode, Encode};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ByteArray, RuntimeDebug};
+use sp_core::ByteArray;
 use sqlx::FromRow;
 
 use argon_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber};
@@ -10,7 +10,7 @@ use argon_primitives::{AccountId, AccountOriginUid, AccountType, NotebookNumber}
 use crate::Error;
 
 pub struct NotebookNewAccountsStore;
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 pub struct NotebookNewAccount {
 	pub notebook_number: NotebookNumber,
 	pub account_uid: AccountOriginUid,

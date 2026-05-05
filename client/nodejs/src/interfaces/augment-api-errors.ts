@@ -466,33 +466,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       TooSoon: AugmentedError<ApiType>;
     };
-    hyperbridge: {};
-    ismp: {
-      /**
-       * Couldn't update challenge period
-       **/
-      ChallengePeriodUpdateFailed: AugmentedError<ApiType>;
-      /**
-       * Encountered an error while creating the consensus client.
-       **/
-      ConsensusClientCreationFailed: AugmentedError<ApiType>;
-      /**
-       * Error charging fee
-       **/
-      ErrorChargingFee: AugmentedError<ApiType>;
-      /**
-       * Invalid ISMP message
-       **/
-      InvalidMessage: AugmentedError<ApiType>;
-      /**
-       * Requested message was not found
-       **/
-      MessageNotFound: AugmentedError<ApiType>;
-      /**
-       * Couldn't update unbonding period
-       **/
-      UnbondingPeriodUpdateFailed: AugmentedError<ApiType>;
-    };
     localchainTransfer: {
       /**
        * Insufficient balance to create this transfer
@@ -949,44 +922,6 @@ declare module '@polkadot/api-base/types/errors' {
       Unauthorized: AugmentedError<ApiType>;
     };
     ticks: {};
-    tokenGateway: {
-      /**
-       * Asset Id creation failed
-       **/
-      AssetCreationError: AugmentedError<ApiType>;
-      /**
-       * Asset decimals not found
-       **/
-      AssetDecimalsNotFound: AugmentedError<ApiType>;
-      /**
-       * Error while teleporting asset
-       **/
-      AssetTeleportError: AugmentedError<ApiType>;
-      /**
-       * Coprocessor was not configured in the runtime
-       **/
-      CoprocessorNotConfigured: AugmentedError<ApiType>;
-      /**
-       * Asset or update Dispatch Error
-       **/
-      DispatchError: AugmentedError<ApiType>;
-      /**
-       * Only root or asset owner can update asset
-       **/
-      NotAssetOwner: AugmentedError<ApiType>;
-      /**
-       * Protocol Params have not been initialized
-       **/
-      NotInitialized: AugmentedError<ApiType>;
-      /**
-       * Unknown Asset
-       **/
-      UnknownAsset: AugmentedError<ApiType>;
-      /**
-       * A asset that has not been registered
-       **/
-      UnregisteredAsset: AugmentedError<ApiType>;
-    };
     treasury: {
       /**
        * The bond lot is already scheduled for release.

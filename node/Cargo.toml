@@ -72,9 +72,6 @@ jsonrpsee = { workspace = true, features = ["server"] }
 serde_json = { workspace = true }
 color-backtrace = { workspace = true }
 
-pallet-ismp-runtime-api = { workspace = true, features = ["default"] }
-pallet-ismp-rpc = { workspace = true }
-
 # Local Dependencies
 argon-node-consensus = { workspace = true }
 argon-notary-apis = { workspace = true }

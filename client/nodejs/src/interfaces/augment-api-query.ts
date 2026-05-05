@@ -58,10 +58,6 @@ import type {
   FrameSystemEventRecord,
   FrameSystemLastRuntimeUpgradeInfo,
   FrameSystemPhase,
-  IsmpConsensusStateCommitment,
-  IsmpConsensusStateMachineHeight,
-  IsmpConsensusStateMachineId,
-  IsmpHostStateMachine,
   PalletBalancesAccountData,
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
@@ -71,8 +67,6 @@ import type {
   PalletDomainsDomainRegistration,
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
-  PalletHyperbridgeVersionedHostParams,
-  PalletInboundTransferLogInboundEvmTransfer,
   PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
@@ -556,193 +550,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       state: AugmentedQuery<ApiType, () => Observable<PalletGrandpaStoredState>, []>;
     };
-    hyperbridge: {
-      /**
-       * The host parameters of the pallet-hyperbridge.
-       **/
-      hostParams: AugmentedQuery<
-        ApiType,
-        () => Observable<PalletHyperbridgeVersionedHostParams>,
-        []
-      >;
-    };
-    inboundTransferLog: {
-      /**
-       * Inbound EVM transfers recorded by their request commitment key.
-       **/
-      inboundEvmTransfers: AugmentedQuery<
-        ApiType,
-        (
-          arg: H256 | string | Uint8Array,
-        ) => Observable<Option<PalletInboundTransferLogInboundEvmTransfer>>,
-        [H256]
-      >;
-      /**
-       * Index of inbound transfer record keys expiring at a given block.
-       **/
-      inboundTransfersExpiringAt: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<H256>>,
-        [u32]
-      >;
-      /**
-       * Recent qualifying Argon transfer count keyed by recipient account.
-       *
-       * This is a transient retained-window index over `InboundEvmTransfers`, not permanent
-       * history.
-       **/
-      recentArgonTransfersByAccount: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<u32>,
-        [AccountId32]
-      >;
-    };
-    ismp: {
-      /**
-       * A mapping of state machine Ids to their challenge periods
-       **/
-      challengePeriod: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
-      /**
-       * The child trie root of messages
-       **/
-      childTrieRoot: AugmentedQuery<ApiType, () => Observable<H256>, []>;
-      /**
-       * Holds the timestamp at which a consensus client was recently updated.
-       * Used in ensuring that the configured challenge period elapses.
-       **/
-      consensusClientUpdateTime: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
-        [U8aFixed]
-      >;
-      /**
-       * A mapping of consensus state identifier to it's associated consensus client identifier
-       **/
-      consensusStateClient: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<U8aFixed>>,
-        [U8aFixed]
-      >;
-      /**
-       * Holds a map of consensus state identifiers to their consensus state.
-       **/
-      consensusStates: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<Bytes>>,
-        [U8aFixed]
-      >;
-      /**
-       * Holds a map of consensus clients frozen due to byzantine
-       * behaviour
-       **/
-      frozenConsensusClients: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<bool>,
-        [U8aFixed]
-      >;
-      /**
-       * The latest verified height for a state machine
-       **/
-      latestStateMachineHeight: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
-      /**
-       * Latest nonce for messages sent from this chain
-       **/
-      nonce: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
-       * The previous verified height for a state machine
-       **/
-      previousStateMachineHeight: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpConsensusStateMachineId
-            | { stateId?: any; consensusStateId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineId]
-      >;
-      /**
-       * Tracks requests that have been responded to
-       * The key is the request commitment
-       **/
-      responded: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<bool>,
-        [H256]
-      >;
-      /**
-       * Holds a map of state machine heights to their verified state commitments. These state
-       * commitments end up here after they are successfully verified by a `ConsensusClient`
-       **/
-      stateCommitments: AugmentedQuery<
-        ApiType,
-        (
-          arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array,
-        ) => Observable<Option<IsmpConsensusStateCommitment>>,
-        [IsmpConsensusStateMachineHeight]
-      >;
-      /**
-       * Holds the timestamp at which a state machine height was updated.
-       * Used in ensuring that the configured challenge period elapses.
-       **/
-      stateMachineUpdateTime: AugmentedQuery<
-        ApiType,
-        (
-          arg: IsmpConsensusStateMachineHeight | { id?: any; height?: any } | string | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpConsensusStateMachineHeight]
-      >;
-      /**
-       * A mapping of consensus state identifiers to their unbonding periods
-       **/
-      unbondingPeriod: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
-        [U8aFixed]
-      >;
-    };
-    ismpGrandpa: {
-      /**
-       * Registered state machines for the grandpa consensus client
-       **/
-      supportedStateMachines: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [IsmpHostStateMachine]
-      >;
-    };
     localchainTransfer: {
       /**
        * Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
@@ -760,10 +567,6 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Vec<u32>>,
         [u32, u64]
       >;
-      /**
-       * The admin of the hyperbridge token gateway
-       **/
-      hyperbridgeTokenAdmin: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
       nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       pendingTransfersOut: AugmentedQuery<
         ApiType,
@@ -1243,10 +1046,6 @@ declare module '@polkadot/api-base/types/storage' {
         [AccountId32]
       >;
       /**
-       * Total length (in bytes) for all extrinsics put together, for the current block.
-       **/
-      allExtrinsicsLen: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      /**
        * `Some` if a code upgrade has been authorized.
        **/
       authorizedUpgrade: AugmentedQuery<
@@ -1262,6 +1061,16 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
         [u32]
       >;
+      /**
+       * Total size (in bytes) of the current block.
+       *
+       * Tracks the size of the header and all extrinsics.
+       **/
+      blockSize: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Number of blocks till the pending code upgrade is applied.
+       **/
+      blocksTillUpgrade: AugmentedQuery<ApiType, () => Observable<Option<u8>>, []>;
       /**
        * The current weight for the block.
        **/
@@ -1392,73 +1201,6 @@ declare module '@polkadot/api-base/types/storage' {
        * The current time for the current block.
        **/
       now: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-    };
-    tokenGateway: {
-      /**
-       * Assets supported by this instance of token gateway
-       * A map of the token gateway asset id to the local asset id
-       **/
-      localAssets: AugmentedQuery<
-        ApiType,
-        (arg: H256 | string | Uint8Array) => Observable<Option<u32>>,
-        [H256]
-      >;
-      /**
-       * Assets that originate from this chain
-       **/
-      nativeAssets: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<bool>,
-        [u32]
-      >;
-      /**
-       * The decimals used by the EVM counterpart of this asset
-       **/
-      precisions: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u8>>,
-        [u32, IsmpHostStateMachine]
-      >;
-      /**
-       * Assets supported by this instance of token gateway
-       * A map of the local asset id to the token gateway asset id
-       **/
-      supportedAssets: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Option<H256>>,
-        [u32]
-      >;
-      /**
-       * The token gateway adresses on different chains
-       **/
-      tokenGatewayAddresses: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | IsmpHostStateMachine
-            | { Evm: any }
-            | { Polkadot: any }
-            | { Kusama: any }
-            | { Substrate: any }
-            | { Tendermint: any }
-            | { Relay: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<Bytes>>,
-        [IsmpHostStateMachine]
-      >;
     };
     transactionPayment: {
       nextFeeMultiplier: AugmentedQuery<ApiType, () => Observable<u128>, []>;

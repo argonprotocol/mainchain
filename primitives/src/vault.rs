@@ -5,7 +5,6 @@ use frame_support::{PalletError, weights::Weight};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
-use sp_debug_derive::RuntimeDebug;
 use sp_runtime::{BoundedVec, traits::AtLeast32BitUnsigned};
 
 use crate::{
@@ -247,7 +246,7 @@ pub trait BitcoinVaultProvider {
 }
 
 #[derive(
-	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, PalletError,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, PalletError,
 )]
 pub enum VaultError {
 	VaultClosed,
@@ -271,15 +270,7 @@ pub enum VaultError {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct Vault<AccountId, Balance>
 where
@@ -333,15 +324,7 @@ where
 }
 
 #[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	PartialEq,
-	Eq,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct VaultTerms<Balance>
 where

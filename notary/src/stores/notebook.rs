@@ -20,7 +20,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, json};
 use sp_core::{
-	Blake2Hasher, H256, RuntimeDebug,
+	Blake2Hasher, H256,
 	bounded::BoundedVec,
 	ed25519::{Public, Signature},
 };
@@ -363,7 +363,7 @@ pub struct NotebookBytes {
 	pub signed_header: Vec<u8>,
 }
 
-#[derive(Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 struct AccountIdAndOrigin {
 	pub key: [u8; 32],
 	pub origin: AccountOrigin,

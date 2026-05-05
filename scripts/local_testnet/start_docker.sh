@@ -65,7 +65,7 @@ for i in {0..2} ; do
     --base-path /tmp/argon/$RUNID/${validators[$i]} \
     --notebook-archive-hosts=$NOTEBOOK_ARCHIVE \
     --rpc-port=994$((i+4)) --port 3033$((i+4)) --compute-miners 1 \
-    --pruning=archive -lRUST_LOG=info,argon=info,ismp=trace \
+    --pruning=archive -lRUST_LOG=info,argon=info \
     --unsafe-force-node-key-generation --unsafe-rpc-external --rpc-methods=unsafe \
     --rpc-cors=all  --bitcoin-rpc-url=http://bitcoin:bitcoin@localhost:18444 &
   # remove docker on exit

@@ -29,7 +29,6 @@ import type {
   ExtrinsicInclusionMode,
   Header,
   Index,
-  KeyTypeId,
   Weight,
 } from '@polkadot/types/interfaces/runtime';
 import type { RuntimeVersion } from '@polkadot/types/interfaces/state';
@@ -209,25 +208,6 @@ declare module '@polkadot/api-base/types/calls' {
             | string
             | Uint8Array,
         ) => Observable<Null>
-      >;
-    };
-    /** 0xab3c0572291feb8b/1 */
-    sessionKeys: {
-      /**
-       * Decode the given public session keys.
-       **/
-      decodeSessionKeys: AugmentedCall<
-        ApiType,
-        (
-          encoded: Bytes | string | Uint8Array,
-        ) => Observable<Option<Vec<ITuple<[Bytes, KeyTypeId]>>>>
-      >;
-      /**
-       * Generate a set of session keys with optionally using the given seed.
-       **/
-      generateSessionKeys: AugmentedCall<
-        ApiType,
-        (seed: Option<Bytes> | null | Uint8Array | Bytes | string) => Observable<Bytes>
       >;
     };
     /** 0xd2bc9897eed08f15/3 */

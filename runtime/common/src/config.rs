@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use argon_primitives::MICROGONS_PER_ARGON;
-use ismp::host::StateMachine;
 use pallet_transaction_payment::Multiplier;
 use smallvec::smallvec;
 use sp_runtime::traits::{AccountIdConversion, One};
@@ -62,8 +61,10 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
-	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength
-		::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
+	pub BlockLength: frame_system::limits::BlockLength = frame_system::limits::BlockLength::builder()
+		.max_length(5 * 1024 * 1024)
+		.modify_max_length_for_class(DispatchClass::Normal, |m| *m = NORMAL_DISPATCH_RATIO * *m)
+		.build();
 
 	// ### pallet_block_seal
 	pub const TargetComputeBlockPercent: FixedU128 = FixedU128::from_rational(49, 100); // aim for less than full compute time so it can wait for notebooks
@@ -189,29 +190,6 @@ parameter_types! {
 	// Fees
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 	pub const TransactionByteFee: Balance = 1;
-
-
-	// ## pallet_hyperbridge
-	// The host state machine of this pallet
-	pub const HostStateMachine: StateMachine = StateMachine::Substrate(*b"argn");
-	// A constant that should represent the native asset id, this id must be unique to the native currency
-	pub const NativeAssetId: u32 = 0;
-
-	// The ownership token Asset Id
-	pub const OwnershipTokenAssetId: u32 = 1;
-	// Set the correct decimals for the native currency
-	pub const Decimals: u8 = 6;
-
-	// ## pallet_inbound_transfer_log
-	/// How many blocks to retain inbound transfer records.
-	pub const InboundTransfersRetentionBlocks: BlockNumber =
-		(10 * TicksPerDay::get()) as BlockNumber;
-	/// Maximum number of inbound transfers retained per block.
-	pub const MaxTransfersToRetainPerBlock: u32 = 100;
-	/// Maximum number of bytes allowed in a TokenGateway request body (0 disables the cap).
-	pub const MaxInboundTransferBytes: u32 = 10 * 1_024;
-	/// Minimum transfer amount (in microgons) to record.
-	pub const MinimumTransferMicrogonsToRecord: Balance = 1_000 * MICROGONS_PER_ARGON;
 
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational referrals allowed at once.

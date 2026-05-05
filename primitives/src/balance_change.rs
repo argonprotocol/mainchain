@@ -9,7 +9,6 @@ use sp_runtime::{MultiSignature, traits::Verify};
 
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
-use sp_debug_derive::RuntimeDebug;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
@@ -26,7 +25,7 @@ use crate::{
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -132,7 +131,7 @@ impl BalanceChange {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -168,7 +167,7 @@ pub struct BalanceProof {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -193,7 +192,7 @@ pub struct MerkleProof {
 	pub leaf_index: u32,
 }
 
-#[derive(Clone, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 pub struct BalanceTip {
 	pub account_id: AccountId,
 	pub account_type: AccountType,
@@ -246,7 +245,7 @@ struct BalanceTipValue {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -264,15 +263,7 @@ pub struct AccountOrigin {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 #[cfg_attr(not(feature = "std"), derive(Serialize, Deserialize))]
 #[repr(transparent)]

@@ -13,11 +13,9 @@ use bitcoin::{bip158, hashes::Hash};
 use bitcoincore_rpc::{Auth, RpcApi};
 use codec::{Decode, Encode};
 use parking_lot::Mutex;
-use polkadot_sdk::*;
-use sp_runtime::RuntimeDebug;
 use std::{collections::BTreeMap, sync::Arc};
 
-#[derive(Clone, Decode, Encode, PartialEq, Eq, RuntimeDebug)]
+#[derive(Clone, Decode, Encode, PartialEq, Eq, Debug)]
 pub struct BlockFilter {
 	pub block_hash: H256Le,
 	pub previous_block_hash: Option<H256Le>,

@@ -105,11 +105,6 @@ pub mod pallet {
 		QueryKind = ValueQuery,
 	>;
 
-	/// The admin of the hyperbridge token gateway
-	#[pallet::storage]
-	pub type HyperbridgeTokenAdmin<T: Config> =
-		StorageValue<_, <T as frame_system::Config>::AccountId, OptionQuery>;
-
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -187,18 +182,13 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		pub hyperbridge_token_admin: Option<<T as frame_system::Config>::AccountId>,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
 	}
 
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
-		fn build(&self) {
-			if let Some(admin) = self.hyperbridge_token_admin.clone() {
-				HyperbridgeTokenAdmin::<T>::put(admin);
-			}
-		}
+		fn build(&self) {}
 	}
 
 	#[pallet::call]
@@ -456,10 +446,6 @@ pub mod pallet {
 			}
 		}
 
-		pub fn hyperbridge_token_admin() -> <T as frame_system::Config>::AccountId {
-			HyperbridgeTokenAdmin::<T>::get().expect("Should have been initialized in genesis")
-		}
-
 		fn next_transfer_id() -> Result<TransferToLocalchainId, Error<T>> {
 			let mut next_transfer_id = NextTransferId::<T>::get().unwrap_or(1);
 			if next_transfer_id == 0 {
@@ -481,7 +467,7 @@ pub mod pallet {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
 #[codec(mel_bound(AccountId: MaxEncodedLen, Balance: MaxEncodedLen))]
 pub struct QueuedTransferOut<AccountId, Balance> {
 	pub account_id: AccountId,

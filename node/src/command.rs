@@ -139,10 +139,7 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| cmd.run::<Block>(&config))
 		},
 		None => {
-			let mut cli = cli;
-			// this is required for hyperbridge
-			cli.run.base.offchain_worker_params.indexing_enabled = true;
-
+			let cli = cli;
 			let runner = cli.create_runner(&cli.run.base)?;
 
 			let mut randomx_config = argon_randomx::Config::default();

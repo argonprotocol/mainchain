@@ -12,7 +12,7 @@ use jsonrpsee::{
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::Deserialize;
-use sp_core::{H256, RuntimeDebug};
+use sp_core::H256;
 
 #[rpc(server, client, namespace = "notebook")]
 pub trait NotebookRpc {
@@ -54,7 +54,7 @@ pub trait NotebookRpc {
 	async fn subscribe_headers(&self) -> SubscriptionResult;
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookSubscriptionBroadcast {
 	pub notebook_number: NotebookNumber,

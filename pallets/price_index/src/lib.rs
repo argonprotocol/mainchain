@@ -27,7 +27,7 @@ mod mock;
 	Copy,
 	Ord,
 	PartialOrd,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 )]

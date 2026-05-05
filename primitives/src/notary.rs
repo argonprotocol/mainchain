@@ -5,12 +5,13 @@ use alloc::{
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::fmt::Debug;
-use frame_support::{pallet_prelude::ConstU32, weights::Weight};
-use frame_support_procedural::{CloneNoBound, PartialEqNoBound, RuntimeDebugNoBound};
+use frame_support::{
+	CloneNoBound, DebugNoBound, PartialEqNoBound, pallet_prelude::ConstU32, weights::Weight,
+};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{Get, H256, RuntimeDebug, ed25519};
+use sp_core::{Get, H256, ed25519};
 use sp_runtime::{BoundedVec, traits::Block as BlockT};
 
 use crate::{
@@ -52,7 +53,7 @@ pub trait NotaryProvider<B: BlockT, AccountId> {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebugNoBound,
+	DebugNoBound,
 	TypeInfo,
 	MaxEncodedLen,
 )]
@@ -64,15 +65,7 @@ pub struct NotaryMeta<MaxHosts: Get<u32>> {
 }
 
 #[derive(
-	PartialEq,
-	Eq,
-	Clone,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 #[repr(transparent)]
 pub struct NotaryName(pub BoundedVec<u8, ConstU32<55>>);
@@ -138,7 +131,7 @@ pub struct GenesisNotary<AccountId> {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebugNoBound,
+	DebugNoBound,
 	TypeInfo,
 	MaxEncodedLen,
 )]
@@ -163,13 +156,7 @@ where
 }
 
 #[derive(
-	CloneNoBound,
-	PartialEqNoBound,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebugNoBound,
-	TypeInfo,
+	CloneNoBound, PartialEqNoBound, Encode, Decode, DecodeWithMemTracking, DebugNoBound, TypeInfo,
 )]
 #[scale_info(skip_type_params(MaxHosts))]
 pub struct NotaryRecordWithState<AccountId, BlockNumber, MaxHosts, NotebookVerifyError>
@@ -194,13 +181,7 @@ where
 }
 
 #[derive(
-	CloneNoBound,
-	PartialEqNoBound,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebugNoBound,
-	TypeInfo,
+	CloneNoBound, PartialEqNoBound, Encode, Decode, DecodeWithMemTracking, DebugNoBound, TypeInfo,
 )]
 pub enum NotaryState<NotebookVerifyError>
 where
@@ -262,9 +243,7 @@ impl From<Vec<u8>> for SignedHeaderBytes {
 	}
 }
 
-#[derive(
-	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, Default,
-)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, Default)]
 pub struct NotaryNotebookTickState {
 	#[codec(compact)]
 	pub tick: Tick,
@@ -273,7 +252,7 @@ pub struct NotaryNotebookTickState {
 	pub notebook_key_details_by_notary: BTreeMap<NotaryId, NotaryNotebookVoteDigestDetails>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct NotaryNotebookDetails<Hash: Codec> {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
@@ -292,7 +271,7 @@ pub struct NotaryNotebookDetails<Hash: Codec> {
 	pub raw_audit_summary: Vec<u8>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct NotaryNotebookRawVotes {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
@@ -301,7 +280,7 @@ pub struct NotaryNotebookRawVotes {
 	pub raw_votes: Vec<(Vec<u8>, BlockVotingPower)>,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct NotaryNotebookAuditSummary {
 	#[codec(compact)]
 	pub notary_id: NotaryId,
@@ -358,7 +337,7 @@ pub struct NotaryNotebookAuditSummaryDecoded {
 	pub details: NotaryNotebookAuditSummaryDetails,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct NotaryNotebookAuditSummaryDetails {
 	pub changed_accounts_root: H256,
 	pub account_changelist: Vec<AccountOrigin>,
@@ -368,15 +347,7 @@ pub struct NotaryNotebookAuditSummaryDetails {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct NotaryNotebookVoteDigestDetails {
 	#[codec(compact)]
@@ -414,7 +385,7 @@ impl<H: Codec> From<&NotaryNotebookDetails<H>> for NotaryNotebookVoteDigestDetai
 	}
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
 pub struct NotaryNotebookKeyDetails {
 	#[codec(compact)]
 	pub notebook_number: NotebookNumber,

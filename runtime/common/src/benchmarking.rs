@@ -1,11 +1,10 @@
 //! Benchmark-only runtime stubs and helpers.
 #![cfg(feature = "runtime-benchmarks")]
 
-use crate::prelude::{Vec, vec};
-use codec::Decode;
+use crate::prelude::Vec;
 use core::marker::PhantomData;
 use polkadot_sdk::{
-	frame_support::traits::{Get, SortedMembers},
+	frame_support::traits::Get,
 	sp_arithmetic::FixedU128,
 	sp_runtime::{
 		DispatchError,
@@ -44,40 +43,6 @@ pub use pallet_prelude::benchmarking::{
 	set_benchmark_operational_accounts_provider_state,
 	set_benchmark_operational_rewards_provider_state, set_benchmark_price_provider_state,
 };
-
-fn benchmark_token_admin_account_id<AccountId: Decode>() -> AccountId {
-	let bytes = [3u8; 32];
-	AccountId::decode(&mut &bytes[..]).expect("benchmark token admin account id must decode")
-}
-
-pub struct BenchmarkTokenAdmin<AccountId>(PhantomData<AccountId>);
-
-impl<AccountId: Decode> Get<AccountId> for BenchmarkTokenAdmin<AccountId> {
-	fn get() -> AccountId {
-		benchmark_token_admin_account_id::<AccountId>()
-	}
-}
-
-pub struct BenchmarkTokenAdmins<AccountId>(PhantomData<AccountId>);
-
-impl<AccountId> SortedMembers<AccountId> for BenchmarkTokenAdmins<AccountId>
-where
-	AccountId: Decode + Ord,
-{
-	fn sorted_members() -> Vec<AccountId> {
-		vec![benchmark_token_admin_account_id::<AccountId>()]
-	}
-
-	fn contains(t: &AccountId) -> bool {
-		*t == benchmark_token_admin_account_id::<AccountId>()
-	}
-
-	fn count() -> usize {
-		1
-	}
-
-	fn add(_t: &AccountId) {}
-}
 
 pub struct BenchmarkBitcoinSignatureVerifier;
 impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSignatureVerifier {

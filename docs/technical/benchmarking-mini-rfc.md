@@ -155,14 +155,6 @@ on block-sealer and reward-account providers. Benchmark runtimes therefore provi
 benchmark-only `BlockSealerProvider` and `BlockRewardAccountsProvider` implementations so the fee
 benchmark measures cleanly without production block-author state.
 
-### Benchmark-only token gateway admin note
-
-`pallet_token_gateway` benchmarks call `T::CreateOrigin::try_successful_origin()`. In production
-that origin is derived from the singleton token-admin wiring, which in this repo resolves through
-`LocalchainTransfer::hyperbridge_token_admin()`. Benchmark runtimes therefore provide a minimal
-benchmark-only token-admin account and `SortedMembers` implementation so token-gateway benchmarks do
-not depend on localchain-transfer genesis initialization.
-
 ### Notebook inherent event handler weight composition
 
 `NotebookEventHandler` now exposes `notebook_submitted_weight(&NotebookHeader) -> Weight` (same
@@ -181,9 +173,6 @@ is 0.44% of the 10-second block weight budget. Expiry processing is not overweig
   modules when complete,
 - additional provider cleanup work outside this scope (for example domains/block_rewards follow-up
   items) remain separate,
-- `pallet_ismp` and `pallet_hyperbridge` currently do not expose runtime `WeightInfo` associated
-  types in this crate version, so they are not wired through the same runtime-generated weight
-  pipeline as `ismp_grandpa` / `pallet_token_gateway`,
 - reconcile the `pallet_grandpa` benchmark generator output with the current upstream trait shape:
   the generated file still emits the older equivocation method name and needs a small local
   signature adjustment after generation,

@@ -2,7 +2,6 @@ use alloc::{format, string::String};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_debug_derive::RuntimeDebug;
 
 use crate::AccountId;
 
@@ -14,7 +13,7 @@ use crate::AccountId;
 	Eq,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -55,7 +54,7 @@ impl core::hash::Hash for LocalchainAccountId {
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,

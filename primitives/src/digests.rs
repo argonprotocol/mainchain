@@ -9,7 +9,7 @@ use frame_support_procedural::DefaultNoBound;
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedVec, *};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{RuntimeDebug, U256};
+use sp_core::U256;
 use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 
 /// The block creator account_id - matches POW so that we can use the built-in front end decoding
@@ -33,7 +33,7 @@ pub const FORK_POWER_DIGEST: ConsensusEngineId = *b"powr";
 /// Frame info
 pub const FRAME_INFO_DIGEST: ConsensusEngineId = *b"fram";
 
-#[derive(Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub enum BlockSealDigest {
 	Vote {
 		seal_strength: U256,
@@ -295,7 +295,7 @@ impl BlockSealDigest {
 	Eq,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	MaxEncodedLen,
 	Serialize,
@@ -315,7 +315,7 @@ pub struct BlockVoteDigest {
 	Eq,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,
@@ -332,7 +332,7 @@ pub struct ParentVotingKeyDigest {
 	Eq,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,
@@ -344,16 +344,7 @@ pub struct NotebookDigest<VerifyError: Codec + MaxEncodedLen> {
 }
 
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	TypeInfo,
-	Serialize,
-	Deserialize,
-	DefaultNoBound,
+	Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize, DefaultNoBound,
 )]
 pub struct NotebookHeaderData<VerifyError: Codec + MaxEncodedLen> {
 	pub signed_headers: Vec<SignedHeaderBytes>,
@@ -367,7 +358,7 @@ pub struct NotebookHeaderData<VerifyError: Codec + MaxEncodedLen> {
 	Eq,
 	Encode,
 	Decode,
-	RuntimeDebug,
+	Debug,
 	TypeInfo,
 	Serialize,
 	Deserialize,

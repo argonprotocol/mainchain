@@ -4,10 +4,8 @@ use bitcoin::{
 	bip32, psbt,
 	psbt::{ExtractTxError, SignError, SigningErrors},
 };
-use polkadot_sdk::*;
-use sp_runtime::RuntimeDebug;
 
-#[derive(RuntimeDebug, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
 	/// Fees overflowed
 	#[error("The fees overflowed.")]

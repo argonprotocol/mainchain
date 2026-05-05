@@ -25,7 +25,6 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 	let sudo_account = AccountId::from_str("5EZxgPRoQDYW72ceBKTd8AcSPizNL38cVjBzDGTqbeHUPfRx")?;
 	let bitcoin_oracle = AccountId::from_str("5GZGFLKPxKegnjudkiy32gU6JmiKFgt6cJ35udQpSjnPu8PY")?;
 	let price_oracle = AccountId::from_str("5Gp8fDqBvgVj3BepUCeyGHEeguy1Jmeb2gfwcFvG8snV4icd")?;
-	let token_admin = sudo_account.clone();
 	let ticker = Ticker::new(TICK_MILLIS, 60);
 
 	let notary_account = AccountId::from_str("5CFiHEZUFSqwEeiSqJwfxjp4wZWxom73y5EjVsrAw3GwQuWh")?;
@@ -85,7 +84,6 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_after_ticks: 0,
 			},
 			minimum_bitcoin_lock_satoshis: 5_000,
-			hyperbridge_token_admin: token_admin,
 		}
 	))
 	.build())

@@ -4,7 +4,6 @@ use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
-use sp_runtime::RuntimeDebug;
 
 use crate::{
 	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
@@ -23,15 +22,7 @@ pub const BITCOIN_INHERENT_IDENTIFIER_V2: InherentIdentifier = *b"bitcoin2";
 
 #[allow(clippy::large_enum_variant)]
 #[derive(
-	Clone,
-	PartialEq,
-	Eq,
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	RuntimeDebug,
-	TypeInfo,
-	MaxEncodedLen,
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub enum BlockSealInherent {
 	Vote {
@@ -48,7 +39,7 @@ pub enum BlockSealInherent {
 	Compute,
 }
 
-#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub enum BlockSealInherentNodeSide {
 	Vote {
 		seal_strength: U256,
@@ -140,7 +131,7 @@ impl BlockSealInherentData for InherentData {
 }
 
 /// Errors that can occur while checking the timestamp inherent.
-#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[derive(Encode, Debug, thiserror::Error)]
 #[cfg_attr(feature = "std", derive(Decode))]
 pub enum SealInherentError {
 	/// The block seal is missing
@@ -248,7 +239,7 @@ impl sp_inherents::InherentDataProvider for NotebooksInherentDataProvider {
 	}
 }
 
-#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[derive(Encode, Debug, thiserror::Error)]
 #[cfg_attr(feature = "std", derive(Decode))]
 pub enum NotebookInherentError {
 	/// The block seal is missing
@@ -298,7 +289,7 @@ impl BitcoinInherentData for InherentData {
 	}
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSyncV0 {
 	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
 	pub verified: BTreeMap<UtxoId, UtxoRef>,
@@ -306,21 +297,21 @@ pub struct BitcoinUtxoSyncV0 {
 	pub sync_to_block: BitcoinBlock,
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSyncV1 {
 	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
 	pub funded: Vec<BitcoinUtxoFunding>,
 	pub sync_to_block: BitcoinBlock,
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSync {
 	pub spent: Vec<BitcoinUtxoSpend>,
 	pub funded: Vec<BitcoinUtxoFunding>,
 	pub sync_to_block: BitcoinBlock,
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSpend {
 	#[codec(compact)]
 	pub utxo_id: UtxoId,
@@ -329,7 +320,7 @@ pub struct BitcoinUtxoSpend {
 	pub bitcoin_height: BitcoinHeight,
 }
 
-#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo)]
+#[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoFunding {
 	#[codec(compact)]
 	pub utxo_id: UtxoId,
@@ -434,7 +425,7 @@ impl sp_inherents::InherentDataProvider for BitcoinInherentDataProvider {
 	}
 }
 
-#[derive(Encode, RuntimeDebug, thiserror::Error)]
+#[derive(Encode, Debug, thiserror::Error)]
 #[cfg_attr(feature = "std", derive(Decode))]
 pub enum BitcoinInherentError {
 	/// The inherent has a mismatch with the details coordinated between bitcoin and the block

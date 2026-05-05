@@ -1,7 +1,6 @@
 use alloc::collections::btree_map::BTreeMap;
 
 use pallet_prelude::*;
-use sp_keyring::Sr25519Keyring::Alice;
 
 use crate as pallet_localchain_transfer;
 use argon_primitives::{
@@ -179,11 +178,8 @@ impl pallet_localchain_transfer::Config for Test {
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
-		pallet_localchain_transfer::GenesisConfig::<Test> {
-			hyperbridge_token_admin: Some(Alice.to_account_id()),
-			..Default::default()
-		}
-		.assimilate_storage(t)
-		.unwrap();
+		pallet_localchain_transfer::GenesisConfig::<Test>::default()
+			.assimilate_storage(t)
+			.unwrap();
 	})
 }
