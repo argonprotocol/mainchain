@@ -113,8 +113,8 @@ mainchain. It uses a PostgresSQL database to keep track of its history and users
   - `block_seal`: Verifies the type of block seal used to secure the blockchain matches eligible
     work.
   - `block_seal_spec`: Tracks and adjust difficulty of compute and vote "power" for block seals.
-  - `chain_transfer`: Allows users to transfer Argon between chains. Currently supports Localchain
-    and Mainchain.
+  - `localchain_transfer`: Allows users to transfer Argon between chains. Currently supports
+    Localchain and Mainchain.
   - `domains`: Registers and tracks domains. Domains are used to establish micropayment channel
     holds with ip routing akin to a dns lookup. They're prominently used for
     [Ulixee Datastores](https://ulixee.org/docs/datastore).

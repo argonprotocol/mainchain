@@ -1,9 +1,9 @@
-//! Benchmarking setup for pallet-chain-transfer
+//! Benchmarking setup for pallet-localchain-transfer
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
 #[allow(unused_imports)]
-use crate::Pallet as ChainTransferPallet;
+use crate::Pallet as LocalchainTransferPallet;
 use argon_primitives::{
 	NotebookEventHandler, TransferToLocalchainId,
 	notary::NotaryProvider,
@@ -130,7 +130,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let is_valid = <ChainTransferPallet<T> as ChainTransferLookup<
+			let is_valid = <LocalchainTransferPallet<T> as ChainTransferLookup<
 				T::AccountId,
 				T::Balance,
 			>>::is_valid_transfer_to_localchain(
@@ -169,7 +169,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			<ChainTransferPallet<T> as NotebookEventHandler>::notebook_submitted(&header);
+			<LocalchainTransferPallet<T> as NotebookEventHandler>::notebook_submitted(&header);
 		}
 
 		assert!(PendingTransfersOut::<T>::iter().next().is_none());
@@ -190,7 +190,7 @@ mod benchmarks {
 		let total_funding = 10_000_000_000u128
 			.saturating_mul(transfer_count as u128)
 			.saturating_add(10_000_000_000u128);
-		let notary_account = ChainTransferPallet::<T>::notary_account_id(notary_id);
+		let notary_account = LocalchainTransferPallet::<T>::notary_account_id(notary_id);
 		T::Argon::mint_into(&notary_account, total_funding.into())
 			.map_err(|_| BenchmarkError::Stop("failed to fund notary account"))?;
 
@@ -211,7 +211,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			<ChainTransferPallet<T> as NotebookEventHandler>::notebook_submitted(&header);
+			<LocalchainTransferPallet<T> as NotebookEventHandler>::notebook_submitted(&header);
 		}
 
 		assert!(ExpiringTransfersOutByNotary::<T>::iter_prefix(notary_id).next().is_none());
@@ -219,5 +219,9 @@ mod benchmarks {
 		Ok(())
 	}
 
-	impl_benchmark_test_suite!(ChainTransferPallet, crate::mock::new_test_ext(), crate::mock::Test);
+	impl_benchmark_test_suite!(
+		LocalchainTransferPallet,
+		crate::mock::new_test_ext(),
+		crate::mock::Test
+	);
 }

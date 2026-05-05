@@ -11,7 +11,7 @@ members = [
     "pallets/block_seal_spec",
     "pallets/domains",
     "pallets/digests",
-    "pallets/chain_transfer",
+    "pallets/localchain_transfer",
     "pallets/fee_control",
     "pallets/treasury",
     "pallets/mining_slot",
@@ -286,7 +286,7 @@ pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = 
 pallet-bitcoin-locks = { path = "pallets/bitcoin_locks", default-features = false }
 pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
-pallet-chain-transfer = { path = "pallets/chain_transfer", default-features = false }
+pallet-localchain-transfer = { path = "pallets/localchain_transfer", default-features = false }
 pallet-digests = { path = "pallets/digests", default-features = false }
 pallet-domains = { path = "pallets/domains", default-features = false }
 pallet-fee-control = { path = "pallets/fee_control", default-features = false }

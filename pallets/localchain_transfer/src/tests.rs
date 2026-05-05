@@ -1,6 +1,6 @@
 use crate::{
 	Error, Event,
-	mock::{ChainTransfer as ChainTransferPallet, *},
+	mock::{LocalchainTransfer as LocalchainTransferPallet, *},
 	pallet::{ExpiringTransfersOutByNotary, NextTransferId},
 };
 use argon_primitives::{
@@ -21,7 +21,7 @@ fn it_can_send_funds_to_localchain() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		set_argons(&who, 5000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
@@ -41,7 +41,7 @@ fn it_rejects_invalid_notary_transfer() {
 		set_argons(&who, 1000);
 
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 99),
+			LocalchainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 99),
 			Error::<Test>::InvalidNotaryUsedForTransfer
 		);
 	});
@@ -56,7 +56,7 @@ fn it_rejects_locked_notary_transfer() {
 		LockedNotaries::set([(1, 1)].into_iter().collect());
 
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 1),
+			LocalchainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 1),
 			Error::<Test>::NotaryLockedForTransfer
 		);
 	});
@@ -70,7 +70,7 @@ fn it_allows_you_to_transfer_full_balance() {
 		System::set_block_number(1);
 		System::inc_account_nonce(&who);
 		set_argons(&who, 5000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			5000,
 			1,
@@ -87,7 +87,7 @@ fn it_expires_transfers_when_notebook_tick_advances_past_expiration() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		set_argons(&who, 2000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			2000,
 			1,
@@ -97,7 +97,7 @@ fn it_expires_transfers_when_notebook_tick_advances_past_expiration() {
 		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: expires_tick + 1,
@@ -125,7 +125,7 @@ fn it_does_not_expire_transfers_without_notebook_submission() {
 		let who = Bob.to_account_id();
 		System::set_block_number(1);
 		set_argons(&who, 2000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			2000,
 			1,
@@ -134,7 +134,7 @@ fn it_does_not_expire_transfers_without_notebook_submission() {
 
 		let expires_tick: Tick = 1 + TransferExpirationTicks::get();
 		NotebookTick::set(expires_tick + 10);
-		ChainTransferPallet::on_finalize(System::block_number());
+		LocalchainTransferPallet::on_finalize(System::block_number());
 
 		assert_eq!(Balances::free_balance(&who), 0);
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick), vec![1]);
@@ -149,13 +149,13 @@ fn it_can_handle_multiple_transfer() {
 		MaxPendingTransfersOutPerBlock::set(2);
 		System::set_block_number(1);
 		set_argons(&who, 5000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
 		));
 		System::inc_account_nonce(&who);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			700,
 			1,
@@ -167,7 +167,11 @@ fn it_can_handle_multiple_transfer() {
 		System::inc_account_nonce(&who);
 		// We have a max number of transfers out per block
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who.clone()), 1200, 1,),
+			LocalchainTransferPallet::send_to_localchain(
+				RuntimeOrigin::signed(who.clone()),
+				1200,
+				1,
+			),
 			Error::<Test>::MaxBlockTransfersExceeded
 		);
 	});
@@ -181,7 +185,7 @@ fn it_rejects_transfer_id_reuse_when_wrapped() {
 		System::set_block_number(1);
 		set_argons(&who, 5000);
 
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
@@ -190,7 +194,7 @@ fn it_rejects_transfer_id_reuse_when_wrapped() {
 
 		NextTransferId::<Test>::set(Some(u32::MAX));
 		System::inc_account_nonce(&who);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			1000,
 			1,
@@ -199,7 +203,11 @@ fn it_rejects_transfer_id_reuse_when_wrapped() {
 
 		System::inc_account_nonce(&who);
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who.clone()), 1000, 1),
+			LocalchainTransferPallet::send_to_localchain(
+				RuntimeOrigin::signed(who.clone()),
+				1000,
+				1,
+			),
 			Error::<Test>::NoAvailableTransferId
 		);
 
@@ -216,7 +224,7 @@ fn it_can_handle_transfers_in() {
 		System::set_block_number(1);
 		let who = Bob.to_account_id();
 		set_argons(&who, 5000);
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			5000,
 			1,
@@ -225,7 +233,7 @@ fn it_can_handle_transfers_in() {
 		assert_eq!(ExpiringTransfersOutByNotary::<Test>::get(1, expires_tick)[0], 1);
 
 		let changed_accounts_root = H256::random();
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -251,7 +259,7 @@ fn it_can_handle_transfers_in() {
 		assert_eq!(Balances::free_balance(&who), 0);
 
 		let change_root_2 = H256::random();
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 2,
 			tick: 2,
@@ -284,11 +292,11 @@ fn it_reduces_circulation_on_tax() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
-		let who = ChainTransferPallet::notary_account_id(1);
+		let who = LocalchainTransferPallet::notary_account_id(1);
 		set_argons(&who, 25000);
 		assert_eq!(Balances::total_issuance(), 25_000);
 
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -317,7 +325,7 @@ fn it_doesnt_allow_a_notary_balance_to_go_negative() {
 		// Go past genesis block so events get deposited
 		System::set_block_number(2);
 
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 0,
@@ -358,7 +366,7 @@ fn it_emits_taxation_error_when_burn_fails() {
 		// Notary escrow has no funds — burn will fail
 		let issuance_before = Balances::total_issuance();
 
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -395,11 +403,11 @@ fn it_partially_burns_tax_when_escrow_is_low() {
 	MaxNotebookBlocksToRemember::set(2);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		let who = ChainTransferPallet::notary_account_id(1);
+		let who = LocalchainTransferPallet::notary_account_id(1);
 		// Fund escrow with less than the tax (but above ED so burn can occur)
 		set_argons(&who, 15_000);
 
-		ChainTransferPallet::notebook_submitted(&NotebookHeader {
+		LocalchainTransferPallet::notebook_submitted(&NotebookHeader {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 1,
@@ -439,7 +447,7 @@ fn it_rejects_zero_amount_transfers() {
 		System::set_block_number(1);
 		set_argons(&who, 5000);
 		assert_noop!(
-			ChainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 0, 1),
+			LocalchainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 0, 1),
 			Error::<Test>::InsufficientFunds
 		);
 	});
@@ -452,10 +460,10 @@ fn it_makes_escrow_account_permanent() {
 		System::set_block_number(1);
 		set_argons(&who, 5000);
 
-		let escrow = ChainTransferPallet::notary_account_id(1);
+		let escrow = LocalchainTransferPallet::notary_account_id(1);
 		assert_eq!(System::providers(&escrow), 0);
 
-		assert_ok!(ChainTransferPallet::send_to_localchain(
+		assert_ok!(LocalchainTransferPallet::send_to_localchain(
 			RuntimeOrigin::signed(who.clone()),
 			2000,
 			1,
@@ -482,7 +490,7 @@ fn it_makes_escrow_account_permanent() {
 			parent_secret: None,
 			domains: bounded_vec![],
 		};
-		<ChainTransferPallet as NotebookEventHandler>::notebook_submitted(&header);
+		<LocalchainTransferPallet as NotebookEventHandler>::notebook_submitted(&header);
 
 		// funds refunded back to user
 		assert_eq!(Balances::free_balance(&who), 5000);

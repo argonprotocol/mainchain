@@ -153,7 +153,7 @@ Pallets define the blockchain's storage, transactions, and logic. Key pallets:
 - `bitcoin_locks` - Lock/release Bitcoin to vault
 - `mining_slot` - Mining slot registration and bidding
 - `notebook` - Track notary notebooks and account changes
-- `chain_transfer` - Transfer between chains (Localchain ↔ Mainchain)
+- `localchain_transfer` - Transfer between chains (Localchain ↔ Mainchain)
 
 ### Updating Chain Metadata
 

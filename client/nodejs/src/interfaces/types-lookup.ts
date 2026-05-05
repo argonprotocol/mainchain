@@ -1065,8 +1065,8 @@ declare module '@polkadot/types/lookup' {
       | 'BlockSpecificationNotFound';
   }
 
-  /** @name PalletChainTransferEvent (76) */
-  interface PalletChainTransferEvent extends Enum {
+  /** @name PalletLocalchainTransferEvent (76) */
+  interface PalletLocalchainTransferEvent extends Enum {
     readonly isTransferToLocalchain: boolean;
     readonly asTransferToLocalchain: {
       readonly accountId: AccountId32;
@@ -2733,8 +2733,8 @@ declare module '@polkadot/types/lookup' {
     readonly accountUid: Compact<u32>;
   }
 
-  /** @name PalletChainTransferCall (249) */
-  interface PalletChainTransferCall extends Enum {
+  /** @name PalletLocalchainTransferCall (249) */
+  interface PalletLocalchainTransferCall extends Enum {
     readonly isSendToLocalchain: boolean;
     readonly asSendToLocalchain: {
       readonly amount: Compact<u128>;
@@ -4001,8 +4001,8 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidNotebookSubmissionTick';
   }
 
-  /** @name PalletChainTransferQueuedTransferOut (457) */
-  interface PalletChainTransferQueuedTransferOut extends Struct {
+  /** @name PalletLocalchainTransferQueuedTransferOut (457) */
+  interface PalletLocalchainTransferQueuedTransferOut extends Struct {
     readonly accountId: AccountId32;
     readonly amount: u128;
     readonly expirationTick: u64;
@@ -4012,8 +4012,8 @@ declare module '@polkadot/types/lookup' {
   /** @name FrameSupportPalletId (459) */
   interface FrameSupportPalletId extends U8aFixed {}
 
-  /** @name PalletChainTransferError (460) */
-  interface PalletChainTransferError extends Enum {
+  /** @name PalletLocalchainTransferError (460) */
+  interface PalletLocalchainTransferError extends Enum {
     readonly isMaxBlockTransfersExceeded: boolean;
     readonly isInsufficientFunds: boolean;
     readonly isInsufficientNotarizedFunds: boolean;

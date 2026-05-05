@@ -68,12 +68,12 @@ import type {
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
-  PalletChainTransferQueuedTransferOut,
   PalletDomainsDomainRegistration,
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletHyperbridgeVersionedHostParams,
   PalletInboundTransferLogInboundEvmTransfer,
+  PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMultisigMultisig,
@@ -480,36 +480,6 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
     };
-    chainTransfer: {
-      /**
-       * Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
-       *
-       * NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,
-       * not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending
-       * transfers for that notary remain frozen by design until a notary-switch recovery path is
-       * executed.
-       **/
-      expiringTransfersOutByNotary: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Vec<u32>>,
-        [u32, u64]
-      >;
-      /**
-       * The admin of the hyperbridge token gateway
-       **/
-      hyperbridgeTokenAdmin: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
-      nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
-      pendingTransfersOut: AugmentedQuery<
-        ApiType,
-        (
-          arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<PalletChainTransferQueuedTransferOut>>,
-        [u32]
-      >;
-    };
     digests: {
       tempDigests: AugmentedQuery<
         ApiType,
@@ -771,6 +741,36 @@ declare module '@polkadot/api-base/types/storage' {
             | Uint8Array,
         ) => Observable<Option<u64>>,
         [IsmpHostStateMachine]
+      >;
+    };
+    localchainTransfer: {
+      /**
+       * Expiration index for outgoing transfers keyed by `(notary_id, expiration_tick)`.
+       *
+       * NOTE: Expiration processing follows notebook progression (`header.tick`) for each notary,
+       * not wall/runtime tick. If a notary stops submitting notebooks indefinitely, pending
+       * transfers for that notary remain frozen by design until a notary-switch recovery path is
+       * executed.
+       **/
+      expiringTransfersOutByNotary: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Vec<u32>>,
+        [u32, u64]
+      >;
+      /**
+       * The admin of the hyperbridge token gateway
+       **/
+      hyperbridgeTokenAdmin: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
+      nextTransferId: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      pendingTransfersOut: AugmentedQuery<
+        ApiType,
+        (
+          arg: u32 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletLocalchainTransferQueuedTransferOut>>,
+        [u32]
       >;
     };
     miningSlot: {

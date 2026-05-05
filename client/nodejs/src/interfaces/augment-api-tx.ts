@@ -523,15 +523,6 @@ declare module '@polkadot/api-base/types/submittable' {
         [Option<u128>, Option<u128>]
       >;
     };
-    chainTransfer: {
-      sendToLocalchain: AugmentedSubmittable<
-        (
-          amount: Compact<u128> | AnyNumber | Uint8Array,
-          notaryId: u32 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [Compact<u128>, u32]
-      >;
-    };
     domains: {
       setZoneRecord: AugmentedSubmittable<
         (
@@ -733,6 +724,15 @@ declare module '@polkadot/api-base/types/submittable' {
               )[],
         ) => SubmittableExtrinsic<ApiType>,
         [Vec<IsmpHostStateMachine>]
+      >;
+    };
+    localchainTransfer: {
+      sendToLocalchain: AugmentedSubmittable<
+        (
+          amount: Compact<u128> | AnyNumber | Uint8Array,
+          notaryId: u32 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Compact<u128>, u32]
       >;
     };
     miningSlot: {

@@ -15,7 +15,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_mining_slot, MiningSlot]
 	[pallet_block_seal_spec, BlockSealSpec]
 	[pallet_block_seal, BlockSeal]
-	[pallet_chain_transfer, ChainTransfer]
+	[pallet_localchain_transfer, LocalchainTransfer]
 	[pallet_notebook, Notebook]
 	[pallet_grandpa, Grandpa]
 	[ismp_grandpa, IsmpGrandpa]

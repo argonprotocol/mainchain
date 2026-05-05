@@ -157,10 +157,6 @@ import type {
   PalletBlockSealSpecCall,
   PalletBlockSealSpecError,
   PalletBlockSealSpecEvent,
-  PalletChainTransferCall,
-  PalletChainTransferError,
-  PalletChainTransferEvent,
-  PalletChainTransferQueuedTransferOut,
   PalletDigestsError,
   PalletDigestsEvent,
   PalletDomainsCall,
@@ -189,6 +185,10 @@ import type {
   PalletIsmpUtilsFundMessageParams,
   PalletIsmpUtilsMessageCommitment,
   PalletIsmpUtilsUpdateConsensusState,
+  PalletLocalchainTransferCall,
+  PalletLocalchainTransferError,
+  PalletLocalchainTransferEvent,
+  PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotCall,
   PalletMiningSlotError,
   PalletMiningSlotEvent,
@@ -443,10 +443,6 @@ declare module '@polkadot/types/types/registry' {
     PalletBlockSealSpecCall: PalletBlockSealSpecCall;
     PalletBlockSealSpecError: PalletBlockSealSpecError;
     PalletBlockSealSpecEvent: PalletBlockSealSpecEvent;
-    PalletChainTransferCall: PalletChainTransferCall;
-    PalletChainTransferError: PalletChainTransferError;
-    PalletChainTransferEvent: PalletChainTransferEvent;
-    PalletChainTransferQueuedTransferOut: PalletChainTransferQueuedTransferOut;
     PalletDigestsError: PalletDigestsError;
     PalletDigestsEvent: PalletDigestsEvent;
     PalletDomainsCall: PalletDomainsCall;
@@ -475,6 +471,10 @@ declare module '@polkadot/types/types/registry' {
     PalletIsmpUtilsFundMessageParams: PalletIsmpUtilsFundMessageParams;
     PalletIsmpUtilsMessageCommitment: PalletIsmpUtilsMessageCommitment;
     PalletIsmpUtilsUpdateConsensusState: PalletIsmpUtilsUpdateConsensusState;
+    PalletLocalchainTransferCall: PalletLocalchainTransferCall;
+    PalletLocalchainTransferError: PalletLocalchainTransferError;
+    PalletLocalchainTransferEvent: PalletLocalchainTransferEvent;
+    PalletLocalchainTransferQueuedTransferOut: PalletLocalchainTransferQueuedTransferOut;
     PalletMiningSlotCall: PalletMiningSlotCall;
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;

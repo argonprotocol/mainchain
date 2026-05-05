@@ -1126,7 +1126,7 @@ mod tests {
 		let in_block = client
 			.tx()
 			.sign_and_submit_then_watch_default(
-				&tx().chain_transfer().send_to_localchain(amount.into(), 1),
+				&tx().localchain_transfer().send_to_localchain(amount.into(), 1),
 				&signer,
 			)
 			.await?
@@ -1136,7 +1136,7 @@ mod tests {
 
 		for event in events.iter().flatten() {
 			if let Some(Ok(transfer)) = event
-				.as_event::<api::chain_transfer::events::TransferToLocalchain>()
+				.as_event::<api::localchain_transfer::events::TransferToLocalchain>()
 				.transpose()
 			{
 				if transfer.account_id == account.public().into() {

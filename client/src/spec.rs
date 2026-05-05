@@ -19,7 +19,7 @@ pub mod api {
 		"BitcoinLocks",
 		"Notaries",
 		"Notebook",
-		"ChainTransfer",
+		"LocalchainTransfer",
 		"BlockSealSpec",
 		"Domains",
 		"PriceIndex",
@@ -1174,10 +1174,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							95u8, 140u8, 128u8, 233u8, 52u8, 150u8, 106u8, 56u8, 11u8, 170u8,
-							212u8, 153u8, 102u8, 197u8, 70u8, 175u8, 179u8, 7u8, 201u8, 239u8,
-							118u8, 208u8, 130u8, 54u8, 90u8, 90u8, 47u8, 217u8, 155u8, 42u8, 10u8,
-							231u8,
+							129u8, 169u8, 221u8, 81u8, 126u8, 93u8, 69u8, 95u8, 93u8, 252u8, 221u8,
+							7u8, 82u8, 94u8, 70u8, 235u8, 94u8, 34u8, 229u8, 192u8, 211u8, 228u8,
+							86u8, 20u8, 156u8, 0u8, 136u8, 209u8, 54u8, 240u8, 49u8, 85u8,
 						],
 					)
 				}
@@ -1195,9 +1194,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							158u8, 56u8, 89u8, 145u8, 111u8, 117u8, 40u8, 212u8, 81u8, 5u8, 9u8,
-							160u8, 0u8, 101u8, 84u8, 34u8, 217u8, 1u8, 240u8, 185u8, 235u8, 28u8,
-							185u8, 32u8, 182u8, 119u8, 133u8, 114u8, 108u8, 145u8, 131u8, 16u8,
+							158u8, 188u8, 209u8, 100u8, 71u8, 167u8, 114u8, 219u8, 27u8, 110u8,
+							132u8, 207u8, 108u8, 209u8, 74u8, 137u8, 64u8, 214u8, 46u8, 13u8,
+							233u8, 201u8, 5u8, 98u8, 212u8, 121u8, 250u8, 235u8, 13u8, 148u8,
+							127u8, 30u8,
 						],
 					)
 				}
@@ -3557,8 +3557,8 @@ pub mod api {
 		pub fn notaries(&self) -> notaries::constants::ConstantsApi {
 			notaries::constants::ConstantsApi
 		}
-		pub fn chain_transfer(&self) -> chain_transfer::constants::ConstantsApi {
-			chain_transfer::constants::ConstantsApi
+		pub fn localchain_transfer(&self) -> localchain_transfer::constants::ConstantsApi {
+			localchain_transfer::constants::ConstantsApi
 		}
 		pub fn block_seal_spec(&self) -> block_seal_spec::constants::ConstantsApi {
 			block_seal_spec::constants::ConstantsApi
@@ -3641,8 +3641,8 @@ pub mod api {
 		pub fn notebook(&self) -> notebook::storage::StorageApi {
 			notebook::storage::StorageApi
 		}
-		pub fn chain_transfer(&self) -> chain_transfer::storage::StorageApi {
-			chain_transfer::storage::StorageApi
+		pub fn localchain_transfer(&self) -> localchain_transfer::storage::StorageApi {
+			localchain_transfer::storage::StorageApi
 		}
 		pub fn block_seal_spec(&self) -> block_seal_spec::storage::StorageApi {
 			block_seal_spec::storage::StorageApi
@@ -3740,8 +3740,8 @@ pub mod api {
 		pub fn notebook(&self) -> notebook::calls::TransactionApi {
 			notebook::calls::TransactionApi
 		}
-		pub fn chain_transfer(&self) -> chain_transfer::calls::TransactionApi {
-			chain_transfer::calls::TransactionApi
+		pub fn localchain_transfer(&self) -> localchain_transfer::calls::TransactionApi {
+			localchain_transfer::calls::TransactionApi
 		}
 		pub fn block_seal_spec(&self) -> block_seal_spec::calls::TransactionApi {
 			block_seal_spec::calls::TransactionApi
@@ -3810,9 +3810,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				43u8, 109u8, 120u8, 186u8, 242u8, 149u8, 63u8, 4u8, 73u8, 117u8, 165u8, 98u8,
-				183u8, 160u8, 162u8, 31u8, 7u8, 62u8, 210u8, 158u8, 201u8, 61u8, 104u8, 100u8,
-				46u8, 231u8, 85u8, 214u8, 50u8, 164u8, 207u8, 65u8,
+				219u8, 130u8, 65u8, 232u8, 142u8, 109u8, 178u8, 16u8, 234u8, 86u8, 30u8, 116u8,
+				21u8, 85u8, 215u8, 96u8, 237u8, 200u8, 60u8, 225u8, 234u8, 170u8, 136u8, 147u8,
+				28u8, 98u8, 106u8, 111u8, 76u8, 75u8, 235u8, 139u8,
 			]
 	}
 	pub mod system {
@@ -4930,9 +4930,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							29u8, 133u8, 186u8, 214u8, 8u8, 208u8, 254u8, 35u8, 84u8, 7u8, 170u8,
-							83u8, 220u8, 116u8, 193u8, 11u8, 249u8, 25u8, 159u8, 185u8, 115u8,
-							247u8, 8u8, 67u8, 2u8, 186u8, 107u8, 157u8, 9u8, 156u8, 155u8, 189u8,
+							37u8, 37u8, 92u8, 46u8, 244u8, 248u8, 84u8, 234u8, 162u8, 89u8, 55u8,
+							40u8, 158u8, 158u8, 31u8, 111u8, 178u8, 73u8, 101u8, 83u8, 26u8, 197u8,
+							8u8, 40u8, 140u8, 54u8, 207u8, 156u8, 7u8, 111u8, 126u8, 24u8,
 						],
 					)
 				}
@@ -5806,10 +5806,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							126u8, 250u8, 95u8, 164u8, 199u8, 44u8, 45u8, 50u8, 145u8, 121u8, 31u8,
-							17u8, 215u8, 226u8, 211u8, 238u8, 67u8, 251u8, 227u8, 92u8, 188u8,
-							104u8, 185u8, 198u8, 253u8, 23u8, 161u8, 222u8, 113u8, 156u8, 207u8,
-							10u8,
+							115u8, 172u8, 214u8, 15u8, 217u8, 113u8, 34u8, 83u8, 7u8, 171u8, 37u8,
+							133u8, 125u8, 188u8, 78u8, 35u8, 118u8, 49u8, 199u8, 28u8, 222u8, 61u8,
+							182u8, 197u8, 121u8, 177u8, 255u8, 98u8, 72u8, 229u8, 104u8, 214u8,
 						],
 					)
 				}
@@ -5871,9 +5870,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							243u8, 238u8, 253u8, 39u8, 77u8, 43u8, 154u8, 113u8, 201u8, 10u8, 99u8,
-							48u8, 74u8, 165u8, 168u8, 70u8, 115u8, 188u8, 105u8, 142u8, 110u8,
-							21u8, 120u8, 88u8, 3u8, 182u8, 6u8, 56u8, 144u8, 36u8, 134u8, 65u8,
+							136u8, 220u8, 223u8, 137u8, 140u8, 156u8, 75u8, 104u8, 49u8, 191u8,
+							211u8, 130u8, 210u8, 69u8, 212u8, 187u8, 199u8, 10u8, 31u8, 147u8,
+							67u8, 59u8, 23u8, 0u8, 137u8, 188u8, 134u8, 68u8, 149u8, 158u8, 87u8,
+							51u8,
 						],
 					)
 				}
@@ -6770,9 +6770,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							226u8, 132u8, 239u8, 28u8, 18u8, 212u8, 245u8, 111u8, 37u8, 154u8,
-							55u8, 140u8, 20u8, 99u8, 86u8, 65u8, 35u8, 77u8, 77u8, 113u8, 20u8,
-							16u8, 235u8, 225u8, 184u8, 242u8, 17u8, 100u8, 59u8, 165u8, 58u8, 27u8,
+							204u8, 159u8, 20u8, 132u8, 136u8, 234u8, 46u8, 196u8, 50u8, 199u8,
+							88u8, 72u8, 123u8, 152u8, 98u8, 121u8, 23u8, 109u8, 220u8, 157u8, 58u8,
+							168u8, 179u8, 185u8, 114u8, 110u8, 40u8, 91u8, 154u8, 95u8, 236u8, 7u8,
 						],
 					)
 				}
@@ -7033,9 +7033,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							99u8, 224u8, 3u8, 36u8, 255u8, 202u8, 201u8, 163u8, 112u8, 70u8, 231u8,
-							244u8, 137u8, 19u8, 59u8, 59u8, 195u8, 8u8, 220u8, 134u8, 40u8, 242u8,
-							232u8, 117u8, 113u8, 210u8, 70u8, 95u8, 194u8, 56u8, 175u8, 192u8,
+							180u8, 92u8, 184u8, 50u8, 150u8, 28u8, 86u8, 96u8, 51u8, 138u8, 140u8,
+							204u8, 210u8, 81u8, 211u8, 42u8, 39u8, 218u8, 194u8, 57u8, 94u8, 123u8,
+							71u8, 185u8, 185u8, 185u8, 139u8, 170u8, 44u8, 155u8, 144u8, 232u8,
 						],
 					)
 				}
@@ -7084,9 +7084,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							84u8, 238u8, 12u8, 65u8, 160u8, 212u8, 48u8, 230u8, 202u8, 92u8, 69u8,
-							107u8, 40u8, 161u8, 172u8, 82u8, 72u8, 144u8, 103u8, 102u8, 252u8,
-							244u8, 105u8, 37u8, 23u8, 155u8, 69u8, 135u8, 51u8, 237u8, 47u8, 162u8,
+							209u8, 132u8, 106u8, 78u8, 172u8, 93u8, 217u8, 115u8, 173u8, 26u8,
+							164u8, 27u8, 239u8, 129u8, 42u8, 225u8, 110u8, 176u8, 78u8, 102u8,
+							129u8, 109u8, 10u8, 157u8, 93u8, 166u8, 159u8, 144u8, 69u8, 163u8,
+							215u8, 7u8,
 						],
 					)
 				}
@@ -14132,12 +14133,12 @@ pub mod api {
 			}
 		}
 	}
-	pub mod chain_transfer {
+	pub mod localchain_transfer {
 		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
-		pub type Error = runtime_types::pallet_chain_transfer::pallet::Error;
+		pub type Error = runtime_types::pallet_localchain_transfer::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-		pub type Call = runtime_types::pallet_chain_transfer::pallet::Call;
+		pub type Call = runtime_types::pallet_localchain_transfer::pallet::Call;
 		pub mod calls {
 			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
@@ -14166,7 +14167,7 @@ pub mod api {
 					pub type NotaryId = ::core::primitive::u32;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SendToLocalchain {
-					const PALLET: &'static str = "ChainTransfer";
+					const PALLET: &'static str = "LocalchainTransfer";
 					const CALL: &'static str = "send_to_localchain";
 				}
 			}
@@ -14179,7 +14180,7 @@ pub mod api {
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SendToLocalchain>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"send_to_localchain",
 						types::SendToLocalchain { amount, notary_id },
 						[
@@ -14192,7 +14193,7 @@ pub mod api {
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
-		pub type Event = runtime_types::pallet_chain_transfer::pallet::Event;
+		pub type Event = runtime_types::pallet_localchain_transfer::pallet::Event;
 		pub mod events {
 			use super::runtime_types;
 			#[derive(
@@ -14220,7 +14221,7 @@ pub mod api {
 				pub type ExpirationTick = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToLocalchain {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TransferToLocalchain";
 			}
 			#[derive(
@@ -14244,7 +14245,7 @@ pub mod api {
 				pub type NotaryId = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToLocalchainExpired {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TransferToLocalchainExpired";
 			}
 			#[derive(
@@ -14268,7 +14269,7 @@ pub mod api {
 				pub type NotaryId = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferFromLocalchain {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TransferFromLocalchain";
 			}
 			#[derive(
@@ -14296,7 +14297,7 @@ pub mod api {
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferFromLocalchainError {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TransferFromLocalchainError";
 			}
 			#[derive(
@@ -14324,7 +14325,7 @@ pub mod api {
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToLocalchainRefundError {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TransferToLocalchainRefundError";
 			}
 			#[derive(
@@ -14349,7 +14350,7 @@ pub mod api {
 				pub type NotebookNumber = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for PossibleInvalidLocalchainTransferAllowed {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "PossibleInvalidLocalchainTransferAllowed";
 			}
 			#[derive(
@@ -14375,7 +14376,7 @@ pub mod api {
 				pub type Error = runtime_types::sp_runtime::DispatchError;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TaxationError {
-				const PALLET: &'static str = "ChainTransfer";
+				const PALLET: &'static str = "LocalchainTransfer";
 				const EVENT: &'static str = "TaxationError";
 			}
 		}
@@ -14390,7 +14391,7 @@ pub mod api {
 				pub mod pending_transfers_out {
 					use super::runtime_types;
 					pub type PendingTransfersOut =
-						runtime_types::pallet_chain_transfer::QueuedTransferOut<
+						runtime_types::pallet_localchain_transfer::QueuedTransferOut<
 							crate::types::AccountId32,
 							::core::primitive::u128,
 						>;
@@ -14422,7 +14423,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"NextTransferId",
 						(),
 						[
@@ -14442,7 +14443,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"PendingTransfersOut",
 						(),
 						[
@@ -14465,7 +14466,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"PendingTransfersOut",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
@@ -14491,7 +14492,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"ExpiringTransfersOutByNotary",
 						(),
 						[
@@ -14521,7 +14522,7 @@ pub mod api {
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"ExpiringTransfersOutByNotary",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
@@ -14557,7 +14558,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"ExpiringTransfersOutByNotary",
 						(
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
@@ -14582,7 +14583,7 @@ pub mod api {
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"HyperbridgeTokenAdmin",
 						(),
 						[
@@ -14605,7 +14606,7 @@ pub mod api {
 					runtime_types::frame_support::PalletId,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"PalletId",
 						[
 							56u8, 243u8, 53u8, 83u8, 154u8, 179u8, 170u8, 80u8, 133u8, 173u8, 61u8,
@@ -14622,7 +14623,7 @@ pub mod api {
 					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"TransferExpirationTicks",
 						[
 							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
@@ -14639,7 +14640,7 @@ pub mod api {
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"ChainTransfer",
+						"LocalchainTransfer",
 						"MaxPendingTransfersOutPerBlock",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
@@ -21516,10 +21517,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							53u8, 174u8, 238u8, 174u8, 231u8, 55u8, 159u8, 156u8, 29u8, 109u8,
-							139u8, 59u8, 124u8, 73u8, 8u8, 108u8, 65u8, 89u8, 48u8, 4u8, 46u8,
-							40u8, 203u8, 110u8, 202u8, 188u8, 137u8, 17u8, 229u8, 125u8, 138u8,
-							230u8,
+							10u8, 111u8, 3u8, 238u8, 46u8, 62u8, 46u8, 93u8, 249u8, 139u8, 113u8,
+							227u8, 164u8, 230u8, 29u8, 13u8, 186u8, 145u8, 104u8, 196u8, 147u8,
+							227u8, 28u8, 245u8, 5u8, 26u8, 71u8, 109u8, 250u8, 160u8, 26u8, 237u8,
 						],
 					)
 				}
@@ -21549,10 +21549,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							149u8, 48u8, 217u8, 31u8, 154u8, 175u8, 200u8, 161u8, 161u8, 167u8,
-							181u8, 112u8, 242u8, 14u8, 96u8, 70u8, 253u8, 191u8, 95u8, 126u8,
-							183u8, 44u8, 191u8, 16u8, 35u8, 172u8, 152u8, 238u8, 54u8, 248u8,
-							109u8, 78u8,
+							73u8, 143u8, 232u8, 169u8, 114u8, 122u8, 206u8, 34u8, 99u8, 88u8,
+							225u8, 145u8, 241u8, 128u8, 28u8, 168u8, 106u8, 229u8, 158u8, 241u8,
+							30u8, 23u8, 41u8, 76u8, 59u8, 235u8, 36u8, 99u8, 181u8, 9u8, 143u8,
+							40u8,
 						],
 					)
 				}
@@ -21578,9 +21578,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							226u8, 43u8, 237u8, 69u8, 87u8, 139u8, 68u8, 172u8, 90u8, 134u8, 45u8,
-							149u8, 78u8, 26u8, 206u8, 96u8, 170u8, 29u8, 0u8, 250u8, 50u8, 189u8,
-							50u8, 231u8, 178u8, 198u8, 148u8, 141u8, 17u8, 46u8, 142u8, 112u8,
+							119u8, 207u8, 81u8, 62u8, 112u8, 152u8, 189u8, 132u8, 115u8, 171u8,
+							87u8, 177u8, 123u8, 111u8, 180u8, 114u8, 4u8, 87u8, 121u8, 8u8, 185u8,
+							230u8, 46u8, 212u8, 146u8, 212u8, 1u8, 128u8, 254u8, 14u8, 226u8, 99u8,
 						],
 					)
 				}
@@ -21603,10 +21603,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							205u8, 42u8, 242u8, 144u8, 218u8, 14u8, 102u8, 100u8, 55u8, 238u8,
-							54u8, 119u8, 204u8, 116u8, 72u8, 106u8, 98u8, 60u8, 107u8, 25u8, 223u8,
-							116u8, 155u8, 92u8, 204u8, 31u8, 54u8, 13u8, 142u8, 201u8, 195u8,
-							154u8,
+							29u8, 31u8, 45u8, 7u8, 133u8, 122u8, 135u8, 100u8, 246u8, 225u8, 218u8,
+							60u8, 159u8, 69u8, 168u8, 176u8, 139u8, 98u8, 202u8, 29u8, 207u8,
+							176u8, 5u8, 224u8, 29u8, 186u8, 137u8, 144u8, 65u8, 251u8, 170u8, 87u8,
 						],
 					)
 				}
@@ -21632,9 +21631,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							170u8, 27u8, 100u8, 239u8, 46u8, 121u8, 236u8, 48u8, 37u8, 16u8, 100u8,
-							78u8, 160u8, 224u8, 50u8, 38u8, 136u8, 236u8, 149u8, 207u8, 22u8, 87u8,
-							107u8, 166u8, 254u8, 87u8, 122u8, 95u8, 106u8, 92u8, 159u8, 143u8,
+							118u8, 90u8, 233u8, 152u8, 6u8, 214u8, 125u8, 18u8, 126u8, 111u8, 1u8,
+							65u8, 70u8, 4u8, 142u8, 233u8, 38u8, 35u8, 23u8, 23u8, 202u8, 216u8,
+							134u8, 164u8, 1u8, 157u8, 69u8, 243u8, 200u8, 107u8, 138u8, 49u8,
 						],
 					)
 				}
@@ -21657,10 +21656,10 @@ pub mod api {
 							weight,
 						},
 						[
-							157u8, 83u8, 243u8, 136u8, 240u8, 9u8, 39u8, 190u8, 154u8, 137u8,
-							158u8, 247u8, 213u8, 51u8, 171u8, 203u8, 206u8, 226u8, 86u8, 2u8,
-							212u8, 204u8, 113u8, 221u8, 62u8, 199u8, 52u8, 21u8, 132u8, 244u8,
-							105u8, 234u8,
+							112u8, 90u8, 58u8, 126u8, 185u8, 43u8, 244u8, 227u8, 231u8, 132u8,
+							69u8, 12u8, 82u8, 139u8, 230u8, 104u8, 125u8, 81u8, 0u8, 185u8, 186u8,
+							253u8, 208u8, 233u8, 138u8, 39u8, 75u8, 187u8, 76u8, 200u8, 247u8,
+							52u8,
 						],
 					)
 				}
@@ -21700,10 +21699,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							175u8, 170u8, 166u8, 207u8, 44u8, 63u8, 95u8, 182u8, 177u8, 65u8,
-							176u8, 173u8, 98u8, 91u8, 103u8, 192u8, 148u8, 253u8, 187u8, 26u8,
-							62u8, 27u8, 120u8, 180u8, 154u8, 231u8, 192u8, 211u8, 30u8, 106u8,
-							100u8, 68u8,
+							84u8, 168u8, 175u8, 71u8, 45u8, 177u8, 216u8, 45u8, 151u8, 176u8, 76u8,
+							245u8, 157u8, 205u8, 194u8, 245u8, 38u8, 213u8, 63u8, 225u8, 213u8,
+							65u8, 127u8, 210u8, 46u8, 22u8, 63u8, 149u8, 135u8, 96u8, 252u8, 26u8,
 						],
 					)
 				}
@@ -21726,10 +21724,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							166u8, 99u8, 75u8, 86u8, 126u8, 38u8, 232u8, 133u8, 252u8, 201u8,
-							132u8, 180u8, 235u8, 7u8, 104u8, 254u8, 227u8, 144u8, 114u8, 198u8,
-							241u8, 139u8, 120u8, 170u8, 8u8, 48u8, 92u8, 38u8, 227u8, 66u8, 100u8,
-							61u8,
+							167u8, 12u8, 103u8, 60u8, 108u8, 241u8, 247u8, 138u8, 206u8, 212u8,
+							18u8, 183u8, 101u8, 234u8, 217u8, 97u8, 251u8, 68u8, 183u8, 211u8,
+							70u8, 210u8, 16u8, 242u8, 80u8, 29u8, 61u8, 250u8, 202u8, 14u8, 58u8,
+							12u8,
 						],
 					)
 				}
@@ -22065,10 +22063,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							209u8, 213u8, 78u8, 140u8, 37u8, 194u8, 228u8, 47u8, 59u8, 171u8,
-							224u8, 217u8, 207u8, 157u8, 25u8, 212u8, 24u8, 254u8, 240u8, 247u8,
-							254u8, 26u8, 210u8, 233u8, 16u8, 103u8, 33u8, 65u8, 187u8, 17u8, 14u8,
-							37u8,
+							184u8, 231u8, 247u8, 172u8, 34u8, 129u8, 186u8, 151u8, 239u8, 227u8,
+							15u8, 238u8, 203u8, 225u8, 148u8, 147u8, 42u8, 71u8, 38u8, 55u8, 253u8,
+							174u8, 44u8, 87u8, 164u8, 71u8, 181u8, 185u8, 238u8, 241u8, 73u8,
+							184u8,
 						],
 					)
 				}
@@ -22091,10 +22089,9 @@ pub mod api {
 							weight,
 						},
 						[
-							39u8, 42u8, 17u8, 231u8, 159u8, 74u8, 143u8, 148u8, 221u8, 186u8,
-							242u8, 172u8, 135u8, 243u8, 158u8, 180u8, 12u8, 7u8, 224u8, 19u8,
-							133u8, 126u8, 219u8, 112u8, 67u8, 171u8, 86u8, 113u8, 135u8, 18u8,
-							112u8, 152u8,
+							164u8, 98u8, 193u8, 17u8, 93u8, 82u8, 60u8, 222u8, 207u8, 84u8, 93u8,
+							218u8, 195u8, 189u8, 204u8, 5u8, 194u8, 246u8, 8u8, 226u8, 243u8, 41u8,
+							97u8, 12u8, 205u8, 102u8, 58u8, 0u8, 127u8, 150u8, 92u8, 54u8,
 						],
 					)
 				}
@@ -22132,9 +22129,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							44u8, 120u8, 79u8, 37u8, 96u8, 218u8, 222u8, 34u8, 237u8, 236u8, 139u8,
-							167u8, 109u8, 255u8, 67u8, 116u8, 86u8, 32u8, 15u8, 44u8, 170u8, 165u8,
-							63u8, 217u8, 142u8, 41u8, 232u8, 217u8, 235u8, 31u8, 233u8, 34u8,
+							78u8, 230u8, 150u8, 163u8, 220u8, 81u8, 60u8, 135u8, 113u8, 38u8, 99u8,
+							0u8, 160u8, 96u8, 67u8, 124u8, 208u8, 219u8, 203u8, 232u8, 62u8, 99u8,
+							241u8, 39u8, 23u8, 106u8, 11u8, 153u8, 197u8, 62u8, 108u8, 2u8,
 						],
 					)
 				}
@@ -28216,7 +28213,7 @@ pub mod api {
 				#[codec(index = 11)]
 				Notebook(runtime_types::pallet_notebook::pallet::Call),
 				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Call),
+				LocalchainTransfer(runtime_types::pallet_localchain_transfer::pallet::Call),
 				#[codec(index = 13)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Call),
 				#[codec(index = 14)]
@@ -28284,7 +28281,7 @@ pub mod api {
 				#[codec(index = 11)]
 				Notebook(runtime_types::pallet_notebook::pallet::Error),
 				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Error),
+				LocalchainTransfer(runtime_types::pallet_localchain_transfer::pallet::Error),
 				#[codec(index = 13)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Error),
 				#[codec(index = 14)]
@@ -28352,7 +28349,7 @@ pub mod api {
 				#[codec(index = 11)]
 				Notebook(runtime_types::pallet_notebook::pallet::Event),
 				#[codec(index = 12)]
-				ChainTransfer(runtime_types::pallet_chain_transfer::pallet::Event),
+				LocalchainTransfer(runtime_types::pallet_localchain_transfer::pallet::Event),
 				#[codec(index = 13)]
 				BlockSealSpec(runtime_types::pallet_block_seal_spec::pallet::Event),
 				#[codec(index = 14)]
@@ -31336,157 +31333,6 @@ pub mod api {
 				}
 			}
 		}
-		pub mod pallet_chain_transfer {
-			use super::runtime_types;
-			pub mod pallet {
-				use super::runtime_types;
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
-				pub enum Call {
-					#[codec(index = 0)]
-					send_to_localchain {
-						#[codec(compact)]
-						amount: ::core::primitive::u128,
-						notary_id: ::core::primitive::u32,
-					},
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "The `Error` enum of this pallet."]
-				pub enum Error {
-					#[codec(index = 0)]
-					MaxBlockTransfersExceeded,
-					#[codec(index = 1)]
-					#[doc = "Insufficient balance to create this transfer"]
-					InsufficientFunds,
-					#[codec(index = 2)]
-					#[doc = "Insufficient balance to fulfill a mainchain transfer"]
-					InsufficientNotarizedFunds,
-					#[codec(index = 3)]
-					#[doc = "The transfer was already submitted in a previous block"]
-					InvalidOrDuplicatedLocalchainTransfer,
-					#[codec(index = 4)]
-					#[doc = "A transfer was submitted in a previous block but the expiration block has passed"]
-					NotebookIncludesExpiredLocalchainTransfer,
-					#[codec(index = 5)]
-					#[doc = "The notary id is not registered"]
-					InvalidNotaryUsedForTransfer,
-					#[codec(index = 6)]
-					#[doc = "The notary is currently locked and cannot process transfers"]
-					NotaryLockedForTransfer,
-					#[codec(index = 7)]
-					#[doc = "No transfer IDs are currently available"]
-					NoAvailableTransferId,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "The `Event` enum of this pallet"]
-				pub enum Event {
-					#[codec(index = 0)]
-					#[doc = "Funds sent to a localchain"]
-					TransferToLocalchain {
-						account_id: crate::types::AccountId32,
-						amount: ::core::primitive::u128,
-						transfer_id: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-						expiration_tick: ::core::primitive::u64,
-					},
-					#[codec(index = 1)]
-					#[doc = "Transfer to localchain expired and rolled back"]
-					TransferToLocalchainExpired {
-						account_id: crate::types::AccountId32,
-						transfer_id: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-					},
-					#[codec(index = 2)]
-					#[doc = "Transfer from Localchain to Mainchain"]
-					TransferFromLocalchain {
-						account_id: crate::types::AccountId32,
-						amount: ::core::primitive::u128,
-						notary_id: ::core::primitive::u32,
-					},
-					#[codec(index = 3)]
-					#[doc = "A transfer into the mainchain failed"]
-					TransferFromLocalchainError {
-						account_id: crate::types::AccountId32,
-						amount: ::core::primitive::u128,
-						notary_id: ::core::primitive::u32,
-						notebook_number: ::core::primitive::u32,
-						error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 4)]
-					#[doc = "An expired transfer to localchain failed to be refunded"]
-					TransferToLocalchainRefundError {
-						account_id: crate::types::AccountId32,
-						transfer_id: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-						notebook_number: ::core::primitive::u32,
-						error: runtime_types::sp_runtime::DispatchError,
-					},
-					#[codec(index = 5)]
-					#[doc = "A localchain transfer could not be cleaned up properly. Possible invalid transfer"]
-					#[doc = "needing investigation."]
-					PossibleInvalidLocalchainTransferAllowed {
-						transfer_id: ::core::primitive::u32,
-						notary_id: ::core::primitive::u32,
-						notebook_number: ::core::primitive::u32,
-					},
-					#[codec(index = 6)]
-					#[doc = "Taxation failed"]
-					TaxationError {
-						notary_id: ::core::primitive::u32,
-						notebook_number: ::core::primitive::u32,
-						tax: ::core::primitive::u128,
-						error: runtime_types::sp_runtime::DispatchError,
-					},
-				}
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct QueuedTransferOut<_0, _1> {
-				pub account_id: _0,
-				pub amount: _1,
-				pub expiration_tick: ::core::primitive::u64,
-				pub notary_id: ::core::primitive::u32,
-			}
-		}
 		pub mod pallet_digests {
 			use super::runtime_types;
 			pub mod pallet {
@@ -32329,6 +32175,157 @@ pub mod api {
 						::core::primitive::u64,
 					>,
 				}
+			}
+		}
+		pub mod pallet_localchain_transfer {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					send_to_localchain {
+						#[codec(compact)]
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					MaxBlockTransfersExceeded,
+					#[codec(index = 1)]
+					#[doc = "Insufficient balance to create this transfer"]
+					InsufficientFunds,
+					#[codec(index = 2)]
+					#[doc = "Insufficient balance to fulfill a mainchain transfer"]
+					InsufficientNotarizedFunds,
+					#[codec(index = 3)]
+					#[doc = "The transfer was already submitted in a previous block"]
+					InvalidOrDuplicatedLocalchainTransfer,
+					#[codec(index = 4)]
+					#[doc = "A transfer was submitted in a previous block but the expiration block has passed"]
+					NotebookIncludesExpiredLocalchainTransfer,
+					#[codec(index = 5)]
+					#[doc = "The notary id is not registered"]
+					InvalidNotaryUsedForTransfer,
+					#[codec(index = 6)]
+					#[doc = "The notary is currently locked and cannot process transfers"]
+					NotaryLockedForTransfer,
+					#[codec(index = 7)]
+					#[doc = "No transfer IDs are currently available"]
+					NoAvailableTransferId,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "Funds sent to a localchain"]
+					TransferToLocalchain {
+						account_id: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						expiration_tick: ::core::primitive::u64,
+					},
+					#[codec(index = 1)]
+					#[doc = "Transfer to localchain expired and rolled back"]
+					TransferToLocalchainExpired {
+						account_id: crate::types::AccountId32,
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+					},
+					#[codec(index = 2)]
+					#[doc = "Transfer from Localchain to Mainchain"]
+					TransferFromLocalchain {
+						account_id: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
+					},
+					#[codec(index = 3)]
+					#[doc = "A transfer into the mainchain failed"]
+					TransferFromLocalchainError {
+						account_id: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 4)]
+					#[doc = "An expired transfer to localchain failed to be refunded"]
+					TransferToLocalchainRefundError {
+						account_id: crate::types::AccountId32,
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 5)]
+					#[doc = "A localchain transfer could not be cleaned up properly. Possible invalid transfer"]
+					#[doc = "needing investigation."]
+					PossibleInvalidLocalchainTransferAllowed {
+						transfer_id: ::core::primitive::u32,
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+					},
+					#[codec(index = 6)]
+					#[doc = "Taxation failed"]
+					TaxationError {
+						notary_id: ::core::primitive::u32,
+						notebook_number: ::core::primitive::u32,
+						tax: ::core::primitive::u128,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct QueuedTransferOut<_0, _1> {
+				pub account_id: _0,
+				pub amount: _1,
+				pub expiration_tick: ::core::primitive::u64,
+				pub notary_id: ::core::primitive::u32,
 			}
 		}
 		pub mod pallet_mining_slot {

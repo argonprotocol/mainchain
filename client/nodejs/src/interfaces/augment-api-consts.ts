@@ -160,18 +160,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
     };
-    chainTransfer: {
-      /**
-       * How many transfers out can be queued per block
-       **/
-      maxPendingTransfersOutPerBlock: u32 & AugmentedConst<ApiType>;
-      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
-      /**
-       * How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
-       * grace period where we will still allow a transfer
-       **/
-      transferExpirationTicks: u64 & AugmentedConst<ApiType>;
-    };
     grandpa: {
       /**
        * Max Authorities in use
@@ -212,6 +200,18 @@ declare module '@polkadot/api-base/types/consts' {
        * Ownership token asset id (Argonot).
        **/
       ownershipAssetId: u32 & AugmentedConst<ApiType>;
+    };
+    localchainTransfer: {
+      /**
+       * How many transfers out can be queued per block
+       **/
+      maxPendingTransfersOutPerBlock: u32 & AugmentedConst<ApiType>;
+      palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
+      /**
+       * How long a transfer should remain in storage before returning. NOTE: there is a 2 tick
+       * grace period where we will still allow a transfer
+       **/
+      transferExpirationTicks: u64 & AugmentedConst<ApiType>;
     };
     miningSlot: {
       /**

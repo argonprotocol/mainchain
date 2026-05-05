@@ -279,7 +279,7 @@ async fn process_finalized_block(
 		}
 
 		if let Some(Ok(to_localchain)) = event
-			.as_event::<api::chain_transfer::events::TransferToLocalchain>()
+			.as_event::<api::localchain_transfer::events::TransferToLocalchain>()
 			.transpose()
 		{
 			if to_localchain.notary_id == notary_id {

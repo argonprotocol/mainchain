@@ -14,6 +14,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 pub mod weights;
 
 #[frame_support::pallet]
@@ -30,8 +31,10 @@ pub mod pallet {
 	use sp_runtime::traits::AccountIdConversion;
 
 	use sp_core::Get;
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.

@@ -1,5 +1,5 @@
 [package]
-name = "pallet-chain-transfer"
+name = "pallet-localchain-transfer"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
