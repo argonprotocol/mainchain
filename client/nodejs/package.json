@@ -16,8 +16,6 @@
     "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn tsc",
     "generate:defs": "tsx node_modules/.bin/polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "tsx node_modules/.bin/polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --package @argonprotocol/mainchain/interfaces --strict",
-    "pretest": "yarn build && yarn workspace @argonprotocol/testing run build",
-    "pretest:ci": "yarn build && yarn workspace @argonprotocol/testing run build",
     "test": "vitest --run --config vitest.config.ts",
     "tsc": "tsup",
     "watch": "tsup --watch",
