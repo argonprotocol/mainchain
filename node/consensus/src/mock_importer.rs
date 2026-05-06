@@ -294,10 +294,11 @@ impl sc_consensus::BlockImport<Block> for MemChain {
 			ExecuteIfPossible => {
 				// If the parent already has full state we can execute immediately.
 				let p_hash = *params.header.parent_hash();
-				let parent_has_state = matches!(
-					self.block_state.lock().unwrap().get(&p_hash),
-					Some(sp_consensus::BlockStatus::InChainWithState)
-				);
+				let parent_has_state = p_hash == self.genesis_hash ||
+					matches!(
+						self.block_state.lock().unwrap().get(&p_hash),
+						Some(sp_consensus::BlockStatus::InChainWithState)
+					);
 				if parent_has_state {
 					self.set_state(hash, sp_consensus::BlockStatus::InChainWithState);
 				} else {

@@ -218,11 +218,13 @@ async fn main() -> anyhow::Result<()> {
 				keystore_params.open()?
 			};
 
-			let s3_buckets = if dev && archive_public_host.is_none() {
+			let s3_buckets = if dev {
 				let (buckets, host) =
 					S3Archive::rand_minio_test_bucket(notary_id, archive_bucket, archive_endpoint)
 						.await?;
-				archive_public_host.replace(host.archive_host);
+				if archive_public_host.is_none() {
+					archive_public_host.replace(host.archive_host);
+				}
 				buckets
 			} else {
 				let archive_region = archive_region.ok_or(Error::Input(

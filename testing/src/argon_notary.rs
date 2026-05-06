@@ -48,6 +48,7 @@ struct Args {
 	db_url: String,
 	mainchain_url: String,
 	archive_bucket: String,
+	archive_public_host: Option<String>,
 }
 
 impl Drop for ArgonTestNotary {
@@ -113,11 +114,13 @@ impl ArgonTestNotary {
 
 	async fn start_process(target_dir: PathBuf, args: &Args) -> anyhow::Result<process::Child> {
 		let rust_log = env::var("RUST_LOG").unwrap_or("info".to_string());
-		let proc = Command::new("./argon-notary")
+		let mut command = Command::new("./argon-notary");
+		command
 			.current_dir(&target_dir)
 			.env("RUST_LOG", rust_log)
+			.env("AWS_S3_ENDPOINT", Self::get_minio_url())
 			.stdout(process::Stdio::piped())
-			.args(vec![
+			.args([
 				"run",
 				"--db-url",
 				&args.db_url,
@@ -132,8 +135,11 @@ impl ArgonTestNotary {
 				&args.prometheus_port.to_string(),
 				"--archive-bucket",
 				&args.archive_bucket,
-			])
-			.spawn()?;
+			]);
+		if let Some(archive_public_host) = &args.archive_public_host {
+			command.args(["--archive-public-host", archive_public_host]);
+		}
+		let proc = command.spawn()?;
 		Ok(proc)
 	}
 
@@ -146,6 +152,25 @@ impl ArgonTestNotary {
 	pub async fn start_with_archive(
 		node: &ArgonTestNode,
 		archive_bucket: String,
+		fixed_port: Option<u16>,
+		existing_db_name: Option<String>,
+		cleanup_db: bool,
+	) -> anyhow::Result<Self> {
+		Self::start_with_archive_public_host(
+			node,
+			archive_bucket,
+			None,
+			fixed_port,
+			existing_db_name,
+			cleanup_db,
+		)
+		.await
+	}
+
+	pub async fn start_with_archive_public_host(
+		node: &ArgonTestNode,
+		archive_bucket: String,
+		archive_public_host: Option<String>,
 		fixed_port: Option<u16>,
 		existing_db_name: Option<String>,
 		cleanup_db: bool,
@@ -208,6 +233,7 @@ impl ArgonTestNotary {
 			db_url: db_url.clone(),
 			mainchain_url: node.client.url.clone(),
 			archive_bucket,
+			archive_public_host,
 		};
 		if args.port != 0 {
 			Self::prepare_fixed_port(args.port).await?;

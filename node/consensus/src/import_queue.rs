@@ -214,17 +214,35 @@ impl<B: BlockT> ImportContext<B> {
 			return false;
 		}
 		if self.state_action == ImportStateAction::ExecuteIfPossible {
-			return self.is_parent_state_available();
+			return self.is_parent_state_available() || self.parent_is_genesis();
 		}
 
 		true
 	}
 
 	fn should_return_missing_state_for_execution(&self) -> bool {
-		self.state_action == ImportStateAction::ExecuteIfPossible &&
-			!self.is_parent_state_available() &&
-			!self.is_initial_sync() &&
-			!self.parent_is_genesis()
+		if self.state_action != ImportStateAction::ExecuteIfPossible {
+			return false;
+		}
+
+		let parent_state_available = self.is_parent_state_available();
+		let parent_is_genesis = self.parent_is_genesis();
+		let is_block_gap = self.is_block_gap;
+		if parent_state_available || parent_is_genesis || is_block_gap {
+			return false;
+		}
+
+		let has_justifications = self.has_justifications;
+		if has_justifications {
+			return false;
+		}
+
+		let header_already_imported = self.is_header_already_imported();
+		if header_already_imported {
+			return false;
+		}
+
+		true
 	}
 
 	fn should_short_circuit_known_header(&self) -> bool {
@@ -236,7 +254,7 @@ impl<B: BlockT> ImportContext<B> {
 	}
 
 	fn can_finalize_import(&self, is_finalized_descendent: bool) -> bool {
-		is_finalized_descendent || self.is_initial_sync() || self.finalized
+		is_finalized_descendent || self.finalized
 	}
 }
 
@@ -330,7 +348,8 @@ where
 	///
 	/// EARLY EXITS
 	///   - Parent state missing + `ExecuteIfPossible` (detected *here*, not in `Verifier::verify`)
-	///     → `ImportResult::MissingState` so `BasicQueue` can retry after parent state sync.
+	///     → `ImportResult::MissingState` so `BasicQueue` can retry after parent state sync, except
+	///     for justified sync fragments and known-header body replays.
 	///   - Header already in DB AND no new body/state → `ImportResult::AlreadyInChain`
 	///
 	/// FORK‑CHOICE
@@ -348,6 +367,7 @@ where
 	///   - Gap header           : NetworkInitialSync + `Skip`                  → store header, not
 	///     best
 	///   - Warp header + state  : NetworkInitialSync + `Import(changes)`       → may become best
+	///     only when it lands on the finalized chain
 	///   - Gossip header + body : `ExecuteIfPossible`                          → exec or
 	///     MissingState
 	///   - Full block           : `ApplyChanges::Changes`                      → full import
@@ -522,7 +542,7 @@ where
 			}
 		}
 
-		if import_context.is_initial_sync() &&
+		if (import_context.is_initial_sync() || import_context.is_block_gap) &&
 			block_number <= info.finalized_number &&
 			!import_context.has_justifications &&
 			is_known_grandpa_authority_change_block(block_hash.as_ref(), block_number_u32)
@@ -644,14 +664,14 @@ where
 		mut block_params: BlockImportParams<B>,
 	) -> Result<BlockImportParams<B>, String> {
 		let block_number = *block_params.header.number();
-		let is_gap_sync = self
-			.client
-			.info()
+		let info = self.client.info();
+		let is_gap_sync = info
 			.block_gap
 			.is_some_and(|gap| gap.start <= block_number && block_number <= gap.end);
 
 		let post_hash = block_params.header.hash();
 		let parent_hash = *block_params.header.parent_hash();
+		let parent_is_genesis = parent_hash == info.genesis_hash;
 		let mut header = block_params.header;
 		let raw_seal_digest = header.digest_mut().pop().ok_or(Error::MissingBlockSealDigest)?;
 		let seal_digest = BlockSealDigest::try_from(&raw_seal_digest)
@@ -677,7 +697,8 @@ where
 
 		if block_params.body.is_some() &&
 			self.client.block_status(parent_hash).unwrap_or(BlockStatus::Unknown) !=
-				BlockStatus::InChainWithState
+				BlockStatus::InChainWithState &&
+			!parent_is_genesis
 		{
 			// Parent state is *not* available yet (pruned or unknown).
 			//
