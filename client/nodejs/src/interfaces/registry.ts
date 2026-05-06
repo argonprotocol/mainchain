@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -36,6 +37,11 @@ import type {
   ArgonPrimitivesDomainSemver,
   ArgonPrimitivesDomainVersionHost,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesEthereumEthereumExecutionBlockProof,
+  ArgonPrimitivesEthereumEthereumExecutionHeader,
+  ArgonPrimitivesEthereumEthereumLog,
+  ArgonPrimitivesEthereumEthereumProof,
+  ArgonPrimitivesEthereumEthereumReceiptProof,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
   ArgonPrimitivesInherentsBitcoinUtxoSpend,
@@ -130,6 +136,14 @@ import type {
   PalletBlockSealSpecCall,
   PalletBlockSealSpecError,
   PalletBlockSealSpecEvent,
+  PalletCrosschainTransferAssetKind,
+  PalletCrosschainTransferBurnNotice,
+  PalletCrosschainTransferCall,
+  PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferError,
+  PalletCrosschainTransferEvent,
+  PalletCrosschainTransferSourceChain,
+  PalletCrosschainTransferTransferProof,
   PalletDigestsError,
   PalletDigestsEvent,
   PalletDomainsCall,
@@ -299,6 +313,11 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainSemver: ArgonPrimitivesDomainSemver;
     ArgonPrimitivesDomainVersionHost: ArgonPrimitivesDomainVersionHost;
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
+    ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
+    ArgonPrimitivesEthereumEthereumExecutionHeader: ArgonPrimitivesEthereumEthereumExecutionHeader;
+    ArgonPrimitivesEthereumEthereumLog: ArgonPrimitivesEthereumEthereumLog;
+    ArgonPrimitivesEthereumEthereumProof: ArgonPrimitivesEthereumEthereumProof;
+    ArgonPrimitivesEthereumEthereumReceiptProof: ArgonPrimitivesEthereumEthereumReceiptProof;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
     ArgonPrimitivesInherentsBitcoinUtxoSpend: ArgonPrimitivesInherentsBitcoinUtxoSpend;
@@ -393,6 +412,14 @@ declare module '@polkadot/types/types/registry' {
     PalletBlockSealSpecCall: PalletBlockSealSpecCall;
     PalletBlockSealSpecError: PalletBlockSealSpecError;
     PalletBlockSealSpecEvent: PalletBlockSealSpecEvent;
+    PalletCrosschainTransferAssetKind: PalletCrosschainTransferAssetKind;
+    PalletCrosschainTransferBurnNotice: PalletCrosschainTransferBurnNotice;
+    PalletCrosschainTransferCall: PalletCrosschainTransferCall;
+    PalletCrosschainTransferChainConfig: PalletCrosschainTransferChainConfig;
+    PalletCrosschainTransferError: PalletCrosschainTransferError;
+    PalletCrosschainTransferEvent: PalletCrosschainTransferEvent;
+    PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
+    PalletCrosschainTransferTransferProof: PalletCrosschainTransferTransferProof;
     PalletDigestsError: PalletDigestsError;
     PalletDigestsEvent: PalletDigestsEvent;
     PalletDomainsCall: PalletDomainsCall;

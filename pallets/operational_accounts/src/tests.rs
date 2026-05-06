@@ -15,12 +15,12 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::{traits::IdentifyAccount, AccountId32, DispatchError, MultiSigner};
 
 use crate::mock::{
-	ensure_registration_lookup, has_vault_operational_mark, new_test_ext, set_registration_lookup,
+	ensure_registration_lookup, has_vault_operational_mark, new_test_ext,
+	record_recent_argon_transfer, set_crosschain_activated, set_registration_lookup,
 	BitcoinLockSizeForReferral, ClaimableTreasuryBalance, ClaimedOperationalRewards,
 	CurrentFrameId, MaxAvailableReferrals, MaxEncryptedServerLen,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
-	OperationalReferralBonusReward, OperationalReferralReward, RecentArgonTransfers,
-	RequiresUniswapTransfer, RuntimeOrigin, Test, TestAccountId,
+	OperationalReferralBonusReward, OperationalReferralReward, RuntimeOrigin, Test, TestAccountId,
 };
 
 #[test]
@@ -203,9 +203,7 @@ fn test_register_rejects_invalid_referral_proof_and_ignores_sponsor_without_capa
 fn test_register_hydrates_recent_argon_transfer_on_linked_account() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(24, 25, 26, 27);
-		RecentArgonTransfers::mutate(|entries| {
-			entries.insert(account_set.mining_funding.clone());
-		});
+		record_recent_argon_transfer(&account_set.mining_funding);
 
 		register_account(&account_set, None);
 
@@ -215,9 +213,9 @@ fn test_register_hydrates_recent_argon_transfer_on_linked_account() {
 }
 
 #[test]
-fn test_register_marks_uniswap_transfer_satisfied_when_uniswap_is_not_required() {
+fn test_register_marks_uniswap_transfer_satisfied_when_crosschain_is_not_activated() {
 	new_test_ext().execute_with(|| {
-		RequiresUniswapTransfer::set(false);
+		set_crosschain_activated(false);
 		let account_set = make_account_set(28, 29, 30, 31);
 
 		register_account(&account_set, None);
@@ -766,9 +764,9 @@ fn test_activate_requires_eligibility() {
 }
 
 #[test]
-fn test_activation_skips_uniswap_transfer_when_it_is_not_required() {
+fn test_activation_skips_uniswap_transfer_when_crosschain_is_not_activated() {
 	new_test_ext().execute_with(|| {
-		RequiresUniswapTransfer::set(false);
+		set_crosschain_activated(false);
 		let account_set = make_account_set(39, 40, 41, 42);
 		register_account(&account_set, None);
 		ensure_registration_lookup(account_set.vault.clone(), account_set.mining_funding.clone());
@@ -1316,12 +1314,6 @@ fn register_account_with_submitter(
 
 fn record_uniswap_transfer(vault_account: &TestAccountId, amount: Balance) {
 	OperationalAccountsPallet::on_uniswap_transfer(vault_account, amount);
-}
-
-fn record_recent_argon_transfer(account_id: &TestAccountId) {
-	RecentArgonTransfers::mutate(|entries| {
-		entries.insert(account_id.clone());
-	});
 }
 
 fn satisfy_operational_requirements(mining_account: &TestAccountId, vault_account: &TestAccountId) {

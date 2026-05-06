@@ -38,6 +38,8 @@ import type {
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
   PalletBalancesUnexpectedKind,
+  PalletCrosschainTransferBurnNotice,
+  PalletCrosschainTransferSourceChain,
   PalletDomainsDomainRegistration,
   PalletEthereumVerifierBasicOperatingMode,
   PalletMintMintType,
@@ -523,6 +525,22 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
     };
+    crosschainTransfer: {
+      /**
+       * An inbound burn notice was accepted and settled locally.
+       **/
+      BurnNoticeAccepted: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: PalletCrosschainTransferSourceChain,
+          notice: PalletCrosschainTransferBurnNotice,
+        ],
+        {
+          sourceChain: PalletCrosschainTransferSourceChain;
+          notice: PalletCrosschainTransferBurnNotice;
+        }
+      >;
+    };
     digests: {};
     domains: {
       /**
@@ -775,8 +793,8 @@ declare module '@polkadot/api-base/types/events' {
         { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
       >;
       /**
-       * The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will
-       * not be able to mint
+       * The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
+       * will not be able to mint
        **/
       MiningMint: AugmentedEvent<
         ApiType,

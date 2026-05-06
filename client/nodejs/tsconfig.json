@@ -37,12 +37,5 @@
     // if you have augment-api.ts etc.
     "node_modules/@polkadot/**/*.d.ts"
   ],
-  "exclude": [
-    "lib",
-    "browser",
-    "**/localchain",
-    "build/**/*",
-    "node_modules",
-    "target",
-  ]
+  "exclude": ["lib", "browser", "**/localchain", "build/**/*", "node_modules", "target"]
 }

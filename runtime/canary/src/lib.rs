@@ -126,6 +126,8 @@ mod runtime {
 	pub type OperationalAccounts = pallet_operational_accounts;
 	#[runtime::pallet_index(35)]
 	pub type EthereumVerifier = pallet_ethereum_verifier;
+	#[runtime::pallet_index(36)]
+	pub type CrosschainTransfer = pallet_crosschain_transfer;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -653,6 +655,23 @@ impl pallet_transaction_payment::Config for Runtime {
 	type WeightInfo = weights::pallet_transaction_payment::WeightInfo<Runtime>;
 }
 
+impl pallet_crosschain_transfer::Config for Runtime {
+	type Balance = Balance;
+	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
+	type NativeCurrency = Balances;
+	type OwnershipCurrency = Ownership;
+	type EthereumVerifier = use_unless_benchmark!(
+		EthereumVerifier,
+		benchmarking::BenchmarkCrosschainTransferEthereumVerifier
+	);
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type CurrentTick = Ticks;
+	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
+	type WeightInfo = pallet_crosschain_transfer::WithProviderWeights<
+		Runtime,
+		weights::pallet_crosschain_transfer::WeightInfo<Runtime>,
+	>;
+}
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type FrameProvider = MiningSlot;
@@ -678,11 +697,10 @@ impl pallet_operational_accounts::Config for Runtime {
 		Treasury,
 		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
 	);
-	type UniswapTransferRequirementProvider = use_unless_benchmark!(
-		ConstBool<false>,
-		benchmarking::BenchmarkOperationalAccountsUniswapTransferRequirementProvider
+	type UniswapTransferProvider = use_unless_benchmark!(
+		CrosschainTransfer,
+		benchmarking::BenchmarkOperationalAccountsUniswapTransferProvider
 	);
-	type RecentArgonTransferLookup = ();
 	type OperationalRewardsPayer =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalRewardsPayer);
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<

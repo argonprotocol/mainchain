@@ -24,9 +24,8 @@ pub mod pallet {
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		vault::BitcoinVaultProvider, MiningFrameTransitionProvider, MiningSlotProvider,
-		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer,
-		RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
-		UniswapTransferRequirementProvider, MICROGONS_PER_ARGON,
+		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer, Signature,
+		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::marker::PhantomData;
@@ -111,10 +110,9 @@ pub mod pallet {
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
 		/// Provider for whether a linked vault account currently has treasury pool participation.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId>;
-		/// Provider for whether new operational accounts should require a Uniswap-backed transfer.
-		type UniswapTransferRequirementProvider: UniswapTransferRequirementProvider;
-		/// Provider for recent qualifying inbound Argon transfer lookup.
-		type RecentArgonTransferLookup: RecentArgonTransferLookup<Self::AccountId>;
+		/// Provider for whether crosschain transfer tracking is active and whether linked accounts
+		/// already satisfy it.
+		type UniswapTransferProvider: UniswapTransferProvider<Self::AccountId>;
 		/// Payout adapter for explicitly claimed operational rewards.
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
 
@@ -707,19 +705,18 @@ pub mod pallet {
 			let observed_mining_seat_total = u32::from(
 				T::MiningSlotProvider::has_active_rewards_account_seat(&mining_funding_account),
 			);
-			let has_uniswap_transfer =
-				!T::UniswapTransferRequirementProvider::requires_uniswap_transfer() ||
-					[
-						&operational_account,
-						&vault_account,
-						&mining_funding_account,
-						&mining_bot_account,
-					]
-					.iter()
-					.copied()
-					.any(|account_id| {
-						T::RecentArgonTransferLookup::has_recent_argon_transfer(account_id)
-					});
+			let has_crosschain_transfer = !T::UniswapTransferProvider::is_crosschain_activated() ||
+				[
+					&operational_account,
+					&vault_account,
+					&mining_funding_account,
+					&mining_bot_account,
+				]
+				.iter()
+				.copied()
+				.any(|account_id| {
+					T::UniswapTransferProvider::has_recent_argon_transfer(account_id)
+				});
 
 			OperationalAccounts::<T>::insert(
 				&operational_account,
@@ -729,7 +726,7 @@ pub mod pallet {
 					mining_bot_account: mining_bot_account.clone(),
 					encryption_pubkey,
 					sponsor: sponsor.clone(),
-					has_uniswap_transfer,
+					has_uniswap_transfer: has_crosschain_transfer,
 					vault_created: vault_registration.is_some(),
 					// Bootstrap lookup seeds current observed totals as live accrual so
 					// registration matches the normal hook-driven activation path.

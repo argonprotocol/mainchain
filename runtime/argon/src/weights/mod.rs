@@ -5,6 +5,7 @@ pub mod pallet_bitcoin_locks;
 pub mod pallet_bitcoin_utxos;
 pub mod pallet_block_seal;
 pub mod pallet_block_seal_spec;
+pub mod pallet_crosschain_transfer;
 pub mod pallet_ethereum_verifier;
 pub mod pallet_grandpa;
 pub mod pallet_localchain_transfer;

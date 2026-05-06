@@ -3,14 +3,15 @@
 use super::*;
 mod util;
 
-use crate::{Fork, ForkVersions, Pallet as EthereumBeaconClient};
+use crate::{CheckpointUpdate, Fork, ForkVersions, Pallet as EthereumBeaconClient, Update};
 use argon_primitives::{
 	EthereumExecutionBlockProof, EthereumLog, EthereumProof, EthereumReceiptProof,
 	EthereumVerifyProvider,
 };
 use frame_benchmarking::v2::*;
+use frame_system::RawOrigin;
 use hex_literal::hex;
-use polkadot_sdk::*;
+use polkadot_sdk::sp_core::H256;
 use snowbridge_beacon_primitives::{
 	fast_aggregate_verify,
 	merkle_proof::{generalized_index_length, subtree_index},
@@ -37,11 +38,11 @@ mod benchmarks {
 
 	#[benchmark]
 	fn force_checkpoint() -> Result<(), BenchmarkError> {
-		let checkpoint_update = make_checkpoint();
+		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
 		let block_root: H256 = checkpoint_update.header.hash_tree_root().unwrap();
 
 		#[extrinsic_call]
-		_(RawOrigin::Root, Box::new(*checkpoint_update), BenchmarkForkVersions::get());
+		_(RawOrigin::Root, Box::new(checkpoint_update), BenchmarkForkVersions::get());
 
 		assert!(<LatestFinalizedBlockRoot<T>>::get() == block_root);
 		assert!(<FinalizedBeaconState<T>>::get(block_root).is_some());
@@ -52,8 +53,8 @@ mod benchmarks {
 	#[benchmark]
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update = make_checkpoint();
-		let finalized_header_update = make_finalized_header_update();
+		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
+		let finalized_header_update: Update = (*make_finalized_header_update()).into();
 		let block_root: H256 = finalized_header_update.finalized_header.hash_tree_root().unwrap();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
@@ -61,7 +62,7 @@ mod benchmarks {
 		)?;
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), Box::new(*finalized_header_update));
+		submit(RawOrigin::Signed(caller.clone()), Box::new(finalized_header_update));
 
 		assert!(<LatestFinalizedBlockRoot<T>>::get() == block_root);
 		assert!(<FinalizedBeaconState<T>>::get(block_root).is_some());
@@ -72,9 +73,9 @@ mod benchmarks {
 	#[benchmark]
 	fn submit_with_sync_committee() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update = make_checkpoint();
-		let sync_committee_update = make_sync_committee_update();
-		let finalized_header_update = make_finalized_header_update();
+		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
+		let sync_committee_update: Update = (*make_sync_committee_update()).into();
+		let finalized_header_update: Update = (*make_finalized_header_update()).into();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
@@ -82,7 +83,7 @@ mod benchmarks {
 		EthereumBeaconClient::<T>::process_update(&finalized_header_update)?;
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), Box::new(*sync_committee_update));
+		submit(RawOrigin::Signed(caller.clone()), Box::new(sync_committee_update));
 
 		assert!(<NextSyncCommittee<T>>::exists());
 
@@ -92,15 +93,14 @@ mod benchmarks {
 	#[benchmark]
 	fn import_execution_header_anchor() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update = make_checkpoint();
-		let finalized_header_update = make_finalized_header_update();
+		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
 		let execution_proof: ExecutionProof = (*make_execution_proof()).into();
 		let block_hash = execution_proof.execution_header.block_hash();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
 		)?;
-		EthereumBeaconClient::<T>::process_update(&finalized_header_update)?;
+		EthereumBeaconClient::<T>::store_finalized_header(execution_proof.header)?;
 
 		#[extrinsic_call]
 		_(RawOrigin::Signed(caller.clone()), execution_proof);
@@ -154,10 +154,10 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify_pre_aggregated() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&make_checkpoint(),
+			&(*make_checkpoint()).into(),
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = make_sync_committee_update();
+		let update: Update = (*make_sync_committee_update()).into();
 		let participant_pubkeys = participant_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
 		let agg_sig =
@@ -175,10 +175,10 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&make_checkpoint(),
+			&(*make_checkpoint()).into(),
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = make_sync_committee_update();
+		let update: Update = (*make_sync_committee_update()).into();
 		let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 		let absent_pubkeys = absent_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
@@ -200,10 +200,10 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn verify_merkle_proof() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&make_checkpoint(),
+			&(*make_checkpoint()).into(),
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = make_sync_committee_update();
+		let update: Update = (*make_sync_committee_update()).into();
 		let block_root: H256 = update.finalized_header.hash_tree_root().unwrap();
 
 		let fork_versions = ForkVersions {

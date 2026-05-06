@@ -13,10 +13,7 @@ use crate::{
 	MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
-use polkadot_sdk::{
-	frame_support::{traits::Get, weights::Weight},
-	sp_runtime::Permill,
-};
+use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
@@ -169,35 +166,37 @@ impl BitcoinUtxoEventsWeightInfo for () {
 	}
 }
 
-pub trait UniswapTransferRequirementProviderWeightInfo {
-	fn requires_uniswap_transfer() -> Weight;
+pub trait UniswapTransferProviderWeightInfo {
+	fn is_crosschain_activated() -> Weight;
+
+	fn has_recent_argon_transfer() -> Weight;
 }
 
-impl UniswapTransferRequirementProviderWeightInfo for () {
-	fn requires_uniswap_transfer() -> Weight {
+impl UniswapTransferProviderWeightInfo for () {
+	fn is_crosschain_activated() -> Weight {
+		Weight::zero()
+	}
+
+	fn has_recent_argon_transfer() -> Weight {
 		Weight::zero()
 	}
 }
 
-pub trait UniswapTransferRequirementProvider {
-	type Weights: UniswapTransferRequirementProviderWeightInfo;
+pub trait UniswapTransferProvider<AccountId> {
+	type Weights: UniswapTransferProviderWeightInfo;
 
-	fn requires_uniswap_transfer() -> bool;
-}
+	fn is_crosschain_activated() -> bool;
 
-impl<T: Get<bool>> UniswapTransferRequirementProvider for T {
-	type Weights = ();
-
-	fn requires_uniswap_transfer() -> bool {
-		T::get()
-	}
-}
-
-pub trait RecentArgonTransferLookup<AccountId> {
 	fn has_recent_argon_transfer(account_id: &AccountId) -> bool;
 }
 
-impl<AccountId> RecentArgonTransferLookup<AccountId> for () {
+impl<AccountId> UniswapTransferProvider<AccountId> for () {
+	type Weights = ();
+
+	fn is_crosschain_activated() -> bool {
+		false
+	}
+
 	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
 		false
 	}
@@ -222,6 +221,30 @@ pub trait EthereumVerifyProvider {
 	) -> Result<(), EthereumVerifyError>;
 }
 
+#[derive(Debug)]
+pub enum EthereumVerifyAndDecodeError<D> {
+	Verify(EthereumVerifyError),
+	Decode(D),
+}
+
+pub trait EthereumEventDecoder: Sized {
+	type Error;
+
+	fn decode_ethereum_log(log: &EthereumLog) -> Result<Self, Self::Error>;
+}
+
+pub fn verify_and_decode_event<Verifier, Event>(
+	event_log: &EthereumLog,
+	proof: &EthereumProof,
+) -> Result<Event, EthereumVerifyAndDecodeError<Event::Error>>
+where
+	Verifier: EthereumVerifyProvider,
+	Event: EthereumEventDecoder,
+{
+	Verifier::verify_event_log(event_log, proof).map_err(EthereumVerifyAndDecodeError::Verify)?;
+	Event::decode_ethereum_log(event_log).map_err(EthereumVerifyAndDecodeError::Decode)
+}
+
 impl EthereumVerifyProvider for () {
 	type Weights = ();
 
@@ -234,7 +257,20 @@ impl EthereumVerifyProvider for () {
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
-impl<AccountId> RecentArgonTransferLookup<AccountId> for Tuple {
+impl<AccountId> UniswapTransferProvider<AccountId> for Tuple {
+	type Weights = ();
+
+	fn is_crosschain_activated() -> bool {
+		for_tuples!(
+			#(
+			if Tuple::is_crosschain_activated() {
+				return true;
+			}
+			)*
+		);
+		false
+	}
+
 	fn has_recent_argon_transfer(account_id: &AccountId) -> bool {
 		for_tuples!(
 			#(

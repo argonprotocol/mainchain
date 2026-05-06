@@ -973,6 +973,7 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-ethereum-verifier",
@@ -1306,6 +1307,7 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-ethereum-verifier",
@@ -1343,6 +1345,7 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
  "pallet-fee-control",
@@ -11420,6 +11423,20 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-crosschain-transfer"
+version = "1.4.3"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "argon-primitives",
+ "log",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
 ]
 
 [[package]]

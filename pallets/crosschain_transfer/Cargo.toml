@@ -1,0 +1,48 @@
+[package]
+name = "pallet-crosschain-transfer"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+pallet-prelude = { workspace = true }
+argon-primitives = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core", "pallet-balances"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"alloy-primitives/std",
+	"alloy-sol-types/std",
+	"argon-primitives/std",
+	"codec/std",
+	"log/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

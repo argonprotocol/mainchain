@@ -163,6 +163,96 @@ it('prefers a light client period update when the next sync committee is missing
   });
 });
 
+it('falls back to the finality update when the period update list is empty', async () => {
+  const anchorFixture = await createAnchorFixture(
+    '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+    1600,
+  );
+  globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(1600),
+    },
+    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {
+      data: [],
+    },
+    'https://beacon.example/eth/v1/beacon/headers/1600': {
+      data: {
+        root: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        canonical: true,
+        header: {
+          message: createBeaconHeader(1600),
+          signature: '0xsig',
+        },
+      },
+    },
+    'https://beacon.example/eth/v1/config/spec': {
+      data: {
+        SLOTS_PER_HISTORICAL_ROOT: '8192',
+      },
+    },
+    'https://beacon.example/eth/v1/beacon/headers/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee':
+      anchorFixture.headerResponse,
+    'https://beacon.example/eth/v2/beacon/blocks/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee':
+      anchorFixture.blockResponse,
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({ hasNextSyncCommittee: false }),
+    'https://beacon.example',
+  );
+
+  expect(txs[0]).toEqual({
+    method: 'submit',
+    update: expect.objectContaining({
+      finalizedHeader: expect.objectContaining({ slot: '1600' }),
+    }),
+  });
+});
+
+it('falls back to the finality update when the period update response omits data', async () => {
+  const anchorFixture = await createAnchorFixture(
+    '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+    1600,
+  );
+  globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(1600),
+    },
+    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {} as any,
+    'https://beacon.example/eth/v1/beacon/headers/1600': {
+      data: {
+        root: '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+        canonical: true,
+        header: {
+          message: createBeaconHeader(1600),
+          signature: '0xsig',
+        },
+      },
+    },
+    'https://beacon.example/eth/v1/config/spec': {
+      data: {
+        SLOTS_PER_HISTORICAL_ROOT: '8192',
+      },
+    },
+    'https://beacon.example/eth/v1/beacon/headers/0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff':
+      anchorFixture.headerResponse,
+    'https://beacon.example/eth/v2/beacon/blocks/0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff':
+      anchorFixture.blockResponse,
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({ hasNextSyncCommittee: false }),
+    'https://beacon.example',
+  );
+
+  expect(txs[0]).toEqual({
+    method: 'submit',
+    update: expect.objectContaining({
+      finalizedHeader: expect.objectContaining({ slot: '1600' }),
+    }),
+  });
+});
+
 it('still submits a same-slot update when it fills a missing next sync committee', async () => {
   const anchorFixture = await createAnchorFixture(
     '0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',

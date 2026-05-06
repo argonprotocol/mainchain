@@ -1,5 +1,4 @@
-import { createBlockFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
-import { Mainnet, createCustomCommon } from '@ethereumjs/common';
+import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMerkleProof, createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
 import type { IArgonQueryable } from './index';
 import { bytesToHex, createPublicClient, type Hex, hexToBytes, http, toHex, toRlp } from 'viem';
@@ -25,10 +24,6 @@ type RetainedExecutionAnchor = {
   blockHash: Hex;
   blockNumber: bigint;
 };
-const executionCommonPromises = new WeakMap<
-  ExecutionClient,
-  Promise<ReturnType<typeof createCustomCommon>>
->();
 
 export type EthereumEventLocator = {
   txHash: Hex;
@@ -84,24 +79,24 @@ export async function buildEthereumEventProof(
 
   if (!log) throw new Error(`Missing log ${logIndex} in receipt ${txHash}`);
 
-  const [targetBlock, anchor] = await Promise.all([
-    loadExecutionBlock(executionClient, receipt.blockHash),
+  const [targetHeader, anchor] = await Promise.all([
+    loadExecutionHeader(executionClient, receipt.blockHash),
     getLatestRetainedAnchor(client),
   ]);
 
-  if (anchor.blockNumber < targetBlock.header.number) {
+  if (anchor.blockNumber < targetHeader.number) {
     throw new Error(
       `Latest retained execution anchor ${anchor.blockHash} is behind target block ${receipt.blockHash}; wait for relayer sync`,
     );
   }
 
   const [headerChain, receiptProofNodes] = await Promise.all([
-    buildExecutionHeaderChain(executionClient, targetBlock.header.number, anchor.blockNumber),
+    buildExecutionHeaderChain(executionClient, targetHeader.number, anchor.blockNumber),
     buildReceiptProofNodes(
       executionClient,
       receipt.blockHash,
       receipt.transactionIndex,
-      bytesToHex(targetBlock.header.receiptTrie),
+      bytesToHex(targetHeader.receiptTrie),
     ),
   ]);
 
@@ -147,7 +142,7 @@ async function getLatestRetainedAnchor(client: IArgonQueryable): Promise<Retaine
   };
 }
 
-async function loadExecutionBlock(executionClient: ExecutionClient, blockTag: Hex | bigint) {
+async function loadExecutionHeader(executionClient: ExecutionClient, blockTag: Hex | bigint) {
   const blockData = await waitForIndexed(() =>
     typeof blockTag === 'string'
       ? executionClient.request<EthGetBlockByHashRpc>({
@@ -159,35 +154,16 @@ async function loadExecutionBlock(executionClient: ExecutionClient, blockTag: He
           params: [toHex(blockTag), true],
         }),
   );
-  const common = await getExecutionCommon(executionClient);
-  const block = createBlockFromRPC(blockData, [], { common });
+  const header = createBlockHeaderFromRPC(blockData);
 
   if (
     typeof blockTag === 'string' &&
-    bytesToHex(block.hash()).toLowerCase() !== blockTag.toLowerCase()
+    bytesToHex(header.hash()).toLowerCase() !== blockTag.toLowerCase()
   ) {
     throw new Error(`Execution header hash mismatch for block ${blockTag}`);
   }
 
-  return block;
-}
-
-function getExecutionCommon(executionClient: ExecutionClient) {
-  let commonPromise = executionCommonPromises.get(executionClient);
-
-  if (!commonPromise) {
-    commonPromise = waitForIndexed(() => executionClient.getChainId()).then(chainId =>
-      createCustomCommon(
-        {
-          chainId,
-        },
-        Mainnet,
-      ),
-    );
-    executionCommonPromises.set(executionClient, commonPromise);
-  }
-
-  return commonPromise;
+  return header;
 }
 
 async function buildExecutionHeaderChain(
@@ -198,8 +174,8 @@ async function buildExecutionHeaderChain(
   const headers: Hex[] = [];
 
   for (let blockNumber = targetBlockNumber; blockNumber < anchorBlockNumber; blockNumber += 1n) {
-    const block = await loadExecutionBlock(executionClient, blockNumber);
-    headers.push(bytesToHex(block.header.serialize()));
+    const header = await loadExecutionHeader(executionClient, blockNumber);
+    headers.push(bytesToHex(header.serialize()));
   }
 
   return headers;
