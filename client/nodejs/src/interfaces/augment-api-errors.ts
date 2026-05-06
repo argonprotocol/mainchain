@@ -352,6 +352,48 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxNotebooksAtTickExceeded: AugmentedError<ApiType>;
     };
+    crosschainTransfer: {
+      /**
+       * The burn account lacks enough balance for the payout.
+       **/
+      InsufficientLiquidity: AugmentedError<ApiType>;
+      /**
+       * The claimed amount was zero or too large for the local balance type.
+       **/
+      InvalidAmount: AugmentedError<ApiType>;
+      /**
+       * The configured source-chain shape is incomplete or malformed.
+       **/
+      InvalidChainConfig: AugmentedError<ApiType>;
+      /**
+       * The Ethereum event topics or payload do not match `BurnForTransfer`.
+       **/
+      InvalidEthereumEvent: AugmentedError<ApiType>;
+      /**
+       * The Ethereum verifier rejected the supplied proof.
+       **/
+      InvalidProof: AugmentedError<ApiType>;
+      /**
+       * The destination account bytes could not be decoded into a local account id.
+       **/
+      InvalidRecipient: AugmentedError<ApiType>;
+      /**
+       * The claim nonce is not exactly the next accepted nonce for the source account.
+       **/
+      UnexpectedNonce: AugmentedError<ApiType>;
+      /**
+       * The gateway does not match the active or still-accepted previous release.
+       **/
+      UnsupportedGateway: AugmentedError<ApiType>;
+      /**
+       * The source chain is not configured for inbound claims.
+       **/
+      UnsupportedSource: AugmentedError<ApiType>;
+      /**
+       * The token is not supported under the matched gateway release.
+       **/
+      UnsupportedToken: AugmentedError<ApiType>;
+    };
     digests: {
       /**
        * Failed to decode digests

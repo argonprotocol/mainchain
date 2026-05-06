@@ -1,10 +1,8 @@
 //! Benchmark-only runtime stubs and helpers.
 #![cfg(feature = "runtime-benchmarks")]
 
-use crate::prelude::Vec;
 use core::marker::PhantomData;
 use polkadot_sdk::{
-	frame_support::traits::Get,
 	sp_arithmetic::FixedU128,
 	sp_runtime::{
 		traits::{AtLeast32BitUnsigned, SaturatedConversion},
@@ -18,10 +16,12 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, UtxoId,
 	},
+	ethereum::{EthereumLog, EthereumProof, EthereumVerifyError},
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
-	MiningSlotProvider, TreasuryPoolProvider, UniswapTransferRequirementProvider, VaultId,
+	EthereumVerifyProvider, MiningSlotProvider, TreasuryPoolProvider, UniswapTransferProvider,
+	VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -53,6 +53,19 @@ impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSig
 		_signature: &BitcoinSignature,
 	) -> Result<bool, DispatchError> {
 		Ok(true)
+	}
+}
+
+pub struct BenchmarkCrosschainTransferEthereumVerifier;
+
+impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
+	type Weights = ();
+
+	fn verify_event_log(
+		_event_log: &EthereumLog,
+		_proof: &EthereumProof,
+	) -> Result<(), EthereumVerifyError> {
+		Ok(())
 	}
 }
 
@@ -255,18 +268,27 @@ impl<AccountId> TreasuryPoolProvider<AccountId>
 	}
 }
 
-pub struct BenchmarkOperationalAccountsUniswapTransferRequirementProvider;
+pub struct BenchmarkOperationalAccountsUniswapTransferProvider;
 
-impl UniswapTransferRequirementProvider
-	for BenchmarkOperationalAccountsUniswapTransferRequirementProvider
+impl<AccountId> UniswapTransferProvider<AccountId>
+	for BenchmarkOperationalAccountsUniswapTransferProvider
 {
 	type Weights = ();
 
-	fn requires_uniswap_transfer() -> bool {
+	fn is_crosschain_activated() -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();
-		state.call_counters.requires_uniswap_transfer =
-			state.call_counters.requires_uniswap_transfer.saturating_add(1);
-		let result = state.requires_uniswap_transfer;
+		state.call_counters.is_crosschain_activated =
+			state.call_counters.is_crosschain_activated.saturating_add(1);
+		let result = state.is_crosschain_activated;
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+
+	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.has_recent_argon_transfer =
+			state.call_counters.has_recent_argon_transfer.saturating_add(1);
+		let result = state.has_recent_argon_transfer;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}

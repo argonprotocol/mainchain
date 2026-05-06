@@ -117,7 +117,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -181,7 +182,8 @@ mod benchmarks {
 			get_registration_vault_data: 1,
 			has_active_rewards_account_seat: 1,
 			has_bond_participation: 1,
-			requires_uniswap_transfer: 1,
+			is_crosschain_activated: 1,
+			has_recent_argon_transfer: 1,
 			account_became_operational: 0,
 		});
 	}
@@ -198,7 +200,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -237,7 +240,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -278,7 +282,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -319,7 +324,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -361,7 +367,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -403,7 +410,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);
@@ -489,7 +497,8 @@ mod benchmarks {
 				}),
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
-				requires_uniswap_transfer: true,
+				is_crosschain_activated: true,
+				has_recent_argon_transfer: true,
 				call_counters: Default::default(),
 			},
 		);

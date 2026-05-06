@@ -41,6 +41,8 @@ import type {
   ArgonRuntimeSessionKeys,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
+  PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferTransferProof,
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
   PalletEthereumVerifierExecutionProof,
@@ -516,6 +518,20 @@ declare module '@polkadot/api-base/types/submittable' {
           computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<u128>, Option<u128>]
+      >;
+    };
+    crosschainTransfer: {
+      proveTransfer: AugmentedSubmittable<
+        (
+          proof: PalletCrosschainTransferTransferProof | { Ethereum: any } | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferTransferProof]
+      >;
+      setChainConfig: AugmentedSubmittable<
+        (
+          config: PalletCrosschainTransferChainConfig | { Ethereum: any } | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferChainConfig]
       >;
     };
     domains: {

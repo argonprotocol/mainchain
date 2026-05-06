@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 31usize] = [
+	pub static PALLETS: [&str; 32usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -38,6 +38,7 @@ pub mod api {
 		"FeeControl",
 		"OperationalAccounts",
 		"EthereumVerifier",
+		"CrosschainTransfer",
 	];
 	pub static RUNTIME_APIS: [&str; 22usize] = [
 		"Core",
@@ -1171,9 +1172,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							12u8, 7u8, 239u8, 100u8, 20u8, 255u8, 146u8, 54u8, 163u8, 18u8, 42u8,
-							137u8, 141u8, 165u8, 227u8, 158u8, 131u8, 138u8, 90u8, 49u8, 67u8,
-							159u8, 253u8, 58u8, 30u8, 15u8, 197u8, 117u8, 25u8, 98u8, 25u8, 206u8,
+							47u8, 106u8, 161u8, 198u8, 56u8, 25u8, 193u8, 46u8, 14u8, 197u8, 90u8,
+							191u8, 194u8, 252u8, 141u8, 64u8, 230u8, 118u8, 7u8, 222u8, 94u8, 30u8,
+							19u8, 149u8, 180u8, 209u8, 99u8, 116u8, 29u8, 77u8, 48u8, 239u8,
 						],
 					)
 				}
@@ -1191,10 +1192,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							100u8, 16u8, 110u8, 27u8, 108u8, 124u8, 123u8, 207u8, 223u8, 66u8,
-							20u8, 80u8, 78u8, 156u8, 41u8, 105u8, 52u8, 132u8, 12u8, 98u8, 37u8,
-							239u8, 113u8, 175u8, 100u8, 102u8, 85u8, 110u8, 88u8, 111u8, 25u8,
-							201u8,
+							160u8, 17u8, 64u8, 138u8, 221u8, 183u8, 194u8, 246u8, 82u8, 210u8,
+							39u8, 233u8, 187u8, 39u8, 116u8, 129u8, 81u8, 75u8, 135u8, 66u8, 173u8,
+							91u8, 131u8, 128u8, 106u8, 52u8, 186u8, 5u8, 51u8, 183u8, 152u8, 171u8,
 						],
 					)
 				}
@@ -3211,6 +3211,9 @@ pub mod api {
 		pub fn ethereum_verifier(&self) -> ethereum_verifier::constants::ConstantsApi {
 			ethereum_verifier::constants::ConstantsApi
 		}
+		pub fn crosschain_transfer(&self) -> crosschain_transfer::constants::ConstantsApi {
+			crosschain_transfer::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3301,6 +3304,9 @@ pub mod api {
 		pub fn ethereum_verifier(&self) -> ethereum_verifier::storage::StorageApi {
 			ethereum_verifier::storage::StorageApi
 		}
+		pub fn crosschain_transfer(&self) -> crosschain_transfer::storage::StorageApi {
+			crosschain_transfer::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3385,6 +3391,9 @@ pub mod api {
 		pub fn ethereum_verifier(&self) -> ethereum_verifier::calls::TransactionApi {
 			ethereum_verifier::calls::TransactionApi
 		}
+		pub fn crosschain_transfer(&self) -> crosschain_transfer::calls::TransactionApi {
+			crosschain_transfer::calls::TransactionApi
+		}
 	}
 	pub struct ViewFunctionsApi;
 	impl ViewFunctionsApi {
@@ -3401,9 +3410,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				215u8, 181u8, 39u8, 198u8, 66u8, 227u8, 148u8, 195u8, 119u8, 153u8, 64u8, 244u8,
-				79u8, 92u8, 42u8, 103u8, 251u8, 152u8, 118u8, 111u8, 74u8, 194u8, 103u8, 148u8,
-				102u8, 214u8, 28u8, 243u8, 233u8, 245u8, 218u8, 181u8,
+				214u8, 230u8, 211u8, 150u8, 211u8, 135u8, 239u8, 212u8, 182u8, 79u8, 155u8, 190u8,
+				74u8, 253u8, 211u8, 8u8, 164u8, 186u8, 106u8, 47u8, 93u8, 198u8, 6u8, 142u8, 78u8,
+				10u8, 148u8, 99u8, 66u8, 215u8, 56u8, 245u8,
 			]
 	}
 	pub mod system {
@@ -4527,9 +4536,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							21u8, 222u8, 1u8, 17u8, 146u8, 59u8, 79u8, 91u8, 232u8, 21u8, 95u8,
-							211u8, 127u8, 54u8, 73u8, 206u8, 83u8, 185u8, 128u8, 239u8, 76u8, 48u8,
-							171u8, 54u8, 134u8, 44u8, 156u8, 106u8, 163u8, 49u8, 19u8, 6u8,
+							137u8, 134u8, 85u8, 15u8, 177u8, 20u8, 232u8, 133u8, 35u8, 235u8, 6u8,
+							171u8, 194u8, 159u8, 142u8, 111u8, 149u8, 249u8, 145u8, 212u8, 80u8,
+							155u8, 87u8, 51u8, 0u8, 69u8, 20u8, 69u8, 28u8, 246u8, 12u8, 252u8,
 						],
 					)
 				}
@@ -5437,10 +5446,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							154u8, 152u8, 94u8, 28u8, 21u8, 51u8, 18u8, 24u8, 66u8, 219u8, 146u8,
-							182u8, 197u8, 4u8, 122u8, 108u8, 129u8, 154u8, 17u8, 192u8, 137u8,
-							187u8, 135u8, 40u8, 245u8, 64u8, 246u8, 89u8, 231u8, 231u8, 19u8,
-							116u8,
+							155u8, 198u8, 203u8, 45u8, 144u8, 73u8, 140u8, 73u8, 64u8, 119u8,
+							120u8, 52u8, 173u8, 37u8, 214u8, 202u8, 6u8, 250u8, 151u8, 246u8, 41u8,
+							110u8, 121u8, 127u8, 2u8, 211u8, 104u8, 22u8, 148u8, 181u8, 151u8,
+							44u8,
 						],
 					)
 				}
@@ -5505,10 +5514,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							226u8, 249u8, 161u8, 148u8, 176u8, 65u8, 135u8, 101u8, 166u8, 22u8,
-							55u8, 236u8, 208u8, 31u8, 225u8, 151u8, 217u8, 80u8, 139u8, 108u8,
-							206u8, 127u8, 9u8, 183u8, 121u8, 236u8, 149u8, 62u8, 117u8, 61u8, 66u8,
-							204u8,
+							126u8, 217u8, 17u8, 4u8, 127u8, 39u8, 9u8, 113u8, 237u8, 1u8, 78u8,
+							164u8, 178u8, 90u8, 73u8, 110u8, 70u8, 175u8, 240u8, 157u8, 111u8,
+							156u8, 164u8, 128u8, 68u8, 67u8, 220u8, 214u8, 255u8, 145u8, 189u8,
+							67u8,
 						],
 					)
 				}
@@ -6413,10 +6422,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							2u8, 111u8, 133u8, 154u8, 228u8, 92u8, 208u8, 39u8, 157u8, 125u8,
-							160u8, 60u8, 60u8, 63u8, 107u8, 246u8, 132u8, 181u8, 187u8, 198u8,
-							176u8, 156u8, 248u8, 166u8, 210u8, 78u8, 163u8, 224u8, 192u8, 215u8,
-							238u8, 19u8,
+							78u8, 45u8, 198u8, 2u8, 0u8, 82u8, 74u8, 100u8, 222u8, 162u8, 239u8,
+							241u8, 161u8, 174u8, 237u8, 197u8, 185u8, 219u8, 157u8, 173u8, 70u8,
+							14u8, 7u8, 205u8, 10u8, 65u8, 28u8, 32u8, 58u8, 153u8, 176u8, 226u8,
 						],
 					)
 				}
@@ -6677,10 +6685,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							160u8, 28u8, 147u8, 188u8, 248u8, 147u8, 129u8, 70u8, 247u8, 63u8,
-							146u8, 153u8, 148u8, 179u8, 82u8, 137u8, 233u8, 123u8, 115u8, 47u8,
-							68u8, 9u8, 180u8, 148u8, 154u8, 178u8, 231u8, 4u8, 250u8, 15u8, 53u8,
-							73u8,
+							209u8, 85u8, 1u8, 206u8, 249u8, 192u8, 108u8, 1u8, 2u8, 167u8, 153u8,
+							47u8, 83u8, 73u8, 16u8, 253u8, 21u8, 230u8, 1u8, 25u8, 172u8, 18u8,
+							121u8, 60u8, 124u8, 244u8, 170u8, 210u8, 239u8, 101u8, 153u8, 45u8,
 						],
 					)
 				}
@@ -6729,9 +6736,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							155u8, 64u8, 7u8, 12u8, 209u8, 202u8, 60u8, 141u8, 68u8, 96u8, 155u8,
-							118u8, 188u8, 119u8, 57u8, 247u8, 3u8, 38u8, 181u8, 25u8, 148u8, 112u8,
-							101u8, 84u8, 133u8, 150u8, 75u8, 97u8, 91u8, 115u8, 244u8, 29u8,
+							253u8, 46u8, 142u8, 173u8, 201u8, 234u8, 66u8, 147u8, 98u8, 68u8,
+							207u8, 193u8, 250u8, 182u8, 195u8, 225u8, 45u8, 95u8, 223u8, 102u8,
+							236u8, 110u8, 119u8, 84u8, 45u8, 54u8, 75u8, 72u8, 116u8, 208u8, 202u8,
+							182u8,
 						],
 					)
 				}
@@ -16730,8 +16738,8 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will"]
-			#[doc = "not be able to mint"]
+			#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit"]
+			#[doc = "will not be able to mint"]
 			pub struct MiningMint {
 				pub amount: mining_mint::Amount,
 				pub per_miner: mining_mint::PerMiner,
@@ -21135,10 +21143,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							254u8, 254u8, 252u8, 8u8, 249u8, 164u8, 244u8, 225u8, 68u8, 207u8,
-							11u8, 179u8, 178u8, 76u8, 207u8, 194u8, 184u8, 35u8, 14u8, 40u8, 253u8,
-							89u8, 29u8, 171u8, 141u8, 78u8, 187u8, 215u8, 144u8, 153u8, 50u8,
-							100u8,
+							98u8, 25u8, 165u8, 111u8, 55u8, 101u8, 165u8, 89u8, 224u8, 128u8,
+							128u8, 211u8, 175u8, 215u8, 241u8, 21u8, 40u8, 147u8, 140u8, 243u8,
+							90u8, 31u8, 157u8, 122u8, 149u8, 66u8, 99u8, 194u8, 228u8, 42u8, 140u8,
+							134u8,
 						],
 					)
 				}
@@ -21168,9 +21176,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							54u8, 60u8, 161u8, 11u8, 231u8, 153u8, 146u8, 117u8, 8u8, 230u8, 91u8,
-							253u8, 108u8, 119u8, 124u8, 12u8, 4u8, 52u8, 196u8, 79u8, 206u8, 121u8,
-							145u8, 107u8, 148u8, 158u8, 70u8, 198u8, 144u8, 36u8, 178u8, 28u8,
+							189u8, 249u8, 144u8, 157u8, 178u8, 49u8, 53u8, 114u8, 148u8, 64u8, 4u8,
+							50u8, 45u8, 232u8, 249u8, 72u8, 113u8, 209u8, 109u8, 251u8, 119u8,
+							132u8, 215u8, 114u8, 202u8, 158u8, 63u8, 83u8, 155u8, 79u8, 71u8, 29u8,
 						],
 					)
 				}
@@ -21196,9 +21204,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							233u8, 116u8, 132u8, 140u8, 113u8, 229u8, 158u8, 112u8, 26u8, 27u8,
-							89u8, 128u8, 250u8, 110u8, 74u8, 198u8, 40u8, 14u8, 149u8, 108u8, 59u8,
-							21u8, 88u8, 117u8, 125u8, 189u8, 242u8, 108u8, 17u8, 26u8, 28u8, 228u8,
+							221u8, 8u8, 108u8, 81u8, 230u8, 79u8, 244u8, 213u8, 186u8, 57u8, 84u8,
+							101u8, 84u8, 171u8, 173u8, 87u8, 209u8, 23u8, 228u8, 56u8, 199u8, 85u8,
+							111u8, 78u8, 201u8, 204u8, 0u8, 246u8, 216u8, 197u8, 229u8, 52u8,
 						],
 					)
 				}
@@ -21221,10 +21229,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							244u8, 203u8, 161u8, 230u8, 209u8, 188u8, 194u8, 69u8, 117u8, 61u8,
-							135u8, 81u8, 76u8, 231u8, 219u8, 239u8, 112u8, 30u8, 214u8, 15u8,
-							221u8, 182u8, 29u8, 83u8, 227u8, 123u8, 108u8, 81u8, 150u8, 149u8,
-							137u8, 1u8,
+							68u8, 167u8, 234u8, 195u8, 33u8, 229u8, 61u8, 154u8, 27u8, 34u8, 117u8,
+							201u8, 153u8, 71u8, 176u8, 95u8, 211u8, 90u8, 86u8, 95u8, 26u8, 174u8,
+							51u8, 121u8, 198u8, 51u8, 174u8, 78u8, 47u8, 74u8, 16u8, 182u8,
 						],
 					)
 				}
@@ -21250,9 +21257,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							41u8, 136u8, 75u8, 198u8, 88u8, 220u8, 141u8, 68u8, 20u8, 11u8, 63u8,
-							82u8, 106u8, 187u8, 51u8, 200u8, 140u8, 193u8, 103u8, 1u8, 5u8, 199u8,
-							201u8, 224u8, 91u8, 244u8, 110u8, 245u8, 190u8, 154u8, 34u8, 27u8,
+							1u8, 141u8, 246u8, 174u8, 127u8, 55u8, 58u8, 139u8, 73u8, 248u8, 33u8,
+							60u8, 80u8, 142u8, 128u8, 220u8, 198u8, 86u8, 113u8, 251u8, 49u8,
+							246u8, 213u8, 111u8, 132u8, 222u8, 159u8, 79u8, 79u8, 120u8, 6u8,
+							236u8,
 						],
 					)
 				}
@@ -21275,10 +21283,9 @@ pub mod api {
 							weight,
 						},
 						[
-							43u8, 54u8, 114u8, 215u8, 244u8, 183u8, 249u8, 76u8, 220u8, 64u8,
-							196u8, 161u8, 93u8, 76u8, 80u8, 90u8, 90u8, 95u8, 215u8, 185u8, 150u8,
-							139u8, 150u8, 121u8, 191u8, 235u8, 41u8, 81u8, 59u8, 205u8, 139u8,
-							119u8,
+							87u8, 146u8, 54u8, 9u8, 246u8, 150u8, 150u8, 155u8, 55u8, 162u8, 99u8,
+							177u8, 71u8, 169u8, 79u8, 174u8, 70u8, 127u8, 66u8, 10u8, 114u8, 129u8,
+							117u8, 48u8, 191u8, 243u8, 92u8, 142u8, 210u8, 5u8, 3u8, 121u8,
 						],
 					)
 				}
@@ -21318,9 +21325,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							157u8, 131u8, 49u8, 62u8, 134u8, 157u8, 86u8, 68u8, 19u8, 120u8, 156u8,
-							58u8, 72u8, 203u8, 252u8, 45u8, 125u8, 246u8, 123u8, 10u8, 161u8,
-							155u8, 172u8, 121u8, 182u8, 156u8, 142u8, 207u8, 236u8, 7u8, 34u8, 2u8,
+							250u8, 191u8, 204u8, 18u8, 101u8, 179u8, 153u8, 133u8, 207u8, 146u8,
+							198u8, 177u8, 99u8, 170u8, 184u8, 66u8, 18u8, 146u8, 78u8, 207u8,
+							109u8, 14u8, 52u8, 192u8, 179u8, 88u8, 135u8, 3u8, 85u8, 229u8, 208u8,
+							207u8,
 						],
 					)
 				}
@@ -21343,9 +21351,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							151u8, 204u8, 210u8, 43u8, 21u8, 96u8, 135u8, 198u8, 147u8, 38u8, 1u8,
-							60u8, 92u8, 28u8, 32u8, 29u8, 104u8, 34u8, 83u8, 66u8, 46u8, 44u8,
-							214u8, 34u8, 31u8, 70u8, 160u8, 81u8, 41u8, 192u8, 163u8, 125u8,
+							169u8, 10u8, 219u8, 215u8, 204u8, 154u8, 193u8, 9u8, 38u8, 222u8, 0u8,
+							200u8, 86u8, 62u8, 22u8, 46u8, 133u8, 63u8, 55u8, 189u8, 229u8, 228u8,
+							52u8, 95u8, 251u8, 1u8, 81u8, 8u8, 10u8, 56u8, 229u8, 154u8,
 						],
 					)
 				}
@@ -21681,9 +21689,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							158u8, 123u8, 161u8, 131u8, 133u8, 242u8, 15u8, 241u8, 39u8, 10u8, 3u8,
-							6u8, 194u8, 12u8, 171u8, 250u8, 194u8, 145u8, 176u8, 26u8, 79u8, 46u8,
-							28u8, 227u8, 64u8, 123u8, 185u8, 193u8, 137u8, 14u8, 125u8, 83u8,
+							53u8, 44u8, 91u8, 247u8, 28u8, 30u8, 30u8, 183u8, 246u8, 197u8, 73u8,
+							199u8, 89u8, 196u8, 67u8, 65u8, 123u8, 233u8, 79u8, 76u8, 136u8, 221u8,
+							241u8, 254u8, 98u8, 126u8, 245u8, 208u8, 171u8, 150u8, 88u8, 192u8,
 						],
 					)
 				}
@@ -21706,9 +21714,10 @@ pub mod api {
 							weight,
 						},
 						[
-							70u8, 38u8, 54u8, 86u8, 9u8, 82u8, 237u8, 101u8, 80u8, 170u8, 95u8,
-							101u8, 161u8, 114u8, 26u8, 54u8, 97u8, 249u8, 165u8, 32u8, 211u8, 82u8,
-							245u8, 9u8, 83u8, 196u8, 238u8, 101u8, 145u8, 7u8, 234u8, 81u8,
+							101u8, 134u8, 151u8, 189u8, 56u8, 182u8, 153u8, 241u8, 62u8, 195u8,
+							95u8, 64u8, 56u8, 81u8, 117u8, 210u8, 124u8, 204u8, 78u8, 2u8, 24u8,
+							94u8, 110u8, 240u8, 48u8, 110u8, 106u8, 216u8, 89u8, 25u8, 227u8,
+							215u8,
 						],
 					)
 				}
@@ -21746,10 +21755,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							196u8, 209u8, 54u8, 168u8, 224u8, 58u8, 17u8, 68u8, 249u8, 242u8,
-							101u8, 74u8, 246u8, 236u8, 119u8, 48u8, 48u8, 25u8, 251u8, 93u8, 235u8,
-							63u8, 156u8, 19u8, 92u8, 236u8, 160u8, 101u8, 90u8, 149u8, 182u8,
-							121u8,
+							255u8, 188u8, 33u8, 246u8, 166u8, 81u8, 109u8, 194u8, 73u8, 78u8,
+							164u8, 112u8, 36u8, 61u8, 90u8, 144u8, 4u8, 104u8, 110u8, 245u8, 249u8,
+							196u8, 244u8, 48u8, 196u8, 153u8, 163u8, 143u8, 206u8, 163u8, 188u8,
+							69u8,
 						],
 					)
 				}
@@ -24561,6 +24570,419 @@ pub mod api {
 			}
 		}
 	}
+	pub mod crosschain_transfer {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_crosschain_transfer::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_crosschain_transfer::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SetChainConfig {
+					pub config: set_chain_config::Config,
+				}
+				pub mod set_chain_config {
+					use super::runtime_types;
+					pub type Config =
+						runtime_types::pallet_crosschain_transfer::pallet::ChainConfig;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetChainConfig {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "set_chain_config";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ProveTransfer {
+					pub proof: prove_transfer::Proof,
+				}
+				pub mod prove_transfer {
+					use super::runtime_types;
+					pub type Proof =
+						runtime_types::pallet_crosschain_transfer::pallet::TransferProof;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProveTransfer {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "prove_transfer";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				pub fn set_chain_config(
+					&self,
+					config: types::set_chain_config::Config,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetChainConfig>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"set_chain_config",
+						types::SetChainConfig { config },
+						[
+							249u8, 173u8, 187u8, 89u8, 23u8, 103u8, 187u8, 12u8, 108u8, 103u8,
+							183u8, 30u8, 200u8, 81u8, 227u8, 252u8, 9u8, 45u8, 125u8, 134u8, 207u8,
+							75u8, 255u8, 246u8, 207u8, 21u8, 186u8, 146u8, 95u8, 178u8, 203u8,
+							64u8,
+						],
+					)
+				}
+				pub fn prove_transfer(
+					&self,
+					proof: types::prove_transfer::Proof,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ProveTransfer>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"prove_transfer",
+						types::ProveTransfer { proof },
+						[
+							107u8, 208u8, 159u8, 180u8, 157u8, 169u8, 136u8, 74u8, 242u8, 120u8,
+							192u8, 134u8, 116u8, 206u8, 18u8, 83u8, 0u8, 185u8, 136u8, 231u8,
+							193u8, 79u8, 160u8, 147u8, 190u8, 104u8, 162u8, 84u8, 33u8, 235u8,
+							218u8, 36u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_crosschain_transfer::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An inbound burn notice was accepted and settled locally."]
+			pub struct BurnNoticeAccepted {
+				pub source_chain: burn_notice_accepted::SourceChain,
+				pub notice: burn_notice_accepted::Notice,
+			}
+			pub mod burn_notice_accepted {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type Notice = runtime_types::pallet_crosschain_transfer::pallet::BurnNotice;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnNoticeAccepted {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "BurnNoticeAccepted";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod chain_config_by_source_chain {
+					use super::runtime_types;
+					pub type ChainConfigBySourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::ChainConfig;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod nonce_by_source_account {
+					use super::runtime_types;
+					pub type NonceBySourceAccount = ::core::primitive::u64;
+					pub type Param0 = (
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+						::subxt::ext::subxt_core::utils::H160,
+					);
+				}
+				pub mod recent_argon_transfers_by_account {
+					use super::runtime_types;
+					pub type RecentArgonTransfersByAccount = ::core::primitive::u32;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod inbound_transfers_expiring_at {
+					use super::runtime_types;
+					pub type InboundTransfersExpiringAt =
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod last_transfer_expiry_cleanup_tick {
+					use super::runtime_types;
+					pub type LastTransferExpiryCleanupTick = ::core::primitive::u64;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Config accepted for each supported source chain."]
+				pub fn chain_config_by_source_chain_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::chain_config_by_source_chain::ChainConfigBySourceChain,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"ChainConfigBySourceChain",
+						(),
+						[
+							80u8, 106u8, 157u8, 238u8, 201u8, 244u8, 214u8, 215u8, 165u8, 7u8,
+							233u8, 203u8, 198u8, 92u8, 90u8, 182u8, 15u8, 93u8, 88u8, 241u8, 201u8,
+							161u8, 2u8, 50u8, 251u8, 134u8, 59u8, 223u8, 180u8, 163u8, 234u8,
+							205u8,
+						],
+					)
+				}
+				#[doc = " Config accepted for each supported source chain."]
+				pub fn chain_config_by_source_chain(
+					&self,
+					_0: types::chain_config_by_source_chain::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::chain_config_by_source_chain::Param0,
+					>,
+					types::chain_config_by_source_chain::ChainConfigBySourceChain,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"ChainConfigBySourceChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							80u8, 106u8, 157u8, 238u8, 201u8, 244u8, 214u8, 215u8, 165u8, 7u8,
+							233u8, 203u8, 198u8, 92u8, 90u8, 182u8, 15u8, 93u8, 88u8, 241u8, 201u8,
+							161u8, 2u8, 50u8, 251u8, 134u8, 59u8, 223u8, 180u8, 163u8, 234u8,
+							205u8,
+						],
+					)
+				}
+				#[doc = " Latest accepted nonce for each `(source_chain, from)` pair."]
+				pub fn nonce_by_source_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::nonce_by_source_account::NonceBySourceAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NonceBySourceAccount",
+						(),
+						[
+							33u8, 64u8, 255u8, 249u8, 131u8, 158u8, 125u8, 45u8, 118u8, 14u8, 59u8,
+							27u8, 216u8, 153u8, 36u8, 212u8, 105u8, 59u8, 113u8, 132u8, 87u8,
+							246u8, 88u8, 36u8, 76u8, 183u8, 255u8, 60u8, 245u8, 185u8, 41u8, 183u8,
+						],
+					)
+				}
+				#[doc = " Latest accepted nonce for each `(source_chain, from)` pair."]
+				pub fn nonce_by_source_account(
+					&self,
+					_0: types::nonce_by_source_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::nonce_by_source_account::Param0,
+					>,
+					types::nonce_by_source_account::NonceBySourceAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NonceBySourceAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							33u8, 64u8, 255u8, 249u8, 131u8, 158u8, 125u8, 45u8, 118u8, 14u8, 59u8,
+							27u8, 216u8, 153u8, 36u8, 212u8, 105u8, 59u8, 113u8, 132u8, 87u8,
+							246u8, 88u8, 36u8, 76u8, 183u8, 255u8, 60u8, 245u8, 185u8, 41u8, 183u8,
+						],
+					)
+				}
+				#[doc = " Count of still-retained qualifying Argon transfers for each local account."]
+				pub fn recent_argon_transfers_by_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"RecentArgonTransfersByAccount",
+						(),
+						[
+							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
+							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
+							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
+							163u8, 142u8,
+						],
+					)
+				}
+				#[doc = " Count of still-retained qualifying Argon transfers for each local account."]
+				pub fn recent_argon_transfers_by_account(
+					&self,
+					_0: types::recent_argon_transfers_by_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::recent_argon_transfers_by_account::Param0,
+					>,
+					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"RecentArgonTransfersByAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
+							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
+							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
+							163u8, 142u8,
+						],
+					)
+				}
+				#[doc = " Accounts whose recent-transfer evidence expires at a given tick."]
+				pub fn inbound_transfers_expiring_at_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::inbound_transfers_expiring_at::InboundTransfersExpiringAt,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"InboundTransfersExpiringAt",
+						(),
+						[
+							69u8, 26u8, 171u8, 206u8, 219u8, 52u8, 118u8, 196u8, 10u8, 181u8,
+							173u8, 30u8, 221u8, 213u8, 163u8, 11u8, 159u8, 72u8, 15u8, 187u8, 92u8,
+							135u8, 45u8, 75u8, 51u8, 128u8, 90u8, 202u8, 157u8, 34u8, 120u8, 108u8,
+						],
+					)
+				}
+				#[doc = " Accounts whose recent-transfer evidence expires at a given tick."]
+				pub fn inbound_transfers_expiring_at(
+					&self,
+					_0: types::inbound_transfers_expiring_at::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::inbound_transfers_expiring_at::Param0,
+					>,
+					types::inbound_transfers_expiring_at::InboundTransfersExpiringAt,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"InboundTransfersExpiringAt",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							69u8, 26u8, 171u8, 206u8, 219u8, 52u8, 118u8, 196u8, 10u8, 181u8,
+							173u8, 30u8, 221u8, 213u8, 163u8, 11u8, 159u8, 72u8, 15u8, 187u8, 92u8,
+							135u8, 45u8, 75u8, 51u8, 128u8, 90u8, 202u8, 157u8, 34u8, 120u8, 108u8,
+						],
+					)
+				}
+				#[doc = " Latest tick whose recent-transfer expiration bucket was cleaned up."]
+				pub fn last_transfer_expiry_cleanup_tick(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::last_transfer_expiry_cleanup_tick::LastTransferExpiryCleanupTick,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"LastTransferExpiryCleanupTick",
+						(),
+						[
+							196u8, 191u8, 170u8, 209u8, 132u8, 141u8, 208u8, 71u8, 48u8, 11u8,
+							196u8, 240u8, 21u8, 211u8, 125u8, 132u8, 163u8, 163u8, 217u8, 254u8,
+							191u8, 75u8, 92u8, 159u8, 150u8, 13u8, 29u8, 250u8, 33u8, 219u8, 240u8,
+							113u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " Canonical Ethereum burn-accounting account representing funds moved to Ethereum."]
+				pub fn ethereum_burn_account(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					crate::types::AccountId32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"EthereumBurnAccount",
+						[
+							115u8, 233u8, 13u8, 223u8, 88u8, 20u8, 202u8, 139u8, 153u8, 28u8,
+							155u8, 157u8, 224u8, 66u8, 3u8, 250u8, 23u8, 53u8, 88u8, 168u8, 211u8,
+							204u8, 122u8, 166u8, 248u8, 23u8, 174u8, 225u8, 99u8, 108u8, 89u8,
+							135u8,
+						],
+					)
+				}
+				#[doc = " Retention window, in ticks, for recent Argon transfer evidence used by operational"]
+				#[doc = " accounts."]
+				pub fn recent_transfer_retention_ticks(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"RecentTransferRetentionTicks",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -26401,6 +26823,8 @@ pub mod api {
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Call),
 				#[codec(index = 35)]
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Call),
+				#[codec(index = 36)]
+				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -26467,6 +26891,8 @@ pub mod api {
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Error),
 				#[codec(index = 35)]
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Error),
+				#[codec(index = 36)]
+				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -26531,6 +26957,8 @@ pub mod api {
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Event),
 				#[codec(index = 35)]
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Event),
+				#[codec(index = 36)]
+				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -28851,6 +29279,200 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_crosschain_transfer {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum AssetKind {
+					#[codec(index = 0)]
+					Argon,
+					#[codec(index = 1)]
+					Argonot,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BurnNotice {
+					pub from: ::subxt::ext::subxt_core::utils::H160,
+					pub to: crate::types::AccountId32,
+					pub asset_kind: runtime_types::pallet_crosschain_transfer::pallet::AssetKind,
+					pub amount: ::core::primitive::u128,
+					#[codec(compact)]
+					pub account_nonce: ::core::primitive::u64,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					set_chain_config {
+						config: runtime_types::pallet_crosschain_transfer::pallet::ChainConfig,
+					},
+					#[codec(index = 1)]
+					prove_transfer {
+						proof: runtime_types::pallet_crosschain_transfer::pallet::TransferProof,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum ChainConfig {
+					#[codec(index = 0)]
+					Ethereum {
+						gateway: ::subxt::ext::subxt_core::utils::H160,
+						argon_token: ::subxt::ext::subxt_core::utils::H160,
+						argonot_token: ::subxt::ext::subxt_core::utils::H160,
+						previous_gateway:
+							::core::option::Option<::subxt::ext::subxt_core::utils::H160>,
+						previous_release_expiration: ::core::option::Option<::core::primitive::u64>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The Ethereum event topics or payload do not match `BurnForTransfer`."]
+					InvalidEthereumEvent,
+					#[codec(index = 1)]
+					#[doc = "The Ethereum verifier rejected the supplied proof."]
+					InvalidProof,
+					#[codec(index = 2)]
+					#[doc = "The destination account bytes could not be decoded into a local account id."]
+					InvalidRecipient,
+					#[codec(index = 3)]
+					#[doc = "The claimed amount was zero or too large for the local balance type."]
+					InvalidAmount,
+					#[codec(index = 4)]
+					#[doc = "The source chain is not configured for inbound claims."]
+					UnsupportedSource,
+					#[codec(index = 5)]
+					#[doc = "The gateway does not match the active or still-accepted previous release."]
+					UnsupportedGateway,
+					#[codec(index = 6)]
+					#[doc = "The token is not supported under the matched gateway release."]
+					UnsupportedToken,
+					#[codec(index = 7)]
+					#[doc = "The claim nonce is not exactly the next accepted nonce for the source account."]
+					UnexpectedNonce,
+					#[codec(index = 8)]
+					#[doc = "The configured source-chain shape is incomplete or malformed."]
+					InvalidChainConfig,
+					#[codec(index = 9)]
+					#[doc = "The burn account lacks enough balance for the payout."]
+					InsufficientLiquidity,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "An inbound burn notice was accepted and settled locally."]
+					BurnNoticeAccepted {
+						source_chain:
+							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+						notice: runtime_types::pallet_crosschain_transfer::pallet::BurnNotice,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum SourceChain {
+					#[codec(index = 0)]
+					Ethereum,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum TransferProof {
+					#[codec(index = 0)]
+					Ethereum {
+						source_chain:
+							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+						event_log: runtime_types::argon_primitives::ethereum::EthereumLog,
+						proof: runtime_types::argon_primitives::ethereum::EthereumProof,
+					},
+				}
+			}
+		}
 		pub mod pallet_digests {
 			use super::runtime_types;
 			pub mod pallet {
@@ -29979,8 +30601,8 @@ pub mod api {
 						amount: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
-					#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will"]
-					#[doc = "not be able to mint"]
+					#[doc = "The amount of microgons minted for mining. NOTE: accounts below Existential Deposit"]
+					#[doc = "will not be able to mint"]
 					MiningMint {
 						amount: ::core::primitive::u128,
 						per_miner: ::core::primitive::u128,

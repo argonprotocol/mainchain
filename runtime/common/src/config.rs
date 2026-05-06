@@ -137,6 +137,11 @@ parameter_types! {
 	// ### pallet localchain transfer
 	pub const LocalchainTransferPalletId: PalletId = PalletId(*b"transfer");
 
+	// ### pallet_crosschain_transfer
+	pub const CrosschainTransferPalletId: PalletId = PalletId(*b"xchaintr");
+	pub CrosschainTransferEthereumBurnAccount: AccountId = CrosschainTransferPalletId::get()
+		.into_sub_account_truncating((pallet_crosschain_transfer::SourceChain::Ethereum, *b"burn"));
+
 	/// How long a transfer should remain in storage before returning.
 	pub const TransferExpirationTicks: u32 = 1400 * 10;
 
@@ -197,6 +202,8 @@ parameter_types! {
 	pub FeeMultiplier: Multiplier = Multiplier::one();
 	pub const TransactionByteFee: Balance = 1;
 
+	/// How many ticks to retain recent inbound Argon transfer evidence.
+	pub const RecentTransferRetentionTicks: Tick = 10 * TicksPerDay::get();
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational referrals allowed at once.
 	pub const MaxAvailableOperationalReferrals: u32 = 3;

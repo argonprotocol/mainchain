@@ -2,7 +2,7 @@ use crate as pallet_operational_accounts;
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
 	MiningFrameTransitionProvider, MiningSlotProvider, OperationalRewardsPayer,
-	RecentArgonTransferLookup, TreasuryPoolProvider,
+	TreasuryPoolProvider, UniswapTransferProvider,
 };
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -42,8 +42,8 @@ parameter_types! {
 	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
 	pub const OperationalReferralReward: Balance = 1_000;
 	pub const OperationalReferralBonusReward: Balance = 500;
-	pub static RequiresUniswapTransfer: bool = true;
-	pub static RecentArgonTransfers: BTreeSet<TestAccountId> = BTreeSet::new();
+	pub static IsCrosschainActivated: bool = true;
+	pub static AccountsWithRecentArgonTransfers: BTreeSet<TestAccountId> = BTreeSet::new();
 	pub static RegistrationVaultDataByAccount:
 		BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
 	pub static TreasuryPoolParticipantsByVaultId:
@@ -238,10 +238,16 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	}
 }
 
-pub struct MockRecentArgonTransferLookup;
-impl RecentArgonTransferLookup<TestAccountId> for MockRecentArgonTransferLookup {
+pub struct MockUniswapTransferProvider;
+impl UniswapTransferProvider<TestAccountId> for MockUniswapTransferProvider {
+	type Weights = ();
+
+	fn is_crosschain_activated() -> bool {
+		IsCrosschainActivated::get()
+	}
+
 	fn has_recent_argon_transfer(account_id: &TestAccountId) -> bool {
-		RecentArgonTransfers::get().contains(account_id)
+		AccountsWithRecentArgonTransfers::get().contains(account_id)
 	}
 }
 
@@ -275,8 +281,7 @@ impl pallet_operational_accounts::Config for Test {
 	type VaultProvider = MockVaultProvider;
 	type MiningSlotProvider = MockMiningSlotProvider;
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
-	type UniswapTransferRequirementProvider = RequiresUniswapTransfer;
-	type RecentArgonTransferLookup = MockRecentArgonTransferLookup;
+	type UniswapTransferProvider = MockUniswapTransferProvider;
 	type OperationalRewardsPayer = MockOperationalRewardsPayer;
 	type WeightInfo = ();
 }
@@ -289,8 +294,8 @@ pub fn new_test_ext() -> TestState {
 	});
 	ext.execute_with(|| {
 		CurrentFrameId::set(1);
-		RequiresUniswapTransfer::set(true);
-		RecentArgonTransfers::set(BTreeSet::new());
+		IsCrosschainActivated::set(true);
+		AccountsWithRecentArgonTransfers::set(BTreeSet::new());
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
@@ -299,6 +304,16 @@ pub fn new_test_ext() -> TestState {
 		ClaimedOperationalRewards::set(Vec::new());
 	});
 	ext
+}
+
+pub fn set_crosschain_activated(activated: bool) {
+	IsCrosschainActivated::set(activated);
+}
+
+pub fn record_recent_argon_transfer(account_id: &TestAccountId) {
+	AccountsWithRecentArgonTransfers::mutate(|accounts| {
+		accounts.insert(account_id.clone());
+	});
 }
 
 pub fn set_registration_lookup(

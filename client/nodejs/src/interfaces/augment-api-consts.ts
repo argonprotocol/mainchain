@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -158,6 +159,17 @@ declare module '@polkadot/api-base/types/consts' {
        * The desired votes per block
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
+    };
+    crosschainTransfer: {
+      /**
+       * Canonical Ethereum burn-accounting account representing funds moved to Ethereum.
+       **/
+      ethereumBurnAccount: AccountId32 & AugmentedConst<ApiType>;
+      /**
+       * Retention window, in ticks, for recent Argon transfer evidence used by operational
+       * accounts.
+       **/
+      recentTransferRetentionTicks: u64 & AugmentedConst<ApiType>;
     };
     ethereumVerifier: {
       /**

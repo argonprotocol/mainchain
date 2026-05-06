@@ -55,7 +55,8 @@ pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub get_registration_vault_data: u32,
 	pub has_active_rewards_account_seat: u32,
 	pub has_bond_participation: u32,
-	pub requires_uniswap_transfer: u32,
+	pub is_crosschain_activated: u32,
+	pub has_recent_argon_transfer: u32,
 	pub account_became_operational: u32,
 }
 
@@ -64,7 +65,8 @@ pub struct BenchmarkOperationalAccountsProviderState {
 	pub vault_registration_data: Option<RegistrationVaultData<u128>>,
 	pub has_active_rewards_account_seat: bool,
 	pub has_bond_participation: bool,
-	pub requires_uniswap_transfer: bool,
+	pub is_crosschain_activated: bool,
+	pub has_recent_argon_transfer: bool,
 	pub call_counters: BenchmarkOperationalAccountsProviderCallCounters,
 }
 
