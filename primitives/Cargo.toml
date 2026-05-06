@@ -47,6 +47,7 @@ polkadot-sdk.features = [
     "frame-support-procedural",
     "frame-support",
 ]
+snowbridge-beacon-primitives = { workspace = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"] }
@@ -77,6 +78,7 @@ std = [
 	"scale-info/std",
 	"serde/std",
 	"serde_json/std",
+	"snowbridge-beacon-primitives/std",
 	"sp-application-crypto/std",
 	"sp-runtime/std",
 	"thiserror/std",

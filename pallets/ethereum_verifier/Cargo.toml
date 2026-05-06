@@ -1,0 +1,71 @@
+[package]
+name = "pallet-ethereum-verifier"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+alloy-consensus = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-rlp = { workspace = true }
+alloy-trie = { workspace = true }
+argon-primitives = { workspace = true }
+codec = { workspace = true }
+hex-literal = { optional = true, workspace = true, default-features = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-core", "sp-runtime"] }
+scale-info = { workspace = true }
+serde = { optional = true, workspace = true, default-features = true }
+serde_json = { optional = true, workspace = true, default-features = true }
+snowbridge-beacon-primitives = { workspace = true }
+snowbridge-pallet-ethereum-client-fixtures = { optional = true, workspace = true }
+static_assertions = { version = "1.1.0", default-features = false }
+tracing = { workspace = true }
+
+[dev-dependencies]
+hex-literal = { workspace = true, default-features = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "pallet-timestamp", "sp-io"], default-features = true }
+serde = { workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
+snowbridge-pallet-ethereum-client-fixtures = { workspace = true, default-features = true }
+
+[features]
+default = [ "std" ]
+fuzzing = [
+	"hex-literal",
+	"polkadot-sdk/pallet-timestamp",
+	"polkadot-sdk/sp-io",
+	"serde",
+	"serde_json",
+]
+std = [
+	"alloy-consensus/std",
+	"alloy-primitives/std",
+	"alloy-rlp/std",
+	"alloy-trie/std",
+	"argon-primitives/std",
+	"codec/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+	"serde",
+	"snowbridge-beacon-primitives/std",
+	"snowbridge-pallet-ethereum-client-fixtures/std",
+	"tracing/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"hex-literal",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/pallet-timestamp",
+	"polkadot-sdk/runtime-benchmarks",
+	"snowbridge-pallet-ethereum-client-fixtures/runtime-benchmarks",
+]
+try-runtime = [ "polkadot-sdk/pallet-timestamp", "polkadot-sdk/try-runtime" ]

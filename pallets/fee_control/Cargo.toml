@@ -13,7 +13,7 @@ publish = false
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
-polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "pallet-balances", "pallet-proxy", "pallet-transaction-payment"] }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "pallet-balances", "pallet-proxy", "pallet-transaction-payment", "pallet-utility"] }
 pallet-prelude = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 

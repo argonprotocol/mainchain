@@ -1,10 +1,17 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
 import '@polkadot/types/types/registry';
 
+import type {
+  ArgonPrimitivesEthereumEthereumExecutionBlockProof,
+  ArgonPrimitivesEthereumEthereumExecutionHeader,
+  ArgonPrimitivesEthereumEthereumLog,
+  ArgonPrimitivesEthereumEthereumProof,
+  ArgonPrimitivesEthereumEthereumReceiptProof,
+  ArgonPrimitivesEthereumEthereumVerifyError,
+} from '@argonprotocol/mainchain/interfaces/ethereum';
 import type { Data, StorageKey } from '@polkadot/types';
 import type {
   BitVec,
@@ -1415,6 +1422,12 @@ declare module '@polkadot/types/types/registry' {
     ApprovalFlag: ApprovalFlag;
     Approvals: Approvals;
     ApprovalVotingParams: ApprovalVotingParams;
+    ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
+    ArgonPrimitivesEthereumEthereumExecutionHeader: ArgonPrimitivesEthereumEthereumExecutionHeader;
+    ArgonPrimitivesEthereumEthereumLog: ArgonPrimitivesEthereumEthereumLog;
+    ArgonPrimitivesEthereumEthereumProof: ArgonPrimitivesEthereumEthereumProof;
+    ArgonPrimitivesEthereumEthereumReceiptProof: ArgonPrimitivesEthereumEthereumReceiptProof;
+    ArgonPrimitivesEthereumEthereumVerifyError: ArgonPrimitivesEthereumEthereumVerifyError;
     ArithmeticError: ArithmeticError;
     AssetApproval: AssetApproval;
     AssetApprovalKey: AssetApprovalKey;

@@ -6,7 +6,8 @@ use codec::EncodeLike;
 use frame_support::{dispatch::CheckIfFeeless, traits::InstanceFilter};
 use pallet_prelude::{
 	argon_primitives::{
-		CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
+		CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
+		TransactionSponsorProvider, TxSponsor,
 	},
 	sp_runtime::traits::{
 		DispatchOriginOf, Implication, PostDispatchInfoOf, StaticLookup, TransactionExtension, Zero,
@@ -66,10 +67,11 @@ struct AnnouncementRecord<AccountId, CallHash, BlockNumber> {
 
 impl<T, S> CheckFeeWrapper<T, S>
 where
-	T: Config + pallet_transaction_payment::Config + pallet_proxy::Config,
+	T: Config + pallet_transaction_payment::Config + pallet_proxy::Config + pallet_utility::Config,
 	// Ensure the proxy pallet's call type is the same RuntimeCall as frame_system.
 	T: pallet_proxy::Config<RuntimeCall = RuntimeCallOf<T>>,
-	RuntimeCallOf<T>: IsSubType<pallet_proxy::Call<T>>,
+	T: pallet_utility::Config<RuntimeCall = RuntimeCallOf<T>>,
+	RuntimeCallOf<T>: IsSubType<pallet_proxy::Call<T>> + IsSubType<pallet_utility::Call<T>>,
 {
 	// Determine the call to check for sponsorship. If the outer call is a proxy wrapper,
 	// unwrap to the inner call (recursing through nested proxy wrappers).
@@ -139,6 +141,71 @@ where
 		}
 
 		(call, Some(signer))
+	}
+
+	fn push_pool_key(validity: &mut ValidTransaction, key: Vec<u8>) {
+		if !validity.provides.contains(&key) {
+			validity.provides.push(key);
+		}
+	}
+
+	fn collect_pool_keys(call: &RuntimeCallOf<T>, signer: Option<T::AccountId>) -> Vec<Vec<u8>> {
+		let (call, signer) = Self::validated_pool_key_context(call, signer);
+
+		if let Some(utility_call) =
+			<RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(call)
+		{
+			let calls = match utility_call {
+				pallet_utility::Call::batch { calls } |
+				pallet_utility::Call::batch_all { calls } |
+				pallet_utility::Call::force_batch { calls } => Some(calls),
+				_ => None,
+			};
+
+			if let Some(calls) = calls {
+				let mut keys = Vec::new();
+				for inner_call in calls.iter() {
+					for key in Self::collect_pool_keys(inner_call, signer.clone()) {
+						if !keys.contains(&key) {
+							keys.push(key);
+						}
+					}
+				}
+				if !keys.is_empty() {
+					keys.push(T::Hashing::hash_of(&(b"batch", &keys)).as_ref().to_vec());
+				}
+				return keys;
+			}
+		}
+
+		T::CallTxPoolKeyProviders::key_for(call, signer.as_ref()).into_iter().collect()
+	}
+
+	fn validate_freshness(
+		call: &RuntimeCallOf<T>,
+		signer: Option<T::AccountId>,
+	) -> Result<(), TransactionValidityError> {
+		let (call, signer) = Self::validated_pool_key_context(call, signer);
+
+		if let Some(utility_call) =
+			<RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(call)
+		{
+			let calls = match utility_call {
+				pallet_utility::Call::batch { calls } |
+				pallet_utility::Call::batch_all { calls } |
+				pallet_utility::Call::force_batch { calls } => Some(calls),
+				_ => None,
+			};
+
+			if let Some(calls) = calls {
+				for inner_call in calls.iter() {
+					Self::validate_freshness(inner_call, signer.clone())?;
+				}
+				return Ok(());
+			}
+		}
+
+		T::CallTxValidityProviders::validate(call, signer.as_ref())
 	}
 
 	fn validated_proxy_pool_key_context<'a>(
@@ -221,9 +288,10 @@ type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
 
 impl<T,S> TransactionExtension<RuntimeCallOf<T>> for CheckFeeWrapper<T, S>
 where
-    T: Config + pallet_transaction_payment::Config + pallet_proxy::Config + Send + Sync,
+    T: Config + pallet_transaction_payment::Config + pallet_proxy::Config + pallet_utility::Config + Send + Sync,
     T: pallet_proxy::Config<RuntimeCall = RuntimeCallOf<T>>,
-    RuntimeCallOf<T>: CheckIfFeeless<Origin = OriginFor<T>> + IsSubType<pallet_proxy::Call<T>>,
+    T: pallet_utility::Config<RuntimeCall = RuntimeCallOf<T>>,
+    RuntimeCallOf<T>: CheckIfFeeless<Origin = OriginFor<T>> + IsSubType<pallet_proxy::Call<T>> + IsSubType<pallet_utility::Call<T>>,
     <<T as pallet_transaction_payment::Config>::OnChargeTransaction as OnChargeTransaction<T>>::Balance:
         EncodeLike<T::Balance> + From<T::Balance> + Into<T::Balance>,
     S: TransactionExtension<RuntimeCallOf<T>, Pre = pallet_transaction_payment::Pre<T>, Val = pallet_transaction_payment::Val<T>>,
@@ -261,21 +329,18 @@ where
         source: TransactionSource,
     ) -> ValidateResult<Self::Val, RuntimeCallOf<T>> {
         let inner_call = Self::unwrap_proxy(call);
-        let (pool_key_call, pool_key_signer) =
-            Self::validated_pool_key_context(call, origin.as_signer().cloned());
-        let general_pool_key =
-            T::CallTxPoolKeyProviders::key_for(pool_key_call, pool_key_signer.as_ref());
+        let signer = origin.as_signer().cloned();
+        Self::validate_freshness(call, signer.clone())?;
+        let general_pool_keys = Self::collect_pool_keys(call, signer);
         if call.is_feeless(&origin) {
             let mut validity = ValidTransaction::default();
-            let mut push_provides = |key: Option<Vec<u8>>| {
-                if let Some(key) = key
-                    && !validity.provides.contains(&key) {
-                        validity.provides.push(key);
-                    }
-            };
 
-            push_provides(general_pool_key.clone());
-            push_provides(T::FeelessCallTxPoolKeyProviders::key_for(call));
+            for key in general_pool_keys.iter().cloned() {
+                Self::push_pool_key(&mut validity, key);
+            }
+            if let Some(key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
+                Self::push_pool_key(&mut validity, key);
+            }
 
             Ok((validity, Feeless(origin.clone()), origin))
         } else {
@@ -307,19 +372,17 @@ where
                     if total_fee > max_fee_with_tip {
                         return Err(TransactionValidityError::Invalid(
                             InvalidTransaction::Custom(INVALID_TX_SPONSORED_FEE_TOO_HIGH),
-                        ));
-                    }
+                    ));
                 }
+            }
 
-            let mut push_provides = |key: Option<Vec<u8>>| {
-                if let Some(key) = key
-                    && !validity.provides.contains(&key) {
-                        validity.provides.push(key);
-                    }
-            };
-
-            push_provides(general_pool_key);
-            push_provides(tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone()));
+            for key in general_pool_keys {
+                Self::push_pool_key(&mut validity, key);
+            }
+            if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())
+            {
+                Self::push_pool_key(&mut validity, key);
+            }
 
             Ok((validity, RequiresFee(inner_val, delegated_origin, tx_sponsor), origin_out))
         }

@@ -42,7 +42,7 @@ jobs:
     name: Build All ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Free Disk Space
         if: ${{startsWith(matrix.os, 'ubuntu')}}
         uses: ./.github/templates/clear-space
@@ -101,7 +101,7 @@ jobs:
         run: ls -lart target/
 
       - name: Upload Debug Assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bins-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/argon-*
@@ -118,17 +118,17 @@ jobs:
       attestations: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: bins-x86_64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ./amd64
 
       - name: Download amd artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: bins-aarch64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -5,6 +5,7 @@
 use crate::{
 	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
+	ethereum::{EthereumLog, EthereumProof, EthereumVerifyError},
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookVoteDigestDetails,
@@ -110,5 +111,14 @@ sp_api::decl_runtime_apis! {
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn get_bitcoin_network() -> BitcoinNetwork;
+	}
+}
+
+sp_api::decl_runtime_apis! {
+	pub trait EthereumApis {
+		fn verify_event_log(
+			event_log: EthereumLog,
+			proof: EthereumProof,
+		) -> Result<(), EthereumVerifyError>;
 	}
 }

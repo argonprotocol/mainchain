@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 30usize] = [
+	pub static PALLETS: [&str; 31usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -37,8 +37,9 @@ pub mod api {
 		"Treasury",
 		"FeeControl",
 		"OperationalAccounts",
+		"EthereumVerifier",
 	];
-	pub static RUNTIME_APIS: [&str; 21usize] = [
+	pub static RUNTIME_APIS: [&str; 22usize] = [
 		"Core",
 		"Metadata",
 		"RuntimeViewFunction",
@@ -58,6 +59,7 @@ pub mod api {
 		"NotebookApis",
 		"TickApis",
 		"BitcoinApis",
+		"EthereumApis",
 		"GrandpaApi",
 		"GenesisBuilder",
 	];
@@ -148,6 +150,9 @@ pub mod api {
 			}
 			pub fn bitcoin_apis(&self) -> bitcoin_apis::BitcoinApis {
 				bitcoin_apis::BitcoinApis
+			}
+			pub fn ethereum_apis(&self) -> ethereum_apis::EthereumApis {
+				ethereum_apis::EthereumApis
 			}
 			pub fn grandpa_api(&self) -> grandpa_api::GrandpaApi {
 				grandpa_api::GrandpaApi
@@ -1166,10 +1171,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							227u8, 71u8, 249u8, 64u8, 166u8, 186u8, 65u8, 192u8, 202u8, 132u8,
-							238u8, 133u8, 75u8, 232u8, 137u8, 218u8, 37u8, 86u8, 249u8, 65u8,
-							114u8, 175u8, 139u8, 163u8, 200u8, 137u8, 5u8, 140u8, 158u8, 29u8,
-							21u8, 22u8,
+							12u8, 7u8, 239u8, 100u8, 20u8, 255u8, 146u8, 54u8, 163u8, 18u8, 42u8,
+							137u8, 141u8, 165u8, 227u8, 158u8, 131u8, 138u8, 90u8, 49u8, 67u8,
+							159u8, 253u8, 58u8, 30u8, 15u8, 197u8, 117u8, 25u8, 98u8, 25u8, 206u8,
 						],
 					)
 				}
@@ -1187,10 +1191,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							40u8, 30u8, 81u8, 252u8, 54u8, 198u8, 79u8, 5u8, 229u8, 56u8, 48u8,
-							247u8, 247u8, 207u8, 140u8, 170u8, 72u8, 3u8, 154u8, 249u8, 230u8,
-							245u8, 49u8, 110u8, 58u8, 234u8, 101u8, 133u8, 201u8, 129u8, 34u8,
-							15u8,
+							100u8, 16u8, 110u8, 27u8, 108u8, 124u8, 123u8, 207u8, 223u8, 66u8,
+							20u8, 80u8, 78u8, 156u8, 41u8, 105u8, 52u8, 132u8, 12u8, 98u8, 37u8,
+							239u8, 113u8, 175u8, 100u8, 102u8, 85u8, 110u8, 88u8, 111u8, 25u8,
+							201u8,
 						],
 					)
 				}
@@ -2682,6 +2686,63 @@ pub mod api {
 				pub struct GetBitcoinNetwork {}
 			}
 		}
+		pub mod ethereum_apis {
+			use super::{root_mod, runtime_types};
+			pub struct EthereumApis;
+			impl EthereumApis {
+				pub fn verify_event_log(
+					&self,
+					event_log: types::verify_event_log::EventLog,
+					proof: types::verify_event_log::Proof,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::VerifyEventLog,
+					types::verify_event_log::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"EthereumApis",
+						"verify_event_log",
+						types::VerifyEventLog { event_log, proof },
+						[
+							94u8, 139u8, 18u8, 253u8, 246u8, 161u8, 55u8, 81u8, 25u8, 4u8, 76u8,
+							119u8, 182u8, 180u8, 194u8, 50u8, 66u8, 171u8, 129u8, 190u8, 13u8,
+							107u8, 60u8, 168u8, 56u8, 115u8, 9u8, 240u8, 223u8, 172u8, 154u8,
+							185u8,
+						],
+					)
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				pub mod verify_event_log {
+					use super::runtime_types;
+					pub type EventLog = runtime_types::argon_primitives::ethereum::EthereumLog;
+					pub type Proof = runtime_types::argon_primitives::ethereum::EthereumProof;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::result::Result<
+							(),
+							runtime_types::argon_primitives::ethereum::EthereumVerifyError,
+						>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct VerifyEventLog {
+					pub event_log: verify_event_log::EventLog,
+					pub proof: verify_event_log::Proof,
+				}
+			}
+		}
 		pub mod grandpa_api {
 			use super::{root_mod, runtime_types};
 			#[doc = " APIs for integrating the GRANDPA finality gadget into runtimes."]
@@ -3147,6 +3208,9 @@ pub mod api {
 		pub fn operational_accounts(&self) -> operational_accounts::constants::ConstantsApi {
 			operational_accounts::constants::ConstantsApi
 		}
+		pub fn ethereum_verifier(&self) -> ethereum_verifier::constants::ConstantsApi {
+			ethereum_verifier::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3234,6 +3298,9 @@ pub mod api {
 		pub fn operational_accounts(&self) -> operational_accounts::storage::StorageApi {
 			operational_accounts::storage::StorageApi
 		}
+		pub fn ethereum_verifier(&self) -> ethereum_verifier::storage::StorageApi {
+			ethereum_verifier::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3315,6 +3382,9 @@ pub mod api {
 		pub fn operational_accounts(&self) -> operational_accounts::calls::TransactionApi {
 			operational_accounts::calls::TransactionApi
 		}
+		pub fn ethereum_verifier(&self) -> ethereum_verifier::calls::TransactionApi {
+			ethereum_verifier::calls::TransactionApi
+		}
 	}
 	pub struct ViewFunctionsApi;
 	impl ViewFunctionsApi {
@@ -3331,9 +3401,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				89u8, 202u8, 111u8, 237u8, 136u8, 163u8, 157u8, 28u8, 213u8, 172u8, 124u8, 122u8,
-				105u8, 106u8, 0u8, 187u8, 57u8, 198u8, 155u8, 193u8, 250u8, 191u8, 181u8, 216u8,
-				51u8, 5u8, 201u8, 138u8, 48u8, 87u8, 105u8, 241u8,
+				215u8, 181u8, 39u8, 198u8, 66u8, 227u8, 148u8, 195u8, 119u8, 153u8, 64u8, 244u8,
+				79u8, 92u8, 42u8, 103u8, 251u8, 152u8, 118u8, 111u8, 74u8, 194u8, 103u8, 148u8,
+				102u8, 214u8, 28u8, 243u8, 233u8, 245u8, 218u8, 181u8,
 			]
 	}
 	pub mod system {
@@ -4457,9 +4527,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							193u8, 57u8, 174u8, 64u8, 55u8, 106u8, 78u8, 90u8, 125u8, 99u8, 236u8,
-							47u8, 133u8, 224u8, 16u8, 199u8, 254u8, 172u8, 35u8, 55u8, 26u8, 31u8,
-							101u8, 204u8, 80u8, 57u8, 209u8, 128u8, 22u8, 27u8, 7u8, 243u8,
+							21u8, 222u8, 1u8, 17u8, 146u8, 59u8, 79u8, 91u8, 232u8, 21u8, 95u8,
+							211u8, 127u8, 54u8, 73u8, 206u8, 83u8, 185u8, 128u8, 239u8, 76u8, 48u8,
+							171u8, 54u8, 134u8, 44u8, 156u8, 106u8, 163u8, 49u8, 19u8, 6u8,
 						],
 					)
 				}
@@ -5367,9 +5437,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							125u8, 23u8, 100u8, 171u8, 88u8, 161u8, 175u8, 25u8, 178u8, 164u8,
-							137u8, 200u8, 160u8, 9u8, 103u8, 103u8, 213u8, 33u8, 208u8, 96u8, 65u8,
-							38u8, 95u8, 9u8, 222u8, 25u8, 207u8, 179u8, 111u8, 222u8, 29u8, 117u8,
+							154u8, 152u8, 94u8, 28u8, 21u8, 51u8, 18u8, 24u8, 66u8, 219u8, 146u8,
+							182u8, 197u8, 4u8, 122u8, 108u8, 129u8, 154u8, 17u8, 192u8, 137u8,
+							187u8, 135u8, 40u8, 245u8, 64u8, 246u8, 89u8, 231u8, 231u8, 19u8,
+							116u8,
 						],
 					)
 				}
@@ -5434,9 +5505,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							231u8, 141u8, 173u8, 97u8, 14u8, 58u8, 154u8, 251u8, 177u8, 93u8, 14u8,
-							70u8, 0u8, 145u8, 164u8, 187u8, 175u8, 173u8, 225u8, 91u8, 172u8, 4u8,
-							137u8, 145u8, 179u8, 234u8, 250u8, 212u8, 227u8, 221u8, 214u8, 5u8,
+							226u8, 249u8, 161u8, 148u8, 176u8, 65u8, 135u8, 101u8, 166u8, 22u8,
+							55u8, 236u8, 208u8, 31u8, 225u8, 151u8, 217u8, 80u8, 139u8, 108u8,
+							206u8, 127u8, 9u8, 183u8, 121u8, 236u8, 149u8, 62u8, 117u8, 61u8, 66u8,
+							204u8,
 						],
 					)
 				}
@@ -6341,10 +6413,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							132u8, 243u8, 178u8, 118u8, 214u8, 82u8, 160u8, 179u8, 181u8, 102u8,
-							37u8, 19u8, 144u8, 95u8, 161u8, 74u8, 142u8, 215u8, 149u8, 116u8,
-							216u8, 178u8, 151u8, 242u8, 90u8, 178u8, 183u8, 183u8, 29u8, 176u8,
-							133u8, 114u8,
+							2u8, 111u8, 133u8, 154u8, 228u8, 92u8, 208u8, 39u8, 157u8, 125u8,
+							160u8, 60u8, 60u8, 63u8, 107u8, 246u8, 132u8, 181u8, 187u8, 198u8,
+							176u8, 156u8, 248u8, 166u8, 210u8, 78u8, 163u8, 224u8, 192u8, 215u8,
+							238u8, 19u8,
 						],
 					)
 				}
@@ -6605,9 +6677,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							200u8, 97u8, 105u8, 7u8, 141u8, 197u8, 44u8, 39u8, 225u8, 106u8, 203u8,
-							37u8, 97u8, 83u8, 3u8, 140u8, 249u8, 18u8, 173u8, 107u8, 242u8, 63u8,
-							187u8, 216u8, 161u8, 166u8, 223u8, 8u8, 101u8, 72u8, 46u8, 138u8,
+							160u8, 28u8, 147u8, 188u8, 248u8, 147u8, 129u8, 70u8, 247u8, 63u8,
+							146u8, 153u8, 148u8, 179u8, 82u8, 137u8, 233u8, 123u8, 115u8, 47u8,
+							68u8, 9u8, 180u8, 148u8, 154u8, 178u8, 231u8, 4u8, 250u8, 15u8, 53u8,
+							73u8,
 						],
 					)
 				}
@@ -6656,9 +6729,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							224u8, 102u8, 14u8, 156u8, 55u8, 61u8, 71u8, 97u8, 222u8, 26u8, 206u8,
-							236u8, 140u8, 172u8, 118u8, 206u8, 7u8, 92u8, 197u8, 241u8, 59u8, 72u8,
-							3u8, 158u8, 151u8, 240u8, 96u8, 48u8, 96u8, 40u8, 163u8, 113u8,
+							155u8, 64u8, 7u8, 12u8, 209u8, 202u8, 60u8, 141u8, 68u8, 96u8, 155u8,
+							118u8, 188u8, 119u8, 57u8, 247u8, 3u8, 38u8, 181u8, 25u8, 148u8, 112u8,
+							101u8, 84u8, 133u8, 150u8, 75u8, 97u8, 91u8, 115u8, 244u8, 29u8,
 						],
 					)
 				}
@@ -21062,9 +21135,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							177u8, 233u8, 110u8, 122u8, 74u8, 89u8, 1u8, 209u8, 194u8, 34u8, 2u8,
-							7u8, 55u8, 237u8, 87u8, 178u8, 149u8, 177u8, 205u8, 151u8, 6u8, 246u8,
-							51u8, 12u8, 123u8, 22u8, 189u8, 24u8, 71u8, 92u8, 252u8, 236u8,
+							254u8, 254u8, 252u8, 8u8, 249u8, 164u8, 244u8, 225u8, 68u8, 207u8,
+							11u8, 179u8, 178u8, 76u8, 207u8, 194u8, 184u8, 35u8, 14u8, 40u8, 253u8,
+							89u8, 29u8, 171u8, 141u8, 78u8, 187u8, 215u8, 144u8, 153u8, 50u8,
+							100u8,
 						],
 					)
 				}
@@ -21094,10 +21168,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							166u8, 158u8, 27u8, 150u8, 160u8, 69u8, 125u8, 94u8, 94u8, 106u8,
-							162u8, 98u8, 242u8, 58u8, 235u8, 171u8, 113u8, 234u8, 30u8, 165u8,
-							231u8, 195u8, 139u8, 248u8, 64u8, 53u8, 102u8, 246u8, 96u8, 34u8, 77u8,
-							46u8,
+							54u8, 60u8, 161u8, 11u8, 231u8, 153u8, 146u8, 117u8, 8u8, 230u8, 91u8,
+							253u8, 108u8, 119u8, 124u8, 12u8, 4u8, 52u8, 196u8, 79u8, 206u8, 121u8,
+							145u8, 107u8, 148u8, 158u8, 70u8, 198u8, 144u8, 36u8, 178u8, 28u8,
 						],
 					)
 				}
@@ -21123,10 +21196,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							141u8, 42u8, 121u8, 75u8, 135u8, 53u8, 52u8, 219u8, 254u8, 221u8,
-							198u8, 37u8, 53u8, 79u8, 144u8, 124u8, 61u8, 204u8, 6u8, 197u8, 1u8,
-							68u8, 219u8, 172u8, 254u8, 177u8, 217u8, 230u8, 187u8, 11u8, 45u8,
-							185u8,
+							233u8, 116u8, 132u8, 140u8, 113u8, 229u8, 158u8, 112u8, 26u8, 27u8,
+							89u8, 128u8, 250u8, 110u8, 74u8, 198u8, 40u8, 14u8, 149u8, 108u8, 59u8,
+							21u8, 88u8, 117u8, 125u8, 189u8, 242u8, 108u8, 17u8, 26u8, 28u8, 228u8,
 						],
 					)
 				}
@@ -21149,10 +21221,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							10u8, 72u8, 112u8, 157u8, 228u8, 237u8, 65u8, 220u8, 246u8, 61u8, 58u8,
-							101u8, 99u8, 193u8, 33u8, 103u8, 130u8, 118u8, 216u8, 238u8, 84u8,
-							176u8, 169u8, 146u8, 76u8, 83u8, 230u8, 241u8, 162u8, 56u8, 129u8,
-							100u8,
+							244u8, 203u8, 161u8, 230u8, 209u8, 188u8, 194u8, 69u8, 117u8, 61u8,
+							135u8, 81u8, 76u8, 231u8, 219u8, 239u8, 112u8, 30u8, 214u8, 15u8,
+							221u8, 182u8, 29u8, 83u8, 227u8, 123u8, 108u8, 81u8, 150u8, 149u8,
+							137u8, 1u8,
 						],
 					)
 				}
@@ -21178,9 +21250,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							191u8, 186u8, 12u8, 235u8, 18u8, 60u8, 48u8, 47u8, 1u8, 7u8, 22u8,
-							173u8, 44u8, 207u8, 85u8, 148u8, 85u8, 47u8, 83u8, 16u8, 84u8, 116u8,
-							113u8, 180u8, 250u8, 69u8, 98u8, 143u8, 145u8, 44u8, 104u8, 145u8,
+							41u8, 136u8, 75u8, 198u8, 88u8, 220u8, 141u8, 68u8, 20u8, 11u8, 63u8,
+							82u8, 106u8, 187u8, 51u8, 200u8, 140u8, 193u8, 103u8, 1u8, 5u8, 199u8,
+							201u8, 224u8, 91u8, 244u8, 110u8, 245u8, 190u8, 154u8, 34u8, 27u8,
 						],
 					)
 				}
@@ -21203,9 +21275,10 @@ pub mod api {
 							weight,
 						},
 						[
-							223u8, 133u8, 6u8, 131u8, 30u8, 175u8, 21u8, 114u8, 248u8, 95u8, 104u8,
-							62u8, 201u8, 10u8, 205u8, 14u8, 96u8, 118u8, 0u8, 97u8, 128u8, 27u8,
-							113u8, 129u8, 228u8, 56u8, 181u8, 232u8, 252u8, 207u8, 2u8, 11u8,
+							43u8, 54u8, 114u8, 215u8, 244u8, 183u8, 249u8, 76u8, 220u8, 64u8,
+							196u8, 161u8, 93u8, 76u8, 80u8, 90u8, 90u8, 95u8, 215u8, 185u8, 150u8,
+							139u8, 150u8, 121u8, 191u8, 235u8, 41u8, 81u8, 59u8, 205u8, 139u8,
+							119u8,
 						],
 					)
 				}
@@ -21245,10 +21318,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							248u8, 154u8, 130u8, 246u8, 46u8, 24u8, 24u8, 220u8, 176u8, 100u8,
-							183u8, 155u8, 122u8, 244u8, 169u8, 166u8, 1u8, 168u8, 249u8, 142u8,
-							43u8, 108u8, 95u8, 91u8, 203u8, 33u8, 150u8, 86u8, 46u8, 94u8, 12u8,
-							68u8,
+							157u8, 131u8, 49u8, 62u8, 134u8, 157u8, 86u8, 68u8, 19u8, 120u8, 156u8,
+							58u8, 72u8, 203u8, 252u8, 45u8, 125u8, 246u8, 123u8, 10u8, 161u8,
+							155u8, 172u8, 121u8, 182u8, 156u8, 142u8, 207u8, 236u8, 7u8, 34u8, 2u8,
 						],
 					)
 				}
@@ -21271,10 +21343,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							177u8, 190u8, 230u8, 67u8, 98u8, 211u8, 200u8, 53u8, 88u8, 201u8,
-							174u8, 244u8, 153u8, 141u8, 103u8, 23u8, 139u8, 96u8, 224u8, 27u8,
-							31u8, 166u8, 6u8, 198u8, 198u8, 77u8, 18u8, 203u8, 228u8, 115u8, 251u8,
-							120u8,
+							151u8, 204u8, 210u8, 43u8, 21u8, 96u8, 135u8, 198u8, 147u8, 38u8, 1u8,
+							60u8, 92u8, 28u8, 32u8, 29u8, 104u8, 34u8, 83u8, 66u8, 46u8, 44u8,
+							214u8, 34u8, 31u8, 70u8, 160u8, 81u8, 41u8, 192u8, 163u8, 125u8,
 						],
 					)
 				}
@@ -21610,9 +21681,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							28u8, 99u8, 132u8, 54u8, 199u8, 222u8, 201u8, 233u8, 86u8, 98u8, 147u8,
-							127u8, 33u8, 180u8, 95u8, 21u8, 56u8, 166u8, 165u8, 147u8, 39u8, 214u8,
-							85u8, 120u8, 247u8, 100u8, 4u8, 51u8, 176u8, 174u8, 6u8, 246u8,
+							158u8, 123u8, 161u8, 131u8, 133u8, 242u8, 15u8, 241u8, 39u8, 10u8, 3u8,
+							6u8, 194u8, 12u8, 171u8, 250u8, 194u8, 145u8, 176u8, 26u8, 79u8, 46u8,
+							28u8, 227u8, 64u8, 123u8, 185u8, 193u8, 137u8, 14u8, 125u8, 83u8,
 						],
 					)
 				}
@@ -21635,10 +21706,9 @@ pub mod api {
 							weight,
 						},
 						[
-							117u8, 156u8, 43u8, 237u8, 141u8, 215u8, 188u8, 157u8, 179u8, 69u8,
-							232u8, 194u8, 166u8, 100u8, 104u8, 204u8, 200u8, 80u8, 9u8, 12u8, 15u8,
-							78u8, 251u8, 86u8, 151u8, 57u8, 198u8, 157u8, 39u8, 240u8, 210u8,
-							168u8,
+							70u8, 38u8, 54u8, 86u8, 9u8, 82u8, 237u8, 101u8, 80u8, 170u8, 95u8,
+							101u8, 161u8, 114u8, 26u8, 54u8, 97u8, 249u8, 165u8, 32u8, 211u8, 82u8,
+							245u8, 9u8, 83u8, 196u8, 238u8, 101u8, 145u8, 7u8, 234u8, 81u8,
 						],
 					)
 				}
@@ -21676,10 +21746,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							222u8, 204u8, 197u8, 213u8, 221u8, 37u8, 128u8, 198u8, 80u8, 98u8,
-							185u8, 27u8, 168u8, 255u8, 219u8, 203u8, 229u8, 122u8, 169u8, 59u8,
-							22u8, 42u8, 144u8, 236u8, 24u8, 228u8, 4u8, 232u8, 19u8, 213u8, 216u8,
-							128u8,
+							196u8, 209u8, 54u8, 168u8, 224u8, 58u8, 17u8, 68u8, 249u8, 242u8,
+							101u8, 74u8, 246u8, 236u8, 119u8, 48u8, 48u8, 25u8, 251u8, 93u8, 235u8,
+							63u8, 156u8, 19u8, 92u8, 236u8, 160u8, 101u8, 90u8, 149u8, 182u8,
+							121u8,
 						],
 					)
 				}
@@ -23674,6 +23744,823 @@ pub mod api {
 			}
 		}
 	}
+	pub mod ethereum_verifier {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_ethereum_verifier::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_ethereum_verifier::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Used for pallet initialization and light client resetting. Needs to be called by"]
+				#[doc = "the root origin."]
+				pub struct ForceCheckpoint {
+					pub update:
+						::subxt::ext::subxt_core::alloc::boxed::Box<force_checkpoint::Update>,
+					pub fork_versions: force_checkpoint::ForkVersions,
+				}
+				pub mod force_checkpoint {
+					use super::runtime_types;
+					pub type Update =
+						runtime_types::pallet_ethereum_verifier::types::CheckpointUpdate;
+					pub type ForkVersions =
+						runtime_types::pallet_ethereum_verifier::types::ForkVersions;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceCheckpoint {
+					const PALLET: &'static str = "EthereumVerifier";
+					const CALL: &'static str = "force_checkpoint";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Submits a new finalized beacon header update. The update may contain the next"]
+				#[doc = "sync committee."]
+				pub struct Submit {
+					pub update: ::subxt::ext::subxt_core::alloc::boxed::Box<submit::Update>,
+				}
+				pub mod submit {
+					use super::runtime_types;
+					pub type Update = runtime_types::pallet_ethereum_verifier::types::Update;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Submit {
+					const PALLET: &'static str = "EthereumVerifier";
+					const CALL: &'static str = "submit";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Imports a proven execution header anchor against already-retained beacon state."]
+				pub struct ImportExecutionHeaderAnchor {
+					pub execution_proof: import_execution_header_anchor::ExecutionProof,
+				}
+				pub mod import_execution_header_anchor {
+					use super::runtime_types;
+					pub type ExecutionProof =
+						runtime_types::pallet_ethereum_verifier::types::ExecutionProof;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ImportExecutionHeaderAnchor {
+					const PALLET: &'static str = "EthereumVerifier";
+					const CALL: &'static str = "import_execution_header_anchor";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Halt or resume all pallet operations. May only be called by root."]
+				pub struct SetOperatingMode {
+					pub mode: set_operating_mode::Mode,
+				}
+				pub mod set_operating_mode {
+					use super::runtime_types;
+					pub type Mode =
+						runtime_types::pallet_ethereum_verifier::types::BasicOperatingMode;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetOperatingMode {
+					const PALLET: &'static str = "EthereumVerifier";
+					const CALL: &'static str = "set_operating_mode";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Used for pallet initialization and light client resetting. Needs to be called by"]
+				#[doc = "the root origin."]
+				pub fn force_checkpoint(
+					&self,
+					update: types::force_checkpoint::Update,
+					fork_versions: types::force_checkpoint::ForkVersions,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ForceCheckpoint>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"EthereumVerifier",
+						"force_checkpoint",
+						types::ForceCheckpoint {
+							update: ::subxt::ext::subxt_core::alloc::boxed::Box::new(update),
+							fork_versions,
+						},
+						[
+							137u8, 26u8, 14u8, 197u8, 139u8, 94u8, 152u8, 91u8, 9u8, 59u8, 202u8,
+							235u8, 22u8, 238u8, 233u8, 254u8, 78u8, 46u8, 10u8, 93u8, 145u8, 4u8,
+							5u8, 74u8, 33u8, 66u8, 69u8, 178u8, 12u8, 28u8, 5u8, 205u8,
+						],
+					)
+				}
+				#[doc = "Submits a new finalized beacon header update. The update may contain the next"]
+				#[doc = "sync committee."]
+				pub fn submit(
+					&self,
+					update: types::submit::Update,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Submit> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"EthereumVerifier",
+						"submit",
+						types::Submit {
+							update: ::subxt::ext::subxt_core::alloc::boxed::Box::new(update),
+						},
+						[
+							142u8, 89u8, 58u8, 243u8, 247u8, 134u8, 187u8, 255u8, 69u8, 202u8,
+							151u8, 78u8, 80u8, 155u8, 206u8, 193u8, 194u8, 221u8, 103u8, 168u8,
+							29u8, 59u8, 187u8, 212u8, 102u8, 254u8, 141u8, 4u8, 239u8, 51u8, 0u8,
+							233u8,
+						],
+					)
+				}
+				#[doc = "Imports a proven execution header anchor against already-retained beacon state."]
+				pub fn import_execution_header_anchor(
+					&self,
+					execution_proof: types::import_execution_header_anchor::ExecutionProof,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::ImportExecutionHeaderAnchor,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"EthereumVerifier",
+						"import_execution_header_anchor",
+						types::ImportExecutionHeaderAnchor { execution_proof },
+						[
+							41u8, 175u8, 130u8, 173u8, 252u8, 202u8, 209u8, 25u8, 176u8, 232u8,
+							17u8, 89u8, 18u8, 78u8, 111u8, 70u8, 5u8, 84u8, 231u8, 184u8, 120u8,
+							238u8, 180u8, 26u8, 36u8, 73u8, 141u8, 11u8, 158u8, 249u8, 83u8, 255u8,
+						],
+					)
+				}
+				#[doc = "Halt or resume all pallet operations. May only be called by root."]
+				pub fn set_operating_mode(
+					&self,
+					mode: types::set_operating_mode::Mode,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetOperatingMode>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"EthereumVerifier",
+						"set_operating_mode",
+						types::SetOperatingMode { mode },
+						[
+							223u8, 92u8, 198u8, 41u8, 160u8, 232u8, 158u8, 165u8, 141u8, 127u8,
+							165u8, 39u8, 1u8, 81u8, 34u8, 107u8, 211u8, 65u8, 173u8, 65u8, 33u8,
+							35u8, 151u8, 177u8, 237u8, 17u8, 112u8, 142u8, 10u8, 93u8, 157u8, 48u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_ethereum_verifier::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct BeaconHeaderImported {
+				pub block_hash: beacon_header_imported::BlockHash,
+				pub slot: beacon_header_imported::Slot,
+			}
+			pub mod beacon_header_imported {
+				use super::runtime_types;
+				pub type BlockHash = crate::types::H256;
+				pub type Slot = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BeaconHeaderImported {
+				const PALLET: &'static str = "EthereumVerifier";
+				const EVENT: &'static str = "BeaconHeaderImported";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct ExecutionHeaderAnchorImported {
+				pub block_hash: execution_header_anchor_imported::BlockHash,
+				pub block_number: execution_header_anchor_imported::BlockNumber,
+			}
+			pub mod execution_header_anchor_imported {
+				use super::runtime_types;
+				pub type BlockHash = crate::types::H256;
+				pub type BlockNumber = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for ExecutionHeaderAnchorImported {
+				const PALLET: &'static str = "EthereumVerifier";
+				const EVENT: &'static str = "ExecutionHeaderAnchorImported";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct SyncCommitteeUpdated {
+				pub period: sync_committee_updated::Period,
+			}
+			pub mod sync_committee_updated {
+				use super::runtime_types;
+				pub type Period = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for SyncCommitteeUpdated {
+				const PALLET: &'static str = "EthereumVerifier";
+				const EVENT: &'static str = "SyncCommitteeUpdated";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Set OperatingMode"]
+			pub struct OperatingModeChanged {
+				pub mode: operating_mode_changed::Mode,
+			}
+			pub mod operating_mode_changed {
+				use super::runtime_types;
+				pub type Mode = runtime_types::pallet_ethereum_verifier::types::BasicOperatingMode;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for OperatingModeChanged {
+				const PALLET: &'static str = "EthereumVerifier";
+				const EVENT: &'static str = "OperatingModeChanged";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod initial_checkpoint_root {
+					use super::runtime_types;
+					pub type InitialCheckpointRoot = crate::types::H256;
+				}
+				pub mod latest_finalized_block_root {
+					use super::runtime_types;
+					pub type LatestFinalizedBlockRoot = crate::types::H256;
+				}
+				pub mod finalized_beacon_state {
+					use super::runtime_types;
+					pub type FinalizedBeaconState =
+						runtime_types::pallet_ethereum_verifier::types::FinalizedBeaconHeaderState;
+					pub type Param0 = crate::types::H256;
+				}
+				pub mod finalized_beacon_state_index {
+					use super::runtime_types;
+					pub type FinalizedBeaconStateIndex = ::core::primitive::u32;
+				}
+				pub mod finalized_beacon_state_mapping {
+					use super::runtime_types;
+					pub type FinalizedBeaconStateMapping = crate::types::H256;
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod execution_header_anchors {
+					use super::runtime_types;
+					pub type ExecutionHeaderAnchors =
+						runtime_types::pallet_ethereum_verifier::types::ExecutionHeaderAnchor;
+					pub type Param0 = crate::types::H256;
+				}
+				pub mod execution_header_anchor_index {
+					use super::runtime_types;
+					pub type ExecutionHeaderAnchorIndex = ::core::primitive::u32;
+				}
+				pub mod execution_header_anchor_mapping {
+					use super::runtime_types;
+					pub type ExecutionHeaderAnchorMapping = crate::types::H256;
+					pub type Param0 = ::core::primitive::u32;
+				}
+				pub mod latest_execution_header_anchor_block_hash {
+					use super::runtime_types;
+					pub type LatestExecutionHeaderAnchorBlockHash = crate::types::H256;
+				}
+				pub mod validators_root {
+					use super::runtime_types;
+					pub type ValidatorsRoot = crate::types::H256;
+				}
+				pub mod fork_version_schedule {
+					use super::runtime_types;
+					pub type ForkVersionSchedule =
+						runtime_types::pallet_ethereum_verifier::types::ForkVersions;
+				}
+				pub mod current_sync_committee {
+					use super::runtime_types;
+					pub type CurrentSyncCommittee =
+						runtime_types::snowbridge_beacon_primitives::types::SyncCommitteePrepared;
+				}
+				pub mod next_sync_committee {
+					use super::runtime_types;
+					pub type NextSyncCommittee =
+						runtime_types::snowbridge_beacon_primitives::types::SyncCommitteePrepared;
+				}
+				pub mod latest_sync_committee_update_period {
+					use super::runtime_types;
+					pub type LatestSyncCommitteeUpdatePeriod = ::core::primitive::u64;
+				}
+				pub mod operating_mode {
+					use super::runtime_types;
+					pub type OperatingMode =
+						runtime_types::pallet_ethereum_verifier::types::BasicOperatingMode;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Latest imported checkpoint root"]
+				pub fn initial_checkpoint_root(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::initial_checkpoint_root::InitialCheckpointRoot,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"InitialCheckpointRoot",
+						(),
+						[
+							56u8, 223u8, 6u8, 69u8, 82u8, 219u8, 129u8, 146u8, 185u8, 32u8, 235u8,
+							10u8, 220u8, 165u8, 98u8, 226u8, 93u8, 173u8, 66u8, 7u8, 214u8, 157u8,
+							125u8, 21u8, 117u8, 52u8, 237u8, 176u8, 232u8, 217u8, 73u8, 116u8,
+						],
+					)
+				}
+				#[doc = " Latest imported finalized block root"]
+				pub fn latest_finalized_block_root(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::latest_finalized_block_root::LatestFinalizedBlockRoot,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"LatestFinalizedBlockRoot",
+						(),
+						[
+							227u8, 89u8, 99u8, 8u8, 252u8, 245u8, 244u8, 207u8, 195u8, 120u8,
+							115u8, 52u8, 236u8, 110u8, 122u8, 226u8, 5u8, 194u8, 220u8, 163u8,
+							234u8, 36u8, 34u8, 114u8, 20u8, 151u8, 243u8, 53u8, 255u8, 252u8, 45u8,
+							109u8,
+						],
+					)
+				}
+				#[doc = " Beacon state by finalized block root"]
+				pub fn finalized_beacon_state_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::finalized_beacon_state::FinalizedBeaconState,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FinalizedBeaconState",
+						(),
+						[
+							239u8, 194u8, 15u8, 219u8, 71u8, 61u8, 209u8, 123u8, 216u8, 14u8,
+							227u8, 111u8, 185u8, 142u8, 153u8, 105u8, 46u8, 177u8, 165u8, 162u8,
+							100u8, 54u8, 141u8, 204u8, 112u8, 106u8, 224u8, 171u8, 55u8, 35u8,
+							122u8, 206u8,
+						],
+					)
+				}
+				#[doc = " Beacon state by finalized block root"]
+				pub fn finalized_beacon_state(
+					&self,
+					_0: types::finalized_beacon_state::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::finalized_beacon_state::Param0,
+					>,
+					types::finalized_beacon_state::FinalizedBeaconState,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FinalizedBeaconState",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							239u8, 194u8, 15u8, 219u8, 71u8, 61u8, 209u8, 123u8, 216u8, 14u8,
+							227u8, 111u8, 185u8, 142u8, 153u8, 105u8, 46u8, 177u8, 165u8, 162u8,
+							100u8, 54u8, 141u8, 204u8, 112u8, 106u8, 224u8, 171u8, 55u8, 35u8,
+							122u8, 206u8,
+						],
+					)
+				}
+				#[doc = " Finalized Headers: Current position in ring buffer"]
+				pub fn finalized_beacon_state_index(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::finalized_beacon_state_index::FinalizedBeaconStateIndex,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FinalizedBeaconStateIndex",
+						(),
+						[
+							162u8, 25u8, 179u8, 182u8, 182u8, 86u8, 200u8, 95u8, 218u8, 198u8,
+							10u8, 138u8, 193u8, 101u8, 120u8, 113u8, 187u8, 25u8, 229u8, 71u8,
+							172u8, 212u8, 205u8, 62u8, 150u8, 87u8, 111u8, 190u8, 183u8, 39u8,
+							190u8, 241u8,
+						],
+					)
+				}
+				#[doc = " Finalized Headers: Mapping of ring buffer index to a pruning candidate"]
+				pub fn finalized_beacon_state_mapping_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::finalized_beacon_state_mapping::FinalizedBeaconStateMapping,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FinalizedBeaconStateMapping",
+						(),
+						[
+							164u8, 150u8, 120u8, 251u8, 127u8, 46u8, 22u8, 185u8, 2u8, 190u8,
+							217u8, 245u8, 141u8, 116u8, 113u8, 38u8, 39u8, 18u8, 152u8, 107u8,
+							215u8, 56u8, 140u8, 96u8, 14u8, 82u8, 194u8, 242u8, 41u8, 161u8, 112u8,
+							68u8,
+						],
+					)
+				}
+				#[doc = " Finalized Headers: Mapping of ring buffer index to a pruning candidate"]
+				pub fn finalized_beacon_state_mapping(
+					&self,
+					_0: types::finalized_beacon_state_mapping::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::finalized_beacon_state_mapping::Param0,
+					>,
+					types::finalized_beacon_state_mapping::FinalizedBeaconStateMapping,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FinalizedBeaconStateMapping",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							164u8, 150u8, 120u8, 251u8, 127u8, 46u8, 22u8, 185u8, 2u8, 190u8,
+							217u8, 245u8, 141u8, 116u8, 113u8, 38u8, 39u8, 18u8, 152u8, 107u8,
+							215u8, 56u8, 140u8, 96u8, 14u8, 82u8, 194u8, 242u8, 41u8, 161u8, 112u8,
+							68u8,
+						],
+					)
+				}
+				#[doc = " Retained execution-layer header anchors by execution block hash."]
+				pub fn execution_header_anchors_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::execution_header_anchors::ExecutionHeaderAnchors,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ExecutionHeaderAnchors",
+						(),
+						[
+							119u8, 129u8, 252u8, 163u8, 183u8, 230u8, 84u8, 255u8, 242u8, 27u8,
+							22u8, 195u8, 6u8, 230u8, 128u8, 84u8, 121u8, 191u8, 110u8, 168u8,
+							122u8, 46u8, 225u8, 100u8, 65u8, 39u8, 8u8, 119u8, 50u8, 113u8, 115u8,
+							9u8,
+						],
+					)
+				}
+				#[doc = " Retained execution-layer header anchors by execution block hash."]
+				pub fn execution_header_anchors(
+					&self,
+					_0: types::execution_header_anchors::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::execution_header_anchors::Param0,
+					>,
+					types::execution_header_anchors::ExecutionHeaderAnchors,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ExecutionHeaderAnchors",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							119u8, 129u8, 252u8, 163u8, 183u8, 230u8, 84u8, 255u8, 242u8, 27u8,
+							22u8, 195u8, 6u8, 230u8, 128u8, 84u8, 121u8, 191u8, 110u8, 168u8,
+							122u8, 46u8, 225u8, 100u8, 65u8, 39u8, 8u8, 119u8, 50u8, 113u8, 115u8,
+							9u8,
+						],
+					)
+				}
+				#[doc = " Execution header anchors: current position in ring buffer."]
+				pub fn execution_header_anchor_index(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::execution_header_anchor_index::ExecutionHeaderAnchorIndex,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ExecutionHeaderAnchorIndex",
+						(),
+						[
+							2u8, 135u8, 14u8, 219u8, 54u8, 229u8, 87u8, 58u8, 33u8, 180u8, 237u8,
+							77u8, 55u8, 7u8, 133u8, 213u8, 220u8, 155u8, 224u8, 123u8, 17u8, 236u8,
+							139u8, 107u8, 153u8, 116u8, 158u8, 177u8, 29u8, 180u8, 44u8, 167u8,
+						],
+					)
+				}
+				#[doc = " Execution header anchors: mapping of ring buffer index to a pruning candidate."]
+				pub fn execution_header_anchor_mapping_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::execution_header_anchor_mapping::ExecutionHeaderAnchorMapping,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ExecutionHeaderAnchorMapping",
+						(),
+						[
+							180u8, 8u8, 171u8, 12u8, 9u8, 39u8, 35u8, 81u8, 235u8, 88u8, 83u8, 9u8,
+							149u8, 48u8, 235u8, 241u8, 161u8, 148u8, 59u8, 7u8, 246u8, 191u8,
+							122u8, 71u8, 97u8, 190u8, 71u8, 53u8, 95u8, 193u8, 165u8, 184u8,
+						],
+					)
+				}
+				#[doc = " Execution header anchors: mapping of ring buffer index to a pruning candidate."]
+				pub fn execution_header_anchor_mapping(
+					&self,
+					_0: types::execution_header_anchor_mapping::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::execution_header_anchor_mapping::Param0,
+					>,
+					types::execution_header_anchor_mapping::ExecutionHeaderAnchorMapping,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ExecutionHeaderAnchorMapping",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							180u8, 8u8, 171u8, 12u8, 9u8, 39u8, 35u8, 81u8, 235u8, 88u8, 83u8, 9u8,
+							149u8, 48u8, 235u8, 241u8, 161u8, 148u8, 59u8, 7u8, 246u8, 191u8,
+							122u8, 71u8, 97u8, 190u8, 71u8, 53u8, 95u8, 193u8, 165u8, 184u8,
+						],
+					)
+				}
+				#[doc = " Latest retained execution-layer anchor block hash."]				pub fn latest_execution_header_anchor_block_hash (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: latest_execution_header_anchor_block_hash :: LatestExecutionHeaderAnchorBlockHash , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"LatestExecutionHeaderAnchorBlockHash",
+						(),
+						[
+							104u8, 233u8, 223u8, 185u8, 12u8, 10u8, 237u8, 183u8, 149u8, 76u8,
+							190u8, 202u8, 54u8, 56u8, 128u8, 183u8, 247u8, 191u8, 71u8, 11u8,
+							168u8, 77u8, 230u8, 128u8, 136u8, 118u8, 211u8, 83u8, 61u8, 140u8,
+							200u8, 243u8,
+						],
+					)
+				}
+				pub fn validators_root(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::validators_root::ValidatorsRoot,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ValidatorsRoot",
+						(),
+						[
+							134u8, 235u8, 142u8, 51u8, 155u8, 224u8, 110u8, 15u8, 72u8, 218u8,
+							23u8, 215u8, 94u8, 97u8, 145u8, 15u8, 183u8, 229u8, 163u8, 56u8, 249u8,
+							142u8, 57u8, 218u8, 36u8, 131u8, 58u8, 255u8, 164u8, 108u8, 71u8,
+							154u8,
+						],
+					)
+				}
+				#[doc = " Fork-version schedule used for sync-committee signing domains and beacon state paths."]
+				pub fn fork_version_schedule(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fork_version_schedule::ForkVersionSchedule,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"ForkVersionSchedule",
+						(),
+						[
+							92u8, 40u8, 14u8, 244u8, 151u8, 92u8, 186u8, 143u8, 131u8, 183u8, 17u8,
+							45u8, 3u8, 247u8, 64u8, 171u8, 53u8, 74u8, 206u8, 51u8, 96u8, 118u8,
+							104u8, 245u8, 31u8, 234u8, 56u8, 78u8, 172u8, 233u8, 158u8, 173u8,
+						],
+					)
+				}
+				#[doc = " Sync committee for current period"]
+				pub fn current_sync_committee(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::current_sync_committee::CurrentSyncCommittee,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"CurrentSyncCommittee",
+						(),
+						[
+							182u8, 115u8, 69u8, 134u8, 246u8, 32u8, 224u8, 232u8, 188u8, 50u8,
+							236u8, 84u8, 8u8, 221u8, 245u8, 10u8, 184u8, 111u8, 230u8, 191u8, 44u8,
+							24u8, 204u8, 11u8, 183u8, 104u8, 177u8, 167u8, 156u8, 44u8, 222u8,
+							238u8,
+						],
+					)
+				}
+				#[doc = " Sync committee for next period"]
+				pub fn next_sync_committee(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_sync_committee::NextSyncCommittee,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"NextSyncCommittee",
+						(),
+						[
+							227u8, 156u8, 211u8, 82u8, 230u8, 193u8, 91u8, 149u8, 155u8, 225u8,
+							144u8, 128u8, 25u8, 162u8, 152u8, 214u8, 175u8, 181u8, 193u8, 74u8,
+							13u8, 47u8, 130u8, 72u8, 136u8, 190u8, 139u8, 139u8, 52u8, 136u8, 28u8,
+							218u8,
+						],
+					)
+				}
+				#[doc = " The last period where the next sync committee was updated for free."]
+				pub fn latest_sync_committee_update_period(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::latest_sync_committee_update_period::LatestSyncCommitteeUpdatePeriod,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"LatestSyncCommitteeUpdatePeriod",
+						(),
+						[
+							178u8, 31u8, 45u8, 74u8, 38u8, 51u8, 169u8, 167u8, 209u8, 12u8, 102u8,
+							165u8, 95u8, 168u8, 214u8, 11u8, 91u8, 74u8, 101u8, 171u8, 140u8, 7u8,
+							98u8, 152u8, 141u8, 156u8, 151u8, 139u8, 134u8, 58u8, 206u8, 201u8,
+						],
+					)
+				}
+				#[doc = " The current operating mode of the pallet."]
+				pub fn operating_mode(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::operating_mode::OperatingMode,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"OperatingMode",
+						(),
+						[
+							226u8, 114u8, 220u8, 104u8, 21u8, 248u8, 88u8, 169u8, 44u8, 12u8,
+							166u8, 92u8, 224u8, 190u8, 190u8, 252u8, 80u8, 153u8, 60u8, 222u8,
+							87u8, 166u8, 91u8, 22u8, 22u8, 137u8, 184u8, 158u8, 115u8, 5u8, 12u8,
+							54u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " Minimum gap between finalized headers for an update to be free."]
+				pub fn free_headers_interval(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"FreeHeadersInterval",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Whether the read-only event-log verification API is enabled."]
+				pub fn event_log_verifier_enabled(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::bool,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"EthereumVerifier",
+						"EventLogVerifierEnabled",
+						[
+							165u8, 28u8, 112u8, 190u8, 18u8, 129u8, 182u8, 206u8, 237u8, 1u8, 68u8,
+							252u8, 125u8, 234u8, 185u8, 50u8, 149u8, 164u8, 47u8, 126u8, 134u8,
+							100u8, 14u8, 86u8, 209u8, 39u8, 20u8, 4u8, 233u8, 115u8, 102u8, 131u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -24617,6 +25504,122 @@ pub mod api {
 						>,
 				}
 			}
+			pub mod ethereum {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumExecutionBlockProof {
+					pub anchor_block_hash: crate::types::H256,
+					pub target_to_anchor_header_chain: ::subxt::ext::subxt_core::alloc::vec::Vec<
+						runtime_types::argon_primitives::ethereum::EthereumExecutionHeader,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumExecutionHeader {
+					pub rlp: ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumLog {
+					pub address: ::subxt::ext::subxt_core::utils::H160,
+					pub topics: ::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::H256>,
+					pub data: ::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumProof {
+					pub execution_block_proof:
+						runtime_types::argon_primitives::ethereum::EthereumExecutionBlockProof,
+					pub receipt_proof:
+						runtime_types::argon_primitives::ethereum::EthereumReceiptProof,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumReceiptProof {
+					#[codec(compact)]
+					pub transaction_index: ::core::primitive::u64,
+					pub nodes: ::subxt::ext::subxt_core::alloc::vec::Vec<
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum EthereumVerifyError {
+					#[codec(index = 0)]
+					VerifierUnavailable,
+					#[codec(index = 1)]
+					AnchorNotFound,
+					#[codec(index = 2)]
+					InvalidHeader,
+					#[codec(index = 3)]
+					InvalidHeaderChain,
+					#[codec(index = 4)]
+					LogNotFound,
+					#[codec(index = 5)]
+					InvalidProof,
+				}
+			}
 			pub mod fork_power {
 				use super::runtime_types;
 				#[derive(
@@ -25396,6 +26399,8 @@ pub mod api {
 				Treasury(runtime_types::pallet_treasury::pallet::Call),
 				#[codec(index = 34)]
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Call),
+				#[codec(index = 35)]
+				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -25460,6 +26465,8 @@ pub mod api {
 				FeeControl(runtime_types::pallet_fee_control::pallet::Error),
 				#[codec(index = 34)]
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Error),
+				#[codec(index = 35)]
+				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -25522,6 +26529,8 @@ pub mod api {
 				FeeControl(runtime_types::pallet_fee_control::pallet::Event),
 				#[codec(index = 34)]
 				OperationalAccounts(runtime_types::pallet_operational_accounts::pallet::Event),
+				#[codec(index = 35)]
+				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -28037,6 +29046,318 @@ pub mod api {
 			pub struct DomainRegistration<_0> {
 				pub account_id: _0,
 				pub registered_at_tick: ::core::primitive::u64,
+			}
+		}
+		pub mod pallet_ethereum_verifier {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Used for pallet initialization and light client resetting. Needs to be called by"]
+					#[doc = "the root origin."]
+					force_checkpoint {
+						update: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::pallet_ethereum_verifier::types::CheckpointUpdate,
+						>,
+						fork_versions: runtime_types::pallet_ethereum_verifier::types::ForkVersions,
+					},
+					#[codec(index = 1)]
+					#[doc = "Submits a new finalized beacon header update. The update may contain the next"]
+					#[doc = "sync committee."]
+					submit {
+						update: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::pallet_ethereum_verifier::types::Update,
+						>,
+					},
+					#[codec(index = 2)]
+					#[doc = "Imports a proven execution header anchor against already-retained beacon state."]
+					import_execution_header_anchor {
+						execution_proof:
+							runtime_types::pallet_ethereum_verifier::types::ExecutionProof,
+					},
+					#[codec(index = 3)]
+					#[doc = "Halt or resume all pallet operations. May only be called by root."]
+					set_operating_mode {
+						mode: runtime_types::pallet_ethereum_verifier::types::BasicOperatingMode,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					SkippedSyncCommitteePeriod,
+					#[codec(index = 1)]
+					SyncCommitteeUpdateRequired,
+					#[codec(index = 2)]
+					#[doc = "Attested header is older than latest finalized header."]
+					IrrelevantUpdate,
+					#[codec(index = 3)]
+					NotBootstrapped,
+					#[codec(index = 4)]
+					SyncCommitteeParticipantsNotSupermajority,
+					#[codec(index = 5)]
+					InvalidHeaderMerkleProof,
+					#[codec(index = 6)]
+					InvalidSyncCommitteeMerkleProof,
+					#[codec(index = 7)]
+					InvalidExecutionHeaderProof,
+					#[codec(index = 8)]
+					#[doc = "The gap between finalized headers is larger than the retained historical window."]
+					InvalidFinalizedHeaderGap,
+					#[codec(index = 9)]
+					HeaderHashTreeRootFailed,
+					#[codec(index = 10)]
+					BlockBodyHashTreeRootFailed,
+					#[codec(index = 11)]
+					SyncCommitteeHashTreeRootFailed,
+					#[codec(index = 12)]
+					SigningRootHashTreeRootFailed,
+					#[codec(index = 13)]
+					ForkDataHashTreeRootFailed,
+					#[codec(index = 14)]
+					ExpectedFinalizedHeaderNotStored,
+					#[codec(index = 15)]
+					BLSPreparePublicKeysFailed,
+					#[codec(index = 16)]
+					BLSVerificationFailed,
+					#[codec(index = 17)]
+					InvalidUpdateSlot,
+					#[codec(index = 18)]
+					#[doc = "The given update is not in the expected period, or the given next sync committee does"]
+					#[doc = "not match the next sync committee in storage."]
+					InvalidSyncCommitteeUpdate,
+					#[codec(index = 19)]
+					Halted,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					BeaconHeaderImported {
+						block_hash: crate::types::H256,
+						slot: ::core::primitive::u64,
+					},
+					#[codec(index = 1)]
+					ExecutionHeaderAnchorImported {
+						block_hash: crate::types::H256,
+						block_number: ::core::primitive::u64,
+					},
+					#[codec(index = 2)]
+					SyncCommitteeUpdated { period: ::core::primitive::u64 },
+					#[codec(index = 3)]
+					#[doc = "Set OperatingMode"]
+					OperatingModeChanged {
+						mode: runtime_types::pallet_ethereum_verifier::types::BasicOperatingMode,
+					},
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum BasicOperatingMode {
+					#[codec(index = 0)]
+					Normal,
+					#[codec(index = 1)]
+					Halted,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct CheckpointUpdate {
+					pub header: runtime_types::snowbridge_beacon_primitives::types::BeaconHeader,
+					pub current_sync_committee:
+						runtime_types::snowbridge_beacon_primitives::types::SyncCommittee,
+					pub current_sync_committee_branch:
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::H256>,
+					pub validators_root: crate::types::H256,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ExecutionHeaderAnchor {
+					#[codec(compact)]
+					pub block_number: ::core::primitive::u64,
+					pub block_hash: crate::types::H256,
+					pub parent_hash: crate::types::H256,
+					pub receipts_root: crate::types::H256,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ExecutionProof { pub header : runtime_types :: snowbridge_beacon_primitives :: types :: BeaconHeader , pub execution_header : runtime_types :: snowbridge_beacon_primitives :: types :: VersionedExecutionPayloadHeader , pub execution_branch : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < crate :: types :: H256 > , }
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FinalizedBeaconHeaderState {
+					#[codec(compact)]
+					pub slot: ::core::primitive::u64,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Fork {
+					pub version: [::core::primitive::u8; 4usize],
+					#[codec(compact)]
+					pub epoch: ::core::primitive::u64,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ForkVersions {
+					pub genesis: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub altair: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub bellatrix: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub capella: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub deneb: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub electra: runtime_types::pallet_ethereum_verifier::types::Fork,
+					pub fulu: runtime_types::pallet_ethereum_verifier::types::Fork,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct NextSyncCommitteeUpdate {
+					pub next_sync_committee:
+						runtime_types::snowbridge_beacon_primitives::types::SyncCommittee,
+					pub next_sync_committee_branch:
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::H256>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Update {
+					pub attested_header:
+						runtime_types::snowbridge_beacon_primitives::types::BeaconHeader,
+					pub sync_aggregate:
+						runtime_types::snowbridge_beacon_primitives::types::SyncAggregate,
+					#[codec(compact)]
+					pub signature_slot: ::core::primitive::u64,
+					pub next_sync_committee_update: ::core::option::Option<
+						runtime_types::pallet_ethereum_verifier::types::NextSyncCommitteeUpdate,
+					>,
+					pub finalized_header:
+						runtime_types::snowbridge_beacon_primitives::types::BeaconHeader,
+					pub finality_branch:
+						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::H256>,
+				}
 			}
 		}
 		pub mod pallet_fee_control {
@@ -31496,6 +32817,276 @@ pub mod api {
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			pub struct U256(pub [::core::primitive::u64; 4usize]);
+		}
+		pub mod snowbridge_amcl {
+			use super::runtime_types;
+			pub mod bls381 {
+				use super::runtime_types;
+				pub mod big {
+					use super::runtime_types;
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct Big {
+						pub w: [::core::primitive::i32; 14usize],
+					}
+				}
+				pub mod ecp {
+					use super::runtime_types;
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct ECP {
+						pub x: runtime_types::snowbridge_amcl::bls381::fp::FP,
+						pub y: runtime_types::snowbridge_amcl::bls381::fp::FP,
+						pub z: runtime_types::snowbridge_amcl::bls381::fp::FP,
+					}
+				}
+				pub mod fp {
+					use super::runtime_types;
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct FP {
+						pub x: runtime_types::snowbridge_amcl::bls381::big::Big,
+						pub xes: ::core::primitive::i32,
+					}
+				}
+			}
+		}
+		pub mod snowbridge_beacon_primitives {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod deneb {
+					use super::runtime_types;
+					#[derive(
+						:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+						:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+						Clone,
+						Debug,
+					)]
+					#[decode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+					)]
+					#[encode_as_type(
+						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+					)]
+					pub struct ExecutionPayloadHeader {
+						pub parent_hash: crate::types::H256,
+						pub fee_recipient: ::subxt::ext::subxt_core::utils::H160,
+						pub state_root: crate::types::H256,
+						pub receipts_root: crate::types::H256,
+						pub logs_bloom:
+							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+						pub prev_randao: crate::types::H256,
+						pub block_number: ::core::primitive::u64,
+						pub gas_limit: ::core::primitive::u64,
+						pub gas_used: ::core::primitive::u64,
+						pub timestamp: ::core::primitive::u64,
+						pub extra_data:
+							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+						pub base_fee_per_gas: runtime_types::primitive_types::U256,
+						pub block_hash: crate::types::H256,
+						pub transactions_root: crate::types::H256,
+						pub withdrawals_root: crate::types::H256,
+						pub blob_gas_used: ::core::primitive::u64,
+						pub excess_blob_gas: ::core::primitive::u64,
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BeaconHeader {
+					pub slot: ::core::primitive::u64,
+					pub proposer_index: ::core::primitive::u64,
+					pub parent_root: crate::types::H256,
+					pub state_root: crate::types::H256,
+					pub body_root: crate::types::H256,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ExecutionPayloadHeader {
+					pub parent_hash: crate::types::H256,
+					pub fee_recipient: ::subxt::ext::subxt_core::utils::H160,
+					pub state_root: crate::types::H256,
+					pub receipts_root: crate::types::H256,
+					pub logs_bloom:
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					pub prev_randao: crate::types::H256,
+					pub block_number: ::core::primitive::u64,
+					pub gas_limit: ::core::primitive::u64,
+					pub gas_used: ::core::primitive::u64,
+					pub timestamp: ::core::primitive::u64,
+					pub extra_data:
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					pub base_fee_per_gas: runtime_types::primitive_types::U256,
+					pub block_hash: crate::types::H256,
+					pub transactions_root: crate::types::H256,
+					pub withdrawals_root: crate::types::H256,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PublicKey(pub [::core::primitive::u8; 48usize]);
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Signature(pub [::core::primitive::u8; 96usize]);
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SyncAggregate {
+					pub sync_committee_bits: [::core::primitive::u8; 64usize],
+					pub sync_committee_signature:
+						runtime_types::snowbridge_beacon_primitives::types::Signature,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SyncCommittee {
+					pub pubkeys:
+						[runtime_types::snowbridge_beacon_primitives::types::PublicKey; 512usize],
+					pub aggregate_pubkey:
+						runtime_types::snowbridge_beacon_primitives::types::PublicKey,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SyncCommitteePrepared {
+					pub root: crate::types::H256,
+					pub pubkeys: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						[runtime_types::snowbridge_milagro_bls::keys::PublicKey; 512usize],
+					>,
+					pub aggregate_pubkey: runtime_types::snowbridge_milagro_bls::keys::PublicKey,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum VersionedExecutionPayloadHeader {
+					# [codec (index = 0)] Capella (runtime_types :: snowbridge_beacon_primitives :: types :: ExecutionPayloadHeader ,) , # [codec (index = 1)] Deneb (runtime_types :: snowbridge_beacon_primitives :: types :: deneb :: ExecutionPayloadHeader ,) , }
+			}
+		}
+		pub mod snowbridge_milagro_bls {
+			use super::runtime_types;
+			pub mod keys {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PublicKey {
+					pub point: runtime_types::snowbridge_amcl::bls381::ecp::ECP,
+				}
+			}
 		}
 		pub mod sp_arithmetic {
 			use super::runtime_types;

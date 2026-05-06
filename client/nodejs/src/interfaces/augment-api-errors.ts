@@ -428,6 +428,38 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotDomainOwner: AugmentedError<ApiType>;
     };
+    ethereumVerifier: {
+      BlockBodyHashTreeRootFailed: AugmentedError<ApiType>;
+      BLSPreparePublicKeysFailed: AugmentedError<ApiType>;
+      BLSVerificationFailed: AugmentedError<ApiType>;
+      ExpectedFinalizedHeaderNotStored: AugmentedError<ApiType>;
+      ForkDataHashTreeRootFailed: AugmentedError<ApiType>;
+      Halted: AugmentedError<ApiType>;
+      HeaderHashTreeRootFailed: AugmentedError<ApiType>;
+      InvalidExecutionHeaderProof: AugmentedError<ApiType>;
+      /**
+       * The gap between finalized headers is larger than the retained historical window.
+       **/
+      InvalidFinalizedHeaderGap: AugmentedError<ApiType>;
+      InvalidHeaderMerkleProof: AugmentedError<ApiType>;
+      InvalidSyncCommitteeMerkleProof: AugmentedError<ApiType>;
+      /**
+       * The given update is not in the expected period, or the given next sync committee does
+       * not match the next sync committee in storage.
+       **/
+      InvalidSyncCommitteeUpdate: AugmentedError<ApiType>;
+      InvalidUpdateSlot: AugmentedError<ApiType>;
+      /**
+       * Attested header is older than latest finalized header.
+       **/
+      IrrelevantUpdate: AugmentedError<ApiType>;
+      NotBootstrapped: AugmentedError<ApiType>;
+      SigningRootHashTreeRootFailed: AugmentedError<ApiType>;
+      SkippedSyncCommitteePeriod: AugmentedError<ApiType>;
+      SyncCommitteeHashTreeRootFailed: AugmentedError<ApiType>;
+      SyncCommitteeParticipantsNotSupermajority: AugmentedError<ApiType>;
+      SyncCommitteeUpdateRequired: AugmentedError<ApiType>;
+    };
     feeControl: {
       /**
        * The requested tip + fee is higher than the maximum allowed by the sponsor

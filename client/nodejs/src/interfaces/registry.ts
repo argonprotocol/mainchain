@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -137,6 +136,18 @@ import type {
   PalletDomainsDomainRegistration,
   PalletDomainsError,
   PalletDomainsEvent,
+  PalletEthereumVerifierBasicOperatingMode,
+  PalletEthereumVerifierCall,
+  PalletEthereumVerifierCheckpointUpdate,
+  PalletEthereumVerifierError,
+  PalletEthereumVerifierEvent,
+  PalletEthereumVerifierExecutionHeaderAnchor,
+  PalletEthereumVerifierExecutionProof,
+  PalletEthereumVerifierFinalizedBeaconHeaderState,
+  PalletEthereumVerifierFork,
+  PalletEthereumVerifierForkVersions,
+  PalletEthereumVerifierNextSyncCommitteeUpdate,
+  PalletEthereumVerifierUpdate,
   PalletFeeControlError,
   PalletFeeControlEvent,
   PalletGrandpaCall,
@@ -223,6 +234,19 @@ import type {
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultConfig,
   PalletVaultsVaultFrameRevenue,
+  SnowbridgeAmclBls381Big,
+  SnowbridgeAmclBls381Ecp,
+  SnowbridgeAmclBls381Fp,
+  SnowbridgeBeaconPrimitivesBeaconHeader,
+  SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader,
+  SnowbridgeBeaconPrimitivesExecutionPayloadHeader,
+  SnowbridgeBeaconPrimitivesPublicKey,
+  SnowbridgeBeaconPrimitivesSignature,
+  SnowbridgeBeaconPrimitivesSyncAggregate,
+  SnowbridgeBeaconPrimitivesSyncCommittee,
+  SnowbridgeBeaconPrimitivesSyncCommitteePrepared,
+  SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader,
+  SnowbridgeMilagroBlsKeysPublicKey,
   SpArithmeticArithmeticError,
   SpConsensusGrandpaAppPublic,
   SpConsensusGrandpaAppSignature,
@@ -375,6 +399,18 @@ declare module '@polkadot/types/types/registry' {
     PalletDomainsDomainRegistration: PalletDomainsDomainRegistration;
     PalletDomainsError: PalletDomainsError;
     PalletDomainsEvent: PalletDomainsEvent;
+    PalletEthereumVerifierBasicOperatingMode: PalletEthereumVerifierBasicOperatingMode;
+    PalletEthereumVerifierCall: PalletEthereumVerifierCall;
+    PalletEthereumVerifierCheckpointUpdate: PalletEthereumVerifierCheckpointUpdate;
+    PalletEthereumVerifierError: PalletEthereumVerifierError;
+    PalletEthereumVerifierEvent: PalletEthereumVerifierEvent;
+    PalletEthereumVerifierExecutionHeaderAnchor: PalletEthereumVerifierExecutionHeaderAnchor;
+    PalletEthereumVerifierExecutionProof: PalletEthereumVerifierExecutionProof;
+    PalletEthereumVerifierFinalizedBeaconHeaderState: PalletEthereumVerifierFinalizedBeaconHeaderState;
+    PalletEthereumVerifierFork: PalletEthereumVerifierFork;
+    PalletEthereumVerifierForkVersions: PalletEthereumVerifierForkVersions;
+    PalletEthereumVerifierNextSyncCommitteeUpdate: PalletEthereumVerifierNextSyncCommitteeUpdate;
+    PalletEthereumVerifierUpdate: PalletEthereumVerifierUpdate;
     PalletFeeControlError: PalletFeeControlError;
     PalletFeeControlEvent: PalletFeeControlEvent;
     PalletGrandpaCall: PalletGrandpaCall;
@@ -461,6 +497,19 @@ declare module '@polkadot/types/types/registry' {
     PalletVaultsRecentCapacityDrop: PalletVaultsRecentCapacityDrop;
     PalletVaultsVaultConfig: PalletVaultsVaultConfig;
     PalletVaultsVaultFrameRevenue: PalletVaultsVaultFrameRevenue;
+    SnowbridgeAmclBls381Big: SnowbridgeAmclBls381Big;
+    SnowbridgeAmclBls381Ecp: SnowbridgeAmclBls381Ecp;
+    SnowbridgeAmclBls381Fp: SnowbridgeAmclBls381Fp;
+    SnowbridgeBeaconPrimitivesBeaconHeader: SnowbridgeBeaconPrimitivesBeaconHeader;
+    SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader: SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader;
+    SnowbridgeBeaconPrimitivesExecutionPayloadHeader: SnowbridgeBeaconPrimitivesExecutionPayloadHeader;
+    SnowbridgeBeaconPrimitivesPublicKey: SnowbridgeBeaconPrimitivesPublicKey;
+    SnowbridgeBeaconPrimitivesSignature: SnowbridgeBeaconPrimitivesSignature;
+    SnowbridgeBeaconPrimitivesSyncAggregate: SnowbridgeBeaconPrimitivesSyncAggregate;
+    SnowbridgeBeaconPrimitivesSyncCommittee: SnowbridgeBeaconPrimitivesSyncCommittee;
+    SnowbridgeBeaconPrimitivesSyncCommitteePrepared: SnowbridgeBeaconPrimitivesSyncCommitteePrepared;
+    SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader: SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader;
+    SnowbridgeMilagroBlsKeysPublicKey: SnowbridgeMilagroBlsKeysPublicKey;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;
     SpConsensusGrandpaAppPublic: SpConsensusGrandpaAppPublic;
     SpConsensusGrandpaAppSignature: SpConsensusGrandpaAppSignature;

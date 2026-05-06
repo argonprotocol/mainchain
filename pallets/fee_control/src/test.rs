@@ -16,7 +16,7 @@
 use super::*;
 use crate::mock::{
 	new_test_ext,
-	pallet_dummy::{Call, OneUseCodes},
+	pallet_dummy::{Call, ConsumedPoolKeys, OneUseCodes},
 	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy, ProxyType,
 	RuntimeCall, Test, TipAmount, ValidateCount,
 };
@@ -25,7 +25,7 @@ use frame_system::RawOrigin;
 use pallet_prelude::frame_support::traits::Currency;
 use sp_runtime::{
 	traits::{DispatchTransaction, Hash},
-	transaction_validity::TransactionSource,
+	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidityError},
 };
 
 #[test]
@@ -188,6 +188,67 @@ fn validate_keeps_sponsor_and_general_pool_keys() {
 		assert_eq!(res.provides.len(), 2);
 		assert!(res.provides.contains(&key.encode()));
 		assert!(res.provides.contains(&(b"general", key).encode()));
+	});
+}
+
+#[test]
+fn validate_keeps_inner_pool_keys_for_batches() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000u128);
+		let calls = vec![
+			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 }),
+			RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 9 }),
+		];
+		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch { calls });
+		let (res, _, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(0).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+		let batch_key = <Test as frame_system::Config>::Hashing::hash_of(&(
+			b"batch",
+			vec![(b"general", 7u32).encode(), (b"general", 9u32).encode()],
+		))
+		.as_ref()
+		.to_vec();
+		assert!(res.provides.contains(&(b"general", 7u32).encode()));
+		assert!(res.provides.contains(&(b"general", 9u32).encode()));
+		assert!(res.provides.contains(&batch_key));
+	});
+}
+
+#[test]
+fn validate_rejects_stale_batched_calls() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000u128);
+		ConsumedPoolKeys::<Test>::insert(7, ());
+		let calls = vec![
+			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 }),
+			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 8 }),
+		];
+		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch { calls });
+		let result =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(0).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				);
+
+		assert!(matches!(
+			result,
+			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+		));
 	});
 }
 

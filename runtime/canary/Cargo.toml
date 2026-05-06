@@ -65,6 +65,7 @@ pallet-bitcoin-locks = { workspace = true }
 pallet-localchain-transfer = { workspace = true }
 pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
+pallet-ethereum-verifier = { workspace = true }
 pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
 pallet-treasury = { workspace = true }
@@ -97,6 +98,7 @@ std = [
 	"pallet-block-seal/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
+	"pallet-ethereum-verifier/std",
 	"pallet-fee-control/std",
 	"pallet-localchain-transfer/std",
 	"pallet-mining-slot/std",
@@ -125,6 +127,7 @@ runtime-benchmarks = [
 	"pallet-block-seal/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
+	"pallet-ethereum-verifier/runtime-benchmarks",
 	"pallet-fee-control/runtime-benchmarks",
 	"pallet-localchain-transfer/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
@@ -148,6 +151,7 @@ try-runtime = [
 	"pallet-block-seal/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
+	"pallet-ethereum-verifier/try-runtime",
 	"pallet-fee-control/try-runtime",
 	"pallet-localchain-transfer/try-runtime",
 	"pallet-mining-slot/try-runtime",

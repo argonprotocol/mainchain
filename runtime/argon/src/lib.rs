@@ -123,6 +123,8 @@ mod runtime {
 	pub type FeeControl = pallet_fee_control;
 	#[runtime::pallet_index(34)]
 	pub type OperationalAccounts = pallet_operational_accounts;
+	#[runtime::pallet_index(35)]
+	pub type EthereumVerifier = pallet_ethereum_verifier;
 }
 
 argon_runtime_common::call_filters!();
@@ -687,9 +689,15 @@ impl pallet_operational_accounts::Config for Runtime {
 	>;
 }
 
+impl pallet_ethereum_verifier::Config for Runtime {
+	type FreeHeadersInterval = EthereumFreeHeadersInterval;
+	type EventLogVerifierEnabled = EthereumEventLogVerifierEnabled;
+	type WeightInfo = weights::pallet_ethereum_verifier::WeightInfo<Runtime>;
+}
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type CallTxPoolKeyProviders = BitcoinLocks;
+	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier);
+	type CallTxValidityProviders = EthereumVerifier;
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }

@@ -50,8 +50,8 @@ The gateway is where the actual protocol behavior lives:
   to the gateway after the app scales the selected 6-decimal amount into 18-decimal ERC-20 units,
   then signs the gateway transaction that burns that approved balance and emits the event Argon
   needs for the outbound proof flow
-- `adminMintBatch(...)` is the current admin-only mint path for restoration work, and it accepts
-  the same 6-decimal runtime amounts as the burn path
+- `adminMintBatch(...)` is the current admin-only mint path for restoration work, and it accepts the
+  same 6-decimal runtime amounts as the burn path
 - `pause()` can be called by the guardian
 - `unpause()` stays on the admin Safe owner path
 

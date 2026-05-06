@@ -20,6 +20,7 @@ use core::str::FromStr;
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
 pub use domain::*;
 pub use domain_top_level::DomainTopLevel;
+pub use ethereum::*;
 #[cfg(feature = "std")]
 pub use keystore_helper::*;
 
@@ -35,6 +36,7 @@ pub mod block_vote;
 pub mod digests;
 mod domain;
 pub mod domain_top_level;
+pub mod ethereum;
 pub mod host;
 pub mod inherents;
 pub mod macros;

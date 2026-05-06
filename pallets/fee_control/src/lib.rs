@@ -18,7 +18,8 @@ use pallet_prelude::*;
 pub mod pallet {
 	use super::*;
 	use pallet_prelude::argon_primitives::{
-		CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
+		CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
+		TransactionSponsorProvider,
 	};
 
 	#[pallet::config]
@@ -42,6 +43,10 @@ pub mod pallet {
 		/// Provides call-level tx pool keys for requests that should be mutually exclusive in the
 		/// pool even when they are not statically feeless or sponsor delegated.
 		type CallTxPoolKeyProviders: CallTxPoolKeyProvider<Self::RuntimeCall, Self::AccountId>;
+
+		/// Provides best-state-aware stale checks for calls that should be rejected before
+		/// inclusion once another transaction has already satisfied the same logical request.
+		type CallTxValidityProviders: CallTxValidityProvider<Self::RuntimeCall, Self::AccountId>;
 
 		/// Provides transaction sponsors for transactions
 		type TransactionSponsorProviders: TransactionSponsorProvider<

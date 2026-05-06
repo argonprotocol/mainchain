@@ -39,6 +39,7 @@ import type {
   FrameSystemDispatchEventInfo,
   PalletBalancesUnexpectedKind,
   PalletDomainsDomainRegistration,
+  PalletEthereumVerifierBasicOperatingMode,
   PalletMintMintType,
   PalletMultisigTimepoint,
   PalletProxyDepositKind,
@@ -565,6 +566,27 @@ declare module '@polkadot/api-base/types/events' {
         [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord],
         { domainHash: H256; zoneRecord: ArgonPrimitivesDomainZoneRecord }
       >;
+    };
+    ethereumVerifier: {
+      BeaconHeaderImported: AugmentedEvent<
+        ApiType,
+        [blockHash: H256, slot: u64],
+        { blockHash: H256; slot: u64 }
+      >;
+      ExecutionHeaderAnchorImported: AugmentedEvent<
+        ApiType,
+        [blockHash: H256, blockNumber: u64],
+        { blockHash: H256; blockNumber: u64 }
+      >;
+      /**
+       * Set OperatingMode
+       **/
+      OperatingModeChanged: AugmentedEvent<
+        ApiType,
+        [mode: PalletEthereumVerifierBasicOperatingMode],
+        { mode: PalletEthereumVerifierBasicOperatingMode }
+      >;
+      SyncCommitteeUpdated: AugmentedEvent<ApiType, [period: u64], { period: u64 }>;
     };
     feeControl: {
       /**

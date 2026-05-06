@@ -41,6 +41,11 @@ import type {
   ArgonRuntimeSessionKeys,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
+  PalletEthereumVerifierBasicOperatingMode,
+  PalletEthereumVerifierCheckpointUpdate,
+  PalletEthereumVerifierExecutionProof,
+  PalletEthereumVerifierForkVersions,
+  PalletEthereumVerifierUpdate,
   PalletMultisigTimepoint,
   PalletOperationalAccountsOperationalProgressPatch,
   PalletOperationalAccountsRegistration,
@@ -524,6 +529,88 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [H256, ArgonPrimitivesDomainZoneRecord]
+      >;
+    };
+    ethereumVerifier: {
+      /**
+       * Used for pallet initialization and light client resetting. Needs to be called by
+       * the root origin.
+       **/
+      forceCheckpoint: AugmentedSubmittable<
+        (
+          update:
+            | PalletEthereumVerifierCheckpointUpdate
+            | {
+                header?: any;
+                currentSyncCommittee?: any;
+                currentSyncCommitteeBranch?: any;
+                validatorsRoot?: any;
+              }
+            | string
+            | Uint8Array,
+          forkVersions:
+            | PalletEthereumVerifierForkVersions
+            | {
+                genesis?: any;
+                altair?: any;
+                bellatrix?: any;
+                capella?: any;
+                deneb?: any;
+                electra?: any;
+                fulu?: any;
+              }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletEthereumVerifierCheckpointUpdate, PalletEthereumVerifierForkVersions]
+      >;
+      /**
+       * Imports a proven execution header anchor against already-retained beacon state.
+       **/
+      importExecutionHeaderAnchor: AugmentedSubmittable<
+        (
+          executionProof:
+            | PalletEthereumVerifierExecutionProof
+            | { header?: any; executionHeader?: any; executionBranch?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletEthereumVerifierExecutionProof]
+      >;
+      /**
+       * Halt or resume all pallet operations. May only be called by root.
+       **/
+      setOperatingMode: AugmentedSubmittable<
+        (
+          mode:
+            | PalletEthereumVerifierBasicOperatingMode
+            | 'Normal'
+            | 'Halted'
+            | number
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletEthereumVerifierBasicOperatingMode]
+      >;
+      /**
+       * Submits a new finalized beacon header update. The update may contain the next
+       * sync committee.
+       **/
+      submit: AugmentedSubmittable<
+        (
+          update:
+            | PalletEthereumVerifierUpdate
+            | {
+                attestedHeader?: any;
+                syncAggregate?: any;
+                signatureSlot?: any;
+                nextSyncCommitteeUpdate?: any;
+                finalizedHeader?: any;
+                finalityBranch?: any;
+              }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletEthereumVerifierUpdate]
       >;
     };
     grandpa: {

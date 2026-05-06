@@ -39,6 +39,12 @@ pub const fn deposit(items: u32, bytes: u32) -> Balance {
 	items as Balance * 100 * CENTS + (bytes as Balance) * 5 * MICROGONS
 }
 parameter_types! {
+	// ### ethereum verifier
+
+	pub const EthereumFreeHeadersInterval: u32 = 32;
+	pub const EthereumEventLogVerifierEnabled: bool = false;
+	pub const CanaryEthereumEventLogVerifierEnabled: bool = true;
+
 	// ### block weights
 
 	pub const BlockHashCount: BlockNumber = 4096;
