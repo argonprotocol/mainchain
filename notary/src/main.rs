@@ -1,25 +1,25 @@
 use anyhow::Context;
 use argon_client::{
-	FetchAt, MainchainClient,
 	api::{notaries::storage::types, storage},
+	FetchAt, MainchainClient,
 };
 use argon_notary::{
-	NotaryServer,
 	block_watch::spawn_block_sync,
 	ensure,
-	notebook_closer::{NOTARY_KEYID, spawn_notebook_closer},
+	notebook_closer::{spawn_notebook_closer, NOTARY_KEYID},
 	s3_archive::S3Archive,
 	server::{
-		ArchiveSettings, DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS, MAX_RATE_LIMIT_MAX_SLOWDOWNS, RpcConfig,
-		RpcRateLimitMode,
+		ArchiveSettings, RpcConfig, RpcRateLimitMode, DEFAULT_RATE_LIMIT_MAX_SLOWDOWNS,
+		MAX_RATE_LIMIT_MAX_SLOWDOWNS,
 	},
+	NotaryServer,
 };
-use argon_primitives::{AccountId, CryptoType, KeystoreParams, NotaryId, tick::Ticker};
+use argon_primitives::{tick::Ticker, AccountId, CryptoType, KeystoreParams, NotaryId};
 use clap::{Parser, Subcommand};
 use futures::StreamExt;
 use polkadot_sdk::*;
 use prometheus::Registry;
-use sp_core::{ByteArray, Pair, crypto::Ss58Codec, sr25519};
+use sp_core::{crypto::Ss58Codec, sr25519, ByteArray, Pair};
 use sqlx::{migrate, postgres::PgPoolOptions};
 use std::{env, time::Duration};
 use tracing::warn;
@@ -316,18 +316,18 @@ async fn main() -> anyhow::Result<()> {
 					tracing::error!("Failed to insert key: {}", e);
 					Error::KeystoreOperation
 				})?;
-			if let Some(verify_address) = verify_address {
-				if *verify_address != address {
-					warn!(
-						?address,
-						?verify_address,
-						"The provided key does not match the `verify_address` param"
-					);
-					return Err(Error::Input(
-						"The provided key does not match the `verify_address` param".to_string(),
-					)
-					.into());
-				}
+			if let Some(verify_address) = verify_address &&
+				*verify_address != address
+			{
+				warn!(
+					?address,
+					?verify_address,
+					"The provided key does not match the `verify_address` param"
+				);
+				return Err(Error::Input(
+					"The provided key does not match the `verify_address` param".to_string(),
+				)
+				.into());
 			}
 		},
 		Commands::Migrate { db_url } => {
@@ -368,12 +368,10 @@ async fn check_notary(
 	};
 
 	if let Some(notary) = active_notaries.0.iter().find(|n| n.notary_id == notary_id) {
-		if let Some(operator_account_id) = operator_account_id {
-			if notary.operator_account_id.0 != operator_account_id.as_slice() {
-				return Err(
-					Error::Input("Notary operator account id does not match".to_string()).into()
-				);
-			}
+		if let Some(operator_account_id) = operator_account_id &&
+			notary.operator_account_id.0 != operator_account_id.as_slice()
+		{
+			return Err(Error::Input("Notary operator account id does not match".to_string()).into());
 		}
 		return Ok((notary.operator_account_id.0.into(), ticker));
 	}

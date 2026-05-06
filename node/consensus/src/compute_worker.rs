@@ -3,13 +3,13 @@ use crate::{
 	notary_client::VotingPowerInfo,
 };
 use argon_primitives::{
-	BlockSealApis, BlockSealAuthorityId, BlockSealDigest, ComputeDifficulty, NotebookApis,
-	TickApis,
 	block_seal::ComputePuzzle,
 	prelude::*,
-	tick::{MAX_BLOCKS_PER_TICK, Ticker},
+	tick::{Ticker, MAX_BLOCKS_PER_TICK},
+	BlockSealApis, BlockSealAuthorityId, BlockSealDigest, ComputeDifficulty, NotebookApis,
+	TickApis,
 };
-use argon_randomx::{RandomXError, calculate_hash, calculate_mining_hash};
+use argon_randomx::{calculate_hash, calculate_mining_hash, RandomXError};
 use argon_runtime::NotebookVerifyError;
 use codec::{Codec, Encode};
 use frame_support::CloneNoBound;
@@ -22,13 +22,13 @@ use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
-use sp_core::{H256, U256, traits::SpawnEssentialNamed};
+use sp_core::{traits::SpawnEssentialNamed, H256, U256};
 use sp_runtime::traits::{Block as BlockT, Header};
 use std::{
 	marker::PhantomData,
 	sync::{
-		Arc,
 		atomic::{AtomicUsize, Ordering},
+		Arc,
 	},
 	time::Duration,
 };
@@ -331,10 +331,10 @@ pub fn run_compute_solver_threads<B, C>(
 			loop {
 				if !worker.is_valid_solver(&solver_ref) {
 					solver_ref = worker.create_solver().map(Box::new);
-					if counter > 0 {
-						if let Some(metrics_copy) = metrics_copy.as_ref() {
-							metrics_copy.record_compute_hashes(counter);
-						}
+					if counter > 0 &&
+						let Some(metrics_copy) = metrics_copy.as_ref()
+					{
+						metrics_copy.record_compute_hashes(counter);
 					}
 					counter = 0;
 				}
@@ -541,7 +541,7 @@ where
 mod tests {
 	use super::*;
 	use crate::mock_notary::setup_logs;
-	use argon_primitives::{HashOutput, tick::Ticker};
+	use argon_primitives::{tick::Ticker, HashOutput};
 	use argon_runtime::Block;
 	use codec::Encode;
 	use sc_utils::mpsc::tracing_unbounded;

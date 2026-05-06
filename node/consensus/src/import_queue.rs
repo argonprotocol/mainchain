@@ -1,24 +1,24 @@
 use crate::{
-	NotaryClient, aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error,
-	grandpa_hard_forks::is_known_grandpa_authority_change_block,
+	aux_client::ArgonAux, compute_worker::BlockComputeNonce, error::Error,
+	grandpa_hard_forks::is_known_grandpa_authority_change_block, NotaryClient,
 };
-use argon_bitcoin_utxo_tracker::{UtxoTracker, get_bitcoin_inherent};
+use argon_bitcoin_utxo_tracker::{get_bitcoin_inherent, UtxoTracker};
 use argon_primitives::{
-	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
-	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	inherents::{BitcoinInherentDataProvider, BlockSealInherentDataProvider},
-	prelude::substrate_prometheus_endpoint::{CounterVec, Opts, Registry, U64, register},
+	prelude::substrate_prometheus_endpoint::{register, CounterVec, Opts, Registry, U64},
+	AccountId, Balance, BitcoinApis, BlockCreatorApis, BlockImportApis, BlockSealApis,
+	BlockSealAuthorityId, BlockSealDigest, NotaryApis, NotebookApis, TickApis,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::{Codec, Encode};
 use polkadot_sdk::{
-	sp_core::{H256, blake2_256},
+	sp_core::{blake2_256, H256},
 	substrate_prometheus_endpoint::PrometheusError,
 	*,
 };
-use sc_client_api::{self, BlockBackend, backend::AuxStore};
+use sc_client_api::{self, backend::AuxStore, BlockBackend};
 use sc_consensus::{
 	BasicQueue, BlockCheckParams, BlockImport, BlockImportParams, BoxJustificationImport,
 	ForkChoiceStrategy, ImportResult, StateAction, StorageChanges, Verifier as VerifierT,
@@ -31,8 +31,8 @@ use sp_blockchain::HeaderBackend;
 use sp_consensus::{BlockOrigin, BlockStatus, Error as ConsensusError};
 use sp_inherents::InherentDataProvider;
 use sp_runtime::{
-	Justification, Justifications,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor},
+	Justification, Justifications,
 };
 use std::{fmt, marker::PhantomData, sync::Arc};
 use tracing::error;

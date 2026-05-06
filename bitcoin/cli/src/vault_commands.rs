@@ -1,16 +1,16 @@
 use anyhow::Context;
 use clap::Subcommand;
-use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use polkadot_sdk::*;
-use sp_runtime::{FixedPointNumber, FixedU128, traits::One};
+use sp_runtime::{traits::One, FixedPointNumber, FixedU128};
 use subxt::dynamic::Value;
 
 use argon_client::{
-	FetchAt, MainchainClient,
 	api::{apis, storage, tx, vaults::storage::types::vaults_by_id::VaultsById},
 	conversion::from_api_fixed_u128,
+	FetchAt, MainchainClient,
 };
-use argon_primitives::{KeystoreParams, VaultId, bitcoin::SATOSHIS_PER_BITCOIN};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, KeystoreParams, VaultId};
 
 use crate::{formatters::ArgonFormatter, vault_create};
 

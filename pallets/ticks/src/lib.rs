@@ -26,8 +26,8 @@ pub mod pallet {
 	use super::*;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
+		tick::{Ticker, MAX_BLOCKS_PER_TICK},
 		Digestset, TickProvider, VotingSchedule,
-		tick::{MAX_BLOCKS_PER_TICK, Ticker},
 	};
 
 	#[pallet::pallet]

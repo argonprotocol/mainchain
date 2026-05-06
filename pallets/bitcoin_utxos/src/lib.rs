@@ -23,12 +23,12 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		BitcoinUtxoEvents, BitcoinUtxoTracker,
 		bitcoin::{
 			BitcoinBlock, BitcoinBlockHash, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinSyncStatus, Satoshis, UtxoId, UtxoRef, UtxoValue,
 		},
 		inherents::{BitcoinInherentData, BitcoinInherentError, BitcoinUtxoSync},
+		BitcoinUtxoEvents, BitcoinUtxoTracker,
 	};
 	use pallet_prelude::argon_primitives::{
 		bitcoin::BitcoinRejectedReason, inherents::BitcoinUtxoFunding,
@@ -365,10 +365,10 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(Some(who) == OracleOperatorAccount::<T>::get(), Error::<T>::NoPermissions);
-			if let Some(current) = ConfirmedBitcoinBlockTip::<T>::get() {
-				if bitcoin_height < current.block_height {
-					return Ok(());
-				}
+			if let Some(current) = ConfirmedBitcoinBlockTip::<T>::get() &&
+				bitcoin_height < current.block_height
+			{
+				return Ok(());
 			}
 			ConfirmedBitcoinBlockTip::<T>::put(BitcoinBlock {
 				block_height: bitcoin_height,
@@ -690,18 +690,18 @@ pub mod pallet {
 			block_height: BitcoinHeight,
 		) -> DispatchResult {
 			if let Some(ref utxo_ref) = utxo_ref {
-				if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::get(utxo_id) {
-					if &locked_ref == utxo_ref {
-						LockedUtxos::<T>::take(locked_ref);
-						UtxoIdToFundingUtxoRef::<T>::remove(utxo_id);
-						LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-						ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-						let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
+				if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::get(utxo_id) &&
+					&locked_ref == utxo_ref
+				{
+					LockedUtxos::<T>::take(locked_ref);
+					UtxoIdToFundingUtxoRef::<T>::remove(utxo_id);
+					LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+					ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
+					let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
 
-						T::EventHandler::spent(utxo_id)?;
-						Self::deposit_event(Event::UtxoSpent { utxo_id, block_height });
-						return Ok(());
-					}
+					T::EventHandler::spent(utxo_id)?;
+					Self::deposit_event(Event::UtxoSpent { utxo_id, block_height });
+					return Ok(());
 				}
 
 				if Self::unwatch_candidate(utxo_id, utxo_ref).is_some() {

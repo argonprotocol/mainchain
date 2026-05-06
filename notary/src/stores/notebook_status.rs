@@ -1,7 +1,7 @@
 use argon_notary_apis::error::Error;
-use argon_primitives::{NotebookNumber, tick::Tick};
+use argon_primitives::{tick::Tick, NotebookNumber};
 use chrono::{DateTime, Utc};
-use sqlx::{Executor, FromRow, PgConnection, query};
+use sqlx::{query, Executor, FromRow, PgConnection};
 
 use crate::ensure;
 
@@ -246,11 +246,9 @@ mod tests {
 			);
 
 			let mut fail_tx = pool.begin().await?;
-			assert!(
-				NotebookStatusStore::lock_to_stop_appends(&mut fail_tx, notebook_number)
-					.await
-					.is_err()
-			);
+			assert!(NotebookStatusStore::lock_to_stop_appends(&mut fail_tx, notebook_number)
+				.await
+				.is_err());
 			fail_tx.commit().await?;
 
 			tx1.commit().await?;

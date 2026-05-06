@@ -21,10 +21,10 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
-		TickProvider, TransferToLocalchainId,
 		notary::NotaryProvider,
 		notebook::{ChainTransfer, NotebookHeader},
+		BurnEventHandler, ChainTransferLookup, NotebookEventHandler, NotebookProvider,
+		TickProvider, TransferToLocalchainId,
 	};
 
 	use sp_core::crypto::AccountId32;
@@ -45,7 +45,10 @@ pub mod pallet {
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 
-		type Argon: Mutate<<Self as frame_system::Config>::AccountId, Balance = <Self as Config>::Balance>;
+		type Argon: Mutate<
+			<Self as frame_system::Config>::AccountId,
+			Balance = <Self as Config>::Balance,
+		>;
 
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec

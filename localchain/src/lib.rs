@@ -9,9 +9,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub use accounts::*;
-use anyhow::{Context, anyhow};
-use argon_primitives::Chain;
+use anyhow::{anyhow, Context};
 use argon_primitives::tick::{Tick, Ticker};
+use argon_primitives::Chain;
 pub use balance_changes::*;
 pub use balance_sync::*;
 pub use constants::*;
@@ -26,10 +26,10 @@ pub use notary_client::*;
 pub use open_channel_holds::*;
 use parking_lot::RwLock;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+use sqlx::{migrate::MigrateDatabase, SqlitePool};
 use sqlx::{Executor, Sqlite};
-use sqlx::{SqlitePool, migrate::MigrateDatabase};
 use tokio::sync::RwLock as AsyncRwLock;
-use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::{fmt, EnvFilter};
 
 use crate::cli::EmbeddedKeyPassword;
 use crate::mainchain_transfer::MainchainTransferStore;
@@ -101,15 +101,15 @@ pub type Result<T> = anyhow::Result<T, Error>;
 impl Localchain {
   pub async fn create_db(path: String) -> Result<SqlitePool> {
     let db_path = PathBuf::from(path.clone());
-    if let Some(dir) = db_path.parent() {
-      if !dir.exists() {
-        create_dir_all(dir).with_context(|| {
-          format!(
-            "Could not create the parent directory ({}) for your localchain",
-            dir.display()
-          )
-        })?;
-      }
+    if let Some(dir) = db_path.parent()
+      && !dir.exists()
+    {
+      create_dir_all(dir).with_context(|| {
+        format!(
+          "Could not create the parent directory ({}) for your localchain",
+          dir.display()
+        )
+      })?;
     }
 
     if !Sqlite::database_exists(&path).await.unwrap_or(false) {
@@ -412,10 +412,10 @@ impl Localchain {
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
   use super::{balance_sync, transactions};
-  use crate::CryptoScheme;
-  use crate::MainchainClient;
   use crate::cli::EmbeddedKeyPassword;
   use crate::error::UniffiResult;
+  use crate::CryptoScheme;
+  use crate::MainchainClient;
 
   #[derive(uniffi::Record)]
   pub struct LocalchainConfig {
@@ -573,8 +573,8 @@ pub mod napi_ext {
   use napi::bindgen_prelude::*;
 
   use super::*;
-  pub use crate::TickerRef;
   use crate::keystore::napi_ext::KeystorePasswordOption;
+  pub use crate::TickerRef;
 
   impl ObjectFinalize for Localchain {
     fn finalize(self, _: Env) -> napi::Result<()> {

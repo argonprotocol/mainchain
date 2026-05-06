@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, ensure};
+use anyhow::{ensure, Context, Result};
 use std::{
 	env, fs,
 	path::{Path, PathBuf},

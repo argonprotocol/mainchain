@@ -57,7 +57,7 @@ pub type PopulateVaultUtxoIndexMigration<T> = frame_support::migrations::Version
 #[cfg(all(feature = "try-runtime", test))]
 mod test {
 	use super::*;
-	use crate::mock::{Test, new_test_ext};
+	use crate::mock::{new_test_ext, Test};
 	use argon_primitives::bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey};
 	use frame_support::assert_ok;
 	use sp_core::H256;

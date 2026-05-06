@@ -1,8 +1,8 @@
 use crate::{mock::*, pallet::TempDigests};
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
-	AUTHOR_DIGEST_ID, BlockVoteDigest, Digestset, NotebookAuditResult, NotebookDigest,
-	tick::TickDigest,
+	tick::TickDigest, BlockVoteDigest, Digestset, NotebookAuditResult, NotebookDigest,
+	AUTHOR_DIGEST_ID,
 };
 use codec::Encode;
 use frame_support::pallet_prelude::Hooks;

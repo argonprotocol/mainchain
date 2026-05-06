@@ -4,20 +4,20 @@ use crate::{
 	grandpa_warp_sync::ArgonWarpSyncProvider,
 	rpc,
 	rpc::GrandpaDeps,
-	runtime_api::{BaseHostRuntimeApis, opaque::Block},
+	runtime_api::{opaque::Block, BaseHostRuntimeApis},
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 #[cfg(any(not(debug_assertions), test))]
 use argon_node_consensus::read_chain_spec_bitcoin_network;
 use argon_node_consensus::{
-	BlockBuilderParams, NotaryClient, NotebookDownloader, aux_client::ArgonAux,
-	create_import_queue, grandpa_hard_forks, read_chain_spec_grandpa_authorities,
-	read_chain_spec_ticker, run_block_builder_task, run_notary_sync,
+	aux_client::ArgonAux, create_import_queue, grandpa_hard_forks,
+	read_chain_spec_grandpa_authorities, read_chain_spec_ticker, run_block_builder_task,
+	run_notary_sync, BlockBuilderParams, NotaryClient, NotebookDownloader,
 };
 use argon_primitives::{
-	AccountId, TickApis,
 	digests::ArgonDigests,
 	tick::{Tick, Ticker},
+	AccountId, TickApis,
 };
 use polkadot_sdk::*;
 use sc_client_api::{BlockBackend, HeaderBackend};
@@ -28,7 +28,7 @@ use sc_consensus_grandpa::{
 };
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_service::{
-	ChainType, TaskManager, WarpSyncConfig, config::Configuration, error::Error as ServiceError,
+	config::Configuration, error::Error as ServiceError, ChainType, TaskManager, WarpSyncConfig,
 };
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;

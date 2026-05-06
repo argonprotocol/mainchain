@@ -1,18 +1,18 @@
 use std::{env, fs::File, str::FromStr};
 
 use anyhow::anyhow;
-use bitcoind::{BitcoinD, Conf, downloaded_exe_path};
+use bitcoind::{downloaded_exe_path, BitcoinD, Conf};
 use fs2::FileExt;
 use lazy_static::lazy_static;
 use rand::Rng;
 
 use argon_primitives::bitcoin::Satoshis;
 use bitcoin::{
-	Address, Amount, CompressedPublicKey, Network, Txid,
 	bip32::{DerivationPath, Fingerprint, Xpriv, Xpub},
 	secp256k1::Secp256k1,
+	Address, Amount, CompressedPublicKey, Network, Txid,
 };
-use bitcoincore_rpc::{RpcApi, json::GetRawTransactionResult};
+use bitcoincore_rpc::{json::GetRawTransactionResult, RpcApi};
 
 lazy_static! {
 	static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -84,10 +84,10 @@ pub fn wait_for_txid(
 			&[txid.to_string().into(), 1.into()],
 		);
 
-		if let Ok(tx) = result {
-			if tx.confirmations.unwrap_or_default() > 1 {
-				return tx;
-			}
+		if let Ok(tx) = result &&
+			tx.confirmations.unwrap_or_default() > 1
+		{
+			return tx;
 		}
 		std::thread::sleep(std::time::Duration::from_secs(1));
 		add_blocks(bitcoind, 1, block_address);

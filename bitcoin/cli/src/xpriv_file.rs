@@ -1,4 +1,4 @@
-use age::{Decryptor, Encryptor, secrecy::SecretString};
+use age::{secrecy::SecretString, Decryptor, Encryptor};
 use anyhow::{anyhow, bail};
 use argon_primitives::KeystoreParams;
 use bitcoin::bip32::Xpriv;
@@ -102,10 +102,10 @@ impl XprivFile {
 			bail!("File already exists");
 		}
 
-		if let Some(parent) = path.parent() {
-			if !parent.exists() {
-				fs::create_dir_all(parent)?;
-			}
+		if let Some(parent) = path.parent() &&
+			!parent.exists()
+		{
+			fs::create_dir_all(parent)?;
 		}
 
 		let mut output_file = File::create(path.clone())?;
@@ -160,12 +160,11 @@ pub fn secret_string_from_str(s: &str) -> Result<SecretString, String> {
 }
 
 pub fn expand_path(path: &Path) -> PathBuf {
-	if let Some(str_path) = path.to_str() {
-		if str_path.starts_with('~') {
-			if let Some(dirs) = BaseDirs::new() {
-				return PathBuf::from(str_path.replacen('~', dirs.home_dir().to_str().unwrap(), 1));
-			}
-		}
+	if let Some(str_path) = path.to_str() &&
+		str_path.starts_with('~') &&
+		let Some(dirs) = BaseDirs::new()
+	{
+		return PathBuf::from(str_path.replacen('~', dirs.home_dir().to_str().unwrap(), 1));
 	}
 	path.to_path_buf()
 }
@@ -174,7 +173,7 @@ pub fn expand_path(path: &Path) -> PathBuf {
 mod tests {
 	use super::XprivFile;
 	use age::secrecy::SecretString;
-	use bitcoin::{Network, bip32::Xpriv};
+	use bitcoin::{bip32::Xpriv, Network};
 	use std::{path::PathBuf, time::SystemTime};
 
 	fn temp_file(name: &str) -> PathBuf {

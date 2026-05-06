@@ -194,9 +194,9 @@ pub struct NotebookProof {
 pub mod uniffi_ext {
   use argon_primitives::AccountType;
 
+  use crate::error::UniffiResult;
   use crate::BalanceChangeStatus;
   use crate::NotaryAccountOrigin;
-  use crate::error::UniffiResult;
   use std::collections::HashMap;
 
   #[derive(uniffi::Object, Debug)]
@@ -326,11 +326,11 @@ pub mod napi_ext {
 
   use argon_primitives::AccountType;
 
+  use crate::balance_sync::napi_ext::ChannelHold;
+  use crate::error::NapiOk;
   use crate::BalanceChangeRow;
   use crate::MainchainClient;
   use crate::NotaryAccountOrigin;
-  use crate::balance_sync::napi_ext::ChannelHold;
-  use crate::error::NapiOk;
 
   use super::NotarizationTracker;
 

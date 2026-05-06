@@ -2,7 +2,7 @@ use crate::utils::{create_active_notary_with_archive_bucket, wait_for_finalized_
 use argon_client::conversion::SubxtRuntime;
 use argon_notary_audit::VerifyError;
 use argon_primitives::ArgonDigests;
-use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
+use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary};
 use serial_test::serial;
 use std::time::Duration;
 

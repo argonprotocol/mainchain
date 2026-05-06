@@ -1,10 +1,10 @@
 use pallet_prelude::*;
 
-use argon_primitives::{ArgonCPI, PriceProvider, bitcoin::SATOSHIS_PER_BITCOIN};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider};
 
 use crate::{
-	CpiMeasurementBucket, Current, HistoricArgonCPI, Operator, PriceIndex as PriceIndexEntry,
-	mock::*,
+	mock::*, CpiMeasurementBucket, Current, HistoricArgonCPI, Operator,
+	PriceIndex as PriceIndexEntry,
 };
 
 type Event = crate::Event<Test>;
@@ -101,11 +101,9 @@ fn stores_history_grouped() {
 		assert_eq!(Current::<Test>::get(), Some(entry));
 		System::assert_last_event(Event::NewIndex.into());
 		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 1);
-		assert!(
-			HistoricArgonCPI::<Test>::get()
-				.iter()
-				.any(|a| a.tick_range.0 == 180 && a.tick_range.1 == 240)
-		);
+		assert!(HistoricArgonCPI::<Test>::get()
+			.iter()
+			.any(|a| a.tick_range.0 == 180 && a.tick_range.1 == 240));
 
 		let mut entry2 = entry;
 		entry2.argon_usd_target_price = FixedU128::from_float(1.01);

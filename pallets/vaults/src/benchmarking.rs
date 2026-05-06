@@ -101,11 +101,11 @@ fn seed_release_schedule_for_benchmark<T: Config>(
 mod benchmarks {
 	use super::*;
 	use argon_primitives::{
-		OnNewSlot, TickProvider,
 		bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinXPub, H256Le},
 		vault::{BitcoinVaultProvider, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		OnNewSlot, TickProvider,
 	};
-	use frame_support::traits::{Get, Hooks, fungible::InspectHold};
+	use frame_support::traits::{fungible::InspectHold, Get, Hooks};
 
 	#[benchmark]
 	fn create() -> Result<(), BenchmarkError> {

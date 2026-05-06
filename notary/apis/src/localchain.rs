@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use sp_core::H256;
 
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, NewAccountOrigin, NotarizationBalanceChangeset,
-	NotarizationBlockVotes, NotarizationDomains, NotebookNumber, tick::Tick,
+	tick::Tick, AccountId, AccountOrigin, AccountType, NewAccountOrigin,
+	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotebookNumber,
 };
 
 #[rpc(server, client, namespace = "localchain")]

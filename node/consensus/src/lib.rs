@@ -1,17 +1,17 @@
 use crate::{
 	aux_client::ArgonAux,
 	block_creator::BlockCreator,
-	compute_worker::{ComputeHandle, run_compute_solver_threads},
+	compute_worker::{run_compute_solver_threads, ComputeHandle},
 	notary_client::VotingPowerInfo,
 	notebook_sealer::NotebookSealer,
 };
 use argon_bitcoin_utxo_tracker::UtxoTracker;
 use argon_primitives::{
-	BLOCK_SEAL_KEY_TYPE, Balance, BitcoinApis, BlockCreatorApis, BlockSealApis,
-	BlockSealAuthorityId, MiningApis, NotaryApis, NotebookApis, TickApis, VotingSchedule,
 	inherents::BlockSealInherentNodeSide,
 	prelude::{sp_arithmetic::Permill, sp_core::U256},
 	tick::{Tick, Ticker},
+	Balance, BitcoinApis, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, MiningApis,
+	NotaryApis, NotebookApis, TickApis, VotingSchedule, BLOCK_SEAL_KEY_TYPE,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::{Codec, MaxEncodedLen};
@@ -50,11 +50,11 @@ pub(crate) mod notary_client;
 pub(crate) mod notebook_sealer;
 pub mod state_anchor;
 
-pub use notary_client::{NotaryClient, NotebookDownloader, run_notary_sync};
+pub use notary_client::{run_notary_sync, NotaryClient, NotebookDownloader};
 pub use state_anchor::{
-	DEFAULT_STATE_LOOKBACK_DEPTH, GenesisStorageReadError, ResolveBestOrFinalizedStateHashError,
 	read_chain_spec_bitcoin_network, read_chain_spec_grandpa_authorities, read_chain_spec_ticker,
 	read_genesis_storage_value, resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+	GenesisStorageReadError, ResolveBestOrFinalizedStateHashError, DEFAULT_STATE_LOOKBACK_DEPTH,
 };
 
 use crate::{compute_worker::ComputeState, notebook_sealer::create_vote_seal};
@@ -286,10 +286,11 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						// or could be a new branch. NOTE: we only want to do this if we have notebooks, otherwise we might kick the
 						// chain back to compute. We will try to solve again once the notebook arrives anyway and look for beatable blocks
 						let voting_schedule = VotingSchedule::when_creating_block(tick);
-						if let Ok( Some((tick, _, notebooks))) = aux_client.get_tick_voting_power(voting_schedule.notebook_tick()) {
-							if notebooks > 0 {
-								check_notebook_tick = Some(tick);
-							}
+						if let Ok(Some((tick, _, notebooks))) =
+							aux_client.get_tick_voting_power(voting_schedule.notebook_tick())
+							&& notebooks > 0
+						{
+							check_notebook_tick = Some(tick);
 						}
 					}
 				},
@@ -313,12 +314,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 										is_my_block = true;
 										ownership_tokens += payout.ownership;
 										argons += payout.argons;
-									} else if let Some(authority) = payout.block_seal_authority {
-										if authority_keys.contains(&authority) {
-											is_my_block = true;
-											argons += payout.argons;
-											ownership_tokens += payout.ownership;
-										}
+									} else if let Some(authority) = payout.block_seal_authority
+										&& authority_keys.contains(&authority)
+									{
+										is_my_block = true;
+										argons += payout.argons;
+										ownership_tokens += payout.ownership;
 									}
 								}
 								if is_my_block {
@@ -408,9 +409,8 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			// don't do anything if we are syncing or not ready to solve
 			if !sync_oracle.is_major_syncing() &&
 				compute_handle.ready_to_solve(tick, time) &&
-				!compute_handle.is_solving()
-			{
-				if let Some(proposal) = block_creator
+				!compute_handle.is_solving() &&
+				let Some(proposal) = block_creator
 					.propose(
 						compute_author.clone(),
 						tick,
@@ -419,10 +419,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 						BlockSealInherentNodeSide::Compute,
 					)
 					.await
-				{
-					trace!(?best_hash, ?tick, "Fallback mining activated");
-					compute_handle.start_solving(proposal);
-				}
+			{
+				trace!(?best_hash, ?tick, "Fallback mining activated");
+				compute_handle.start_solving(proposal);
 			}
 		}
 	};
@@ -505,7 +504,11 @@ impl NotebookTickChecker {
 		elapsed: Duration,
 	) -> Option<Duration> {
 		let remaining_delay = target_offset.saturating_sub(elapsed);
-		if remaining_delay.is_zero() { None } else { Some(remaining_delay) }
+		if remaining_delay.is_zero() {
+			None
+		} else {
+			Some(remaining_delay)
+		}
 	}
 
 	fn percentile_tick_offset(duration_per_tick: Duration, percentile: Permill) -> Duration {

@@ -1,7 +1,7 @@
 use pallet_prelude::*;
 
 use crate as pallet_bitcoin_utxos;
-use argon_primitives::{BitcoinUtxoEvents, bitcoin::UtxoId};
+use argon_primitives::{bitcoin::UtxoId, BitcoinUtxoEvents};
 use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
 type UtxoVerifiedCallbackFn = fn((UtxoId, Satoshis)) -> DispatchResult;

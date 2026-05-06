@@ -1,38 +1,37 @@
 use crate::{
 	formatters::ArgonFormatter,
 	helpers::get_bitcoin_network,
-	xpriv_file::{XprivFile, secret_string_from_str},
+	xpriv_file::{secret_string_from_str, XprivFile},
 };
-use anyhow::{Context, anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use argon_bitcoin::{
-	Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep,
 	psbt_utils::{finalize, get_tx_hex},
+	Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep,
 };
 use argon_client::{
-	FetchAt, MainchainClient, api,
+	api,
 	api::{apis, runtime_types::pallet_bitcoin_locks::pallet::LockReleaseRequest, storage, tx},
 	conversion::from_api_fixed_u128,
+	FetchAt, MainchainClient,
 };
 use argon_primitives::{
-	BlockNumber, KeystoreParams, VaultId,
 	bitcoin::{
-		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
-		SATOSHIS_PER_BITCOIN, UtxoId,
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoId,
+		SATOSHIS_PER_BITCOIN,
 	},
 	prelude::sp_core::crypto::ExposeSecret,
-	read_secret_input,
+	read_secret_input, BlockNumber, KeystoreParams, VaultId,
 };
-use base64::{Engine, engine::general_purpose};
+use base64::{engine::general_purpose, Engine};
 use bitcoin::{
-	Address, CompressedPublicKey, FeeRate, Network, Txid,
 	bip32::{ChildNumber, DerivationPath, Fingerprint},
 	key::Secp256k1,
-	secp256k1,
+	secp256k1, Address, CompressedPublicKey, FeeRate, Network, Txid,
 };
 use clap::{Subcommand, ValueEnum};
-use comfy_table::{ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
 use polkadot_sdk::{sp_core::crypto::SecretString, *};
-use sp_runtime::{FixedPointNumber, FixedU128, testing::H256};
+use sp_runtime::{testing::H256, FixedPointNumber, FixedU128};
 use std::{
 	path::PathBuf,
 	str::FromStr,
@@ -555,17 +554,17 @@ impl LockCommands {
 								.await?
 								.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>(
 							)?;
-							if let Some(cosign_release) = cosign {
-								if cosign_release.utxo_id == pending_release.utxo_id {
-									signature = Some(
-										cosign_release
-											.signature
-											.try_into()
-											.map_err(|_| anyhow!("Unable to decode signature"))?,
-									);
-									active_height = Some(block.hash());
-									break;
-								}
+							if let Some(cosign_release) = cosign &&
+								cosign_release.utxo_id == pending_release.utxo_id
+							{
+								signature = Some(
+									cosign_release
+										.signature
+										.try_into()
+										.map_err(|_| anyhow!("Unable to decode signature"))?,
+								);
+								active_height = Some(block.hash());
+								break;
 							}
 						}
 					} else {

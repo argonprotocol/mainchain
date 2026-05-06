@@ -161,8 +161,8 @@ fn storage_value_key(pallet: &[u8], storage_item: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod test {
 	use super::{
-		ResolveBestOrFinalizedStateHashError, StateAnchorClient,
 		resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+		ResolveBestOrFinalizedStateHashError, StateAnchorClient,
 	};
 
 	struct TestClient;

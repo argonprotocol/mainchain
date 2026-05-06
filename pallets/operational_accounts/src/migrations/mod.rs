@@ -2,8 +2,8 @@ use crate::{Config, OpaqueEncryptionPubkey, OperationalAccount, OperationalAccou
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use pallet_prelude::{
 	frame_support::{
-		Blake2_128Concat, Twox64Concat, migrations::VersionedMigration, storage_alias,
-		traits::UncheckedOnRuntimeUpgrade, weights::Weight,
+		migrations::VersionedMigration, storage_alias, traits::UncheckedOnRuntimeUpgrade,
+		weights::Weight, Blake2_128Concat, Twox64Concat,
 	},
 	frame_system, log, *,
 };

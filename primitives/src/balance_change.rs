@@ -3,9 +3,9 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{ConstU32, H256, bounded::BoundedVec, ecdsa, ed25519, sr25519};
+use sp_core::{bounded::BoundedVec, ecdsa, ed25519, sr25519, ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
-use sp_runtime::{MultiSignature, traits::Verify};
+use sp_runtime::{traits::Verify, MultiSignature};
 
 #[cfg(feature = "std")]
 use sp_core::crypto::Pair;
@@ -14,8 +14,8 @@ use sp_core::crypto::Pair;
 use crate::serialize_unsafe_u128_as_string;
 
 use crate::{
-	AccountId, AccountOriginUid, AccountType, Note, NoteType, NotebookNumber, notary::NotaryId,
-	tick::Tick,
+	notary::NotaryId, tick::Tick, AccountId, AccountOriginUid, AccountType, Note, NoteType,
+	NotebookNumber,
 };
 
 #[derive(
@@ -109,15 +109,14 @@ impl BalanceChange {
 	pub fn verify_signature(&self) -> bool {
 		let hash = self.hash();
 		let hash = hash.as_ref();
-		if let Some(hold_note) = &self.channel_hold_note {
-			if let NoteType::ChannelHold { delegated_signer: Some(signer), .. } =
+		if let Some(hold_note) = &self.channel_hold_note &&
+			let NoteType::ChannelHold { delegated_signer: Some(signer), .. } =
 				&hold_note.note_type
-			{
-				// allow the delegated signer to sign the balance change (NOTE: still accept the
-				// account_id signature)
-				if self.signature.0.verify(hash, signer) {
-					return true;
-				}
+		{
+			// allow the delegated signer to sign the balance change (NOTE: still accept the
+			// account_id signature)
+			if self.signature.0.verify(hash, signer) {
+				return true;
 			}
 		}
 		self.signature.0.verify(hash, &self.account_id)

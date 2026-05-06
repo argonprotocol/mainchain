@@ -7,16 +7,14 @@ use alloc::{
 	vec::Vec,
 };
 use argon_primitives::{
-	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
-	UtxoLockEvents, VaultId, VotingSchedule,
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
 	},
 	block_seal::MiningAuthority,
 	digests::{
-		AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID, BlockVoteDigest, NOTEBOOKS_DIGEST_ID,
-		NotebookDigest, TICK_DIGEST_ID,
+		BlockVoteDigest, NotebookDigest, AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID,
+		NOTEBOOKS_DIGEST_ID, TICK_DIGEST_ID,
 	},
 	notary::{NotaryProvider, NotarySignature},
 	providers::{
@@ -28,6 +26,8 @@ use argon_primitives::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
 		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
 	},
+	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
+	UtxoLockEvents, VaultId, VotingSchedule,
 };
 use codec::{Decode, Encode, FullCodec, HasCompact};
 use core::{iter::Sum, marker::PhantomData};
@@ -475,8 +475,8 @@ pub fn benchmark_operational_accounts_provider_state() -> BenchmarkOperationalAc
 	operational_accounts_state_backend::get()
 }
 
-pub fn benchmark_operational_accounts_provider_call_counters()
--> BenchmarkOperationalAccountsProviderCallCounters {
+pub fn benchmark_operational_accounts_provider_call_counters(
+) -> BenchmarkOperationalAccountsProviderCallCounters {
 	benchmark_operational_accounts_provider_state().call_counters
 }
 
@@ -499,8 +499,8 @@ pub fn reset_benchmark_operational_rewards_provider_state() {
 	operational_rewards_provider_state_backend::reset();
 }
 
-pub fn benchmark_operational_rewards_provider_state<AccountId, Balance>()
--> BenchmarkOperationalRewardsProviderState<AccountId, Balance>
+pub fn benchmark_operational_rewards_provider_state<AccountId, Balance>(
+) -> BenchmarkOperationalRewardsProviderState<AccountId, Balance>
 where
 	AccountId: Codec,
 	Balance: Codec + Copy,
@@ -541,7 +541,11 @@ where
 	fn max_pending_rewards() -> u32 {
 		let configured_max = benchmark_operational_rewards_provider_state::<AccountId, Balance>()
 			.max_pending_rewards;
-		if configured_max > 0 { configured_max } else { MaxPendingRewards::get() }
+		if configured_max > 0 {
+			configured_max
+		} else {
+			MaxPendingRewards::get()
+		}
 	}
 
 	fn mark_reward_paid(
@@ -1004,8 +1008,8 @@ pub fn reset_benchmark_bitcoin_vault_provider_state() {
 	bitcoin_vault_provider_state_backend::reset();
 }
 
-pub fn benchmark_bitcoin_vault_provider_state<AccountId, Balance>()
--> BenchmarkBitcoinVaultProviderState<AccountId, Balance>
+pub fn benchmark_bitcoin_vault_provider_state<AccountId, Balance>(
+) -> BenchmarkBitcoinVaultProviderState<AccountId, Balance>
 where
 	AccountId: Codec + Ord,
 	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
@@ -1082,7 +1086,11 @@ where
 			.iter()
 			.find_map(
 				|(vault_id, vault)| {
-					if vault.operator_account_id == *account_id { Some(*vault_id) } else { None }
+					if vault.operator_account_id == *account_id {
+						Some(*vault_id)
+					} else {
+						None
+					}
 				},
 			)
 	}
@@ -1412,8 +1420,8 @@ pub fn reset_benchmark_utxo_lock_events_state() {
 	utxo_lock_events_state_backend::reset();
 }
 
-pub fn benchmark_utxo_lock_events_state<AccountId, Balance>()
--> BenchmarkUtxoLockEventsState<AccountId, Balance>
+pub fn benchmark_utxo_lock_events_state<AccountId, Balance>(
+) -> BenchmarkUtxoLockEventsState<AccountId, Balance>
 where
 	AccountId: Codec,
 	Balance: Codec + Copy,

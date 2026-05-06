@@ -5,10 +5,10 @@ mod metrics;
 use anyhow::ensure;
 use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
 use argon_primitives::{
-	Balance, BitcoinApis,
 	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
 	inherents::BitcoinUtxoSync,
 	prelude::sp_api::ApiExt,
+	Balance, BitcoinApis,
 };
 use codec::{Decode, Encode};
 use log::info;
@@ -34,10 +34,10 @@ where
 	let api = client.runtime_api();
 	let mut minimum_satoshis: Satoshis = 1000;
 	// if we have version 2 of the api, use that to get minimum satoshis
-	if let Ok(Some(version)) = api.api_version::<dyn BitcoinApis<B, Balance>>(*block_hash) {
-		if version >= 2 {
-			minimum_satoshis = api.get_minimum_satoshis(*block_hash)?;
-		}
+	if let Ok(Some(version)) = api.api_version::<dyn BitcoinApis<B, Balance>>(*block_hash) &&
+		version >= 2
+	{
+		minimum_satoshis = api.get_minimum_satoshis(*block_hash)?;
 	}
 
 	let Some(sync_status) = api.get_sync_status(*block_hash)? else {
@@ -100,12 +100,12 @@ impl UtxoTracker {
 
 		{
 			let synched_filters = filter.get_stored_filters();
-			if synched_filters.is_empty() {
-				if let Ok(Some(bytes)) = aux_store.get_aux(&UTXO_KEY[..]) {
-					let synched_filters =
-						<Vec<BlockFilter>>::decode(&mut &bytes[..]).ok().unwrap_or_default();
-					filter.load_filters(synched_filters);
-				}
+			if synched_filters.is_empty() &&
+				let Ok(Some(bytes)) = aux_store.get_aux(&UTXO_KEY[..])
+			{
+				let synched_filters =
+					<Vec<BlockFilter>>::decode(&mut &bytes[..]).ok().unwrap_or_default();
+				filter.load_filters(synched_filters);
 			}
 		}
 		filter.sync_to_block(sync_status)?;
@@ -133,7 +133,7 @@ impl UtxoTracker {
 mod test {
 	use std::{collections::BTreeMap, sync::Arc};
 
-	use bitcoin::{Address, Amount, CompressedPublicKey, Network, hashes::Hash};
+	use bitcoin::{hashes::Hash, Address, Amount, CompressedPublicKey, Network};
 	use bitcoincore_rpc::RpcApi;
 	use bitcoind::BitcoinD;
 	use lazy_static::lazy_static;

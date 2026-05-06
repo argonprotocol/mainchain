@@ -17,7 +17,7 @@ pub(crate) mod utils {
 
 	use anyhow::Context;
 	use argon_client::{
-		FetchAt, MainchainClient, TxInBlockWithEvents, api,
+		api,
 		api::{
 			runtime_types::{
 				argon_primitives::block_seal,
@@ -30,10 +30,11 @@ pub(crate) mod utils {
 			tx,
 		},
 		signer::{Signer, Sr25519Signer},
+		FetchAt, MainchainClient, TxInBlockWithEvents,
 	};
-	use argon_primitives::{BLOCK_SEAL_KEY_TYPE, prelude::*};
+	use argon_primitives::{prelude::*, BLOCK_SEAL_KEY_TYPE};
 	use argon_testing::{ArgonTestNode, ArgonTestNotary};
-	use sp_core::{DeriveJunction, Pair, crypto::key_types::GRANDPA};
+	use sp_core::{crypto::key_types::GRANDPA, DeriveJunction, Pair};
 	use sp_keyring::{Sr25519Keyring, Sr25519Keyring::Alice};
 	use tokio::join;
 

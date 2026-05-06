@@ -12,7 +12,7 @@ use std::{
 use strip_ansi_escapes::strip;
 use tokio::task::spawn_blocking;
 
-use crate::{ArgonTestNode, get_target_dir};
+use crate::{get_target_dir, ArgonTestNode};
 
 pub struct ArgonTestOracle {
 	// Keep a handle to the node; once it's dropped the node is killed.

@@ -1,10 +1,10 @@
 #![allow(clippy::await_holding_lock)]
 
 use bitcoin::hex::DisplayHex;
-use bitcoind::{BitcoinD, bitcoincore_rpc::Auth};
+use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
 use lazy_static::lazy_static;
 use polkadot_sdk::*;
-use sp_core::{Pair, crypto::KeyTypeId, ed25519};
+use sp_core::{crypto::KeyTypeId, ed25519, Pair};
 use sp_keyring::Sr25519Keyring;
 use std::{
 	env,
@@ -130,13 +130,10 @@ impl Drop for ArgonTestNode {
 		}
 		if self.start_args.cleanup_base_data_path {
 			let base_data_path = self.start_args.base_data_path.clone();
-			if let Err(error) = remove_dir_all(&base_data_path) {
-				if error.kind() != std::io::ErrorKind::NotFound {
-					eprintln!(
-						"Failed to remove node base path {}: {error}",
-						base_data_path.display()
-					);
-				}
+			if let Err(error) = remove_dir_all(&base_data_path) &&
+				error.kind() != std::io::ErrorKind::NotFound
+			{
+				eprintln!("Failed to remove node base path {}: {error}", base_data_path.display());
 			}
 		}
 		if let Some(mut bitcoind) = self.bitcoind.take() {

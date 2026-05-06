@@ -1,8 +1,8 @@
 use crate::{aux_client::AuxKey, aux_data::AuxData, block_creator::ProposalMeta};
 use argon_primitives::{
-	Balance, NotaryId,
 	prelude::sp_runtime::Saturating,
 	tick::{Tick, Ticker},
+	Balance, NotaryId,
 };
 use codec::{Decode, Encode};
 use polkadot_sdk::*;
@@ -10,8 +10,8 @@ use sc_client_api::AuxStore;
 use sp_arithmetic::traits::UniqueSaturatedInto;
 use std::{sync::Arc, time::Instant};
 use substrate_prometheus_endpoint::{
-	CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64,
-	prometheus, register,
+	prometheus, register, CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, PrometheusError,
+	Registry, U64,
 };
 
 #[derive(Debug, Clone, Decode, Encode, Default)]

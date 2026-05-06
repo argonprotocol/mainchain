@@ -1,11 +1,12 @@
 use bitcoin::hashes::serde;
 use bitcoincore_rpc::{
-	Auth, Error, RpcApi, jsonrpc,
-	jsonrpc::{Request, Response, base64, minreq, minreq_http::HttpError},
+	jsonrpc,
+	jsonrpc::{base64, minreq, minreq_http::HttpError, Request, Response},
+	Auth, Error, RpcApi,
 };
 use log::{
-	Level::{Debug, Trace, Warn},
 	debug, log_enabled, trace,
+	Level::{Debug, Trace, Warn},
 };
 use serde::Deserialize;
 use serde_json::Value;

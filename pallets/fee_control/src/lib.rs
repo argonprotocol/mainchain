@@ -44,7 +44,11 @@ pub mod pallet {
 		type CallTxPoolKeyProviders: CallTxPoolKeyProvider<Self::RuntimeCall, Self::AccountId>;
 
 		/// Provides transaction sponsors for transactions
-		type TransactionSponsorProviders: TransactionSponsorProvider<Self::AccountId, Self::RuntimeCall, Self::Balance>;
+		type TransactionSponsorProviders: TransactionSponsorProvider<
+			Self::AccountId,
+			Self::RuntimeCall,
+			Self::Balance,
+		>;
 	}
 
 	#[pallet::pallet]

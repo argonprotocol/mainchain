@@ -1,10 +1,10 @@
 use crate::utils::parse_f64;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use polkadot_sdk::*;
 use reqwest::Client;
 use serde::Deserialize;
-use sp_runtime::{FixedU128, traits::One};
+use sp_runtime::{traits::One, FixedU128};
 use std::{collections::HashMap, time::Duration};
 use tokio::{join, task::JoinSet, time::Instant};
 
@@ -77,10 +77,10 @@ impl CoinUsdPriceLookup {
 
 		const MIN_REFRESH: Duration = Duration::from_secs(60);
 
-		if let Some((last_refresh, value)) = self.last_refresh {
-			if last_refresh.elapsed() < MIN_REFRESH {
-				return Ok(value);
-			}
+		if let Some((last_refresh, value)) = self.last_refresh &&
+			last_refresh.elapsed() < MIN_REFRESH
+		{
+			return Ok(value);
 		}
 		if self.providers.is_empty() {
 			return Err(anyhow!(

@@ -3,16 +3,16 @@ use core::str::FromStr;
 
 pub use bitcoin::Amount;
 use bitcoin::{
-	Address, FeeRate, Network, PublicKey, ScriptBuf,
 	absolute::LockTime,
-	transaction::{InputWeightPrediction, predict_weight},
+	transaction::{predict_weight, InputWeightPrediction},
+	Address, FeeRate, Network, PublicKey, ScriptBuf,
 };
 use miniscript::{
-	Descriptor, FromStrKey, MiniscriptKey, Segwitv0,
 	policy::{
-		Concrete,
 		concrete::{DescriptorCtx, Policy},
+		Concrete,
 	},
+	Descriptor, FromStrKey, MiniscriptKey, Segwitv0,
 };
 
 use argon_primitives::bitcoin::{BitcoinError, BitcoinHeight, CompressedBitcoinPubkey};
@@ -201,10 +201,10 @@ impl CosignScript {
 #[cfg(test)]
 mod test {
 	use bitcoin::{
-		Address, Amount, CompressedPublicKey, EcdsaSighashType, FeeRate, Network, PrivateKey,
-		absolute::LockTime, blockdata::script::Script, secp256k1::Secp256k1,
+		absolute::LockTime, blockdata::script::Script, secp256k1::Secp256k1, Address, Amount,
+		CompressedPublicKey, EcdsaSighashType, FeeRate, Network, PrivateKey,
 	};
-	use bitcoincore_rpc::{RawTx, RpcApi, jsonrpc::base64};
+	use bitcoincore_rpc::{jsonrpc::base64, RawTx, RpcApi};
 	use bitcoind::BitcoinD;
 
 	use argon_primitives::bitcoin::{

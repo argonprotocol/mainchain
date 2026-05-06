@@ -2,14 +2,15 @@ use alloc::vec::Vec;
 use polkadot_sdk::*;
 
 use crate::{
-	BlockSealAuthorityId, ComputeDifficulty, MICROGONS_PER_ARGON, NotaryId, NotebookHeader,
-	NotebookNumber, NotebookSecret, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, Satoshis, UtxoId, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
+	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
+	NotebookSecret, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
+	MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
 use polkadot_sdk::{
@@ -18,11 +19,11 @@ use polkadot_sdk::{
 };
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
-use sp_arithmetic::{FixedI128, FixedPointNumber, traits::Zero};
+use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
 use sp_core::{H256, U256};
 use sp_runtime::{
-	DispatchError, DispatchResult, FixedU128, Saturating,
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
+	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 
 pub trait NotebookProviderWeightInfo {

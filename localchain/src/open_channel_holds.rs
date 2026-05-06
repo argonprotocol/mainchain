@@ -2,22 +2,22 @@ use crate::accounts::AccountStore;
 use crate::balance_changes::BalanceChangeStore;
 use crate::keystore::Keystore;
 use crate::notary_client::NotaryClients;
-use crate::{BalanceChangeStatus, Error, Result, bail};
-use crate::{CHANNEL_HOLD_MINIMUM_SETTLEMENT, TickerRef};
+use crate::{bail, BalanceChangeStatus, Error, Result};
+use crate::{TickerRef, CHANNEL_HOLD_MINIMUM_SETTLEMENT};
 use anyhow::anyhow;
 use argon_notary_audit::verify_changeset_signatures;
 use argon_primitives::tick::Tick;
 use argon_primitives::{
-  AccountType, Balance, BalanceChange, BalanceTip, CHANNEL_HOLD_CLAWBACK_TICKS,
-  MINIMUM_CHANNEL_HOLD_SETTLEMENT, MultiSignatureBytes, NoteType, NotebookNumber,
+  AccountType, Balance, BalanceChange, BalanceTip, MultiSignatureBytes, NoteType, NotebookNumber,
+  CHANNEL_HOLD_CLAWBACK_TICKS, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use bech32::{Bech32m, Hrp};
 use chrono::NaiveDateTime;
 use codec::Encode;
 use lazy_static::lazy_static;
 use polkadot_sdk::*;
-use sp_core::Decode;
 use sp_core::ed25519::Signature;
+use sp_core::Decode;
 use sp_runtime::MultiSignature;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use std::sync::Arc;
@@ -195,7 +195,7 @@ impl ChannelHold {
       bail!("ChannelHold settlement has not been signed");
     }
     balance_change.signature = MultiSignatureBytes::decode(&mut self.settled_signature.as_slice())?;
-    verify_changeset_signatures(&vec![balance_change.clone()])?;
+    verify_changeset_signatures(&[balance_change.clone()])?;
     Ok(balance_change)
   }
 
@@ -247,7 +247,7 @@ impl ChannelHold {
   ) -> Result<()> {
     let mut balance_change = self.get_change_with_settled_amount(microgons);
     balance_change.signature = MultiSignatureBytes::decode(&mut signature.as_slice())?;
-    verify_changeset_signatures(&vec![balance_change.clone()])?;
+    verify_changeset_signatures(&[balance_change.clone()])?;
 
     self.settled_amount = microgons;
     self.settled_signature = signature;
@@ -520,7 +520,7 @@ impl OpenChannelHoldsStore {
   /// Import a channel_hold from a JSON string. Verifies with the notary that the channel hold is valid.
   pub async fn import_channel_hold(&self, channel_hold_json: String) -> Result<OpenChannelHold> {
     let mut channel_hold = ChannelHold::try_from_balance_change_json(channel_hold_json)?;
-    verify_changeset_signatures(&vec![channel_hold.balance_change.clone()])?;
+    verify_changeset_signatures(&[channel_hold.balance_change.clone()])?;
     let mut db = self.db.acquire().await?;
     let default_account =
       AccountStore::db_deposit_account(&mut db, Some(channel_hold.notary_id)).await?;
@@ -752,7 +752,7 @@ mod tests {
   use super::*;
   use crate::balance_change_builder::BalanceChangeBuilder;
   use crate::notarization_builder::NotarizationBuilder;
-  use crate::test_utils::{MockNotary, create_mock_notary, mock_notary_clients};
+  use crate::test_utils::{create_mock_notary, mock_notary_clients, MockNotary};
   use crate::transactions::Transactions;
   use crate::*;
   use argon_primitives::tick::Tick;
@@ -999,12 +999,10 @@ mod tests {
       balance_change.signature = signature.into();
       (balance_change.signature, balance_change.notes[0].microgons)
     };
-    assert!(
-      alice_channel_hold
-        .record_updated_settlement(updated_total, updated_signature.encode())
-        .await
-        .is_ok()
-    );
+    assert!(alice_channel_hold
+      .record_updated_settlement(updated_total, updated_signature.encode())
+      .await
+      .is_ok());
 
     Ok(())
   }
@@ -1197,13 +1195,11 @@ mod tests {
     let result = alice_store.import_channel_hold(json.clone()).await;
     assert!(result.is_err());
     println!("{:?}", result.as_ref().err());
-    assert!(
-      result
-        .err()
-        .expect("")
-        .to_string()
-        .contains("This localchain is not configured to accept payments addressed ")
-    );
+    assert!(result
+      .err()
+      .expect("")
+      .to_string()
+      .contains("This localchain is not configured to accept payments addressed "));
     Ok(())
   }
 }

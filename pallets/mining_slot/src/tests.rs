@@ -1,6 +1,4 @@
 use crate::{
-	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
-	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
 	mock::{MiningSlots, Ownership, *},
 	pallet::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
@@ -8,16 +6,18 @@ use crate::{
 		IsNextSlotBiddingOpen, MinerNonceScoringByCohort, MinersByCohort, MiningConfig,
 		NextCohortSize, NextFrameId,
 	},
+	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
+	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
 };
 use argon_primitives::{
-	AuthorityProvider,
 	block_seal::{MiningBidStats, MiningRegistration},
+	AuthorityProvider,
 };
 use frame_support::traits::fungible::Unbalanced;
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use pallet_prelude::{
-	argon_primitives::{FRAME_INFO_DIGEST, FrameInfo},
+	argon_primitives::{FrameInfo, FRAME_INFO_DIGEST},
 	sp_core::Pair,
 	*,
 };
@@ -1675,10 +1675,12 @@ fn it_should_allow_a_tie() {
 		let res1 = MiningSlots::get_winning_managed_authority(U256::from(150u32), None, None);
 		assert!(res1.is_some(), "Should have a winning miner");
 		let top_score = res1.unwrap().1;
-		assert!(
-			MiningSlots::get_winning_managed_authority(U256::from(150u32), None, Some(top_score))
-				.is_none()
-		);
+		assert!(MiningSlots::get_winning_managed_authority(
+			U256::from(150u32),
+			None,
+			Some(top_score)
+		)
+		.is_none());
 		let res2 =
 			MiningSlots::get_winning_managed_authority(U256::from(155u32), None, Some(top_score));
 		assert!(res2.is_some(), "Should have a winning miner");

@@ -8,14 +8,14 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{
-	ConstU32,
 	crypto::{Ss58AddressFormat, Ss58Codec},
+	ConstU32,
 };
 use sp_runtime::BoundedVec;
 
 #[cfg(feature = "std")]
 use crate::serialize_unsafe_u128_as_string;
-use crate::{ADDRESS_PREFIX, AccountId, Balance, DomainHash, TransferToLocalchainId, tick::Tick};
+use crate::{tick::Tick, AccountId, Balance, DomainHash, TransferToLocalchainId, ADDRESS_PREFIX};
 
 #[derive(
 	Clone,
@@ -47,7 +47,11 @@ impl Note {
 
 	pub fn calculate_transfer_tax(amount: Balance) -> Balance {
 		// less than one argon is percent based
-		if amount < 1_000_000 { round_up(amount, TAX_PERCENT_BASE) } else { TRANSFER_TAX_CAP }
+		if amount < 1_000_000 {
+			round_up(amount, TAX_PERCENT_BASE)
+		} else {
+			TRANSFER_TAX_CAP
+		}
 	}
 
 	pub fn calculate_channel_hold_tax(amount: u128) -> u128 {
@@ -59,15 +63,15 @@ impl Display for Note {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 		let argons = self.microgons as f64 / 1_000_000.0;
 
-		if self.microgons % 1_000_000 == 0 || self.microgons % 100_000 == 0 {
+		if self.microgons.is_multiple_of(1_000_000) || self.microgons.is_multiple_of(100_000) {
 			write!(f, "{} ₳{:.1}", self.note_type, argons)
-		} else if self.microgons % 10_000 == 0 {
+		} else if self.microgons.is_multiple_of(10_000) {
 			write!(f, "{} ₳{:.2}", self.note_type, argons)
-		} else if self.microgons % 1_000 == 0 {
+		} else if self.microgons.is_multiple_of(1_000) {
 			write!(f, "{} ₳{:.3}", self.note_type, argons)
-		} else if self.microgons % 100 == 0 {
+		} else if self.microgons.is_multiple_of(100) {
 			write!(f, "{} ₳{:.4}", self.note_type, argons)
-		} else if self.microgons % 10 == 0 {
+		} else if self.microgons.is_multiple_of(10) {
 			write!(f, "{} ₳{:.5}", self.note_type, argons)
 		} else {
 			write!(f, "{} ₳{:.6}", self.note_type, argons)
@@ -78,7 +82,7 @@ impl Display for Note {
 pub fn round_up(value: u128, percentage: u128) -> u128 {
 	let numerator = value * percentage;
 
-	let round = if numerator % 100 == 0 { 0 } else { 1 };
+	let round = if numerator.is_multiple_of(100) { 0 } else { 1 };
 
 	numerator.saturating_div(100) + round
 }

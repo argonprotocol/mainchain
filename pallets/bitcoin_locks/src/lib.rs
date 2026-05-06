@@ -11,9 +11,9 @@ use pallet_prelude::*;
 
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
-	CallTxPoolKeyProvider,
 	bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey},
 	vault::BitcoinVaultProvider,
+	CallTxPoolKeyProvider,
 };
 pub use pallet::*;
 pub use weights::*;
@@ -72,14 +72,14 @@ pub mod pallet {
 	use super::*;
 	use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 	use argon_primitives::{
-		BitcoinUtxoEvents, BitcoinUtxoTracker, MICROGONS_PER_ARGON, PriceProvider, UtxoLockEvents,
-		VaultId,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey, BitcoinSignature,
-			CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId, UtxoRef,
-			XPubChildNumber, XPubFingerprint,
+			CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef, XPubChildNumber, XPubFingerprint,
+			SATOSHIS_PER_BITCOIN,
 		},
 		vault::{BitcoinVaultProvider, LockExtension, Securitization, VaultError},
+		BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents, VaultId,
+		MICROGONS_PER_ARGON,
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
@@ -129,7 +129,10 @@ pub mod pallet {
 
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 
-		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
+		type VaultProvider: BitcoinVaultProvider<
+			AccountId = Self::AccountId,
+			Balance = Self::Balance,
+		>;
 
 		/// Argon tick per day
 		#[pallet::constant]
@@ -1555,17 +1558,16 @@ pub mod pallet {
 			for (account_id, utxo_ref) in expiring {
 				orphan_expiring_count = orphan_expiring_count.saturating_add(1);
 				let res: Result<(), DispatchError> = with_storage_layer(|| {
-					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref)
+					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref) &&
+						request.cosign_request.is_some()
 					{
-						if request.cosign_request.is_some() {
-							T::VaultProvider::update_orphan_cosign_list(
-								request.vault_id,
-								request.utxo_id,
-								&account_id,
-								true,
-							)
-							.map_err(Error::<T>::from)?;
-						}
+						T::VaultProvider::update_orphan_cosign_list(
+							request.vault_id,
+							request.utxo_id,
+							&account_id,
+							true,
+						)
+						.map_err(Error::<T>::from)?;
 					}
 					Ok::<(), DispatchError>(())
 				});

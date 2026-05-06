@@ -7,8 +7,8 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use frame_support::{
 	storage_alias,
 	traits::{
-		UncheckedOnRuntimeUpgrade,
 		fungible::{InspectHold, MutateHold},
+		UncheckedOnRuntimeUpgrade,
 	},
 	weights::Weight,
 };
@@ -524,14 +524,14 @@ pub type BondLotsMigration<T> = frame_support::migrations::VersionedMigration<
 mod test {
 	use super::{
 		super::{
+			mock::{
+				insert_vault, new_test_ext, set_argons, Balances, CurrentFrameId,
+				RuntimeHoldReason, Test, TestVault, Treasury,
+			},
 			BondLotById, BondLotIdsByAccount, BondLotsByVault, CurrentFrameVaultCapital,
 			HoldReason, NextBondLotId, PendingBondReleaseRetryCursor,
-			mock::{
-				Balances, CurrentFrameId, RuntimeHoldReason, Test, TestVault, Treasury,
-				insert_vault, new_test_ext, set_argons,
-			},
 		},
-		BondLotsMigration, old_storage,
+		old_storage, BondLotsMigration,
 	};
 	use argon_primitives::MICROGONS_PER_ARGON;
 	use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
@@ -575,18 +575,16 @@ mod test {
 
 			let mut current_pools =
 				BoundedBTreeMap::<VaultId, old_storage::TreasuryPool<Test>, _>::new();
-			assert!(
-				current_pools
-					.try_insert(
-						1,
-						old_storage::TreasuryPool::<Test> {
-							bond_holders: BoundedVec::truncate_from(vec![(2, 4 * one_bond)]),
-							distributed_earnings: None,
-							vault_sharing_percent: Permill::from_percent(20),
-						},
-					)
-					.is_ok()
-			);
+			assert!(current_pools
+				.try_insert(
+					1,
+					old_storage::TreasuryPool::<Test> {
+						bond_holders: BoundedVec::truncate_from(vec![(2, 4 * one_bond)]),
+						distributed_earnings: None,
+						vault_sharing_percent: Permill::from_percent(20),
+					},
+				)
+				.is_ok());
 			old_storage::VaultPoolsByFrame::<Test>::insert(2, current_pools);
 			old_storage::CapitalActive::<Test>::put(BoundedVec::truncate_from(vec![
 				old_storage::TreasuryCapital {

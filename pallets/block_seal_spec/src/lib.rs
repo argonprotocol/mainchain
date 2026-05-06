@@ -40,13 +40,13 @@ pub(crate) const KEY_BLOCK_ROTATION: u32 = 1440;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
-		NotebookEventHandler, NotebookProvider, TickProvider,
 		block_vote::VoteMinimum,
-		digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest},
+		digests::{BlockVoteDigest, BLOCK_VOTES_DIGEST_ID},
 		inherents::BlockSealInherent,
 		notary::NotaryNotebookVoteDigestDetails,
 		notebook::{BlockVotingPower, NotebookHeader},
+		AuthorityProvider, BlockSealAuthorityId, BlockSealSpecProvider, ComputeDifficulty,
+		NotebookEventHandler, NotebookProvider, TickProvider,
 	};
 	use sp_runtime::DigestItem;
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
@@ -61,7 +61,11 @@ pub mod pallet {
 		/// The desired percent of the default block time to use for compute
 		type TargetComputeBlockPercent: Get<FixedU128>;
 
-		type AuthorityProvider: AuthorityProvider<BlockSealAuthorityId, Self::Block, Self::AccountId>;
+		type AuthorityProvider: AuthorityProvider<
+			BlockSealAuthorityId,
+			Self::Block,
+			Self::AccountId,
+		>;
 
 		/// The maximum active notaries allowed
 		#[pallet::constant]
@@ -263,7 +267,7 @@ pub mod pallet {
 			.expect("VoteMinimumHistory is bounded");
 
 			let block_number = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-			if (block_number - 1) % KEY_BLOCK_ROTATION == 0 {
+			if (block_number - 1).is_multiple_of(KEY_BLOCK_ROTATION) {
 				let block_hash = <frame_system::Pallet<T>>::parent_hash();
 				<CurrentComputeKeyBlock<T>>::put(block_hash);
 			}
@@ -277,12 +281,12 @@ pub mod pallet {
 			total_voting_power: u128,
 		) {
 			let did_append = <PastBlockVotes<T>>::try_mutate(|x| {
-				if let Some(entry) = x.last_mut() {
-					if entry.0 == notebook_tick {
-						entry.1 = entry.1.saturating_add(total_votes);
-						entry.2 = entry.2.saturating_add(total_voting_power);
-						return Ok(());
-					}
+				if let Some(entry) = x.last_mut() &&
+					entry.0 == notebook_tick
+				{
+					entry.1 = entry.1.saturating_add(total_votes);
+					entry.2 = entry.2.saturating_add(total_voting_power);
+					return Ok(());
 				}
 				x.try_push((notebook_tick, total_votes, total_voting_power))
 			})

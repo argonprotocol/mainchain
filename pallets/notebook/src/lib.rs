@@ -23,12 +23,8 @@ pub mod pallet {
 	use tracing::{info, trace, warn};
 
 	use super::*;
-	use argon_notary_audit::{AccountHistoryLookupError, NotebookHistoryLookup, notebook_verify};
+	use argon_notary_audit::{notebook_verify, AccountHistoryLookupError, NotebookHistoryLookup};
 	use argon_primitives::{
-		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
-		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
-		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
-		TransferToLocalchainId, VotingSchedule,
 		inherents::{NotebookInherentData, NotebookInherentError},
 		notary::{
 			NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDecoded,
@@ -36,6 +32,10 @@ pub mod pallet {
 			NotaryNotebookRawVotes, NotaryProvider, NotaryState,
 		},
 		notebook::{AccountOrigin, Notebook, NotebookHeader},
+		AccountOriginUid, BlockSealSpecProvider, BlockVote, ChainTransfer, ChainTransferLookup,
+		Digestset, NotebookDigest as NotebookDigestT, NotebookEventHandler, NotebookProvider,
+		NotebookSecret, NotebookSecretHash, SignedNotebookHeader, TickProvider,
+		TransferToLocalchainId, VotingSchedule,
 	};
 
 	type NotebookDigest = NotebookDigestT<NotebookVerifyError>;
@@ -847,10 +847,10 @@ pub mod pallet {
 		}
 
 		fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool {
-			if let Some((_, locked_at_tick, _)) = Self::notary_failed_audit_by_id(notary_id) {
-				if locked_at_tick <= tick {
-					return true;
-				}
+			if let Some((_, locked_at_tick, _)) = Self::notary_failed_audit_by_id(notary_id) &&
+				locked_at_tick <= tick
+			{
+				return true;
 			}
 			false
 		}

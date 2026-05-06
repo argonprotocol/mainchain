@@ -3,18 +3,17 @@ use crate::{
 	error::Error,
 	metrics::ConsensusMetrics,
 	state_anchor::{
-		DEFAULT_STATE_LOOKBACK_DEPTH, ResolveBestOrFinalizedStateHashError, StateAnchorClient,
-		resolve_best_or_finalized_state_hash,
+		resolve_best_or_finalized_state_hash, ResolveBestOrFinalizedStateHashError,
+		StateAnchorClient, DEFAULT_STATE_LOOKBACK_DEPTH,
 	},
 };
 use argon_notary_apis::{
-	ArchiveHost, Client, DownloadKind, DownloadPolicy, DownloadTrustMode, SystemRpcClient,
 	get_download_path_suffix, get_header_url, get_notebook_url,
 	notebook::{NotebookRpcClient, RawHeadersSubscription},
+	ArchiveHost, Client, DownloadKind, DownloadPolicy, DownloadTrustMode, SystemRpcClient,
 };
 use argon_primitives::{
-	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
-	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule, ensure,
+	ensure,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes, NotaryState,
 		NotebookBytes, SignedHeaderBytes,
@@ -22,22 +21,24 @@ use argon_primitives::{
 	notebook::NotebookNumber,
 	prelude::sc_client_api::BlockBackend,
 	tick::{Tick, Ticker},
+	BlockSealApis, BlockSealAuthorityId, BlockVotingPower, NotaryApis, NotaryId, NotebookApis,
+	NotebookAuditResult, NotebookHeaderData, TickApis, VoteMinimum, VotingSchedule,
 };
 use argon_runtime::{NotaryRecordT, NotebookVerifyError};
 use codec::Codec;
-use futures::{Stream, StreamExt, future::join_all, task::noop_waker_ref};
+use futures::{future::join_all, task::noop_waker_ref, Stream, StreamExt};
 use log::{info, trace, warn};
 use polkadot_sdk::*;
 use rand::prelude::SliceRandom;
 use sc_client_api::{AuxStore, BlockchainEvents};
 use sc_service::TaskManager;
-use sc_utils::mpsc::{TracingUnboundedReceiver, TracingUnboundedSender, tracing_unbounded};
+use sc_utils::mpsc::{tracing_unbounded, TracingUnboundedReceiver, TracingUnboundedSender};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::H256;
 use sp_runtime::{
-	DispatchError,
 	traits::{Block as BlockT, Header},
+	DispatchError,
 };
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -397,10 +398,10 @@ where
 			let mut notaries_by_id = self.notaries_by_id.write().await;
 			if next_notaries_by_id != *notaries_by_id {
 				for notary in &notaries {
-					if let Some(existing) = notaries_by_id.get(&notary.notary_id) {
-						if existing.meta.hosts[0] != notary.meta.hosts[0] {
-							reconnect_ids.insert(notary.notary_id);
-						}
+					if let Some(existing) = notaries_by_id.get(&notary.notary_id) &&
+						existing.meta.hosts[0] != notary.meta.hosts[0]
+					{
+						reconnect_ids.insert(notary.notary_id);
 					}
 				}
 				*notaries_by_id = next_notaries_by_id.clone();
@@ -408,10 +409,10 @@ where
 				let existing_notary_ids =
 					self.notary_client_by_id.read().await.keys().copied().collect::<Vec<_>>();
 				for id in existing_notary_ids {
-					if let Some(entry) = notaries_by_id.get(&id) {
-						if Self::should_connect_to_notary(entry) {
-							continue;
-						}
+					if let Some(entry) = notaries_by_id.get(&id) &&
+						Self::should_connect_to_notary(entry)
+					{
+						continue;
 					}
 					self.disconnect(&id, None).await;
 				}
@@ -529,12 +530,11 @@ where
 						);
 					}
 					if let Ok(did_overflow) =
-						self.enqueue_notebook(notary_id, notebook_number, None, None).await
+						self.enqueue_notebook(notary_id, notebook_number, None, None).await &&
+						did_overflow
 					{
-						if did_overflow {
-							info!("Overflowed queue for notary {notary_id}");
-							self.unsubscribe_if_overflowed(notary_id).await;
-						}
+						info!("Overflowed queue for notary {notary_id}");
+						self.unsubscribe_if_overflowed(notary_id).await;
 					}
 					return Some((notary_id, notebook_number));
 				},
@@ -764,10 +764,10 @@ where
 	) -> Result<SignedHeaderBytes, Error> {
 		let expected_archive_origin =
 			self.notary_archive_host_by_id.read().await.get(&notary_id).cloned();
-		if download_url.is_none() {
-			if let Some(archive_host) = expected_archive_origin.as_ref() {
-				download_url = Some(get_header_url(archive_host, notary_id, notebook_number));
-			}
+		if download_url.is_none() &&
+			let Some(archive_host) = expected_archive_origin.as_ref()
+		{
+			download_url = Some(get_header_url(archive_host, notary_id, notebook_number));
 		}
 		self.notebook_downloader
 			.get_header(notary_id, notebook_number, download_url, expected_archive_origin)
@@ -1262,10 +1262,10 @@ where
 		block_hash: B::Hash,
 		notary_id: NotaryId,
 	) -> NotebookNumber {
-		if let Ok(latest_notebooks_in_runtime) = self.client.latest_notebook_by_notary(block_hash) {
-			if let Some((latest_notebook, _)) = latest_notebooks_in_runtime.get(&notary_id) {
-				return *latest_notebook;
-			}
+		if let Ok(latest_notebooks_in_runtime) = self.client.latest_notebook_by_notary(block_hash) &&
+			let Some((latest_notebook, _)) = latest_notebooks_in_runtime.get(&notary_id)
+		{
+			return *latest_notebook;
 		}
 		0
 	}
@@ -1459,17 +1459,17 @@ mod test {
 	use super::*;
 	use crate::{error::Error, mock_notary::MockNotary, notary_client::NotaryApisExt};
 	use argon_primitives::{
-		AccountId, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 		notary::{
 			NotaryMeta, NotaryNotebookAuditSummary, NotaryNotebookAuditSummaryDetails,
 			NotaryNotebookRawVotes, NotaryRecordWithState,
 		},
+		AccountId, ChainTransfer, NotaryId, NotebookHeader, NotebookMeta, NotebookNumber,
 	};
 	use argon_runtime::Block;
 	use codec::{Decode, Encode};
 
 	use crate::mock_notary::setup_logs;
-	use sp_core::{H256, bounded_vec};
+	use sp_core::{bounded_vec, H256};
 	use sp_keyring::Ed25519Keyring;
 	use std::collections::BTreeMap;
 

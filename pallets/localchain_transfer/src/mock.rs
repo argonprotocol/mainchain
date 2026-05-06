@@ -4,9 +4,9 @@ use pallet_prelude::*;
 
 use crate as pallet_localchain_transfer;
 use argon_primitives::{
-	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
 	notary::{NotaryProvider, NotarySignature},
 	tick::Ticker,
+	NotebookProvider, NotebookSecret, TickProvider, VotingSchedule,
 };
 use frame_support::traits::Currency;
 use sp_runtime::AccountId32;

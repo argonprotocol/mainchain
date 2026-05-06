@@ -15,9 +15,10 @@
 
 use super::*;
 use crate::mock::{
-	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy, ProxyType,
-	RuntimeCall, Test, TipAmount, ValidateCount, new_test_ext,
+	new_test_ext,
 	pallet_dummy::{Call, OneUseCodes},
+	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy, ProxyType,
+	RuntimeCall, Test, TipAmount, ValidateCount,
 };
 use frame_support::dispatch::DispatchInfo;
 use frame_system::RawOrigin;

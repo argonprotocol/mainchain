@@ -4,12 +4,12 @@ use sp_core::sr25519;
 use std::env;
 
 use crate::chain_spec::{
-	ChainSpec, GenesisSettings, authority_keys_from_seed, build_genesis_config,
-	get_account_id_from_seed,
+	authority_keys_from_seed, build_genesis_config, get_account_id_from_seed, ChainSpec,
+	GenesisSettings,
 };
 use argon_primitives::{
-	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, Chain, ComputeDifficulty, TOKEN_DECIMALS,
-	bitcoin::BitcoinNetwork, block_seal::MiningSlotConfig, tick::Ticker,
+	bitcoin::BitcoinNetwork, block_seal::MiningSlotConfig, tick::Ticker, Chain, ComputeDifficulty,
+	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 use argon_runtime::WASM_BINARY;
 

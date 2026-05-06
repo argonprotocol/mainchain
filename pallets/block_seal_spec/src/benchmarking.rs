@@ -4,29 +4,29 @@
 use super::*;
 use crate::Pallet as BlockSealSpecPallet;
 use argon_primitives::{
-	ComputeDifficulty, NotebookEventHandler, TickProvider,
-	digests::{BLOCK_VOTES_DIGEST_ID, BlockVoteDigest, NotebookDigest},
+	digests::{BlockVoteDigest, NotebookDigest, BLOCK_VOTES_DIGEST_ID},
 	inherents::BlockSealInherent,
 	notebook::NotebookHeader,
 	providers::BlockSealSpecProvider,
 	tick::Tick,
+	ComputeDifficulty, NotebookEventHandler, TickProvider,
 };
 use codec::{Decode, Encode};
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::{
-	BenchmarkNotebookProviderCallCounters, benchmark_notebook_provider_call_counters,
-	reset_benchmark_notebook_provider_call_counters, reset_benchmark_notebook_provider_state,
-	set_all_digests,
+	benchmark_notebook_provider_call_counters, reset_benchmark_notebook_provider_call_counters,
+	reset_benchmark_notebook_provider_state, set_all_digests,
+	BenchmarkNotebookProviderCallCounters,
 };
 use polkadot_sdk::{
 	frame_benchmarking::v2::*,
 	frame_support::{
-		BoundedVec,
 		storage::storage_prefix,
 		traits::{Hooks, OnTimestampSet},
+		BoundedVec,
 	},
 	sp_core::H256,
-	sp_runtime::{DigestItem, traits::SaturatedConversion},
+	sp_runtime::{traits::SaturatedConversion, DigestItem},
 };
 
 fn benchmark_notebook_header(tick: Tick) -> NotebookHeader {

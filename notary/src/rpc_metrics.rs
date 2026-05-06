@@ -20,10 +20,10 @@
 
 use std::time::Instant;
 
-use jsonrpsee::{MethodResponse, types::Request};
+use jsonrpsee::{types::Request, MethodResponse};
 use polkadot_sdk::substrate_prometheus_endpoint::{
-	Counter, CounterVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64,
-	register,
+	register, Counter, CounterVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry,
+	U64,
 };
 
 /// Histogram time buckets in microseconds.

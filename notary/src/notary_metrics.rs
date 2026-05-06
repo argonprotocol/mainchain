@@ -5,7 +5,7 @@ use polkadot_sdk::*;
 use sp_runtime::traits::UniqueSaturatedInto;
 use std::time::Instant;
 use substrate_prometheus_endpoint::{
-	CounterVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64, register,
+	register, CounterVec, HistogramOpts, HistogramVec, Opts, PrometheusError, Registry, U64,
 };
 
 /// Metrics for the notary processing

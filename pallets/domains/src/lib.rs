@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-use argon_primitives::{NotebookEventHandler, notebook::NotebookHeader};
+use argon_primitives::{notebook::NotebookHeader, NotebookEventHandler};
 pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
@@ -21,7 +21,7 @@ pub mod weights;
 /// If more than one domain registration is received in a tick, they are canceled out.
 #[frame_support::pallet]
 pub mod pallet {
-	use argon_primitives::{DomainHash, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES, ZoneRecord};
+	use argon_primitives::{DomainHash, ZoneRecord, MAX_DOMAINS_PER_NOTEBOOK, MAX_NOTARIES};
 	use sp_core::crypto::AccountId32;
 
 	use super::*;

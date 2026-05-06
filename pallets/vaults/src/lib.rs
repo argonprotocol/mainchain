@@ -29,9 +29,8 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeSet;
-	use argon_bitcoin::{CosignScript, CosignScriptArgs, primitives::UtxoId};
+	use argon_bitcoin::{primitives::UtxoId, CosignScript, CosignScriptArgs};
 	use argon_primitives::{
-		MiningFrameProvider, TickProvider,
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
@@ -40,12 +39,13 @@ pub mod pallet {
 			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault, VaultError,
 			VaultName, VaultTerms,
 		},
+		MiningFrameProvider, TickProvider,
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::{
-		OnNewSlot, OperationalAccountsHook,
 		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
+		OnNewSlot, OperationalAccountsHook,
 	};
 	use sp_runtime::traits::SaturatedConversion;
 

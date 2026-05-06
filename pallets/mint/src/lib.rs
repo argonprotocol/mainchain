@@ -19,8 +19,8 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		ArgonCPI, BlockRewardAccountsProvider, BlockRewardsEventHandler, BurnEventHandler,
-		PriceProvider, UtxoLockEvents, bitcoin::UtxoId, block_seal::BlockPayout,
+		bitcoin::UtxoId, block_seal::BlockPayout, ArgonCPI, BlockRewardAccountsProvider,
+		BlockRewardsEventHandler, BurnEventHandler, PriceProvider, UtxoLockEvents,
 	};
 	use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 	use sp_runtime::FixedPointNumber;
@@ -101,8 +101,8 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Any bitcoins minted
 		BitcoinMint { account_id: T::AccountId, utxo_id: Option<UtxoId>, amount: T::Balance },
-		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit will
-		/// not be able to mint
+		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
+		/// will not be able to mint
 		MiningMint {
 			amount: T::Balance,
 			per_miner: T::Balance,

@@ -51,7 +51,7 @@ impl ArgonotPriceLookup {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::uniswap_oracle::{PriceAndLiquidity, use_mock_uniswap_prices};
+	use crate::uniswap_oracle::{use_mock_uniswap_prices, PriceAndLiquidity};
 	use std::str::FromStr;
 
 	const MOCK_ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";

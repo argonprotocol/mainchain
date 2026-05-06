@@ -1,13 +1,12 @@
 use anyhow::{anyhow, bail, ensure};
 use argon_client::signer::KeystoreSigner;
-use argon_primitives::{ADDRESS_PREFIX, AccountId, CryptoType, KeystoreParams};
+use argon_primitives::{AccountId, CryptoType, KeystoreParams, ADDRESS_PREFIX};
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use polkadot_sdk::*;
 use sp_core::{
-	Pair as PairT,
-	crypto::{Ss58Codec, key_types::ACCOUNT},
-	sr25519,
+	crypto::{key_types::ACCOUNT, Ss58Codec},
+	sr25519, Pair as PairT,
 };
 use sp_runtime::traits::IdentifyAccount;
 use std::env;
@@ -16,7 +15,7 @@ use url::Url;
 
 use crate::{
 	bitcoin_tip::bitcoin_loop,
-	coin_usd_prices::{ALL_PRICE_PROVIDERS, PriceProviderKind},
+	coin_usd_prices::{PriceProviderKind, ALL_PRICE_PROVIDERS},
 	price_index::{price_index_loop, price_index_loop_from_file},
 };
 
@@ -135,15 +134,15 @@ async fn main() -> anyhow::Result<()> {
 			ACCOUNT,
 			false,
 		)?;
-		if let Some(verify_address) = verify_address {
-			if *verify_address != address {
-				error!(
-					?address,
-					?verify_address,
-					"The provided key does not match the `verify_address` param"
-				);
-				bail!("The provided key does not match the `verify_address` param");
-			}
+		if let Some(verify_address) = verify_address &&
+			*verify_address != address
+		{
+			error!(
+				?address,
+				?verify_address,
+				"The provided key does not match the `verify_address` param"
+			);
+			bail!("The provided key does not match the `verify_address` param");
 		}
 		info!(?address,
 			keystore_path = ?keystore_params.keystore_path,

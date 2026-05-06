@@ -4,19 +4,19 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook};
+use argon_primitives::{OperationalAccountsHook, MICROGONS_PER_ARGON};
 use codec::Decode;
 #[cfg(test)]
 use codec::Encode;
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	benchmarking::{
-		BenchmarkOperationalAccountsProviderCallCounters,
-		BenchmarkOperationalAccountsProviderState,
 		benchmark_operational_accounts_provider_call_counters,
 		reset_benchmark_operational_accounts_provider_call_counters,
 		reset_benchmark_operational_accounts_provider_state,
 		set_benchmark_operational_accounts_provider_state,
+		BenchmarkOperationalAccountsProviderCallCounters,
+		BenchmarkOperationalAccountsProviderState,
 	},
 	*,
 };
@@ -657,7 +657,7 @@ mod benchmarks {
 		use argon_primitives::Signature;
 		use polkadot_sdk::{
 			sp_io::hashing::blake2_256,
-			sp_runtime::{AccountId32, traits::Verify},
+			sp_runtime::{traits::Verify, AccountId32},
 		};
 
 		#[test]
@@ -687,38 +687,28 @@ mod benchmarks {
 					&operational_account,
 				)
 			);
-			assert!(
-				vault_signature.verify(
-					(VAULT_ACCOUNT_PROOF_MESSAGE_KEY, &operational_account, &vault_account)
-						.using_encoded(blake2_256)
-						.as_slice(),
-					&vault_account,
-				)
-			);
-			assert!(
-				mining_funding_signature.verify(
-					(
-						MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
-						&operational_account,
-						&mining_funding_account,
-					)
-						.using_encoded(blake2_256)
-						.as_slice(),
+			assert!(vault_signature.verify(
+				(VAULT_ACCOUNT_PROOF_MESSAGE_KEY, &operational_account, &vault_account)
+					.using_encoded(blake2_256)
+					.as_slice(),
+				&vault_account,
+			));
+			assert!(mining_funding_signature.verify(
+				(
+					MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
+					&operational_account,
 					&mining_funding_account,
 				)
-			);
-			assert!(
-				mining_bot_signature.verify(
-					(
-						MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
-						&operational_account,
-						&mining_bot_account,
-					)
-						.using_encoded(blake2_256)
-						.as_slice(),
-					&mining_bot_account,
-				)
-			);
+					.using_encoded(blake2_256)
+					.as_slice(),
+				&mining_funding_account,
+			));
+			assert!(mining_bot_signature.verify(
+				(MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY, &operational_account, &mining_bot_account,)
+					.using_encoded(blake2_256)
+					.as_slice(),
+				&mining_bot_account,
+			));
 		}
 
 		#[test]

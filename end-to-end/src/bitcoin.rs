@@ -2,7 +2,7 @@ use crate::utils::{create_active_notary, register_miner_keys, register_miners, s
 use anyhow::anyhow;
 use argon_bitcoin::{CosignScript, CosignScriptArgs};
 use argon_client::{
-	ArgonConfig, FetchAt, MainchainClient, api,
+	api,
 	api::{
 		price_index::calls::types::submit::Index,
 		runtime_types::{
@@ -11,32 +11,34 @@ use argon_client::{
 		storage, tx,
 	},
 	signer::{Signer, Sr25519Signer},
+	ArgonConfig, FetchAt, MainchainClient,
 };
 use argon_primitives::{
-	Balance, VaultId,
 	argon_utils::format_argons,
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, SATOSHIS_PER_BITCOIN, Satoshis, UtxoId},
+	bitcoin::{BitcoinCosignScriptPubkey, BitcoinNetwork, Satoshis, UtxoId, SATOSHIS_PER_BITCOIN},
 	prelude::sp_core::Encode,
 	tick::{Tick, Ticker},
+	Balance, VaultId,
 };
 use argon_testing::{
-	ArgonTestNode, ArgonTestOracle, add_blocks, add_wallet_address, fund_script_address,
-	run_bitcoin_cli, start_argon_test_node,
+	add_blocks, add_wallet_address, fund_script_address, run_bitcoin_cli, start_argon_test_node,
+	ArgonTestNode, ArgonTestOracle,
 };
 use bitcoin::{
-	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
 	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
 	secp256k1::{All, Secp256k1},
+	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
 };
 use bitcoind::{
-	BitcoinD, anyhow,
-	bitcoincore_rpc::{Auth, RpcApi, bitcoincore_rpc_json::AddressType, jsonrpc::serde_json},
+	anyhow,
+	bitcoincore_rpc::{bitcoincore_rpc_json::AddressType, jsonrpc::serde_json, Auth, RpcApi},
+	BitcoinD,
 };
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_arithmetic::FixedU128;
-use sp_core::{Pair, crypto::AccountId32, sr25519};
+use sp_core::{crypto::AccountId32, sr25519, Pair};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
 use std::{env, str::FromStr, sync::Arc, time::Duration};
 use tokio::{fs, time::sleep};
@@ -843,13 +845,11 @@ async fn confirm_lock(
 		assert_eq!(cosign_script_pubkey, lock_api.utxo_script_pubkey.clone().into());
 	}
 
-	assert!(
-		lock_cli_get
-			.lines()
-			.find(|line| line.contains("Minted Argons"))
-			.unwrap()
-			.contains(&format!("₳0 of {}", format_argons(lock_api.liquidity_promised)))
-	);
+	assert!(lock_cli_get
+		.lines()
+		.find(|line| line.contains("Minted Argons"))
+		.unwrap()
+		.contains(&format!("₳0 of {}", format_argons(lock_api.liquidity_promised))));
 	let liquidity_promised = lock_api.liquidity_promised;
 	Ok((lock_api.utxo_script_pubkey.into(), liquidity_promised))
 }

@@ -26,10 +26,10 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
-		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 		block_seal::{BlockPayout, BlockRewardType, FrameId},
 		notary::NotaryProvider,
+		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
+		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 	};
 
 	/// A reason for the pallet placing a hold on funds.
@@ -406,7 +406,11 @@ pub mod pallet {
 			let notebook_tick = T::TickProvider::voting_schedule().notebook_tick();
 			let tick_notebooks =
 				block_notebooks.iter().fold(T::Balance::zero(), |acc, (_, _, tick)| {
-					if *tick == notebook_tick { acc + T::Balance::one() } else { acc }
+					if *tick == notebook_tick {
+						acc + T::Balance::one()
+					} else {
+						acc
+					}
 				});
 
 			if active_notaries > tick_notebooks {

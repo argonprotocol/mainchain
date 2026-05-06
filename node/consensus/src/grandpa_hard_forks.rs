@@ -233,15 +233,15 @@ const TESTNET_AUTHORITY_CHANGE_BLOCKS: &[GrandpaHardForkBlock] = &[
 #[cfg(test)]
 mod tests {
 	use super::{
-		AuthorityList, authority_set_hard_forks, is_known_grandpa_authority_change_block,
-		is_known_grandpa_hard_fork_block,
+		authority_set_hard_forks, is_known_grandpa_authority_change_block,
+		is_known_grandpa_hard_fork_block, AuthorityList,
 	};
 	use argon_primitives::BlockNumber;
 	use hex_literal::hex;
 	use polkadot_sdk::{
 		sp_consensus_grandpa::AuthorityId,
 		sp_core::ed25519,
-		sp_runtime::{OpaqueExtrinsic, generic, traits::BlakeTwo256},
+		sp_runtime::{generic, traits::BlakeTwo256, OpaqueExtrinsic},
 	};
 
 	type Header = generic::Header<BlockNumber, BlakeTwo256>;

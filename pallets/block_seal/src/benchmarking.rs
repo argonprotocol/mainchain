@@ -7,30 +7,30 @@ use super::*;
 use crate::Pallet as BlockSealPallet;
 use alloc::collections::BTreeMap;
 use argon_primitives::{
-	AuthorityProvider, BlockSealerInfo, MerkleProof, NotebookAuditResult, TickProvider,
 	digests::{BlockVoteDigest, NotebookDigest},
 	inherents::BlockSealInherent,
 	localchain::BlockVote,
 	providers::BlockSealerProvider,
 	tick::Tick,
+	AuthorityProvider, BlockSealerInfo, MerkleProof, NotebookAuditResult, TickProvider,
 };
 use binary_merkle_tree::{merkle_proof, merkle_root};
 use codec::Encode;
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::{
-	BenchmarkNotebookProviderCallCounters, BenchmarkNotebookProviderState,
 	benchmark_notebook_provider_call_counters, benchmark_notebook_provider_state,
 	reset_benchmark_notebook_provider_call_counters, reset_benchmark_notebook_provider_state,
 	set_all_digests, set_benchmark_notebook_provider_state, synthetic_benchmark_parent_secret,
-	synthetic_benchmark_votes_root,
+	synthetic_benchmark_votes_root, BenchmarkNotebookProviderCallCounters,
+	BenchmarkNotebookProviderState,
 };
 #[cfg(not(test))]
 use polkadot_sdk::sp_core::crypto::KeyTypeId;
 #[cfg(test)]
-use polkadot_sdk::sp_core::{Pair, ed25519::Pair as Ed25519Pair};
+use polkadot_sdk::sp_core::{ed25519::Pair as Ed25519Pair, Pair};
 use polkadot_sdk::{
 	frame_benchmarking::v2::*,
-	frame_support::{BoundedVec, traits::Hooks},
+	frame_support::{traits::Hooks, BoundedVec},
 	sp_runtime::traits::BlakeTwo256,
 };
 

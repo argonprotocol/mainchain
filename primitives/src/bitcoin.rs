@@ -296,8 +296,8 @@ mod bitcoin_compat {
 	use ::bip32::secp256k1::ecdsa::VerifyingKey;
 	use bip32::{ChildNumber, ExtendedKeyAttrs, XPub};
 	use bitcoin::{
-		Network,
 		hashes::{FromSliceError, Hash},
+		Network,
 	};
 	use sp_core::H256;
 	use sp_runtime::BoundedVec;
@@ -585,7 +585,7 @@ mod bitcoin_compat {
 
 /// Returns the block height of the next Bitcoin day (eg, next iteration of 144 blocks)
 pub(crate) fn get_rounded_up_bitcoin_day_height(block_height: BitcoinHeight) -> BitcoinHeight {
-	if block_height % 144 == 0 {
+	if block_height.is_multiple_of(144) {
 		return block_height;
 	}
 	block_height - (block_height % 144) + 144

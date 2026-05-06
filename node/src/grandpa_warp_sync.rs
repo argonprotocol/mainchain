@@ -2,9 +2,10 @@ use codec::{DecodeAll, Encode};
 use polkadot_sdk::*;
 use sc_client_api::Backend as ClientBackend;
 use sc_consensus_grandpa::{
-	AuthoritySetChanges, AuthoritySetHardFork, BlockNumberOps, GrandpaJustification,
-	SharedAuthoritySet, best_justification, find_scheduled_change,
+	best_justification, find_scheduled_change,
 	warp_proof::{Error as WarpProofError, NetworkProvider, WarpSyncFragment},
+	AuthoritySetChanges, AuthoritySetHardFork, BlockNumberOps, GrandpaJustification,
+	SharedAuthoritySet,
 };
 use sc_network_sync::strategy::warp::{EncodedProof, WarpSyncProvider};
 use sp_blockchain::{Backend as BlockchainBackend, HeaderBackend};
@@ -220,7 +221,7 @@ where
 
 #[cfg(test)]
 mod tests {
-	use super::{GRANDPA_ENGINE_ID, is_authority_boundary};
+	use super::{is_authority_boundary, GRANDPA_ENGINE_ID};
 	use codec::Encode;
 	use polkadot_sdk::*;
 	use sp_consensus_grandpa::{ConsensusLog, ScheduledChange};

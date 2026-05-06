@@ -1,21 +1,21 @@
 use alloc::collections::BTreeSet;
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::iter::Sum;
-use frame_support::{PalletError, weights::Weight};
+use frame_support::{weights::Weight, PalletError};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
-use sp_runtime::{BoundedVec, traits::AtLeast32BitUnsigned};
+use sp_runtime::{traits::AtLeast32BitUnsigned, BoundedVec};
 
 use crate::{
-	VaultId,
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
-		UtxoId, get_rounded_up_bitcoin_day_height,
+		get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub,
+		CompressedBitcoinPubkey, Satoshis, UtxoId,
 	},
 	ensure,
 	prelude::FrameId,
 	tick::Tick,
+	VaultId,
 };
 
 pub trait BitcoinVaultProviderWeightInfo {
@@ -348,20 +348,20 @@ pub struct BurnResult<Balance> {
 }
 
 impl<
-	AccountId: Codec,
-	Balance: Codec
-		+ Copy
-		+ MaxEncodedLen
-		+ Default
-		+ AtLeast32BitUnsigned
-		+ MaxEncodedLen
-		+ Clone
-		+ TypeInfo
-		+ core::fmt::Debug
-		+ PartialEq
-		+ Eq
-		+ Sum,
-> Vault<AccountId, Balance>
+		AccountId: Codec,
+		Balance: Codec
+			+ Copy
+			+ MaxEncodedLen
+			+ Default
+			+ AtLeast32BitUnsigned
+			+ MaxEncodedLen
+			+ Clone
+			+ TypeInfo
+			+ core::fmt::Debug
+			+ PartialEq
+			+ Eq
+			+ Sum,
+	> Vault<AccountId, Balance>
 {
 	#[cfg(debug_assertions)]
 	#[inline(always)]
@@ -636,10 +636,10 @@ impl<
 		let mut remaining = securitization.collateral_required;
 		let max_expiration = max_expiration.map(get_rounded_up_bitcoin_day_height);
 		for (height, releasing_amount) in self.securitization_release_schedule.iter_mut() {
-			if let Some(max_expiration) = max_expiration {
-				if *height > max_expiration {
-					continue;
-				}
+			if let Some(max_expiration) = max_expiration &&
+				*height > max_expiration
+			{
+				continue;
 			}
 			let amount_to_use = remaining.min(*releasing_amount);
 			releasing_amount.saturating_reduce(amount_to_use);
@@ -658,8 +658,8 @@ impl<
 mod test {
 	use super::*;
 	use crate::{
+		prelude::sp_arithmetic::{traits::One, FixedU128},
 		Balance,
-		prelude::sp_arithmetic::{FixedU128, traits::One},
 	};
 	use polkadot_sdk::frame_support::assert_err;
 

@@ -3,15 +3,15 @@
 use super::*;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
-	NotebookAuditResult, TickProvider,
 	digests::{BlockVoteDigest, NotebookDigest},
-	tick::{MAX_BLOCKS_PER_TICK, Tick},
+	tick::{Tick, MAX_BLOCKS_PER_TICK},
+	NotebookAuditResult, TickProvider,
 };
 use codec::Decode;
 use pallet_prelude::benchmarking::set_all_digests;
 use polkadot_sdk::{
 	frame_benchmarking::v2::*,
-	frame_support::{BoundedVec, traits::Hooks},
+	frame_support::{traits::Hooks, BoundedVec},
 };
 
 const MAX_CLEANUP_RANGE: u32 = 1_024;

@@ -1,8 +1,8 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
+	vault::{BitcoinVaultProvider, RegistrationVaultData},
 	MiningFrameTransitionProvider, MiningSlotProvider, OperationalRewardsPayer,
 	RecentArgonTransferLookup, TreasuryPoolProvider,
-	vault::{BitcoinVaultProvider, RegistrationVaultData},
 };
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};

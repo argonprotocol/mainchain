@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use polkadot_sdk::*;
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use sp_core::H256;
-use sqlx::{FromRow, PgConnection, PgPool, postgres::PgListener};
+use sqlx::{postgres::PgListener, FromRow, PgConnection, PgPool};
 pub type AuditFailureStream = NotificationStream<NotebookNumber, AuditFailureTracingKey>;
 
 #[derive(Clone)]

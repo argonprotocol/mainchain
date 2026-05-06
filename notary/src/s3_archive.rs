@@ -1,14 +1,14 @@
 use crate::server::ArchiveSettings;
 use anyhow::bail;
-use argon_notary_apis::{Error, Error::ArchiveError, get_header_bucket, get_notebook_bucket};
+use argon_notary_apis::{get_header_bucket, get_notebook_bucket, Error, Error::ArchiveError};
 use argon_primitives::{NotaryId, NotebookNumber};
 use base64::Engine;
 use md5::{Digest, Md5};
-use rusoto_core::{Region, request::BufferedHttpResponse};
+use rusoto_core::{request::BufferedHttpResponse, Region};
 use rusoto_credential::DefaultCredentialsProvider;
 use rusoto_s3::{
 	DeleteBucketRequest, HeadBucketError, HeadBucketRequest, PutBucketPolicyRequest,
-	PutObjectOutput, PutObjectRequest, S3, S3Client,
+	PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
 use std::{env, str::FromStr};
 use tokio::task;

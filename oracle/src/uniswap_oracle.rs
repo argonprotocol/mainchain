@@ -1,11 +1,11 @@
 use alloy_contract::Error as ContractError;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{address, aliases::I56};
-use alloy_provider::{RootProvider, network::Ethereum};
-use anyhow::{Result, anyhow};
+use alloy_provider::{network::Ethereum, RootProvider};
+use anyhow::{anyhow, Result};
 use argon_primitives::{
-	Balance,
 	prelude::{frame_support::pallet_prelude::Zero, sp_arithmetic::FixedPointNumber},
+	Balance,
 };
 use polkadot_sdk::*;
 use sdk_core::prelude::*;

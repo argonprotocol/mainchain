@@ -1,13 +1,13 @@
 use anyhow::anyhow;
 use polkadot_sdk::*;
-use sp_core::Decode;
 use sp_core::crypto::AccountId32;
+use sp_core::Decode;
 use sp_core::{ByteArray, H256};
 use sp_runtime::MultiSignature;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use subxt::runtime_api::Payload as RuntimeApiPayload;
 use subxt::storage::Address as StorageAddress;
 use subxt::utils::Yes;
@@ -19,8 +19,8 @@ use argon_client::api::{runtime_types, tx};
 
 use argon_client::api::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 use argon_client::{
-  ArgonConfig, ArgonExtrinsicParamsBuilder, FetchAt, MainchainClient as InnerMainchainClient,
-  TxInBlockWithEvents, api,
+  api, ArgonConfig, ArgonExtrinsicParamsBuilder, FetchAt, MainchainClient as InnerMainchainClient,
+  TxInBlockWithEvents,
 };
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
@@ -30,7 +30,7 @@ use argon_primitives::{
 
 use crate::AccountStore;
 use crate::Keystore;
-use crate::{Result, bail};
+use crate::{bail, Result};
 
 #[cfg_attr(feature = "napi", napi)]
 #[allow(clippy::type_complexity)]
@@ -65,10 +65,10 @@ impl MainchainClient {
   }
 
   async fn ensure_connected(&self, timeout_millis: i64) -> Result<()> {
-    if let Some(c) = self.client.read().await.as_ref() {
-      if c.ws_client.is_connected() {
-        return Ok(());
-      }
+    if let Some(c) = self.client.read().await.as_ref()
+      && c.ws_client.is_connected()
+    {
+      return Ok(());
     }
     // hold lock while we swap out the client
     let mut write_lock = self.client.write().await;
@@ -247,7 +247,7 @@ impl MainchainClient {
         }
       };
 
-      let prim_host: Host = host.host.0.0.into();
+      let prim_host: Host = host.host.0 .0.into();
       let host_string: String = prim_host.try_into()?;
       versions.insert(
         format!("{}.{}.{}", version.major, version.minor, version.patch),
@@ -285,7 +285,7 @@ impl MainchainClient {
       .hosts
       .0
       .into_iter()
-      .map(|h| Host::from(h.0.0).try_into())
+      .map(|h| Host::from(h.0 .0).try_into())
       .collect();
     let notary = NotaryDetails {
       id: notary.notary_id,
@@ -416,10 +416,9 @@ impl MainchainClient {
       if let Some(Ok(transfer)) = event
         .as_event::<api::localchain_transfer::events::TransferToLocalchain>()
         .transpose()
+        && transfer.account_id.0 == account_bytes
       {
-        if transfer.account_id.0 == account_bytes {
-          return Some(transfer);
-        }
+        return Some(transfer);
       }
       None
     });
@@ -481,16 +480,15 @@ impl MainchainClient {
         if let Some(Ok(transfer)) = event
           .as_event::<api::localchain_transfer::events::TransferToLocalchain>()
           .transpose()
+          && transfer.transfer_id == transfer_id
         {
-          if transfer.transfer_id == transfer_id {
-            return Ok(Some(LocalchainTransfer {
-              address: transfer.account_id.to_address(),
-              amount: transfer.amount,
-              notary_id: transfer.notary_id,
-              expiration_tick: transfer.expiration_tick,
-              transfer_id,
-            }));
-          }
+          return Ok(Some(LocalchainTransfer {
+            address: transfer.account_id.to_address(),
+            amount: transfer.amount,
+            notary_id: transfer.notary_id,
+            expiration_tick: transfer.expiration_tick,
+            transfer_id,
+          }));
         }
       }
     }
@@ -546,10 +544,10 @@ impl MainchainClient {
     notary_id: NotaryId,
     notebook_number: NotebookNumber,
   ) -> Result<u32> {
-    if let Ok(notebook_details) = self.get_latest_notebook(notary_id).await {
-      if notebook_details.notebook_number >= notebook_number {
-        return self.latest_finalized_number().await;
-      }
+    if let Ok(notebook_details) = self.get_latest_notebook(notary_id).await
+      && notebook_details.notebook_number >= notebook_number
+    {
+      return self.latest_finalized_number().await;
     }
 
     let mut subscription = self
@@ -573,10 +571,10 @@ impl MainchainClient {
         if let Some(Ok(notebook)) = event
           .as_event::<api::notebook::events::NotebookSubmitted>()
           .transpose()
+          && notebook.notary_id == notary_id
+          && notebook.notebook_number >= notebook_number
         {
-          if notebook.notary_id == notary_id && notebook.notebook_number >= notebook_number {
-            return Ok(block_height);
-          }
+          return Ok(block_height);
         }
       }
     }

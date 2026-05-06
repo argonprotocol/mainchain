@@ -1,7 +1,7 @@
 use crate::get_header_url;
 use argon_primitives::{
-	AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookMeta, NotebookNumber,
-	SignedNotebookHeader, prelude::Tick,
+	prelude::Tick, AccountId, AccountType, BalanceProof, BalanceTip, Notarization, NotebookMeta,
+	NotebookNumber, SignedNotebookHeader,
 };
 use codec::{Decode, Encode};
 use jsonrpsee::{

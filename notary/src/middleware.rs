@@ -3,12 +3,12 @@ use crate::{
 	server::{RpcConfig, RpcRateLimitMode},
 };
 use futures::future::{BoxFuture, FutureExt};
-use governor::{Jitter, Quota, clock::Clock, middleware::NoOpMiddleware};
+use governor::{clock::Clock, middleware::NoOpMiddleware, Jitter, Quota};
 use jsonrpsee::{
-	MethodResponse,
 	core::server::ConnectionId,
-	server::{HttpRequest, middleware::rpc::RpcServiceT},
+	server::{middleware::rpc::RpcServiceT, HttpRequest},
 	types::{ErrorObject, Request},
+	MethodResponse,
 };
 use polkadot_sdk::*;
 use prometheus::Registry;
@@ -330,11 +330,10 @@ fn get_client_rate_limit_key_from_http_request<B>(
 	// Proxy headers are only read when trust is explicitly enabled.
 	// This assumes the node is deployed behind trusted proxies and should only be
 	// enabled when the request path is controlled.
-	if trust_proxy_headers {
-		if let Some(key) = get_forwarded_ip(request).or_else(|| get_header_ip(request, "x-real-ip"))
-		{
-			return Some(key);
-		}
+	if trust_proxy_headers &&
+		let Some(key) = get_forwarded_ip(request).or_else(|| get_header_ip(request, "x-real-ip"))
+	{
+		return Some(key);
 	}
 
 	request
@@ -497,11 +496,9 @@ mod tests {
 
 		// Same connection and key should be rate-limited; this would complete immediately if keying
 		// is broken.
-		assert!(
-			timeout(Duration::from_millis(100), middleware.call(second_request))
-				.await
-				.is_err()
-		);
+		assert!(timeout(Duration::from_millis(100), middleware.call(second_request))
+			.await
+			.is_err());
 		assert_eq!(service.calls(), 1);
 
 		let third_request = Request::new("rpc.health".into(), None, Id::Number(3));

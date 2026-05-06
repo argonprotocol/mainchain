@@ -3,8 +3,8 @@ pub use crate::{
 };
 use anyhow::anyhow;
 use argon_primitives::{
-	NotaryId, Notebook, NotebookNumber, SignedNotebookHeader,
 	notary::{NotebookBytes, SignedHeaderBytes},
+	NotaryId, Notebook, NotebookNumber, SignedNotebookHeader,
 };
 use codec::Decode;
 use jsonrpsee::{
@@ -47,10 +47,10 @@ fn strict_http_client() -> &'static reqwest::Client {
 			.pool_max_idle_per_host(20)
 			// Strict mode allows redirects only when they stay on the same host.
 			.redirect(reqwest::redirect::Policy::custom(|attempt| {
-				if let Some(previous) = attempt.previous().last() {
-					if !is_same_host(attempt.url(), previous) {
-						return attempt.error("cross-host redirect is not allowed in strict mode");
-					}
+				if let Some(previous) = attempt.previous().last() &&
+					!is_same_host(attempt.url(), previous)
+				{
+					return attempt.error("cross-host redirect is not allowed in strict mode");
 				}
 				if has_private_or_loopback_target(attempt.url()) {
 					return attempt
@@ -271,12 +271,12 @@ async fn download(
 		"Notary/notebook download complete",
 	);
 
-	if let Some(content_length) = declared_content_length {
-		if total_bytes != content_length {
-			return Err(anyhow!(
-				"download content-length mismatch: declared={content_length}, actual={total_bytes}"
-			));
-		}
+	if let Some(content_length) = declared_content_length &&
+		total_bytes != content_length
+	{
+		return Err(anyhow!(
+			"download content-length mismatch: declared={content_length}, actual={total_bytes}"
+		));
 	}
 
 	Ok(bytes)
@@ -313,13 +313,13 @@ fn validate_download_url(url: &reqwest::Url, policy: &DownloadPolicy) -> anyhow:
 		}
 	}
 
-	if let Some(expected_path_suffix) = &policy.expected_path_suffix {
-		if !url.path().ends_with(expected_path_suffix) {
-			return Err(anyhow!(
+	if let Some(expected_path_suffix) = &policy.expected_path_suffix &&
+		!url.path().ends_with(expected_path_suffix)
+	{
+		return Err(anyhow!(
 				"download policy reject: path mismatch, expected suffix `{expected_path_suffix}` got `{}`",
 				url.path()
 			));
-		}
 	}
 
 	Ok(())
@@ -365,10 +365,10 @@ fn has_private_or_loopback_target(url: &reqwest::Url) -> bool {
 }
 
 fn enforce_download_limits(total_bytes: u64, max_bytes: Option<u64>) -> anyhow::Result<()> {
-	if let Some(max_bytes) = max_bytes {
-		if total_bytes > max_bytes {
-			return Err(anyhow!("download oversize: {total_bytes} bytes > {max_bytes} bytes"));
-		}
+	if let Some(max_bytes) = max_bytes &&
+		total_bytes > max_bytes
+	{
+		return Err(anyhow!("download oversize: {total_bytes} bytes > {max_bytes} bytes"));
 	}
 	Ok(())
 }

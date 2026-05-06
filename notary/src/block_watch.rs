@@ -1,5 +1,5 @@
 use codec::Decode;
-use sp_core::{H256, ed25519::Public as Ed25519Public};
+use sp_core::{ed25519::Public as Ed25519Public, H256};
 use sqlx::{PgConnection, PgPool};
 use std::time::Duration;
 use subxt::{
@@ -9,11 +9,11 @@ use subxt::{
 use tracing::{error, info, trace, warn};
 
 pub use argon_client;
-use argon_client::{ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, api};
+use argon_client::{api, ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient};
 use argon_primitives::{
-	NotebookDigest,
 	prelude::*,
 	tick::{TickDigest, Ticker},
+	NotebookDigest,
 };
 
 use crate::stores::{
@@ -126,20 +126,19 @@ async fn process_block(
 	let events = block.events().await?;
 	for event in events.iter().flatten() {
 		if let Some(Ok(notebook)) =
-			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose()
+			event.as_event::<api::notebook::events::NotebookAuditFailure>().transpose() &&
+			notebook.notary_id == notary_id
 		{
-			if notebook.notary_id == notary_id {
-				error!("Notebook audit failure: {:?}", notebook);
-				NotebookAuditFailureStore::record(
-					db,
-					notebook.notebook_number,
-					notebook.notebook_hash.into(),
-					format!("{:?}", notebook.first_failure_reason),
-					block.number(),
-				)
-				.await?;
-				break;
-			}
+			error!("Notebook audit failure: {:?}", notebook);
+			NotebookAuditFailureStore::record(
+				db,
+				notebook.notebook_number,
+				notebook.notebook_hash.into(),
+				format!("{:?}", notebook.first_failure_reason),
+				block.number(),
+			)
+			.await?;
+			break;
 		}
 	}
 

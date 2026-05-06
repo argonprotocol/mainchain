@@ -1,10 +1,10 @@
 use argon_client::{
-	ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient, api, signer::Sr25519Signer,
+	api, signer::Sr25519Signer, ArgonConfig, ArgonExtrinsicParamsBuilder, ArgonOnlineClient,
 };
 use polkadot_sdk::{sp_runtime::AccountId32, *};
 use sp_core::Pair;
 use sp_keyring::Sr25519Keyring::{Alice, Bob};
-use subxt::{OnlineClient, config::HashFor, tx::TxStatus};
+use subxt::{config::HashFor, tx::TxStatus, OnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

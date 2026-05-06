@@ -1,6 +1,5 @@
 use crate::{
-	Error,
-	middleware::{ClientRateLimitKeyLayer, MiddlewareLayer, register_prometheus_metrics},
+	middleware::{register_prometheus_metrics, ClientRateLimitKeyLayer, MiddlewareLayer},
 	notary_metrics::NotaryMetrics,
 	stores::{
 		balance_tip::BalanceTipStore,
@@ -11,6 +10,7 @@ use crate::{
 		},
 		notebook_header::NotebookHeaderStore,
 	},
+	Error,
 };
 use argon_notary_apis::{
 	get_header_url, get_notebook_url,
@@ -19,28 +19,28 @@ use argon_notary_apis::{
 	system::SystemRpcServer,
 };
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
+	tick::Ticker, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization,
 	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, NotaryId,
-	NotebookMeta, NotebookNumber, SignedNotebookHeader, tick::Ticker,
+	NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 use clap::ValueEnum;
 use futures::{Stream, StreamExt};
 use jsonrpsee::{
-	RpcModule, TrySendError,
-	core::{SubscriptionResult, async_trait},
+	core::{async_trait, SubscriptionResult},
 	server::{
+		middleware::{http::ProxyGetRequestLayer, rpc::either::Either},
 		BatchRequestConfig, PendingSubscriptionSink, PingConfig, RpcServiceBuilder, Server,
 		ServerBuilder, ServerHandle, SubscriptionMessage,
-		middleware::{http::ProxyGetRequestLayer, rpc::either::Either},
 	},
 	types::ErrorObjectOwned,
+	RpcModule, TrySendError,
 };
 use polkadot_sdk::*;
 use prometheus::Registry;
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use serde::Serialize;
 use sp_core::H256;
-use sqlx::{PgPool, Postgres, pool::PoolConnection};
+use sqlx::{pool::PoolConnection, PgPool, Postgres};
 use std::{net::SocketAddr, num::NonZeroU32, sync::Arc, time::Duration};
 use tokio::{net::ToSocketAddrs, sync::Mutex, task::JoinHandle};
 use tower::layer::util::{Identity, Stack};
@@ -329,10 +329,10 @@ impl NotaryServer {
 		&self,
 		notebook_number: NotebookNumber,
 	) -> Result<(), Error> {
-		if let Some(failed_notebook_number) = *self.audit_failure_number.lock().await {
-			if notebook_number >= failed_notebook_number {
-				return Err(Error::NotaryFailedAudit(notebook_number));
-			}
+		if let Some(failed_notebook_number) = *self.audit_failure_number.lock().await &&
+			notebook_number >= failed_notebook_number
+		{
+			return Err(Error::NotaryFailedAudit(notebook_number));
 		}
 		Ok(())
 	}
@@ -522,20 +522,20 @@ mod tests {
 	use jsonrpsee::ws_client::WsClientBuilder;
 	use polkadot_sdk::*;
 	use prometheus::Registry;
-	use sp_core::{Blake2Hasher, bounded_vec, ed25519::Signature};
+	use sp_core::{bounded_vec, ed25519::Signature, Blake2Hasher};
 	use sp_keyring::{Ed25519Keyring::Bob, Sr25519Keyring::Ferdie};
-	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 	use std::time::Duration;
 
 	use argon_primitives::{
-		AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip, ChainTransfer,
-		NewAccountOrigin, Note, NoteType, tick::Ticker,
+		tick::Ticker, AccountOrigin, AccountType::Deposit, BalanceChange, BalanceTip,
+		ChainTransfer, NewAccountOrigin, Note, NoteType,
 	};
 
 	use super::NotaryServer;
 	use crate::{
-		notebook_closer::{FinalizedNotebookHeaderListener, NOTARY_KEYID, NotebookCloser},
+		notebook_closer::{FinalizedNotebookHeaderListener, NotebookCloser, NOTARY_KEYID},
 		s3_archive::S3Archive,
 		stores::{
 			blocks::BlocksStore, chain_transfer::ChainTransferStore,

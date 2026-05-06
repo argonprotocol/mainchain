@@ -5,18 +5,18 @@ use super::*;
 #[allow(unused_imports)]
 use crate::Pallet as NotebookPallet;
 use argon_primitives::{
-	NotebookAuditResult, SignedNotebookHeader, TickProvider,
 	digests::{BlockVoteDigest, NotebookDigest},
 	notary::NotaryProvider,
 	notebook::{AccountOrigin, ChainTransfer, NotebookHeader},
 	providers::NotebookProvider,
+	NotebookAuditResult, SignedNotebookHeader, TickProvider,
 };
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::set_all_digests;
 use polkadot_sdk::{
 	frame_benchmarking::v2::*,
 	frame_support::BoundedVec,
-	sp_core::{H256, ed25519},
+	sp_core::{ed25519, H256},
 };
 
 fn notebook_digest(headers: &[SignedNotebookHeader]) -> NotebookDigest<NotebookVerifyError> {

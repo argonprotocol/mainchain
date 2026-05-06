@@ -8,7 +8,7 @@ use frame_support::{
 #[cfg(feature = "try-runtime")]
 use frame_support::{
 	storage::KeyPrefixIterator,
-	traits::{GetStorageVersion, STORAGE_VERSION_STORAGE_KEY_POSTFIX, StorageVersion},
+	traits::{GetStorageVersion, StorageVersion, STORAGE_VERSION_STORAGE_KEY_POSTFIX},
 };
 use pallet_prelude::*;
 use sp_io::hashing::twox_128;

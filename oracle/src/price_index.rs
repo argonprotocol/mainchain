@@ -4,8 +4,8 @@ use anyhow::{anyhow, ensure};
 use polkadot_sdk::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use sp_runtime::{
-	FixedU128, Saturating,
 	traits::{One, Zero},
+	FixedU128, Saturating,
 };
 use tokio::{join, time::sleep};
 use tracing::info;
@@ -17,10 +17,10 @@ use crate::{
 	us_cpi::UsCpiRetriever,
 };
 use argon_client::{
-	FetchAt, MainchainClient, ReconnectingClient,
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
+	FetchAt, MainchainClient, ReconnectingClient,
 };
 use argon_primitives::prelude::sp_arithmetic::FixedPointNumber;
 
@@ -61,13 +61,13 @@ pub async fn price_index_loop(
 	}
 
 	let mut ticker = mainchain_client.lookup_ticker().await?;
-	if let Ok(ntp_pool) = env::var("NTP_POOL") {
-		if !ntp_pool.is_empty() {
-			ticker
-				.lookup_ntp_offset(&ntp_pool)
-				.await
-				.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
-		}
+	if let Ok(ntp_pool) = env::var("NTP_POOL") &&
+		!ntp_pool.is_empty()
+	{
+		ticker
+			.lookup_ntp_offset(&ntp_pool)
+			.await
+			.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
 	}
 
 	let last_price = mainchain_client
@@ -332,11 +332,10 @@ mod tests {
 	use alloy_primitives::Address;
 	use polkadot_sdk::*;
 	use sp_core::{
-		Pair,
-		crypto::{AccountId32, key_types::ACCOUNT},
-		sr25519,
+		crypto::{key_types::ACCOUNT, AccountId32},
+		sr25519, Pair,
 	};
-	use sp_keystore::{Keystore, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sp_runtime::FixedU128;
 	use std::{env, str::FromStr};
 	use tokio::spawn;
@@ -346,9 +345,9 @@ mod tests {
 	use argon_testing::start_argon_test_node;
 
 	use crate::{
-		coin_usd_prices::{PriceLookups, use_mock_price_lookups},
+		coin_usd_prices::{use_mock_price_lookups, PriceLookups},
 		price_index_loop,
-		uniswap_oracle::{PriceAndLiquidity, UniswapOracleError, use_mock_uniswap_prices},
+		uniswap_oracle::{use_mock_uniswap_prices, PriceAndLiquidity, UniswapOracleError},
 		us_cpi::use_mock_cpi_values,
 	};
 

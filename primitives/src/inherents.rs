@@ -6,10 +6,10 @@ use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 
 use crate::{
-	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
-	SignedNotebookHeader,
 	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef},
 	notary::SignedHeaderBytes,
+	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
+	SignedNotebookHeader,
 };
 
 pub const SEAL_INHERENT_IDENTIFIER: InherentIdentifier = *b"seal_arg";

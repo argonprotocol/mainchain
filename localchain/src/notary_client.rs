@@ -1,15 +1,15 @@
 use crate::mainchain_client::MainchainClient;
-use crate::{AccountStore, Error, Result, bail};
+use crate::{bail, AccountStore, Error, Result};
 use anyhow::anyhow;
-use argon_notary_apis::NotebookRpcClient;
 use argon_notary_apis::localchain::{BalanceChangeResult, BalanceTipResult};
-use argon_notary_apis::{LocalchainRpcClient, download_notebook_header};
+use argon_notary_apis::NotebookRpcClient;
+use argon_notary_apis::{download_notebook_header, LocalchainRpcClient};
 use argon_primitives::{
   AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, Notarization, NotebookNumber,
   SignedNotebookHeader,
 };
-use futures::StreamExt;
 use futures::stream::TryStreamExt;
+use futures::StreamExt;
 use polkadot_sdk::*;
 use sp_core::ed25519;
 use sp_runtime::traits::Verify;
@@ -62,10 +62,10 @@ impl NotaryClients {
   pub async fn get(&self, notary_id: u32) -> Result<NotaryClient> {
     // hold lock for this function
     let mut clients_by_id = self.clients_by_id.write().await;
-    if let Some(client) = clients_by_id.get(&notary_id) {
-      if client.is_connected().await {
-        return Ok(client.clone());
-      }
+    if let Some(client) = clients_by_id.get(&notary_id)
+      && client.is_connected().await
+    {
+      return Ok(client.clone());
     }
 
     let notary_details = {
@@ -301,10 +301,10 @@ pub mod napi_ext {
   use super::NotaryClient;
   use super::NotaryClients;
   use super::*;
-  use crate::MainchainClient;
   use crate::error::NapiOk;
+  use crate::MainchainClient;
   use argon_notary_apis::NotebookRpcClient;
-  use argon_primitives::{AccountType, NotebookNumber, tick::Tick};
+  use argon_primitives::{tick::Tick, AccountType, NotebookNumber};
   use napi::bindgen_prelude::*;
   use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
   use std::sync::Arc;

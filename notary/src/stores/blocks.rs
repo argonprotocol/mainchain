@@ -1,10 +1,10 @@
 use argon_notary_audit::VerifyError;
-use argon_primitives::{NotebookAuditResult, ensure};
+use argon_primitives::{ensure, NotebookAuditResult};
 use chrono::Utc;
 use polkadot_sdk::*;
 use serde_json::json;
 use sp_core::H256;
-use sqlx::{FromRow, PgConnection, postgres::PgDatabaseError};
+use sqlx::{postgres::PgDatabaseError, FromRow, PgConnection};
 
 use crate::Error;
 

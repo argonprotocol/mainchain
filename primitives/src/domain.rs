@@ -8,7 +8,7 @@ use sp_core::{ConstU32, H256};
 use sp_crypto_hashing::blake2_256;
 use sp_runtime::{BoundedBTreeMap, BoundedVec};
 
-use crate::{Balance, NotaryId, domain_top_level::DomainTopLevel, host::Host};
+use crate::{domain_top_level::DomainTopLevel, host::Host, Balance, NotaryId};
 
 pub const MAX_DATASTORE_VERSIONS: u32 = 25;
 

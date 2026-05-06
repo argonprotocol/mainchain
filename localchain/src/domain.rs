@@ -3,7 +3,7 @@ use chrono::NaiveDateTime;
 use serde_json::json;
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 
-use crate::{Result, bail};
+use crate::{bail, Result};
 
 #[derive(FromRow, Clone)]
 #[allow(dead_code)]

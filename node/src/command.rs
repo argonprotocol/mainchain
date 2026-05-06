@@ -1,16 +1,16 @@
 use crate::{
 	chain_spec,
 	cli::{Cli, RandomxFlag, Subcommand},
-	runtime_api::{BaseHostRuntimeApis, opaque::Block},
+	runtime_api::{opaque::Block, BaseHostRuntimeApis},
 	service,
-	service::{FullClient, new_partial},
+	service::{new_partial, FullClient},
 };
 use argon_notary_apis::DownloadTrustMode;
 use argon_primitives::prelude::sp_api::ConstructRuntimeApi;
 use polkadot_sdk::{sc_service::TaskManager, *};
 use sc_chain_spec::ChainSpec;
 use sc_cli::{Error, Result as CliResult, SubstrateCli};
-use sc_network::{Litep2pNetworkBackend, NetworkWorker, config::NetworkBackendType};
+use sc_network::{config::NetworkBackendType, Litep2pNetworkBackend, NetworkWorker};
 use sp_core::crypto::AccountId32;
 use sp_keyring::Sr25519Keyring::Alice;
 use std::cmp::max;
@@ -240,7 +240,11 @@ impl MiningConfig {
 			.unwrap_or_else(|_| {
 				matches!(selected_chain_id.as_str(), "dev" | "dev-docker" | "local" | "meta")
 			});
-		if is_dev_chain { DownloadTrustMode::Dev } else { DownloadTrustMode::Strict }
+		if is_dev_chain {
+			DownloadTrustMode::Dev
+		} else {
+			DownloadTrustMode::Strict
+		}
 	}
 
 	fn mb_to_bytes(mb: u64) -> u64 {

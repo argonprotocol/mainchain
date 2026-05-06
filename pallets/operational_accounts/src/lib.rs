@@ -23,10 +23,10 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		MICROGONS_PER_ARGON, MiningFrameTransitionProvider, MiningSlotProvider,
+		vault::BitcoinVaultProvider, MiningFrameTransitionProvider, MiningSlotProvider,
 		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer,
 		RecentArgonTransferLookup, Signature, TreasuryPoolProvider,
-		UniswapTransferRequirementProvider, vault::BitcoinVaultProvider,
+		UniswapTransferRequirementProvider, MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::marker::PhantomData;
@@ -34,8 +34,8 @@ pub mod pallet {
 	use polkadot_sdk::frame_system::ensure_root;
 	use sp_core::sr25519;
 	use sp_runtime::{
-		AccountId32,
 		traits::{Verify, Zero},
+		AccountId32,
 	};
 
 	/// Domain separator for referral claim proofs.
@@ -103,7 +103,10 @@ pub mod pallet {
 		type MiningSeatsPerReferral: Get<u32>;
 
 		/// Provider for current vault state used to initialize registration.
-		type VaultProvider: BitcoinVaultProvider<AccountId = Self::AccountId, Balance = Self::Balance>;
+		type VaultProvider: BitcoinVaultProvider<
+			AccountId = Self::AccountId,
+			Balance = Self::Balance,
+		>;
 		/// Provider for whether a linked mining rewards account currently has an active seat.
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
 		/// Provider for whether a linked vault account currently has treasury pool participation.
@@ -946,7 +949,10 @@ pub mod pallet {
 			let amount_u128: u128 = amount.into();
 
 			ensure!(amount >= claim_increment, Error::<T>::RewardClaimBelowMinimum);
-			ensure!(amount_u128 % MICROGONS_PER_ARGON == 0, Error::<T>::RewardClaimNotWholeArgon);
+			ensure!(
+				amount_u128.is_multiple_of(MICROGONS_PER_ARGON),
+				Error::<T>::RewardClaimNotWholeArgon
+			);
 
 			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
 				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;

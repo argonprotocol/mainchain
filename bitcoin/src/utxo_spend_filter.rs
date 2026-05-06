@@ -84,10 +84,10 @@ impl UtxoSpendFilter {
 
 		let mut keep_sync_back_to = sync_status.oldest_allowed_block_height;
 		// make sure we don't have a gap in the blocks
-		if let Some(synched_block) = &sync_status.synched_block {
-			if synched_block.block_height < keep_sync_back_to {
-				keep_sync_back_to = synched_block.block_height;
-			}
+		if let Some(synched_block) = &sync_status.synched_block &&
+			synched_block.block_height < keep_sync_back_to
+		{
+			keep_sync_back_to = synched_block.block_height;
 		}
 
 		Self::prune_filters(keep_sync_back_to, &mut stored_filters);
@@ -196,11 +196,11 @@ impl UtxoSpendFilter {
 				break;
 			}
 			let prev_header = &filters[i - 1];
-			if let Some(prev_hash) = &header.previous_block_hash {
-				if prev_hash != &prev_header.block_hash {
-					drain_to = i;
-					break;
-				}
+			if let Some(prev_hash) = &header.previous_block_hash &&
+				prev_hash != &prev_header.block_hash
+			{
+				drain_to = i;
+				break;
 			}
 		}
 

@@ -1,7 +1,7 @@
 use std::{fmt, io, io::Write, iter::Iterator, string::ToString};
 
 use crate::{
-	formatters::{Argons, Pct, parse_number},
+	formatters::{parse_number, Argons, Pct},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 };
 use argon_bitcoin_cli_macros::ReadDocs;
@@ -13,9 +13,9 @@ use argon_client::{
 use argon_primitives::bitcoin::BitcoinXPub;
 use clap::Args;
 use inquire::{
-	CustomUserError, InquireError, Select, Text,
 	error::InquireResult,
 	validator::{StringValidator, Validation},
+	CustomUserError, InquireError, Select, Text,
 };
 use polkadot_sdk::*;
 use sp_runtime::{FixedU128, Permill};
@@ -232,32 +232,32 @@ impl VaultConfig {
 	}
 
 	fn sanitize_bad_values(&mut self) {
-		if let Some(val) = self.argons {
-			if val < 0.0 {
-				self.argons = None;
-			}
+		if let Some(val) = self.argons &&
+			val < 0.0
+		{
+			self.argons = None;
 		}
-		if let Some(val) = self.treasury_profit_sharing {
-			if val < 0.0 {
-				self.treasury_profit_sharing = None;
-			}
+		if let Some(val) = self.treasury_profit_sharing &&
+			val < 0.0
+		{
+			self.treasury_profit_sharing = None;
 		}
-		if let Some(val) = self.securitization_ratio {
-			if val < 1.0 {
-				self.securitization_ratio = None;
-			}
-		}
-
-		if let Some(val) = self.bitcoin_apr {
-			if val < 0.0 {
-				self.bitcoin_apr = None;
-			}
+		if let Some(val) = self.securitization_ratio &&
+			val < 1.0
+		{
+			self.securitization_ratio = None;
 		}
 
-		if let Some(val) = self.bitcoin_base_fee {
-			if val < 0.0 {
-				self.bitcoin_base_fee = None;
-			}
+		if let Some(val) = self.bitcoin_apr &&
+			val < 0.0
+		{
+			self.bitcoin_apr = None;
+		}
+
+		if let Some(val) = self.bitcoin_base_fee &&
+			val < 0.0
+		{
+			self.bitcoin_base_fee = None;
 		}
 	}
 
@@ -308,7 +308,7 @@ impl VaultConfig {
 		}
 	}
 
-	fn text_field(&self, field: &'static str, default: &'static str) -> TextField {
+	fn text_field(&self, field: &'static str, default: &'static str) -> TextField<'_> {
 		let text = label(field);
 		let docs = VaultConfig::get_docs(field).unwrap();
 

@@ -10,7 +10,7 @@ use pallet_prelude::{
 use polkadot_sdk::{
 	frame_support::{traits::fungible, weights::IdentityFee},
 	pallet_balances::Instance1,
-	sp_core::{ConstU8, ConstU128},
+	sp_core::{ConstU128, ConstU8},
 };
 use sp_runtime::{
 	traits::{DispatchOriginOf, TransactionExtension},
@@ -252,7 +252,7 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 
 #[frame_support::pallet(dev_mode)]
 pub mod pallet_dummy {
-	use crate::mock::{RuntimeCall, pallet_dummy};
+	use crate::mock::{pallet_dummy, RuntimeCall};
 	use pallet_prelude::{
 		argon_primitives::{
 			CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,

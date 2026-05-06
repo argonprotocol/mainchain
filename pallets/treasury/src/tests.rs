@@ -5,15 +5,15 @@ use super::{
 };
 use crate::{
 	mock::{
-		Balances, BidPoolAccountId, CurrentFrameId, ExistentialDeposit, LastVaultProfits,
+		insert_vault, new_test_ext, set_argons, take_treasury_pool_participated, Balances,
+		BidPoolAccountId, CurrentFrameId, ExistentialDeposit, LastVaultProfits,
 		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeHoldReason,
 		RuntimeOrigin, Test, TestVault, Treasury, TreasuryExitDelayFrames,
-		TreasuryReservesAccountId, insert_vault, new_test_ext, set_argons,
-		take_treasury_pool_participated,
+		TreasuryReservesAccountId,
 	},
 	pallet::{BondLotAllocation, FrameVaultCapital, VaultCapital},
 };
-use argon_primitives::{MICROGONS_PER_ARGON, OperationalRewardsPayer, TreasuryPoolProvider};
+use argon_primitives::{OperationalRewardsPayer, TreasuryPoolProvider, MICROGONS_PER_ARGON};
 use frame_support::{
 	assert_err, assert_ok,
 	traits::fungible::{Inspect, InspectHold},
@@ -334,21 +334,19 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 			},
 		);
 		let mut vaults = BoundedBTreeMap::<VaultId, VaultCapital<Test>, MaxVaultsPerPool>::new();
-		assert!(
-			vaults
-				.try_insert(
-					1,
-					VaultCapital {
-						bond_lot_allocations: BoundedVec::truncate_from(vec![BondLotAllocation {
-							bond_lot_id: 0,
-							prorata: FixedU128::one(),
-						}]),
-						eligible_bonds: 1,
-						vault_sharing_percent: Permill::zero(),
-					},
-				)
-				.is_ok()
-		);
+		assert!(vaults
+			.try_insert(
+				1,
+				VaultCapital {
+					bond_lot_allocations: BoundedVec::truncate_from(vec![BondLotAllocation {
+						bond_lot_id: 0,
+						prorata: FixedU128::one(),
+					}]),
+					eligible_bonds: 1,
+					vault_sharing_percent: Permill::zero(),
+				},
+			)
+			.is_ok());
 		CurrentFrameVaultCapital::<Test>::put(FrameVaultCapital { frame_id: 1, vaults });
 
 		frame_system::Pallet::<Test>::inc_providers(&BidPoolAccountId::get());

@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf, process, process::Command};
 
-use crate::{ArgonTestNode, get_target_dir};
+use crate::{get_target_dir, ArgonTestNode};
 
 pub struct LocalchainCli {
 	pub tmp_dir: PathBuf,

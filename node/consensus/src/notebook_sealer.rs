@@ -1,14 +1,14 @@
 use crate::{
-	NotebookTickChecker, aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error,
+	aux_client::ArgonAux, block_creator::CreateTaxVoteBlock, error::Error, NotebookTickChecker,
 };
 use argon_primitives::{
-	BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	BlockVote, TickApis, VotingSchedule,
 	block_seal::{BLOCK_SEAL_CRYPTO_ID, BLOCK_SEAL_KEY_TYPE},
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	notary::NotaryNotebookRawVotes,
 	tick::{Tick, Ticker},
+	BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
+	BlockVote, TickApis, VotingSchedule,
 };
 use argon_runtime::NotebookVerifyError;
 use codec::Codec;
@@ -316,15 +316,14 @@ where
 			{
 				let fork_power = self.get_fork_power(competing_hash)?;
 				// Prefer strictly better fork power; use hash as deterministic tie-break.
-				if let Some((best_child_hash, best_fork_power)) = &best_child {
-					if !is_better_fork_candidate(
+				if let Some((best_child_hash, best_fork_power)) = &best_child &&
+					!is_better_fork_candidate(
 						&competing_hash,
 						&fork_power,
 						best_child_hash,
 						best_fork_power,
 					) {
-						continue;
-					}
+					continue;
 				}
 				best_child = Some((competing_hash, fork_power));
 			}
@@ -342,10 +341,10 @@ where
 
 	fn get_block_ancestor_with_tick(&self, hash: B::Hash, tick: Tick) -> Option<B::Hash> {
 		// first check this because `block_at_tick` can't include a block until it's a parent block
-		if let Ok(current_tick) = self.client.runtime_api().current_tick(hash) {
-			if current_tick == tick {
-				return Some(hash);
-			}
+		if let Ok(current_tick) = self.client.runtime_api().current_tick(hash) &&
+			current_tick == tick
+		{
+			return Some(hash);
 		}
 		if let Ok(blocks) = self.client.runtime_api().blocks_at_tick(hash, tick) {
 			return blocks.last().copied();
@@ -407,7 +406,7 @@ mod tests {
 	use frame_support::assert_ok;
 	use sp_core::H256;
 	use sp_keyring::Ed25519Keyring;
-	use sp_keystore::{Keystore, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, Keystore};
 
 	use argon_primitives::block_seal::BLOCK_SEAL_KEY_TYPE;
 

@@ -2,25 +2,25 @@
 
 use super::*;
 use argon_primitives::{
-	MICROGONS_PER_ARGON, TreasuryPoolProvider, VaultId,
 	bitcoin::Satoshis,
 	vault::{Vault, VaultTerms},
+	TreasuryPoolProvider, VaultId, MICROGONS_PER_ARGON,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	argon_primitives::OperationalRewardsPayer,
 	benchmarking::{
-		BenchmarkBitcoinVaultProviderState, BenchmarkPriceProviderState,
 		benchmark_bitcoin_vault_provider_state, reset_benchmark_bitcoin_vault_provider_state,
 		reset_benchmark_price_provider_state, set_benchmark_bitcoin_vault_provider_state,
-		set_benchmark_price_provider_state,
+		set_benchmark_price_provider_state, BenchmarkBitcoinVaultProviderState,
+		BenchmarkPriceProviderState,
 	},
 };
 use polkadot_sdk::{
 	frame_support::{
-		BoundedVec,
 		traits::fungible::{InspectHold, Mutate},
+		BoundedVec,
 	},
 	sp_arithmetic::FixedU128,
 	sp_runtime::Permill,

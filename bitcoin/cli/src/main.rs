@@ -1,12 +1,12 @@
 use crate::{
-	formatters::{Pct64, parse_number},
+	formatters::{parse_number, Pct64},
 	helpers::{read_bitcoin_xpub, read_percent_to_fixed_128},
 	lock_commands::LockCommands,
 	vault_commands::VaultCommands,
 	xpriv_commands::XPrivCommands,
 };
 use anyhow::anyhow;
-use clap::{Parser, Subcommand, crate_version};
+use clap::{crate_version, Parser, Subcommand};
 use polkadot_sdk::*;
 use sp_runtime::FixedU128;
 use std::{env, process::exit, str::FromStr};

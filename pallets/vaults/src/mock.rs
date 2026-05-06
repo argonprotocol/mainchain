@@ -1,15 +1,15 @@
 use crate as pallet_vaults;
 use argon_bitcoin::{
-	CosignReleaser,
 	primitives::{
 		BitcoinCosignScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
 		UtxoRef,
 	},
+	CosignReleaser,
 };
 use argon_primitives::{
-	MiningFrameProvider, TickProvider, VotingSchedule,
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
+	MiningFrameProvider, TickProvider, VotingSchedule,
 };
 use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;

@@ -3,14 +3,14 @@ use crate::{
 	import_queue::{ArgonBlockImport, ImportApisExt},
 };
 use argon_primitives::{
-	BlockSealAuthoritySignature, BlockSealDigest, ComputeDifficulty, Digestset, FORK_POWER_DIGEST,
-	HashOutput as BlockHash, NotebookDigest, PARENT_VOTING_KEY_DIGEST, ParentVotingKeyDigest,
-	VotingKey,
 	fork_power::ForkPower,
 	prelude::{
 		sp_runtime::{generic::SignedBlock, traits::BlakeTwo256},
 		*,
 	},
+	BlockSealAuthoritySignature, BlockSealDigest, ComputeDifficulty, Digestset,
+	HashOutput as BlockHash, NotebookDigest, ParentVotingKeyDigest, VotingKey, FORK_POWER_DIGEST,
+	PARENT_VOTING_KEY_DIGEST,
 };
 use argon_runtime::NotebookVerifyError;
 use async_trait::async_trait;
@@ -20,15 +20,16 @@ use polkadot_sdk::{
 	sp_core::{ByteArray, H256, U256},
 	sp_runtime::DigestItem,
 };
-use sc_client_api::{BlockBackend, backend::AuxStore};
+use sc_client_api::{backend::AuxStore, BlockBackend};
 use sc_consensus::{
 	BlockCheckParams, BlockImportParams, ImportResult, ImportedAux, StateAction, StateAction::*,
 };
 use sp_blockchain::{BlockGap, BlockStatus, Error as BlockchainError, HeaderBackend};
 use sp_consensus::{BlockOrigin, Error as ConsensusError};
 use sp_runtime::{
-	Digest, OpaqueExtrinsic as UncheckedExtrinsic, generic,
+	generic,
 	traits::{Block as BlockT, Header as HeaderT, NumberFor, Zero},
+	Digest, OpaqueExtrinsic as UncheckedExtrinsic,
 };
 use std::{
 	collections::{BTreeMap, HashMap},
@@ -117,7 +118,11 @@ impl HeaderBackend<Block> for MemChain {
 				}
 
 				cursor = headers.get(&hash).and_then(|header| {
-					if header.number().is_zero() { None } else { Some(*header.parent_hash()) }
+					if header.number().is_zero() {
+						None
+					} else {
+						Some(*header.parent_hash())
+					}
 				});
 			}
 

@@ -5,8 +5,8 @@ use codec::Encode;
 use frame_support::{assert_err, assert_ok, parameter_types};
 use polkadot_sdk::*;
 use sp_core::{
-	Blake2Hasher, H256, Pair, bounded::BoundedVec, bounded_vec, crypto::AccountId32, ed25519,
-	sr25519::Signature,
+	bounded::BoundedVec, bounded_vec, crypto::AccountId32, ed25519, sr25519::Signature,
+	Blake2Hasher, Pair, H256,
 };
 use sp_keyring::{
 	Ed25519Keyring,
@@ -16,15 +16,15 @@ use sp_keyring::{
 use sp_runtime::traits::BlakeTwo256;
 
 use crate::{
-	AccountHistoryLookupError, NotebookHistoryLookup, VerifyError, verify_previous_balance_proof,
+	verify_previous_balance_proof, AccountHistoryLookupError, NotebookHistoryLookup, VerifyError,
 };
 use argon_primitives::{
-	AccountId, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, LocalchainAccountId,
-	MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization, Notebook, NotebookHeader,
-	NotebookNumber, TransferToLocalchainId,
 	balance_change::{AccountOrigin, BalanceChange, BalanceProof},
 	note::{Note, NoteType},
 	tick::Tick,
+	AccountId, AccountType, Balance, BalanceTip, BlockVote, ChainTransfer, LocalchainAccountId,
+	MerkleProof, MultiSignatureBytes, NewAccountOrigin, Notarization, Notebook, NotebookHeader,
+	NotebookNumber, TransferToLocalchainId,
 };
 
 use super::notebook_verify;
@@ -185,36 +185,32 @@ fn test_verify_previous_balance() {
 fn test_verify_notebook() {
 	let note = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
-	let alice_balance_changeset = vec![
-		BalanceChange {
-			balance: 1_000_000,
-			change_number: 1,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance_proof: None,
-			channel_hold_note: None,
-			notes: bounded_vec![note],
-			signature: empty_signature(),
-		}
-		.sign(Alice.pair())
-		.clone(),
-	];
+	let alice_balance_changeset = vec![BalanceChange {
+		balance: 1_000_000,
+		change_number: 1,
+		account_id: Alice.to_account_id(),
+		account_type: AccountType::Deposit,
+		previous_balance_proof: None,
+		channel_hold_note: None,
+		notes: bounded_vec![note],
+		signature: empty_signature(),
+	}
+	.sign(Alice.pair())
+	.clone()];
 	let notebook_header1 = NotebookHeader {
 		version: 1,
 		notary_id: 1,
 		notebook_number: 1,
 		tick: 1,
-		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![
-			BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 1_000_000,
-				change_number: 1,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
-			}
-			.encode(),
-		]),
+		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 1_000_000,
+			change_number: 1,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: None,
+		}
+		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
@@ -304,36 +300,32 @@ fn test_disallows_double_claim() {
 	let note1 = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 	let note2 = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 
-	let alice_balance_changeset = vec![
-		BalanceChange {
-			balance: 2_000_000,
-			change_number: 1,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance_proof: None,
-			channel_hold_note: None,
-			notes: bounded_vec![note1, note2],
-			signature: empty_signature(),
-		}
-		.sign(Alice.pair())
-		.clone(),
-	];
+	let alice_balance_changeset = vec![BalanceChange {
+		balance: 2_000_000,
+		change_number: 1,
+		account_id: Alice.to_account_id(),
+		account_type: AccountType::Deposit,
+		previous_balance_proof: None,
+		channel_hold_note: None,
+		notes: bounded_vec![note1, note2],
+		signature: empty_signature(),
+	}
+	.sign(Alice.pair())
+	.clone()];
 	let notebook_header1 = NotebookHeader {
 		version: 1,
 		notary_id: 1,
 		notebook_number: 1,
 		tick: 0,
-		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![
-			BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 2_000_000,
-				change_number: 1,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: None,
-			}
-			.encode(),
-		]),
+		changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 2_000_000,
+			change_number: 1,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: None,
+		}
+		.encode()]),
 		chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
 		tax: 0,
 		changed_account_origins: bounded_vec![AccountOrigin { notebook_number: 1, account_uid: 1 }],
@@ -625,51 +617,47 @@ fn test_multiple_changesets_in_a_notebook() {
 
 #[test]
 fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
-	let alice_balance_changeset = vec![
-		BalanceChange {
+	let alice_balance_changeset = vec![BalanceChange {
+		balance: 1_000_000,
+		change_number: 1,
+		account_id: Alice.to_account_id(),
+		account_type: AccountType::Deposit,
+		previous_balance_proof: None,
+		channel_hold_note: None,
+		notes: bounded_vec![Note::create(
+			1_000_000,
+			NoteType::ClaimFromMainchain { transfer_id: 1 }
+		),],
+		signature: empty_signature(),
+	}
+	.sign(Alice.pair())
+	.clone()];
+	let alice_balance_changeset2 = vec![BalanceChange {
+		balance: 1_000_000,
+		change_number: 2,
+		account_id: Alice.to_account_id(),
+		account_type: AccountType::Deposit,
+		previous_balance_proof: Some(BalanceProof {
+			notary_id: 1,
+			notebook_number: 1,
+			tick: 1,
+			notebook_proof: None,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 			balance: 1_000_000,
-			change_number: 1,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance_proof: None,
-			channel_hold_note: None,
-			notes: bounded_vec![Note::create(
-				1_000_000,
-				NoteType::ClaimFromMainchain { transfer_id: 1 }
-			),],
-			signature: empty_signature(),
-		}
-		.sign(Alice.pair())
-		.clone(),
-	];
-	let alice_balance_changeset2 = vec![
-		BalanceChange {
-			balance: 1_000_000,
-			change_number: 2,
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			previous_balance_proof: Some(BalanceProof {
-				notary_id: 1,
-				notebook_number: 1,
-				tick: 1,
-				notebook_proof: None,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				balance: 1_000_000,
-			}),
-			channel_hold_note: None,
-			notes: bounded_vec![Note::create(
-				1_000_000,
-				NoteType::ChannelHold {
-					recipient: Bob.to_account_id(),
-					delegated_signer: None,
-					domain_hash: None
-				}
-			)],
-			signature: empty_signature(),
-		}
-		.sign(Alice.pair())
-		.clone(),
-	];
+		}),
+		channel_hold_note: None,
+		notes: bounded_vec![Note::create(
+			1_000_000,
+			NoteType::ChannelHold {
+				recipient: Bob.to_account_id(),
+				delegated_signer: None,
+				domain_hash: None
+			}
+		)],
+		signature: empty_signature(),
+	}
+	.sign(Alice.pair())
+	.clone()];
 
 	ValidLocalchainTransfers::mutate(|a| a.insert((Alice.to_account_id(), 1)));
 	let mut notebook = Notebook {
@@ -678,17 +666,15 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			notary_id: 1,
 			notebook_number: 1,
 			tick: 0,
-			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![
-				BalanceTip {
-					account_id: Alice.to_account_id(),
-					account_type: AccountType::Deposit,
-					balance: 1_000_000,
-					change_number: 2,
-					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-					channel_hold_note: None,
-				}
-				.encode(),
-			]),
+			changed_accounts_root: merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+				account_id: Alice.to_account_id(),
+				account_type: AccountType::Deposit,
+				balance: 1_000_000,
+				change_number: 2,
+				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+				channel_hold_note: None,
+			}
+			.encode()]),
 			chain_transfers: bounded_vec![ChainTransfer::ToLocalchain { transfer_id: 1 }],
 			changed_account_origins: bounded_vec![AccountOrigin {
 				notebook_number: 1,
@@ -731,51 +717,47 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 
 	let hold_note = notebook.notarizations[1].balance_changes[0].notes[0].clone();
 
-	notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![
-		BalanceTip {
-			account_id: Alice.to_account_id(),
-			account_type: AccountType::Deposit,
-			balance: 1_000_000,
-			change_number: 2,
-			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-			channel_hold_note: Some(hold_note),
-		}
-		.encode(),
-	]);
+	notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+		account_id: Alice.to_account_id(),
+		account_type: AccountType::Deposit,
+		balance: 1_000_000,
+		change_number: 2,
+		account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+		channel_hold_note: Some(hold_note),
+	}
+	.encode()]);
 	notebook.hash = notebook.calculate_hash();
 	assert_ok!(notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),);
 
 	// now confirm we can't remove the hold in the same set of changes
 	{
 		// Try 1: pretend it didn't happen
-		let alice_balance_changeset3 = vec![
-			BalanceChange {
+		let alice_balance_changeset3 = vec![BalanceChange {
+			balance: 1_000_000,
+			change_number: 3,
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			previous_balance_proof: Some(BalanceProof {
+				notary_id: 1,
+				notebook_number: 1,
+				tick: 1,
+				notebook_proof: None,
+				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1_000_000,
-				change_number: 3,
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 1,
-					notebook_number: 1,
-					tick: 1,
-					notebook_proof: None,
-					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-					balance: 1_000_000,
-				}),
-				channel_hold_note: None,
-				notes: bounded_vec![Note::create(
-					1_000_000,
-					NoteType::ChannelHold {
-						recipient: Ferdie.to_account_id(),
-						delegated_signer: None,
-						domain_hash: None
-					}
-				)],
-				signature: empty_signature(),
-			}
-			.sign(Alice.pair())
-			.clone(),
-		];
+			}),
+			channel_hold_note: None,
+			notes: bounded_vec![Note::create(
+				1_000_000,
+				NoteType::ChannelHold {
+					recipient: Ferdie.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None
+				}
+			)],
+			signature: empty_signature(),
+		}
+		.sign(Alice.pair())
+		.clone()];
 		let mut notebook = notebook.clone();
 		let _ = notebook.notarizations.try_push(Notarization::new(
 			alice_balance_changeset3,
@@ -783,17 +765,15 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 			vec![],
 		));
 		let hold_note = notebook.notarizations[2].balance_changes[0].notes[0].clone();
-		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![
-			BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 1_000_000,
-				change_number: 3,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: Some(hold_note),
-			}
-			.encode(),
-		]);
+		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 1_000_000,
+			change_number: 3,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: Some(hold_note),
+		}
+		.encode()]);
 		assert_err!(
 			notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 			VerifyError::InvalidChannelHoldNote
@@ -801,34 +781,32 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 	}
 	{
 		// Try 2: try to remove the hold
-		let alice_balance_changeset3 = vec![
-			BalanceChange {
+		let alice_balance_changeset3 = vec![BalanceChange {
+			balance: 1_000_000,
+			change_number: 3,
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			previous_balance_proof: Some(BalanceProof {
+				notary_id: 1,
+				notebook_number: 1,
+				tick: 1,
+				notebook_proof: None,
+				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
 				balance: 1_000_000,
-				change_number: 3,
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				previous_balance_proof: Some(BalanceProof {
-					notary_id: 1,
-					notebook_number: 1,
-					tick: 1,
-					notebook_proof: None,
-					account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-					balance: 1_000_000,
-				}),
-				channel_hold_note: Some(Note::create(
-					1_000_000,
-					NoteType::ChannelHold {
-						recipient: Bob.to_account_id(),
-						delegated_signer: None,
-						domain_hash: None,
-					},
-				)),
-				notes: bounded_vec![Note::create(0, NoteType::ChannelHoldSettle)],
-				signature: empty_signature(),
-			}
-			.sign(Alice.pair())
-			.clone(),
-		];
+			}),
+			channel_hold_note: Some(Note::create(
+				1_000_000,
+				NoteType::ChannelHold {
+					recipient: Bob.to_account_id(),
+					delegated_signer: None,
+					domain_hash: None,
+				},
+			)),
+			notes: bounded_vec![Note::create(0, NoteType::ChannelHoldSettle)],
+			signature: empty_signature(),
+		}
+		.sign(Alice.pair())
+		.clone()];
 
 		let mut notebook = notebook.clone();
 		let _ = notebook.notarizations.try_push(Notarization::new(
@@ -838,17 +816,15 @@ fn test_cannot_remove_lock_between_changesets_in_a_notebook() {
 		));
 		let hold_note = notebook.notarizations[2].balance_changes[0].notes[0].clone();
 
-		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![
-			BalanceTip {
-				account_id: Alice.to_account_id(),
-				account_type: AccountType::Deposit,
-				balance: 1_000_000,
-				change_number: 3,
-				account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
-				channel_hold_note: Some(hold_note),
-			}
-			.encode(),
-		]);
+		notebook.header.changed_accounts_root = merkle_root::<Blake2Hasher, _>(vec![BalanceTip {
+			account_id: Alice.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 1_000_000,
+			change_number: 3,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: Some(hold_note),
+		}
+		.encode()]);
 		assert!(matches!(
 			notebook_verify(&TestLookup, &notebook, &notary_operator(), 2),
 			Err(VerifyError::ChannelHoldNotReadyForClaim { .. })

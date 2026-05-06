@@ -1,7 +1,7 @@
 use crate::{
-	BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult, VotingKey,
 	block_seal::FrameId, ensure, fork_power::ForkPower, notary::SignedHeaderBytes,
-	tick::TickDigest,
+	tick::TickDigest, BlockSealAuthoritySignature, BlockVotingPower, NotebookAuditResult,
+	VotingKey,
 };
 use alloc::{vec, vec::Vec};
 use codec::{Codec, Decode, Encode, EncodeLike, MaxEncodedLen};
@@ -276,10 +276,10 @@ impl BlockSealDigest {
 	}
 
 	pub fn is_seal(digest_item: &DigestItem) -> bool {
-		if let DigestItem::Seal(id, _) = digest_item {
-			if id == &BLOCK_SEAL_DIGEST_ID {
-				return true;
-			}
+		if let DigestItem::Seal(id, _) = digest_item &&
+			id == &BLOCK_SEAL_DIGEST_ID
+		{
+			return true;
 		}
 		false
 	}

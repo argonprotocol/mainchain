@@ -6,7 +6,7 @@ use alloc::{
 	collections::{btree_map::BTreeMap, btree_set::BTreeSet},
 	vec::Vec,
 };
-use binary_merkle_tree::{Leaf, merkle_root, verify_proof};
+use binary_merkle_tree::{merkle_root, verify_proof, Leaf};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
@@ -17,11 +17,11 @@ use sp_runtime::{
 };
 
 use argon_primitives::{
-	ABSOLUTE_TAX_VOTE_MINIMUM, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
-	BalanceChange, BalanceProof, BalanceTip, BlockVote, CHANNEL_HOLD_CLAWBACK_TICKS, ChainTransfer,
-	DOMAIN_LEASE_COST, DomainHash, LocalchainAccountId, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
-	NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader, NotebookNumber,
-	TAX_PERCENT_BASE, TransferToLocalchainId, ensure, round_up, tick::Tick,
+	ensure, round_up, tick::Tick, AccountId, AccountOrigin, AccountOriginUid, AccountType, Balance,
+	BalanceChange, BalanceProof, BalanceTip, BlockVote, ChainTransfer, DomainHash,
+	LocalchainAccountId, NewAccountOrigin, NotaryId, Note, NoteType, Notebook, NotebookHeader,
+	NotebookNumber, TransferToLocalchainId, ABSOLUTE_TAX_VOTE_MINIMUM, CHANNEL_HOLD_CLAWBACK_TICKS,
+	DOMAIN_LEASE_COST, MINIMUM_CHANNEL_HOLD_SETTLEMENT, TAX_PERCENT_BASE,
 };
 
 pub use crate::error::VerifyError;

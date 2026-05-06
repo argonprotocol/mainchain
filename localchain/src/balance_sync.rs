@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::LocalAccount;
 use crate::accounts::AccountStore;
 use crate::balance_changes::{BalanceChangeRow, BalanceChangeStatus, BalanceChangeStore};
 use crate::keystore::Keystore;
@@ -9,20 +8,21 @@ use crate::notarization_builder::NotarizationBuilder;
 use crate::notarization_tracker::NotarizationTracker;
 use crate::open_channel_holds::OpenChannelHoldsStore;
 use crate::transactions::{TransactionType, Transactions};
+use crate::LocalAccount;
+use crate::{bail, Error, Result};
 use crate::{ChannelHold, MainchainClient};
-use crate::{Error, Result, bail};
 use crate::{Localchain, OpenChannelHold};
 use crate::{LocalchainTransfer, NotaryAccountOrigin, TickerRef};
 use crate::{NotaryClient, NotaryClients};
 use argon_notary_apis::Error as NotaryError;
 use argon_notary_audit::VerifyError;
 use argon_primitives::tick::Tick;
-use argon_primitives::{AccountType, Balance, BlockVote, NotaryId, NotebookNumber, ensure};
+use argon_primitives::{ensure, AccountType, Balance, BlockVote, NotaryId, NotebookNumber};
 use polkadot_sdk::*;
 use serde_json::json;
+use sp_core::sr25519::Signature;
 use sp_core::Decode;
 use sp_core::H256;
-use sp_core::sr25519::Signature;
 use sp_runtime::MultiSignature;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 use tokio::sync::{Mutex, RwLock};
@@ -88,9 +88,9 @@ impl BalanceSyncResult {
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
-  use crate::ChannelHold;
   use crate::notarization_tracker::uniffi_ext::BalanceChange;
   use crate::notarization_tracker::uniffi_ext::NotarizationTracker;
+  use crate::ChannelHold;
   use std::sync::Arc;
 
   #[derive(uniffi::Record)]
@@ -592,15 +592,13 @@ impl BalanceSync {
             if let Some(tracker) = tracker {
               notarizations.push(tracker);
             }
-            if did_update {
-              if let Ok(channel_hold) = open_channel_hold.reload().await {
-                tracing::info!(
-                  "Updated client channel hold. Id={}, Final Balance={}",
-                  channel_hold.id,
-                  channel_hold.settled_amount,
-                );
-                channel_holds.push(channel_hold);
-              }
+            if did_update && let Ok(channel_hold) = open_channel_hold.reload().await {
+              tracing::info!(
+                "Updated client channel hold. Id={}, Final Balance={}",
+                channel_hold.id,
+                channel_hold.settled_amount,
+              );
+              channel_holds.push(channel_hold);
             }
           }
           Err(e) => {

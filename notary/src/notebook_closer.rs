@@ -3,22 +3,22 @@ use crate::{
 	s3_archive::S3Archive,
 	server::NotebookHeaderInfo,
 	stores::{
-		BoxFutureResult,
 		notebook::{NotebookBytes, NotebookStore},
 		notebook_audit_failure::NotebookAuditFailureStore,
 		notebook_header::NotebookHeaderStore,
 		notebook_status::{NotebookFinalizationStep, NotebookStatusStore},
 		registered_key::RegisteredKeyStore,
+		BoxFutureResult,
 	},
 };
 use argon_notary_apis::error::Error;
-use argon_primitives::{AccountId, NotaryId, NotebookNumber, SignedNotebookHeader, tick::Ticker};
+use argon_primitives::{tick::Ticker, AccountId, NotaryId, NotebookNumber, SignedNotebookHeader};
 use futures::FutureExt;
 use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
-use sp_core::{H256, ed25519};
+use sp_core::{ed25519, H256};
 use sp_keystore::KeystorePtr;
-use sqlx::{Error as SqlxError, PgPool, postgres::PgListener};
+use sqlx::{postgres::PgListener, Error as SqlxError, PgPool};
 use std::{
 	sync::Arc,
 	time::{Duration, Instant},
@@ -215,7 +215,7 @@ impl NotebookCloser {
 		}
 	}
 
-	pub(super) fn try_rotate_notebook(&self) -> BoxFutureResult<()> {
+	pub(super) fn try_rotate_notebook(&self) -> BoxFutureResult<'_, ()> {
 		async move {
 			let mut tx = self.pool.begin().await?;
 			// NOTE: must rotate existing first. The db has a constraint to only allow a single open
@@ -237,7 +237,7 @@ impl NotebookCloser {
 		.boxed()
 	}
 
-	pub(super) fn try_close_notebook(&mut self) -> BoxFutureResult<()> {
+	pub(super) fn try_close_notebook(&mut self) -> BoxFutureResult<'_, ()> {
 		async move {
 			let start_time = Instant::now();
 			let mut tx = self.pool.begin().await?;
@@ -317,15 +317,15 @@ mod tests {
 	use anyhow::{anyhow, bail};
 	use chrono::{Duration as ChronoDuration, Utc};
 	use frame_support::assert_ok;
-	use futures::{StreamExt, task::noop_waker_ref};
+	use futures::{task::noop_waker_ref, StreamExt};
 	use prometheus::Registry;
-	use sp_core::{Pair, bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature};
+	use sp_core::{bounded_vec, crypto::AccountId32, ed25519::Public, sr25519::Signature, Pair};
 	use sp_keyring::{
+		sr25519::Keyring,
 		Sr25519Keyring,
 		Sr25519Keyring::{Alice, Bob, Ferdie},
-		sr25519::Keyring,
 	};
-	use sp_keystore::{Keystore, KeystoreExt, testing::MemoryKeystore};
+	use sp_keystore::{testing::MemoryKeystore, Keystore, KeystoreExt};
 	use sqlx::PgPool;
 	use std::{
 		future::Future,
@@ -340,15 +340,14 @@ mod tests {
 
 	use super::*;
 	use crate::{
-		NotaryServer,
 		block_watch::spawn_block_sync,
 		notebook_closer::NOTARY_KEYID,
 		server::NotebookHeaderStream,
 		stores::{notarizations::NotarizationsStore, notebook_status::NotebookStatusStore},
+		NotaryServer,
 	};
 	use argon_client::{
-		ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, ReconnectingClient,
-		TxInBlockWithEvents, api,
+		api,
 		api::{
 			runtime_types,
 			runtime_types::{
@@ -359,21 +358,22 @@ mod tests {
 		},
 		conversion::SubxtRuntime,
 		signer::Sr25519Signer,
+		ArgonConfig, ArgonOnlineClient, FetchAt, MainchainClient, ReconnectingClient,
+		TxInBlockWithEvents,
 	};
 	use argon_notary_apis::localchain::BalanceChangeResult;
 	use argon_notary_audit::VerifyError;
 	use argon_primitives::{
-		AccountOrigin,
-		AccountType::{Deposit, Tax},
-		ArgonDigests, BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote,
-		BlockVoteDigest, DOMAIN_LEASE_COST, Domain, DomainHash, DomainTopLevel, HashOutput,
-		MerkleProof,
-		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
-		NotebookDigest, ParentVotingKeyDigest, SignedNotebookHeader, TransferToLocalchainId,
-		VotingSchedule,
 		fork_power::ForkPower,
 		host::Host,
 		prelude::*,
+		AccountOrigin,
+		AccountType::{Deposit, Tax},
+		ArgonDigests, BalanceChange, BalanceProof, BalanceTip, BlockSealDigest, BlockVote,
+		BlockVoteDigest, Domain, DomainHash, DomainTopLevel, HashOutput, MerkleProof,
+		NoteType::{ChannelHoldClaim, ChannelHoldSettle},
+		NotebookDigest, ParentVotingKeyDigest, SignedNotebookHeader, TransferToLocalchainId,
+		VotingSchedule, DOMAIN_LEASE_COST,
 	};
 	use argon_testing::start_argon_test_node;
 	use serial_test::serial;
@@ -402,11 +402,9 @@ mod tests {
 			.await?
 			.expect("should publish the latest closed notebook");
 		assert_eq!(header.header.notebook_number, 2);
-		assert!(
-			tokio::time::timeout(Duration::from_millis(100), subscription.next())
-				.await
-				.is_err()
-		);
+		assert!(tokio::time::timeout(Duration::from_millis(100), subscription.next())
+			.await
+			.is_err());
 
 		Ok(())
 	}
@@ -864,23 +862,21 @@ mod tests {
 			&Ferdie.to_account_id(),
 			ticker,
 			notary_metrics,
-			vec![
-				BalanceChange {
-					account_id: keypair.public().into(),
-					account_type: Deposit,
-					change_number: 1,
-					balance: amount as u128,
-					previous_balance_proof: None,
-					notes: bounded_vec![Note::create(
-						amount as u128,
-						NoteType::ClaimFromMainchain { transfer_id },
-					)],
-					channel_hold_note: None,
-					signature: Signature::from_raw([0u8; 64]).into(),
-				}
-				.sign(keypair)
-				.clone(),
-			],
+			vec![BalanceChange {
+				account_id: keypair.public().into(),
+				account_type: Deposit,
+				change_number: 1,
+				balance: amount as u128,
+				previous_balance_proof: None,
+				notes: bounded_vec![Note::create(
+					amount as u128,
+					NoteType::ClaimFromMainchain { transfer_id },
+				)],
+				channel_hold_note: None,
+				signature: Signature::from_raw([0u8; 64]).into(),
+			}
+			.sign(keypair)
+			.clone()],
 			vec![],
 			vec![],
 		)
@@ -1001,27 +997,25 @@ mod tests {
 				domain_hash: None,
 			},
 		);
-		let changes = vec![
-			BalanceChange {
-				account_id: Bob.to_account_id(),
-				account_type: Deposit,
-				change_number: 2,
+		let changes = vec![BalanceChange {
+			account_id: Bob.to_account_id(),
+			account_type: Deposit,
+			change_number: 2,
+			balance,
+			previous_balance_proof: Some(BalanceProof {
 				balance,
-				previous_balance_proof: Some(BalanceProof {
-					balance,
-					notebook_number: account_origin.notebook_number,
-					tick,
-					notebook_proof: None, // notebook still open
-					notary_id: 1,
-					account_origin: account_origin.clone(),
-				}),
-				notes: bounded_vec![hold_note.clone()],
-				channel_hold_note: None,
-				signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
-			}
-			.sign(Bob.pair())
-			.clone(),
-		];
+				notebook_number: account_origin.notebook_number,
+				tick,
+				notebook_proof: None, // notebook still open
+				notary_id: 1,
+				account_origin: account_origin.clone(),
+			}),
+			notes: bounded_vec![hold_note.clone()],
+			channel_hold_note: None,
+			signature: sp_core::sr25519::Signature::from_raw([0u8; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone()];
 
 		let result = NotarizationsStore::apply(
 			pool,
@@ -1098,19 +1092,17 @@ mod tests {
 			ticker,
 			notary_metrics,
 			changes,
-			vec![
-				BlockVote {
-					account_id: Alice.to_account_id(),
-					index: 1,
-					tick: vote_tick,
-					block_hash: vote_block_hash,
-					power: tax,
-					block_rewards_account_id: Alice.to_account_id(),
-					signature: Signature::from_raw([0u8; 64]).into(),
-				}
-				.sign(Alice.pair())
-				.clone(),
-			],
+			vec![BlockVote {
+				account_id: Alice.to_account_id(),
+				index: 1,
+				tick: vote_tick,
+				block_hash: vote_block_hash,
+				power: tax,
+				block_rewards_account_id: Alice.to_account_id(),
+				signature: Signature::from_raw([0u8; 64]).into(),
+			}
+			.sign(Alice.pair())
+			.clone()],
 			vec![],
 		)
 		.await?;

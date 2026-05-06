@@ -12,10 +12,10 @@ use std::sync::Arc;
 #[cfg(feature = "napi")]
 use tokio::sync::RwLock;
 
-use crate::AccountStore;
 use crate::cli::EmbeddedKeyPassword;
 use crate::embedded_keystore::{CryptoScheme, EmbeddedKeystore};
-use crate::{Result, bail};
+use crate::AccountStore;
+use crate::{bail, Result};
 
 #[cfg_attr(feature = "napi", napi)]
 #[derive(Clone)]
@@ -118,14 +118,13 @@ impl Keystore {
   }
 
   pub async fn sign(&self, address: String, message: Vec<u8>) -> Result<Vec<u8>> {
-    if self.embedded_keystore.is_unlocked().await {
-      if let Some(signature) = self
+    if self.embedded_keystore.is_unlocked().await
+      && let Some(signature) = self
         .embedded_keystore
         .sign(address.clone(), message.as_ref())
         .await?
-      {
-        return Ok(signature.encode());
-      }
+    {
+      return Ok(signature.encode());
     }
 
     #[cfg(feature = "napi")]

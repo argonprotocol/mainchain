@@ -16,15 +16,15 @@ use argon_notary_audit::{
 	verify_changeset_signatures, verify_notarization_allocation, verify_voting_sources,
 };
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, Balance, BalanceChange, BalanceProof, BalanceTip,
-	BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin, Notarization, NotaryId, NoteType,
-	NotebookNumber, ensure, tick::Ticker,
+	ensure, tick::Ticker, AccountId, AccountOrigin, AccountType, Balance, BalanceChange,
+	BalanceProof, BalanceTip, BlockVote, DomainHash, LocalchainAccountId, NewAccountOrigin,
+	Notarization, NotaryId, NoteType, NotebookNumber,
 };
 use codec::Encode;
 use polkadot_sdk::*;
 use serde_json::{from_value, json};
 use sp_runtime::BoundedVec;
-use sqlx::{FromRow, PgConnection, PgPool, query, types::Json};
+use sqlx::{query, types::Json, FromRow, PgConnection, PgPool};
 
 #[derive(FromRow)]
 #[allow(dead_code)]
@@ -515,19 +515,17 @@ mod tests {
 			},
 		];
 
-		let block_votes = vec![
-			BlockVote {
-				block_hash: [0u8; 32].into(),
-				power: 1222,
-				tick: 1,
-				account_id: Bob.to_account_id(),
-				index: 0,
-				block_rewards_account_id: Bob.to_account_id(),
-				signature: Signature::from_raw([0u8; 64]).into(),
-			}
-			.sign(Bob.pair())
-			.clone(),
-		];
+		let block_votes = vec![BlockVote {
+			block_hash: [0u8; 32].into(),
+			power: 1222,
+			tick: 1,
+			account_id: Bob.to_account_id(),
+			index: 0,
+			block_rewards_account_id: Bob.to_account_id(),
+			signature: Signature::from_raw([0u8; 64]).into(),
+		}
+		.sign(Bob.pair())
+		.clone()];
 		let domains =
 			vec![(Domain::new("test", DomainTopLevel::Analytics).hash(), Bob.to_account_id())];
 
@@ -569,17 +567,15 @@ mod tests {
 			.unwrap();
 			assert_eq!(result, notarization.clone());
 
-			assert!(
-				NotarizationsStore::get_account_change(
-					&mut tx,
-					notebook_number,
-					Ferdie.to_account_id(),
-					AccountType::Deposit,
-					3,
-				)
-				.await
-				.is_err()
-			);
+			assert!(NotarizationsStore::get_account_change(
+				&mut tx,
+				notebook_number,
+				Ferdie.to_account_id(),
+				AccountType::Deposit,
+				3,
+			)
+			.await
+			.is_err());
 			tx.commit().await?;
 		}
 

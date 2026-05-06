@@ -1,4 +1,4 @@
-use crate::{Balance, tick::Tick};
+use crate::{tick::Tick, Balance};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, EqNoBound, Parameter, PartialEqNoBound};
 use polkadot_sdk::*;
@@ -6,8 +6,8 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_application_crypto::AppCrypto;
 use sp_core::{
-	H256, OpaquePeerId,
 	crypto::{CryptoTypeId, KeyTypeId},
+	OpaquePeerId, H256,
 };
 use sp_runtime::traits::{Block, OpaqueKeys};
 
@@ -16,7 +16,7 @@ pub const BLOCK_SEAL_KEY_TYPE: KeyTypeId = KeyTypeId(*b"seal");
 // sr25519 signatures are non-deterministic, so we use ed25519 for deterministic signatures since
 // these are part of the nonce hash
 pub mod app {
-	use sp_application_crypto::{KeyTypeId, app_crypto, ed25519};
+	use sp_application_crypto::{app_crypto, ed25519, KeyTypeId};
 
 	app_crypto!(ed25519, KeyTypeId(*b"seal"));
 }

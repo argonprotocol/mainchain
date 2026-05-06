@@ -10,7 +10,7 @@ use alloc::{
 };
 use anyhow::Result;
 use argon_bitcoin::{
-	Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep, primitives::*, psbt_utils,
+	primitives::*, psbt_utils, Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep,
 };
 use argon_primitives::bitcoin::{
 	BitcoinHeight, BitcoinNetwork, BitcoinScriptPubkey, H256Le, Satoshis,

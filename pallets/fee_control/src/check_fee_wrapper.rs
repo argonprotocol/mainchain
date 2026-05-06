@@ -1,25 +1,24 @@
 // Error code for InvalidTransaction::Custom when sponsored fee is too high
 const INVALID_TX_SPONSORED_FEE_TOO_HIGH: u8 = 1;
 use crate::pallet::{Config, Event, Pallet};
-use Intermediate::*;
 use alloc::vec::Vec;
 use codec::EncodeLike;
 use frame_support::{dispatch::CheckIfFeeless, traits::InstanceFilter};
 use pallet_prelude::{
-	Decode, DecodeWithMemTracking, DispatchInfoOf, DispatchResult, Encode, OriginFor, OriginTrait,
-	TransactionSource, TransactionValidityError, ValidTransaction, ValidateResult, Weight,
 	argon_primitives::{
 		CallTxPoolKeyProvider, FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
 	},
 	sp_runtime::traits::{
 		DispatchOriginOf, Implication, PostDispatchInfoOf, StaticLookup, TransactionExtension, Zero,
 	},
-	*,
+	Decode, DecodeWithMemTracking, DispatchInfoOf, DispatchResult, Encode, OriginFor, OriginTrait,
+	TransactionSource, TransactionValidityError, ValidTransaction, ValidateResult, Weight, *,
 };
 use pallet_transaction_payment::OnChargeTransaction;
 use polkadot_sdk::frame_support::traits::IsSubType;
 use scale_info::{StaticTypeInfo, TypeInfo};
 use sp_runtime::traits::{self, BlockNumberProvider, Hash};
+use Intermediate::*;
 
 /// A [`TransactionExtension`] that checks if a call can be feeless and allows protecting against
 /// dos by providing a unique tx pool key
@@ -269,11 +268,10 @@ where
         if call.is_feeless(&origin) {
             let mut validity = ValidTransaction::default();
             let mut push_provides = |key: Option<Vec<u8>>| {
-                if let Some(key) = key {
-                    if !validity.provides.contains(&key) {
+                if let Some(key) = key
+                    && !validity.provides.contains(&key) {
                         validity.provides.push(key);
                     }
-                }
             };
 
             push_provides(general_pool_key.clone());
@@ -283,15 +281,14 @@ where
         } else {
             let mut delegated_origin = origin.clone();
             let mut tx_sponsor = None;
-            if let Some(signer) = origin.as_signer() {
-                if let Some(sponsor) =
+            if let Some(signer) = origin.as_signer()
+                && let Some(sponsor) =
                     T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
                 {
                     log::debug!("fee sponsor detected: payer={:?}", sponsor.payer);
                     delegated_origin.set_caller_from_signed(sponsor.payer.clone());
                     tx_sponsor = Some(sponsor);
-                }
-            };
+                };
 
             let (mut validity, inner_val, origin_out) = self.0.validate(
                 delegated_origin.clone(),
@@ -303,8 +300,7 @@ where
                 source,
             )?;
             if let Some(max_fee_with_tip) = tx_sponsor.as_ref().and_then(|sp| sp.max_fee_with_tip)
-            {
-                if let pallet_transaction_payment::Val::<T>::Charge { fee_with_tip, .. } =
+                && let pallet_transaction_payment::Val::<T>::Charge { fee_with_tip, .. } =
                     &inner_val
                 {
                     let total_fee: T::Balance = (*fee_with_tip).into();
@@ -314,14 +310,12 @@ where
                         ));
                     }
                 }
-            }
 
             let mut push_provides = |key: Option<Vec<u8>>| {
-                if let Some(key) = key {
-                    if !validity.provides.contains(&key) {
+                if let Some(key) = key
+                    && !validity.provides.contains(&key) {
                         validity.provides.push(key);
                     }
-                }
             };
 
             push_provides(general_pool_key);

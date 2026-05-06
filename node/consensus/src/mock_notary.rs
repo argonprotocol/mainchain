@@ -1,18 +1,18 @@
 use binary_merkle_tree::merkle_root;
 use codec::Encode;
 use jsonrpsee::{
-	RpcModule,
-	core::{SubscriptionResult, async_trait},
+	core::{async_trait, SubscriptionResult},
 	server::{PendingSubscriptionSink, Server, ServerHandle, SubscriptionMessage},
 	types::error::ErrorObjectOwned,
+	RpcModule,
 };
 use polkadot_sdk::*;
 use sc_utils::notification::NotificationSender;
-use sp_core::{Blake2Hasher, H256, ed25519::Signature};
+use sp_core::{ed25519::Signature, Blake2Hasher, H256};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
-use argon_notary::server::{NotebookHeaderInfo, NotebookHeaderStream, pipe_from_stream_and_drop};
+use argon_notary::server::{pipe_from_stream_and_drop, NotebookHeaderInfo, NotebookHeaderStream};
 use argon_notary_apis::{
 	get_header_url, get_notebook_url,
 	localchain::{BalanceChangeResult, BalanceTipResult, LocalchainRpcServer},
@@ -20,17 +20,17 @@ use argon_notary_apis::{
 	system::SystemRpcServer,
 };
 use argon_primitives::{
-	AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, BlockVote, Notarization,
-	NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains, Notebook,
-	NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader, tick::Tick,
+	tick::Tick, AccountId, AccountOrigin, AccountType, BalanceProof, BalanceTip, BlockVote,
+	Notarization, NotarizationBalanceChangeset, NotarizationBlockVotes, NotarizationDomains,
+	Notebook, NotebookHeader, NotebookMeta, NotebookNumber, SignedNotebookHeader,
 };
 use axum::{
-	Router,
 	body::Bytes,
 	extract::{Path, State},
 	http::StatusCode,
 	response::IntoResponse,
 	routing::get,
+	Router,
 };
 use env_logger::{Builder, Env};
 use tokio::task::JoinHandle;

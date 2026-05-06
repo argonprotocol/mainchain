@@ -1,26 +1,26 @@
 use crate::{
 	AccountOwnershipProof, ConsumedReferralCodes, ConsumedReferralCodesByExpiration,
-	EncryptedServerBySponsee, ExpiredReferralCodeCleanupFrame,
-	MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY, MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY,
-	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, OpaqueEncryptionPubkey, OperationalAccountBySubAccount,
-	OperationalAccounts, OperationalProgressPatch, REFERRAL_CLAIM_PROOF_MESSAGE_KEY,
-	REFERRAL_SPONSOR_GRANT_MESSAGE_KEY, ReferralProof, Registration, RegistrationV1, Rewards,
+	EncryptedServerBySponsee, ExpiredReferralCodeCleanupFrame, OpaqueEncryptionPubkey,
+	OperationalAccountBySubAccount, OperationalAccounts, OperationalProgressPatch, ReferralProof,
+	Registration, RegistrationV1, Rewards, MINING_BOT_ACCOUNT_PROOF_MESSAGE_KEY,
+	MINING_FUNDING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
+	REFERRAL_CLAIM_PROOF_MESSAGE_KEY, REFERRAL_SPONSOR_GRANT_MESSAGE_KEY,
 	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
-use argon_primitives::{MICROGONS_PER_ARGON, OperationalAccountsHook, Signature};
+use argon_primitives::{OperationalAccountsHook, Signature, MICROGONS_PER_ARGON};
 use frame_support::{assert_err, assert_noop, assert_ok, traits::Hooks};
 use pallet_prelude::*;
-use sp_core::{Pair, sr25519};
+use sp_core::{sr25519, Pair};
 use sp_io::hashing::blake2_256;
-use sp_runtime::{AccountId32, DispatchError, MultiSigner, traits::IdentifyAccount};
+use sp_runtime::{traits::IdentifyAccount, AccountId32, DispatchError, MultiSigner};
 
 use crate::mock::{
+	ensure_registration_lookup, has_vault_operational_mark, new_test_ext, set_registration_lookup,
 	BitcoinLockSizeForReferral, ClaimableTreasuryBalance, ClaimedOperationalRewards,
 	CurrentFrameId, MaxAvailableReferrals, MaxEncryptedServerLen,
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
 	OperationalReferralBonusReward, OperationalReferralReward, RecentArgonTransfers,
-	RequiresUniswapTransfer, RuntimeOrigin, Test, TestAccountId, ensure_registration_lookup,
-	has_vault_operational_mark, new_test_ext, set_registration_lookup,
+	RequiresUniswapTransfer, RuntimeOrigin, Test, TestAccountId,
 };
 
 #[test]

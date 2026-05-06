@@ -1,7 +1,6 @@
-use crate::{ArgonTestNode, get_target_dir, log_watcher::LogWatcher};
-use anyhow::{Context, bail};
+use crate::{get_target_dir, log_watcher::LogWatcher, ArgonTestNode};
+use anyhow::{bail, Context};
 use argon_client::{
-	MainchainClient,
 	api::{
 		runtime_types::argon_primitives::{
 			host::Host,
@@ -10,6 +9,7 @@ use argon_client::{
 		tx,
 	},
 	signer::Sr25519Signer,
+	MainchainClient,
 };
 use polkadot_sdk::*;
 use rand::prelude::IndexedRandom;
@@ -17,7 +17,7 @@ use sp_core::{
 	crypto::{Pair, Ss58Codec},
 	ed25519, sr25519,
 };
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::{
 	env, net::TcpListener, path::PathBuf, process, process::Command, sync::Arc, thread,
 	time::Duration,

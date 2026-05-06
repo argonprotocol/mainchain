@@ -1,15 +1,14 @@
 use anyhow::anyhow;
 use argon_notary_audit::{verify_changeset_signatures, verify_notarization_allocation};
 use argon_primitives::{
-  AccountType, BalanceChange, BlockVote, DOMAIN_LEASE_COST, Domain,
-  MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTARIZATION,
-  MAX_DOMAINS_PER_NOTARIZATION, Notarization, Note, NoteType, TAX_PERCENT_BASE, TRANSFER_TAX_CAP,
-  prelude::*,
+  prelude::*, AccountType, BalanceChange, BlockVote, Domain, Notarization, Note, NoteType,
+  DOMAIN_LEASE_COST, MAX_BALANCE_CHANGES_PER_NOTARIZATION, MAX_BLOCK_VOTES_PER_NOTARIZATION,
+  MAX_DOMAINS_PER_NOTARIZATION, TAX_PERCENT_BASE, TRANSFER_TAX_CAP,
 };
 use codec::Decode;
 use serde_json::json;
-use sp_core::ConstU32;
 use sp_core::crypto::AccountId32;
+use sp_core::ConstU32;
 use sp_runtime::traits::Verify;
 use sp_runtime::{BoundedVec, MultiSignature};
 use sqlx::SqlitePool;
@@ -28,8 +27,8 @@ use crate::notarization_tracker::NotarizationTracker;
 use crate::notary_client::NotaryClients;
 use crate::open_channel_holds::OpenChannelHold;
 use crate::transactions::LocalchainTransaction;
+use crate::{bail, Error};
 use crate::{ChannelHold, DomainStore, LocalchainTransfer, NotaryAccountOrigin};
-use crate::{Error, bail};
 use crate::{Result, TickerRef};
 
 #[cfg_attr(feature = "napi", napi)]
@@ -491,7 +490,11 @@ impl NotarizationBuilder {
     if amount < 1000 {
       let total_before_tax = (amount * 100) / (100 - TAX_PERCENT_BASE);
 
-      let round = if total_before_tax % 100 == 0 { 0 } else { 1 };
+      let round = if total_before_tax.is_multiple_of(100) {
+        0
+      } else {
+        1
+      };
 
       total_before_tax + round
     } else {
@@ -964,16 +967,16 @@ impl NotarizationBuilder {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::NotarizationBuilder;
-  use crate::ChannelHold;
-  use crate::LocalAccount;
   use crate::argon_file::ArgonFileType;
   use crate::balance_change_builder::BalanceChangeBuilder;
   use crate::error::NapiOk;
   use crate::mainchain_client::napi_ext::LocalchainTransfer;
   use crate::open_channel_holds::OpenChannelHold;
   use crate::transactions::LocalchainTransaction;
-  use crate::{AccountStore, notarization_tracker::NotarizationTracker};
-  use argon_primitives::{AccountType, BlockVote, prelude::*};
+  use crate::ChannelHold;
+  use crate::LocalAccount;
+  use crate::{notarization_tracker::NotarizationTracker, AccountStore};
+  use argon_primitives::{prelude::*, AccountType, BlockVote};
   use codec::Decode;
   use napi::bindgen_prelude::BigInt;
   use sp_core::H256;
@@ -1294,11 +1297,11 @@ mod test {
   use sp_keyring::Sr25519Keyring::Bob;
   use sqlx::SqlitePool;
 
-  use crate::AccountStore;
-  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::test_utils::{
     create_mock_notary, create_pool, get_balance_tip, mock_mainchain_transfer, mock_notary_clients,
   };
+  use crate::AccountStore;
+  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::*;
 
   use super::*;
@@ -1439,11 +1442,9 @@ mod test {
     let bob_tax_account =
       AccountStore::db_get(&mut bob_db, bob_address.clone(), AccountType::Tax, 1).await?;
     assert_eq!(bob_notarization.accounts_by_id.len(), 2);
-    assert!(
-      bob_notarization
-        .accounts_by_id
-        .contains_key(&bob_account.id)
-    );
+    assert!(bob_notarization
+      .accounts_by_id
+      .contains_key(&bob_account.id));
     assert_eq!(bob_notarization.notarized_balance_changes, 3);
     assert_eq!(bob_notarization.notarized_votes, 0);
 

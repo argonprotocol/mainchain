@@ -7,16 +7,15 @@ use jsonrpsee::{
 	ws_client::{PingConfig, WsClient},
 };
 pub(crate) use polkadot_sdk::*;
-use sp_core::{H256, crypto::AccountId32};
+use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
 use std::{fmt::Debug, io::Write, sync::Arc};
 use subxt::{
-	Metadata, OnlineClient,
-	backend::{BackendExt, BlockRef, legacy::LegacyRpcMethods, rpc::RpcClient},
+	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
 	blocks::ExtrinsicEvents,
 	config::{
-		Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder, ExtrinsicParams, HashFor,
-		substrate::BlakeTwo256,
+		substrate::BlakeTwo256, Config, DefaultExtrinsicParams, DefaultExtrinsicParamsBuilder,
+		ExtrinsicParams, HashFor,
 	},
 	error::{Error, RpcError},
 	events::EventDetails,
@@ -25,16 +24,17 @@ use subxt::{
 	storage::Address as StorageAddress,
 	tx::{Payload, Signer, TxInBlock, TxProgress, TxStatus},
 	utils::Yes,
+	Metadata, OnlineClient,
 };
 use tokio::{
-	sync::{Mutex, RwLock, mpsc},
+	sync::{mpsc, Mutex, RwLock},
 	task::JoinHandle,
 };
 use tracing::{info, log::debug, warn};
 
 use argon_primitives::{
-	AccountId, BlockNumber, Chain, ChainIdentity, Nonce, VotingSchedule, prelude::FrameId,
-	tick::Tick,
+	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce,
+	VotingSchedule,
 };
 pub use spec::api;
 
@@ -128,13 +128,13 @@ impl MainchainClient {
 			.await?
 			.fetch(&storage().system().last_runtime_upgrade())
 			.await?;
-		if let Some(upgrade) = last_upgrade {
-			if upgrade.spec_version > version.spec_version {
-				info!(?upgrade, build_version = ?version, "ArgonFullClient: runtime version mismatch, updating..");
-				let updated_metadata =
-					live.backend().metadata_at_version(15, block_hash.hash()).await?;
-				live.set_metadata(updated_metadata);
-			}
+		if let Some(upgrade) = last_upgrade &&
+			upgrade.spec_version > version.spec_version
+		{
+			info!(?upgrade, build_version = ?version, "ArgonFullClient: runtime version mismatch, updating..");
+			let updated_metadata =
+				live.backend().metadata_at_version(15, block_hash.hash()).await?;
+			live.set_metadata(updated_metadata);
 		}
 
 		let updater_handle = tokio::spawn(async move {
@@ -431,10 +431,10 @@ impl MainchainClient {
 		match api.call(payload).await {
 			Ok(x) => Ok(x),
 			Err(e) => {
-				if matches!(e, Error::Rpc(RpcError::ClientError(_))) {
-					if let Some(on_client_error) = self.on_client_error.as_ref() {
-						let _ = on_client_error.send(e.to_string()).await;
-					}
+				if matches!(e, Error::Rpc(RpcError::ClientError(_))) &&
+					let Some(on_client_error) = self.on_client_error.as_ref()
+				{
+					let _ = on_client_error.send(e.to_string()).await;
 				}
 				Err(e)
 			},
@@ -461,10 +461,10 @@ impl MainchainClient {
 		match storage.fetch(address).await {
 			Ok(x) => Ok(x),
 			Err(e) => {
-				if matches!(e, Error::Rpc(RpcError::ClientError(_))) {
-					if let Some(on_client_error) = self.on_client_error.as_ref() {
-						let _ = on_client_error.send(e.to_string()).await;
-					}
+				if matches!(e, Error::Rpc(RpcError::ClientError(_))) &&
+					let Some(on_client_error) = self.on_client_error.as_ref()
+				{
+					let _ = on_client_error.send(e.to_string()).await;
 				}
 				Err(e)
 			},

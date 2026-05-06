@@ -6,9 +6,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::Result;
 use crate::mainchain_transfer::MainchainTransferIn;
 use crate::transactions::TransactionType;
+use crate::Result;
 use crate::{AccountStore, BalanceChangeRow};
 use crate::{BalanceChangeStatus, LocalAccount, MainchainClient};
 use argon_primitives::argon_utils::format_argons;
@@ -221,10 +221,10 @@ impl OverviewStore {
       overview.processing_mainchain_balance_change -= transfer.amount.parse::<i128>()?;
     }
 
-    if let Some(mainchain_client) = self.mainchain_client.read().await.as_ref() {
-      if let Ok(account) = mainchain_client.get_account(overview.address.clone()).await {
-        overview.mainchain_balance = account.data.free as i128;
-      }
+    if let Some(mainchain_client) = self.mainchain_client.read().await.as_ref()
+      && let Ok(account) = mainchain_client.get_account(overview.address.clone()).await
+    {
+      overview.mainchain_balance = account.data.free as i128;
     }
 
     let mut seen_accounts = HashSet::new();
@@ -373,8 +373,8 @@ impl OverviewStore {
 
 #[cfg(feature = "uniffi")]
 pub mod uniffi_ext {
-  use crate::BalanceChangeStatus;
   use crate::transactions::TransactionType;
+  use crate::BalanceChangeStatus;
   use argon_primitives::{AccountType, Chain};
 
   #[derive(uniffi::Record, Clone, Debug)]
@@ -511,9 +511,9 @@ pub mod uniffi_ext {
 #[cfg(feature = "napi")]
 pub mod napi_ext {
   use super::OverviewStore;
-  use crate::BalanceChangeStatus;
   use crate::error::NapiOk;
   use crate::transactions::TransactionType;
+  use crate::BalanceChangeStatus;
   use argon_primitives::{AccountType, Chain};
   use napi::bindgen_prelude::*;
 
@@ -670,10 +670,10 @@ mod tests {
   use sp_keyring::Ed25519Keyring::Ferdie;
   use sp_keyring::Sr25519Keyring::{Alice, Bob};
 
-  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::overview::OverviewStore;
   use crate::test_utils::{create_mock_notary, create_pool, mock_localchain, mock_notary_clients};
   use crate::transactions::TransactionType;
+  use crate::CryptoScheme::{Ed25519, Sr25519};
   use crate::*;
 
   #[sqlx::test]

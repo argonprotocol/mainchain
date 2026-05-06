@@ -1,8 +1,8 @@
 use crate as pallet_ticks;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{
-	BlockVoteDigest, Digestset, NotebookDigest,
 	tick::{TickDigest, Ticker},
+	BlockVoteDigest, Digestset, NotebookDigest,
 };
 
 use pallet_prelude::*;

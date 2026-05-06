@@ -3,12 +3,12 @@ use crate::{
 	aux_data::AuxData, error::Error, metrics::BlockMetrics, notary_client::VotingPowerInfo,
 };
 use argon_primitives::{
-	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 	notary::{
 		NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
 		NotaryNotebookTickState, NotaryNotebookVoteDigestDetails, SignedHeaderBytes,
 	},
 	tick::Tick,
+	AccountId, NotaryId, NotebookAuditResult, NotebookHeaderData, NotebookNumber, VotingSchedule,
 };
 use argon_runtime::NotebookVerifyError;
 use codec::{Codec, Decode, Encode};
@@ -222,10 +222,10 @@ impl<B: BlockT, C: AuxStore + 'static> ArgonAux<B, C> {
 			return false;
 		};
 		let authors = block_authors.get();
-		if let Some(authors_at_height) = authors.get(&tick) {
-			if let Some(authors_for_key) = authors_at_height.get(&block_key) {
-				return authors_for_key.contains(account_id);
-			}
+		if let Some(authors_at_height) = authors.get(&tick) &&
+			let Some(authors_for_key) = authors_at_height.get(&block_key)
+		{
+			return authors_for_key.contains(account_id);
 		}
 		false
 	}
@@ -1230,11 +1230,9 @@ mod test {
 			.expect("clean state history");
 		assert!(recording.iter().any(|x| x.0 == AuxKey::BlockAuthors.encode()));
 		assert!(recording.iter().any(|x| x.0 == AuxKey::NotaryState.encode()));
-		assert!(
-			recording
-				.iter()
-				.any(|x| x.0 == AuxKey::VotesAtTick(runtime_tick - OLDEST_VOTES_TO_KEEP).encode())
-		);
+		assert!(recording
+			.iter()
+			.any(|x| x.0 == AuxKey::VotesAtTick(runtime_tick - OLDEST_VOTES_TO_KEEP).encode()));
 		// apply changes
 		for (key, value) in recording {
 			if let Some(value) = value {
@@ -1264,11 +1262,9 @@ mod test {
 			.expect("clean state history");
 		assert!(recording.iter().any(|x| x.0 == AuxKey::BlockAuthors.encode()));
 		assert!(recording.iter().any(|x| x.0 == AuxKey::NotaryState.encode()));
-		assert!(
-			recording
-				.iter()
-				.any(|x| x.0 == AuxKey::VotesAtTick(next_tick - OLDEST_VOTES_TO_KEEP).encode())
-		);
+		assert!(recording
+			.iter()
+			.any(|x| x.0 == AuxKey::VotesAtTick(next_tick - OLDEST_VOTES_TO_KEEP).encode()));
 		// apply changes
 		for (key, value) in recording {
 			if let Some(value) = value {

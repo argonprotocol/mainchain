@@ -1,11 +1,11 @@
 use crate::{
-	Event, MiningMintPerCohort, MintType,
 	mock::*,
 	pallet::{BlockMintAction, MintedBitcoinMicrogons, MintedMiningMicrogons, PendingMintUtxos},
+	Event, MiningMintPerCohort, MintType,
 };
 use argon_primitives::{
-	BlockRewardsEventHandler, UtxoLockEvents,
 	block_seal::{BlockPayout, BlockRewardType},
+	BlockRewardsEventHandler, UtxoLockEvents,
 };
 use frame_support::traits::fungible::Unbalanced;
 use pallet_prelude::*;

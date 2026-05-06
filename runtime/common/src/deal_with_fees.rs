@@ -92,7 +92,11 @@ macro_rules! deal_with_fees {
 						let (defs, _deposit) =
 							pallet_proxy::Pallet::<R>::proxies(real_account.clone());
 						defs.into_iter().find_map(|def| {
-							if def.delegate == *signer { Some(def.proxy_type) } else { None }
+							if def.delegate == *signer {
+								Some(def.proxy_type)
+							} else {
+								None
+							}
 						})
 					};
 

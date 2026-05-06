@@ -1,4 +1,4 @@
-use argon_client::{ArgonOnlineClient, api};
+use argon_client::{api, ArgonOnlineClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

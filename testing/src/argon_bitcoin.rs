@@ -1,4 +1,4 @@
-use crate::{ArgonTestNode, get_target_dir};
+use crate::{get_target_dir, ArgonTestNode};
 use std::{env, process::Stdio};
 use tokio::{
 	io::{AsyncBufReadExt, BufReader},

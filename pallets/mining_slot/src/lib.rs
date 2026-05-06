@@ -3,14 +3,14 @@ extern crate alloc;
 extern crate core;
 
 use argon_primitives::{
-	ArgonDigests, SlotEvents, TickProvider,
 	block_seal::{MinerIndex, MiningAuthority, MiningBidStats, MiningSlotConfig},
 	inherents::BlockSealInherent,
 	providers::*,
+	ArgonDigests, SlotEvents, TickProvider,
 };
 pub use pallet::*;
 use pallet_prelude::*;
-use sp_runtime::{RuntimeAppPublic, traits::OpaqueKeys};
+use sp_runtime::{traits::OpaqueKeys, RuntimeAppPublic};
 pub use weights::*;
 
 #[cfg(test)]
@@ -56,7 +56,7 @@ pub mod pallet {
 
 	use super::*;
 	use argon_primitives::{
-		ArgonDigests, SlotEvents, TickProvider, block_seal::MiningRegistration, digests::FrameInfo,
+		block_seal::MiningRegistration, digests::FrameInfo, ArgonDigests, SlotEvents, TickProvider,
 	};
 	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
@@ -641,19 +641,18 @@ pub mod pallet {
 
 			MiningConfig::<T>::mutate(|a| {
 				let mut has_update = false;
-				if let Some(ticks_before_bid_end_for_vrf_close) = ticks_before_bid_end_for_vrf_close
+				if let Some(ticks_before_bid_end_for_vrf_close) = ticks_before_bid_end_for_vrf_close &&
+					a.ticks_before_bid_end_for_vrf_close != ticks_before_bid_end_for_vrf_close
 				{
-					if a.ticks_before_bid_end_for_vrf_close != ticks_before_bid_end_for_vrf_close {
-						a.ticks_before_bid_end_for_vrf_close = ticks_before_bid_end_for_vrf_close;
-						has_update = true;
-					}
+					a.ticks_before_bid_end_for_vrf_close = ticks_before_bid_end_for_vrf_close;
+					has_update = true;
 				}
 
-				if let Some(mining_slot_delay) = mining_slot_delay {
-					if a.slot_bidding_start_after_ticks != mining_slot_delay {
-						a.slot_bidding_start_after_ticks = mining_slot_delay;
-						has_update = true;
-					}
+				if let Some(mining_slot_delay) = mining_slot_delay &&
+					a.slot_bidding_start_after_ticks != mining_slot_delay
+				{
+					a.slot_bidding_start_after_ticks = mining_slot_delay;
+					has_update = true;
 				}
 
 				if has_update {
@@ -683,11 +682,11 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, FrameId)> {
 		let mut result = vec![];
 		for (frame_id, cohort) in <MinersByCohort<T>>::iter() {
-			if let Some(just_activated_frame) = Self::get_newly_started_frame() {
-				if frame_id == just_activated_frame {
-					// skip just activated frame
-					continue;
-				}
+			if let Some(just_activated_frame) = Self::get_newly_started_frame() &&
+				frame_id == just_activated_frame
+			{
+				// skip just activated frame
+				continue;
 			}
 			for registration in cohort {
 				let account = registration.rewards_account();
@@ -752,10 +751,10 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 				scores.push(score);
 				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
-					if let Some(ref limit_to_authority) = signing_key {
-						if &authority.authority_id != limit_to_authority {
-							continue;
-						}
+					if let Some(ref limit_to_authority) = signing_key &&
+						&authority.authority_id != limit_to_authority
+					{
+						continue;
 					}
 					best_score = score;
 					best = Some(authority);
@@ -849,7 +848,7 @@ impl<T: Config> Pallet<T> {
 		let rotate_grandpa_blocks =
 			UniqueSaturatedInto::<u32>::unique_saturated_into(T::GrandpaRotationBlocks::get());
 		let current_block = UniqueSaturatedInto::<u32>::unique_saturated_into(n);
-		!HasAddedGrandpaRotation::<T>::get() || current_block % rotate_grandpa_blocks == 0
+		!HasAddedGrandpaRotation::<T>::get() || current_block.is_multiple_of(rotate_grandpa_blocks)
 	}
 
 	pub fn is_registered_mining_active() -> bool {
@@ -894,11 +893,11 @@ impl<T: Config> Pallet<T> {
 			return;
 		};
 		MinerNonceScoringByCohort::<T>::mutate(|a| {
-			if let Some(cohort_nonces) = a.get_mut(&miner_index.0) {
-				if let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize) {
-					miner_scoring.blocks_won_in_frame.saturating_accrue(1);
-					miner_scoring.last_win_block = Some(frame_system::Pallet::<T>::block_number());
-				}
+			if let Some(cohort_nonces) = a.get_mut(&miner_index.0) &&
+				let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize)
+			{
+				miner_scoring.blocks_won_in_frame.saturating_accrue(1);
+				miner_scoring.last_win_block = Some(frame_system::Pallet::<T>::block_number());
 			}
 		});
 	}
@@ -1528,10 +1527,11 @@ impl<T: Config> BlockSealEventHandler for Pallet<T> {
 		// If bids are open, and we're in the closing-period, check if bidding should close.
 		// NOTE: This should run first to ensure bids in this block can't be manipulated once
 		// this state is known
-		if let Some(proof) = vote_seal_proof {
-			if IsNextSlotBiddingOpen::<T>::get() && Self::check_for_bidding_close(proof) {
-				IsNextSlotBiddingOpen::<T>::put(false);
-			}
+		if let Some(proof) = vote_seal_proof &&
+			IsNextSlotBiddingOpen::<T>::get() &&
+			Self::check_for_bidding_close(proof)
+		{
+			IsNextSlotBiddingOpen::<T>::put(false);
 		}
 	}
 

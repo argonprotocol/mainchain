@@ -6,22 +6,22 @@ use codec::Encode;
 use pallet_prelude::*;
 
 use crate::{
-	Error, Event, HoldReason, LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest,
-	MicrogonPerBtcHistory, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
 	mock::*,
 	pallet::{
 		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
 		LocksByUtxoId, UtxoIdsByVaultId,
 	},
+	Error, Event, HoldReason, LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest,
+	MicrogonPerBtcHistory, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
 };
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
-	BitcoinUtxoEvents, CallTxPoolKeyProvider, MICROGONS_PER_ARGON, PriceProvider,
 	bitcoin::{
-		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le,
-		SATOSHIS_PER_BITCOIN, UtxoRef,
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoRef,
+		SATOSHIS_PER_BITCOIN,
 	},
 	vault::{LockExtension, Securitization},
+	BitcoinUtxoEvents, CallTxPoolKeyProvider, PriceProvider, MICROGONS_PER_ARGON,
 };
 
 #[test]
@@ -304,17 +304,16 @@ fn initialize_for_has_a_pool_key_per_vault_and_account() {
 				.using_encoded(sp_crypto_hashing::blake2_256)
 				.to_vec()
 		);
-		assert!(
-			<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
-				&first_call,
-				Some(&99),
-			)
-			.is_none()
-		);
-		assert!(
-			<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(&first_call, None)
-				.is_none()
-		);
+		assert!(<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
+			&first_call,
+			Some(&99),
+		)
+		.is_none());
+		assert!(<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
+			&first_call,
+			None
+		)
+		.is_none());
 	});
 }
 
@@ -486,12 +485,10 @@ fn allows_orphan_release_after_cancel() {
 			release_script_pubkey.clone(),
 			1000
 		));
-		assert!(
-			OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
-				.unwrap()
-				.cosign_request
-				.is_some()
-		);
+		assert!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
+			.unwrap()
+			.cosign_request
+			.is_some());
 		assert_eq!(
 			VaultViewOfOrphanedUtxoCosigns::get()
 				.get(&vault_id)
@@ -594,10 +591,8 @@ fn orphan_release_requests_expire() {
 		assert!(LocksByUtxoId::<Test>::get(1).is_none());
 
 		let expires_at = CurrentFrameId::get() + OrphanedUtxoReleaseExpiryFrames::get();
-		assert!(
-			OrphanedUtxoExpirationByFrame::<Test>::get(expires_at)
-				.contains(&(who, utxo_ref.clone()))
-		);
+		assert!(OrphanedUtxoExpirationByFrame::<Test>::get(expires_at)
+			.contains(&(who, utxo_ref.clone())));
 		CurrentFrameId::set(expires_at);
 		BitcoinLocks::on_initialize(3);
 
@@ -646,12 +641,10 @@ fn external_spend_clears_orphan_release_requests() {
 			release_script_pubkey,
 			1000
 		));
-		assert!(
-			OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
-				.unwrap()
-				.cosign_request
-				.is_some()
-		);
+		assert!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
+			.unwrap()
+			.cosign_request
+			.is_some());
 		assert_eq!(
 			VaultViewOfOrphanedUtxoCosigns::get()
 				.get(&vault_id)
@@ -1137,12 +1130,10 @@ fn can_release_a_bitcoin() {
 				bitcoin_network_fee: 1000
 			}
 		);
-		assert!(
-			LockCosignDueByFrame::<Test>::get(
-				CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get()
-			)
-			.contains(&1)
-		);
+		assert!(LockCosignDueByFrame::<Test>::get(
+			CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get()
+		)
+		.contains(&1));
 		assert!(VaultViewOfCosignPendingLocks::get().contains_key(&1));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 		System::assert_last_event(

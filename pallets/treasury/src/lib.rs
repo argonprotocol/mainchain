@@ -80,9 +80,9 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		BlockSealAuthorityId, MICROGONS_PER_ARGON, OnNewSlot, TreasuryPoolProvider,
 		providers::PriceProvider,
 		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		BlockSealAuthorityId, OnNewSlot, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
@@ -129,7 +129,10 @@ pub mod pallet {
 		type RuntimeHoldReason: From<HoldReason>;
 
 		/// Provider for vault treasury settings and vault-side earnings collection.
-		type TreasuryVaultProvider: TreasuryVaultProvider<Balance = Self::Balance, AccountId = Self::AccountId>;
+		type TreasuryVaultProvider: TreasuryVaultProvider<
+			Balance = Self::Balance,
+			AccountId = Self::AccountId,
+		>;
 
 		/// Provider for turning securitized satoshis into argon value.
 		type PriceProvider: PriceProvider<Self::Balance>;
@@ -560,23 +563,22 @@ pub mod pallet {
 						earnings_for_vault.saturating_accrue(paid_payout);
 						capital_contributed_by_vault
 							.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-					} else if !paid_payout.is_zero() {
-						if let Err(e) = T::Currency::transfer(
+					} else if !paid_payout.is_zero() &&
+						let Err(e) = T::Currency::transfer(
 							&bid_pool_account,
 							&bond_lot.owner,
 							paid_payout,
 							Preservation::Expendable,
 						) {
-							Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
-								frame_id,
-								vault_id: *vault_id,
-								bond_lot_id: allocation.bond_lot_id,
-								account_id: bond_lot.owner,
-								amount: paid_payout,
-								dispatch_error: e,
-							});
-							paid_payout = T::Balance::zero();
-						}
+						Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
+							frame_id,
+							vault_id: *vault_id,
+							bond_lot_id: allocation.bond_lot_id,
+							account_id: bond_lot.owner,
+							amount: paid_payout,
+							dispatch_error: e,
+						});
+						paid_payout = T::Balance::zero();
 					}
 
 					BondLotById::<T>::mutate_exists(allocation.bond_lot_id, |maybe_bond_lot| {
@@ -691,17 +693,15 @@ pub mod pallet {
 				total_eligible_bonds = total_eligible_bonds.saturating_add(eligible_bonds as u128);
 				let _ = vaults.try_insert(vault_id, vault_capital);
 
-				if let Some(operator) = T::TreasuryVaultProvider::get_vault_operator(vault_id) {
-					if let Some(operator_amount) =
-						Self::active_account_bond_amount(vault_id, &operator).unwrap_or_default()
-					{
-						if !operator_amount.is_zero() {
-							T::OperationalAccountsHook::treasury_pool_participated(
-								&operator,
-								operator_amount,
-							);
-						}
-					}
+				if let Some(operator) = T::TreasuryVaultProvider::get_vault_operator(vault_id) &&
+					let Some(operator_amount) =
+						Self::active_account_bond_amount(vault_id, &operator).unwrap_or_default() &&
+					!operator_amount.is_zero()
+				{
+					T::OperationalAccountsHook::treasury_pool_participated(
+						&operator,
+						operator_amount,
+					);
 				}
 			}
 

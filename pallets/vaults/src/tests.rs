@@ -1,12 +1,12 @@
 use crate::{
-	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
-	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 	mock::{Vaults, *},
 	pallet::{
 		BitcoinLockUpdate, NextVaultId, PendingTermsModificationsByTick,
 		RecentCapacityDropsByVault, RevenuePerFrameByVault, VaultFundsReleasingByHeight,
 		VaultXPubById, VaultsById,
 	},
+	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
+	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub},
@@ -20,8 +20,8 @@ use frame_support::traits::Hooks;
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_prelude::{
 	argon_primitives::{
-		OnNewSlot,
 		vault::{LockExtension, Securitization, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		OnNewSlot,
 	},
 	*,
 };
@@ -321,10 +321,8 @@ fn it_locks_operational_minimum_after_becoming_operational() {
 		let unlock_tick = 1 + OperationalMinimumVaultLockTicks::get();
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert_eq!(vault.operational_minimum_release_tick, Some(unlock_tick));
-		assert!(
-			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
-				.contains(&1)
-		);
+		assert!(crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
+			.contains(&1));
 	});
 }
 
@@ -343,11 +341,9 @@ fn it_skips_operational_minimum_for_aged_vaults() {
 
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert_eq!(vault.operational_minimum_release_tick, None);
-		assert!(
-			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::iter()
-				.next()
-				.is_none()
-		);
+		assert!(crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::iter()
+			.next()
+			.is_none());
 	});
 }
 
@@ -395,10 +391,8 @@ fn it_keeps_then_releases_operational_minimum_for_closed_vaults() {
 
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert_eq!(vault.operational_minimum_release_tick, None);
-		assert!(
-			crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
-				.is_empty()
-		);
+		assert!(crate::pallet::VaultsReleasingOperationalMinimumByTick::<Test>::get(unlock_tick)
+			.is_empty());
 
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert!(vault.is_closed);

@@ -7,7 +7,7 @@ use std::str::Utf8Error;
 use tracing::error;
 
 use argon_notary_audit::VerifyError;
-use argon_primitives::{NotebookNumber, tick::Tick};
+use argon_primitives::{tick::Tick, NotebookNumber};
 
 #[derive(Debug, PartialEq, Decode, Encode, Clone, thiserror::Error)]
 pub enum Error {

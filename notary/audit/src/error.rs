@@ -1,9 +1,9 @@
 use crate::AccountHistoryLookupError;
 use alloc::{string::String, vec::Vec};
 use argon_primitives::{
-	AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 	prelude::{frame_support::BoundedVec, sp_core::ConstU32},
 	tick::Tick,
+	AccountType, MINIMUM_CHANNEL_HOLD_SETTLEMENT,
 };
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use core::fmt::Display;

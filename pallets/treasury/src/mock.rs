@@ -1,11 +1,11 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	OperationalAccountsHook, bitcoin::Satoshis, providers::PriceProvider,
-	vault::TreasuryVaultProvider,
+	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
+	OperationalAccountsHook,
 };
 use frame_support::traits::Currency;
 use pallet_prelude::{
-	argon_primitives::{MiningFrameTransitionProvider, vault::VaultTreasuryFrameEarnings},
+	argon_primitives::{vault::VaultTreasuryFrameEarnings, MiningFrameTransitionProvider},
 	*,
 };
 use std::collections::HashMap;

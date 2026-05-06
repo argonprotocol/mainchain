@@ -1,8 +1,8 @@
 use argon_primitives::{
+	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	MiningSlotProvider, MiningSlotProviderWeightInfo, TreasuryPoolProvider,
 	TreasuryPoolProviderWeightInfo, UniswapTransferRequirementProvider,
 	UniswapTransferRequirementProviderWeightInfo,
-	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -52,13 +52,13 @@ pub struct WithProviderWeights<
 	)>,
 );
 impl<
-	T,
-	Base,
-	VaultProviderWeight,
-	MiningSlotProviderWeight,
-	UniswapTransferRequirementWeight,
-	TreasuryPoolProviderWeight,
-> WeightInfo
+		T,
+		Base,
+		VaultProviderWeight,
+		MiningSlotProviderWeight,
+		UniswapTransferRequirementWeight,
+		TreasuryPoolProviderWeight,
+	> WeightInfo
 	for WithProviderWeights<
 		T,
 		Base,

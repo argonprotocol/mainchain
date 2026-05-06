@@ -25,7 +25,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use pallet_bitcoin_locks::MinimumSatoshis;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use sp_runtime::{Weight, impl_opaque_keys};
+use sp_runtime::{impl_opaque_keys, Weight};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 

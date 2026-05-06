@@ -1,12 +1,12 @@
 use crate::utils::{activate_vote_mining, create_active_notary_with_archive_bucket};
 use argon_client::{
-	FetchAt,
 	api::storage,
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
+	FetchAt,
 };
 use argon_primitives::{AccountId, ArgonDigests, BlockSealDigest};
-use argon_testing::{ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, test_miner_count};
+use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary};
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};

@@ -1,12 +1,12 @@
 use crate::keystore::Keystore;
 use crate::overview::LocalchainOverview;
 use crate::{
-  AccountStore, CryptoScheme, DomainStore, Localchain, LocalchainConfig, MainchainClient,
-  VoteCreationOptions, overview,
+  overview, AccountStore, CryptoScheme, DomainStore, Localchain, LocalchainConfig, MainchainClient,
+  VoteCreationOptions,
 };
 use anyhow::anyhow;
-use argon_primitives::Domain;
 use argon_primitives::argon_utils::format_argons;
+use argon_primitives::Domain;
 use clap::{Args, Parser, Subcommand, ValueHint};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;

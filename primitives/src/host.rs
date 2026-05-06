@@ -5,7 +5,7 @@ use alloc::{
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_runtime::{BoundedVec, traits::ConstU32};
+use sp_runtime::{traits::ConstU32, BoundedVec};
 
 #[derive(
 	PartialEq, Eq, Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,

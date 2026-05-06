@@ -18,7 +18,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use argon_primitives::{VotingKey, digests::*};
+	use argon_primitives::{digests::*, VotingKey};
 	use codec::EncodeLike;
 	use frame_support::traits::FindAuthor;
 	use sp_runtime::ConsensusEngineId;
@@ -145,10 +145,10 @@ pub mod pallet {
 			}
 
 			for (id, data) in digests {
-				if id == AUTHOR_DIGEST_ID {
-					if let Ok(author) = T::AccountId::decode(&mut &data[..]) {
-						return Some(author);
-					}
+				if id == AUTHOR_DIGEST_ID &&
+					let Ok(author) = T::AccountId::decode(&mut &data[..])
+				{
+					return Some(author);
 				}
 			}
 

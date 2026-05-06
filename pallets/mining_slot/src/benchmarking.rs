@@ -3,7 +3,7 @@
 
 use super::*;
 use argon_primitives::{
-	AccountId, MiningSlotProvider, NotaryId, balance_change::MerkleProof, localchain::BlockVote,
+	balance_change::MerkleProof, localchain::BlockVote, AccountId, MiningSlotProvider, NotaryId,
 };
 use frame_system::RawOrigin;
 use polkadot_sdk::frame_benchmarking::v2::*;

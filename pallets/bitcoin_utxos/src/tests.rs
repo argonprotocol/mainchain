@@ -1,18 +1,18 @@
 use crate::{
-	Error, Event,
 	mock::{System, *},
 	pallet::{
 		CandidateUtxoRefsByUtxoId, ConfirmedBitcoinBlockTip, ExpiredPendingFunding,
 		InherentIncluded, LockedUtxos, LocksPendingFunding, UtxoIdToFundingUtxoRef,
 	},
+	Error, Event,
 };
 use argon_primitives::{
-	BitcoinUtxoTracker,
 	bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinRejectedReason, H256Le,
 		Satoshis, UtxoId, UtxoRef, UtxoValue,
 	},
 	inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
+	BitcoinUtxoTracker,
 };
 use frame_support::{assert_err, assert_noop, assert_ok, pallet_prelude::Hooks};
 use pallet_prelude::*;
