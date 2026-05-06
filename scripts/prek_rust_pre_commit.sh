@@ -28,7 +28,9 @@ if ((${#rust_files[@]} == 0)); then
 fi
 
 echo "Running cargo make format"
-cargo make format
+# GUI git clients like Tower can run hooks in environments where the global sccache
+# wrapper is unavailable, but formatting does not need compiler caching.
+RUSTC_WRAPPER= cargo make format
 
 declare -a restaged_files=()
 

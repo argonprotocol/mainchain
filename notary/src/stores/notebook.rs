@@ -16,9 +16,7 @@ use argon_primitives::{
 	Notarization, NotaryId, Note, NoteType, Notebook, NotebookNumber,
 };
 use binary_merkle_tree::{merkle_proof, merkle_root, verify_proof, Leaf};
-use codec::{Decode, Encode};
-use scale_info::TypeInfo;
-use serde::{Deserialize, Serialize};
+use codec::Encode;
 use serde_json::{from_value, json};
 use sp_core::{
 	bounded::BoundedVec,
@@ -364,11 +362,6 @@ pub struct NotebookBytes {
 	pub signed_header: Vec<u8>,
 }
 
-#[derive(Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
-struct AccountIdAndOrigin {
-	pub key: [u8; 32],
-	pub origin: AccountOrigin,
-}
 #[cfg(test)]
 mod tests {
 	use chrono::{Duration, Utc};

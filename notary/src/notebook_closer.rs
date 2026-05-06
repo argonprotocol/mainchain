@@ -307,11 +307,6 @@ pub fn notary_sign(
 	Ok(sig)
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct NotebookAuditResponse {
-	pub signature: String,
-}
-
 #[cfg(test)]
 mod tests {
 	use anyhow::{anyhow, bail};
