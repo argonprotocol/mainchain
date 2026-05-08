@@ -137,6 +137,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const laterReceipt = await mineLaterExecutionAnchorReceipt(
       walletClient,
+      chain,
       ethereum,
       account,
       burnBlockNumber,
@@ -273,40 +274,53 @@ async function waitForFinalizedBeaconExecutionAtOrAbove(
   let lastSeenExecutionBlockNumber = 0n;
   let lastSeenHeadSlot = 0n;
   let lastSeenFinalizedSlot = 0n;
+  let lastError: Error | undefined;
 
   while (Date.now() - startedAt < 300_000) {
-    const [headHeader, finalizedHeader] = await Promise.all([
-      ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/head'),
-      ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/finalized'),
-    ]);
-    lastSeenHeadSlot = BigInt(headHeader.data.header.message.slot);
-    lastSeenFinalizedSlot = BigInt(finalizedHeader.data.header.message.slot);
-    const block = await ethereum.getBeacon<EthereumBeaconBlockResponse>(
-      `/eth/v2/beacon/blocks/${finalizedHeader.data.root}`,
-    );
-    const executionBlockNumber = BigInt(block.data.message.body.execution_payload.block_number);
-    lastSeenExecutionBlockNumber = executionBlockNumber;
+    try {
+      const [headHeader, finalizedHeader] = await Promise.all([
+        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/head'),
+        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/finalized'),
+      ]);
+      lastSeenHeadSlot = BigInt(headHeader.data.header.message.slot);
+      lastSeenFinalizedSlot = BigInt(finalizedHeader.data.header.message.slot);
+      const block = await ethereum.getBeacon<EthereumBeaconBlockResponse>(
+        `/eth/v2/beacon/blocks/${finalizedHeader.data.root}`,
+      );
+      const executionBlockNumber = BigInt(block.data.message.body.execution_payload.block_number);
+      lastSeenExecutionBlockNumber = executionBlockNumber;
+      lastError = undefined;
 
-    if (executionBlockNumber >= minimumExecutionBlockNumber) {
-      return { header: finalizedHeader, block };
+      if (executionBlockNumber >= minimumExecutionBlockNumber) {
+        return { header: finalizedHeader, block };
+      }
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      lastError = error;
     }
 
     await delay(1_000);
   }
 
+  const lastErrorSuffix = lastError ? `; last beacon error was: ${lastError.message}` : '';
   throw new Error(
-    `Timed out waiting for finalized beacon execution block at or above ${minimumExecutionBlockNumber}; last seen head slot was ${lastSeenHeadSlot}, finalized slot was ${lastSeenFinalizedSlot}, and finalized execution block was ${lastSeenExecutionBlockNumber}`,
+    `Timed out waiting for finalized beacon execution block at or above ${minimumExecutionBlockNumber}; last seen head slot was ${lastSeenHeadSlot}, finalized slot was ${lastSeenFinalizedSlot}, and finalized execution block was ${lastSeenExecutionBlockNumber}${lastErrorSuffix}`,
   );
 }
 
 async function mineLaterExecutionAnchorReceipt(
   walletClient: ReturnType<typeof createWalletClient>,
+  chain: ReturnType<typeof defineChain>,
   ethereum: TestEthereum,
   account: ReturnType<typeof privateKeyToAccount>,
   minimumBlockNumber: bigint,
 ) {
   while (true) {
     const transactionHash = await walletClient.sendTransaction({
+      account,
+      chain,
       to: account.address,
       value: 0n,
     });

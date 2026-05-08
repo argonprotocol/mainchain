@@ -1,8 +1,7 @@
 # Crosschain Transfer V1: Ethereum Inbound
 
-This note covers the inbound Ethereum burn-proof flow implemented by
-`pallet_crosschain_transfer`, `pallet_ethereum_verifier`, and the current client proof-building
-path.
+This note covers the inbound Ethereum burn-proof flow implemented by `pallet_crosschain_transfer`,
+`pallet_ethereum_verifier`, and the current client proof-building path.
 
 ## Scope
 
@@ -27,8 +26,8 @@ The current slice is Ethereum-only and inbound-only.
 5. The user submits `crosschainTransfer.proveTransfer`.
 6. The verifier proves the log exists in a finalized Ethereum receipt under a known execution
    header.
-7. `pallet_crosschain_transfer` validates the configured gateway, accepted token, and next nonce
-   for the Ethereum source account.
+7. `pallet_crosschain_transfer` validates the configured gateway, accepted token, and next nonce for
+   the Ethereum source account.
 8. The pallet pays the local recipient from the configured Ethereum burn-accounting account and
    emits `BurnNoticeAccepted`.
 9. For inbound Argon, the pallet also records recent-transfer evidence used by

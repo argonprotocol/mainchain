@@ -292,10 +292,13 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       txSigner: vaulter,
     });
     await tx.waitForFinalizedBlock;
-    expect(tx.blockHash).toBeTruthy();
-    console.log('Cosign transaction included in block:', tx.blockHash);
+    const { blockHash } = tx;
+    expect(blockHash).toBeTruthy();
+    if (!blockHash) throw new Error('Cosign transaction block hash not found');
+
+    console.log('Cosign transaction included in block:', blockHash);
     const blockHeight = await vaulterClient
-      .at(tx.blockHash)
+      .at(blockHash)
       .then(x => x.query.system.number())
       .then(x => x.toNumber());
     console.log('Cosign transaction block height:', blockHeight);

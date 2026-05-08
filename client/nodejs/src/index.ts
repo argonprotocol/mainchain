@@ -34,8 +34,13 @@ export * from './BitcoinLock';
 export * from './PriceIndex';
 export {
   buildEthereumEventProof,
+  getLatestRetainedAnchor,
+  waitForRetainedExecutionAnchor,
   type EthereumEventLocator,
   type EthereumEventProof,
+  type EthereumExecutionClient,
+  type EthereumReceipt,
+  type RetainedExecutionAnchor,
   type EthereumVerifyEventLogResult,
 } from './EthereumProof';
 export {

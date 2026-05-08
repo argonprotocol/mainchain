@@ -16,11 +16,11 @@ type EthGetBlockByNumberRpc = {
   ReturnType: JSONRPCBlock;
 };
 
-type EthereumReceipt = Awaited<
+export type EthereumReceipt = Awaited<
   ReturnType<ReturnType<typeof createPublicClient>['getTransactionReceipt']>
 >;
-type ExecutionClient = ReturnType<typeof createPublicClient>;
-type RetainedExecutionAnchor = {
+export type EthereumExecutionClient = ReturnType<typeof createPublicClient>;
+export type RetainedExecutionAnchor = {
   blockHash: Hex;
   blockNumber: bigint;
 };
@@ -28,12 +28,37 @@ type RetainedExecutionAnchor = {
 export type EthereumEventLocator = {
   txHash: Hex;
   logIndex?: number;
-  executionRpcUrl: string;
+  executionRpcUrl?: string;
+  executionClient?: EthereumExecutionClient;
+  receipt?: EthereumReceipt;
+};
+
+export type EthereumEventLog = {
+  address: Hex;
+  topics: Hex[];
+  data: Hex;
+};
+
+export type EthereumExecutionHeaderProof = {
+  rlp: Hex;
+};
+
+export type EthereumExecutionBlockProof = {
+  anchorBlockHash: Hex;
+  targetToAnchorHeaderChain: EthereumExecutionHeaderProof[];
+};
+
+export type EthereumReceiptProof = {
+  transactionIndex: number;
+  nodes: Hex[];
 };
 
 export type EthereumEventProof = {
-  eventLog: Parameters<VerifyEventLog>[0];
-  proof: Parameters<VerifyEventLog>[1];
+  eventLog: EthereumEventLog;
+  proof: {
+    executionBlockProof: EthereumExecutionBlockProof;
+    receiptProof: EthereumReceiptProof;
+  };
 };
 
 export function encodeReceiptTrieKey(transactionIndex: number): Uint8Array {
@@ -69,12 +94,12 @@ export function encodeEthereumReceiptForProof(receipt: EthereumReceipt): Uint8Ar
 
 export async function buildEthereumEventProof(
   client: IArgonQueryable,
-  { txHash, logIndex = 0, executionRpcUrl }: EthereumEventLocator,
+  { txHash, logIndex = 0, receipt: providedReceipt, ...executionSource }: EthereumEventLocator,
 ): Promise<EthereumEventProof> {
-  const executionClient = createPublicClient({ transport: http(executionRpcUrl) });
-  const receipt = await waitForIndexed(() =>
-    executionClient.getTransactionReceipt({ hash: txHash }),
-  );
+  const executionClient = getExecutionClient(executionSource);
+  const receipt =
+    providedReceipt ??
+    (await waitForIndexed(() => executionClient.getTransactionReceipt({ hash: txHash })));
   const log = receipt.logs[logIndex];
 
   if (!log) throw new Error(`Missing log ${logIndex} in receipt ${txHash}`);
@@ -119,7 +144,9 @@ export async function buildEthereumEventProof(
   return { eventLog, proof };
 }
 
-async function getLatestRetainedAnchor(client: IArgonQueryable): Promise<RetainedExecutionAnchor> {
+export async function getLatestRetainedAnchor(
+  client: IArgonQueryable,
+): Promise<RetainedExecutionAnchor> {
   const verifierQuery = client.query.ethereumVerifier;
   const latestAnchorHash = await verifierQuery.latestExecutionHeaderAnchorBlockHash();
 
@@ -129,7 +156,7 @@ async function getLatestRetainedAnchor(client: IArgonQueryable): Promise<Retaine
     );
   }
 
-  const blockHash = latestAnchorHash.unwrap().toHex().toLowerCase() as Hex;
+  const blockHash = latestAnchorHash.unwrap().toHex();
   const anchor = await verifierQuery.executionHeaderAnchors(blockHash);
 
   if (anchor.isNone) {
@@ -142,7 +169,57 @@ async function getLatestRetainedAnchor(client: IArgonQueryable): Promise<Retaine
   };
 }
 
-async function loadExecutionHeader(executionClient: ExecutionClient, blockTag: Hex | bigint) {
+export async function waitForRetainedExecutionAnchor(
+  client: IArgonQueryable,
+  targetBlockNumber: bigint,
+  options: { pollMs?: number; timeoutMs?: number } = {},
+): Promise<RetainedExecutionAnchor> {
+  const pollMs = options.pollMs ?? 3_000;
+  const timeoutMs = options.timeoutMs ?? 5 * 60_000;
+  const startedAt = Date.now();
+  let lastError: Error | undefined;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const anchor = await getLatestRetainedAnchor(client);
+      if (anchor.blockNumber >= targetBlockNumber) {
+        return anchor;
+      }
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      lastError = error;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, pollMs));
+  }
+
+  throw (
+    lastError ??
+    new Error(
+      `Retained ethereum execution anchor did not reach block ${targetBlockNumber} within ${Math.floor(timeoutMs / 1000)}s`,
+    )
+  );
+}
+
+function getExecutionClient(
+  source: Pick<EthereumEventLocator, 'executionRpcUrl' | 'executionClient'>,
+): EthereumExecutionClient {
+  if (source.executionClient) {
+    return source.executionClient;
+  }
+  if (source.executionRpcUrl) {
+    return createPublicClient({ transport: http(source.executionRpcUrl) });
+  }
+
+  throw new Error('Ethereum event proof requires an execution client or execution RPC URL');
+}
+
+async function loadExecutionHeader(
+  executionClient: EthereumExecutionClient,
+  blockTag: Hex | bigint,
+) {
   const blockData = await waitForIndexed(() =>
     typeof blockTag === 'string'
       ? executionClient.request<EthGetBlockByHashRpc>({
@@ -167,7 +244,7 @@ async function loadExecutionHeader(executionClient: ExecutionClient, blockTag: H
 }
 
 async function buildExecutionHeaderChain(
-  executionClient: ExecutionClient,
+  executionClient: EthereumExecutionClient,
   targetBlockNumber: bigint,
   anchorBlockNumber: bigint,
 ): Promise<Hex[]> {
@@ -182,7 +259,7 @@ async function buildExecutionHeaderChain(
 }
 
 async function buildReceiptProofNodes(
-  executionClient: ExecutionClient,
+  executionClient: EthereumExecutionClient,
   blockHash: Hex,
   transactionIndex: number,
   receiptsRoot: Hex,

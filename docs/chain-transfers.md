@@ -19,8 +19,8 @@ The current implemented flow is:
 3. Wait for the Ethereum execution block containing that burn to finalize through the beacon chain.
 4. Build an Ethereum event proof for the `BurnForTransfer` log.
 5. Submit `crosschainTransfer.proveTransfer` on Argon mainchain.
-6. If the proof, gateway, token, and nonce are all valid, Argon mainchain settles the matching
-   funds to the destination account.
+6. If the proof, gateway, token, and nonce are all valid, Argon mainchain settles the matching funds
+   to the destination account.
 
 What exists today:
 
