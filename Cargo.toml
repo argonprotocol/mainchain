@@ -231,7 +231,7 @@ randomx-rs = { git = "https://github.com/argonprotocol/randomx-rs", rev = "4bea9
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }
 quote = { version = "1.0" }
 inquire = { version = "0.9" }
-rpassword = { version = "7.3" }
+rpassword = { version = "7.5" }
 comfy-table = { version = "7.1" }
 bech32 = { version = "0.11.0" }
 array-bytes = { version = "9.3.0" }
