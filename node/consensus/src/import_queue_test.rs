@@ -59,7 +59,7 @@ async fn test_higher_fork_power_sets_best() {
 }
 
 #[tokio::test]
-async fn test_header_plus_state_can_be_best() {
+async fn test_initial_sync_state_import_on_finalized_chain_can_be_best() {
 	let (importer, client) = new_importer();
 	let parent = client.info().best_hash;
 	let params = create_params(
@@ -74,10 +74,12 @@ async fn test_header_plus_state_can_be_best() {
 		})),
 		None,
 	);
+	let hash = params.header.hash();
 
 	let res = importer.import_block(params).await.unwrap();
-	// We just care that full import ran; NoopImport returns Imported(...)
 	assert!(matches!(res, ImportResult::Imported(_)));
+	assert_eq!(client.info().best_hash, hash);
+	assert!(has_state(&client, hash));
 }
 
 #[tokio::test]
@@ -109,6 +111,37 @@ async fn test_state_upgrade() {
 }
 
 #[tokio::test]
+async fn test_known_header_state_import_on_finalized_chain_can_be_best() {
+	let (importer, client) = new_importer();
+	let parent = client.info().best_hash;
+
+	let gap_header =
+		create_params(1, parent, 1, None, BlockOrigin::NetworkInitialSync, StateAction::Skip, None);
+	let hash = gap_header.header.hash();
+	importer.import_block(gap_header).await.unwrap();
+	assert_eq!(client.info().best_hash, parent);
+
+	let state_upgrade = create_params(
+		1,
+		parent,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+			block: H256::zero(),
+			state: KeyValueStates(Vec::new()),
+		})),
+		None,
+	);
+
+	let result = importer.import_block(state_upgrade).await.unwrap();
+
+	assert!(matches!(result, ImportResult::Imported(_)));
+	assert_eq!(client.info().best_hash, hash);
+	assert!(has_state(&client, hash));
+}
+
+#[tokio::test]
 async fn test_known_initial_sync_authority_change_uses_empty_justification_marker() {
 	let (importer, client) = new_importer();
 	let parent = client.info().best_hash;
@@ -126,6 +159,29 @@ async fn test_known_initial_sync_authority_change_uses_empty_justification_marke
 		StateAction::Skip,
 		None,
 	);
+	params.post_hash = Some(authority_change_hash);
+
+	let result = importer.import_block(params).await.unwrap();
+	assert!(matches!(result, ImportResult::Imported(_)));
+	assert_eq!(client.last_import_had_empty_justifications(), Some(true));
+}
+
+#[tokio::test]
+async fn test_known_gap_sync_authority_change_uses_empty_justification_marker() {
+	let (importer, client) = new_importer();
+	let parent = client.info().best_hash;
+	let authority_change_hash =
+		H256::from(hex!("1f1f857295b01455051c70c2e3f8c31aa9bead6f8384d26f94b5555d6f3aa62c"));
+
+	client.force_finalized(30_269, authority_change_hash);
+	client.set_block_gap(Some(BlockGap {
+		start: 30_269,
+		end: 30_269,
+		gap_type: BlockGapType::MissingBody,
+	}));
+
+	let mut params =
+		create_params(30_269, parent, 1, None, BlockOrigin::GapSync, StateAction::Skip, None);
 	params.post_hash = Some(authority_change_hash);
 
 	let result = importer.import_block(params).await.unwrap();
@@ -228,13 +284,17 @@ async fn test_execute_if_possible_allows_genesis_parent_when_pruned() {
 		StateAction::ExecuteIfPossible,
 		None,
 	);
+	let hash = params.header.hash();
 	params.body = Some(Vec::new());
 	let result = importer.import_block(params).await.unwrap();
+
 	assert!(!matches!(result, ImportResult::MissingState));
+	assert!(has_state(&client, hash));
+	assert_eq!(client.info().best_hash, hash);
 }
 
 #[tokio::test]
-async fn test_execute_if_possible_does_not_missing_state_in_network_initial_sync() {
+async fn test_execute_if_possible_returns_missing_state_when_parent_state_is_missing() {
 	let (importer, client) = new_importer();
 	let genesis_hash = client.info().genesis_hash;
 
@@ -261,13 +321,12 @@ async fn test_execute_if_possible_does_not_missing_state_in_network_initial_sync
 	);
 	block_2.body = Some(Vec::new());
 	let result = importer.import_block(block_2).await.unwrap();
-	assert!(!matches!(result, ImportResult::MissingState));
+	assert!(matches!(result, ImportResult::MissingState));
 }
 
 #[tokio::test]
-async fn test_execute_if_possible_initial_sync_block_with_pruned_parent_is_not_best() {
+async fn test_justified_initial_sync_execute_if_possible_does_not_missing_state() {
 	let (importer, client) = new_importer();
-	let original_best = client.info().best_hash;
 	let genesis_hash = client.info().genesis_hash;
 
 	let block_1 = create_params(
@@ -282,7 +341,51 @@ async fn test_execute_if_possible_initial_sync_block_with_pruned_parent_is_not_b
 	let block_1_hash = block_1.header.hash();
 	let _ = importer.import_block(block_1).await.unwrap();
 
-	let mut block_2 = create_params(
+	let mut block_10 = create_params(
+		10,
+		block_1_hash,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::ExecuteIfPossible,
+		None,
+	);
+	block_10.body = Some(Vec::new());
+	block_10.justifications = Some(Justifications::default());
+
+	let result = importer.import_block(block_10).await.unwrap();
+	assert!(!matches!(result, ImportResult::MissingState));
+}
+
+#[tokio::test]
+async fn test_known_header_body_replay_does_not_missing_state() {
+	let (importer, client) = new_importer();
+	let genesis_hash = client.info().genesis_hash;
+
+	let block_1 = create_params(
+		1,
+		genesis_hash,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::Skip,
+		None,
+	);
+	let block_1_hash = block_1.header.hash();
+	let _ = importer.import_block(block_1).await.unwrap();
+
+	let block_2 = create_params(
+		2,
+		block_1_hash,
+		1,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::Skip,
+		None,
+	);
+	let _ = importer.import_block(block_2).await.unwrap();
+
+	let mut block_2_reimport = create_params(
 		2,
 		block_1_hash,
 		1,
@@ -291,13 +394,88 @@ async fn test_execute_if_possible_initial_sync_block_with_pruned_parent_is_not_b
 		StateAction::ExecuteIfPossible,
 		None,
 	);
-	block_2.body = Some(Vec::new());
-	let block_2_hash = block_2.header.hash();
-	let result = importer.import_block(block_2).await.unwrap();
+	block_2_reimport.body = Some(Vec::new());
+
+	let result = importer.import_block(block_2_reimport).await.unwrap();
+	assert!(!matches!(result, ImportResult::MissingState));
+}
+
+#[tokio::test]
+async fn test_initial_sync_state_import_off_finalized_chain_does_not_become_best() {
+	let (importer, client) = new_importer();
+	let genesis_hash = client.info().genesis_hash;
+
+	let finalized_block =
+		create_params(1, genesis_hash, 1, None, BlockOrigin::Own, StateAction::Execute, None);
+	let finalized_hash = finalized_block.header.hash();
+	let _ = importer.import_block(finalized_block).await.unwrap();
+	client.force_finalized(1, finalized_hash);
+	client.force_best(1, finalized_hash);
+
+	let competing_state_import = create_params(
+		1,
+		genesis_hash,
+		2,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+			block: H256::zero(),
+			state: KeyValueStates(Vec::new()),
+		})),
+		None,
+	);
+	let competing_hash = competing_state_import.header.hash();
+	let result = importer.import_block(competing_state_import).await.unwrap();
 
 	assert!(matches!(result, ImportResult::Imported(_)));
-	assert_eq!(client.info().best_hash, original_best);
-	assert_ne!(client.info().best_hash, block_2_hash);
+	assert!(has_state(&client, competing_hash));
+	assert_eq!(client.info().best_hash, finalized_hash);
+	assert_ne!(client.info().best_hash, competing_hash);
+}
+
+#[tokio::test]
+async fn test_known_header_state_import_off_finalized_chain_does_not_become_best() {
+	let (importer, client) = new_importer();
+	let genesis_hash = client.info().genesis_hash;
+
+	let finalized_block =
+		create_params(1, genesis_hash, 1, None, BlockOrigin::Own, StateAction::Execute, None);
+	let finalized_hash = finalized_block.header.hash();
+	let _ = importer.import_block(finalized_block).await.unwrap();
+	client.force_finalized(1, finalized_hash);
+	client.force_best(1, finalized_hash);
+
+	let competing_header = create_params(
+		1,
+		genesis_hash,
+		2,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::Skip,
+		None,
+	);
+	let competing_hash = competing_header.header.hash();
+	let _ = importer.import_block(competing_header).await.unwrap();
+
+	let state_upgrade = create_params(
+		1,
+		genesis_hash,
+		2,
+		None,
+		BlockOrigin::NetworkInitialSync,
+		StateAction::ApplyChanges(StorageChanges::Import(ImportedState {
+			block: H256::zero(),
+			state: KeyValueStates(Vec::new()),
+		})),
+		None,
+	);
+
+	let result = importer.import_block(state_upgrade).await.unwrap();
+
+	assert!(matches!(result, ImportResult::Imported(_)));
+	assert!(has_state(&client, competing_hash));
+	assert_eq!(client.info().best_hash, finalized_hash);
+	assert_ne!(client.info().best_hash, competing_hash);
 }
 
 #[tokio::test]

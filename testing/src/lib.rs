@@ -45,6 +45,12 @@ pub(crate) fn get_target_dir() -> PathBuf {
 	let workspace_cargo_path = project_dir.join("..");
 	let workspace_cargo_path =
 		workspace_cargo_path.canonicalize().expect("Failed to canonicalize path");
+	if let Some(target_dir) = env::var_os("CARGO_TARGET_DIR") {
+		let target_dir = PathBuf::from(target_dir).join("debug");
+		if Path::is_file(&target_dir.join("argon-node")) {
+			return target_dir;
+		}
+	}
 	let triple_target = workspace_cargo_path
 		.as_path()
 		.join("target")

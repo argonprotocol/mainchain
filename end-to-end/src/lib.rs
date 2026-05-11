@@ -228,24 +228,18 @@ pub(crate) mod utils {
 		let keys1 = keys1.context("failed to register miner_1 primary session keys")?;
 		let keys_1_2 = keys_1_2.context("failed to register miner_1 secondary session keys")?;
 		let keys2 = keys2.context("failed to register miner_2 session keys")?;
-		let source_signer = Sr25519Signer::new(Alice.pair());
-		let source_nonce = source.client.get_account_nonce(&source_signer.account_id()).await?;
 		register_miners(
 			source,
 			Sr25519Signer::new(Alice.pair()),
-			vec![(miner_2.account_id.clone(), keys2)],
-			Some(source_nonce),
+			vec![
+				(miner_2.account_id.clone(), keys2),
+				(miner_1.account_id.clone(), keys1),
+				(miner_1_second_account, keys_1_2),
+			],
+			None,
 		)
 		.await
-		.context("failed to register miner_2 bids")?;
-		register_miners(
-			source,
-			Sr25519Signer::new(Alice.pair()),
-			vec![(miner_1.account_id.clone(), keys1), (miner_1_second_account, keys_1_2)],
-			Some(source_nonce + 1),
-		)
-		.await
-		.context("failed to register miner_1 bids")?;
+		.context("failed to register miner bids")?;
 		Ok(())
 	}
 
@@ -305,7 +299,33 @@ pub(crate) mod utils {
 		// wait for next cohort to start
 		let lookup = storage().mining_slot().account_index_lookup(first_account);
 		let mut block_sub = client.live.blocks().subscribe_best().await?;
-		while let Some(Ok(block)) = block_sub.next().await {
+		let deadline = tokio::time::Instant::now() + Duration::from_secs(180);
+		let mut last_registered_miners = 0;
+		let mut last_pending_cohort = Vec::new();
+		let mut last_next_frame_id = wait_til_past_frame_id;
+
+		loop {
+			let now = tokio::time::Instant::now();
+			if now >= deadline {
+				anyhow::bail!(
+					"timed out waiting for cohort account to be registered. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				);
+			}
+
+			let remaining = deadline.saturating_duration_since(now);
+			let block = match tokio::time::timeout(remaining, block_sub.next()).await {
+				Ok(Some(next)) => next?,
+				Ok(None) => anyhow::bail!(
+					"best block subscription ended while waiting for cohort account registration. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				),
+				Err(_) => anyhow::bail!(
+					"timed out waiting for cohort account to be registered. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				),
+			};
+
 			let fetch_at = FetchAt::Block(block.hash());
 			let account_index = client.fetch_storage(&lookup, fetch_at).await?;
 			if let Some((frame_id, index)) = account_index {
@@ -324,20 +344,27 @@ pub(crate) mod utils {
 				.fetch_storage(&storage().mining_slot().next_frame_id(), fetch_at)
 				.await?
 				.unwrap_or_default();
+			let pending_cohort = bids_for_next_cohort
+				.0
+				.iter()
+				.map(|a| a.account_id.to_address())
+				.collect::<Vec<_>>();
+			last_registered_miners = registered_miners;
+			last_pending_cohort = pending_cohort.clone();
+			last_next_frame_id = next_frame_id;
 			println!(
 				"Waiting for cohort account to be registered. Currently registered {registered_miners}. Pending cohort: {:?}",
-				bids_for_next_cohort
-					.0
-					.iter()
-					.map(|a| a.account_id.to_address())
-					.collect::<Vec<_>>()
+				pending_cohort
 			);
 			let block_confirm = client.block_number(register.block_hash()).await;
 			if block_confirm.is_err() {
 				println!("Block no longer finalized! {block_confirm:?}");
 			}
 			if next_frame_id > wait_til_past_frame_id {
-				panic!("next frameId changed while waiting for registration");
+				anyhow::bail!(
+					"next frameId changed while waiting for registration. currently registered {registered_miners}. pending cohort: {:?}. next_frame_id={next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				);
 			}
 		}
 		let registered_miners = client

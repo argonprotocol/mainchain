@@ -1,5 +1,9 @@
 name: Sync
 on:
+  push:
+    branches:
+      - 'fix_sync_*'
+      - 'pr/fix-sync-*'
   workflow_run:
     workflows:
       - Build Edge Docker Images
@@ -8,6 +12,7 @@ on:
     branches:
       - main
       - 'fix_sync_*'
+      - 'pr/fix-sync-*'
   workflow_dispatch:
 
 concurrency:
@@ -23,6 +28,7 @@ jobs:
     name: Sync
     if: >
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 180
@@ -73,6 +79,12 @@ jobs:
       - name: Migrate Localchain Db
         working-directory: localchain
         run: cargo sqlx database setup
+
+      - name: Build node binaries
+        run: cargo build --bins
+        env:
+          CARGO_INCREMENTAL: 0
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run normal sync tests
         run: cargo test -p end-to-end sync::test_normal_ -- --ignored --test-threads=1 --nocapture

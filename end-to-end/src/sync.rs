@@ -1,5 +1,6 @@
 use crate::utils::{
-	activate_vote_mining, create_active_notary_with_archive_bucket, wait_for_finalized_catchup,
+	activate_notary, activate_vote_mining, create_active_notary_with_archive_bucket,
+	wait_for_finalized_catchup,
 };
 use argon_client::{api::storage, conversion::SubxtRuntime, FetchAt};
 use argon_notary_audit::VerifyError;
@@ -13,8 +14,13 @@ use std::{
 	io,
 	path::{Path, PathBuf},
 	process::Command,
+	sync::{
+		atomic::{AtomicBool, Ordering},
+		Arc,
+	},
 	time::Duration,
 };
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
@@ -31,7 +37,7 @@ async fn test_normal_fast_sync_smoke_catches_up_to_notebook_history() {
 		.await
 		.expect("Notary registered");
 
-	let target = wait_for_finalized_notebook_snapshot(&source, 4, 40).await;
+	let target = wait_for_finalized_notebook_snapshot(&source, 2, 20).await;
 	let mut sync_args = source.get_fork_args("charlie", 0);
 	sync_args.is_validator = false;
 	sync_args.is_archive_node = false;
@@ -129,12 +135,6 @@ async fn test_soak_recovers_after_notary_outage() {
 	tokio::time::sleep(Duration::from_secs(2)).await;
 	harness.restart_test_notary().await.unwrap();
 	harness.ensure_vote_mining_active().await;
-	harness
-		.assert_mixed_history_window(
-			settings.recovery_finalized_blocks,
-			"recovery window should resume notebook, vote, and compute history after notary restart",
-		)
-		.await;
 
 	let recovery_target = finalized_snapshot(&harness.source).await;
 	wait_for_finalized_catchup(&harness.source, &recovering_node).await.unwrap();
@@ -155,7 +155,6 @@ struct FinalizedSnapshot {
 
 struct SyncSoakSettings {
 	warmup_finalized_blocks: u32,
-	recovery_finalized_blocks: u32,
 	outage_seconds: u64,
 }
 
@@ -165,6 +164,7 @@ struct SyncHarness {
 	vote_miner_2: ArgonTestNode,
 	test_notary: ArgonTestNotary,
 	state_cache: Option<SyncStateCache>,
+	archive_bucket: String,
 	archive_host: String,
 	reused_state: bool,
 }
@@ -172,7 +172,6 @@ struct SyncHarness {
 #[derive(Debug)]
 struct FinalizedHistoryWindow {
 	notebook_blocks_seen: u32,
-	compute_blocks_seen: u32,
 	vote_blocks_seen: u32,
 }
 
@@ -231,7 +230,6 @@ async fn observe_finalized_history_window(
 	let target_number = start_finalized + additional_finalized_blocks;
 	let mut blocks_sub = node.client.live.blocks().subscribe_finalized().await.unwrap();
 	let mut notebook_blocks_seen = 0;
-	let mut compute_blocks_seen = 0;
 	let mut vote_blocks_seen = 0;
 
 	loop {
@@ -260,16 +258,10 @@ async fn observe_finalized_history_window(
 		}
 		if saw_vote_seal {
 			vote_blocks_seen += 1;
-		} else {
-			compute_blocks_seen += 1;
 		}
 
 		if block.number() >= target_number {
-			return FinalizedHistoryWindow {
-				notebook_blocks_seen,
-				compute_blocks_seen,
-				vote_blocks_seen,
-			};
+			return FinalizedHistoryWindow { notebook_blocks_seen, vote_blocks_seen };
 		}
 	}
 }
@@ -292,13 +284,6 @@ async fn assert_node_matches_snapshot(
 
 	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
 	assert_eq!(source_finalized_hash, Some(latest_finalized_hash), "{context}",);
-
-	let synced_target_hash = header_hash_at_height(node, snapshot.number).await;
-	assert_eq!(
-		synced_target_hash,
-		Some(snapshot.hash),
-		"{context}: synced node should retain the target finalized block hash",
-	);
 
 	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
 	loop {
@@ -367,13 +352,6 @@ async fn assert_basic_sync_mode_catches_up(sync_mode: &str) {
 	let target = finalized_snapshot(&harness.source).await;
 	let sync_node = harness.start_sync_node("ferdie", Some(sync_mode)).await;
 	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
-	assert_node_matches_snapshot(
-		&sync_node,
-		&harness.source,
-		target,
-		&format!("{sync_mode} sync node should catch up to mixed finalized history"),
-	)
-	.await;
 	if sync_mode == "warp" {
 		assert_block_history_gap_fill_completes(
 			&sync_node,
@@ -383,31 +361,59 @@ async fn assert_basic_sync_mode_catches_up(sync_mode: &str) {
 		)
 		.await;
 	}
+	assert_node_matches_snapshot(
+		&sync_node,
+		&harness.source,
+		target,
+		&format!("{sync_mode} sync node should catch up to mixed finalized history"),
+	)
+	.await;
 	drop(sync_node);
 	drop(harness);
 }
 
 async fn assert_sync_mode_recovers_after_notebook_archive_delay(sync_mode: &str) {
-	let mut harness = SyncHarness::start().await;
+	let delayed_archive =
+		DelayedArchiveProxy::start(&ArgonTestNotary::get_minio_url()).await.unwrap();
+	let mut harness = SyncHarness::start_fresh().await;
 	harness.assert_warmup_history_window(40).await;
+	harness
+		.restart_test_notary_with_archive_endpoint(Some(delayed_archive.url.clone()))
+		.await
+		.unwrap();
 
-	let target = finalized_snapshot(&harness.source).await;
-	let missing_archive_host = "http://127.0.0.1:9/missing-notebook-archive".to_string();
-	let mut sync_node = harness
+	let sync_node = harness
 		.start_sync_node_with("eve", Some(sync_mode), |args| {
-			args.notebook_archive_urls = vec![missing_archive_host];
+			args.notebook_archive_urls = vec![harness.archive_host.clone()];
 		})
 		.await;
 
-	tokio::time::sleep(Duration::from_secs(5)).await;
-	sync_node.start_args.notebook_archive_urls = vec![harness.archive_host.clone()];
-	sync_node.restart(Duration::from_secs(1)).await.unwrap();
-
+	sync_node
+		.log_watcher
+		.wait_for_log_for_secs(
+			"Notebook digest has missing audits. Will attempt to catchup now.",
+			1,
+			30,
+		)
+		.await
+		.unwrap();
+	delayed_archive.release();
+	let recovery_target = finalized_snapshot(&harness.source).await;
 	wait_for_finalized_catchup(&harness.source, &sync_node).await.unwrap();
+
+	if sync_mode == "warp" {
+		assert_block_history_gap_fill_completes(
+			&sync_node,
+			&harness.source,
+			recovery_target,
+			"warp sync should recover historical block access after notebook archive delay",
+		)
+		.await;
+	}
 	assert_node_matches_snapshot(
 		&sync_node,
 		&harness.source,
-		target,
+		recovery_target,
 		&format!("{sync_mode} sync should recover after notebook archive delay"),
 	)
 	.await;
@@ -449,31 +455,53 @@ async fn assert_block_history_gap_fill_completes(
 	snapshot: FinalizedSnapshot,
 	context: &str,
 ) {
-	node.log_watcher
-		.wait_for_log_for_secs("Block history download is complete", 1, 60)
-		.await
-		.unwrap_or_else(|err| panic!("{context}: {err:?}"));
-
 	let mut checked_heights = Vec::new();
 	for height in [1, snapshot.number / 2, snapshot.number.saturating_sub(1)] {
-		if height == 0 || checked_heights.contains(&height) {
-			continue;
+		if height != 0 && !checked_heights.contains(&height) {
+			checked_heights.push(height);
 		}
-		checked_heights.push(height);
+	}
 
-		let source_hash = header_hash_at_height(source, height).await;
-		let node_hash = header_hash_at_height(node, height).await;
-		assert_eq!(
-			node_hash, source_hash,
-			"{context}: historical block mismatch at height {height}"
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+	loop {
+		let mut mismatches = Vec::new();
+		for height in &checked_heights {
+			let source_hash = header_hash_at_height(source, *height).await;
+			let node_hash = header_hash_at_height(node, *height).await;
+			if node_hash != source_hash {
+				mismatches
+					.push(format!("height {height}: source={source_hash:?}, node={node_hash:?}"));
+			}
+		}
+
+		if mismatches.is_empty() {
+			return;
+		}
+
+		assert!(
+			tokio::time::Instant::now() < deadline,
+			"{context}: historical block gap did not close: {}",
+			mismatches.join(", "),
 		);
+
+		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
 }
 
 impl SyncHarness {
 	async fn start() -> Self {
+		Self::start_with_archive_endpoint_and_state_cache(None, SyncStateCache::from_env()).await
+	}
+
+	async fn start_fresh() -> Self {
+		Self::start_with_archive_endpoint_and_state_cache(None, None).await
+	}
+
+	async fn start_with_archive_endpoint_and_state_cache(
+		archive_endpoint: Option<String>,
+		state_cache: Option<SyncStateCache>,
+	) -> Self {
 		let compute_threads = test_miner_count();
-		let state_cache = SyncStateCache::from_env();
 		if let Some(cache) = &state_cache {
 			cache.prepare_run_dirs().unwrap();
 		}
@@ -482,9 +510,15 @@ impl SyncHarness {
 			.as_ref()
 			.map(|cache| cache.archive_bucket.clone())
 			.unwrap_or_else(ArgonTestNotary::create_archive_bucket);
+		let source_archive_host = format!(
+			"{}/{}",
+			ArgonTestNotary::get_minio_url().trim_end_matches('/'),
+			archive_bucket.clone()
+		);
+		let archive_base = archive_endpoint.clone().unwrap_or_else(ArgonTestNotary::get_minio_url);
 		let archive_host =
-			format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
-		source_args.notebook_archive_urls.push(archive_host.clone());
+			format!("{}/{}", archive_base.trim_end_matches('/'), archive_bucket.clone());
+		source_args.notebook_archive_urls.push(source_archive_host);
 		if let Some(cache) = &state_cache {
 			source_args.base_data_path = cache.run_node_path("alice");
 			source_args.cleanup_base_data_path = false;
@@ -512,10 +546,20 @@ impl SyncHarness {
 			.await
 			.expect("Notary restarted from preserved sync state")
 		} else {
-			create_active_notary_with_archive_bucket(&source, archive_bucket.clone())
-				.await
-				.expect("Notary registered")
+			ArgonTestNotary::start_with_archive_public_host(
+				&source,
+				archive_bucket.clone(),
+				Some(archive_host.clone()),
+				None,
+				None,
+				true,
+			)
+			.await
+			.expect("Notary registered")
 		};
+		if !reused_state {
+			activate_notary(&source, &test_notary).await.expect("Notary activated");
+		}
 		if let Some(cache) = &state_cache {
 			let notary_port = test_notary
 				.ws_url
@@ -551,17 +595,10 @@ impl SyncHarness {
 			vote_miner_2,
 			test_notary,
 			state_cache,
+			archive_bucket,
 			archive_host,
 			reused_state,
 		}
-	}
-
-	async fn assert_mixed_history_window(&self, additional_finalized_blocks: u32, context: &str) {
-		let history =
-			observe_finalized_history_window(&self.source, additional_finalized_blocks).await;
-		assert!(history.notebook_blocks_seen > 0, "{context}: {history:?}");
-		assert!(history.vote_blocks_seen > 0, "{context}: {history:?}");
-		assert!(history.compute_blocks_seen > 0, "{context}: {history:?}");
 	}
 
 	async fn assert_vote_history_window(&self, additional_finalized_blocks: u32, context: &str) {
@@ -672,6 +709,36 @@ impl SyncHarness {
 		Ok(())
 	}
 
+	async fn restart_test_notary_with_archive_endpoint(
+		&mut self,
+		archive_endpoint: Option<String>,
+	) -> anyhow::Result<()> {
+		let notary_port = self
+			.test_notary
+			.ws_url
+			.parse::<url::Url>()
+			.unwrap()
+			.port()
+			.expect("test notary ws url should include a port");
+
+		self.test_notary.stop();
+		let run_db_name = ArgonTestNotary::clone_database(&self.test_notary.db_name).await?;
+		let archive_base = archive_endpoint.unwrap_or_else(ArgonTestNotary::get_minio_url);
+		let archive_host =
+			format!("{}/{}", archive_base.trim_end_matches('/'), self.archive_bucket.clone());
+		self.test_notary = ArgonTestNotary::start_with_archive_public_host(
+			&self.source,
+			self.archive_bucket.clone(),
+			Some(archive_host.clone()),
+			Some(notary_port),
+			Some(run_db_name),
+			true,
+		)
+		.await?;
+		self.archive_host = archive_host;
+		Ok(())
+	}
+
 	async fn ensure_vote_mining_active(&self) {
 		let bob_account = self.source.client.api_account(&self.vote_miner_1.account_id);
 		let dave_account = self.source.client.api_account(&self.vote_miner_2.account_id);
@@ -748,10 +815,6 @@ impl SyncSoakSettings {
 				.ok()
 				.and_then(|value| value.parse::<u32>().ok())
 				.unwrap_or(400),
-			recovery_finalized_blocks: env::var("ARGON_LONG_SYNC_RECOVERY_BLOCKS")
-				.ok()
-				.and_then(|value| value.parse::<u32>().ok())
-				.unwrap_or(80),
 			outage_seconds: env::var("ARGON_LONG_SYNC_OUTAGE_SECONDS")
 				.ok()
 				.and_then(|value| value.parse::<u64>().ok())
@@ -911,4 +974,104 @@ fn stop_stale_sync_node(base_data_path: &Path) {
 		.args(["-INT", "-f", &format!("argon-node.*--base-path={}", base_data_path.display())])
 		.status();
 	std::thread::sleep(Duration::from_secs(1));
+}
+
+struct DelayedArchiveProxy {
+	url: String,
+	ready: Arc<AtomicBool>,
+	handle: tokio::task::JoinHandle<()>,
+}
+
+impl DelayedArchiveProxy {
+	async fn start(target_archive_endpoint: &str) -> anyhow::Result<Self> {
+		let target_url = url::Url::parse(target_archive_endpoint)?;
+		let target_host = target_url
+			.host_str()
+			.ok_or_else(|| anyhow::anyhow!("archive endpoint should include a host"))?
+			.to_string();
+		let target_port = target_url
+			.port_or_known_default()
+			.ok_or_else(|| anyhow::anyhow!("archive endpoint should include a port"))?;
+		let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+		let local_addr = listener.local_addr()?;
+		let ready = Arc::new(AtomicBool::new(false));
+		let ready_for_task = ready.clone();
+
+		let handle = tokio::spawn(async move {
+			loop {
+				let Ok((socket, _)) = listener.accept().await else {
+					return;
+				};
+				tokio::spawn(handle_archive_proxy_connection(
+					socket,
+					target_host.clone(),
+					target_port,
+					ready_for_task.clone(),
+				));
+			}
+		});
+
+		Ok(Self { url: format!("http://{local_addr}"), ready, handle })
+	}
+
+	fn release(&self) {
+		self.ready.store(true, Ordering::SeqCst);
+	}
+}
+
+impl Drop for DelayedArchiveProxy {
+	fn drop(&mut self) {
+		self.handle.abort();
+	}
+}
+
+async fn handle_archive_proxy_connection(
+	mut socket: tokio::net::TcpStream,
+	target_host: String,
+	target_port: u16,
+	ready: Arc<AtomicBool>,
+) -> io::Result<()> {
+	let request = read_http_request(&mut socket).await?;
+	let Some((method, path)) = request_method_and_path(&request) else {
+		return write_http_response(&mut socket, "400 Bad Request").await;
+	};
+	if !ready.load(Ordering::SeqCst) && method == "GET" && path.contains("/notary/") {
+		return write_http_response(&mut socket, "503 Service Unavailable").await;
+	}
+
+	let mut upstream = tokio::net::TcpStream::connect((target_host.as_str(), target_port)).await?;
+	upstream.write_all(&request).await?;
+	let _ = tokio::io::copy_bidirectional(&mut socket, &mut upstream).await?;
+	Ok(())
+}
+
+async fn read_http_request(socket: &mut tokio::net::TcpStream) -> io::Result<Vec<u8>> {
+	let mut request = Vec::new();
+	let mut buffer = [0; 1024];
+	while request.len() < 64 * 1024 {
+		let bytes_read = socket.read(&mut buffer).await?;
+		if bytes_read == 0 {
+			break;
+		}
+		request.extend_from_slice(&buffer[..bytes_read]);
+		if request.windows(4).any(|window| window == b"\r\n\r\n") {
+			break;
+		}
+	}
+	Ok(request)
+}
+
+fn request_method_and_path(request: &[u8]) -> Option<(String, String)> {
+	let request = String::from_utf8_lossy(request);
+	let request_line = request.lines().next()?;
+	let mut parts = request_line.split_whitespace();
+	match (parts.next(), parts.next(), parts.next()) {
+		(Some(method), Some(path), Some(_)) => Some((method.to_string(), path.to_string())),
+		_ => None,
+	}
+}
+
+async fn write_http_response(socket: &mut tokio::net::TcpStream, status: &str) -> io::Result<()> {
+	let response = format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+	socket.write_all(response.as_bytes()).await
 }

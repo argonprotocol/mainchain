@@ -3,8 +3,8 @@ use crate::{
 	error::Error,
 	metrics::ConsensusMetrics,
 	state_anchor::{
-		resolve_best_or_finalized_state_hash, ResolveBestOrFinalizedStateHashError,
-		StateAnchorClient, DEFAULT_STATE_LOOKBACK_DEPTH,
+		resolve_best_or_finalized_state_hash, resolve_stateful_hash,
+		ResolveBestOrFinalizedStateHashError, StateAnchorClient, DEFAULT_STATE_LOOKBACK_DEPTH,
 	},
 };
 use argon_notary_apis::{
@@ -559,8 +559,19 @@ where
 			return Ok(true);
 		};
 		let is_import_context = importing_with_parent_hash.is_some();
-		let finalized_hash = self.client.finalized_hash();
 		let best_hash = importing_with_parent_hash.unwrap_or(self.client.best_hash());
+		let finalized_hash = if is_import_context {
+			match resolve_stateful_hash(
+				self.as_ref(),
+				self.client.finalized_hash(),
+				DEFAULT_STATE_LOOKBACK_DEPTH,
+			)? {
+				Some(hash) => hash,
+				None => return Ok(true),
+			}
+		} else {
+			self.client.finalized_hash()
+		};
 		if !self.client.has_block_state(finalized_hash) || !self.client.has_block_state(best_hash) {
 			return Ok(is_import_context);
 		}
@@ -576,7 +587,10 @@ where
 				let Some((notebook_number, raw_header, time)) =
 					self_clone.get_next(notary_id, finalized_notebook_number).await
 				else {
-					return Ok::<_, Error>(false);
+					// `get_next` also returns `None` after requeueing a notebook whose header is
+					// still unavailable, so queue depth distinguishes pending work from an empty
+					// queue.
+					return Ok::<_, Error>(self_clone.queue_depth(notary_id).await > 0);
 				};
 				match self_clone
 					.process_notebook(
@@ -1870,6 +1884,41 @@ mod test {
 	}
 
 	#[tokio::test]
+	async fn waits_for_pending_headers_during_verify_notebook_audits() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let parent_hash = client.best_hash();
+		let verify = {
+			let notary_client = notary_client.clone();
+			tokio::spawn(async move {
+				notary_client
+					.verify_notebook_audits(
+						&parent_hash,
+						vec![NotebookAuditResult {
+							notary_id: 1,
+							tick: 1,
+							notebook_number: 1,
+							audit_first_failure: None,
+						}],
+					)
+					.await
+			})
+		};
+
+		tokio::time::sleep(Duration::from_millis(100)).await;
+		test_notary.create_notebook_header(vec![]).await;
+
+		verify
+			.await
+			.expect("verify task should complete")
+			.expect("pending notebook header should eventually be audited");
+	}
+
+	#[tokio::test]
 	async fn disconnects_stale_subscription_after_missing_ticks() {
 		setup_logs();
 		let (mut test_notary, client, notary_client) = system().await;
@@ -2177,6 +2226,52 @@ mod test {
 			.expect("Could not process queues");
 		assert!(has_more_work);
 		assert_eq!(notary_client.queue_depth(1).await, 1);
+	}
+
+	#[tokio::test]
+	async fn uses_stateful_finalized_ancestor_during_import_catchup() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		test_notary.create_notebook_header(vec![]).await;
+		notary_client
+			.next_subscription(Duration::from_millis(500))
+			.await
+			.expect("Could not get next");
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		let block_0 = H256::from_slice(&[0; 32]);
+		let block_1 = H256::from_slice(&[1; 32]);
+		let block_2 = H256::from_slice(&[2; 32]);
+		client.block_chain.lock().append(&mut vec![block_0, block_1, block_2]);
+		client.set_best_hash(block_2);
+		client.set_finalized_hash(block_1);
+		client.set_block_state(block_0, true);
+		client.set_block_state(block_1, false);
+		client.set_block_state(block_2, true);
+
+		client.decode_intercept.lock().replace(NotaryNotebookDetails {
+			notary_id: 1,
+			notebook_number: 1,
+			version: 1,
+			tick: 1,
+			header_hash: H256::from_slice(&[9; 32]),
+			block_votes_count: 0,
+			block_voting_power: 0,
+			blocks_with_votes: vec![],
+			raw_audit_summary: vec![],
+		});
+
+		let has_more_work = notary_client
+			.process_queues(Some(block_2))
+			.await
+			.expect("Could not process queues");
+		assert!(!has_more_work);
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		assert_eq!(*client.decode_intercepted_at_block.lock(), Some(block_2));
 	}
 
 	#[tokio::test]
