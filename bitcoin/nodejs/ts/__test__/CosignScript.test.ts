@@ -113,10 +113,16 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(priceIndex.argonotUsdPrice).toBeDefined();
     await expect(BitcoinLock.getMarketRate(priceIndex, 100n)).resolves.toStrictEqual(60_000n);
     await expect(
-      BitcoinLock.calculateRedemptionAmount(priceIndex, { lockedMarketRate: 60_000n, satoshis: 100n }),
+      BitcoinLock.calculateRedemptionAmount(priceIndex, {
+        lockedMarketRate: 60_000n,
+        satoshis: 100n,
+      }),
     ).resolves.toStrictEqual(60_000n);
     await expect(
-      BitcoinLock.calculateRedemptionAmount(priceIndex, { lockedMarketRate: 50_000n, satoshis: 100n }),
+      BitcoinLock.calculateRedemptionAmount(priceIndex, {
+        lockedMarketRate: 50_000n,
+        satoshis: 100n,
+      }),
     ).resolves.toStrictEqual(50_000n);
   });
 

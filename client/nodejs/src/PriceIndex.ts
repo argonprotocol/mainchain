@@ -60,7 +60,9 @@ export class PriceIndex {
 
     const satoshiCents = this.btcUsdPrice.multipliedBy(satoshis).dividedBy(SATS_PER_BTC);
 
-    const microgons = satoshiCents.multipliedBy(MICROGONS_PER_ARGON).dividedBy(this.argonUsdTargetPrice);
+    const microgons = satoshiCents
+      .multipliedBy(MICROGONS_PER_ARGON)
+      .dividedBy(this.argonUsdTargetPrice);
     return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
   }
 
