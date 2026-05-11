@@ -376,45 +376,46 @@ pub trait NotebookProvider {
 	fn is_notary_locked_at_tick(notary_id: NotaryId, tick: Tick) -> bool;
 }
 
+fn btc_price_in_microgons<
+	Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
+>(
+	satoshis: Satoshis,
+	btc_usd_price: FixedU128,
+	argon_usd_price: FixedU128,
+) -> Option<Balance> {
+	let satoshis = FixedU128::saturating_from_integer(satoshis);
+	let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
+	let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);
+
+	let satoshi_cents =
+		satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
+
+	let microgons = satoshi_cents
+		.saturating_mul(microgons_per_argon)
+		.checked_div(&argon_usd_price)?;
+
+	Some(microgons.saturating_mul_int(Balance::one()))
+}
+
 pub trait PriceProvider<
 	Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
 >
 {
 	/// Price of the given satoshis in argon microgons at current market
 	fn get_btc_price_in_market_microgons(satoshis: Satoshis) -> Option<Balance> {
-		let satoshis = FixedU128::saturating_from_integer(satoshis);
-		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
-		let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);
-
-		let btc_usd_price = Self::get_latest_btc_price_in_usd()?;
-		let argon_usd_price = Self::get_latest_argon_price_in_usd()?;
-
-		let satoshi_cents =
-			satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
-
-		let microgons = satoshi_cents
-			.saturating_mul(microgons_per_argon)
-			.checked_div(&argon_usd_price)?;
-
-		Some(microgons.saturating_mul_int(Balance::one()))
+		btc_price_in_microgons(
+			satoshis,
+			Self::get_latest_btc_price_in_usd()?,
+			Self::get_latest_argon_price_in_usd()?,
+		)
 	}
 
 	fn get_btc_price_in_target_microgons(satoshis: Satoshis) -> Option<Balance> {
-		let satoshis = FixedU128::saturating_from_integer(satoshis);
-		let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
-		let microgons_per_argon = FixedU128::saturating_from_integer(MICROGONS_PER_ARGON);
-
-		let btc_usd_price = Self::get_latest_btc_price_in_usd()?;
-		let argon_usd_price = Self::get_target_argon_price_in_usd()?;
-
-		let satoshi_cents =
-			satoshis.saturating_mul(btc_usd_price).checked_div(&satoshis_per_bitcoin)?;
-
-		let microgons = satoshi_cents
-			.saturating_mul(microgons_per_argon)
-			.checked_div(&argon_usd_price)?;
-
-		Some(microgons.saturating_mul_int(Balance::one()))
+		btc_price_in_microgons(
+			satoshis,
+			Self::get_latest_btc_price_in_usd()?,
+			Self::get_target_argon_price_in_usd()?,
+		)
 	}
 
 	/// Prices of a single bitcoin in USD
