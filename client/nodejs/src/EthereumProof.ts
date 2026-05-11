@@ -75,9 +75,8 @@ export type EthereumEventProof = {
   };
 };
 
-const ethereumBurnForTransferEvent = getMintingGatewayBurnForTransferEvent();
 const ethereumBurnForTransferTopic = encodeEventTopics({
-  abi: [ethereumBurnForTransferEvent],
+  abi: mintingGatewayArtifact.abi,
   eventName: MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
 })[0]?.toLowerCase();
 
@@ -254,23 +253,6 @@ function getExecutionClient(
   }
 
   throw new Error('Ethereum event proof requires an execution client or execution RPC URL');
-}
-
-function getMintingGatewayBurnForTransferEvent() {
-  const eventAbi = mintingGatewayArtifact.abi.find(abiItem => {
-    return (
-      abiItem.type === 'event' &&
-      abiItem.name === MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME
-    );
-  });
-
-  if (!eventAbi || eventAbi.type !== 'event') {
-    throw new Error(
-      `MintingGateway artifact is missing ${MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME}`,
-    );
-  }
-
-  return eventAbi;
 }
 
 async function loadEthereumReceipt(
