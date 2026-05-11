@@ -170,7 +170,7 @@ export class BitcoinLock implements IBitcoinLock {
       priceIndex: PriceIndex;
       txSigner: TxSigningAccount;
       vault: Vault;
-      microgonsPerBtc?: bigint;
+      microgonsAtTargetPerBtc?: bigint;
     } & ISubmittableOptions,
   ): Promise<{
     txResult: TxResult;
@@ -185,10 +185,10 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinBlockHeight: number;
     }>;
   }> {
-    const { priceIndex, txSigner, tip = 0n, vault, client, microgonsPerBtc = null } = args;
+    const { priceIndex, txSigner, tip = 0n, vault, client, microgonsAtTargetPerBtc = null } = args;
 
     const ratchetPrice = await this.getRatchetPrice(client, priceIndex, vault);
-    const tx = client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsPerBtc } });
+    const tx = client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsAtTargetPerBtc } });
     const txSubmitter = new TxSubmitter(client, tx, txSigner);
     const canAfford = await txSubmitter.canAfford({
       tip,
@@ -661,7 +661,7 @@ export class BitcoinLock implements IBitcoinLock {
     satoshis: bigint;
     txSigner: TxSigningAccount;
     reducedBalanceBy?: bigint;
-    microgonsPerBtc?: bigint;
+    microgonsAtTargetPerBtc?: bigint;
     tip?: bigint;
     initializeForAccountId?: string;
   }) {
@@ -673,7 +673,7 @@ export class BitcoinLock implements IBitcoinLock {
       tip = 0n,
       ownerBitcoinPubkey,
       client,
-      microgonsPerBtc = null,
+      microgonsAtTargetPerBtc = null,
       initializeForAccountId,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
@@ -691,14 +691,14 @@ export class BitcoinLock implements IBitcoinLock {
         ownerBitcoinPubkey,
         {
           V1: {
-            microgonsPerBtc,
+            microgonsAtTargetPerBtc,
           },
         },
       );
     } else {
       tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, {
         V1: {
-          microgonsPerBtc,
+          microgonsAtTargetPerBtc,
         },
       });
     }

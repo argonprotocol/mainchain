@@ -161,6 +161,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPriceInUsd::get()
 	}
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonTargetPriceInUsd::get()
+	}
 	fn get_argon_cpi() -> Option<ArgonCPI> {
 		let ratio = ArgonTargetPriceInUsd::get()? / ArgonPriceInUsd::get()?;
 		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);

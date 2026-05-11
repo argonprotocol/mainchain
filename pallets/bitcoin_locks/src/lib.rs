@@ -623,7 +623,8 @@ pub mod pallet {
 			let current_tick = T::CurrentTick::get();
 			let oldest_allowed_tick =
 				current_tick.saturating_sub(T::MaxBtcPriceTickAge::get() as Tick);
-			let current_target_price = Self::calculate_target_microgons_per_btc();
+			let current_target_price =
+				T::PriceProvider::get_btc_price_in_target_microgons(SATOSHIS_PER_BITCOIN);
 
 			MicrogonPerBtcHistory::<T>::mutate(|history| {
 				history.retain(|y| y.0 >= oldest_allowed_tick);
@@ -656,14 +657,15 @@ pub mod pallet {
 	pub enum LockOptions<T: Config> {
 		V1 {
 			/// The microgons per btc rate if Argon were trading at target price.
-			target_microgons_per_btc: Option<T::Balance>,
+			microgons_at_target_per_btc: Option<T::Balance>,
 		},
 	}
 
 	impl<T: Config> LockOptions<T> {
-		pub fn target_microgons_per_btc(&self) -> Option<T::Balance> {
+		pub fn microgons_at_target_per_btc(&self) -> Option<T::Balance> {
 			match self {
-				LockOptions::<T>::V1 { target_microgons_per_btc } => *target_microgons_per_btc,
+				LockOptions::<T>::V1 { microgons_at_target_per_btc } =>
+					*microgons_at_target_per_btc,
 			}
 		}
 	}
@@ -755,8 +757,10 @@ pub mod pallet {
 					bitcoin_network_fee < lock.effective_satoshis(),
 					Error::<T>::BitcoinFeeTooHigh
 				);
-				redemption_price =
-					Self::get_redemption_amount_from_satoshis(&lock.satoshis, Some(lock.locked_market_rate))?;
+				redemption_price = Self::get_redemption_amount_from_satoshis(
+					&lock.satoshis,
+					Some(lock.locked_market_rate),
+				)?;
 				// hold funds until the utxo is seen in the chain
 				let balance = T::Currency::balance(&who);
 				ensure!(
@@ -910,9 +914,8 @@ pub mod pallet {
 				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
 				Error::<T>::LockInProcessOfRelease
 			);
-			let target_per_btc = options
-				.as_ref()
-				.and_then(LockOptions::target_microgons_per_btc);
+			let target_per_btc =
+				options.as_ref().and_then(LockOptions::microgons_at_target_per_btc);
 
 			let orig_locked_target_rate: T::Balance = lock.locked_market_rate;
 			let new_locked_target_rate: T::Balance =
@@ -926,39 +929,36 @@ pub mod pallet {
 			let vault_id = lock.vault_id;
 			let expiration_height = lock.vault_claim_height;
 
-			let mut amount_to_mint = T::Balance::zero();
-			let mut amount_burned = T::Balance::zero();
 			let mut duration_for_new_funds = FixedU128::zero();
 
-			let new_liquidity_promised = Self::get_redemption_amount(
-				new_locked_target_rate,
-				None,
-			)?;
+			let new_liquidity_promised = Self::get_redemption_amount(new_locked_target_rate, None)?;
 
 			// We need to determine up/down ratchet based on argon target rate
 			let is_up_ratchet = new_locked_target_rate > orig_locked_target_rate;
 
 			// up-ratcheting
-			if is_up_ratchet {
-				let diff_target_amount = new_locked_target_rate - orig_locked_target_rate;
+			let (amount_to_mint, amount_to_burn) = if is_up_ratchet {
 				let start_height = lock.created_at_height;
 				let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
 				let elapsed_blocks = current_bitcoin_height.saturating_sub(start_height);
 				let full_term = expiration_height.saturating_sub(start_height).max(1);
 				let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
-				amount_to_mint = Self::get_redemption_amount(diff_target_amount, None)?;
+				let diff_target_amount = new_locked_target_rate - orig_locked_target_rate;
+				let amount_to_mint = Self::get_redemption_amount(diff_target_amount, None)?;
 				duration_for_new_funds =
 					FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
+				(amount_to_mint, T::Balance::zero())
 
 			// down-ratcheting
 			} else {
-				amount_burned = new_liquidity_promised;
+				let amount_to_burn = new_liquidity_promised;
+				let amount_to_mint = new_liquidity_promised;
 
-				// NOTE: we send amount_burned to be released
-				T::LockEvents::utxo_released(utxo_id, false, amount_burned)?;
+				// NOTE: we send amount_to_burn to be released
+				T::LockEvents::utxo_released(utxo_id, false, amount_to_burn)?;
 				let _ = T::Currency::burn_from(
 					&who,
-					amount_burned,
+					amount_to_burn,
 					Preservation::Expendable,
 					Precision::Exact,
 					Fortitude::Force,
@@ -971,7 +971,9 @@ pub mod pallet {
 					&lock.get_lock_extension(),
 				)
 				.map_err(Error::<T>::from)?;
-			}
+
+				(amount_to_mint, amount_to_burn)
+			};
 
 			let mut lock_extension = lock.get_lock_extension();
 			let securitization = Securitization::new(amount_to_mint, lock.securitization_ratio);
@@ -998,7 +1000,7 @@ pub mod pallet {
 				original_market_rate: orig_locked_target_rate,
 				new_locked_market_rate: new_locked_target_rate,
 				liquidity_promised: new_liquidity_promised,
-				amount_burned,
+				amount_burned: amount_to_burn,
 				account_id: who.clone(),
 			});
 			LocksByUtxoId::<T>::insert(utxo_id, lock);
@@ -1112,7 +1114,7 @@ pub mod pallet {
 				T::VaultProvider::can_initialize_bitcoin_locks(vault_id, &who),
 				Error::<T>::NoPermissions
 			);
-			let securitization =
+			let (securitization, _) =
 				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
 
 			match Self::create_bitcoin_lock(
@@ -1378,13 +1380,8 @@ pub mod pallet {
 			let open_claim_height =
 				vault_claim_height.saturating_add(T::LockReclamationBlocks::get());
 
-			let securitization =
+			let (securitization, locked_market_rate) =
 				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
-
-			let locked_market_rate =
-				Self::convert_market_price_to_target_price(securitization.liquidity_promised)?;
-			let liquidity_promised =
-				Self::get_redemption_amount(locked_market_rate, None)?;
 
 			let fee = T::VaultProvider::lock(
 				vault_id,
@@ -1438,7 +1435,7 @@ pub mod pallet {
 					owner_account: account_id.clone(),
 					vault_id,
 					locked_market_rate,
-					liquidity_promised,
+					liquidity_promised: securitization.liquidity_promised,
 					security_fees: fee,
 					securitization_ratio: securitization.securitization_ratio,
 					coupon_paid_fees: if vault_covers_fee { fee } else { T::Balance::zero() },
@@ -1461,8 +1458,8 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::BitcoinLockCreated {
 				utxo_id,
 				vault_id,
-				liquidity_promised,
 				locked_market_rate,
+				liquidity_promised: securitization.liquidity_promised,
 				securitization: securitization.collateral_required,
 				account_id: account_id.clone(),
 				security_fee: fee,
@@ -1475,98 +1472,55 @@ pub mod pallet {
 			vault_id: VaultId,
 			satoshis: Satoshis,
 			options: Option<&LockOptions<T>>,
-		) -> Result<Securitization<T::Balance>, Error<T>> {
+		) -> Result<(Securitization<T::Balance>, T::Balance), Error<T>> {
 			ensure!(
 				satoshis >= MinimumSatoshis::<T>::get(),
 				Error::<T>::InsufficientSatoshisLocked
 			);
 
-			let btc_microgons_at_market = if let Some(target_rate) =
-				options.and_then(LockOptions::target_microgons_per_btc)
-			{
-				Self::get_btc_microgons_at_market(satoshis, target_rate)?
-			} else {
-				T::PriceProvider::get_btc_market_price_in_microgons(satoshis)
-					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-			};
+			let target_per_btc = options.and_then(LockOptions::microgons_at_target_per_btc);
+			let locked_target_rate: T::Balance =
+				Self::get_btc_microgons_at_target(satoshis, target_per_btc)?;
+			let liquidity_promised = Self::get_redemption_amount(locked_target_rate, None)?;
 			let securitization_ratio =
 				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
-			Ok(Securitization::new(btc_microgons_at_market, securitization_ratio))
-		}
 
-		fn calculate_target_microgons_per_btc() -> Option<T::Balance> {
-			let market_rate =
-				T::PriceProvider::get_btc_market_price_in_microgons(SATOSHIS_PER_BITCOIN)?;
-			let r = T::PriceProvider::get_redemption_r_value()?;
-
-			Some(r.saturating_mul_int(market_rate))
+			Ok((Securitization::new(liquidity_promised, securitization_ratio), locked_target_rate))
 		}
 
 		fn get_btc_microgons_at_target(
 			satoshis: Satoshis,
-			target_microgons_per_btc: Option<T::Balance>,
+			microgons_at_target_per_btc: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
-			let target_microgons_per_btc = if let Some(target_microgons_per_btc) =
-				target_microgons_per_btc
-			{
-				let rates = MicrogonPerBtcHistory::<T>::get();
-				if !rates.iter().any(|(_, r)| r == &target_microgons_per_btc) {
-					return Err(Error::<T>::IneligibleMicrogonRateRequested);
-				}
-				target_microgons_per_btc
-			} else {
-				Self::calculate_target_microgons_per_btc()
-					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-			};
+			let microgons_at_target_per_btc =
+				if let Some(microgons_at_target_per_btc) = microgons_at_target_per_btc {
+					let rates = MicrogonPerBtcHistory::<T>::get();
+					if !rates.iter().any(|(_, x)| x == &microgons_at_target_per_btc) {
+						return Err(Error::<T>::IneligibleMicrogonRateRequested);
+					}
+					microgons_at_target_per_btc
+				} else {
+					T::PriceProvider::get_btc_price_in_target_microgons(SATOSHIS_PER_BITCOIN)
+						.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
+				};
 
-			Ok(Self::scale_btc_microgons_by_satoshis(
-				satoshis,
-				target_microgons_per_btc,
-			))
-		}
-
-		fn get_btc_microgons_at_market(
-			satoshis: Satoshis,
-			target_microgons_per_btc: T::Balance,
-		) -> Result<T::Balance, Error<T>> {
-			let btc_microgons_at_target = Self::get_btc_microgons_at_target(satoshis, Some(target_microgons_per_btc))?;
-			let argon_cpi =
-				T::PriceProvider::get_argon_cpi().ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
-			let btc_microgons_at_market =
-				argon_cpi.add(FixedI128::one()).saturating_mul_int(btc_microgons_at_target);
-			Ok(btc_microgons_at_market)
+			Ok(Self::scale_btc_microgons_by_satoshis(satoshis, microgons_at_target_per_btc))
 		}
 
 		fn scale_btc_microgons_by_satoshis(
 			satoshis: Satoshis,
-			microgons_per_btc: T::Balance,
+			microgons_at_target_per_btc: T::Balance,
 		) -> T::Balance {
 			let satoshis = FixedU128::saturating_from_integer(satoshis);
 			let satoshis_per_bitcoin = FixedU128::saturating_from_integer(SATOSHIS_PER_BITCOIN);
 
 			let sat_ratio = satoshis / satoshis_per_bitcoin;
 
-			sat_ratio.saturating_mul_int(microgons_per_btc)
+			sat_ratio.saturating_mul_int(microgons_at_target_per_btc)
 		}
 
 		pub fn minimum_satoshis() -> Satoshis {
 			MinimumSatoshis::<T>::get()
-		}
-
-		/// The liquidity price accounts for BTC -> USD and MICROGON -> USD prices, which gives us
-		/// MICROGON -> BTC, but we don't account for how far off target the ARGON is from the CPI
-		/// target price. So, for instance, we might be trading 1-1 with the USD, but in reality,
-		/// there's been 100% inflation, so the lock price should be 2 ARGON per BTC, not 1
-		/// ARGON per BTC.
-		pub(crate) fn convert_market_price_to_target_price(
-			liquidity_promised: T::Balance,
-		) -> Result<T::Balance, Error<T>> {
-			let target_offset = T::PriceProvider::get_argon_cpi()
-				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?
-				.add(FixedI128::one());
-			// target = 1.5, price = 1.4, offset = 0.1, target_offset = 1.1
-			// need to multiply price by 1.1 to get to pegged price
-			Ok(target_offset.saturating_mul_int(liquidity_promised))
 		}
 
 		pub(crate) fn process_expiring_locks(expirations: impl IntoIterator<Item = UtxoId>) -> u64 {
@@ -1783,8 +1737,9 @@ pub mod pallet {
 
 			// need to compensate with market price, not the redemption price - use the real
 			// satoshis locked to get the market price
-			let market_price = T::PriceProvider::get_btc_market_price_in_microgons(lock.effective_satoshis())
-				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
+			let market_price =
+				T::PriceProvider::get_btc_price_in_market_microgons(lock.effective_satoshis())
+					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
 
 			let adjusted_market_rate = market_price.min(redemption_price_on_hold);
 
@@ -1831,19 +1786,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn get_btc_microgons_at_target_from_market(market_rate: T::Balance) -> T::Balance {
-			let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
-			r.saturating_mul_int(market_rate)
-		}
-
 		pub fn get_redemption_amount_from_satoshis(
 			satoshis: &Satoshis,
 			max_microgons_at_target: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
-			let btc_market_price = T::PriceProvider::get_btc_market_price_in_microgons(*satoshis)
-				.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
-			let current_target_price = Self::get_btc_microgons_at_target_from_market(btc_market_price);
-			Self::get_redemption_amount(current_target_price, max_microgons_at_target)
+			let btc_microgons_at_target =
+				T::PriceProvider::get_btc_price_in_target_microgons(*satoshis)
+					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
+			Self::get_redemption_amount(btc_microgons_at_target, max_microgons_at_target)
 		}
 
 		fn get_redemption_amount(

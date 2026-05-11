@@ -475,18 +475,18 @@ fn benchmark_vault_securitization() -> u128 {
 	200_000_000_000
 }
 
-fn benchmark_target_microgons_per_btc<T: Config>() -> Result<T::Balance, BenchmarkError> {
-	let market_rate = T::PriceProvider::get_btc_market_price_in_microgons(SATOSHIS_PER_BITCOIN)
+fn benchmark_microgons_at_target_per_btc<T: Config>() -> Result<T::Balance, BenchmarkError> {
+	let market_rate = T::PriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
 		.ok_or(BenchmarkError::Stop("benchmark bitcoin price should be available"))?;
 	let r = T::PriceProvider::get_redemption_r_value()
 		.ok_or(BenchmarkError::Stop("benchmark redemption r value should be available"))?;
 	Ok(r.saturating_mul_int(market_rate))
 }
 
-fn seed_target_microgons_per_btc_history<T: Config>(
-	target_microgons_per_btc: T::Balance,
+fn seed_microgons_at_target_per_btc_history<T: Config>(
+	microgons_at_target_per_btc: T::Balance,
 ) -> Result<(), BenchmarkError> {
-	let history = BoundedVec::try_from(vec![(T::CurrentTick::get(), target_microgons_per_btc)])
+	let history = BoundedVec::try_from(vec![(T::CurrentTick::get(), microgons_at_target_per_btc)])
 		.map_err(|_| BenchmarkError::Stop("benchmark microgons per btc history overflow"))?;
 	MicrogonPerBtcHistory::<T>::put(history);
 	Ok(())
@@ -498,9 +498,9 @@ fn benchmark_lock_options<T: Config>(
 	_max_satoshis: Satoshis,
 	_seed_hint: u8,
 ) -> Result<Option<LockOptions<T>>, BenchmarkError> {
-	let target_microgons_per_btc = benchmark_target_microgons_per_btc::<T>()?;
-	seed_target_microgons_per_btc_history::<T>(target_microgons_per_btc)?;
-	Ok(Some(LockOptions::V1 { target_microgons_per_btc: Some(target_microgons_per_btc) }))
+	let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
+	seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
+	Ok(Some(LockOptions::V1 { microgons_at_target_per_btc: Some(microgons_at_target_per_btc) }))
 }
 
 fn benchmark_block_hash(seed: u8) -> H256Le {

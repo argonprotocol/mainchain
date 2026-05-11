@@ -298,7 +298,7 @@ macro_rules! inject_common_apis {
             }
 
             fn market_rate(satoshis: Satoshis) -> Option<Balance> {
-                PriceIndex::get_btc_market_price_in_microgons(satoshis)
+                PriceIndex::get_btc_price_in_market_microgons(satoshis)
             }
 
             fn get_bitcoin_network() -> BitcoinNetwork {

@@ -197,16 +197,20 @@ fn can_convert_argon_prices() {
 		Current::<Test>::put(index);
 
 		assert_eq!(
-            <PriceIndex as PriceProvider<u128>>::get_btc_market_price_in_microgons(SATOSHIS_PER_BITCOIN),
-            Some(62_000 * 1_000_000),
-            "price in microgons"
+			<PriceIndex as PriceProvider<u128>>::get_btc_price_in_market_microgons(
+				SATOSHIS_PER_BITCOIN
+			),
+			Some(62_000 * 1_000_000),
+			"price in microgons"
 		);
 
 		index.argon_usd_price = FixedU128::from_float(1.01);
 		Current::<Test>::put(index);
 
 		assert_eq!(
-			<PriceIndex as PriceProvider<u128>>::get_btc_market_price_in_microgons(SATOSHIS_PER_BITCOIN),
+			<PriceIndex as PriceProvider<u128>>::get_btc_price_in_market_microgons(
+				SATOSHIS_PER_BITCOIN
+			),
 			Some(1_000_000 * (62_000 * 100) / 101),
 		);
 	});
