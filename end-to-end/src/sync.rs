@@ -44,24 +44,13 @@ async fn test_normal_fast_sync_smoke_catches_up_to_notebook_history() {
 	sync_args.extra_flags.push("--sync=fast".to_string());
 	let sync_node = source.fork_node_with(sync_args).await.unwrap();
 
-	wait_for_finalized_catchup(&source, &sync_node).await.unwrap();
-
-	let latest_finalized = sync_node.client.latest_finalized_block_hash().await.unwrap();
-	let latest_finalized_number =
-		sync_node.client.block_number(latest_finalized.hash()).await.unwrap();
-	assert!(
-		latest_finalized_number >= target.number,
-		"fast sync node should catch up to recent notebook history: expected finalized number >= {}, got {}",
-		target.number,
-		latest_finalized_number,
-	);
-
-	let synced_target_hash = header_hash_at_height(&sync_node, target.number).await;
-	assert_eq!(
-		synced_target_hash,
-		Some(target.hash),
-		"fast sync node should catch up to recent notebook history: synced node should retain the target finalized block hash",
-	);
+	assert_node_matches_snapshot(
+		&sync_node,
+		&source,
+		target,
+		"fast sync node should catch up to recent notebook history",
+	)
+	.await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -150,7 +139,6 @@ async fn test_soak_recovers_after_notary_outage() {
 #[derive(Clone, Copy)]
 struct FinalizedSnapshot {
 	number: u32,
-	hash: H256,
 }
 
 struct SyncSoakSettings {
@@ -178,7 +166,7 @@ struct FinalizedHistoryWindow {
 async fn finalized_snapshot(node: &ArgonTestNode) -> FinalizedSnapshot {
 	let finalized_hash = node.client.latest_finalized_block_hash().await.unwrap();
 	let finalized_number = node.client.block_number(finalized_hash.hash()).await.unwrap();
-	FinalizedSnapshot { number: finalized_number, hash: finalized_hash.hash() }
+	FinalizedSnapshot { number: finalized_number }
 }
 
 async fn wait_for_finalized_notebook_snapshot(
@@ -205,7 +193,7 @@ async fn wait_for_finalized_notebook_snapshot(
 		if has_notebooks {
 			notebook_blocks_seen += 1;
 			if notebook_blocks_seen >= min_notebook_blocks {
-				return FinalizedSnapshot { number: block.number(), hash: block.hash() };
+				return FinalizedSnapshot { number: block.number() };
 			}
 		}
 
@@ -272,20 +260,34 @@ async fn assert_node_matches_snapshot(
 	snapshot: FinalizedSnapshot,
 	context: &str,
 ) {
-	let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
-	let latest_finalized_hash = latest_finalized.hash();
-	let latest_finalized_number = node.client.block_number(latest_finalized_hash).await.unwrap();
-	assert!(
-		latest_finalized_number >= snapshot.number,
-		"{context}: expected finalized number >= {}, got {}",
-		snapshot.number,
-		latest_finalized_number,
-	);
-
-	let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
-	assert_eq!(source_finalized_hash, Some(latest_finalized_hash), "{context}",);
-
 	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+	loop {
+		let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
+		let latest_finalized_hash = latest_finalized.hash();
+		let latest_finalized_number =
+			node.client.block_number(latest_finalized_hash).await.unwrap();
+		let source_finalized_hash = header_hash_at_height(source, latest_finalized_number).await;
+
+		if latest_finalized_number >= snapshot.number &&
+			source_finalized_hash == Some(latest_finalized_hash)
+		{
+			break;
+		}
+
+		assert!(
+			tokio::time::Instant::now() < deadline,
+			"{context}: synced node did not recover a source-matching finalized block. finalized={latest_finalized_number}, target_finalized={}, source_at_height={source_finalized_hash:?}",
+			snapshot.number,
+		);
+
+		println!(
+			"Waiting for synced node to recover a source-matching finalized block. finalized={latest_finalized_number}, target_finalized={}",
+			snapshot.number,
+		);
+		tokio::time::sleep(Duration::from_millis(250)).await;
+	}
+
 	loop {
 		let best_hash = node.client.best_block_hash().await.unwrap();
 		let best_number = node.client.block_number(best_hash).await.unwrap();

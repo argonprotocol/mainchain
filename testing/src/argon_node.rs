@@ -171,6 +171,7 @@ impl ArgonTestNode {
 		self.boot_url = listen_urls
 			.into_iter()
 			.find(|address| address.contains("127.0.0.1"))
+			.map(normalize_bootnode_address)
 			.expect("should have a localhost ip");
 		Ok(())
 	}
@@ -291,8 +292,8 @@ impl ArgonTestNode {
 			boot_url: listen_urls
 				.into_iter()
 				.find(|a| a.contains("127.0.0.1"))
-				.expect("should have a localhost ip")
-				.clone(),
+				.map(normalize_bootnode_address)
+				.expect("should have a localhost ip"),
 			log_watcher: log_watch,
 			start_args: args.clone(),
 		})
@@ -340,5 +341,20 @@ impl ArgonTestNode {
 		rpc_url.set_password(None).unwrap();
 		rpc_url.set_username("").unwrap();
 		(rpc_url.to_string(), auth)
+	}
+}
+
+fn normalize_bootnode_address(address: String) -> String {
+	let Some((base, first_peer_segment)) = address.split_once("/p2p/") else {
+		return address;
+	};
+	let Some((peer_id, repeated_peer_segments)) = first_peer_segment.split_once("/p2p/") else {
+		return address;
+	};
+
+	if repeated_peer_segments.split("/p2p/").all(|segment| segment == peer_id) {
+		format!("{base}/p2p/{peer_id}")
+	} else {
+		address
 	}
 }
