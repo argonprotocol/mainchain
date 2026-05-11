@@ -15,7 +15,7 @@ it('exports bitcoin lock helpers', () => {
   expect(BitcoinLock).toBeTruthy();
 });
 
-describe('BitcoinLock.getRedemptionRate', () => {
+describe('BitcoinLock.calculateRedemptionAmount', () => {
   function priceIndex(args: {
     btcUsdPrice: number;
     argonUsdPrice: number;
@@ -36,7 +36,7 @@ describe('BitcoinLock.getRedemptionRate', () => {
     });
 
     await expect(
-      BitcoinLock.getRedemptionRate(index, { lockedMarketRate: 60_000n, satoshis: 100n }),
+      BitcoinLock.calculateRedemptionAmount(index, { lockedMarketRate: 60_000n, satoshis: 100n }),
     ).resolves.toStrictEqual(50_000n);
   });
 
@@ -48,7 +48,7 @@ describe('BitcoinLock.getRedemptionRate', () => {
     });
 
     await expect(
-      BitcoinLock.getRedemptionRate(index, {
+      BitcoinLock.calculateRedemptionAmount(index, {
         lockedMarketRate: 1_250_000n,
         satoshis: 100_000_000n,
       }),

@@ -245,7 +245,7 @@ export class BitcoinLock implements IBitcoinLock {
   }
 
   public async releasePrice(priceIndex: PriceIndex): Promise<bigint> {
-    return await BitcoinLock.getRedemptionRate(priceIndex, this);
+    return await BitcoinLock.calculateRedemptionAmount(priceIndex, this);
   }
 
   public async requestRelease(
@@ -274,7 +274,7 @@ export class BitcoinLock implements IBitcoinLock {
       txSigner,
     );
 
-    const redemptionPrice = await BitcoinLock.getRedemptionRate(priceIndex, this);
+    const redemptionPrice = await BitcoinLock.calculateRedemptionAmount(priceIndex, this);
 
     const canAfford = await submitter.canAfford({
       tip,
@@ -403,12 +403,12 @@ export class BitcoinLock implements IBitcoinLock {
     return priceIndex.getBtcPriceInMicrogons(satoshis);
   }
 
-  public static async getRedemptionRate(
+  public static async calculateRedemptionAmount(
     priceIndex: PriceIndex,
     details: { satoshis: bigint; lockedMarketRate?: bigint },
   ): Promise<bigint> {
     const { satoshis, lockedMarketRate } = details;
-    let price = priceIndex.getBtcPriceInMicrogons(satoshis);
+    let price = priceIndex.getBtcPriceInTargetMicrogons(satoshis);
 
     if (lockedMarketRate !== undefined && lockedMarketRate < price) {
       price = lockedMarketRate;

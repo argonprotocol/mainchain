@@ -905,7 +905,7 @@ fn calculates_redemption_prices() {
 			ArgonTargetPriceInUsd::set(Some(FixedU128::from_u32(1)));
 			BitcoinPriceInUsd::set(Some(parse_price(scenario.btc_price)));
 			let new_price =
-				BitcoinLocks::get_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
+				BitcoinLocks::calculate_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
 					.expect("should have price");
 			let expected_price = parse_price(scenario.expected_redemption);
 			let expected_microgons = expected_price.saturating_mul_int(MICROGONS_PER_ARGON);
@@ -972,7 +972,7 @@ fn burns_an_externally_spent_bitcoin() {
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(50000)));
 
 		let new_price =
-			BitcoinLocks::get_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
+			BitcoinLocks::calculate_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
 				.expect("should have price");
 		assert_eq!(new_price, 50_000_000_000);
 
@@ -1152,7 +1152,7 @@ fn can_release_a_bitcoin() {
 		));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 		let redemption_price =
-			BitcoinLocks::get_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
+			BitcoinLocks::calculate_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
 				.expect("should have price");
 		assert!(redemption_price > lock.liquidity_promised);
 		// redemption price should be the lock price since current redemption price is above
@@ -1193,7 +1193,7 @@ fn test_redemption_rate_vs_market() {
 		let market_rate =
 			StaticPriceProvider::get_btc_price_in_market_microgons(100).expect("should have price");
 		assert_eq!(market_rate, 60_000);
-		assert_eq!(BitcoinLocks::get_redemption_amount_from_satoshis(&100, None).unwrap(), 60_000);
+		assert_eq!(BitcoinLocks::calculate_redemption_amount_from_satoshis(&100, None).unwrap(), 60_000);
 	});
 }
 
@@ -1225,7 +1225,7 @@ fn penalizes_vault_if_not_release_countersigned() {
 		));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
-		let redemption_price = BitcoinLocks::get_redemption_amount_from_satoshis(&satoshis, None)
+		let redemption_price = BitcoinLocks::calculate_redemption_amount_from_satoshis(&satoshis, None)
 			.expect("should have price");
 		let cosign_due = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
 		assert_eq!(
@@ -1307,7 +1307,7 @@ fn clears_released_bitcoins() {
 		));
 		assert!(LocksByUtxoId::<Test>::get(1).is_some());
 
-		let redemption_price = BitcoinLocks::get_redemption_amount_from_satoshis(&satoshis, None)
+		let redemption_price = BitcoinLocks::calculate_redemption_amount_from_satoshis(&satoshis, None)
 			.expect("should have price");
 		let cosign_due_frame = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
 		assert_eq!(
@@ -1475,7 +1475,7 @@ fn it_should_aggregate_holds_for_a_second_release() {
 		assert_ok!(BitcoinLocks::funding_received(2, satoshis));
 		// Mint the argons into account
 		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised * 2));
-		let redemption_price = BitcoinLocks::get_redemption_amount_from_satoshis(&satoshis, None)
+		let redemption_price = BitcoinLocks::calculate_redemption_amount_from_satoshis(&satoshis, None)
 			.expect("should have price");
 
 		assert_ok!(BitcoinLocks::request_release(
@@ -1777,7 +1777,7 @@ fn it_should_allow_a_ratchet_down() {
 		// now set price to 52k and down ratchet
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(52_000)));
 		let redemption_price =
-			BitcoinLocks::get_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
+			BitcoinLocks::calculate_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
 				.expect("should have price");
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
 		assert_eq!(
@@ -1905,7 +1905,7 @@ fn redemption_price_matches_market_rate_at_non_one_dollar_target() {
 			StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
 				.expect("should have price");
 		let redemption_price =
-			BitcoinLocks::get_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
+			BitcoinLocks::calculate_redemption_amount_from_satoshis(&SATOSHIS_PER_BITCOIN, None)
 				.expect("should have redemption price");
 
 		assert_eq!(market_rate, 50_000 * MICROGONS_PER_ARGON);

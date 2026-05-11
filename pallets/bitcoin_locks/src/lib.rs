@@ -757,7 +757,7 @@ pub mod pallet {
 					bitcoin_network_fee < lock.effective_satoshis(),
 					Error::<T>::BitcoinFeeTooHigh
 				);
-				redemption_price = Self::get_redemption_amount_from_satoshis(
+				redemption_price = Self::calculate_redemption_amount_from_satoshis(
 					&lock.satoshis,
 					Some(lock.locked_market_rate),
 				)?;
@@ -931,7 +931,7 @@ pub mod pallet {
 
 			let mut duration_for_new_funds = FixedU128::zero();
 
-			let new_liquidity_promised = Self::get_redemption_amount(new_locked_target_rate, None)?;
+			let new_liquidity_promised = Self::calculate_redemption_amount(new_locked_target_rate, None)?;
 
 			// We need to determine up/down ratchet based on argon target rate
 			let is_up_ratchet = new_locked_target_rate > orig_locked_target_rate;
@@ -944,7 +944,7 @@ pub mod pallet {
 				let full_term = expiration_height.saturating_sub(start_height).max(1);
 				let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
 				let diff_target_amount = new_locked_target_rate - orig_locked_target_rate;
-				let amount_to_mint = Self::get_redemption_amount(diff_target_amount, None)?;
+				let amount_to_mint = Self::calculate_redemption_amount(diff_target_amount, None)?;
 				duration_for_new_funds =
 					FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
 				(amount_to_mint, T::Balance::zero())
@@ -1481,7 +1481,7 @@ pub mod pallet {
 			let target_per_btc = options.and_then(LockOptions::microgons_at_target_per_btc);
 			let locked_target_rate: T::Balance =
 				Self::get_btc_microgons_at_target(satoshis, target_per_btc)?;
-			let liquidity_promised = Self::get_redemption_amount(locked_target_rate, None)?;
+			let liquidity_promised = Self::calculate_redemption_amount(locked_target_rate, None)?;
 			let securitization_ratio =
 				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
 
@@ -1618,7 +1618,7 @@ pub mod pallet {
 			}
 
 			// burn the current redemption price from the vault at value of actual satoshis locked
-			let redemption_price = Self::get_redemption_amount_from_satoshis(
+			let redemption_price = Self::calculate_redemption_amount_from_satoshis(
 				&lock.effective_satoshis(),
 				Some(lock.locked_market_rate),
 			)?;
@@ -1786,17 +1786,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn get_redemption_amount_from_satoshis(
+		pub fn calculate_redemption_amount_from_satoshis(
 			satoshis: &Satoshis,
 			max_microgons_at_target: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
 			let btc_microgons_at_target =
 				T::PriceProvider::get_btc_price_in_target_microgons(*satoshis)
 					.ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
-			Self::get_redemption_amount(btc_microgons_at_target, max_microgons_at_target)
+			Self::calculate_redemption_amount(btc_microgons_at_target, max_microgons_at_target)
 		}
 
-		fn get_redemption_amount(
+		fn calculate_redemption_amount(
 			btc_microgons_at_target: T::Balance,
 			max_microgons_at_target: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {

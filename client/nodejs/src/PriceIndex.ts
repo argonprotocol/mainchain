@@ -53,6 +53,17 @@ export class PriceIndex {
     return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
   }
 
+  getBtcPriceInTargetMicrogons(satoshis: bigint | number): bigint {
+    if (this.btcUsdPrice === undefined || this.argonUsdTargetPrice === undefined) {
+      throw new Error('PriceIndex not loaded');
+    }
+
+    const satoshiCents = this.btcUsdPrice.multipliedBy(satoshis).dividedBy(SATS_PER_BTC);
+
+    const microgons = satoshiCents.multipliedBy(MICROGONS_PER_ARGON).dividedBy(this.argonUsdTargetPrice);
+    return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
+  }
+
   get rValue(): BigNumber {
     if (this.argonUsdTargetPrice === undefined || this.argonUsdPrice === undefined) {
       throw new Error('PriceIndex not loaded');
