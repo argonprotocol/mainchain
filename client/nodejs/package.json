@@ -67,6 +67,7 @@
     "viem": "^2.38.5"
   },
   "devDependencies": {
+    "@argonprotocol/ethereum-contracts": "workspace:*",
     "@argonprotocol/testing": "1.4.3",
     "@polkadot/typegen": "^16.4.4",
     "@substrate/ss58-registry": "^1.51.0",

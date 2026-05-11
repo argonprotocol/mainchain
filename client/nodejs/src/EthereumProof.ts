@@ -1,7 +1,21 @@
 import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMerkleProof, createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
+import {
+  MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
+  mintingGatewayArtifact,
+} from '@argonprotocol/ethereum-contracts';
 import type { IArgonQueryable } from './index';
-import { bytesToHex, createPublicClient, type Hex, hexToBytes, http, toHex, toRlp } from 'viem';
+import {
+  bytesToHex,
+  createPublicClient,
+  encodeEventTopics,
+  getAddress,
+  type Hex,
+  hexToBytes,
+  http,
+  toHex,
+  toRlp,
+} from 'viem';
 
 type VerifyEventLog = IArgonQueryable['call']['ethereumApis']['verifyEventLog'];
 export type EthereumVerifyEventLogResult = Awaited<ReturnType<VerifyEventLog>>;
@@ -61,6 +75,12 @@ export type EthereumEventProof = {
   };
 };
 
+const ethereumBurnForTransferEvent = getMintingGatewayBurnForTransferEvent();
+const ethereumBurnForTransferTopic = encodeEventTopics({
+  abi: [ethereumBurnForTransferEvent],
+  eventName: MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
+})[0]?.toLowerCase();
+
 export function encodeReceiptTrieKey(transactionIndex: number): Uint8Array {
   return transactionIndex === 0 ? Uint8Array.from([0x80]) : toRlp(toHex(transactionIndex), 'bytes');
 }
@@ -97,9 +117,7 @@ export async function buildEthereumEventProof(
   { txHash, logIndex = 0, receipt: providedReceipt, ...executionSource }: EthereumEventLocator,
 ): Promise<EthereumEventProof> {
   const executionClient = getExecutionClient(executionSource);
-  const receipt =
-    providedReceipt ??
-    (await waitForIndexed(() => executionClient.getTransactionReceipt({ hash: txHash })));
+  const receipt = await loadEthereumReceipt(txHash, providedReceipt, executionClient);
   const log = receipt.logs[logIndex];
 
   if (!log) throw new Error(`Missing log ${logIndex} in receipt ${txHash}`);
@@ -142,6 +160,28 @@ export async function buildEthereumEventProof(
   };
 
   return { eventLog, proof };
+}
+
+export function findEthereumBurnForTransferLogIndex(
+  receipt: EthereumReceipt,
+  gatewayAddress: Hex,
+): number {
+  const normalizedGatewayAddress = getAddress(gatewayAddress).toLowerCase();
+
+  const index = receipt.logs.findIndex(log => {
+    return (
+      log.address.toLowerCase() === normalizedGatewayAddress &&
+      log.topics[0]?.toLowerCase() === ethereumBurnForTransferTopic
+    );
+  });
+
+  if (index === -1) {
+    throw new Error(
+      `Ethereum receipt ${receipt.transactionHash} did not emit BurnForTransfer from gateway ${gatewayAddress}`,
+    );
+  }
+
+  return index;
 }
 
 export async function getLatestRetainedAnchor(
@@ -214,6 +254,34 @@ function getExecutionClient(
   }
 
   throw new Error('Ethereum event proof requires an execution client or execution RPC URL');
+}
+
+function getMintingGatewayBurnForTransferEvent() {
+  const eventAbi = mintingGatewayArtifact.abi.find(abiItem => {
+    return (
+      abiItem.type === 'event' &&
+      abiItem.name === MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME
+    );
+  });
+
+  if (!eventAbi || eventAbi.type !== 'event') {
+    throw new Error(
+      `MintingGateway artifact is missing ${MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME}`,
+    );
+  }
+
+  return eventAbi;
+}
+
+async function loadEthereumReceipt(
+  txHash: Hex,
+  providedReceipt: EthereumReceipt | undefined,
+  executionClient: EthereumExecutionClient,
+) {
+  return (
+    providedReceipt ??
+    (await waitForIndexed(() => executionClient.getTransactionReceipt({ hash: txHash })))
+  );
 }
 
 async function loadExecutionHeader(

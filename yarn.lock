@@ -38,7 +38,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/ethereum-contracts@workspace:chains/ethereum/contracts":
+"@argonprotocol/ethereum-contracts@workspace:*, @argonprotocol/ethereum-contracts@workspace:chains/ethereum/contracts":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/ethereum-contracts@workspace:chains/ethereum/contracts"
   dependencies:
@@ -121,6 +121,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/mainchain@workspace:client/nodejs"
   dependencies:
+    "@argonprotocol/ethereum-contracts": "workspace:*"
     "@argonprotocol/testing": "npm:1.4.3"
     "@chainsafe/persistent-merkle-tree": "npm:1.2.5"
     "@ethereumjs/block": "npm:^10.1.1"

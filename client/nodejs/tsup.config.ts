@@ -3,8 +3,14 @@ import { defineConfig } from 'tsup';
 export default defineConfig([
   {
     entry: ['src/index.ts'],
-    dts: true,
+    dts: {
+      compilerOptions: {
+        rootDir: '.',
+      },
+      resolve: ['@argonprotocol/ethereum-contracts'],
+    },
     external: ['@polkadot/types/lookup'],
+    noExternal: ['@argonprotocol/ethereum-contracts'],
     format: ['esm', 'cjs'],
     clean: true,
     splitting: true,
@@ -21,7 +27,13 @@ export default defineConfig([
     format: ['esm'], // browser-friendly
     outDir: 'browser',
     external: ['@polkadot/types/lookup'],
-    dts: true,
+    dts: {
+      compilerOptions: {
+        rootDir: '.',
+      },
+      resolve: ['@argonprotocol/ethereum-contracts'],
+    },
+    noExternal: ['@argonprotocol/ethereum-contracts'],
     platform: 'browser',
     target: 'es2020',
     sourcemap: true,
