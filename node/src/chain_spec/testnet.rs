@@ -5,7 +5,8 @@ use argon_primitives::{
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::Ticker,
-	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
+	AccountId, Chain, ComputeDifficulty, EthereumBeaconPreset, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL,
+	TOKEN_DECIMALS,
 };
 use core::str::FromStr;
 use polkadot_sdk::*;
@@ -84,6 +85,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_after_ticks: 0,
 			},
 			minimum_bitcoin_lock_satoshis: 5_000,
+			ethereum_beacon_preset: EthereumBeaconPreset::Mainnet,
 		}
 	))
 	.build())

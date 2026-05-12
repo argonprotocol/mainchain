@@ -1,6 +1,5 @@
 import { createProof as createSingleProof, ProofType } from '@chainsafe/persistent-merkle-tree';
 import camelcaseKeys from 'camelcase-keys';
-import { ForkName } from '@lodestar/params';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 import type {
   EthereumBeaconBlockResponse,
@@ -17,7 +16,11 @@ import type { ArgonClient } from './index';
 import { bytesToHex, hexToBytes, type Hex } from 'viem';
 
 type BeaconPreset = 'mainnet' | 'minimal';
-type BeaconForkName = ForkName.capella | ForkName.deneb | ForkName.electra | ForkName.fulu;
+type BeaconExecutionForkName =
+  | import('@lodestar/params').ForkName.capella
+  | import('@lodestar/params').ForkName.deneb
+  | import('@lodestar/params').ForkName.electra
+  | import('@lodestar/params').ForkName.fulu;
 type BeaconNetworkParams = {
   epochsPerSyncCommitteePeriod: bigint;
   preset: BeaconPreset;
@@ -46,17 +49,20 @@ const lightClientUpdateRetryIntervalMs = 500;
 const lightClientUpdateRetryTimeoutMs = 30_000;
 let lodestarModulesPromise:
   | Promise<{
+      ForkName: typeof import('@lodestar/params').ForkName;
       epochsPerSyncCommitteePeriod: bigint;
       slotsPerEpoch: bigint;
       sszTypesFor: typeof import('@lodestar/types').sszTypesFor;
     }>
   | undefined;
+const expectedBeaconPresetPromises = new WeakMap<ArgonClient, Promise<BeaconPreset>>();
 const beaconNetworkParamsPromises = new Map<string, Promise<BeaconNetworkParams>>();
 
 export async function getEthereumBeaconSyncBootstrapTx(
   client: ArgonClient,
   beaconApiUrl: string,
 ): Promise<SubmittableExtrinsic> {
+  const expectedPreset = await getExpectedBeaconPreset(client);
   const [genesis, spec, finalizedHeader] = await Promise.all([
     getBeaconJson<EthereumBeaconGenesisResponse>(beaconApiUrl, '/eth/v1/beacon/genesis'),
     getBeaconJson<EthereumBeaconConfigSpecResponse>(beaconApiUrl, '/eth/v1/config/spec'),
@@ -70,6 +76,7 @@ export async function getEthereumBeaconSyncBootstrapTx(
     `/eth/v1/beacon/light_client/bootstrap/${finalizedHeader.data.root}`,
   );
   const specData = spec.data;
+  parseBeaconNetworkParams(specData, expectedPreset);
 
   return client.tx.ethereumVerifier.forceCheckpoint(
     {
@@ -103,7 +110,8 @@ export async function getNextEthereumBeaconSyncTxs(
     return [];
   }
 
-  const beaconNetworkParams = await getBeaconNetworkParams(beaconApiUrl);
+  const expectedPreset = await getExpectedBeaconPreset(client);
+  const beaconNetworkParams = await getBeaconNetworkParams(beaconApiUrl, expectedPreset);
 
   const update = await getNextLightClientUpdate(beaconApiUrl, state, beaconNetworkParams);
   const txs: SubmittableExtrinsic[] = [];
@@ -153,7 +161,12 @@ export async function getNextEthereumBeaconSyncTxs(
         update.finalized_header.beacon.slot,
         update.finalized_header.beacon,
       );
-      const anchorTx = await createExecutionHeaderAnchorTx(client, beaconApiUrl, beaconBlockRoot);
+      const anchorTx = await createExecutionHeaderAnchorTx(
+        client,
+        beaconApiUrl,
+        beaconBlockRoot,
+        expectedPreset,
+      );
       if (anchorTx) {
         txs.push(anchorTx);
       }
@@ -166,6 +179,7 @@ export async function getNextEthereumBeaconSyncTxs(
     client,
     beaconApiUrl,
     state.latestFinalizedBlockRoot,
+    expectedPreset,
   );
   if (anchorTx) {
     txs.push(anchorTx);
@@ -213,9 +227,13 @@ export async function getEthereumBeaconSyncState(
   };
 }
 
-async function buildExecutionHeaderAnchorProof(beaconApiUrl: string, beaconBlockRoot: string) {
+async function buildExecutionHeaderAnchorProof(
+  beaconApiUrl: string,
+  beaconBlockRoot: string,
+  expectedPreset: BeaconPreset,
+) {
   const [beaconNetworkParams, header, block] = await Promise.all([
-    getBeaconNetworkParams(beaconApiUrl),
+    getBeaconNetworkParams(beaconApiUrl, expectedPreset),
     getBeaconJson<EthereumBeaconHeaderDetailsResponse>(
       beaconApiUrl,
       `/eth/v1/beacon/headers/${beaconBlockRoot}`,
@@ -225,9 +243,9 @@ async function buildExecutionHeaderAnchorProof(beaconApiUrl: string, beaconBlock
       `/eth/v2/beacon/blocks/${beaconBlockRoot}`,
     ),
   ]);
-  const { sszTypesFor } = await loadLodestarModules(beaconNetworkParams.preset);
-  const forkName = getBeaconForkName(block.version);
-  const { BeaconBlockBody } = sszTypesFor(forkName);
+  const { ForkName, sszTypesFor } = await loadLodestarModules(beaconNetworkParams.preset);
+  const forkName = getBeaconForkName(block.version, ForkName);
+  const BeaconBlockBody = sszTypesFor(forkName, 'BeaconBlockBody');
   const ExecutionPayload = sszTypesFor(forkName, 'ExecutionPayload');
   const body = BeaconBlockBody.fromJson(block.data.message.body);
   const bodyRoot = bytesToHex(BeaconBlockBody.hashTreeRoot(body)).toLowerCase();
@@ -267,8 +285,13 @@ async function createExecutionHeaderAnchorTx(
   client: ArgonClient,
   beaconApiUrl: string,
   beaconBlockRoot: string,
+  expectedPreset: BeaconPreset,
 ): Promise<SubmittableExtrinsic | undefined> {
-  const executionProof = await buildExecutionHeaderAnchorProof(beaconApiUrl, beaconBlockRoot);
+  const executionProof = await buildExecutionHeaderAnchorProof(
+    beaconApiUrl,
+    beaconBlockRoot,
+    expectedPreset,
+  );
   const executionHeader = executionProof.executionHeader;
   const blockHash =
     'Deneb' in executionHeader && executionHeader.Deneb
@@ -414,24 +437,28 @@ function detectBeaconPreset(spec: Record<string, string>): BeaconPreset {
   return spec.SLOTS_PER_HISTORICAL_ROOT === '64' ? 'minimal' : 'mainnet';
 }
 
-function getBeaconForkName(version: string): BeaconForkName {
-  if (version === 'capella') {
-    return ForkName.capella;
+function getBeaconForkName(
+  version: string,
+  ForkName: typeof import('@lodestar/params').ForkName,
+): BeaconExecutionForkName {
+  switch (version) {
+    case ForkName.capella:
+      return ForkName.capella;
+    case ForkName.deneb:
+      return ForkName.deneb;
+    case ForkName.electra:
+      return ForkName.electra;
+    case ForkName.fulu:
+      return ForkName.fulu;
+    default:
+      throw new Error(`Unsupported beacon block version ${version}`);
   }
-  if (version === 'deneb') {
-    return ForkName.deneb;
-  }
-  if (version === 'electra') {
-    return ForkName.electra;
-  }
-  if (version === 'fulu') {
-    return ForkName.fulu;
-  }
-
-  throw new Error(`Unsupported beacon block version ${version}`);
 }
 
-async function getBeaconNetworkParams(beaconApiUrl: string): Promise<BeaconNetworkParams> {
+async function getBeaconNetworkParams(
+  beaconApiUrl: string,
+  expectedPreset: BeaconPreset,
+): Promise<BeaconNetworkParams> {
   let paramsPromise = beaconNetworkParamsPromises.get(beaconApiUrl);
 
   if (!paramsPromise) {
@@ -442,7 +469,15 @@ async function getBeaconNetworkParams(beaconApiUrl: string): Promise<BeaconNetwo
     beaconNetworkParamsPromises.set(beaconApiUrl, paramsPromise);
   }
 
-  return paramsPromise;
+  const beaconNetworkParams = await paramsPromise;
+
+  if (beaconNetworkParams.preset !== expectedPreset) {
+    throw new Error(
+      `Beacon preset mismatch: chain expects ${expectedPreset}, but endpoint reports ${beaconNetworkParams.preset}`,
+    );
+  }
+
+  return beaconNetworkParams;
 }
 
 async function loadLodestarModules(preset: BeaconPreset) {
@@ -466,11 +501,12 @@ async function loadLodestarModules(preset: BeaconPreset) {
         }
       }
 
-      const [{ EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH }, { sszTypesFor }] =
+      const [{ EPOCHS_PER_SYNC_COMMITTEE_PERIOD, ForkName, SLOTS_PER_EPOCH }, { sszTypesFor }] =
         await Promise.all([import('@lodestar/params'), import('@lodestar/types')]);
 
       loadedEthereumBeaconPreset = preset;
       return {
+        ForkName,
         epochsPerSyncCommitteePeriod: BigInt(EPOCHS_PER_SYNC_COMMITTEE_PERIOD),
         slotsPerEpoch: BigInt(SLOTS_PER_EPOCH),
         sszTypesFor,
@@ -481,7 +517,10 @@ async function loadLodestarModules(preset: BeaconPreset) {
   return lodestarModulesPromise;
 }
 
-function parseBeaconNetworkParams(spec: Record<string, string>): BeaconNetworkParams {
+function parseBeaconNetworkParams(
+  spec: Record<string, string>,
+  expectedPreset?: BeaconPreset,
+): BeaconNetworkParams {
   const slotsPerEpoch = spec.SLOTS_PER_EPOCH;
   const epochsPerSyncCommitteePeriod = spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD;
 
@@ -492,11 +531,44 @@ function parseBeaconNetworkParams(spec: Record<string, string>): BeaconNetworkPa
     throw new Error('Missing beacon spec value for EPOCHS_PER_SYNC_COMMITTEE_PERIOD');
   }
 
+  const preset = detectBeaconPreset(spec);
+
+  if (expectedPreset && preset !== expectedPreset) {
+    throw new Error(
+      `Beacon preset mismatch: chain expects ${expectedPreset}, but endpoint reports ${preset}`,
+    );
+  }
+
   return {
-    preset: detectBeaconPreset(spec),
+    preset,
     slotsPerEpoch: BigInt(slotsPerEpoch),
     epochsPerSyncCommitteePeriod: BigInt(epochsPerSyncCommitteePeriod),
   };
+}
+
+async function getExpectedBeaconPreset(client: ArgonClient): Promise<BeaconPreset> {
+  let presetPromise = expectedBeaconPresetPromises.get(client);
+
+  if (!presetPromise) {
+    presetPromise = client.query.ethereumVerifier.beaconPreset().then(preset => {
+      if (preset.isMainnet) {
+        return 'mainnet';
+      }
+      if (preset.isMinimal) {
+        return 'minimal';
+      }
+
+      throw new Error(`Unknown ethereum verifier beacon preset: ${preset.toString()}`);
+    });
+    expectedBeaconPresetPromises.set(client, presetPromise);
+  }
+
+  try {
+    return await presetPromise;
+  } catch (error) {
+    expectedBeaconPresetPromises.delete(client);
+    throw error;
+  }
 }
 
 function computePeriod(slot: bigint, beaconNetworkParams: BeaconNetworkParams) {

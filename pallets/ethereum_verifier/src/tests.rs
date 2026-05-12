@@ -2,16 +2,15 @@
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 pub use crate::mock::*;
 use crate::{
-	config::{EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH, SLOTS_PER_HISTORICAL_ROOT},
 	fixture_conversions::execution_proof_from_fixture,
-	functions::{compute_epoch, compute_period},
+	functions::{compute_epoch, compute_period as raw_compute_period},
 	mock::{
 		load_checkpoint_update_fixture, load_execution_proof_fixture,
 		load_finalized_header_update_fixture, load_next_finalized_header_update_fixture,
 		load_next_sync_committee_update_fixture, load_sync_committee_update_fixture,
 	},
 	sync_committee_sum,
-	types::{CheckpointUpdate, NextSyncCommitteeUpdate},
+	types::CheckpointUpdate,
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
 	ExecutionHeaderAnchors, ExecutionProof, FinalizedBeaconHeaderState, FinalizedBeaconState, Fork,
 	ForkVersionSchedule, ForkVersions, LatestFinalizedBlockRoot, LatestSyncCommitteeUpdatePeriod,
@@ -26,8 +25,9 @@ use argon_primitives::{
 		MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS, MAX_ETHEREUM_RECEIPT_PROOF_NODES,
 		MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
 	},
-	CallTxPoolKeyProvider, EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog,
-	EthereumProof, EthereumReceiptProof, EthereumVerifyError, EthereumVerifyProvider,
+	CallTxPoolKeyProvider, EthereumBeaconPreset, EthereumExecutionBlockProof,
+	EthereumExecutionHeader, EthereumLog, EthereumProof, EthereumReceiptProof, EthereumVerifyError,
+	EthereumVerifyProvider,
 };
 use codec::{Decode, Encode};
 use hex_literal::hex;
@@ -39,6 +39,15 @@ use polkadot_sdk::{
 	sp_runtime::DispatchError,
 };
 use snowbridge_beacon_primitives::merkle_proof::{generalized_index_length, subtree_index};
+
+const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u64;
+const MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD: u64 =
+	EthereumBeaconPreset::Mainnet.epochs_per_sync_committee_period() as u64;
+const MAINNET_SLOTS_PER_HISTORICAL_ROOT: u64 =
+	EthereumBeaconPreset::Mainnet.slots_per_historical_root() as u64;
+const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
+const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
+	EthereumBeaconPreset::Mainnet.sync_committee_bits_size();
 
 /// Arbitrary hash used for tests and invalid hashes.
 const TEST_HASH: [u8; 32] =
@@ -79,6 +88,10 @@ fn b256_from_h256(value: H256) -> B256 {
 
 fn process_checkpoint_update(update: &CheckpointUpdate) -> DispatchResult {
 	EthereumBeaconClient::process_checkpoint_update(update, &ChainForkVersions::get())
+}
+
+fn compute_period(slot: u64) -> u64 {
+	raw_compute_period(slot, MAINNET_SLOTS_PER_EPOCH, MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD)
 }
 
 fn retained_anchor_verification_payload() -> (EthereumLog, EthereumProof, ExecutionHeaderAnchor) {
@@ -307,8 +320,10 @@ pub fn sync_committee_participation_is_supermajority() {
 	let bits = hex!(
 		"bffffffff7f1ffdfcfeffeffbfdffffbfffffdffffefefffdffff7f7ffff77fffdf7bff77ffdf7fffafffffff77fefffeff7effffffff5f7fedfffdfb6ddff7b"
 	);
-	let participation =
-		snowbridge_beacon_primitives::decompress_sync_committee_bits::<512, 64>(bits);
+	let participation = snowbridge_beacon_primitives::decompress_sync_committee_bits::<
+		MAINNET_SYNC_COMMITTEE_SIZE,
+		MAINNET_SYNC_COMMITTEE_BITS_SIZE,
+	>(bits);
 	assert_ok!(EthereumBeaconClient::sync_committee_participation_is_supermajority(&participation));
 }
 
@@ -370,15 +385,17 @@ fn find_absent_keys() {
 	let participation: [u8; 32] =
 		hex!("0001010101010100010101010101010101010101010101010101010101010101");
 	let update = load_sync_committee_update_fixture();
-	let sync_committee_prepared: SyncCommitteePrepared =
-		(&update.next_sync_committee_update.unwrap().next_sync_committee)
-			.try_into()
-			.unwrap();
+	let sync_committee_prepared: SyncCommitteePrepared = update
+		.next_sync_committee_update
+		.unwrap()
+		.next_sync_committee
+		.prepare(EthereumBeaconPreset::Mainnet)
+		.unwrap();
 
 	new_tester().execute_with(|| {
 		let pubkeys = EthereumBeaconClient::find_pubkeys(
 			&participation,
-			(*sync_committee_prepared.pubkeys).as_ref(),
+			sync_committee_prepared.pubkeys.as_ref(),
 			false,
 		);
 		assert_eq!(pubkeys.len(), 2);
@@ -392,15 +409,17 @@ fn find_present_keys() {
 	let participation: [u8; 32] =
 		hex!("0001000000000000010000000000000000000000000000000000010000000100");
 	let update = load_sync_committee_update_fixture();
-	let sync_committee_prepared: SyncCommitteePrepared =
-		(&update.next_sync_committee_update.unwrap().next_sync_committee)
-			.try_into()
-			.unwrap();
+	let sync_committee_prepared: SyncCommitteePrepared = update
+		.next_sync_committee_update
+		.unwrap()
+		.next_sync_committee
+		.prepare(EthereumBeaconPreset::Mainnet)
+		.unwrap();
 
 	new_tester().execute_with(|| {
 		let pubkeys = EthereumBeaconClient::find_pubkeys(
 			&participation,
-			(*sync_committee_prepared.pubkeys).as_ref(),
+			sync_committee_prepared.pubkeys.as_ref(),
 			true,
 		);
 		assert_eq!(pubkeys.len(), 4);
@@ -564,7 +583,7 @@ fn submit_update_with_skipped_period() {
 	let checkpoint = Box::new(load_checkpoint_update_fixture());
 	let sync_committee_update = Box::new(load_sync_committee_update_fixture());
 	let mut update = Box::new(load_next_finalized_header_update_fixture());
-	update.signature_slot += (EPOCHS_PER_SYNC_COMMITTEE_PERIOD * SLOTS_PER_EPOCH) as u64;
+	update.signature_slot += MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD * MAINNET_SLOTS_PER_EPOCH;
 	update.attested_header.slot = update.signature_slot - 1;
 
 	new_tester().execute_with(|| {
@@ -690,11 +709,9 @@ fn submit_update_with_invalid_sync_committee_update() {
 		});
 		next_update.attested_header.slot += 1;
 		next_update.signature_slot = next_update.attested_header.slot + 1;
-		let next_sync_committee = NextSyncCommitteeUpdate {
-			next_sync_committee: Default::default(),
-			next_sync_committee_branch: Default::default(),
-		};
-		next_update.next_sync_committee_update = Some(next_sync_committee);
+		if let Some(ref mut next_sync_committee_update) = next_update.next_sync_committee_update {
+			next_sync_committee_update.next_sync_committee.pubkeys[0] = Default::default();
+		}
 
 		let second_result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), next_update);
 		assert_err!(second_result, Error::<Test>::InvalidSyncCommitteeUpdate);
@@ -711,7 +728,7 @@ fn submit_finalized_header_update_with_too_large_gap() {
 
 	// Adds 8193 slots, so that the next update is still in the next sync committee, but the
 	// gap between the finalized headers is more than 8192 slots.
-	let slot_with_large_gap = checkpoint.header.slot + SLOTS_PER_HISTORICAL_ROOT as u64 + 1;
+	let slot_with_large_gap = checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 1;
 
 	next_update.finalized_header.slot = slot_with_large_gap;
 	// Adding some slots to the attested header and signature slot since they need to be ahead
@@ -739,12 +756,12 @@ fn submit_finalized_header_update_with_gap_at_limit() {
 	let update = Box::new(load_sync_committee_update_fixture());
 	let mut next_update = Box::new(load_next_sync_committee_update_fixture());
 
-	next_update.finalized_header.slot = checkpoint.header.slot + SLOTS_PER_HISTORICAL_ROOT as u64;
+	next_update.finalized_header.slot = checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT;
 	// Adding some slots to the attested header and signature slot since they need to be ahead
 	// of the finalized header.
 	next_update.attested_header.slot =
-		checkpoint.header.slot + SLOTS_PER_HISTORICAL_ROOT as u64 + 33;
-	next_update.signature_slot = checkpoint.header.slot + SLOTS_PER_HISTORICAL_ROOT as u64 + 43;
+		checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 33;
+	next_update.signature_slot = checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 43;
 
 	new_tester().execute_with(|| {
 		assert_ok!(process_checkpoint_update(&checkpoint));
@@ -1009,6 +1026,24 @@ fn verify_message_invalid_topic() {
 }
 
 #[test]
+fn verify_message_is_unavailable_when_halted() {
+	let (event_log, proof, anchor) = retained_anchor_verification_payload();
+
+	new_tester().execute_with(|| {
+		assert_ok!(EthereumBeaconClient::set_operating_mode(
+			RuntimeOrigin::root(),
+			BasicOperatingMode::Halted
+		));
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof),
+			Err(EthereumVerifyError::VerifierUnavailable)
+		);
+	});
+}
+
+#[test]
 fn signing_root_uses_previous_slot_for_fork_version() {
 	new_tester().execute_with(|| {
 		ForkVersionSchedule::<Test>::put(ChainForkVersions::get());
@@ -1016,10 +1051,10 @@ fn signing_root_uses_previous_slot_for_fork_version() {
 		// Use a signature_slot at a fork boundary (first slot of the fulu epoch).
 		// In mock.rs: electra.epoch = 0, fulu.epoch = 100000000
 		let fulu_epoch = ChainForkVersions::get().fulu.epoch;
-		let signature_slot: u64 = fulu_epoch * (SLOTS_PER_EPOCH as u64);
+		let signature_slot: u64 = fulu_epoch * MAINNET_SLOTS_PER_EPOCH;
 
 		// Verify this is the first slot of the epoch
-		assert_eq!(signature_slot % (SLOTS_PER_EPOCH as u64), 0);
+		assert_eq!(signature_slot % MAINNET_SLOTS_PER_EPOCH, 0);
 
 		let header = BeaconHeader {
 			slot: signature_slot - 1,
@@ -1033,11 +1068,11 @@ fn signing_root_uses_previous_slot_for_fork_version() {
 
 		// Get fork versions for comparison
 		let fork_version_at_signature_slot = EthereumBeaconClient::compute_fork_version(
-			compute_epoch(signature_slot, SLOTS_PER_EPOCH as u64),
+			compute_epoch(signature_slot, MAINNET_SLOTS_PER_EPOCH),
 		)
 		.unwrap();
 		let fork_version_at_previous_slot = EthereumBeaconClient::compute_fork_version(
-			compute_epoch(signature_slot.saturating_sub(1), SLOTS_PER_EPOCH as u64),
+			compute_epoch(signature_slot.saturating_sub(1), MAINNET_SLOTS_PER_EPOCH),
 		)
 		.unwrap();
 
@@ -1254,11 +1289,11 @@ fn verify_event_log_availability_gate() {
 	};
 
 	new_tester().execute_with(|| {
-		EventLogVerifierEnabled::set(true);
+		VerifyEventLogApiEnabled::set(true);
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 
 		assert_ok!(EthereumBeaconClient::verify_event_log(event_log, proof,));
-		EventLogVerifierEnabled::set(false);
+		VerifyEventLogApiEnabled::set(false);
 
 		assert_eq!(
 			EthereumBeaconClient::verify_event_log(

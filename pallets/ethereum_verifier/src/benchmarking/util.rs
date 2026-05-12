@@ -11,11 +11,12 @@ pub fn participant_pubkeys<T: Config>(
 	update: &Update,
 ) -> Result<Vec<PublicKeyPrepared>, &'static str> {
 	let sync_committee_bits =
-		decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits);
+		decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits.as_ref())
+			.ok_or("unsupported sync committee bits length")?;
 	let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 	let pubkeys = EthereumBeaconClient::<T>::find_pubkeys(
 		&sync_committee_bits,
-		(*current_sync_committee.pubkeys).as_ref(),
+		current_sync_committee.pubkeys.as_ref(),
 		true,
 	);
 	Ok(pubkeys)
@@ -23,11 +24,12 @@ pub fn participant_pubkeys<T: Config>(
 
 pub fn absent_pubkeys<T: Config>(update: &Update) -> Result<Vec<PublicKeyPrepared>, &'static str> {
 	let sync_committee_bits =
-		decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits);
+		decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits.as_ref())
+			.ok_or("unsupported sync committee bits length")?;
 	let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 	let pubkeys = EthereumBeaconClient::<T>::find_pubkeys(
 		&sync_committee_bits,
-		(*current_sync_committee.pubkeys).as_ref(),
+		current_sync_committee.pubkeys.as_ref(),
 		false,
 	);
 	Ok(pubkeys)

@@ -9,7 +9,7 @@ use crate::chain_spec::{
 };
 use argon_primitives::{
 	bitcoin::BitcoinNetwork, block_seal::MiningSlotConfig, tick::Ticker, Chain, ComputeDifficulty,
-	ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
+	EthereumBeaconPreset, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
 };
 use argon_runtime::WASM_BINARY;
 
@@ -46,6 +46,7 @@ pub fn metadata_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_after_ticks: 4,
 			},
 			minimum_bitcoin_lock_satoshis: 100,
+			ethereum_beacon_preset: EthereumBeaconPreset::Minimal,
 		}))
 		.build())
 }

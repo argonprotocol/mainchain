@@ -1,24 +1,45 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
-use crate::config::{
-	EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH, SYNC_COMMITTEE_BITS_SIZE,
-	SYNC_COMMITTEE_SIZE,
-};
+use alloc::vec::Vec;
+use argon_primitives::EthereumBeaconPreset;
+use snowbridge_beacon_primitives::decompress_sync_committee_bits as decompress_raw_sync_committee_bits;
+
+const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
+const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
+	EthereumBeaconPreset::Mainnet.sync_committee_bits_size();
+const MINIMAL_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Minimal.sync_committee_size();
+const MINIMAL_SYNC_COMMITTEE_BITS_SIZE: usize =
+	EthereumBeaconPreset::Minimal.sync_committee_bits_size();
 
 /// Decompress packed bitvector into byte vector according to SSZ deserialization rules. Each byte
 /// in the decompressed vector is either 0 or 1.
-pub fn decompress_sync_committee_bits(
-	input: [u8; SYNC_COMMITTEE_BITS_SIZE],
-) -> [u8; SYNC_COMMITTEE_SIZE] {
-	snowbridge_beacon_primitives::decompress_sync_committee_bits::<
-		SYNC_COMMITTEE_SIZE,
-		SYNC_COMMITTEE_BITS_SIZE,
-	>(input)
+pub fn decompress_sync_committee_bits(input: &[u8]) -> Option<Vec<u8>> {
+	match input.len() {
+		MAINNET_SYNC_COMMITTEE_BITS_SIZE => Some(
+			decompress_raw_sync_committee_bits::<
+				MAINNET_SYNC_COMMITTEE_SIZE,
+				MAINNET_SYNC_COMMITTEE_BITS_SIZE,
+			>(input.try_into().ok()?)
+			.to_vec(),
+		),
+		MINIMAL_SYNC_COMMITTEE_BITS_SIZE => Some(
+			decompress_raw_sync_committee_bits::<
+				MINIMAL_SYNC_COMMITTEE_SIZE,
+				MINIMAL_SYNC_COMMITTEE_BITS_SIZE,
+			>(input.try_into().ok()?)
+			.to_vec(),
+		),
+		_ => None,
+	}
 }
 
 /// Compute the sync committee period in which a slot is contained.
-pub fn compute_period(slot: u64) -> u64 {
-	slot / SLOTS_PER_EPOCH as u64 / EPOCHS_PER_SYNC_COMMITTEE_PERIOD as u64
+pub fn compute_period(
+	slot: u64,
+	slots_per_epoch: u64,
+	epochs_per_sync_committee_period: u64,
+) -> u64 {
+	slot / slots_per_epoch / epochs_per_sync_committee_period
 }
 
 /// Compute epoch in which a slot is contained.

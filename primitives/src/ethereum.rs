@@ -1,6 +1,7 @@
-use codec::{Decode, DecodeWithMemTracking, Encode};
+use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
 use sp_core::{H160, H256};
 use sp_runtime::{traits::ConstU32, BoundedVec};
 
@@ -26,6 +27,61 @@ pub type EthereumExecutionHeaderRlp =
 	BoundedVec<u8, ConstU32<MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES>>;
 pub type EthereumExecutionHeaderChain =
 	BoundedVec<EthereumExecutionHeader, ConstU32<MAX_ETHEREUM_HEADER_CHAIN_LEN>>;
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	MaxEncodedLen,
+	Default,
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	Debug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+)]
+pub enum EthereumBeaconPreset {
+	#[default]
+	Mainnet,
+	Minimal,
+}
+
+impl EthereumBeaconPreset {
+	pub const fn slots_per_epoch(self) -> usize {
+		match self {
+			Self::Mainnet => 32,
+			Self::Minimal => 8,
+		}
+	}
+
+	pub const fn epochs_per_sync_committee_period(self) -> usize {
+		match self {
+			Self::Mainnet => 256,
+			Self::Minimal => 8,
+		}
+	}
+
+	pub const fn sync_committee_size(self) -> usize {
+		match self {
+			Self::Mainnet => 512,
+			Self::Minimal => 32,
+		}
+	}
+
+	pub const fn sync_committee_bits_size(self) -> usize {
+		self.sync_committee_size() / 8
+	}
+
+	pub const fn slots_per_historical_root(self) -> usize {
+		match self {
+			Self::Mainnet => 8192,
+			Self::Minimal => 64,
+		}
+	}
+}
 
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct EthereumLog {

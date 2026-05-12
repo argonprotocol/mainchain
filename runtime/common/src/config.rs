@@ -42,8 +42,8 @@ parameter_types! {
 	// ### ethereum verifier
 
 	pub const EthereumFreeHeadersInterval: u32 = 32;
-	pub const EthereumEventLogVerifierEnabled: bool = false;
-	pub const CanaryEthereumEventLogVerifierEnabled: bool = true;
+	pub const EthereumVerifyEventLogApiEnabled: bool = false;
+	pub const CanaryEthereumVerifyEventLogApiEnabled: bool = true;
 
 	// ### block weights
 

@@ -1083,6 +1083,7 @@ dependencies = [
  "jsonrpsee",
  "log",
  "num_cpus",
+ "pallet-ethereum-verifier",
  "parity-scale-codec",
  "polkadot-sdk",
  "rocksdb",

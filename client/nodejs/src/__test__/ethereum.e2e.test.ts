@@ -48,6 +48,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
   it('boots a real ethereum devnet and proves a MintingGateway burn into CrosschainTransfer', async () => {
     const ethereum = new TestEthereum();
     const endpoints = await ethereum.launch({
+      preset: 'minimal',
       secondsPerSlot: 1,
       prefundedAccounts: {
         [TEST_ACCOUNT.address]: {

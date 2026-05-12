@@ -4,7 +4,7 @@ use argon_primitives::{
 	block_vote::VoteMinimum,
 	notary::GenesisNotary,
 	tick::Ticker,
-	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, Signature,
+	AccountId, Balance, BlockSealAuthorityId, ComputeDifficulty, EthereumBeaconPreset, Signature,
 };
 use argon_runtime::{
 	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig, GrandpaConfig,
@@ -72,6 +72,7 @@ pub struct GenesisSettings {
 	pub initial_notaries: Vec<GenesisNotary<AccountId>>,
 	pub mining_config: MiningSlotConfig,
 	pub minimum_bitcoin_lock_satoshis: Satoshis,
+	pub ethereum_beacon_preset: EthereumBeaconPreset,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -90,6 +91,7 @@ pub(crate) fn build_genesis_config(
 		initial_notaries,
 		mining_config,
 		minimum_bitcoin_lock_satoshis,
+		ethereum_beacon_preset,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let config = RuntimeGenesisConfig {
@@ -107,6 +109,10 @@ pub(crate) fn build_genesis_config(
 			initial_vote_minimum,
 			initial_compute_difficulty: initial_difficulty,
 			..Default::default()
+		},
+		ethereum_verifier: pallet_ethereum_verifier::GenesisConfig {
+			beacon_preset: ethereum_beacon_preset,
+			_phantom: Default::default(),
 		},
 		notaries: NotariesConfig { list: initial_notaries },
 		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },

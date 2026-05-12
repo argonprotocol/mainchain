@@ -711,7 +711,7 @@ impl pallet_operational_accounts::Config for Runtime {
 
 impl pallet_ethereum_verifier::Config for Runtime {
 	type FreeHeadersInterval = EthereumFreeHeadersInterval;
-	type EventLogVerifierEnabled = EthereumEventLogVerifierEnabled;
+	type VerifyEventLogApiEnabled = EthereumVerifyEventLogApiEnabled;
 	type WeightInfo = weights::pallet_ethereum_verifier::WeightInfo<Runtime>;
 }
 impl pallet_fee_control::Config for Runtime {
