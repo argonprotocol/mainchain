@@ -67,8 +67,9 @@ jobs:
       - name: Extract changelog for the current version
         run: |
           # Extract changelog section for the specified version
-          sed -n "/^## \[$RELEASE_TAG\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
-          cat changelog.txt
+          RELEASE_TAG_PATTERN=$(printf '%s\n' "$RELEASE_TAG" | sed 's/[][\\/.*^$+?(){}|]/\\&/g')
+          sed -n "/^## \[$RELEASE_TAG_PATTERN\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
+          cat changelog.txt  # Print the extracted changelog
 
       - name: Create draft release if not exists
         if: env.RELEASE_EXISTS == 'false'
