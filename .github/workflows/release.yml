@@ -17,6 +17,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: true
+  RELEASE_TAG: ${{ github.ref_name }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,22 +37,29 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate release tag
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*(?:[-.][0-9A-Za-z._-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
       - name: If published release exists, exit
         run: |
-          PUBLISHED_RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft == false) | .tagName" | head -n 1)
+          PUBLISHED_RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"$RELEASE_TAG\" and .isDraft == false) | .tagName" | head -n 1)
           if [[ -n "$PUBLISHED_RELEASE_EXISTS" ]]; then
-           exit 1
+            exit 1
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if draft release exists
         run: |
-          RELEASE_EXISTS=$(gh release list --json tagName --jq ".[] | select(.tagName==\"${{ github.ref_name }}\") | .tagName" | head -n 1)
+          RELEASE_EXISTS=$(gh release list --json tagName --jq ".[] | select(.tagName==\"$RELEASE_TAG\") | .tagName" | head -n 1)
           if [[ -n "$RELEASE_EXISTS" ]]; then
-           echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
+            echo "RELEASE_EXISTS=true" >> "$GITHUB_ENV"
           else
-            echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
+            echo "RELEASE_EXISTS=false" >> "$GITHUB_ENV"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,12 +67,12 @@ jobs:
       - name: Extract changelog for the current version
         run: |
           # Extract changelog section for the specified version
-          sed -n "/^## \[${{ github.ref_name }}\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
-          cat changelog.txt  # Print the extracted changelog
+          sed -n "/^## \[$RELEASE_TAG\]/,/^### \[v/p" CHANGELOG.md | sed '$d' > changelog.txt
+          cat changelog.txt
 
       - name: Create draft release if not exists
         if: env.RELEASE_EXISTS == 'false'
-        run: gh release create ${{ github.ref_name }} --draft --title "${{ github.ref_name }}" --notes-file changelog.txt --target ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" --draft --title "$RELEASE_TAG" --notes-file changelog.txt --target "$RELEASE_TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -131,16 +139,16 @@ jobs:
           echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
 
-      - uses: taiki-e/setup-cross-toolchain-action@v1
+      - uses: taiki-e/setup-cross-toolchain-action@129361238c06ff2cc1c4ca5c5d2217af441ffdf6 # v1
         with:
           target: ${{ matrix.target }}
 
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-node
@@ -148,38 +156,38 @@ jobs:
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-notary
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         with:
           bin: argon-localchain
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-oracle
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
         with:
           bin: argon-bitcoin-cli
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ github.ref_name }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}

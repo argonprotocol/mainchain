@@ -64,7 +64,7 @@ jobs:
         run: yarn install
 
       - name: Install
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
@@ -80,7 +80,7 @@ jobs:
 
       - name: Set HOME_DIR for Mac builds
         if: ${{ !startsWith(matrix.os, 'ubuntu') }}
-        run: echo "TARGET_BASEDIR=${{ github.workspace }}" >> "$GITHUB_ENV"
+        run: echo "TARGET_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Set HOME_DIR
@@ -239,7 +239,7 @@ jobs:
           name: cargo-${{ env.TARGET }}
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
 
@@ -359,7 +359,7 @@ jobs:
         run: yarn artifacts
         working-directory: ./localchain
 
-      - uses: stefanzweifel/git-auto-commit-action@v7
+      - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
         with:
           branch: napi-bindings
           commit_message: Check-in binding files
@@ -375,13 +375,25 @@ jobs:
         shell: bash
         working-directory: ./localchain
 
+      - name: Validate release tag
+        if: github.ref_name != 'main'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*(?:[-.][0-9A-Za-z._-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+
       - name: Upload artifacts to release
         if: github.ref_name != 'main'
         run: |
           tar -czf bitcoin-wasm.tar.gz -C bitcoin/nodejs/ts/wasm .
-          RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"${{ github.ref_name }}\" and .isDraft == true) | .tagName" | head -n 1)
+          RELEASE_EXISTS=$(gh release list --json tagName,isDraft --jq ".[] | select(.tagName==\"$RELEASE_TAG\" and .isDraft == true) | .tagName" | head -n 1)
           if [[ -n "$RELEASE_EXISTS" ]]; then
-            gh release upload ${{ github.ref_name }} \
+            gh release upload "$RELEASE_TAG" \
               ./localchain/npm/**/*.node \
               bitcoin-wasm.tar.gz \
               --clobber

@@ -40,7 +40,7 @@ jobs:
       - name: Free Disk Space
         uses: ./.github/templates/clear-space
 
-      - uses: ikalnytskyi/action-setup-postgres@v7
+      - uses: ikalnytskyi/action-setup-postgres@10ab8a56cc77b4823c2bfa57b1d4dd5605ef0481 # v7
       - uses: ./.github/templates/minio
 
       - name: Install linux dependencies
@@ -55,12 +55,12 @@ jobs:
           name: cargo-x86_64-unknown-linux-gnu
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
           target: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
         with:
           tool: sqlx-cli@0.8.3
 

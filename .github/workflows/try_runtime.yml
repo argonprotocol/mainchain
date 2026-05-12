@@ -13,6 +13,10 @@ permissions:
   contents: read
   actions: write
 
+env:
+  TRY_RUNTIME_VERSION: 0.8.0
+  TRY_RUNTIME_SHA256: e269a1af856494e21b5ee17d0305c3a3a97ebca46d2c4b4db3ddddc290828b14
+
 jobs:
   build-runtimes:
     runs-on: ubuntu-22.04
@@ -22,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Install
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
 
@@ -59,7 +63,9 @@ jobs:
     steps:
       - name: Download try-runtime-cli
         run: |
-          curl -sL https://github.com/paritytech/try-runtime-cli/releases/download/v0.8.0/try-runtime-x86_64-unknown-linux-musl -o try-runtime
+          set -eu
+          curl --fail --location --silent --show-error "https://github.com/paritytech/try-runtime-cli/releases/download/v${TRY_RUNTIME_VERSION}/try-runtime-x86_64-unknown-linux-musl" -o try-runtime
+          echo "${TRY_RUNTIME_SHA256}  try-runtime" | shasum -a 256 -c -
           chmod +x ./try-runtime
         shell: bash
 

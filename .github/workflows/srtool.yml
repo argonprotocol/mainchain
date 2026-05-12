@@ -2,6 +2,8 @@ name: Build Deterministic Runtimes
 
 env:
   SUBWASM_VERSION: 0.21.3
+  SUBWASM_SHA256: 0560d1b8785be9a0d04cb0bf939feaaa621c2d0809f818225698d5c44198550c
+  SRTOOL_COMMIT: 70b86b039233ba31ebe3140987e51fae913dd81e
   BUILD_OPTS: --features on-chain-release-build
 
 on:
@@ -33,7 +35,15 @@ jobs:
 
       - name: Build custom srtool image (Rust ${{ env.RUST_VERSION }})
         run: |
-          git clone https://github.com/paritytech/srtool.git --depth 1
+          set -eu
+          git init srtool
+          git -C srtool remote add origin https://github.com/paritytech/srtool.git
+          git -C srtool fetch --depth 1 origin "$SRTOOL_COMMIT"
+          git -C srtool checkout --detach FETCH_HEAD
+          if [[ "$(git -C srtool rev-parse HEAD)" != "$SRTOOL_COMMIT" ]]; then
+            echo "srtool checkout did not match pinned commit $SRTOOL_COMMIT" >&2
+            exit 1
+          fi
           cd srtool
           docker build --build-arg RUSTC_VERSION=${{ env.RUST_VERSION }} -t srtool .
 
@@ -84,8 +94,11 @@ jobs:
       # We now get extra information thanks to subwasm,
       - name: Install subwasm ${{ env.SUBWASM_VERSION }}
         run: |
-          wget https://github.com/chevdor/subwasm/releases/download/v${{ env.SUBWASM_VERSION }}/subwasm_linux_amd64_v${{ env.SUBWASM_VERSION }}.deb
-          sudo dpkg -i subwasm_linux_amd64_v${{ env.SUBWASM_VERSION }}.deb
+          set -eu
+          artifact="subwasm_linux_amd64_v${SUBWASM_VERSION}.deb"
+          wget "https://github.com/chevdor/subwasm/releases/download/v${SUBWASM_VERSION}/${artifact}"
+          echo "${SUBWASM_SHA256}  ${artifact}" | shasum -a 256 -c -
+          sudo dpkg -i "$artifact"
           subwasm --version
       - name: Show Runtime information
         run: |
@@ -114,7 +127,7 @@ jobs:
 
       # Release published: add artifacts to release
       - name: Add artifacts to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/v')
         with:
           append_body: true
