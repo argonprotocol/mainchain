@@ -1,7 +1,7 @@
 use crate as pallet_crosschain_transfer;
 use argon_primitives::{
-	EthereumLog, EthereumProof, EthereumVerifyError, EthereumVerifyProvider,
-	OperationalAccountsHook,
+	CurrentTransactionFeeProvider, EthereumLog, EthereumProof, EthereumVerifyError,
+	EthereumVerifyProvider, OperationalAccountsHook,
 };
 use frame_support::traits::StorageMapShim;
 use pallet_prelude::*;
@@ -42,6 +42,7 @@ parameter_types! {
 	pub static CurrentTick: Tick = 0;
 	pub static ProofVerificationAllowed: bool = true;
 	pub static ConfirmedTransfers: Vec<(TestAccountId, Balance)> = Vec::new();
+	pub static CurrentTransactionReimbursableFee: Option<Balance> = None;
 }
 
 impl pallet_balances::Config<ArgonToken> for Test {
@@ -125,6 +126,15 @@ impl OperationalAccountsHook<TestAccountId, Balance> for MockOperationalAccounts
 	}
 }
 
+pub struct MockCurrentTransactionFeeProvider;
+impl CurrentTransactionFeeProvider<Balance> for MockCurrentTransactionFeeProvider {
+	type Weights = ();
+
+	fn reimbursable_fee() -> Option<Balance> {
+		CurrentTransactionReimbursableFee::get()
+	}
+}
+
 impl pallet_crosschain_transfer::Config for Test {
 	type Balance = Balance;
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
@@ -132,6 +142,7 @@ impl pallet_crosschain_transfer::Config for Test {
 	type OwnershipCurrency = Ownership;
 	type EthereumVerifier = MockEthereumVerifier;
 	type OperationalAccountsHook = MockOperationalAccountsHook;
+	type CurrentTransactionFeeProvider = MockCurrentTransactionFeeProvider;
 	type CurrentTick = CurrentTick;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type WeightInfo = ();

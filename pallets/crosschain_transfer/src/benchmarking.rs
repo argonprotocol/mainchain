@@ -34,13 +34,13 @@ mod benchmarks {
 	#[benchmark]
 	fn prove_transfer() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let recipient = caller.clone();
+		let recipient: T::AccountId = account("crosschain-transfer-recipient", 0, 0);
 		let burn_account = CrosschainTransferPallet::<T>::burn_account(SourceChain::Ethereum);
 		let amount: T::Balance = 1_000_000_000u128.into();
 
 		ChainConfigBySourceChain::<T>::insert(SourceChain::Ethereum, benchmark_chain_config(0x21));
-		T::NativeCurrency::mint_into(&recipient, amount)
-			.map_err(|_| BenchmarkError::Stop("failed to seed benchmark recipient"))?;
+		T::NativeCurrency::mint_into(&caller, amount)
+			.map_err(|_| BenchmarkError::Stop("failed to seed benchmark caller"))?;
 		T::NativeCurrency::mint_into(&burn_account, 10_000_000_000u128.into())
 			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark burn account"))?;
 
@@ -141,8 +141,10 @@ fn burn_for_transfer_log(
 			H256::from_slice(keccak256(BURN_FOR_TRANSFER_EVENT_SIGNATURE).as_slice()),
 			indexed_address_word(from),
 			indexed_address_word(token),
-		],
-		data,
+		]
+		.try_into()
+		.expect("topics stay within Ethereum log topic bounds"),
+		data: data.try_into().expect("burn event data stays within bounded log payload"),
 	}
 }
 
@@ -168,9 +170,16 @@ fn dummy_proof() -> EthereumProof {
 	EthereumProof {
 		execution_block_proof: EthereumExecutionBlockProof {
 			anchor_block_hash: H256::repeat_byte(1),
-			target_to_anchor_header_chain: Vec::new(),
+			target_to_anchor_header_chain: Vec::new()
+				.try_into()
+				.expect("empty header chain stays within bounds"),
 		},
-		receipt_proof: EthereumReceiptProof { transaction_index: 0, nodes: vec![vec![1u8]] },
+		receipt_proof: EthereumReceiptProof {
+			transaction_index: 0,
+			nodes: vec![vec![1u8].try_into().expect("tiny receipt proof node stays within bounds")]
+				.try_into()
+				.expect("single-node receipt proof stays within bounds"),
+		},
 	}
 }
 

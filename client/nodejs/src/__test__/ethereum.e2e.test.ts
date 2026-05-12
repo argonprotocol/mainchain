@@ -147,7 +147,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     await mainchainReady;
 
     const mainchainClient = await mainchain.client();
-    const alice = sudo();
+    const relayer = sudo();
 
     const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
       mainchainClient,
@@ -156,7 +156,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     const checkpointResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.sudo.sudo(checkpointTx),
-      alice,
+      relayer,
     ).submit();
     await checkpointResult.waitForInFirstBlock;
 
@@ -180,7 +180,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       throw new Error('missing ethereum verifier maintenance txs');
     }
     for (const tx of maintenanceTxs) {
-      const result = await new TxSubmitter(mainchainClient, tx, alice).submit();
+      const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
       await result.waitForInFirstBlock;
     }
 
@@ -206,7 +206,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
           },
         }),
       ),
-      alice,
+      relayer,
     ).submit();
     await setConfigResult.waitForInFirstBlock;
 
@@ -217,7 +217,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     const fundBurnAccountResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
-      alice,
+      relayer,
     ).submit();
     await fundBurnAccountResult.waitForInFirstBlock;
 
@@ -242,7 +242,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
           proof: eventProof.proof,
         },
       }),
-      alice,
+      relayer,
     ).submit();
     await proveTransferResult.waitForInFirstBlock;
 
@@ -260,7 +260,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const recipientAfter = await mainchainClient.query.system.account(bob.address);
     expect(recipientAfter.data.free.toBigInt() - recipientBefore.data.free.toBigInt()).toBe(
-      TRANSFER_AMOUNT_BASE_UNITS,
+      TRANSFER_AMOUNT_BASE_UNITS - (proveTransferResult.finalFee ?? 0n),
     );
   }, 420_000);
 });

@@ -20,16 +20,21 @@ use alloy_consensus::Header as AlloyHeader;
 use alloy_primitives::B256;
 use alloy_rlp::Encodable;
 use argon_primitives::{
+	ethereum::{
+		MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES, MAX_ETHEREUM_HEADER_CHAIN_LEN,
+		MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS, MAX_ETHEREUM_RECEIPT_PROOF_NODES,
+		MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
+	},
 	CallTxPoolKeyProvider, EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog,
 	EthereumProof, EthereumReceiptProof, EthereumVerifyError, EthereumVerifyProvider,
 };
-use codec::Encode;
+use codec::{Decode, Encode};
 use hex_literal::hex;
 use polkadot_sdk::{
 	frame_support::{
 		assert_err, assert_noop, assert_ok, dispatch::DispatchResult, pallet_prelude::Pays,
 	},
-	sp_core::{hashing::blake2_256, H256},
+	sp_core::{hashing::blake2_256, H160, H256},
 	sp_runtime::DispatchError,
 };
 use snowbridge_beacon_primitives::{
@@ -61,7 +66,12 @@ fn make_execution_header(
 	let mut rlp = Vec::new();
 	header.encode(&mut rlp);
 
-	(EthereumExecutionHeader { rlp }, block_hash)
+	(
+		EthereumExecutionHeader {
+			rlp: rlp.try_into().expect("test execution header stays within bounded RLP size"),
+		},
+		block_hash,
+	)
 }
 
 fn b256_from_h256(value: H256) -> B256 {
@@ -83,17 +93,39 @@ fn retained_anchor_verification_payload() -> (EthereumLog, EthereumProof, Execut
 	};
 	let event_log = EthereumLog {
 		address: inbound_fixture.event.event_log.address,
-		topics: inbound_fixture.event.event_log.topics,
-		data: inbound_fixture.event.event_log.data,
+		topics: inbound_fixture
+			.event
+			.event_log
+			.topics
+			.try_into()
+			.expect("fixture topics stay within bounded Ethereum log topics"),
+		data: inbound_fixture
+			.event
+			.event_log
+			.data
+			.try_into()
+			.expect("fixture event data stays within bounded Ethereum log payload"),
 	};
 	let proof = EthereumProof {
 		execution_block_proof: EthereumExecutionBlockProof {
 			anchor_block_hash,
-			target_to_anchor_header_chain: Vec::new(),
+			target_to_anchor_header_chain: Vec::new()
+				.try_into()
+				.expect("empty header chain stays within bounds"),
 		},
 		receipt_proof: EthereumReceiptProof {
 			transaction_index: INBOUND_FIXTURE_RECEIPT_INDEX,
-			nodes: inbound_fixture.event.proof.receipt_proof,
+			nodes: inbound_fixture
+				.event
+				.proof
+				.receipt_proof
+				.into_iter()
+				.map(|node| {
+					node.try_into().expect("fixture receipt proof node stays within bounded size")
+				})
+				.collect::<Vec<_>>()
+				.try_into()
+				.expect("fixture receipt proof stays within bounded node count"),
 		},
 	};
 
@@ -815,7 +847,8 @@ fn verify_message() {
 #[test]
 fn verify_message_invalid_proof() {
 	let (event_log, mut proof, anchor) = retained_anchor_verification_payload();
-	proof.receipt_proof.nodes[0] = vec![1, 2, 3];
+	proof.receipt_proof.nodes[0] =
+		vec![1, 2, 3].try_into().expect("tiny malformed node stays within bounded size");
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
@@ -843,7 +876,8 @@ fn verify_message_invalid_receipts_root() {
 #[test]
 fn verify_message_invalid_log() {
 	let (mut event_log, proof, anchor) = retained_anchor_verification_payload();
-	event_log.topics = vec![H256::zero(); 10];
+	event_log.topics[0] = H256::zero();
+
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
@@ -856,7 +890,10 @@ fn verify_message_invalid_log() {
 #[test]
 fn verify_message_receipt_does_not_contain_log() {
 	let (mut event_log, proof, anchor) = retained_anchor_verification_payload();
-	event_log.data = hex!("f9013c94ee9170abfbf9421ad6dd07f6bdec9d89f2b581e0f863a01b11dcf133cc240f682dab2d3a8e4cd35c5da8c9cf99adac4336f8512584c5ada000000000000000000000000000000000000000000000000000000000000003e8a00000000000000000000000000000000000000000000000000000000000000002b8c000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000068000f000000000000000101d184c103f7acc340847eee82a0b909e3358bc28d440edffa1352b13227e8ee646f3ea37456dec70100000101001cbd2d43530a44705ad088af313e18f80b53ef16b36177cd4b77b846f2a5f07c0000e8890423c78a0000000000000000000000000000000000000000000000000000000000000000").to_vec();
+	event_log.data = hex!("f9013c94ee9170abfbf9421ad6dd07f6bdec9d89f2b581e0f863a01b11dcf133cc240f682dab2d3a8e4cd35c5da8c9cf99adac4336f8512584c5ada000000000000000000000000000000000000000000000000000000000000003e8a00000000000000000000000000000000000000000000000000000000000000002b8c000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000068000f000000000000000101d184c103f7acc340847eee82a0b909e3358bc28d440edffa1352b13227e8ee646f3ea37456dec70100000101001cbd2d43530a44705ad088af313e18f80b53ef16b36177cd4b77b846f2a5f07c0000e8890423c78a0000000000000000000000000000000000000000000000000000000000000000")
+		.to_vec()
+		.try_into()
+		.expect("mutated log payload stays within bounded log data size");
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
@@ -1202,9 +1239,16 @@ fn verify_event_log_availability_gate() {
 	let unavailable_proof = EthereumProof {
 		execution_block_proof: EthereumExecutionBlockProof {
 			anchor_block_hash: H256::repeat_byte(1),
-			target_to_anchor_header_chain: Vec::new(),
+			target_to_anchor_header_chain: Vec::new()
+				.try_into()
+				.expect("empty header chain stays within bounds"),
 		},
-		receipt_proof: EthereumReceiptProof { transaction_index: 0, nodes: Vec::new() },
+		receipt_proof: EthereumReceiptProof {
+			transaction_index: 0,
+			nodes: Vec::new()
+				.try_into()
+				.expect("empty receipt proof stays within bounded node count"),
+		},
 	};
 
 	new_tester().execute_with(|| {
@@ -1216,12 +1260,116 @@ fn verify_event_log_availability_gate() {
 
 		assert_eq!(
 			EthereumBeaconClient::verify_event_log(
-				EthereumLog { address: Default::default(), topics: Vec::new(), data: Vec::new() },
+				EthereumLog {
+					address: Default::default(),
+					topics: Vec::new().try_into().expect("empty topics stay within bounds"),
+					data: Vec::new().try_into().expect("empty data stays within bounds"),
+				},
 				unavailable_proof,
 			),
 			Err(EthereumVerifyError::VerifierUnavailable)
 		);
 	});
+}
+
+#[test]
+fn ethereum_log_decode_rejects_oversized_topics_and_data() {
+	#[derive(Encode)]
+	struct UnboundedEthereumLog {
+		address: H160,
+		topics: Vec<H256>,
+		data: Vec<u8>,
+	}
+
+	let oversized_topics = UnboundedEthereumLog {
+		address: H160::zero(),
+		topics: vec![H256::zero(); (MAX_ETHEREUM_LOG_TOPICS + 1) as usize],
+		data: Vec::new(),
+	}
+	.encode();
+	assert!(EthereumLog::decode(&mut &oversized_topics[..]).is_err());
+
+	let oversized_data = UnboundedEthereumLog {
+		address: H160::zero(),
+		topics: Vec::new(),
+		data: vec![0u8; (MAX_ETHEREUM_LOG_DATA_BYTES + 1) as usize],
+	}
+	.encode();
+	assert!(EthereumLog::decode(&mut &oversized_data[..]).is_err());
+}
+
+#[test]
+fn ethereum_receipt_proof_decode_rejects_oversized_nodes() {
+	#[derive(Encode)]
+	struct UnboundedEthereumReceiptProof {
+		#[codec(compact)]
+		transaction_index: u64,
+		nodes: Vec<Vec<u8>>,
+	}
+
+	let oversized_node = UnboundedEthereumReceiptProof {
+		transaction_index: 0,
+		nodes: vec![vec![0u8; (MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES + 1) as usize]],
+	}
+	.encode();
+	assert!(EthereumReceiptProof::decode(&mut &oversized_node[..]).is_err());
+
+	let oversized_node_count = UnboundedEthereumReceiptProof {
+		transaction_index: 0,
+		nodes: vec![vec![0u8]; (MAX_ETHEREUM_RECEIPT_PROOF_NODES + 1) as usize],
+	}
+	.encode();
+	assert!(EthereumReceiptProof::decode(&mut &oversized_node_count[..]).is_err());
+}
+
+#[test]
+fn execution_block_and_anchor_proof_decode_reject_oversized_vectors() {
+	#[derive(Clone, Encode)]
+	struct UnboundedEthereumExecutionHeader {
+		rlp: Vec<u8>,
+	}
+
+	#[derive(Encode)]
+	struct UnboundedEthereumExecutionBlockProof {
+		anchor_block_hash: H256,
+		target_to_anchor_header_chain: Vec<UnboundedEthereumExecutionHeader>,
+	}
+
+	#[derive(Encode)]
+	struct UnboundedExecutionProof {
+		header: BeaconHeader,
+		execution_header: snowbridge_beacon_primitives::VersionedExecutionPayloadHeader,
+		execution_branch: Vec<H256>,
+	}
+
+	let oversized_header_rlp = UnboundedEthereumExecutionHeader {
+		rlp: vec![0u8; (MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES + 1) as usize],
+	};
+	let oversized_rlp = UnboundedEthereumExecutionBlockProof {
+		anchor_block_hash: H256::zero(),
+		target_to_anchor_header_chain: vec![oversized_header_rlp],
+	}
+	.encode();
+	assert!(EthereumExecutionBlockProof::decode(&mut &oversized_rlp[..]).is_err());
+
+	let oversized_header_count = UnboundedEthereumExecutionBlockProof {
+		anchor_block_hash: H256::zero(),
+		target_to_anchor_header_chain: vec![
+			UnboundedEthereumExecutionHeader { rlp: vec![0u8] };
+			(MAX_ETHEREUM_HEADER_CHAIN_LEN + 1) as usize
+		],
+	}
+	.encode();
+	assert!(EthereumExecutionBlockProof::decode(&mut &oversized_header_count[..]).is_err());
+
+	let proof = anchor_execution_proof();
+	let oversized_branch = UnboundedExecutionProof {
+		header: proof.header,
+		execution_header: proof.execution_header,
+		execution_branch: vec![H256::zero(); crate::config::MAX_BRANCH_PROOF_SIZE + 1],
+	}
+	.encode();
+	assert!(ExecutionProof::decode(&mut &oversized_branch[..]).is_err());
 }
 
 #[test]
@@ -1238,7 +1386,9 @@ fn verify_execution_block_proof_accepts_header_chain_to_anchor() {
 	};
 	let proof = EthereumExecutionBlockProof {
 		anchor_block_hash,
-		target_to_anchor_header_chain: vec![target_header],
+		target_to_anchor_header_chain: vec![target_header]
+			.try_into()
+			.expect("single-header chain stays within bounded header chain length"),
 	};
 
 	new_tester().execute_with(|| {
@@ -1255,7 +1405,10 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 	let (target_header, _target_block_hash) =
 		make_execution_header(100, H256::repeat_byte(1), H256::repeat_byte(7));
 	let mut malformed_header = target_header.clone();
-	malformed_header.rlp.push(0);
+	malformed_header
+		.rlp
+		.try_push(0)
+		.expect("malformed header stays within bounded RLP size");
 	let anchor_block_hash = H256::repeat_byte(9);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 101,
@@ -1265,7 +1418,9 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 	};
 	let proof = EthereumExecutionBlockProof {
 		anchor_block_hash,
-		target_to_anchor_header_chain: vec![target_header],
+		target_to_anchor_header_chain: vec![target_header]
+			.try_into()
+			.expect("single-header chain stays within bounded header chain length"),
 	};
 
 	new_tester().execute_with(|| {
@@ -1273,7 +1428,9 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 		assert_eq!(
 			EthereumBeaconClient::verify_execution_block_proof(&EthereumExecutionBlockProof {
 				anchor_block_hash,
-				target_to_anchor_header_chain: vec![malformed_header],
+				target_to_anchor_header_chain: vec![malformed_header]
+					.try_into()
+					.expect("single malformed header stays within bounded chain length"),
 			}),
 			Err(EthereumVerifyError::InvalidHeader)
 		);

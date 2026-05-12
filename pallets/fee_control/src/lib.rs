@@ -10,6 +10,7 @@ mod mock;
 mod test;
 
 pub use check_fee_wrapper::*;
+use core::marker::PhantomData;
 use frame_support::traits::OriginTrait;
 pub use pallet::*;
 use pallet_prelude::*;
@@ -18,7 +19,8 @@ use pallet_prelude::*;
 pub mod pallet {
 	use super::*;
 	use pallet_prelude::argon_primitives::{
-		CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
+		CallTxPoolKeyProvider, CallTxValidityProvider, CurrentTransactionFeeProvider,
+		CurrentTransactionFeeProviderWeightInfo, FeelessCallTxPoolKeyProvider,
 		TransactionSponsorProvider,
 	};
 
@@ -76,5 +78,28 @@ pub mod pallet {
 			from: T::AccountId,
 			to: T::AccountId,
 		},
+	}
+
+	pub struct CurrentTransactionFeeWeightAdapter<T>(PhantomData<T>);
+	impl<T: Config> CurrentTransactionFeeProviderWeightInfo for CurrentTransactionFeeWeightAdapter<T> {
+		fn current_transaction_fee() -> Weight {
+			T::DbWeight::get().reads(1)
+		}
+	}
+
+	impl<T> CurrentTransactionFeeProvider<T::Balance> for Pallet<T>
+	where
+		T: Config + pallet_transaction_payment::Config,
+		<<<T as pallet_transaction_payment::Config>::OnChargeTransaction as pallet_transaction_payment::TxCreditHold<
+			T,
+		>>::Credit as frame_support::traits::SuppressedDrop>::Inner:
+			frame_support::traits::Imbalance<T::Balance>,
+	{
+		type Weights = CurrentTransactionFeeWeightAdapter<T>;
+
+		fn reimbursable_fee() -> Option<T::Balance> {
+			let fee = pallet_transaction_payment::Pallet::<T>::remaining_txfee::<T::Balance>();
+			(fee != T::Balance::default()).then_some(fee)
+		}
 	}
 }
