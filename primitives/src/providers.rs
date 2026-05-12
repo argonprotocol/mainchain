@@ -256,6 +256,30 @@ impl EthereumVerifyProvider for () {
 	}
 }
 
+pub trait CurrentTransactionFeeProviderWeightInfo {
+	fn current_transaction_fee() -> Weight;
+}
+
+impl CurrentTransactionFeeProviderWeightInfo for () {
+	fn current_transaction_fee() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait CurrentTransactionFeeProvider<Balance> {
+	type Weights: CurrentTransactionFeeProviderWeightInfo;
+
+	fn reimbursable_fee() -> Option<Balance>;
+}
+
+impl<Balance> CurrentTransactionFeeProvider<Balance> for () {
+	type Weights = ();
+
+	fn reimbursable_fee() -> Option<Balance> {
+		None
+	}
+}
+
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
 impl<AccountId> UniswapTransferProvider<AccountId> for Tuple {
 	type Weights = ();

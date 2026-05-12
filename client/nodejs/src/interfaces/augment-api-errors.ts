@@ -354,6 +354,10 @@ declare module '@polkadot/api-base/types/errors' {
     };
     crosschainTransfer: {
       /**
+       * The captured reimbursable fee is greater than or equal to the burned Argon amount.
+       **/
+      InsufficientBurnAmountForFee: AugmentedError<ApiType>;
+      /**
        * The burn account lacks enough balance for the payout.
        **/
       InsufficientLiquidity: AugmentedError<ApiType>;

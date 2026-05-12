@@ -17,12 +17,14 @@ use super::*;
 use crate::mock::{
 	new_test_ext,
 	pallet_dummy::{Call, ConsumedPoolKeys, OneUseCodes},
-	Balances, FeeAmount, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy, ProxyType,
-	RuntimeCall, Test, TipAmount, ValidateCount,
+	Balances, FeeAmount, FeeControl, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy,
+	ProxyType, RuntimeCall, Test, TipAmount, ValidateCount,
 };
 use frame_support::dispatch::DispatchInfo;
 use frame_system::RawOrigin;
-use pallet_prelude::frame_support::traits::Currency;
+use pallet_prelude::{
+	argon_primitives::CurrentTransactionFeeProvider, frame_support::traits::Currency,
+};
 use sp_runtime::{
 	traits::{DispatchTransaction, Hash},
 	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidityError},
@@ -101,6 +103,22 @@ fn validate_works() {
 		assert_eq!(ValidateCount::get(), 2);
 		assert_eq!(PrepareCount::get(), 0);
 		assert_eq!(res3.provides[0], (b"general", 7u32).encode());
+	});
+}
+
+#[test]
+fn reimbursable_fee_reads_transaction_payment_credit() {
+	new_test_ext().execute_with(|| {
+		assert_eq!(<FeeControl as CurrentTransactionFeeProvider<u128>>::reimbursable_fee(), None);
+
+		let inclusion_fee =
+			<Balances as frame_support::traits::fungible::Balanced<u64>>::issue(FeeAmount::get());
+		pallet_transaction_payment::Pallet::<Test>::deposit_txfee::<u128>(inclusion_fee);
+
+		assert_eq!(
+			<FeeControl as CurrentTransactionFeeProvider<u128>>::reimbursable_fee(),
+			Some(FeeAmount::get()),
+		);
 	});
 }
 

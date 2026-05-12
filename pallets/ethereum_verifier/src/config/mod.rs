@@ -12,6 +12,7 @@ pub const MAX_FEE_RECIPIENT_SIZE: usize = 20;
 
 /// Sanity value to constrain the max size of a merkle branch proof.
 pub const MAX_BRANCH_PROOF_SIZE: usize = 20;
+pub const MAX_BRANCH_PROOF_SIZE_U32: u32 = MAX_BRANCH_PROOF_SIZE as u32;
 
 /// DomainType('0x07000000')
 /// <https://github.com/ethereum/consensus-specs/blob/master/specs/altair/beacon-chain.md#domains>

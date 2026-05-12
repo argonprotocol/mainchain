@@ -30,6 +30,9 @@ pub mod ring_buffer;
 pub mod types;
 pub mod weights;
 
+#[cfg(any(test, feature = "runtime-benchmarks", feature = "fuzzing"))]
+mod fixture_conversions;
+
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
 

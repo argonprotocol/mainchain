@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 pub use crate::config::{SYNC_COMMITTEE_BITS_SIZE as SC_BITS_SIZE, SYNC_COMMITTEE_SIZE as SC_SIZE};
-use crate::ring_buffer::RingBufferMapImpl;
-use alloc::vec::Vec;
+use crate::{config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::storage::types::OptionQuery;
-use polkadot_sdk::{sp_core::H256, *};
+use polkadot_sdk::{
+	sp_core::{ConstU32, H256},
+	sp_runtime::BoundedVec,
+	*,
+};
 use scale_info::TypeInfo;
 use snowbridge_beacon_primitives::{
 	BeaconHeader, Fork as SnowbridgeFork, ForkVersion, ForkVersions as SnowbridgeForkVersions,
@@ -16,6 +19,7 @@ use snowbridge_beacon_primitives::{
 pub type SyncCommittee = snowbridge_beacon_primitives::SyncCommittee<SC_SIZE>;
 pub type SyncCommitteePrepared = snowbridge_beacon_primitives::SyncCommitteePrepared<SC_SIZE>;
 pub type SyncAggregate = snowbridge_beacon_primitives::SyncAggregate<SC_SIZE, SC_BITS_SIZE>;
+type BranchProof = BoundedVec<H256, ConstU32<{ MAX_BRANCH_PROOF_SIZE_U32 }>>;
 
 // Argon verifier models.
 
@@ -114,37 +118,15 @@ impl From<ForkVersions> for SnowbridgeForkVersions {
 pub struct CheckpointUpdate {
 	pub header: BeaconHeader,
 	pub current_sync_committee: SyncCommittee,
-	pub current_sync_committee_branch: Vec<H256>,
+	pub current_sync_committee_branch: BranchProof,
 	pub validators_root: H256,
-}
-
-impl From<snowbridge_beacon_primitives::CheckpointUpdate<SC_SIZE>> for CheckpointUpdate {
-	fn from(update: snowbridge_beacon_primitives::CheckpointUpdate<SC_SIZE>) -> Self {
-		Self {
-			header: update.header,
-			current_sync_committee: update.current_sync_committee,
-			current_sync_committee_branch: update.current_sync_committee_branch,
-			validators_root: update.validators_root,
-		}
-	}
 }
 
 /// Argon-owned next sync committee witness carried inside an update.
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
 pub struct NextSyncCommitteeUpdate {
 	pub next_sync_committee: SyncCommittee,
-	pub next_sync_committee_branch: Vec<H256>,
-}
-
-impl From<snowbridge_beacon_primitives::NextSyncCommitteeUpdate<SC_SIZE>>
-	for NextSyncCommitteeUpdate
-{
-	fn from(update: snowbridge_beacon_primitives::NextSyncCommitteeUpdate<SC_SIZE>) -> Self {
-		Self {
-			next_sync_committee: update.next_sync_committee,
-			next_sync_committee_branch: update.next_sync_committee_branch,
-		}
-	}
+	pub next_sync_committee_branch: BranchProof,
 }
 
 /// Argon-owned finalized update shape without ancestry or `block_roots` data.
@@ -156,20 +138,7 @@ pub struct Update {
 	pub signature_slot: u64,
 	pub next_sync_committee_update: Option<NextSyncCommitteeUpdate>,
 	pub finalized_header: BeaconHeader,
-	pub finality_branch: Vec<H256>,
-}
-
-impl From<snowbridge_beacon_primitives::Update<SC_SIZE, SC_BITS_SIZE>> for Update {
-	fn from(update: snowbridge_beacon_primitives::Update<SC_SIZE, SC_BITS_SIZE>) -> Self {
-		Self {
-			attested_header: update.attested_header,
-			sync_aggregate: update.sync_aggregate,
-			signature_slot: update.signature_slot,
-			next_sync_committee_update: update.next_sync_committee_update.map(Into::into),
-			finalized_header: update.finalized_header,
-			finality_branch: update.finality_branch,
-		}
-	}
+	pub finality_branch: BranchProof,
 }
 
 /// Minimal finalized beacon state retained by Argon for direct-finalized verification.
@@ -242,17 +211,7 @@ pub struct ExecutionProof {
 	/// The execution payload header being anchored.
 	pub execution_header: VersionedExecutionPayloadHeader,
 	/// Merkle proof that the execution payload header is contained within `header`.
-	pub execution_branch: Vec<H256>,
-}
-
-impl From<snowbridge_beacon_primitives::ExecutionProof> for ExecutionProof {
-	fn from(proof: snowbridge_beacon_primitives::ExecutionProof) -> Self {
-		Self {
-			header: proof.header,
-			execution_header: proof.execution_header,
-			execution_branch: proof.execution_branch,
-		}
-	}
+	pub execution_branch: BranchProof,
 }
 
 // Storage adapters.

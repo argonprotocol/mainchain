@@ -28,11 +28,15 @@ pub mod pallet {
 	use alloy_primitives::U256;
 	use alloy_sol_types::{sol, SolEvent};
 	use argon_primitives::{
-		verify_and_decode_event, EthereumEventDecoder, EthereumLog, EthereumProof,
-		EthereumVerifyAndDecodeError, EthereumVerifyProvider, OperationalAccountsHook,
-		UniswapTransferProvider,
+		verify_and_decode_event, CallTxPoolKeyProvider, CurrentTransactionFeeProvider,
+		EthereumEventDecoder, EthereumLog, EthereumProof, EthereumVerifyAndDecodeError,
+		EthereumVerifyProvider, OperationalAccountsHook, UniswapTransferProvider,
 	};
-	use polkadot_sdk::frame_system::{ensure_root, ensure_signed};
+	use polkadot_sdk::{
+		frame_support::traits::IsSubType,
+		frame_system::{ensure_root, ensure_signed},
+		sp_crypto_hashing::blake2_256,
+	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
@@ -82,6 +86,9 @@ pub mod pallet {
 
 		/// Existing operational-accounts hook for qualifying inbound Argon transfers.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
+
+		/// Reimbursable transaction fee captured for the currently executing prove-transfer call.
+		type CurrentTransactionFeeProvider: CurrentTransactionFeeProvider<Self::Balance>;
 
 		/// Runtime tick provider used for previous-release cutover checks.
 		type CurrentTick: Get<Tick>;
@@ -166,7 +173,7 @@ pub mod pallet {
 		pub to: T::AccountId,
 		/// Local asset paid out after claim verification.
 		pub asset_kind: AssetKind,
-		/// Local payout amount.
+		/// Gross local amount proven burned on the source chain.
 		pub amount: T::Balance,
 		/// Monotonic nonce tracked for this source-chain account.
 		#[codec(compact)]
@@ -227,6 +234,8 @@ pub mod pallet {
 		InvalidChainConfig,
 		/// The burn account lacks enough balance for the payout.
 		InsufficientLiquidity,
+		/// The captured reimbursable fee is greater than or equal to the burned Argon amount.
+		InsufficientBurnAmountForFee,
 	}
 
 	#[pallet::hooks]
@@ -313,7 +322,7 @@ pub mod pallet {
 				.saturating_add(T::OperationalAccountsHook::uniswap_transfer_confirmed_weight())
 		)]
 		pub fn prove_transfer(origin: OriginFor<T>, proof: TransferProof) -> DispatchResult {
-			ensure_signed(origin)?;
+			let submitter = ensure_signed(origin)?;
 
 			match proof {
 				TransferProof::Ethereum { source_chain, event_log, proof } => {
@@ -333,7 +342,7 @@ pub mod pallet {
 						&claim.token,
 					)?;
 
-					Self::enact_burn_transfer(source_chain, claim, asset_kind)
+					Self::enact_burn_transfer(&submitter, source_chain, claim, asset_kind)
 				},
 			}
 		}
@@ -347,6 +356,7 @@ pub mod pallet {
 		}
 
 		fn enact_burn_transfer(
+			submitter: &T::AccountId,
 			source_chain: SourceChain,
 			claim: DecodedEthereumBurnNotice<T>,
 			asset_kind: AssetKind,
@@ -361,6 +371,14 @@ pub mod pallet {
 			match asset_kind {
 				AssetKind::Argon => {
 					let burn_account = Self::burn_account(source_chain);
+					let reimbursable_fee = if claim.to == *submitter {
+						T::Balance::default()
+					} else {
+						T::CurrentTransactionFeeProvider::reimbursable_fee().unwrap_or_default()
+					};
+					let recipient_amount =
+						Self::argon_recipient_amount(claim.amount, reimbursable_fee)?;
+
 					ensure!(
 						T::NativeCurrency::reducible_balance(
 							&burn_account,
@@ -369,12 +387,23 @@ pub mod pallet {
 						) >= claim.amount,
 						Error::<T>::InsufficientLiquidity,
 					);
+
 					let _ = T::NativeCurrency::transfer(
 						&burn_account,
 						&claim.to,
-						claim.amount,
+						recipient_amount,
 						Preservation::Expendable,
 					)?;
+
+					if reimbursable_fee != T::Balance::default() {
+						let _ = T::NativeCurrency::transfer(
+							&burn_account,
+							submitter,
+							reimbursable_fee,
+							Preservation::Expendable,
+						)?;
+					}
+
 					Self::retain_recent_argon_transfer(&claim.to);
 					T::OperationalAccountsHook::uniswap_transfer_confirmed(&claim.to, claim.amount);
 				},
@@ -409,6 +438,21 @@ pub mod pallet {
 			Self::deposit_event(Event::BurnNoticeAccepted { source_chain, notice });
 
 			Ok(())
+		}
+
+		fn argon_recipient_amount(
+			amount: T::Balance,
+			reimbursable_fee: T::Balance,
+		) -> Result<T::Balance, DispatchError> {
+			let reimbursable_fee: u128 = reimbursable_fee.into();
+			if reimbursable_fee == 0 {
+				return Ok(amount);
+			}
+
+			let amount: u128 = amount.into();
+			ensure!(amount > reimbursable_fee, Error::<T>::InsufficientBurnAmountForFee);
+
+			Ok(amount.saturating_sub(reimbursable_fee).into())
 		}
 
 		fn retain_recent_argon_transfer(account_id: &T::AccountId) {
@@ -527,6 +571,38 @@ pub mod pallet {
 
 		fn has_recent_argon_transfer(account_id: &T::AccountId) -> bool {
 			RecentArgonTransfersByAccount::<T>::get(account_id) > 0
+		}
+	}
+
+	type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
+
+	impl<T: Config> CallTxPoolKeyProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		fn key_for(call: &RuntimeCallOf<T>, _signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
+			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
+
+			match call {
+				Call::prove_transfer {
+					proof: TransferProof::Ethereum { source_chain, event_log, .. },
+				} => {
+					let event = BurnForTransfer::decode_ethereum_log(event_log).ok()?;
+					let from = H160::from_slice(event.from.as_slice());
+
+					Some(
+						(
+							b"crosschain_transfer:prove".as_slice(),
+							source_chain,
+							from,
+							event.account_nonce,
+						)
+							.using_encoded(blake2_256)
+							.to_vec(),
+					)
+				},
+				_ => None,
+			}
 		}
 	}
 }
