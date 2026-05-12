@@ -117,7 +117,7 @@ jobs:
           if [[ -z "$RELEASE_TAG" || "$RELEASE_TAG" == "null" ]]; then
             RELEASE_TAG="$RELEASE_REF_NAME"
           fi
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*(?:[-.][0-9A-Za-z._-]+)?$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*([.-][0-9A-Za-z][0-9A-Za-z._-]*)?$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG" >&2
             exit 1
           fi

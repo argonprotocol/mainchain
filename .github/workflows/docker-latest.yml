@@ -36,7 +36,7 @@ jobs:
       - name: Update latest
         if: ${{ github.event.release.draft == false }}
         run: |
-          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+)*(?:[-.][0-9A-Za-z._-]+)?$ ]]; then
+          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+)*([.-][0-9A-Za-z][0-9A-Za-z._-]*)?$ ]]; then
             echo "Invalid latest release tag: $VERSION" >&2
             exit 1
           fi

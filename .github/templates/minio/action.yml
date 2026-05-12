@@ -10,6 +10,7 @@ runs:
       shell: bash
       run: |
         set -eu
+        release_file="minio.RELEASE.2025-09-07T16-13-09Z"
         platform="darwin"
         if [[ "$RUNNER_OS" == "Linux" ]]; then
           platform="linux"
@@ -17,20 +18,21 @@ runs:
 
         arch=$(uname -m)
         arch_part="amd64"
+        expected_sha="4759080aeef7385aaceaac1131c30aaeb99605921553967dc6d3ef4e16ac64f9"
         if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
           arch_part="arm64"
+          expected_sha="7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
         fi
 
-        url="https://dl.min.io/server/minio/release/${platform}-${arch_part}/minio"
-        curl --fail --location --silent --show-error "$url" -o minio
-        curl --fail --location --silent --show-error "${url}.sha256sum" -o minio.sha256sum
-        expected_sha=$(awk '{print $1}' minio.sha256sum)
-        actual_sha=$(shasum -a 256 minio)
-        actual_sha=${actual_sha%% *}
-        if [[ "$actual_sha" != "$expected_sha" ]]; then
-          echo "Minio checksum verification failed for $url" >&2
-          exit 1
+        if [[ "$platform" == "linux" && "$arch_part" == "amd64" ]]; then
+          expected_sha="7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f"
+        elif [[ "$platform" == "linux" && "$arch_part" == "arm64" ]]; then
+          expected_sha="5c83cd2cf151717ba0243f73e1c7802ff36e272b67144bdd7f1f7d684fd6f03d"
         fi
+
+        url="https://dl.min.io/server/minio/release/${platform}-${arch_part}/${release_file}"
+        curl --fail --location --silent --show-error "$url" -o minio
+        echo "${expected_sha}  minio" | shasum -a 256 -c -
         chmod +x minio
         sudo mv minio /usr/local/bin
 
