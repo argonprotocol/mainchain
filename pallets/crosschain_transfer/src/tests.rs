@@ -1,10 +1,10 @@
 use crate::{
-	migrations::InitializeCrosschainTransferMigration, AssetKind, BurnNotice, ChainConfig,
+	migrations::InitializeCrosschainTransferMigration, AssetKind, BurnNotice, Call, ChainConfig,
 	ChainConfigBySourceChain, Event, InboundTransfersExpiringAt, NonceBySourceAccount,
 	RecentArgonTransfersByAccount, SourceChain, TransferProof, BURN_FOR_TRANSFER_EVENT_SIGNATURE,
 };
 use alloy_primitives::keccak256;
-use argon_primitives::{EthereumLog, EthereumProof};
+use argon_primitives::{CallTxPoolKeyProvider, EthereumLog, EthereumProof};
 use frame_support::{assert_noop, assert_ok, traits::OnRuntimeUpgrade};
 use pallet_prelude::*;
 use sp_core::crypto::Ss58Codec;
@@ -12,8 +12,9 @@ use sp_runtime::AccountId32;
 
 use crate::mock::{
 	account, h160, legacy_token_gateway_account, new_test_ext, Balances, ConfirmedTransfers,
-	CrosschainTransfer, CurrentTick, Ownership, ProofVerificationAllowed, RuntimeEvent,
-	RuntimeOrigin, System, Test,
+	CrosschainTransfer, CurrentTick, CurrentTransactionReimbursableFee, ExistentialDeposit,
+	Ownership, ProofVerificationAllowed, RuntimeCall, RuntimeEvent, RuntimeOrigin, System, Test,
+	TestAccountId,
 };
 
 #[test]
@@ -28,6 +29,7 @@ fn prove_transfer_pays_argon_and_marks_recent_transfer() {
 		);
 
 		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+		assert!(System::providers(&burn_account) > 0);
 		assert_ok!(Balances::mint_into(&burn_account, 10_000));
 
 		let recipient = account(2);
@@ -56,6 +58,86 @@ fn prove_transfer_pays_argon_and_marks_recent_transfer() {
 }
 
 #[test]
+fn prove_transfer_splits_argon_payout_with_reimbursable_fee() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		assert_ok!(CrosschainTransfer::set_chain_config(RuntimeOrigin::root(), chain_config(),));
+
+		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+		assert_ok!(Balances::mint_into(&burn_account, 10_000));
+
+		let relayer = account(1);
+		let recipient = account(9);
+		CurrentTransactionReimbursableFee::set(Some(250));
+
+		assert_ok!(CrosschainTransfer::prove_transfer(
+			RuntimeOrigin::signed(relayer.clone()),
+			argon_proof(recipient.clone(), 1, 1_250),
+		));
+
+		assert_eq!(Balances::balance(&recipient), 1_000);
+		assert_eq!(Balances::balance(&relayer), 1_000_250);
+		assert_eq!(ConfirmedTransfers::get(), vec![(recipient.clone(), 1_250)]);
+		assert!(System::events().iter().any(|record| matches!(
+			record.event,
+			RuntimeEvent::CrosschainTransfer(Event::BurnNoticeAccepted {
+				source_chain: SourceChain::Ethereum,
+				ref notice,
+			}) if notice == &BurnNotice::<Test> {
+				from: h160(0x11),
+				to: recipient.clone(),
+				asset_kind: AssetKind::Argon,
+				amount: 1_250,
+				account_nonce: 1,
+			}
+		)));
+	});
+}
+
+#[test]
+fn prove_transfer_can_split_payout_when_either_intermediate_remainder_would_drop_below_ed() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ExistentialDeposit::set(100);
+
+		assert_ok!(CrosschainTransfer::set_chain_config(RuntimeOrigin::root(), chain_config(),));
+
+		for (index, (reimbursable_fee, recipient_seed, recipient_starting_balance)) in
+			[(1, 11u8, 0u128), (25, 35u8, 0u128), (99, 109u8, 0u128), (175, 200u8, 100u128)]
+				.into_iter()
+				.enumerate()
+		{
+			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			let relayer = account(1);
+			let recipient = account(recipient_seed);
+			let claim_amount = 250u128;
+
+			Balances::set_balance(&burn_account, claim_amount);
+			Balances::set_balance(&relayer, 1_000_000);
+			Balances::set_balance(&recipient, recipient_starting_balance);
+			assert!(Balances::balance(&burn_account) >= ExistentialDeposit::get());
+
+			CurrentTransactionReimbursableFee::set(Some(reimbursable_fee));
+
+			assert_ok!(CrosschainTransfer::prove_transfer(
+				RuntimeOrigin::signed(relayer.clone()),
+				argon_proof(recipient.clone(), (index + 1) as u64, claim_amount),
+			));
+
+			assert_eq!(
+				Balances::balance(&recipient),
+				recipient_starting_balance + claim_amount - reimbursable_fee
+			);
+			assert_eq!(Balances::balance(&relayer), 1_000_000 + reimbursable_fee);
+			assert_eq!(Balances::balance(&burn_account), 0);
+			assert!(System::account_exists(&burn_account));
+			assert!(System::providers(&burn_account) > 0);
+		}
+	});
+}
+
+#[test]
 fn prove_transfer_pays_argonot_from_burn_account() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -74,6 +156,42 @@ fn prove_transfer_pays_argonot_from_burn_account() {
 		assert_eq!(Ownership::balance(&burn_account), 0);
 		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 0);
 		assert!(ConfirmedTransfers::get().is_empty());
+	});
+}
+
+#[test]
+fn prove_transfer_pool_key_uses_claim_identity_not_signer() {
+	new_test_ext().execute_with(|| {
+		let first_call = RuntimeCall::CrosschainTransfer(Call::<Test>::prove_transfer {
+			proof: argon_proof(account(2), 1, 1_250),
+		});
+		let retry_call = RuntimeCall::CrosschainTransfer(Call::<Test>::prove_transfer {
+			proof: argon_proof(account(2), 1, 1_250),
+		});
+		let different_nonce_call = RuntimeCall::CrosschainTransfer(Call::<Test>::prove_transfer {
+			proof: argon_proof(account(2), 2, 1_250),
+		});
+
+		let first_key =
+			<CrosschainTransfer as CallTxPoolKeyProvider<RuntimeCall, TestAccountId>>::key_for(
+				&first_call,
+				Some(&account(1)),
+			)
+			.expect("prove_transfer should publish a pool key");
+		let retry_key =
+			<CrosschainTransfer as CallTxPoolKeyProvider<RuntimeCall, TestAccountId>>::key_for(
+				&retry_call,
+				Some(&account(9)),
+			)
+			.expect("prove_transfer retry should publish a pool key");
+		let different_nonce_key = <CrosschainTransfer as CallTxPoolKeyProvider<
+			RuntimeCall,
+			TestAccountId,
+		>>::key_for(&different_nonce_call, Some(&account(1)))
+		.expect("prove_transfer with different nonce should publish a pool key");
+
+		assert_eq!(first_key, retry_key);
+		assert_ne!(first_key, different_nonce_key);
 	});
 }
 
@@ -332,8 +450,10 @@ fn burn_for_transfer_log(
 			H256::from_slice(keccak256(BURN_FOR_TRANSFER_EVENT_SIGNATURE).as_slice()),
 			indexed_address_word(from),
 			indexed_address_word(token),
-		],
-		data,
+		]
+		.try_into()
+		.expect("topics stay within Ethereum log topic bounds"),
+		data: data.try_into().expect("burn event data stays within bounded log payload"),
 	}
 }
 
@@ -359,11 +479,15 @@ fn dummy_proof() -> EthereumProof {
 	EthereumProof {
 		execution_block_proof: argon_primitives::ethereum::EthereumExecutionBlockProof {
 			anchor_block_hash: H256::repeat_byte(1),
-			target_to_anchor_header_chain: Vec::new(),
+			target_to_anchor_header_chain: Vec::new()
+				.try_into()
+				.expect("empty header chain stays within bounds"),
 		},
 		receipt_proof: argon_primitives::ethereum::EthereumReceiptProof {
 			transaction_index: 0,
-			nodes: vec![vec![1u8]],
+			nodes: vec![vec![1u8].try_into().expect("tiny receipt proof node stays within bounds")]
+				.try_into()
+				.expect("single-node receipt proof stays within bounds"),
 		},
 	}
 }

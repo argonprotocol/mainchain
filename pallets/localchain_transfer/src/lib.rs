@@ -219,6 +219,7 @@ pub mod pallet {
 			);
 
 			ensure!(!amount.is_zero(), Error::<T>::InsufficientFunds);
+			ensure!(amount >= T::Argon::minimum_balance(), TokenError::BelowMinimum);
 			ensure!(
 				T::Argon::reducible_balance(&who, Preservation::Expendable, Fortitude::Force) >=
 					amount,

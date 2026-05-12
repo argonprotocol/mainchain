@@ -568,7 +568,7 @@ impl pallet_price_index::Config for Runtime {
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
-	type CurrentTick = Ticks;
+	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
@@ -663,6 +663,8 @@ impl pallet_crosschain_transfer::Config for Runtime {
 		benchmarking::BenchmarkCrosschainTransferEthereumVerifier
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type CurrentTransactionFeeProvider =
+		use_unless_benchmark!(FeeControl, benchmarking::BenchmarkCrosschainTransferFeeProvider);
 	type CurrentTick = Ticks;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type WeightInfo = pallet_crosschain_transfer::WithProviderWeights<
@@ -715,7 +717,7 @@ impl pallet_ethereum_verifier::Config for Runtime {
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier);
+	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier, CrosschainTransfer);
 	type CallTxValidityProviders = EthereumVerifier;
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }

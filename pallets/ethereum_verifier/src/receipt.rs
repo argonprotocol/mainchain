@@ -18,14 +18,15 @@ use alloy_trie::{
 };
 use polkadot_sdk::sp_core::H256;
 
-pub(crate) fn verify_receipt_proof(
+pub(crate) fn verify_receipt_proof<Node: AsRef<[u8]>>(
 	receipts_root: H256,
 	tx_index: u64,
-	proof: &[Vec<u8>],
+	proof: &[Node],
 ) -> Option<ReceiptEnvelope> {
 	let key = receipt_trie_key(tx_index);
 	let root = B256::from_slice(receipts_root.as_bytes());
-	let proof_nodes: Vec<Bytes> = proof.iter().map(|node| Bytes::copy_from_slice(node)).collect();
+	let proof_nodes: Vec<Bytes> =
+		proof.iter().map(|node| Bytes::copy_from_slice(node.as_ref())).collect();
 
 	let value = match verify_proof(root, key, None, proof_nodes.iter()) {
 		Ok(()) => return None,

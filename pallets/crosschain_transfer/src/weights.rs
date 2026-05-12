@@ -1,5 +1,6 @@
 use argon_primitives::{
-	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, UniswapTransferProviderWeightInfo,
+	CurrentTransactionFeeProvider, CurrentTransactionFeeProviderWeightInfo, EthereumVerifyProvider,
+	EthereumVerifyProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -14,23 +15,33 @@ pub trait WeightInfo {
 
 type EthereumVerifyProviderWeights<T> =
 	<<T as crate::Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
+type CurrentTransactionFeeProviderWeights<T> =
+	<<T as crate::Config>::CurrentTransactionFeeProvider as CurrentTransactionFeeProvider<
+		<T as crate::Config>::Balance,
+	>>::Weights;
 
-pub struct WithProviderWeights<T, Base, EthereumVerifyWeight = EthereumVerifyProviderWeights<T>>(
-	PhantomData<(T, Base, EthereumVerifyWeight)>,
-);
-impl<T, Base, EthereumVerifyWeight> WeightInfo
-	for WithProviderWeights<T, Base, EthereumVerifyWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	EthereumVerifyWeight = EthereumVerifyProviderWeights<T>,
+	CurrentFeeWeight = CurrentTransactionFeeProviderWeights<T>,
+>(PhantomData<(T, Base, EthereumVerifyWeight, CurrentFeeWeight)>);
+impl<T, Base, EthereumVerifyWeight, CurrentFeeWeight> WeightInfo
+	for WithProviderWeights<T, Base, EthereumVerifyWeight, CurrentFeeWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	EthereumVerifyWeight: EthereumVerifyProviderWeightInfo,
+	CurrentFeeWeight: CurrentTransactionFeeProviderWeightInfo,
 {
 	fn set_chain_config() -> Weight {
 		Base::set_chain_config()
 	}
 
 	fn prove_transfer() -> Weight {
-		Base::prove_transfer().saturating_add(EthereumVerifyWeight::verify_event_log())
+		Base::prove_transfer()
+			.saturating_add(EthereumVerifyWeight::verify_event_log())
+			.saturating_add(CurrentFeeWeight::current_transaction_fee())
 	}
 
 	fn on_initialize_cleanup(expiring: u32) -> Weight {

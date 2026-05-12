@@ -20,8 +20,8 @@ use argon_primitives::{
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
-	EthereumVerifyProvider, MiningSlotProvider, TreasuryPoolProvider, UniswapTransferProvider,
-	VaultId,
+	CurrentTransactionFeeProvider, EthereumVerifyProvider, MiningSlotProvider,
+	TreasuryPoolProvider, UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -66,6 +66,19 @@ impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 		_proof: &EthereumProof,
 	) -> Result<(), EthereumVerifyError> {
 		Ok(())
+	}
+}
+
+pub struct BenchmarkCrosschainTransferFeeProvider;
+
+impl<Balance> CurrentTransactionFeeProvider<Balance> for BenchmarkCrosschainTransferFeeProvider
+where
+	Balance: From<u128>,
+{
+	type Weights = ();
+
+	fn reimbursable_fee() -> Option<Balance> {
+		Some(1_000u128.into())
 	}
 }
 

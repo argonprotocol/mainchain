@@ -12,7 +12,7 @@ use frame_support::{assert_noop, assert_ok};
 use pallet_prelude::*;
 use sp_core::bounded_vec;
 use sp_keyring::Sr25519Keyring::Bob;
-use sp_runtime::testing::H256;
+use sp_runtime::{testing::H256, TokenError};
 
 #[test]
 fn it_can_send_funds_to_localchain() {
@@ -43,6 +43,21 @@ fn it_rejects_invalid_notary_transfer() {
 		assert_noop!(
 			LocalchainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 1000, 99),
 			Error::<Test>::InvalidNotaryUsedForTransfer
+		);
+	});
+}
+
+#[test]
+fn it_rejects_transfer_below_minimum_balance() {
+	new_test_ext().execute_with(|| {
+		let who = Bob.to_account_id();
+		System::set_block_number(1);
+		set_argons(&who, 1_000);
+		ExistentialDeposit::set(100);
+
+		assert_noop!(
+			LocalchainTransferPallet::send_to_localchain(RuntimeOrigin::signed(who), 99, 1),
+			TokenError::BelowMinimum
 		);
 	});
 }

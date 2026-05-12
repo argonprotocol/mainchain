@@ -3,8 +3,17 @@
 use super::*;
 mod util;
 
-use crate::{CheckpointUpdate, Fork, ForkVersions, Pallet as EthereumBeaconClient, Update};
+use crate::{
+	fixture_conversions::{
+		checkpoint_update_from_fixture, execution_proof_from_fixture, update_from_fixture,
+	},
+	Fork, ForkVersions, Pallet as EthereumBeaconClient,
+};
+use alloy_consensus::Header as AlloyHeader;
+use alloy_primitives::B256;
+use alloy_rlp::Encodable;
 use argon_primitives::{
+	ethereum::{EthereumExecutionHeader, MAX_ETHEREUM_HEADER_CHAIN_LEN},
 	EthereumExecutionBlockProof, EthereumLog, EthereumProof, EthereumReceiptProof,
 	EthereumVerifyProvider,
 };
@@ -38,7 +47,8 @@ mod benchmarks {
 
 	#[benchmark]
 	fn force_checkpoint() -> Result<(), BenchmarkError> {
-		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
+		let checkpoint_update =
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = checkpoint_update.header.hash_tree_root().unwrap();
 
 		#[extrinsic_call]
@@ -53,8 +63,10 @@ mod benchmarks {
 	#[benchmark]
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
-		let finalized_header_update: Update = (*make_finalized_header_update()).into();
+		let checkpoint_update =
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
+		let finalized_header_update =
+			update_from_fixture(*make_finalized_header_update()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = finalized_header_update.finalized_header.hash_tree_root().unwrap();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
@@ -73,9 +85,12 @@ mod benchmarks {
 	#[benchmark]
 	fn submit_with_sync_committee() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
-		let sync_committee_update: Update = (*make_sync_committee_update()).into();
-		let finalized_header_update: Update = (*make_finalized_header_update()).into();
+		let checkpoint_update =
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
+		let sync_committee_update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
+		let finalized_header_update =
+			update_from_fixture(*make_finalized_header_update()).map_err(BenchmarkError::Stop)?;
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
@@ -93,8 +108,10 @@ mod benchmarks {
 	#[benchmark]
 	fn import_execution_header_anchor() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let checkpoint_update: CheckpointUpdate = (*make_checkpoint()).into();
-		let execution_proof: ExecutionProof = (*make_execution_proof()).into();
+		let checkpoint_update =
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
+		let execution_proof =
+			execution_proof_from_fixture(*make_execution_proof()).map_err(BenchmarkError::Stop)?;
 		let block_hash = execution_proof.execution_header.block_hash();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
@@ -117,28 +134,43 @@ mod benchmarks {
 		let receipt_proof = inbound_fixture.event.proof.receipt_proof;
 		let receipts_root =
 			inbound_fixture.event.proof.execution_proof.execution_header.receipts_root();
+		let (target_to_anchor_header_chain, anchor) =
+			max_header_chain(anchor_block_hash, 100, receipts_root);
 		let event_log = EthereumLog {
 			address: inbound_fixture.event.event_log.address,
-			topics: inbound_fixture.event.event_log.topics,
-			data: inbound_fixture.event.event_log.data,
+			topics: inbound_fixture
+				.event
+				.event_log
+				.topics
+				.try_into()
+				.expect("fixture topics stay within bounded Ethereum log topics"),
+			data: inbound_fixture
+				.event
+				.event_log
+				.data
+				.try_into()
+				.expect("fixture event data stays within bounded Ethereum log payload"),
 		};
 		let proof = EthereumProof {
 			execution_block_proof: EthereumExecutionBlockProof {
 				anchor_block_hash,
-				target_to_anchor_header_chain: Vec::new(),
+				target_to_anchor_header_chain,
 			},
-			receipt_proof: EthereumReceiptProof { transaction_index: 0, nodes: receipt_proof },
+			receipt_proof: EthereumReceiptProof {
+				transaction_index: 0,
+				nodes: receipt_proof
+					.into_iter()
+					.map(|node| {
+						node.try_into()
+							.expect("fixture receipt proof node stays within bounded size")
+					})
+					.collect::<Vec<_>>()
+					.try_into()
+					.expect("fixture receipt proof stays within bounded node count"),
+			},
 		};
 
-		ExecutionHeaderAnchors::<T>::insert(
-			anchor_block_hash,
-			ExecutionHeaderAnchor {
-				block_number: 100,
-				block_hash: anchor_block_hash,
-				parent_hash: H256::repeat_byte(8),
-				receipts_root,
-			},
-		);
+		ExecutionHeaderAnchors::<T>::insert(anchor_block_hash, anchor);
 
 		#[block]
 		{
@@ -154,10 +186,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify_pre_aggregated() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&(*make_checkpoint()).into(),
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update: Update = (*make_sync_committee_update()).into();
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let participant_pubkeys = participant_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
 		let agg_sig =
@@ -175,10 +208,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&(*make_checkpoint()).into(),
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update: Update = (*make_sync_committee_update()).into();
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 		let absent_pubkeys = absent_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
@@ -200,10 +234,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn verify_merkle_proof() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&(*make_checkpoint()).into(),
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update: Update = (*make_sync_committee_update()).into();
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = update.finalized_header.hash_tree_root().unwrap();
 
 		let fork_versions = ForkVersions {
@@ -234,4 +269,51 @@ mod benchmarks {
 	}
 
 	impl_benchmark_test_suite!(EthereumBeaconClient, crate::mock::new_tester(), crate::mock::Test);
+}
+
+fn max_header_chain(
+	anchor_block_hash: H256,
+	target_block_number: u64,
+	receipts_root: H256,
+) -> (argon_primitives::ethereum::EthereumExecutionHeaderChain, ExecutionHeaderAnchor) {
+	let mut headers = Vec::with_capacity(MAX_ETHEREUM_HEADER_CHAIN_LEN as usize);
+	let mut previous_block_hash = H256::repeat_byte(1);
+	let mut last_block_hash = H256::repeat_byte(1);
+
+	for offset in 0..MAX_ETHEREUM_HEADER_CHAIN_LEN {
+		let header = AlloyHeader {
+			number: target_block_number + offset as u64,
+			parent_hash: b256_from_h256(previous_block_hash),
+			receipts_root: b256_from_h256(if offset == 0 {
+				receipts_root
+			} else {
+				H256::repeat_byte(offset as u8)
+			}),
+			..Default::default()
+		};
+		let block_hash = H256::from_slice(header.hash_slow().as_slice());
+		let mut rlp = Vec::new();
+		header.encode(&mut rlp);
+		headers.push(EthereumExecutionHeader {
+			rlp: rlp.try_into().expect("benchmark headers stay within bounded RLP size"),
+		});
+		previous_block_hash = block_hash;
+		last_block_hash = block_hash;
+	}
+
+	(
+		headers
+			.try_into()
+			.expect("benchmark chain stays within bounded header chain length"),
+		ExecutionHeaderAnchor {
+			block_number: target_block_number + MAX_ETHEREUM_HEADER_CHAIN_LEN as u64,
+			block_hash: anchor_block_hash,
+			parent_hash: last_block_hash,
+			receipts_root: H256::repeat_byte(8),
+		},
+	)
+}
+
+fn b256_from_h256(value: H256) -> B256 {
+	B256::from_slice(value.as_bytes())
 }

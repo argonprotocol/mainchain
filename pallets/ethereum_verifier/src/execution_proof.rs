@@ -34,7 +34,7 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		.ok_or(EthereumVerifyError::InvalidProof)?;
 
 		let has_log = receipt.logs().iter().any(|receipt_log| {
-			receipt_log.data.data.0 == event_log.data &&
+			receipt_log.data.data.0.as_ref() == event_log.data.as_slice() &&
 				receipt_log.address.0 == event_log.address.0 &&
 				receipt_log.topics().len() == event_log.topics.len() &&
 				receipt_log
