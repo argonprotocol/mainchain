@@ -665,7 +665,7 @@ impl pallet_crosschain_transfer::Config for Runtime {
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type CurrentTransactionFeeProvider =
 		use_unless_benchmark!(FeeControl, benchmarking::BenchmarkCrosschainTransferFeeProvider);
-	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type CurrentTick = Ticks;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type WeightInfo = pallet_crosschain_transfer::WithProviderWeights<
 		Runtime,

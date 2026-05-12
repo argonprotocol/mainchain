@@ -1,8 +1,11 @@
-use crate::types::{
-	CheckpointUpdate, ExecutionProof, NextSyncCommitteeUpdate, Update, SC_BITS_SIZE, SC_SIZE,
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
+use crate::{
+	types::{CheckpointUpdate, NextSyncCommitteeUpdate, SC_BITS_SIZE, SC_SIZE},
+	ExecutionProof, Update,
 };
 
-pub(crate) fn checkpoint_update_from_fixture(
+pub fn checkpoint_update_from_fixture(
 	update: snowbridge_beacon_primitives::CheckpointUpdate<SC_SIZE>,
 ) -> Result<CheckpointUpdate, &'static str> {
 	Ok(CheckpointUpdate {
@@ -16,7 +19,7 @@ pub(crate) fn checkpoint_update_from_fixture(
 	})
 }
 
-pub(crate) fn update_from_fixture(
+pub fn update_from_fixture(
 	update: snowbridge_beacon_primitives::Update<SC_SIZE, SC_BITS_SIZE>,
 ) -> Result<Update, &'static str> {
 	Ok(Update {
@@ -35,7 +38,7 @@ pub(crate) fn update_from_fixture(
 	})
 }
 
-pub(crate) fn execution_proof_from_fixture(
+pub fn execution_proof_from_fixture(
 	proof: snowbridge_beacon_primitives::ExecutionProof,
 ) -> Result<ExecutionProof, &'static str> {
 	Ok(ExecutionProof {

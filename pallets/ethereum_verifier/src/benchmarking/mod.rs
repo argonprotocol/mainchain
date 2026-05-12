@@ -3,7 +3,12 @@
 use super::*;
 mod util;
 
-use crate::{Fork, ForkVersions, Pallet as EthereumBeaconClient};
+use crate::{
+	fixture_conversions::{
+		checkpoint_update_from_fixture, execution_proof_from_fixture, update_from_fixture,
+	},
+	Fork, ForkVersions, Pallet as EthereumBeaconClient,
+};
 use alloy_consensus::Header as AlloyHeader;
 use alloy_primitives::B256;
 use alloy_rlp::Encodable;
@@ -43,8 +48,7 @@ mod benchmarks {
 	#[benchmark]
 	fn force_checkpoint() -> Result<(), BenchmarkError> {
 		let checkpoint_update =
-			crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?;
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = checkpoint_update.header.hash_tree_root().unwrap();
 
 		#[extrinsic_call]
@@ -60,11 +64,9 @@ mod benchmarks {
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update =
-			crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?;
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let finalized_header_update =
-			crate::fixture_conversions::update_from_fixture(*make_finalized_header_update())
-				.map_err(BenchmarkError::Stop)?;
+			update_from_fixture(*make_finalized_header_update()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = finalized_header_update.finalized_header.hash_tree_root().unwrap();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
@@ -84,14 +86,11 @@ mod benchmarks {
 	fn submit_with_sync_committee() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update =
-			crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?;
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let sync_committee_update =
-			crate::fixture_conversions::update_from_fixture(*make_sync_committee_update())
-				.map_err(BenchmarkError::Stop)?;
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let finalized_header_update =
-			crate::fixture_conversions::update_from_fixture(*make_finalized_header_update())
-				.map_err(BenchmarkError::Stop)?;
+			update_from_fixture(*make_finalized_header_update()).map_err(BenchmarkError::Stop)?;
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
@@ -110,11 +109,9 @@ mod benchmarks {
 	fn import_execution_header_anchor() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update =
-			crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?;
+			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let execution_proof =
-			crate::fixture_conversions::execution_proof_from_fixture(*make_execution_proof())
-				.map_err(BenchmarkError::Stop)?;
+			execution_proof_from_fixture(*make_execution_proof()).map_err(BenchmarkError::Stop)?;
 		let block_hash = execution_proof.execution_header.block_hash();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
@@ -189,12 +186,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify_pre_aggregated() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?,
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = crate::fixture_conversions::update_from_fixture(*make_sync_committee_update())
-			.map_err(BenchmarkError::Stop)?;
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let participant_pubkeys = participant_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
 		let agg_sig =
@@ -212,12 +208,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn bls_fast_aggregate_verify() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?,
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = crate::fixture_conversions::update_from_fixture(*make_sync_committee_update())
-			.map_err(BenchmarkError::Stop)?;
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 		let absent_pubkeys = absent_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
@@ -239,12 +234,11 @@ mod benchmarks {
 	#[benchmark(extra)]
 	fn verify_merkle_proof() -> Result<(), BenchmarkError> {
 		EthereumBeaconClient::<T>::process_checkpoint_update(
-			&crate::fixture_conversions::checkpoint_update_from_fixture(*make_checkpoint())
-				.map_err(BenchmarkError::Stop)?,
+			&checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = crate::fixture_conversions::update_from_fixture(*make_sync_committee_update())
-			.map_err(BenchmarkError::Stop)?;
+		let update =
+			update_from_fixture(*make_sync_committee_update()).map_err(BenchmarkError::Stop)?;
 		let block_root: H256 = update.finalized_header.hash_tree_root().unwrap();
 
 		let fork_versions = ForkVersions {

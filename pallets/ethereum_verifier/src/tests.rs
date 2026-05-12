@@ -3,6 +3,7 @@
 pub use crate::mock::*;
 use crate::{
 	config::{EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH, SLOTS_PER_HISTORICAL_ROOT},
+	fixture_conversions::execution_proof_from_fixture,
 	functions::{compute_epoch, compute_period},
 	mock::{
 		load_checkpoint_update_fixture, load_execution_proof_fixture,
@@ -44,7 +45,7 @@ const TEST_HASH: [u8; 32] =
 	hex!["5f6f02af29218292d21a69b64a794a7c0873b3e0f54611972863706e8cbdf371"];
 
 fn anchor_execution_proof() -> ExecutionProof {
-	crate::fixture_conversions::execution_proof_from_fixture(load_execution_proof_fixture())
+	execution_proof_from_fixture(load_execution_proof_fixture())
 		.expect("execution proof fixture stays within bounded branch size")
 }
 
