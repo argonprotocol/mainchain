@@ -33,8 +33,8 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: Balance = 1;
-	pub const OwnershipExistentialDeposit: Balance = 1;
+	pub static ExistentialDeposit: Balance = 1;
+	pub static OwnershipExistentialDeposit: Balance = 1;
 	pub const CrosschainTransferPalletId: PalletId = PalletId(*b"xchaintr");
 	pub CrosschainTransferEthereumBurnAccount: TestAccountId = CrosschainTransferPalletId::get()
 		.into_sub_account_truncating((crate::SourceChain::Ethereum, *b"burn"));

@@ -12,8 +12,8 @@ use sp_runtime::AccountId32;
 
 use crate::mock::{
 	account, h160, legacy_token_gateway_account, new_test_ext, Balances, ConfirmedTransfers,
-	CrosschainTransfer, CurrentTick, CurrentTransactionReimbursableFee, Ownership,
-	ProofVerificationAllowed, RuntimeCall, RuntimeEvent, RuntimeOrigin, System, Test,
+	CrosschainTransfer, CurrentTick, CurrentTransactionReimbursableFee, ExistentialDeposit,
+	Ownership, ProofVerificationAllowed, RuntimeCall, RuntimeEvent, RuntimeOrigin, System, Test,
 	TestAccountId,
 };
 
@@ -29,6 +29,7 @@ fn prove_transfer_pays_argon_and_marks_recent_transfer() {
 		);
 
 		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+		assert!(System::providers(&burn_account) > 0);
 		assert_ok!(Balances::mint_into(&burn_account, 10_000));
 
 		let recipient = account(2);
@@ -91,6 +92,48 @@ fn prove_transfer_splits_argon_payout_with_reimbursable_fee() {
 				account_nonce: 1,
 			}
 		)));
+	});
+}
+
+#[test]
+fn prove_transfer_can_split_payout_when_either_intermediate_remainder_would_drop_below_ed() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		ExistentialDeposit::set(100);
+
+		assert_ok!(CrosschainTransfer::set_chain_config(RuntimeOrigin::root(), chain_config(),));
+
+		for (index, (reimbursable_fee, recipient_seed, recipient_starting_balance)) in
+			[(1, 11u8, 0u128), (25, 35u8, 0u128), (99, 109u8, 0u128), (175, 200u8, 100u128)]
+				.into_iter()
+				.enumerate()
+		{
+			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			let relayer = account(1);
+			let recipient = account(recipient_seed);
+			let claim_amount = 250u128;
+
+			Balances::set_balance(&burn_account, claim_amount);
+			Balances::set_balance(&relayer, 1_000_000);
+			Balances::set_balance(&recipient, recipient_starting_balance);
+			assert!(Balances::balance(&burn_account) >= ExistentialDeposit::get());
+
+			CurrentTransactionReimbursableFee::set(Some(reimbursable_fee));
+
+			assert_ok!(CrosschainTransfer::prove_transfer(
+				RuntimeOrigin::signed(relayer.clone()),
+				argon_proof(recipient.clone(), (index + 1) as u64, claim_amount),
+			));
+
+			assert_eq!(
+				Balances::balance(&recipient),
+				recipient_starting_balance + claim_amount - reimbursable_fee
+			);
+			assert_eq!(Balances::balance(&relayer), 1_000_000 + reimbursable_fee);
+			assert_eq!(Balances::balance(&burn_account), 0);
+			assert!(System::account_exists(&burn_account));
+			assert!(System::providers(&burn_account) > 0);
+		}
 	});
 }
 

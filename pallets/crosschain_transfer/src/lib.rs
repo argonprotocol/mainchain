@@ -312,7 +312,9 @@ pub mod pallet {
 				},
 			};
 
-			ChainConfigBySourceChain::<T>::insert(config.source_chain(), config);
+			let source_chain = config.source_chain();
+			Self::ensure_burn_account_unreapable(&Self::burn_account(source_chain));
+			ChainConfigBySourceChain::<T>::insert(source_chain, config);
 			Ok(())
 		}
 
@@ -355,6 +357,7 @@ pub mod pallet {
 			}
 		}
 
+		#[frame_support::transactional]
 		fn enact_burn_transfer(
 			submitter: &T::AccountId,
 			source_chain: SourceChain,
@@ -388,20 +391,18 @@ pub mod pallet {
 						Error::<T>::InsufficientLiquidity,
 					);
 
-					let _ = T::NativeCurrency::transfer(
+					let _ = T::NativeCurrency::burn_from(
 						&burn_account,
-						&claim.to,
-						recipient_amount,
+						claim.amount,
 						Preservation::Expendable,
+						Precision::Exact,
+						Fortitude::Force,
 					)?;
 
+					let _ = T::NativeCurrency::mint_into(&claim.to, recipient_amount)?;
+
 					if reimbursable_fee != T::Balance::default() {
-						let _ = T::NativeCurrency::transfer(
-							&burn_account,
-							submitter,
-							reimbursable_fee,
-							Preservation::Expendable,
-						)?;
+						let _ = T::NativeCurrency::mint_into(submitter, reimbursable_fee)?;
 					}
 
 					Self::retain_recent_argon_transfer(&claim.to);
@@ -453,6 +454,13 @@ pub mod pallet {
 			ensure!(amount > reimbursable_fee, Error::<T>::InsufficientBurnAmountForFee);
 
 			Ok(amount.saturating_sub(reimbursable_fee).into())
+		}
+
+		fn ensure_burn_account_unreapable(account_id: &T::AccountId) {
+			let providers = frame_system::Pallet::<T>::providers(account_id);
+			for _ in providers..2 {
+				frame_system::Pallet::<T>::inc_providers(account_id);
+			}
 		}
 
 		fn retain_recent_argon_transfer(account_id: &T::AccountId) {

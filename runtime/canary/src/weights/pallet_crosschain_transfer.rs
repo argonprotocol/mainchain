@@ -34,14 +34,16 @@ pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightInfo<T> {
 	/// Storage: `CrosschainTransfer::ChainConfigBySourceChain` (r:1 w:1)
 	/// Proof: `CrosschainTransfer::ChainConfigBySourceChain` (`max_values`: None, `max_size`: Some(108), added: 2583, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
+	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
 	fn set_chain_config() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `86`
-		//  Estimated: `3573`
-		// Minimum execution time: 6_000_000 picoseconds.
-		Weight::from_parts(7_000_000, 3573)
-			.saturating_add(T::DbWeight::get().reads(1))
-			.saturating_add(T::DbWeight::get().writes(1))
+		//  Estimated: `3593`
+		// Minimum execution time: 12_000_000 picoseconds.
+		Weight::from_parts(13_000_000, 3593)
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
 		}
 	/// Storage: `CrosschainTransfer::ChainConfigBySourceChain` (r:1 w:0)
 	/// Proof: `CrosschainTransfer::ChainConfigBySourceChain` (`max_values`: None, `max_size`: Some(108), added: 2583, mode: `MaxEncodedLen`)
@@ -59,8 +61,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `189`
 		//  Estimated: `6196`
-		// Minimum execution time: 82_000_000 picoseconds.
-		Weight::from_parts(83_000_000, 6196)
+		// Minimum execution time: 89_000_000 picoseconds.
+		Weight::from_parts(181_000_000, 6196)
 			.saturating_add(T::DbWeight::get().reads(7))
 			.saturating_add(T::DbWeight::get().writes(5))
 		}
@@ -78,9 +80,9 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		//  Measured:  `63 + e * (89 +/- 0)`
 		//  Estimated: `3537 + e * (2527 +/- 0)`
 		// Minimum execution time: 8_000_000 picoseconds.
-		Weight::from_parts(8_000_000, 3537)
-			// Standard Error: 9_121
-			.saturating_add(Weight::from_parts(3_893_171, 0).saturating_mul(e.into()))
+		Weight::from_parts(14_000_000, 3537)
+			// Standard Error: 68_693
+			.saturating_add(Weight::from_parts(5_119_446, 0).saturating_mul(e.into()))
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(e.into())))
 			.saturating_add(T::DbWeight::get().writes(2))
@@ -94,7 +96,7 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		//  Measured:  `53`
 		//  Estimated: `3573`
 		// Minimum execution time: 2_000_000 picoseconds.
-		Weight::from_parts(2_000_000, 3573)
+		Weight::from_parts(3_000_000, 3573)
 			.saturating_add(T::DbWeight::get().reads(1))
 		}
 	/// Storage: `CrosschainTransfer::RecentArgonTransfersByAccount` (r:1 w:0)
