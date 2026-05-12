@@ -5,31 +5,34 @@ description: |
 runs:
   using: "composite"
   steps:
-    - name: Install Minio on Linux
-      if: ${{ runner.os == 'Linux' }}
+    - name: Install Minio
+      if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
       shell: bash
       run: |
-        arch=$(uname -m)
-        if [ "$arch" = "aarch64" ]; then
-          url="https://dl.min.io/server/minio/release/linux-arm64/minio"
-        else
-          url="https://dl.min.io/server/minio/release/linux-amd64/minio"
+        set -eu
+        release_file="minio.RELEASE.2025-09-07T16-13-09Z"
+        platform="darwin"
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          platform="linux"
         fi
-        wget "$url"
-        chmod +x minio
-        sudo mv minio /usr/local/bin
 
-    - name: Install Minio on macOS
-      if: ${{ runner.os == 'macOS' }}
-      shell: bash
-      run: |
         arch=$(uname -m)
-        if [ "$arch" = "arm64" ]; then
-          url="https://dl.min.io/server/minio/release/darwin-arm64/minio"
-        else
-          url="https://dl.min.io/server/minio/release/darwin-amd64/minio"
+        arch_part="amd64"
+        expected_sha="4759080aeef7385aaceaac1131c30aaeb99605921553967dc6d3ef4e16ac64f9"
+        if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+          arch_part="arm64"
+          expected_sha="7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
         fi
-        wget "$url"
+
+        if [[ "$platform" == "linux" && "$arch_part" == "amd64" ]]; then
+          expected_sha="7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f"
+        elif [[ "$platform" == "linux" && "$arch_part" == "arm64" ]]; then
+          expected_sha="5c83cd2cf151717ba0243f73e1c7802ff36e272b67144bdd7f1f7d684fd6f03d"
+        fi
+
+        url="https://dl.min.io/server/minio/release/${platform}-${arch_part}/${release_file}"
+        curl --fail --location --silent --show-error "$url" -o minio
+        echo "${expected_sha}  minio" | shasum -a 256 -c -
         chmod +x minio
         sudo mv minio /usr/local/bin
 

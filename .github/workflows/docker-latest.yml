@@ -26,21 +26,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to container registry
-        if: ${{ github.event.release.draft == false }}
-        uses: docker/login-action@v3
+        if: ${{ github.event.release.draft == false && steps.get_latest.outputs.latest != '' }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update latest
-        if: ${{ github.event.release.draft == false }}
+        if: ${{ github.event.release.draft == false && steps.get_latest.outputs.latest != '' }}
         run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+)*([.-][0-9A-Za-z][0-9A-Za-z._-]*)?$ ]]; then
+            echo "Invalid latest release tag: $VERSION" >&2
+            exit 1
+          fi
           for name in argon-miner argon-oracle argon-notary; do
-            image=ghcr.io/argonprotocol/$name
-            docker pull $image:${{ env.VERSION }}
-            docker tag $image:${{ env.VERSION }} $image:latest
-            docker push $image:latest
+            image="ghcr.io/argonprotocol/$name"
+            docker pull "$image:$VERSION"
+            docker tag "$image:$VERSION" "$image:latest"
+            docker push "$image:latest"
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

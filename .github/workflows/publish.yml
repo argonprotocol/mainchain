@@ -1,22 +1,16 @@
 name: Publish
 
 on:
-  push:
-    tags:
-      - v[0-9]+.*
-  workflow_dispatch:
-    inputs:
-      TAG:
-        description: 'The tag to publish'
-        required: true
-
+  release:
+    types:
+      - published
 
 defaults:
   run:
     shell: bash
 
 env:
-  VERSION: ${{ github.event.inputs.TAG || github.ref_name }}
+  VERSION: ${{ github.event.release.tag_name }}
 
 jobs:
   docker:
@@ -30,14 +24,21 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v5
 
+      - name: Validate release tag
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+(\.[0-9]+)*([.-][0-9A-Za-z][0-9A-Za-z._-]*)?$ ]]; then
+            echo "Invalid release tag: $VERSION" >&2
+            exit 1
+          fi
+
       - name: Download artifacts
         run: |
-          gh release download ${{env.VERSION}} --dir ./amd64 --pattern *x86_64-unknown-linux-gnu*
+          gh release download "$VERSION" --dir ./amd64 --pattern '*x86_64-unknown-linux-gnu*'
           ls ./amd64
-          find ./amd64 -name "*.tar.gz" -exec tar -xf {} -C ./amd64 \;
+          find ./amd64 -name "*.tar.gz" -exec tar -xf '{}' -C ./amd64 \;
           ls -R ./amd64
-          gh release download ${{env.VERSION}} --dir ./arm64 --pattern *aarch64-unknown-linux-gnu*
-          find ./arm64 -name "*.tar.gz" -exec tar -xf {} -C ./arm64 \;
+          gh release download "$VERSION" --dir ./arm64 --pattern '*aarch64-unknown-linux-gnu*'
+          find ./arm64 -name "*.tar.gz" -exec tar -xf '{}' -C ./arm64 \;
           ls -R ./arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,10 +47,10 @@ jobs:
         id: check_latest
         run: |
           LATEST_RELEASE=$(gh release list --exclude-pre-releases --json tagName,isLatest --jq ".[] | select(.isLatest == true) | .tagName" | head -n 1)
-           if [ "${{ env.VERSION }}" == "$LATEST_RELEASE" ]; then
-            echo "isLatest=true" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" == "$LATEST_RELEASE" ]]; then
+            echo "isLatest=true" >> "$GITHUB_OUTPUT"
           else
-            echo "isLatest=false" >> $GITHUB_OUTPUT
+            echo "isLatest=false" >> "$GITHUB_OUTPUT"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +63,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
           tags: |
-            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern=${{ env.VERSION }}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
@@ -74,7 +75,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
           tags: |
-            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern=${{ env.VERSION }}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
@@ -86,6 +87,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           flavor: ${{ steps.check_latest.outputs.isLatest == 'true' && 'latest=true' || 'latest=false' }}
           tags: |
-            type=semver,pattern=${{env.VERSION}}
+            type=semver,pattern=${{ env.VERSION }}
             type=semver,pattern={{major}}.{{minor}}
             type=sha

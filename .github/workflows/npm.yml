@@ -36,7 +36,7 @@ jobs:
           SOURCE_RUN_ID: ${{ github.event.client_payload.source_run_id }}
           PAYLOAD_SHA: ${{ github.event.client_payload.head_sha }}
         run: |
-          set -euo pipefail
+          set -eu
 
           if [[ ! "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "Invalid source_run_id payload" >&2
@@ -99,41 +99,46 @@ jobs:
           path: bitcoin/nodejs/ts/wasm
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve release tag
+      - name: Validate release tag
         if: github.event_name != 'repository_dispatch'
         id: release_tag
+        env:
+          RELEASE_INPUT_TAG: ${{ github.event.inputs.tag }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
         run: |
-          TAG="${{ github.event.inputs.tag }}"
-          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
-            TAG="${{ github.event.release.tag_name }}"
+          RELEASE_TAG="$RELEASE_INPUT_TAG"
+          if [[ -z "$RELEASE_TAG" || "$RELEASE_TAG" == "null" ]]; then
+            RELEASE_TAG="$RELEASE_EVENT_TAG"
           fi
-          if [[ "$TAG" == refs/tags/* ]]; then
-            TAG="${TAG#refs/tags/}"
+          if [[ "$RELEASE_TAG" == refs/tags/* ]]; then
+            RELEASE_TAG="${RELEASE_TAG#refs/tags/}"
           fi
-          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
-            TAG="${{ github.ref_name }}"
+          if [[ -z "$RELEASE_TAG" || "$RELEASE_TAG" == "null" ]]; then
+            RELEASE_TAG="$RELEASE_REF_NAME"
           fi
-          if [[ -z "$TAG" || "$TAG" == "null" ]]; then
-            echo "Unable to resolve release tag" >&2
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+)*([.-][0-9A-Za-z][0-9A-Za-z._-]*)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
             exit 1
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Validate workflow dispatch release is published
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
-          set -euo pipefail
+          set -eu
 
-          TAG="${{ steps.release_tag.outputs.tag }}"
-          if ! RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"; then
-            echo "No release found for tag $TAG. Ensure the release exists and is published before running this workflow." >&2
+          if ! RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"; then
+            echo "No release found for tag $RELEASE_TAG. Ensure the release exists and is published before running this workflow." >&2
             exit 1
           fi
 
           if ! jq -e '.draft == false and (.published_at != null)' <<<"$RELEASE_JSON" >/dev/null; then
-            echo "workflow_dispatch requires an already published release for tag $TAG" >&2
+            echo "workflow_dispatch requires an already published release for tag $RELEASE_TAG" >&2
             exit 1
           fi
 
@@ -172,7 +177,9 @@ jobs:
 
       - name: Bump workspace versions for dev publish
         if: github.event_name == 'repository_dispatch'
-        run: VERSION=${{ steps.npm_dev_version.outputs.version }} yarn version:bump
+        run: yarn version:bump
+        env:
+          VERSION: ${{ steps.npm_dev_version.outputs.version }}
 
       - name: Verify artifacts
         run: ls -R ./npm
@@ -182,7 +189,7 @@ jobs:
         if: ${{ vars.NPM_ENABLED == 'true' }}
         run: |
           PUBLISH_ARGS=(--access public)
-          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "repository_dispatch" ]]; then
             PUBLISH_ARGS+=(--tag dev)
           fi
           npm publish "${PUBLISH_ARGS[@]}" --workspace=client/nodejs

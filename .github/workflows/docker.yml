@@ -65,13 +65,13 @@ jobs:
           name: cargo-${{ matrix.target }}
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
 
       - name: Install sqlx-cli
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
         with:
           tool: sqlx-cli@0.8.3
 
