@@ -1,25 +1,193 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
-pub use crate::config::{SYNC_COMMITTEE_BITS_SIZE as SC_BITS_SIZE, SYNC_COMMITTEE_SIZE as SC_SIZE};
-use crate::{config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl};
+use crate::{
+	config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl, ExecutionHeaderAnchorIndex,
+	ExecutionHeaderAnchorMapping, ExecutionHeaderAnchors, FinalizedBeaconState,
+	FinalizedBeaconStateIndex, FinalizedBeaconStateMapping, MaxFinalizedHeadersToKeep,
+};
+use argon_primitives::EthereumBeaconPreset;
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
-use frame_support::storage::types::OptionQuery;
 use polkadot_sdk::{
-	sp_core::{ConstU32, H256},
-	sp_runtime::BoundedVec,
-	*,
+	frame_support::{pallet_prelude::ConstU32, storage::types::OptionQuery, BoundedVec},
+	sp_core::H256,
 };
 use scale_info::TypeInfo;
 use snowbridge_beacon_primitives::{
-	BeaconHeader, Fork as SnowbridgeFork, ForkVersion, ForkVersions as SnowbridgeForkVersions,
+	self as snowbridge, BeaconHeader, Fork as SnowbridgeFork, ForkVersion,
+	ForkVersions as SnowbridgeForkVersions, PublicKey, PublicKeyPrepared, Signature,
 	VersionedExecutionPayloadHeader,
 };
 
-// Specialize types based on configured sync committee size.
-pub type SyncCommittee = snowbridge_beacon_primitives::SyncCommittee<SC_SIZE>;
-pub type SyncCommitteePrepared = snowbridge_beacon_primitives::SyncCommitteePrepared<SC_SIZE>;
-pub type SyncAggregate = snowbridge_beacon_primitives::SyncAggregate<SC_SIZE, SC_BITS_SIZE>;
+const SYNC_COMMITTEE_BOUND_SIZE: u32 = EthereumBeaconPreset::Mainnet.sync_committee_size() as u32;
+const SYNC_COMMITTEE_BITS_BOUND_SIZE: u32 =
+	EthereumBeaconPreset::Mainnet.sync_committee_bits_size() as u32;
+const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
+#[cfg(any(test, feature = "fuzzing"))]
+const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
+	EthereumBeaconPreset::Mainnet.sync_committee_bits_size();
+const MINIMAL_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Minimal.sync_committee_size();
+
+type RawSyncCommittee<const COMMITTEE_SIZE: usize> = snowbridge::SyncCommittee<COMMITTEE_SIZE>;
+type RawSyncCommitteePrepared<const COMMITTEE_SIZE: usize> =
+	snowbridge::SyncCommitteePrepared<COMMITTEE_SIZE>;
+type RawSyncAggregate<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize> =
+	snowbridge::SyncAggregate<COMMITTEE_SIZE, BITS_SIZE>;
+type RawCheckpointUpdate<const COMMITTEE_SIZE: usize> =
+	snowbridge::CheckpointUpdate<COMMITTEE_SIZE>;
+type RawNextSyncCommitteeUpdate<const COMMITTEE_SIZE: usize> =
+	snowbridge::NextSyncCommitteeUpdate<COMMITTEE_SIZE>;
+type RawUpdate<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize> =
+	snowbridge::Update<COMMITTEE_SIZE, BITS_SIZE>;
 type BranchProof = BoundedVec<H256, ConstU32<{ MAX_BRANCH_PROOF_SIZE_U32 }>>;
+
+#[cfg(any(test, feature = "fuzzing"))]
+pub(crate) type MainnetCheckpointUpdate = RawCheckpointUpdate<{ MAINNET_SYNC_COMMITTEE_SIZE }>;
+#[cfg(any(test, feature = "fuzzing"))]
+pub(crate) type MainnetUpdate =
+	RawUpdate<{ MAINNET_SYNC_COMMITTEE_SIZE }, { MAINNET_SYNC_COMMITTEE_BITS_SIZE }>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TypeError {
+	InvalidBoundedLength,
+	HashTreeRootFailed,
+	PreparePublicKeysFailed,
+}
+
+#[derive(
+	Default, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo, MaxEncodedLen,
+)]
+pub struct SyncCommittee {
+	pub pubkeys: BoundedVec<PublicKey, ConstU32<{ SYNC_COMMITTEE_BOUND_SIZE }>>,
+	pub aggregate_pubkey: PublicKey,
+}
+
+impl SyncCommittee {
+	pub fn matches_preset(&self, preset: EthereumBeaconPreset) -> bool {
+		self.pubkeys.len() == preset.sync_committee_size()
+	}
+
+	pub fn hash_tree_root(&self, preset: EthereumBeaconPreset) -> Result<H256, TypeError> {
+		match preset {
+			EthereumBeaconPreset::Mainnet => self
+				.to_raw::<{ MAINNET_SYNC_COMMITTEE_SIZE }>()?
+				.hash_tree_root()
+				.map_err(|_| TypeError::HashTreeRootFailed),
+			EthereumBeaconPreset::Minimal => self
+				.to_raw::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>()?
+				.hash_tree_root()
+				.map_err(|_| TypeError::HashTreeRootFailed),
+		}
+	}
+
+	pub fn prepare(
+		&self,
+		preset: EthereumBeaconPreset,
+	) -> Result<SyncCommitteePrepared, TypeError> {
+		match preset {
+			EthereumBeaconPreset::Mainnet => {
+				let committee = self.to_raw::<{ MAINNET_SYNC_COMMITTEE_SIZE }>()?;
+				RawSyncCommitteePrepared::<{ MAINNET_SYNC_COMMITTEE_SIZE }>::try_from(&committee)
+					.map_err(|_| TypeError::PreparePublicKeysFailed)?
+					.try_into()
+			},
+			EthereumBeaconPreset::Minimal => {
+				let committee = self.to_raw::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>()?;
+				RawSyncCommitteePrepared::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>::try_from(&committee)
+					.map_err(|_| TypeError::PreparePublicKeysFailed)?
+					.try_into()
+			},
+		}
+	}
+
+	fn to_raw<const COMMITTEE_SIZE: usize>(
+		&self,
+	) -> Result<RawSyncCommittee<COMMITTEE_SIZE>, TypeError> {
+		Ok(RawSyncCommittee {
+			pubkeys: self
+				.pubkeys
+				.to_vec()
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+			aggregate_pubkey: self.aggregate_pubkey,
+		})
+	}
+}
+
+impl<const COMMITTEE_SIZE: usize> TryFrom<RawSyncCommittee<COMMITTEE_SIZE>> for SyncCommittee {
+	type Error = TypeError;
+
+	fn try_from(sync_committee: RawSyncCommittee<COMMITTEE_SIZE>) -> Result<Self, Self::Error> {
+		Ok(Self {
+			pubkeys: sync_committee
+				.pubkeys
+				.to_vec()
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+			aggregate_pubkey: sync_committee.aggregate_pubkey,
+		})
+	}
+}
+
+#[derive(Default, Encode, Decode, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen)]
+pub struct SyncCommitteePrepared {
+	pub root: H256,
+	pub pubkeys: BoundedVec<PublicKeyPrepared, ConstU32<{ SYNC_COMMITTEE_BOUND_SIZE }>>,
+	pub aggregate_pubkey: PublicKeyPrepared,
+}
+
+impl DecodeWithMemTracking for SyncCommitteePrepared {}
+
+impl<const COMMITTEE_SIZE: usize> TryFrom<RawSyncCommitteePrepared<COMMITTEE_SIZE>>
+	for SyncCommitteePrepared
+{
+	type Error = TypeError;
+
+	fn try_from(
+		sync_committee: RawSyncCommitteePrepared<COMMITTEE_SIZE>,
+	) -> Result<Self, Self::Error> {
+		Ok(Self {
+			root: sync_committee.root,
+			pubkeys: sync_committee
+				.pubkeys
+				.as_ref()
+				.to_vec()
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+			aggregate_pubkey: sync_committee.aggregate_pubkey,
+		})
+	}
+}
+
+#[derive(Default, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
+pub struct SyncAggregate {
+	pub sync_committee_bits: BoundedVec<u8, ConstU32<{ SYNC_COMMITTEE_BITS_BOUND_SIZE }>>,
+	pub sync_committee_signature: Signature,
+}
+
+impl SyncAggregate {
+	pub fn matches_preset(&self, preset: EthereumBeaconPreset) -> bool {
+		self.sync_committee_bits.len() == preset.sync_committee_bits_size()
+	}
+}
+
+impl<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize>
+	TryFrom<RawSyncAggregate<COMMITTEE_SIZE, BITS_SIZE>> for SyncAggregate
+{
+	type Error = TypeError;
+
+	fn try_from(
+		sync_aggregate: RawSyncAggregate<COMMITTEE_SIZE, BITS_SIZE>,
+	) -> Result<Self, Self::Error> {
+		Ok(Self {
+			sync_committee_bits: sync_aggregate
+				.sync_committee_bits
+				.to_vec()
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+			sync_committee_signature: sync_aggregate.sync_committee_signature,
+		})
+	}
+}
 
 // Argon verifier models.
 
@@ -122,11 +290,45 @@ pub struct CheckpointUpdate {
 	pub validators_root: H256,
 }
 
+impl<const COMMITTEE_SIZE: usize> TryFrom<RawCheckpointUpdate<COMMITTEE_SIZE>>
+	for CheckpointUpdate
+{
+	type Error = TypeError;
+
+	fn try_from(update: RawCheckpointUpdate<COMMITTEE_SIZE>) -> Result<Self, Self::Error> {
+		Ok(Self {
+			header: update.header,
+			current_sync_committee: update.current_sync_committee.try_into()?,
+			current_sync_committee_branch: update
+				.current_sync_committee_branch
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+			validators_root: update.validators_root,
+		})
+	}
+}
+
 /// Argon-owned next sync committee witness carried inside an update.
-#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
+#[derive(Default, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
 pub struct NextSyncCommitteeUpdate {
 	pub next_sync_committee: SyncCommittee,
 	pub next_sync_committee_branch: BranchProof,
+}
+
+impl<const COMMITTEE_SIZE: usize> TryFrom<RawNextSyncCommitteeUpdate<COMMITTEE_SIZE>>
+	for NextSyncCommitteeUpdate
+{
+	type Error = TypeError;
+
+	fn try_from(update: RawNextSyncCommitteeUpdate<COMMITTEE_SIZE>) -> Result<Self, Self::Error> {
+		Ok(Self {
+			next_sync_committee: update.next_sync_committee.try_into()?,
+			next_sync_committee_branch: update
+				.next_sync_committee_branch
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+		})
+	}
 }
 
 /// Argon-owned finalized update shape without ancestry or `block_roots` data.
@@ -139,6 +341,29 @@ pub struct Update {
 	pub next_sync_committee_update: Option<NextSyncCommitteeUpdate>,
 	pub finalized_header: BeaconHeader,
 	pub finality_branch: BranchProof,
+}
+
+impl<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize>
+	TryFrom<RawUpdate<COMMITTEE_SIZE, BITS_SIZE>> for Update
+{
+	type Error = TypeError;
+
+	fn try_from(update: RawUpdate<COMMITTEE_SIZE, BITS_SIZE>) -> Result<Self, Self::Error> {
+		Ok(Self {
+			attested_header: update.attested_header,
+			sync_aggregate: update.sync_aggregate.try_into()?,
+			signature_slot: update.signature_slot,
+			next_sync_committee_update: update
+				.next_sync_committee_update
+				.map(TryInto::try_into)
+				.transpose()?,
+			finalized_header: update.finalized_header,
+			finality_branch: update
+				.finality_branch
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+		})
+	}
 }
 
 /// Minimal finalized beacon state retained by Argon for direct-finalized verification.
@@ -214,24 +439,39 @@ pub struct ExecutionProof {
 	pub execution_branch: BranchProof,
 }
 
+impl TryFrom<snowbridge::ExecutionProof> for ExecutionProof {
+	type Error = TypeError;
+
+	fn try_from(proof: snowbridge::ExecutionProof) -> Result<Self, Self::Error> {
+		Ok(Self {
+			header: proof.header,
+			execution_header: proof.execution_header,
+			execution_branch: proof
+				.execution_branch
+				.try_into()
+				.map_err(|_| TypeError::InvalidBoundedLength)?,
+		})
+	}
+}
+
 // Storage adapters.
 
 /// Finalized state ring buffer implementation.
 pub type FinalizedBeaconStateBuffer<T> = RingBufferMapImpl<
 	u32,
-	crate::MaxFinalizedHeadersToKeep<T>,
-	crate::FinalizedBeaconStateIndex<T>,
-	crate::FinalizedBeaconStateMapping<T>,
-	crate::FinalizedBeaconState<T>,
+	MaxFinalizedHeadersToKeep<T>,
+	FinalizedBeaconStateIndex<T>,
+	FinalizedBeaconStateMapping<T>,
+	FinalizedBeaconState<T>,
 	OptionQuery,
 >;
 
 /// Execution header anchor ring buffer implementation.
 pub type ExecutionHeaderAnchorBuffer<T> = RingBufferMapImpl<
 	u32,
-	crate::MaxFinalizedHeadersToKeep<T>,
-	crate::ExecutionHeaderAnchorIndex<T>,
-	crate::ExecutionHeaderAnchorMapping<T>,
-	crate::ExecutionHeaderAnchors<T>,
+	MaxFinalizedHeadersToKeep<T>,
+	ExecutionHeaderAnchorIndex<T>,
+	ExecutionHeaderAnchorMapping<T>,
+	ExecutionHeaderAnchors<T>,
 	OptionQuery,
 >;

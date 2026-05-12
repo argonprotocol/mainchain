@@ -2,15 +2,16 @@
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 use crate as ethereum_beacon_client;
 use crate::{
-	config,
 	fixture_conversions::{checkpoint_update_from_fixture, update_from_fixture},
 	pallet_timestamp, sp_io, sp_runtime,
-	types::{CheckpointUpdate, Update},
+	types::{CheckpointUpdate, MainnetCheckpointUpdate, MainnetUpdate, Update},
 	Fork, ForkVersions,
 };
+use argon_primitives::EthereumBeaconPreset;
 use core::default::Default;
 use frame_support::{derive_impl, dispatch::DispatchResult, parameter_types, traits::ConstU32};
 use polkadot_sdk::*;
+use snowbridge_beacon_primitives as snowbridge;
 use sp_runtime::BuildStorage;
 use std::{fs::File, path::PathBuf};
 
@@ -28,76 +29,60 @@ where
 	serde_json::from_reader(File::open(filepath).unwrap())
 }
 
-pub fn load_execution_proof_fixture() -> snowbridge_beacon_primitives::ExecutionProof {
+pub fn load_execution_proof_fixture() -> snowbridge::ExecutionProof {
 	load_fixture("execution-proof.json".to_string()).unwrap()
 }
 
 pub fn load_checkpoint_update_fixture() -> CheckpointUpdate {
-	let update: snowbridge_beacon_primitives::CheckpointUpdate<{ config::SYNC_COMMITTEE_SIZE }> =
+	let update: MainnetCheckpointUpdate =
 		load_fixture("initial-checkpoint.json".to_string()).unwrap();
 	checkpoint_update_from_fixture(update)
 		.expect("checkpoint fixture stays within bounded branch size")
 }
 
 pub fn load_sync_committee_update_fixture() -> Update {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("sync-committee-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("sync-committee-update.json".to_string()).unwrap();
 	update_from_fixture(update).expect("sync committee fixture stays within bounded branch size")
 }
 
 pub fn load_finalized_header_update_fixture() -> Update {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("finalized-header-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("finalized-header-update.json".to_string()).unwrap();
 	update_from_fixture(update).expect("finalized header fixture stays within bounded branch size")
 }
 
 pub fn load_next_sync_committee_update_fixture() -> Update {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("next-sync-committee-update.json".to_string()).unwrap();
+	let update: MainnetUpdate =
+		load_fixture("next-sync-committee-update.json".to_string()).unwrap();
 	update_from_fixture(update)
 		.expect("next sync committee fixture stays within bounded branch size")
 }
 
 pub fn load_next_finalized_header_update_fixture() -> Update {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("next-finalized-header-update.json".to_string()).unwrap();
+	let update: MainnetUpdate =
+		load_fixture("next-finalized-header-update.json".to_string()).unwrap();
 	update_from_fixture(update)
 		.expect("next finalized header fixture stays within bounded branch size")
 }
 
 pub fn load_sync_committee_update_period_0() -> Box<Update> {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("sync-committee-update-period-0.json".to_string()).unwrap();
+	let update: MainnetUpdate =
+		load_fixture("sync-committee-update-period-0.json".to_string()).unwrap();
 	Box::new(
 		update_from_fixture(update).expect("period-0 fixture stays within bounded branch size"),
 	)
 }
 
 pub fn load_sync_committee_update_period_0_older_fixture() -> Box<Update> {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("sync-committee-update-period-0-older.json".to_string()).unwrap();
+	let update: MainnetUpdate =
+		load_fixture("sync-committee-update-period-0-older.json".to_string()).unwrap();
 	Box::new(
 		update_from_fixture(update).expect("older period fixture stays within bounded branch size"),
 	)
 }
 
 pub fn load_sync_committee_update_period_0_newer_fixture() -> Box<Update> {
-	let update: snowbridge_beacon_primitives::Update<
-		{ config::SYNC_COMMITTEE_SIZE },
-		{ config::SYNC_COMMITTEE_BITS_SIZE },
-	> = load_fixture("sync-committee-update-period-0-newer.json".to_string()).unwrap();
+	let update: MainnetUpdate =
+		load_fixture("sync-committee-update-period-0-newer.json".to_string()).unwrap();
 	Box::new(
 		update_from_fixture(update).expect("newer period fixture stays within bounded branch size"),
 	)
@@ -154,14 +139,14 @@ parameter_types! {
 			epoch: 100000000,
 		}
 	};
-	pub static EventLogVerifierEnabled: bool = true;
+	pub static VerifyEventLogApiEnabled: bool = true;
 }
 
-pub const FREE_SLOTS_INTERVAL: u32 = config::SLOTS_PER_EPOCH as u32;
+pub const FREE_SLOTS_INTERVAL: u32 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u32;
 
 impl ethereum_beacon_client::Config for Test {
 	type FreeHeadersInterval = ConstU32<FREE_SLOTS_INTERVAL>;
-	type EventLogVerifierEnabled = EventLogVerifierEnabled;
+	type VerifyEventLogApiEnabled = VerifyEventLogApiEnabled;
 	type WeightInfo = ();
 }
 

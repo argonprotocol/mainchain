@@ -40,6 +40,7 @@ import type {
   ArgonPrimitivesDigestsFrameInfo,
   ArgonPrimitivesDigestsNotebookDigest,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesEthereumEthereumBeaconPreset,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
@@ -71,6 +72,7 @@ import type {
   PalletEthereumVerifierExecutionHeaderAnchor,
   PalletEthereumVerifierFinalizedBeaconHeaderState,
   PalletEthereumVerifierForkVersions,
+  PalletEthereumVerifierSyncCommitteePrepared,
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
@@ -89,7 +91,6 @@ import type {
   PalletTreasuryFrameVaultCapital,
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
-  SnowbridgeBeaconPrimitivesSyncCommitteePrepared,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
   SpWeightsWeightV2Weight,
@@ -554,11 +555,19 @@ declare module '@polkadot/api-base/types/storage' {
     };
     ethereumVerifier: {
       /**
+       * Chain-configured beacon preset expected by clients that submit verifier updates.
+       **/
+      beaconPreset: AugmentedQuery<
+        ApiType,
+        () => Observable<ArgonPrimitivesEthereumEthereumBeaconPreset>,
+        []
+      >;
+      /**
        * Sync committee for current period
        **/
       currentSyncCommittee: AugmentedQuery<
         ApiType,
-        () => Observable<SnowbridgeBeaconPrimitivesSyncCommitteePrepared>,
+        () => Observable<PalletEthereumVerifierSyncCommitteePrepared>,
         []
       >;
       /**
@@ -638,7 +647,7 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       nextSyncCommittee: AugmentedQuery<
         ApiType,
-        () => Observable<SnowbridgeBeaconPrimitivesSyncCommitteePrepared>,
+        () => Observable<PalletEthereumVerifierSyncCommitteePrepared>,
         []
       >;
       /**

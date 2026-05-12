@@ -37,6 +37,7 @@ import type {
   ArgonPrimitivesDomainSemver,
   ArgonPrimitivesDomainVersionHost,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesEthereumEthereumBeaconPreset,
   ArgonPrimitivesEthereumEthereumExecutionBlockProof,
   ArgonPrimitivesEthereumEthereumExecutionHeader,
   ArgonPrimitivesEthereumEthereumLog,
@@ -161,6 +162,9 @@ import type {
   PalletEthereumVerifierFork,
   PalletEthereumVerifierForkVersions,
   PalletEthereumVerifierNextSyncCommitteeUpdate,
+  PalletEthereumVerifierSyncAggregate,
+  PalletEthereumVerifierSyncCommittee,
+  PalletEthereumVerifierSyncCommitteePrepared,
   PalletEthereumVerifierUpdate,
   PalletFeeControlError,
   PalletFeeControlEvent,
@@ -256,9 +260,6 @@ import type {
   SnowbridgeBeaconPrimitivesExecutionPayloadHeader,
   SnowbridgeBeaconPrimitivesPublicKey,
   SnowbridgeBeaconPrimitivesSignature,
-  SnowbridgeBeaconPrimitivesSyncAggregate,
-  SnowbridgeBeaconPrimitivesSyncCommittee,
-  SnowbridgeBeaconPrimitivesSyncCommitteePrepared,
   SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader,
   SnowbridgeMilagroBlsKeysPublicKey,
   SpArithmeticArithmeticError,
@@ -313,6 +314,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainSemver: ArgonPrimitivesDomainSemver;
     ArgonPrimitivesDomainVersionHost: ArgonPrimitivesDomainVersionHost;
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
+    ArgonPrimitivesEthereumEthereumBeaconPreset: ArgonPrimitivesEthereumEthereumBeaconPreset;
     ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
     ArgonPrimitivesEthereumEthereumExecutionHeader: ArgonPrimitivesEthereumEthereumExecutionHeader;
     ArgonPrimitivesEthereumEthereumLog: ArgonPrimitivesEthereumEthereumLog;
@@ -437,6 +439,9 @@ declare module '@polkadot/types/types/registry' {
     PalletEthereumVerifierFork: PalletEthereumVerifierFork;
     PalletEthereumVerifierForkVersions: PalletEthereumVerifierForkVersions;
     PalletEthereumVerifierNextSyncCommitteeUpdate: PalletEthereumVerifierNextSyncCommitteeUpdate;
+    PalletEthereumVerifierSyncAggregate: PalletEthereumVerifierSyncAggregate;
+    PalletEthereumVerifierSyncCommittee: PalletEthereumVerifierSyncCommittee;
+    PalletEthereumVerifierSyncCommitteePrepared: PalletEthereumVerifierSyncCommitteePrepared;
     PalletEthereumVerifierUpdate: PalletEthereumVerifierUpdate;
     PalletFeeControlError: PalletFeeControlError;
     PalletFeeControlEvent: PalletFeeControlEvent;
@@ -532,9 +537,6 @@ declare module '@polkadot/types/types/registry' {
     SnowbridgeBeaconPrimitivesExecutionPayloadHeader: SnowbridgeBeaconPrimitivesExecutionPayloadHeader;
     SnowbridgeBeaconPrimitivesPublicKey: SnowbridgeBeaconPrimitivesPublicKey;
     SnowbridgeBeaconPrimitivesSignature: SnowbridgeBeaconPrimitivesSignature;
-    SnowbridgeBeaconPrimitivesSyncAggregate: SnowbridgeBeaconPrimitivesSyncAggregate;
-    SnowbridgeBeaconPrimitivesSyncCommittee: SnowbridgeBeaconPrimitivesSyncCommittee;
-    SnowbridgeBeaconPrimitivesSyncCommitteePrepared: SnowbridgeBeaconPrimitivesSyncCommitteePrepared;
     SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader: SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader;
     SnowbridgeMilagroBlsKeysPublicKey: SnowbridgeMilagroBlsKeysPublicKey;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;

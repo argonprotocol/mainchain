@@ -173,13 +173,13 @@ declare module '@polkadot/api-base/types/consts' {
     };
     ethereumVerifier: {
       /**
-       * Whether the read-only event-log verification API is enabled.
-       **/
-      eventLogVerifierEnabled: bool & AugmentedConst<ApiType>;
-      /**
        * Minimum gap between finalized headers for an update to be free.
        **/
       freeHeadersInterval: u32 & AugmentedConst<ApiType>;
+      /**
+       * Whether the read-only event-log verification API is enabled.
+       **/
+      verifyEventLogApiEnabled: bool & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**

@@ -25,6 +25,8 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		event_log: &EthereumLog,
 		proof: &EthereumProof,
 	) -> Result<(), EthereumVerifyError> {
+		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
+
 		let receipts_root = Self::verify_execution_block_proof(&proof.execution_block_proof)?;
 		let receipt = verify_receipt_proof(
 			receipts_root,

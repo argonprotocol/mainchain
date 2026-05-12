@@ -43,7 +43,9 @@ mod tests;
 mod benchmarking;
 
 use alloc::{boxed::Box, vec, vec::Vec};
-use argon_primitives::{EthereumLog, EthereumProof, EthereumVerifyError, EthereumVerifyProvider};
+use argon_primitives::{
+	EthereumBeaconPreset, EthereumLog, EthereumProof, EthereumVerifyError, EthereumVerifyProvider,
+};
 use frame_support::{
 	dispatch::{DispatchResult, Pays, PostDispatchInfo},
 	pallet_prelude::OptionQuery,
@@ -72,8 +74,6 @@ use types::{
 pub use pallet::*;
 pub use types::{BasicOperatingMode, ExecutionProof, Fork, ForkVersions};
 
-pub use config::SLOTS_PER_HISTORICAL_ROOT;
-
 pub const LOG_TARGET: &str = "ethereum-client";
 
 #[frame_support::pallet]
@@ -92,7 +92,7 @@ pub mod pallet {
 	impl<T: Config> Get<u32> for MaxFinalizedHeadersToKeep<T> {
 		fn get() -> u32 {
 			const MAX_REDUNDANCY: u32 = 20;
-			config::EPOCHS_PER_SYNC_COMMITTEE_PERIOD as u32 * MAX_REDUNDANCY
+			Pallet::<T>::epochs_per_sync_committee_period() as u32 * MAX_REDUNDANCY
 		}
 	}
 
@@ -106,7 +106,7 @@ pub mod pallet {
 		type FreeHeadersInterval: Get<u32>;
 		/// Whether the read-only event-log verification API is enabled.
 		#[pallet::constant]
-		type EventLogVerifierEnabled: Get<bool>;
+		type VerifyEventLogApiEnabled: Get<bool>;
 		type WeightInfo: WeightInfo;
 	}
 
@@ -151,6 +151,7 @@ pub mod pallet {
 		ExpectedFinalizedHeaderNotStored,
 		BLSPreparePublicKeysFailed,
 		BLSVerificationFailed,
+		UnexpectedBeaconPreset,
 		InvalidUpdateSlot,
 		/// The given update is not in the expected period, or the given next sync committee does
 		/// not match the next sync committee in storage.
@@ -225,6 +226,25 @@ pub mod pallet {
 	/// The current operating mode of the pallet.
 	#[pallet::storage]
 	pub type OperatingMode<T: Config> = StorageValue<_, BasicOperatingMode, ValueQuery>;
+
+	/// Chain-configured beacon preset expected by clients that submit verifier updates.
+	#[pallet::storage]
+	pub type BeaconPreset<T: Config> = StorageValue<_, EthereumBeaconPreset, ValueQuery>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		pub beacon_preset: EthereumBeaconPreset,
+		#[serde(skip)]
+		pub _phantom: PhantomData<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			BeaconPreset::<T>::put(self.beacon_preset);
+		}
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -313,7 +333,7 @@ pub mod pallet {
 			event_log: EthereumLog,
 			proof: EthereumProof,
 		) -> Result<(), EthereumVerifyError> {
-			ensure!(T::EventLogVerifierEnabled::get(), EthereumVerifyError::VerifierUnavailable);
+			ensure!(T::VerifyEventLogApiEnabled::get(), EthereumVerifyError::VerifierUnavailable);
 			<Self as EthereumVerifyProvider>::verify_event_log(&event_log, &proof)
 		}
 
@@ -323,9 +343,16 @@ pub mod pallet {
 			update: &CheckpointUpdate,
 			fork_versions: &ForkVersions,
 		) -> DispatchResult {
+			let preset = Self::beacon_preset();
+
+			ensure!(
+				update.current_sync_committee.matches_preset(preset),
+				Error::<T>::UnexpectedBeaconPreset
+			);
+
 			let sync_committee_root = update
 				.current_sync_committee
-				.hash_tree_root()
+				.hash_tree_root(preset)
 				.map_err(|_| Error::<T>::SyncCommitteeHashTreeRootFailed)?;
 
 			let sync_committee_gindex =
@@ -347,8 +374,9 @@ pub mod pallet {
 				.hash_tree_root()
 				.map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
 
-			let sync_committee_prepared: SyncCommitteePrepared = (&update.current_sync_committee)
-				.try_into()
+			let sync_committee_prepared = update
+				.current_sync_committee
+				.prepare(preset)
 				.map_err(|_| <Error<T>>::BLSPreparePublicKeysFailed)?;
 			<CurrentSyncCommittee<T>>::set(sync_committee_prepared);
 			<NextSyncCommittee<T>>::kill();
@@ -371,9 +399,23 @@ pub mod pallet {
 		/// (including checking that a sync committee period isn't skipped and that the header is
 		/// signed by the current sync committee.
 		fn verify_update(update: &Update) -> DispatchResult {
+			let preset = Self::beacon_preset();
+
+			ensure!(
+				update.sync_aggregate.matches_preset(preset),
+				Error::<T>::UnexpectedBeaconPreset
+			);
+			if let Some(next_sync_committee_update) = &update.next_sync_committee_update {
+				ensure!(
+					next_sync_committee_update.next_sync_committee.matches_preset(preset),
+					Error::<T>::UnexpectedBeaconPreset
+				);
+			}
+
 			// Verify sync committee has sufficient participants.
 			let participation =
-				decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits);
+				decompress_sync_committee_bits(update.sync_aggregate.sync_committee_bits.as_ref())
+					.ok_or(Error::<T>::UnexpectedBeaconPreset)?;
 			Self::sync_committee_participation_is_supermajority(&participation)?;
 
 			// Verify update does not skip a sync committee period.
@@ -386,8 +428,8 @@ pub mod pallet {
 			let latest_finalized_state =
 				FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
 					.ok_or(Error::<T>::NotBootstrapped)?;
-			let store_period = compute_period(latest_finalized_state.slot);
-			let signature_period = compute_period(update.signature_slot);
+			let store_period = Self::compute_period(latest_finalized_state.slot);
+			let signature_period = Self::compute_period(update.signature_slot);
 			if <NextSyncCommittee<T>>::exists() {
 				ensure!(
 					(store_period..=store_period + 1).contains(&signature_period),
@@ -398,8 +440,8 @@ pub mod pallet {
 			}
 
 			// Verify update is relevant.
-			let update_attested_period = compute_period(update.attested_header.slot);
-			let update_finalized_period = compute_period(update.finalized_header.slot);
+			let update_attested_period = Self::compute_period(update.attested_header.slot);
+			let update_finalized_period = Self::compute_period(update.finalized_header.slot);
 			let update_has_next_sync_committee = !<NextSyncCommittee<T>>::exists() &&
 				(update.next_sync_committee_update.is_some() &&
 					update_attested_period == store_period);
@@ -413,9 +455,7 @@ pub mod pallet {
 			// header is not larger than the sync committee period, otherwise we cannot do
 			// ancestry proofs for execution headers in the gap.
 			ensure!(
-				latest_finalized_state
-					.slot
-					.saturating_add(config::SLOTS_PER_HISTORICAL_ROOT as u64) >=
+				latest_finalized_state.slot.saturating_add(Self::slots_per_historical_root()) >=
 					update.finalized_header.slot,
 				Error::<T>::InvalidFinalizedHeaderGap
 			);
@@ -446,7 +486,7 @@ pub mod pallet {
 			if let Some(next_sync_committee_update) = &update.next_sync_committee_update {
 				let sync_committee_root = next_sync_committee_update
 					.next_sync_committee
-					.hash_tree_root()
+					.hash_tree_root(preset)
 					.map_err(|_| Error::<T>::SyncCommitteeHashTreeRootFailed)?;
 				if update_attested_period == store_period && <NextSyncCommittee<T>>::exists() {
 					let next_committee_root = <NextSyncCommittee<T>>::get().root;
@@ -483,7 +523,7 @@ pub mod pallet {
 				<NextSyncCommittee<T>>::get()
 			};
 			let absent_pubkeys =
-				Self::find_pubkeys(&participation, (*sync_committee.pubkeys).as_ref(), false);
+				Self::find_pubkeys(&participation, sync_committee.pubkeys.as_ref(), false);
 			let signing_root = Self::signing_root(
 				&update.attested_header,
 				Self::validators_root(),
@@ -509,6 +549,7 @@ pub mod pallet {
 		/// SyncCommitteePrepared type. Stores the provided finalized header. Updates are free
 		/// if the certain conditions specified in `check_refundable` are met.
 		fn apply_update(update: &Update) -> DispatchResultWithPostInfo {
+			let preset = Self::beacon_preset();
 			let latest_finalized_state =
 				FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
 					.ok_or(Error::<T>::NotBootstrapped)?;
@@ -520,11 +561,11 @@ pub mod pallet {
 			};
 
 			if let Some(next_sync_committee_update) = &update.next_sync_committee_update {
-				let store_period = compute_period(latest_finalized_state.slot);
-				let update_finalized_period = compute_period(update.finalized_header.slot);
-				let sync_committee_prepared: SyncCommitteePrepared = (&next_sync_committee_update
-					.next_sync_committee)
-					.try_into()
+				let store_period = Self::compute_period(latest_finalized_state.slot);
+				let update_finalized_period = Self::compute_period(update.finalized_header.slot);
+				let sync_committee_prepared = next_sync_committee_update
+					.next_sync_committee
+					.prepare(preset)
 					.map_err(|_| <Error<T>>::BLSPreparePublicKeysFailed)?;
 
 				if !<NextSyncCommittee<T>>::exists() {
@@ -751,7 +792,7 @@ pub mod pallet {
 			// In validate_light_client_update: fork_version_slot = max(signature_slot, 1) - 1
 			let fork_version = Self::compute_fork_version(compute_epoch(
 				signature_slot.saturating_sub(1),
-				config::SLOTS_PER_EPOCH as u64,
+				Self::slots_per_epoch(),
 			))?;
 			let domain_type = config::DOMAIN_SYNC_COMMITTEE.to_vec();
 			// Domains are used for seeds, for signatures, and for selecting aggregators.
@@ -766,7 +807,7 @@ pub mod pallet {
 		/// successful sync committee updates are free.
 		pub(super) fn check_refundable(update: &Update, latest_slot: u64) -> Pays {
 			// If the sync committee was successfully updated, the update may be free.
-			let update_period = compute_period(update.finalized_header.slot);
+			let update_period = Self::compute_period(update.finalized_header.slot);
 			let latest_free_update_period = LatestSyncCommitteeUpdatePeriod::<T>::get();
 			// If the next sync committee is not known and this update sets it, the update is free.
 			// If the sync committee update is in a period that we have not received an update for,
@@ -789,7 +830,7 @@ pub mod pallet {
 		}
 
 		pub fn finalized_root_gindex_at_slot(slot: u64, fork_versions: &ForkVersions) -> usize {
-			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
+			let epoch = compute_epoch(slot, Self::slots_per_epoch());
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::FINALIZED_ROOT_INDEX;
@@ -802,7 +843,7 @@ pub mod pallet {
 			slot: u64,
 			fork_versions: &ForkVersions,
 		) -> usize {
-			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
+			let epoch = compute_epoch(slot, Self::slots_per_epoch());
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::CURRENT_SYNC_COMMITTEE_INDEX;
@@ -815,7 +856,7 @@ pub mod pallet {
 			slot: u64,
 			fork_versions: &ForkVersions,
 		) -> usize {
-			let epoch = compute_epoch(slot, config::SLOTS_PER_EPOCH as u64);
+			let epoch = compute_epoch(slot, Self::slots_per_epoch());
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::NEXT_SYNC_COMMITTEE_INDEX;
@@ -826,6 +867,26 @@ pub mod pallet {
 
 		pub fn execution_header_gindex() -> usize {
 			config::altair::EXECUTION_HEADER_INDEX
+		}
+
+		pub fn beacon_preset() -> EthereumBeaconPreset {
+			BeaconPreset::<T>::get()
+		}
+
+		pub fn slots_per_epoch() -> u64 {
+			Self::beacon_preset().slots_per_epoch() as u64
+		}
+
+		pub fn epochs_per_sync_committee_period() -> u64 {
+			Self::beacon_preset().epochs_per_sync_committee_period() as u64
+		}
+
+		pub fn slots_per_historical_root() -> u64 {
+			Self::beacon_preset().slots_per_historical_root() as u64
+		}
+
+		pub fn compute_period(slot: u64) -> u64 {
+			compute_period(slot, Self::slots_per_epoch(), Self::epochs_per_sync_committee_period())
 		}
 	}
 
@@ -884,8 +945,8 @@ pub mod pallet {
 					else {
 						return Ok(());
 					};
-					let store_period = compute_period(latest_finalized_state.slot);
-					let update_attested_period = compute_period(update.attested_header.slot);
+					let store_period = Self::compute_period(latest_finalized_state.slot);
+					let update_attested_period = Self::compute_period(update.attested_header.slot);
 					let can_advance_finalized =
 						update.finalized_header.slot > latest_finalized_state.slot;
 					let can_set_missing_next_sync = !<NextSyncCommittee<T>>::exists() &&

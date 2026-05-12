@@ -35,6 +35,46 @@ it('returns nothing when the verifier is not bootstrapped', async () => {
   expect(txs).toEqual([]);
 });
 
+it('rejects a beacon endpoint whose preset does not match the chain config', async () => {
+  globalThis.fetch = createFetch({
+    'http://minimal-beacon.invalid/eth/v1/config/spec': {
+      data: createBeaconSpec({ slotsPerHistoricalRoot: '64' }),
+    },
+  });
+
+  await expect(
+    getNextEthereumBeaconSyncTxs(
+      createMockClient({ beaconPreset: 'mainnet' }),
+      'http://minimal-beacon.invalid',
+    ),
+  ).rejects.toThrow('Beacon preset mismatch: chain expects mainnet, but endpoint reports minimal');
+});
+
+it('caches the expected beacon preset per client across sync attempts', async () => {
+  let beaconPresetQueries = 0;
+  const client = createMockClient({
+    beaconPreset: 'mainnet',
+    onBeaconPresetQuery: () => {
+      beaconPresetQueries += 1;
+    },
+  });
+
+  globalThis.fetch = createFetch({
+    'http://minimal-beacon.invalid/eth/v1/config/spec': {
+      data: createBeaconSpec({ slotsPerHistoricalRoot: '64' }),
+    },
+  });
+
+  await expect(
+    getNextEthereumBeaconSyncTxs(client, 'http://minimal-beacon.invalid'),
+  ).rejects.toThrow('Beacon preset mismatch: chain expects mainnet, but endpoint reports minimal');
+  await expect(
+    getNextEthereumBeaconSyncTxs(client, 'http://minimal-beacon.invalid'),
+  ).rejects.toThrow('Beacon preset mismatch: chain expects mainnet, but endpoint reports minimal');
+
+  expect(beaconPresetQueries).toBe(1);
+});
+
 it('returns nothing when the verifier state is current and the anchor is already retained', async () => {
   const anchorFixture = await createAnchorFixture(
     '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -186,9 +226,7 @@ it('falls back to the finality update when the period update list is empty', asy
       },
     },
     'https://beacon.example/eth/v1/config/spec': {
-      data: {
-        SLOTS_PER_HISTORICAL_ROOT: '8192',
-      },
+      data: createBeaconSpec(),
     },
     'https://beacon.example/eth/v1/beacon/headers/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee':
       anchorFixture.headerResponse,
@@ -230,9 +268,7 @@ it('falls back to the finality update when the period update response omits data
       },
     },
     'https://beacon.example/eth/v1/config/spec': {
-      data: {
-        SLOTS_PER_HISTORICAL_ROOT: '8192',
-      },
+      data: createBeaconSpec(),
     },
     'https://beacon.example/eth/v1/beacon/headers/0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff':
       anchorFixture.headerResponse,
@@ -344,6 +380,7 @@ it('builds a force-checkpoint tx from beacon bootstrap data without block-roots 
     },
     'https://beacon.example/eth/v1/config/spec': {
       data: {
+        ...createBeaconSpec(),
         ALTAIR_FORK_VERSION: '0x01000000',
         ALTAIR_FORK_EPOCH: '0',
         BELLATRIX_FORK_VERSION: '0x02000000',
@@ -399,6 +436,13 @@ it('builds a force-checkpoint tx from beacon bootstrap data without block-roots 
   });
 });
 
+it('uses mainnet as the default beacon preset value', async () => {
+  await expect(createMockClient().query.ethereumVerifier.beaconPreset()).resolves.toMatchObject({
+    isMainnet: true,
+    isMinimal: false,
+  });
+});
+
 function createMockClient(args?: {
   isBootstrapped?: boolean;
   latestFinalizedSlot?: number;
@@ -406,6 +450,8 @@ function createMockClient(args?: {
   headerInterval?: number;
   hasNextSyncCommittee?: boolean;
   hasExecutionAnchor?: boolean;
+  beaconPreset?: 'mainnet' | 'minimal';
+  onBeaconPresetQuery?: () => void;
 }) {
   const defaultLatestFinalizedBlockRoot =
     '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -416,6 +462,8 @@ function createMockClient(args?: {
     headerInterval = 32,
     hasNextSyncCommittee = false,
     hasExecutionAnchor = false,
+    beaconPreset = 'mainnet',
+    onBeaconPresetQuery,
   } = args ?? {};
 
   const client = {
@@ -426,6 +474,15 @@ function createMockClient(args?: {
     },
     query: {
       ethereumVerifier: {
+        beaconPreset: async () => {
+          onBeaconPresetQuery?.();
+
+          return {
+            isMainnet: beaconPreset === 'mainnet',
+            isMinimal: beaconPreset === 'minimal',
+            toString: () => beaconPreset,
+          };
+        },
         latestFinalizedBlockRoot: async () => ({
           toHex: () => defaultLatestFinalizedBlockRoot,
         }),
@@ -527,11 +584,13 @@ function createLightClientUpdate(slot: number, extra: Record<string, unknown> = 
   };
 }
 
-function createBeaconSpec() {
+function createBeaconSpec(args?: { slotsPerHistoricalRoot?: string }) {
+  const { slotsPerHistoricalRoot = '8192' } = args ?? {};
+
   return {
     SLOTS_PER_EPOCH: '32',
     EPOCHS_PER_SYNC_COMMITTEE_PERIOD: '256',
-    SLOTS_PER_HISTORICAL_ROOT: '8192',
+    SLOTS_PER_HISTORICAL_ROOT: slotsPerHistoricalRoot,
   };
 }
 

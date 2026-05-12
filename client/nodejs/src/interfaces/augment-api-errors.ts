@@ -505,6 +505,7 @@ declare module '@polkadot/api-base/types/errors' {
       SyncCommitteeHashTreeRootFailed: AugmentedError<ApiType>;
       SyncCommitteeParticipantsNotSupermajority: AugmentedError<ApiType>;
       SyncCommitteeUpdateRequired: AugmentedError<ApiType>;
+      UnexpectedBeaconPreset: AugmentedError<ApiType>;
     };
     feeControl: {
       /**

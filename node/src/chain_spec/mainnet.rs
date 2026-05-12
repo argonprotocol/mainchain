@@ -4,7 +4,8 @@ use argon_primitives::{
 	block_seal::MiningSlotConfig,
 	notary::{GenesisNotary, NotaryPublic},
 	tick::Ticker,
-	AccountId, Chain, ComputeDifficulty, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL, TOKEN_DECIMALS,
+	AccountId, Chain, ComputeDifficulty, EthereumBeaconPreset, ADDRESS_PREFIX, ARGON_TOKEN_SYMBOL,
+	TOKEN_DECIMALS,
 };
 use argon_runtime::WASM_BINARY;
 use core::str::FromStr;
@@ -98,6 +99,7 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
 				slot_bidding_start_after_ticks: 14_400 - 1_440, // start at day 9
 			},
 			minimum_bitcoin_lock_satoshis: 1_000,
+			ethereum_beacon_preset: EthereumBeaconPreset::Mainnet,
 		}))
 		.build())
 }

@@ -80,6 +80,7 @@ argon-canary-runtime = { workspace = true, features = ["default"] }
 argon-primitives = { workspace = true, features = ["default"] }
 argon-bitcoin-utxo-tracker = { workspace = true }
 argon-randomx = { workspace = true }
+pallet-ethereum-verifier = { workspace = true, features = ["default"] }
 
 # CLI-specific dependencies
 url = { workspace = true }
@@ -94,6 +95,7 @@ runtime-benchmarks = [
 	"argon-canary-runtime/runtime-benchmarks",
 	"argon-primitives/runtime-benchmarks",
 	"argon-runtime/runtime-benchmarks",
+	"pallet-ethereum-verifier/runtime-benchmarks",
 	"polkadot-sdk/runtime-benchmarks",
 ]
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
@@ -101,5 +103,6 @@ runtime-benchmarks = [
 try-runtime = [
 	"argon-canary-runtime/try-runtime",
 	"argon-runtime/try-runtime",
+	"pallet-ethereum-verifier/try-runtime",
 	"polkadot-sdk/try-runtime",
 ]
