@@ -1468,6 +1468,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[allow(clippy::type_complexity, reason = "Return type intentionally exposes both securitization state and balance.")]
 		fn prepare_lock_securitization(
 			vault_id: VaultId,
 			satoshis: Satoshis,
