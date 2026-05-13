@@ -100,9 +100,7 @@ export type EthereumBeaconHeaderDetailsResponse = {
   };
 };
 
-export type EthereumLightClientUpdatesResponse = {
-  data: EthereumLightClientUpdate[];
-};
+export type EthereumLightClientUpdatesResponse = EthereumLightClientUpdate[];
 
 export type EthereumBeaconBlockResponse = {
   version: string;

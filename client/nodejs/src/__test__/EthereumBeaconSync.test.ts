@@ -1,5 +1,4 @@
 import { afterEach, expect, it } from 'vitest';
-import { ssz } from '@lodestar/types';
 import {
   type ArgonClient,
   getEthereumBeaconSyncBootstrapTx,
@@ -76,10 +75,6 @@ it('caches the expected beacon preset per client across sync attempts', async ()
 });
 
 it('returns nothing when the verifier state is current and the anchor is already retained', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    800,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(800),
@@ -87,10 +82,6 @@ it('returns nothing when the verifier state is current and the anchor is already
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -102,31 +93,19 @@ it('returns nothing when the verifier state is current and the anchor is already
 });
 
 it('builds submit and anchor txs once the free header interval is reached', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    832,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(832),
-    },
-    'https://beacon.example/eth/v1/beacon/headers/832': {
-      data: {
-        root: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        canonical: true,
-        header: {
-          message: createBeaconHeader(832),
-          signature: '0xsig',
+      data: createLightClientUpdate(832, {
+        finalized_header: {
+          beacon: createBeaconHeader(832),
+          execution: createExecutionHeader(832),
+          execution_branch: ['0xbranch832'],
         },
-      },
+      }),
     },
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -145,48 +124,79 @@ it('builds submit and anchor txs once the free header interval is reached', asyn
       method: 'importExecutionHeaderAnchor',
       executionProof: expect.objectContaining({
         header: expect.objectContaining({ slot: '832' }),
+        executionBranch: ['0xbranch832'],
+      }),
+    },
+  ]);
+});
+
+it('supports minimal beacon updates without fetching full beacon blocks', async () => {
+  globalThis.fetch = createFetch({
+    'https://minimal-beacon.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(32, {
+        sync_aggregate: {
+          sync_committee_bits: '0xffffffff',
+          sync_committee_signature: '0x02',
+        },
+        finalized_header: {
+          beacon: createBeaconHeader(32),
+          execution: createExecutionHeader(32),
+          execution_branch: ['0xfulu32'],
+        },
+      }),
+    },
+    'https://minimal-beacon.example/eth/v1/config/spec': {
+      data: createBeaconSpec({
+        slotsPerHistoricalRoot: '64',
+        slotsPerEpoch: '8',
+        epochsPerSyncCommitteePeriod: '8',
+      }),
+    },
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({
+      beaconPreset: 'minimal',
+      hasNextSyncCommittee: true,
+      latestFinalizedSlot: 0,
+    }),
+    'https://minimal-beacon.example',
+  );
+
+  expect(txs).toEqual([
+    {
+      method: 'submit',
+      update: expect.objectContaining({
+        finalizedHeader: expect.objectContaining({ slot: '32' }),
+      }),
+    },
+    {
+      method: 'importExecutionHeaderAnchor',
+      executionProof: expect.objectContaining({
+        header: expect.objectContaining({ slot: '32' }),
+        executionBranch: ['0xfulu32'],
       }),
     },
   ]);
 });
 
 it('prefers a light client period update when the next sync committee is missing', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-    801,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(1600),
     },
-    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {
-      data: [
-        createLightClientUpdate(801, {
-          next_sync_committee: {
-            pubkeys: ['0x4'],
-            aggregate_pubkey: '0x5',
-          },
-          next_sync_committee_branch: ['0x6'],
-        }),
-      ],
-    },
-    'https://beacon.example/eth/v1/beacon/headers/801': {
-      data: {
-        root: '0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
-        canonical: true,
-        header: {
-          message: createBeaconHeader(801),
-          signature: '0xsig',
+    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [
+      createLightClientUpdate(801, {
+        next_sync_committee: {
+          pubkeys: ['0x4'],
+          aggregate_pubkey: '0x5',
         },
-      },
-    },
+        next_sync_committee_branch: ['0x6'],
+      }),
+    ],
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -204,34 +214,14 @@ it('prefers a light client period update when the next sync committee is missing
 });
 
 it('falls back to the finality update when the period update list is empty', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-    1600,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(1600),
     },
-    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {
-      data: [],
-    },
-    'https://beacon.example/eth/v1/beacon/headers/1600': {
-      data: {
-        root: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-        canonical: true,
-        header: {
-          message: createBeaconHeader(1600),
-          signature: '0xsig',
-        },
-      },
-    },
+    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [],
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -248,32 +238,14 @@ it('falls back to the finality update when the period update list is empty', asy
 });
 
 it('falls back to the finality update when the period update response omits data', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
-    1600,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(1600),
     },
     'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {} as any,
-    'https://beacon.example/eth/v1/beacon/headers/1600': {
-      data: {
-        root: '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
-        canonical: true,
-        header: {
-          message: createBeaconHeader(1600),
-          signature: '0xsig',
-        },
-      },
-    },
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -290,10 +262,6 @@ it('falls back to the finality update when the period update response omits data
 });
 
 it('still submits a same-slot update when it fills a missing next sync committee', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-    800,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(800, {
@@ -304,23 +272,9 @@ it('still submits a same-slot update when it fills a missing next sync committee
         next_sync_committee_branch: ['0x6'],
       }),
     },
-    'https://beacon.example/eth/v1/beacon/headers/800': {
-      data: {
-        root: '0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-        canonical: true,
-        header: {
-          message: createBeaconHeader(800),
-          signature: '0xsig',
-        },
-      },
-    },
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -338,21 +292,19 @@ it('still submits a same-slot update when it fills a missing next sync committee
 });
 
 it('returns only an anchor import when the header state is current but the anchor is missing', async () => {
-  const anchorFixture = await createAnchorFixture(
-    '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    800,
-  );
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(800),
+      data: createLightClientUpdate(800, {
+        finalized_header: {
+          beacon: createBeaconHeader(800),
+          execution: createExecutionHeader(800),
+          execution_branch: ['0xanchor800'],
+        },
+      }),
     },
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
-    'https://beacon.example/eth/v1/beacon/headers/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
-      anchorFixture.headerResponse,
-    'https://beacon.example/eth/v2/beacon/blocks/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
-      anchorFixture.blockResponse,
   });
 
   const txs = await getNextEthereumBeaconSyncTxs(
@@ -365,6 +317,7 @@ it('returns only an anchor import when the header state is current but the ancho
       method: 'importExecutionHeaderAnchor',
       executionProof: expect.objectContaining({
         header: expect.objectContaining({ slot: '800' }),
+        executionBranch: ['0xanchor800'],
       }),
     },
   ]);
@@ -584,12 +537,20 @@ function createLightClientUpdate(slot: number, extra: Record<string, unknown> = 
   };
 }
 
-function createBeaconSpec(args?: { slotsPerHistoricalRoot?: string }) {
-  const { slotsPerHistoricalRoot = '8192' } = args ?? {};
+function createBeaconSpec(args?: {
+  slotsPerHistoricalRoot?: string;
+  slotsPerEpoch?: string;
+  epochsPerSyncCommitteePeriod?: string;
+}) {
+  const {
+    slotsPerHistoricalRoot = '8192',
+    slotsPerEpoch = '32',
+    epochsPerSyncCommitteePeriod = '256',
+  } = args ?? {};
 
   return {
-    SLOTS_PER_EPOCH: '32',
-    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: '256',
+    SLOTS_PER_EPOCH: slotsPerEpoch,
+    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: epochsPerSyncCommitteePeriod,
     SLOTS_PER_HISTORICAL_ROOT: slotsPerHistoricalRoot,
   };
 }
@@ -601,79 +562,6 @@ function createBeaconHeader(slot: number) {
     parent_root: `0xparent${slot}`,
     state_root: `0xstate${slot}`,
     body_root: `0xbody${slot}`,
-  };
-}
-
-async function createAnchorFixture(blockRoot: string, slot: number) {
-  const BeaconBlockBody = ssz.capella.BeaconBlockBody;
-  const bodyJson = {
-    randao_reveal: `0x${'11'.repeat(96)}`,
-    eth1_data: {
-      deposit_root: `0x${'22'.repeat(32)}`,
-      deposit_count: '0',
-      block_hash: `0x${'33'.repeat(32)}`,
-    },
-    graffiti: `0x${'44'.repeat(32)}`,
-    proposer_slashings: [],
-    attester_slashings: [],
-    attestations: [],
-    deposits: [],
-    voluntary_exits: [],
-    sync_aggregate: {
-      sync_committee_bits: `0x${'00'.repeat(64)}`,
-      sync_committee_signature: `0x${'55'.repeat(96)}`,
-    },
-    execution_payload: {
-      parent_hash: `0x${'66'.repeat(32)}`,
-      fee_recipient: `0x${'77'.repeat(20)}`,
-      state_root: `0x${'88'.repeat(32)}`,
-      receipts_root: `0x${'99'.repeat(32)}`,
-      logs_bloom: `0x${'00'.repeat(256)}`,
-      prev_randao: `0x${'aa'.repeat(32)}`,
-      block_number: `${slot}`,
-      gas_limit: '30000000',
-      gas_used: '21000',
-      timestamp: `${slot}`,
-      extra_data: '0x',
-      base_fee_per_gas: '7',
-      block_hash: `0x${'bb'.repeat(32)}`,
-      transactions: [],
-      withdrawals: [],
-    },
-    bls_to_execution_changes: [],
-  };
-  const body = BeaconBlockBody.fromJson(bodyJson);
-  const bodyRoot = `0x${Buffer.from(BeaconBlockBody.hashTreeRoot(body)).toString('hex')}`;
-
-  return {
-    headerResponse: {
-      data: {
-        root: blockRoot,
-        canonical: true,
-        header: {
-          message: {
-            slot: `${slot}`,
-            proposer_index: '1',
-            parent_root: `0x${'cc'.repeat(32)}`,
-            state_root: `0x${'dd'.repeat(32)}`,
-            body_root: bodyRoot,
-          },
-          signature: `0x${'ee'.repeat(96)}`,
-        },
-      },
-    },
-    blockResponse: {
-      version: 'capella',
-      data: {
-        message: {
-          slot: `${slot}`,
-          proposer_index: '1',
-          parent_root: `0x${'cc'.repeat(32)}`,
-          state_root: `0x${'dd'.repeat(32)}`,
-          body: bodyJson,
-        },
-      },
-    },
   };
 }
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   TxSubmitter,
   buildEthereumEventProof,
+  dispatchErrorToString,
   getEthereumBeaconSyncBootstrapTx,
   getNextEthereumBeaconSyncTxs,
 } from '../index';
@@ -38,7 +39,7 @@ const TEST_ACCOUNT = {
 } as const;
 
 const RUNTIME_TO_ERC20_SCALE = 1_000_000_000_000n;
-const TRANSFER_AMOUNT_BASE_UNITS = 250n;
+const TRANSFER_AMOUNT_BASE_UNITS = 10_000n;
 
 afterEach(async () => {
   await teardown();
@@ -168,8 +169,9 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       throw new Error('forceCheckpoint did not emit sudo.Sudid');
     }
     if (checkpointSudoEvent.data.sudoResult.isErr) {
+      const dispatchError = checkpointSudoEvent.data.sudoResult.asErr;
       throw new Error(
-        `forceCheckpoint failed: ${checkpointSudoEvent.data.sudoResult.asErr.toString()}`,
+        `forceCheckpoint failed: ${dispatchErrorToString(mainchainClient, dispatchError)}`,
       );
     }
 

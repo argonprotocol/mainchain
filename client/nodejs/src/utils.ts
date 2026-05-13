@@ -6,6 +6,11 @@ import { EventRecord } from '@polkadot/types/interfaces/system';
 const { ROUND_FLOOR } = BN;
 
 export const MICROGONS_PER_ARGON = 1_000_000;
+type IDispatchErrorLike = {
+  isModule: boolean;
+  asModule: Parameters<ArgonClient['registry']['findMetaError']>[0];
+  toString(): string;
+};
 
 export function formatArgons(microgons: bigint | number): string {
   if (microgons === undefined || microgons === null) return 'na';
@@ -53,7 +58,7 @@ export async function gettersToObject<T>(obj: T): Promise<T> {
   return result as T;
 }
 
-export function dispatchErrorToString(client: ArgonClient, error: DispatchError) {
+export function dispatchErrorToString(client: ArgonClient, error: IDispatchErrorLike) {
   let message = error.toString();
   if (error.isModule) {
     const decoded = client.registry.findMetaError(error.asModule);
@@ -84,7 +89,7 @@ export class ExtrinsicError extends Error {
 
 export function dispatchErrorToExtrinsicError(
   client: ArgonClient,
-  error: DispatchError,
+  error: IDispatchErrorLike,
   batchInterruptedIndex?: number,
   txFee?: bigint,
 ) {
