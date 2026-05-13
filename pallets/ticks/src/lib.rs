@@ -2,10 +2,12 @@
 extern crate alloc;
 extern crate core;
 
-use argon_primitives::TickProvider;
+use argon_primitives::{ArgonDigests, TickProvider, TimestampDigest, TIMESTAMP_DIGEST_ID};
+use codec::Encode;
 use frame_support::traits::OnTimestampSet;
 pub use pallet::*;
 use pallet_prelude::*;
+use sp_runtime::DigestItem;
 pub use weights::*;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -192,14 +194,36 @@ pub mod pallet {
 impl<T: Config> OnTimestampSet<T::Moment> for Pallet<T> {
 	// called from an inherent, so will be after on_initialize
 	fn on_timestamp_set(now: T::Moment) {
-		let timestamp = UniqueSaturatedInto::<u64>::unique_saturated_into(now);
-		let tick_for_now = Self::ticker().tick_for_time(timestamp);
+		let timestamp_millis = UniqueSaturatedInto::<u64>::unique_saturated_into(now);
+		let tick_for_now = Self::ticker().tick_for_time(timestamp_millis);
 		let proposed_tick = <CurrentTick<T>>::get();
 		// tick for current time must be >= the proposed tick
 		if tick_for_now < proposed_tick {
 			panic!(
 				"The proposed tick is in the future, which is not allowed. Digest tick={proposed_tick} vs Current tick={tick_for_now}"
 			);
+		}
+
+		let digest_timestamp = TimestampDigest { timestamp: timestamp_millis / 1_000 };
+		let mut included_digest = None;
+
+		for digest_item in <frame_system::Pallet<T>>::digest().logs.iter() {
+			if let Some(timestamp_digest) = digest_item.as_timestamp() {
+				assert!(included_digest.is_none(), "Timestamp digest can only be provided once");
+				included_digest = Some(timestamp_digest);
+			}
+		}
+
+		if let Some(timestamp_digest) = included_digest {
+			assert_eq!(
+				timestamp_digest, digest_timestamp,
+				"Timestamp digest does not match the timestamp pallet"
+			);
+		} else {
+			<frame_system::Pallet<T>>::deposit_log(DigestItem::Consensus(
+				TIMESTAMP_DIGEST_ID,
+				digest_timestamp.encode(),
+			));
 		}
 	}
 }
