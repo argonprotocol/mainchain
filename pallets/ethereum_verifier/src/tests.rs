@@ -39,6 +39,7 @@ use polkadot_sdk::{
 	sp_runtime::DispatchError,
 };
 use snowbridge_beacon_primitives::merkle_proof::{generalized_index_length, subtree_index};
+use std::{fs::File, path::PathBuf};
 
 const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u64;
 const MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD: u64 =
@@ -48,6 +49,7 @@ const MAINNET_SLOTS_PER_HISTORICAL_ROOT: u64 =
 const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
 const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
 	EthereumBeaconPreset::Mainnet.sync_committee_bits_size();
+const MINIMAL_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Minimal.sync_committee_size();
 
 /// Arbitrary hash used for tests and invalid hashes.
 const TEST_HASH: [u8; 32] =
@@ -88,6 +90,20 @@ fn b256_from_h256(value: H256) -> B256 {
 
 fn process_checkpoint_update(update: &CheckpointUpdate) -> DispatchResult {
 	EthereumBeaconClient::process_checkpoint_update(update, &ChainForkVersions::get())
+}
+
+#[derive(serde::Deserialize)]
+struct MinimalBootstrapFixture {
+	header: BeaconHeader,
+	current_sync_committee:
+		snowbridge_beacon_primitives::SyncCommittee<{ MINIMAL_SYNC_COMMITTEE_SIZE }>,
+	current_sync_committee_branch: Vec<H256>,
+}
+
+fn load_minimal_bootstrap_fixture(basename: &str) -> MinimalBootstrapFixture {
+	let filepath: PathBuf =
+		[env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", basename].iter().collect();
+	serde_json::from_reader(File::open(filepath).unwrap()).unwrap()
 }
 
 fn compute_period(slot: u64) -> u64 {
@@ -461,6 +477,106 @@ fn process_initial_checkpoint_with_invalid_sync_committee_proof() {
 			),
 			Error::<Test>::InvalidSyncCommitteeMerkleProof
 		);
+	});
+}
+
+#[test]
+fn process_minimal_bootstrap_checkpoint() {
+	let bootstrap = load_minimal_bootstrap_fixture("minimal-bootstrap.json");
+	let raw_sync_committee = bootstrap.current_sync_committee;
+	let current_sync_committee = crate::types::SyncCommittee {
+		pubkeys: raw_sync_committee
+			.pubkeys
+			.to_vec()
+			.try_into()
+			.expect("minimal bootstrap fixture stays within bounded sync committee size"),
+		aggregate_pubkey: raw_sync_committee.aggregate_pubkey,
+	};
+	let current_sync_committee_root = current_sync_committee
+		.hash_tree_root(EthereumBeaconPreset::Minimal)
+		.expect("minimal committee root should serialize");
+
+	assert_eq!(
+		current_sync_committee_root,
+		raw_sync_committee
+			.hash_tree_root()
+			.expect("raw minimal committee root should serialize")
+	);
+	assert!(verify_merkle_branch(
+		current_sync_committee_root,
+		&bootstrap.current_sync_committee_branch,
+		subtree_index(crate::config::electra::CURRENT_SYNC_COMMITTEE_INDEX),
+		generalized_index_length(crate::config::electra::CURRENT_SYNC_COMMITTEE_INDEX),
+		bootstrap.header.state_root
+	));
+
+	let checkpoint = Box::new(CheckpointUpdate {
+		header: bootstrap.header,
+		current_sync_committee,
+		current_sync_committee_branch: bootstrap
+			.current_sync_committee_branch
+			.try_into()
+			.expect("minimal bootstrap branch stays within bounded proof size"),
+		validators_root: H256::zero(),
+	});
+
+	new_tester().execute_with(|| {
+		crate::pallet::BeaconPreset::<Test>::put(EthereumBeaconPreset::Minimal);
+
+		assert_ok!(EthereumBeaconClient::force_checkpoint(
+			RuntimeOrigin::root(),
+			checkpoint,
+			ForkVersions {
+				genesis: Fork { version: hex!("00000000"), epoch: 0 },
+				altair: Fork { version: hex!("01000000"), epoch: 0 },
+				bellatrix: Fork { version: hex!("02000000"), epoch: 0 },
+				capella: Fork { version: hex!("03000000"), epoch: 0 },
+				deneb: Fork { version: hex!("04000000"), epoch: 0 },
+				electra: Fork { version: hex!("05000000"), epoch: 0 },
+				fulu: Fork { version: hex!("06000000"), epoch: 0 },
+			}
+		));
+	});
+}
+
+#[test]
+fn process_later_minimal_bootstrap_checkpoint() {
+	let bootstrap = load_minimal_bootstrap_fixture("minimal-bootstrap-later.json");
+	let raw_sync_committee = bootstrap.current_sync_committee;
+	let current_sync_committee = crate::types::SyncCommittee {
+		pubkeys: raw_sync_committee
+			.pubkeys
+			.to_vec()
+			.try_into()
+			.expect("later minimal bootstrap fixture stays within bounded sync committee size"),
+		aggregate_pubkey: raw_sync_committee.aggregate_pubkey,
+	};
+	let checkpoint = Box::new(CheckpointUpdate {
+		header: bootstrap.header,
+		current_sync_committee,
+		current_sync_committee_branch: bootstrap
+			.current_sync_committee_branch
+			.try_into()
+			.expect("later minimal bootstrap branch stays within bounded proof size"),
+		validators_root: H256::zero(),
+	});
+
+	new_tester().execute_with(|| {
+		crate::pallet::BeaconPreset::<Test>::put(EthereumBeaconPreset::Minimal);
+
+		assert_ok!(EthereumBeaconClient::force_checkpoint(
+			RuntimeOrigin::root(),
+			checkpoint,
+			ForkVersions {
+				genesis: Fork { version: hex!("00000000"), epoch: 0 },
+				altair: Fork { version: hex!("01000000"), epoch: 0 },
+				bellatrix: Fork { version: hex!("02000000"), epoch: 0 },
+				capella: Fork { version: hex!("03000000"), epoch: 0 },
+				deneb: Fork { version: hex!("04000000"), epoch: 0 },
+				electra: Fork { version: hex!("05000000"), epoch: 0 },
+				fulu: Fork { version: hex!("06000000"), epoch: 0 },
+			}
+		));
 	});
 }
 
