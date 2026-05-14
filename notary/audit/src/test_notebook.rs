@@ -182,6 +182,154 @@ fn test_verify_previous_balance() {
 }
 
 #[test]
+fn test_verify_previous_balance_rejects_malformed_merkle_proofs() {
+	let mut final_balances = BTreeMap::<LocalchainAccountId, BalanceTip>::new();
+	let account_id = Alice.to_account_id();
+	let account_type = AccountType::Deposit;
+	let localchain_account_id = LocalchainAccountId::new(account_id.clone(), account_type);
+
+	let mut change = BalanceChange {
+		account_id,
+		account_type,
+		change_number: 500_000,
+		balance: 0,
+		previous_balance_proof: None,
+		channel_hold_note: None,
+		notes: bounded_vec![],
+		signature: empty_signature(),
+	};
+
+	let leaves = vec![
+		BalanceTip {
+			account_id: Dave.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 20,
+			change_number: 3,
+			account_origin: AccountOrigin { notebook_number: 5, account_uid: 2 },
+			channel_hold_note: None,
+		}
+		.encode(),
+		BalanceTip {
+			account_id: Bob.to_account_id(),
+			account_type: AccountType::Deposit,
+			balance: 100,
+			change_number: 1,
+			account_origin: AccountOrigin { notebook_number: 6, account_uid: 1 },
+			channel_hold_note: None,
+		}
+		.encode(),
+		BalanceTip {
+			account_id: change.account_id.clone(),
+			account_type: change.account_type,
+			balance: 100,
+			change_number: change.change_number - 1,
+			account_origin: AccountOrigin { notebook_number: 1, account_uid: 1 },
+			channel_hold_note: None,
+		}
+		.encode(),
+	];
+	let merkle_root = merkle_root::<Blake2Hasher, _>(&leaves);
+	let origin = AccountOrigin { notebook_number: 1, account_uid: 1 };
+
+	NotebookRoots::mutate(|a| a.insert(7, merkle_root));
+	LastChangedNotebook::mutate(|c| c.insert(origin.clone(), 7));
+
+	let proof = merkle_proof::<Blake2Hasher, _, _>(leaves, 2);
+	change.previous_balance_proof = Some(BalanceProof {
+		notary_id: 1,
+		notebook_number: 7,
+		tick: 7,
+		notebook_proof: Some(MerkleProof {
+			proof: BoundedVec::truncate_from(proof.proof),
+			leaf_index: proof.leaf_index as u32,
+			number_of_leaves: proof.number_of_leaves as u32,
+		}),
+		account_origin: origin,
+		balance: 100,
+	});
+
+	let valid_previous_balance_proof = change.previous_balance_proof.clone().unwrap();
+
+	let mut missing_siblings = valid_previous_balance_proof.clone();
+	missing_siblings.notebook_proof.as_mut().expect("test proof is populated").proof =
+		bounded_vec![];
+	assert_err!(
+		verify_previous_balance_proof(
+			&TestLookup,
+			&missing_siblings,
+			7,
+			&mut final_balances,
+			&change,
+			&localchain_account_id,
+		),
+		VerifyError::InvalidPreviousBalanceProof
+	);
+
+	let mut zero_leaves = valid_previous_balance_proof.clone();
+	zero_leaves
+		.notebook_proof
+		.as_mut()
+		.expect("test proof is populated")
+		.number_of_leaves = 0;
+	assert_err!(
+		verify_previous_balance_proof(
+			&TestLookup,
+			&zero_leaves,
+			7,
+			&mut final_balances,
+			&change,
+			&localchain_account_id,
+		),
+		VerifyError::InvalidPreviousBalanceProof
+	);
+
+	let mut out_of_range_leaf_index = valid_previous_balance_proof.clone();
+	{
+		let notebook_proof = out_of_range_leaf_index
+			.notebook_proof
+			.as_mut()
+			.expect("test proof is populated");
+		notebook_proof.leaf_index = notebook_proof.number_of_leaves;
+	}
+	assert_err!(
+		verify_previous_balance_proof(
+			&TestLookup,
+			&out_of_range_leaf_index,
+			7,
+			&mut final_balances,
+			&change,
+			&localchain_account_id,
+		),
+		VerifyError::InvalidPreviousBalanceProof
+	);
+
+	let mut duplicated_sibling = valid_previous_balance_proof;
+	{
+		let notebook_proof =
+			duplicated_sibling.notebook_proof.as_mut().expect("test proof is populated");
+		let mut duplicated_items = notebook_proof.proof.to_vec();
+		duplicated_items.push(
+			duplicated_items
+				.first()
+				.cloned()
+				.expect("fixture merkle proof includes at least one sibling"),
+		);
+		notebook_proof.proof = BoundedVec::truncate_from(duplicated_items);
+	}
+	assert_err!(
+		verify_previous_balance_proof(
+			&TestLookup,
+			&duplicated_sibling,
+			7,
+			&mut final_balances,
+			&change,
+			&localchain_account_id,
+		),
+		VerifyError::InvalidPreviousBalanceProof
+	);
+}
+
+#[test]
 fn test_verify_notebook() {
 	let note = Note::create(1_000_000, NoteType::ClaimFromMainchain { transfer_id: 1 });
 

@@ -995,6 +995,47 @@ fn verify_message_invalid_proof() {
 }
 
 #[test]
+fn verify_message_rejects_empty_and_duplicated_receipt_proofs() {
+	let (event_log, proof, anchor) = retained_anchor_verification_payload();
+
+	let mut empty_proof = proof.clone();
+	empty_proof.receipt_proof.nodes = Vec::new()
+		.try_into()
+		.expect("empty receipt proof stays within bounded node count");
+
+	let mut duplicated_proof = proof.clone();
+	let mut duplicated_nodes = duplicated_proof.receipt_proof.nodes.to_vec();
+	duplicated_nodes.push(
+		duplicated_nodes
+			.last()
+			.cloned()
+			.expect("fixture receipt proof includes at least one node"),
+	);
+	duplicated_proof.receipt_proof.nodes = duplicated_nodes
+		.try_into()
+		.expect("duplicated receipt proof stays within bounded node count");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
+				&event_log,
+				&empty_proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
+				&event_log,
+				&duplicated_proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+	});
+}
+
+#[test]
 fn verify_message_invalid_receipts_root() {
 	let (event_log, proof, mut anchor) = retained_anchor_verification_payload();
 	anchor.receipts_root = TEST_HASH.into();
