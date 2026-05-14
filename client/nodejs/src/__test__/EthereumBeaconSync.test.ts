@@ -79,6 +79,8 @@ it('returns nothing when the verifier state is current and the anchor is already
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(800),
     },
+    'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
+      createBootstrapResponse(800, ['0xstored800']),
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
@@ -180,13 +182,19 @@ it('supports minimal beacon updates without fetching full beacon blocks', async 
   ]);
 });
 
-it('prefers a light client period update when the next sync committee is missing', async () => {
+it('prefers the current-period update when the next sync committee is missing', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(1600),
+      data: createLightClientUpdate(1600, {
+        next_sync_committee: {
+          pubkeys: ['0x7'],
+          aggregate_pubkey: '0x8',
+        },
+        next_sync_committee_branch: ['0x9'],
+      }),
     },
     'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [
-      createLightClientUpdate(801, {
+      createVersionedLightClientUpdate(800, {
         next_sync_committee: {
           pubkeys: ['0x4'],
           aggregate_pubkey: '0x5',
@@ -194,6 +202,8 @@ it('prefers a light client period update when the next sync committee is missing
         next_sync_committee_branch: ['0x6'],
       }),
     ],
+    'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
+      createBootstrapResponse(800, ['0xstored800']),
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
@@ -201,84 +211,6 @@ it('prefers a light client period update when the next sync committee is missing
 
   const txs = await getNextEthereumBeaconSyncTxs(
     createMockClient({ hasNextSyncCommittee: false }),
-    'https://beacon.example',
-  );
-
-  expect(txs[0]).toEqual({
-    method: 'submit',
-    update: expect.objectContaining({
-      finalizedHeader: expect.objectContaining({ slot: '801' }),
-      nextSyncCommitteeUpdate: expect.anything(),
-    }),
-  });
-});
-
-it('falls back to the finality update when the period update list is empty', async () => {
-  globalThis.fetch = createFetch({
-    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(1600),
-    },
-    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [],
-    'https://beacon.example/eth/v1/config/spec': {
-      data: createBeaconSpec(),
-    },
-  });
-
-  const txs = await getNextEthereumBeaconSyncTxs(
-    createMockClient({ hasNextSyncCommittee: false }),
-    'https://beacon.example',
-  );
-
-  expect(txs[0]).toEqual({
-    method: 'submit',
-    update: expect.objectContaining({
-      finalizedHeader: expect.objectContaining({ slot: '1600' }),
-    }),
-  });
-});
-
-it('falls back to the finality update when the period update response omits data', async () => {
-  globalThis.fetch = createFetch({
-    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(1600),
-    },
-    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': {} as any,
-    'https://beacon.example/eth/v1/config/spec': {
-      data: createBeaconSpec(),
-    },
-  });
-
-  const txs = await getNextEthereumBeaconSyncTxs(
-    createMockClient({ hasNextSyncCommittee: false }),
-    'https://beacon.example',
-  );
-
-  expect(txs[0]).toEqual({
-    method: 'submit',
-    update: expect.objectContaining({
-      finalizedHeader: expect.objectContaining({ slot: '1600' }),
-    }),
-  });
-});
-
-it('still submits a same-slot update when it fills a missing next sync committee', async () => {
-  globalThis.fetch = createFetch({
-    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(800, {
-        next_sync_committee: {
-          pubkeys: ['0x4'],
-          aggregate_pubkey: '0x5',
-        },
-        next_sync_committee_branch: ['0x6'],
-      }),
-    },
-    'https://beacon.example/eth/v1/config/spec': {
-      data: createBeaconSpec(),
-    },
-  });
-
-  const txs = await getNextEthereumBeaconSyncTxs(
-    createMockClient({ hasNextSyncCommittee: false, latestSyncCommitteeUpdatePeriod: 0 }),
     'https://beacon.example',
   );
 
@@ -286,7 +218,51 @@ it('still submits a same-slot update when it fills a missing next sync committee
     method: 'submit',
     update: expect.objectContaining({
       finalizedHeader: expect.objectContaining({ slot: '800' }),
-      nextSyncCommitteeUpdate: expect.anything(),
+      nextSyncCommitteeUpdate: expect.objectContaining({
+        nextSyncCommittee: expect.anything(),
+        nextSyncCommitteeBranch: expect.anything(),
+      }),
+    }),
+  });
+  expect(txs[1]).toEqual({
+    method: 'importExecutionHeaderAnchor',
+    executionProof: expect.objectContaining({
+      header: expect.objectContaining({ slot: '800' }),
+      executionBranch: ['0xstored800'],
+    }),
+  });
+});
+
+it('falls back to the finality update when no current-period update is available', async () => {
+  globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(1600, {
+        next_sync_committee: {
+          pubkeys: ['0x4'],
+          aggregate_pubkey: '0x5',
+        },
+        next_sync_committee_branch: ['0x6'],
+      }),
+    },
+    'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [{} as any],
+    'https://beacon.example/eth/v1/config/spec': {
+      data: createBeaconSpec(),
+    },
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({ hasNextSyncCommittee: false }),
+    'https://beacon.example',
+  );
+
+  expect(txs[0]).toEqual({
+    method: 'submit',
+    update: expect.objectContaining({
+      finalizedHeader: expect.objectContaining({ slot: '1600' }),
+      nextSyncCommitteeUpdate: expect.objectContaining({
+        nextSyncCommittee: expect.anything(),
+        nextSyncCommitteeBranch: expect.anything(),
+      }),
     }),
   });
 });
@@ -298,10 +274,12 @@ it('returns only an anchor import when the header state is current but the ancho
         finalized_header: {
           beacon: createBeaconHeader(800),
           execution: createExecutionHeader(800),
-          execution_branch: ['0xanchor800'],
+          execution_branch: ['0xfinality800'],
         },
       }),
     },
+    'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
+      createBootstrapResponse(800, ['0xstored800']),
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
@@ -317,7 +295,7 @@ it('returns only an anchor import when the header state is current but the ancho
       method: 'importExecutionHeaderAnchor',
       executionProof: expect.objectContaining({
         header: expect.objectContaining({ slot: '800' }),
-        executionBranch: ['0xanchor800'],
+        executionBranch: ['0xstored800'],
       }),
     },
   ]);
@@ -534,6 +512,30 @@ function createLightClientUpdate(slot: number, extra: Record<string, unknown> = 
     },
     finality_branch: ['0xfinality'],
     ...extra,
+  };
+}
+
+function createVersionedLightClientUpdate(slot: number, extra: Record<string, unknown> = {}) {
+  return {
+    version: 'fulu',
+    data: createLightClientUpdate(slot, extra),
+  };
+}
+
+function createBootstrapResponse(slot: number, executionBranch: string[]) {
+  return {
+    data: {
+      header: {
+        beacon: createBeaconHeader(slot),
+        execution: createExecutionHeader(slot),
+        execution_branch: executionBranch,
+      },
+      current_sync_committee: {
+        pubkeys: ['0x1'],
+        aggregate_pubkey: '0x2',
+      },
+      current_sync_committee_branch: ['0x3'],
+    },
   };
 }
 

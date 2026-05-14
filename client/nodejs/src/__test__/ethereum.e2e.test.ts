@@ -6,6 +6,7 @@ import {
   dispatchErrorToString,
   getEthereumBeaconSyncBootstrapTx,
   getNextEthereumBeaconSyncTxs,
+  isOutdatedTransactionError,
 } from '../index';
 import type {
   EthereumBeaconBlockResponse,
@@ -183,8 +184,15 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       throw new Error('missing ethereum verifier maintenance txs');
     }
     for (const tx of maintenanceTxs) {
-      const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
-      await result.waitForInFirstBlock;
+      try {
+        const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
+        await result.waitForInFirstBlock;
+      } catch (error) {
+        if (isOutdatedTransactionError(error)) {
+          continue;
+        }
+        throw error;
+      }
     }
 
     const finalizedState = await mainchainClient.query.ethereumVerifier.finalizedBeaconState(
@@ -266,6 +274,200 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       TRANSFER_AMOUNT_BASE_UNITS - (proveTransferResult.finalFee ?? 0n),
     );
   }, 420_000);
+
+  it('proves a burn after the first minimal sync committee transition', async () => {
+    const ethereum = new TestEthereum();
+    const endpoints = await ethereum.launch({
+      preset: 'minimal',
+      secondsPerSlot: 1,
+      prefundedAccounts: {
+        [TEST_ACCOUNT.address]: {
+          balance: TEST_ACCOUNT.balance,
+        },
+      },
+    });
+
+    const mainchain = new TestMainchain();
+    const mainchainReady = mainchain.launch();
+
+    const chain = defineChain({
+      id: Number.parseInt(endpoints.chainId, 16),
+      name: 'argon-test-ethereum',
+      nativeCurrency: {
+        name: 'Ether',
+        symbol: 'ETH',
+        decimals: 18,
+      },
+      rpcUrls: {
+        default: {
+          http: [endpoints.executionRpcUrl],
+        },
+      },
+    });
+
+    const account = privateKeyToAccount(TEST_ACCOUNT.privateKey);
+    const publicClient = createPublicClient({
+      chain,
+      transport: http(endpoints.executionRpcUrl),
+    });
+    const walletClient = createWalletClient({
+      account,
+      chain,
+      transport: http(endpoints.executionRpcUrl),
+    });
+
+    const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
+      deployerPrivateKey: TEST_ACCOUNT.privateKey,
+      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
+      seedArgonRecipient: account.address,
+    });
+    const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
+    const argonDestination = toHex(bob.publicKey, { size: 32 });
+    const burnForTransferTopic = encodeEventTopics({
+      abi: mintingGatewayArtifact.abi,
+      eventName: 'BurnForTransfer',
+    })[0];
+    if (!burnForTransferTopic) {
+      throw new Error('Missing BurnForTransfer topic');
+    }
+
+    const approveHash = await walletClient.sendTransaction({
+      to: gatewayDeployment.argonTokenAddress,
+      data: encodeFunctionData({
+        abi: argonTokenArtifact.abi,
+        functionName: 'approve',
+        args: [
+          gatewayDeployment.gatewayAddress,
+          TRANSFER_AMOUNT_BASE_UNITS * RUNTIME_TO_ERC20_SCALE,
+        ],
+      }),
+    });
+    await waitForExecutionReceipt(ethereum, approveHash);
+    await waitForExecutionBlockAtOrAbove(publicClient, 73n);
+
+    const burnHash = await walletClient.sendTransaction({
+      to: gatewayDeployment.gatewayAddress,
+      data: encodeFunctionData({
+        abi: mintingGatewayArtifact.abi,
+        functionName: 'burnForTransfer',
+        args: [gatewayDeployment.argonTokenAddress, TRANSFER_AMOUNT_BASE_UNITS, argonDestination],
+      }),
+    });
+    const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
+    const burnBlockNumber = BigInt(burnReceipt.blockNumber);
+    const burnLogIndex = burnReceipt.logs.findIndex(
+      log =>
+        log.address.toLowerCase() === gatewayDeployment.gatewayAddress.toLowerCase() &&
+        log.topics[0]?.toLowerCase() === burnForTransferTopic.toLowerCase(),
+    );
+
+    const laterReceipt = await mineLaterExecutionAnchorReceipt(
+      walletClient,
+      chain,
+      ethereum,
+      account,
+      burnBlockNumber,
+    );
+    await waitForFinalizedBeaconExecutionAtOrAbove(ethereum, BigInt(laterReceipt.blockNumber));
+
+    await mainchainReady;
+
+    const mainchainClient = await mainchain.client();
+    const relayer = sudo();
+
+    const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
+      mainchainClient,
+      endpoints.beaconApiUrl,
+    );
+    const checkpointResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.sudo.sudo(checkpointTx),
+      relayer,
+    ).submit();
+    await checkpointResult.waitForInFirstBlock;
+
+    const checkpointSudoEvent = checkpointResult.events.find(event =>
+      mainchainClient.events.sudo.Sudid.is(event),
+    );
+    if (!checkpointSudoEvent || !mainchainClient.events.sudo.Sudid.is(checkpointSudoEvent)) {
+      throw new Error('forceCheckpoint did not emit sudo.Sudid');
+    }
+    if (checkpointSudoEvent.data.sudoResult.isErr) {
+      const dispatchError = checkpointSudoEvent.data.sudoResult.asErr;
+      throw new Error(
+        `forceCheckpoint failed: ${dispatchErrorToString(mainchainClient, dispatchError)}`,
+      );
+    }
+
+    while (true) {
+      const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, endpoints.beaconApiUrl);
+      if (txs.length === 0) break;
+
+      for (const tx of txs) {
+        try {
+          const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
+          await result.waitForInFirstBlock;
+        } catch (error) {
+          if (isOutdatedTransactionError(error)) {
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+
+    const setConfigResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.sudo.sudo(
+        mainchainClient.tx.crosschainTransfer.setChainConfig({
+          Ethereum: {
+            gateway: gatewayDeployment.gatewayAddress,
+            argonToken: gatewayDeployment.argonTokenAddress,
+            argonotToken: gatewayDeployment.argonotTokenAddress,
+            previousGateway: null,
+            previousReleaseExpiration: null,
+          },
+        }),
+      ),
+      relayer,
+    ).submit();
+    await setConfigResult.waitForInFirstBlock;
+
+    const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
+    const burnAccountFunding =
+      TRANSFER_AMOUNT_BASE_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
+
+    const fundBurnAccountResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
+      relayer,
+    ).submit();
+    await fundBurnAccountResult.waitForInFirstBlock;
+
+    const eventProof = await buildEthereumEventProof(mainchainClient, {
+      executionRpcUrl: endpoints.executionRpcUrl,
+      txHash: burnHash,
+      logIndex: burnLogIndex,
+    });
+    const proveTransferResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.crosschainTransfer.proveTransfer({
+        Ethereum: {
+          sourceChain: 'Ethereum',
+          eventLog: eventProof.eventLog,
+          proof: eventProof.proof,
+        },
+      }),
+      relayer,
+    ).submit();
+    await proveTransferResult.waitForInFirstBlock;
+
+    expect(
+      proveTransferResult.events.some(event =>
+        mainchainClient.events.crosschainTransfer.BurnNoticeAccepted.is(event),
+      ),
+    ).toBe(true);
+  }, 420_000);
 });
 
 async function waitForFinalizedBeaconExecutionAtOrAbove(
@@ -333,6 +535,24 @@ async function mineLaterExecutionAnchorReceipt(
       return receipt;
     }
   }
+}
+
+async function waitForExecutionBlockAtOrAbove(
+  publicClient: ReturnType<typeof createPublicClient>,
+  minimumExecutionBlockNumber: bigint,
+) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < 120_000) {
+    const blockNumber = await publicClient.getBlockNumber();
+    if (blockNumber >= minimumExecutionBlockNumber) {
+      return blockNumber;
+    }
+
+    await delay(500);
+  }
+
+  throw new Error(`Timed out waiting for execution block ${minimumExecutionBlockNumber}`);
 }
 
 async function waitForExecutionReceipt(

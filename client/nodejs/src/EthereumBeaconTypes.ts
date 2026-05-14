@@ -78,6 +78,11 @@ export type EthereumLightClientUpdate = {
   finality_branch: string[];
 };
 
+export type EthereumVersionedLightClientUpdate = {
+  version: string;
+  data: EthereumLightClientUpdate;
+};
+
 export type EthereumBeaconGenesisResponse = {
   data: {
     genesis_fork_version: string;
@@ -100,7 +105,7 @@ export type EthereumBeaconHeaderDetailsResponse = {
   };
 };
 
-export type EthereumLightClientUpdatesResponse = EthereumLightClientUpdate[];
+export type EthereumLightClientUpdatesResponse = EthereumVersionedLightClientUpdate[];
 
 export type EthereumBeaconBlockResponse = {
   version: string;

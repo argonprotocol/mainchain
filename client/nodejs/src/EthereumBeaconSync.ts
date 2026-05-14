@@ -95,60 +95,100 @@ export async function getNextEthereumBeaconSyncTxs(
 
   const expectedPreset = await getExpectedBeaconPreset(client);
   const beaconNetworkParams = await getBeaconNetworkParams(beaconApiUrl, expectedPreset);
-
-  const update = await getNextLightClientUpdate(beaconApiUrl, state, beaconNetworkParams);
+  const storedPeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
   const txs: SubmittableExtrinsic[] = [];
   let anchorHeader: EthereumLightClientHeader | undefined;
+  const startedAt = Date.now();
 
-  if (update) {
-    const finalizedSlot = BigInt(update.finalized_header.beacon.slot);
-    const attestedSlot = BigInt(update.attested_header.beacon.slot);
+  while (Date.now() - startedAt < lightClientUpdateRetryTimeoutMs) {
+    const finalityUpdate = (
+      await getBeaconJson<{ data: EthereumLightClientUpdate }>(
+        beaconApiUrl,
+        '/eth/v1/beacon/light_client/finality_update',
+      )
+    ).data;
 
-    const finalizedPeriod = computePeriod(finalizedSlot, beaconNetworkParams);
-    const attestedPeriod = computePeriod(attestedSlot, beaconNetworkParams);
-    const storedPeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
+    const missingNextSyncCommittee = !state.hasNextSyncCommittee;
+    const finalityUpdateHasNextSyncCommittee = hasNextSyncCommitteeUpdate(finalityUpdate);
+    const finalityFinalizedSlot = BigInt(finalityUpdate.finalized_header.beacon.slot);
+    const finalityFinalizedPeriod = computePeriod(finalityFinalizedSlot, beaconNetworkParams);
+    const needsNewSyncCommitteePeriod =
+      finalityFinalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
+    const needsCommitteeData = missingNextSyncCommittee || needsNewSyncCommitteePeriod;
+    const needsCurrentPeriodUpdate =
+      missingNextSyncCommittee ||
+      (needsNewSyncCommitteePeriod && !finalityUpdateHasNextSyncCommittee);
+    let submitUpdate: EthereumLightClientUpdate | undefined = finalityUpdate;
 
-    const isNewerThanStoredFinalized = finalizedSlot > state.latestFinalizedSlot;
-    const hasReachedNextFinalizedWindow = finalizedSlot >= state.nextRecommendedFinalizedSlot;
-    const canAdvanceFinalized = isNewerThanStoredFinalized && hasReachedNextFinalizedWindow;
+    if (needsCommitteeData && needsCurrentPeriodUpdate) {
+      const periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
+        beaconApiUrl,
+        `/eth/v1/beacon/light_client/updates?count=1&start_period=${storedPeriod}`,
+      );
+      const currentPeriodUpdate = periodUpdates[0]?.data;
+      const currentPeriodUpdateHasNextSyncCommittee =
+        hasNextSyncCommitteeUpdate(currentPeriodUpdate);
 
-    const hasNextSyncCommitteeInUpdate =
-      !!update.next_sync_committee && !!update.next_sync_committee_branch;
-    const movesToNewSyncCommitteePeriod = finalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
-    const shouldIncludeNextSyncCommitteeUpdate =
-      hasNextSyncCommitteeInUpdate &&
-      (!state.hasNextSyncCommittee || movesToNewSyncCommitteePeriod);
-
-    const isMissingNextSyncCommittee = !state.hasNextSyncCommittee;
-    const attestedPeriodMatchesStoredPeriod = attestedPeriod === storedPeriod;
-    const canSetMissingNextSync =
-      isMissingNextSyncCommittee &&
-      shouldIncludeNextSyncCommitteeUpdate &&
-      attestedPeriodMatchesStoredPeriod;
-    const submitTx =
-      canAdvanceFinalized || canSetMissingNextSync
-        ? client.tx.ethereumVerifier.submit({
-            attestedHeader: camelcaseKeys(update.attested_header.beacon),
-            syncAggregate: camelcaseKeys(update.sync_aggregate),
-            signatureSlot: update.signature_slot,
-            ...(shouldIncludeNextSyncCommitteeUpdate
-              ? {
-                  nextSyncCommitteeUpdate: {
-                    nextSyncCommittee: camelcaseKeys(update.next_sync_committee!),
-                    nextSyncCommitteeBranch: update.next_sync_committee_branch!,
-                  },
-                }
-              : {}),
-            finalizedHeader: camelcaseKeys(update.finalized_header.beacon),
-            finalityBranch: update.finality_branch,
-          })
-        : undefined;
-    if (submitTx) {
-      txs.push(submitTx);
-      anchorHeader = update.finalized_header;
-    } else if (finalizedSlot === state.latestFinalizedSlot) {
-      anchorHeader = update.finalized_header;
+      if (currentPeriodUpdateHasNextSyncCommittee) {
+        submitUpdate = currentPeriodUpdate;
+      } else if (!missingNextSyncCommittee && !finalityUpdateHasNextSyncCommittee) {
+        submitUpdate = undefined;
+      }
     }
+
+    // make sure the update we choose has a supermajority of sync committee participants
+    if (
+      submitUpdate &&
+      !hasSyncCommitteeSupermajority(submitUpdate.sync_aggregate.sync_committee_bits)
+    ) {
+      await new Promise(resolve => setTimeout(resolve, lightClientUpdateRetryIntervalMs));
+      continue;
+    }
+
+    if (submitUpdate) {
+      const finalizedSlot = BigInt(submitUpdate.finalized_header.beacon.slot);
+      const attestedSlot = BigInt(submitUpdate.attested_header.beacon.slot);
+
+      const finalizedPeriod = computePeriod(finalizedSlot, beaconNetworkParams);
+      const attestedPeriod = computePeriod(attestedSlot, beaconNetworkParams);
+
+      const isNewerThanStoredFinalized = finalizedSlot > state.latestFinalizedSlot;
+      const hasReachedNextFinalizedWindow = finalizedSlot >= state.nextRecommendedFinalizedSlot;
+      const canAdvanceFinalized = isNewerThanStoredFinalized && hasReachedNextFinalizedWindow;
+      const advancesSyncCommitteePeriod = finalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
+      const canUseNextSyncCommittee = missingNextSyncCommittee || advancesSyncCommitteePeriod;
+      const includesNextSyncCommittee =
+        hasNextSyncCommitteeUpdate(submitUpdate) && canUseNextSyncCommittee;
+      const fillsMissingNextSyncCommittee =
+        missingNextSyncCommittee && includesNextSyncCommittee && attestedPeriod === storedPeriod;
+
+      if (canAdvanceFinalized || fillsMissingNextSyncCommittee) {
+        const nextSyncCommitteeUpdate = includesNextSyncCommittee
+          ? {
+              nextSyncCommitteeUpdate: {
+                nextSyncCommittee: camelcaseKeys(submitUpdate.next_sync_committee!),
+                nextSyncCommitteeBranch: submitUpdate.next_sync_committee_branch!,
+              },
+            }
+          : {};
+        txs.push(
+          client.tx.ethereumVerifier.submit({
+            attestedHeader: camelcaseKeys(submitUpdate.attested_header.beacon),
+            syncAggregate: camelcaseKeys(submitUpdate.sync_aggregate),
+            signatureSlot: submitUpdate.signature_slot,
+            ...nextSyncCommitteeUpdate,
+            finalizedHeader: camelcaseKeys(submitUpdate.finalized_header.beacon),
+            finalityBranch: submitUpdate.finality_branch,
+          }),
+        );
+      }
+
+      if (canAdvanceFinalized) {
+        anchorHeader = submitUpdate.finalized_header;
+      }
+    }
+
+    break;
   }
 
   anchorHeader ??= await getFinalizedHeaderByRoot(beaconApiUrl, state.latestFinalizedBlockRoot);
@@ -254,57 +294,10 @@ function buildFork(spec: Record<string, string>, name: string) {
   };
 }
 
-async function getNextLightClientUpdate(
-  beaconApiUrl: string,
-  state: Extract<EthereumBeaconSyncState, { isBootstrapped: true }>,
-  beaconNetworkParams: BeaconNetworkParams,
-): Promise<EthereumLightClientUpdate | undefined> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < lightClientUpdateRetryTimeoutMs) {
-    const finalityUpdate = (
-      await getBeaconJson<{ data: EthereumLightClientUpdate }>(
-        beaconApiUrl,
-        '/eth/v1/beacon/light_client/finality_update',
-      )
-    ).data;
-
-    if (!hasSyncCommitteeSupermajority(finalityUpdate.sync_aggregate.sync_committee_bits)) {
-      await new Promise(resolve => setTimeout(resolve, lightClientUpdateRetryIntervalMs));
-      continue;
-    }
-
-    const finalizedPeriod = computePeriod(
-      BigInt(finalityUpdate.finalized_header.beacon.slot),
-      beaconNetworkParams,
-    );
-    const needsSyncCommitteeUpdate =
-      !state.hasNextSyncCommittee || finalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
-    const finalityUpdateIncludesNextSyncCommittee =
-      !!finalityUpdate.next_sync_committee && !!finalityUpdate.next_sync_committee_branch;
-
-    if (!needsSyncCommitteeUpdate || finalityUpdateIncludesNextSyncCommittee) {
-      return finalityUpdate;
-    }
-
-    const periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
-      beaconApiUrl,
-      `/eth/v1/beacon/light_client/updates?count=1&start_period=${computePeriod(state.latestFinalizedSlot, beaconNetworkParams)}`,
-    );
-    const periodUpdate = periodUpdates[0];
-
-    if (periodUpdate?.next_sync_committee && periodUpdate.next_sync_committee_branch) {
-      return periodUpdate;
-    }
-
-    if (finalizedPeriod > state.latestSyncCommitteeUpdatePeriod) {
-      return;
-    }
-
-    return finalityUpdate;
-  }
-
-  return;
+function hasNextSyncCommitteeUpdate(
+  update?: Pick<EthereumLightClientUpdate, 'next_sync_committee' | 'next_sync_committee_branch'>,
+): boolean {
+  return !!update?.next_sync_committee && !!update?.next_sync_committee_branch;
 }
 
 function buildExecutionPayloadHeader(header: EthereumLightClientHeader['execution']) {

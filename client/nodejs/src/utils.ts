@@ -68,6 +68,14 @@ export function dispatchErrorToString(client: ArgonClient, error: IDispatchError
   return message;
 }
 
+export function isOutdatedTransactionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Invalid Transaction: Transaction is outdated') ||
+    message.includes('InvalidTransaction::Stale')
+  );
+}
+
 // ExtrinsicError
 export class ExtrinsicError extends Error {
   constructor(
