@@ -4,13 +4,13 @@ import type {
   EthereumBeaconConfigSpecResponse,
   EthereumBeaconGenesisResponse,
   EthereumBeaconHeaderDetailsResponse,
-  EthereumLightClientHeader,
   EthereumLightClientBootstrapResponse,
+  EthereumLightClientHeader,
   EthereumLightClientUpdate,
   EthereumLightClientUpdatesResponse,
 } from './EthereumBeaconTypes';
 import type { ArgonClient } from './index';
-import { hexToBytes, type Hex } from 'viem';
+import { type Hex, hexToBytes } from 'viem';
 
 type BeaconPreset = 'mainnet' | 'minimal';
 type BeaconNetworkParams = {
@@ -98,26 +98,33 @@ export async function getNextEthereumBeaconSyncTxs(
 
   const update = await getNextLightClientUpdate(beaconApiUrl, state, beaconNetworkParams);
   const txs: SubmittableExtrinsic[] = [];
+  let anchorHeader: EthereumLightClientHeader | undefined;
 
   if (update) {
     const finalizedSlot = BigInt(update.finalized_header.beacon.slot);
+    const attestedSlot = BigInt(update.attested_header.beacon.slot);
+
     const finalizedPeriod = computePeriod(finalizedSlot, beaconNetworkParams);
-    const attestedPeriod = computePeriod(
-      BigInt(update.attested_header.beacon.slot),
-      beaconNetworkParams,
-    );
-    const storePeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
-    const canAdvanceFinalized =
-      finalizedSlot >= state.nextRecommendedFinalizedSlot &&
-      finalizedSlot > state.latestFinalizedSlot;
+    const attestedPeriod = computePeriod(attestedSlot, beaconNetworkParams);
+    const storedPeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
+
+    const isNewerThanStoredFinalized = finalizedSlot > state.latestFinalizedSlot;
+    const hasReachedNextFinalizedWindow = finalizedSlot >= state.nextRecommendedFinalizedSlot;
+    const canAdvanceFinalized = isNewerThanStoredFinalized && hasReachedNextFinalizedWindow;
+
+    const hasNextSyncCommitteeInUpdate =
+      !!update.next_sync_committee && !!update.next_sync_committee_branch;
+    const movesToNewSyncCommitteePeriod = finalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
     const shouldIncludeNextSyncCommitteeUpdate =
-      !!update.next_sync_committee &&
-      !!update.next_sync_committee_branch &&
-      (!state.hasNextSyncCommittee || finalizedPeriod > state.latestSyncCommitteeUpdatePeriod);
+      hasNextSyncCommitteeInUpdate &&
+      (!state.hasNextSyncCommittee || movesToNewSyncCommitteePeriod);
+
+    const isMissingNextSyncCommittee = !state.hasNextSyncCommittee;
+    const attestedPeriodMatchesStoredPeriod = attestedPeriod === storedPeriod;
     const canSetMissingNextSync =
-      !state.hasNextSyncCommittee &&
+      isMissingNextSyncCommittee &&
       shouldIncludeNextSyncCommitteeUpdate &&
-      attestedPeriod === storePeriod;
+      attestedPeriodMatchesStoredPeriod;
     const submitTx =
       canAdvanceFinalized || canSetMissingNextSync
         ? client.tx.ethereumVerifier.submit({
@@ -138,18 +145,16 @@ export async function getNextEthereumBeaconSyncTxs(
         : undefined;
     if (submitTx) {
       txs.push(submitTx);
-
-      const anchorTx = await createExecutionHeaderAnchorTx(client, update.finalized_header);
-      if (anchorTx) {
-        txs.push(anchorTx);
-      }
-
-      return txs;
+      anchorHeader = update.finalized_header;
+    } else if (finalizedSlot === state.latestFinalizedSlot) {
+      anchorHeader = update.finalized_header;
     }
   }
 
-  if (update) {
-    const anchorTx = await createExecutionHeaderAnchorTx(client, update.finalized_header);
+  anchorHeader ??= await getFinalizedHeaderByRoot(beaconApiUrl, state.latestFinalizedBlockRoot);
+
+  if (anchorHeader) {
+    const anchorTx = await createExecutionHeaderAnchorTx(client, anchorHeader);
     if (anchorTx) {
       txs.push(anchorTx);
     }
@@ -222,6 +227,18 @@ async function createExecutionHeaderAnchorTx(
   }
 
   return client.tx.ethereumVerifier.importExecutionHeaderAnchor(executionProof);
+}
+
+async function getFinalizedHeaderByRoot(
+  beaconApiUrl: string,
+  finalizedBlockRoot: string,
+): Promise<EthereumLightClientHeader | undefined> {
+  const bootstrap = await getBeaconJson<EthereumLightClientBootstrapResponse>(
+    beaconApiUrl,
+    `/eth/v1/beacon/light_client/bootstrap/${finalizedBlockRoot}`,
+  );
+
+  return bootstrap.data.header;
 }
 
 function buildFork(spec: Record<string, string>, name: string) {
