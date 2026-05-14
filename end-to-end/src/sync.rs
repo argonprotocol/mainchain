@@ -260,7 +260,7 @@ async fn assert_node_matches_snapshot(
 	snapshot: FinalizedSnapshot,
 	context: &str,
 ) {
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+	let finalized_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
 
 	loop {
 		let latest_finalized = node.client.latest_finalized_block_hash().await.unwrap();
@@ -276,7 +276,7 @@ async fn assert_node_matches_snapshot(
 		}
 
 		assert!(
-			tokio::time::Instant::now() < deadline,
+			tokio::time::Instant::now() < finalized_deadline,
 			"{context}: synced node did not recover a source-matching finalized block. finalized={latest_finalized_number}, target_finalized={}, source_at_height={source_finalized_hash:?}",
 			snapshot.number,
 		);
@@ -288,62 +288,58 @@ async fn assert_node_matches_snapshot(
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
 
+	let best_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+	let mut state_deadline = None;
+
 	loop {
 		let best_hash = node.client.best_block_hash().await.unwrap();
 		let best_number = node.client.block_number(best_hash).await.unwrap();
 		let source_best_at_height = header_hash_at_height(source, best_number).await;
-
-		if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
-			assert_state_available_at(node, best_hash, best_number, context).await;
-			return;
-		}
+		let last_progress =
+			if best_number >= snapshot.number && source_best_at_height == Some(best_hash) {
+				state_deadline
+					.get_or_insert_with(|| tokio::time::Instant::now() + Duration::from_secs(30));
+				match check_state_available_at(node, best_hash, best_number, context).await {
+					Ok(()) => return,
+					Err(err) => format!(
+						"best={best_number} ({best_hash:?}) matched source, but state is not available yet: {err}"
+					),
+				}
+			} else {
+				format!("best={best_number}, source_at_height={source_best_at_height:?}")
+			};
+		let active_deadline = state_deadline.unwrap_or(best_deadline);
 
 		assert!(
-			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover a source-matching best block. best={best_number}, source_at_height={source_best_at_height:?}",
+			tokio::time::Instant::now() < active_deadline,
+			"{context}: synced node did not recover a source-matching best block with state. {last_progress}",
 		);
 
-		println!(
-			"Waiting for synced node to recover a source-matching best block. best={best_number}"
-		);
+		println!("Waiting for synced node to recover a source-matching best block with state. {last_progress}");
 		tokio::time::sleep(Duration::from_millis(250)).await;
 	}
 }
 
-async fn assert_state_available_at(
+async fn check_state_available_at(
 	node: &ArgonTestNode,
 	block_hash: H256,
 	expected_number: u32,
 	context: &str,
-) {
-	let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-
-	loop {
-		let last_state_error = match node
-			.client
-			.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
-			.await
-		{
-			Ok(Some(state_number)) => {
-				assert_eq!(
-					state_number, expected_number,
-					"{context}: state should match block number at {block_hash:?}"
-				);
-				return;
-			},
-			Ok(None) => "storage returned None".to_string(),
-			Err(err) => err.to_string(),
-		};
-
-		assert!(
-			tokio::time::Instant::now() < deadline,
-			"{context}: synced node did not recover state for block {expected_number} ({block_hash:?}). last_state_error={last_state_error}",
-		);
-
-		println!(
-			"Waiting for synced node to recover state for block {expected_number} ({block_hash:?}). Last state error: {last_state_error}"
-		);
-		tokio::time::sleep(Duration::from_millis(250)).await;
+) -> Result<(), String> {
+	match node
+		.client
+		.fetch_storage(&storage().system().number(), FetchAt::Block(block_hash))
+		.await
+	{
+		Ok(Some(state_number)) => {
+			assert_eq!(
+				state_number, expected_number,
+				"{context}: state should match block number at {block_hash:?}"
+			);
+			Ok(())
+		},
+		Ok(None) => Err("storage returned None".to_string()),
+		Err(err) => Err(err.to_string()),
 	}
 }
 
