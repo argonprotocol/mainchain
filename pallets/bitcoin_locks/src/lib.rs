@@ -931,7 +931,8 @@ pub mod pallet {
 
 			let mut duration_for_new_funds = FixedU128::zero();
 
-			let new_liquidity_promised = Self::calculate_redemption_amount(new_locked_target_rate, None)?;
+			let new_liquidity_promised =
+				Self::calculate_redemption_amount(new_locked_target_rate, None)?;
 
 			// We need to determine up/down ratchet based on argon target rate
 			let is_up_ratchet = new_locked_target_rate > orig_locked_target_rate;
@@ -1468,7 +1469,10 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[allow(clippy::type_complexity, reason = "Return type intentionally exposes both securitization state and balance.")]
+		#[allow(
+			clippy::type_complexity,
+			reason = "Return type intentionally exposes both securitization state and balance."
+		)]
 		fn prepare_lock_securitization(
 			vault_id: VaultId,
 			satoshis: Satoshis,

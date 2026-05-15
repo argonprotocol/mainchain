@@ -42,13 +42,7 @@ export interface ArgonPrimitivesEthereumEthereumVerifyError extends Enum {
   readonly isInvalidHeaderChain: boolean;
   readonly isLogNotFound: boolean;
   readonly isInvalidProof: boolean;
-  readonly type:
-    | 'VerifierUnavailable'
-    | 'AnchorNotFound'
-    | 'InvalidHeader'
-    | 'InvalidHeaderChain'
-    | 'LogNotFound'
-    | 'InvalidProof';
+  readonly type: 'VerifierUnavailable' | 'AnchorNotFound' | 'InvalidHeader' | 'InvalidHeaderChain' | 'LogNotFound' | 'InvalidProof';
 }
 
 export type PHANTOM_ETHEREUM = 'ethereum';
