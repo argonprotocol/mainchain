@@ -2,9 +2,14 @@ use crate::{
 	mock::{System, Ticks, *},
 	pallet::RecentBlocksAtTicks,
 };
-use argon_primitives::{tick::MAX_BLOCKS_PER_TICK, NotebookAuditResult, TickProvider};
+use argon_primitives::{
+	tick::MAX_BLOCKS_PER_TICK, ArgonDigests, NotebookAuditResult, TickProvider, TimestampDigest,
+	TIMESTAMP_DIGEST_ID,
+};
+use codec::Encode;
 use frame_support::traits::OnTimestampSet;
 use pallet_prelude::*;
+use sp_runtime::{Digest, DigestItem};
 use std::panic::catch_unwind;
 
 #[test]
@@ -19,6 +24,7 @@ fn it_panics_if_the_tick_is_invalid() {
 			let now = 999;
 			assert_eq!(Ticks::ticker().tick_for_time(now), 1);
 			// now tick is 1, so once timestamp comes in, it should panic (less than proposed 2)
+			Timestamp::set_timestamp(now);
 			Ticks::on_timestamp_set(now);
 		});
 		assert!(err.is_err());
@@ -124,5 +130,84 @@ fn it_should_track_multiple_blocks_at_tick_if_enabled() {
 		System::initialize(&5, &System::parent_hash(), &Default::default());
 		Ticks::on_initialize(5);
 		assert_eq!(Ticks::blocks_at_tick(2).len(), 2);
+	});
+}
+
+#[test]
+fn it_handles_the_timestamp_digest() {
+	new_test_ext(500).execute_with(|| {
+		System::set_block_number(1);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(&2, &System::parent_hash(), &Digest::default());
+		Ticks::on_initialize(2);
+
+		let now = 1_000;
+		Timestamp::set_timestamp(now);
+		Ticks::on_timestamp_set(now);
+
+		let timestamps = System::digest()
+			.logs
+			.iter()
+			.filter_map(|digest| digest.as_timestamp())
+			.collect::<Vec<_>>();
+		assert_eq!(timestamps, vec![TimestampDigest { timestamp: 1 }]);
+		assert!(System::digest()
+			.logs
+			.iter()
+			.any(|digest| matches!(digest, DigestItem::Consensus(TIMESTAMP_DIGEST_ID, _))));
+	});
+
+	new_test_ext(500).execute_with(|| {
+		System::set_block_number(1);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(
+			&2,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::Consensus(
+					TIMESTAMP_DIGEST_ID,
+					TimestampDigest { timestamp: 1 }.encode(),
+				)],
+			},
+		);
+		Ticks::on_initialize(2);
+
+		let now = 1_000;
+		Timestamp::set_timestamp(now);
+		Ticks::on_timestamp_set(now);
+
+		let timestamps = System::digest()
+			.logs
+			.iter()
+			.filter_map(|digest| digest.as_timestamp())
+			.collect::<Vec<_>>();
+		assert_eq!(timestamps, vec![TimestampDigest { timestamp: 1 }]);
+		assert_eq!(timestamps.len(), 1);
+	});
+}
+
+#[test]
+fn it_panics_if_the_timestamp_digest_does_not_match_timestamp_pallet() {
+	new_test_ext(500).execute_with(|| {
+		System::set_block_number(1);
+		Digests::mutate(|a| a.tick.0 = 2);
+		System::initialize(
+			&2,
+			&System::parent_hash(),
+			&Digest {
+				logs: vec![DigestItem::Consensus(
+					TIMESTAMP_DIGEST_ID,
+					TimestampDigest { timestamp: 2 }.encode(),
+				)],
+			},
+		);
+		Ticks::on_initialize(2);
+
+		let now = 1_000;
+		Timestamp::set_timestamp(now);
+		let err = catch_unwind(|| {
+			Ticks::on_timestamp_set(now);
+		});
+		assert!(err.is_err());
 	});
 }

@@ -16,6 +16,11 @@ use sp_runtime::{ConsensusEngineId, Digest, DigestItem};
 pub const AUTHOR_DIGEST_ID: ConsensusEngineId = *b"pow_";
 /// The "tick" for the block - matches aura to provide compatibility for aura slot information.
 pub const TICK_DIGEST_ID: ConsensusEngineId = *b"aura";
+/// Consensus timestamp digest ID.
+///
+/// This preserves the legacy Hyperbridge/ISMP `ISTM` identifier so downstream consumers can keep
+/// reading the same header slot after Hyperbridge removal.
+pub const TIMESTAMP_DIGEST_ID: ConsensusEngineId = *b"ISTM";
 
 /// Seal Digest ID for the high level block seal details - used to quickly check the seal
 /// details in the node.
@@ -195,6 +200,7 @@ where
 
 pub trait ArgonDigests {
 	fn as_tick(&self) -> Option<TickDigest>;
+	fn as_timestamp(&self) -> Option<TimestampDigest>;
 	fn as_author<AC: Codec>(&self) -> Option<AC>;
 	fn as_block_vote(&self) -> Option<BlockVoteDigest>;
 	fn as_notebooks<VerifyError: Codec + MaxEncodedLen>(
@@ -210,6 +216,13 @@ impl ArgonDigests for DigestItem {
 	fn as_tick(&self) -> Option<TickDigest> {
 		if let DigestItem::PreRuntime(TICK_DIGEST_ID, value) = self {
 			return TickDigest::decode(&mut &value[..]).ok();
+		}
+		None
+	}
+
+	fn as_timestamp(&self) -> Option<TimestampDigest> {
+		if let DigestItem::Consensus(TIMESTAMP_DIGEST_ID, value) = self {
+			return TimestampDigest::decode(&mut &value[..]).ok();
 		}
 		None
 	}
@@ -307,6 +320,25 @@ pub struct BlockVoteDigest {
 	pub voting_power: BlockVotingPower,
 	#[codec(compact)]
 	pub votes_count: u32,
+}
+
+#[derive(
+	Clone,
+	Copy,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	Debug,
+	TypeInfo,
+	Serialize,
+	Deserialize,
+	Default,
+	MaxEncodedLen,
+)]
+pub struct TimestampDigest {
+	/// Timestamp value in seconds.
+	pub timestamp: u64,
 }
 
 #[derive(
