@@ -2465,7 +2465,7 @@ declare module '@polkadot/types/lookup' {
   interface PalletBitcoinLocksLockOptions extends Enum {
     readonly isV1: boolean;
     readonly asV1: {
-      readonly microgonsPerBtc: Option<u128>;
+      readonly microgonsAtTargetPerBtc: Option<u128>;
     } & Struct;
     readonly type: 'V1';
   }

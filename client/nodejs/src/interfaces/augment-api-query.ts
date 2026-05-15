@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import '@polkadot/api-base/types/storage';
+import type {} from '@polkadot/api-base/types/storage';
 
 import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/api-base/types';
 import type {
@@ -235,7 +235,7 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * History of microgons per btc
+       * History of target microgons per btc.
        **/
       microgonPerBtcHistory: AugmentedQuery<
         ApiType,

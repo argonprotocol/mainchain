@@ -2043,7 +2043,7 @@ export default {
   PalletBitcoinLocksLockOptions: {
     _enum: {
       V1: {
-        microgonsPerBtc: 'Option<u128>',
+        microgonsAtTargetPerBtc: 'Option<u128>',
       },
     },
   },
