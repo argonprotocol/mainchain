@@ -109,6 +109,11 @@ sp_api::decl_runtime_apis! {
 		#[api_version(2)]
 		fn get_minimum_satoshis() -> Satoshis;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;
+		#[api_version(3)]
+		fn calculate_redemption_amount(
+			satoshis: Satoshis,
+			max_microgons_at_target: Option<Balance>,
+		) -> Option<Balance>;
 		fn market_rate(satoshis: Satoshis) -> Option<Balance>;
 		fn get_bitcoin_network() -> BitcoinNetwork;
 	}

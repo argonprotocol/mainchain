@@ -280,6 +280,7 @@ macro_rules! inject_common_apis {
             }
         }
 
+        #[api_version(3)]
         impl argon_primitives::BitcoinApis<Block,Balance> for Runtime {
             fn get_sync_status() -> Option<BitcoinSyncStatus> {
                 BitcoinUtxos::get_sync_status()
@@ -295,6 +296,17 @@ macro_rules! inject_common_apis {
 
             fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {
                 BitcoinLocks::calculate_redemption_amount_from_satoshis(&satoshis, None).ok()
+            }
+
+            fn calculate_redemption_amount(
+                satoshis: Satoshis,
+                max_microgons_at_target: Option<Balance>,
+            ) -> Option<Balance> {
+                BitcoinLocks::calculate_redemption_amount_from_satoshis(
+                    &satoshis,
+                    max_microgons_at_target,
+                )
+                .ok()
             }
 
             fn market_rate(satoshis: Satoshis) -> Option<Balance> {

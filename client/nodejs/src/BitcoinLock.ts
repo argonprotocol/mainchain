@@ -134,34 +134,38 @@ export class BitcoinLock implements IBitcoinLock {
     return mintsPending;
   }
 
-  public async getRatchetingCosts(
+  public async calculateRatchetingCosts(
     client: IQueryableClient,
     priceIndex: PriceIndex,
     vault: Vault,
+    microgonsAtTargetPerBtc?: bigint,
   ): Promise<{ burnAmount: bigint; ratchetingFee: bigint }> {
     const { createdAtHeight, vaultClaimHeight, lockedTargetPrice, satoshis } = this;
-    const currentTargetPrice = priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+    const currentTargetPrice =
+      microgonsAtTargetPerBtc !== undefined
+        ? (microgonsAtTargetPerBtc * satoshis) / SATS_PER_BTC
+        : priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
 
     let ratchetingFee = vault.terms.bitcoinBaseFee;
     let burnAmount = 0n;
 
     // ratchet up
     if (currentTargetPrice > lockedTargetPrice) {
-      const additionalLiquidityToMint = currentTargetPrice - lockedTargetPrice;
-      const percentageFee =
-        vault.calculateBitcoinFee(additionalLiquidityToMint) - vault.terms.bitcoinBaseFee;
+      const diffTargetAmount = currentTargetPrice - lockedTargetPrice;
+      const amountToMint = BitcoinLock.calculateRedemptionAmount(priceIndex, diffTargetAmount);
+      const bitcoinFee = vault.calculateBitcoinFee(amountToMint);
+      const percentageFee = bitcoinFee - vault.terms.bitcoinBaseFee;
+
       const currentBitcoinHeight = await client.query.bitcoinUtxos
         .confirmedBitcoinBlockTip()
         .then(x => x.unwrap().blockHeight.toNumber());
-      const blockLength = vaultClaimHeight - createdAtHeight;
-      const remainingBlocks = Math.max(0, vaultClaimHeight - currentBitcoinHeight);
-      const cappedRemainingBlocks = Math.min(blockLength, remainingBlocks);
-      const proratedFee =
-        (percentageFee * BigInt(cappedRemainingBlocks) + BigInt(blockLength - 1)) /
-        BigInt(blockLength);
+      const fullTerm = Math.max(1, vaultClaimHeight - createdAtHeight);
+      const elapsedBlocks = Math.max(0, currentBitcoinHeight - createdAtHeight);
+      const cappedRemainingBlocks = Math.max(0, fullTerm - elapsedBlocks);
+      const proratedFee = (percentageFee * BigInt(cappedRemainingBlocks)) / BigInt(fullTerm);
       ratchetingFee = vault.terms.bitcoinBaseFee + proratedFee;
     } else {
-      burnAmount = this.calculateUnlockAmount(priceIndex);
+      burnAmount = BitcoinLock.calculateRedemptionAmount(priceIndex, currentTargetPrice);
     }
 
     return {
@@ -191,9 +195,14 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinBlockHeight: number;
     }>;
   }> {
-    const { priceIndex, txSigner, tip = 0n, vault, client, microgonsAtTargetPerBtc = null } = args;
+    const { priceIndex, txSigner, tip = 0n, vault, client, microgonsAtTargetPerBtc } = args;
 
-    const ratchetingCosts = await this.getRatchetingCosts(client, priceIndex, vault);
+    const ratchetingCosts = await this.calculateRatchetingCosts(
+      client,
+      priceIndex,
+      vault,
+      microgonsAtTargetPerBtc,
+    );
     const tx = client.tx.bitcoinLocks.ratchet(this.utxoId, { V1: { microgonsAtTargetPerBtc } });
     const txSubmitter = new TxSubmitter(client, tx, txSigner);
     const canAfford = await txSubmitter.canAfford({
@@ -225,22 +234,26 @@ export class BitcoinLock implements IBitcoinLock {
       const {
         amountBurned,
         liquidityPromised: liquidityPromisedRaw,
-        newTargetPrice: lockedTargetPrice,
-        oldTargetPrice,
+        newTargetPrice: newTargetPriceRaw,
+        oldTargetPrice: oldTargetPriceRaw,
         securityFee,
       } = ratchetEvent.data;
+
       const liquidityPromised = liquidityPromisedRaw.toBigInt();
-      let mintAmount = liquidityPromised;
-      if (liquidityPromised > oldTargetPrice.toBigInt()) {
-        mintAmount -= oldTargetPrice.toBigInt();
-      }
+      const newTargetPrice = newTargetPriceRaw.toBigInt();
+      const oldTargetPrice = oldTargetPriceRaw.toBigInt();
+      const pendingMint =
+        newTargetPrice > oldTargetPrice
+          ? BitcoinLock.calculateRedemptionAmount(priceIndex, newTargetPrice - oldTargetPrice)
+          : liquidityPromised;
+
       return {
         txFee: txResult.finalFee ?? 0n,
         blockHeight: txResult.blockNumber!,
         bitcoinBlockHeight,
-        pendingMint: mintAmount,
+        pendingMint,
         liquidityPromised,
-        lockedTargetPrice: lockedTargetPrice.toBigInt(),
+        lockedTargetPrice: newTargetPrice,
         burned: amountBurned.toBigInt(),
         securityFee: securityFee.toBigInt(),
       };
@@ -252,8 +265,12 @@ export class BitcoinLock implements IBitcoinLock {
     };
   }
 
-  public calculateUnlockAmount(priceIndex: PriceIndex): bigint {
-    return BitcoinLock.calculateUnlockAmount(priceIndex, this);
+  public calculateRedemptionAmount(priceIndex: PriceIndex): bigint {
+    return BitcoinLock.calculateRedemptionAmountFromSatoshis(
+      priceIndex,
+      this.satoshis,
+      this.lockedTargetPrice,
+    );
   }
 
   public async requestRelease(
@@ -282,16 +299,16 @@ export class BitcoinLock implements IBitcoinLock {
       txSigner,
     );
 
-    const redemptionPrice = BitcoinLock.calculateUnlockAmount(priceIndex, this);
+    const redemptionAmount = this.calculateRedemptionAmount(priceIndex);
 
     const canAfford = await submitter.canAfford({
       tip,
-      unavailableBalance: BigInt(redemptionPrice),
+      unavailableBalance: BigInt(redemptionAmount),
     });
 
     if (!canAfford.canAfford) {
       throw new Error(
-        `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionPrice + canAfford.txFee + tip)}`,
+        `Insufficient funds to release lock. Available: ${formatArgons(canAfford.availableBalance)}, Required: ${formatArgons(redemptionAmount + canAfford.txFee + tip)}`,
       );
     }
     return submitter.submit({
@@ -313,7 +330,7 @@ export class BitcoinLock implements IBitcoinLock {
       bitcoinNetworkFee: request.bitcoinNetworkFee.toBigInt(),
       dueFrame: request.cosignDueFrame.toNumber(),
       vaultId: request.vaultId.toNumber(),
-      redemptionPrice: request.redemptionPrice.toBigInt(),
+      redemptionAmount: getBigIntFallback(request.redemptionAmount, request, ['redemptionPrice']),
     };
   }
 
@@ -404,15 +421,23 @@ export class BitcoinLock implements IBitcoinLock {
     return undefined;
   }
 
-  public static calculateUnlockAmount(
+  public static calculateRedemptionAmountFromSatoshis(
     priceIndex: PriceIndex,
-    details: { satoshis: bigint; lockedTargetPrice?: bigint },
+    satoshis: bigint,
+    lockedTargetPrice?: bigint,
   ): bigint {
-    const { satoshis, lockedTargetPrice } = details;
-    let price = priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+    const btcMicrogonsAtTarget = priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+    return this.calculateRedemptionAmount(priceIndex, btcMicrogonsAtTarget, lockedTargetPrice);
+  }
 
-    if (lockedTargetPrice !== undefined && lockedTargetPrice < price) {
-      price = lockedTargetPrice;
+  public static calculateRedemptionAmount(
+    priceIndex: PriceIndex,
+    btcMicrogonsAtTarget: bigint,
+    maxMicrogonsAtTarget?: bigint,
+  ): bigint {
+    let price = btcMicrogonsAtTarget;
+    if (maxMicrogonsAtTarget !== undefined && maxMicrogonsAtTarget < btcMicrogonsAtTarget) {
+      price = maxMicrogonsAtTarget;
     }
 
     const r = priceIndex.rValue;
@@ -704,9 +729,13 @@ export class BitcoinLock implements IBitcoinLock {
       });
     }
     const submitter = new TxSubmitter(client, tx, txSigner);
-    const targetPrice = priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+    const targetPrice =
+      microgonsAtTargetPerBtc !== null
+        ? (microgonsAtTargetPerBtc * satoshis) / SATS_PER_BTC
+        : priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+    const unlockAmount = this.calculateRedemptionAmount(priceIndex, targetPrice);
     const isVaultOwner = txSigner.address === vault.operatorAccountId;
-    const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(targetPrice);
+    const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(unlockAmount);
 
     const { canAfford, availableBalance, txFee } = await submitter.canAfford({
       tip,
@@ -804,7 +833,7 @@ export interface IReleaseRequest {
 export interface IReleaseRequestDetails extends IReleaseRequest {
   dueFrame: number;
   vaultId: number;
-  redemptionPrice: bigint;
+  redemptionAmount: bigint;
 }
 
 export interface IBitcoinLock {

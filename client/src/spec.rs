@@ -2569,6 +2569,26 @@ pub mod api {
 						],
 					)
 				}
+				pub fn calculate_redemption_amount(
+					&self,
+					satoshis: types::calculate_redemption_amount::Satoshis,
+					max_microgons_at_target : types :: calculate_redemption_amount :: MaxMicrogonsAtTarget,
+				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
+					types::CalculateRedemptionAmount,
+					types::calculate_redemption_amount::output::Output,
+				> {
+					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
+						"BitcoinApis",
+						"calculate_redemption_amount",
+						types::CalculateRedemptionAmount { satoshis, max_microgons_at_target },
+						[
+							222u8, 194u8, 97u8, 36u8, 54u8, 245u8, 156u8, 74u8, 0u8, 81u8, 185u8,
+							10u8, 29u8, 217u8, 128u8, 77u8, 231u8, 141u8, 181u8, 238u8, 86u8,
+							165u8, 109u8, 107u8, 242u8, 156u8, 56u8, 121u8, 14u8, 196u8, 145u8,
+							182u8,
+						],
+					)
+				}
 			}
 			pub mod types {
 				use super::runtime_types;
@@ -2705,6 +2725,31 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct GetBitcoinNetwork {}
+				pub mod calculate_redemption_amount {
+					use super::runtime_types;
+					pub type Satoshis = ::core::primitive::u64;
+					pub type MaxMicrogonsAtTarget = ::core::option::Option<::core::primitive::u128>;
+					pub mod output {
+						use super::runtime_types;
+						pub type Output = ::core::option::Option<::core::primitive::u128>;
+					}
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct CalculateRedemptionAmount {
+					pub satoshis: calculate_redemption_amount::Satoshis,
+					pub max_microgons_at_target: calculate_redemption_amount::MaxMicrogonsAtTarget,
+				}
 			}
 		}
 		pub mod ethereum_apis {
@@ -3434,9 +3479,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash
 			== [
-				189u8, 130u8, 85u8, 251u8, 34u8, 180u8, 243u8, 90u8, 136u8, 202u8, 102u8, 53u8,
-				197u8, 252u8, 119u8, 109u8, 184u8, 209u8, 114u8, 134u8, 224u8, 23u8, 34u8, 137u8,
-				198u8, 40u8, 155u8, 143u8, 218u8, 177u8, 200u8, 17u8,
+				31u8, 4u8, 192u8, 165u8, 134u8, 35u8, 185u8, 142u8, 165u8, 62u8, 216u8, 42u8, 5u8,
+				245u8, 97u8, 85u8, 39u8, 160u8, 82u8, 184u8, 148u8, 80u8, 58u8, 42u8, 117u8, 189u8,
+				125u8, 15u8, 31u8, 88u8, 67u8, 205u8,
 			]
 	}
 	pub mod system {
@@ -12227,10 +12272,10 @@ pub mod api {
 						"LockReleaseRequestsByUtxoId",
 						(),
 						[
-							14u8, 143u8, 135u8, 111u8, 60u8, 186u8, 119u8, 103u8, 16u8, 183u8,
-							81u8, 194u8, 37u8, 227u8, 60u8, 191u8, 193u8, 113u8, 136u8, 161u8,
-							198u8, 71u8, 116u8, 43u8, 120u8, 76u8, 223u8, 104u8, 227u8, 213u8,
-							142u8, 126u8,
+							6u8, 18u8, 175u8, 140u8, 128u8, 141u8, 127u8, 210u8, 43u8, 176u8,
+							220u8, 250u8, 118u8, 160u8, 71u8, 167u8, 65u8, 158u8, 184u8, 1u8,
+							215u8, 5u8, 92u8, 168u8, 236u8, 135u8, 76u8, 127u8, 232u8, 86u8, 134u8,
+							170u8,
 						],
 					)
 				}
@@ -12252,10 +12297,10 @@ pub mod api {
 						"LockReleaseRequestsByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							14u8, 143u8, 135u8, 111u8, 60u8, 186u8, 119u8, 103u8, 16u8, 183u8,
-							81u8, 194u8, 37u8, 227u8, 60u8, 191u8, 193u8, 113u8, 136u8, 161u8,
-							198u8, 71u8, 116u8, 43u8, 120u8, 76u8, 223u8, 104u8, 227u8, 213u8,
-							142u8, 126u8,
+							6u8, 18u8, 175u8, 140u8, 128u8, 141u8, 127u8, 210u8, 43u8, 176u8,
+							220u8, 250u8, 118u8, 160u8, 71u8, 167u8, 65u8, 158u8, 184u8, 1u8,
+							215u8, 5u8, 92u8, 168u8, 236u8, 135u8, 76u8, 127u8, 232u8, 86u8, 134u8,
+							170u8,
 						],
 					)
 				}
@@ -28883,7 +28928,7 @@ pub mod api {
 					pub to_script_pubkey:
 						runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey,
 					#[codec(compact)]
-					pub redemption_price: _0,
+					pub redemption_amount: _0,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

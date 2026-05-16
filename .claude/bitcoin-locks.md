@@ -322,8 +322,8 @@ simple, automatable ratcheting operations
 
 ### Redemption Price Formula Economics
 
-The `get_redemption_price()` function implements a **penalty curve** based on Argon's deviation from
-target price:
+The `calculate_redemption_amount()` function implements a **penalty curve** based on Argon's
+deviation from target price:
 
 ```rust
 // r = argon_current_price / argon_target_price

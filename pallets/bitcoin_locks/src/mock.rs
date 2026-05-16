@@ -304,11 +304,11 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn burn(
 		_vault_id: VaultId,
 		securitization: &Securitization<Balance>,
-		redemption_rate: Self::Balance,
+		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(securitization, redemption_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(securitization, redemption_amount, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 
