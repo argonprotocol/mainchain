@@ -6,49 +6,10 @@
 import type {} from '@polkadot/api-base/types/events';
 
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
-import type {
-  Bytes,
-  Null,
-  Option,
-  Result,
-  U8aFixed,
-  Vec,
-  bool,
-  i128,
-  u128,
-  u16,
-  u32,
-  u64,
-} from '@polkadot/types-codec';
+import type { Bytes, Null, Option, Result, U8aFixed, Vec, bool, i128, u128, u16, u32, u64 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
-import type {
-  ArgonNotaryAuditErrorVerifyError,
-  ArgonPrimitivesBitcoinBitcoinRejectedReason,
-  ArgonPrimitivesBitcoinUtxoRef,
-  ArgonPrimitivesBlockSealBlockPayout,
-  ArgonPrimitivesBlockSealMiningRegistration,
-  ArgonPrimitivesDomainZoneRecord,
-  ArgonPrimitivesNotaryNotaryMeta,
-  ArgonPrimitivesNotaryNotaryRecord,
-  ArgonPrimitivesProvidersOperationalRewardKind,
-  ArgonRuntimeOriginCaller,
-  ArgonRuntimeProxyType,
-  ArgonRuntimeRuntimeHoldReason,
-  FrameSupportTokensMiscBalanceStatus,
-  FrameSystemDispatchEventInfo,
-  PalletBalancesUnexpectedKind,
-  PalletCrosschainTransferBurnNotice,
-  PalletCrosschainTransferSourceChain,
-  PalletDomainsDomainRegistration,
-  PalletEthereumVerifierBasicOperatingMode,
-  PalletMintMintType,
-  PalletMultisigTimepoint,
-  PalletProxyDepositKind,
-  PalletTreasuryBondReleaseReason,
-  SpConsensusGrandpaAppPublic,
-  SpRuntimeDispatchError,
-} from '@polkadot/types/lookup';
+import type { ArgonNotaryAuditErrorVerifyError, ArgonPrimitivesBitcoinBitcoinRejectedReason, ArgonPrimitivesBitcoinUtxoRef, ArgonPrimitivesBlockSealBlockPayout, ArgonPrimitivesBlockSealMiningRegistration, ArgonPrimitivesDomainZoneRecord, ArgonPrimitivesNotaryNotaryMeta, ArgonPrimitivesNotaryNotaryRecord, ArgonPrimitivesProvidersOperationalRewardKind, ArgonRuntimeOriginCaller, ArgonRuntimeProxyType, ArgonRuntimeRuntimeHoldReason, FrameSupportTokensMiscBalanceStatus, FrameSystemDispatchEventInfo, PalletBalancesUnexpectedKind, PalletCrosschainTransferBurnNotice, PalletCrosschainTransferSourceChain, PalletDomainsDomainRegistration, PalletEthereumVerifierBasicOperatingMode, PalletMintMintType, PalletMultisigTimepoint, PalletProxyDepositKind, PalletTreasuryBondReleaseReason, SpConsensusGrandpaAppPublic, SpRuntimeDispatchError } from '@polkadot/types/lookup';
 
 export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>;
 
@@ -58,19 +19,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A balance was set by root.
        **/
-      BalanceSet: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, free: u128],
-        { who: AccountId32; free: u128 }
-      >;
+      BalanceSet: AugmentedEvent<ApiType, [who: AccountId32, free: u128], { who: AccountId32, free: u128 }>;
       /**
        * Some amount was burned from an account.
        **/
-      Burned: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Burned: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some debt has been dropped from the Total Issuance.
        **/
@@ -78,52 +31,28 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Held balance was burned from an account.
        **/
-      BurnedHeld: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      BurnedHeld: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Some amount was deposited (e.g. for transaction fees).
        **/
-      Deposit: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Deposit: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * An account was removed whose balance was non-zero but below ExistentialDeposit,
        * resulting in an outright loss.
        **/
-      DustLost: AugmentedEvent<
-        ApiType,
-        [account: AccountId32, amount: u128],
-        { account: AccountId32; amount: u128 }
-      >;
+      DustLost: AugmentedEvent<ApiType, [account: AccountId32, amount: u128], { account: AccountId32, amount: u128 }>;
       /**
        * An account was created with some free balance.
        **/
-      Endowed: AugmentedEvent<
-        ApiType,
-        [account: AccountId32, freeBalance: u128],
-        { account: AccountId32; freeBalance: u128 }
-      >;
+      Endowed: AugmentedEvent<ApiType, [account: AccountId32, freeBalance: u128], { account: AccountId32, freeBalance: u128 }>;
       /**
        * Some balance was frozen.
        **/
-      Frozen: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Frozen: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was placed on hold.
        **/
-      Held: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      Held: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Total issuance was increased by `amount`, creating a credit to be balanced.
        **/
@@ -131,19 +60,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was locked.
        **/
-      Locked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Locked: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was minted into an account.
        **/
-      Minted: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Minted: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some credit was balanced and added to the TotalIssuance.
        **/
@@ -151,11 +72,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was released from hold.
        **/
-      Released: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      Released: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Total issuance was decreased by `amount`, creating a debt to be balanced.
        **/
@@ -163,114 +80,44 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was reserved (moved from free to reserved).
        **/
-      Reserved: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Reserved: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was moved from the reserve of the first account to the second account.
        * Final argument indicates the destination balance type.
        **/
-      ReserveRepatriated: AugmentedEvent<
-        ApiType,
-        [
-          from: AccountId32,
-          to: AccountId32,
-          amount: u128,
-          destinationStatus: FrameSupportTokensMiscBalanceStatus,
-        ],
-        {
-          from: AccountId32;
-          to: AccountId32;
-          amount: u128;
-          destinationStatus: FrameSupportTokensMiscBalanceStatus;
-        }
-      >;
+      ReserveRepatriated: AugmentedEvent<ApiType, [from: AccountId32, to: AccountId32, amount: u128, destinationStatus: FrameSupportTokensMiscBalanceStatus], { from: AccountId32, to: AccountId32, amount: u128, destinationStatus: FrameSupportTokensMiscBalanceStatus }>;
       /**
        * Some amount was restored into an account.
        **/
-      Restored: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Restored: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was removed from the account (e.g. for misbehavior).
        **/
-      Slashed: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Slashed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was suspended from an account (it can be restored later).
        **/
-      Suspended: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Suspended: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was thawed.
        **/
-      Thawed: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Thawed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * The `TotalIssuance` was forcefully changed.
        **/
-      TotalIssuanceForced: AugmentedEvent<
-        ApiType,
-        [old: u128, new_: u128],
-        { old: u128; new_: u128 }
-      >;
+      TotalIssuanceForced: AugmentedEvent<ApiType, [old: u128, new_: u128], { old: u128, new_: u128 }>;
       /**
        * Transfer succeeded.
        **/
-      Transfer: AugmentedEvent<
-        ApiType,
-        [from: AccountId32, to: AccountId32, amount: u128],
-        { from: AccountId32; to: AccountId32; amount: u128 }
-      >;
+      Transfer: AugmentedEvent<ApiType, [from: AccountId32, to: AccountId32, amount: u128], { from: AccountId32, to: AccountId32, amount: u128 }>;
       /**
        * The `transferred` balance is placed on hold at the `dest` account.
        **/
-      TransferAndHold: AugmentedEvent<
-        ApiType,
-        [
-          reason: ArgonRuntimeRuntimeHoldReason,
-          source: AccountId32,
-          dest: AccountId32,
-          transferred: u128,
-        ],
-        {
-          reason: ArgonRuntimeRuntimeHoldReason;
-          source: AccountId32;
-          dest: AccountId32;
-          transferred: u128;
-        }
-      >;
+      TransferAndHold: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, transferred: u128], { reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, transferred: u128 }>;
       /**
        * A transfer of `amount` on hold from `source` to `dest` was initiated.
        **/
-      TransferOnHold: AugmentedEvent<
-        ApiType,
-        [
-          reason: ArgonRuntimeRuntimeHoldReason,
-          source: AccountId32,
-          dest: AccountId32,
-          amount: u128,
-        ],
-        {
-          reason: ArgonRuntimeRuntimeHoldReason;
-          source: AccountId32;
-          dest: AccountId32;
-          amount: u128;
-        }
-      >;
+      TransferOnHold: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, amount: u128 }>;
       /**
        * An unexpected/defensive event was triggered.
        **/
@@ -278,19 +125,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was unlocked.
        **/
-      Unlocked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Unlocked: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was unreserved (moved from reserved to free).
        **/
-      Unreserved: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Unreserved: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * An account was upgraded.
        **/
@@ -298,250 +137,55 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some amount was withdrawn from the account (e.g. for transaction fees).
        **/
-      Withdraw: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
     bitcoinLocks: {
-      BitcoinCosignPastDue: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32],
-        { utxoId: u64; vaultId: u32; compensationAmount: u128; compensatedAccountId: AccountId32 }
-      >;
-      BitcoinLockBurned: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32, wasUtxoSpent: bool],
-        { utxoId: u64; vaultId: u32; wasUtxoSpent: bool }
-      >;
-      BitcoinLockCreated: AugmentedEvent<
-        ApiType,
-        [
-          utxoId: u64,
-          vaultId: u32,
-          liquidityPromised: u128,
-          securitization: u128,
-          lockedMarketRate: u128,
-          accountId: AccountId32,
-          securityFee: u128,
-        ],
-        {
-          utxoId: u64;
-          vaultId: u32;
-          liquidityPromised: u128;
-          securitization: u128;
-          lockedMarketRate: u128;
-          accountId: AccountId32;
-          securityFee: u128;
-        }
-      >;
-      BitcoinLockRatcheted: AugmentedEvent<
-        ApiType,
-        [
-          utxoId: u64,
-          vaultId: u32,
-          liquidityPromised: u128,
-          originalMarketRate: u128,
-          securityFee: u128,
-          newLockedMarketRate: u128,
-          amountBurned: u128,
-          accountId: AccountId32,
-        ],
-        {
-          utxoId: u64;
-          vaultId: u32;
-          liquidityPromised: u128;
-          originalMarketRate: u128;
-          securityFee: u128;
-          newLockedMarketRate: u128;
-          amountBurned: u128;
-          accountId: AccountId32;
-        }
-      >;
-      BitcoinSpentAfterRelease: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32],
-        { utxoId: u64; vaultId: u32 }
-      >;
-      BitcoinUtxoCosigned: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32, signature: Bytes],
-        { utxoId: u64; vaultId: u32; signature: Bytes }
-      >;
-      BitcoinUtxoCosignRequested: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32],
-        { utxoId: u64; vaultId: u32 }
-      >;
+      BitcoinCosignPastDue: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32], { utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32 }>;
+      BitcoinLockBurned: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, wasUtxoSpent: bool], { utxoId: u64, vaultId: u32, wasUtxoSpent: bool }>;
+      BitcoinLockCreated: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, liquidityPromised: u128, securitization: u128, lockedTargetPrice: u128, accountId: AccountId32, securityFee: u128], { utxoId: u64, vaultId: u32, liquidityPromised: u128, securitization: u128, lockedTargetPrice: u128, accountId: AccountId32, securityFee: u128 }>;
+      BitcoinLockRatcheted: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, liquidityPromised: u128, oldTargetPrice: u128, securityFee: u128, newTargetPrice: u128, amountBurned: u128, accountId: AccountId32], { utxoId: u64, vaultId: u32, liquidityPromised: u128, oldTargetPrice: u128, securityFee: u128, newTargetPrice: u128, amountBurned: u128, accountId: AccountId32 }>;
+      BitcoinSpentAfterRelease: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32], { utxoId: u64, vaultId: u32 }>;
+      BitcoinUtxoCosigned: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, signature: Bytes], { utxoId: u64, vaultId: u32, signature: Bytes }>;
+      BitcoinUtxoCosignRequested: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32], { utxoId: u64, vaultId: u32 }>;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin lock
        **/
-      CosignOverdueError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
+      CosignOverdueError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
       /**
        * An error occurred while completing a lock
        **/
-      LockExpirationError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
-      OrphanedUtxoCosigned: AugmentedEvent<
-        ApiType,
-        [
-          utxoId: u64,
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef,
-          vaultId: u32,
-          accountId: AccountId32,
-          signature: Bytes,
-        ],
-        {
-          utxoId: u64;
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          vaultId: u32;
-          accountId: AccountId32;
-          signature: Bytes;
-        }
-      >;
-      OrphanedUtxoReceived: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, satoshis: u64],
-        { utxoId: u64; utxoRef: ArgonPrimitivesBitcoinUtxoRef; vaultId: u32; satoshis: u64 }
-      >;
-      OrphanedUtxoReleaseRequested: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32],
-        {
-          utxoId: u64;
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          vaultId: u32;
-          accountId: AccountId32;
-        }
-      >;
-      SecuritizationIncreased: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32],
-        { utxoId: u64; vaultId: u32; newSatoshis: u64; accountId: AccountId32 }
-      >;
-      UtxoFundedFromCandidate: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32],
-        {
-          utxoId: u64;
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          vaultId: u32;
-          accountId: AccountId32;
-        }
-      >;
+      LockExpirationError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
+      OrphanedUtxoCosigned: AugmentedEvent<ApiType, [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32, signature: Bytes], { utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32, signature: Bytes }>;
+      OrphanedUtxoReceived: AugmentedEvent<ApiType, [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, satoshis: u64], { utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, satoshis: u64 }>;
+      OrphanedUtxoReleaseRequested: AugmentedEvent<ApiType, [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32], { utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32 }>;
+      SecuritizationIncreased: AugmentedEvent<ApiType, [utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32], { utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32 }>;
+      UtxoFundedFromCandidate: AugmentedEvent<ApiType, [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32], { utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32 }>;
     };
     bitcoinUtxos: {
-      UtxoRejected: AugmentedEvent<
-        ApiType,
-        [
-          utxoId: u64,
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef,
-          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason,
-          satoshisReceived: u64,
-        ],
-        {
-          utxoId: u64;
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
-          satoshisReceived: u64;
-        }
-      >;
-      UtxoRejectedError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
-      UtxoSpent: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, blockHeight: u64],
-        { utxoId: u64; blockHeight: u64 }
-      >;
-      UtxoSpentError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
+      UtxoRejected: AugmentedEvent<ApiType, [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason, satoshisReceived: u64], { utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason, satoshisReceived: u64 }>;
+      UtxoRejectedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
+      UtxoSpent: AugmentedEvent<ApiType, [utxoId: u64, blockHeight: u64], { utxoId: u64, blockHeight: u64 }>;
+      UtxoSpentError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
       UtxoUnwatched: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
-      UtxoVerified: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, satoshisReceived: u64],
-        { utxoId: u64; satoshisReceived: u64 }
-      >;
-      UtxoVerifiedError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
+      UtxoVerified: AugmentedEvent<ApiType, [utxoId: u64, satoshisReceived: u64], { utxoId: u64, satoshisReceived: u64 }>;
+      UtxoVerifiedError: AugmentedEvent<ApiType, [utxoId: u64, error: SpRuntimeDispatchError], { utxoId: u64, error: SpRuntimeDispatchError }>;
     };
     blockRewards: {
-      RewardCreated: AugmentedEvent<
-        ApiType,
-        [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>],
-        { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }
-      >;
-      RewardCreateError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          argons: Option<u128>,
-          ownership: Option<u128>,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          argons: Option<u128>;
-          ownership: Option<u128>;
-          error: SpRuntimeDispatchError;
-        }
-      >;
+      RewardCreated: AugmentedEvent<ApiType, [rewards: Vec<ArgonPrimitivesBlockSealBlockPayout>], { rewards: Vec<ArgonPrimitivesBlockSealBlockPayout> }>;
+      RewardCreateError: AugmentedEvent<ApiType, [accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError], { accountId: AccountId32, argons: Option<u128>, ownership: Option<u128>, error: SpRuntimeDispatchError }>;
     };
     blockSealSpec: {
-      ComputeDifficultyAdjusted: AugmentedEvent<
-        ApiType,
-        [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128],
-        { expectedBlockTime: u64; actualBlockTime: u64; startDifficulty: u128; newDifficulty: u128 }
-      >;
-      VoteMinimumAdjusted: AugmentedEvent<
-        ApiType,
-        [
-          expectedBlockVotes: u128,
-          actualBlockVotes: u128,
-          startVoteMinimum: u128,
-          newVoteMinimum: u128,
-        ],
-        {
-          expectedBlockVotes: u128;
-          actualBlockVotes: u128;
-          startVoteMinimum: u128;
-          newVoteMinimum: u128;
-        }
-      >;
+      ComputeDifficultyAdjusted: AugmentedEvent<ApiType, [expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128], { expectedBlockTime: u64, actualBlockTime: u64, startDifficulty: u128, newDifficulty: u128 }>;
+      VoteMinimumAdjusted: AugmentedEvent<ApiType, [expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128], { expectedBlockVotes: u128, actualBlockVotes: u128, startVoteMinimum: u128, newVoteMinimum: u128 }>;
     };
     crosschainTransfer: {
       /**
        * An inbound burn notice was accepted and settled locally.
        **/
-      BurnNoticeAccepted: AugmentedEvent<
-        ApiType,
-        [
-          sourceChain: PalletCrosschainTransferSourceChain,
-          notice: PalletCrosschainTransferBurnNotice,
-        ],
-        {
-          sourceChain: PalletCrosschainTransferSourceChain;
-          notice: PalletCrosschainTransferBurnNotice;
-        }
-      >;
+      BurnNoticeAccepted: AugmentedEvent<ApiType, [sourceChain: PalletCrosschainTransferSourceChain, notice: PalletCrosschainTransferBurnNotice], { sourceChain: PalletCrosschainTransferSourceChain, notice: PalletCrosschainTransferBurnNotice }>;
     };
-    digests: {};
+    digests: {
+    };
     domains: {
       /**
        * A domain was expired
@@ -550,28 +194,16 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A domain was registered
        **/
-      DomainRegistered: AugmentedEvent<
-        ApiType,
-        [domainHash: H256, registration: PalletDomainsDomainRegistration],
-        { domainHash: H256; registration: PalletDomainsDomainRegistration }
-      >;
+      DomainRegistered: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
        * A domain registration was canceled due to a conflicting registration in the same
        * tick
        **/
-      DomainRegistrationCanceled: AugmentedEvent<
-        ApiType,
-        [domainHash: H256, registration: PalletDomainsDomainRegistration],
-        { domainHash: H256; registration: PalletDomainsDomainRegistration }
-      >;
+      DomainRegistrationCanceled: AugmentedEvent<ApiType, [domainHash: H256, registration: PalletDomainsDomainRegistration], { domainHash: H256, registration: PalletDomainsDomainRegistration }>;
       /**
        * A domain registration failed due to an error
        **/
-      DomainRegistrationError: AugmentedEvent<
-        ApiType,
-        [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError],
-        { domainHash: H256; accountId: AccountId32; error: SpRuntimeDispatchError }
-      >;
+      DomainRegistrationError: AugmentedEvent<ApiType, [domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError], { domainHash: H256, accountId: AccountId32, error: SpRuntimeDispatchError }>;
       /**
        * A domain was registered
        **/
@@ -579,60 +211,32 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A domain zone record was updated
        **/
-      ZoneRecordUpdated: AugmentedEvent<
-        ApiType,
-        [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord],
-        { domainHash: H256; zoneRecord: ArgonPrimitivesDomainZoneRecord }
-      >;
+      ZoneRecordUpdated: AugmentedEvent<ApiType, [domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord], { domainHash: H256, zoneRecord: ArgonPrimitivesDomainZoneRecord }>;
     };
     ethereumVerifier: {
-      BeaconHeaderImported: AugmentedEvent<
-        ApiType,
-        [blockHash: H256, slot: u64],
-        { blockHash: H256; slot: u64 }
-      >;
-      ExecutionHeaderAnchorImported: AugmentedEvent<
-        ApiType,
-        [blockHash: H256, blockNumber: u64],
-        { blockHash: H256; blockNumber: u64 }
-      >;
+      BeaconHeaderImported: AugmentedEvent<ApiType, [blockHash: H256, slot: u64], { blockHash: H256, slot: u64 }>;
+      ExecutionHeaderAnchorImported: AugmentedEvent<ApiType, [blockHash: H256, blockNumber: u64], { blockHash: H256, blockNumber: u64 }>;
       /**
        * Set OperatingMode
        **/
-      OperatingModeChanged: AugmentedEvent<
-        ApiType,
-        [mode: PalletEthereumVerifierBasicOperatingMode],
-        { mode: PalletEthereumVerifierBasicOperatingMode }
-      >;
+      OperatingModeChanged: AugmentedEvent<ApiType, [mode: PalletEthereumVerifierBasicOperatingMode], { mode: PalletEthereumVerifierBasicOperatingMode }>;
       SyncCommitteeUpdated: AugmentedEvent<ApiType, [period: u64], { period: u64 }>;
     };
     feeControl: {
       /**
        * A transaction fee was delegated
        **/
-      FeeDelegated: AugmentedEvent<
-        ApiType,
-        [origin: ArgonRuntimeOriginCaller, from: AccountId32, to: AccountId32],
-        { origin: ArgonRuntimeOriginCaller; from: AccountId32; to: AccountId32 }
-      >;
+      FeeDelegated: AugmentedEvent<ApiType, [origin: ArgonRuntimeOriginCaller, from: AccountId32, to: AccountId32], { origin: ArgonRuntimeOriginCaller, from: AccountId32, to: AccountId32 }>;
       /**
        * A transaction fee was skipped.
        **/
-      FeeSkipped: AugmentedEvent<
-        ApiType,
-        [origin: ArgonRuntimeOriginCaller],
-        { origin: ArgonRuntimeOriginCaller }
-      >;
+      FeeSkipped: AugmentedEvent<ApiType, [origin: ArgonRuntimeOriginCaller], { origin: ArgonRuntimeOriginCaller }>;
     };
     grandpa: {
       /**
        * New authority set has been applied.
        **/
-      NewAuthorities: AugmentedEvent<
-        ApiType,
-        [authoritySet: Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>>],
-        { authoritySet: Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>> }
-      >;
+      NewAuthorities: AugmentedEvent<ApiType, [authoritySet: Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>>], { authoritySet: Vec<ITuple<[SpConsensusGrandpaAppPublic, u64]>> }>;
       /**
        * Current authority set has been paused.
        **/
@@ -647,446 +251,148 @@ declare module '@polkadot/api-base/types/events' {
        * A localchain transfer could not be cleaned up properly. Possible invalid transfer
        * needing investigation.
        **/
-      PossibleInvalidLocalchainTransferAllowed: AugmentedEvent<
-        ApiType,
-        [transferId: u32, notaryId: u32, notebookNumber: u32],
-        { transferId: u32; notaryId: u32; notebookNumber: u32 }
-      >;
+      PossibleInvalidLocalchainTransferAllowed: AugmentedEvent<ApiType, [transferId: u32, notaryId: u32, notebookNumber: u32], { transferId: u32, notaryId: u32, notebookNumber: u32 }>;
       /**
        * Taxation failed
        **/
-      TaxationError: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError],
-        { notaryId: u32; notebookNumber: u32; tax: u128; error: SpRuntimeDispatchError }
-      >;
+      TaxationError: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError], { notaryId: u32, notebookNumber: u32, tax: u128, error: SpRuntimeDispatchError }>;
       /**
        * Transfer from Localchain to Mainchain
        **/
-      TransferFromLocalchain: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, amount: u128, notaryId: u32],
-        { accountId: AccountId32; amount: u128; notaryId: u32 }
-      >;
+      TransferFromLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32], { accountId: AccountId32, amount: u128, notaryId: u32 }>;
       /**
        * A transfer into the mainchain failed
        **/
-      TransferFromLocalchainError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          amount: u128,
-          notaryId: u32,
-          notebookNumber: u32,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          amount: u128;
-          notaryId: u32;
-          notebookNumber: u32;
-          error: SpRuntimeDispatchError;
-        }
-      >;
+      TransferFromLocalchainError: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, amount: u128, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
       /**
        * Funds sent to a localchain
        **/
-      TransferToLocalchain: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64],
-        {
-          accountId: AccountId32;
-          amount: u128;
-          transferId: u32;
-          notaryId: u32;
-          expirationTick: u64;
-        }
-      >;
+      TransferToLocalchain: AugmentedEvent<ApiType, [accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64], { accountId: AccountId32, amount: u128, transferId: u32, notaryId: u32, expirationTick: u64 }>;
       /**
        * Transfer to localchain expired and rolled back
        **/
-      TransferToLocalchainExpired: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, transferId: u32, notaryId: u32],
-        { accountId: AccountId32; transferId: u32; notaryId: u32 }
-      >;
+      TransferToLocalchainExpired: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32], { accountId: AccountId32, transferId: u32, notaryId: u32 }>;
       /**
        * An expired transfer to localchain failed to be refunded
        **/
-      TransferToLocalchainRefundError: AugmentedEvent<
-        ApiType,
-        [
-          accountId: AccountId32,
-          transferId: u32,
-          notaryId: u32,
-          notebookNumber: u32,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          accountId: AccountId32;
-          transferId: u32;
-          notaryId: u32;
-          notebookNumber: u32;
-          error: SpRuntimeDispatchError;
-        }
-      >;
+      TransferToLocalchainRefundError: AugmentedEvent<ApiType, [accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError], { accountId: AccountId32, transferId: u32, notaryId: u32, notebookNumber: u32, error: SpRuntimeDispatchError }>;
     };
     miningSlot: {
       /**
        * Bids are closed due to the VRF randomized function triggering
        **/
       MiningBidsClosed: AugmentedEvent<ApiType, [frameId: u64], { frameId: u64 }>;
-      MiningConfigurationUpdated: AugmentedEvent<
-        ApiType,
-        [
-          ticksBeforeBidEndForVrfClose: u64,
-          ticksBetweenSlots: u64,
-          slotBiddingStartAfterTicks: u64,
-        ],
-        {
-          ticksBeforeBidEndForVrfClose: u64;
-          ticksBetweenSlots: u64;
-          slotBiddingStartAfterTicks: u64;
-        }
-      >;
-      NewMiners: AugmentedEvent<
-        ApiType,
-        [
-          newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>,
-          releasedMiners: u32,
-          frameId: u64,
-        ],
-        {
-          newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>;
-          releasedMiners: u32;
-          frameId: u64;
-        }
-      >;
-      ReleaseBidError: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, error: SpRuntimeDispatchError],
-        { accountId: AccountId32; error: SpRuntimeDispatchError }
-      >;
-      ReleaseMinerSeatError: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, error: SpRuntimeDispatchError],
-        { accountId: AccountId32; error: SpRuntimeDispatchError }
-      >;
-      SlotBidderAdded: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, bidAmount: u128, index: u32],
-        { accountId: AccountId32; bidAmount: u128; index: u32 }
-      >;
-      SlotBidderDropped: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, preservedArgonotHold: bool],
-        { accountId: AccountId32; preservedArgonotHold: bool }
-      >;
+      MiningConfigurationUpdated: AugmentedEvent<ApiType, [ticksBeforeBidEndForVrfClose: u64, ticksBetweenSlots: u64, slotBiddingStartAfterTicks: u64], { ticksBeforeBidEndForVrfClose: u64, ticksBetweenSlots: u64, slotBiddingStartAfterTicks: u64 }>;
+      NewMiners: AugmentedEvent<ApiType, [newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>, releasedMiners: u32, frameId: u64], { newMiners: Vec<ArgonPrimitivesBlockSealMiningRegistration>, releasedMiners: u32, frameId: u64 }>;
+      ReleaseBidError: AugmentedEvent<ApiType, [accountId: AccountId32, error: SpRuntimeDispatchError], { accountId: AccountId32, error: SpRuntimeDispatchError }>;
+      ReleaseMinerSeatError: AugmentedEvent<ApiType, [accountId: AccountId32, error: SpRuntimeDispatchError], { accountId: AccountId32, error: SpRuntimeDispatchError }>;
+      SlotBidderAdded: AugmentedEvent<ApiType, [accountId: AccountId32, bidAmount: u128, index: u32], { accountId: AccountId32, bidAmount: u128, index: u32 }>;
+      SlotBidderDropped: AugmentedEvent<ApiType, [accountId: AccountId32, preservedArgonotHold: bool], { accountId: AccountId32, preservedArgonotHold: bool }>;
     };
     mint: {
       /**
        * Any bitcoins minted
        **/
-      BitcoinMint: AugmentedEvent<
-        ApiType,
-        [accountId: AccountId32, utxoId: Option<u64>, amount: u128],
-        { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
-      >;
+      BitcoinMint: AugmentedEvent<ApiType, [accountId: AccountId32, utxoId: Option<u64>, amount: u128], { accountId: AccountId32, utxoId: Option<u64>, amount: u128 }>;
       /**
        * The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
        * will not be able to mint
        **/
-      MiningMint: AugmentedEvent<
-        ApiType,
-        [amount: u128, perMiner: u128, argonCpi: i128, liquidity: u128],
-        { amount: u128; perMiner: u128; argonCpi: i128; liquidity: u128 }
-      >;
+      MiningMint: AugmentedEvent<ApiType, [amount: u128, perMiner: u128, argonCpi: i128, liquidity: u128], { amount: u128, perMiner: u128, argonCpi: i128, liquidity: u128 }>;
       /**
        * Errors encountered while minting. Most often due to mint amount still below Existential
        * Deposit
        **/
-      MintError: AugmentedEvent<
-        ApiType,
-        [
-          mintType: PalletMintMintType,
-          accountId: AccountId32,
-          utxoId: Option<u64>,
-          amount: u128,
-          error: SpRuntimeDispatchError,
-        ],
-        {
-          mintType: PalletMintMintType;
-          accountId: AccountId32;
-          utxoId: Option<u64>;
-          amount: u128;
-          error: SpRuntimeDispatchError;
-        }
-      >;
+      MintError: AugmentedEvent<ApiType, [mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError], { mintType: PalletMintMintType, accountId: AccountId32, utxoId: Option<u64>, amount: u128, error: SpRuntimeDispatchError }>;
     };
     multisig: {
       /**
        * The deposit for a multisig operation has been updated/poked.
        **/
-      DepositPoked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, callHash: U8aFixed, oldDeposit: u128, newDeposit: u128],
-        { who: AccountId32; callHash: U8aFixed; oldDeposit: u128; newDeposit: u128 }
-      >;
+      DepositPoked: AugmentedEvent<ApiType, [who: AccountId32, callHash: U8aFixed, oldDeposit: u128, newDeposit: u128], { who: AccountId32, callHash: U8aFixed, oldDeposit: u128, newDeposit: u128 }>;
       /**
        * A multisig operation has been approved by someone.
        **/
-      MultisigApproval: AugmentedEvent<
-        ApiType,
-        [
-          approving: AccountId32,
-          timepoint: PalletMultisigTimepoint,
-          multisig: AccountId32,
-          callHash: U8aFixed,
-        ],
-        {
-          approving: AccountId32;
-          timepoint: PalletMultisigTimepoint;
-          multisig: AccountId32;
-          callHash: U8aFixed;
-        }
-      >;
+      MultisigApproval: AugmentedEvent<ApiType, [approving: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed], { approving: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed }>;
       /**
        * A multisig operation has been cancelled.
        **/
-      MultisigCancelled: AugmentedEvent<
-        ApiType,
-        [
-          cancelling: AccountId32,
-          timepoint: PalletMultisigTimepoint,
-          multisig: AccountId32,
-          callHash: U8aFixed,
-        ],
-        {
-          cancelling: AccountId32;
-          timepoint: PalletMultisigTimepoint;
-          multisig: AccountId32;
-          callHash: U8aFixed;
-        }
-      >;
+      MultisigCancelled: AugmentedEvent<ApiType, [cancelling: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed], { cancelling: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed }>;
       /**
        * A multisig operation has been executed.
        **/
-      MultisigExecuted: AugmentedEvent<
-        ApiType,
-        [
-          approving: AccountId32,
-          timepoint: PalletMultisigTimepoint,
-          multisig: AccountId32,
-          callHash: U8aFixed,
-          result: Result<Null, SpRuntimeDispatchError>,
-        ],
-        {
-          approving: AccountId32;
-          timepoint: PalletMultisigTimepoint;
-          multisig: AccountId32;
-          callHash: U8aFixed;
-          result: Result<Null, SpRuntimeDispatchError>;
-        }
-      >;
+      MultisigExecuted: AugmentedEvent<ApiType, [approving: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed, result: Result<Null, SpRuntimeDispatchError>], { approving: AccountId32, timepoint: PalletMultisigTimepoint, multisig: AccountId32, callHash: U8aFixed, result: Result<Null, SpRuntimeDispatchError> }>;
       /**
        * A new multisig operation has begun.
        **/
-      NewMultisig: AugmentedEvent<
-        ApiType,
-        [approving: AccountId32, multisig: AccountId32, callHash: U8aFixed],
-        { approving: AccountId32; multisig: AccountId32; callHash: U8aFixed }
-      >;
+      NewMultisig: AugmentedEvent<ApiType, [approving: AccountId32, multisig: AccountId32, callHash: U8aFixed], { approving: AccountId32, multisig: AccountId32, callHash: U8aFixed }>;
     };
     notaries: {
       /**
        * A notary proposal has been accepted
        **/
-      NotaryActivated: AugmentedEvent<
-        ApiType,
-        [notary: ArgonPrimitivesNotaryNotaryRecord],
-        { notary: ArgonPrimitivesNotaryNotaryRecord }
-      >;
+      NotaryActivated: AugmentedEvent<ApiType, [notary: ArgonPrimitivesNotaryNotaryRecord], { notary: ArgonPrimitivesNotaryNotaryRecord }>;
       /**
        * Notary metadata updated
        **/
-      NotaryMetaUpdated: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta],
-        { notaryId: u32; meta: ArgonPrimitivesNotaryNotaryMeta }
-      >;
+      NotaryMetaUpdated: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta }>;
       /**
        * Error updating queued notary info
        **/
-      NotaryMetaUpdateError: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta],
-        { notaryId: u32; error: SpRuntimeDispatchError; meta: ArgonPrimitivesNotaryNotaryMeta }
-      >;
+      NotaryMetaUpdateError: AugmentedEvent<ApiType, [notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta], { notaryId: u32, error: SpRuntimeDispatchError, meta: ArgonPrimitivesNotaryNotaryMeta }>;
       /**
        * Notary metadata queued for update
        **/
-      NotaryMetaUpdateQueued: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64],
-        { notaryId: u32; meta: ArgonPrimitivesNotaryNotaryMeta; effectiveTick: u64 }
-      >;
+      NotaryMetaUpdateQueued: AugmentedEvent<ApiType, [notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64], { notaryId: u32, meta: ArgonPrimitivesNotaryNotaryMeta, effectiveTick: u64 }>;
       /**
        * A user has proposed operating as a notary
        **/
-      NotaryProposed: AugmentedEvent<
-        ApiType,
-        [operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32],
-        { operatorAccount: AccountId32; meta: ArgonPrimitivesNotaryNotaryMeta; expires: u32 }
-      >;
+      NotaryProposed: AugmentedEvent<ApiType, [operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32], { operatorAccount: AccountId32, meta: ArgonPrimitivesNotaryNotaryMeta, expires: u32 }>;
     };
     notebook: {
-      NotebookAuditFailure: AugmentedEvent<
-        ApiType,
-        [
-          notaryId: u32,
-          notebookNumber: u32,
-          notebookHash: H256,
-          firstFailureReason: ArgonNotaryAuditErrorVerifyError,
-        ],
-        {
-          notaryId: u32;
-          notebookNumber: u32;
-          notebookHash: H256;
-          firstFailureReason: ArgonNotaryAuditErrorVerifyError;
-        }
-      >;
-      NotebookReadyForReprocess: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, notebookNumber: u32],
-        { notaryId: u32; notebookNumber: u32 }
-      >;
-      NotebookSubmitted: AugmentedEvent<
-        ApiType,
-        [notaryId: u32, notebookNumber: u32],
-        { notaryId: u32; notebookNumber: u32 }
-      >;
+      NotebookAuditFailure: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32, notebookHash: H256, firstFailureReason: ArgonNotaryAuditErrorVerifyError], { notaryId: u32, notebookNumber: u32, notebookHash: H256, firstFailureReason: ArgonNotaryAuditErrorVerifyError }>;
+      NotebookReadyForReprocess: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
+      NotebookSubmitted: AugmentedEvent<ApiType, [notaryId: u32, notebookNumber: u32], { notaryId: u32, notebookNumber: u32 }>;
     };
     operationalAccounts: {
       /**
        * Account has become operational.
        **/
-      AccountWentOperational: AugmentedEvent<
-        ApiType,
-        [account: AccountId32],
-        { account: AccountId32 }
-      >;
+      AccountWentOperational: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
       /**
        * A sponsor updated the encrypted server payload for a sponsee.
        **/
-      EncryptedServerUpdated: AugmentedEvent<
-        ApiType,
-        [sponsor: AccountId32, sponsee: AccountId32],
-        { sponsor: AccountId32; sponsee: AccountId32 }
-      >;
+      EncryptedServerUpdated: AugmentedEvent<ApiType, [sponsor: AccountId32, sponsee: AccountId32], { sponsor: AccountId32, sponsee: AccountId32 }>;
       /**
        * An operational account was registered with its linked accounts.
        **/
-      OperationalAccountRegistered: AugmentedEvent<
-        ApiType,
-        [
-          operationalAccount: AccountId32,
-          vaultAccount: AccountId32,
-          miningFundingAccount: AccountId32,
-          miningBotAccount: AccountId32,
-          sponsor: Option<AccountId32>,
-        ],
-        {
-          operationalAccount: AccountId32;
-          vaultAccount: AccountId32;
-          miningFundingAccount: AccountId32;
-          miningBotAccount: AccountId32;
-          sponsor: Option<AccountId32>;
-        }
-      >;
+      OperationalAccountRegistered: AugmentedEvent<ApiType, [operationalAccount: AccountId32, vaultAccount: AccountId32, miningFundingAccount: AccountId32, miningBotAccount: AccountId32, sponsor: Option<AccountId32>], { operationalAccount: AccountId32, vaultAccount: AccountId32, miningFundingAccount: AccountId32, miningBotAccount: AccountId32, sponsor: Option<AccountId32> }>;
       /**
        * Operational progress was forced by root.
        **/
-      OperationalProgressForced: AugmentedEvent<
-        ApiType,
-        [
-          account: AccountId32,
-          updateOperationalProgress: bool,
-          hasUniswapTransfer: bool,
-          vaultCreated: bool,
-          hasTreasuryPoolParticipation: bool,
-          observedBitcoinTotal: u128,
-          observedMiningSeatTotal: u32,
-        ],
-        {
-          account: AccountId32;
-          updateOperationalProgress: bool;
-          hasUniswapTransfer: bool;
-          vaultCreated: bool;
-          hasTreasuryPoolParticipation: bool;
-          observedBitcoinTotal: u128;
-          observedMiningSeatTotal: u32;
-        }
-      >;
+      OperationalProgressForced: AugmentedEvent<ApiType, [account: AccountId32, updateOperationalProgress: bool, hasUniswapTransfer: bool, vaultCreated: bool, hasTreasuryPoolParticipation: bool, observedBitcoinTotal: u128, observedMiningSeatTotal: u32], { account: AccountId32, updateOperationalProgress: bool, hasUniswapTransfer: bool, vaultCreated: bool, hasTreasuryPoolParticipation: bool, observedBitcoinTotal: u128, observedMiningSeatTotal: u32 }>;
       /**
        * A reward is earned for an operational account, but not yet claimed.
        **/
-      OperationalRewardEarned: AugmentedEvent<
-        ApiType,
-        [
-          account: AccountId32,
-          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind,
-          amount: u128,
-        ],
-        {
-          account: AccountId32;
-          rewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
-          amount: u128;
-        }
-      >;
+      OperationalRewardEarned: AugmentedEvent<ApiType, [account: AccountId32, rewardKind: ArgonPrimitivesProvidersOperationalRewardKind, amount: u128], { account: AccountId32, rewardKind: ArgonPrimitivesProvidersOperationalRewardKind, amount: u128 }>;
       /**
        * Claimable operational rewards were paid to a managed account.
        **/
-      OperationalRewardsClaimed: AugmentedEvent<
-        ApiType,
-        [
-          operationalAccount: AccountId32,
-          claimant: AccountId32,
-          amount: u128,
-          remainingPending: u128,
-        ],
-        {
-          operationalAccount: AccountId32;
-          claimant: AccountId32;
-          amount: u128;
-          remainingPending: u128;
-        }
-      >;
+      OperationalRewardsClaimed: AugmentedEvent<ApiType, [operationalAccount: AccountId32, claimant: AccountId32, amount: u128, remainingPending: u128], { operationalAccount: AccountId32, claimant: AccountId32, amount: u128, remainingPending: u128 }>;
       /**
        * Reward config values were updated.
        **/
-      RewardsConfigUpdated: AugmentedEvent<
-        ApiType,
-        [operationalReferralReward: u128, referralBonusReward: u128],
-        { operationalReferralReward: u128; referralBonusReward: u128 }
-      >;
+      RewardsConfigUpdated: AugmentedEvent<ApiType, [operationalReferralReward: u128, referralBonusReward: u128], { operationalReferralReward: u128, referralBonusReward: u128 }>;
     };
     ownership: {
       /**
        * A balance was set by root.
        **/
-      BalanceSet: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, free: u128],
-        { who: AccountId32; free: u128 }
-      >;
+      BalanceSet: AugmentedEvent<ApiType, [who: AccountId32, free: u128], { who: AccountId32, free: u128 }>;
       /**
        * Some amount was burned from an account.
        **/
-      Burned: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Burned: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some debt has been dropped from the Total Issuance.
        **/
@@ -1094,52 +400,28 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Held balance was burned from an account.
        **/
-      BurnedHeld: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      BurnedHeld: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Some amount was deposited (e.g. for transaction fees).
        **/
-      Deposit: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Deposit: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * An account was removed whose balance was non-zero but below ExistentialDeposit,
        * resulting in an outright loss.
        **/
-      DustLost: AugmentedEvent<
-        ApiType,
-        [account: AccountId32, amount: u128],
-        { account: AccountId32; amount: u128 }
-      >;
+      DustLost: AugmentedEvent<ApiType, [account: AccountId32, amount: u128], { account: AccountId32, amount: u128 }>;
       /**
        * An account was created with some free balance.
        **/
-      Endowed: AugmentedEvent<
-        ApiType,
-        [account: AccountId32, freeBalance: u128],
-        { account: AccountId32; freeBalance: u128 }
-      >;
+      Endowed: AugmentedEvent<ApiType, [account: AccountId32, freeBalance: u128], { account: AccountId32, freeBalance: u128 }>;
       /**
        * Some balance was frozen.
        **/
-      Frozen: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Frozen: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was placed on hold.
        **/
-      Held: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      Held: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Total issuance was increased by `amount`, creating a credit to be balanced.
        **/
@@ -1147,19 +429,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was locked.
        **/
-      Locked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Locked: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was minted into an account.
        **/
-      Minted: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Minted: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some credit was balanced and added to the TotalIssuance.
        **/
@@ -1167,11 +441,7 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was released from hold.
        **/
-      Released: AugmentedEvent<
-        ApiType,
-        [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128],
-        { reason: ArgonRuntimeRuntimeHoldReason; who: AccountId32; amount: u128 }
-      >;
+      Released: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, who: AccountId32, amount: u128 }>;
       /**
        * Total issuance was decreased by `amount`, creating a debt to be balanced.
        **/
@@ -1179,114 +449,44 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was reserved (moved from free to reserved).
        **/
-      Reserved: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Reserved: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was moved from the reserve of the first account to the second account.
        * Final argument indicates the destination balance type.
        **/
-      ReserveRepatriated: AugmentedEvent<
-        ApiType,
-        [
-          from: AccountId32,
-          to: AccountId32,
-          amount: u128,
-          destinationStatus: FrameSupportTokensMiscBalanceStatus,
-        ],
-        {
-          from: AccountId32;
-          to: AccountId32;
-          amount: u128;
-          destinationStatus: FrameSupportTokensMiscBalanceStatus;
-        }
-      >;
+      ReserveRepatriated: AugmentedEvent<ApiType, [from: AccountId32, to: AccountId32, amount: u128, destinationStatus: FrameSupportTokensMiscBalanceStatus], { from: AccountId32, to: AccountId32, amount: u128, destinationStatus: FrameSupportTokensMiscBalanceStatus }>;
       /**
        * Some amount was restored into an account.
        **/
-      Restored: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Restored: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was removed from the account (e.g. for misbehavior).
        **/
-      Slashed: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Slashed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some amount was suspended from an account (it can be restored later).
        **/
-      Suspended: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Suspended: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was thawed.
        **/
-      Thawed: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Thawed: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * The `TotalIssuance` was forcefully changed.
        **/
-      TotalIssuanceForced: AugmentedEvent<
-        ApiType,
-        [old: u128, new_: u128],
-        { old: u128; new_: u128 }
-      >;
+      TotalIssuanceForced: AugmentedEvent<ApiType, [old: u128, new_: u128], { old: u128, new_: u128 }>;
       /**
        * Transfer succeeded.
        **/
-      Transfer: AugmentedEvent<
-        ApiType,
-        [from: AccountId32, to: AccountId32, amount: u128],
-        { from: AccountId32; to: AccountId32; amount: u128 }
-      >;
+      Transfer: AugmentedEvent<ApiType, [from: AccountId32, to: AccountId32, amount: u128], { from: AccountId32, to: AccountId32, amount: u128 }>;
       /**
        * The `transferred` balance is placed on hold at the `dest` account.
        **/
-      TransferAndHold: AugmentedEvent<
-        ApiType,
-        [
-          reason: ArgonRuntimeRuntimeHoldReason,
-          source: AccountId32,
-          dest: AccountId32,
-          transferred: u128,
-        ],
-        {
-          reason: ArgonRuntimeRuntimeHoldReason;
-          source: AccountId32;
-          dest: AccountId32;
-          transferred: u128;
-        }
-      >;
+      TransferAndHold: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, transferred: u128], { reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, transferred: u128 }>;
       /**
        * A transfer of `amount` on hold from `source` to `dest` was initiated.
        **/
-      TransferOnHold: AugmentedEvent<
-        ApiType,
-        [
-          reason: ArgonRuntimeRuntimeHoldReason,
-          source: AccountId32,
-          dest: AccountId32,
-          amount: u128,
-        ],
-        {
-          reason: ArgonRuntimeRuntimeHoldReason;
-          source: AccountId32;
-          dest: AccountId32;
-          amount: u128;
-        }
-      >;
+      TransferOnHold: AugmentedEvent<ApiType, [reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, amount: u128], { reason: ArgonRuntimeRuntimeHoldReason, source: AccountId32, dest: AccountId32, amount: u128 }>;
       /**
        * An unexpected/defensive event was triggered.
        **/
@@ -1294,19 +494,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some balance was unlocked.
        **/
-      Unlocked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Unlocked: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * Some balance was unreserved (moved from reserved to free).
        **/
-      Unreserved: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Unreserved: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
       /**
        * An account was upgraded.
        **/
@@ -1314,135 +506,51 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * Some amount was withdrawn from the account (e.g. for transaction fees).
        **/
-      Withdraw: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, amount: u128],
-        { who: AccountId32; amount: u128 }
-      >;
+      Withdraw: AugmentedEvent<ApiType, [who: AccountId32, amount: u128], { who: AccountId32, amount: u128 }>;
     };
     priceIndex: {
       /**
        * Event emitted when a new price index is submitted
        **/
       NewIndex: AugmentedEvent<ApiType, []>;
-      OperatorChanged: AugmentedEvent<
-        ApiType,
-        [operatorId: AccountId32],
-        { operatorId: AccountId32 }
-      >;
+      OperatorChanged: AugmentedEvent<ApiType, [operatorId: AccountId32], { operatorId: AccountId32 }>;
     };
     proxy: {
       /**
        * An announcement was placed to make a call in the future.
        **/
-      Announced: AugmentedEvent<
-        ApiType,
-        [real: AccountId32, proxy: AccountId32, callHash: H256],
-        { real: AccountId32; proxy: AccountId32; callHash: H256 }
-      >;
+      Announced: AugmentedEvent<ApiType, [real: AccountId32, proxy: AccountId32, callHash: H256], { real: AccountId32, proxy: AccountId32, callHash: H256 }>;
       /**
        * A deposit stored for proxies or announcements was poked / updated.
        **/
-      DepositPoked: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, kind: PalletProxyDepositKind, oldDeposit: u128, newDeposit: u128],
-        { who: AccountId32; kind: PalletProxyDepositKind; oldDeposit: u128; newDeposit: u128 }
-      >;
+      DepositPoked: AugmentedEvent<ApiType, [who: AccountId32, kind: PalletProxyDepositKind, oldDeposit: u128, newDeposit: u128], { who: AccountId32, kind: PalletProxyDepositKind, oldDeposit: u128, newDeposit: u128 }>;
       /**
        * A proxy was added.
        **/
-      ProxyAdded: AugmentedEvent<
-        ApiType,
-        [
-          delegator: AccountId32,
-          delegatee: AccountId32,
-          proxyType: ArgonRuntimeProxyType,
-          delay: u32,
-        ],
-        {
-          delegator: AccountId32;
-          delegatee: AccountId32;
-          proxyType: ArgonRuntimeProxyType;
-          delay: u32;
-        }
-      >;
+      ProxyAdded: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32 }>;
       /**
        * A proxy was executed correctly, with the given.
        **/
-      ProxyExecuted: AugmentedEvent<
-        ApiType,
-        [result: Result<Null, SpRuntimeDispatchError>],
-        { result: Result<Null, SpRuntimeDispatchError> }
-      >;
+      ProxyExecuted: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
       /**
        * A proxy was removed.
        **/
-      ProxyRemoved: AugmentedEvent<
-        ApiType,
-        [
-          delegator: AccountId32,
-          delegatee: AccountId32,
-          proxyType: ArgonRuntimeProxyType,
-          delay: u32,
-        ],
-        {
-          delegator: AccountId32;
-          delegatee: AccountId32;
-          proxyType: ArgonRuntimeProxyType;
-          delay: u32;
-        }
-      >;
+      ProxyRemoved: AugmentedEvent<ApiType, [delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32], { delegator: AccountId32, delegatee: AccountId32, proxyType: ArgonRuntimeProxyType, delay: u32 }>;
       /**
        * A pure account has been created by new proxy with given
        * disambiguation index and proxy type.
        **/
-      PureCreated: AugmentedEvent<
-        ApiType,
-        [
-          pure: AccountId32,
-          who: AccountId32,
-          proxyType: ArgonRuntimeProxyType,
-          disambiguationIndex: u16,
-          at: u32,
-          extrinsicIndex: u32,
-        ],
-        {
-          pure: AccountId32;
-          who: AccountId32;
-          proxyType: ArgonRuntimeProxyType;
-          disambiguationIndex: u16;
-          at: u32;
-          extrinsicIndex: u32;
-        }
-      >;
+      PureCreated: AugmentedEvent<ApiType, [pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16, at: u32, extrinsicIndex: u32], { pure: AccountId32, who: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16, at: u32, extrinsicIndex: u32 }>;
       /**
        * A pure proxy was killed by its spawner.
        **/
-      PureKilled: AugmentedEvent<
-        ApiType,
-        [
-          pure: AccountId32,
-          spawner: AccountId32,
-          proxyType: ArgonRuntimeProxyType,
-          disambiguationIndex: u16,
-        ],
-        {
-          pure: AccountId32;
-          spawner: AccountId32;
-          proxyType: ArgonRuntimeProxyType;
-          disambiguationIndex: u16;
-        }
-      >;
+      PureKilled: AugmentedEvent<ApiType, [pure: AccountId32, spawner: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16], { pure: AccountId32, spawner: AccountId32, proxyType: ArgonRuntimeProxyType, disambiguationIndex: u16 }>;
     };
     sudo: {
       /**
        * The sudo key has been updated.
        **/
-      KeyChanged: AugmentedEvent<
-        ApiType,
-        [old: Option<AccountId32>, new_: AccountId32],
-        { old: Option<AccountId32>; new_: AccountId32 }
-      >;
+      KeyChanged: AugmentedEvent<ApiType, [old: Option<AccountId32>, new_: AccountId32], { old: Option<AccountId32>, new_: AccountId32 }>;
       /**
        * The key was permanently removed.
        **/
@@ -1450,19 +558,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A sudo call just took place.
        **/
-      Sudid: AugmentedEvent<
-        ApiType,
-        [sudoResult: Result<Null, SpRuntimeDispatchError>],
-        { sudoResult: Result<Null, SpRuntimeDispatchError> }
-      >;
+      Sudid: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
       /**
        * A [sudo_as](Pallet::sudo_as) call just took place.
        **/
-      SudoAsDone: AugmentedEvent<
-        ApiType,
-        [sudoResult: Result<Null, SpRuntimeDispatchError>],
-        { sudoResult: Result<Null, SpRuntimeDispatchError> }
-      >;
+      SudoAsDone: AugmentedEvent<ApiType, [sudoResult: Result<Null, SpRuntimeDispatchError>], { sudoResult: Result<Null, SpRuntimeDispatchError> }>;
     };
     system: {
       /**
@@ -1472,19 +572,11 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * An extrinsic failed.
        **/
-      ExtrinsicFailed: AugmentedEvent<
-        ApiType,
-        [dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSystemDispatchEventInfo],
-        { dispatchError: SpRuntimeDispatchError; dispatchInfo: FrameSystemDispatchEventInfo }
-      >;
+      ExtrinsicFailed: AugmentedEvent<ApiType, [dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSystemDispatchEventInfo], { dispatchError: SpRuntimeDispatchError, dispatchInfo: FrameSystemDispatchEventInfo }>;
       /**
        * An extrinsic completed successfully.
        **/
-      ExtrinsicSuccess: AugmentedEvent<
-        ApiType,
-        [dispatchInfo: FrameSystemDispatchEventInfo],
-        { dispatchInfo: FrameSystemDispatchEventInfo }
-      >;
+      ExtrinsicSuccess: AugmentedEvent<ApiType, [dispatchInfo: FrameSystemDispatchEventInfo], { dispatchInfo: FrameSystemDispatchEventInfo }>;
       /**
        * An account was reaped.
        **/
@@ -1496,164 +588,66 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * An invalid authorized upgrade was rejected while trying to apply it.
        **/
-      RejectedInvalidAuthorizedUpgrade: AugmentedEvent<
-        ApiType,
-        [codeHash: H256, error: SpRuntimeDispatchError],
-        { codeHash: H256; error: SpRuntimeDispatchError }
-      >;
+      RejectedInvalidAuthorizedUpgrade: AugmentedEvent<ApiType, [codeHash: H256, error: SpRuntimeDispatchError], { codeHash: H256, error: SpRuntimeDispatchError }>;
       /**
        * On on-chain remark happened.
        **/
-      Remarked: AugmentedEvent<
-        ApiType,
-        [sender: AccountId32, hash_: H256],
-        { sender: AccountId32; hash_: H256 }
-      >;
+      Remarked: AugmentedEvent<ApiType, [sender: AccountId32, hash_: H256], { sender: AccountId32, hash_: H256 }>;
       /**
        * An upgrade was authorized.
        **/
-      UpgradeAuthorized: AugmentedEvent<
-        ApiType,
-        [codeHash: H256, checkVersion: bool],
-        { codeHash: H256; checkVersion: bool }
-      >;
+      UpgradeAuthorized: AugmentedEvent<ApiType, [codeHash: H256, checkVersion: bool], { codeHash: H256, checkVersion: bool }>;
     };
     transactionPayment: {
       /**
        * A transaction fee `actual_fee`, of which `tip` was added to the minimum inclusion fee,
        * has been paid by `who`.
        **/
-      TransactionFeePaid: AugmentedEvent<
-        ApiType,
-        [who: AccountId32, actualFee: u128, tip: u128],
-        { who: AccountId32; actualFee: u128; tip: u128 }
-      >;
+      TransactionFeePaid: AugmentedEvent<ApiType, [who: AccountId32, actualFee: u128, tip: u128], { who: AccountId32, actualFee: u128, tip: u128 }>;
     };
     treasury: {
       /**
        * A bond purchase entered a vault's accepted list.
        **/
-      BondLotPurchased: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
-        { vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
-      >;
+      BondLotPurchased: AugmentedEvent<ApiType, [vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32], { vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32 }>;
       /**
        * A bond lot was released.
        **/
-      BondLotReleased: AugmentedEvent<
-        ApiType,
-        [frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
-        { frameId: u64; vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
-      >;
+      BondLotReleased: AugmentedEvent<ApiType, [frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32], { frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32 }>;
       /**
        * A bond lot was removed from future frames and scheduled for release.
        **/
-      BondLotReleaseScheduled: AugmentedEvent<
-        ApiType,
-        [
-          vaultId: u32,
-          bondLotId: u64,
-          accountId: AccountId32,
-          bonds: u32,
-          releaseFrameId: u64,
-          reason: PalletTreasuryBondReleaseReason,
-        ],
-        {
-          vaultId: u32;
-          bondLotId: u64;
-          accountId: AccountId32;
-          bonds: u32;
-          releaseFrameId: u64;
-          reason: PalletTreasuryBondReleaseReason;
-        }
-      >;
+      BondLotReleaseScheduled: AugmentedEvent<ApiType, [vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32, releaseFrameId: u64, reason: PalletTreasuryBondReleaseReason], { vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32, releaseFrameId: u64, reason: PalletTreasuryBondReleaseReason }>;
       /**
        * An error occurred while paying frame earnings for a bond lot.
        **/
-      CouldNotDistributeEarningsToBondLot: AugmentedEvent<
-        ApiType,
-        [
-          frameId: u64,
-          vaultId: u32,
-          bondLotId: u64,
-          accountId: AccountId32,
-          amount: u128,
-          dispatchError: SpRuntimeDispatchError,
-        ],
-        {
-          frameId: u64;
-          vaultId: u32;
-          bondLotId: u64;
-          accountId: AccountId32;
-          amount: u128;
-          dispatchError: SpRuntimeDispatchError;
-        }
-      >;
+      CouldNotDistributeEarningsToBondLot: AugmentedEvent<ApiType, [frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, amount: u128, dispatchError: SpRuntimeDispatchError], { frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, amount: u128, dispatchError: SpRuntimeDispatchError }>;
       /**
        * An error occurred while releasing a bond lot.
        **/
-      CouldNotReleaseBondLot: AugmentedEvent<
-        ApiType,
-        [
-          frameId: u64,
-          vaultId: u32,
-          bondLotId: u64,
-          amount: u128,
-          accountId: AccountId32,
-          dispatchError: SpRuntimeDispatchError,
-        ],
-        {
-          frameId: u64;
-          vaultId: u32;
-          bondLotId: u64;
-          amount: u128;
-          accountId: AccountId32;
-          dispatchError: SpRuntimeDispatchError;
-        }
-      >;
+      CouldNotReleaseBondLot: AugmentedEvent<ApiType, [frameId: u64, vaultId: u32, bondLotId: u64, amount: u128, accountId: AccountId32, dispatchError: SpRuntimeDispatchError], { frameId: u64, vaultId: u32, bondLotId: u64, amount: u128, accountId: AccountId32, dispatchError: SpRuntimeDispatchError }>;
       /**
        * An error occurred while moving bid-pool funds into treasury reserves.
        **/
-      CouldNotTransferToTreasuryReserves: AugmentedEvent<
-        ApiType,
-        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
-      >;
+      CouldNotTransferToTreasuryReserves: AugmentedEvent<ApiType, [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError], { frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError }>;
       /**
        * Frame earnings were distributed.
        **/
-      FrameEarningsDistributed: AugmentedEvent<
-        ApiType,
-        [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, participatingVaults: u32],
-        { frameId: u64; bidPoolDistributed: u128; treasuryReserves: u128; participatingVaults: u32 }
-      >;
+      FrameEarningsDistributed: AugmentedEvent<ApiType, [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, participatingVaults: u32], { frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, participatingVaults: u32 }>;
       /**
        * The current frame's vault capital was locked in.
        **/
-      FrameVaultCapitalLocked: AugmentedEvent<
-        ApiType,
-        [frameId: u64, totalEligibleBonds: u128, participatingVaults: u32],
-        { frameId: u64; totalEligibleBonds: u128; participatingVaults: u32 }
-      >;
+      FrameVaultCapitalLocked: AugmentedEvent<ApiType, [frameId: u64, totalEligibleBonds: u128, participatingVaults: u32], { frameId: u64, totalEligibleBonds: u128, participatingVaults: u32 }>;
     };
     txPause: {
       /**
        * This pallet, or a specific call is now paused.
        **/
-      CallPaused: AugmentedEvent<
-        ApiType,
-        [fullName: ITuple<[Bytes, Bytes]>],
-        { fullName: ITuple<[Bytes, Bytes]> }
-      >;
+      CallPaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
       /**
        * This pallet, or a specific call is now unpaused.
        **/
-      CallUnpaused: AugmentedEvent<
-        ApiType,
-        [fullName: ITuple<[Bytes, Bytes]>],
-        { fullName: ITuple<[Bytes, Bytes]> }
-      >;
+      CallUnpaused: AugmentedEvent<ApiType, [fullName: ITuple<[Bytes, Bytes]>], { fullName: ITuple<[Bytes, Bytes]> }>;
     };
     utility: {
       /**
@@ -1668,27 +662,15 @@ declare module '@polkadot/api-base/types/events' {
        * Batch of dispatches did not complete fully. Index of first failing dispatch given, as
        * well as the error.
        **/
-      BatchInterrupted: AugmentedEvent<
-        ApiType,
-        [index: u32, error: SpRuntimeDispatchError],
-        { index: u32; error: SpRuntimeDispatchError }
-      >;
+      BatchInterrupted: AugmentedEvent<ApiType, [index: u32, error: SpRuntimeDispatchError], { index: u32, error: SpRuntimeDispatchError }>;
       /**
        * A call was dispatched.
        **/
-      DispatchedAs: AugmentedEvent<
-        ApiType,
-        [result: Result<Null, SpRuntimeDispatchError>],
-        { result: Result<Null, SpRuntimeDispatchError> }
-      >;
+      DispatchedAs: AugmentedEvent<ApiType, [result: Result<Null, SpRuntimeDispatchError>], { result: Result<Null, SpRuntimeDispatchError> }>;
       /**
        * The fallback call was dispatched.
        **/
-      IfElseFallbackCalled: AugmentedEvent<
-        ApiType,
-        [mainError: SpRuntimeDispatchError],
-        { mainError: SpRuntimeDispatchError }
-      >;
+      IfElseFallbackCalled: AugmentedEvent<ApiType, [mainError: SpRuntimeDispatchError], { mainError: SpRuntimeDispatchError }>;
       /**
        * Main call was dispatched.
        **/
@@ -1700,117 +682,30 @@ declare module '@polkadot/api-base/types/events' {
       /**
        * A single item within a Batch of dispatches has completed with error.
        **/
-      ItemFailed: AugmentedEvent<
-        ApiType,
-        [error: SpRuntimeDispatchError],
-        { error: SpRuntimeDispatchError }
-      >;
+      ItemFailed: AugmentedEvent<ApiType, [error: SpRuntimeDispatchError], { error: SpRuntimeDispatchError }>;
     };
     vaults: {
-      FundLockCanceled: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, amount: u128],
-        { vaultId: u32; amount: u128 }
-      >;
-      FundsLocked: AugmentedEvent<
-        ApiType,
-        [
-          vaultId: u32,
-          locker: AccountId32,
-          liquidityPromised: u128,
-          isRatchet: bool,
-          feeRevenue: u128,
-          didUseFeeCoupon: bool,
-        ],
-        {
-          vaultId: u32;
-          locker: AccountId32;
-          liquidityPromised: u128;
-          isRatchet: bool;
-          feeRevenue: u128;
-          didUseFeeCoupon: bool;
-        }
-      >;
-      FundsReleased: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, securitization: u128],
-        { vaultId: u32; securitization: u128 }
-      >;
-      FundsReleasedError: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, error: SpRuntimeDispatchError],
-        { vaultId: u32; error: SpRuntimeDispatchError }
-      >;
-      FundsScheduledForRelease: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, securitization: u128, releaseHeight: u64],
-        { vaultId: u32; securitization: u128; releaseHeight: u64 }
-      >;
-      LostBitcoinCompensated: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128],
-        { vaultId: u32; beneficiary: AccountId32; toBeneficiary: u128; burned: u128 }
-      >;
-      TreasuryRecordingError: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, frameId: u64, vaultEarnings: u128, error: SpRuntimeDispatchError],
-        { vaultId: u32; frameId: u64; vaultEarnings: u128; error: SpRuntimeDispatchError }
-      >;
+      FundLockCanceled: AugmentedEvent<ApiType, [vaultId: u32, amount: u128], { vaultId: u32, amount: u128 }>;
+      FundsLocked: AugmentedEvent<ApiType, [vaultId: u32, locker: AccountId32, liquidityPromised: u128, isRatchet: bool, feeRevenue: u128, didUseFeeCoupon: bool], { vaultId: u32, locker: AccountId32, liquidityPromised: u128, isRatchet: bool, feeRevenue: u128, didUseFeeCoupon: bool }>;
+      FundsReleased: AugmentedEvent<ApiType, [vaultId: u32, securitization: u128], { vaultId: u32, securitization: u128 }>;
+      FundsReleasedError: AugmentedEvent<ApiType, [vaultId: u32, error: SpRuntimeDispatchError], { vaultId: u32, error: SpRuntimeDispatchError }>;
+      FundsScheduledForRelease: AugmentedEvent<ApiType, [vaultId: u32, securitization: u128, releaseHeight: u64], { vaultId: u32, securitization: u128, releaseHeight: u64 }>;
+      LostBitcoinCompensated: AugmentedEvent<ApiType, [vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128], { vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128 }>;
+      TreasuryRecordingError: AugmentedEvent<ApiType, [vaultId: u32, frameId: u64, vaultEarnings: u128, error: SpRuntimeDispatchError], { vaultId: u32, frameId: u64, vaultEarnings: u128, error: SpRuntimeDispatchError }>;
       VaultBitcoinXpubChange: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
-      VaultClosed: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, securitizationRemaining: u128, securitizationReleased: u128],
-        { vaultId: u32; securitizationRemaining: u128; securitizationReleased: u128 }
-      >;
+      VaultClosed: AugmentedEvent<ApiType, [vaultId: u32, securitizationRemaining: u128, securitizationReleased: u128], { vaultId: u32, securitizationRemaining: u128, securitizationReleased: u128 }>;
       /**
        * The vault collected revenue and cosigned all pending bitcoin locks
        **/
-      VaultCollected: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, revenue: u128],
-        { vaultId: u32; revenue: u128 }
-      >;
-      VaultCreated: AugmentedEvent<
-        ApiType,
-        [
-          vaultId: u32,
-          securitization: u128,
-          securitizationRatio: u128,
-          operatorAccountId: AccountId32,
-          openedTick: u64,
-        ],
-        {
-          vaultId: u32;
-          securitization: u128;
-          securitizationRatio: u128;
-          operatorAccountId: AccountId32;
-          openedTick: u64;
-        }
-      >;
-      VaultModified: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, securitization: u128, securitizationTarget: u128, securitizationRatio: u128],
-        {
-          vaultId: u32;
-          securitization: u128;
-          securitizationTarget: u128;
-          securitizationRatio: u128;
-        }
-      >;
+      VaultCollected: AugmentedEvent<ApiType, [vaultId: u32, revenue: u128], { vaultId: u32, revenue: u128 }>;
+      VaultCreated: AugmentedEvent<ApiType, [vaultId: u32, securitization: u128, securitizationRatio: u128, operatorAccountId: AccountId32, openedTick: u64], { vaultId: u32, securitization: u128, securitizationRatio: u128, operatorAccountId: AccountId32, openedTick: u64 }>;
+      VaultModified: AugmentedEvent<ApiType, [vaultId: u32, securitization: u128, securitizationTarget: u128, securitizationRatio: u128], { vaultId: u32, securitization: u128, securitizationTarget: u128, securitizationRatio: u128 }>;
       /**
        * Vault revenue was not collected within the required window, so has been burned
        **/
-      VaultRevenueUncollected: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, frameId: u64, amount: u128],
-        { vaultId: u32; frameId: u64; amount: u128 }
-      >;
+      VaultRevenueUncollected: AugmentedEvent<ApiType, [vaultId: u32, frameId: u64, amount: u128], { vaultId: u32, frameId: u64, amount: u128 }>;
       VaultTermsChanged: AugmentedEvent<ApiType, [vaultId: u32], { vaultId: u32 }>;
-      VaultTermsChangeScheduled: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, changeTick: u64],
-        { vaultId: u32; changeTick: u64 }
-      >;
+      VaultTermsChangeScheduled: AugmentedEvent<ApiType, [vaultId: u32, changeTick: u64], { vaultId: u32, changeTick: u64 }>;
     };
   } // AugmentedEvents
 } // declare module

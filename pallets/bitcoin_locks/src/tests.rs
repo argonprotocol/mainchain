@@ -59,7 +59,7 @@ fn can_lock_a_bitcoin_utxo_until_expiration() {
 				vault_id: 1,
 				liquidity_promised,
 				securitization: liquidity_promised,
-				locked_market_rate: liquidity_promised,
+				locked_target_price: liquidity_promised,
 				account_id: 2,
 				security_fee: liquidity_promised / 10,
 			}
@@ -811,7 +811,7 @@ fn increase_securitization_scales_lock_values() {
 		let after = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(after.satoshis, new_satoshis);
 		assert_eq!(after.liquidity_promised, before.liquidity_promised * 2u128);
-		assert_eq!(after.locked_market_rate, before.locked_market_rate * 2u128);
+		assert_eq!(after.locked_target_price, before.locked_target_price * 2u128);
 		System::assert_last_event(
 			Event::<Test>::SecuritizationIncreased {
 				utxo_id: 1,
@@ -850,7 +850,7 @@ fn preset_target_rate_uses_cpi_to_calculate_liquidity() {
 			Some(LockOptions::V1 { microgons_at_target_per_btc: Some(target_rate) })
 		));
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
-		assert_eq!(lock.locked_market_rate, 500_000 * MICROGONS_PER_ARGON);
+		assert_eq!(lock.locked_target_price, 500_000 * MICROGONS_PER_ARGON);
 		assert_eq!(lock.liquidity_promised, 491_735_537_190);
 	});
 }
@@ -1606,8 +1606,8 @@ fn it_should_allow_a_ratchet_up() {
 				vault_id: 1,
 				utxo_id: 1,
 				liquidity_promised: 65_000 * MICROGONS_PER_ARGON,
-				original_market_rate: 62_000 * MICROGONS_PER_ARGON,
-				new_locked_market_rate: 65_000 * MICROGONS_PER_ARGON,
+				old_target_price: 62_000 * MICROGONS_PER_ARGON,
+				new_target_price: 65_000 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
 				security_fee: 1000 + apr / 2,
@@ -1736,8 +1736,8 @@ fn it_should_charge_early_ratchet_up_fee_for_remaining_lock_term() {
 				vault_id: 1,
 				utxo_id: 1,
 				liquidity_promised: 611 * MICROGONS_PER_ARGON,
-				original_market_rate: 500 * MICROGONS_PER_ARGON,
-				new_locked_market_rate: 611 * MICROGONS_PER_ARGON,
+				old_target_price: 500 * MICROGONS_PER_ARGON,
+				new_target_price: 611 * MICROGONS_PER_ARGON,
 				account_id: who,
 				amount_burned: 0,
 				security_fee: remaining_term_fee,
@@ -1857,7 +1857,7 @@ fn it_should_handle_mismatched_satoshis() {
 		assert_eq!(lock.utxo_satoshis, Some(100_000_000 - 3000));
 		assert_eq!(lock.satoshis, 100_000_000 - 3000);
 		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
-		assert_eq!(lock.locked_market_rate, actual_sats);
+		assert_eq!(lock.locked_target_price, actual_sats);
 	});
 }
 
@@ -1946,7 +1946,7 @@ fn ratchet_uses_target_basis_for_availability() {
 
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.liquidity_promised, 101_000 * MICROGONS_PER_ARGON);
-		assert_eq!(lock.locked_market_rate, 101_000 * MICROGONS_PER_ARGON);
+		assert_eq!(lock.locked_target_price, 101_000 * MICROGONS_PER_ARGON);
 
 		// Mint the argons into account
 		assert_ok!(BitcoinLocks::funding_received(1, satoshis));

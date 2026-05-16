@@ -259,7 +259,8 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UtxoNotLocked: AugmentedError<ApiType>;
     };
-    blockRewards: {};
+    blockRewards: {
+    };
     blockSeal: {
       /**
        * A block seal authority could not be properly decoded
@@ -965,7 +966,7 @@ declare module '@polkadot/api-base/types/errors' {
       CallFiltered: AugmentedError<ApiType>;
       /**
        * Failed to extract the runtime version from the new runtime.
-       *
+       * 
        * Either calling `Core_version` or decoding `RuntimeVersion` failed.
        **/
       FailedToExtractRuntimeVersion: AugmentedError<ApiType>;
@@ -1000,7 +1001,8 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       Unauthorized: AugmentedError<ApiType>;
     };
-    ticks: {};
+    ticks: {
+    };
     treasury: {
       /**
        * The bond lot is already scheduled for release.

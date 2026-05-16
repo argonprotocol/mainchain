@@ -111,16 +111,16 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
     expect(priceIndex.argonotUsdPrice).toBeDefined();
-    await expect(BitcoinLock.getMarketRate(priceIndex, 100n)).resolves.toStrictEqual(60_000n);
+    expect(priceIndex.getSatoshiPriceInTargetMicrogons(100n)).toStrictEqual(60_000n);
     expect(
       BitcoinLock.calculateUnlockAmount(priceIndex, {
-        lockedMarketRate: 60_000n,
+        lockedTargetPrice: 60_000n,
         satoshis: 100n,
       }),
     ).toStrictEqual(60_000n);
     expect(
       BitcoinLock.calculateUnlockAmount(priceIndex, {
-        lockedMarketRate: 50_000n,
+        lockedTargetPrice: 50_000n,
         satoshis: 100n,
       }),
     ).toStrictEqual(50_000n);
@@ -246,7 +246,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
 
-    expect(lock.calculateUnlockAmount(priceIndex)).toEqual(lock.lockedMarketRate);
+    expect(lock.calculateUnlockAmount(priceIndex)).toEqual(lock.lockedTargetPrice);
 
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');

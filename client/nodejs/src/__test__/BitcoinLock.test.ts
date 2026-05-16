@@ -36,7 +36,7 @@ describe('BitcoinLock.calculateUnlockAmount', () => {
     });
 
     expect(
-      BitcoinLock.calculateUnlockAmount(index, { lockedMarketRate: 60_000n, satoshis: 100n }),
+      BitcoinLock.calculateUnlockAmount(index, { lockedTargetPrice: 60_000n, satoshis: 100n }),
     ).toStrictEqual(50_000n);
   });
 
@@ -49,9 +49,9 @@ describe('BitcoinLock.calculateUnlockAmount', () => {
 
     expect(
       BitcoinLock.calculateUnlockAmount(index, {
-        lockedMarketRate: 1_250_000n,
+        lockedTargetPrice: 1_250_000n,
         satoshis: 100_000_000n,
       }),
-    ).toStrictEqual(1_318_500n);
+    ).toStrictEqual(1_054_800n);
   });
 });

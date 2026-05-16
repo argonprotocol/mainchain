@@ -68,7 +68,7 @@ mod test {
 			let lock_v1 = crate::LockedBitcoin::<Test> {
 				vault_id: 1,
 				liquidity_promised: 100,
-				locked_market_rate: 100,
+				locked_target_price: 100,
 				owner_account: 1,
 				securitization_ratio: FixedU128::one(),
 				security_fees: 10u128,

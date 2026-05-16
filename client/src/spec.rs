@@ -3434,9 +3434,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash
 			== [
-				203u8, 220u8, 1u8, 32u8, 151u8, 194u8, 212u8, 106u8, 128u8, 195u8, 118u8, 40u8,
-				121u8, 188u8, 150u8, 170u8, 232u8, 131u8, 38u8, 66u8, 145u8, 78u8, 172u8, 5u8,
-				188u8, 168u8, 35u8, 27u8, 69u8, 140u8, 53u8, 8u8,
+				189u8, 130u8, 85u8, 251u8, 34u8, 180u8, 243u8, 90u8, 136u8, 202u8, 102u8, 53u8,
+				197u8, 252u8, 119u8, 109u8, 184u8, 209u8, 114u8, 134u8, 224u8, 23u8, 34u8, 137u8,
+				198u8, 40u8, 155u8, 143u8, 218u8, 177u8, 200u8, 17u8,
 			]
 	}
 	pub mod system {
@@ -4562,9 +4562,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							137u8, 134u8, 85u8, 15u8, 177u8, 20u8, 232u8, 133u8, 35u8, 235u8, 6u8,
-							171u8, 194u8, 159u8, 142u8, 111u8, 149u8, 249u8, 145u8, 212u8, 80u8,
-							155u8, 87u8, 51u8, 0u8, 69u8, 20u8, 69u8, 28u8, 246u8, 12u8, 252u8,
+							151u8, 134u8, 76u8, 213u8, 195u8, 168u8, 35u8, 102u8, 138u8, 221u8,
+							126u8, 121u8, 187u8, 180u8, 69u8, 216u8, 114u8, 112u8, 142u8, 142u8,
+							75u8, 111u8, 74u8, 210u8, 231u8, 37u8, 92u8, 143u8, 160u8, 44u8, 193u8,
+							202u8,
 						],
 					)
 				}
@@ -11597,7 +11598,7 @@ pub mod api {
 				pub vault_id: bitcoin_lock_created::VaultId,
 				pub liquidity_promised: bitcoin_lock_created::LiquidityPromised,
 				pub securitization: bitcoin_lock_created::Securitization,
-				pub locked_market_rate: bitcoin_lock_created::LockedMarketRate,
+				pub locked_target_price: bitcoin_lock_created::LockedTargetPrice,
 				pub account_id: bitcoin_lock_created::AccountId,
 				pub security_fee: bitcoin_lock_created::SecurityFee,
 			}
@@ -11607,7 +11608,7 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type LiquidityPromised = ::core::primitive::u128;
 				pub type Securitization = ::core::primitive::u128;
-				pub type LockedMarketRate = ::core::primitive::u128;
+				pub type LockedTargetPrice = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 				pub type SecurityFee = ::core::primitive::u128;
 			}
@@ -11627,9 +11628,9 @@ pub mod api {
 				pub utxo_id: bitcoin_lock_ratcheted::UtxoId,
 				pub vault_id: bitcoin_lock_ratcheted::VaultId,
 				pub liquidity_promised: bitcoin_lock_ratcheted::LiquidityPromised,
-				pub original_market_rate: bitcoin_lock_ratcheted::OriginalMarketRate,
+				pub old_target_price: bitcoin_lock_ratcheted::OldTargetPrice,
 				pub security_fee: bitcoin_lock_ratcheted::SecurityFee,
-				pub new_locked_market_rate: bitcoin_lock_ratcheted::NewLockedMarketRate,
+				pub new_target_price: bitcoin_lock_ratcheted::NewTargetPrice,
 				pub amount_burned: bitcoin_lock_ratcheted::AmountBurned,
 				pub account_id: bitcoin_lock_ratcheted::AccountId,
 			}
@@ -11638,9 +11639,9 @@ pub mod api {
 				pub type UtxoId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
 				pub type LiquidityPromised = ::core::primitive::u128;
-				pub type OriginalMarketRate = ::core::primitive::u128;
+				pub type OldTargetPrice = ::core::primitive::u128;
 				pub type SecurityFee = ::core::primitive::u128;
-				pub type NewLockedMarketRate = ::core::primitive::u128;
+				pub type NewTargetPrice = ::core::primitive::u128;
 				pub type AmountBurned = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 			}
@@ -12051,9 +12052,10 @@ pub mod api {
 						"LocksByUtxoId",
 						(),
 						[
-							240u8, 125u8, 202u8, 251u8, 213u8, 221u8, 81u8, 149u8, 83u8, 8u8,
-							104u8, 124u8, 43u8, 85u8, 123u8, 48u8, 155u8, 65u8, 114u8, 48u8, 66u8,
-							16u8, 128u8, 70u8, 74u8, 22u8, 22u8, 144u8, 94u8, 107u8, 66u8, 165u8,
+							32u8, 181u8, 203u8, 207u8, 186u8, 1u8, 131u8, 145u8, 23u8, 74u8, 116u8,
+							160u8, 56u8, 155u8, 44u8, 127u8, 207u8, 152u8, 188u8, 130u8, 4u8,
+							250u8, 184u8, 120u8, 169u8, 44u8, 139u8, 83u8, 144u8, 223u8, 66u8,
+							51u8,
 						],
 					)
 				}
@@ -12075,9 +12077,10 @@ pub mod api {
 						"LocksByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							240u8, 125u8, 202u8, 251u8, 213u8, 221u8, 81u8, 149u8, 83u8, 8u8,
-							104u8, 124u8, 43u8, 85u8, 123u8, 48u8, 155u8, 65u8, 114u8, 48u8, 66u8,
-							16u8, 128u8, 70u8, 74u8, 22u8, 22u8, 144u8, 94u8, 107u8, 66u8, 165u8,
+							32u8, 181u8, 203u8, 207u8, 186u8, 1u8, 131u8, 145u8, 23u8, 74u8, 116u8,
+							160u8, 56u8, 155u8, 44u8, 127u8, 207u8, 152u8, 188u8, 130u8, 4u8,
+							250u8, 184u8, 120u8, 169u8, 44u8, 139u8, 83u8, 144u8, 223u8, 66u8,
+							51u8,
 						],
 					)
 				}
@@ -28728,7 +28731,7 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						liquidity_promised: ::core::primitive::u128,
 						securitization: ::core::primitive::u128,
-						locked_market_rate: ::core::primitive::u128,
+						locked_target_price: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 						security_fee: ::core::primitive::u128,
 					},
@@ -28737,9 +28740,9 @@ pub mod api {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						liquidity_promised: ::core::primitive::u128,
-						original_market_rate: ::core::primitive::u128,
+						old_target_price: ::core::primitive::u128,
 						security_fee: ::core::primitive::u128,
-						new_locked_market_rate: ::core::primitive::u128,
+						new_target_price: ::core::primitive::u128,
 						amount_burned: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 					},
@@ -28900,7 +28903,7 @@ pub mod api {
 					#[codec(compact)]
 					pub liquidity_promised: ::core::primitive::u128,
 					#[codec(compact)]
-					pub locked_market_rate: ::core::primitive::u128,
+					pub locked_target_price: ::core::primitive::u128,
 					pub owner_account: crate::types::AccountId32,
 					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					#[codec(compact)]

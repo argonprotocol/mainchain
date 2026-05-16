@@ -42,7 +42,7 @@ export class PriceIndex {
     return this;
   }
 
-  getBtcPriceInMicrogons(satoshis: bigint | number): bigint {
+  getSatoshiPriceInMarketMicrogons(satoshis: bigint | number): bigint {
     if (this.btcUsdPrice === undefined || this.argonUsdPrice === undefined) {
       throw new Error('PriceIndex not loaded');
     }
@@ -53,7 +53,7 @@ export class PriceIndex {
     return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
   }
 
-  getBtcPriceInTargetMicrogons(satoshis: bigint | number): bigint {
+  getSatoshiPriceInTargetMicrogons(satoshis: bigint | number): bigint {
     if (this.btcUsdPrice === undefined || this.argonUsdTargetPrice === undefined) {
       throw new Error('PriceIndex not loaded');
     }
