@@ -115,6 +115,9 @@ export async function getNextEthereumBeaconSyncTxs(
     const needsNewSyncCommitteePeriod =
       finalityFinalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
     const needsCommitteeData = missingNextSyncCommittee || needsNewSyncCommitteePeriod;
+    const nextCommitteePeriod = missingNextSyncCommittee
+      ? storedPeriod
+      : state.latestSyncCommitteeUpdatePeriod + 1n;
     const needsCurrentPeriodUpdate =
       missingNextSyncCommittee ||
       (needsNewSyncCommitteePeriod && !finalityUpdateHasNextSyncCommittee);
@@ -123,7 +126,7 @@ export async function getNextEthereumBeaconSyncTxs(
     if (needsCommitteeData && needsCurrentPeriodUpdate) {
       const periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
         beaconApiUrl,
-        `/eth/v1/beacon/light_client/updates?count=1&start_period=${storedPeriod}`,
+        `/eth/v1/beacon/light_client/updates?count=1&start_period=${nextCommitteePeriod}`,
       );
       const currentPeriodUpdate = periodUpdates[0]?.data;
       const currentPeriodUpdateHasNextSyncCommittee =
