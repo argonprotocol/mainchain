@@ -161,6 +161,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPriceInUsd::get()
 	}
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonTargetPriceInUsd::get()
+	}
 	fn get_argon_cpi() -> Option<ArgonCPI> {
 		let ratio = ArgonTargetPriceInUsd::get()? / ArgonPriceInUsd::get()?;
 		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);
@@ -301,11 +304,11 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn burn(
 		_vault_id: VaultId,
 		securitization: &Securitization<Balance>,
-		redemption_rate: Self::Balance,
+		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		let result =
-			DefaultVault::mutate(|a| a.burn(securitization, redemption_rate, lock_extension))?;
+			DefaultVault::mutate(|a| a.burn(securitization, redemption_amount, lock_extension))?;
 		Ok(result.burned_amount)
 	}
 

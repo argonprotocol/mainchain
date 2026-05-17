@@ -213,8 +213,13 @@ impl LockCommands {
 					.await?
 					.ok_or(anyhow!("Vault not found"))?;
 				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
-				let Some(argons_minted) =
-					client.call(apis().bitcoin_apis().market_rate(satoshis), None).await?
+
+				let Some(argons_minted) = client
+					.call(
+						apis().bitcoin_apis().calculate_redemption_amount(satoshis, None),
+						None,
+					)
+					.await?
 				else {
 					println!("No price conversion found in blockchain for bitcoin to argon");
 					return Ok(());
@@ -306,16 +311,16 @@ impl LockCommands {
 					})
 					.unwrap_or_default();
 
-				let redemption_price = if let Some(ref request) = release_request {
-					request.redemption_price
+				let redemption_amount = if let Some(ref request) = release_request {
+					request.redemption_amount
 				} else {
-					let redemption_price_query =
-						apis().bitcoin_apis().redemption_rate(lock.satoshis);
+					let redemption_amount_query = apis()
+						.bitcoin_apis()
+						.calculate_redemption_amount(lock.satoshis, Some(lock.locked_target_price));
 					client
-						.call(redemption_price_query, Some(at_block))
+						.call(redemption_amount_query, Some(at_block))
 						.await?
 						.unwrap_or_default()
-						.min(lock.locked_market_rate)
 				};
 
 				let minted = if lock.is_funded { lock.liquidity_promised - remaining } else { 0 };
@@ -353,7 +358,7 @@ impl LockCommands {
 							"Redemption Price{}",
 							if release_request.is_some() { " (paid)" } else { "" }
 						),
-						format!("{}", ArgonFormatter(redemption_price)),
+						format!("{}", ArgonFormatter(redemption_amount)),
 					],
 					vec!["Expiration Bitcoin Block".into(), format!("{}", lock.vault_claim_height)],
 					vec![
@@ -392,19 +397,18 @@ impl LockCommands {
 
 				let (_, lock) =
 					get_bitcoin_lock_from_utxo_id(&client, utxo_id, FetchAt::Finalized).await?;
-				let redemption_price_query = apis().bitcoin_apis().redemption_rate(lock.satoshis);
+				let redemption_amount_query = apis()
+					.bitcoin_apis()
+					.calculate_redemption_amount(lock.satoshis, Some(lock.locked_target_price));
 
 				let latest_block = client.latest_finalized_block_hash().await?;
-				let mut redemption_price = client
+				let redemption_amount = client
 					.live
 					.runtime_api()
 					.at(latest_block)
-					.call(redemption_price_query)
+					.call(redemption_amount_query)
 					.await?
 					.unwrap_or_default();
-				if redemption_price > lock.locked_market_rate {
-					redemption_price = lock.locked_market_rate;
-				}
 
 				let bitcoin_dest_pubkey = Address::from_str(&dest_pubkey)
 					.map_err(|e| anyhow!("Unable to parse bitcoin destination pubkey: {e:?}"))?
@@ -421,7 +425,7 @@ impl LockCommands {
 
 				println!(
 					"The price to release this lock is: {}\nBitcoin fee: {:?}",
-					ArgonFormatter(redemption_price),
+					ArgonFormatter(redemption_amount),
 					network_fee
 				);
 				let argon_bitcoin_script_pubkey: BitcoinScriptPubkey = bitcoin_dest_pubkey.into();

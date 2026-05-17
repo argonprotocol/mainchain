@@ -527,7 +527,7 @@ export default {
         vaultId: 'u32',
         liquidityPromised: 'u128',
         securitization: 'u128',
-        lockedMarketRate: 'u128',
+        lockedTargetPrice: 'u128',
         accountId: 'AccountId32',
         securityFee: 'u128',
       },
@@ -535,9 +535,9 @@ export default {
         utxoId: 'u64',
         vaultId: 'u32',
         liquidityPromised: 'u128',
-        originalMarketRate: 'u128',
+        oldTargetPrice: 'u128',
         securityFee: 'u128',
-        newLockedMarketRate: 'u128',
+        newTargetPrice: 'u128',
         amountBurned: 'u128',
         accountId: 'AccountId32',
       },
@@ -2043,7 +2043,7 @@ export default {
   PalletBitcoinLocksLockOptions: {
     _enum: {
       V1: {
-        microgonsPerBtc: 'Option<u128>',
+        microgonsAtTargetPerBtc: 'Option<u128>',
       },
     },
   },
@@ -3050,7 +3050,7 @@ export default {
   PalletBitcoinLocksLockedBitcoin: {
     vaultId: 'Compact<u32>',
     liquidityPromised: 'Compact<u128>',
-    lockedMarketRate: 'Compact<u128>',
+    lockedTargetPrice: 'Compact<u128>',
     ownerAccount: 'AccountId32',
     securitizationRatio: 'u128',
     securityFees: 'Compact<u128>',
@@ -3078,7 +3078,7 @@ export default {
     bitcoinNetworkFee: 'Compact<u64>',
     cosignDueFrame: 'Compact<u64>',
     toScriptPubkey: 'Bytes',
-    redemptionPrice: 'Compact<u128>',
+    redemptionAmount: 'Compact<u128>',
   },
   /**
    * Lookup399: pallet_bitcoin_locks::pallet::OrphanedUtxo<BlockNumber>

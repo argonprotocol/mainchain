@@ -1,12 +1,10 @@
-import {
-  ArgonClient,
-  FIXED_U128_DECIMALS,
-  fromFixedNumber,
-  MICROGONS_PER_ARGON,
-  SATS_PER_BTC,
-} from './index';
+import type { ArgonClient } from './index';
+import { FIXED_U128_DECIMALS, fromFixedNumber } from './convert';
+import { MICROGONS_PER_ARGON } from './utils';
 import BigNumber from 'bignumber.js';
 import { ApiDecoration } from '@polkadot/api/types';
+
+const SATS_PER_BTC = 100_000_000n;
 
 export class PriceIndex {
   btcUsdPrice?: BigNumber;
@@ -44,7 +42,7 @@ export class PriceIndex {
     return this;
   }
 
-  getBtcMicrogonPrice(satoshis: bigint | number): bigint {
+  getSatoshiPriceInMarketMicrogons(satoshis: bigint | number): bigint {
     if (this.btcUsdPrice === undefined || this.argonUsdPrice === undefined) {
       throw new Error('PriceIndex not loaded');
     }
@@ -52,6 +50,19 @@ export class PriceIndex {
     const satoshiCents = this.btcUsdPrice.multipliedBy(satoshis).dividedBy(SATS_PER_BTC);
 
     const microgons = satoshiCents.multipliedBy(MICROGONS_PER_ARGON).dividedBy(this.argonUsdPrice);
+    return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
+  }
+
+  getSatoshiPriceInTargetMicrogons(satoshis: bigint | number): bigint {
+    if (this.btcUsdPrice === undefined || this.argonUsdTargetPrice === undefined) {
+      throw new Error('PriceIndex not loaded');
+    }
+
+    const satoshiCents = this.btcUsdPrice.multipliedBy(satoshis).dividedBy(SATS_PER_BTC);
+
+    const microgons = satoshiCents
+      .multipliedBy(MICROGONS_PER_ARGON)
+      .dividedBy(this.argonUsdTargetPrice);
     return BigInt(microgons.integerValue(BigNumber.ROUND_DOWN).toString());
   }
 

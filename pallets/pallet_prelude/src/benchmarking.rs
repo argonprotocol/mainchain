@@ -802,6 +802,10 @@ where
 		benchmark_price_provider_state().argon_price_in_usd
 	}
 
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		benchmark_price_provider_state().argon_target_price_in_usd
+	}
+
 	fn get_argon_cpi() -> Option<ArgonCPI> {
 		let state = benchmark_price_provider_state();
 		let ratio = state.argon_target_price_in_usd? / state.argon_price_in_usd?;

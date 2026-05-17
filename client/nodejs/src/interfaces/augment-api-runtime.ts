@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import '@polkadot/api-base/types/calls';
+import type {} from '@polkadot/api-base/types/calls';
 
 import type { ArgonPrimitivesEthereumEthereumVerifyError } from '@argonprotocol/mainchain/interfaces/ethereum';
 import type { ApiTypes, AugmentedCall, DecoratedCallBase } from '@polkadot/api-base/types';

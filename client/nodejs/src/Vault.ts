@@ -183,10 +183,10 @@ export class Vault {
   }
 
   public calculateBitcoinFee(amount: bigint): bigint {
-    const fee = this.terms.bitcoinAnnualPercentRate
-      .multipliedBy(Number(amount))
+    const feeBn = this.terms.bitcoinAnnualPercentRate
+      .multipliedBy(amount)
       .integerValue(BigNumber.ROUND_CEIL);
-    return BigInt(fee.toString()) + this.terms.bitcoinBaseFee;
+    return BigInt(feeBn.toString()) + this.terms.bitcoinBaseFee;
   }
 
   public static async get(

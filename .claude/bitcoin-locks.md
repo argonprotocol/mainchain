@@ -198,7 +198,7 @@ fn ratchet(origin: OriginFor<T>, utxo_id: UtxoId) -> DispatchResult {
     );
 
     // 4. Price must have changed
-    let new_pegged_price = T::PriceProvider::get_bitcoin_argon_price(lock.satoshis)
+    let new_pegged_price = T::PriceProvider::get_btc_price_in_market_microgons(lock.satoshis)
         .ok_or(Error::<T>::NoBitcoinPricesAvailable)?;
     ensure!(original_pegged_price != new_pegged_price, Error::<T>::NoRatchetingAvailable);
 }
@@ -322,8 +322,8 @@ simple, automatable ratcheting operations
 
 ### Redemption Price Formula Economics
 
-The `get_redemption_price()` function implements a **penalty curve** based on Argon's deviation from
-target price:
+The `calculate_redemption_amount()` function implements a **penalty curve** based on Argon's
+deviation from target price:
 
 ```rust
 // r = argon_current_price / argon_target_price

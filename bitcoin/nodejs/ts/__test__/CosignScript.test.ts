@@ -111,13 +111,13 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
     expect(priceIndex.argonotUsdPrice).toBeDefined();
-    await expect(BitcoinLock.getMarketRate(priceIndex, 100n)).resolves.toStrictEqual(60_000n);
-    await expect(
-      BitcoinLock.getRedemptionRate(priceIndex, { lockedMarketRate: 60_000n, satoshis: 100n }),
-    ).resolves.toStrictEqual(60_000n);
-    await expect(
-      BitcoinLock.getRedemptionRate(priceIndex, { lockedMarketRate: 50_000n, satoshis: 100n }),
-    ).resolves.toStrictEqual(50_000n);
+    expect(priceIndex.getSatoshiPriceInTargetMicrogons(100n)).toStrictEqual(60_000n);
+    expect(
+      BitcoinLock.calculateRedemptionAmountFromSatoshis(priceIndex, 100n, 60_000n),
+    ).toStrictEqual(60_000n);
+    expect(
+      BitcoinLock.calculateRedemptionAmountFromSatoshis(priceIndex, 100n, 50_000n),
+    ).toStrictEqual(50_000n);
   });
 
   test.sequential('it can lock a bitcoin', async () => {
@@ -240,7 +240,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
 
-    await expect(lock.releasePrice(priceIndex)).resolves.toEqual(lock.lockedMarketRate);
+    expect(lock.calculateRedemptionAmount(priceIndex)).toEqual(lock.lockedTargetPrice);
 
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');

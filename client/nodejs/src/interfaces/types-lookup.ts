@@ -683,7 +683,7 @@ declare module '@polkadot/types/lookup' {
       readonly vaultId: u32;
       readonly liquidityPromised: u128;
       readonly securitization: u128;
-      readonly lockedMarketRate: u128;
+      readonly lockedTargetPrice: u128;
       readonly accountId: AccountId32;
       readonly securityFee: u128;
     } & Struct;
@@ -692,9 +692,9 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly vaultId: u32;
       readonly liquidityPromised: u128;
-      readonly originalMarketRate: u128;
+      readonly oldTargetPrice: u128;
       readonly securityFee: u128;
-      readonly newLockedMarketRate: u128;
+      readonly newTargetPrice: u128;
       readonly amountBurned: u128;
       readonly accountId: AccountId32;
     } & Struct;
@@ -2465,7 +2465,7 @@ declare module '@polkadot/types/lookup' {
   interface PalletBitcoinLocksLockOptions extends Enum {
     readonly isV1: boolean;
     readonly asV1: {
-      readonly microgonsPerBtc: Option<u128>;
+      readonly microgonsAtTargetPerBtc: Option<u128>;
     } & Struct;
     readonly type: 'V1';
   }
@@ -3525,7 +3525,7 @@ declare module '@polkadot/types/lookup' {
   interface PalletBitcoinLocksLockedBitcoin extends Struct {
     readonly vaultId: Compact<u32>;
     readonly liquidityPromised: Compact<u128>;
-    readonly lockedMarketRate: Compact<u128>;
+    readonly lockedTargetPrice: Compact<u128>;
     readonly ownerAccount: AccountId32;
     readonly securitizationRatio: u128;
     readonly securityFees: Compact<u128>;
@@ -3552,7 +3552,7 @@ declare module '@polkadot/types/lookup' {
     readonly bitcoinNetworkFee: Compact<u64>;
     readonly cosignDueFrame: Compact<u64>;
     readonly toScriptPubkey: Bytes;
-    readonly redemptionPrice: Compact<u128>;
+    readonly redemptionAmount: Compact<u128>;
   }
 
   /** @name PalletBitcoinLocksOrphanedUtxo (399) */

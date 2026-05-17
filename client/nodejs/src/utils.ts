@@ -138,3 +138,34 @@ export function checkForExtrinsicSuccess(
     }
   });
 }
+
+/**
+ * Return a bigint value using a canonical field first, then named fallback fields on the same source object.
+ * Helpful when reading runtime records that may use older field names across spec versions.
+ * @param value The preferred bigint-like value, usually from the current field name
+ * @param source The object to read fallback fields from
+ * @param fallbackFields The fallback field names to check in order
+ * @param fallback The value to return if no preferred or fallback field is present
+ * @returns The preferred or fallback value converted to bigint
+ */
+export function getBigIntFallback<T extends object>(
+  value: IBigIntLike | undefined,
+  source: T,
+  fallbackFields: readonly string[],
+  fallback = 0n,
+): bigint {
+  if (typeof value === 'bigint') return value;
+  if (value !== undefined) return value.toBigInt();
+
+  const record = source as Record<string, IBigIntLike | undefined>;
+
+  for (const fieldName of fallbackFields) {
+    const field = record[fieldName];
+    if (typeof field === 'bigint') return field;
+    if (field !== undefined) return field.toBigInt();
+  }
+
+  return fallback;
+}
+
+type IBigIntLike = bigint | { toBigInt(): bigint };

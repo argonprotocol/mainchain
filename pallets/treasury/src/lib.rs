@@ -811,7 +811,8 @@ pub mod pallet {
 
 		pub(crate) fn get_vault_securitized_funds_cap(vault_id: VaultId) -> T::Balance {
 			let securitized_satoshis = T::TreasuryVaultProvider::get_securitized_satoshis(vault_id);
-			T::PriceProvider::get_bitcoin_argon_price(securitized_satoshis).unwrap_or_default()
+			T::PriceProvider::get_btc_price_in_market_microgons(securitized_satoshis)
+				.unwrap_or_default()
 		}
 
 		fn sum_bonds(summaries: &BoundedVec<BondLotSummary, T::MaxTreasuryContributors>) -> Bonds {

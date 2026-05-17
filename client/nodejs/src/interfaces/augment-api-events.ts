@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import '@polkadot/api-base/types/events';
+import type {} from '@polkadot/api-base/types/events';
 
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type {
@@ -322,7 +322,7 @@ declare module '@polkadot/api-base/types/events' {
           vaultId: u32,
           liquidityPromised: u128,
           securitization: u128,
-          lockedMarketRate: u128,
+          lockedTargetPrice: u128,
           accountId: AccountId32,
           securityFee: u128,
         ],
@@ -331,7 +331,7 @@ declare module '@polkadot/api-base/types/events' {
           vaultId: u32;
           liquidityPromised: u128;
           securitization: u128;
-          lockedMarketRate: u128;
+          lockedTargetPrice: u128;
           accountId: AccountId32;
           securityFee: u128;
         }
@@ -342,9 +342,9 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64,
           vaultId: u32,
           liquidityPromised: u128,
-          originalMarketRate: u128,
+          oldTargetPrice: u128,
           securityFee: u128,
-          newLockedMarketRate: u128,
+          newTargetPrice: u128,
           amountBurned: u128,
           accountId: AccountId32,
         ],
@@ -352,9 +352,9 @@ declare module '@polkadot/api-base/types/events' {
           utxoId: u64;
           vaultId: u32;
           liquidityPromised: u128;
-          originalMarketRate: u128;
+          oldTargetPrice: u128;
           securityFee: u128;
-          newLockedMarketRate: u128;
+          newTargetPrice: u128;
           amountBurned: u128;
           accountId: AccountId32;
         }

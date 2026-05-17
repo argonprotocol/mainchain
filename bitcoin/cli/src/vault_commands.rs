@@ -169,7 +169,7 @@ impl VaultCommands {
 						utxo_id.to_string(),
 						pending.cosign_due_frame.to_string(),
 						"Cosign Request".to_string(),
-						ArgonFormatter(pending.redemption_price).to_string(),
+						ArgonFormatter(pending.redemption_amount).to_string(),
 					]);
 				}
 
