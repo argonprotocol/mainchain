@@ -302,6 +302,13 @@ pub mod pallet_dummy {
 			Ok(())
 		}
 
+		#[pallet::weight((Weight::zero(), DispatchClass::Operational))]
+		#[pallet::feeless_if(|_origin: &OriginFor<T>, _key: &u32| -> bool { true })]
+		pub fn stacked_operational(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			Ok(())
+		}
+
 		pub fn pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
 			let _who = ensure_signed(_origin)?;
 			Ok(())
@@ -318,6 +325,8 @@ pub mod pallet_dummy {
 				RuntimeCall::DummyPallet(pallet_dummy::Call::aux { key, .. }) => Some(key.encode()),
 				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { key }) =>
 					Some((b"feeless", key).encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked_operational { key }) =>
+					Some((b"feeless", key).encode()),
 				_ => None,
 			}
 		}
@@ -328,6 +337,8 @@ pub mod pallet_dummy {
 				RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =>
 					Some((b"general", key).encode()),
 				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { key }) =>
+					Some((b"general", key).encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked_operational { key }) =>
 					Some((b"general", key).encode()),
 				RuntimeCall::DummyPallet(pallet_dummy::Call::sponsored_pooled { key }) =>
 					Some((b"general", key).encode()),

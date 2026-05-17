@@ -20,11 +20,13 @@ use crate::mock::{
 	Balances, FeeAmount, FeeControl, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy,
 	ProxyType, RuntimeCall, Test, TipAmount, ValidateCount,
 };
-use frame_support::dispatch::DispatchInfo;
+use codec::Encode;
+use frame_support::dispatch::{DispatchInfo, GetDispatchInfo};
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	argon_primitives::CurrentTransactionFeeProvider, frame_support::traits::Currency,
 };
+use pallet_transaction_payment::ChargeTransactionPayment;
 use sp_runtime::{
 	traits::{DispatchTransaction, Hash},
 	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidityError},
@@ -103,6 +105,87 @@ fn validate_works() {
 		assert_eq!(ValidateCount::get(), 2);
 		assert_eq!(PrepareCount::get(), 0);
 		assert_eq!(res3.provides[0], (b"general", 7u32).encode());
+	});
+}
+
+#[test]
+fn feeless_calls_get_a_non_zero_priority_floor() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000_000_000u128);
+
+		let feeless_call = RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 7 });
+
+		let (feeless, _, _) = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::from(0u128),
+		)
+		.validate_only(
+			Some(0).into(),
+			&feeless_call,
+			&feeless_call.get_dispatch_info(),
+			feeless_call.encoded_size(),
+			TransactionSource::External,
+			0,
+		)
+		.unwrap();
+		let expected_priority = ChargeTransactionPayment::<Test>::get_priority(
+			&feeless_call.get_dispatch_info(),
+			feeless_call.encoded_size(),
+			0u128,
+			pallet_transaction_payment::Pallet::<Test>::compute_fee(
+				feeless_call.encoded_size() as u32,
+				&feeless_call.get_dispatch_info(),
+				0u128,
+			),
+		);
+
+		assert!(feeless.priority > 0);
+		assert_eq!(feeless.priority, expected_priority);
+	});
+}
+
+#[test]
+fn operational_feeless_calls_keep_operational_priority_bump() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000_000_000u128);
+
+		let call = RuntimeCall::DummyPallet(Call::<Test>::stacked_operational { key: 7 });
+		let normal_call = RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 7 });
+
+		let (feeless, _, _) = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::from(0u128),
+		)
+		.validate_only(
+			Some(0).into(),
+			&call,
+			&call.get_dispatch_info(),
+			call.encoded_size(),
+			TransactionSource::External,
+			0,
+		)
+		.unwrap();
+		let expected_priority = ChargeTransactionPayment::<Test>::get_priority(
+			&call.get_dispatch_info(),
+			call.encoded_size(),
+			0u128,
+			pallet_transaction_payment::Pallet::<Test>::compute_fee(
+				call.encoded_size() as u32,
+				&call.get_dispatch_info(),
+				0u128,
+			),
+		);
+		let normal_priority = ChargeTransactionPayment::<Test>::get_priority(
+			&normal_call.get_dispatch_info(),
+			normal_call.encoded_size(),
+			0u128,
+			pallet_transaction_payment::Pallet::<Test>::compute_fee(
+				normal_call.encoded_size() as u32,
+				&normal_call.get_dispatch_info(),
+				0u128,
+			),
+		);
+
+		assert_eq!(feeless.priority, expected_priority);
+		assert!(feeless.priority > normal_priority);
 	});
 }
 
