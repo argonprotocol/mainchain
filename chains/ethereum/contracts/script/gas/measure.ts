@@ -2,7 +2,7 @@ import { Wallet } from 'ethers';
 import { network } from 'hardhat';
 import type { Address, Hex } from 'viem';
 import {
-  encodeMintingGatewayV2CouncilSnapshot,
+  encodeMintingGatewayV2GlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayV2MintingAuthorityActivationTarget,
   hashMintingGatewayV2ActivateMintingAuthorityApproval,
   hashMintingGatewayV2GlobalIssuanceCouncil,
@@ -12,6 +12,7 @@ import {
   MINTING_GATEWAY_V2_UPDATE_KINDS,
   type MintingGatewayV2CouncilSnapshot,
   type MintingGatewayV2GatewayUpdate,
+  type MintingGatewayV2GlobalIssuanceCouncilRotateTarget,
   type MintingGatewayV2HashContext,
   type MintingGatewayV2MigrationAssetDistribution,
   type MintingGatewayV2MintingAuthorityActivationTarget,
@@ -23,6 +24,7 @@ import {
 const SCALE = MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE;
 const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
 const COUNCIL_WEIGHTS = [40n, 30n, 20n, 10n] as const;
+const MICROGONS_PER_ARGONOT = 1_000_000n;
 const LOCAL_GAS_CAP = 16_777_216n;
 
 type SignerLike = {
@@ -57,6 +59,7 @@ type GatewayContract = {
   getAddress(): Promise<Address>;
   connect(signer: AccountSigner): GatewayContract;
   getFunction(name: 'argonApprovalsHash'): () => Promise<Hex>;
+  globalIssuanceCouncil(): Promise<{ councilNumber: bigint }>;
   migrate(
     argonMigration: MintingGatewayV2MigrationAssetDistribution,
     argonotMigration: MintingGatewayV2MigrationAssetDistribution,
@@ -111,6 +114,7 @@ type Council = {
   memberCount: bigint;
   totalWeight: bigint;
   hash: Hex;
+  microgonsPerArgonot: bigint;
   snapshot: MintingGatewayV2CouncilSnapshot;
   quorumSigners: SignerLike[];
 };
@@ -261,7 +265,7 @@ async function measureUserPaths() {
 
   const singleAuthorityFixture = await deployFixture(createCouncil(4));
   const singleAuthority = await activateMintingAuthority(singleAuthorityFixture, 1n, 1);
-  const singleRequest = await buildTransferOutOfArgonRequest(singleAuthorityFixture, 1n, 50n, 80n);
+  const singleRequest = await buildTransferOutOfArgonRequest(singleAuthorityFixture, 1n, 50n);
   const finalizeOneAuthorityGas = await getGasUsed(
     singleAuthorityFixture.gateway.connect(singleAuthorityFixture.outsider).finalizeTransferOutOfArgon(
       singleRequest,
@@ -283,7 +287,7 @@ async function measureUserPaths() {
   const authorityOne = await activateMintingAuthority(multiAuthorityFixture, 1n, 1);
   const authorityTwo = await activateMintingAuthority(multiAuthorityFixture, 2n, 2);
   const authorityThree = await activateMintingAuthority(multiAuthorityFixture, 3n, 3);
-  const multiRequest = await buildTransferOutOfArgonRequest(multiAuthorityFixture, 1n, 50n, 240n);
+  const multiRequest = await buildTransferOutOfArgonRequest(multiAuthorityFixture, 1n, 50n);
   const multiAuthorizations = await Promise.all(
     [authorityOne, authorityTwo, authorityThree]
       .sort((left, right) => left.signingWallet.address.localeCompare(right.signingWallet.address))
@@ -306,16 +310,16 @@ async function measureUserPaths() {
 
   const cancelFixture = await deployFixture(createCouncil(4));
   const chainId = BigInt((await ethers.provider.getNetwork()).chainId);
+  const activeCouncil = await cancelFixture.gateway.globalIssuanceCouncil();
   const expiredRequest: MintingGatewayV2TransferOutOfArgonRequest = {
     argonAccountId: ethers.encodeBytes32String('account-cancel') as Hex,
     argonTransferNonce: 99n,
     chainId,
+    councilNumber: activeCouncil.councilNumber,
     recipient: cancelFixture.recipient.address,
     validUntilBlock: 0n,
     token: await cancelFixture.argon.getAddress(),
     amount: 25n,
-    microgonsPerArgonot: 0n,
-    requiredCollateralMicrogons: 25n,
     finalizationTip: 1n,
   };
   const cancelGas = await getGasUsed(
@@ -371,6 +375,7 @@ async function deployGatewayV2Stack(council: Council) {
     council.hash,
     council.memberCount,
     council.totalWeight,
+    council.microgonsPerArgonot,
   ]);
 
   const gatewayProxyFactory = (await ethers.getContractFactory(
@@ -573,11 +578,17 @@ async function measureCouncilRotationGas(
       queueNonce,
       approvingCouncilHash: fixture.council.hash,
       previousUpdateHash,
-      nextCouncil: nextCouncil.snapshot,
+      target: {
+        council: nextCouncil.snapshot,
+        microgonsPerArgonot: nextCouncil.microgonsPerArgonot,
+      },
     },
   );
   const signatures = await signApprovalHash(fixture.council.quorumSigners, approvalHash);
-  const payload = encodeMintingGatewayV2CouncilSnapshot(nextCouncil.snapshot);
+  const payload = encodeMintingGatewayV2GlobalIssuanceCouncilRotateTarget({
+    council: nextCouncil.snapshot,
+    microgonsPerArgonot: nextCouncil.microgonsPerArgonot,
+  } satisfies MintingGatewayV2GlobalIssuanceCouncilRotateTarget);
 
   let estimate: bigint;
 
@@ -633,20 +644,19 @@ async function buildTransferOutOfArgonRequest(
   fixture: DeployStack,
   transferNonce: bigint,
   amount: bigint,
-  requiredCollateralMicrogons: bigint,
 ): Promise<MintingGatewayV2TransferOutOfArgonRequest> {
   const chainId = BigInt((await ethers.provider.getNetwork()).chainId);
+  const activeCouncil = await fixture.gateway.globalIssuanceCouncil();
 
   return {
     argonAccountId: ethers.encodeBytes32String(`account-${transferNonce}`) as Hex,
     argonTransferNonce: transferNonce,
     chainId,
+    councilNumber: activeCouncil.councilNumber,
     recipient: fixture.recipient.address,
     validUntilBlock: 1_000_000n,
     token: await fixture.argon.getAddress(),
     amount,
-    microgonsPerArgonot: 0n,
-    requiredCollateralMicrogons,
     finalizationTip: 5n,
   };
 }
@@ -740,6 +750,7 @@ function createCouncil(memberCount: number): Council {
     memberCount: BigInt(memberCount),
     totalWeight,
     hash: hashMintingGatewayV2GlobalIssuanceCouncil({ signers, weights }),
+    microgonsPerArgonot: MICROGONS_PER_ARGONOT,
     snapshot: { signers, weights },
     quorumSigners: wallets.slice(0, quorumCount),
   };

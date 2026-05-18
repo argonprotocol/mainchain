@@ -32,6 +32,10 @@ export type MintingGatewayV2TransferOutOfArgonProof = FinalizeTransferOutOfArgon
 export type MintingGatewayV2MintingAuthorization =
   MintingGatewayV2TransferOutOfArgonProof['authorizations'][number];
 export type MintingGatewayV2MigrationAssetDistribution = MigrateArgs[0];
+export type MintingGatewayV2GlobalIssuanceCouncilRotateTarget = {
+  council: MintingGatewayV2CouncilSnapshot;
+  microgonsPerArgonot: bigint;
+};
 
 export type MintingGatewayV2MintingAuthorityActivationTarget = {
   mintingAuthorityId: Hex;
@@ -41,7 +45,6 @@ export type MintingGatewayV2MintingAuthorityActivationTarget = {
 };
 
 export type MintingGatewayV2MintingAuthorityDeactivateTarget = {
-  mintingAuthorityId: Hex;
   signingKey: Address;
 };
 
@@ -56,7 +59,7 @@ type RotateGlobalIssuanceCouncilApprovalArgs = {
   queueNonce: bigint;
   approvingCouncilHash: Hex;
   previousUpdateHash: Hex;
-  nextCouncil: MintingGatewayV2CouncilSnapshot;
+  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget;
 };
 
 type MintingAuthorizationHashArgs = {
@@ -85,13 +88,27 @@ const COUNCIL_SNAPSHOT_PARAMETERS = [
   { name: 'weights', type: 'uint256[]' },
 ] as const;
 
+const GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS = [
+  {
+    type: 'tuple',
+    components: [
+      {
+        name: 'council',
+        type: 'tuple',
+        components: COUNCIL_SNAPSHOT_PARAMETERS,
+      },
+      { name: 'microgonsPerArgonot', type: 'uint128' },
+    ],
+  },
+] as const;
+
 const ACTIVATION_TARGET_PARAMETERS = [
   {
     type: 'tuple',
     components: [
       { name: 'mintingAuthorityId', type: 'bytes32' },
-      { name: 'microgonCollateral', type: 'uint64' },
-      { name: 'micronotCollateral', type: 'uint64' },
+      { name: 'microgonCollateral', type: 'uint128' },
+      { name: 'micronotCollateral', type: 'uint128' },
       { name: 'signingKey', type: 'address' },
     ],
   },
@@ -101,7 +118,6 @@ const DEACTIVATION_TARGET_PARAMETERS = [
   {
     type: 'tuple',
     components: [
-      { name: 'mintingAuthorityId', type: 'bytes32' },
       { name: 'signingKey', type: 'address' },
     ],
   },
@@ -121,8 +137,8 @@ const GATEWAY_UPDATE_APPROVAL_PARAMETERS = [
 
 const MINTING_AUTHORITY_HASH_PARAMETERS = [
   { type: 'bytes32' },
-  { type: 'uint64' },
-  { type: 'uint64' },
+  { type: 'uint128' },
+  { type: 'uint128' },
   { type: 'address' },
 ] as const;
 
@@ -138,6 +154,7 @@ const GLOBAL_ISSUANCE_COUNCIL_ROTATION_PARAMETERS = [
   { type: 'uint256' },
   { type: 'address' },
   { type: 'bytes32' },
+  { type: 'uint128' },
 ] as const;
 
 const MINTING_AUTHORITY_DEACTIVATION_PARAMETERS = [
@@ -145,7 +162,6 @@ const MINTING_AUTHORITY_DEACTIVATION_PARAMETERS = [
   { type: 'uint256' },
   { type: 'address' },
   { type: 'uint64' },
-  { type: 'bytes32' },
   { type: 'address' },
   { type: 'bytes32' },
 ] as const;
@@ -154,13 +170,12 @@ const TRANSFER_OUT_OF_ARGON_REQUEST_PARAMETERS = [
   { type: 'bytes32' },
   { type: 'uint64' },
   { type: 'uint64' },
-  { type: 'address' },
   { type: 'uint64' },
   { type: 'address' },
   { type: 'uint64' },
-  { type: 'uint256' },
-  { type: 'uint64' },
-  { type: 'uint64' },
+  { type: 'address' },
+  { type: 'uint128' },
+  { type: 'uint128' },
 ] as const;
 
 const MINTING_AUTHORIZATION_PARAMETERS = [
@@ -168,8 +183,8 @@ const MINTING_AUTHORIZATION_PARAMETERS = [
   { type: 'uint256' },
   { type: 'address' },
   { type: 'bytes32' },
-  { type: 'uint64' },
-  { type: 'uint64' },
+  { type: 'uint128' },
+  { type: 'uint128' },
 ] as const;
 
 const GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG = keccak256(
@@ -193,6 +208,12 @@ export function encodeMintingGatewayV2CouncilSnapshot(
     [{ type: 'tuple', components: COUNCIL_SNAPSHOT_PARAMETERS }],
     [snapshot],
   );
+}
+
+export function encodeMintingGatewayV2GlobalIssuanceCouncilRotateTarget(
+  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget,
+): Hex {
+  return encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS, [target]);
 }
 
 export function encodeMintingGatewayV2MintingAuthorityActivationTarget(
@@ -246,14 +267,14 @@ export function hashMintingGatewayV2RotateGlobalIssuanceCouncilApproval(
   context: MintingGatewayV2HashContext,
   args: RotateGlobalIssuanceCouncilApprovalArgs,
 ): Hex {
-  const nextCouncilHash = hashMintingGatewayV2GlobalIssuanceCouncil(args.nextCouncil);
+  const nextCouncilHash = hashMintingGatewayV2GlobalIssuanceCouncil(args.target.council);
 
   return hashMintingGatewayV2GatewayUpdateApproval(context, {
     queueNonce: args.queueNonce,
     approvingCouncilHash: args.approvingCouncilHash,
     kind: MINTING_GATEWAY_V2_UPDATE_KINDS.globalIssuanceCouncilRotate,
     targetId: nextCouncilHash,
-    targetPayloadHash: hashMintingGatewayV2RotateGlobalIssuanceCouncil(context, args.nextCouncil),
+    targetPayloadHash: hashMintingGatewayV2RotateGlobalIssuanceCouncil(context, args.target),
     previousUpdateHash: args.previousUpdateHash,
   });
 }
@@ -274,14 +295,15 @@ export function hashMintingGatewayV2ActivateMintingAuthority(
 
 export function hashMintingGatewayV2RotateGlobalIssuanceCouncil(
   context: MintingGatewayV2HashContext,
-  nextCouncil: MintingGatewayV2CouncilSnapshot,
+  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget,
 ): Hex {
   return keccak256(
     encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATION_PARAMETERS, [
       GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayV2GlobalIssuanceCouncil(nextCouncil),
+      hashMintingGatewayV2GlobalIssuanceCouncil(target.council),
+      target.microgonsPerArgonot,
     ]),
   );
 }
@@ -315,7 +337,6 @@ export function hashMintingGatewayV2MintingAuthorityDeactivation(
       context.chainId,
       context.gatewayAddress,
       args.queueNonce,
-      args.target.mintingAuthorityId,
       args.target.signingKey,
       args.previousUpdateHash,
     ]),
@@ -330,12 +351,11 @@ export function hashMintingGatewayV2TransferOutOfArgonRequest(
       request.argonAccountId,
       request.argonTransferNonce,
       request.chainId,
+      request.councilNumber,
       request.recipient,
       request.validUntilBlock,
       request.token,
       request.amount,
-      request.microgonsPerArgonot,
-      request.requiredCollateralMicrogons,
       request.finalizationTip,
     ]),
   );

@@ -19,8 +19,12 @@ The current bootstrap slice is intentionally narrow:
 
 - `ArgonToken`
 - `ArgonotToken`
-- `MintingGateway` with the user transfer-start path, first-council initialization, and one-time
+- `MintingGatewayV2` with the user transfer-start path, first-council initialization, and one-time
   `migrate(...)`
+
+The bootstrap implementation only stores the first council summary. Token-bearing gateway
+entrypoints and `migrate(...)` reject until the proxy is upgraded to the final implementation with
+canonical token addresses baked in.
 
 This branch does not yet include the runtime-side `pallet_crosschain_transfer` migration, so the
 bootstrap manifest here is the handoff artifact for that later step.

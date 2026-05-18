@@ -14,6 +14,10 @@ const adminSafe = getRequiredAddress('admin-safe', 'ADMIN_SAFE_ADDRESS');
 const guardianSafe = getRequiredAddress('guardian-safe', 'GUARDIAN_SAFE_ADDRESS');
 const councilSigners = getRequiredAddressList('council-signers', 'COUNCIL_SIGNERS');
 const councilWeights = getRequiredBigIntList('council-weights', 'COUNCIL_WEIGHTS');
+const microgonsPerArgonot = getRequiredBigInt(
+  'microgons-per-argonot',
+  'MICROGONS_PER_ARGONOT',
+);
 
 async function main() {
   const connection = await network.create(args.network);
@@ -31,12 +35,32 @@ async function main() {
     if (councilSigners.length !== councilWeights.length || councilSigners.length === 0) {
       throw new Error('COUNCIL_SIGNERS and COUNCIL_WEIGHTS must be non-empty and have the same length');
     }
-    const councilMemberCount = BigInt(councilSigners.length);
-    const councilTotalWeight = councilWeights.reduce((sum, weight) => sum + weight, 0n);
+    const initialCouncil = councilSigners
+      .map((signer, index) => ({ signer, weight: councilWeights[index]! }))
+      .sort((left, right) => left.signer.toLowerCase().localeCompare(right.signer.toLowerCase()));
+    const sortedCouncilSigners = initialCouncil.map(({ signer }) => signer);
+    const sortedCouncilWeights = initialCouncil.map(({ weight }) => weight);
+
+    let previousSigner = ethers.ZeroAddress;
+    for (let index = 0; index < initialCouncil.length; index += 1) {
+      const { signer, weight } = initialCouncil[index]!;
+      if (
+        signer === ethers.ZeroAddress ||
+        weight === 0n ||
+        signer.toLowerCase() === previousSigner.toLowerCase()
+      ) {
+        throw new Error(`Initial council entry ${index} must have a unique non-zero signer and non-zero weight`);
+      }
+
+      previousSigner = signer;
+    }
+
+    const councilMemberCount = BigInt(sortedCouncilSigners.length);
+    const councilTotalWeight = sortedCouncilWeights.reduce((sum, weight) => sum + weight, 0n);
     const councilHash = ethers.keccak256(
       ethers.AbiCoder.defaultAbiCoder().encode(
         ['address[]', 'uint256[]'],
-        [councilSigners, councilWeights],
+        [sortedCouncilSigners, sortedCouncilWeights],
       ),
     );
 
@@ -53,6 +77,7 @@ async function main() {
       councilHash,
       councilMemberCount,
       councilTotalWeight,
+      microgonsPerArgonot,
     ]);
 
     const gatewayProxyFactory = await ethers.getContractFactory('TransparentUpgradeableProxy');
@@ -130,8 +155,9 @@ async function main() {
         councilHash,
         memberCount: councilMemberCount.toString(),
         totalWeight: councilTotalWeight.toString(),
-        signers: councilSigners,
-        weights: councilWeights.map((a) => a.toString()),
+        microgonsPerArgonot: microgonsPerArgonot.toString(),
+        signers: sortedCouncilSigners,
+        weights: sortedCouncilWeights.map((a) => a.toString()),
       },
       runtimeBootstrap: {
         externalChain: {
@@ -164,6 +190,7 @@ async function main() {
         'Canonical tokens are deployed with the MintingGateway proxy address fixed in their constructors.',
         'The proxy is first deployed against a bootstrap MintingGatewayV2 implementation with zero canonical token immutables.',
         'That proxy initialization stores the first council summary.',
+        'Token-bearing gateway entrypoints reject until the proxy is upgraded to the final implementation with canonical token addresses configured.',
         'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGatewayV2 implementation that has the Argon and Argonot token addresses baked in as immutables.',
         'MintingGateway business ownership starts under the admin Safe.',
         'The guardian Safe can pause immediately, while unpause remains on the admin Safe owner path.',
@@ -248,6 +275,15 @@ function getRequiredBigIntList(argKey: string, envKey: string) {
     .map((a) => a.trim())
     .filter(Boolean)
     .map((a) => BigInt(a));
+}
+
+function getRequiredBigInt(argKey: string, envKey: string) {
+  const raw = args[argKey] ?? process.env[envKey];
+  if (!raw) {
+    throw new Error(`Missing required ${argKey} argument or ${envKey} environment variable`);
+  }
+
+  return BigInt(raw);
 }
 
 function parseArgs(argv: string[]) {

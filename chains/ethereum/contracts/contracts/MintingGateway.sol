@@ -27,7 +27,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	event BurnForTransfer(
 		address indexed from,
 		address indexed token,
-		uint64 amount,
+		uint256 amountBaseUnits,
 		bytes32 argonDestination,
 		uint64 accountNonce
 	);
@@ -74,7 +74,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 accountNonce = accountNonces[msg.sender] + 1;
 		accountNonces[msg.sender] = accountNonce;
 
-		emit BurnForTransfer(msg.sender, token, amount, argonDestination, accountNonce);
+		emit BurnForTransfer(msg.sender, token, uint256(amount), argonDestination, accountNonce);
 	}
 
 	function adminMintBatch(
@@ -127,6 +127,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	}
 
 	function _requireCanonicalToken(address token) private view {
+		if (token == address(0)) revert UnsupportedToken(token);
+		if (argonToken == address(0) || argonotToken == address(0)) revert UnsupportedToken(token);
 		if (token != argonToken && token != argonotToken) revert UnsupportedToken(token);
 	}
 }

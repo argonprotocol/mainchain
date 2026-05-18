@@ -45,7 +45,7 @@ public self-burn path.
 The gateway is where the actual protocol behavior lives:
 
 - steady-state transfer amounts are expressed in 6-decimal Argon runtime base units
-- runtime-unit amounts on the gateway surface are capped to `uint64`
+- MintingGatewayV2 runtime-unit amount and collateral fields use `uint128` balances
 - `startTransferToArgon(...)` is the primary user path: the caller supplies the runtime-unit amount
   Argon should credit plus an ERC-2612 permit signature, and the gateway scales that amount into
   exact token base units before it permits, burns, and emits the outbound proof event
@@ -55,6 +55,13 @@ The gateway is where the actual protocol behavior lives:
 - `forceUpdateActiveCouncil(...)` is the owner recovery seam: it replaces the stored active
   council summary without resetting `argonApprovalsNonce` or `argonApprovalsHash`, so later queue
   items can keep chaining from the same last applied update under the replacement council
+- each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
+  council snapshot
+- transfer-out requests bind to the current or immediately previous council number, and Ethereum
+  uses the matching council-managed Argonot floor price window instead of trusting a request-supplied
+  conversion rate
+- the gateway stores both `microgonsPerArgonot` and `previousMicrogonsPerArgonot` so a transfer can
+  resolve against the council window it was opened under
 - queued council-approved updates chain each signed item to the previous queue item's signed hash,
   so Ethereum only needs to verify council signatures on council-segment tips:
   each council rotation item and the last council-approved item in the submitted batch
@@ -120,16 +127,18 @@ behavior.
 
 The deployment order still matters:
 
-1. Deploy a bootstrap `MintingGateway` implementation with zero canonical-token immutables.
-2. Deploy the gateway proxy with the admin Safe as its current `ProxyAdmin` owner.
+1. Deploy a bootstrap `MintingGatewayV2` implementation with zero canonical-token immutables.
+2. Deploy the gateway proxy with the admin Safe as its current `ProxyAdmin` owner and the bootstrap
+   `initialize(...)` calldata already encoded into the proxy constructor.
+   Token-bearing gateway entrypoints and the one-time `migrate(...)` path stay blocked in this
+   bootstrap state until the final implementation is installed with canonical token addresses
+   configured.
 3. Deploy `ArgonToken` and `ArgonotToken` with the proxy address in their constructors.
-4. Deploy the final `MintingGateway` implementation with the Argon and Argonot token addresses baked
-   in as immutables.
+4. Deploy the final `MintingGatewayV2` implementation with the Argon and Argonot token addresses
+   baked in as immutables.
 5. Have the admin Safe call `ProxyAdmin.upgradeAndCall(...)` once to move the proxy onto that final
    implementation.
-6. Have the proxy `initialize(...)` call set the owner, guardian, and first council summary
-   (`councilHash`, `councilMemberCount`, `councilTotalWeight`).
-7. Have the admin Safe call `migrate(...)` once with the migrated Argon balances and migrated
+6. Have the admin Safe call `migrate(...)` once with the migrated Argon balances and migrated
    Argonot balances.
 
 The reverse direction does not exist: the token contracts do not have a mutable `setGateway(...)`
@@ -159,15 +168,17 @@ Contract commands stay here:
 yarn workspace @argonprotocol/ethereum-contracts test
 yarn workspace @argonprotocol/ethereum-contracts typecheck
 yarn workspace @argonprotocol/ethereum-contracts gas:measure
-yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --admin-safe 0x... --guardian-safe 0x...
+yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --admin-safe 0x... --guardian-safe 0x... --council-signers 0x...,0x... --council-weights 40,30 --microgons-per-argonot 1000000
 ```
+
+Bootstrap council inputs must use unique non-zero signer addresses and non-zero weights.
 
 Mainnet bootstrap generation uses the env-driven Hardhat 3 network config:
 
 ```sh
 ETHEREUM_RPC_URL=https://...
 ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
-yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --network mainnet --admin-safe 0x... --guardian-safe 0x...
+yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --network mainnet --admin-safe 0x... --guardian-safe 0x... --council-signers 0x...,0x... --council-weights 40,30 --microgons-per-argonot 1000000
 ```
 
 ## Current Costs
@@ -185,25 +196,25 @@ ETH columns are sample gas-price math only at `10 gwei` and `20 gwei`.
 
 | Action | Gas | Wei @ 10 gwei | ETH @ 10 gwei | Wei @ 20 gwei | ETH @ 20 gwei |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `startTransferToArgon` | 125,992 | 1,259,920,000,000,000 | 0.001259 ETH | 2,519,840,000,000,000 | 0.002519 ETH |
-| `finalizeTransferOutOfArgon` (1 authorization) | 157,320 | 1,573,200,000,000,000 | 0.001573 ETH | 3,146,400,000,000,000 | 0.003146 ETH |
-| `finalizeTransferOutOfArgon` (3 authorizations) | 194,497 | 1,944,970,000,000,000 | 0.001944 ETH | 3,889,940,000,000,000 | 0.003889 ETH |
-| `cancelTransferOutOfArgon` | 104,894 | 1,048,940,000,000,000 | 0.001048 ETH | 2,097,880,000,000,000 | 0.002097 ETH |
+| `startTransferToArgon` | 126,077 | 1,260,770,000,000,000 | 0.001260 ETH | 2,521,540,000,000,000 | 0.002521 ETH |
+| `finalizeTransferOutOfArgon` (1 authorization) | 162,100 | 1,621,000,000,000,000 | 0.001621 ETH | 3,242,000,000,000,000 | 0.003242 ETH |
+| `finalizeTransferOutOfArgon` (3 authorizations) | 198,594 | 1,985,940,000,000,000 | 0.001985 ETH | 3,971,880,000,000,000 | 0.003971 ETH |
+| `cancelTransferOutOfArgon` | 104,629 | 1,046,290,000,000,000 | 0.001046 ETH | 2,092,580,000,000,000 | 0.002092 ETH |
 
 ### Admin And Council Actions
 
 | Action | Gas | Wei @ 10 gwei | ETH @ 10 gwei | Wei @ 20 gwei | ETH @ 20 gwei |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Proxy deploy + `initialize` | 774,526 | 7,745,260,000,000,000 | 0.007745 ETH | 15,490,520,000,000,000 | 0.015490 ETH |
+| Proxy deploy + `initialize` | 819,347 | 8,193,470,000,000,000 | 0.008193 ETH | 16,386,940,000,000,000 | 0.016386 ETH |
 | Upgrade to final implementation | 37,834 | 378,340,000,000,000 | 0.000378 ETH | 756,680,000,000,000 | 0.000756 ETH |
-| Minting authority activation (4 members, 3 signatures) | 185,832 | 1,858,320,000,000,000 | 0.001858 ETH | 3,716,640,000,000,000 | 0.003716 ETH |
-| Minting authority activation (100 members, 90 signatures) | 858,913 | 8,589,130,000,000,000 | 0.008589 ETH | 17,178,260,000,000,000 | 0.017178 ETH |
-| Minting authority activation batch (100 members, 3 activations, 90 signatures once) | 933,256 | 9,332,560,000,000,000 | 0.009332 ETH | 18,665,120,000,000,000 | 0.018665 ETH |
-| Council rotation (4 -> 4 members, 3 signatures) | 141,940 | 1,419,400,000,000,000 | 0.001419 ETH | 2,838,800,000,000,000 | 0.002838 ETH |
-| Council rotation (100 -> 100 members, 90 signatures) | 986,737 | 9,867,370,000,000,000 | 0.009867 ETH | 19,734,740,000,000,000 | 0.019734 ETH |
+| Minting authority activation (4 members, 3 signatures) | 186,016 | 1,860,160,000,000,000 | 0.001860 ETH | 3,720,320,000,000,000 | 0.003720 ETH |
+| Minting authority activation (100 members, 90 signatures) | 859,145 | 8,591,450,000,000,000 | 0.008591 ETH | 17,182,900,000,000,000 | 0.017182 ETH |
+| Minting authority activation batch (100 members, 3 activations, 90 signatures once) | 932,994 | 9,329,940,000,000,000 | 0.009329 ETH | 18,659,880,000,000,000 | 0.018659 ETH |
+| Council rotation (4 -> 4 members, 3 signatures) | 150,647 | 1,506,470,000,000,000 | 0.001506 ETH | 3,012,940,000,000,000 | 0.003012 ETH |
+| Council rotation (100 -> 100 members, 90 signatures) | 995,505 | 9,955,050,000,000,000 | 0.009955 ETH | 19,910,100,000,000,000 | 0.019910 ETH |
 
 The batched `100`-member activation row is where the chained queue hash pays off: three activations
-land for about `933,256` gas total, or about `311,085` gas per activation, because the council
+land for about `932,994` gas total, or about `310,998` gas per activation, because the council
 quorum is only verified once at the segment tip.
 
 `startTransferToArgon(...)` now includes the ERC-2612 permit directly. The caller signs for the

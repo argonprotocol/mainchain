@@ -255,11 +255,26 @@ describe('MintingGateway', () => {
   });
 
   it('starts on a bootstrap implementation and upgrades once tokens exist', async () => {
-    const { adminSafe, gateway, proxyAdmin, gatewayFinalImplementation, argon, argonot } =
+    const { adminSafe, gateway, holder, proxyAdmin, gatewayFinalImplementation, argon, argonot } =
       await deployGatewayStack();
 
     expect(await gateway.argonToken()).to.equal(ethers.ZeroAddress);
     expect(await gateway.argonotToken()).to.equal(ethers.ZeroAddress);
+
+    await expectCustomError(
+      gateway.connect(holder).burnForTransfer(
+        ethers.ZeroAddress,
+        1n,
+        ethers.encodeBytes32String('bootstrap'),
+        0n,
+        27,
+        ethers.ZeroHash,
+        ethers.ZeroHash,
+      ),
+      gateway,
+      'UnsupportedToken',
+      [ethers.ZeroAddress],
+    );
 
     await proxyAdmin
       .connect(adminSafe)

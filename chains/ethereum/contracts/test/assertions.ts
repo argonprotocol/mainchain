@@ -11,7 +11,18 @@ export async function expectCustomError(
   try {
     await action;
   } catch (error) {
-    const data = getErrorData(error);
+    const errorWithData = error as {
+      data?: string;
+      error?: { data?: string };
+      info?: { error?: { data?: string } };
+    };
+    const data = [
+      errorWithData.data,
+      errorWithData.error?.data,
+      errorWithData.info?.error?.data,
+    ].find(value => typeof value === 'string' && value !== '0x');
+    if (!data) throw error;
+
     const decodedError = contract.interface.parseError(data);
 
     expect(decodedError?.name).to.equal(errorName);
@@ -53,17 +64,4 @@ export async function expectEvent(
 
   expect(parsedLogs.length).to.be.greaterThan(0);
   expect(Array.from(parsedLogs[0].args)).to.deep.equal(expectedArgs);
-}
-
-function getErrorData(error: unknown) {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'data' in error &&
-    typeof error.data === 'string'
-  ) {
-    return error.data;
-  }
-
-  throw error;
 }
