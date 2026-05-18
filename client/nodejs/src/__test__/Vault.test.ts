@@ -29,7 +29,9 @@ describe('Vault.availableBondSpace', () => {
     const vault = vaultWithSecuritizedSatoshis(1);
     const priceIndex = priceIndexForCapacity(105n * MICROGONS_PER_ARGON_BIGINT);
 
-    expect(vault.availableBondSpace(priceIndex, [], true)).toStrictEqual(105n * MICROGONS_PER_ARGON_BIGINT);
+    expect(vault.availableBondSpace(priceIndex, [], true)).toStrictEqual(
+      105n * MICROGONS_PER_ARGON_BIGINT,
+    );
   });
 
   it('subtracts active bond lots from next-frame capacity', () => {
@@ -45,9 +47,7 @@ describe('Vault.availableBondSpace', () => {
     const vault = vaultWithSecuritizedSatoshis(1);
     const priceIndex = priceIndexForCapacity(100n * MICROGONS_PER_ARGON_BIGINT);
 
-    expect(
-      vault.availableBondSpace(priceIndex, [{ activeBonds: 11 }]),
-    ).toStrictEqual(0n);
+    expect(vault.availableBondSpace(priceIndex, [{ activeBonds: 11 }])).toStrictEqual(0n);
   });
 
   it('returns zero when the vault has no securitized satoshis', () => {

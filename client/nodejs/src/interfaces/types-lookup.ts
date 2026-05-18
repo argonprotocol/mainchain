@@ -5,9 +5,38 @@
 // this is required to allow for ambient/previous definitions
 import '@polkadot/types/lookup';
 
-import type { BTreeMap, Bytes, Compact, Enum, Null, Option, Result, Struct, Text, U256, U8aFixed, Vec, bool, i128, i16, i32, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type {
+  BTreeMap,
+  Bytes,
+  Compact,
+  Enum,
+  Null,
+  Option,
+  Result,
+  Struct,
+  Text,
+  U256,
+  U8aFixed,
+  Vec,
+  bool,
+  i128,
+  i16,
+  i32,
+  u128,
+  u16,
+  u32,
+  u64,
+  u8,
+} from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, H160, H256, MultiAddress, Permill } from '@polkadot/types/interfaces/runtime';
+import type {
+  AccountId32,
+  Call,
+  H160,
+  H256,
+  MultiAddress,
+  Permill,
+} from '@polkadot/types/interfaces/runtime';
 import type { Event } from '@polkadot/types/interfaces/system';
 
 declare module '@polkadot/types/lookup' {
@@ -102,7 +131,15 @@ declare module '@polkadot/types/lookup' {
       readonly codeHash: H256;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'ExtrinsicSuccess' | 'ExtrinsicFailed' | 'CodeUpdated' | 'NewAccount' | 'KilledAccount' | 'Remarked' | 'UpgradeAuthorized' | 'RejectedInvalidAuthorizedUpgrade';
+    readonly type:
+      | 'ExtrinsicSuccess'
+      | 'ExtrinsicFailed'
+      | 'CodeUpdated'
+      | 'NewAccount'
+      | 'KilledAccount'
+      | 'Remarked'
+      | 'UpgradeAuthorized'
+      | 'RejectedInvalidAuthorizedUpgrade';
   }
 
   /** @name FrameSystemDispatchEventInfo (23) */
@@ -149,7 +186,22 @@ declare module '@polkadot/types/lookup' {
     readonly isRootNotAllowed: boolean;
     readonly isTrie: boolean;
     readonly asTrie: SpRuntimeProvingTrieTrieError;
-    readonly type: 'Other' | 'CannotLookup' | 'BadOrigin' | 'Module' | 'ConsumerRemaining' | 'NoProviders' | 'TooManyConsumers' | 'Token' | 'Arithmetic' | 'Transactional' | 'Exhausted' | 'Corruption' | 'Unavailable' | 'RootNotAllowed' | 'Trie';
+    readonly type:
+      | 'Other'
+      | 'CannotLookup'
+      | 'BadOrigin'
+      | 'Module'
+      | 'ConsumerRemaining'
+      | 'NoProviders'
+      | 'TooManyConsumers'
+      | 'Token'
+      | 'Arithmetic'
+      | 'Transactional'
+      | 'Exhausted'
+      | 'Corruption'
+      | 'Unavailable'
+      | 'RootNotAllowed'
+      | 'Trie';
   }
 
   /** @name SpRuntimeModuleError (27) */
@@ -170,7 +222,17 @@ declare module '@polkadot/types/lookup' {
     readonly isCannotCreateHold: boolean;
     readonly isNotExpendable: boolean;
     readonly isBlocked: boolean;
-    readonly type: 'FundsUnavailable' | 'OnlyProvider' | 'BelowMinimum' | 'CannotCreate' | 'UnknownAsset' | 'Frozen' | 'Unsupported' | 'CannotCreateHold' | 'NotExpendable' | 'Blocked';
+    readonly type:
+      | 'FundsUnavailable'
+      | 'OnlyProvider'
+      | 'BelowMinimum'
+      | 'CannotCreate'
+      | 'UnknownAsset'
+      | 'Frozen'
+      | 'Unsupported'
+      | 'CannotCreateHold'
+      | 'NotExpendable'
+      | 'Blocked';
   }
 
   /** @name SpArithmeticArithmeticError (29) */
@@ -204,7 +266,21 @@ declare module '@polkadot/types/lookup' {
     readonly isIncompleteProof: boolean;
     readonly isRootMismatch: boolean;
     readonly isDecodeError: boolean;
-    readonly type: 'InvalidStateRoot' | 'IncompleteDatabase' | 'ValueAtIncompleteKey' | 'DecoderError' | 'InvalidHash' | 'DuplicateKey' | 'ExtraneousNode' | 'ExtraneousValue' | 'ExtraneousHashReference' | 'InvalidChildReference' | 'ValueMismatch' | 'IncompleteProof' | 'RootMismatch' | 'DecodeError';
+    readonly type:
+      | 'InvalidStateRoot'
+      | 'IncompleteDatabase'
+      | 'ValueAtIncompleteKey'
+      | 'DecoderError'
+      | 'InvalidHash'
+      | 'DuplicateKey'
+      | 'ExtraneousNode'
+      | 'ExtraneousValue'
+      | 'ExtraneousHashReference'
+      | 'InvalidChildReference'
+      | 'ValueMismatch'
+      | 'IncompleteProof'
+      | 'RootMismatch'
+      | 'DecodeError';
   }
 
   /** @name PalletDigestsEvent (32) */
@@ -247,7 +323,12 @@ declare module '@polkadot/types/lookup' {
       readonly oldDeposit: u128;
       readonly newDeposit: u128;
     } & Struct;
-    readonly type: 'NewMultisig' | 'MultisigApproval' | 'MultisigExecuted' | 'MultisigCancelled' | 'DepositPoked';
+    readonly type:
+      | 'NewMultisig'
+      | 'MultisigApproval'
+      | 'MultisigExecuted'
+      | 'MultisigCancelled'
+      | 'DepositPoked';
   }
 
   /** @name PalletMultisigTimepoint (34) */
@@ -305,7 +386,14 @@ declare module '@polkadot/types/lookup' {
       readonly oldDeposit: u128;
       readonly newDeposit: u128;
     } & Struct;
-    readonly type: 'ProxyExecuted' | 'PureCreated' | 'PureKilled' | 'Announced' | 'ProxyAdded' | 'ProxyRemoved' | 'DepositPoked';
+    readonly type:
+      | 'ProxyExecuted'
+      | 'PureCreated'
+      | 'PureKilled'
+      | 'Announced'
+      | 'ProxyAdded'
+      | 'ProxyRemoved'
+      | 'DepositPoked';
   }
 
   /** @name ArgonRuntimeProxyType (38) */
@@ -318,7 +406,15 @@ declare module '@polkadot/types/lookup' {
     readonly isBitcoin: boolean;
     readonly isVaultAdmin: boolean;
     readonly isBitcoinInitializeFor: boolean;
-    readonly type: 'Any' | 'NonTransfer' | 'PriceIndex' | 'MiningBid' | 'MiningBidRealPaysFee' | 'Bitcoin' | 'VaultAdmin' | 'BitcoinInitializeFor';
+    readonly type:
+      | 'Any'
+      | 'NonTransfer'
+      | 'PriceIndex'
+      | 'MiningBid'
+      | 'MiningBidRealPaysFee'
+      | 'Bitcoin'
+      | 'VaultAdmin'
+      | 'BitcoinInitializeFor';
   }
 
   /** @name PalletProxyDepositKind (40) */
@@ -367,7 +463,14 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'NewMiners' | 'SlotBidderAdded' | 'SlotBidderDropped' | 'ReleaseMinerSeatError' | 'MiningConfigurationUpdated' | 'MiningBidsClosed' | 'ReleaseBidError';
+    readonly type:
+      | 'NewMiners'
+      | 'SlotBidderAdded'
+      | 'SlotBidderDropped'
+      | 'ReleaseMinerSeatError'
+      | 'MiningConfigurationUpdated'
+      | 'MiningBidsClosed'
+      | 'ReleaseBidError';
   }
 
   /** @name ArgonPrimitivesBlockSealMiningRegistration (43) */
@@ -431,7 +534,14 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'UtxoVerified' | 'UtxoRejected' | 'UtxoSpent' | 'UtxoUnwatched' | 'UtxoSpentError' | 'UtxoVerifiedError' | 'UtxoRejectedError';
+    readonly type:
+      | 'UtxoVerified'
+      | 'UtxoRejected'
+      | 'UtxoSpent'
+      | 'UtxoUnwatched'
+      | 'UtxoSpentError'
+      | 'UtxoVerifiedError'
+      | 'UtxoRejectedError';
   }
 
   /** @name ArgonPrimitivesBitcoinUtxoRef (51) */
@@ -449,7 +559,11 @@ declare module '@polkadot/types/lookup' {
     readonly isSpent: boolean;
     readonly isVerificationExpired: boolean;
     readonly isAlreadyVerified: boolean;
-    readonly type: 'SatoshisOutsideAcceptedRange' | 'Spent' | 'VerificationExpired' | 'AlreadyVerified';
+    readonly type:
+      | 'SatoshisOutsideAcceptedRange'
+      | 'Spent'
+      | 'VerificationExpired'
+      | 'AlreadyVerified';
   }
 
   /** @name PalletVaultsEvent (55) */
@@ -543,7 +657,22 @@ declare module '@polkadot/types/lookup' {
       readonly vaultEarnings: u128;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'VaultCreated' | 'VaultModified' | 'VaultTermsChangeScheduled' | 'VaultTermsChanged' | 'VaultClosed' | 'VaultBitcoinXpubChange' | 'VaultRevenueUncollected' | 'VaultCollected' | 'FundsLocked' | 'FundLockCanceled' | 'FundsScheduledForRelease' | 'LostBitcoinCompensated' | 'FundsReleased' | 'FundsReleasedError' | 'TreasuryRecordingError';
+    readonly type:
+      | 'VaultCreated'
+      | 'VaultModified'
+      | 'VaultTermsChangeScheduled'
+      | 'VaultTermsChanged'
+      | 'VaultClosed'
+      | 'VaultBitcoinXpubChange'
+      | 'VaultRevenueUncollected'
+      | 'VaultCollected'
+      | 'FundsLocked'
+      | 'FundLockCanceled'
+      | 'FundsScheduledForRelease'
+      | 'LostBitcoinCompensated'
+      | 'FundsReleased'
+      | 'FundsReleasedError'
+      | 'TreasuryRecordingError';
   }
 
   /** @name PalletBitcoinLocksEvent (57) */
@@ -644,7 +773,21 @@ declare module '@polkadot/types/lookup' {
       readonly newSatoshis: u64;
       readonly accountId: AccountId32;
     } & Struct;
-    readonly type: 'BitcoinLockCreated' | 'BitcoinLockRatcheted' | 'BitcoinLockBurned' | 'BitcoinUtxoCosignRequested' | 'BitcoinUtxoCosigned' | 'BitcoinSpentAfterRelease' | 'BitcoinCosignPastDue' | 'CosignOverdueError' | 'LockExpirationError' | 'OrphanedUtxoReceived' | 'OrphanedUtxoReleaseRequested' | 'OrphanedUtxoCosigned' | 'UtxoFundedFromCandidate' | 'SecuritizationIncreased';
+    readonly type:
+      | 'BitcoinLockCreated'
+      | 'BitcoinLockRatcheted'
+      | 'BitcoinLockBurned'
+      | 'BitcoinUtxoCosignRequested'
+      | 'BitcoinUtxoCosigned'
+      | 'BitcoinSpentAfterRelease'
+      | 'BitcoinCosignPastDue'
+      | 'CosignOverdueError'
+      | 'LockExpirationError'
+      | 'OrphanedUtxoReceived'
+      | 'OrphanedUtxoReleaseRequested'
+      | 'OrphanedUtxoCosigned'
+      | 'UtxoFundedFromCandidate'
+      | 'SecuritizationIncreased';
   }
 
   /** @name PalletNotariesEvent (60) */
@@ -676,7 +819,12 @@ declare module '@polkadot/types/lookup' {
       readonly error: SpRuntimeDispatchError;
       readonly meta: ArgonPrimitivesNotaryNotaryMeta;
     } & Struct;
-    readonly type: 'NotaryProposed' | 'NotaryActivated' | 'NotaryMetaUpdateQueued' | 'NotaryMetaUpdated' | 'NotaryMetaUpdateError';
+    readonly type:
+      | 'NotaryProposed'
+      | 'NotaryActivated'
+      | 'NotaryMetaUpdateQueued'
+      | 'NotaryMetaUpdated'
+      | 'NotaryMetaUpdateError';
   }
 
   /** @name ArgonPrimitivesNotaryNotaryMeta (61) */
@@ -836,7 +984,66 @@ declare module '@polkadot/types/lookup' {
       readonly expected: AccountId32;
     } & Struct;
     readonly isNoDefaultBlockVote: boolean;
-    readonly type: 'MissingAccountOrigin' | 'HistoryLookupError' | 'InvalidAccountChangelist' | 'InvalidChainTransfersList' | 'InvalidBalanceChangeRoot' | 'InvalidHeaderTaxRecorded' | 'InvalidPreviousNonce' | 'InvalidPreviousBalance' | 'InvalidPreviousAccountOrigin' | 'InvalidPreviousBalanceChangeNotebook' | 'InvalidBalanceChange' | 'InvalidBalanceChangeSignature' | 'InvalidNoteRecipients' | 'BalanceChangeError' | 'InvalidNetBalanceChangeset' | 'InsufficientBalance' | 'ExceededMaxBalance' | 'BalanceChangeMismatch' | 'BalanceChangeNotNetZero' | 'InvalidDomainLeaseAllocation' | 'TaxBalanceChangeNotNetZero' | 'MissingBalanceProof' | 'InvalidPreviousBalanceProof' | 'InvalidNotebookHash' | 'InvalidNotebookHeaderHash' | 'InvalidNotebookVersion' | 'DuplicateChainTransfer' | 'DuplicatedAccountOriginUid' | 'InvalidNotarySignature' | 'InvalidSecretProvided' | 'NotebookTooOld' | 'CatchupNotebooksMissing' | 'DecodeError' | 'AccountChannelHoldDoesntExist' | 'AccountAlreadyHasChannelHold' | 'ChannelHoldNotReadyForClaim' | 'AccountLocked' | 'MissingChannelHoldNote' | 'InvalidChannelHoldNote' | 'InvalidChannelHoldClaimers' | 'ChannelHoldNoteBelowMinimum' | 'InvalidTaxNoteAccount' | 'InvalidTaxOperation' | 'InsufficientTaxIncluded' | 'InsufficientBlockVoteTax' | 'IneligibleTaxVoter' | 'BlockVoteInvalidSignature' | 'InvalidBlockVoteAllocation' | 'InvalidBlockVoteRoot' | 'InvalidBlockVotesCount' | 'InvalidBlockVotingPower' | 'InvalidBlockVoteList' | 'InvalidComputeProof' | 'InvalidBlockVoteSource' | 'InsufficientBlockVoteMinimum' | 'InvalidBlockVoteTick' | 'InvalidDefaultBlockVote' | 'InvalidDefaultBlockVoteAuthor' | 'NoDefaultBlockVote';
+    readonly type:
+      | 'MissingAccountOrigin'
+      | 'HistoryLookupError'
+      | 'InvalidAccountChangelist'
+      | 'InvalidChainTransfersList'
+      | 'InvalidBalanceChangeRoot'
+      | 'InvalidHeaderTaxRecorded'
+      | 'InvalidPreviousNonce'
+      | 'InvalidPreviousBalance'
+      | 'InvalidPreviousAccountOrigin'
+      | 'InvalidPreviousBalanceChangeNotebook'
+      | 'InvalidBalanceChange'
+      | 'InvalidBalanceChangeSignature'
+      | 'InvalidNoteRecipients'
+      | 'BalanceChangeError'
+      | 'InvalidNetBalanceChangeset'
+      | 'InsufficientBalance'
+      | 'ExceededMaxBalance'
+      | 'BalanceChangeMismatch'
+      | 'BalanceChangeNotNetZero'
+      | 'InvalidDomainLeaseAllocation'
+      | 'TaxBalanceChangeNotNetZero'
+      | 'MissingBalanceProof'
+      | 'InvalidPreviousBalanceProof'
+      | 'InvalidNotebookHash'
+      | 'InvalidNotebookHeaderHash'
+      | 'InvalidNotebookVersion'
+      | 'DuplicateChainTransfer'
+      | 'DuplicatedAccountOriginUid'
+      | 'InvalidNotarySignature'
+      | 'InvalidSecretProvided'
+      | 'NotebookTooOld'
+      | 'CatchupNotebooksMissing'
+      | 'DecodeError'
+      | 'AccountChannelHoldDoesntExist'
+      | 'AccountAlreadyHasChannelHold'
+      | 'ChannelHoldNotReadyForClaim'
+      | 'AccountLocked'
+      | 'MissingChannelHoldNote'
+      | 'InvalidChannelHoldNote'
+      | 'InvalidChannelHoldClaimers'
+      | 'ChannelHoldNoteBelowMinimum'
+      | 'InvalidTaxNoteAccount'
+      | 'InvalidTaxOperation'
+      | 'InsufficientTaxIncluded'
+      | 'InsufficientBlockVoteTax'
+      | 'IneligibleTaxVoter'
+      | 'BlockVoteInvalidSignature'
+      | 'InvalidBlockVoteAllocation'
+      | 'InvalidBlockVoteRoot'
+      | 'InvalidBlockVotesCount'
+      | 'InvalidBlockVotingPower'
+      | 'InvalidBlockVoteList'
+      | 'InvalidComputeProof'
+      | 'InvalidBlockVoteSource'
+      | 'InsufficientBlockVoteMinimum'
+      | 'InvalidBlockVoteTick'
+      | 'InvalidDefaultBlockVote'
+      | 'InvalidDefaultBlockVoteAuthor'
+      | 'NoDefaultBlockVote';
   }
 
   /** @name ArgonPrimitivesAccountAccountType (71) */
@@ -852,7 +1059,11 @@ declare module '@polkadot/types/lookup' {
     readonly isLastChangeNotFound: boolean;
     readonly isInvalidTransferToLocalchain: boolean;
     readonly isBlockSpecificationNotFound: boolean;
-    readonly type: 'RootNotFound' | 'LastChangeNotFound' | 'InvalidTransferToLocalchain' | 'BlockSpecificationNotFound';
+    readonly type:
+      | 'RootNotFound'
+      | 'LastChangeNotFound'
+      | 'InvalidTransferToLocalchain'
+      | 'BlockSpecificationNotFound';
   }
 
   /** @name PalletLocalchainTransferEvent (76) */
@@ -906,7 +1117,14 @@ declare module '@polkadot/types/lookup' {
       readonly tax: u128;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'TransferToLocalchain' | 'TransferToLocalchainExpired' | 'TransferFromLocalchain' | 'TransferFromLocalchainError' | 'TransferToLocalchainRefundError' | 'PossibleInvalidLocalchainTransferAllowed' | 'TaxationError';
+    readonly type:
+      | 'TransferToLocalchain'
+      | 'TransferToLocalchainExpired'
+      | 'TransferFromLocalchain'
+      | 'TransferFromLocalchainError'
+      | 'TransferToLocalchainRefundError'
+      | 'PossibleInvalidLocalchainTransferAllowed'
+      | 'TaxationError';
   }
 
   /** @name PalletBlockSealSpecEvent (77) */
@@ -959,7 +1177,13 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'ZoneRecordUpdated' | 'DomainRegistered' | 'DomainRenewed' | 'DomainExpired' | 'DomainRegistrationCanceled' | 'DomainRegistrationError';
+    readonly type:
+      | 'ZoneRecordUpdated'
+      | 'DomainRegistered'
+      | 'DomainRenewed'
+      | 'DomainExpired'
+      | 'DomainRegistrationCanceled'
+      | 'DomainRegistrationError';
   }
 
   /** @name ArgonPrimitivesDomainZoneRecord (79) */
@@ -1229,7 +1453,37 @@ declare module '@polkadot/types/lookup' {
     } & Struct;
     readonly isUnexpected: boolean;
     readonly asUnexpected: PalletBalancesUnexpectedKind;
-    readonly type: 'Endowed' | 'DustLost' | 'Transfer' | 'BalanceSet' | 'Reserved' | 'Unreserved' | 'ReserveRepatriated' | 'Deposit' | 'Withdraw' | 'Slashed' | 'Minted' | 'MintedCredit' | 'Burned' | 'BurnedDebt' | 'Suspended' | 'Restored' | 'Upgraded' | 'Issued' | 'Rescinded' | 'Locked' | 'Unlocked' | 'Frozen' | 'Thawed' | 'TotalIssuanceForced' | 'Held' | 'BurnedHeld' | 'TransferOnHold' | 'TransferAndHold' | 'Released' | 'Unexpected';
+    readonly type:
+      | 'Endowed'
+      | 'DustLost'
+      | 'Transfer'
+      | 'BalanceSet'
+      | 'Reserved'
+      | 'Unreserved'
+      | 'ReserveRepatriated'
+      | 'Deposit'
+      | 'Withdraw'
+      | 'Slashed'
+      | 'Minted'
+      | 'MintedCredit'
+      | 'Burned'
+      | 'BurnedDebt'
+      | 'Suspended'
+      | 'Restored'
+      | 'Upgraded'
+      | 'Issued'
+      | 'Rescinded'
+      | 'Locked'
+      | 'Unlocked'
+      | 'Frozen'
+      | 'Thawed'
+      | 'TotalIssuanceForced'
+      | 'Held'
+      | 'BurnedHeld'
+      | 'TransferOnHold'
+      | 'TransferAndHold'
+      | 'Released'
+      | 'Unexpected';
   }
 
   /** @name FrameSupportTokensMiscBalanceStatus (103) */
@@ -1340,7 +1594,15 @@ declare module '@polkadot/types/lookup' {
     readonly asIfElseFallbackCalled: {
       readonly mainError: SpRuntimeDispatchError;
     } & Struct;
-    readonly type: 'BatchInterrupted' | 'BatchCompleted' | 'BatchCompletedWithErrors' | 'ItemCompleted' | 'ItemFailed' | 'DispatchedAs' | 'IfElseMainSuccess' | 'IfElseFallbackCalled';
+    readonly type:
+      | 'BatchInterrupted'
+      | 'BatchCompleted'
+      | 'BatchCompletedWithErrors'
+      | 'ItemCompleted'
+      | 'ItemFailed'
+      | 'DispatchedAs'
+      | 'IfElseMainSuccess'
+      | 'IfElseFallbackCalled';
   }
 
   /** @name PalletSudoEvent (117) */
@@ -1425,7 +1687,15 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly bonds: u32;
     } & Struct;
-    readonly type: 'CouldNotDistributeEarningsToBondLot' | 'CouldNotTransferToTreasuryReserves' | 'FrameEarningsDistributed' | 'FrameVaultCapitalLocked' | 'CouldNotReleaseBondLot' | 'BondLotPurchased' | 'BondLotReleaseScheduled' | 'BondLotReleased';
+    readonly type:
+      | 'CouldNotDistributeEarningsToBondLot'
+      | 'CouldNotTransferToTreasuryReserves'
+      | 'FrameEarningsDistributed'
+      | 'FrameVaultCapitalLocked'
+      | 'CouldNotReleaseBondLot'
+      | 'BondLotPurchased'
+      | 'BondLotReleaseScheduled'
+      | 'BondLotReleased';
   }
 
   /** @name PalletTreasuryBondReleaseReason (119) */
@@ -1515,7 +1785,14 @@ declare module '@polkadot/types/lookup' {
       readonly sponsor: AccountId32;
       readonly sponsee: AccountId32;
     } & Struct;
-    readonly type: 'OperationalAccountRegistered' | 'AccountWentOperational' | 'OperationalRewardEarned' | 'OperationalRewardsClaimed' | 'RewardsConfigUpdated' | 'OperationalProgressForced' | 'EncryptedServerUpdated';
+    readonly type:
+      | 'OperationalAccountRegistered'
+      | 'AccountWentOperational'
+      | 'OperationalRewardEarned'
+      | 'OperationalRewardsClaimed'
+      | 'RewardsConfigUpdated'
+      | 'OperationalProgressForced'
+      | 'EncryptedServerUpdated';
   }
 
   /** @name ArgonPrimitivesProvidersOperationalRewardKind (124) */
@@ -1545,7 +1822,11 @@ declare module '@polkadot/types/lookup' {
     readonly asOperatingModeChanged: {
       readonly mode: PalletEthereumVerifierBasicOperatingMode;
     } & Struct;
-    readonly type: 'BeaconHeaderImported' | 'ExecutionHeaderAnchorImported' | 'SyncCommitteeUpdated' | 'OperatingModeChanged';
+    readonly type:
+      | 'BeaconHeaderImported'
+      | 'ExecutionHeaderAnchorImported'
+      | 'SyncCommitteeUpdated'
+      | 'OperatingModeChanged';
   }
 
   /** @name PalletEthereumVerifierBasicOperatingMode (126) */
@@ -1655,7 +1936,18 @@ declare module '@polkadot/types/lookup' {
     readonly asApplyAuthorizedUpgrade: {
       readonly code: Bytes;
     } & Struct;
-    readonly type: 'Remark' | 'SetHeapPages' | 'SetCode' | 'SetCodeWithoutChecks' | 'SetStorage' | 'KillStorage' | 'KillPrefix' | 'RemarkWithEvent' | 'AuthorizeUpgrade' | 'AuthorizeUpgradeWithoutChecks' | 'ApplyAuthorizedUpgrade';
+    readonly type:
+      | 'Remark'
+      | 'SetHeapPages'
+      | 'SetCode'
+      | 'SetCodeWithoutChecks'
+      | 'SetStorage'
+      | 'KillStorage'
+      | 'KillPrefix'
+      | 'RemarkWithEvent'
+      | 'AuthorizeUpgrade'
+      | 'AuthorizeUpgradeWithoutChecks'
+      | 'ApplyAuthorizedUpgrade';
   }
 
   /** @name FrameSystemLimitsBlockWeights (145) */
@@ -1722,7 +2014,16 @@ declare module '@polkadot/types/lookup' {
     readonly isMultiBlockMigrationsOngoing: boolean;
     readonly isNothingAuthorized: boolean;
     readonly isUnauthorized: boolean;
-    readonly type: 'InvalidSpecName' | 'SpecVersionNeedsToIncrease' | 'FailedToExtractRuntimeVersion' | 'NonDefaultComposite' | 'NonZeroRefCount' | 'CallFiltered' | 'MultiBlockMigrationsOngoing' | 'NothingAuthorized' | 'Unauthorized';
+    readonly type:
+      | 'InvalidSpecName'
+      | 'SpecVersionNeedsToIncrease'
+      | 'FailedToExtractRuntimeVersion'
+      | 'NonDefaultComposite'
+      | 'NonZeroRefCount'
+      | 'CallFiltered'
+      | 'MultiBlockMigrationsOngoing'
+      | 'NothingAuthorized'
+      | 'Unauthorized';
   }
 
   /** @name ArgonPrimitivesDigestsDigestset (159) */
@@ -1793,7 +2094,20 @@ declare module '@polkadot/types/lookup' {
     readonly isMissingNotebookDigest: boolean;
     readonly isCouldNotDecodeDigest: boolean;
     readonly isDuplicateFrameInfoDigest: boolean;
-    readonly type: 'DuplicateBlockVoteDigest' | 'DuplicateAuthorDigest' | 'DuplicateTickDigest' | 'DuplicateParentVotingKeyDigest' | 'DuplicateNotebookDigest' | 'DuplicateForkPowerDigest' | 'MissingBlockVoteDigest' | 'MissingAuthorDigest' | 'MissingTickDigest' | 'MissingParentVotingKeyDigest' | 'MissingNotebookDigest' | 'CouldNotDecodeDigest' | 'DuplicateFrameInfoDigest';
+    readonly type:
+      | 'DuplicateBlockVoteDigest'
+      | 'DuplicateAuthorDigest'
+      | 'DuplicateTickDigest'
+      | 'DuplicateParentVotingKeyDigest'
+      | 'DuplicateNotebookDigest'
+      | 'DuplicateForkPowerDigest'
+      | 'MissingBlockVoteDigest'
+      | 'MissingAuthorDigest'
+      | 'MissingTickDigest'
+      | 'MissingParentVotingKeyDigest'
+      | 'MissingNotebookDigest'
+      | 'CouldNotDecodeDigest'
+      | 'DuplicateFrameInfoDigest';
   }
 
   /** @name PalletTimestampCall (178) */
@@ -1849,7 +2163,12 @@ declare module '@polkadot/types/lookup' {
       readonly otherSignatories: Vec<AccountId32>;
       readonly callHash: U8aFixed;
     } & Struct;
-    readonly type: 'AsMultiThreshold1' | 'AsMulti' | 'ApproveAsMulti' | 'CancelAsMulti' | 'PokeDeposit';
+    readonly type:
+      | 'AsMultiThreshold1'
+      | 'AsMulti'
+      | 'ApproveAsMulti'
+      | 'CancelAsMulti'
+      | 'PokeDeposit';
   }
 
   /** @name PalletProxyCall (185) */
@@ -1910,7 +2229,18 @@ declare module '@polkadot/types/lookup' {
       readonly call: Call;
     } & Struct;
     readonly isPokeDeposit: boolean;
-    readonly type: 'Proxy' | 'AddProxy' | 'RemoveProxy' | 'RemoveProxies' | 'CreatePure' | 'KillPure' | 'Announce' | 'RemoveAnnouncement' | 'RejectAnnouncement' | 'ProxyAnnounced' | 'PokeDeposit';
+    readonly type:
+      | 'Proxy'
+      | 'AddProxy'
+      | 'RemoveProxy'
+      | 'RemoveProxies'
+      | 'CreatePure'
+      | 'KillPure'
+      | 'Announce'
+      | 'RemoveAnnouncement'
+      | 'RejectAnnouncement'
+      | 'ProxyAnnounced'
+      | 'PokeDeposit';
   }
 
   /** @name PalletTicksCall (189) */
@@ -1957,7 +2287,12 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly utxoRef: ArgonPrimitivesBitcoinUtxoRef;
     } & Struct;
-    readonly type: 'Sync' | 'SetConfirmedBlock' | 'SetOperator' | 'FundWithUtxoCandidate' | 'RejectUtxoCandidate';
+    readonly type:
+      | 'Sync'
+      | 'SetConfirmedBlock'
+      | 'SetOperator'
+      | 'FundWithUtxoCandidate'
+      | 'RejectUtxoCandidate';
   }
 
   /** @name ArgonPrimitivesInherentsBitcoinUtxoSync (192) */
@@ -2027,7 +2362,15 @@ declare module '@polkadot/types/lookup' {
     readonly asSetName: {
       readonly name: Option<Bytes>;
     } & Struct;
-    readonly type: 'Create' | 'ModifyFunding' | 'ModifyTerms' | 'Close' | 'ReplaceBitcoinXpub' | 'Collect' | 'SetBitcoinLockDelegate' | 'SetName';
+    readonly type:
+      | 'Create'
+      | 'ModifyFunding'
+      | 'ModifyTerms'
+      | 'Close'
+      | 'ReplaceBitcoinXpub'
+      | 'Collect'
+      | 'SetBitcoinLockDelegate'
+      | 'SetName';
   }
 
   /** @name PalletVaultsVaultConfig (200) */
@@ -2103,7 +2446,16 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly newSatoshis: Compact<u64>;
     } & Struct;
-    readonly type: 'Initialize' | 'RequestRelease' | 'CosignRelease' | 'Ratchet' | 'AdminModifyMinimumLockedSats' | 'RequestOrphanedUtxoRelease' | 'CosignOrphanedUtxoRelease' | 'InitializeFor' | 'IncreaseSecuritization';
+    readonly type:
+      | 'Initialize'
+      | 'RequestRelease'
+      | 'CosignRelease'
+      | 'Ratchet'
+      | 'AdminModifyMinimumLockedSats'
+      | 'RequestOrphanedUtxoRelease'
+      | 'CosignOrphanedUtxoRelease'
+      | 'InitializeFor'
+      | 'IncreaseSecuritization';
   }
 
   /** @name ArgonPrimitivesBitcoinCompressedBitcoinPubkey (210) */
@@ -2431,7 +2783,16 @@ declare module '@polkadot/types/lookup' {
       readonly value: Compact<u128>;
       readonly keepAlive: bool;
     } & Struct;
-    readonly type: 'TransferAllowDeath' | 'ForceTransfer' | 'TransferKeepAlive' | 'TransferAll' | 'ForceUnreserve' | 'UpgradeAccounts' | 'ForceSetBalance' | 'ForceAdjustTotalIssuance' | 'Burn';
+    readonly type:
+      | 'TransferAllowDeath'
+      | 'ForceTransfer'
+      | 'TransferKeepAlive'
+      | 'TransferAll'
+      | 'ForceUnreserve'
+      | 'UpgradeAccounts'
+      | 'ForceSetBalance'
+      | 'ForceAdjustTotalIssuance'
+      | 'Burn';
   }
 
   /** @name PalletBalancesAdjustmentDirection (259) */
@@ -2493,7 +2854,15 @@ declare module '@polkadot/types/lookup' {
       readonly asOrigin: ArgonRuntimeOriginCaller;
       readonly call: Call;
     } & Struct;
-    readonly type: 'Batch' | 'AsDerivative' | 'BatchAll' | 'DispatchAs' | 'ForceBatch' | 'WithWeight' | 'IfElse' | 'DispatchAsFallible';
+    readonly type:
+      | 'Batch'
+      | 'AsDerivative'
+      | 'BatchAll'
+      | 'DispatchAs'
+      | 'ForceBatch'
+      | 'WithWeight'
+      | 'IfElse'
+      | 'DispatchAsFallible';
   }
 
   /** @name PalletSudoCall (264) */
@@ -2561,7 +2930,13 @@ declare module '@polkadot/types/lookup' {
     readonly asClaimRewards: {
       readonly amount: u128;
     } & Struct;
-    readonly type: 'Register' | 'SetRewardConfig' | 'ForceSetProgress' | 'SetEncryptedServerForSponsee' | 'Activate' | 'ClaimRewards';
+    readonly type:
+      | 'Register'
+      | 'SetRewardConfig'
+      | 'ForceSetProgress'
+      | 'SetEncryptedServerForSponsee'
+      | 'Activate'
+      | 'ClaimRewards';
   }
 
   /** @name PalletOperationalAccountsRegistration (267) */
@@ -2630,7 +3005,11 @@ declare module '@polkadot/types/lookup' {
     readonly asSetOperatingMode: {
       readonly mode: PalletEthereumVerifierBasicOperatingMode;
     } & Struct;
-    readonly type: 'ForceCheckpoint' | 'Submit' | 'ImportExecutionHeaderAnchor' | 'SetOperatingMode';
+    readonly type:
+      | 'ForceCheckpoint'
+      | 'Submit'
+      | 'ImportExecutionHeaderAnchor'
+      | 'SetOperatingMode';
   }
 
   /** @name PalletEthereumVerifierCheckpointUpdate (276) */
@@ -2840,7 +3219,21 @@ declare module '@polkadot/types/lookup' {
     readonly isUnexpectedTimepoint: boolean;
     readonly isMaxWeightTooLow: boolean;
     readonly isAlreadyStored: boolean;
-    readonly type: 'MinimumThreshold' | 'AlreadyApproved' | 'NoApprovalsNeeded' | 'TooFewSignatories' | 'TooManySignatories' | 'SignatoriesOutOfOrder' | 'SenderInSignatories' | 'NotFound' | 'NotOwner' | 'NoTimepoint' | 'WrongTimepoint' | 'UnexpectedTimepoint' | 'MaxWeightTooLow' | 'AlreadyStored';
+    readonly type:
+      | 'MinimumThreshold'
+      | 'AlreadyApproved'
+      | 'NoApprovalsNeeded'
+      | 'TooFewSignatories'
+      | 'TooManySignatories'
+      | 'SignatoriesOutOfOrder'
+      | 'SenderInSignatories'
+      | 'NotFound'
+      | 'NotOwner'
+      | 'NoTimepoint'
+      | 'WrongTimepoint'
+      | 'UnexpectedTimepoint'
+      | 'MaxWeightTooLow'
+      | 'AlreadyStored';
   }
 
   /** @name PalletProxyProxyDefinition (317) */
@@ -2867,7 +3260,15 @@ declare module '@polkadot/types/lookup' {
     readonly isNoPermission: boolean;
     readonly isUnannounced: boolean;
     readonly isNoSelfProxy: boolean;
-    readonly type: 'TooMany' | 'NotFound' | 'NotProxy' | 'Unproxyable' | 'Duplicate' | 'NoPermission' | 'Unannounced' | 'NoSelfProxy';
+    readonly type:
+      | 'TooMany'
+      | 'NotFound'
+      | 'NotProxy'
+      | 'Unproxyable'
+      | 'Duplicate'
+      | 'NoPermission'
+      | 'Unannounced'
+      | 'NoSelfProxy';
   }
 
   /** @name ArgonPrimitivesTickTicker (324) */
@@ -2914,7 +3315,17 @@ declare module '@polkadot/types/lookup' {
     readonly isBidCannotBeReduced: boolean;
     readonly isInvalidBidAmount: boolean;
     readonly isUnrecoverableHold: boolean;
-    readonly type: 'SlotNotTakingBids' | 'TooManyBlockRegistrants' | 'InsufficientOwnershipTokens' | 'BidTooLow' | 'CannotRegisterOverlappingSessions' | 'CannotChangeFundingAccount' | 'InsufficientFunds' | 'BidCannotBeReduced' | 'InvalidBidAmount' | 'UnrecoverableHold';
+    readonly type:
+      | 'SlotNotTakingBids'
+      | 'TooManyBlockRegistrants'
+      | 'InsufficientOwnershipTokens'
+      | 'BidTooLow'
+      | 'CannotRegisterOverlappingSessions'
+      | 'CannotChangeFundingAccount'
+      | 'InsufficientFunds'
+      | 'BidCannotBeReduced'
+      | 'InvalidBidAmount'
+      | 'UnrecoverableHold';
   }
 
   /** @name ArgonPrimitivesBitcoinUtxoValue (357) */
@@ -2961,7 +3372,22 @@ declare module '@polkadot/types/lookup' {
     readonly isMaxCandidateUtxosExceeded: boolean;
     readonly isUtxoNotCandidate: boolean;
     readonly isLockAlreadyFunded: boolean;
-    readonly type: 'NoPermissions' | 'NoBitcoinConfirmedBlock' | 'InsufficientBitcoinAmount' | 'NoBitcoinPricesAvailable' | 'ScriptPubkeyConflict' | 'UtxoNotLocked' | 'RedemptionsUnavailable' | 'InvalidBitcoinSyncHeight' | 'BitcoinHeightNotConfirmed' | 'MaxUtxosExceeded' | 'InvalidBitcoinScript' | 'DuplicateUtxoId' | 'MaxCandidateUtxosExceeded' | 'UtxoNotCandidate' | 'LockAlreadyFunded';
+    readonly type:
+      | 'NoPermissions'
+      | 'NoBitcoinConfirmedBlock'
+      | 'InsufficientBitcoinAmount'
+      | 'NoBitcoinPricesAvailable'
+      | 'ScriptPubkeyConflict'
+      | 'UtxoNotLocked'
+      | 'RedemptionsUnavailable'
+      | 'InvalidBitcoinSyncHeight'
+      | 'BitcoinHeightNotConfirmed'
+      | 'MaxUtxosExceeded'
+      | 'InvalidBitcoinScript'
+      | 'DuplicateUtxoId'
+      | 'MaxCandidateUtxosExceeded'
+      | 'UtxoNotCandidate'
+      | 'LockAlreadyFunded';
   }
 
   /** @name ArgonPrimitivesVault (369) */
@@ -3062,7 +3488,37 @@ declare module '@polkadot/types/lookup' {
     readonly isPendingCosignsBeforeCollect: boolean;
     readonly isPendingOrphanedUtxoCosignsBeforeCollect: boolean;
     readonly isAccountAlreadyHasVault: boolean;
-    readonly type: 'NoMoreVaultIds' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'AccountBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'VaultReductionBelowSecuritization' | 'InvalidSecuritization' | 'ReusedVaultBitcoinXpub' | 'InvalidBitcoinScript' | 'InvalidXpubkey' | 'WrongXpubNetwork' | 'UnsafeXpubkey' | 'UnableToDeriveVaultXpubChild' | 'BitcoinConversionFailed' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'VaultNotYetActive' | 'NoVaultBitcoinPubkeysAvailable' | 'TermsModificationOverflow' | 'TermsChangeAlreadyScheduled' | 'InternalError' | 'UnableToGenerateVaultBitcoinPubkey' | 'FundingChangeAlreadyScheduled' | 'InvalidVaultName' | 'PendingCosignsBeforeCollect' | 'PendingOrphanedUtxoCosignsBeforeCollect' | 'AccountAlreadyHasVault';
+    readonly type:
+      | 'NoMoreVaultIds'
+      | 'InsufficientFunds'
+      | 'InsufficientVaultFunds'
+      | 'AccountBelowMinimumBalance'
+      | 'VaultClosed'
+      | 'InvalidVaultAmount'
+      | 'VaultReductionBelowSecuritization'
+      | 'InvalidSecuritization'
+      | 'ReusedVaultBitcoinXpub'
+      | 'InvalidBitcoinScript'
+      | 'InvalidXpubkey'
+      | 'WrongXpubNetwork'
+      | 'UnsafeXpubkey'
+      | 'UnableToDeriveVaultXpubChild'
+      | 'BitcoinConversionFailed'
+      | 'NoPermissions'
+      | 'HoldUnexpectedlyModified'
+      | 'UnrecoverableHold'
+      | 'VaultNotFound'
+      | 'VaultNotYetActive'
+      | 'NoVaultBitcoinPubkeysAvailable'
+      | 'TermsModificationOverflow'
+      | 'TermsChangeAlreadyScheduled'
+      | 'InternalError'
+      | 'UnableToGenerateVaultBitcoinPubkey'
+      | 'FundingChangeAlreadyScheduled'
+      | 'InvalidVaultName'
+      | 'PendingCosignsBeforeCollect'
+      | 'PendingOrphanedUtxoCosignsBeforeCollect'
+      | 'AccountAlreadyHasVault';
   }
 
   /** @name PalletBitcoinLocksLockedBitcoin (394) */
@@ -3153,7 +3609,42 @@ declare module '@polkadot/types/lookup' {
     readonly isOrphanedUtxoReleaseRequested: boolean;
     readonly isFundingUtxoCannotBeReleased: boolean;
     readonly isMaxOrphanedUtxoReleaseRequestsExceeded: boolean;
-    readonly type: 'InsufficientFunds' | 'InsufficientVaultFunds' | 'AccountWouldGoBelowMinimumBalance' | 'VaultClosed' | 'InvalidVaultAmount' | 'RedemptionNotLocked' | 'BitcoinReleaseInitiationDeadlinePassed' | 'BitcoinFeeTooHigh' | 'BitcoinUtxoNotFound' | 'BitcoinUnableToBeDecodedForRelease' | 'BitcoinSignatureUnableToBeDecoded' | 'BitcoinPubkeyUnableToBeDecoded' | 'BitcoinInvalidCosignature' | 'InsufficientSatoshisLocked' | 'NoBitcoinPricesAvailable' | 'InvalidBitcoinScript' | 'NoPermissions' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'GenericVaultError' | 'LockNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey' | 'VaultNotYetActive' | 'ExpirationAtBlockOverflow' | 'NoRatchetingAvailable' | 'LockInProcessOfRelease' | 'LockPendingFunding' | 'OverflowError' | 'IneligibleMicrogonRateRequested' | 'OrphanedUtxoFundingConflict' | 'OrphanedUtxoReleaseRequested' | 'FundingUtxoCannotBeReleased' | 'MaxOrphanedUtxoReleaseRequestsExceeded';
+    readonly type:
+      | 'InsufficientFunds'
+      | 'InsufficientVaultFunds'
+      | 'AccountWouldGoBelowMinimumBalance'
+      | 'VaultClosed'
+      | 'InvalidVaultAmount'
+      | 'RedemptionNotLocked'
+      | 'BitcoinReleaseInitiationDeadlinePassed'
+      | 'BitcoinFeeTooHigh'
+      | 'BitcoinUtxoNotFound'
+      | 'BitcoinUnableToBeDecodedForRelease'
+      | 'BitcoinSignatureUnableToBeDecoded'
+      | 'BitcoinPubkeyUnableToBeDecoded'
+      | 'BitcoinInvalidCosignature'
+      | 'InsufficientSatoshisLocked'
+      | 'NoBitcoinPricesAvailable'
+      | 'InvalidBitcoinScript'
+      | 'NoPermissions'
+      | 'HoldUnexpectedlyModified'
+      | 'UnrecoverableHold'
+      | 'VaultNotFound'
+      | 'GenericVaultError'
+      | 'LockNotFound'
+      | 'NoVaultBitcoinPubkeysAvailable'
+      | 'UnableToGenerateVaultBitcoinPubkey'
+      | 'VaultNotYetActive'
+      | 'ExpirationAtBlockOverflow'
+      | 'NoRatchetingAvailable'
+      | 'LockInProcessOfRelease'
+      | 'LockPendingFunding'
+      | 'OverflowError'
+      | 'IneligibleMicrogonRateRequested'
+      | 'OrphanedUtxoFundingConflict'
+      | 'OrphanedUtxoReleaseRequested'
+      | 'FundingUtxoCannotBeReleased'
+      | 'MaxOrphanedUtxoReleaseRequestsExceeded';
   }
 
   /** @name ArgonPrimitivesVaultVaultError (409) */
@@ -3170,7 +3661,19 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidBitcoinScript: boolean;
     readonly isInternalError: boolean;
     readonly isVaultNotYetActive: boolean;
-    readonly type: 'VaultClosed' | 'AccountWouldBeBelowMinimum' | 'InsufficientFunds' | 'InsufficientVaultFunds' | 'HoldUnexpectedlyModified' | 'UnrecoverableHold' | 'VaultNotFound' | 'NoVaultBitcoinPubkeysAvailable' | 'UnableToGenerateVaultBitcoinPubkey' | 'InvalidBitcoinScript' | 'InternalError' | 'VaultNotYetActive';
+    readonly type:
+      | 'VaultClosed'
+      | 'AccountWouldBeBelowMinimum'
+      | 'InsufficientFunds'
+      | 'InsufficientVaultFunds'
+      | 'HoldUnexpectedlyModified'
+      | 'UnrecoverableHold'
+      | 'VaultNotFound'
+      | 'NoVaultBitcoinPubkeysAvailable'
+      | 'UnableToGenerateVaultBitcoinPubkey'
+      | 'InvalidBitcoinScript'
+      | 'InternalError'
+      | 'VaultNotYetActive';
   }
 
   /** @name PalletNotariesError (421) */
@@ -3184,7 +3687,16 @@ declare module '@polkadot/types/lookup' {
     readonly isEffectiveTickTooSoon: boolean;
     readonly isTooManyKeys: boolean;
     readonly isInvalidNotary: boolean;
-    readonly type: 'ProposalNotFound' | 'MaxNotariesExceeded' | 'MaxProposalsPerBlockExceeded' | 'NotAnActiveNotary' | 'InvalidNotaryOperator' | 'NoMoreNotaryIds' | 'EffectiveTickTooSoon' | 'TooManyKeys' | 'InvalidNotary';
+    readonly type:
+      | 'ProposalNotFound'
+      | 'MaxNotariesExceeded'
+      | 'MaxProposalsPerBlockExceeded'
+      | 'NotAnActiveNotary'
+      | 'InvalidNotaryOperator'
+      | 'NoMoreNotaryIds'
+      | 'EffectiveTickTooSoon'
+      | 'TooManyKeys'
+      | 'InvalidNotary';
   }
 
   /** @name ArgonPrimitivesNotaryNotaryNotebookKeyDetails (425) */
@@ -3213,7 +3725,22 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidReprocessNotebook: boolean;
     readonly isInvalidNotaryOperator: boolean;
     readonly isInvalidNotebookSubmissionTick: boolean;
-    readonly type: 'DuplicateNotebookNumber' | 'MissingNotebookNumber' | 'NotebookTickAlreadyUsed' | 'InvalidNotebookSignature' | 'InvalidSecretProvided' | 'CouldNotDecodeNotebook' | 'DuplicateNotebookDigest' | 'MissingNotebookDigest' | 'InvalidNotebookDigest' | 'MultipleNotebookInherentsProvided' | 'InternalError' | 'NotebookSubmittedForLockedNotary' | 'InvalidReprocessNotebook' | 'InvalidNotaryOperator' | 'InvalidNotebookSubmissionTick';
+    readonly type:
+      | 'DuplicateNotebookNumber'
+      | 'MissingNotebookNumber'
+      | 'NotebookTickAlreadyUsed'
+      | 'InvalidNotebookSignature'
+      | 'InvalidSecretProvided'
+      | 'CouldNotDecodeNotebook'
+      | 'DuplicateNotebookDigest'
+      | 'MissingNotebookDigest'
+      | 'InvalidNotebookDigest'
+      | 'MultipleNotebookInherentsProvided'
+      | 'InternalError'
+      | 'NotebookSubmittedForLockedNotary'
+      | 'InvalidReprocessNotebook'
+      | 'InvalidNotaryOperator'
+      | 'InvalidNotebookSubmissionTick';
   }
 
   /** @name PalletLocalchainTransferQueuedTransferOut (429) */
@@ -3237,7 +3764,15 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidNotaryUsedForTransfer: boolean;
     readonly isNotaryLockedForTransfer: boolean;
     readonly isNoAvailableTransferId: boolean;
-    readonly type: 'MaxBlockTransfersExceeded' | 'InsufficientFunds' | 'InsufficientNotarizedFunds' | 'InvalidOrDuplicatedLocalchainTransfer' | 'NotebookIncludesExpiredLocalchainTransfer' | 'InvalidNotaryUsedForTransfer' | 'NotaryLockedForTransfer' | 'NoAvailableTransferId';
+    readonly type:
+      | 'MaxBlockTransfersExceeded'
+      | 'InsufficientFunds'
+      | 'InsufficientNotarizedFunds'
+      | 'InvalidOrDuplicatedLocalchainTransfer'
+      | 'NotebookIncludesExpiredLocalchainTransfer'
+      | 'InvalidNotaryUsedForTransfer'
+      | 'NotaryLockedForTransfer'
+      | 'NoAvailableTransferId';
   }
 
   /** @name ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails (436) */
@@ -3262,7 +3797,12 @@ declare module '@polkadot/types/lookup' {
     readonly isFailedToAddToAddressHistory: boolean;
     readonly isFailedToAddExpiringDomain: boolean;
     readonly isAccountDecodingError: boolean;
-    readonly type: 'DomainNotRegistered' | 'NotDomainOwner' | 'FailedToAddToAddressHistory' | 'FailedToAddExpiringDomain' | 'AccountDecodingError';
+    readonly type:
+      | 'DomainNotRegistered'
+      | 'NotDomainOwner'
+      | 'FailedToAddToAddressHistory'
+      | 'FailedToAddExpiringDomain'
+      | 'AccountDecodingError';
   }
 
   /** @name PalletPriceIndexCpiMeasurementBucket (445) */
@@ -3278,7 +3818,11 @@ declare module '@polkadot/types/lookup' {
     readonly isMissingValue: boolean;
     readonly isPricesTooOld: boolean;
     readonly isMaxPriceChangePerTickExceeded: boolean;
-    readonly type: 'NotAuthorizedOperator' | 'MissingValue' | 'PricesTooOld' | 'MaxPriceChangePerTickExceeded';
+    readonly type:
+      | 'NotAuthorizedOperator'
+      | 'MissingValue'
+      | 'PricesTooOld'
+      | 'MaxPriceChangePerTickExceeded';
   }
 
   /** @name PalletGrandpaStoredState (448) */
@@ -3315,7 +3859,14 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidKeyOwnershipProof: boolean;
     readonly isInvalidEquivocationProof: boolean;
     readonly isDuplicateOffenceReport: boolean;
-    readonly type: 'PauseFailed' | 'ResumeFailed' | 'ChangePending' | 'TooSoon' | 'InvalidKeyOwnershipProof' | 'InvalidEquivocationProof' | 'DuplicateOffenceReport';
+    readonly type:
+      | 'PauseFailed'
+      | 'ResumeFailed'
+      | 'ChangePending'
+      | 'TooSoon'
+      | 'InvalidKeyOwnershipProof'
+      | 'InvalidEquivocationProof'
+      | 'DuplicateOffenceReport';
   }
 
   /** @name ArgonPrimitivesProvidersBlockSealerInfo (452) */
@@ -3348,7 +3899,28 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidComputeBlockTick: boolean;
     readonly isInvalidMinerNonceScore: boolean;
     readonly isDuplicateVoteBlockAtTick: boolean;
-    readonly type: 'InvalidVoteSealStrength' | 'InvalidSubmitter' | 'UnableToDecodeVoteAccount' | 'UnregisteredBlockAuthor' | 'InvalidBlockVoteProof' | 'NoGrandparentVoteMinimum' | 'DuplicateBlockSealProvided' | 'InsufficientVotingPower' | 'ParentVotingKeyNotFound' | 'InvalidVoteGrandparentHash' | 'IneligibleNotebookUsed' | 'NoEligibleVotingRoot' | 'CouldNotDecodeVote' | 'MaxNotebooksAtTickExceeded' | 'NoClosestMinerFoundForVote' | 'BlockVoteInvalidSignature' | 'InvalidForkPowerParent' | 'BlockSealDecodeError' | 'InvalidComputeBlockTick' | 'InvalidMinerNonceScore' | 'DuplicateVoteBlockAtTick';
+    readonly type:
+      | 'InvalidVoteSealStrength'
+      | 'InvalidSubmitter'
+      | 'UnableToDecodeVoteAccount'
+      | 'UnregisteredBlockAuthor'
+      | 'InvalidBlockVoteProof'
+      | 'NoGrandparentVoteMinimum'
+      | 'DuplicateBlockSealProvided'
+      | 'InsufficientVotingPower'
+      | 'ParentVotingKeyNotFound'
+      | 'InvalidVoteGrandparentHash'
+      | 'IneligibleNotebookUsed'
+      | 'NoEligibleVotingRoot'
+      | 'CouldNotDecodeVote'
+      | 'MaxNotebooksAtTickExceeded'
+      | 'NoClosestMinerFoundForVote'
+      | 'BlockVoteInvalidSignature'
+      | 'InvalidForkPowerParent'
+      | 'BlockSealDecodeError'
+      | 'InvalidComputeBlockTick'
+      | 'InvalidMinerNonceScore'
+      | 'DuplicateVoteBlockAtTick';
   }
 
   /** @name PalletBlockRewardsError (458) */
@@ -3427,7 +3999,19 @@ declare module '@polkadot/types/lookup' {
     readonly isTooManyFreezes: boolean;
     readonly isIssuanceDeactivated: boolean;
     readonly isDeltaZero: boolean;
-    readonly type: 'VestingBalance' | 'LiquidityRestrictions' | 'InsufficientBalance' | 'ExistentialDeposit' | 'Expendability' | 'ExistingVestingSchedule' | 'DeadAccount' | 'TooManyReserves' | 'TooManyHolds' | 'TooManyFreezes' | 'IssuanceDeactivated' | 'DeltaZero';
+    readonly type:
+      | 'VestingBalance'
+      | 'LiquidityRestrictions'
+      | 'InsufficientBalance'
+      | 'ExistentialDeposit'
+      | 'Expendability'
+      | 'ExistingVestingSchedule'
+      | 'DeadAccount'
+      | 'TooManyReserves'
+      | 'TooManyHolds'
+      | 'TooManyFreezes'
+      | 'IssuanceDeactivated'
+      | 'DeltaZero';
   }
 
   /** @name PalletTxPauseError (483) */
@@ -3517,7 +4101,17 @@ declare module '@polkadot/types/lookup' {
     readonly isNotBondLotOwner: boolean;
     readonly isBondLotAlreadyReleasing: boolean;
     readonly isBondPurchaseAboveSecurity: boolean;
-    readonly type: 'BondPurchaseRejected' | 'VaultNotAcceptingBondPurchases' | 'BondPurchaseBelowMinimum' | 'InternalError' | 'MaxAcceptedBondLotsExceeded' | 'MaxPendingBondReleasesExceeded' | 'BondLotNotFound' | 'NotBondLotOwner' | 'BondLotAlreadyReleasing' | 'BondPurchaseAboveSecurity';
+    readonly type:
+      | 'BondPurchaseRejected'
+      | 'VaultNotAcceptingBondPurchases'
+      | 'BondPurchaseBelowMinimum'
+      | 'InternalError'
+      | 'MaxAcceptedBondLotsExceeded'
+      | 'MaxPendingBondReleasesExceeded'
+      | 'BondLotNotFound'
+      | 'NotBondLotOwner'
+      | 'BondLotAlreadyReleasing'
+      | 'BondPurchaseAboveSecurity';
   }
 
   /** @name PalletFeeControlError (506) */
@@ -3574,7 +4168,24 @@ declare module '@polkadot/types/lookup' {
     readonly isTreasuryInsufficientFunds: boolean;
     readonly isAlreadyOperational: boolean;
     readonly isNotEligibleForActivation: boolean;
-    readonly type: 'AlreadyRegistered' | 'InvalidRegistrationSubmitter' | 'AccountAlreadyLinked' | 'InvalidAccountProof' | 'NotOperationalAccount' | 'InvalidReferralProof' | 'ReferralProofExpired' | 'NoProgressUpdateProvided' | 'EncryptedServerTooLong' | 'NotSponsorOfSponsee' | 'NoPendingRewards' | 'RewardClaimBelowMinimum' | 'RewardClaimNotWholeArgon' | 'RewardClaimExceedsPending' | 'TreasuryInsufficientFunds' | 'AlreadyOperational' | 'NotEligibleForActivation';
+    readonly type:
+      | 'AlreadyRegistered'
+      | 'InvalidRegistrationSubmitter'
+      | 'AccountAlreadyLinked'
+      | 'InvalidAccountProof'
+      | 'NotOperationalAccount'
+      | 'InvalidReferralProof'
+      | 'ReferralProofExpired'
+      | 'NoProgressUpdateProvided'
+      | 'EncryptedServerTooLong'
+      | 'NotSponsorOfSponsee'
+      | 'NoPendingRewards'
+      | 'RewardClaimBelowMinimum'
+      | 'RewardClaimNotWholeArgon'
+      | 'RewardClaimExceedsPending'
+      | 'TreasuryInsufficientFunds'
+      | 'AlreadyOperational'
+      | 'NotEligibleForActivation';
   }
 
   /** @name PalletEthereumVerifierFinalizedBeaconHeaderState (512) */
@@ -3650,7 +4261,28 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidUpdateSlot: boolean;
     readonly isInvalidSyncCommitteeUpdate: boolean;
     readonly isHalted: boolean;
-    readonly type: 'SkippedSyncCommitteePeriod' | 'SyncCommitteeUpdateRequired' | 'IrrelevantUpdate' | 'NotBootstrapped' | 'SyncCommitteeParticipantsNotSupermajority' | 'InvalidHeaderMerkleProof' | 'InvalidSyncCommitteeMerkleProof' | 'InvalidExecutionHeaderProof' | 'InvalidFinalizedHeaderGap' | 'HeaderHashTreeRootFailed' | 'BlockBodyHashTreeRootFailed' | 'SyncCommitteeHashTreeRootFailed' | 'SigningRootHashTreeRootFailed' | 'ForkDataHashTreeRootFailed' | 'ExpectedFinalizedHeaderNotStored' | 'BlsPreparePublicKeysFailed' | 'BlsVerificationFailed' | 'UnexpectedBeaconPreset' | 'InvalidUpdateSlot' | 'InvalidSyncCommitteeUpdate' | 'Halted';
+    readonly type:
+      | 'SkippedSyncCommitteePeriod'
+      | 'SyncCommitteeUpdateRequired'
+      | 'IrrelevantUpdate'
+      | 'NotBootstrapped'
+      | 'SyncCommitteeParticipantsNotSupermajority'
+      | 'InvalidHeaderMerkleProof'
+      | 'InvalidSyncCommitteeMerkleProof'
+      | 'InvalidExecutionHeaderProof'
+      | 'InvalidFinalizedHeaderGap'
+      | 'HeaderHashTreeRootFailed'
+      | 'BlockBodyHashTreeRootFailed'
+      | 'SyncCommitteeHashTreeRootFailed'
+      | 'SigningRootHashTreeRootFailed'
+      | 'ForkDataHashTreeRootFailed'
+      | 'ExpectedFinalizedHeaderNotStored'
+      | 'BlsPreparePublicKeysFailed'
+      | 'BlsVerificationFailed'
+      | 'UnexpectedBeaconPreset'
+      | 'InvalidUpdateSlot'
+      | 'InvalidSyncCommitteeUpdate'
+      | 'Halted';
   }
 
   /** @name PalletCrosschainTransferError (526) */
@@ -3666,7 +4298,18 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidChainConfig: boolean;
     readonly isInsufficientLiquidity: boolean;
     readonly isInsufficientBurnAmountForFee: boolean;
-    readonly type: 'InvalidEthereumEvent' | 'InvalidProof' | 'InvalidRecipient' | 'InvalidAmount' | 'UnsupportedSource' | 'UnsupportedGateway' | 'UnsupportedToken' | 'UnexpectedNonce' | 'InvalidChainConfig' | 'InsufficientLiquidity' | 'InsufficientBurnAmountForFee';
+    readonly type:
+      | 'InvalidEthereumEvent'
+      | 'InvalidProof'
+      | 'InvalidRecipient'
+      | 'InvalidAmount'
+      | 'UnsupportedSource'
+      | 'UnsupportedGateway'
+      | 'UnsupportedToken'
+      | 'UnexpectedNonce'
+      | 'InvalidChainConfig'
+      | 'InsufficientLiquidity'
+      | 'InsufficientBurnAmountForFee';
   }
 
   /** @name FrameSystemExtensionsAuthorizeCall (529) */
@@ -3710,5 +4353,4 @@ declare module '@polkadot/types/lookup' {
 
   /** @name ArgonRuntimeRuntime (543) */
   type ArgonRuntimeRuntime = Null;
-
 } // declare module
