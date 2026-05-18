@@ -3,7 +3,10 @@ const INVALID_TX_SPONSORED_FEE_TOO_HIGH: u8 = 1;
 use crate::pallet::{Config, Event, Pallet};
 use alloc::vec::Vec;
 use codec::EncodeLike;
-use frame_support::{dispatch::CheckIfFeeless, traits::InstanceFilter};
+use frame_support::{
+	dispatch::{CheckIfFeeless, DispatchInfo, PostDispatchInfo},
+	traits::InstanceFilter,
+};
 use pallet_prelude::{
 	argon_primitives::{
 		CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
@@ -291,7 +294,10 @@ where
     T: Config + pallet_transaction_payment::Config + pallet_proxy::Config + pallet_utility::Config + Send + Sync,
     T: pallet_proxy::Config<RuntimeCall = RuntimeCallOf<T>>,
     T: pallet_utility::Config<RuntimeCall = RuntimeCallOf<T>>,
-    RuntimeCallOf<T>: CheckIfFeeless<Origin = OriginFor<T>> + IsSubType<pallet_proxy::Call<T>> + IsSubType<pallet_utility::Call<T>>,
+    RuntimeCallOf<T>: CheckIfFeeless<Origin = OriginFor<T>>
+        + Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>
+        + IsSubType<pallet_proxy::Call<T>>
+        + IsSubType<pallet_utility::Call<T>>,
     <<T as pallet_transaction_payment::Config>::OnChargeTransaction as OnChargeTransaction<T>>::Balance:
         EncodeLike<T::Balance> + From<T::Balance> + Into<T::Balance>,
     S: TransactionExtension<RuntimeCallOf<T>, Pre = pallet_transaction_payment::Pre<T>, Val = pallet_transaction_payment::Val<T>>,
@@ -333,7 +339,17 @@ where
         Self::validate_freshness(call, signer.clone())?;
         let general_pool_keys = Self::collect_pool_keys(call, signer);
         if call.is_feeless(&origin) {
-            let mut validity = ValidTransaction::default();
+			let synthetic_fee =
+				pallet_transaction_payment::Pallet::<T>::compute_fee(len as u32, info, Zero::zero());
+				let mut validity = ValidTransaction {
+				priority: pallet_transaction_payment::ChargeTransactionPayment::<T>::get_priority(
+					info,
+					len,
+					Zero::zero(),
+					synthetic_fee,
+				),
+				..Default::default()
+			};
 
             for key in general_pool_keys.iter().cloned() {
                 Self::push_pool_key(&mut validity, key);
