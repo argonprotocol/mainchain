@@ -215,10 +215,7 @@ impl LockCommands {
 				let satoshis = FixedU128::from_float(btc).saturating_mul_int(SATOSHIS_PER_BITCOIN);
 
 				let Some(argons_minted) = client
-					.call(
-						apis().bitcoin_apis().calculate_redemption_amount(satoshis, None),
-						None,
-					)
+					.call(apis().bitcoin_apis().calculate_redemption_amount(satoshis, None), None)
 					.await?
 				else {
 					println!("No price conversion found in blockchain for bitcoin to argon");
@@ -317,10 +314,7 @@ impl LockCommands {
 					let redemption_amount_query = apis()
 						.bitcoin_apis()
 						.calculate_redemption_amount(lock.satoshis, Some(lock.locked_target_price));
-					client
-						.call(redemption_amount_query, Some(at_block))
-						.await?
-						.unwrap_or_default()
+					client.call(redemption_amount_query, Some(at_block)).await?.unwrap_or_default()
 				};
 
 				let minted = if lock.is_funded { lock.liquidity_promised - remaining } else { 0 };

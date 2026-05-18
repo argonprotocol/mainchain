@@ -771,10 +771,10 @@ pub mod pallet {
 				frame_system::Pallet::<T>::inc_providers(&who);
 				T::Currency::hold(&HoldReason::ReleaseBitcoinLock.into(), &who, redemption_amount)
 					.map_err(|e| match e {
-					Token(TokenError::BelowMinimum) =>
-						Error::<T>::AccountWouldGoBelowMinimumBalance,
-					_ => Error::<T>::InsufficientFunds,
-				})?;
+						Token(TokenError::BelowMinimum) =>
+							Error::<T>::AccountWouldGoBelowMinimumBalance,
+						_ => Error::<T>::InsufficientFunds,
+					})?;
 			}
 
 			let cosign_due_frame =
