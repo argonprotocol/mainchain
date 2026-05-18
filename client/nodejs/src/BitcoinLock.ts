@@ -440,33 +440,35 @@ export class BitcoinLock implements IBitcoinLock {
       price = maxMicrogonsAtTarget;
     }
 
-    const r = priceIndex.rValue;
-
-    let multiplier: BigNumber;
-
-    if (r.gte(1)) {
-      // Case 1: no penalty
-      multiplier = new BigNumber(1);
-    } else if (r.gte(0.9)) {
-      // Case 2: quadratic curve
-      // Formula: 20r² - 38r + 19
-      multiplier = new BigNumber(20).times(r.pow(2)).minus(new BigNumber(38).times(r)).plus(19);
-    } else if (r.gte(0.01)) {
-      // Case 3: rational linear formula
-      // Formula: (0.5618r + 0.3944) / r
-      multiplier = new BigNumber(0.5618).times(r).plus(0.3944).div(r);
-    } else {
-      // Case 4: extreme deviation
-      // Formula: (1 / r) * (0.576r + 0.4)
-      multiplier = new BigNumber(1).div(r).times(new BigNumber(0.576).times(r).plus(0.4));
-    }
+    const multiplierBn = this.redemptionMultiplierBn(priceIndex);
 
     return BigInt(
       new BigNumber(price.toString())
-        .times(multiplier)
+        .times(multiplierBn)
         .integerValue(BigNumber.ROUND_DOWN)
         .toFixed(0),
     );
+  }
+
+  private static redemptionMultiplierBn(priceIndex: PriceIndex): BigNumber {
+    const r = priceIndex.rValue;
+
+    if (r.gte(1)) {
+      // Case 1: no penalty
+      return new BigNumber(1);
+    } else if (r.gte(0.9)) {
+      // Case 2: quadratic curve
+      // Formula: 20r² - 38r + 19
+      return new BigNumber(20).times(r.pow(2)).minus(new BigNumber(38).times(r)).plus(19);
+    } else if (r.gte(0.01)) {
+      // Case 3: rational linear formula
+      // Formula: (0.5618r + 0.3944) / r
+      return new BigNumber(0.5618).times(r).plus(0.3944).div(r);
+    } else {
+      // Case 4: extreme deviation
+      // Formula: (1 / r) * (0.576r + 0.4)
+      return new BigNumber(1).div(r).times(new BigNumber(0.576).times(r).plus(0.4));
+    }
   }
 
   public static async getConfig(client: IQueryableClient): Promise<IBitcoinLockConfig> {
@@ -805,16 +807,46 @@ export class BitcoinLock implements IBitcoinLock {
     return { lock, createdAtHeight: blockHeight, txResult };
   }
 
-  public static async requiredSatoshisForArgonLiquidity(
+  public static satoshisRequiredForRedemptionAmount(
     priceIndex: PriceIndex,
-    argonAmount: bigint,
-  ): Promise<bigint> {
-    /**
-     * If 1_000_000 microgons are available, and the market rate is 100 microgons per satoshi, then
-     * 1_000_000 / 100 = 10_000 satoshis needed
-     */
-    const marketRatePerBitcoin = priceIndex.getSatoshiPriceInMarketMicrogons(SATS_PER_BTC);
-    return (argonAmount * SATS_PER_BTC) / marketRatePerBitcoin;
+    redemptionAmount: bigint,
+  ): bigint {
+    if (redemptionAmount <= 0n) return 0n;
+
+    const multiplierBn = this.redemptionMultiplierBn(priceIndex);
+    const targetMicrogonsPerBtc = priceIndex.getSatoshiPriceInTargetMicrogons(SATS_PER_BTC);
+    let requiredTargetMicrogons = BigInt(
+      new BigNumber(redemptionAmount.toString())
+        .div(multiplierBn)
+        .integerValue(BigNumber.ROUND_CEIL)
+        .toFixed(0),
+    );
+
+    while (this.calculateRedemptionAmount(priceIndex, requiredTargetMicrogons) < redemptionAmount) {
+      requiredTargetMicrogons += 1n;
+    }
+
+    let satoshis = BigInt(
+      new BigNumber(requiredTargetMicrogons.toString())
+        .times(SATS_PER_BTC.toString())
+        .div(targetMicrogonsPerBtc.toString())
+        .integerValue(BigNumber.ROUND_CEIL)
+        .toFixed(0),
+    );
+
+    // The forward path floors target microgons from sats, then floors the redemption amount.
+    // Verify the computed sats satisfy both boundaries, then step down to the minimal sat count.
+    while (this.calculateRedemptionAmountFromSatoshis(priceIndex, satoshis) < redemptionAmount) {
+      satoshis += 1n;
+    }
+    while (
+      satoshis > 0n &&
+      this.calculateRedemptionAmountFromSatoshis(priceIndex, satoshis - 1n) >= redemptionAmount
+    ) {
+      satoshis -= 1n;
+    }
+
+    return satoshis;
   }
 }
 

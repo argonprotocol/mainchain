@@ -4,6 +4,7 @@ import {
   FIXED_U128_DECIMALS,
   formatArgons,
   fromFixedNumber,
+  MICROGONS_PER_ARGON,
   PERMILL_DECIMALS,
   toFixedNumber,
   TxSubmitter,
@@ -13,6 +14,7 @@ import bs58check from 'bs58check';
 import { hexToU8a } from '@polkadot/util';
 import { TxResult } from './TxResult';
 import type { ISubmittableOptions, TxSigningAccount } from './TxSubmitter';
+import type { PriceIndex } from './PriceIndex';
 import { ApiDecoration } from '@polkadot/api/types';
 import type {
   bool,
@@ -160,6 +162,30 @@ export class Vault {
 
   public availableSecuritization(): bigint {
     return this.securitization - this.securitizationLocked;
+  }
+
+  public availableBondSpace(
+    priceIndex: PriceIndex,
+    bondLots?: Iterable<{ activeBonds: number }>,
+    bondFullCapacityPerFrame?: boolean,
+  ): bigint {
+    if (this.securitizedSatoshis <= 0) return 0n;
+
+    const microgonsPerBond = BigInt(MICROGONS_PER_ARGON);
+    const totalBondCapacityMicrogons = priceIndex.getSatoshiPriceInTargetMicrogons(
+      BigInt(this.securitizedSatoshis),
+    );
+    const capacityMicrogons = bondFullCapacityPerFrame
+      ? totalBondCapacityMicrogons
+      : totalBondCapacityMicrogons / 10n;
+    const bondCapacity = Number(capacityMicrogons / microgonsPerBond);
+    const activeBonds = [...(bondLots ?? [])].reduce(
+      (sum, bondLot) => sum + bondLot.activeBonds,
+      0,
+    );
+    const availableBonds = activeBonds < bondCapacity ? bondCapacity - activeBonds : 0;
+
+    return BigInt(availableBonds) * microgonsPerBond;
   }
 
   public getRelockCapacity(): bigint {

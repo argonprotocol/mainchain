@@ -60,6 +60,57 @@ describe('BitcoinLock.calculateRedemptionAmount', () => {
   });
 });
 
+describe('BitcoinLock.satoshisRequiredForRedemptionAmount', () => {
+  function priceIndex(args: {
+    btcUsdPrice: number;
+    argonUsdPrice: number;
+    argonUsdTargetPrice: number;
+  }): PriceIndex {
+    const index = new PriceIndex();
+    index.btcUsdPrice = new BigNumber(args.btcUsdPrice);
+    index.argonUsdPrice = new BigNumber(args.argonUsdPrice);
+    index.argonUsdTargetPrice = new BigNumber(args.argonUsdTargetPrice);
+    return index;
+  }
+
+  it('returns the minimum sats needed when argon is at target', () => {
+    const index = priceIndex({
+      btcUsdPrice: 60_000,
+      argonUsdPrice: 1,
+      argonUsdTargetPrice: 1,
+    });
+
+    const redemptionAmount = 2_000_000_000n;
+    const satoshis = BitcoinLock.satoshisRequiredForRedemptionAmount(index, redemptionAmount);
+
+    expect(
+      BitcoinLock.calculateRedemptionAmountFromSatoshis(index, satoshis),
+    ).toBeGreaterThanOrEqual(redemptionAmount);
+    expect(BitcoinLock.calculateRedemptionAmountFromSatoshis(index, satoshis - 1n)).toBeLessThan(
+      redemptionAmount,
+    );
+  });
+
+  it('reverses the redemption multiplier when argon is below target', () => {
+    const index = priceIndex({
+      btcUsdPrice: 1,
+      argonUsdPrice: 0.8,
+      argonUsdTargetPrice: 1,
+    });
+
+    const redemptionAmount = 1_054_800n;
+    const satoshis = BitcoinLock.satoshisRequiredForRedemptionAmount(index, redemptionAmount);
+
+    expect(satoshis).toStrictEqual(100_000_000n);
+    expect(
+      BitcoinLock.calculateRedemptionAmountFromSatoshis(index, satoshis),
+    ).toBeGreaterThanOrEqual(redemptionAmount);
+    expect(BitcoinLock.calculateRedemptionAmountFromSatoshis(index, satoshis - 1n)).toBeLessThan(
+      redemptionAmount,
+    );
+  });
+});
+
 describe('BitcoinLock.createInitializeTx', () => {
   function priceIndex(): PriceIndex {
     const index = new PriceIndex();
