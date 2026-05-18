@@ -27,7 +27,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	event BurnForTransfer(
 		address indexed from,
 		address indexed token,
-		uint256 amountBaseUnits,
+		uint64 amount,
 		bytes32 argonDestination,
 		uint64 accountNonce
 	);
@@ -35,7 +35,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	event AdminMintBatch(
 		address indexed token,
 		uint256 recipientCount,
-		uint256 totalAmountBaseUnits
+		uint64 totalAmount
 	);
 	event GuardianUpdated(address indexed previousGuardian, address indexed newGuardian);
 
@@ -57,42 +57,48 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 	function burnForTransfer(
 		address token,
-		uint256 amountBaseUnits,
-		bytes32 argonDestination
+		uint64 amount,
+		bytes32 argonDestination,
+		uint256 deadline,
+		uint8 v,
+		bytes32 r,
+		bytes32 s
 	) external whenNotPaused {
 		_requireCanonicalToken(token);
-		if (amountBaseUnits == 0) revert ZeroAmount();
+		if (amount == 0) revert ZeroAmount();
 
-		ICanonicalToken(token).burnFrom(msg.sender, toTokenAmount(amountBaseUnits));
+		uint256 tokenAmount = toTokenAmount(amount);
+		ICanonicalToken(token).permit(msg.sender, address(this), tokenAmount, deadline, v, r, s);
+		ICanonicalToken(token).burnFrom(msg.sender, tokenAmount);
 
 		uint64 accountNonce = accountNonces[msg.sender] + 1;
 		accountNonces[msg.sender] = accountNonce;
 
-		emit BurnForTransfer(msg.sender, token, amountBaseUnits, argonDestination, accountNonce);
+		emit BurnForTransfer(msg.sender, token, amount, argonDestination, accountNonce);
 	}
 
 	function adminMintBatch(
 		address token,
 		address[] calldata recipients,
-		uint256[] calldata amountsBaseUnits
+		uint64[] calldata amounts
 	) external onlyOwner whenNotPaused {
 		_requireCanonicalToken(token);
-		if (recipients.length != amountsBaseUnits.length) revert ArrayLengthMismatch();
+		if (recipients.length != amounts.length) revert ArrayLengthMismatch();
 
-		uint256 totalAmountBaseUnits = 0;
+		uint64 totalAmount = 0;
 
 		for (uint256 index = 0; index < recipients.length; index += 1) {
 			address recipient = recipients[index];
-			uint256 amountBaseUnits = amountsBaseUnits[index];
+			uint64 amount = amounts[index];
 
 			if (recipient == address(0)) revert ZeroRecipient(index);
-			if (amountBaseUnits == 0) revert ZeroAmount();
+			if (amount == 0) revert ZeroAmount();
 
-			ICanonicalToken(token).mint(recipient, toTokenAmount(amountBaseUnits));
-			totalAmountBaseUnits += amountBaseUnits;
+			ICanonicalToken(token).mint(recipient, toTokenAmount(amount));
+			totalAmount += amount;
 		}
 
-		emit AdminMintBatch(token, recipients.length, totalAmountBaseUnits);
+		emit AdminMintBatch(token, recipients.length, totalAmount);
 	}
 
 	function pause() external {
@@ -112,8 +118,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		emit GuardianUpdated(previousGuardian, guardianAddress);
 	}
 
-	function toTokenAmount(uint256 amountBaseUnits) public pure returns (uint256) {
-		return amountBaseUnits * RUNTIME_TO_ERC20_SCALE;
+	function toTokenAmount(uint64 amount) public pure returns (uint256) {
+		return uint256(amount) * RUNTIME_TO_ERC20_SCALE;
 	}
 
 	function unpause() external onlyOwner {

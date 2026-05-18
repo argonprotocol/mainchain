@@ -95,40 +95,104 @@ describe('MintingGateway', () => {
     return stack;
   }
 
+  async function signPermit(
+    signer: any,
+    token: any,
+    owner: string,
+    spender: string,
+    value: bigint,
+    deadline: bigint,
+    name: string,
+  ) {
+    const { chainId } = await ethers.provider.getNetwork();
+    const nonce = await token.getFunction('nonces')(owner);
+    const signature = await signer.signTypedData(
+      {
+        name,
+        version: '1',
+        chainId,
+        verifyingContract: await token.getAddress(),
+      },
+      {
+        Permit: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      {
+        owner,
+        spender,
+        value,
+        nonce,
+        deadline,
+      },
+    );
+
+    return ethers.Signature.from(signature);
+  }
+
   it('burns canonical tokens and increments one nonce stream per account', async () => {
     const { argon, argonot, gateway, holder } = await deployFixture();
     const destination = ethers.encodeBytes32String('argon-destination');
-
-    await expectCustomError(
-      gateway.connect(holder).burnForTransfer(await argon.getAddress(), 250n, destination),
+    const gatewayAddress = await gateway.getAddress();
+    const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
+    const argonPermit = await signPermit(
+      holder,
       argon,
-      'ERC20InsufficientAllowance',
-      [await gateway.getAddress(), 0n, 250n * SCALE],
+      holder.address,
+      gatewayAddress,
+      250n * SCALE,
+      deadline,
+      'Argon',
     );
 
-    await argon.connect(holder).approve(await gateway.getAddress(), 250n * SCALE);
-
     await expectEvent(
-      gateway.connect(holder).burnForTransfer(await argon.getAddress(), 250n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await argon.getAddress(),
+        250n,
+        destination,
+        deadline,
+        argonPermit.v,
+        argonPermit.r,
+        argonPermit.s,
+      ),
       gateway,
       'BurnForTransfer',
       [holder.address, await argon.getAddress(), 250n, destination, 1n],
     );
 
     expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
-    expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
+    expect(await argon.allowance(holder.address, gatewayAddress)).to.equal(0n);
     expect(await gateway.accountNonces(holder.address)).to.equal(1n);
-
-    await argonot.connect(holder).approve(await gateway.getAddress(), 10n * SCALE);
+    const argonotPermit = await signPermit(
+      holder,
+      argonot,
+      holder.address,
+      gatewayAddress,
+      10n * SCALE,
+      deadline,
+      'Argonot',
+    );
 
     await expectEvent(
-      gateway.connect(holder).burnForTransfer(await argonot.getAddress(), 10n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await argonot.getAddress(),
+        10n,
+        destination,
+        deadline,
+        argonotPermit.v,
+        argonotPermit.r,
+        argonotPermit.s,
+      ),
       gateway,
       'BurnForTransfer',
       [holder.address, await argonot.getAddress(), 10n, destination, 2n],
     );
 
-    expect(await argonot.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
+    expect(await argonot.allowance(holder.address, gatewayAddress)).to.equal(0n);
     expect(await gateway.accountNonces(holder.address)).to.equal(2n);
   });
 
@@ -141,14 +205,30 @@ describe('MintingGateway', () => {
     await extraToken.waitForDeployment();
 
     await expectCustomError(
-      gateway.connect(holder).burnForTransfer(await extraToken.getAddress(), 1n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await extraToken.getAddress(),
+        1n,
+        destination,
+        0n,
+        27,
+        ethers.ZeroHash,
+        ethers.ZeroHash,
+      ),
       gateway,
       'UnsupportedToken',
       [await extraToken.getAddress()],
     );
 
     await expectCustomError(
-      gateway.connect(holder).burnForTransfer(await extraToken.getAddress(), 0n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await extraToken.getAddress(),
+        0n,
+        destination,
+        0n,
+        27,
+        ethers.ZeroHash,
+        ethers.ZeroHash,
+      ),
       gateway,
       'UnsupportedToken',
       [await extraToken.getAddress()],
@@ -204,7 +284,15 @@ describe('MintingGateway', () => {
     const destination = ethers.encodeBytes32String('argon-destination');
 
     await expectCustomError(
-      gateway.connect(holder).burnForTransfer(await argon.getAddress(), 0n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await argon.getAddress(),
+        0n,
+        destination,
+        0n,
+        27,
+        ethers.ZeroHash,
+        ethers.ZeroHash,
+      ),
       gateway,
       'ZeroAmount',
     );
@@ -252,10 +340,16 @@ describe('MintingGateway', () => {
 
     await gateway.connect(guardian).pause();
 
-    await argon.connect(holder).approve(await gateway.getAddress(), 10n * SCALE);
-
     await expectCustomError(
-      gateway.connect(holder).burnForTransfer(await argon.getAddress(), 10n, destination),
+      gateway.connect(holder).burnForTransfer(
+        await argon.getAddress(),
+        10n,
+        destination,
+        0n,
+        27,
+        ethers.ZeroHash,
+        ethers.ZeroHash,
+      ),
       gateway,
       'EnforcedPause',
     );

@@ -8,8 +8,7 @@ At a high level, the shape is:
 - the tokens trust one gateway address forever
 - that gateway address is a proxy, so the gateway logic can change without changing the address the
   tokens trust
-- the gateway handles the protocol behavior: burns for transfer and the current admin batch mint
-  path
+- the gateway handles the protocol behavior: burns for transfer, first-council initialization, and the one-time migration path
 - a guardian can pause immediately
 - the admin Safe owns gateway actions and upgrades today
 
@@ -18,7 +17,7 @@ At a high level, the shape is:
 ```text
 Users ----------------------> MintingGateway proxy ----------------------> ArgonToken / ArgonotToken
 Guardian Safe -------------> pause()
-Admin Safe ---------------> proxy upgrade / adminMintBatch / unpause
+Admin Safe ---------------> proxy upgrade / migrate / unpause
 Admin Safe ---------------> ProxyAdmin --------> upgrade gateway implementation
 
 The tokens only trust the proxy address.
@@ -37,7 +36,7 @@ At the basic level, that is the whole shape:
 
 - `ArgonToken.sol`
 - `ArgonotToken.sol`
-- `MintingGateway.sol`
+- `MintingGatewayV2.sol`
 
 The two token contracts are intentionally boring. They expose `mint(...)` and `burnFrom(...)`, but
 only the gateway can call them. They do not have their own role system, and they do not expose a
@@ -45,13 +44,20 @@ public self-burn path.
 
 The gateway is where the actual protocol behavior lives:
 
-- every gateway amount is expressed in 6-decimal Argon runtime base units
-- `burnForTransfer(...)` is the primary user path: the user first grants an exact ERC-20 allowance
-  to the gateway after the app scales the selected 6-decimal amount into 18-decimal ERC-20 units,
-  then signs the gateway transaction that burns that approved balance and emits the event Argon
-  needs for the outbound proof flow
-- `adminMintBatch(...)` is the current admin-only mint path for restoration work, and it accepts the
-  same 6-decimal runtime amounts as the burn path
+- steady-state transfer amounts are expressed in 6-decimal Argon runtime base units
+- runtime-unit amounts on the gateway surface are capped to `uint64`
+- `startTransferToArgon(...)` is the primary user path: the caller supplies the runtime-unit amount
+  Argon should credit plus an ERC-2612 permit signature, and the gateway scales that amount into
+  exact token base units before it permits, burns, and emits the outbound proof event
+- `initialize(...)` sets the owner, guardian, and first council summary when the proxy is created
+- `migrate(...)` is the one-time owner migration path: it loads the exact Argon and Argonot
+  migration balances from the prior contracts using base-unit calldata
+- `forceUpdateActiveCouncil(...)` is the owner recovery seam: it replaces the stored active
+  council summary without resetting `argonApprovalsNonce` or `argonApprovalsHash`, so later queue
+  items can keep chaining from the same last applied update under the replacement council
+- queued council-approved updates chain each signed item to the previous queue item's signed hash,
+  so Ethereum only needs to verify council signatures on council-segment tips:
+  each council rotation item and the last council-approved item in the submitted batch
 - `pause()` can be called by the guardian
 - `unpause()` stays on the admin Safe owner path
 
@@ -75,7 +81,7 @@ There are only three things to keep in your head:
 Today the split is:
 
 - guardian Safe: `pause()`
-- admin Safe: `adminMintBatch(...)`, `unpause()`, and the one-time bootstrap upgrade into the final
+- admin Safe: `migrate(...)`, `unpause()`, and the one-time bootstrap upgrade into the final
   implementation
 - admin Safe-owned `ProxyAdmin`: gateway upgrades
 
@@ -105,9 +111,10 @@ That split is the point of this package:
 - gateway owns the moving parts
 - upgrades happen behind the gateway address, not by teaching the token to trust someone new
 
-Admin minting also goes through the gateway for the same reason. It is a temporary capability, but
-it is still part of the same authority boundary. That keeps the token surface smaller and keeps the
-current mint path in the same place as the long-term burn behavior.
+Migration also goes through the gateway for the same reason. It is a one-time setup
+capability, but it is still part of the same authority boundary. That keeps the token surface
+smaller and keeps the initial migration distribution in the same place as the long-term burn
+behavior.
 
 ## Deployment Shape
 
@@ -120,6 +127,10 @@ The deployment order still matters:
    in as immutables.
 5. Have the admin Safe call `ProxyAdmin.upgradeAndCall(...)` once to move the proxy onto that final
    implementation.
+6. Have the proxy `initialize(...)` call set the owner, guardian, and first council summary
+   (`councilHash`, `councilMemberCount`, `councilTotalWeight`).
+7. Have the admin Safe call `migrate(...)` once with the migrated Argon balances and migrated
+   Argonot balances.
 
 The reverse direction does not exist: the token contracts do not have a mutable `setGateway(...)`
 path.
@@ -147,6 +158,7 @@ Contract commands stay here:
 ```sh
 yarn workspace @argonprotocol/ethereum-contracts test
 yarn workspace @argonprotocol/ethereum-contracts typecheck
+yarn workspace @argonprotocol/ethereum-contracts gas:measure
 yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --admin-safe 0x... --guardian-safe 0x...
 ```
 
@@ -158,6 +170,46 @@ ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
 yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --network mainnet --admin-safe 0x... --guardian-safe 0x...
 ```
 
+## Current Costs
+
+Refresh these sample costs with:
+
+```sh
+yarn workspace @argonprotocol/ethereum-contracts gas:measure
+```
+
+The numbers below are the current local measurements from `script/gas/measure.ts`. The wei and
+ETH columns are sample gas-price math only at `10 gwei` and `20 gwei`.
+
+### User Actions
+
+| Action | Gas | Wei @ 10 gwei | ETH @ 10 gwei | Wei @ 20 gwei | ETH @ 20 gwei |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `startTransferToArgon` | 125,992 | 1,259,920,000,000,000 | 0.001259 ETH | 2,519,840,000,000,000 | 0.002519 ETH |
+| `finalizeTransferOutOfArgon` (1 authorization) | 157,320 | 1,573,200,000,000,000 | 0.001573 ETH | 3,146,400,000,000,000 | 0.003146 ETH |
+| `finalizeTransferOutOfArgon` (3 authorizations) | 194,497 | 1,944,970,000,000,000 | 0.001944 ETH | 3,889,940,000,000,000 | 0.003889 ETH |
+| `cancelTransferOutOfArgon` | 104,894 | 1,048,940,000,000,000 | 0.001048 ETH | 2,097,880,000,000,000 | 0.002097 ETH |
+
+### Admin And Council Actions
+
+| Action | Gas | Wei @ 10 gwei | ETH @ 10 gwei | Wei @ 20 gwei | ETH @ 20 gwei |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Proxy deploy + `initialize` | 774,526 | 7,745,260,000,000,000 | 0.007745 ETH | 15,490,520,000,000,000 | 0.015490 ETH |
+| Upgrade to final implementation | 37,834 | 378,340,000,000,000 | 0.000378 ETH | 756,680,000,000,000 | 0.000756 ETH |
+| Minting authority activation (4 members, 3 signatures) | 185,832 | 1,858,320,000,000,000 | 0.001858 ETH | 3,716,640,000,000,000 | 0.003716 ETH |
+| Minting authority activation (100 members, 90 signatures) | 858,913 | 8,589,130,000,000,000 | 0.008589 ETH | 17,178,260,000,000,000 | 0.017178 ETH |
+| Minting authority activation batch (100 members, 3 activations, 90 signatures once) | 933,256 | 9,332,560,000,000,000 | 0.009332 ETH | 18,665,120,000,000,000 | 0.018665 ETH |
+| Council rotation (4 -> 4 members, 3 signatures) | 141,940 | 1,419,400,000,000,000 | 0.001419 ETH | 2,838,800,000,000,000 | 0.002838 ETH |
+| Council rotation (100 -> 100 members, 90 signatures) | 986,737 | 9,867,370,000,000,000 | 0.009867 ETH | 19,734,740,000,000,000 | 0.019734 ETH |
+
+The batched `100`-member activation row is where the chained queue hash pays off: three activations
+land for about `933,256` gas total, or about `311,085` gas per activation, because the council
+quorum is only verified once at the segment tip.
+
+`startTransferToArgon(...)` now includes the ERC-2612 permit directly. The caller signs for the
+runtime-unit amount they want Argon to credit, and the gateway scales that amount into exact token
+base units before it permits and burns in one transaction.
+
 ## Current Scope
 
 This is still the bootstrap slice, not the full long-term mint-authority system.
@@ -167,8 +219,20 @@ Today that means:
 - the gateway contract shape is in place
 - the stable proxy address is in place
 - the guardian pause path is in place
+- the owner recovery seam for the active council summary is in place
 - the current Safe-owned admin / upgrade path is in place
-- the admin batch mint path is in place
+- the one-time migration path is in place
+
+## Deferred Controls
+
+This package still does not include the follow-on control layer.
+
+Not included yet:
+
+- per-authority, per-chain, per-epoch, or rolling daily issuance caps
+- delayed Ethereum-side activation for large mint paths that should allow emergency review
+- automatic pause triggers on abnormal circulation growth, authority loss, or state drift
+- fast authority disable / suspend and replacement-authorization handling for suspicious operators
 - the restoration batch generator now lives in the standalone recovery repo
-- the admin mint path is still temporary
+- the migration path is still temporary
 - the restoration forensics work is still the real blocker before a mainnet mint run

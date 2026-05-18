@@ -19,7 +19,8 @@ The current bootstrap slice is intentionally narrow:
 
 - `ArgonToken`
 - `ArgonotToken`
-- `MintingGateway` with `burnForTransfer(...)` and `adminMintBatch(...)`
+- `MintingGateway` with the user transfer-start path, first-council initialization, and one-time
+  `migrate(...)`
 
 This branch does not yet include the runtime-side `pallet_crosschain_transfer` migration, so the
 bootstrap manifest here is the handoff artifact for that later step.

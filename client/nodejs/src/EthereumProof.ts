@@ -2,7 +2,7 @@ import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMerkleProof, createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
 import {
   MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
-  mintingGatewayArtifact,
+  mintingGatewayAbi,
 } from '@argonprotocol/ethereum-contracts';
 import type { IArgonQueryable } from './index';
 import {
@@ -76,7 +76,7 @@ export type EthereumEventProof = {
 };
 
 const ethereumBurnForTransferTopic = encodeEventTopics({
-  abi: mintingGatewayArtifact.abi,
+  abi: mintingGatewayAbi,
   eventName: MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
 })[0]?.toLowerCase();
 

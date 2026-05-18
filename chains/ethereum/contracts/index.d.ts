@@ -1,10 +1,15 @@
-export declare const MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME: 'BurnForTransfer';
-export declare const MINTING_GATEWAY_RUNTIME_DECIMALS: 6;
-export declare const MINTING_GATEWAY_TOKEN_DECIMALS: 18;
-export declare const MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE: bigint;
+export const MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME: 'BurnForTransfer';
+export const MINTING_GATEWAY_V2_TRANSFER_TO_ARGON_STARTED_EVENT_NAME: 'TransferToArgonStarted';
+export const MINTING_GATEWAY_RUNTIME_DECIMALS: 6;
+export const MINTING_GATEWAY_TOKEN_DECIMALS: 18;
+export const MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE: bigint;
 
-export declare const argonTokenArtifact: import('./artifacts/contracts/ArgonToken.sol/artifacts.js').ArgonToken$Type;
-export declare const argonotTokenArtifact: import('./artifacts/contracts/ArgonotToken.sol/artifacts.js').ArgonotToken$Type;
-export declare const mintingGatewayArtifact: import('./artifacts/contracts/MintingGateway.sol/artifacts.js').MintingGateway$Type;
-export declare const proxyAdminArtifact: import('./artifacts/contracts/ProxyArtifacts.sol/artifacts.js').ProxyAdmin$Type;
-export declare const transparentUpgradeableProxyArtifact: import('./artifacts/contracts/ProxyArtifacts.sol/artifacts.js').TransparentUpgradeableProxy$Type;
+export * from './generated.js';
+export * from './hashing.js';
+
+export { default as argonTokenArtifact } from './artifacts/contracts/ArgonToken.sol/ArgonToken.json';
+export { default as argonotTokenArtifact } from './artifacts/contracts/ArgonotToken.sol/ArgonotToken.json';
+export { default as mintingGatewayArtifact } from './artifacts/contracts/MintingGateway.sol/MintingGateway.json';
+export { default as mintingGatewayV2Artifact } from './artifacts/contracts/MintingGatewayV2.sol/MintingGatewayV2.json';
+export { default as proxyAdminArtifact } from './artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json';
+export { default as transparentUpgradeableProxyArtifact } from './artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json';

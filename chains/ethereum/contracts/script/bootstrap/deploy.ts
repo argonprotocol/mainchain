@@ -12,6 +12,8 @@ const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6
 const args = parseArgs(process.argv.slice(2));
 const adminSafe = getRequiredAddress('admin-safe', 'ADMIN_SAFE_ADDRESS');
 const guardianSafe = getRequiredAddress('guardian-safe', 'GUARDIAN_SAFE_ADDRESS');
+const councilSigners = getRequiredAddressList('council-signers', 'COUNCIL_SIGNERS');
+const councilWeights = getRequiredBigIntList('council-weights', 'COUNCIL_WEIGHTS');
 
 async function main() {
   const connection = await network.create(args.network);
@@ -26,7 +28,19 @@ async function main() {
     const [deployer] = await ethers.getSigners();
     const connectedNetwork = await ethers.provider.getNetwork();
 
-    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGateway');
+    if (councilSigners.length !== councilWeights.length || councilSigners.length === 0) {
+      throw new Error('COUNCIL_SIGNERS and COUNCIL_WEIGHTS must be non-empty and have the same length');
+    }
+    const councilMemberCount = BigInt(councilSigners.length);
+    const councilTotalWeight = councilWeights.reduce((sum, weight) => sum + weight, 0n);
+    const councilHash = ethers.keccak256(
+      ethers.AbiCoder.defaultAbiCoder().encode(
+        ['address[]', 'uint256[]'],
+        [councilSigners, councilWeights],
+      ),
+    );
+
+    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGatewayV2');
     const gatewayBootstrapImplementation = await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
@@ -36,6 +50,9 @@ async function main() {
     const initializeData = gatewayImplementationFactory.interface.encodeFunctionData('initialize', [
       adminSafe,
       guardianSafe,
+      councilHash,
+      councilMemberCount,
+      councilTotalWeight,
     ]);
 
     const gatewayProxyFactory = await ethers.getContractFactory('TransparentUpgradeableProxy');
@@ -109,6 +126,13 @@ async function main() {
           initializeData,
         ]),
       },
+      initialCouncil: {
+        councilHash,
+        memberCount: councilMemberCount.toString(),
+        totalWeight: councilTotalWeight.toString(),
+        signers: councilSigners,
+        weights: councilWeights.map((a) => a.toString()),
+      },
       runtimeBootstrap: {
         externalChain: {
           chainId: connectedNetwork.chainId.toString(),
@@ -126,7 +150,7 @@ async function main() {
       safeTransactions: [
         {
           description:
-            'Upgrade MintingGateway proxy to final implementation with fixed canonical tokens',
+          'Upgrade MintingGatewayV2 proxy to final implementation with fixed canonical tokens',
           target: proxyAdminAddress,
           value: '0',
           data: proxyAdminInterface.encodeFunctionData('upgradeAndCall', [
@@ -138,12 +162,14 @@ async function main() {
       ],
       notes: [
         'Canonical tokens are deployed with the MintingGateway proxy address fixed in their constructors.',
-        'The proxy is first deployed against a bootstrap MintingGateway implementation with zero canonical token immutables.',
-        'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGateway implementation that has the Argon and Argonot token addresses baked in as immutables.',
+        'The proxy is first deployed against a bootstrap MintingGatewayV2 implementation with zero canonical token immutables.',
+        'That proxy initialization stores the first council summary.',
+        'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGatewayV2 implementation that has the Argon and Argonot token addresses baked in as immutables.',
         'MintingGateway business ownership starts under the admin Safe.',
         'The guardian Safe can pause immediately, while unpause remains on the admin Safe owner path.',
         'The proxy admin is initially owned by the admin Safe.',
         'A later hardening step can transfer ProxyAdmin ownership to a TimelockController once the governance flow is ready.',
+        'The migration balances still need a later admin Safe migrate(...) call on the final implementation.',
         'Long-term upgrades should happen through the stable gateway proxy address, not by rotating token trust.',
       ],
     };
@@ -196,6 +222,32 @@ function getRequiredAddress(argKey: string, envKey: string) {
   }
 
   return getAddress(raw);
+}
+
+function getRequiredAddressList(argKey: string, envKey: string) {
+  const raw = args[argKey] ?? process.env[envKey];
+  if (!raw) {
+    throw new Error(`Missing required ${argKey} argument or ${envKey} environment variable`);
+  }
+
+  return raw
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .map((a) => getAddress(a));
+}
+
+function getRequiredBigIntList(argKey: string, envKey: string) {
+  const raw = args[argKey] ?? process.env[envKey];
+  if (!raw) {
+    throw new Error(`Missing required ${argKey} argument or ${envKey} environment variable`);
+  }
+
+  return raw
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .map((a) => BigInt(a));
 }
 
 function parseArgs(argv: string[]) {

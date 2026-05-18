@@ -32,13 +32,7 @@ export * from './Vault';
 export * from './convert';
 export * from './BitcoinLock';
 export * from './PriceIndex';
-export {
-  MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
-  MINTING_GATEWAY_RUNTIME_DECIMALS,
-  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-  MINTING_GATEWAY_TOKEN_DECIMALS,
-  mintingGatewayArtifact,
-} from '@argonprotocol/ethereum-contracts';
+export * from '@argonprotocol/ethereum-contracts';
 export {
   buildEthereumEventProof,
   findEthereumBurnForTransferLogIndex,
