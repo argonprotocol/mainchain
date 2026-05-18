@@ -1,6 +1,11 @@
 import { Keyring } from '@polkadot/keyring';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  argonTokenAbi,
+  findEthereumBurnForTransferLogIndex,
+  MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
+  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+  mintingGatewayAbi,
   TxSubmitter,
   buildEthereumEventProof,
   dispatchErrorToString,
@@ -17,15 +22,13 @@ import {
   createPublicClient,
   createWalletClient,
   defineChain,
-  encodeEventTopics,
   encodeFunctionData,
   http,
+  parseSignature,
   toHex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
-  argonTokenArtifact,
-  mintingGatewayArtifact,
   SKIP_E2E,
   sudo,
   teardown,
@@ -39,12 +42,50 @@ const TEST_ACCOUNT = {
   privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
 } as const;
 
-const RUNTIME_TO_ERC20_SCALE = 1_000_000_000_000n;
-const TRANSFER_AMOUNT_BASE_UNITS = 10_000n;
+const TRANSFER_AMOUNT_RUNTIME_UNITS = 10_000n;
 
 afterEach(async () => {
   await teardown();
 });
+
+async function signGatewayPermit(args: {
+  account: ReturnType<typeof privateKeyToAccount>;
+  chainId: number;
+  tokenAddress: Hex;
+  gatewayAddress: Hex;
+  owner: Hex;
+  value: bigint;
+  nonce: bigint;
+  deadline: bigint;
+}) {
+  return parseSignature(
+    await args.account.signTypedData({
+      domain: {
+        name: 'Argon',
+        version: '1',
+        chainId: args.chainId,
+        verifyingContract: args.tokenAddress,
+      },
+      types: {
+        Permit: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      primaryType: 'Permit',
+      message: {
+        owner: args.owner,
+        spender: args.gatewayAddress,
+        value: args.value,
+        nonce: args.nonce,
+        deadline: args.deadline,
+      },
+    }),
+  );
+}
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
   it('boots a real ethereum devnet and proves a MintingGateway burn into CrosschainTransfer', async () => {
@@ -92,46 +133,51 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
       deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
+      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_RUNTIME_UNITS,
       seedArgonRecipient: account.address,
     });
     const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
     const argonDestination = toHex(bob.publicKey, { size: 32 });
-    const burnForTransferTopic = encodeEventTopics({
-      abi: mintingGatewayArtifact.abi,
-      eventName: 'BurnForTransfer',
-    })[0];
-    if (!burnForTransferTopic) {
-      throw new Error('Missing BurnForTransfer topic');
-    }
 
-    const approveHash = await walletClient.sendTransaction({
-      to: gatewayDeployment.argonTokenAddress,
-      data: encodeFunctionData({
-        abi: argonTokenArtifact.abi,
-        functionName: 'approve',
-        args: [
-          gatewayDeployment.gatewayAddress,
-          TRANSFER_AMOUNT_BASE_UNITS * RUNTIME_TO_ERC20_SCALE,
-        ],
-      }),
+    const permitDeadline = (await publicClient.getBlock()).timestamp + 3600n;
+    const permitNonce = await publicClient.readContract({
+      address: gatewayDeployment.argonTokenAddress,
+      abi: argonTokenAbi,
+      functionName: 'nonces',
+      args: [account.address],
     });
-    await waitForExecutionReceipt(ethereum, approveHash);
+    const permitSignature = await signGatewayPermit({
+      account,
+      chainId: chain.id,
+      tokenAddress: gatewayDeployment.argonTokenAddress,
+      gatewayAddress: gatewayDeployment.gatewayAddress,
+      owner: account.address,
+      value: TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+      nonce: permitNonce,
+      deadline: permitDeadline,
+    });
 
     const burnHash = await walletClient.sendTransaction({
       to: gatewayDeployment.gatewayAddress,
       data: encodeFunctionData({
-        abi: mintingGatewayArtifact.abi,
+        abi: mintingGatewayAbi,
         functionName: 'burnForTransfer',
-        args: [gatewayDeployment.argonTokenAddress, TRANSFER_AMOUNT_BASE_UNITS, argonDestination],
+        args: [
+          gatewayDeployment.argonTokenAddress,
+          TRANSFER_AMOUNT_RUNTIME_UNITS,
+          argonDestination,
+          permitDeadline,
+          permitSignature.v,
+          permitSignature.r,
+          permitSignature.s,
+        ],
       }),
     });
     const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
     const burnBlockNumber = BigInt(burnReceipt.blockNumber);
-    const burnLogIndex = burnReceipt.logs.findIndex(
-      log =>
-        log.address.toLowerCase() === gatewayDeployment.gatewayAddress.toLowerCase() &&
-        log.topics[0]?.toLowerCase() === burnForTransferTopic.toLowerCase(),
+    const burnLogIndex = findEthereumBurnForTransferLogIndex(
+      burnReceipt,
+      gatewayDeployment.gatewayAddress,
     );
 
     expect(burnReceipt.status).toBe('0x1');
@@ -223,7 +269,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
     const burnAccountFunding =
-      TRANSFER_AMOUNT_BASE_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
+      TRANSFER_AMOUNT_RUNTIME_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
 
     const fundBurnAccountResult = await new TxSubmitter(
       mainchainClient,
@@ -271,7 +317,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const recipientAfter = await mainchainClient.query.system.account(bob.address);
     expect(recipientAfter.data.free.toBigInt() - recipientBefore.data.free.toBigInt()).toBe(
-      TRANSFER_AMOUNT_BASE_UNITS - (proveTransferResult.finalFee ?? 0n),
+      TRANSFER_AMOUNT_RUNTIME_UNITS - (proveTransferResult.finalFee ?? 0n),
     );
   }, 420_000);
 
@@ -318,47 +364,51 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
       deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
+      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_RUNTIME_UNITS,
       seedArgonRecipient: account.address,
     });
     const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
     const argonDestination = toHex(bob.publicKey, { size: 32 });
-    const burnForTransferTopic = encodeEventTopics({
-      abi: mintingGatewayArtifact.abi,
-      eventName: 'BurnForTransfer',
-    })[0];
-    if (!burnForTransferTopic) {
-      throw new Error('Missing BurnForTransfer topic');
-    }
-
-    const approveHash = await walletClient.sendTransaction({
-      to: gatewayDeployment.argonTokenAddress,
-      data: encodeFunctionData({
-        abi: argonTokenArtifact.abi,
-        functionName: 'approve',
-        args: [
-          gatewayDeployment.gatewayAddress,
-          TRANSFER_AMOUNT_BASE_UNITS * RUNTIME_TO_ERC20_SCALE,
-        ],
-      }),
+    const permitDeadline = (await publicClient.getBlock()).timestamp + 3600n;
+    const permitNonce = await publicClient.readContract({
+      address: gatewayDeployment.argonTokenAddress,
+      abi: argonTokenAbi,
+      functionName: 'nonces',
+      args: [account.address],
     });
-    await waitForExecutionReceipt(ethereum, approveHash);
+    const permitSignature = await signGatewayPermit({
+      account,
+      chainId: chain.id,
+      tokenAddress: gatewayDeployment.argonTokenAddress,
+      gatewayAddress: gatewayDeployment.gatewayAddress,
+      owner: account.address,
+      value: TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+      nonce: permitNonce,
+      deadline: permitDeadline,
+    });
     await waitForExecutionBlockAtOrAbove(publicClient, 73n);
 
     const burnHash = await walletClient.sendTransaction({
       to: gatewayDeployment.gatewayAddress,
       data: encodeFunctionData({
-        abi: mintingGatewayArtifact.abi,
+        abi: mintingGatewayAbi,
         functionName: 'burnForTransfer',
-        args: [gatewayDeployment.argonTokenAddress, TRANSFER_AMOUNT_BASE_UNITS, argonDestination],
+        args: [
+          gatewayDeployment.argonTokenAddress,
+          TRANSFER_AMOUNT_RUNTIME_UNITS,
+          argonDestination,
+          permitDeadline,
+          permitSignature.v,
+          permitSignature.r,
+          permitSignature.s,
+        ],
       }),
     });
     const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
     const burnBlockNumber = BigInt(burnReceipt.blockNumber);
-    const burnLogIndex = burnReceipt.logs.findIndex(
-      log =>
-        log.address.toLowerCase() === gatewayDeployment.gatewayAddress.toLowerCase() &&
-        log.topics[0]?.toLowerCase() === burnForTransferTopic.toLowerCase(),
+    const burnLogIndex = findEthereumBurnForTransferLogIndex(
+      burnReceipt,
+      gatewayDeployment.gatewayAddress,
     );
 
     const laterReceipt = await mineLaterExecutionAnchorReceipt(
@@ -435,7 +485,8 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
     const burnAccountFunding =
-      TRANSFER_AMOUNT_BASE_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
+      TRANSFER_AMOUNT_RUNTIME_UNITS +
+      mainchainClient.consts.balances.existentialDeposit.toBigInt();
 
     const fundBurnAccountResult = await new TxSubmitter(
       mainchainClient,
@@ -563,10 +614,10 @@ async function waitForExecutionReceipt(
 
   while (Date.now() - startedAt < 120_000) {
     try {
-      const receipt = await ethereum.callExecution<RpcTransactionReceipt | null>(
+      const receipt = (await ethereum.callExecution<RpcTransactionReceipt | null>(
         'eth_getTransactionReceipt',
         [transactionHash],
-      );
+      )) as RpcTransactionReceipt | null;
 
       if (receipt) {
         return receipt;
