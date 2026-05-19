@@ -40,10 +40,15 @@
     "vite-plugin-wasm": "^3.5.0",
     "vitest": "^4.0.5"
   },
+  "dependenciesMeta": {
+    "esbuild": {
+      "built": true
+    }
+  },
   "resolutions": {
     "axios@npm:^0.26.1": "1.15.2",
     "minimatch@npm:9.0.3": "9.0.9",
     "yaml@npm:2.7.0": "2.8.3"
   },
-  "packageManager": "yarn@4.1.1"
+  "packageManager": "yarn@4.10.3"
 }
