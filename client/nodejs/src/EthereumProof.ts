@@ -1,24 +1,20 @@
-import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
+import { BlockHeader, createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMerkleProof, createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
-import {
-  MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
-  mintingGatewayAbi,
-} from '@argonprotocol/ethereum-contracts';
 import type { IArgonQueryable } from './index';
+import { bytesToHex, type Hex, hexToBytes, toHex, toRlp } from 'viem';
 import {
-  bytesToHex,
-  createPublicClient,
-  encodeEventTopics,
-  getAddress,
-  type Hex,
-  hexToBytes,
-  http,
-  toHex,
-  toRlp,
-} from 'viem';
+  type EthereumExecutionClient,
+  type EthereumExecutionSource,
+  type EthereumReceipt,
+  getExecutionClient,
+  retryWhileExecutionRpcIndexing,
+} from './EthereumExecution';
 
-type VerifyEventLog = IArgonQueryable['call']['ethereumApis']['verifyEventLog'];
-export type EthereumVerifyEventLogResult = Awaited<ReturnType<VerifyEventLog>>;
+// Keep in sync with primitives/src/ethereum.rs proof decode bounds.
+export const MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES = 128;
+export const MAX_ETHEREUM_RECEIPTS_PER_PROOF = 32;
+export const MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS = 32;
+
 type EthGetBlockByHashRpc = {
   Method: 'eth_getBlockByHash';
   Parameters: [Hex, true];
@@ -30,55 +26,64 @@ type EthGetBlockByNumberRpc = {
   ReturnType: JSONRPCBlock;
 };
 
-export type EthereumReceipt = Awaited<
-  ReturnType<ReturnType<typeof createPublicClient>['getTransactionReceipt']>
->;
-export type EthereumExecutionClient = ReturnType<typeof createPublicClient>;
-export type RetainedExecutionAnchor = {
+export type ArgonFinalizedExecutionHeader = {
   blockHash: Hex;
   blockNumber: bigint;
 };
 
+export class ArgonFinalizedExecutionHeaderPathError extends Error {}
+
+export class EthereumCombinedReceiptProofBoundsError extends Error {
+  constructor(
+    readonly kind: 'receipt-count' | 'shared-nodes' | 'receipt-node-refs',
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export type EthereumEventLocator = {
   txHash: Hex;
-  logIndex?: number;
-  executionRpcUrl?: string;
-  executionClient?: EthereumExecutionClient;
+  logIndexes?: number[];
   receipt?: EthereumReceipt;
 };
 
-export type EthereumEventLog = {
-  address: Hex;
+export type EthereumEventLocatorBlock = EthereumEventLocator[];
+
+export type EthereumEventLog = Pick<EthereumReceipt['logs'][number], 'address' | 'data'> & {
   topics: Hex[];
-  data: Hex;
 };
 
-export type EthereumExecutionHeaderProof = {
-  rlp: Hex;
-};
-
-export type EthereumExecutionBlockProof = {
-  anchorBlockHash: Hex;
-  targetToAnchorHeaderChain: EthereumExecutionHeaderProof[];
-};
-
-export type EthereumReceiptProof = {
-  transactionIndex: number;
-  nodes: Hex[];
+type LoadedEthereumEventLocator = {
+  receipt: EthereumReceipt;
+  requestedLogIndexes: number[];
 };
 
 export type EthereumEventProof = {
-  eventLog: EthereumEventLog;
-  proof: {
-    executionBlockProof: EthereumExecutionBlockProof;
-    receiptProof: EthereumReceiptProof;
+  executionBlockProof: {
+    anchorBlockHash: Hex;
+    targetToAnchorHeaderChain: { rlp: Hex }[];
   };
+  blocks: {
+    targetBlockNumber: number;
+    receiptLogs: {
+      transactionIndex: number;
+      eventLog: EthereumEventLog;
+    }[];
+    receiptProof: {
+      nodes: Hex[];
+      receipts: {
+        transactionIndex: number;
+        nodeIndexes: number[];
+      }[];
+    };
+  }[];
 };
 
-const ethereumBurnForTransferTopic = encodeEventTopics({
-  abi: mintingGatewayAbi,
-  eventName: MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
-})[0]?.toLowerCase();
+type EthereumEventProofBlock = EthereumEventProof['blocks'][number];
+type EthereumReceiptProof = EthereumEventProofBlock['receiptProof'];
+type EthereumReceiptLog = EthereumEventProofBlock['receiptLogs'][number];
+type EthereumCombinedReceiptProofReceipt = EthereumReceiptProof['receipts'][number];
 
 export function encodeReceiptTrieKey(transactionIndex: number): Uint8Array {
   return transactionIndex === 0 ? Uint8Array.from([0x80]) : toRlp(toHex(transactionIndex), 'bytes');
@@ -112,107 +117,160 @@ export function encodeEthereumReceiptForProof(receipt: EthereumReceipt): Uint8Ar
 }
 
 export async function buildEthereumEventProof(
-  client: IArgonQueryable,
-  { txHash, logIndex = 0, receipt: providedReceipt, ...executionSource }: EthereumEventLocator,
+  executionSource: EthereumExecutionSource,
+  argonFinalizedExecutionHeader: ArgonFinalizedExecutionHeader,
+  locatorBlocks: EthereumEventLocatorBlock[],
 ): Promise<EthereumEventProof> {
+  if (locatorBlocks.length === 0) {
+    throw new Error('At least one Ethereum event locator is required');
+  }
+
   const executionClient = getExecutionClient(executionSource);
-  const receipt = await loadEthereumReceipt(txHash, providedReceipt, executionClient);
-  const log = receipt.logs[logIndex];
+  const blocksWithHeaders = await Promise.all(
+    locatorBlocks.map(async (locatorBlock, index) => {
+      if (locatorBlock.length === 0) {
+        throw new Error(`Ethereum event locator block ${index} is empty`);
+      }
 
-  if (!log) throw new Error(`Missing log ${logIndex} in receipt ${txHash}`);
+      const loadedLocators = await loadEthereumEventLocators(executionClient, locatorBlock);
+      const firstLocator = loadedLocators[0];
+      const blockHash = firstLocator.receipt.blockHash;
 
-  const [targetHeader, anchor] = await Promise.all([
-    loadExecutionHeader(executionClient, receipt.blockHash),
-    getLatestRetainedAnchor(client),
-  ]);
+      for (const locator of loadedLocators.slice(1)) {
+        if (locator.receipt.blockHash.toLowerCase() !== blockHash.toLowerCase()) {
+          throw new Error(`Ethereum event locator block ${index} spans multiple execution blocks`);
+        }
+      }
 
-  if (anchor.blockNumber < targetHeader.number) {
-    throw new Error(
-      `Latest retained execution anchor ${anchor.blockHash} is behind target block ${receipt.blockHash}; wait for relayer sync`,
-    );
+      const targetHeader = await loadExecutionHeader(executionClient, blockHash);
+      if (argonFinalizedExecutionHeader.blockNumber < targetHeader.number) {
+        throw new Error(
+          `Argon finalized execution header ${argonFinalizedExecutionHeader.blockHash} is behind target block ${blockHash}; wait for relayer sync`,
+        );
+      }
+      return {
+        blockHash,
+        locators: loadedLocators,
+        targetHeader,
+      };
+    }),
+  );
+
+  if (blocksWithHeaders.length === 0) {
+    throw new Error('At least one Ethereum event locator is required');
   }
 
-  const [headerChain, receiptProofNodes] = await Promise.all([
-    buildExecutionHeaderChain(executionClient, targetHeader.number, anchor.blockNumber),
-    buildReceiptProofNodes(
+  blocksWithHeaders.sort((a, b) => Number(a.targetHeader.number - b.targetHeader.number));
+  const furthestTargetBlock = blocksWithHeaders[0];
+
+  const targetToArgonFinalizedHeaderChain = await buildExecutionHeaderChain(
+    executionClient,
+    furthestTargetBlock.targetHeader,
+    argonFinalizedExecutionHeader,
+  );
+
+  const blocks: EthereumEventProof['blocks'] = [];
+  for (const { blockHash, locators, targetHeader } of blocksWithHeaders) {
+    if (targetHeader.number === argonFinalizedExecutionHeader.blockNumber) {
+      if (blockHash.toLowerCase() !== argonFinalizedExecutionHeader.blockHash.toLowerCase()) {
+        throw new ArgonFinalizedExecutionHeaderPathError(
+          `Target block ${blockHash} is not the Argon finalized execution header ${argonFinalizedExecutionHeader.blockHash}`,
+        );
+      }
+    } else {
+      const sharedTargetHeaderOnArgonFinalizedChain =
+        targetToArgonFinalizedHeaderChain[
+          Number(targetHeader.number - furthestTargetBlock.targetHeader.number)
+        ];
+      if (
+        !sharedTargetHeaderOnArgonFinalizedChain ||
+        sharedTargetHeaderOnArgonFinalizedChain.blockHash.toLowerCase() !== blockHash.toLowerCase()
+      ) {
+        throw new ArgonFinalizedExecutionHeaderPathError(
+          `Target block ${blockHash} is not on the shared execution header chain to Argon finalized execution header ${argonFinalizedExecutionHeader.blockHash}`,
+        );
+      }
+    }
+
+    const receiptLogs: EthereumReceiptLog[] = [];
+    const transactionIndexes: number[] = [];
+    const seenTransactionIndexes = new Set<number>();
+
+    for (const { receipt, requestedLogIndexes } of locators) {
+      if (!seenTransactionIndexes.has(receipt.transactionIndex)) {
+        seenTransactionIndexes.add(receipt.transactionIndex);
+        transactionIndexes.push(receipt.transactionIndex);
+      }
+
+      for (const index of requestedLogIndexes) {
+        const log = receipt.logs[index];
+        if (!log) {
+          throw new Error(`Missing log ${index} in receipt ${receipt.transactionHash}`);
+        }
+
+        receiptLogs.push({
+          transactionIndex: receipt.transactionIndex,
+          eventLog: {
+            address: log.address,
+            topics: [...log.topics],
+            data: log.data,
+          },
+        });
+      }
+    }
+
+    const receiptProof = await buildEthereumCombinedReceiptProof(
       executionClient,
-      receipt.blockHash,
-      receipt.transactionIndex,
+      blockHash,
+      transactionIndexes,
       bytesToHex(targetHeader.receiptTrie),
-    ),
-  ]);
+    );
 
-  const eventLog: EthereumEventProof['eventLog'] = {
-    address: log.address,
-    topics: [...log.topics],
-    data: log.data,
-  };
-  const proof: EthereumEventProof['proof'] = {
+    blocks.push({
+      targetBlockNumber: Number(targetHeader.number),
+      receiptProof,
+      receiptLogs,
+    });
+  }
+
+  return {
     executionBlockProof: {
-      anchorBlockHash: anchor.blockHash,
-      targetToAnchorHeaderChain: headerChain.map(rlp => ({ rlp })),
+      anchorBlockHash: argonFinalizedExecutionHeader.blockHash,
+      targetToAnchorHeaderChain: targetToArgonFinalizedHeaderChain.map(({ rlp }) => ({ rlp })),
     },
-    receiptProof: {
-      transactionIndex: receipt.transactionIndex,
-      nodes: receiptProofNodes,
-    },
+    blocks,
   };
-
-  return { eventLog, proof };
 }
 
-export function findEthereumBurnForTransferLogIndex(
-  receipt: EthereumReceipt,
-  gatewayAddress: Hex,
-): number {
-  const normalizedGatewayAddress = getAddress(gatewayAddress).toLowerCase();
-
-  const index = receipt.logs.findIndex(log => {
-    return (
-      log.address.toLowerCase() === normalizedGatewayAddress &&
-      log.topics[0]?.toLowerCase() === ethereumBurnForTransferTopic
-    );
-  });
-
-  if (index === -1) {
-    throw new Error(
-      `Ethereum receipt ${receipt.transactionHash} did not emit BurnForTransfer from gateway ${gatewayAddress}`,
-    );
-  }
-
-  return index;
-}
-
-export async function getLatestRetainedAnchor(
+export async function getLatestArgonFinalizedExecutionHeader(
   client: IArgonQueryable,
-): Promise<RetainedExecutionAnchor> {
+): Promise<ArgonFinalizedExecutionHeader> {
   const verifierQuery = client.query.ethereumVerifier;
-  const latestAnchorHash = await verifierQuery.latestExecutionHeaderAnchorBlockHash();
+  const latestArgonFinalizedExecutionHeaderHash =
+    await verifierQuery.latestExecutionHeaderAnchorBlockHash();
 
-  if (latestAnchorHash.isNone) {
-    throw new Error(
-      'No retained ethereum execution anchor is available yet; wait for relayer sync',
-    );
+  if (latestArgonFinalizedExecutionHeaderHash.isNone) {
+    throw new Error('No Argon finalized execution header is available yet; wait for relayer sync');
   }
 
-  const blockHash = latestAnchorHash.unwrap().toHex();
-  const anchor = await verifierQuery.executionHeaderAnchors(blockHash);
+  const blockHash = latestArgonFinalizedExecutionHeaderHash.unwrap().toHex();
+  const argonFinalizedExecutionHeaderEntry = await verifierQuery.executionHeaderAnchors(blockHash);
 
-  if (anchor.isNone) {
-    throw new Error(`Retained ethereum execution anchor ${blockHash} is missing`);
+  if (argonFinalizedExecutionHeaderEntry.isNone) {
+    throw new Error(`Argon finalized execution header ${blockHash} is missing`);
   }
 
   return {
     blockHash,
-    blockNumber: anchor.unwrap().blockNumber.toBigInt(),
+    blockNumber: argonFinalizedExecutionHeaderEntry.unwrap().blockNumber.toBigInt(),
   };
 }
 
-export async function waitForRetainedExecutionAnchor(
+export async function waitForArgonFinalizedExecutionHeader(
   client: IArgonQueryable,
   targetBlockNumber: bigint,
   options: { pollMs?: number; timeoutMs?: number } = {},
-): Promise<RetainedExecutionAnchor> {
+): Promise<ArgonFinalizedExecutionHeader> {
   const pollMs = options.pollMs ?? 3_000;
   const timeoutMs = options.timeoutMs ?? 5 * 60_000;
   const startedAt = Date.now();
@@ -220,9 +278,9 @@ export async function waitForRetainedExecutionAnchor(
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
-      const anchor = await getLatestRetainedAnchor(client);
-      if (anchor.blockNumber >= targetBlockNumber) {
-        return anchor;
+      const argonFinalizedExecutionHeader = await getLatestArgonFinalizedExecutionHeader(client);
+      if (argonFinalizedExecutionHeader.blockNumber >= targetBlockNumber) {
+        return argonFinalizedExecutionHeader;
       }
     } catch (error) {
       if (!(error instanceof Error)) {
@@ -237,40 +295,38 @@ export async function waitForRetainedExecutionAnchor(
   throw (
     lastError ??
     new Error(
-      `Retained ethereum execution anchor did not reach block ${targetBlockNumber} within ${Math.floor(timeoutMs / 1000)}s`,
+      `Argon finalized execution header did not reach block ${targetBlockNumber} within ${Math.floor(timeoutMs / 1000)}s`,
     )
   );
 }
 
-function getExecutionClient(
-  source: Pick<EthereumEventLocator, 'executionRpcUrl' | 'executionClient'>,
-): EthereumExecutionClient {
-  if (source.executionClient) {
-    return source.executionClient;
-  }
-  if (source.executionRpcUrl) {
-    return createPublicClient({ transport: http(source.executionRpcUrl) });
-  }
-
-  throw new Error('Ethereum event proof requires an execution client or execution RPC URL');
-}
-
-async function loadEthereumReceipt(
-  txHash: Hex,
-  providedReceipt: EthereumReceipt | undefined,
+async function loadEthereumEventLocators(
   executionClient: EthereumExecutionClient,
+  locators: EthereumEventLocator[],
 ) {
-  return (
-    providedReceipt ??
-    (await waitForIndexed(() => executionClient.getTransactionReceipt({ hash: txHash })))
-  );
+  return await retryWhileExecutionRpcIndexing(() => {
+    return Promise.all(
+      locators.map(async ({ txHash, logIndexes, receipt }) => {
+        receipt ??= await executionClient.getTransactionReceipt({ hash: txHash });
+        const requestedLogIndexes = logIndexes ?? [0];
+        if (requestedLogIndexes.length === 0) {
+          throw new Error(`At least one log index is required for receipt ${txHash}`);
+        }
+
+        return {
+          receipt,
+          requestedLogIndexes,
+        } satisfies LoadedEthereumEventLocator;
+      }),
+    );
+  });
 }
 
-async function loadExecutionHeader(
+export async function loadExecutionHeader(
   executionClient: EthereumExecutionClient,
   blockTag: Hex | bigint,
 ) {
-  const blockData = await waitForIndexed(() =>
+  const blockData = await retryWhileExecutionRpcIndexing(() =>
     typeof blockTag === 'string'
       ? executionClient.request<EthGetBlockByHashRpc>({
           method: 'eth_getBlockByHash',
@@ -293,33 +349,73 @@ async function loadExecutionHeader(
   return header;
 }
 
-async function buildExecutionHeaderChain(
+export async function buildExecutionHeaderChain(
   executionClient: EthereumExecutionClient,
-  targetBlockNumber: bigint,
-  anchorBlockNumber: bigint,
-): Promise<Hex[]> {
-  const headers: Hex[] = [];
+  targetHeader: BlockHeader,
+  argonFinalizedExecutionHeader: ArgonFinalizedExecutionHeader,
+): Promise<{ blockHash: Hex; rlp: Hex }[]> {
+  const targetBlockHash = bytesToHex(targetHeader.hash());
 
-  for (let blockNumber = targetBlockNumber; blockNumber < anchorBlockNumber; blockNumber += 1n) {
-    const header = await loadExecutionHeader(executionClient, blockNumber);
-    headers.push(bytesToHex(header.serialize()));
+  if (targetHeader.number === argonFinalizedExecutionHeader.blockNumber) {
+    if (targetBlockHash.toLowerCase() !== argonFinalizedExecutionHeader.blockHash.toLowerCase()) {
+      throw new ArgonFinalizedExecutionHeaderPathError(
+        `Target block ${targetBlockHash} is not the Argon finalized execution header ${argonFinalizedExecutionHeader.blockHash}`,
+      );
+    }
+
+    return [];
   }
 
-  return headers;
+  const headers: { blockHash: Hex; rlp: Hex }[] = [];
+  let header = await loadExecutionHeader(executionClient, argonFinalizedExecutionHeader.blockHash);
+
+  if (header.number !== argonFinalizedExecutionHeader.blockNumber) {
+    throw new Error(
+      `Execution header ${argonFinalizedExecutionHeader.blockHash} is not block ${argonFinalizedExecutionHeader.blockNumber}`,
+    );
+  }
+
+  while (header.number > targetHeader.number) {
+    header = await loadExecutionHeader(executionClient, bytesToHex(header.parentHash));
+    headers.push({
+      blockHash: bytesToHex(header.hash()),
+      rlp: bytesToHex(header.serialize()),
+    });
+  }
+
+  if (
+    header.number !== targetHeader.number ||
+    bytesToHex(header.hash()).toLowerCase() !== targetBlockHash.toLowerCase()
+  ) {
+    throw new ArgonFinalizedExecutionHeaderPathError(
+      `Target block ${targetBlockHash} is not on the shared execution header chain to Argon finalized execution header ${argonFinalizedExecutionHeader.blockHash}`,
+    );
+  }
+
+  return headers.reverse();
 }
 
-async function buildReceiptProofNodes(
+export async function buildEthereumCombinedReceiptProof(
   executionClient: EthereumExecutionClient,
   blockHash: Hex,
-  transactionIndex: number,
+  transactionIndexes: number[],
   receiptsRoot: Hex,
-): Promise<Hex[]> {
-  const block = await waitForIndexed(() => executionClient.getBlock({ blockHash }));
-  const receipts = await Promise.all(
-    block.transactions.map(hash =>
-      waitForIndexed(() => executionClient.getTransactionReceipt({ hash })),
-    ),
-  );
+): Promise<EthereumReceiptProof> {
+  if (transactionIndexes.length > MAX_ETHEREUM_RECEIPTS_PER_PROOF) {
+    throw new EthereumCombinedReceiptProofBoundsError(
+      'receipt-count',
+      'Ethereum combined receipt proof exceeds the runtime receipt-count bound',
+    );
+  }
+
+  const { receipts } = await retryWhileExecutionRpcIndexing(async () => {
+    const block = await executionClient.getBlock({ blockHash });
+    const receipts = await Promise.all(
+      block.transactions.map(hash => executionClient.getTransactionReceipt({ hash })),
+    );
+
+    return { receipts };
+  });
 
   const trie = await createMPT();
 
@@ -334,32 +430,55 @@ async function buildReceiptProofNodes(
     throw new Error(`Receipt trie root mismatch for block ${blockHash}`);
   }
 
-  const key = encodeReceiptTrieKey(transactionIndex);
-  const proof = await createMerkleProof(trie, key);
-  const verifiedReceipt = await verifyMPTWithMerkleProof(trie, trie.root(), key, proof);
+  const nodeIndexesByHex = new Map<Hex, number>();
+  const sharedNodes: Hex[] = [];
+  const proofReceipts = await Promise.all(
+    transactionIndexes.map(async transactionIndex => {
+      const key = encodeReceiptTrieKey(transactionIndex);
+      const proof = await createMerkleProof(trie, key);
+      const verifiedReceipt = await verifyMPTWithMerkleProof(trie, trie.root(), key, proof);
 
-  if (!verifiedReceipt) {
-    throw new Error(`Receipt proof verification failed for transaction index ${transactionIndex}`);
-  }
-
-  return proof.map(node => bytesToHex(node));
-}
-async function waitForIndexed<TResult>(request: () => Promise<TResult>): Promise<TResult> {
-  const startedAt = Date.now();
-  let lastError: Error | undefined;
-
-  while (Date.now() - startedAt < 30_000) {
-    try {
-      return await request();
-    } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('indexing is in progress')) {
-        throw error;
+      if (!verifiedReceipt) {
+        throw new Error(
+          `Receipt proof verification failed for transaction index ${transactionIndex}`,
+        );
       }
 
-      lastError = error;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      return {
+        transactionIndex,
+        nodeIndexes: proof.map(node => {
+          const hexNode = bytesToHex(node);
+          const existingIndex = nodeIndexesByHex.get(hexNode);
+          if (existingIndex !== undefined) {
+            return existingIndex;
+          }
+
+          const nextIndex = sharedNodes.length;
+          sharedNodes.push(hexNode);
+          if (sharedNodes.length > MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES) {
+            throw new EthereumCombinedReceiptProofBoundsError(
+              'shared-nodes',
+              'Ethereum combined receipt proof exceeds the runtime shared-node bound',
+            );
+          }
+          nodeIndexesByHex.set(hexNode, nextIndex);
+          return nextIndex;
+        }),
+      } satisfies EthereumCombinedReceiptProofReceipt;
+    }),
+  );
+
+  for (const receipt of proofReceipts) {
+    if (receipt.nodeIndexes.length > MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS) {
+      throw new EthereumCombinedReceiptProofBoundsError(
+        'receipt-node-refs',
+        'Ethereum combined receipt proof exceeds the runtime receipt node-reference bound',
+      );
     }
   }
 
-  throw lastError ?? new Error('Timed out waiting for execution RPC indexing');
+  return {
+    nodes: sharedNodes,
+    receipts: proofReceipts,
+  };
 }

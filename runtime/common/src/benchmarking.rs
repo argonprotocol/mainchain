@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use polkadot_sdk::{
 	sp_arithmetic::FixedU128,
 	sp_runtime::{
-		traits::{AtLeast32BitUnsigned, SaturatedConversion},
+		traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
 		DispatchError,
 	},
 };
@@ -16,12 +16,12 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, UtxoId,
 	},
-	ethereum::{EthereumLog, EthereumProof, EthereumVerifyError},
+	ethereum::{EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError},
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
-	CurrentTransactionFeeProvider, EthereumVerifyProvider, MiningSlotProvider,
-	TreasuryPoolProvider, UniswapTransferProvider, VaultId,
+	EthereumVerifyProvider, MiningSlotProvider, TreasuryPoolProvider, UniswapTransferProvider,
+	VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -61,24 +61,14 @@ pub struct BenchmarkCrosschainTransferEthereumVerifier;
 impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 	type Weights = ();
 
-	fn verify_event_log(
-		_event_log: &EthereumLog,
-		_proof: &EthereumProof,
-	) -> Result<(), EthereumVerifyError> {
+	fn verify_receipt_logs<MaxProofBlocks, MaxReceiptLogs>(
+		_proof_batch: &EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxProofBlocks: Get<u32>,
+		MaxReceiptLogs: Get<u32>,
+	{
 		Ok(())
-	}
-}
-
-pub struct BenchmarkCrosschainTransferFeeProvider;
-
-impl<Balance> CurrentTransactionFeeProvider<Balance> for BenchmarkCrosschainTransferFeeProvider
-where
-	Balance: From<u128>,
-{
-	type Weights = ();
-
-	fn reimbursable_fee() -> Option<Balance> {
-		Some(1_000u128.into())
 	}
 }
 

@@ -19,12 +19,12 @@ use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
 use sp_core::{H256, U256};
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, NumberFor, OpaqueKeys},
+	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, Get, NumberFor, OpaqueKeys},
 	transaction_validity::TransactionValidityError,
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 
-use crate::ethereum::{EthereumLog, EthereumProof, EthereumVerifyError};
+use crate::ethereum::{EthereumReceiptLogProofBatch, EthereumVerifyError};
 
 pub trait NotebookProviderWeightInfo {
 	fn notebooks_in_block() -> Weight;
@@ -203,11 +203,11 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 }
 
 pub trait EthereumVerifyProviderWeightInfo {
-	fn verify_event_log() -> Weight;
+	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
 }
 
 impl EthereumVerifyProviderWeightInfo for () {
-	fn verify_event_log() -> Weight {
+	fn verify_receipt_logs(_proof_blocks: u32, _extra_activities: u32) -> Weight {
 		Weight::zero()
 	}
 }
@@ -215,43 +215,24 @@ impl EthereumVerifyProviderWeightInfo for () {
 pub trait EthereumVerifyProvider {
 	type Weights: EthereumVerifyProviderWeightInfo;
 
-	fn verify_event_log(
-		event_log: &EthereumLog,
-		proof: &EthereumProof,
-	) -> Result<(), EthereumVerifyError>;
-}
-
-#[derive(Debug)]
-pub enum EthereumVerifyAndDecodeError<D> {
-	Verify(EthereumVerifyError),
-	Decode(D),
-}
-
-pub trait EthereumEventDecoder: Sized {
-	type Error;
-
-	fn decode_ethereum_log(log: &EthereumLog) -> Result<Self, Self::Error>;
-}
-
-pub fn verify_and_decode_event<Verifier, Event>(
-	event_log: &EthereumLog,
-	proof: &EthereumProof,
-) -> Result<Event, EthereumVerifyAndDecodeError<Event::Error>>
-where
-	Verifier: EthereumVerifyProvider,
-	Event: EthereumEventDecoder,
-{
-	Verifier::verify_event_log(event_log, proof).map_err(EthereumVerifyAndDecodeError::Verify)?;
-	Event::decode_ethereum_log(event_log).map_err(EthereumVerifyAndDecodeError::Decode)
+	fn verify_receipt_logs<MaxProofBlocks, MaxReceiptLogs>(
+		proof_batch: &EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxProofBlocks: Get<u32>,
+		MaxReceiptLogs: Get<u32>;
 }
 
 impl EthereumVerifyProvider for () {
 	type Weights = ();
 
-	fn verify_event_log(
-		_event_log: &EthereumLog,
-		_proof: &EthereumProof,
-	) -> Result<(), EthereumVerifyError> {
+	fn verify_receipt_logs<MaxProofBlocks, MaxReceiptLogs>(
+		_proof_batch: &EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxProofBlocks: Get<u32>,
+		MaxReceiptLogs: Get<u32>,
+	{
 		Err(EthereumVerifyError::VerifierUnavailable)
 	}
 }

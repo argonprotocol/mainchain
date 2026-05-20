@@ -1,11 +1,9 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
 import type {} from '@polkadot/api-base/types/calls';
 
-import type { ArgonPrimitivesEthereumEthereumVerifyError } from '@argonprotocol/mainchain/interfaces/ethereum';
 import type { ApiTypes, AugmentedCall, DecoratedCallBase } from '@polkadot/api-base/types';
 import type { Bytes, Null, Option, Result, Vec, u32 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
@@ -35,10 +33,6 @@ import type {
 import type { RuntimeVersion } from '@polkadot/types/interfaces/state';
 import type { ApplyExtrinsicResult } from '@polkadot/types/interfaces/system';
 import type { TransactionSource, TransactionValidity } from '@polkadot/types/interfaces/txqueue';
-import type {
-  ArgonPrimitivesEthereumEthereumLog,
-  ArgonPrimitivesEthereumEthereumProof,
-} from '@polkadot/types/lookup';
 import type { IExtrinsic, Observable } from '@polkadot/types/types';
 
 export type __AugmentedCall<ApiType extends ApiTypes> = AugmentedCall<ApiType>;
@@ -125,27 +119,6 @@ declare module '@polkadot/api-base/types/calls' {
        * Returns the version of the runtime.
        **/
       version: AugmentedCall<ApiType, () => Observable<RuntimeVersion>>;
-    };
-    /** 0x97c56de838cad0ef/1 */
-    ethereumApis: {
-      /**
-       * Preflight verify an Ethereum event log proof.
-       **/
-      verifyEventLog: AugmentedCall<
-        ApiType,
-        (
-          eventLog:
-            | ArgonPrimitivesEthereumEthereumLog
-            | { address?: any; topics?: any; data?: any }
-            | string
-            | Uint8Array,
-          proof:
-            | ArgonPrimitivesEthereumEthereumProof
-            | { executionBlockProof?: any; receiptProof?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Result<Null, ArgonPrimitivesEthereumEthereumVerifyError>>
-      >;
     };
     /** 0xfbc577b9d747efd6/1 */
     genesisBuilder: {

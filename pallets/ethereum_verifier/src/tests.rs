@@ -16,18 +16,21 @@ use crate::{
 	ForkVersionSchedule, ForkVersions, LatestFinalizedBlockRoot, LatestSyncCommitteeUpdatePeriod,
 	NextSyncCommittee, SyncCommitteePrepared,
 };
-use alloy_consensus::Header as AlloyHeader;
-use alloy_primitives::B256;
+use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
+use alloy_primitives::{Address, Bytes, Log, B256};
 use alloy_rlp::Encodable;
+use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles};
 use argon_primitives::{
 	ethereum::{
-		MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES, MAX_ETHEREUM_HEADER_CHAIN_LEN,
-		MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS, MAX_ETHEREUM_RECEIPT_PROOF_NODES,
-		MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
+		EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock,
+		MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES, MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES,
+		MAX_ETHEREUM_HEADER_CHAIN_LEN, MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS,
+		MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
+		MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS,
 	},
-	CallTxPoolKeyProvider, EthereumBeaconPreset, EthereumExecutionBlockProof,
-	EthereumExecutionHeader, EthereumLog, EthereumProof, EthereumReceiptProof, EthereumVerifyError,
-	EthereumVerifyProvider,
+	CallTxPoolKeyProvider, EthereumBeaconPreset, EthereumCombinedReceiptProof,
+	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
+	EthereumReceiptProofReceipt, EthereumVerifyError, EthereumVerifyProvider,
 };
 use codec::{Decode, Encode};
 use hex_literal::hex;
@@ -36,7 +39,7 @@ use polkadot_sdk::{
 		assert_err, assert_noop, assert_ok, dispatch::DispatchResult, pallet_prelude::Pays,
 	},
 	sp_core::{hashing::blake2_256, H160, H256},
-	sp_runtime::DispatchError,
+	sp_runtime::{traits::ConstU32, DispatchError},
 };
 use snowbridge_beacon_primitives::merkle_proof::{generalized_index_length, subtree_index};
 use std::{fs::File, path::PathBuf};
@@ -110,7 +113,30 @@ fn compute_period(slot: u64) -> u64 {
 	raw_compute_period(slot, MAINNET_SLOTS_PER_EPOCH, MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD)
 }
 
-fn retained_anchor_verification_payload() -> (EthereumLog, EthereumProof, ExecutionHeaderAnchor) {
+fn single_receipt_log_proof_batch(
+	receipt_log: EthereumReceiptLog,
+	execution_block_proof: EthereumExecutionBlockProof,
+	receipt_proof: EthereumCombinedReceiptProof,
+) -> EthereumReceiptLogProofBatch<ConstU32<1>, ConstU32<1>> {
+	EthereumReceiptLogProofBatch {
+		execution_block_proof,
+		blocks: vec![EthereumReceiptLogProofBlock {
+			target_block_number: 100,
+			receipt_proof,
+			receipt_logs: vec![receipt_log]
+				.try_into()
+				.expect("single receipt log stays within bounded log count"),
+		}]
+		.try_into()
+		.expect("single proof block stays within bounded block count"),
+	}
+}
+
+fn retained_anchor_verification_payload() -> (
+	EthereumReceiptLog,
+	EthereumReceiptLogProofBatch<ConstU32<1>, ConstU32<1>>,
+	ExecutionHeaderAnchor,
+) {
 	let inbound_fixture = snowbridge_pallet_ethereum_client_fixtures::make_inbound_fixture();
 	let anchor_block_hash = H256::repeat_byte(9);
 	let anchor = ExecutionHeaderAnchor {
@@ -119,45 +145,57 @@ fn retained_anchor_verification_payload() -> (EthereumLog, EthereumProof, Execut
 		parent_hash: H256::repeat_byte(8),
 		receipts_root: inbound_fixture.event.proof.execution_proof.execution_header.receipts_root(),
 	};
-	let event_log = EthereumLog {
-		address: inbound_fixture.event.event_log.address,
-		topics: inbound_fixture
-			.event
-			.event_log
-			.topics
-			.try_into()
-			.expect("fixture topics stay within bounded Ethereum log topics"),
-		data: inbound_fixture
-			.event
-			.event_log
-			.data
-			.try_into()
-			.expect("fixture event data stays within bounded Ethereum log payload"),
+	let event_log = EthereumReceiptLog {
+		transaction_index: INBOUND_FIXTURE_RECEIPT_INDEX,
+		event_log: EthereumLog {
+			address: inbound_fixture.event.event_log.address,
+			topics: inbound_fixture
+				.event
+				.event_log
+				.topics
+				.try_into()
+				.expect("fixture topics stay within bounded Ethereum log topics"),
+			data: inbound_fixture
+				.event
+				.event_log
+				.data
+				.try_into()
+				.expect("fixture event data stays within bounded Ethereum log payload"),
+		},
 	};
-	let proof = EthereumProof {
-		execution_block_proof: EthereumExecutionBlockProof {
+	let receipt_proof_nodes = inbound_fixture
+		.event
+		.proof
+		.receipt_proof
+		.into_iter()
+		.map(|node| node.try_into().expect("fixture receipt proof node stays within bounded size"))
+		.collect::<Vec<_>>();
+	let receipt_proof_node_indexes =
+		(0..receipt_proof_nodes.len()).map(|index| index as u16).collect::<Vec<_>>();
+	let proof_batch = single_receipt_log_proof_batch(
+		event_log.clone(),
+		EthereumExecutionBlockProof {
 			anchor_block_hash,
 			target_to_anchor_header_chain: Vec::new()
 				.try_into()
 				.expect("empty header chain stays within bounds"),
 		},
-		receipt_proof: EthereumReceiptProof {
-			transaction_index: INBOUND_FIXTURE_RECEIPT_INDEX,
-			nodes: inbound_fixture
-				.event
-				.proof
-				.receipt_proof
-				.into_iter()
-				.map(|node| {
-					node.try_into().expect("fixture receipt proof node stays within bounded size")
-				})
-				.collect::<Vec<_>>()
+		EthereumCombinedReceiptProof {
+			nodes: receipt_proof_nodes
 				.try_into()
 				.expect("fixture receipt proof stays within bounded node count"),
+			receipts: vec![EthereumReceiptProofReceipt {
+				transaction_index: INBOUND_FIXTURE_RECEIPT_INDEX,
+				node_indexes: receipt_proof_node_indexes
+					.try_into()
+					.expect("fixture node indexes stay within bounded receipt proof refs"),
+			}]
+			.try_into()
+			.expect("fixture receipt proof stays within bounded receipt count"),
 		},
-	};
+	);
 
-	(event_log, proof, anchor)
+	(event_log, proof_batch, anchor)
 }
 
 /* UNIT TESTS */
@@ -969,26 +1007,202 @@ fn sync_committee_update_for_sync_committee_already_imported_are_not_free() {
 
 #[test]
 fn verify_message() {
-	let (event_log, proof, anchor) = retained_anchor_verification_payload();
+	let (_event_log, proof, anchor) = retained_anchor_verification_payload();
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
-		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
-			&event_log, &proof,
-		));
+		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof,));
+	});
+}
+
+#[test]
+fn verify_message_accepts_multiple_claims_from_the_same_receipt() {
+	let (_event_log, proof, anchor) = retained_anchor_verification_payload();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof,));
+	});
+}
+
+#[test]
+fn verify_message_accepts_multiple_receipts_from_one_combined_proof() {
+	let first_address = Address::repeat_byte(0x11);
+	let second_address = Address::repeat_byte(0x22);
+	let first_topic = B256::repeat_byte(0xa1);
+	let second_topic = B256::repeat_byte(0xb2);
+	let first_data = Bytes::from_static(b"first-transfer");
+	let second_data = Bytes::from_static(b"second-transfer");
+
+	let first_receipt = ReceiptEnvelope::Legacy(
+		Receipt {
+			status: true.into(),
+			cumulative_gas_used: 10,
+			logs: vec![Log::new_unchecked(first_address, vec![first_topic], first_data.clone())],
+		}
+		.with_bloom(),
+	);
+	let second_receipt = ReceiptEnvelope::Legacy(
+		Receipt {
+			status: true.into(),
+			cumulative_gas_used: 20,
+			logs: vec![Log::new_unchecked(second_address, vec![second_topic], second_data.clone())],
+		}
+		.with_bloom(),
+	);
+
+	let mut first_receipt_bytes = Vec::new();
+	first_receipt.encode(&mut first_receipt_bytes);
+	let mut second_receipt_bytes = Vec::new();
+	second_receipt.encode(&mut second_receipt_bytes);
+
+	let first_path = Nibbles::unpack(alloy_rlp::encode(0u64));
+	let second_path = Nibbles::unpack(alloy_rlp::encode(1u64));
+	let mut hash_builder = HashBuilder::default()
+		.with_proof_retainer(ProofRetainer::new(vec![first_path, second_path]));
+	let mut trie_receipts =
+		vec![(first_path, first_receipt_bytes), (second_path, second_receipt_bytes)];
+	trie_receipts.sort_unstable_by_key(|(path, _)| *path);
+
+	for (path, receipt_bytes) in &trie_receipts {
+		hash_builder.add_leaf(*path, receipt_bytes);
+	}
+
+	let receipts_root = H256::from_slice(hash_builder.root().as_slice());
+	let proof_nodes = hash_builder.take_proof_nodes();
+	let sorted_nodes = proof_nodes.nodes_sorted();
+	let node_paths = sorted_nodes.iter().map(|(path, _)| *path).collect::<Vec<_>>();
+	let anchor = ExecutionHeaderAnchor {
+		block_number: 200,
+		block_hash: H256::repeat_byte(0x44),
+		parent_hash: H256::repeat_byte(0x33),
+		receipts_root,
+	};
+	let first_event_log = EthereumReceiptLog {
+		transaction_index: 0,
+		event_log: EthereumLog {
+			address: H160::from_slice(first_address.as_slice()),
+			topics: vec![H256::from_slice(first_topic.as_slice())]
+				.try_into()
+				.expect("single topic stays within bounded topic count"),
+			data: first_data
+				.to_vec()
+				.try_into()
+				.expect("first log data stays within bounded payload size"),
+		},
+	};
+	let second_event_log = EthereumReceiptLog {
+		transaction_index: 1,
+		event_log: EthereumLog {
+			address: H160::from_slice(second_address.as_slice()),
+			topics: vec![H256::from_slice(second_topic.as_slice())]
+				.try_into()
+				.expect("single topic stays within bounded topic count"),
+			data: second_data
+				.to_vec()
+				.try_into()
+				.expect("second log data stays within bounded payload size"),
+		},
+	};
+	let proof = EthereumReceiptLogProofBatch::<ConstU32<1>, ConstU32<2>> {
+		execution_block_proof: EthereumExecutionBlockProof {
+			anchor_block_hash: anchor.block_hash,
+			target_to_anchor_header_chain: Vec::new()
+				.try_into()
+				.expect("empty header chain stays within bounds"),
+		},
+		blocks: vec![EthereumReceiptLogProofBlock::<ConstU32<2>> {
+			target_block_number: anchor.block_number,
+			receipt_proof: EthereumCombinedReceiptProof {
+				nodes: sorted_nodes
+					.iter()
+					.map(|(_, node)| {
+						node.to_vec()
+							.try_into()
+							.expect("retained proof node stays within bounded node size")
+					})
+					.collect::<Vec<_>>()
+					.try_into()
+					.expect("combined proof nodes stay within bounded node count"),
+				receipts: vec![
+					EthereumReceiptProofReceipt {
+						transaction_index: 0,
+						node_indexes: proof_nodes
+							.matching_nodes_sorted(&first_path)
+							.into_iter()
+							.map(|(path, _)| {
+								node_paths
+									.iter()
+									.position(|candidate| *candidate == path)
+									.expect("first receipt proof nodes should be retained")
+									as u16
+							})
+							.collect::<Vec<_>>()
+							.try_into()
+							.expect("first receipt node refs stay within bounds"),
+					},
+					EthereumReceiptProofReceipt {
+						transaction_index: 1,
+						node_indexes: proof_nodes
+							.matching_nodes_sorted(&second_path)
+							.into_iter()
+							.map(|(path, _)| {
+								node_paths
+									.iter()
+									.position(|candidate| *candidate == path)
+									.expect("second receipt proof nodes should be retained")
+									as u16
+							})
+							.collect::<Vec<_>>()
+							.try_into()
+							.expect("second receipt node refs stay within bounds"),
+					},
+				]
+				.try_into()
+				.expect("combined proof receipts stay within bounded receipt count"),
+			},
+			receipt_logs: vec![first_event_log, second_event_log]
+				.try_into()
+				.expect("combined receipt logs stay within bounded log count"),
+		}]
+		.try_into()
+		.expect("single proof block stays within bounded block count"),
+	};
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof,));
 	});
 }
 
 #[test]
 fn verify_message_invalid_proof() {
-	let (event_log, mut proof, anchor) = retained_anchor_verification_payload();
-	proof.receipt_proof.nodes[0] =
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	proof.blocks[0].receipt_proof.nodes[0] =
 		vec![1, 2, 3].try_into().expect("tiny malformed node stays within bounded size");
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof,),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+	});
+}
+
+#[test]
+fn verify_message_rejects_duplicate_receipt_entries_for_one_transaction_index() {
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	let mut receipts = proof.blocks[0].receipt_proof.receipts.to_vec();
+	receipts.push(receipts[0].clone());
+	proof.blocks[0].receipt_proof.receipts = receipts
+		.try_into()
+		.expect("duplicated receipt entries stay within bounded receipt count");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
 			Err(EthereumVerifyError::InvalidProof)
 		);
 	});
@@ -996,38 +1210,34 @@ fn verify_message_invalid_proof() {
 
 #[test]
 fn verify_message_rejects_empty_and_duplicated_receipt_proofs() {
-	let (event_log, proof, anchor) = retained_anchor_verification_payload();
+	let (_event_log, proof, anchor) = retained_anchor_verification_payload();
 
 	let mut empty_proof = proof.clone();
-	empty_proof.receipt_proof.nodes = Vec::new()
+	empty_proof.blocks[0].receipt_proof.nodes = Vec::new()
 		.try_into()
 		.expect("empty receipt proof stays within bounded node count");
 
 	let mut duplicated_proof = proof.clone();
-	let mut duplicated_nodes = duplicated_proof.receipt_proof.nodes.to_vec();
-	duplicated_nodes.push(
-		duplicated_nodes
+	let mut duplicated_indexes =
+		duplicated_proof.blocks[0].receipt_proof.receipts[0].node_indexes.to_vec();
+	duplicated_indexes.push(
+		*duplicated_indexes
 			.last()
-			.cloned()
-			.expect("fixture receipt proof includes at least one node"),
+			.expect("fixture receipt proof includes at least one node index"),
 	);
-	duplicated_proof.receipt_proof.nodes = duplicated_nodes
+	duplicated_proof.blocks[0].receipt_proof.receipts[0].node_indexes = duplicated_indexes
 		.try_into()
-		.expect("duplicated receipt proof stays within bounded node count");
+		.expect("duplicated receipt proof stays within bounded node refs");
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
-				&event_log,
-				&empty_proof,
-			),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&empty_proof,),
 			Err(EthereumVerifyError::InvalidProof)
 		);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
-				&event_log,
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(
 				&duplicated_proof,
 			),
 			Err(EthereumVerifyError::InvalidProof)
@@ -1036,28 +1246,71 @@ fn verify_message_rejects_empty_and_duplicated_receipt_proofs() {
 }
 
 #[test]
-fn verify_message_invalid_receipts_root() {
-	let (event_log, proof, mut anchor) = retained_anchor_verification_payload();
-	anchor.receipts_root = TEST_HASH.into();
+fn verify_message_rejects_missing_receipt_entries_and_out_of_range_node_indexes() {
+	let (_event_log, proof, anchor) = retained_anchor_verification_payload();
+
+	let mut missing_receipt = proof.clone();
+	missing_receipt.blocks[0].receipt_proof.receipts = Vec::new()
+		.try_into()
+		.expect("empty receipt list stays within bounded receipt count");
+
+	let mut out_of_range_node_index = proof.clone();
+	out_of_range_node_index.blocks[0].receipt_proof.receipts[0].node_indexes = vec![999u16]
+		.try_into()
+		.expect("out-of-range node index stays within bounded receipt proof refs");
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof,),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&missing_receipt,),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(
+				&out_of_range_node_index,
+			),
 			Err(EthereumVerifyError::InvalidProof)
 		);
 	});
 }
 
 #[test]
-fn verify_message_invalid_log() {
-	let (mut event_log, proof, anchor) = retained_anchor_verification_payload();
-	event_log.topics[0] = H256::zero();
+fn verify_message_invalid_receipts_root() {
+	let (_event_log, proof, mut anchor) = retained_anchor_verification_payload();
+	anchor.receipts_root = TEST_HASH.into();
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof,),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+	});
+}
+
+#[test]
+fn verify_message_rejects_batches_with_any_invalid_log() {
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	proof.blocks[0].receipt_logs[0].event_log.topics[0] = H256::zero();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
+			Err(EthereumVerifyError::LogNotFound)
+		);
+	});
+}
+
+#[test]
+fn verify_message_invalid_log() {
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	proof.blocks[0].receipt_logs[0].event_log.topics[0] = H256::zero();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
 			Err(EthereumVerifyError::LogNotFound)
 		);
 	});
@@ -1065,8 +1318,8 @@ fn verify_message_invalid_log() {
 
 #[test]
 fn verify_message_receipt_does_not_contain_log() {
-	let (mut event_log, proof, anchor) = retained_anchor_verification_payload();
-	event_log.data = hex!("f9013c94ee9170abfbf9421ad6dd07f6bdec9d89f2b581e0f863a01b11dcf133cc240f682dab2d3a8e4cd35c5da8c9cf99adac4336f8512584c5ada000000000000000000000000000000000000000000000000000000000000003e8a00000000000000000000000000000000000000000000000000000000000000002b8c000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000068000f000000000000000101d184c103f7acc340847eee82a0b909e3358bc28d440edffa1352b13227e8ee646f3ea37456dec70100000101001cbd2d43530a44705ad088af313e18f80b53ef16b36177cd4b77b846f2a5f07c0000e8890423c78a0000000000000000000000000000000000000000000000000000000000000000")
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	proof.blocks[0].receipt_logs[0].event_log.data = hex!("f9013c94ee9170abfbf9421ad6dd07f6bdec9d89f2b581e0f863a01b11dcf133cc240f682dab2d3a8e4cd35c5da8c9cf99adac4336f8512584c5ada000000000000000000000000000000000000000000000000000000000000003e8a00000000000000000000000000000000000000000000000000000000000000002b8c000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000068000f000000000000000101d184c103f7acc340847eee82a0b909e3358bc28d440edffa1352b13227e8ee646f3ea37456dec70100000101001cbd2d43530a44705ad088af313e18f80b53ef16b36177cd4b77b846f2a5f07c0000e8890423c78a0000000000000000000000000000000000000000000000000000000000000000")
 		.to_vec()
 		.try_into()
 		.expect("mutated log payload stays within bounded log data size");
@@ -1074,7 +1327,7 @@ fn verify_message_receipt_does_not_contain_log() {
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof,),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
 			Err(EthereumVerifyError::LogNotFound)
 		);
 	});
@@ -1166,17 +1419,13 @@ fn import_execution_header_anchor_requires_matching_stored_finalized_header() {
 
 #[test]
 fn verify_message_invalid_topic() {
-	let (event_log, proof, anchor) = retained_anchor_verification_payload();
-	let mut event_log_muted = event_log.clone();
-	event_log_muted.topics[0] = H256::default();
+	let (_event_log, mut proof, anchor) = retained_anchor_verification_payload();
+	proof.blocks[0].receipt_logs[0].event_log.topics[0] = H256::default();
 
 	new_tester().execute_with(|| {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(
-				&event_log_muted,
-				&proof,
-			),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
 			Err(EthereumVerifyError::LogNotFound)
 		);
 	});
@@ -1184,7 +1433,7 @@ fn verify_message_invalid_topic() {
 
 #[test]
 fn verify_message_is_unavailable_when_halted() {
-	let (event_log, proof, anchor) = retained_anchor_verification_payload();
+	let (_event_log, proof, anchor) = retained_anchor_verification_payload();
 
 	new_tester().execute_with(|| {
 		assert_ok!(EthereumBeaconClient::set_operating_mode(
@@ -1194,7 +1443,7 @@ fn verify_message_is_unavailable_when_halted() {
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 
 		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_event_log(&event_log, &proof),
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&proof),
 			Err(EthereumVerifyError::VerifierUnavailable)
 		);
 	});
@@ -1428,45 +1677,6 @@ fn execution_header_anchor_pool_key_uses_exact_proof_payload() {
 }
 
 #[test]
-fn verify_event_log_availability_gate() {
-	let (event_log, proof, anchor) = retained_anchor_verification_payload();
-	let unavailable_proof = EthereumProof {
-		execution_block_proof: EthereumExecutionBlockProof {
-			anchor_block_hash: H256::repeat_byte(1),
-			target_to_anchor_header_chain: Vec::new()
-				.try_into()
-				.expect("empty header chain stays within bounds"),
-		},
-		receipt_proof: EthereumReceiptProof {
-			transaction_index: 0,
-			nodes: Vec::new()
-				.try_into()
-				.expect("empty receipt proof stays within bounded node count"),
-		},
-	};
-
-	new_tester().execute_with(|| {
-		VerifyEventLogApiEnabled::set(true);
-		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
-
-		assert_ok!(EthereumBeaconClient::verify_event_log(event_log, proof,));
-		VerifyEventLogApiEnabled::set(false);
-
-		assert_eq!(
-			EthereumBeaconClient::verify_event_log(
-				EthereumLog {
-					address: Default::default(),
-					topics: Vec::new().try_into().expect("empty topics stay within bounds"),
-					data: Vec::new().try_into().expect("empty data stays within bounds"),
-				},
-				unavailable_proof,
-			),
-			Err(EthereumVerifyError::VerifierUnavailable)
-		);
-	});
-}
-
-#[test]
 fn ethereum_log_decode_rejects_oversized_topics_and_data() {
 	#[derive(Encode)]
 	struct UnboundedEthereumLog {
@@ -1494,26 +1704,61 @@ fn ethereum_log_decode_rejects_oversized_topics_and_data() {
 
 #[test]
 fn ethereum_receipt_proof_decode_rejects_oversized_nodes() {
-	#[derive(Encode)]
-	struct UnboundedEthereumReceiptProof {
+	#[derive(Clone, Encode)]
+	struct UnboundedEthereumReceiptProofReceipt {
 		#[codec(compact)]
 		transaction_index: u64,
+		node_indexes: Vec<u16>,
+	}
+
+	#[derive(Encode)]
+	struct UnboundedEthereumCombinedReceiptProof {
 		nodes: Vec<Vec<u8>>,
+		receipts: Vec<UnboundedEthereumReceiptProofReceipt>,
 	}
 
-	let oversized_node = UnboundedEthereumReceiptProof {
-		transaction_index: 0,
+	let oversized_node = UnboundedEthereumCombinedReceiptProof {
 		nodes: vec![vec![0u8; (MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES + 1) as usize]],
+		receipts: vec![UnboundedEthereumReceiptProofReceipt {
+			transaction_index: 0,
+			node_indexes: vec![0],
+		}],
 	}
 	.encode();
-	assert!(EthereumReceiptProof::decode(&mut &oversized_node[..]).is_err());
+	assert!(EthereumCombinedReceiptProof::decode(&mut &oversized_node[..]).is_err());
 
-	let oversized_node_count = UnboundedEthereumReceiptProof {
-		transaction_index: 0,
-		nodes: vec![vec![0u8]; (MAX_ETHEREUM_RECEIPT_PROOF_NODES + 1) as usize],
+	let oversized_node_count = UnboundedEthereumCombinedReceiptProof {
+		nodes: vec![vec![0u8]; (MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES + 1) as usize],
+		receipts: vec![UnboundedEthereumReceiptProofReceipt {
+			transaction_index: 0,
+			node_indexes: vec![0],
+		}],
 	}
 	.encode();
-	assert!(EthereumReceiptProof::decode(&mut &oversized_node_count[..]).is_err());
+	assert!(EthereumCombinedReceiptProof::decode(&mut &oversized_node_count[..]).is_err());
+
+	let oversized_receipt_count = UnboundedEthereumCombinedReceiptProof {
+		nodes: vec![vec![0u8]],
+		receipts: vec![
+			UnboundedEthereumReceiptProofReceipt {
+				transaction_index: 0,
+				node_indexes: vec![0],
+			};
+			(MAX_ETHEREUM_RECEIPTS_PER_PROOF + 1) as usize
+		],
+	}
+	.encode();
+	assert!(EthereumCombinedReceiptProof::decode(&mut &oversized_receipt_count[..]).is_err());
+
+	let oversized_receipt_node_refs = UnboundedEthereumCombinedReceiptProof {
+		nodes: vec![vec![0u8]],
+		receipts: vec![UnboundedEthereumReceiptProofReceipt {
+			transaction_index: 0,
+			node_indexes: vec![0u16; (MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS + 1) as usize],
+		}],
+	}
+	.encode();
+	assert!(EthereumCombinedReceiptProof::decode(&mut &oversized_receipt_node_refs[..]).is_err());
 }
 
 #[test]
@@ -1591,6 +1836,176 @@ fn verify_execution_block_proof_accepts_header_chain_to_anchor() {
 			EthereumBeaconClient::verify_execution_block_proof(&proof),
 			Ok(target_receipts_root)
 		);
+	});
+}
+
+#[test]
+fn verify_execution_block_proof_accepts_multi_hop_header_chain_to_anchor() {
+	let target_receipts_root = H256::repeat_byte(0x51);
+	let (target_header, target_block_hash) =
+		make_execution_header(100, H256::repeat_byte(0x10), target_receipts_root);
+	let (intermediate_header, intermediate_block_hash) =
+		make_execution_header(101, target_block_hash, H256::repeat_byte(0x52));
+	let anchor_block_hash = H256::repeat_byte(0x53);
+	let anchor = ExecutionHeaderAnchor {
+		block_number: 102,
+		block_hash: anchor_block_hash,
+		parent_hash: intermediate_block_hash,
+		receipts_root: H256::repeat_byte(0x54),
+	};
+	let proof = EthereumExecutionBlockProof {
+		anchor_block_hash,
+		target_to_anchor_header_chain: vec![target_header, intermediate_header]
+			.try_into()
+			.expect("two-hop header chain stays within bounded header chain length"),
+	};
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor_block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_execution_block_proof(&proof),
+			Ok(target_receipts_root)
+		);
+	});
+}
+
+#[test]
+fn verify_receipt_logs_accepts_shared_header_chain_suffixes_for_multiple_blocks() {
+	let older_address = Address::repeat_byte(0x71);
+	let older_topic = B256::repeat_byte(0x72);
+	let older_data = Bytes::from_static(&[0x01, 0x02]);
+	let newer_address = Address::repeat_byte(0x81);
+	let newer_topic = B256::repeat_byte(0x82);
+	let newer_data = Bytes::from_static(&[0x03, 0x04]);
+
+	let older_receipt = ReceiptEnvelope::Legacy(
+		Receipt {
+			status: true.into(),
+			cumulative_gas_used: 10,
+			logs: vec![Log::new_unchecked(older_address, vec![older_topic], older_data.clone())],
+		}
+		.with_bloom(),
+	);
+	let newer_receipt = ReceiptEnvelope::Legacy(
+		Receipt {
+			status: true.into(),
+			cumulative_gas_used: 20,
+			logs: vec![Log::new_unchecked(newer_address, vec![newer_topic], newer_data.clone())],
+		}
+		.with_bloom(),
+	);
+
+	let build_receipt_proof =
+		|receipt: &ReceiptEnvelope, address: Address, topic: B256, data: Bytes| {
+			let mut receipt_bytes = Vec::new();
+			receipt.encode(&mut receipt_bytes);
+
+			let path = Nibbles::unpack(alloy_rlp::encode(0u64));
+			let mut hash_builder =
+				HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![path]));
+			hash_builder.add_leaf(path, &receipt_bytes);
+
+			let receipts_root = H256::from_slice(hash_builder.root().as_slice());
+			let proof_nodes = hash_builder.take_proof_nodes();
+			let sorted_nodes = proof_nodes.nodes_sorted();
+			let node_paths = sorted_nodes.iter().map(|(path, _)| *path).collect::<Vec<_>>();
+
+			(
+				EthereumCombinedReceiptProof {
+					nodes: sorted_nodes
+						.iter()
+						.map(|(_, node)| {
+							node.to_vec()
+								.try_into()
+								.expect("retained proof node stays within bounded node size")
+						})
+						.collect::<Vec<_>>()
+						.try_into()
+						.expect("combined proof nodes stay within bounded node count"),
+					receipts: vec![EthereumReceiptProofReceipt {
+						transaction_index: 0,
+						node_indexes: proof_nodes
+							.matching_nodes_sorted(&path)
+							.into_iter()
+							.map(|(path, _)| {
+								node_paths
+									.iter()
+									.position(|candidate| *candidate == path)
+									.expect("receipt proof nodes should be retained") as u16
+							})
+							.collect::<Vec<_>>()
+							.try_into()
+							.expect("receipt node refs stay within bounds"),
+					}]
+					.try_into()
+					.expect("single receipt proof stays within bounded receipt count"),
+				},
+				receipts_root,
+				EthereumReceiptLog {
+					transaction_index: 0,
+					event_log: EthereumLog {
+						address: H160::from_slice(address.as_slice()),
+						topics: vec![H256::from_slice(topic.as_slice())]
+							.try_into()
+							.expect("single topic stays within bounded topic count"),
+						data: data
+							.to_vec()
+							.try_into()
+							.expect("log data stays within bounded payload size"),
+					},
+				},
+			)
+		};
+
+	let (older_receipt_proof, older_receipts_root, older_receipt_log) =
+		build_receipt_proof(&older_receipt, older_address, older_topic, older_data);
+	let (newer_receipt_proof, newer_receipts_root, newer_receipt_log) =
+		build_receipt_proof(&newer_receipt, newer_address, newer_topic, newer_data);
+
+	let older_parent_hash = H256::repeat_byte(0x61);
+	let (older_header, older_block_hash) =
+		make_execution_header(10, older_parent_hash, older_receipts_root);
+	let (newer_header, newer_block_hash) =
+		make_execution_header(11, older_block_hash, newer_receipts_root);
+	let anchor_block_hash = H256::repeat_byte(0x62);
+	let anchor = ExecutionHeaderAnchor {
+		block_number: 12,
+		block_hash: anchor_block_hash,
+		parent_hash: newer_block_hash,
+		receipts_root: H256::repeat_byte(0x63),
+	};
+	let proof_batch = EthereumReceiptLogProofBatch::<ConstU32<2>, ConstU32<1>> {
+		execution_block_proof: EthereumExecutionBlockProof {
+			anchor_block_hash,
+			target_to_anchor_header_chain: vec![older_header, newer_header]
+				.try_into()
+				.expect("two-hop shared chain stays within bounded header chain length"),
+		},
+		blocks: vec![
+			EthereumReceiptLogProofBlock::<ConstU32<1>> {
+				target_block_number: 10,
+				receipt_proof: older_receipt_proof,
+				receipt_logs: vec![older_receipt_log]
+					.try_into()
+					.expect("single receipt log stays within bounded log count"),
+			},
+			EthereumReceiptLogProofBlock::<ConstU32<1>> {
+				target_block_number: 11,
+				receipt_proof: newer_receipt_proof,
+				receipt_logs: vec![newer_receipt_log]
+					.try_into()
+					.expect("single receipt log stays within bounded log count"),
+			},
+		]
+		.try_into()
+		.expect("two proof blocks stay within bounded block count"),
+	};
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor_block_hash, anchor);
+		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(
+			&proof_batch,
+		));
 	});
 }
 

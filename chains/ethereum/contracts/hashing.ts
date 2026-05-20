@@ -1,50 +1,51 @@
 import type { Address, ContractFunctionArgs, Hex } from 'viem';
 import { encodeAbiParameters, keccak256, stringToHex } from 'viem';
-import { mintingGatewayV2Abi } from './generated.js';
+import { mintingGatewayAbi } from './generated.js';
 
-export const MINTING_GATEWAY_V2_UPDATE_KINDS = {
+export const MINTING_GATEWAY_UPDATE_KINDS = {
   globalIssuanceCouncilRotate: 0,
   mintingAuthorityActivate: 1,
   mintingAuthorityDeactivate: 2,
 } as const;
 
-export type MintingGatewayV2HashContext = {
+export type MintingGatewayHashContext = {
   chainId: bigint;
   gatewayAddress: Address;
 };
 
 type ApplyGatewayUpdatesArgs = ContractFunctionArgs<
-  typeof mintingGatewayV2Abi,
+  typeof mintingGatewayAbi,
   'nonpayable',
   'applyGatewayUpdates'
 >;
 type FinalizeTransferOutOfArgonArgs = ContractFunctionArgs<
-  typeof mintingGatewayV2Abi,
+  typeof mintingGatewayAbi,
   'nonpayable',
   'finalizeTransferOutOfArgon'
 >;
-type MigrateArgs = ContractFunctionArgs<typeof mintingGatewayV2Abi, 'nonpayable', 'migrate'>;
+type MigrateArgs = ContractFunctionArgs<typeof mintingGatewayAbi, 'nonpayable', 'migrate'>;
 
-export type MintingGatewayV2CouncilSnapshot = ApplyGatewayUpdatesArgs[0];
-export type MintingGatewayV2GatewayUpdate = ApplyGatewayUpdatesArgs[1][number];
-export type MintingGatewayV2TransferOutOfArgonRequest = FinalizeTransferOutOfArgonArgs[0];
-export type MintingGatewayV2TransferOutOfArgonProof = FinalizeTransferOutOfArgonArgs[1];
-export type MintingGatewayV2MintingAuthorization =
-  MintingGatewayV2TransferOutOfArgonProof['authorizations'][number];
-export type MintingGatewayV2MigrationAssetDistribution = MigrateArgs[0];
-export type MintingGatewayV2GlobalIssuanceCouncilRotateTarget = {
-  council: MintingGatewayV2CouncilSnapshot;
+export type MintingGatewayCouncilSnapshot = ApplyGatewayUpdatesArgs[0];
+export type MintingGatewayGatewayUpdate = ApplyGatewayUpdatesArgs[1][number];
+export type MintingGatewayTransferOutOfArgonRequest = FinalizeTransferOutOfArgonArgs[0];
+export type MintingGatewayTransferOutOfArgonProof = FinalizeTransferOutOfArgonArgs[1];
+export type MintingGatewayMintingAuthorization =
+  MintingGatewayTransferOutOfArgonProof['authorizations'][number];
+export type MintingGatewayMigrationAssetDistribution = MigrateArgs[0];
+export type MintingGatewayGlobalIssuanceCouncilRotateTarget = {
+  council: MintingGatewayCouncilSnapshot;
   microgonsPerArgonot: bigint;
 };
 
-export type MintingGatewayV2MintingAuthorityActivationTarget = {
+export type MintingGatewayMintingAuthorityActivationTarget = {
   mintingAuthorityId: Hex;
   microgonCollateral: bigint;
   micronotCollateral: bigint;
   signingKey: Address;
 };
 
-export type MintingGatewayV2MintingAuthorityDeactivateTarget = {
+export type MintingGatewayMintingAuthorityDeactivateTarget = {
+  mintingAuthorityId: Hex;
   signingKey: Address;
 };
 
@@ -52,32 +53,32 @@ type ActivateMintingAuthorityApprovalArgs = {
   queueNonce: bigint;
   approvingCouncilHash: Hex;
   previousUpdateHash: Hex;
-  target: MintingGatewayV2MintingAuthorityActivationTarget;
+  target: MintingGatewayMintingAuthorityActivationTarget;
 };
 
 type RotateGlobalIssuanceCouncilApprovalArgs = {
   queueNonce: bigint;
   approvingCouncilHash: Hex;
   previousUpdateHash: Hex;
-  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget;
+  target: MintingGatewayGlobalIssuanceCouncilRotateTarget;
 };
 
 type MintingAuthorizationHashArgs = {
-  request: MintingGatewayV2TransferOutOfArgonRequest;
-  microgonCollateral: MintingGatewayV2MintingAuthorization['microgonCollateral'];
-  micronotCollateral: MintingGatewayV2MintingAuthorization['micronotCollateral'];
+  request: MintingGatewayTransferOutOfArgonRequest;
+  microgonCollateral: MintingGatewayMintingAuthorization['microgonCollateral'];
+  micronotCollateral: MintingGatewayMintingAuthorization['micronotCollateral'];
 };
 
 type MintingAuthorityDeactivationHashArgs = {
   queueNonce: bigint;
-  target: MintingGatewayV2MintingAuthorityDeactivateTarget;
+  target: MintingGatewayMintingAuthorityDeactivateTarget;
   previousUpdateHash: Hex;
 };
 
 type GatewayUpdateApprovalArgs = {
   queueNonce: bigint;
   approvingCouncilHash: Hex;
-  kind: (typeof MINTING_GATEWAY_V2_UPDATE_KINDS)[keyof typeof MINTING_GATEWAY_V2_UPDATE_KINDS];
+  kind: (typeof MINTING_GATEWAY_UPDATE_KINDS)[keyof typeof MINTING_GATEWAY_UPDATE_KINDS];
   targetId: Hex;
   targetPayloadHash: Hex;
   previousUpdateHash: Hex;
@@ -118,6 +119,7 @@ const DEACTIVATION_TARGET_PARAMETERS = [
   {
     type: 'tuple',
     components: [
+      { name: 'mintingAuthorityId', type: 'bytes32' },
       { name: 'signingKey', type: 'address' },
     ],
   },
@@ -162,6 +164,7 @@ const MINTING_AUTHORITY_DEACTIVATION_PARAMETERS = [
   { type: 'uint256' },
   { type: 'address' },
   { type: 'uint64' },
+  { type: 'bytes32' },
   { type: 'address' },
   { type: 'bytes32' },
 ] as const;
@@ -201,43 +204,41 @@ const TRANSFER_OUT_OF_ARGON_AUTHORIZATION_TAG = keccak256(
   stringToHex('ARGON_TRANSFER_OUT_OF_ARGON_AUTHORIZATION'),
 );
 
-export function encodeMintingGatewayV2CouncilSnapshot(
-  snapshot: MintingGatewayV2CouncilSnapshot,
-): Hex {
+export function encodeMintingGatewayCouncilSnapshot(snapshot: MintingGatewayCouncilSnapshot): Hex {
   return encodeAbiParameters(
     [{ type: 'tuple', components: COUNCIL_SNAPSHOT_PARAMETERS }],
     [snapshot],
   );
 }
 
-export function encodeMintingGatewayV2GlobalIssuanceCouncilRotateTarget(
-  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget,
+export function encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(
+  target: MintingGatewayGlobalIssuanceCouncilRotateTarget,
 ): Hex {
   return encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS, [target]);
 }
 
-export function encodeMintingGatewayV2MintingAuthorityActivationTarget(
-  target: MintingGatewayV2MintingAuthorityActivationTarget,
+export function encodeMintingGatewayMintingAuthorityActivationTarget(
+  target: MintingGatewayMintingAuthorityActivationTarget,
 ): Hex {
   return encodeAbiParameters(ACTIVATION_TARGET_PARAMETERS, [target]);
 }
 
-export function encodeMintingGatewayV2MintingAuthorityDeactivateTarget(
-  target: MintingGatewayV2MintingAuthorityDeactivateTarget,
+export function encodeMintingGatewayMintingAuthorityDeactivateTarget(
+  target: MintingGatewayMintingAuthorityDeactivateTarget,
 ): Hex {
   return encodeAbiParameters(DEACTIVATION_TARGET_PARAMETERS, [target]);
 }
 
-export function hashMintingGatewayV2GlobalIssuanceCouncil(
-  snapshot: MintingGatewayV2CouncilSnapshot,
+export function hashMintingGatewayGlobalIssuanceCouncil(
+  snapshot: MintingGatewayCouncilSnapshot,
 ): Hex {
   return keccak256(
     encodeAbiParameters(COUNCIL_SNAPSHOT_PARAMETERS, [snapshot.signers, snapshot.weights]),
   );
 }
 
-export function hashMintingGatewayV2MintingAuthority(
-  target: MintingGatewayV2MintingAuthorityActivationTarget,
+export function hashMintingGatewayMintingAuthority(
+  target: MintingGatewayMintingAuthorityActivationTarget,
 ): Hex {
   return keccak256(
     encodeAbiParameters(MINTING_AUTHORITY_HASH_PARAMETERS, [
@@ -249,67 +250,67 @@ export function hashMintingGatewayV2MintingAuthority(
   );
 }
 
-export function hashMintingGatewayV2ActivateMintingAuthorityApproval(
-  context: MintingGatewayV2HashContext,
+export function hashMintingGatewayActivateMintingAuthorityApproval(
+  context: MintingGatewayHashContext,
   args: ActivateMintingAuthorityApprovalArgs,
 ): Hex {
-  return hashMintingGatewayV2GatewayUpdateApproval(context, {
+  return hashMintingGatewayGatewayUpdateApproval(context, {
     queueNonce: args.queueNonce,
     approvingCouncilHash: args.approvingCouncilHash,
-    kind: MINTING_GATEWAY_V2_UPDATE_KINDS.mintingAuthorityActivate,
+    kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityActivate,
     targetId: args.target.mintingAuthorityId,
-    targetPayloadHash: hashMintingGatewayV2ActivateMintingAuthority(context, args.target),
+    targetPayloadHash: hashMintingGatewayActivateMintingAuthority(context, args.target),
     previousUpdateHash: args.previousUpdateHash,
   });
 }
 
-export function hashMintingGatewayV2RotateGlobalIssuanceCouncilApproval(
-  context: MintingGatewayV2HashContext,
+export function hashMintingGatewayRotateGlobalIssuanceCouncilApproval(
+  context: MintingGatewayHashContext,
   args: RotateGlobalIssuanceCouncilApprovalArgs,
 ): Hex {
-  const nextCouncilHash = hashMintingGatewayV2GlobalIssuanceCouncil(args.target.council);
+  const nextCouncilHash = hashMintingGatewayGlobalIssuanceCouncil(args.target.council);
 
-  return hashMintingGatewayV2GatewayUpdateApproval(context, {
+  return hashMintingGatewayGatewayUpdateApproval(context, {
     queueNonce: args.queueNonce,
     approvingCouncilHash: args.approvingCouncilHash,
-    kind: MINTING_GATEWAY_V2_UPDATE_KINDS.globalIssuanceCouncilRotate,
+    kind: MINTING_GATEWAY_UPDATE_KINDS.globalIssuanceCouncilRotate,
     targetId: nextCouncilHash,
-    targetPayloadHash: hashMintingGatewayV2RotateGlobalIssuanceCouncil(context, args.target),
+    targetPayloadHash: hashMintingGatewayRotateGlobalIssuanceCouncil(context, args.target),
     previousUpdateHash: args.previousUpdateHash,
   });
 }
 
-export function hashMintingGatewayV2ActivateMintingAuthority(
-  context: MintingGatewayV2HashContext,
-  target: MintingGatewayV2MintingAuthorityActivationTarget,
+export function hashMintingGatewayActivateMintingAuthority(
+  context: MintingGatewayHashContext,
+  target: MintingGatewayMintingAuthorityActivationTarget,
 ): Hex {
   return keccak256(
     encodeAbiParameters(MINTING_AUTHORITY_ACTIVATION_PARAMETERS, [
       MINTING_AUTHORITY_ACTIVATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayV2MintingAuthority(target),
+      hashMintingGatewayMintingAuthority(target),
     ]),
   );
 }
 
-export function hashMintingGatewayV2RotateGlobalIssuanceCouncil(
-  context: MintingGatewayV2HashContext,
-  target: MintingGatewayV2GlobalIssuanceCouncilRotateTarget,
+export function hashMintingGatewayRotateGlobalIssuanceCouncil(
+  context: MintingGatewayHashContext,
+  target: MintingGatewayGlobalIssuanceCouncilRotateTarget,
 ): Hex {
   return keccak256(
     encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATION_PARAMETERS, [
       GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayV2GlobalIssuanceCouncil(target.council),
+      hashMintingGatewayGlobalIssuanceCouncil(target.council),
       target.microgonsPerArgonot,
     ]),
   );
 }
 
-export function hashMintingGatewayV2GatewayUpdateApproval(
-  context: MintingGatewayV2HashContext,
+export function hashMintingGatewayGatewayUpdateApproval(
+  context: MintingGatewayHashContext,
   args: GatewayUpdateApprovalArgs,
 ): Hex {
   return keccak256(
@@ -327,8 +328,8 @@ export function hashMintingGatewayV2GatewayUpdateApproval(
   );
 }
 
-export function hashMintingGatewayV2MintingAuthorityDeactivation(
-  context: MintingGatewayV2HashContext,
+export function hashMintingGatewayMintingAuthorityDeactivation(
+  context: MintingGatewayHashContext,
   args: MintingAuthorityDeactivationHashArgs,
 ): Hex {
   return keccak256(
@@ -337,14 +338,15 @@ export function hashMintingGatewayV2MintingAuthorityDeactivation(
       context.chainId,
       context.gatewayAddress,
       args.queueNonce,
+      args.target.mintingAuthorityId,
       args.target.signingKey,
       args.previousUpdateHash,
     ]),
   );
 }
 
-export function hashMintingGatewayV2TransferOutOfArgonRequest(
-  request: MintingGatewayV2TransferOutOfArgonRequest,
+export function hashMintingGatewayTransferOutOfArgonRequest(
+  request: MintingGatewayTransferOutOfArgonRequest,
 ): Hex {
   return keccak256(
     encodeAbiParameters(TRANSFER_OUT_OF_ARGON_REQUEST_PARAMETERS, [
@@ -361,8 +363,8 @@ export function hashMintingGatewayV2TransferOutOfArgonRequest(
   );
 }
 
-export function hashMintingGatewayV2MintingAuthorization(
-  context: MintingGatewayV2HashContext,
+export function hashMintingGatewayMintingAuthorization(
+  context: MintingGatewayHashContext,
   args: MintingAuthorizationHashArgs,
 ): Hex {
   return keccak256(
@@ -370,7 +372,7 @@ export function hashMintingGatewayV2MintingAuthorization(
       TRANSFER_OUT_OF_ARGON_AUTHORIZATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayV2TransferOutOfArgonRequest(args.request),
+      hashMintingGatewayTransferOutOfArgonRequest(args.request),
       args.microgonCollateral,
       args.micronotCollateral,
     ]),

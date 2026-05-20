@@ -1,4 +1,4 @@
-import { ArgonPrimitivesDigestsFrameInfo, getOfflineRegistry, Header } from './index';
+import { getOfflineRegistry, type ArgonPrimitivesDigestsFrameInfo, type Header } from './index';
 
 export function getTickFromHeader(header: Header): number | undefined {
   for (const x of header.digest.logs) {

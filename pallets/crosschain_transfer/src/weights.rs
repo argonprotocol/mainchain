@@ -1,13 +1,12 @@
 use argon_primitives::{
-	CurrentTransactionFeeProvider, CurrentTransactionFeeProviderWeightInfo, EthereumVerifyProvider,
-	EthereumVerifyProviderWeightInfo, UniswapTransferProviderWeightInfo,
+	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
 
 pub trait WeightInfo {
 	fn set_chain_config() -> Weight;
-	fn prove_transfer() -> Weight;
+	fn prove_gateway_activity(proof_blocks: u32, extra_activities: u32) -> Weight;
 	fn on_initialize_cleanup(expiring: u32) -> Weight;
 	fn provider_is_crosschain_activated() -> Weight;
 	fn provider_has_recent_argon_transfer() -> Weight;
@@ -15,33 +14,25 @@ pub trait WeightInfo {
 
 type EthereumVerifyProviderWeights<T> =
 	<<T as crate::Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
-type CurrentTransactionFeeProviderWeights<T> =
-	<<T as crate::Config>::CurrentTransactionFeeProvider as CurrentTransactionFeeProvider<
-		<T as crate::Config>::Balance,
-	>>::Weights;
 
-pub struct WithProviderWeights<
-	T,
-	Base,
-	EthereumVerifyWeight = EthereumVerifyProviderWeights<T>,
-	CurrentFeeWeight = CurrentTransactionFeeProviderWeights<T>,
->(PhantomData<(T, Base, EthereumVerifyWeight, CurrentFeeWeight)>);
-impl<T, Base, EthereumVerifyWeight, CurrentFeeWeight> WeightInfo
-	for WithProviderWeights<T, Base, EthereumVerifyWeight, CurrentFeeWeight>
+pub struct WithProviderWeights<T, Base, EthereumVerifyWeight = EthereumVerifyProviderWeights<T>>(
+	PhantomData<(T, Base, EthereumVerifyWeight)>,
+);
+impl<T, Base, EthereumVerifyWeight> WeightInfo
+	for WithProviderWeights<T, Base, EthereumVerifyWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	EthereumVerifyWeight: EthereumVerifyProviderWeightInfo,
-	CurrentFeeWeight: CurrentTransactionFeeProviderWeightInfo,
 {
 	fn set_chain_config() -> Weight {
 		Base::set_chain_config()
 	}
 
-	fn prove_transfer() -> Weight {
-		Base::prove_transfer()
-			.saturating_add(EthereumVerifyWeight::verify_event_log())
-			.saturating_add(CurrentFeeWeight::current_transaction_fee())
+	fn prove_gateway_activity(proof_blocks: u32, extra_activities: u32) -> Weight {
+		Base::prove_gateway_activity(proof_blocks, extra_activities).saturating_add(
+			EthereumVerifyWeight::verify_receipt_logs(proof_blocks, extra_activities),
+		)
 	}
 
 	fn on_initialize_cleanup(expiring: u32) -> Weight {
@@ -73,7 +64,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn prove_transfer() -> Weight {
+	fn prove_gateway_activity(_proof_blocks: u32, _extra_activities: u32) -> Weight {
 		Weight::zero()
 	}
 

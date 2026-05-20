@@ -1,7 +1,7 @@
 use crate as pallet_crosschain_transfer;
 use argon_primitives::{
-	CurrentTransactionFeeProvider, EthereumLog, EthereumProof, EthereumVerifyError,
-	EthereumVerifyProvider, OperationalAccountsHook,
+	EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider,
+	OperationalAccountsHook,
 };
 use frame_support::traits::StorageMapShim;
 use pallet_prelude::*;
@@ -39,10 +39,12 @@ parameter_types! {
 	pub CrosschainTransferEthereumBurnAccount: TestAccountId = CrosschainTransferPalletId::get()
 		.into_sub_account_truncating((crate::SourceChain::Ethereum, *b"burn"));
 	pub const RecentTransferRetentionTicks: Tick = 5;
+	pub const MaxActivitiesPerReceiptProof: u32 = 16;
+	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
 	pub static CurrentTick: Tick = 0;
 	pub static ProofVerificationAllowed: bool = true;
+	pub static ProofVerificationRejectedTransactionIndexes: Vec<u64> = Vec::new();
 	pub static ConfirmedTransfers: Vec<(TestAccountId, Balance)> = Vec::new();
-	pub static CurrentTransactionReimbursableFee: Option<Balance> = None;
 }
 
 impl pallet_balances::Config<ArgonToken> for Test {
@@ -87,15 +89,38 @@ pub struct MockEthereumVerifier;
 impl EthereumVerifyProvider for MockEthereumVerifier {
 	type Weights = ();
 
-	fn verify_event_log(
-		_event_log: &EthereumLog,
-		_proof: &EthereumProof,
-	) -> Result<(), EthereumVerifyError> {
-		if ProofVerificationAllowed::get() {
-			Ok(())
-		} else {
-			Err(EthereumVerifyError::InvalidProof)
+	fn verify_receipt_logs<MaxProofBlocks, MaxReceiptLogs>(
+		proof_batch: &EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxProofBlocks: Get<u32>,
+		MaxReceiptLogs: Get<u32>,
+	{
+		for proof_block in &proof_batch.blocks {
+			Self::verify_receipt_logs_internal(&proof_block.receipt_logs)?;
 		}
+
+		Ok(())
+	}
+}
+
+impl MockEthereumVerifier {
+	fn verify_receipt_logs_internal(
+		receipt_logs: &[EthereumReceiptLog],
+	) -> Result<(), EthereumVerifyError> {
+		if !ProofVerificationAllowed::get() {
+			return Err(EthereumVerifyError::InvalidProof);
+		}
+
+		let rejected_indexes = ProofVerificationRejectedTransactionIndexes::get();
+		if receipt_logs
+			.iter()
+			.any(|receipt_log| rejected_indexes.contains(&receipt_log.transaction_index))
+		{
+			return Err(EthereumVerifyError::InvalidProof);
+		}
+
+		Ok(())
 	}
 }
 
@@ -126,15 +151,6 @@ impl OperationalAccountsHook<TestAccountId, Balance> for MockOperationalAccounts
 	}
 }
 
-pub struct MockCurrentTransactionFeeProvider;
-impl CurrentTransactionFeeProvider<Balance> for MockCurrentTransactionFeeProvider {
-	type Weights = ();
-
-	fn reimbursable_fee() -> Option<Balance> {
-		CurrentTransactionReimbursableFee::get()
-	}
-}
-
 impl pallet_crosschain_transfer::Config for Test {
 	type Balance = Balance;
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
@@ -142,13 +158,19 @@ impl pallet_crosschain_transfer::Config for Test {
 	type OwnershipCurrency = Ownership;
 	type EthereumVerifier = MockEthereumVerifier;
 	type OperationalAccountsHook = MockOperationalAccountsHook;
-	type CurrentTransactionFeeProvider = MockCurrentTransactionFeeProvider;
 	type CurrentTick = CurrentTick;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
+	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
+	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type WeightInfo = ();
 }
 
 pub fn new_test_ext() -> TestState {
+	CurrentTick::set(0);
+	ProofVerificationAllowed::set(true);
+	ProofVerificationRejectedTransactionIndexes::set(Vec::new());
+	ConfirmedTransfers::set(Vec::new());
+
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_balances::GenesisConfig::<Test, ArgonToken> {
 			balances: vec![(account(1), 1_000_000), (legacy_token_gateway_account(), 200_000_000)],

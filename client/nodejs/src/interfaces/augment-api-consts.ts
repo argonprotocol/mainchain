@@ -1,12 +1,11 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
 import type {} from '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
-import type { bool, u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
+import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
@@ -166,6 +165,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       ethereumBurnAccount: AccountId32 & AugmentedConst<ApiType>;
       /**
+       * Maximum number of ordered gateway activities that may share one receipt proof.
+       **/
+      maxActivitiesPerReceiptProof: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum execution headers carried in one receipt proof's target-to-anchor chain.
+       **/
+      maxProofExecutionHeaderDepth: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of proved receipt proofs that may be supplied in one extrinsic.
+       **/
+      maxReceiptProofsPerExtrinsic: u32 & AugmentedConst<ApiType>;
+      /**
        * Retention window, in ticks, for recent Argon transfer evidence used by operational
        * accounts.
        **/
@@ -176,10 +187,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum gap between finalized headers for an update to be free.
        **/
       freeHeadersInterval: u32 & AugmentedConst<ApiType>;
-      /**
-       * Whether the read-only event-log verification API is enabled.
-       **/
-      verifyEventLogApiEnabled: bool & AugmentedConst<ApiType>;
     };
     grandpa: {
       /**

@@ -139,14 +139,12 @@ parameter_types! {
 			epoch: 100000000,
 		}
 	};
-	pub static VerifyEventLogApiEnabled: bool = true;
 }
 
 pub const FREE_SLOTS_INTERVAL: u32 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u32;
 
 impl ethereum_beacon_client::Config for Test {
 	type FreeHeadersInterval = ConstU32<FREE_SLOTS_INTERVAL>;
-	type VerifyEventLogApiEnabled = VerifyEventLogApiEnabled;
 	type WeightInfo = ();
 }
 

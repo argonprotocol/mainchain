@@ -18,7 +18,7 @@ export default defineConfig({
     const contractArtifacts = [
       ['artifacts/contracts/ArgonToken.sol/ArgonToken.json', 'ArgonToken.json'],
       ['artifacts/contracts/ArgonotToken.sol/ArgonotToken.json', 'ArgonotToken.json'],
-      ['artifacts/contracts/MintingGateway.sol/MintingGateway.json', 'MintingGateway.json'],
+      ['artifacts/contracts/MintingGatewayV2.sol/MintingGatewayV2.json', 'MintingGatewayV2.json'],
       ['artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json', 'ProxyAdmin.json'],
       [
         'artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json',

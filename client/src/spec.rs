@@ -40,7 +40,7 @@ pub mod api {
 		"EthereumVerifier",
 		"CrosschainTransfer",
 	];
-	pub static RUNTIME_APIS: [&str; 22usize] = [
+	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
 		"Metadata",
 		"RuntimeViewFunction",
@@ -60,7 +60,6 @@ pub mod api {
 		"NotebookApis",
 		"TickApis",
 		"BitcoinApis",
-		"EthereumApis",
 		"GrandpaApi",
 		"GenesisBuilder",
 	];
@@ -151,9 +150,6 @@ pub mod api {
 			}
 			pub fn bitcoin_apis(&self) -> bitcoin_apis::BitcoinApis {
 				bitcoin_apis::BitcoinApis
-			}
-			pub fn ethereum_apis(&self) -> ethereum_apis::EthereumApis {
-				ethereum_apis::EthereumApis
 			}
 			pub fn grandpa_api(&self) -> grandpa_api::GrandpaApi {
 				grandpa_api::GrandpaApi
@@ -1172,9 +1168,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							207u8, 140u8, 15u8, 198u8, 23u8, 123u8, 19u8, 43u8, 176u8, 53u8, 218u8,
-							2u8, 110u8, 1u8, 156u8, 146u8, 79u8, 31u8, 86u8, 38u8, 183u8, 31u8,
-							175u8, 51u8, 56u8, 150u8, 125u8, 103u8, 145u8, 186u8, 43u8, 206u8,
+							248u8, 40u8, 193u8, 86u8, 132u8, 75u8, 2u8, 37u8, 132u8, 143u8, 156u8,
+							141u8, 96u8, 99u8, 254u8, 194u8, 117u8, 185u8, 143u8, 6u8, 117u8,
+							178u8, 159u8, 59u8, 128u8, 122u8, 61u8, 48u8, 13u8, 47u8, 200u8, 101u8,
 						],
 					)
 				}
@@ -1192,10 +1188,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							18u8, 238u8, 176u8, 237u8, 60u8, 224u8, 215u8, 73u8, 252u8, 225u8,
-							221u8, 254u8, 69u8, 197u8, 56u8, 58u8, 120u8, 165u8, 146u8, 37u8, 30u8,
-							112u8, 28u8, 63u8, 100u8, 108u8, 31u8, 229u8, 222u8, 198u8, 88u8,
-							129u8,
+							58u8, 73u8, 154u8, 144u8, 87u8, 100u8, 31u8, 169u8, 231u8, 189u8,
+							189u8, 33u8, 227u8, 171u8, 150u8, 86u8, 234u8, 0u8, 79u8, 92u8, 171u8,
+							111u8, 248u8, 255u8, 70u8, 251u8, 174u8, 18u8, 48u8, 137u8, 106u8,
+							104u8,
 						],
 					)
 				}
@@ -2732,63 +2728,6 @@ pub mod api {
 				}
 			}
 		}
-		pub mod ethereum_apis {
-			use super::{root_mod, runtime_types};
-			pub struct EthereumApis;
-			impl EthereumApis {
-				pub fn verify_event_log(
-					&self,
-					event_log: types::verify_event_log::EventLog,
-					proof: types::verify_event_log::Proof,
-				) -> ::subxt::ext::subxt_core::runtime_api::payload::StaticPayload<
-					types::VerifyEventLog,
-					types::verify_event_log::output::Output,
-				> {
-					::subxt::ext::subxt_core::runtime_api::payload::StaticPayload::new_static(
-						"EthereumApis",
-						"verify_event_log",
-						types::VerifyEventLog { event_log, proof },
-						[
-							43u8, 165u8, 233u8, 54u8, 137u8, 50u8, 164u8, 173u8, 142u8, 162u8,
-							100u8, 190u8, 93u8, 247u8, 190u8, 42u8, 78u8, 122u8, 43u8, 27u8, 0u8,
-							238u8, 98u8, 25u8, 189u8, 45u8, 165u8, 123u8, 130u8, 102u8, 107u8,
-							200u8,
-						],
-					)
-				}
-			}
-			pub mod types {
-				use super::runtime_types;
-				pub mod verify_event_log {
-					use super::runtime_types;
-					pub type EventLog = runtime_types::argon_primitives::ethereum::EthereumLog;
-					pub type Proof = runtime_types::argon_primitives::ethereum::EthereumProof;
-					pub mod output {
-						use super::runtime_types;
-						pub type Output = ::core::result::Result<
-							(),
-							runtime_types::argon_primitives::ethereum::EthereumVerifyError,
-						>;
-					}
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct VerifyEventLog {
-					pub event_log: verify_event_log::EventLog,
-					pub proof: verify_event_log::Proof,
-				}
-			}
-		}
 		pub mod grandpa_api {
 			use super::{root_mod, runtime_types};
 			#[doc = " APIs for integrating the GRANDPA finality gadget into runtimes."]
@@ -3456,9 +3395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				31u8, 4u8, 192u8, 165u8, 134u8, 35u8, 185u8, 142u8, 165u8, 62u8, 216u8, 42u8, 5u8,
-				245u8, 97u8, 85u8, 39u8, 160u8, 82u8, 184u8, 148u8, 80u8, 58u8, 42u8, 117u8, 189u8,
-				125u8, 15u8, 31u8, 88u8, 67u8, 205u8,
+				154u8, 55u8, 168u8, 170u8, 103u8, 84u8, 76u8, 251u8, 30u8, 183u8, 53u8, 154u8,
+				104u8, 67u8, 50u8, 95u8, 131u8, 148u8, 18u8, 110u8, 209u8, 101u8, 169u8, 152u8,
+				244u8, 60u8, 235u8, 66u8, 183u8, 142u8, 244u8, 125u8,
 			]
 	}
 	pub mod system {
@@ -4582,10 +4521,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							151u8, 134u8, 76u8, 213u8, 195u8, 168u8, 35u8, 102u8, 138u8, 221u8,
-							126u8, 121u8, 187u8, 180u8, 69u8, 216u8, 114u8, 112u8, 142u8, 142u8,
-							75u8, 111u8, 74u8, 210u8, 231u8, 37u8, 92u8, 143u8, 160u8, 44u8, 193u8,
-							202u8,
+							245u8, 117u8, 140u8, 173u8, 134u8, 235u8, 182u8, 10u8, 175u8, 106u8,
+							224u8, 104u8, 10u8, 71u8, 23u8, 246u8, 162u8, 151u8, 10u8, 114u8, 5u8,
+							194u8, 191u8, 14u8, 16u8, 210u8, 192u8, 211u8, 190u8, 23u8, 113u8,
+							48u8,
 						],
 					)
 				}
@@ -5493,9 +5432,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							113u8, 242u8, 125u8, 227u8, 0u8, 185u8, 25u8, 193u8, 129u8, 59u8, 83u8,
-							71u8, 246u8, 50u8, 164u8, 204u8, 198u8, 52u8, 225u8, 37u8, 70u8, 182u8,
-							207u8, 22u8, 79u8, 228u8, 225u8, 31u8, 112u8, 108u8, 231u8, 160u8,
+							217u8, 44u8, 145u8, 32u8, 50u8, 107u8, 117u8, 237u8, 81u8, 203u8,
+							155u8, 58u8, 34u8, 76u8, 38u8, 109u8, 126u8, 96u8, 122u8, 241u8, 235u8,
+							112u8, 251u8, 69u8, 203u8, 143u8, 99u8, 173u8, 175u8, 41u8, 237u8,
+							167u8,
 						],
 					)
 				}
@@ -5560,10 +5500,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							166u8, 202u8, 171u8, 47u8, 76u8, 12u8, 85u8, 61u8, 8u8, 117u8, 46u8,
-							216u8, 121u8, 253u8, 106u8, 63u8, 126u8, 152u8, 18u8, 233u8, 89u8,
-							128u8, 17u8, 160u8, 28u8, 144u8, 157u8, 39u8, 174u8, 122u8, 82u8,
-							110u8,
+							13u8, 89u8, 181u8, 37u8, 29u8, 88u8, 7u8, 8u8, 129u8, 80u8, 253u8,
+							16u8, 245u8, 54u8, 180u8, 171u8, 211u8, 110u8, 88u8, 203u8, 100u8,
+							101u8, 78u8, 178u8, 103u8, 131u8, 58u8, 236u8, 32u8, 81u8, 32u8, 199u8,
 						],
 					)
 				}
@@ -6468,9 +6407,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							95u8, 189u8, 0u8, 241u8, 60u8, 55u8, 12u8, 178u8, 131u8, 60u8, 114u8,
-							204u8, 155u8, 208u8, 128u8, 40u8, 247u8, 196u8, 141u8, 199u8, 40u8,
-							133u8, 158u8, 46u8, 169u8, 47u8, 215u8, 81u8, 30u8, 247u8, 218u8, 30u8,
+							22u8, 106u8, 53u8, 55u8, 177u8, 108u8, 130u8, 148u8, 12u8, 142u8,
+							142u8, 48u8, 145u8, 213u8, 1u8, 209u8, 141u8, 249u8, 79u8, 169u8, 15u8,
+							61u8, 97u8, 239u8, 174u8, 31u8, 126u8, 133u8, 98u8, 51u8, 30u8, 24u8,
 						],
 					)
 				}
@@ -6731,10 +6670,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							81u8, 246u8, 236u8, 174u8, 114u8, 37u8, 248u8, 166u8, 216u8, 159u8,
-							242u8, 213u8, 254u8, 116u8, 255u8, 154u8, 74u8, 166u8, 112u8, 30u8,
-							143u8, 110u8, 167u8, 32u8, 205u8, 202u8, 89u8, 143u8, 236u8, 189u8,
-							113u8, 229u8,
+							196u8, 212u8, 173u8, 155u8, 222u8, 47u8, 172u8, 30u8, 251u8, 206u8,
+							152u8, 249u8, 164u8, 146u8, 21u8, 145u8, 140u8, 108u8, 232u8, 255u8,
+							232u8, 152u8, 138u8, 109u8, 1u8, 46u8, 68u8, 228u8, 211u8, 114u8, 11u8,
+							127u8,
 						],
 					)
 				}
@@ -6783,9 +6722,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							0u8, 126u8, 142u8, 2u8, 129u8, 223u8, 158u8, 196u8, 9u8, 116u8, 21u8,
-							133u8, 156u8, 253u8, 187u8, 229u8, 18u8, 49u8, 213u8, 59u8, 186u8,
-							40u8, 113u8, 91u8, 113u8, 215u8, 197u8, 10u8, 197u8, 186u8, 2u8, 135u8,
+							135u8, 80u8, 240u8, 140u8, 59u8, 177u8, 250u8, 154u8, 112u8, 21u8, 4u8,
+							52u8, 23u8, 40u8, 16u8, 36u8, 225u8, 190u8, 29u8, 31u8, 52u8, 50u8,
+							167u8, 87u8, 134u8, 245u8, 224u8, 201u8, 245u8, 33u8, 122u8, 62u8,
 						],
 					)
 				}
@@ -21192,9 +21131,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							77u8, 206u8, 31u8, 47u8, 173u8, 99u8, 218u8, 167u8, 220u8, 74u8, 197u8,
-							72u8, 17u8, 132u8, 110u8, 207u8, 245u8, 220u8, 129u8, 140u8, 2u8,
-							131u8, 71u8, 169u8, 131u8, 55u8, 53u8, 65u8, 181u8, 36u8, 138u8, 5u8,
+							89u8, 157u8, 5u8, 87u8, 197u8, 201u8, 183u8, 86u8, 86u8, 2u8, 128u8,
+							229u8, 46u8, 21u8, 49u8, 103u8, 191u8, 184u8, 72u8, 205u8, 62u8, 132u8,
+							202u8, 93u8, 59u8, 178u8, 91u8, 133u8, 3u8, 82u8, 60u8, 82u8,
 						],
 					)
 				}
@@ -21224,10 +21163,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							40u8, 182u8, 117u8, 90u8, 230u8, 65u8, 31u8, 226u8, 198u8, 251u8,
-							255u8, 86u8, 85u8, 224u8, 184u8, 101u8, 38u8, 115u8, 67u8, 187u8,
-							253u8, 220u8, 96u8, 70u8, 35u8, 93u8, 127u8, 81u8, 239u8, 167u8, 2u8,
-							136u8,
+							165u8, 195u8, 179u8, 200u8, 57u8, 123u8, 48u8, 233u8, 78u8, 38u8,
+							130u8, 69u8, 86u8, 20u8, 248u8, 81u8, 210u8, 212u8, 6u8, 89u8, 195u8,
+							45u8, 0u8, 226u8, 42u8, 133u8, 95u8, 120u8, 32u8, 59u8, 199u8, 135u8,
 						],
 					)
 				}
@@ -21253,10 +21191,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							141u8, 184u8, 197u8, 191u8, 117u8, 56u8, 30u8, 189u8, 67u8, 134u8,
-							120u8, 119u8, 101u8, 102u8, 142u8, 191u8, 58u8, 39u8, 110u8, 136u8,
-							86u8, 154u8, 253u8, 191u8, 154u8, 48u8, 67u8, 186u8, 153u8, 5u8, 107u8,
-							223u8,
+							13u8, 92u8, 68u8, 210u8, 107u8, 222u8, 234u8, 104u8, 235u8, 170u8,
+							179u8, 57u8, 24u8, 129u8, 55u8, 147u8, 93u8, 10u8, 245u8, 66u8, 134u8,
+							221u8, 86u8, 77u8, 10u8, 157u8, 102u8, 101u8, 59u8, 117u8, 132u8,
+							145u8,
 						],
 					)
 				}
@@ -21279,10 +21217,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							236u8, 64u8, 205u8, 206u8, 82u8, 251u8, 144u8, 176u8, 21u8, 170u8,
-							164u8, 153u8, 189u8, 105u8, 85u8, 177u8, 145u8, 40u8, 243u8, 168u8,
-							28u8, 148u8, 153u8, 176u8, 5u8, 170u8, 152u8, 48u8, 249u8, 59u8, 176u8,
-							96u8,
+							75u8, 9u8, 95u8, 226u8, 27u8, 39u8, 236u8, 254u8, 139u8, 150u8, 180u8,
+							4u8, 86u8, 56u8, 195u8, 44u8, 45u8, 43u8, 25u8, 5u8, 206u8, 230u8,
+							214u8, 21u8, 160u8, 3u8, 43u8, 114u8, 65u8, 152u8, 137u8, 84u8,
 						],
 					)
 				}
@@ -21308,9 +21245,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							81u8, 90u8, 121u8, 175u8, 24u8, 76u8, 37u8, 78u8, 94u8, 183u8, 97u8,
-							171u8, 113u8, 229u8, 163u8, 237u8, 71u8, 177u8, 114u8, 145u8, 221u8,
-							154u8, 95u8, 94u8, 173u8, 75u8, 205u8, 92u8, 24u8, 82u8, 114u8, 75u8,
+							219u8, 149u8, 170u8, 68u8, 23u8, 36u8, 58u8, 85u8, 222u8, 197u8, 239u8,
+							233u8, 134u8, 206u8, 108u8, 43u8, 182u8, 82u8, 92u8, 157u8, 201u8,
+							180u8, 60u8, 158u8, 159u8, 219u8, 166u8, 136u8, 234u8, 222u8, 202u8,
+							212u8,
 						],
 					)
 				}
@@ -21333,9 +21271,9 @@ pub mod api {
 							weight,
 						},
 						[
-							131u8, 57u8, 225u8, 221u8, 0u8, 5u8, 19u8, 39u8, 187u8, 154u8, 214u8,
-							101u8, 237u8, 16u8, 122u8, 198u8, 45u8, 153u8, 46u8, 23u8, 91u8, 192u8,
-							144u8, 169u8, 220u8, 189u8, 164u8, 205u8, 63u8, 229u8, 161u8, 230u8,
+							232u8, 96u8, 55u8, 179u8, 92u8, 102u8, 187u8, 44u8, 100u8, 235u8,
+							175u8, 38u8, 104u8, 17u8, 50u8, 20u8, 190u8, 104u8, 233u8, 65u8, 97u8,
+							124u8, 204u8, 16u8, 34u8, 244u8, 17u8, 250u8, 175u8, 65u8, 11u8, 27u8,
 						],
 					)
 				}
@@ -21375,10 +21313,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							236u8, 251u8, 149u8, 86u8, 107u8, 98u8, 98u8, 178u8, 251u8, 23u8, 23u8,
-							242u8, 165u8, 192u8, 126u8, 224u8, 168u8, 138u8, 66u8, 139u8, 177u8,
-							36u8, 34u8, 160u8, 245u8, 180u8, 44u8, 169u8, 249u8, 163u8, 113u8,
-							82u8,
+							222u8, 94u8, 199u8, 127u8, 9u8, 170u8, 47u8, 114u8, 44u8, 189u8, 58u8,
+							176u8, 131u8, 186u8, 223u8, 111u8, 88u8, 99u8, 6u8, 60u8, 70u8, 167u8,
+							212u8, 70u8, 87u8, 253u8, 176u8, 95u8, 138u8, 163u8, 5u8, 40u8,
 						],
 					)
 				}
@@ -21401,9 +21338,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							73u8, 43u8, 169u8, 94u8, 70u8, 130u8, 181u8, 174u8, 62u8, 121u8, 117u8,
-							51u8, 137u8, 222u8, 180u8, 206u8, 232u8, 67u8, 6u8, 154u8, 249u8,
-							154u8, 46u8, 6u8, 144u8, 216u8, 196u8, 30u8, 87u8, 171u8, 43u8, 12u8,
+							213u8, 84u8, 241u8, 82u8, 1u8, 219u8, 102u8, 208u8, 184u8, 38u8, 191u8,
+							102u8, 39u8, 148u8, 44u8, 43u8, 45u8, 98u8, 133u8, 94u8, 159u8, 68u8,
+							116u8, 227u8, 193u8, 111u8, 161u8, 26u8, 111u8, 89u8, 136u8, 203u8,
 						],
 					)
 				}
@@ -21739,9 +21676,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							90u8, 3u8, 133u8, 217u8, 33u8, 182u8, 73u8, 132u8, 110u8, 56u8, 6u8,
-							253u8, 88u8, 6u8, 79u8, 96u8, 102u8, 153u8, 59u8, 103u8, 81u8, 150u8,
-							178u8, 232u8, 180u8, 229u8, 97u8, 26u8, 104u8, 48u8, 147u8, 20u8,
+							170u8, 130u8, 84u8, 202u8, 92u8, 22u8, 57u8, 129u8, 204u8, 128u8,
+							154u8, 113u8, 16u8, 194u8, 19u8, 199u8, 12u8, 98u8, 53u8, 0u8, 24u8,
+							33u8, 89u8, 215u8, 40u8, 131u8, 233u8, 82u8, 72u8, 217u8, 102u8, 233u8,
 						],
 					)
 				}
@@ -21764,10 +21701,9 @@ pub mod api {
 							weight,
 						},
 						[
-							67u8, 123u8, 188u8, 54u8, 238u8, 134u8, 231u8, 192u8, 152u8, 161u8,
-							81u8, 241u8, 169u8, 223u8, 20u8, 232u8, 201u8, 218u8, 105u8, 211u8,
-							86u8, 38u8, 205u8, 116u8, 177u8, 254u8, 117u8, 110u8, 215u8, 47u8,
-							37u8, 225u8,
+							5u8, 26u8, 73u8, 67u8, 121u8, 152u8, 74u8, 243u8, 219u8, 117u8, 144u8,
+							16u8, 95u8, 3u8, 222u8, 10u8, 252u8, 110u8, 88u8, 58u8, 56u8, 247u8,
+							105u8, 65u8, 15u8, 211u8, 7u8, 4u8, 15u8, 162u8, 146u8, 36u8,
 						],
 					)
 				}
@@ -21805,10 +21741,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							39u8, 169u8, 111u8, 46u8, 163u8, 171u8, 102u8, 207u8, 59u8, 127u8,
-							218u8, 171u8, 124u8, 16u8, 123u8, 255u8, 218u8, 4u8, 235u8, 51u8,
-							122u8, 82u8, 164u8, 108u8, 236u8, 205u8, 132u8, 175u8, 48u8, 149u8,
-							114u8, 178u8,
+							0u8, 24u8, 43u8, 57u8, 28u8, 206u8, 86u8, 139u8, 143u8, 249u8, 34u8,
+							226u8, 30u8, 61u8, 222u8, 56u8, 96u8, 242u8, 117u8, 211u8, 115u8,
+							231u8, 85u8, 89u8, 198u8, 106u8, 197u8, 106u8, 72u8, 144u8, 120u8,
+							152u8,
 						],
 					)
 				}
@@ -24627,22 +24563,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Whether the read-only event-log verification API is enabled."]
-				pub fn verify_event_log_api_enabled(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::bool,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"EthereumVerifier",
-						"VerifyEventLogApiEnabled",
-						[
-							165u8, 28u8, 112u8, 190u8, 18u8, 129u8, 182u8, 206u8, 237u8, 1u8, 68u8,
-							252u8, 125u8, 234u8, 185u8, 50u8, 149u8, 164u8, 47u8, 126u8, 134u8,
-							100u8, 14u8, 86u8, 209u8, 39u8, 20u8, 4u8, 233u8, 115u8, 102u8, 131u8,
-						],
-					)
-				}
 			}
 		}
 	}
@@ -24693,17 +24613,24 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct ProveTransfer {
-					pub proof: prove_transfer::Proof,
+				pub struct ProveGatewayActivity {
+					pub source_chain: prove_gateway_activity::SourceChain,
+					#[codec(compact)]
+					pub previous_gateway_activity_nonce:
+						prove_gateway_activity::PreviousGatewayActivityNonce,
+					pub proof_batch: prove_gateway_activity::ProofBatch,
 				}
-				pub mod prove_transfer {
+				pub mod prove_gateway_activity {
 					use super::runtime_types;
-					pub type Proof =
-						runtime_types::pallet_crosschain_transfer::pallet::TransferProof;
+					pub type SourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type PreviousGatewayActivityNonce = ::core::primitive::u64;
+					pub type ProofBatch =
+						runtime_types::argon_primitives::ethereum::EthereumReceiptLogProofBatch;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProveTransfer {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProveGatewayActivity {
 					const PALLET: &'static str = "CrosschainTransfer";
-					const CALL: &'static str = "prove_transfer";
+					const CALL: &'static str = "prove_gateway_activity";
 				}
 			}
 			pub struct TransactionApi;
@@ -24718,26 +24645,33 @@ pub mod api {
 						"set_chain_config",
 						types::SetChainConfig { config },
 						[
-							249u8, 173u8, 187u8, 89u8, 23u8, 103u8, 187u8, 12u8, 108u8, 103u8,
-							183u8, 30u8, 200u8, 81u8, 227u8, 252u8, 9u8, 45u8, 125u8, 134u8, 207u8,
-							75u8, 255u8, 246u8, 207u8, 21u8, 186u8, 146u8, 95u8, 178u8, 203u8,
-							64u8,
+							255u8, 113u8, 163u8, 82u8, 62u8, 198u8, 84u8, 61u8, 226u8, 234u8,
+							227u8, 65u8, 206u8, 143u8, 2u8, 87u8, 244u8, 81u8, 173u8, 32u8, 88u8,
+							203u8, 48u8, 16u8, 164u8, 144u8, 104u8, 149u8, 250u8, 167u8, 152u8,
+							255u8,
 						],
 					)
 				}
-				pub fn prove_transfer(
+				pub fn prove_gateway_activity(
 					&self,
-					proof: types::prove_transfer::Proof,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ProveTransfer>
+					source_chain: types::prove_gateway_activity::SourceChain,
+					previous_gateway_activity_nonce : types :: prove_gateway_activity :: PreviousGatewayActivityNonce,
+					proof_batch: types::prove_gateway_activity::ProofBatch,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ProveGatewayActivity>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"CrosschainTransfer",
-						"prove_transfer",
-						types::ProveTransfer { proof },
+						"prove_gateway_activity",
+						types::ProveGatewayActivity {
+							source_chain,
+							previous_gateway_activity_nonce,
+							proof_batch,
+						},
 						[
-							132u8, 225u8, 66u8, 171u8, 28u8, 205u8, 82u8, 71u8, 252u8, 26u8, 228u8,
-							210u8, 53u8, 65u8, 244u8, 51u8, 170u8, 83u8, 116u8, 149u8, 48u8, 208u8,
-							109u8, 0u8, 244u8, 159u8, 2u8, 127u8, 224u8, 85u8, 116u8, 99u8,
+							219u8, 131u8, 216u8, 145u8, 0u8, 119u8, 58u8, 235u8, 118u8, 128u8,
+							165u8, 18u8, 56u8, 25u8, 210u8, 35u8, 69u8, 51u8, 72u8, 215u8, 204u8,
+							241u8, 100u8, 222u8, 98u8, 184u8, 233u8, 19u8, 204u8, 169u8, 64u8,
+							102u8,
 						],
 					)
 				}
@@ -24755,20 +24689,45 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An inbound burn notice was accepted and settled locally."]
-			pub struct BurnNoticeAccepted {
-				pub source_chain: burn_notice_accepted::SourceChain,
-				pub notice: burn_notice_accepted::Notice,
+			#[doc = "A `TransferToArgonStarted` activity was proved and settled locally."]
+			pub struct TransferToArgonSettled {
+				pub source_chain: transfer_to_argon_settled::SourceChain,
+				pub transfer: transfer_to_argon_settled::Transfer,
 			}
-			pub mod burn_notice_accepted {
+			pub mod transfer_to_argon_settled {
 				use super::runtime_types;
 				pub type SourceChain =
 					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
-				pub type Notice = runtime_types::pallet_crosschain_transfer::pallet::BurnNotice;
+				pub type Transfer =
+					runtime_types::pallet_crosschain_transfer::pallet::TransferToArgonActivity;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for BurnNoticeAccepted {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferToArgonSettled {
 				const PALLET: &'static str = "CrosschainTransfer";
-				const EVENT: &'static str = "BurnNoticeAccepted";
+				const EVENT: &'static str = "TransferToArgonSettled";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The stored gateway-state snapshot advanced after a proved contiguous batch."]
+			pub struct GatewayStateAdvanced {
+				pub source_chain: gateway_state_advanced::SourceChain,
+				pub gateway_state: gateway_state_advanced::GatewayState,
+			}
+			pub mod gateway_state_advanced {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type GatewayState =
+					runtime_types::pallet_crosschain_transfer::pallet::GatewayState;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewayStateAdvanced {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "GatewayStateAdvanced";
 			}
 		}
 		pub mod storage {
@@ -24782,13 +24741,12 @@ pub mod api {
 					pub type Param0 =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
-				pub mod nonce_by_source_account {
+				pub mod gateway_state_by_source_chain {
 					use super::runtime_types;
-					pub type NonceBySourceAccount = ::core::primitive::u64;
-					pub type Param0 = (
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
-						::subxt::ext::subxt_core::utils::H160,
-					);
+					pub type GatewayStateBySourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::GatewayState;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
 				pub mod recent_argon_transfers_by_account {
 					use super::runtime_types;
@@ -24823,10 +24781,10 @@ pub mod api {
 						"ChainConfigBySourceChain",
 						(),
 						[
-							80u8, 106u8, 157u8, 238u8, 201u8, 244u8, 214u8, 215u8, 165u8, 7u8,
-							233u8, 203u8, 198u8, 92u8, 90u8, 182u8, 15u8, 93u8, 88u8, 241u8, 201u8,
-							161u8, 2u8, 50u8, 251u8, 134u8, 59u8, 223u8, 180u8, 163u8, 234u8,
-							205u8,
+							235u8, 158u8, 81u8, 16u8, 215u8, 90u8, 157u8, 171u8, 243u8, 56u8,
+							119u8, 201u8, 43u8, 253u8, 115u8, 255u8, 144u8, 93u8, 235u8, 133u8,
+							242u8, 253u8, 149u8, 26u8, 39u8, 209u8, 71u8, 79u8, 132u8, 247u8, 29u8,
+							26u8,
 						],
 					)
 				}
@@ -24848,55 +24806,55 @@ pub mod api {
 						"ChainConfigBySourceChain",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							80u8, 106u8, 157u8, 238u8, 201u8, 244u8, 214u8, 215u8, 165u8, 7u8,
-							233u8, 203u8, 198u8, 92u8, 90u8, 182u8, 15u8, 93u8, 88u8, 241u8, 201u8,
-							161u8, 2u8, 50u8, 251u8, 134u8, 59u8, 223u8, 180u8, 163u8, 234u8,
-							205u8,
+							235u8, 158u8, 81u8, 16u8, 215u8, 90u8, 157u8, 171u8, 243u8, 56u8,
+							119u8, 201u8, 43u8, 253u8, 115u8, 255u8, 144u8, 93u8, 235u8, 133u8,
+							242u8, 253u8, 149u8, 26u8, 39u8, 209u8, 71u8, 79u8, 132u8, 247u8, 29u8,
+							26u8,
 						],
 					)
 				}
-				#[doc = " Latest accepted nonce for each `(source_chain, from)` pair."]
-				pub fn nonce_by_source_account_iter(
+				#[doc = " Latest proven gateway activity snapshot for each source chain."]
+				pub fn gateway_state_by_source_chain_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::nonce_by_source_account::NonceBySourceAccount,
+					types::gateway_state_by_source_chain::GatewayStateBySourceChain,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
-						"NonceBySourceAccount",
+						"GatewayStateBySourceChain",
 						(),
 						[
-							33u8, 64u8, 255u8, 249u8, 131u8, 158u8, 125u8, 45u8, 118u8, 14u8, 59u8,
-							27u8, 216u8, 153u8, 36u8, 212u8, 105u8, 59u8, 113u8, 132u8, 87u8,
-							246u8, 88u8, 36u8, 76u8, 183u8, 255u8, 60u8, 245u8, 185u8, 41u8, 183u8,
+							54u8, 104u8, 149u8, 30u8, 46u8, 214u8, 251u8, 91u8, 50u8, 92u8, 121u8,
+							76u8, 13u8, 235u8, 8u8, 34u8, 110u8, 36u8, 60u8, 45u8, 97u8, 108u8,
+							172u8, 170u8, 17u8, 107u8, 244u8, 110u8, 100u8, 244u8, 231u8, 190u8,
 						],
 					)
 				}
-				#[doc = " Latest accepted nonce for each `(source_chain, from)` pair."]
-				pub fn nonce_by_source_account(
+				#[doc = " Latest proven gateway activity snapshot for each source chain."]
+				pub fn gateway_state_by_source_chain(
 					&self,
-					_0: types::nonce_by_source_account::Param0,
+					_0: types::gateway_state_by_source_chain::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::nonce_by_source_account::Param0,
+						types::gateway_state_by_source_chain::Param0,
 					>,
-					types::nonce_by_source_account::NonceBySourceAccount,
+					types::gateway_state_by_source_chain::GatewayStateBySourceChain,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
-						"NonceBySourceAccount",
+						"GatewayStateBySourceChain",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							33u8, 64u8, 255u8, 249u8, 131u8, 158u8, 125u8, 45u8, 118u8, 14u8, 59u8,
-							27u8, 216u8, 153u8, 36u8, 212u8, 105u8, 59u8, 113u8, 132u8, 87u8,
-							246u8, 88u8, 36u8, 76u8, 183u8, 255u8, 60u8, 245u8, 185u8, 41u8, 183u8,
+							54u8, 104u8, 149u8, 30u8, 46u8, 214u8, 251u8, 91u8, 50u8, 92u8, 121u8,
+							76u8, 13u8, 235u8, 8u8, 34u8, 110u8, 36u8, 60u8, 45u8, 97u8, 108u8,
+							172u8, 170u8, 17u8, 107u8, 244u8, 110u8, 100u8, 244u8, 231u8, 190u8,
 						],
 					)
 				}
@@ -25052,6 +25010,57 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of ordered gateway activities that may share one receipt proof."]
+				pub fn max_activities_per_receipt_proof(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxActivitiesPerReceiptProof",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of proved receipt proofs that may be supplied in one extrinsic."]
+				pub fn max_receipt_proofs_per_extrinsic(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxReceiptProofsPerExtrinsic",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum execution headers carried in one receipt proof's target-to-anchor chain."]
+				pub fn max_proof_execution_header_depth(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"max_proof_execution_header_depth",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -26033,6 +26042,28 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct EthereumCombinedReceiptProof {
+					pub nodes: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
+					>,
+					pub receipts: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::argon_primitives::ethereum::EthereumReceiptProofReceipt,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct EthereumExecutionBlockProof {
 					pub anchor_block_hash: crate::types::H256,
 					pub target_to_anchor_header_chain:
@@ -26090,11 +26121,10 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct EthereumProof {
-					pub execution_block_proof:
-						runtime_types::argon_primitives::ethereum::EthereumExecutionBlockProof,
-					pub receipt_proof:
-						runtime_types::argon_primitives::ethereum::EthereumReceiptProof,
+				pub struct EthereumReceiptLog {
+					#[codec(compact)]
+					pub transaction_index: ::core::primitive::u64,
+					pub event_log: runtime_types::argon_primitives::ethereum::EthereumLog,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -26108,13 +26138,11 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct EthereumReceiptProof {
-					#[codec(compact)]
-					pub transaction_index: ::core::primitive::u64,
-					pub nodes: runtime_types::bounded_collections::bounded_vec::BoundedVec<
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>,
+				pub struct EthereumReceiptLogProofBatch {
+					pub execution_block_proof:
+						runtime_types::argon_primitives::ethereum::EthereumExecutionBlockProof,
+					pub blocks: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::argon_primitives::ethereum::EthereumReceiptLogProofBlock,
 					>,
 				}
 				#[derive(
@@ -26129,19 +26157,33 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub enum EthereumVerifyError {
-					#[codec(index = 0)]
-					VerifierUnavailable,
-					#[codec(index = 1)]
-					AnchorNotFound,
-					#[codec(index = 2)]
-					InvalidHeader,
-					#[codec(index = 3)]
-					InvalidHeaderChain,
-					#[codec(index = 4)]
-					LogNotFound,
-					#[codec(index = 5)]
-					InvalidProof,
+				pub struct EthereumReceiptLogProofBlock {
+					#[codec(compact)]
+					pub target_block_number: ::core::primitive::u64,
+					pub receipt_proof:
+						runtime_types::argon_primitives::ethereum::EthereumCombinedReceiptProof,
+					pub receipt_logs: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::argon_primitives::ethereum::EthereumReceiptLog,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumReceiptProofReceipt {
+					#[codec(compact)]
+					pub transaction_index: ::core::primitive::u64,
+					pub node_indexes: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						::core::primitive::u16,
+					>,
 				}
 			}
 			pub mod fork_power {
@@ -29418,26 +29460,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct BurnNotice {
-					pub from: ::subxt::ext::subxt_core::utils::H160,
-					pub to: crate::types::AccountId32,
-					pub asset_kind: runtime_types::pallet_crosschain_transfer::pallet::AssetKind,
-					pub amount: ::core::primitive::u128,
-					#[codec(compact)]
-					pub account_nonce: ::core::primitive::u64,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
@@ -29445,8 +29467,13 @@ pub mod api {
 						config: runtime_types::pallet_crosschain_transfer::pallet::ChainConfig,
 					},
 					#[codec(index = 1)]
-					prove_transfer {
-						proof: runtime_types::pallet_crosschain_transfer::pallet::TransferProof,
+					prove_gateway_activity {
+						source_chain:
+							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+						#[codec(compact)]
+						previous_gateway_activity_nonce: ::core::primitive::u64,
+						proof_batch:
+							runtime_types::argon_primitives::ethereum::EthereumReceiptLogProofBatch,
 					},
 				}
 				#[derive(
@@ -29467,9 +29494,6 @@ pub mod api {
 						gateway: ::subxt::ext::subxt_core::utils::H160,
 						argon_token: ::subxt::ext::subxt_core::utils::H160,
 						argonot_token: ::subxt::ext::subxt_core::utils::H160,
-						previous_gateway:
-							::core::option::Option<::subxt::ext::subxt_core::utils::H160>,
-						previous_release_expiration: ::core::option::Option<::core::primitive::u64>,
 					},
 				}
 				#[derive(
@@ -29487,38 +29511,41 @@ pub mod api {
 				#[doc = "The `Error` enum of this pallet."]
 				pub enum Error {
 					#[codec(index = 0)]
-					#[doc = "The Ethereum event topics or payload do not match `BurnForTransfer`."]
-					InvalidEthereumEvent,
+					#[doc = "The Ethereum event topics or payload do not match `TransferToArgonStarted`."]
+					InvalidTransferToArgonActivity,
 					#[codec(index = 1)]
+					#[doc = "At least one proved gateway-activity block must be supplied."]
+					NoGatewayProofBlocksProvided,
+					#[codec(index = 2)]
+					#[doc = "At least one gateway activity log must be supplied with the receipt proof."]
+					NoGatewayActivitiesProvided,
+					#[codec(index = 3)]
 					#[doc = "The Ethereum verifier rejected the supplied proof."]
 					InvalidProof,
-					#[codec(index = 2)]
+					#[codec(index = 4)]
 					#[doc = "The destination account bytes could not be decoded into a local account id."]
 					InvalidRecipient,
-					#[codec(index = 3)]
-					#[doc = "The claimed amount was zero or too large for the local balance type."]
-					InvalidAmount,
-					#[codec(index = 4)]
+					#[codec(index = 5)]
 					#[doc = "The source chain is not configured for inbound claims."]
 					UnsupportedSource,
-					#[codec(index = 5)]
-					#[doc = "The gateway does not match the active or still-accepted previous release."]
-					UnsupportedGateway,
 					#[codec(index = 6)]
-					#[doc = "The token is not supported under the matched gateway release."]
-					UnsupportedToken,
+					#[doc = "The gateway does not match the configured gateway address."]
+					UnsupportedGateway,
 					#[codec(index = 7)]
-					#[doc = "The claim nonce is not exactly the next accepted nonce for the source account."]
-					UnexpectedNonce,
+					#[doc = "The token is not supported under the configured gateway."]
+					UnsupportedToken,
 					#[codec(index = 8)]
+					#[doc = "The caller's expected already-proven gateway activity nonce is stale or incorrect."]
+					UnexpectedPreviousGatewayActivityNonce,
+					#[codec(index = 9)]
+					#[doc = "The proven gateway activity nonce is not the next contiguous nonce."]
+					UnexpectedGatewayActivityNonce,
+					#[codec(index = 10)]
 					#[doc = "The configured source-chain shape is incomplete or malformed."]
 					InvalidChainConfig,
-					#[codec(index = 9)]
+					#[codec(index = 11)]
 					#[doc = "The burn account lacks enough balance for the payout."]
 					InsufficientLiquidity,
-					#[codec(index = 10)]
-					#[doc = "The captured reimbursable fee is greater than or equal to the burned Argon amount."]
-					InsufficientBurnAmountForFee,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29534,13 +29561,26 @@ pub mod api {
 				)]
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
-					#[codec(index = 0)]
-					#[doc = "An inbound burn notice was accepted and settled locally."]
-					BurnNoticeAccepted {
-						source_chain:
-							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
-						notice: runtime_types::pallet_crosschain_transfer::pallet::BurnNotice,
-					},
+					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proved and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "The stored gateway-state snapshot advanced after a proved contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , }
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GatewayState {
+					#[codec(compact)]
+					pub gateway_activity_nonce: ::core::primitive::u64,
+					#[codec(compact)]
+					pub argon_approvals_nonce: ::core::primitive::u64,
+					pub argon_circulation: ::core::primitive::u128,
+					pub argonot_circulation: ::core::primitive::u128,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29570,14 +29610,14 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub enum TransferProof {
-					#[codec(index = 0)]
-					Ethereum {
-						source_chain:
-							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
-						event_log: runtime_types::argon_primitives::ethereum::EthereumLog,
-						proof: runtime_types::argon_primitives::ethereum::EthereumProof,
-					},
+				pub struct TransferToArgonActivity {
+					#[codec(compact)]
+					pub gateway_activity_nonce: ::core::primitive::u64,
+					pub from: ::subxt::ext::subxt_core::utils::H160,
+					pub asset: runtime_types::pallet_crosschain_transfer::pallet::AssetKind,
+					pub to: crate::types::AccountId32,
+					#[codec(compact)]
+					pub amount: ::core::primitive::u128,
 				}
 			}
 		}

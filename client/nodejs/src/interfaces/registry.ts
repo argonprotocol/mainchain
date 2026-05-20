@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -38,11 +37,14 @@ import type {
   ArgonPrimitivesDomainVersionHost,
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesEthereumEthereumBeaconPreset,
+  ArgonPrimitivesEthereumEthereumCombinedReceiptProof,
   ArgonPrimitivesEthereumEthereumExecutionBlockProof,
   ArgonPrimitivesEthereumEthereumExecutionHeader,
   ArgonPrimitivesEthereumEthereumLog,
-  ArgonPrimitivesEthereumEthereumProof,
-  ArgonPrimitivesEthereumEthereumReceiptProof,
+  ArgonPrimitivesEthereumEthereumReceiptLog,
+  ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
+  ArgonPrimitivesEthereumEthereumReceiptLogProofBlock,
+  ArgonPrimitivesEthereumEthereumReceiptProofReceipt,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
   ArgonPrimitivesInherentsBitcoinUtxoSpend,
@@ -138,13 +140,13 @@ import type {
   PalletBlockSealSpecError,
   PalletBlockSealSpecEvent,
   PalletCrosschainTransferAssetKind,
-  PalletCrosschainTransferBurnNotice,
   PalletCrosschainTransferCall,
   PalletCrosschainTransferChainConfig,
   PalletCrosschainTransferError,
   PalletCrosschainTransferEvent,
+  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferSourceChain,
-  PalletCrosschainTransferTransferProof,
+  PalletCrosschainTransferTransferToArgonActivity,
   PalletDigestsError,
   PalletDigestsEvent,
   PalletDomainsCall,
@@ -315,11 +317,14 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainVersionHost: ArgonPrimitivesDomainVersionHost;
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
     ArgonPrimitivesEthereumEthereumBeaconPreset: ArgonPrimitivesEthereumEthereumBeaconPreset;
+    ArgonPrimitivesEthereumEthereumCombinedReceiptProof: ArgonPrimitivesEthereumEthereumCombinedReceiptProof;
     ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
     ArgonPrimitivesEthereumEthereumExecutionHeader: ArgonPrimitivesEthereumEthereumExecutionHeader;
     ArgonPrimitivesEthereumEthereumLog: ArgonPrimitivesEthereumEthereumLog;
-    ArgonPrimitivesEthereumEthereumProof: ArgonPrimitivesEthereumEthereumProof;
-    ArgonPrimitivesEthereumEthereumReceiptProof: ArgonPrimitivesEthereumEthereumReceiptProof;
+    ArgonPrimitivesEthereumEthereumReceiptLog: ArgonPrimitivesEthereumEthereumReceiptLog;
+    ArgonPrimitivesEthereumEthereumReceiptLogProofBatch: ArgonPrimitivesEthereumEthereumReceiptLogProofBatch;
+    ArgonPrimitivesEthereumEthereumReceiptLogProofBlock: ArgonPrimitivesEthereumEthereumReceiptLogProofBlock;
+    ArgonPrimitivesEthereumEthereumReceiptProofReceipt: ArgonPrimitivesEthereumEthereumReceiptProofReceipt;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
     ArgonPrimitivesInherentsBitcoinUtxoSpend: ArgonPrimitivesInherentsBitcoinUtxoSpend;
@@ -415,13 +420,13 @@ declare module '@polkadot/types/types/registry' {
     PalletBlockSealSpecError: PalletBlockSealSpecError;
     PalletBlockSealSpecEvent: PalletBlockSealSpecEvent;
     PalletCrosschainTransferAssetKind: PalletCrosschainTransferAssetKind;
-    PalletCrosschainTransferBurnNotice: PalletCrosschainTransferBurnNotice;
     PalletCrosschainTransferCall: PalletCrosschainTransferCall;
     PalletCrosschainTransferChainConfig: PalletCrosschainTransferChainConfig;
     PalletCrosschainTransferError: PalletCrosschainTransferError;
     PalletCrosschainTransferEvent: PalletCrosschainTransferEvent;
+    PalletCrosschainTransferGatewayState: PalletCrosschainTransferGatewayState;
     PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
-    PalletCrosschainTransferTransferProof: PalletCrosschainTransferTransferProof;
+    PalletCrosschainTransferTransferToArgonActivity: PalletCrosschainTransferTransferToArgonActivity;
     PalletDigestsError: PalletDigestsError;
     PalletDigestsEvent: PalletDigestsEvent;
     PalletDomainsCall: PalletDomainsCall;

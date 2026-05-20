@@ -1,27 +1,4 @@
 export const ethereum = {
-  runtime: {
-    EthereumApis: [
-      {
-        methods: {
-          verify_event_log: {
-            description: 'Preflight verify an Ethereum event log proof.',
-            params: [
-              {
-                name: 'eventLog',
-                type: 'ArgonPrimitivesEthereumEthereumLog',
-              },
-              {
-                name: 'proof',
-                type: 'ArgonPrimitivesEthereumEthereumProof',
-              },
-            ],
-            type: 'Result<Null, ArgonPrimitivesEthereumEthereumVerifyError>',
-          },
-        },
-        version: 1,
-      },
-    ],
-  },
   types: {
     ArgonPrimitivesEthereumEthereumExecutionHeader: {
       rlp: 'Bytes',
@@ -37,11 +14,19 @@ export const ethereum = {
     },
     ArgonPrimitivesEthereumEthereumProof: {
       executionBlockProof: 'ArgonPrimitivesEthereumEthereumExecutionBlockProof',
-      receiptProof: 'ArgonPrimitivesEthereumEthereumReceiptProof',
+      receiptProof: 'ArgonPrimitivesEthereumEthereumCombinedReceiptProof',
     },
-    ArgonPrimitivesEthereumEthereumReceiptProof: {
-      transactionIndex: 'Compact<u64>',
+    ArgonPrimitivesEthereumEthereumCombinedReceiptProof: {
       nodes: 'Vec<Bytes>',
+      receipts: 'Vec<ArgonPrimitivesEthereumEthereumReceiptProofReceipt>',
+    },
+    ArgonPrimitivesEthereumEthereumReceiptProofReceipt: {
+      transactionIndex: 'Compact<u64>',
+      nodeIndexes: 'Vec<u16>',
+    },
+    ArgonPrimitivesEthereumEthereumReceiptLog: {
+      transactionIndex: 'Compact<u64>',
+      eventLog: 'ArgonPrimitivesEthereumEthereumLog',
     },
     ArgonPrimitivesEthereumEthereumVerifyError: {
       _enum: [

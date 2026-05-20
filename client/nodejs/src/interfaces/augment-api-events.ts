@@ -38,8 +38,9 @@ import type {
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
   PalletBalancesUnexpectedKind,
-  PalletCrosschainTransferBurnNotice,
+  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferSourceChain,
+  PalletCrosschainTransferTransferToArgonActivity,
   PalletDomainsDomainRegistration,
   PalletEthereumVerifierBasicOperatingMode,
   PalletMintMintType,
@@ -527,17 +528,31 @@ declare module '@polkadot/api-base/types/events' {
     };
     crosschainTransfer: {
       /**
-       * An inbound burn notice was accepted and settled locally.
+       * The stored gateway-state snapshot advanced after a proved contiguous batch.
        **/
-      BurnNoticeAccepted: AugmentedEvent<
+      GatewayStateAdvanced: AugmentedEvent<
         ApiType,
         [
           sourceChain: PalletCrosschainTransferSourceChain,
-          notice: PalletCrosschainTransferBurnNotice,
+          gatewayState: PalletCrosschainTransferGatewayState,
         ],
         {
           sourceChain: PalletCrosschainTransferSourceChain;
-          notice: PalletCrosschainTransferBurnNotice;
+          gatewayState: PalletCrosschainTransferGatewayState;
+        }
+      >;
+      /**
+       * A `TransferToArgonStarted` activity was proved and settled locally.
+       **/
+      TransferToArgonSettled: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: PalletCrosschainTransferSourceChain,
+          transfer: PalletCrosschainTransferTransferToArgonActivity,
+        ],
+        {
+          sourceChain: PalletCrosschainTransferSourceChain;
+          transfer: PalletCrosschainTransferTransferToArgonActivity;
         }
       >;
     };

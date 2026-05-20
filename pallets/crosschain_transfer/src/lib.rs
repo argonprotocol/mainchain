@@ -8,8 +8,8 @@ pub use weights::{WeightInfo, WithProviderWeights};
 use pallet_prelude::*;
 
 #[cfg(any(test, feature = "runtime-benchmarks"))]
-pub(crate) const BURN_FOR_TRANSFER_EVENT_SIGNATURE: &[u8] =
-	b"BurnForTransfer(address,address,uint256,bytes32,uint64)";
+pub(crate) const TRANSFER_TO_ARGON_STARTED_EVENT_SIGNATURE: &[u8] =
+	b"TransferToArgonStarted(address,address,uint128,bytes32,(uint64,uint64,uint128,uint128))";
 
 #[cfg(test)]
 mod mock;
@@ -25,28 +25,40 @@ mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use alloy_primitives::U256;
 	use alloy_sol_types::{sol, SolEvent};
 	use argon_primitives::{
-		verify_and_decode_event, CallTxPoolKeyProvider, CurrentTransactionFeeProvider,
-		EthereumEventDecoder, EthereumLog, EthereumProof, EthereumVerifyAndDecodeError,
-		EthereumVerifyProvider, OperationalAccountsHook, UniswapTransferProvider,
+		ethereum::{
+			EthereumReceiptLogProofBatch as BaseEthereumReceiptLogProofBatch,
+			EthereumReceiptLogProofBlock as BaseEthereumReceiptLogProofBlock,
+			MAX_ETHEREUM_HEADER_CHAIN_LEN,
+		},
+		CallTxPoolKeyProvider, CallTxValidityProvider, EthereumLog, EthereumVerifyProvider,
+		OperationalAccountsHook, UniswapTransferProvider,
 	};
+	use frame_support::dispatch::Pays;
 	use polkadot_sdk::{
 		frame_support::traits::IsSubType,
 		frame_system::{ensure_root, ensure_signed},
 		sp_crypto_hashing::blake2_256,
+		sp_runtime::transaction_validity::InvalidTransaction,
 	};
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	sol! {
-		event BurnForTransfer(
+		struct GatewayActivityState {
+			uint64 gateway_activity_nonce;
+			uint64 argon_approvals_nonce;
+			uint128 argon_circulation;
+			uint128 argonot_circulation;
+		}
+
+		event TransferToArgonStarted(
 			address indexed from,
 			address indexed token,
-			uint256 amount_base_units,
+			uint128 amount,
 			bytes32 argon_destination,
-			uint64 account_nonce
+			GatewayActivityState gateway_state
 		);
 	}
 
@@ -87,10 +99,7 @@ pub mod pallet {
 		/// Existing operational-accounts hook for qualifying inbound Argon transfers.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 
-		/// Reimbursable transaction fee captured for the currently executing prove-transfer call.
-		type CurrentTransactionFeeProvider: CurrentTransactionFeeProvider<Self::Balance>;
-
-		/// Runtime tick provider used for previous-release cutover checks.
+		/// Runtime tick provider used for recent-transfer retention checks.
 		type CurrentTick: Get<Tick>;
 
 		/// Retention window, in ticks, for recent Argon transfer evidence used by operational
@@ -98,8 +107,24 @@ pub mod pallet {
 		#[pallet::constant]
 		type RecentTransferRetentionTicks: Get<Tick>;
 
+		/// Maximum number of ordered gateway activities that may share one receipt proof.
+		#[pallet::constant]
+		type MaxActivitiesPerReceiptProof: Get<u32>;
+
+		/// Maximum number of proved receipt proofs that may be supplied in one extrinsic.
+		#[pallet::constant]
+		type MaxReceiptProofsPerExtrinsic: Get<u32>;
+
 		/// Weight implementation for pallet calls and hooks.
 		type WeightInfo: WeightInfo;
+	}
+
+	#[pallet::extra_constants]
+	impl<T: Config> Pallet<T> {
+		/// Maximum execution headers carried in one receipt proof's target-to-anchor chain.
+		pub fn max_proof_execution_header_depth() -> u32 {
+			MAX_ETHEREUM_HEADER_CHAIN_LEN
+		}
 	}
 
 	#[derive(
@@ -131,10 +156,6 @@ pub mod pallet {
 			argon_token: H160,
 			/// Active Ethereum Argonot token address.
 			argonot_token: H160,
-			/// Previously accepted gateway during a bounded cutover window.
-			previous_gateway: Option<H160>,
-			/// Last runtime tick where the previous release remains accepted.
-			previous_release_expiration: Option<Tick>,
 		},
 	}
 
@@ -147,7 +168,16 @@ pub mod pallet {
 	}
 
 	#[derive(
-		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Copy,
+		Clone,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
 	)]
 	/// Local payout asset selected from a proven inbound burn notice.
 	pub enum AssetKind {
@@ -155,30 +185,53 @@ pub mod pallet {
 		Argonot,
 	}
 
-	#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo)]
-	/// Supported inbound proof variants.
-	pub enum TransferProof {
-		Ethereum { source_chain: SourceChain, event_log: EthereumLog, proof: EthereumProof },
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		DebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	/// Latest proven gateway activity snapshot for one source chain.
+	pub struct GatewayState<T: Config> {
+		#[codec(compact)]
+		pub gateway_activity_nonce: u64,
+		#[codec(compact)]
+		pub argon_approvals_nonce: u64,
+		pub argon_circulation: T::Balance,
+		pub argonot_circulation: T::Balance,
 	}
 
 	#[derive(
 		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, DebugNoBound, TypeInfo,
 	)]
 	#[scale_info(skip_type_params(T))]
-	/// Burn notice accepted after a successful inbound proof verification.
-	pub struct BurnNotice<T: Config> {
-		/// Source-chain account that burned tokens.
-		pub from: H160,
-		/// Local payout recipient.
-		pub to: T::AccountId,
-		/// Local asset paid out after claim verification.
-		pub asset_kind: AssetKind,
-		/// Gross local amount proven burned on the source chain.
-		pub amount: T::Balance,
-		/// Monotonic nonce tracked for this source-chain account.
+	/// One proven `TransferToArgonStarted` gateway activity.
+	pub struct TransferToArgonActivity<T: Config> {
 		#[codec(compact)]
-		pub account_nonce: u64,
+		pub gateway_activity_nonce: u64,
+		pub from: H160,
+		pub asset: AssetKind,
+		pub to: T::AccountId,
+		#[codec(compact)]
+		pub amount: T::Balance,
 	}
+
+	/// One proved contiguous activity slice backed by a combined receipt proof for one execution
+	/// block.
+	pub type GatewayActivityProofBlock<T> =
+		BaseEthereumReceiptLogProofBlock<<T as Config>::MaxActivitiesPerReceiptProof>;
+
+	/// Ordered proof batch supplied to `prove_gateway_activity(...)`.
+	pub type GatewayActivityProofBatch<T> = BaseEthereumReceiptLogProofBatch<
+		<T as Config>::MaxReceiptProofsPerExtrinsic,
+		<T as Config>::MaxActivitiesPerReceiptProof,
+	>;
 
 	#[pallet::storage]
 	/// Config accepted for each supported source chain.
@@ -186,9 +239,9 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, ChainConfig, OptionQuery>;
 
 	#[pallet::storage]
-	/// Latest accepted nonce for each `(source_chain, from)` pair.
-	pub type NonceBySourceAccount<T: Config> =
-		StorageMap<_, Blake2_128Concat, (SourceChain, H160), u64, OptionQuery>;
+	/// Latest proven gateway activity snapshot for each source chain.
+	pub type GatewayStateBySourceChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, GatewayState<T>, OptionQuery>;
 
 	#[pallet::storage]
 	/// Count of still-retained qualifying Argon transfers for each local account.
@@ -208,34 +261,38 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// An inbound burn notice was accepted and settled locally.
-		BurnNoticeAccepted { source_chain: SourceChain, notice: BurnNotice<T> },
+		/// A `TransferToArgonStarted` activity was proved and settled locally.
+		TransferToArgonSettled { source_chain: SourceChain, transfer: TransferToArgonActivity<T> },
+		/// The stored gateway-state snapshot advanced after a proved contiguous batch.
+		GatewayStateAdvanced { source_chain: SourceChain, gateway_state: GatewayState<T> },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
-		/// The Ethereum event topics or payload do not match `BurnForTransfer`.
-		InvalidEthereumEvent,
+		/// The Ethereum event topics or payload do not match `TransferToArgonStarted`.
+		InvalidTransferToArgonActivity,
+		/// At least one proved gateway-activity block must be supplied.
+		NoGatewayProofBlocksProvided,
+		/// At least one gateway activity log must be supplied with the receipt proof.
+		NoGatewayActivitiesProvided,
 		/// The Ethereum verifier rejected the supplied proof.
 		InvalidProof,
 		/// The destination account bytes could not be decoded into a local account id.
 		InvalidRecipient,
-		/// The claimed amount was zero or too large for the local balance type.
-		InvalidAmount,
 		/// The source chain is not configured for inbound claims.
 		UnsupportedSource,
-		/// The gateway does not match the active or still-accepted previous release.
+		/// The gateway does not match the configured gateway address.
 		UnsupportedGateway,
-		/// The token is not supported under the matched gateway release.
+		/// The token is not supported under the configured gateway.
 		UnsupportedToken,
-		/// The claim nonce is not exactly the next accepted nonce for the source account.
-		UnexpectedNonce,
+		/// The caller's expected already-proven gateway activity nonce is stale or incorrect.
+		UnexpectedPreviousGatewayActivityNonce,
+		/// The proven gateway activity nonce is not the next contiguous nonce.
+		UnexpectedGatewayActivityNonce,
 		/// The configured source-chain shape is incomplete or malformed.
 		InvalidChainConfig,
 		/// The burn account lacks enough balance for the payout.
 		InsufficientLiquidity,
-		/// The captured reimbursable fee is greater than or equal to the burned Argon amount.
-		InsufficientBurnAmountForFee,
 	}
 
 	#[pallet::hooks]
@@ -271,13 +328,7 @@ pub mod pallet {
 		pub fn set_chain_config(origin: OriginFor<T>, config: ChainConfig) -> DispatchResult {
 			ensure_root(origin)?;
 			match config {
-				ChainConfig::Ethereum {
-					gateway,
-					argon_token,
-					argonot_token,
-					previous_gateway,
-					previous_release_expiration,
-				} => {
+				ChainConfig::Ethereum { gateway, argon_token, argonot_token } => {
 					ensure!(
 						gateway != H160::zero() &&
 							argon_token != H160::zero() &&
@@ -302,13 +353,6 @@ pub mod pallet {
 							},
 						}
 					}
-
-					let has_any_previous =
-						previous_gateway.is_some() || previous_release_expiration.is_some();
-					let has_full_previous =
-						previous_gateway.is_some() && previous_release_expiration.is_some();
-
-					ensure!(!has_any_previous || has_full_previous, Error::<T>::InvalidChainConfig);
 				},
 			};
 
@@ -319,34 +363,107 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(1)]
-		#[pallet::weight(
-			T::WeightInfo::prove_transfer()
-				.saturating_add(T::OperationalAccountsHook::uniswap_transfer_confirmed_weight())
-		)]
-		pub fn prove_transfer(origin: OriginFor<T>, proof: TransferProof) -> DispatchResult {
-			let submitter = ensure_signed(origin)?;
+		#[pallet::weight({
+			let proof_blocks = proof_batch.blocks.len() as u32;
+			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
+				total.saturating_add(block.receipt_logs.len() as u32)
+			});
+			let extra_activities = activities.saturating_sub(proof_blocks);
+			T::WeightInfo::prove_gateway_activity(proof_blocks, extra_activities).saturating_add(
+				T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
+					.saturating_mul(activities as u64)
+			)
+		})]
+		pub fn prove_gateway_activity(
+			origin: OriginFor<T>,
+			source_chain: SourceChain,
+			#[pallet::compact] previous_gateway_activity_nonce: u64,
+			proof_batch: GatewayActivityProofBatch<T>,
+		) -> DispatchResultWithPostInfo {
+			let _ = ensure_signed(origin)?;
+			ensure!(!proof_batch.blocks.is_empty(), Error::<T>::NoGatewayProofBlocksProvided);
+			let current_gateway_state = GatewayStateBySourceChain::<T>::get(source_chain)
+				.unwrap_or(GatewayState::<T> {
+					gateway_activity_nonce: 0,
+					argon_approvals_nonce: 0,
+					argon_circulation: T::Balance::default(),
+					argonot_circulation: T::Balance::default(),
+				});
 
-			match proof {
-				TransferProof::Ethereum { source_chain, event_log, proof } => {
-					let burn_notice =
-						verify_and_decode_event::<T::EthereumVerifier, BurnForTransfer>(
-							&event_log, &proof,
-						)
-						.map_err(|error| match error {
-							EthereumVerifyAndDecodeError::Verify(_) => Error::<T>::InvalidProof,
-							EthereumVerifyAndDecodeError::Decode(_) =>
-								Error::<T>::InvalidEthereumEvent,
-						})?;
-					let claim = Self::decode_ethereum_burn_notice(burn_notice)?;
-					let asset_kind = Self::resolve_ethereum_asset_kind(
-						source_chain,
-						&event_log.address,
-						&claim.token,
-					)?;
-
-					Self::enact_burn_transfer(&submitter, source_chain, claim, asset_kind)
-				},
+			ensure!(
+				previous_gateway_activity_nonce == current_gateway_state.gateway_activity_nonce,
+				Error::<T>::UnexpectedPreviousGatewayActivityNonce,
+			);
+			let mut expected_gateway_activity_nonce = previous_gateway_activity_nonce;
+			let mut latest_gateway_state = None;
+			for proof_block in &proof_batch.blocks {
+				ensure!(
+					!proof_block.receipt_logs.is_empty(),
+					Error::<T>::NoGatewayActivitiesProvided
+				);
 			}
+
+			T::EthereumVerifier::verify_receipt_logs(&proof_batch)
+				.map_err(|_| Error::<T>::InvalidProof)?;
+
+			for proof_block in proof_batch.blocks {
+				for receipt_log in proof_block.receipt_logs {
+					let activity =
+						Self::decode_transfer_to_argon_started_log(&receipt_log.event_log)
+							.map_err(|_| Error::<T>::InvalidTransferToArgonActivity)?;
+					let (transfer, gateway_state) =
+						Self::decode_ethereum_transfer_to_argon_started(
+							activity,
+							&receipt_log.event_log.address,
+						)?;
+
+					ensure!(
+						gateway_state.gateway_activity_nonce ==
+							expected_gateway_activity_nonce.saturating_add(1),
+						Error::<T>::UnexpectedGatewayActivityNonce,
+					);
+
+					expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
+
+					match transfer.asset {
+						AssetKind::Argon => {
+							Self::mint_to::<T::NativeCurrency>(
+								source_chain,
+								transfer.amount,
+								&transfer.to,
+							)?;
+
+							if transfer.amount != T::Balance::default() {
+								Self::retain_recent_argon_transfer(&transfer.to);
+								T::OperationalAccountsHook::uniswap_transfer_confirmed(
+									&transfer.to,
+									transfer.amount,
+								);
+							}
+						},
+						AssetKind::Argonot => {
+							Self::mint_to::<T::OwnershipCurrency>(
+								source_chain,
+								transfer.amount,
+								&transfer.to,
+							)?;
+						},
+					}
+
+					Self::deposit_event(Event::TransferToArgonSettled { source_chain, transfer });
+
+					latest_gateway_state = Some(gateway_state);
+				}
+			}
+
+			let latest_gateway_state =
+				latest_gateway_state.expect("non-empty proof batch must produce gateway state");
+			GatewayStateBySourceChain::<T>::insert(source_chain, latest_gateway_state.clone());
+			Self::deposit_event(Event::GatewayStateAdvanced {
+				source_chain,
+				gateway_state: latest_gateway_state,
+			});
+			Ok(Pays::No.into())
 		}
 	}
 
@@ -357,103 +474,31 @@ pub mod pallet {
 			}
 		}
 
-		#[frame_support::transactional]
-		fn enact_burn_transfer(
-			submitter: &T::AccountId,
+		fn mint_to<C: Mutate<T::AccountId, Balance = T::Balance> + 'static>(
 			source_chain: SourceChain,
-			claim: DecodedEthereumBurnNotice<T>,
-			asset_kind: AssetKind,
+			amount: T::Balance,
+			to: &T::AccountId,
 		) -> DispatchResult {
-			let source_key = (source_chain, claim.from);
-			let latest_nonce = NonceBySourceAccount::<T>::get(source_key).unwrap_or_default();
+			let burn_account = Self::burn_account(source_chain);
+			if amount == 0u128.into() {
+				return Ok(());
+			}
 			ensure!(
-				claim.account_nonce == latest_nonce.saturating_add(1),
-				Error::<T>::UnexpectedNonce,
+				C::reducible_balance(&burn_account, Preservation::Expendable, Fortitude::Force,) >=
+					amount,
+				Error::<T>::InsufficientLiquidity,
 			);
 
-			match asset_kind {
-				AssetKind::Argon => {
-					let burn_account = Self::burn_account(source_chain);
-					let reimbursable_fee = if claim.to == *submitter {
-						T::Balance::default()
-					} else {
-						T::CurrentTransactionFeeProvider::reimbursable_fee().unwrap_or_default()
-					};
-					let recipient_amount =
-						Self::argon_recipient_amount(claim.amount, reimbursable_fee)?;
-
-					ensure!(
-						T::NativeCurrency::reducible_balance(
-							&burn_account,
-							Preservation::Expendable,
-							Fortitude::Force,
-						) >= claim.amount,
-						Error::<T>::InsufficientLiquidity,
-					);
-
-					let _ = T::NativeCurrency::burn_from(
-						&burn_account,
-						claim.amount,
-						Preservation::Expendable,
-						Precision::Exact,
-						Fortitude::Force,
-					)?;
-
-					let _ = T::NativeCurrency::mint_into(&claim.to, recipient_amount)?;
-
-					if reimbursable_fee != T::Balance::default() {
-						let _ = T::NativeCurrency::mint_into(submitter, reimbursable_fee)?;
-					}
-
-					Self::retain_recent_argon_transfer(&claim.to);
-					T::OperationalAccountsHook::uniswap_transfer_confirmed(&claim.to, claim.amount);
-				},
-				AssetKind::Argonot => {
-					let burn_account = Self::burn_account(source_chain);
-					ensure!(
-						T::OwnershipCurrency::reducible_balance(
-							&burn_account,
-							Preservation::Expendable,
-							Fortitude::Force,
-						) >= claim.amount,
-						Error::<T>::InsufficientLiquidity,
-					);
-					let _ = T::OwnershipCurrency::transfer(
-						&burn_account,
-						&claim.to,
-						claim.amount,
-						Preservation::Expendable,
-					)?;
-				},
-			}
-
-			let notice = BurnNotice::<T> {
-				from: claim.from,
-				to: claim.to,
-				asset_kind,
-				amount: claim.amount,
-				account_nonce: claim.account_nonce,
-			};
-
-			NonceBySourceAccount::<T>::insert(source_key, notice.account_nonce);
-			Self::deposit_event(Event::BurnNoticeAccepted { source_chain, notice });
+			let _ = C::burn_from(
+				&burn_account,
+				amount,
+				Preservation::Expendable,
+				Precision::Exact,
+				Fortitude::Force,
+			)?;
+			let _ = C::mint_into(to, amount)?;
 
 			Ok(())
-		}
-
-		fn argon_recipient_amount(
-			amount: T::Balance,
-			reimbursable_fee: T::Balance,
-		) -> Result<T::Balance, DispatchError> {
-			let reimbursable_fee: u128 = reimbursable_fee.into();
-			if reimbursable_fee == 0 {
-				return Ok(amount);
-			}
-
-			let amount: u128 = amount.into();
-			ensure!(amount > reimbursable_fee, Error::<T>::InsufficientBurnAmountForFee);
-
-			Ok(amount.saturating_sub(reimbursable_fee).into())
 		}
 
 		fn ensure_burn_account_unreapable(account_id: &T::AccountId) {
@@ -496,80 +541,68 @@ pub mod pallet {
 		) -> Result<AssetKind, DispatchError> {
 			let config = ChainConfigBySourceChain::<T>::get(source_chain)
 				.ok_or(Error::<T>::UnsupportedSource)?;
-			let now = T::CurrentTick::get();
 
 			match config {
-				ChainConfig::Ethereum {
-					gateway: active_gateway,
-					argon_token,
-					argonot_token,
-					previous_gateway,
-					previous_release_expiration,
-				} => {
-					let mut is_valid_gateway = *gateway == active_gateway;
+				ChainConfig::Ethereum { gateway: active_gateway, argon_token, argonot_token } => {
+					ensure!(*gateway == active_gateway, Error::<T>::UnsupportedGateway);
 
-					let previous_release_is_open =
-						previous_release_expiration.is_some_and(|expiration| now <= expiration);
-					if previous_release_is_open && previous_gateway == Some(*gateway) {
-						is_valid_gateway = true;
+					if *token == argon_token {
+						return Ok(AssetKind::Argon);
+					}
+					if *token == argonot_token {
+						return Ok(AssetKind::Argonot);
 					}
 
-					if is_valid_gateway {
-						if *token == argon_token {
-							return Ok(AssetKind::Argon);
-						}
-						if *token == argonot_token {
-							return Ok(AssetKind::Argonot);
-						}
-					}
-
-					Err(Error::<T>::UnsupportedGateway.into())
+					Err(Error::<T>::UnsupportedToken.into())
 				},
 			}
 		}
 
-		fn decode_ethereum_burn_notice(
-			event: BurnForTransfer,
-		) -> Result<DecodedEthereumBurnNotice<T>, DispatchError> {
+		fn decode_ethereum_transfer_to_argon_started(
+			event: TransferToArgonStarted,
+			gateway: &H160,
+		) -> Result<(TransferToArgonActivity<T>, GatewayState<T>), DispatchError> {
 			let from = H160::from_slice(event.from.as_slice());
 			let token = H160::from_slice(event.token.as_slice());
-			let amount = Self::decode_amount(event.amount_base_units)?;
+			let amount = Self::decode_runtime_balance(event.amount)?;
 			let mut destination_bytes = event.argon_destination.as_slice();
 			let destination = T::AccountId::decode(&mut destination_bytes)
 				.map_err(|_| Error::<T>::InvalidRecipient)?;
-
-			Ok(DecodedEthereumBurnNotice {
+			let gateway_state = GatewayState::<T> {
+				gateway_activity_nonce: event.gateway_state.gateway_activity_nonce,
+				argon_approvals_nonce: event.gateway_state.argon_approvals_nonce,
+				argon_circulation: Self::decode_runtime_balance(
+					event.gateway_state.argon_circulation,
+				)?,
+				argonot_circulation: Self::decode_runtime_balance(
+					event.gateway_state.argonot_circulation,
+				)?,
+			};
+			let asset = Self::resolve_ethereum_asset_kind(SourceChain::Ethereum, gateway, &token)?;
+			let transfer = TransferToArgonActivity::<T> {
+				gateway_activity_nonce: gateway_state.gateway_activity_nonce,
 				from,
-				token,
+				asset,
 				to: destination,
 				amount,
-				account_nonce: event.account_nonce,
-			})
+			};
+
+			Ok((transfer, gateway_state))
 		}
 
-		fn decode_amount(amount: U256) -> Result<T::Balance, DispatchError> {
-			let amount_u128 = u128::try_from(amount).map_err(|_| Error::<T>::InvalidAmount)?;
-			ensure!(amount_u128 > 0, Error::<T>::InvalidAmount);
-			Ok(amount_u128.into())
+		fn decode_runtime_balance(amount: u128) -> Result<T::Balance, DispatchError> {
+			Ok(amount.into())
+		}
+
+		fn decode_transfer_to_argon_started_log(
+			log: &EthereumLog,
+		) -> Result<TransferToArgonStarted, alloy_sol_types::Error> {
+			TransferToArgonStarted::decode_raw_log_validate(
+				log.topics.iter().map(|topic| topic.0),
+				&log.data,
+			)
 		}
 	}
-
-	impl EthereumEventDecoder for BurnForTransfer {
-		type Error = alloy_sol_types::Error;
-
-		fn decode_ethereum_log(log: &EthereumLog) -> Result<Self, Self::Error> {
-			Self::decode_raw_log_validate(log.topics.iter().map(|topic| topic.0), &log.data)
-		}
-	}
-
-	struct DecodedEthereumBurnNotice<T: Config> {
-		from: H160,
-		token: H160,
-		to: T::AccountId,
-		amount: T::Balance,
-		account_nonce: u64,
-	}
-
 	impl<T: Config> UniswapTransferProvider<T::AccountId> for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
 
@@ -592,25 +625,48 @@ pub mod pallet {
 			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
 
 			match call {
-				Call::prove_transfer {
-					proof: TransferProof::Ethereum { source_chain, event_log, .. },
-				} => {
-					let event = BurnForTransfer::decode_ethereum_log(event_log).ok()?;
-					let from = H160::from_slice(event.from.as_slice());
-
-					Some(
-						(
-							b"crosschain_transfer:prove".as_slice(),
-							source_chain,
-							from,
-							event.account_nonce,
-						)
-							.using_encoded(blake2_256)
-							.to_vec(),
+				Call::prove_gateway_activity { source_chain, proof_batch, .. } => Some(
+					(
+						b"crosschain_transfer:prove".as_slice(),
+						source_chain,
+						proof_batch.using_encoded(blake2_256),
 					)
-				},
+						.using_encoded(blake2_256)
+						.to_vec(),
+				),
 				_ => None,
 			}
+		}
+	}
+
+	impl<T: Config> CallTxValidityProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		fn validate(
+			call: &RuntimeCallOf<T>,
+			_signer: Option<&T::AccountId>,
+		) -> Result<(), TransactionValidityError> {
+			let Some(call) = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call) else {
+				return Ok(());
+			};
+
+			if let Call::prove_gateway_activity {
+				source_chain,
+				previous_gateway_activity_nonce,
+				..
+			} = call
+			{
+				let current_nonce = GatewayStateBySourceChain::<T>::get(source_chain)
+					.map(|state| state.gateway_activity_nonce)
+					.unwrap_or_default();
+
+				if previous_gateway_activity_nonce < &current_nonce {
+					return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
+				}
+			}
+
+			Ok(())
 		}
 	}
 }

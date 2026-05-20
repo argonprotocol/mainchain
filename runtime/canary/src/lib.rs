@@ -665,12 +665,10 @@ impl pallet_crosschain_transfer::Config for Runtime {
 		benchmarking::BenchmarkCrosschainTransferEthereumVerifier
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type CurrentTransactionFeeProvider = use_unless_benchmark!(
-		FeelessTransaction,
-		benchmarking::BenchmarkCrosschainTransferFeeProvider
-	);
 	type CurrentTick = Ticks;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
+	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
+	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type WeightInfo = pallet_crosschain_transfer::WithProviderWeights<
 		Runtime,
 		weights::pallet_crosschain_transfer::WeightInfo<Runtime>,
@@ -715,13 +713,12 @@ impl pallet_operational_accounts::Config for Runtime {
 
 impl pallet_ethereum_verifier::Config for Runtime {
 	type FreeHeadersInterval = EthereumFreeHeadersInterval;
-	type VerifyEventLogApiEnabled = CanaryEthereumVerifyEventLogApiEnabled;
 	type WeightInfo = weights::pallet_ethereum_verifier::WeightInfo<Runtime>;
 }
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
 	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier, CrosschainTransfer);
-	type CallTxValidityProviders = EthereumVerifier;
+	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer);
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
 }

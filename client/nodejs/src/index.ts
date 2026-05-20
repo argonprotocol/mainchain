@@ -33,23 +33,14 @@ export * from './convert';
 export * from './BitcoinLock';
 export * from './PriceIndex';
 export * from '@argonprotocol/ethereum-contracts';
-export {
-  buildEthereumEventProof,
-  findEthereumBurnForTransferLogIndex,
-  getLatestRetainedAnchor,
-  waitForRetainedExecutionAnchor,
-  type EthereumEventLocator,
-  type EthereumEventProof,
-  type EthereumExecutionClient,
-  type EthereumReceipt,
-  type RetainedExecutionAnchor,
-  type EthereumVerifyEventLogResult,
-} from './EthereumProof';
-export {
-  getEthereumBeaconSyncBootstrapTx,
-  getEthereumBeaconSyncState,
-  getNextEthereumBeaconSyncTxs,
-} from './EthereumBeaconSync';
+export * from './EthereumProof';
+export * from './EthereumGatewayActivity';
+export * from './EthereumBeaconSync';
+export type {
+  EthereumExecutionClient,
+  EthereumExecutionSource,
+  EthereumReceipt,
+} from './EthereumExecution';
 export {
   Keyring,
   KeyringPair,

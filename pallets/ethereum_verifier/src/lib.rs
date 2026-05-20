@@ -43,9 +43,7 @@ mod tests;
 mod benchmarking;
 
 use alloc::{boxed::Box, vec, vec::Vec};
-use argon_primitives::{
-	EthereumBeaconPreset, EthereumLog, EthereumProof, EthereumVerifyError, EthereumVerifyProvider,
-};
+use argon_primitives::EthereumBeaconPreset;
 use frame_support::{
 	dispatch::{DispatchResult, Pays, PostDispatchInfo},
 	pallet_prelude::OptionQuery,
@@ -104,9 +102,6 @@ pub mod pallet {
 		/// Minimum gap between finalized headers for an update to be free.
 		#[pallet::constant]
 		type FreeHeadersInterval: Get<u32>;
-		/// Whether the read-only event-log verification API is enabled.
-		#[pallet::constant]
-		type VerifyEventLogApiEnabled: Get<bool>;
 		type WeightInfo: WeightInfo;
 	}
 
@@ -328,15 +323,6 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		/// Verify an Ethereum event log proof without mutating verifier state.
-		pub fn verify_event_log(
-			event_log: EthereumLog,
-			proof: EthereumProof,
-		) -> Result<(), EthereumVerifyError> {
-			ensure!(T::VerifyEventLogApiEnabled::get(), EthereumVerifyError::VerifierUnavailable);
-			<Self as EthereumVerifyProvider>::verify_event_log(&event_log, &proof)
-		}
-
 		/// Forces a finalized beacon header checkpoint update. The current sync committee,
 		/// with a header attesting to the current sync committee, should be provided.
 		pub(crate) fn process_checkpoint_update(
