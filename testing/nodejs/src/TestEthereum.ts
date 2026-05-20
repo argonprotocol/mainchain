@@ -13,12 +13,14 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   type Abi,
+  encodeAbiParameters,
   createPublicClient,
   createWalletClient,
   defineChain,
   encodeFunctionData,
   getAddress,
   http,
+  keccak256,
   type Hex,
   zeroAddress,
 } from 'viem';
@@ -35,6 +37,7 @@ const PROBE_TIMEOUT_MS = 60_000;
 const LIGHT_CLIENT_READY_TIMEOUT_MS = 5 * 60_000;
 const KURTOSIS_RUN_TIMEOUT_MS = 20 * 60_000;
 const DEFAULT_SEED_ARGON_AMOUNT_BASE_UNITS = 1_000_000_000n;
+const DEFAULT_INITIAL_MICROGONS_PER_ARGONOT = 1_000_000n;
 const ERC1967_ADMIN_SLOT =
   '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103' as const;
 
@@ -233,6 +236,16 @@ export default class TestEthereum implements ITeardownable {
       chain,
       transport: http(executionRpcUrl),
     });
+    const bootstrapCouncil = {
+      signers: [adminSafe],
+      weights: [1n],
+    } as const;
+    const bootstrapCouncilHash = keccak256(
+      encodeAbiParameters(
+        [{ type: 'address[]' }, { type: 'uint256[]' }],
+        [bootstrapCouncil.signers, bootstrapCouncil.weights],
+      ),
+    );
 
     const bootstrapImplementationAddress = await deployContract(walletClient, publicClient, {
       abi: mintingGatewayArtifact.abi,
@@ -242,7 +255,14 @@ export default class TestEthereum implements ITeardownable {
     const initializeData = encodeFunctionData({
       abi: mintingGatewayArtifact.abi,
       functionName: 'initialize',
-      args: [adminSafe, guardianSafe],
+      args: [
+        adminSafe,
+        guardianSafe,
+        bootstrapCouncilHash,
+        BigInt(bootstrapCouncil.signers.length),
+        1n,
+        DEFAULT_INITIAL_MICROGONS_PER_ARGONOT,
+      ],
     });
     const gatewayAddress = await deployContract(walletClient, publicClient, {
       abi: transparentUpgradeableProxyArtifact.abi,
@@ -288,17 +308,22 @@ export default class TestEthereum implements ITeardownable {
         to: gatewayAddress,
         data: encodeFunctionData({
           abi: mintingGatewayArtifact.abi,
-          functionName: 'adminMintBatch',
+          functionName: 'migrate',
           args: [
-            argonTokenAddress,
-            [options.seedArgonRecipient],
-            [options.seedArgonAmountBaseUnits ?? DEFAULT_SEED_ARGON_AMOUNT_BASE_UNITS],
+            {
+              recipients: [options.seedArgonRecipient],
+              amounts: [options.seedArgonAmountBaseUnits ?? DEFAULT_SEED_ARGON_AMOUNT_BASE_UNITS],
+            },
+            {
+              recipients: [],
+              amounts: [],
+            },
           ],
         }),
       });
       const mintReceipt = await waitForExecutionReceipt(publicClient, mintHash);
       if (mintReceipt.status !== 'success') {
-        throw new Error('MintingGateway admin mint failed');
+        throw new Error('MintingGateway migrate failed');
       }
     }
 

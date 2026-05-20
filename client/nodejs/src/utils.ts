@@ -1,9 +1,6 @@
-import BigNumber, * as BN from 'bignumber.js';
+import BigNumber from 'bignumber.js';
 import type { ArgonClient } from './index';
-import type { DispatchError } from '@polkadot/types/interfaces';
 import { EventRecord } from '@polkadot/types/interfaces/system';
-
-const { ROUND_FLOOR } = BN;
 
 export const MICROGONS_PER_ARGON = 1_000_000;
 type IDispatchErrorLike = {
@@ -18,7 +15,7 @@ export function formatArgons(microgons: bigint | number): string {
   let format = BigNumber(microgons.toString())
     .abs()
     .div(MICROGONS_PER_ARGON)
-    .toFormat(2, ROUND_FLOOR);
+    .toFormat(2, BigNumber.ROUND_FLOOR);
   if (format.endsWith('.00')) {
     format = format.slice(0, -3);
   }

@@ -31,6 +31,7 @@ import type {
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub,
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
@@ -42,7 +43,7 @@ import type {
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
   PalletCrosschainTransferChainConfig,
-  PalletCrosschainTransferTransferProof,
+  PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
   PalletEthereumVerifierExecutionProof,
@@ -521,11 +522,21 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
     };
     crosschainTransfer: {
-      proveTransfer: AugmentedSubmittable<
+      proveGatewayActivity: AugmentedSubmittable<
         (
-          proof: PalletCrosschainTransferTransferProof | { Ethereum: any } | string | Uint8Array,
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          previousGatewayActivityNonce: Compact<u64> | AnyNumber | Uint8Array,
+          proofBatch:
+            | ArgonPrimitivesEthereumEthereumReceiptLogProofBatch
+            | { executionBlockProof?: any; blocks?: any }
+            | string
+            | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [PalletCrosschainTransferTransferProof]
+        [
+          PalletCrosschainTransferSourceChain,
+          Compact<u64>,
+          ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
+        ]
       >;
       setChainConfig: AugmentedSubmittable<
         (

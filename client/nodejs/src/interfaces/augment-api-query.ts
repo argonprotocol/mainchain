@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -22,7 +21,7 @@ import type {
   u8,
 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBalanceChangeAccountOrigin,
@@ -66,6 +65,7 @@ import type {
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
   PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferSourceChain,
   PalletDomainsDomainRegistration,
   PalletEthereumVerifierBasicOperatingMode,
@@ -494,6 +494,16 @@ declare module '@polkadot/api-base/types/storage' {
         [PalletCrosschainTransferSourceChain]
       >;
       /**
+       * Latest proven gateway activity snapshot for each source chain.
+       **/
+      gatewayStateBySourceChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<PalletCrosschainTransferGatewayState>>,
+        [PalletCrosschainTransferSourceChain]
+      >;
+      /**
        * Accounts whose recent-transfer evidence expires at a given tick.
        **/
       inboundTransfersExpiringAt: AugmentedQuery<
@@ -505,21 +515,6 @@ declare module '@polkadot/api-base/types/storage' {
        * Latest tick whose recent-transfer expiration bucket was cleaned up.
        **/
       lastTransferExpiryCleanupTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
-       * Latest accepted nonce for each `(source_chain, from)` pair.
-       **/
-      nonceBySourceAccount: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | ITuple<[PalletCrosschainTransferSourceChain, H160]>
-            | [
-                PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
-                H160 | string | Uint8Array,
-              ],
-        ) => Observable<Option<u64>>,
-        [ITuple<[PalletCrosschainTransferSourceChain, H160]>]
-      >;
       /**
        * Count of still-retained qualifying Argon transfers for each local account.
        **/

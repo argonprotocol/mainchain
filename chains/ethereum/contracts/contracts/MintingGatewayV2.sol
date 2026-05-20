@@ -11,7 +11,6 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 /// @title MintingGatewayV2
 /// @author Argon Protocol
 /// @notice Gateway for transfers between this chain and Argon, plus council-managed minting authority updates.
-/// @dev This is the clean V2 surface. It does not keep the older V1 entrypoints for compatibility.
 contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradeable {
 	using MessageHashUtils for bytes32;
 
@@ -162,6 +161,8 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 
 	/// @notice Decoded payload for a minting-authority deactivation queue item.
 	struct MintingAuthorityDeactivateTarget {
+		/// @notice Stable Argon identifier for the minting authority to deactivate.
+		bytes32 mintingAuthorityId;
 		/// @notice Signing key that must authorize the deactivation on this chain.
 		address signingKey;
 	}
@@ -265,13 +266,13 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 		GatewayActivityState gatewayState
 	);
 	/// @notice Emitted when a queued minting-authority deactivation is applied.
-	/// @param signingKey Signing key whose remaining collateral was removed.
+	/// @param mintingAuthorityId Stable Argon identifier for the minting authority.
 	/// @param microgonCollateral Remaining Argon collateral returned by the deactivation.
 	/// @param micronotCollateral Remaining Argonot collateral returned by the deactivation.
 	/// @param relayerArgonAccountId Argon account that submitted the update relay.
 	/// @param gatewayState Shared gateway state snapshot after the update lands.
 	event MintingAuthorityDeactivated(
-		address indexed signingKey,
+		bytes32 indexed mintingAuthorityId,
 		uint128 microgonCollateral,
 		uint128 micronotCollateral,
 		bytes32 relayerArgonAccountId,
@@ -356,9 +357,8 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 		MigrationAssetDistribution calldata argonotMigration
 	) external onlyOwner whenNotPaused {
 		if (migrationCompleted) revert MigrationAlreadyCompleted();
-		if (argonToken == address(0) || argonotToken == address(0)) {
-			revert UnsupportedToken(address(0));
-		}
+		_requireCanonicalToken(argonToken);
+		_requireCanonicalToken(argonotToken);
 
 		uint256 argonTotalAmount =
 			_mintMigrationBalances(argonToken, argonMigration.recipients, argonMigration.amounts);
@@ -524,6 +524,7 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 		_requireTransferOutOfArgonChain(request);
 		_requireCanonicalToken(request.token);
 		if (request.amount == 0) revert ZeroAmount();
+
 		if (block.number > request.validUntilBlock) {
 			revert TransferOutOfArgonExpired(block.number, request.validUntilBlock);
 		}
@@ -820,7 +821,7 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 		}
 
 		updateHash = _hashMintingAuthorityDeactivation(
-			update.queueNonce, target.signingKey, previousUpdateHash
+			update.queueNonce, target.mintingAuthorityId, target.signingKey, previousUpdateHash
 		);
 		address recoveredSigner = ECDSA.recoverCalldata(
 			updateHash.toEthSignedMessageHash(),
@@ -843,7 +844,7 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 
 		uint64 activityNonce = _nextGatewayActivityNonce();
 		emit MintingAuthorityDeactivated(
-			target.signingKey,
+			target.mintingAuthorityId,
 			microgonCollateral,
 			micronotCollateral,
 			relayerArgonAccountId,
@@ -1262,11 +1263,13 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 
 	/// @notice Returns the hash that a minting authority signs to authorize its own deactivation.
 	/// @param queueNonce Contiguous queue nonce being applied.
+	/// @param mintingAuthorityId Minting authority being deactivated.
 	/// @param signingKey Signing key that must authorize the deactivation on this chain.
 	/// @param previousUpdateHash Chained signed hash of the immediately previous queue item.
 	/// @return deactivateHash Deactivation authorization hash.
 	function _hashMintingAuthorityDeactivation(
 		uint64 queueNonce,
+		bytes32 mintingAuthorityId,
 		address signingKey,
 		bytes32 previousUpdateHash
 	) private view returns (bytes32) {
@@ -1276,6 +1279,7 @@ contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradea
 				block.chainid,
 				address(this),
 				queueNonce,
+				mintingAuthorityId,
 				signingKey,
 				previousUpdateHash
 			)

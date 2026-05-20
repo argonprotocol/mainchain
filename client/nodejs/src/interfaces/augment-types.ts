@@ -1,16 +1,17 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
 import type {} from '@polkadot/types/types/registry';
 
 import type {
+  ArgonPrimitivesEthereumEthereumCombinedReceiptProof,
   ArgonPrimitivesEthereumEthereumExecutionBlockProof,
   ArgonPrimitivesEthereumEthereumExecutionHeader,
   ArgonPrimitivesEthereumEthereumLog,
   ArgonPrimitivesEthereumEthereumProof,
-  ArgonPrimitivesEthereumEthereumReceiptProof,
+  ArgonPrimitivesEthereumEthereumReceiptLog,
+  ArgonPrimitivesEthereumEthereumReceiptProofReceipt,
   ArgonPrimitivesEthereumEthereumVerifyError,
 } from '@argonprotocol/mainchain/interfaces/ethereum';
 import type { Data, StorageKey } from '@polkadot/types';
@@ -1423,11 +1424,13 @@ declare module '@polkadot/types/types/registry' {
     ApprovalFlag: ApprovalFlag;
     Approvals: Approvals;
     ApprovalVotingParams: ApprovalVotingParams;
+    ArgonPrimitivesEthereumEthereumCombinedReceiptProof: ArgonPrimitivesEthereumEthereumCombinedReceiptProof;
     ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
     ArgonPrimitivesEthereumEthereumExecutionHeader: ArgonPrimitivesEthereumEthereumExecutionHeader;
     ArgonPrimitivesEthereumEthereumLog: ArgonPrimitivesEthereumEthereumLog;
     ArgonPrimitivesEthereumEthereumProof: ArgonPrimitivesEthereumEthereumProof;
-    ArgonPrimitivesEthereumEthereumReceiptProof: ArgonPrimitivesEthereumEthereumReceiptProof;
+    ArgonPrimitivesEthereumEthereumReceiptLog: ArgonPrimitivesEthereumEthereumReceiptLog;
+    ArgonPrimitivesEthereumEthereumReceiptProofReceipt: ArgonPrimitivesEthereumEthereumReceiptProofReceipt;
     ArgonPrimitivesEthereumEthereumVerifyError: ArgonPrimitivesEthereumEthereumVerifyError;
     ArithmeticError: ArithmeticError;
     AssetApproval: AssetApproval;

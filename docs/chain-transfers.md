@@ -14,19 +14,21 @@ Argon currently supports an Ethereum inbound transfer flow.
 
 The current implemented flow is:
 
-1. Burn `ArgonToken` or `ArgonotToken` through the Ethereum `MintingGateway`.
-2. Include the destination Argon account in the burn payload.
-3. Wait for the Ethereum execution block containing that burn to finalize through the beacon chain.
-4. Build an Ethereum event proof for the `BurnForTransfer` log.
-5. Submit `crosschainTransfer.proveTransfer` on Argon mainchain.
-6. If the proof, gateway, token, and nonce are all valid, Argon mainchain settles the matching funds
-   to the destination account.
+1. Call `startTransferToArgon(...)` on the Ethereum `MintingGateway`.
+2. Include the destination Argon account in the gateway activity payload.
+3. Wait for the Ethereum execution block containing that activity to finalize through the beacon
+   chain.
+4. Build an Ethereum gateway-activity proof batch for the ordered `TransferToArgonStarted` log range
+   you want to settle.
+5. Submit `crosschainTransfer.proveGatewayActivity` on Argon mainchain with that proof batch.
+6. If the proof, gateway, token, and ordered gateway activity nonce are all valid, Argon mainchain
+   settles the matching funds to the destination account.
 
 What exists today:
 
 - Ethereum to Argon mainchain inbound settlement
-- support for both Argon and Argonot burn proofs
-- replay protection through per-source-account nonces
+- support for both Argon and Argonot gateway activity proofs
+- replay protection through ordered gateway activity nonces
 - inbound-only Ethereum support in this flow
 
 For the implementation-oriented overview, see

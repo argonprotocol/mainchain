@@ -8,11 +8,11 @@ Expected generated artifacts:
 - `deployment-manifest.json` from
   `yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy`
 - deployment transaction hashes and constructor arguments
-- MintingGateway bootstrap implementation address, final implementation address, proxy address, and
+- MintingGatewayV2 bootstrap implementation address, final implementation address, proxy address, and
   proxy admin address
-- Safe calldata to upgrade the MintingGateway proxy to the final implementation with fixed Argon and
+- Safe calldata to upgrade the MintingGatewayV2 proxy to the final implementation with fixed Argon and
   Argonot token addresses
-- the Ethereum `chainId`, `MintingGateway` address, and canonical token addresses that the future
+- the Ethereum `chainId`, `MintingGatewayV2` address, and canonical token addresses that the future
   Argon-side runtime seeding step will need
 
 The current bootstrap slice is intentionally narrow:
@@ -23,8 +23,8 @@ The current bootstrap slice is intentionally narrow:
   `migrate(...)`
 
 The bootstrap implementation only stores the first council summary. Token-bearing gateway
-entrypoints and `migrate(...)` reject until the proxy is upgraded to the final implementation with
-canonical token addresses baked in.
+entrypoints reject until the proxy is upgraded to the final implementation with canonical token
+addresses baked in.
 
 This branch does not yet include the runtime-side `pallet_crosschain_transfer` migration, so the
 bootstrap manifest here is the handoff artifact for that later step.

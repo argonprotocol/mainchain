@@ -2,14 +2,14 @@ import { Keyring } from '@polkadot/keyring';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   argonTokenAbi,
-  findEthereumBurnForTransferLogIndex,
-  MINTING_GATEWAY_BURN_FOR_TRANSFER_EVENT_NAME,
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   mintingGatewayAbi,
   TxSubmitter,
-  buildEthereumEventProof,
+  buildGatewayActivityProofPayload,
   dispatchErrorToString,
+  type EthereumReceipt,
   getEthereumBeaconSyncBootstrapTx,
+  getLatestArgonFinalizedExecutionHeader,
   getNextEthereumBeaconSyncTxs,
   isOutdatedTransactionError,
 } from '../index';
@@ -28,13 +28,7 @@ import {
   toHex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import {
-  SKIP_E2E,
-  sudo,
-  teardown,
-  TestEthereum,
-  TestMainchain,
-} from '@argonprotocol/testing';
+import { SKIP_E2E, sudo, teardown, TestEthereum, TestMainchain } from '@argonprotocol/testing';
 
 const TEST_ACCOUNT = {
   address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
@@ -43,6 +37,9 @@ const TEST_ACCOUNT = {
 } as const;
 
 const TRANSFER_AMOUNT_RUNTIME_UNITS = 10_000n;
+const TRANSFER_AMOUNT_BASE_UNITS =
+  TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE;
+const PROOF_RELAYER_URI = '//Charlie';
 
 afterEach(async () => {
   await teardown();
@@ -58,7 +55,7 @@ async function signGatewayPermit(args: {
   nonce: bigint;
   deadline: bigint;
 }) {
-  return parseSignature(
+  const signature = parseSignature(
     await args.account.signTypedData({
       domain: {
         name: 'Argon',
@@ -85,12 +82,14 @@ async function signGatewayPermit(args: {
       },
     }),
   );
+  return { v: Number(signature.v), r: signature.r, s: signature.s };
 }
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
-  it('boots a real ethereum devnet and proves a MintingGateway burn into CrosschainTransfer', async () => {
+  it('boots a real ethereum devnet and proves two MintingGatewayV2 burns in one proof batch', async () => {
     const ethereum = new TestEthereum();
     const endpoints = await ethereum.launch({
+      consensusClient: 'lodestar',
       preset: 'minimal',
       secondsPerSlot: 1,
       prefundedAccounts: {
@@ -133,11 +132,15 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
       deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_RUNTIME_UNITS,
+      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS * 2n,
       seedArgonRecipient: account.address,
     });
     const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
-    const argonDestination = toHex(bob.publicKey, { size: 32 });
+    const charlie = new Keyring({ type: 'sr25519' }).createFromUri('//Charlie//beneficiary');
+    const firstTransferAmount = TRANSFER_AMOUNT_RUNTIME_UNITS;
+    const secondTransferAmount = TRANSFER_AMOUNT_RUNTIME_UNITS;
+    const firstArgonDestination = toHex(bob.publicKey, { size: 32 });
+    const secondArgonDestination = toHex(charlie.publicKey, { size: 32 });
 
     const permitDeadline = (await publicClient.getBlock()).timestamp + 3600n;
     const permitNonce = await publicClient.readContract({
@@ -152,20 +155,20 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       tokenAddress: gatewayDeployment.argonTokenAddress,
       gatewayAddress: gatewayDeployment.gatewayAddress,
       owner: account.address,
-      value: TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+      value: firstTransferAmount * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
       nonce: permitNonce,
       deadline: permitDeadline,
     });
 
-    const burnHash = await walletClient.sendTransaction({
+    const firstBurnHash = await walletClient.sendTransaction({
       to: gatewayDeployment.gatewayAddress,
       data: encodeFunctionData({
         abi: mintingGatewayAbi,
-        functionName: 'burnForTransfer',
+        functionName: 'startTransferToArgon',
         args: [
           gatewayDeployment.argonTokenAddress,
-          TRANSFER_AMOUNT_RUNTIME_UNITS,
-          argonDestination,
+          firstTransferAmount,
+          firstArgonDestination,
           permitDeadline,
           permitSignature.v,
           permitSignature.r,
@@ -173,30 +176,60 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         ],
       }),
     });
-    const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
-    const burnBlockNumber = BigInt(burnReceipt.blockNumber);
-    const burnLogIndex = findEthereumBurnForTransferLogIndex(
-      burnReceipt,
-      gatewayDeployment.gatewayAddress,
-    );
+    const firstBurnReceipt = await waitForExecutionReceipt(ethereum, firstBurnHash);
+    const firstBurnBlockNumber = BigInt(firstBurnReceipt.blockNumber);
 
-    expect(burnReceipt.status).toBe('0x1');
-    expect(burnReceipt.blockHash).toBeTruthy();
-    expect(burnLogIndex).toBeGreaterThanOrEqual(0);
+    expect(firstBurnReceipt.status).toBe('0x1');
+    expect(firstBurnReceipt.blockHash).toBeTruthy();
+
+    await waitForExecutionBlockAtOrAbove(publicClient, firstBurnBlockNumber + 1n);
+
+    const secondPermitSignature = await signGatewayPermit({
+      account,
+      chainId: chain.id,
+      tokenAddress: gatewayDeployment.argonTokenAddress,
+      gatewayAddress: gatewayDeployment.gatewayAddress,
+      owner: account.address,
+      value: secondTransferAmount * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+      nonce: permitNonce + 1n,
+      deadline: permitDeadline,
+    });
+    const secondBurnHash = await walletClient.sendTransaction({
+      to: gatewayDeployment.gatewayAddress,
+      data: encodeFunctionData({
+        abi: mintingGatewayAbi,
+        functionName: 'startTransferToArgon',
+        args: [
+          gatewayDeployment.argonTokenAddress,
+          secondTransferAmount,
+          secondArgonDestination,
+          permitDeadline,
+          secondPermitSignature.v,
+          secondPermitSignature.r,
+          secondPermitSignature.s,
+        ],
+      }),
+    });
+    const secondBurnReceipt = await waitForExecutionReceipt(ethereum, secondBurnHash);
+    const secondBurnBlockNumber = BigInt(secondBurnReceipt.blockNumber);
+
+    expect(secondBurnReceipt.status).toBe('0x1');
+    expect(secondBurnBlockNumber).toBeGreaterThan(firstBurnBlockNumber);
 
     const laterReceipt = await mineLaterExecutionAnchorReceipt(
       walletClient,
       chain,
       ethereum,
       account,
-      burnBlockNumber,
+      secondBurnBlockNumber,
     );
     await waitForFinalizedBeaconExecutionAtOrAbove(ethereum, BigInt(laterReceipt.blockNumber));
 
     await mainchainReady;
 
     const mainchainClient = await mainchain.client();
-    const relayer = sudo();
+    const sudoSigner = sudo();
+    const proofRelayer = new Keyring({ type: 'sr25519' }).createFromUri(PROOF_RELAYER_URI);
 
     const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
       mainchainClient,
@@ -205,7 +238,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     const checkpointResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.sudo.sudo(checkpointTx),
-      relayer,
+      sudoSigner,
     ).submit();
     await checkpointResult.waitForInFirstBlock;
 
@@ -222,24 +255,12 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       );
     }
 
-    const maintenanceTxs = await getNextEthereumBeaconSyncTxs(
+    await syncEthereumVerifierUntilAnchorCovers(
       mainchainClient,
+      sudoSigner,
       endpoints.beaconApiUrl,
+      secondBurnBlockNumber,
     );
-    if (maintenanceTxs.length === 0) {
-      throw new Error('missing ethereum verifier maintenance txs');
-    }
-    for (const tx of maintenanceTxs) {
-      try {
-        const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
-        await result.waitForInFirstBlock;
-      } catch (error) {
-        if (isOutdatedTransactionError(error)) {
-          continue;
-        }
-        throw error;
-      }
-    }
 
     const finalizedState = await mainchainClient.query.ethereumVerifier.finalizedBeaconState(
       await mainchainClient.query.ethereumVerifier.latestFinalizedBlockRoot(),
@@ -263,67 +284,112 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
           },
         }),
       ),
-      relayer,
+      sudoSigner,
     ).submit();
     await setConfigResult.waitForInFirstBlock;
 
     const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
     const burnAccountFunding =
-      TRANSFER_AMOUNT_RUNTIME_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
+      firstTransferAmount +
+      secondTransferAmount +
+      mainchainClient.consts.balances.existentialDeposit.toBigInt();
+    const proofRelayerFunding =
+      mainchainClient.consts.balances.existentialDeposit.toBigInt() + 1_000_000n;
 
     const fundBurnAccountResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
-      relayer,
+      sudoSigner,
     ).submit();
     await fundBurnAccountResult.waitForInFirstBlock;
 
-    const eventProof = await buildEthereumEventProof(mainchainClient, {
-      executionRpcUrl: endpoints.executionRpcUrl,
-      txHash: burnHash,
-      logIndex: burnLogIndex,
-    });
-    const verifyResult = await mainchainClient.call.ethereumApis.verifyEventLog(
-      eventProof.eventLog,
-      eventProof.proof,
-    );
-    const executionBlockProof = eventProof.proof.executionBlockProof;
-    const recipientBefore = await mainchainClient.query.system.account(bob.address);
-
-    const proveTransferResult = await new TxSubmitter(
+    const fundProofRelayerResult = await new TxSubmitter(
       mainchainClient,
-      mainchainClient.tx.crosschainTransfer.proveTransfer({
-        Ethereum: {
-          sourceChain: 'Ethereum',
-          eventLog: eventProof.eventLog,
-          proof: eventProof.proof,
-        },
-      }),
-      relayer,
+      mainchainClient.tx.balances.transferAllowDeath(proofRelayer.address, proofRelayerFunding),
+      sudoSigner,
     ).submit();
-    await proveTransferResult.waitForInFirstBlock;
+    await fundProofRelayerResult.waitForInFirstBlock;
 
-    expect(eventProof.proof.receiptProof.nodes.length).toBeGreaterThan(0);
-    expect(eventProof.proof.receiptProof.transactionIndex).toBe(
-      Number(BigInt(burnReceipt.transactionIndex)),
+    const proofPlan = await buildGatewayActivityProofPayload(mainchainClient, {
+      executionRpcUrl: endpoints.executionRpcUrl,
+      gatewayAddress: gatewayDeployment.gatewayAddress,
+      throughExecutionBlockNumber: secondBurnBlockNumber,
+    });
+    const proofPayload = proofPlan.payload;
+    if (!proofPayload) {
+      throw new Error('Expected uncovered gateway activity to prove');
+    }
+
+    expect(proofPlan.latestGatewayActivityNonce).toBe(2n);
+    expect(proofPlan.payloadUpToGatewayActivityNonce).toBe(2n);
+    const { previousGatewayActivityNonce, proof: eventProof } = proofPayload;
+    const firstProofBlock = eventProof.blocks[0];
+    const secondProofBlock = eventProof.blocks[1];
+    const recipientBefore = await mainchainClient.query.system.account(bob.address);
+    const secondRecipientBefore = await mainchainClient.query.system.account(charlie.address);
+    const relayerBefore = await mainchainClient.query.system.account(proofRelayer.address);
+
+    const proveGatewayActivityResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
+        'Ethereum',
+        previousGatewayActivityNonce,
+        eventProof,
+      ),
+      proofRelayer,
+    ).submit();
+    await proveGatewayActivityResult.waitForInFirstBlock;
+
+    expect(previousGatewayActivityNonce).toBe(0n);
+    expect(proofPayload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 2n });
+    expect(proofPayload.executionBlockNumberRange).toEqual({
+      start: firstBurnBlockNumber,
+      end: secondBurnBlockNumber,
+    });
+    expect(eventProof.executionBlockProof.anchorBlockHash).toBeTruthy();
+    expect(eventProof.blocks).toHaveLength(2);
+    expect(firstProofBlock.receiptProof.nodes.length).toBeGreaterThan(0);
+    expect(secondProofBlock.receiptProof.nodes.length).toBeGreaterThan(0);
+    expect(firstProofBlock.receiptLogs[0]?.transactionIndex).toBe(
+      Number(BigInt(firstBurnReceipt.transactionIndex)),
     );
-    expect(executionBlockProof.anchorBlockHash).toBeTruthy();
-    expect(verifyResult.isOk).toBe(true);
+    expect(secondProofBlock.receiptLogs[0]?.transactionIndex).toBe(
+      Number(BigInt(secondBurnReceipt.transactionIndex)),
+    );
+    expect(firstProofBlock.receiptProof.receipts[0]?.transactionIndex).toBe(
+      Number(BigInt(firstBurnReceipt.transactionIndex)),
+    );
+    expect(secondProofBlock.receiptProof.receipts[0]?.transactionIndex).toBe(
+      Number(BigInt(secondBurnReceipt.transactionIndex)),
+    );
     expect(
-      proveTransferResult.events.some(event =>
-        mainchainClient.events.crosschainTransfer.BurnNoticeAccepted.is(event),
+      proveGatewayActivityResult.events.filter(event =>
+        mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
+      ),
+    ).toHaveLength(2);
+    expect(
+      proveGatewayActivityResult.events.some(event =>
+        mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
       ),
     ).toBe(true);
+    expect(proveGatewayActivityResult.finalFee ?? 0n).toBe(0n);
 
     const recipientAfter = await mainchainClient.query.system.account(bob.address);
+    const secondRecipientAfter = await mainchainClient.query.system.account(charlie.address);
+    const relayerAfter = await mainchainClient.query.system.account(proofRelayer.address);
     expect(recipientAfter.data.free.toBigInt() - recipientBefore.data.free.toBigInt()).toBe(
-      TRANSFER_AMOUNT_RUNTIME_UNITS - (proveTransferResult.finalFee ?? 0n),
+      firstTransferAmount,
     );
+    expect(
+      secondRecipientAfter.data.free.toBigInt() - secondRecipientBefore.data.free.toBigInt(),
+    ).toBe(secondTransferAmount);
+    expect(relayerAfter.data.free.toBigInt()).toBe(relayerBefore.data.free.toBigInt());
   }, 420_000);
 
   it('proves a burn after the first minimal sync committee transition', async () => {
     const ethereum = new TestEthereum();
     const endpoints = await ethereum.launch({
+      consensusClient: 'lodestar',
       preset: 'minimal',
       secondsPerSlot: 1,
       prefundedAccounts: {
@@ -364,7 +430,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
     const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
       deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_RUNTIME_UNITS,
+      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
       seedArgonRecipient: account.address,
     });
     const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
@@ -392,7 +458,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       to: gatewayDeployment.gatewayAddress,
       data: encodeFunctionData({
         abi: mintingGatewayAbi,
-        functionName: 'burnForTransfer',
+        functionName: 'startTransferToArgon',
         args: [
           gatewayDeployment.argonTokenAddress,
           TRANSFER_AMOUNT_RUNTIME_UNITS,
@@ -406,10 +472,6 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     });
     const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
     const burnBlockNumber = BigInt(burnReceipt.blockNumber);
-    const burnLogIndex = findEthereumBurnForTransferLogIndex(
-      burnReceipt,
-      gatewayDeployment.gatewayAddress,
-    );
 
     const laterReceipt = await mineLaterExecutionAnchorReceipt(
       walletClient,
@@ -423,7 +485,8 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     await mainchainReady;
 
     const mainchainClient = await mainchain.client();
-    const relayer = sudo();
+    const sudoSigner = sudo();
+    const proofRelayer = new Keyring({ type: 'sr25519' }).createFromUri(PROOF_RELAYER_URI);
 
     const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
       mainchainClient,
@@ -432,7 +495,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     const checkpointResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.sudo.sudo(checkpointTx),
-      relayer,
+      sudoSigner,
     ).submit();
     await checkpointResult.waitForInFirstBlock;
 
@@ -449,22 +512,12 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       );
     }
 
-    while (true) {
-      const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, endpoints.beaconApiUrl);
-      if (txs.length === 0) break;
-
-      for (const tx of txs) {
-        try {
-          const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
-          await result.waitForInFirstBlock;
-        } catch (error) {
-          if (isOutdatedTransactionError(error)) {
-            continue;
-          }
-          throw error;
-        }
-      }
-    }
+    await syncEthereumVerifierUntilAnchorCovers(
+      mainchainClient,
+      sudoSigner,
+      endpoints.beaconApiUrl,
+      burnBlockNumber,
+    );
 
     const setConfigResult = await new TxSubmitter(
       mainchainClient,
@@ -479,45 +532,75 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
           },
         }),
       ),
-      relayer,
+      sudoSigner,
     ).submit();
     await setConfigResult.waitForInFirstBlock;
 
     const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
     const burnAccountFunding =
-      TRANSFER_AMOUNT_RUNTIME_UNITS +
-      mainchainClient.consts.balances.existentialDeposit.toBigInt();
+      TRANSFER_AMOUNT_RUNTIME_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
+    const proofRelayerFunding =
+      mainchainClient.consts.balances.existentialDeposit.toBigInt() + 1_000_000n;
 
     const fundBurnAccountResult = await new TxSubmitter(
       mainchainClient,
       mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
-      relayer,
+      sudoSigner,
     ).submit();
     await fundBurnAccountResult.waitForInFirstBlock;
 
-    const eventProof = await buildEthereumEventProof(mainchainClient, {
-      executionRpcUrl: endpoints.executionRpcUrl,
-      txHash: burnHash,
-      logIndex: burnLogIndex,
-    });
-    const proveTransferResult = await new TxSubmitter(
+    const fundProofRelayerResult = await new TxSubmitter(
       mainchainClient,
-      mainchainClient.tx.crosschainTransfer.proveTransfer({
-        Ethereum: {
-          sourceChain: 'Ethereum',
-          eventLog: eventProof.eventLog,
-          proof: eventProof.proof,
-        },
-      }),
-      relayer,
+      mainchainClient.tx.balances.transferAllowDeath(proofRelayer.address, proofRelayerFunding),
+      sudoSigner,
     ).submit();
-    await proveTransferResult.waitForInFirstBlock;
+    await fundProofRelayerResult.waitForInFirstBlock;
 
+    const proofPlan = await buildGatewayActivityProofPayload(mainchainClient, {
+      executionRpcUrl: endpoints.executionRpcUrl,
+      gatewayAddress: gatewayDeployment.gatewayAddress,
+      throughExecutionBlockNumber: burnBlockNumber,
+    });
+    const proofPayload = proofPlan.payload;
+    if (!proofPayload) {
+      throw new Error('Expected uncovered gateway activity to prove');
+    }
+
+    expect(proofPlan.latestGatewayActivityNonce).toBe(1n);
+    expect(proofPlan.payloadUpToGatewayActivityNonce).toBe(1n);
+    const { previousGatewayActivityNonce, proof: eventProof } = proofPayload;
+    const relayerBefore = await mainchainClient.query.system.account(proofRelayer.address);
+    const proveGatewayActivityResult = await new TxSubmitter(
+      mainchainClient,
+      mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
+        'Ethereum',
+        previousGatewayActivityNonce,
+        eventProof,
+      ),
+      proofRelayer,
+    ).submit();
+    await proveGatewayActivityResult.waitForInFirstBlock;
+
+    expect(previousGatewayActivityNonce).toBe(0n);
+    expect(proofPayload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
+    expect(proofPayload.executionBlockNumberRange).toEqual({
+      start: burnBlockNumber,
+      end: burnBlockNumber,
+    });
     expect(
-      proveTransferResult.events.some(event =>
-        mainchainClient.events.crosschainTransfer.BurnNoticeAccepted.is(event),
+      proveGatewayActivityResult.events.some(event =>
+        mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
       ),
     ).toBe(true);
+    expect(
+      proveGatewayActivityResult.events.some(event =>
+        mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
+      ),
+    ).toBe(true);
+    expect(proveGatewayActivityResult.finalFee ?? 0n).toBe(0n);
+
+    const relayerAfter = await mainchainClient.query.system.account(proofRelayer.address);
+    expect(relayerAfter.data.free.toBigInt()).toBe(relayerBefore.data.free.toBigInt());
   }, 420_000);
 });
 
@@ -609,18 +692,18 @@ async function waitForExecutionBlockAtOrAbove(
 async function waitForExecutionReceipt(
   ethereum: TestEthereum,
   transactionHash: Hex,
-): Promise<RpcTransactionReceipt> {
+): Promise<EthereumReceipt> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < 120_000) {
     try {
-      const receipt = (await ethereum.callExecution<RpcTransactionReceipt | null>(
+      const receipt = await ethereum.callExecution<RpcTransactionReceipt | null>(
         'eth_getTransactionReceipt',
         [transactionHash],
-      )) as RpcTransactionReceipt | null;
+      );
 
       if (receipt) {
-        return receipt;
+        return receipt as unknown as EthereumReceipt;
       }
     } catch (error) {
       const errorText =
@@ -642,6 +725,73 @@ async function waitForExecutionReceipt(
   }
 
   throw new Error(`Timed out waiting for execution receipt ${transactionHash}`);
+}
+
+async function syncEthereumVerifierUntilAnchorCovers(
+  mainchainClient: Awaited<ReturnType<TestMainchain['client']>>,
+  relayer: ReturnType<typeof sudo>,
+  beaconApiUrl: string,
+  minimumExecutionBlockNumber: bigint,
+) {
+  const startedAt = Date.now();
+  let sawAnyTx = false;
+  let lastRetryableError: Error | undefined;
+
+  while (Date.now() - startedAt < 120_000) {
+    try {
+      const anchor = await getLatestArgonFinalizedExecutionHeader(mainchainClient);
+      if (anchor.blockNumber >= minimumExecutionBlockNumber) {
+        return;
+      }
+    } catch {}
+
+    const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, beaconApiUrl);
+    if (txs.length === 0) {
+      if (sawAnyTx && !lastRetryableError) {
+        break;
+      }
+
+      await delay(500);
+      continue;
+    }
+
+    sawAnyTx = true;
+    let shouldRetry = false;
+    for (const tx of txs) {
+      try {
+        const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
+        await result.waitForInFirstBlock;
+        lastRetryableError = undefined;
+      } catch (error) {
+        if (isRetryableEthereumVerifierSyncError(error)) {
+          lastRetryableError = error instanceof Error ? error : new Error(String(error));
+          shouldRetry = true;
+          break;
+        }
+        throw error;
+      }
+    }
+
+    if (shouldRetry) {
+      await delay(500);
+    }
+  }
+
+  throw (
+    lastRetryableError ??
+    new Error(
+      `Ethereum verifier did not retain an anchor at or above execution block ${minimumExecutionBlockNumber} within the retry window`,
+    )
+  );
+}
+
+function isRetryableEthereumVerifierSyncError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    isOutdatedTransactionError(error) ||
+    message.includes('ethereumVerifier.InvalidHeaderMerkleProof')
+  );
 }
 
 async function delay(ms: number): Promise<void> {

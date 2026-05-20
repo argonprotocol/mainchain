@@ -943,241 +943,6 @@ export const mintingGatewayAbi = [
     stateMutability: 'nonpayable',
   },
   { type: 'error', inputs: [], name: 'ArrayLengthMismatch' },
-  { type: 'error', inputs: [], name: 'EnforcedPause' },
-  { type: 'error', inputs: [], name: 'ExpectedPause' },
-  { type: 'error', inputs: [], name: 'InvalidInitialization' },
-  {
-    type: 'error',
-    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
-    name: 'NotGuardianOrOwner',
-  },
-  { type: 'error', inputs: [], name: 'NotInitializing' },
-  {
-    type: 'error',
-    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
-    name: 'OwnableInvalidOwner',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'OwnableUnauthorizedAccount',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
-    name: 'UnsupportedToken',
-  },
-  { type: 'error', inputs: [], name: 'ZeroAdminSafe' },
-  { type: 'error', inputs: [], name: 'ZeroAmount' },
-  { type: 'error', inputs: [], name: 'ZeroGuardian' },
-  {
-    type: 'error',
-    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
-    name: 'ZeroRecipient',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'recipientCount', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'totalAmount', internalType: 'uint64', type: 'uint64', indexed: false },
-    ],
-    name: 'AdminMintBatch',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address', indexed: true },
-      { name: 'token', internalType: 'address', type: 'address', indexed: true },
-      { name: 'amountBaseUnits', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'argonDestination', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'accountNonce', internalType: 'uint64', type: 'uint64', indexed: false },
-    ],
-    name: 'BurnForTransfer',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'previousGuardian', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newGuardian', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'GuardianUpdated',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'version', internalType: 'uint64', type: 'uint64', indexed: false }],
-    name: 'Initialized',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'previousOwner', internalType: 'address', type: 'address', indexed: true },
-      { name: 'newOwner', internalType: 'address', type: 'address', indexed: true },
-    ],
-    name: 'OwnershipTransferred',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
-    name: 'Paused',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [{ name: 'account', internalType: 'address', type: 'address', indexed: false }],
-    name: 'Unpaused',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'RUNTIME_DECIMALS',
-    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'RUNTIME_TO_ERC20_SCALE',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'TOKEN_DECIMALS',
-    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'accountNonces',
-    outputs: [{ name: 'nonce', internalType: 'uint64', type: 'uint64' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'recipients', internalType: 'address[]', type: 'address[]' },
-      { name: 'amounts', internalType: 'uint64[]', type: 'uint64[]' },
-    ],
-    name: 'adminMintBatch',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'argonToken',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'argonotToken',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'amount', internalType: 'uint64', type: 'uint64' },
-      { name: 'argonDestination', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'deadline', internalType: 'uint256', type: 'uint256' },
-      { name: 'v', internalType: 'uint8', type: 'uint8' },
-      { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-      { name: 's', internalType: 'bytes32', type: 'bytes32' },
-    ],
-    name: 'burnForTransfer',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'guardian',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'adminSafe', internalType: 'address', type: 'address' },
-      { name: 'guardianAddress', internalType: 'address', type: 'address' },
-    ],
-    name: 'initialize',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'owner',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  { type: 'function', inputs: [], name: 'pause', outputs: [], stateMutability: 'nonpayable' },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'paused',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'renounceOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'guardianAddress', internalType: 'address', type: 'address' }],
-    name: 'setGuardian',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'amount', internalType: 'uint64', type: 'uint64' }],
-    name: 'toTokenAmount',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'pure',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
-    name: 'transferOwnership',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  { type: 'function', inputs: [], name: 'unpause', outputs: [], stateMutability: 'nonpayable' },
-] as const;
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MintingGatewayV2
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const mintingGatewayV2Abi = [
-  {
-    type: 'constructor',
-    inputs: [
-      { name: 'argonTokenAddress', internalType: 'address', type: 'address' },
-      { name: 'argonotTokenAddress', internalType: 'address', type: 'address' },
-    ],
-    stateMutability: 'nonpayable',
-  },
-  { type: 'error', inputs: [], name: 'ArrayLengthMismatch' },
   { type: 'error', inputs: [], name: 'ECDSAInvalidSignature' },
   {
     type: 'error',
@@ -1356,7 +1121,7 @@ export const mintingGatewayV2Abi = [
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1406,7 +1171,7 @@ export const mintingGatewayV2Abi = [
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1423,13 +1188,13 @@ export const mintingGatewayV2Abi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'signingKey', internalType: 'address', type: 'address', indexed: true },
+      { name: 'mintingAuthorityId', internalType: 'bytes32', type: 'bytes32', indexed: true },
       { name: 'microgonCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'micronotCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1464,7 +1229,7 @@ export const mintingGatewayV2Abi = [
       { name: 'transferId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1484,7 +1249,7 @@ export const mintingGatewayV2Abi = [
       { name: 'transferId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'mintingCollateral',
-        internalType: 'struct MintingGatewayV2.MintingAuthorityCollateral[]',
+        internalType: 'struct MintingGateway.MintingAuthorityCollateral[]',
         type: 'tuple[]',
         components: [
           { name: 'signingKey', internalType: 'address', type: 'address' },
@@ -1495,7 +1260,7 @@ export const mintingGatewayV2Abi = [
       },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1518,7 +1283,7 @@ export const mintingGatewayV2Abi = [
       { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
-        internalType: 'struct MintingGatewayV2.GatewayActivityState',
+        internalType: 'struct MintingGateway.GatewayActivityState',
         type: 'tuple',
         components: [
           { name: 'gatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
@@ -1574,7 +1339,7 @@ export const mintingGatewayV2Abi = [
     inputs: [
       {
         name: 'currentCouncil',
-        internalType: 'struct MintingGatewayV2.CouncilSnapshot',
+        internalType: 'struct MintingGateway.CouncilSnapshot',
         type: 'tuple',
         components: [
           { name: 'signers', internalType: 'address[]', type: 'address[]' },
@@ -1583,11 +1348,11 @@ export const mintingGatewayV2Abi = [
       },
       {
         name: 'updates',
-        internalType: 'struct MintingGatewayV2.GatewayUpdate[]',
+        internalType: 'struct MintingGateway.GatewayUpdate[]',
         type: 'tuple[]',
         components: [
           { name: 'queueNonce', internalType: 'uint64', type: 'uint64' },
-          { name: 'kind', internalType: 'enum MintingGatewayV2.GatewayUpdateKind', type: 'uint8' },
+          { name: 'kind', internalType: 'enum MintingGateway.GatewayUpdateKind', type: 'uint8' },
           { name: 'payload', internalType: 'bytes', type: 'bytes' },
           { name: 'signatures', internalType: 'bytes[]', type: 'bytes[]' },
         ],
@@ -1645,7 +1410,7 @@ export const mintingGatewayV2Abi = [
     inputs: [
       {
         name: 'request',
-        internalType: 'struct MintingGatewayV2.TransferOutOfArgonRequest',
+        internalType: 'struct MintingGateway.TransferOutOfArgonRequest',
         type: 'tuple',
         components: [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
@@ -1669,7 +1434,7 @@ export const mintingGatewayV2Abi = [
     inputs: [
       {
         name: 'request',
-        internalType: 'struct MintingGatewayV2.TransferOutOfArgonRequest',
+        internalType: 'struct MintingGateway.TransferOutOfArgonRequest',
         type: 'tuple',
         components: [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
@@ -1685,12 +1450,12 @@ export const mintingGatewayV2Abi = [
       },
       {
         name: 'proof',
-        internalType: 'struct MintingGatewayV2.TransferOutOfArgonProof',
+        internalType: 'struct MintingGateway.TransferOutOfArgonProof',
         type: 'tuple',
         components: [
           {
             name: 'authorizations',
-            internalType: 'struct MintingGatewayV2.MintingAuthorization[]',
+            internalType: 'struct MintingGateway.MintingAuthorization[]',
             type: 'tuple[]',
             components: [
               { name: 'microgonCollateral', internalType: 'uint128', type: 'uint128' },
@@ -1717,7 +1482,7 @@ export const mintingGatewayV2Abi = [
     inputs: [
       {
         name: 'nextCouncil',
-        internalType: 'struct MintingGatewayV2.CouncilSnapshot',
+        internalType: 'struct MintingGateway.CouncilSnapshot',
         type: 'tuple',
         components: [
           { name: 'signers', internalType: 'address[]', type: 'address[]' },
@@ -1788,7 +1553,7 @@ export const mintingGatewayV2Abi = [
     inputs: [
       {
         name: 'argonMigration',
-        internalType: 'struct MintingGatewayV2.MigrationAssetDistribution',
+        internalType: 'struct MintingGateway.MigrationAssetDistribution',
         type: 'tuple',
         components: [
           { name: 'recipients', internalType: 'address[]', type: 'address[]' },
@@ -1797,7 +1562,7 @@ export const mintingGatewayV2Abi = [
       },
       {
         name: 'argonotMigration',
-        internalType: 'struct MintingGatewayV2.MigrationAssetDistribution',
+        internalType: 'struct MintingGateway.MigrationAssetDistribution',
         type: 'tuple',
         components: [
           { name: 'recipients', internalType: 'address[]', type: 'address[]' },
@@ -2014,3 +1779,303 @@ export const transparentUpgradeableProxyAbi = [
   },
   { type: 'fallback', stateMutability: 'payable' },
 ] as const;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// EventMetadataConstants
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import type { Hex } from 'viem';
+
+export type ArgonTokenApproval = {
+  owner: Hex;
+  spender: Hex;
+  value: bigint;
+};
+
+export type ArgonTokenEIP712DomainChanged = {};
+
+export type ArgonTokenTransfer = {
+  from: Hex;
+  to: Hex;
+  value: bigint;
+};
+
+export type ArgonotTokenApproval = {
+  owner: Hex;
+  spender: Hex;
+  value: bigint;
+};
+
+export type ArgonotTokenEIP712DomainChanged = {};
+
+export type ArgonotTokenTransfer = {
+  from: Hex;
+  to: Hex;
+  value: bigint;
+};
+
+export type CanonicalMintableBurnableERC20Approval = {
+  owner: Hex;
+  spender: Hex;
+  value: bigint;
+};
+
+export type CanonicalMintableBurnableERC20EIP712DomainChanged = {};
+
+export type CanonicalMintableBurnableERC20Transfer = {
+  from: Hex;
+  to: Hex;
+  value: bigint;
+};
+
+export type ICanonicalTokenApproval = {
+  owner: Hex;
+  spender: Hex;
+  value: bigint;
+};
+
+export type ICanonicalTokenTransfer = {
+  from: Hex;
+  to: Hex;
+  value: bigint;
+};
+
+export type MintingGatewayGlobalIssuanceCouncilBootstrapped = {
+  councilHash: Hex;
+};
+
+export type MintingGatewayGlobalIssuanceCouncilForceUpdated = {
+  previousCouncilHash: Hex;
+  councilHash: Hex;
+};
+
+export type MintingGatewayActivityState = {
+  gatewayActivityNonce: bigint;
+  argonApprovalsNonce: bigint;
+  argonCirculation: bigint;
+  argonotCirculation: bigint;
+};
+
+export type MintingGatewayGlobalIssuanceCouncilRotated = {
+  councilHash: Hex;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayGuardianUpdated = {
+  previousGuardian: Hex;
+  newGuardian: Hex;
+};
+
+export type MintingGatewayInitialized = {
+  version: bigint;
+};
+
+export type MintingGatewayMigrationCompleted = {
+  argonRecipientCount: bigint;
+  argonTotalAmount: bigint;
+  argonotRecipientCount: bigint;
+  argonotTotalAmount: bigint;
+};
+
+export type MintingGatewayMintingAuthorityActivated = {
+  mintingAuthorityId: Hex;
+  microgonCollateral: bigint;
+  micronotCollateral: bigint;
+  signingKey: Hex;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayMintingAuthorityDeactivated = {
+  mintingAuthorityId: Hex;
+  microgonCollateral: bigint;
+  micronotCollateral: bigint;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayOwnershipTransferred = {
+  previousOwner: Hex;
+  newOwner: Hex;
+};
+
+export type MintingGatewayPaused = {
+  account: Hex;
+};
+
+export type MintingGatewayTransferOutOfArgonCanceled = {
+  transferId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayMintingAuthorityCollateral = {
+  signingKey: Hex;
+  microgonCollateral: bigint;
+  micronotCollateral: bigint;
+};
+
+export type MintingGatewayTransferOutOfArgonFinalized = {
+  transferId: Hex;
+  mintingCollateral: readonly MintingGatewayMintingAuthorityCollateral[];
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayTransferToArgonStarted = {
+  from: Hex;
+  token: Hex;
+  amount: bigint;
+  argonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+
+export type MintingGatewayUnpaused = {
+  account: Hex;
+};
+
+export type ProxyAdminOwnershipTransferred = {
+  previousOwner: Hex;
+  newOwner: Hex;
+};
+
+export type TransparentUpgradeableProxyAdminChanged = {
+  previousAdmin: Hex;
+  newAdmin: Hex;
+};
+
+export type TransparentUpgradeableProxyUpgraded = {
+  implementation: Hex;
+};
+
+export const ArgonTokenEvents = {
+  Approval: {
+    name: 'Approval',
+    topic: '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925',
+  },
+  EIP712DomainChanged: {
+    name: 'EIP712DomainChanged',
+    topic: '0x0a6387c9ea3628b88a633bb4f3b151770f70085117a15f9bf3787cda53f13d31',
+  },
+  Transfer: {
+    name: 'Transfer',
+    topic: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+  },
+} as const;
+
+export const ArgonotTokenEvents = {
+  Approval: {
+    name: 'Approval',
+    topic: '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925',
+  },
+  EIP712DomainChanged: {
+    name: 'EIP712DomainChanged',
+    topic: '0x0a6387c9ea3628b88a633bb4f3b151770f70085117a15f9bf3787cda53f13d31',
+  },
+  Transfer: {
+    name: 'Transfer',
+    topic: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+  },
+} as const;
+
+export const CanonicalMintableBurnableERC20Events = {
+  Approval: {
+    name: 'Approval',
+    topic: '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925',
+  },
+  EIP712DomainChanged: {
+    name: 'EIP712DomainChanged',
+    topic: '0x0a6387c9ea3628b88a633bb4f3b151770f70085117a15f9bf3787cda53f13d31',
+  },
+  Transfer: {
+    name: 'Transfer',
+    topic: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+  },
+} as const;
+
+export const ICanonicalTokenEvents = {
+  Approval: {
+    name: 'Approval',
+    topic: '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925',
+  },
+  Transfer: {
+    name: 'Transfer',
+    topic: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+  },
+} as const;
+
+export const MintingGatewayEvents = {
+  GlobalIssuanceCouncilBootstrapped: {
+    name: 'GlobalIssuanceCouncilBootstrapped',
+    topic: '0xac3566d46c25f65b48d269870da4b9349704c79de13ad49b115532834d7e7ed1',
+  },
+  GlobalIssuanceCouncilForceUpdated: {
+    name: 'GlobalIssuanceCouncilForceUpdated',
+    topic: '0x33e53e90d61fdc868629a6234670f92c4445196f3f98ebd71935bbc76c7d9153',
+  },
+  GlobalIssuanceCouncilRotated: {
+    name: 'GlobalIssuanceCouncilRotated',
+    topic: '0xb3dbfeab9c5013403dc2f2300318b92643b1cb9323077d549b4f93bbddded963',
+  },
+  GuardianUpdated: {
+    name: 'GuardianUpdated',
+    topic: '0x064d28d3d3071c5cbc271a261c10c2f0f0d9e319390397101aa0eb23c6bad909',
+  },
+  Initialized: {
+    name: 'Initialized',
+    topic: '0xc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2',
+  },
+  MigrationCompleted: {
+    name: 'MigrationCompleted',
+    topic: '0xc255ddc45163282f24909556f7475ab4ec8eb1d51763b25a4560cee9f43d0645',
+  },
+  MintingAuthorityActivated: {
+    name: 'MintingAuthorityActivated',
+    topic: '0x0979cc09e676df76240cc73ba72832bb245d770c4029e526bf7ed115c6bbcb36',
+  },
+  MintingAuthorityDeactivated: {
+    name: 'MintingAuthorityDeactivated',
+    topic: '0x282837b277a62657a658088ea05a123b3560686317498f8b2cc5318619c5a9f9',
+  },
+  OwnershipTransferred: {
+    name: 'OwnershipTransferred',
+    topic: '0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0',
+  },
+  Paused: {
+    name: 'Paused',
+    topic: '0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258',
+  },
+  TransferOutOfArgonCanceled: {
+    name: 'TransferOutOfArgonCanceled',
+    topic: '0x3cb8789e9bf6f532eec2bc8ffee9b622fc0d6e6daefb7fb6bb2e2f7b2d62e452',
+  },
+  TransferOutOfArgonFinalized: {
+    name: 'TransferOutOfArgonFinalized',
+    topic: '0x8ae526f6f5bc6ec0e6b4bf46b1aecd08ff639bbd259d56fea940908be08a31c7',
+  },
+  TransferToArgonStarted: {
+    name: 'TransferToArgonStarted',
+    topic: '0x3ab970a848f33363427e47cfbd7a627af0c6e72757f150137e38cef3cee24d93',
+  },
+  Unpaused: {
+    name: 'Unpaused',
+    topic: '0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa',
+  },
+} as const;
+
+export const ProxyAdminEvents = {
+  OwnershipTransferred: {
+    name: 'OwnershipTransferred',
+    topic: '0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0',
+  },
+} as const;
+
+export const TransparentUpgradeableProxyEvents = {
+  AdminChanged: {
+    name: 'AdminChanged',
+    topic: '0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f',
+  },
+  Upgraded: {
+    name: 'Upgraded',
+    topic: '0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b',
+  },
+} as const;

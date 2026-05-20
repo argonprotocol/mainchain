@@ -46,20 +46,43 @@ export async function getEthereumBeaconSyncBootstrapTx(
   beaconApiUrl: string,
 ): Promise<SubmittableExtrinsic> {
   const expectedPreset = await getExpectedBeaconPreset(client);
-  const [genesis, spec, finalizedHeader] = await Promise.all([
+  const [genesis, spec] = await Promise.all([
     getBeaconJson<EthereumBeaconGenesisResponse>(beaconApiUrl, '/eth/v1/beacon/genesis'),
     getBeaconJson<EthereumBeaconConfigSpecResponse>(beaconApiUrl, '/eth/v1/config/spec'),
-    getBeaconJson<EthereumBeaconHeaderDetailsResponse>(
-      beaconApiUrl,
-      '/eth/v1/beacon/headers/finalized',
-    ),
   ]);
-  const bootstrap = await getBeaconJson<EthereumLightClientBootstrapResponse>(
-    beaconApiUrl,
-    `/eth/v1/beacon/light_client/bootstrap/${finalizedHeader.data.root}`,
-  );
   const specData = spec.data;
   parseBeaconNetworkParams(specData, expectedPreset);
+  const startedAt = Date.now();
+  let lastError: Error | undefined;
+  let bootstrap: EthereumLightClientBootstrapResponse | undefined;
+
+  while (Date.now() - startedAt < lightClientUpdateRetryTimeoutMs) {
+    try {
+      const finalizedHeader = await getBeaconJson<EthereumBeaconHeaderDetailsResponse>(
+        beaconApiUrl,
+        '/eth/v1/beacon/headers/finalized',
+      );
+      bootstrap = await getBeaconJson<EthereumLightClientBootstrapResponse>(
+        beaconApiUrl,
+        `/eth/v1/beacon/light_client/bootstrap/${finalizedHeader.data.root}`,
+      );
+      lastError = undefined;
+      break;
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, lightClientUpdateRetryIntervalMs));
+    }
+  }
+
+  if (!bootstrap) {
+    throw (
+      lastError ??
+      new Error('Unable to fetch ethereum beacon bootstrap before the retry timeout elapsed')
+    );
+  }
 
   return client.tx.ethereumVerifier.forceCheckpoint(
     {
@@ -101,12 +124,23 @@ export async function getNextEthereumBeaconSyncTxs(
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < lightClientUpdateRetryTimeoutMs) {
-    const finalityUpdate = (
-      await getBeaconJson<{ data: EthereumLightClientUpdate }>(
-        beaconApiUrl,
-        '/eth/v1/beacon/light_client/finality_update',
-      )
-    ).data;
+    let finalityUpdate: EthereumLightClientUpdate;
+
+    try {
+      finalityUpdate = (
+        await getBeaconJson<{ data: EthereumLightClientUpdate }>(
+          beaconApiUrl,
+          '/eth/v1/beacon/light_client/finality_update',
+        )
+      ).data;
+    } catch (error) {
+      if (!isRetryableBeaconLightClientError(error)) {
+        throw error;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, lightClientUpdateRetryIntervalMs));
+      continue;
+    }
 
     const missingNextSyncCommittee = !state.hasNextSyncCommittee;
     const finalityUpdateHasNextSyncCommittee = hasNextSyncCommitteeUpdate(finalityUpdate);
@@ -124,10 +158,22 @@ export async function getNextEthereumBeaconSyncTxs(
     let submitUpdate: EthereumLightClientUpdate | undefined = finalityUpdate;
 
     if (needsCommitteeData && needsCurrentPeriodUpdate) {
-      const periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
-        beaconApiUrl,
-        `/eth/v1/beacon/light_client/updates?count=1&start_period=${nextCommitteePeriod}`,
-      );
+      let periodUpdates: EthereumLightClientUpdatesResponse;
+
+      try {
+        periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
+          beaconApiUrl,
+          `/eth/v1/beacon/light_client/updates?count=1&start_period=${nextCommitteePeriod}`,
+        );
+      } catch (error) {
+        if (!isRetryableBeaconLightClientError(error)) {
+          throw error;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, lightClientUpdateRetryIntervalMs));
+        continue;
+      }
+
       const currentPeriodUpdate = periodUpdates[0]?.data;
       const currentPeriodUpdateHasNextSyncCommittee =
         hasNextSyncCommitteeUpdate(currentPeriodUpdate);
@@ -466,4 +512,13 @@ async function getBeaconJson<T>(beaconApiUrl: string, path: string): Promise<T> 
   }
 
   return (await response.json()) as T;
+}
+
+function isRetryableBeaconLightClientError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    message.includes('/eth/v1/beacon/light_client/') &&
+    (message.includes(': 404') || message.includes(': 500'))
+  );
 }

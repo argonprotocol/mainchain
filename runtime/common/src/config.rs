@@ -42,8 +42,6 @@ parameter_types! {
 	// ### ethereum verifier
 
 	pub const EthereumFreeHeadersInterval: u32 = 32;
-	pub const EthereumVerifyEventLogApiEnabled: bool = false;
-	pub const CanaryEthereumVerifyEventLogApiEnabled: bool = true;
 
 	// ### block weights
 
@@ -204,6 +202,14 @@ parameter_types! {
 
 	/// How many ticks to retain recent inbound Argon transfer evidence.
 	pub const RecentTransferRetentionTicks: Tick = 10 * TicksPerDay::get();
+	/// Maximum number of gateway activities carried by one Ethereum receipt proof.
+	pub const MaxActivitiesPerReceiptProof: u32 = 16;
+	/// Maximum number of proved Ethereum receipt proofs accepted in one extrinsic.
+	///
+	/// `10` leaves comfortable headroom below the worst-case bound proven in the config test, so
+	/// any proof accepted by the runtime envelope is submitable without extra client-side byte
+	/// budgeting.
+	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational referrals allowed at once.
 	pub const MaxAvailableOperationalReferrals: u32 = 3;
@@ -267,5 +273,31 @@ impl WeightToFeePolynomial for ArgonWeightToFee {
 			coeff_frac: Perbill::from_rational(p % q, q),
 			coeff_integer: p / q,
 		}]
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use argon_primitives::ethereum::EthereumReceiptLogProofBatch;
+	use codec::MaxEncodedLen;
+	use frame_support::dispatch::DispatchClass;
+
+	#[test]
+	fn gateway_activity_proof_batch_bound_fits_normal_extrinsic_limit() {
+		type MaxGatewayActivityProofBatch = EthereumReceiptLogProofBatch<
+			MaxReceiptProofsPerExtrinsic,
+			MaxActivitiesPerReceiptProof,
+		>;
+
+		const RESERVED_SIGNED_EXTRINSIC_BYTES: usize = 512;
+		const RESERVED_CALL_PREFIX_BYTES: usize = 16;
+
+		assert!(
+			MaxGatewayActivityProofBatch::max_encoded_len() +
+				RESERVED_SIGNED_EXTRINSIC_BYTES +
+				RESERVED_CALL_PREFIX_BYTES <=
+				*BlockLength::get().max.get(DispatchClass::Normal) as usize
+		);
 	}
 }

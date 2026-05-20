@@ -12,8 +12,12 @@ afterAll(async () => {
 describe('ArgonToken', () => {
   it('binds to the gateway at construction time and does not expose mutable gateway setup', async () => {
     const [, adminSafe, holder] = await ethers.getSigners();
+    const councilHash = ethers.keccak256(ethers.toUtf8Bytes('test council'));
+    const councilMemberCount = 1n;
+    const councilTotalWeight = 1n;
+    const initialMicrogonsPerArgonot = 1_000_000n;
 
-    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGateway');
+    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGatewayV2');
     const gatewayImplementation = (await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
@@ -23,6 +27,10 @@ describe('ArgonToken', () => {
     const initializeData = gatewayImplementationFactory.interface.encodeFunctionData('initialize', [
       adminSafe.address,
       adminSafe.address,
+      councilHash,
+      councilMemberCount,
+      councilTotalWeight,
+      initialMicrogonsPerArgonot,
     ]);
 
     const gatewayProxyFactory = await ethers.getContractFactory('TransparentUpgradeableProxy');

@@ -28,7 +28,7 @@ use pallet_prelude::{
 };
 use pallet_transaction_payment::ChargeTransactionPayment;
 use sp_runtime::{
-	traits::{DispatchTransaction, Hash},
+	traits::{DispatchTransaction, Hash, TransactionExtension},
 	transaction_validity::{InvalidTransaction, TransactionSource, TransactionValidityError},
 };
 
@@ -350,6 +350,45 @@ fn validate_rejects_stale_batched_calls() {
 			result,
 			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
 		));
+	});
+}
+
+#[test]
+fn prepare_rejects_calls_that_become_stale_after_validation() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000u128);
+		PrepareCount::set(0);
+		ValidateCount::set(0);
+		LastPayer::set(None);
+
+		let call = RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 });
+		let wrapper =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
+		let (_, val, validated_origin) = wrapper
+			.validate_only(
+				Some(0).into(),
+				&call,
+				&DispatchInfo::default(),
+				0,
+				TransactionSource::External,
+				0,
+			)
+			.unwrap();
+
+		ConsumedPoolKeys::<Test>::insert(7, ());
+
+		let result =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.prepare(val, &validated_origin, &call, &DispatchInfo::default(), 0);
+
+		assert!(matches!(
+			result,
+			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+		));
+		assert_eq!(ValidateCount::get(), 1);
+		assert_eq!(PrepareCount::get(), 0);
+		assert_eq!(LastPayer::get(), None);
+		assert_eq!(Balances::free_balance(0), 1_000_000u128);
 	});
 }
 

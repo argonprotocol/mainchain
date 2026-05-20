@@ -354,25 +354,13 @@ declare module '@polkadot/api-base/types/errors' {
     };
     crosschainTransfer: {
       /**
-       * The captured reimbursable fee is greater than or equal to the burned Argon amount.
-       **/
-      InsufficientBurnAmountForFee: AugmentedError<ApiType>;
-      /**
        * The burn account lacks enough balance for the payout.
        **/
       InsufficientLiquidity: AugmentedError<ApiType>;
       /**
-       * The claimed amount was zero or too large for the local balance type.
-       **/
-      InvalidAmount: AugmentedError<ApiType>;
-      /**
        * The configured source-chain shape is incomplete or malformed.
        **/
       InvalidChainConfig: AugmentedError<ApiType>;
-      /**
-       * The Ethereum event topics or payload do not match `BurnForTransfer`.
-       **/
-      InvalidEthereumEvent: AugmentedError<ApiType>;
       /**
        * The Ethereum verifier rejected the supplied proof.
        **/
@@ -382,11 +370,27 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidRecipient: AugmentedError<ApiType>;
       /**
-       * The claim nonce is not exactly the next accepted nonce for the source account.
+       * The Ethereum event topics or payload do not match `TransferToArgonStarted`.
        **/
-      UnexpectedNonce: AugmentedError<ApiType>;
+      InvalidTransferToArgonActivity: AugmentedError<ApiType>;
       /**
-       * The gateway does not match the active or still-accepted previous release.
+       * At least one gateway activity log must be supplied with the receipt proof.
+       **/
+      NoGatewayActivitiesProvided: AugmentedError<ApiType>;
+      /**
+       * At least one proved gateway-activity block must be supplied.
+       **/
+      NoGatewayProofBlocksProvided: AugmentedError<ApiType>;
+      /**
+       * The proven gateway activity nonce is not the next contiguous nonce.
+       **/
+      UnexpectedGatewayActivityNonce: AugmentedError<ApiType>;
+      /**
+       * The caller's expected already-proven gateway activity nonce is stale or incorrect.
+       **/
+      UnexpectedPreviousGatewayActivityNonce: AugmentedError<ApiType>;
+      /**
+       * The gateway does not match the configured gateway address.
        **/
       UnsupportedGateway: AugmentedError<ApiType>;
       /**
@@ -394,7 +398,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       UnsupportedSource: AugmentedError<ApiType>;
       /**
-       * The token is not supported under the matched gateway release.
+       * The token is not supported under the configured gateway.
        **/
       UnsupportedToken: AugmentedError<ApiType>;
     };

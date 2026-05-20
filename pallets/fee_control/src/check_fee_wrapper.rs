@@ -407,11 +407,13 @@ where
     fn prepare(
         self,
         val: Self::Val,
-        _origin: &DispatchOriginOf<RuntimeCallOf<T>>,
+        origin: &DispatchOriginOf<RuntimeCallOf<T>>,
         call: &RuntimeCallOf<T>,
         info: &DispatchInfoOf<RuntimeCallOf<T>>,
         len: usize,
     ) -> Result<Self::Pre, TransactionValidityError> {
+        Self::validate_freshness(call, origin.as_signer().cloned())?;
+
         match val {
             RequiresFee(inner, delegated_origin, sponsor) => {
                 let res = self.0.prepare(inner, &delegated_origin, call, info, len)?;

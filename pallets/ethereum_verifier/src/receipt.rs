@@ -16,17 +16,18 @@ use alloy_trie::{
 	proof::{verify_proof, ProofVerificationError},
 	Nibbles,
 };
+use argon_primitives::ethereum::{EthereumCombinedReceiptProof, EthereumReceiptProofReceipt};
 use polkadot_sdk::sp_core::H256;
 
-pub(crate) fn verify_receipt_proof<Node: AsRef<[u8]>>(
+pub(crate) fn verify_receipt_proof(
 	receipts_root: H256,
+	combined_proof: &EthereumCombinedReceiptProof,
 	tx_index: u64,
-	proof: &[Node],
 ) -> Option<ReceiptEnvelope> {
 	let key = receipt_trie_key(tx_index);
 	let root = B256::from_slice(receipts_root.as_bytes());
-	let proof_nodes: Vec<Bytes> =
-		proof.iter().map(|node| Bytes::copy_from_slice(node.as_ref())).collect();
+	let receipt = find_receipt_proof(&combined_proof.receipts, tx_index)?;
+	let proof_nodes = receipt_proof_nodes(combined_proof, receipt)?;
 
 	let value = match verify_proof(root, key, None, proof_nodes.iter()) {
 		Ok(()) => return None,
@@ -37,6 +38,39 @@ pub(crate) fn verify_receipt_proof<Node: AsRef<[u8]>>(
 	};
 
 	ReceiptEnvelope::decode(&mut value.as_slice()).ok()
+}
+
+fn find_receipt_proof(
+	receipts: &[EthereumReceiptProofReceipt],
+	tx_index: u64,
+) -> Option<&EthereumReceiptProofReceipt> {
+	let mut matches = receipts.iter().filter(|receipt| receipt.transaction_index == tx_index);
+	let receipt = matches.next()?;
+	if matches.next().is_some() {
+		return None;
+	}
+
+	Some(receipt)
+}
+
+fn receipt_proof_nodes(
+	combined_proof: &EthereumCombinedReceiptProof,
+	receipt: &EthereumReceiptProofReceipt,
+) -> Option<Vec<Bytes>> {
+	let mut proof_nodes = Vec::with_capacity(receipt.node_indexes.len());
+	let mut seen_indexes = Vec::with_capacity(receipt.node_indexes.len());
+
+	for node_index in receipt.node_indexes.iter() {
+		if seen_indexes.contains(node_index) {
+			return None;
+		}
+		seen_indexes.push(*node_index);
+
+		let node = combined_proof.nodes.get(*node_index as usize)?;
+		proof_nodes.push(Bytes::copy_from_slice(node.as_slice()));
+	}
+
+	Some(proof_nodes)
 }
 
 fn receipt_trie_key(tx_index: u64) -> Nibbles {
