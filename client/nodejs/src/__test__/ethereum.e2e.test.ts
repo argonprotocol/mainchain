@@ -86,7 +86,7 @@ async function signGatewayPermit(args: {
 }
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
-  it('boots a real ethereum devnet and proves two MintingGatewayV2 burns in one proof batch', async () => {
+  it('boots a real ethereum devnet and proves two MintingGateway burns in one proof batch', async () => {
     const ethereum = new TestEthereum();
     const endpoints = await ethereum.launch({
       consensusClient: 'lodestar',

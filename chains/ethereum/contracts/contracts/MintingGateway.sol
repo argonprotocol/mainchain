@@ -8,10 +8,10 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-/// @title MintingGatewayV2
+/// @title MintingGateway
 /// @author Argon Protocol
 /// @notice Gateway for transfers between this chain and Argon, plus council-managed minting authority updates.
-contract MintingGatewayV2 is Initializable, OwnableUpgradeable, PausableUpgradeable {
+contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeable {
 	using MessageHashUtils for bytes32;
 
 	/// @notice Decimal precision used by Argon runtime balances.

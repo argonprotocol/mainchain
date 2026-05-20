@@ -14,7 +14,7 @@ function loadArtifact(fileName: string) {
 
 const argonTokenArtifact = loadArtifact('ArgonToken.json');
 const argonotTokenArtifact = loadArtifact('ArgonotToken.json');
-const mintingGatewayArtifact = loadArtifact('MintingGatewayV2.json');
+const mintingGatewayArtifact = loadArtifact('MintingGateway.json');
 const proxyAdminArtifact = loadArtifact('ProxyAdmin.json');
 const transparentUpgradeableProxyArtifact = loadArtifact('TransparentUpgradeableProxy.json');
 

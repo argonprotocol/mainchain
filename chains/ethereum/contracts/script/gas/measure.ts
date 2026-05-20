@@ -366,14 +366,14 @@ async function deployGatewayStack(council: Council) {
     (await ethers.getSigners()) as AccountSigner[];
 
   const gatewayFactory = (await ethers.getContractFactory(
-    'MintingGatewayV2',
+    'MintingGateway',
   )) as unknown as ContractFactory<ContractWithDeployment>;
   const gatewayBootstrapImplementation = await gatewayFactory.deploy(
     ethers.ZeroAddress,
     ethers.ZeroAddress,
   );
   const gatewayBootstrapImplementationTx = requireDeploymentTransaction(
-    'MintingGatewayV2 bootstrap implementation',
+    'MintingGateway bootstrap implementation',
     gatewayBootstrapImplementation.deploymentTransaction(),
   );
   await gatewayBootstrapImplementation.waitForDeployment();
@@ -402,7 +402,7 @@ async function deployGatewayStack(council: Council) {
   await gatewayProxy.waitForDeployment();
 
   const gateway = (await ethers.getContractAt(
-    'MintingGatewayV2',
+    'MintingGateway',
     await gatewayProxy.getAddress(),
   )) as unknown as GatewayContract;
 
