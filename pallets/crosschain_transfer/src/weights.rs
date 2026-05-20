@@ -6,7 +6,7 @@ use pallet_prelude::*;
 
 pub trait WeightInfo {
 	fn set_chain_config() -> Weight;
-	fn prove_gateway_activity(proof_blocks: u32, extra_activities: u32) -> Weight;
+	fn prove_gateway_activity(activities: u32) -> Weight;
 	fn on_initialize_cleanup(expiring: u32) -> Weight;
 	fn provider_is_crosschain_activated() -> Weight;
 	fn provider_has_recent_argon_transfer() -> Weight;
@@ -29,10 +29,9 @@ where
 		Base::set_chain_config()
 	}
 
-	fn prove_gateway_activity(proof_blocks: u32, extra_activities: u32) -> Weight {
-		Base::prove_gateway_activity(proof_blocks, extra_activities).saturating_add(
-			EthereumVerifyWeight::verify_receipt_logs(proof_blocks, extra_activities),
-		)
+	fn prove_gateway_activity(activities: u32) -> Weight {
+		Base::prove_gateway_activity(activities)
+			.saturating_add(EthereumVerifyWeight::verify_receipt_logs())
 	}
 
 	fn on_initialize_cleanup(expiring: u32) -> Weight {
@@ -64,7 +63,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn prove_gateway_activity(_proof_blocks: u32, _extra_activities: u32) -> Weight {
+	fn prove_gateway_activity(_activities: u32) -> Weight {
 		Weight::zero()
 	}
 

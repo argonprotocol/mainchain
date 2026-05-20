@@ -34,65 +34,42 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn prove_gateway_activity(
-		b: Linear<1, { T::MaxReceiptProofsPerExtrinsic::get() }>,
-		e: Linear<0, { T::MaxActivitiesPerReceiptProof::get() - 1 }>,
-	) -> Result<(), BenchmarkError> {
+	fn prove_gateway_activity(a: Linear<1, 10>) -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let burn_account = CrosschainTransferPallet::<T>::burn_account(SourceChain::Ethereum);
 		let amount: T::Balance = 1_000_000_000u128.into();
-		let burn_funding: T::Balance = u128::from(b.saturating_add(e).saturating_add(1))
-			.saturating_mul(1_000_000_000)
-			.into();
 
 		ChainConfigBySourceChain::<T>::insert(SourceChain::Ethereum, benchmark_chain_config(0x21));
-		T::NativeCurrency::mint_into(&burn_account, burn_funding)
+		T::NativeCurrency::mint_into(&burn_account, 10_000_000_000u128.into())
 			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark burn account"))?;
-		let mut next_gateway_activity_nonce = 1u64;
-		let proof_blocks = (0..b)
-			.map(|block_index| {
-				let logs_in_block = if block_index == 0 { e.saturating_add(1) } else { 1 };
-				let receipt_logs = (0..logs_in_block)
-					.map(|log_index| {
-						let recipient: T::AccountId = account(
-							"crosschain-transfer-recipient",
-							block_index.saturating_mul(T::MaxActivitiesPerReceiptProof::get()) +
-								log_index,
-							0,
-						);
-						let receipt_log = EthereumReceiptLog {
-							transaction_index: u64::from(log_index),
-							event_log: transfer_to_argon_started_log(
-								h160(0x21),
-								h160(0x11),
-								h160(0x31),
-								amount.into(),
-								<[u8; 32]>::from(recipient),
-								next_gateway_activity_nonce,
-								0,
-							),
-						};
-						next_gateway_activity_nonce = next_gateway_activity_nonce.saturating_add(1);
-						receipt_log
-					})
-					.collect::<Vec<_>>()
-					.try_into()
-					.map_err(|_| {
-						BenchmarkError::Stop("benchmark receipt logs exceeded pallet bound")
-					})?;
-
-				Ok(GatewayActivityProofBlock::<T> {
-					target_block_number: u64::from(block_index),
-					receipt_proof: dummy_receipt_proof(logs_in_block),
-					receipt_logs,
-				})
+		let receipt_logs = (0..a)
+			.map(|index| {
+				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
+				EthereumReceiptLog {
+					transaction_index: 0,
+					event_log: transfer_to_argon_started_log(
+						h160(0x21),
+						h160(0x11),
+						h160(0x31),
+						amount.into(),
+						<[u8; 32]>::from(recipient),
+						u64::from(index).saturating_add(1),
+						0,
+					),
+				}
 			})
-			.collect::<Result<Vec<_>, BenchmarkError>>()?;
+			.collect::<Vec<_>>()
+			.try_into()
+			.map_err(|_| BenchmarkError::Stop("benchmark receipt logs exceeded pallet bound"))?;
 		let proof_batch = GatewayActivityProofBatch::<T> {
 			execution_block_proof: dummy_execution_block_proof(),
-			blocks: proof_blocks.try_into().map_err(|_| {
-				BenchmarkError::Stop("benchmark proof blocks exceeded pallet bound")
-			})?,
+			blocks: vec![GatewayActivityProofBlock::<T> {
+				target_block_number: 0,
+				receipt_proof: dummy_receipt_proof(),
+				receipt_logs,
+			}]
+			.try_into()
+			.map_err(|_| BenchmarkError::Stop("benchmark proof blocks exceeded pallet bound"))?,
 		};
 
 		#[extrinsic_call]
@@ -102,7 +79,7 @@ mod benchmarks {
 			GatewayStateBySourceChain::<T>::get(SourceChain::Ethereum)
 				.expect("gateway state should be written")
 				.gateway_activity_nonce,
-			u64::from(b).saturating_add(u64::from(e))
+			u64::from(a)
 		);
 		Ok(())
 	}
@@ -214,21 +191,19 @@ fn dummy_execution_block_proof() -> EthereumExecutionBlockProof {
 	}
 }
 
-fn dummy_receipt_proof(receipt_count: u32) -> EthereumCombinedReceiptProof {
+fn dummy_receipt_proof() -> EthereumCombinedReceiptProof {
 	EthereumCombinedReceiptProof {
 		nodes: vec![vec![1u8].try_into().expect("tiny receipt proof node stays within bounds")]
 			.try_into()
 			.expect("single-node receipt proof stays within bounds"),
-		receipts: (0..receipt_count)
-			.map(|transaction_index| EthereumReceiptProofReceipt {
-				transaction_index: u64::from(transaction_index),
-				node_indexes: vec![0u16]
-					.try_into()
-					.expect("single node index stays within bounded receipt proof refs"),
-			})
-			.collect::<Vec<_>>()
-			.try_into()
-			.expect("benchmark receipt proofs stay within bounded receipt count"),
+		receipts: vec![EthereumReceiptProofReceipt {
+			transaction_index: 0,
+			node_indexes: vec![0u16]
+				.try_into()
+				.expect("single node index stays within bounded receipt proof refs"),
+		}]
+		.try_into()
+		.expect("single receipt proof stays within bounded receipt count"),
 	}
 }
 

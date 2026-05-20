@@ -357,8 +357,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		MigrationAssetDistribution calldata argonotMigration
 	) external onlyOwner whenNotPaused {
 		if (migrationCompleted) revert MigrationAlreadyCompleted();
-		_requireCanonicalToken(argonToken);
-		_requireCanonicalToken(argonotToken);
 
 		uint256 argonTotalAmount =
 			_mintMigrationBalances(argonToken, argonMigration.recipients, argonMigration.amounts);
@@ -523,7 +521,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	) external whenNotPaused {
 		_requireTransferOutOfArgonChain(request);
 		_requireCanonicalToken(request.token);
-		if (request.amount == 0) revert ZeroAmount();
 
 		if (block.number > request.validUntilBlock) {
 			revert TransferOutOfArgonExpired(block.number, request.validUntilBlock);

@@ -38,7 +38,7 @@ pub trait WeightInfo {
 	fn submit() -> Weight;
 	fn submit_with_sync_committee() -> Weight;
 	fn import_execution_header_anchor() -> Weight;
-	fn provider_verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
+	fn provider_verify_receipt_logs() -> Weight;
 }
 
 // For backwards compatibility and tests
@@ -64,7 +64,7 @@ impl WeightInfo for () {
 	fn import_execution_header_anchor() -> Weight {
 		Self::submit()
 	}
-	fn provider_verify_receipt_logs(_proof_blocks: u32, _extra_activities: u32) -> Weight {
+	fn provider_verify_receipt_logs() -> Weight {
 		Weight::from_parts(25_000_000_000_u64, 0)
 			.saturating_add(Weight::from_parts(0, 8192))
 			.saturating_add(RocksDbWeight::get().reads(1))
@@ -74,7 +74,7 @@ impl WeightInfo for () {
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 
 impl<T: crate::Config> EthereumVerifyProviderWeightInfo for ProviderWeightAdapter<T> {
-	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight {
-		T::WeightInfo::provider_verify_receipt_logs(proof_blocks, extra_activities)
+	fn verify_receipt_logs() -> Weight {
+		T::WeightInfo::provider_verify_receipt_logs()
 	}
 }

@@ -10,13 +10,11 @@ import {
   type MintingGatewayTransferToArgonStarted,
 } from '@argonprotocol/ethereum-contracts';
 import type { ArgonClient, IArgonQueryable } from './index';
-import { bytesToHex, decodeEventLog, getAddress, type Hex } from 'viem';
+import { decodeEventLog, getAddress, type Hex } from 'viem';
 import {
   ArgonFinalizedExecutionHeaderPathError,
-  buildEthereumCombinedReceiptProof,
   buildExecutionHeaderChain,
   buildEthereumEventProof,
-  EthereumCombinedReceiptProofBoundsError,
   type ArgonFinalizedExecutionHeader,
   type EthereumEventLocator,
   type EthereumEventLocatorBlock,
@@ -74,21 +72,11 @@ export type EthereumGatewayActivityProofPayload = {
   activities: EthereumGatewayActivity[];
 };
 
-export type EthereumGatewayActivityProofPlan = {
-  latestGatewayActivityNonce: bigint;
-  payloadUpToGatewayActivityNonce: bigint;
-  payload: EthereumGatewayActivityProofPayload | null;
-};
-
 type EthereumBlockLog = Awaited<ReturnType<EthereumExecutionClient['getLogs']>>[number];
-type GatewayActivityLocatorWindow = {
-  gatewayAddress: Hex;
-  previousGatewayActivityNonce: bigint;
-  latestGatewayActivityNonce: bigint;
-  firstUncoveredLocatorIndex: bigint | null;
-  latestRelevantLocatorIndex: bigint | null;
-  locatorCache: Map<bigint, MintingGatewayActivityBlockLocator>;
-};
+type DiscoveredGatewayActivities = Pick<
+  EthereumGatewayActivityProofPayload,
+  'previousGatewayActivityNonce' | 'activities'
+>;
 
 type GatewayActivityProofChunk = {
   activities: EthereumGatewayActivity[];
@@ -115,111 +103,6 @@ const gatewayActivityEvents = [
   MintingGatewayEvents.TransferOutOfArgonFinalized,
   MintingGatewayEvents.TransferToArgonStarted,
 ] as const;
-
-export async function buildGatewayActivityProofPayload(
-  client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
-  options: EthereumExecutionSource & {
-    gatewayAddress: Hex;
-    throughExecutionBlockNumber?: bigint;
-  },
-): Promise<EthereumGatewayActivityProofPlan> {
-  const bounds = getGatewayProofBounds(client);
-  const executionClient = getExecutionClient(options);
-  const locatorWindow = await discoverGatewayActivityLocatorWindow(
-    client,
-    executionClient,
-    options,
-  );
-
-  if (
-    !locatorWindow.firstUncoveredLocatorIndex ||
-    !locatorWindow.latestRelevantLocatorIndex ||
-    locatorWindow.firstUncoveredLocatorIndex > locatorWindow.latestRelevantLocatorIndex
-  ) {
-    return {
-      latestGatewayActivityNonce: locatorWindow.latestGatewayActivityNonce,
-      payloadUpToGatewayActivityNonce: locatorWindow.previousGatewayActivityNonce,
-      payload: null,
-    };
-  }
-
-  const firstLocator = await loadActivityBlockLocator(
-    executionClient,
-    locatorWindow.gatewayAddress,
-    locatorWindow.firstUncoveredLocatorIndex,
-    locatorWindow.locatorCache,
-  );
-  const firstLocatorProofChunks = await loadGatewayProofChunksForLocator(
-    executionClient,
-    locatorWindow.gatewayAddress,
-    firstLocator,
-    locatorWindow.previousGatewayActivityNonce + 1n,
-    bounds.activitiesPerReceiptProof,
-  );
-  const earliestProofChunk = firstLocatorProofChunks[0];
-  if (!earliestProofChunk) {
-    return {
-      latestGatewayActivityNonce: locatorWindow.latestGatewayActivityNonce,
-      payloadUpToGatewayActivityNonce: locatorWindow.previousGatewayActivityNonce,
-      payload: null,
-    };
-  }
-
-  const argonFinalizedExecutionHeaderPlan = await selectArgonFinalizedExecutionHeader(
-    client,
-    executionClient,
-    earliestProofChunk,
-    bounds.sharedHeaderDepth,
-  );
-  if (!argonFinalizedExecutionHeaderPlan) {
-    return {
-      latestGatewayActivityNonce: locatorWindow.latestGatewayActivityNonce,
-      payloadUpToGatewayActivityNonce: locatorWindow.previousGatewayActivityNonce,
-      payload: null,
-    };
-  }
-
-  const acceptedProofChunks = await collectGatewayProofChunksForArgonFinalizedExecutionHeader(
-    executionClient,
-    locatorWindow,
-    firstLocatorProofChunks,
-    bounds.activitiesPerReceiptProof,
-    argonFinalizedExecutionHeaderPlan,
-    bounds.receiptProofsPerExtrinsic,
-  );
-  if (acceptedProofChunks.length === 0) {
-    return {
-      latestGatewayActivityNonce: locatorWindow.latestGatewayActivityNonce,
-      payloadUpToGatewayActivityNonce: locatorWindow.previousGatewayActivityNonce,
-      payload: null,
-    };
-  }
-
-  const acceptedActivities = acceptedProofChunks.flatMap(({ activities }) => activities);
-  const proof = await buildEthereumEventProof(
-    { executionClient },
-    argonFinalizedExecutionHeaderPlan.argonFinalizedExecutionHeader,
-    acceptedProofChunks.map(({ locatorBlock }) => locatorBlock),
-  );
-
-  return {
-    latestGatewayActivityNonce: locatorWindow.latestGatewayActivityNonce,
-    payloadUpToGatewayActivityNonce: acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce,
-    payload: {
-      previousGatewayActivityNonce: locatorWindow.previousGatewayActivityNonce,
-      proof,
-      gatewayActivityNonceRange: {
-        start: acceptedActivities[0].gatewayState.gatewayActivityNonce,
-        end: acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce,
-      },
-      executionBlockNumberRange: {
-        start: acceptedActivities[0].blockNumber,
-        end: acceptedActivities.at(-1)!.blockNumber,
-      },
-      activities: acceptedActivities,
-    },
-  };
-}
 
 export function findEthereumTransferToArgonStartedLogIndexes(
   receipt: { transactionHash: Hex; logs: { address: Hex; topics: Hex[] }[] },
@@ -283,6 +166,66 @@ export function decodeEthereumGatewayActivityLog(
   } as DecodedEthereumGatewayActivity;
 }
 
+export async function buildGatewayActivityProofPayload(
+  client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
+  options: EthereumExecutionSource & {
+    gatewayAddress: Hex;
+    throughExecutionBlockNumber?: bigint;
+  },
+): Promise<EthereumGatewayActivityProofPayload | null> {
+  const bounds = getGatewayProofBounds(client);
+  const discovered = await discoverGatewayActivities(client, options);
+  if (!discovered) {
+    return null;
+  }
+
+  const executionClient = getExecutionClient(options);
+  const proofChunks = chunkGatewayActivitiesForProof(
+    discovered.activities,
+    bounds.activitiesPerReceiptProof,
+  );
+  const argonFinalizedExecutionHeaderPlan = await selectArgonFinalizedExecutionHeader(
+    client,
+    executionClient,
+    proofChunks[0],
+    bounds.sharedHeaderDepth,
+  );
+  if (!argonFinalizedExecutionHeaderPlan) {
+    return null;
+  }
+
+  const acceptedProofChunks = await collectProofChunksForArgonFinalizedExecutionHeader(
+    executionClient,
+    proofChunks,
+    argonFinalizedExecutionHeaderPlan,
+    bounds.receiptProofsPerExtrinsic,
+  );
+  if (acceptedProofChunks.length === 0) {
+    return null;
+  }
+
+  const acceptedActivities = acceptedProofChunks.flatMap(({ activities }) => activities);
+  const proof = await buildEthereumEventProof(
+    options,
+    argonFinalizedExecutionHeaderPlan.argonFinalizedExecutionHeader,
+    acceptedProofChunks.map(({ locatorBlock }) => locatorBlock),
+  );
+
+  return {
+    previousGatewayActivityNonce: discovered.previousGatewayActivityNonce,
+    proof,
+    gatewayActivityNonceRange: {
+      start: acceptedActivities[0].gatewayState.gatewayActivityNonce,
+      end: acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce,
+    },
+    executionBlockNumberRange: {
+      start: acceptedActivities[0].blockNumber,
+      end: acceptedActivities.at(-1)!.blockNumber,
+    },
+    activities: acceptedActivities,
+  };
+}
+
 async function loadActivityBlockLocator(
   executionClient: EthereumExecutionClient,
   gatewayAddress: Hex,
@@ -337,95 +280,30 @@ async function findFirstUncoveredActivityBlockLocatorIndex(
   return firstUncoveredIndex;
 }
 
-async function findLatestActivityBlockLocatorIndexAtOrBeforeBlock(
-  executionClient: EthereumExecutionClient,
-  gatewayAddress: Hex,
-  latestLocatorIndex: bigint,
-  throughExecutionBlockNumber: bigint,
-  cache: Map<bigint, MintingGatewayActivityBlockLocator>,
-): Promise<bigint | null> {
-  let low = 1n;
-  let high = latestLocatorIndex;
-  let latestRelevantIndex: bigint | null = null;
-
-  while (low <= high) {
-    const middle = (low + high) / 2n;
-    const locator = await loadActivityBlockLocator(executionClient, gatewayAddress, middle, cache);
-
-    if (locator.blockNumber <= throughExecutionBlockNumber) {
-      latestRelevantIndex = middle;
-      low = middle + 1n;
-      continue;
-    }
-
-    high = middle - 1n;
-  }
-
-  return latestRelevantIndex;
-}
-
-async function discoverGatewayActivityLocatorWindow(
+async function discoverGatewayActivities(
   client: IArgonQueryable,
-  executionClient: EthereumExecutionClient,
-  options: {
+  options: EthereumExecutionSource & {
     gatewayAddress: Hex;
     throughExecutionBlockNumber?: bigint;
   },
-): Promise<GatewayActivityLocatorWindow> {
+): Promise<DiscoveredGatewayActivities | null> {
+  const executionClient = getExecutionClient(options);
   const gatewayAddress = getAddress(options.gatewayAddress);
-  const currentGatewayState =
-    await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
-  const previousGatewayActivityNonce = currentGatewayState.isSome
-    ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt()
-    : 0n;
   const latestLocatorIndex = await executionClient.readContract({
     abi: mintingGatewayAbi,
     address: gatewayAddress,
     functionName: 'latestActivityBlockLocatorIndex',
   });
   if (latestLocatorIndex === 0n) {
-    return {
-      gatewayAddress,
-      previousGatewayActivityNonce,
-      latestGatewayActivityNonce: previousGatewayActivityNonce,
-      firstUncoveredLocatorIndex: null,
-      latestRelevantLocatorIndex: null,
-      locatorCache: new Map(),
-    };
+    return null;
   }
 
+  const currentGatewayState =
+    await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+  const previousGatewayActivityNonce = currentGatewayState.isSome
+    ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt()
+    : 0n;
   const locatorCache = new Map<bigint, MintingGatewayActivityBlockLocator>();
-  const latestRelevantLocatorIndex =
-    options.throughExecutionBlockNumber !== undefined
-      ? await findLatestActivityBlockLocatorIndexAtOrBeforeBlock(
-          executionClient,
-          gatewayAddress,
-          latestLocatorIndex,
-          options.throughExecutionBlockNumber,
-          locatorCache,
-        )
-      : latestLocatorIndex;
-  if (!latestRelevantLocatorIndex) {
-    return {
-      gatewayAddress,
-      previousGatewayActivityNonce,
-      latestGatewayActivityNonce: previousGatewayActivityNonce,
-      firstUncoveredLocatorIndex: null,
-      latestRelevantLocatorIndex: null,
-      locatorCache,
-    };
-  }
-
-  const latestRelevantLocator = await loadActivityBlockLocator(
-    executionClient,
-    gatewayAddress,
-    latestRelevantLocatorIndex,
-    locatorCache,
-  );
-  const latestGatewayActivityNonce =
-    latestRelevantLocator.endGatewayActivityNonce > previousGatewayActivityNonce
-      ? latestRelevantLocator.endGatewayActivityNonce
-      : previousGatewayActivityNonce;
   const firstLocatorIndex = await findFirstUncoveredActivityBlockLocatorIndex(
     executionClient,
     gatewayAddress,
@@ -433,14 +311,51 @@ async function discoverGatewayActivityLocatorWindow(
     previousGatewayActivityNonce,
     locatorCache,
   );
+  if (!firstLocatorIndex) {
+    return null;
+  }
+
+  const activities: EthereumGatewayActivity[] = [];
+  let expectedGatewayActivityNonce = previousGatewayActivityNonce + 1n;
+
+  for (
+    let locatorIndex = firstLocatorIndex;
+    locatorIndex <= latestLocatorIndex;
+    locatorIndex += 1n
+  ) {
+    const locator = await loadActivityBlockLocator(
+      executionClient,
+      gatewayAddress,
+      locatorIndex,
+      locatorCache,
+    );
+    if (
+      options.throughExecutionBlockNumber !== undefined &&
+      locator.blockNumber > options.throughExecutionBlockNumber
+    ) {
+      break;
+    }
+    if (locator.endGatewayActivityNonce < expectedGatewayActivityNonce) {
+      continue;
+    }
+
+    const blockActivities = await loadGatewayActivitiesForLocator(
+      executionClient,
+      gatewayAddress,
+      locator,
+      expectedGatewayActivityNonce,
+    );
+    activities.push(...blockActivities);
+    expectedGatewayActivityNonce = locator.endGatewayActivityNonce + 1n;
+  }
+
+  if (activities.length === 0) {
+    return null;
+  }
 
   return {
-    gatewayAddress,
     previousGatewayActivityNonce,
-    latestGatewayActivityNonce,
-    firstUncoveredLocatorIndex: firstLocatorIndex,
-    latestRelevantLocatorIndex,
-    locatorCache,
+    activities,
   };
 }
 
@@ -518,73 +433,6 @@ function toEthereumGatewayActivity(log: EthereumBlockLog): EthereumGatewayActivi
   };
 }
 
-async function loadGatewayProofChunksForLocator(
-  executionClient: EthereumExecutionClient,
-  gatewayAddress: Hex,
-  locator: MintingGatewayActivityBlockLocator,
-  expectedGatewayActivityNonce: bigint,
-  maxActivitiesPerReceiptProof: number,
-): Promise<GatewayActivityProofChunk[]> {
-  const activities = await loadGatewayActivitiesForLocator(
-    executionClient,
-    gatewayAddress,
-    locator,
-    expectedGatewayActivityNonce,
-  );
-  const blockHash = activities[0]?.blockHash;
-  if (!blockHash) {
-    return [];
-  }
-
-  const targetHeader = await loadExecutionHeader(executionClient, blockHash);
-  const initialChunks = chunkGatewayActivitiesForProof(activities, maxActivitiesPerReceiptProof);
-  const proofChunks: GatewayActivityProofChunk[] = [];
-
-  for (const initialChunk of initialChunks) {
-    let remainingActivities = initialChunk.activities;
-
-    while (remainingActivities.length > 0) {
-      let candidateActivities = remainingActivities;
-
-      while (true) {
-        const candidateChunk = createGatewayActivityProofChunk(candidateActivities);
-        const transactionIndexes = [
-          ...new Set(candidateChunk.activities.map(activity => activity.transactionIndex)),
-        ];
-
-        try {
-          await buildEthereumCombinedReceiptProof(
-            executionClient,
-            blockHash,
-            transactionIndexes,
-            bytesToHex(targetHeader.receiptTrie),
-          );
-
-          proofChunks.push(candidateChunk);
-          remainingActivities = remainingActivities.slice(candidateActivities.length);
-          break;
-        } catch (error) {
-          if (!(error instanceof EthereumCombinedReceiptProofBoundsError)) {
-            throw error;
-          }
-
-          if (candidateActivities.length === 1) {
-            const boundDescription =
-              error.kind === 'receipt-count' ? 'receipt-count' : 'receipt-proof';
-            throw new Error(
-              `Gateway block ${locator.blockNumber} proof exceeds the runtime ${boundDescription} bound`,
-            );
-          }
-
-          candidateActivities = candidateActivities.slice(0, -1);
-        }
-      }
-    }
-  }
-
-  return proofChunks;
-}
-
 function chunkGatewayActivitiesForProof(
   activities: EthereumGatewayActivity[],
   maxActivitiesPerReceiptProof: number,
@@ -607,7 +455,25 @@ function chunkGatewayActivitiesForProof(
         start,
         start + maxActivitiesPerReceiptProof,
       );
-      chunks.push(createGatewayActivityProofChunk(chunkActivities));
+      const locatorsByReceipt = new Map<Hex, EthereumEventLocator>();
+
+      for (const activity of chunkActivities) {
+        const existing = locatorsByReceipt.get(activity.txHash);
+        if (existing) {
+          existing.logIndexes!.push(activity.logIndex);
+          continue;
+        }
+
+        locatorsByReceipt.set(activity.txHash, {
+          txHash: activity.txHash,
+          logIndexes: [activity.logIndex],
+        });
+      }
+
+      chunks.push({
+        activities: chunkActivities,
+        locatorBlock: [...locatorsByReceipt.values()],
+      });
     }
   };
 
@@ -623,30 +489,6 @@ function chunkGatewayActivitiesForProof(
 
   flushBlock();
   return chunks;
-}
-
-function createGatewayActivityProofChunk(
-  activities: EthereumGatewayActivity[],
-): GatewayActivityProofChunk {
-  const locatorsByReceipt = new Map<Hex, EthereumEventLocator>();
-
-  for (const activity of activities) {
-    const existing = locatorsByReceipt.get(activity.txHash);
-    if (existing) {
-      existing.logIndexes!.push(activity.logIndex);
-      continue;
-    }
-
-    locatorsByReceipt.set(activity.txHash, {
-      txHash: activity.txHash,
-      logIndexes: [activity.logIndex],
-    });
-  }
-
-  return {
-    activities,
-    locatorBlock: [...locatorsByReceipt.values()],
-  };
 }
 
 function getGatewayProofBounds(client: Pick<ArgonClient, 'consts'>): GatewayProofBounds {
@@ -774,99 +616,59 @@ async function selectArgonFinalizedExecutionHeader(
   );
 }
 
-async function collectGatewayProofChunksForArgonFinalizedExecutionHeader(
+async function collectProofChunksForArgonFinalizedExecutionHeader(
   executionClient: EthereumExecutionClient,
-  locatorWindow: GatewayActivityLocatorWindow,
-  firstLocatorProofChunks: GatewayActivityProofChunk[],
-  maxActivitiesPerReceiptProof: number,
+  proofChunks: GatewayActivityProofChunk[],
   plan: ArgonFinalizedExecutionHeaderPlan,
   receiptProofsPerExtrinsic: number,
 ): Promise<GatewayActivityProofChunk[]> {
   const acceptedProofChunks: GatewayActivityProofChunk[] = [];
   const loadedTargetHeaders = [
     {
-      blockHash: firstLocatorProofChunks[0].activities[0].blockHash,
+      blockHash: proofChunks[0].activities[0].blockHash,
       targetHeader: plan.earliestTargetHeader,
     },
   ];
 
-  let expectedGatewayActivityNonce = locatorWindow.previousGatewayActivityNonce + 1n;
-  const latestRelevantLocatorIndex = locatorWindow.latestRelevantLocatorIndex ?? 0n;
-  let locatorIndex = locatorWindow.firstUncoveredLocatorIndex ?? 0n;
-  let locatorProofChunks = firstLocatorProofChunks;
-
-  while (locatorIndex <= latestRelevantLocatorIndex) {
-    for (const proofChunk of locatorProofChunks) {
-      if (acceptedProofChunks.length === receiptProofsPerExtrinsic) {
-        break;
-      }
-
-      const blockHash = proofChunk.activities[0].blockHash;
-      const blockNumber = proofChunk.activities[0].blockNumber;
-
-      if (blockNumber > plan.argonFinalizedExecutionHeader.blockNumber) {
-        return acceptedProofChunks;
-      }
-
-      let targetHeader = loadedTargetHeaders.find(
-        loadedHeader => loadedHeader.blockHash.toLowerCase() === blockHash.toLowerCase(),
-      )?.targetHeader;
-      if (!targetHeader) {
-        targetHeader = await loadExecutionHeader(executionClient, blockHash);
-        loadedTargetHeaders.push({ blockHash, targetHeader });
-      }
-
-      if (targetHeader.number === plan.argonFinalizedExecutionHeader.blockNumber) {
-        if (
-          blockHash.toLowerCase() !== plan.argonFinalizedExecutionHeader.blockHash.toLowerCase()
-        ) {
-          return acceptedProofChunks;
-        }
-      } else {
-        const expectedTargetHeaderOnArgonFinalizedChain =
-          plan.targetToArgonFinalizedHeaderChain[
-            Number(targetHeader.number - plan.earliestTargetHeader.number)
-          ];
-        if (
-          !expectedTargetHeaderOnArgonFinalizedChain ||
-          expectedTargetHeaderOnArgonFinalizedChain.blockHash.toLowerCase() !==
-            blockHash.toLowerCase()
-        ) {
-          return acceptedProofChunks;
-        }
-      }
-
-      acceptedProofChunks.push(proofChunk);
-      expectedGatewayActivityNonce =
-        proofChunk.activities.at(-1)!.gatewayState.gatewayActivityNonce + 1n;
-    }
-
+  for (const proofChunk of proofChunks) {
     if (acceptedProofChunks.length === receiptProofsPerExtrinsic) {
       break;
     }
 
-    locatorIndex += 1n;
-    if (locatorIndex > latestRelevantLocatorIndex) {
+    const blockHash = proofChunk.activities[0].blockHash;
+    const blockNumber = proofChunk.activities[0].blockNumber;
+
+    if (blockNumber > plan.argonFinalizedExecutionHeader.blockNumber) {
       break;
     }
 
-    const locator = await loadActivityBlockLocator(
-      executionClient,
-      locatorWindow.gatewayAddress,
-      locatorIndex,
-      locatorWindow.locatorCache,
-    );
-    if (locator.endGatewayActivityNonce < expectedGatewayActivityNonce) {
-      continue;
+    let targetHeader = loadedTargetHeaders.find(
+      loadedHeader => loadedHeader.blockHash.toLowerCase() === blockHash.toLowerCase(),
+    )?.targetHeader;
+    if (!targetHeader) {
+      targetHeader = await loadExecutionHeader(executionClient, blockHash);
+      loadedTargetHeaders.push({ blockHash, targetHeader });
     }
 
-    locatorProofChunks = await loadGatewayProofChunksForLocator(
-      executionClient,
-      locatorWindow.gatewayAddress,
-      locator,
-      expectedGatewayActivityNonce,
-      maxActivitiesPerReceiptProof,
-    );
+    if (targetHeader.number === plan.argonFinalizedExecutionHeader.blockNumber) {
+      if (blockHash.toLowerCase() !== plan.argonFinalizedExecutionHeader.blockHash.toLowerCase()) {
+        break;
+      }
+    } else {
+      const expectedTargetHeaderOnArgonFinalizedChain =
+        plan.targetToArgonFinalizedHeaderChain[
+          Number(targetHeader.number - plan.earliestTargetHeader.number)
+        ];
+      if (
+        !expectedTargetHeaderOnArgonFinalizedChain ||
+        expectedTargetHeaderOnArgonFinalizedChain.blockHash.toLowerCase() !==
+          blockHash.toLowerCase()
+      ) {
+        break;
+      }
+    }
+
+    acceptedProofChunks.push(proofChunk);
   }
 
   return acceptedProofChunks;

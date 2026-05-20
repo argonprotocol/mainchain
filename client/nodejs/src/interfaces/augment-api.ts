@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+ 
 
 import './augment-api-consts.js';
 import './augment-api-errors.js';

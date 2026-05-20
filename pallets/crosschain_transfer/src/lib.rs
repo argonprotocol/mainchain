@@ -364,12 +364,10 @@ pub mod pallet {
 
 		#[pallet::call_index(1)]
 		#[pallet::weight({
-			let proof_blocks = proof_batch.blocks.len() as u32;
 			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
 				total.saturating_add(block.receipt_logs.len() as u32)
 			});
-			let extra_activities = activities.saturating_sub(proof_blocks);
-			T::WeightInfo::prove_gateway_activity(proof_blocks, extra_activities).saturating_add(
+			T::WeightInfo::prove_gateway_activity(activities).saturating_add(
 				T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
 					.saturating_mul(activities as u64)
 			)

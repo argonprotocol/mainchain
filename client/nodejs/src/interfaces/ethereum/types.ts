@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+ 
 
 import type { Bytes, Compact, Enum, Struct, Vec, u16, u64 } from '@polkadot/types-codec';
 import type { H160, H256 } from '@polkadot/types/interfaces/runtime';
