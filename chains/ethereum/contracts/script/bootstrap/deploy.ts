@@ -65,7 +65,7 @@ async function main() {
       ),
     );
 
-    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGatewayV2');
+    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGateway');
     const gatewayBootstrapImplementation = await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
@@ -177,7 +177,7 @@ async function main() {
       safeTransactions: [
         {
           description:
-            'Upgrade MintingGatewayV2 proxy to final implementation with fixed canonical tokens',
+            'Upgrade MintingGateway proxy to final implementation with fixed canonical tokens',
           target: proxyAdminAddress,
           value: '0',
           data: proxyAdminInterface.encodeFunctionData('upgradeAndCall', [
@@ -188,12 +188,12 @@ async function main() {
         },
       ],
       notes: [
-        'Canonical tokens are deployed with the MintingGatewayV2 proxy address fixed in their constructors.',
-        'The proxy is first deployed against a bootstrap MintingGatewayV2 implementation with zero canonical token immutables.',
+        'Canonical tokens are deployed with the MintingGateway proxy address fixed in their constructors.',
+        'The proxy is first deployed against a bootstrap MintingGateway implementation with zero canonical token immutables.',
         'That proxy initialization stores the first council summary.',
         'Token-bearing gateway entrypoints reject until the proxy is upgraded to the final implementation with canonical token addresses configured.',
-        'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGatewayV2 implementation that has the Argon and Argonot token addresses baked in as immutables.',
-        'MintingGatewayV2 business ownership starts under the admin Safe.',
+        'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGateway implementation that has the Argon and Argonot token addresses baked in as immutables.',
+        'MintingGateway business ownership starts under the admin Safe.',
         'The guardian Safe can pause immediately, while unpause remains on the admin Safe owner path.',
         'The proxy admin is initially owned by the admin Safe.',
         'A later hardening step can transfer ProxyAdmin ownership to a TimelockController once the governance flow is ready.',

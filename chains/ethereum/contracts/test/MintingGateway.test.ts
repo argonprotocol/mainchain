@@ -71,7 +71,7 @@ afterAll(async () => {
   await connection.close();
 });
 
-describe('MintingGatewayV2', () => {
+describe('MintingGateway', () => {
   async function getGatewayHashContext(gateway: {
     getAddress(): Promise<string>;
   }): Promise<MintingGatewayHashContext> {
@@ -221,7 +221,7 @@ describe('MintingGatewayV2', () => {
       mintingAuthoritySigner,
     ] = await ethers.getSigners();
 
-    const gatewayFactory = await ethers.getContractFactory('MintingGatewayV2');
+    const gatewayFactory = await ethers.getContractFactory('MintingGateway');
     const gatewayBootstrapImplementation = await gatewayFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
@@ -253,7 +253,7 @@ describe('MintingGatewayV2', () => {
     await gatewayProxy.waitForDeployment();
 
     const gateway = (await ethers.getContractAt(
-      'MintingGatewayV2',
+      'MintingGateway',
       await gatewayProxy.getAddress(),
     )) as any;
 

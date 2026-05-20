@@ -17,7 +17,7 @@ describe('ArgonToken', () => {
     const councilTotalWeight = 1n;
     const initialMicrogonsPerArgonot = 1_000_000n;
 
-    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGatewayV2');
+    const gatewayImplementationFactory = await ethers.getContractFactory('MintingGateway');
     const gatewayImplementation = (await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,

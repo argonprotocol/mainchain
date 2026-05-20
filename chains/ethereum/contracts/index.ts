@@ -1,6 +1,6 @@
 import argonTokenArtifact from './artifacts/contracts/ArgonToken.sol/ArgonToken.json' with { type: 'json' };
 import argonotTokenArtifact from './artifacts/contracts/ArgonotToken.sol/ArgonotToken.json' with { type: 'json' };
-import mintingGatewayArtifact from './artifacts/contracts/MintingGatewayV2.sol/MintingGatewayV2.json' with { type: 'json' };
+import mintingGatewayArtifact from './artifacts/contracts/MintingGateway.sol/MintingGateway.json' with { type: 'json' };
 import proxyAdminArtifact from './artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json' with { type: 'json' };
 import transparentUpgradeableProxyArtifact from './artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json' with { type: 'json' };
 

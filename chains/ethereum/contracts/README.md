@@ -16,13 +16,13 @@ At a high level, the shape is:
 ## Visual Overview
 
 ```text
-Users ----------------------> MintingGatewayV2 proxy ----------------------> ArgonToken / ArgonotToken
+Users ----------------------> MintingGateway proxy ----------------------> ArgonToken / ArgonotToken
 Guardian Safe -------------> pause()
 Admin Safe ---------------> proxy upgrade / migrate / unpause
 Admin Safe ---------------> ProxyAdmin --------> upgrade gateway implementation
 
 The tokens only trust the proxy address.
-The proxy runs MintingGatewayV2 implementation code behind that stable address.
+The proxy runs MintingGateway implementation code behind that stable address.
 ```
 
 At the basic level, that is the whole shape:
@@ -37,7 +37,7 @@ At the basic level, that is the whole shape:
 
 - `ArgonToken.sol`
 - `ArgonotToken.sol`
-- `MintingGatewayV2.sol`
+- `MintingGateway.sol`
 
 The two token contracts are intentionally boring. They expose `mint(...)` and `burnFrom(...)`, but
 only the gateway can call them. They do not have their own role system, and they do not expose a
@@ -46,7 +46,7 @@ public self-burn path.
 The gateway is where the actual protocol behavior lives:
 
 - steady-state transfer amounts are expressed in 6-decimal Argon runtime base units
-- MintingGatewayV2 runtime-unit amount and collateral fields use `uint128` balances
+- MintingGateway runtime-unit amount and collateral fields use `uint128` balances
 - `startTransferToArgon(...)` is the primary user path: the caller supplies the runtime-unit amount
   Argon should credit plus an ERC-2612 permit signature, and the gateway scales that amount into
   exact token base units before it permits, burns, and emits the outbound proof event
@@ -83,7 +83,7 @@ There are only three things to keep in your head:
 2. The gateway address is stable. The tokens keep trusting that one proxy address. They do not have
    a `setGateway(...)` path.
 
-3. The gateway code is upgradeable. The proxy points at a `MintingGatewayV2` implementation, and that
+3. The gateway code is upgradeable. The proxy points at a `MintingGateway` implementation, and that
    implementation can be replaced later.
 
 Today the split is:
@@ -127,13 +127,13 @@ initial migration distribution in the same place as the long-term burn behavior.
 
 The deployment order still matters:
 
-1. Deploy a bootstrap `MintingGatewayV2` implementation with zero canonical-token immutables.
+1. Deploy a bootstrap `MintingGateway` implementation with zero canonical-token immutables.
 2. Deploy the gateway proxy with the admin Safe as its current `ProxyAdmin` owner and the bootstrap
    `initialize(...)` calldata already encoded into the proxy constructor. Token-bearing gateway
    entrypoints stay blocked in this bootstrap state until the final implementation is installed with
    canonical token addresses configured.
 3. Deploy `ArgonToken` and `ArgonotToken` with the proxy address in their constructors.
-4. Deploy the final `MintingGatewayV2` implementation with the Argon and Argonot token addresses baked
+4. Deploy the final `MintingGateway` implementation with the Argon and Argonot token addresses baked
    in as immutables.
 5. Have the admin Safe call `ProxyAdmin.upgradeAndCall(...)` once to move the proxy onto that final
    implementation.
