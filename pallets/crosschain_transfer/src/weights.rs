@@ -86,7 +86,6 @@ where
 
 	fn prove_gateway_activity(activities: u32) -> Weight {
 		Base::prove_gateway_activity(activities)
-			.saturating_add(EthereumVerifyWeight::verify_receipt_logs())
 	}
 
 	fn transfer_out() -> Weight {
@@ -194,4 +193,15 @@ impl WeightInfo for () {
 	fn provider_has_overdue_collect_blocker() -> Weight {
 		Weight::zero()
 	}
+}
+
+pub fn prove_gateway_activity_with_providers<T: Config>(
+	proof_blocks: u32,
+	activities: u32,
+) -> Weight {
+	let extra_activities = activities.saturating_sub(proof_blocks);
+	T::WeightInfo::prove_gateway_activity(activities).saturating_add(
+		<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
+			EthereumVerifyProviderWeightInfo>::verify_receipt_logs(proof_blocks, extra_activities),
+	)
 }

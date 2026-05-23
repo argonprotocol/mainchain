@@ -3,7 +3,7 @@
 extern crate alloc;
 
 pub use pallet::*;
-pub use weights::{WeightInfo, WithProviderWeights};
+pub use weights::{prove_gateway_activity_with_providers, WeightInfo, WithProviderWeights};
 
 use pallet_prelude::*;
 
@@ -1615,13 +1615,15 @@ pub mod pallet {
 
 		#[pallet::call_index(9)]
 		#[pallet::weight({
+			let proof_blocks = proof_batch.blocks.len() as u32;
 			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
 				total.saturating_add(block.receipt_logs.len() as u32)
 			});
-			T::WeightInfo::prove_gateway_activity(activities).saturating_add(
-				T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
-					.saturating_mul(activities as u64)
-			)
+			prove_gateway_activity_with_providers::<T>(proof_blocks, activities)
+				.saturating_add(
+					T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
+						.saturating_mul(activities as u64)
+				)
 		})]
 		pub fn prove_gateway_activity(
 			origin: OriginFor<T>,

@@ -218,13 +218,13 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 }
 
 pub trait EthereumVerifyProviderWeightInfo {
-	fn verify_receipt_logs() -> Weight;
+	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
 	fn latest_execution_block_number() -> Weight;
 	fn latest_execution_block_timestamp() -> Weight;
 }
 
 impl EthereumVerifyProviderWeightInfo for () {
-	fn verify_receipt_logs() -> Weight {
+	fn verify_receipt_logs(_proof_blocks: u32, _extra_activities: u32) -> Weight {
 		Weight::zero()
 	}
 

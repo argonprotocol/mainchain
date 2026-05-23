@@ -1,5 +1,5 @@
 use argon_primitives::{
-	providers::{CollectBlockerProviderWeightInfo, TickProvider, TickProviderWeightInfo},
+	providers::{CollectBlockerProvider, TickProvider, TickProviderWeightInfo},
 	vault::BitcoinVaultProviderWeightInfo,
 };
 use core::marker::PhantomData;
@@ -27,21 +27,29 @@ pub trait WeightInfo {
 	fn provider_get_committed_argonots() -> Weight;
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
-	fn provider_has_overdue_collect_blocker() -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
 	<T as frame_system::Config>::Block,
 >>::Weights;
+type CollectBlockerProviderWeights<T> =
+	<<T as crate::Config>::CollectBlockerProvider as CollectBlockerProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
 
-pub struct WithProviderWeights<T, Base, TickProviderWeight = TickProviderWeights<T>>(
-	PhantomData<(T, Base, TickProviderWeight)>,
-);
-impl<T, Base, TickProviderWeight> WeightInfo for WithProviderWeights<T, Base, TickProviderWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	TickProviderWeight = TickProviderWeights<T>,
+	CollectBlockerWeight = CollectBlockerProviderWeights<T>,
+>(PhantomData<(T, Base, TickProviderWeight, CollectBlockerWeight)>);
+impl<T, Base, TickProviderWeight, CollectBlockerWeight> WeightInfo
+	for WithProviderWeights<T, Base, TickProviderWeight, CollectBlockerWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
+	CollectBlockerWeight: argon_primitives::CollectBlockerProviderWeightInfo,
 {
 	fn create() -> Weight {
 		Base::create().saturating_add(TickProviderWeight::current_tick())
@@ -90,7 +98,7 @@ where
 	}
 
 	fn collect() -> Weight {
-		Base::collect().saturating_add(Base::provider_has_overdue_collect_blocker())
+		Base::collect().saturating_add(CollectBlockerWeight::has_overdue_collect_blocker())
 	}
 
 	fn on_frame_start(vault_count: u32) -> Weight {
@@ -117,10 +125,6 @@ where
 		Base::provider_account_became_operational()
 			.saturating_add(TickProviderWeight::current_tick())
 	}
-
-	fn provider_has_overdue_collect_blocker() -> Weight {
-		Base::provider_has_overdue_collect_blocker()
-	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -143,12 +147,6 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 	fn account_became_operational() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_account_became_operational()
-	}
-}
-
-impl<T: crate::Config> CollectBlockerProviderWeightInfo for ProviderWeightAdapter<T> {
-	fn has_overdue_collect_blocker() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_has_overdue_collect_blocker()
 	}
 }
 
@@ -208,10 +206,6 @@ impl WeightInfo for () {
 	}
 
 	fn provider_account_became_operational() -> Weight {
-		Weight::zero()
-	}
-
-	fn provider_has_overdue_collect_blocker() -> Weight {
 		Weight::zero()
 	}
 }

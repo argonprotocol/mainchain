@@ -1156,6 +1156,13 @@ where
 		Ok(())
 	}
 
+	fn burn_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults

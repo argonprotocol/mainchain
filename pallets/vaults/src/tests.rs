@@ -3,7 +3,7 @@ use crate::{
 	pallet::{
 		ArgonotCommitmentByVaultId, BitcoinLockUpdate, NextVaultId,
 		PendingTermsModificationsByTick, RecentCapacityDropsByVault, RevenuePerFrameByVault,
-		VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
+		RevenuePerFrameByVaultCount, VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
 	},
 	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
 	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
@@ -155,6 +155,10 @@ fn committed_argonots_cannot_be_reduced_below_encumbered_backing() {
 		assert_noop!(
 			Vaults::set_committed_argonots(RuntimeOrigin::signed(1), 5_999),
 			Error::<Test>::CommittedArgonotsBelowEncumberedBacking
+		);
+		assert_eq!(
+			<Vaults as BitcoinVaultProvider>::release_encumbered_argonots(&1, 6_001),
+			Err(VaultError::CommittedArgonotsBelowEncumberedBacking)
 		);
 		assert_ok!(Vaults::set_committed_argonots(RuntimeOrigin::signed(1), 6_000));
 		let commitment =
@@ -710,6 +714,7 @@ fn it_can_lock_funds() {
 		let current_frame_id = CurrentFrameId::get();
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(vault_revenue.len(), 1);
+		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
 		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
@@ -1528,6 +1533,7 @@ fn vaults_can_collect_revenue() {
 		Vaults::on_frame_start(2);
 		RevenuePerFrameByVault::<Test>::get(1);
 		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).len(), 0);
+		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 0);
 
 		set_argons(2, 6_000);
 		let fee = Vaults::lock(1, &2, &securitization(500_000), 500, None, false)
@@ -1687,6 +1693,7 @@ fn it_burns_uncollected_revenue() {
 		}
 		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
 		assert_eq!(pending_revenue.len(), 10);
+		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 1);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 1_000_000);
 		assert_eq!(pending_revenue[0].uncollected_revenue, 100_000);
 		assert_eq!(pending_revenue[0].frame_id, 10);
@@ -1705,6 +1712,7 @@ fn it_burns_uncollected_revenue() {
 		);
 		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
 		assert_eq!(pending_revenue.len(), 9);
+		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 1);
 		assert!(!pending_revenue.iter().any(|a| a.frame_id == 1));
 	})
 }

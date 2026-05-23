@@ -144,6 +144,15 @@ impl<T: Config> Pallet<T> {
 		(b"argon/minting-authority-signer/v2".as_slice(), destination_chain, account_id).encode()
 	}
 
+	#[cfg(feature = "runtime-benchmarks")]
+	pub(crate) fn recover_evm_personal_signer(
+		_message: &[u8],
+		signature: &KeccakSignature,
+	) -> Option<H160> {
+		Some(H160::from_slice(&signature[..20]))
+	}
+
+	#[cfg(not(feature = "runtime-benchmarks"))]
 	pub(crate) fn recover_evm_personal_signer(
 		message: &[u8],
 		signature: &KeccakSignature,
@@ -152,6 +161,15 @@ impl<T: Config> Pallet<T> {
 		Self::evm_address_from_public_key(&public_key)
 	}
 
+	#[cfg(feature = "runtime-benchmarks")]
+	pub(crate) fn recover_evm_message_signer(
+		_approval_hash: H256,
+		signature: &KeccakSignature,
+	) -> Option<H160> {
+		Some(H160::from_slice(&signature[..20]))
+	}
+
+	#[cfg(not(feature = "runtime-benchmarks"))]
 	pub(crate) fn recover_evm_message_signer(
 		approval_hash: H256,
 		signature: &KeccakSignature,
@@ -160,6 +178,7 @@ impl<T: Config> Pallet<T> {
 		Self::evm_address_from_public_key(&public_key)
 	}
 
+	#[cfg_attr(feature = "runtime-benchmarks", allow(dead_code))]
 	pub(crate) fn evm_personal_message(message: &[u8]) -> Vec<u8> {
 		let mut signable_message =
 			format!("\x19Ethereum Signed Message:\n{}", message.len()).into_bytes();
@@ -167,10 +186,12 @@ impl<T: Config> Pallet<T> {
 		signable_message
 	}
 
+	#[cfg_attr(feature = "runtime-benchmarks", allow(dead_code))]
 	pub(crate) fn evm_signed_message(message_hash: H256) -> Vec<u8> {
 		Self::evm_personal_message(message_hash.as_bytes())
 	}
 
+	#[cfg_attr(feature = "runtime-benchmarks", allow(dead_code))]
 	pub(crate) fn evm_address_from_public_key(
 		public_key: &polkadot_sdk::sp_core::ecdsa::KeccakPublic,
 	) -> Option<H160> {

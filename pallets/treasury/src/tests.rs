@@ -629,6 +629,13 @@ fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_re
 		);
 		assert_eq!(Treasury::encumbered_bond_microgons(&2), MICROGONS_PER_ARGON / 2);
 
+		assert_err!(
+			<Treasury as TreasuryPoolProvider<u64>>::release_encumbered_bond_microgons(
+				&2,
+				(MICROGONS_PER_ARGON / 2) + 1,
+			),
+			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
+		);
 		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::release_encumbered_bond_microgons(
 			&2,
 			MICROGONS_PER_ARGON / 2,

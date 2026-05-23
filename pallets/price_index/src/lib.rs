@@ -414,7 +414,7 @@ pub mod pallet {
 
 		fn get_lowest_microgons_per_argonot(frames: FrameId) -> Option<T::Balance> {
 			let mut lowest_microgons_per_argonot = Self::get_microgons_per_argonot();
-			let oldest_allowed = T::CurrentFrameId::get().saturating_sub(frames);
+			let oldest_allowed = T::CurrentFrameId::get().saturating_sub(frames.saturating_sub(1));
 
 			for entry in HistoricArgonotFloorByFrame::<T>::get().into_iter() {
 				if entry.0 < oldest_allowed {

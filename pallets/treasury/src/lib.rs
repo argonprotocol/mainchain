@@ -1041,8 +1041,12 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			let remaining_encumbered =
-				Self::encumbered_bond_microgons(account_id).saturating_sub(microgon_amount);
+			let current_encumbered = Self::encumbered_bond_microgons(account_id);
+			ensure!(
+				current_encumbered >= microgon_amount,
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+			let remaining_encumbered = current_encumbered.saturating_sub(microgon_amount);
 			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, remaining_encumbered);
 			let current_active =
 				Self::active_non_releasing_account_bond_amount(account_id)?.unwrap_or_default();

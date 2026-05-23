@@ -229,6 +229,9 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	pub type RevenuePerFrameByVaultCount<T: Config> = StorageValue<_, u32, ValueQuery>;
+
 	/// Recent reductions in `available_for_lock`, grouped by vault.
 	#[pallet::storage]
 	pub type RecentCapacityDropsByVault<T: Config> = StorageMap<
@@ -1181,6 +1184,7 @@ pub mod pallet {
 			frame_id: FrameId,
 			callback: impl FnOnce(&mut VaultFrameRevenue<T>) -> Result<(), VaultError>,
 		) -> Result<(), VaultError> {
+			let had_revenue = RevenuePerFrameByVault::<T>::contains_key(vault_id);
 			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |x| {
 				let vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 				let current_frame_id = T::CurrentFrameId::get();
@@ -1198,7 +1202,13 @@ pub mod pallet {
 						VaultError::InternalError
 					})
 				}
-			})
+			})?;
+			if !had_revenue {
+				RevenuePerFrameByVaultCount::<T>::mutate(|count| {
+					*count = count.saturating_add(1);
+				});
+			}
+			Ok(())
 		}
 
 		pub(crate) fn update_vault_bitcoin_metrics(
@@ -1317,12 +1327,17 @@ pub mod pallet {
 				});
 				if is_empty {
 					RevenuePerFrameByVault::<T>::remove(vault_id);
+					RevenuePerFrameByVaultCount::<T>::mutate(|count| {
+						*count = count.saturating_sub(1);
+					});
 				}
 			}
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			T::WeightInfo::on_frame_start(T::MaxVaults::get())
+			T::DbWeight::get().reads(1).saturating_add(T::WeightInfo::on_frame_start(
+				RevenuePerFrameByVaultCount::<T>::get(),
+			))
 		}
 	}
 
@@ -1509,8 +1524,10 @@ pub mod pallet {
 			let vault_id =
 				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
 			let mut commitment = Self::argonot_commitment(vault_id, account_id);
-			commitment.encumbered_micronots =
-				commitment.encumbered_micronots.saturating_sub(amount);
+			commitment.encumbered_micronots = commitment
+				.encumbered_micronots
+				.checked_sub(&amount)
+				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
 			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
 			Ok(())
 		}

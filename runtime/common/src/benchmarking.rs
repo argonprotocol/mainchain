@@ -16,12 +16,10 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, UtxoId,
 	},
-	ethereum::{
-		EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
-	},
+	block_seal::FrameId,
+	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
 	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
-		VaultArgonotCommitment, VaultError,
+		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
 	EthereumVerifyProvider, MiningSlotProvider, Moment, TreasuryPoolProvider,
 	UniswapTransferProvider, VaultId,
@@ -47,6 +45,7 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkPriceProvider, BenchmarkPriceProviderState, BenchmarkTickProvider,
 	BenchmarkUtxoLockEvents,
 };
+use pallet_prelude::DispatchResult;
 
 pub struct BenchmarkBitcoinSignatureVerifier;
 impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSignatureVerifier {
@@ -154,6 +153,13 @@ where
 	}
 
 	fn release_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
+	fn burn_encumbered_argonots(
 		_account_id: &Self::AccountId,
 		_amount: Self::Balance,
 	) -> Result<(), VaultError> {
@@ -319,6 +325,13 @@ impl<AccountId, Balance> TreasuryPoolProvider<AccountId>
 	}
 
 	fn release_encumbered_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_encumbered_bond_microgons(
 		_account_id: &AccountId,
 		_microgon_amount: Self::Balance,
 	) -> DispatchResult {

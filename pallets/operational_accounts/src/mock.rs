@@ -7,7 +7,7 @@ use argon_primitives::{
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-use argon_primitives::{AccountId, VaultId};
+use argon_primitives::{vault::VaultError, AccountId, VaultId};
 use sp_runtime::FixedU128;
 
 pub type TestAccountId = AccountId;
@@ -117,6 +117,13 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_account_id: &Self::AccountId,
 		_amount: Self::Balance,
 	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
+	}
+
+	fn burn_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
 		Ok(())
 	}
 
@@ -274,6 +281,13 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 		_account_id: &TestAccountId,
 		_microgon_amount: Self::Balance,
 	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_encumbered_bond_microgons(
+		_account_id: &TestAccountId,
+		_microgon_amount: Self::Balance,
+	) -> sp_runtime::DispatchResult {
 		Ok(())
 	}
 }
