@@ -326,7 +326,7 @@ async function measureUserPaths() {
     validUntilBlock: 0n,
     token: await cancelFixture.argon.getAddress(),
     amount: 25n,
-    finalizationTip: 1n,
+    mintingAuthorityTip: 1n,
   };
   const cancelGas = await getGasUsed(
     cancelFixture.gateway.connect(cancelFixture.outsider).cancelTransferOutOfArgon(expiredRequest),
@@ -670,7 +670,7 @@ async function buildTransferOutOfArgonRequest(
     validUntilBlock: 1_000_000n,
     token: await fixture.argon.getAddress(),
     amount,
-    finalizationTip: 5n,
+    mintingAuthorityTip: 5n,
   };
 }
 

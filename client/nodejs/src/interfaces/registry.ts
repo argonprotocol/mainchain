@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -62,6 +63,7 @@ import type {
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
+  ArgonPrimitivesVaultVaultArgonotCommitment,
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
@@ -142,10 +144,25 @@ import type {
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferCall,
   PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferCouncilApprovalQueueEntry,
+  PalletCrosschainTransferCouncilApprovalTargetId,
   PalletCrosschainTransferError,
   PalletCrosschainTransferEvent,
   PalletCrosschainTransferGatewayState,
+  PalletCrosschainTransferGatewaySyncPause,
+  PalletCrosschainTransferGatewaySyncPauseReason,
+  PalletCrosschainTransferGlobalIssuanceCouncil,
+  PalletCrosschainTransferGlobalIssuanceCouncilMember,
+  PalletCrosschainTransferHoldReason,
+  PalletCrosschainTransferMintingAuthority,
+  PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
+  PalletCrosschainTransferMintingAuthorityState,
   PalletCrosschainTransferSourceChain,
+  PalletCrosschainTransferSourceChainCirculation,
+  PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation,
+  PalletCrosschainTransferTransferOutPendingCollateralizationRequest,
+  PalletCrosschainTransferTransferOutTransferOutOfArgon,
+  PalletCrosschainTransferTransferOutTransferOutState,
   PalletCrosschainTransferTransferToArgonActivity,
   PalletDigestsError,
   PalletDigestsEvent,
@@ -342,6 +359,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
+    ArgonPrimitivesVaultVaultArgonotCommitment: ArgonPrimitivesVaultVaultArgonotCommitment;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
@@ -422,10 +440,25 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferAssetKind: PalletCrosschainTransferAssetKind;
     PalletCrosschainTransferCall: PalletCrosschainTransferCall;
     PalletCrosschainTransferChainConfig: PalletCrosschainTransferChainConfig;
+    PalletCrosschainTransferCouncilApprovalQueueEntry: PalletCrosschainTransferCouncilApprovalQueueEntry;
+    PalletCrosschainTransferCouncilApprovalTargetId: PalletCrosschainTransferCouncilApprovalTargetId;
     PalletCrosschainTransferError: PalletCrosschainTransferError;
     PalletCrosschainTransferEvent: PalletCrosschainTransferEvent;
     PalletCrosschainTransferGatewayState: PalletCrosschainTransferGatewayState;
+    PalletCrosschainTransferGatewaySyncPause: PalletCrosschainTransferGatewaySyncPause;
+    PalletCrosschainTransferGatewaySyncPauseReason: PalletCrosschainTransferGatewaySyncPauseReason;
+    PalletCrosschainTransferGlobalIssuanceCouncil: PalletCrosschainTransferGlobalIssuanceCouncil;
+    PalletCrosschainTransferGlobalIssuanceCouncilMember: PalletCrosschainTransferGlobalIssuanceCouncilMember;
+    PalletCrosschainTransferHoldReason: PalletCrosschainTransferHoldReason;
+    PalletCrosschainTransferMintingAuthority: PalletCrosschainTransferMintingAuthority;
+    PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing: PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing;
+    PalletCrosschainTransferMintingAuthorityState: PalletCrosschainTransferMintingAuthorityState;
     PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
+    PalletCrosschainTransferSourceChainCirculation: PalletCrosschainTransferSourceChainCirculation;
+    PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation: PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation;
+    PalletCrosschainTransferTransferOutPendingCollateralizationRequest: PalletCrosschainTransferTransferOutPendingCollateralizationRequest;
+    PalletCrosschainTransferTransferOutTransferOutOfArgon: PalletCrosschainTransferTransferOutTransferOutOfArgon;
+    PalletCrosschainTransferTransferOutTransferOutState: PalletCrosschainTransferTransferOutTransferOutState;
     PalletCrosschainTransferTransferToArgonActivity: PalletCrosschainTransferTransferToArgonActivity;
     PalletDigestsError: PalletDigestsError;
     PalletDigestsEvent: PalletDigestsEvent;

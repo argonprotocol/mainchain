@@ -30,6 +30,7 @@ Already implemented and intentionally omitted from the open list:
   finalization has become impossible
 
 ## 3. Add transfer-out prioritization and queue management
+
 - revisit the current `MaxPendingTransferOutsPerDestinationChain` queue model so ready transfers do
   not swamp the scarce open-collateralization slots
 - if transfer-outs become priority-queued by user-paid tip, allow a higher-tip still-unfunded

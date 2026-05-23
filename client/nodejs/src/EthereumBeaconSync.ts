@@ -210,8 +210,14 @@ export async function getNextEthereumBeaconSyncTxs(
         hasNextSyncCommitteeUpdate(submitUpdate) && canUseNextSyncCommittee;
       const fillsMissingNextSyncCommittee =
         missingNextSyncCommittee && includesNextSyncCommittee && attestedPeriod === storedPeriod;
+      const advancesKnownSyncCommitteePeriod =
+        !missingNextSyncCommittee && includesNextSyncCommittee;
 
-      if (canAdvanceFinalized || fillsMissingNextSyncCommittee) {
+      if (
+        canAdvanceFinalized ||
+        fillsMissingNextSyncCommittee ||
+        advancesKnownSyncCommitteePeriod
+      ) {
         const nextSyncCommitteeUpdate = includesNextSyncCommittee
           ? {
               nextSyncCommitteeUpdate: {

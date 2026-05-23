@@ -21,7 +21,7 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBitcoinBitcoinRejectedReason,
@@ -38,7 +38,10 @@ import type {
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
   PalletBalancesUnexpectedKind,
+  PalletCrosschainTransferAssetKind,
+  PalletCrosschainTransferCouncilApprovalTargetId,
   PalletCrosschainTransferGatewayState,
+  PalletCrosschainTransferGatewaySyncPause,
   PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferTransferToArgonActivity,
   PalletDomainsDomainRegistration,
@@ -528,7 +531,39 @@ declare module '@polkadot/api-base/types/events' {
     };
     crosschainTransfer: {
       /**
-       * The stored gateway-state snapshot advanced after a proved contiguous batch.
+       * An account registered its council signer for one destination chain.
+       **/
+      CouncilSignerRegistered: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          accountId: AccountId32,
+          signer: H160,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          accountId: AccountId32;
+          signer: H160;
+        }
+      >;
+      /**
+       * An account queued a replacement council signer for the next council update.
+       **/
+      CouncilSignerRotationQueued: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          accountId: AccountId32,
+          signer: H160,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          accountId: AccountId32;
+          signer: H160;
+        }
+      >;
+      /**
+       * The stored gateway-state snapshot advanced after a proven contiguous batch.
        **/
       GatewayStateAdvanced: AugmentedEvent<
         ApiType,
@@ -542,7 +577,225 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * A `TransferToArgonStarted` activity was proved and settled locally.
+       * Gateway proof application paused one source chain at a specific canonical activity.
+       **/
+      GatewaySyncPaused: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: PalletCrosschainTransferSourceChain,
+          pause: PalletCrosschainTransferGatewaySyncPause,
+        ],
+        {
+          sourceChain: PalletCrosschainTransferSourceChain;
+          pause: PalletCrosschainTransferGatewaySyncPause;
+        }
+      >;
+      /**
+       * Root manually unpaused one source chain.
+       **/
+      GatewayUnpaused: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain],
+        { sourceChain: PalletCrosschainTransferSourceChain }
+      >;
+      /**
+       * Root force-set the active Global Issuance Council for a destination chain.
+       **/
+      GlobalIssuanceCouncilForced: AugmentedEvent<
+        ApiType,
+        [destinationChain: PalletCrosschainTransferSourceChain, councilHash: H256],
+        { destinationChain: PalletCrosschainTransferSourceChain; councilHash: H256 }
+      >;
+      /**
+       * Root updated the minimum normalized microgon value required to register a Minting
+       * Authority on one destination chain.
+       **/
+      MinimumMintingAuthorityValueSet: AugmentedEvent<
+        ApiType,
+        [destinationChain: PalletCrosschainTransferSourceChain, minimumValue: u128],
+        { destinationChain: PalletCrosschainTransferSourceChain; minimumValue: u128 }
+      >;
+      /**
+       * A proven activation paid or released the held relayer reimbursement and made the
+       * authority usable.
+       **/
+      MintingAuthorityActivationCompleted: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationSigningKey: H160,
+          relayerArgonAccountId: AccountId32,
+          repaymentAmount: u128,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationSigningKey: H160;
+          relayerArgonAccountId: AccountId32;
+          repaymentAmount: u128;
+        }
+      >;
+      /**
+       * A proven Ethereum activation filled the pending local activation fields.
+       **/
+      MintingAuthorityActivationFinalized: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain, destinationSigningKey: H160],
+        { sourceChain: PalletCrosschainTransferSourceChain; destinationSigningKey: H160 }
+      >;
+      /**
+       * Root updated the pricing inputs used to repay relayers for activation batches on one
+       * destination chain.
+       **/
+      MintingAuthorityActivationRepaymentPricingSet: AugmentedEvent<
+        ApiType,
+        [destinationChain: PalletCrosschainTransferSourceChain],
+        { destinationChain: PalletCrosschainTransferSourceChain }
+      >;
+      /**
+       * A proven Ethereum deactivation released collateral and removed the local authority
+       * record.
+       **/
+      MintingAuthorityDeactivationFinalized: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain, destinationSigningKey: H160],
+        { sourceChain: PalletCrosschainTransferSourceChain; destinationSigningKey: H160 }
+      >;
+      /**
+       * An operator queued the signer-authorized Ethereum deactivation for a Minting Authority.
+       **/
+      MintingAuthorityDeactivationQueued: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationSigningKey: H160,
+          approvalQueueNonce: u64,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationSigningKey: H160;
+          approvalQueueNonce: u64;
+        }
+      >;
+      /**
+       * An operator account registered a Minting Authority and queued it for council approval.
+       **/
+      MintingAuthorityRegistered: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationSigningKey: H160,
+          accountId: AccountId32,
+          approvalQueueNonce: u64,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationSigningKey: H160;
+          accountId: AccountId32;
+          approvalQueueNonce: u64;
+        }
+      >;
+      /**
+       * The queued council update entry reached local quorum.
+       **/
+      QueueEntryApprovalReady: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          target: PalletCrosschainTransferCouncilApprovalTargetId,
+          approvalQueueNonce: u64,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          target: PalletCrosschainTransferCouncilApprovalTargetId;
+          approvalQueueNonce: u64;
+        }
+      >;
+      /**
+       * A council member recorded approval for a queued council update entry.
+       **/
+      QueueEntryApprovalRecorded: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          target: PalletCrosschainTransferCouncilApprovalTargetId,
+          approvalQueueNonce: u64,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          target: PalletCrosschainTransferCouncilApprovalTargetId;
+          approvalQueueNonce: u64;
+        }
+      >;
+      /**
+       * A pending collateral reservation was invalidated.
+       **/
+      TransferCollateralInvalidated: AugmentedEvent<
+        ApiType,
+        [transferId: H256, destinationSigningKey: H160],
+        { transferId: H256; destinationSigningKey: H160 }
+      >;
+      /**
+       * A minting authority updated transfer collateral.
+       **/
+      TransferCollateralized: AugmentedEvent<
+        ApiType,
+        [
+          transferId: H256,
+          destinationSigningKey: H160,
+          microgonCollateral: u128,
+          micronotCollateral: u128,
+        ],
+        {
+          transferId: H256;
+          destinationSigningKey: H160;
+          microgonCollateral: u128;
+          micronotCollateral: u128;
+        }
+      >;
+      /**
+       * A transfer was canceled on the source chain.
+       **/
+      TransferOutCanceled: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain, transferId: H256],
+        { sourceChain: PalletCrosschainTransferSourceChain; transferId: H256 }
+      >;
+      /**
+       * A transfer was finalized on the source chain.
+       **/
+      TransferOutFinalized: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain, transferId: H256],
+        { sourceChain: PalletCrosschainTransferSourceChain; transferId: H256 }
+      >;
+      /**
+       * A transfer is ready for finalization.
+       **/
+      TransferOutReady: AugmentedEvent<ApiType, [transferId: H256], { transferId: H256 }>;
+      /**
+       * A transfer out was opened.
+       **/
+      TransferOutStarted: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          transferId: H256,
+          accountId: AccountId32,
+          asset: PalletCrosschainTransferAssetKind,
+          amount: u128,
+          mintingAuthorityTip: u128,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          transferId: H256;
+          accountId: AccountId32;
+          asset: PalletCrosschainTransferAssetKind;
+          amount: u128;
+          mintingAuthorityTip: u128;
+        }
+      >;
+      /**
+       * A `TransferToArgonStarted` activity was proven and settled locally.
        **/
       TransferToArgonSettled: AugmentedEvent<
         ApiType,
@@ -1636,6 +1889,15 @@ declare module '@polkadot/api-base/types/events' {
         { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
+       * Encumbered treasury backing was burned and any no-longer-needed fractional hold was
+       * returned.
+       **/
+      EncumberedBondMicrogonsBurned: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, burnedAmount: u128, releasedAmount: u128],
+        { accountId: AccountId32; burnedAmount: u128; releasedAmount: u128 }
+      >;
+      /**
        * Frame earnings were distributed.
        **/
       FrameEarningsDistributed: AugmentedEvent<
@@ -1722,6 +1984,11 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     vaults: {
+      CommittedArgonotsSet: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, operatorAccountId: AccountId32, amount: u128],
+        { vaultId: u32; operatorAccountId: AccountId32; amount: u128 }
+      >;
       FundLockCanceled: AugmentedEvent<
         ApiType,
         [vaultId: u32, amount: u128],

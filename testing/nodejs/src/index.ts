@@ -12,10 +12,26 @@ import TestBitcoinCli from './TestBitcoinCli';
 import TestOracle from './TestOracle';
 import TestEthereum from './TestEthereum';
 import { startNetwork } from './TestNetwork';
-import { argonTokenArtifact, mintingGatewayArtifact } from './ethereumContracts';
 
+export {
+  mineLaterExecutionAnchorReceipt,
+  signGatewayPermit,
+  syncEthereumVerifierUntilAnchorCovers,
+  toArgonKeccakSignature,
+  toEvmRecoverableSignature,
+  waitForExecutionReceipt,
+  waitForFinalizedBeaconExecutionAtOrAbove,
+} from './EthereumE2eUtils';
+export {
+  getReadyEthereumGatewayUpdates,
+  type EthereumGatewayUpdateBatch,
+} from './EthereumGatewayQueue';
+export {
+  EthereumProofE2eHarness,
+  TestMintingAuthorityActor,
+  TestMintingGateway,
+} from './TestEthereumProofActors';
 export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle, TestEthereum, startNetwork };
-export { argonTokenArtifact, mintingGatewayArtifact };
 
 export interface ITeardownable {
   teardown(): Promise<void>;

@@ -1,4 +1,24 @@
 import { defineConfig } from 'tsup';
+import { promises as fs } from 'node:fs';
+import { resolve } from 'node:path';
+
+const contractArtifacts = [
+  'artifacts/contracts/ArgonToken.sol/ArgonToken.json',
+  'artifacts/contracts/ArgonotToken.sol/ArgonotToken.json',
+  'artifacts/contracts/MintingGateway.sol/MintingGateway.json',
+  'artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json',
+  'artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json',
+] as const;
+
+async function copyContractArtifacts(outDir: 'lib' | 'browser') {
+  const contractsRoot = resolve('..', '..', 'chains', 'ethereum', 'contracts');
+
+  for (const artifactPath of contractArtifacts) {
+    const outputPath = resolve(outDir, artifactPath);
+    await fs.mkdir(resolve(outputPath, '..'), { recursive: true });
+    await fs.copyFile(resolve(contractsRoot, artifactPath), outputPath);
+  }
+}
 
 export default defineConfig([
   {
@@ -20,6 +40,9 @@ export default defineConfig([
     sourcemap: true,
     skipNodeModulesBundle: true,
     shims: true,
+    onSuccess: async () => {
+      await copyContractArtifacts('lib');
+    },
   },
 
   {
@@ -40,5 +63,8 @@ export default defineConfig([
     clean: true,
     splitting: false,
     treeshake: true,
+    onSuccess: async () => {
+      await copyContractArtifacts('browser');
+    },
   },
 ]);

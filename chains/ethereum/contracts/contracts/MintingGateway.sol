@@ -131,7 +131,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 validUntilBlock;
 		address token;
 		uint128 amount;
-		uint128 finalizationTip;
+		uint128 mintingAuthorityTip;
 	}
 
 	/// @notice One minting authority's signed authorization for a transfer-out.
@@ -1374,7 +1374,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				request.validUntilBlock,
 				request.token,
 				request.amount,
-				request.finalizationTip
+				request.mintingAuthorityTip
 			)
 		);
 	}

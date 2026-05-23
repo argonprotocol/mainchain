@@ -3,28 +3,29 @@ import * as os from 'node:os';
 import * as Path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { detectPort } from 'detect-port';
-import {
-  argonTokenArtifact,
-  argonotTokenArtifact,
-  mintingGatewayArtifact,
-  proxyAdminArtifact,
-  transparentUpgradeableProxyArtifact,
-} from './ethereumContracts';
+import { EvmContracts } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   type Abi,
-  encodeAbiParameters,
   createPublicClient,
   createWalletClient,
   defineChain,
   encodeFunctionData,
   getAddress,
   http,
-  keccak256,
   type Hex,
   zeroAddress,
 } from 'viem';
 import { addTeardown, type ITeardownable } from './index';
+
+const {
+  argonTokenArtifact,
+  argonotTokenArtifact,
+  hashMintingGatewayGlobalIssuanceCouncil,
+  mintingGatewayArtifact,
+  proxyAdminArtifact,
+  transparentUpgradeableProxyArtifact,
+} = EvmContracts;
 
 const DEFAULT_KURTOSIS_BIN = 'kurtosis';
 const DEFAULT_ETHEREUM_PACKAGE = 'github.com/ethpandaops/ethereum-package';
@@ -215,6 +216,7 @@ export default class TestEthereum implements ITeardownable {
     deployerPrivateKey: Hex;
     adminSafe?: Hex;
     guardianSafe?: Hex;
+    initialMicrogonsPerArgonot?: bigint;
     seedArgonRecipient?: Hex;
     seedArgonAmountBaseUnits?: bigint;
   }): Promise<EthereumMintingGatewayFixture> {
@@ -240,12 +242,12 @@ export default class TestEthereum implements ITeardownable {
       signers: [adminSafe],
       weights: [1n],
     } as const;
-    const bootstrapCouncilHash = keccak256(
-      encodeAbiParameters(
-        [{ type: 'address[]' }, { type: 'uint256[]' }],
-        [bootstrapCouncil.signers, bootstrapCouncil.weights],
-      ),
-    );
+    const initialMicrogonsPerArgonot =
+      options.initialMicrogonsPerArgonot ?? DEFAULT_INITIAL_MICROGONS_PER_ARGONOT;
+    const bootstrapCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+      ...bootstrapCouncil,
+      epochMicrogonsPerArgonot: initialMicrogonsPerArgonot,
+    });
 
     const bootstrapImplementationAddress = await deployContract(walletClient, publicClient, {
       abi: mintingGatewayArtifact.abi,
@@ -261,7 +263,7 @@ export default class TestEthereum implements ITeardownable {
         bootstrapCouncilHash,
         BigInt(bootstrapCouncil.signers.length),
         1n,
-        DEFAULT_INITIAL_MICROGONS_PER_ARGONOT,
+        initialMicrogonsPerArgonot,
       ],
     });
     const gatewayAddress = await deployContract(walletClient, publicClient, {

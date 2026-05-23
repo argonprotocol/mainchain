@@ -354,41 +354,220 @@ declare module '@polkadot/api-base/types/errors' {
     };
     crosschainTransfer: {
       /**
+       * The force-set cut would discard a queue entry that already has local quorum.
+       **/
+      CannotForceSetQuorumApprovedQueueEntry: AugmentedError<ApiType>;
+      /**
+       * This council member already approved the queued Minting Authority.
+       **/
+      CouncilApprovalAlreadyRecorded: AugmentedError<ApiType>;
+      /**
+       * The Minting Authority approval queue entry does not exist.
+       **/
+      CouncilApprovalQueueEntryNotFound: AugmentedError<ApiType>;
+      /**
+       * The account has not registered a council signer for this destination chain.
+       **/
+      CouncilSignerNotRegistered: AugmentedError<ApiType>;
+      /**
+       * The supplied Global Issuance Council contains the same account more than once.
+       **/
+      DuplicateGlobalIssuanceCouncilAccount: AugmentedError<ApiType>;
+      /**
+       * The supplied Global Issuance Council contains the same signer more than once.
+       **/
+      DuplicateGlobalIssuanceCouncilSigner: AugmentedError<ApiType>;
+      /**
+       * This source chain is paused due to gateway sync misalignment and needs operator
+       * recovery.
+       **/
+      GatewaySyncPaused: AugmentedError<ApiType>;
+      /**
+       * The origin is not an active Global Issuance Council member for the destination chain.
+       **/
+      GlobalIssuanceCouncilMemberNotFound: AugmentedError<ApiType>;
+      /**
+       * The active Global Issuance Council has not been seeded for this destination chain.
+       **/
+      GlobalIssuanceCouncilNotFound: AugmentedError<ApiType>;
+      /**
+       * The operator does not have enough remaining committed Argonot collateral for this
+       * Minting Authority.
+       **/
+      InsufficientCommittedArgonotCollateral: AugmentedError<ApiType>;
+      /**
+       * The operator does not have enough remaining committed microgon collateral for this
+       * Minting Authority.
+       **/
+      InsufficientCommittedMicrogonCollateral: AugmentedError<ApiType>;
+      /**
        * The burn account lacks enough balance for the payout.
        **/
       InsufficientLiquidity: AugmentedError<ApiType>;
+      /**
+       * The authority does not have enough remaining gateway collateral for this transfer row.
+       **/
+      InsufficientMintingAuthorityCollateral: AugmentedError<ApiType>;
       /**
        * The configured source-chain shape is incomplete or malformed.
        **/
       InvalidChainConfig: AugmentedError<ApiType>;
       /**
+       * The provided council approval signature did not match the expected Ethereum signer.
+       **/
+      InvalidCouncilApprovalSignature: AugmentedError<ApiType>;
+      /**
+       * The provided council signer proof did not match the recovered Ethereum signer.
+       **/
+      InvalidCouncilSignerProof: AugmentedError<ApiType>;
+      /**
+       * The force-set cut point was behind already confirmed queue progress.
+       **/
+      InvalidForceSetAfterNonce: AugmentedError<ApiType>;
+      /**
+       * The Ethereum event topics or payload do not match a supported gateway activity.
+       **/
+      InvalidGatewayActivity: AugmentedError<ApiType>;
+      /**
+       * The supplied Global Issuance Council is empty or internally inconsistent.
+       **/
+      InvalidGlobalIssuanceCouncil: AugmentedError<ApiType>;
+      /**
+       * The council-managed Argonot floor could not be determined from current pricing.
+       **/
+      InvalidMicrogonsPerArgonot: AugmentedError<ApiType>;
+      /**
+       * The configured activation repayment pricing is internally invalid.
+       **/
+      InvalidMintingAuthorityActivationRepaymentPricing: AugmentedError<ApiType>;
+      /**
+       * The supplied Minting Authority collateral is invalid.
+       **/
+      InvalidMintingAuthorityCollateral: AugmentedError<ApiType>;
+      /**
+       * The provided signer-authorized deactivation signature did not match the expected
+       * Minting Authority signing key.
+       **/
+      InvalidMintingAuthorityDeactivationSignature: AugmentedError<ApiType>;
+      /**
+       * The supplied Minting Authority signing key is invalid.
+       **/
+      InvalidMintingAuthoritySigningKey: AugmentedError<ApiType>;
+      /**
+       * The provided Minting Authority signer proof did not match the recovered Ethereum
+       * signer.
+       **/
+      InvalidMintingAuthoritySigningKeyProof: AugmentedError<ApiType>;
+      /**
        * The Ethereum verifier rejected the supplied proof.
        **/
       InvalidProof: AugmentedError<ApiType>;
       /**
-       * The destination account bytes could not be decoded into a local account id.
+       * The provided transfer collateral row is invalid for this transfer asset.
        **/
-      InvalidRecipient: AugmentedError<ApiType>;
+      InvalidTransferCollateral: AugmentedError<ApiType>;
+      /**
+       * The transfer collateral signature did not match the authority signing key.
+       **/
+      InvalidTransferCollateralSignature: AugmentedError<ApiType>;
+      /**
+       * The provided transfer collateral row did not advance the signer's local reservation.
+       **/
+      InvalidTransferCollateralUpdate: AugmentedError<ApiType>;
+      /**
+       * The transfer-out amount must be nonzero.
+       **/
+      InvalidTransferOutAmount: AugmentedError<ApiType>;
+      /**
+       * The transfer-out recipient must be nonzero for the destination chain.
+       **/
+      InvalidTransferOutRecipient: AugmentedError<ApiType>;
       /**
        * The Ethereum event topics or payload do not match `TransferToArgonStarted`.
        **/
       InvalidTransferToArgonActivity: AugmentedError<ApiType>;
       /**
+       * The supplied Minting Authority signing key already has a live local authority record.
+       **/
+      MintingAuthorityAlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * The supplied Minting Authority collateral is below the configured per-chain minimum
+       * normalized microgon value.
+       **/
+      MintingAuthorityCollateralBelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The local Minting Authority did not match the proven Ethereum activity.
+       **/
+      MintingAuthorityMismatch: AugmentedError<ApiType>;
+      /**
+       * The supplied Minting Authority signing key does not exist locally.
+       **/
+      MintingAuthorityNotFound: AugmentedError<ApiType>;
+      /**
+       * The configured activation repayment pricing is missing for this source chain.
+       **/
+      MissingMintingAuthorityActivationRepaymentPricing: AugmentedError<ApiType>;
+      /**
+       * No verifier-backed Ethereum execution block is available to anchor a transfer-out
+       * expiry window.
+       **/
+      MissingVerifiedExecutionBlock: AugmentedError<ApiType>;
+      /**
+       * At least one council approval signature must be supplied.
+       **/
+      NoCouncilApprovalSignaturesProvided: AugmentedError<ApiType>;
+      /**
        * At least one gateway activity log must be supplied with the receipt proof.
        **/
       NoGatewayActivitiesProvided: AugmentedError<ApiType>;
       /**
-       * At least one proved gateway-activity block must be supplied.
+       * At least one proven gateway-activity block must be supplied.
        **/
       NoGatewayProofBlocksProvided: AugmentedError<ApiType>;
+      /**
+       * The latest verifier-backed Ethereum execution block is too old to safely open a new
+       * transfer out.
+       **/
+      StaleVerifiedExecutionBlock: AugmentedError<ApiType>;
+      /**
+       * The destination chain already tracks the maximum number of non-terminal transfer-out
+       * requests.
+       **/
+      TooManyPendingTransferOuts: AugmentedError<ApiType>;
+      /**
+       * The collateral increment is below the configured minimum and does not complete the
+       * transfer.
+       **/
+      TransferCollateralIncrementTooSmall: AugmentedError<ApiType>;
+      /**
+       * The outbound transfer cannot accept more collateral because it is already fully
+       * covered.
+       **/
+      TransferOutAlreadyReady: AugmentedError<ApiType>;
+      /**
+       * The outbound transfer request is already expired on the latest verified Ethereum block.
+       **/
+      TransferOutExpired: AugmentedError<ApiType>;
+      /**
+       * The outbound transfer record does not exist.
+       **/
+      TransferOutNotFound: AugmentedError<ApiType>;
       /**
        * The proven gateway activity nonce is not the next contiguous nonce.
        **/
       UnexpectedGatewayActivityNonce: AugmentedError<ApiType>;
       /**
+       * The local Minting Authority was not in the expected lifecycle state.
+       **/
+      UnexpectedMintingAuthorityState: AugmentedError<ApiType>;
+      /**
        * The caller's expected already-proven gateway activity nonce is stale or incorrect.
        **/
       UnexpectedPreviousGatewayActivityNonce: AugmentedError<ApiType>;
+      /**
+       * The local owner vault could not be resolved.
+       **/
+      UnknownOwnerVault: AugmentedError<ApiType>;
       /**
        * The gateway does not match the configured gateway address.
        **/
@@ -1007,6 +1186,11 @@ declare module '@polkadot/api-base/types/errors' {
     ticks: {};
     treasury: {
       /**
+       * Liquidating this bond lot would take the account below its crosschain-encumbered
+       * treasury backing.
+       **/
+      ActiveBondAmountBelowEncumberedBacking: AugmentedError<ApiType>;
+      /**
        * The bond lot is already scheduled for release.
        **/
       BondLotAlreadyReleasing: AugmentedError<ApiType>;
@@ -1082,6 +1266,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;
       /**
+       * Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
+       **/
+      CommittedArgonotsBelowEncumberedBacking: AugmentedError<ApiType>;
+      /**
        * A funding change is already scheduled
        **/
       FundingChangeAlreadyScheduled: AugmentedError<ApiType>;
@@ -1129,6 +1317,10 @@ declare module '@polkadot/api-base/types/errors' {
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * A vault must clear out all overdue external collect blockers before it can collect.
+       **/
+      OverdueCollectBlockersBeforeCollect: AugmentedError<ApiType>;
       /**
        * A vault must clear out all pending cosigns before it can collect
        **/

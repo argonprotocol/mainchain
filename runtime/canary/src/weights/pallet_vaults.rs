@@ -50,8 +50,8 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `52`
 		//  Estimated: `3676`
-		// Minimum execution time: 172_000_000 picoseconds.
-		Weight::from_parts(180_000_000, 3676)
+		// Minimum execution time: 171_000_000 picoseconds.
+		Weight::from_parts(182_000_000, 3676)
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().writes(6))
 		}
@@ -85,7 +85,7 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		//  Measured:  `630`
 		//  Estimated: `12552`
 		// Minimum execution time: 15_000_000 picoseconds.
-		Weight::from_parts(16_000_000, 12552)
+		Weight::from_parts(15_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(4))
 			.saturating_add(T::DbWeight::get().writes(2))
 		}
@@ -101,8 +101,8 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `9085`
 		//  Estimated: `12552`
-		// Minimum execution time: 60_000_000 picoseconds.
-		Weight::from_parts(62_000_000, 12552)
+		// Minimum execution time: 59_000_000 picoseconds.
+		Weight::from_parts(67_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(4))
 			.saturating_add(T::DbWeight::get().writes(4))
 		}
@@ -116,7 +116,7 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `271`
 		//  Estimated: `12552`
-		// Minimum execution time: 138_000_000 picoseconds.
+		// Minimum execution time: 137_000_000 picoseconds.
 		Weight::from_parts(143_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(1))
@@ -143,7 +143,7 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		//  Measured:  `221`
 		//  Estimated: `12552`
 		// Minimum execution time: 10_000_000 picoseconds.
-		Weight::from_parts(10_000_000, 12552)
+		Weight::from_parts(11_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
@@ -184,7 +184,7 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 	/// Proof: `Vaults::LastCollectFrameByVaultId` (`max_values`: None, `max_size`: Some(20), added: 2495, mode: `MaxEncodedLen`)
 	fn collect() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `746`
+		//  Measured:  `772`
 		//  Estimated: `12552`
 		// Minimum execution time: 58_000_000 picoseconds.
 		Weight::from_parts(61_000_000, 12552)
@@ -200,7 +200,7 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		//  Measured:  `221`
 		//  Estimated: `12552`
 		// Minimum execution time: 7_000_000 picoseconds.
-		Weight::from_parts(8_000_000, 12552)
+		Weight::from_parts(7_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(2))
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
@@ -229,9 +229,35 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `180`
 		//  Estimated: `3509`
-		// Minimum execution time: 6_000_000 picoseconds.
+		// Minimum execution time: 7_000_000 picoseconds.
+		Weight::from_parts(7_000_000, 3509)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
+	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
+	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
+	/// Storage: `Vaults::ArgonotCommitmentByVaultId` (r:1 w:1)
+	/// Proof: `Vaults::ArgonotCommitmentByVaultId` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
+	fn provider_encumber_argonots() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `180`
+		//  Estimated: `3509`
+		// Minimum execution time: 8_000_000 picoseconds.
 		Weight::from_parts(8_000_000, 3509)
 			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
+	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
+	/// Storage: `Vaults::ArgonotCommitmentByVaultId` (r:1 w:1)
+	/// Proof: `Vaults::ArgonotCommitmentByVaultId` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
+	fn provider_release_encumbered_argonots() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `183`
+		//  Estimated: `3509`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(8_000_000, 3509)
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(1))
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
 	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
@@ -247,8 +273,8 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `394`
 		//  Estimated: `3676`
-		// Minimum execution time: 29_000_000 picoseconds.
-		Weight::from_parts(30_000_000, 3676)
+		// Minimum execution time: 30_000_000 picoseconds.
+		Weight::from_parts(31_000_000, 3676)
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().writes(4))
 		}
@@ -275,17 +301,20 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
 	/// Storage: `Balances::Holds` (r:100 w:100)
 	/// Proof: `Balances::Holds` (`max_values`: None, `max_size`: Some(211), added: 2686, mode: `MaxEncodedLen`)
+	/// Storage: `Vaults::RevenuePerFrameByVaultCount` (r:1 w:1)
+	/// Proof: `Vaults::RevenuePerFrameByVaultCount` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// The range of component `v` is `[1, 100]`.
 	fn on_frame_start(v: u32, ) -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `137 + v * (598 +/- 0)`
+		//  Measured:  `163 + v * (598 +/- 0)`
 		//  Estimated: `6118 + v * (11562 +/- 0)`
-		// Minimum execution time: 241_000_000 picoseconds.
-		Weight::from_parts(244_000_000, 6118)
-			// Standard Error: 206_796
-			.saturating_add(Weight::from_parts(252_554_310, 0).saturating_mul(v.into()))
-			.saturating_add(T::DbWeight::get().reads(1))
+		// Minimum execution time: 243_000_000 picoseconds.
+		Weight::from_parts(929_683_961, 6118)
+			// Standard Error: 5_740_539
+			.saturating_add(Weight::from_parts(260_867_293, 0).saturating_mul(v.into()))
+			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().reads((4_u64).saturating_mul(v.into())))
+			.saturating_add(T::DbWeight::get().writes(1))
 			.saturating_add(T::DbWeight::get().writes((3_u64).saturating_mul(v.into())))
 				.saturating_add(Weight::from_parts(0, 11562).saturating_mul(v.into()))
 		}
@@ -312,12 +341,10 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `0 + o * (313 +/- 0) + v * (9117 +/- 0)`
 		//  Estimated: `43483 + h * (42493 +/- 0) + o * (11562 +/- 0) + v * (11562 +/- 0)`
-		// Minimum execution time: 4_683_000_000 picoseconds.
-		Weight::from_parts(4_913_000_000, 43483)
-			// Standard Error: 525_170
-			.saturating_add(Weight::from_parts(58_358_987, 0).saturating_mul(v.into()))
-			// Standard Error: 525_170
-			.saturating_add(Weight::from_parts(18_521_211, 0).saturating_mul(o.into()))
+		// Minimum execution time: 5_024_000_000 picoseconds.
+		Weight::from_parts(12_728_923_246, 43483)
+			// Standard Error: 8_159_399
+			.saturating_add(Weight::from_parts(40_446_667, 0).saturating_mul(v.into()))
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(h.into())))
 			.saturating_add(T::DbWeight::get().reads((4_u64).saturating_mul(v.into())))

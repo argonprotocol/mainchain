@@ -30,7 +30,7 @@ const connection = await network.create();
 const { ethers } = connection;
 
 type SignerLike = {
-  address: `0x${string}`;
+  address: string;
   signMessage(message: Uint8Array): Promise<string>;
 };
 
@@ -150,7 +150,7 @@ describe('MintingGateway', () => {
     const wallets = [...signers].sort((left, right) =>
       left.address.toLowerCase().localeCompare(right.address.toLowerCase()),
     );
-    const sortedSigners = wallets.map(wallet => wallet.address);
+    const sortedSigners = wallets.map(wallet => wallet.address as `0x${string}`);
     const weights = wallets.map((_, index) => COUNCIL_WEIGHTS[index] ?? 10n);
     const snapshot = {
       signers: sortedSigners,
@@ -355,7 +355,7 @@ describe('MintingGateway', () => {
     const target = {
       microgonCollateral: overrides.microgonCollateral ?? 1_000n,
       micronotCollateral: overrides.micronotCollateral ?? 200n,
-      signingKey: overrides.signingKey ?? fixture.mintingAuthoritySigner.address,
+      signingKey: overrides.signingKey ?? (fixture.mintingAuthoritySigner.address as `0x${string}`),
     } satisfies MintingGatewayMintingAuthorityActivationTarget;
     const previousUpdateHash = await fixture.gateway.getFunction('argonApprovalsHash')();
     const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(
@@ -446,7 +446,7 @@ describe('MintingGateway', () => {
       validUntilBlock: overrides.validUntilBlock ?? 1_000_000n,
       token: overrides.token ?? ((await fixture.argon.getAddress()) as `0x${string}`),
       amount: overrides.amount ?? 50n,
-      finalizationTip: overrides.finalizationTip ?? 5n,
+      mintingAuthorityTip: overrides.mintingAuthorityTip ?? 5n,
     };
   }
 
@@ -1002,7 +1002,7 @@ describe('MintingGateway', () => {
     const { target } = await activateMintingAuthority(fixture, 1n, {
       microgonCollateral: 0n,
       micronotCollateral: 50n,
-      signingKey: signingWallet.address,
+      signingKey: signingWallet.address as `0x${string}`,
     });
     const nextCouncil = createCouncil(
       [fixture.adminSafe, fixture.guardian, fixture.holder, fixture.outsider],
@@ -1089,7 +1089,7 @@ describe('MintingGateway', () => {
       argonTransferNonce: 7n,
       validUntilBlock: currentBlock + 100n,
       amount: 25n,
-      finalizationTip: 1n,
+      mintingAuthorityTip: 1n,
     });
     const expiredRequest = {
       ...notExpiredRequest,
@@ -1130,7 +1130,7 @@ describe('MintingGateway', () => {
     const expiredRequest = await createTransferOutRequest(fixture, {
       validUntilBlock: 0n,
       amount: 0n,
-      finalizationTip: 0n,
+      mintingAuthorityTip: 0n,
     });
 
     await expectCustomError(

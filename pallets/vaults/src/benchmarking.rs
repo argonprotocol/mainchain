@@ -381,6 +381,63 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_encumber_argonots() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_encumber_argonots", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;
+		let amount: T::Balance = 40_000u128.into();
+		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
+		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
+
+		#[block]
+		{
+			assert!(<Pallet<T> as BitcoinVaultProvider>::encumber_argonots(&caller, amount).is_ok());
+		}
+
+		assert_eq!(
+			ArgonotCommitmentByVaultId::<T>::get(vault_id)
+				.map(|commitment| commitment.encumbered_micronots),
+			Some(amount),
+		);
+		assert_eq!(
+			T::OwnershipCurrency::balance_on_hold(&HoldReason::EnterVault.into(), &caller),
+			amount,
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_release_encumbered_argonots() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_release_encumbered_argonots", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;
+		let amount: T::Balance = 40_000u128.into();
+		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
+		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
+		<Pallet<T> as BitcoinVaultProvider>::encumber_argonots(&caller, amount)
+			.map_err(|_| BenchmarkError::Stop("failed to encumber argonots"))?;
+
+		#[block]
+		{
+			assert!(<Pallet<T> as BitcoinVaultProvider>::release_encumbered_argonots(
+				&caller, amount
+			)
+			.is_ok());
+		}
+
+		assert_eq!(
+			ArgonotCommitmentByVaultId::<T>::get(vault_id)
+				.map(|commitment| commitment.encumbered_micronots),
+			Some(T::Balance::zero()),
+		);
+		assert_eq!(
+			T::OwnershipCurrency::balance_on_hold(&HoldReason::EnterVault.into(), &caller),
+			amount,
+		);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn provider_burn_encumbered_argonots() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("provider_burn_encumbered_argonots", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;

@@ -25,6 +25,8 @@ pub trait WeightInfo {
 	fn provider_get_registration_vault_data() -> Weight;
 	fn provider_get_committed_securitization() -> Weight;
 	fn provider_get_committed_argonots() -> Weight;
+	fn provider_encumber_argonots() -> Weight;
+	fn provider_release_encumbered_argonots() -> Weight;
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
 }
@@ -117,6 +119,14 @@ where
 		Base::provider_get_committed_argonots()
 	}
 
+	fn provider_encumber_argonots() -> Weight {
+		Base::provider_encumber_argonots()
+	}
+
+	fn provider_release_encumbered_argonots() -> Weight {
+		Base::provider_release_encumbered_argonots()
+	}
+
 	fn provider_burn_encumbered_argonots() -> Weight {
 		Base::provider_burn_encumbered_argonots()
 	}
@@ -139,6 +149,14 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 	fn get_committed_argonots() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_committed_argonots()
+	}
+
+	fn encumber_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_encumber_argonots()
+	}
+
+	fn release_encumbered_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_release_encumbered_argonots()
 	}
 
 	fn burn_encumbered_argonots() -> Weight {
@@ -198,6 +216,14 @@ impl WeightInfo for () {
 	}
 
 	fn provider_get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_encumber_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_release_encumbered_argonots() -> Weight {
 		Weight::zero()
 	}
 

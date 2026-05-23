@@ -3395,9 +3395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				220u8, 198u8, 251u8, 19u8, 113u8, 158u8, 111u8, 241u8, 120u8, 241u8, 175u8, 12u8,
-				25u8, 141u8, 168u8, 152u8, 232u8, 112u8, 27u8, 93u8, 253u8, 33u8, 211u8, 176u8,
-				176u8, 49u8, 24u8, 110u8, 83u8, 225u8, 126u8, 11u8,
+				199u8, 143u8, 148u8, 17u8, 29u8, 88u8, 0u8, 217u8, 130u8, 172u8, 81u8, 2u8, 248u8,
+				230u8, 192u8, 139u8, 172u8, 70u8, 51u8, 160u8, 16u8, 137u8, 15u8, 11u8, 221u8,
+				40u8, 103u8, 212u8, 79u8, 43u8, 32u8, 183u8,
 			]
 	}
 	pub mod system {
@@ -10342,6 +10342,10 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
+				pub mod revenue_per_frame_by_vault_count {
+					use super::runtime_types;
+					pub type RevenuePerFrameByVaultCount = ::core::primitive::u32;
+				}
 				pub mod recent_capacity_drops_by_vault {
 					use super::runtime_types;
 					pub type RecentCapacityDropsByVault =
@@ -10903,6 +10907,27 @@ pub mod api {
 							218u8, 76u8, 104u8, 3u8, 160u8, 121u8, 96u8, 61u8, 159u8, 114u8, 15u8,
 							64u8, 117u8, 224u8, 220u8, 144u8, 174u8, 10u8, 34u8, 8u8, 144u8, 81u8,
 							222u8, 79u8, 242u8, 249u8, 64u8, 36u8, 64u8, 30u8, 195u8, 45u8,
+						],
+					)
+				}
+				pub fn revenue_per_frame_by_vault_count(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::revenue_per_frame_by_vault_count::RevenuePerFrameByVaultCount,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"RevenuePerFrameByVaultCount",
+						(),
+						[
+							175u8, 44u8, 140u8, 125u8, 74u8, 219u8, 122u8, 96u8, 217u8, 239u8,
+							212u8, 184u8, 88u8, 222u8, 31u8, 226u8, 255u8, 155u8, 43u8, 83u8,
+							211u8, 170u8, 66u8, 92u8, 53u8, 37u8, 128u8, 190u8, 81u8, 213u8, 39u8,
+							156u8,
 						],
 					)
 				}
