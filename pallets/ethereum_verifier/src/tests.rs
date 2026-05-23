@@ -141,6 +141,7 @@ fn retained_anchor_verification_payload() -> (
 	let anchor_block_hash = H256::repeat_byte(9);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 100,
+		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: H256::repeat_byte(8),
 		receipts_root: inbound_fixture.event.proof.execution_proof.execution_header.receipts_root(),
@@ -1074,6 +1075,7 @@ fn verify_message_accepts_multiple_receipts_from_one_combined_proof() {
 	let node_paths = sorted_nodes.iter().map(|(path, _)| *path).collect::<Vec<_>>();
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 200,
+		timestamp_millis: 0,
 		block_hash: H256::repeat_byte(0x44),
 		parent_hash: H256::repeat_byte(0x33),
 		receipts_root,
@@ -1819,6 +1821,7 @@ fn verify_execution_block_proof_accepts_header_chain_to_anchor() {
 	let anchor_block_hash = H256::repeat_byte(9);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 101,
+		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: target_block_hash,
 		receipts_root: H256::repeat_byte(8),
@@ -1849,6 +1852,7 @@ fn verify_execution_block_proof_accepts_multi_hop_header_chain_to_anchor() {
 	let anchor_block_hash = H256::repeat_byte(0x53);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 102,
+		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: intermediate_block_hash,
 		receipts_root: H256::repeat_byte(0x54),
@@ -1970,6 +1974,7 @@ fn verify_receipt_logs_accepts_shared_header_chain_suffixes_for_multiple_blocks(
 	let anchor_block_hash = H256::repeat_byte(0x62);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 12,
+		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: newer_block_hash,
 		receipts_root: H256::repeat_byte(0x63),
@@ -2021,6 +2026,7 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 	let anchor_block_hash = H256::repeat_byte(9);
 	let anchor = ExecutionHeaderAnchor {
 		block_number: 101,
+		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: H256::repeat_byte(2),
 		receipts_root: H256::repeat_byte(8),

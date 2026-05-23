@@ -9,7 +9,7 @@ use argon_bitcoin::{
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
-	MiningFrameProvider, TickProvider, VotingSchedule,
+	CollectBlockerProvider, MiningFrameProvider, TickProvider, VotingSchedule,
 };
 use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;
@@ -84,6 +84,7 @@ parameter_types! {
 
 	pub static LastBitcoinHeightChange: (BitcoinHeight, BitcoinHeight) = (10, 11);
 	pub static IsSlotBiddingStarted: bool = false;
+	pub const TicksPerFrame: Tick = 10;
 
 	pub const BidPoolAccountId: u64 = 10000;
 	pub const TreasuryReservesAccountId: u64 = 10001;
@@ -103,6 +104,7 @@ parameter_types! {
 	pub const CapacityDropAttemptUnit: Balance = 100;
 
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
+	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
 
 }
 pub struct StaticMiningFrameProvider;
@@ -123,8 +125,13 @@ impl MiningFrameProvider for StaticMiningFrameProvider {
 	fn is_seat_bidding_started() -> bool {
 		IsSlotBiddingStarted::get()
 	}
-	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
-		todo!()
+	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
+		let current_frame = CurrentFrameId::get();
+		let frame_offset = frame_id.checked_sub(current_frame)?;
+		let starting_tick = NextSlot::get()
+			.saturating_sub(TicksPerFrame::get())
+			.saturating_add(frame_offset.saturating_mul(TicksPerFrame::get()));
+		Some((starting_tick, starting_tick.saturating_add(TicksPerFrame::get())))
 	}
 }
 
@@ -152,9 +159,19 @@ impl TickProvider<Block> for StaticTickProvider {
 	}
 }
 
+pub struct MockCollectBlockerProvider;
+impl CollectBlockerProvider<u64> for MockCollectBlockerProvider {
+	type Weights = ();
+
+	fn has_overdue_collect_blocker(account_id: &u64) -> bool {
+		OverdueCollectBlockers::get().contains(account_id)
+	}
+}
+
 impl pallet_vaults::Config for Test {
 	type WeightInfo = ();
 	type Currency = Balances;
+	type OwnershipCurrency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxPendingTermModificationsPerTick = ConstU32<100>;
@@ -162,6 +179,8 @@ impl pallet_vaults::Config for Test {
 	type MiningFrameProvider = StaticMiningFrameProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
+	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
+	type TicksPerFrame = TicksPerFrame;
 	type TickProvider = StaticTickProvider;
 	type MaxVaults = ConstU32<100>;
 	type MaxPendingCosignsPerVault = ConstU32<100>;
@@ -172,6 +191,7 @@ impl pallet_vaults::Config for Test {
 	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
 	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = ();
+	type CollectBlockerProvider = MockCollectBlockerProvider;
 }
 
 impl pallet_treasury::Config for Test {
@@ -283,6 +303,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPriceInUsd::get()
 	}
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		ArgonPriceInUsd::get()
+	}
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonTargetPriceInUsd::get()
 	}
@@ -339,5 +362,6 @@ impl pallet_bitcoin_locks::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
+	OverdueCollectBlockers::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|_t| {})
 }

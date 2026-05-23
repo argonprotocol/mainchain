@@ -1,5 +1,5 @@
 use argon_primitives::{
-	providers::{TickProvider, TickProviderWeightInfo},
+	providers::{CollectBlockerProvider, TickProvider, TickProviderWeightInfo},
 	vault::BitcoinVaultProviderWeightInfo,
 };
 use core::marker::PhantomData;
@@ -14,6 +14,7 @@ pub trait WeightInfo {
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_bitcoin_lock_delegate() -> Weight;
 	fn set_name() -> Weight;
+	fn set_committed_argonots() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -22,21 +23,33 @@ pub trait WeightInfo {
 	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
+	fn provider_get_committed_securitization() -> Weight;
+	fn provider_get_committed_argonots() -> Weight;
+	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
 	<T as frame_system::Config>::Block,
 >>::Weights;
+type CollectBlockerProviderWeights<T> =
+	<<T as crate::Config>::CollectBlockerProvider as CollectBlockerProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
 
-pub struct WithProviderWeights<T, Base, TickProviderWeight = TickProviderWeights<T>>(
-	PhantomData<(T, Base, TickProviderWeight)>,
-);
-impl<T, Base, TickProviderWeight> WeightInfo for WithProviderWeights<T, Base, TickProviderWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	TickProviderWeight = TickProviderWeights<T>,
+	CollectBlockerWeight = CollectBlockerProviderWeights<T>,
+>(PhantomData<(T, Base, TickProviderWeight, CollectBlockerWeight)>);
+impl<T, Base, TickProviderWeight, CollectBlockerWeight> WeightInfo
+	for WithProviderWeights<T, Base, TickProviderWeight, CollectBlockerWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
+	CollectBlockerWeight: argon_primitives::CollectBlockerProviderWeightInfo,
 {
 	fn create() -> Weight {
 		Base::create().saturating_add(TickProviderWeight::current_tick())
@@ -66,6 +79,10 @@ where
 		Base::set_name().saturating_add(TickProviderWeight::current_tick())
 	}
 
+	fn set_committed_argonots() -> Weight {
+		Base::set_committed_argonots()
+	}
+
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -81,7 +98,7 @@ where
 	}
 
 	fn collect() -> Weight {
-		Base::collect()
+		Base::collect().saturating_add(CollectBlockerWeight::has_overdue_collect_blocker())
 	}
 
 	fn on_frame_start(vault_count: u32) -> Weight {
@@ -90,6 +107,18 @@ where
 
 	fn provider_get_registration_vault_data() -> Weight {
 		Base::provider_get_registration_vault_data()
+	}
+
+	fn provider_get_committed_securitization() -> Weight {
+		Base::provider_get_committed_securitization()
+	}
+
+	fn provider_get_committed_argonots() -> Weight {
+		Base::provider_get_committed_argonots()
+	}
+
+	fn provider_burn_encumbered_argonots() -> Weight {
+		Base::provider_burn_encumbered_argonots()
 	}
 
 	fn provider_account_became_operational() -> Weight {
@@ -102,6 +131,18 @@ pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn get_registration_vault_data() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_registration_vault_data()
+	}
+
+	fn get_committed_securitization() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_committed_securitization()
+	}
+
+	fn get_committed_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_committed_argonots()
+	}
+
+	fn burn_encumbered_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_burn_encumbered_argonots()
 	}
 
 	fn account_became_operational() -> Weight {
@@ -132,6 +173,9 @@ impl WeightInfo for () {
 	fn set_name() -> Weight {
 		Weight::zero()
 	}
+	fn set_committed_argonots() -> Weight {
+		Weight::zero()
+	}
 	fn on_initialize_with_vault_releases(
 		_height_range: u32,
 		_bitcoin_release_vault_count: u32,
@@ -146,6 +190,18 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_get_registration_vault_data() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_get_committed_securitization() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_burn_encumbered_argonots() -> Weight {
 		Weight::zero()
 	}
 

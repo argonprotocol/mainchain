@@ -761,6 +761,7 @@ fn decode_benchmark_state<State: Decode + Default>(encoded: Vec<u8>) -> State {
 pub struct BenchmarkPriceProviderState {
 	pub btc_price_in_usd: Option<FixedU128>,
 	pub argon_price_in_usd: Option<FixedU128>,
+	pub argonot_price_in_usd: Option<FixedU128>,
 	pub argon_target_price_in_usd: Option<FixedU128>,
 	pub circulation: u128,
 }
@@ -770,6 +771,7 @@ impl Default for BenchmarkPriceProviderState {
 		Self {
 			btc_price_in_usd: Some(FixedU128::from_rational(62_000_00u128, 100u128)),
 			argon_price_in_usd: Some(FixedU128::one()),
+			argonot_price_in_usd: Some(FixedU128::one()),
 			argon_target_price_in_usd: Some(FixedU128::one()),
 			circulation: 1_000,
 		}
@@ -800,6 +802,10 @@ where
 
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		benchmark_price_provider_state().argon_price_in_usd
+	}
+
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		benchmark_price_provider_state().argonot_price_in_usd
 	}
 
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
@@ -1114,6 +1120,47 @@ where
 					securitization: vault.securitization,
 				})
 			})
+	}
+
+	fn get_committed_securitization(
+		account_id: &Self::AccountId,
+		_min_frames_remaining: FrameId,
+	) -> Option<Self::Balance> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.iter()
+			.find_map(|(_, vault)| {
+				(vault.operator_account_id == *account_id).then_some(
+					vault
+						.get_activated_securitization()
+						.saturating_add(vault.get_relock_capacity()),
+				)
+			})
+	}
+
+	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+		Self::get_vault_id(account_id).map(|_| Default::default())
+	}
+
+	fn encumber_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
+	fn release_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
+	fn burn_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
 	}
 
 	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {

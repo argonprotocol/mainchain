@@ -20,11 +20,26 @@ use crate::{
 
 pub trait BitcoinVaultProviderWeightInfo {
 	fn get_registration_vault_data() -> Weight;
+	fn get_committed_securitization() -> Weight;
+	fn get_committed_argonots() -> Weight;
+	fn burn_encumbered_argonots() -> Weight;
 	fn account_became_operational() -> Weight;
 }
 
 impl BitcoinVaultProviderWeightInfo for () {
 	fn get_registration_vault_data() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_committed_securitization() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn burn_encumbered_argonots() -> Weight {
 		Weight::zero()
 	}
 
@@ -55,6 +70,31 @@ pub struct VaultTreasuryFrameEarnings<Balance, AccountId> {
 	pub earnings_for_vault: Balance,
 	/// Contributed capital by the vault
 	pub capital_contributed_by_vault: Balance,
+}
+
+#[derive(
+	Clone,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Debug,
+	TypeInfo,
+	MaxEncodedLen,
+	Default,
+)]
+pub struct VaultArgonotCommitment<Balance>
+where
+	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
+{
+	/// Total committed argonots, denominated in micronots.
+	#[codec(compact)]
+	pub committed_micronots: Balance,
+
+	/// Amount of argonots held for cross-chain transfer collateral, denominated in micronots.
+	#[codec(compact)]
+	pub encumbered_micronots: Balance,
 }
 
 pub trait TreasuryVaultProvider {
@@ -139,6 +179,23 @@ pub trait BitcoinVaultProvider {
 	fn get_registration_vault_data(
 		account_id: &Self::AccountId,
 	) -> Option<RegistrationVaultData<Self::Balance>>;
+	fn get_committed_securitization(
+		account_id: &Self::AccountId,
+		min_frames_remaining: FrameId,
+	) -> Option<Self::Balance>;
+	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance>;
+	fn encumber_argonots(
+		account_id: &Self::AccountId,
+		amount: Self::Balance,
+	) -> Result<(), VaultError>;
+	fn release_encumbered_argonots(
+		account_id: &Self::AccountId,
+		amount: Self::Balance,
+	) -> Result<(), VaultError>;
+	fn burn_encumbered_argonots(
+		account_id: &Self::AccountId,
+		amount: Self::Balance,
+	) -> Result<(), VaultError>;
 	fn account_became_operational(_vault_operator_account: &Self::AccountId) {}
 
 	/// Get the securitization ratio offered by this vault
@@ -267,6 +324,8 @@ pub enum VaultError {
 	InternalError,
 	/// This vault is not yet active
 	VaultNotYetActive,
+	/// Committed Argonots cannot be reduced below the backing already encumbered elsewhere.
+	CommittedArgonotsBelowEncumberedBacking,
 }
 
 #[derive(
@@ -598,6 +657,16 @@ impl<
 	/// The amount of securitization that can be re-locked (with expiration extended out)
 	pub fn get_relock_capacity(&self) -> Balance {
 		self.securitization_release_schedule.values().copied().sum()
+	}
+
+	/// The amount of release-scheduled securitization that remains committed after a given
+	/// bitcoin block height horizon.
+	pub fn get_relock_capacity_after(&self, min_release_height: BitcoinHeight) -> Balance {
+		self.securitization_release_schedule
+			.iter()
+			.filter(|(height, _)| **height > min_release_height)
+			.map(|(_, amount)| *amount)
+			.sum()
 	}
 
 	pub fn available_for_lock(&self) -> Balance {

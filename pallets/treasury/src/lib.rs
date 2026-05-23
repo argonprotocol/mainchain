@@ -207,6 +207,16 @@ pub mod pallet {
 	pub type BondLotIdsByAccount<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, BondLotId, (), OptionQuery>;
 
+	/// Exact treasury bond backing reserved for crosschain minting authorities by account.
+	///
+	/// This is an exact microgon claim, not a mirror of the account's active whole-bond lots.
+	/// Bond lots stay coarse because participation only moves in whole bonds, while encumbrance can
+	/// remain fractional after a burn. The key invariant is that the non-releasing held balance
+	/// always covers this amount.
+	#[pallet::storage]
+	pub type EncumberedBondMicrogonsByAccount<T: Config> =
+		StorageMap<_, Twox64Concat, T::AccountId, T::Balance, ValueQuery>;
+
 	/// Bond lots to release at the given frame.
 	#[pallet::storage]
 	pub type PendingBondReleasesByFrame<T: Config> = StorageMap<
@@ -297,6 +307,13 @@ pub mod pallet {
 			account_id: T::AccountId,
 			bonds: Bonds,
 		},
+		/// Encumbered treasury backing was burned and any no-longer-needed fractional hold was
+		/// returned.
+		EncumberedBondMicrogonsBurned {
+			account_id: T::AccountId,
+			burned_amount: T::Balance,
+			released_amount: T::Balance,
+		},
 	}
 
 	#[pallet::error]
@@ -321,6 +338,9 @@ pub mod pallet {
 		BondLotAlreadyReleasing,
 		/// The vault doesn't have enough bitcoin security to support this bond purchase
 		BondPurchaseAboveSecurity,
+		/// Liquidating this bond lot would take the account below its crosschain-encumbered
+		/// treasury backing.
+		ActiveBondAmountBelowEncumberedBacking,
 	}
 
 	#[pallet::call]
@@ -427,6 +447,12 @@ pub mod pallet {
 			let bond_lot = BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
 			ensure!(bond_lot.owner == who, Error::<T>::NotBondLotOwner);
 			ensure!(bond_lot.release_reason.is_none(), Error::<T>::BondLotAlreadyReleasing);
+			let remaining_non_releasing_hold = Self::non_releasing_held_bond_amount(&who)?
+				.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
+			ensure!(
+				remaining_non_releasing_hold >= Self::encumbered_bond_microgons(&who),
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
 
 			Self::remove_bond_lot_from_vault(bond_lot.vault_id, bond_lot_id);
 			let release_frame_id =
@@ -838,6 +864,46 @@ pub mod pallet {
 			Ok((!total.is_zero()).then_some(total))
 		}
 
+		fn active_non_releasing_account_bond_amount(
+			account_id: &T::AccountId,
+		) -> Result<Option<T::Balance>, Error<T>> {
+			let mut total = T::Balance::zero();
+			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
+				let bond_lot =
+					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+				if bond_lot.release_reason.is_some() {
+					continue;
+				}
+
+				total.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
+			}
+
+			Ok((!total.is_zero()).then_some(total))
+		}
+
+		fn non_releasing_held_bond_amount(
+			account_id: &T::AccountId,
+		) -> Result<T::Balance, Error<T>> {
+			let mut held_balance =
+				T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id);
+
+			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
+				let bond_lot =
+					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+				if bond_lot.release_reason.is_none() {
+					continue;
+				}
+
+				held_balance = held_balance.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
+			}
+
+			Ok(held_balance)
+		}
+
+		pub(crate) fn encumbered_bond_microgons(account_id: &T::AccountId) -> T::Balance {
+			EncumberedBondMicrogonsByAccount::<T>::get(account_id)
+		}
+
 		fn remove_bond_lot_from_vault(vault_id: VaultId, bond_lot_id: BondLotId) {
 			BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_summaries| {
 				let Some(summaries) = maybe_summaries.as_mut() else {
@@ -933,6 +999,7 @@ pub mod pallet {
 
 	impl<T: Config> TreasuryPoolProvider<T::AccountId> for Pallet<T> {
 		type Weights = ProviderWeightAdapter<T>;
+		type Balance = T::Balance;
 
 		fn has_bond_participation(vault_id: VaultId, account_id: &T::AccountId) -> bool {
 			BondLotsByVault::<T>::get(vault_id).into_iter().any(|summary| {
@@ -942,6 +1009,164 @@ pub mod pallet {
 					})
 					.unwrap_or(false)
 			})
+		}
+
+		fn encumber_bond_microgons(
+			account_id: &T::AccountId,
+			microgon_amount: Self::Balance,
+		) -> DispatchResult {
+			if microgon_amount.is_zero() {
+				return Ok(());
+			}
+
+			let next_encumbered = Self::encumbered_bond_microgons(account_id)
+				.checked_add(&microgon_amount)
+				.ok_or(Error::<T>::InternalError)?;
+			ensure!(
+				Self::non_releasing_held_bond_amount(account_id)? >= next_encumbered,
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+
+			EncumberedBondMicrogonsByAccount::<T>::mutate(account_id, |encumbered| {
+				encumbered.saturating_accrue(microgon_amount);
+			});
+			Ok(())
+		}
+
+		fn release_encumbered_bond_microgons(
+			account_id: &T::AccountId,
+			microgon_amount: Self::Balance,
+		) -> DispatchResult {
+			if microgon_amount.is_zero() {
+				return Ok(());
+			}
+
+			let current_encumbered = Self::encumbered_bond_microgons(account_id);
+			ensure!(
+				current_encumbered >= microgon_amount,
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+			let remaining_encumbered = current_encumbered.saturating_sub(microgon_amount);
+			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, remaining_encumbered);
+			let current_active =
+				Self::active_non_releasing_account_bond_amount(account_id)?.unwrap_or_default();
+			let current_hold = Self::non_releasing_held_bond_amount(account_id)?;
+			let required_hold = current_active.max(remaining_encumbered);
+			let released_amount = current_hold.saturating_sub(required_hold);
+			if !released_amount.is_zero() {
+				Self::release_hold(account_id, released_amount)?;
+			}
+			Ok(())
+		}
+
+		fn burn_encumbered_bond_microgons(
+			account_id: &T::AccountId,
+			microgon_amount: Self::Balance,
+		) -> DispatchResult {
+			if microgon_amount.is_zero() {
+				return Ok(());
+			}
+
+			ensure!(
+				Self::encumbered_bond_microgons(account_id) >= microgon_amount,
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+			let encumbered_after_burn =
+				Self::encumbered_bond_microgons(account_id).saturating_sub(microgon_amount);
+			T::Currency::burn_held(
+				&HoldReason::ContributedToTreasury.into(),
+				account_id,
+				microgon_amount,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| Error::<T>::InternalError)?;
+			if T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id)
+				.is_zero()
+			{
+				let _ = frame_system::Pallet::<T>::dec_providers(account_id);
+			}
+			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, encumbered_after_burn);
+
+			let held_microgons_after_burn = Self::non_releasing_held_bond_amount(account_id)?;
+			ensure!(held_microgons_after_burn >= encumbered_after_burn, Error::<T>::InternalError,);
+
+			let active_bonds_before_trim = Self::balance_to_bonds(
+				Self::active_non_releasing_account_bond_amount(account_id)?.unwrap_or_default(),
+			);
+			let target_active_bonds = Self::balance_to_bonds(held_microgons_after_burn);
+			let mut remaining_bonds_to_trim =
+				active_bonds_before_trim.saturating_sub(target_active_bonds);
+
+			if remaining_bonds_to_trim != 0 {
+				let mut bond_lot_ids = BondLotIdsByAccount::<T>::iter_prefix(account_id)
+					.map(|(bond_lot_id, ())| bond_lot_id)
+					.collect::<Vec<_>>();
+				bond_lot_ids.sort_unstable_by(|left, right| right.cmp(left));
+
+				for bond_lot_id in bond_lot_ids {
+					if remaining_bonds_to_trim == 0 {
+						break;
+					}
+
+					let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else {
+						continue;
+					};
+					if bond_lot.release_reason.is_some() || bond_lot.bonds == 0 {
+						continue;
+					}
+
+					let removed_bonds = bond_lot.bonds.min(remaining_bonds_to_trim);
+					let remaining_bonds = bond_lot.bonds.saturating_sub(removed_bonds);
+					remaining_bonds_to_trim = remaining_bonds_to_trim.saturating_sub(removed_bonds);
+
+					if remaining_bonds == 0 {
+						BondLotById::<T>::remove(bond_lot_id);
+						BondLotIdsByAccount::<T>::remove(account_id, bond_lot_id);
+						Self::remove_bond_lot_from_vault(bond_lot.vault_id, bond_lot_id);
+					} else {
+						BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
+							let Some(bond_lot) = maybe_bond_lot.as_mut() else {
+								return;
+							};
+							bond_lot.bonds = remaining_bonds;
+						});
+						BondLotsByVault::<T>::mutate_exists(bond_lot.vault_id, |maybe_summaries| {
+							let Some(summaries) = maybe_summaries.as_mut() else {
+								return;
+							};
+
+							if let Some(summary) = summaries
+								.iter_mut()
+								.find(|summary| summary.bond_lot_id == bond_lot_id)
+							{
+								summary.bonds = remaining_bonds;
+								summaries.sort_by(|left, right| {
+									right
+										.bonds
+										.cmp(&left.bonds)
+										.then_with(|| left.bond_lot_id.cmp(&right.bond_lot_id))
+								});
+							}
+						});
+					}
+				}
+			}
+
+			ensure!(remaining_bonds_to_trim == 0, Error::<T>::InternalError);
+
+			let target_active_hold = Self::bonds_to_balance(target_active_bonds);
+			let required_hold = target_active_hold.max(encumbered_after_burn);
+			let released_amount = held_microgons_after_burn.saturating_sub(required_hold);
+			if !released_amount.is_zero() {
+				Self::release_hold(account_id, released_amount)?;
+			}
+			Self::deposit_event(Event::<T>::EncumberedBondMicrogonsBurned {
+				account_id: account_id.clone(),
+				burned_amount: microgon_amount,
+				released_amount,
+			});
+			Ok(())
 		}
 	}
 

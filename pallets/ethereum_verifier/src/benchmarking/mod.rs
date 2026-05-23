@@ -272,6 +272,7 @@ fn build_gateway_proof_batch(
 
 	let argon_finalized_execution_header = ExecutionHeaderAnchor {
 		block_number: 100u64.saturating_add(u64::from(proof_blocks)),
+		timestamp_millis: 0,
 		block_hash: H256::repeat_byte(0x80),
 		parent_hash: last_block_hash,
 		receipts_root: H256::repeat_byte(0x81),

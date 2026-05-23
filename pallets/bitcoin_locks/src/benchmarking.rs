@@ -546,6 +546,7 @@ fn seed_price_state(btc_usd_price: u128, argon_usd_price: u128, argon_target_pri
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
 		btc_price_in_usd: Some(FixedU128::saturating_from_integer(btc_usd_price)),
 		argon_price_in_usd: Some(FixedU128::saturating_from_integer(argon_usd_price)),
+		argonot_price_in_usd: Some(FixedU128::saturating_from_integer(argon_usd_price)),
 		argon_target_price_in_usd: Some(FixedU128::saturating_from_integer(argon_target_price)),
 		circulation: 1_000_000,
 	});

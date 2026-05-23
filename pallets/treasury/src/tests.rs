@@ -7,11 +7,11 @@ use crate::{
 	mock::{
 		insert_vault, new_test_ext, set_argons, take_treasury_pool_participated, Balances,
 		BidPoolAccountId, CurrentFrameId, ExistentialDeposit, LastVaultProfits,
-		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeHoldReason,
-		RuntimeOrigin, Test, TestVault, Treasury, TreasuryExitDelayFrames,
-		TreasuryReservesAccountId,
+		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, RuntimeEvent,
+		RuntimeHoldReason, RuntimeOrigin, System, Test, TestVault, Treasury,
+		TreasuryExitDelayFrames, TreasuryReservesAccountId,
 	},
-	pallet::{BondLotAllocation, FrameVaultCapital, VaultCapital},
+	pallet::{BondLotAllocation, Error, FrameVaultCapital, VaultCapital},
 };
 use argon_primitives::{OperationalRewardsPayer, TreasuryPoolProvider, MICROGONS_PER_ARGON};
 use frame_support::{
@@ -101,6 +101,42 @@ fn liquidate_bond_lot_removes_it_from_future_frames_and_releases_on_maturity() {
 				&2
 			),
 			0,
+		);
+	});
+}
+
+#[test]
+fn liquidate_bond_lot_rejects_when_it_would_drop_below_encumbered_backing() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 10,
+				securitized_satoshis: (100 * MICROGONS_PER_ARGON) as u64,
+				sharing_percent: Permill::from_percent(20),
+				is_closed: false,
+			},
+		);
+		set_argons(2, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(2), 1, 3));
+		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(2), 1, 2));
+		let bond_lot_ids = account_bond_lot_ids(2);
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::encumber_bond_microgons(
+			&2,
+			4 * MICROGONS_PER_ARGON,
+		));
+
+		assert_err!(
+			Treasury::liquidate_bond_lot(RuntimeOrigin::signed(2), bond_lot_ids[0]),
+			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
+		);
+		assert_eq!(BondLotsByVault::<Test>::get(1).len(), 2);
+		assert_eq!(
+			BondLotById::<Test>::get(bond_lot_ids[0]).expect("bond lot").release_reason,
+			None,
 		);
 	});
 }
@@ -305,6 +341,50 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 }
 
 #[test]
+fn locked_frame_skips_lot_after_it_is_fully_burned() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 10,
+				securitized_satoshis: (10 * MICROGONS_PER_ARGON) as u64,
+				sharing_percent: Permill::from_percent(20),
+				is_closed: false,
+			},
+		);
+
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(2), 1, 4));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		let balance_before = Balances::balance(&2);
+
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::encumber_bond_microgons(
+			&2,
+			4 * MICROGONS_PER_ARGON,
+		));
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::burn_encumbered_bond_microgons(
+			&2,
+			4 * MICROGONS_PER_ARGON,
+		));
+		assert!(BondLotsByVault::<Test>::get(1).is_empty());
+		assert!(account_bond_lot_ids(2).is_empty());
+		assert_eq!(Treasury::encumbered_bond_microgons(&2), 0);
+		assert!(BondLotById::<Test>::get(bond_lot_id).is_none());
+
+		let bid_pool_account = BidPoolAccountId::get();
+		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
+
+		Treasury::distribute_bid_pool(1);
+
+		assert_eq!(Balances::balance(&2), balance_before);
+	});
+}
+
+#[test]
 fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 	new_test_ext().execute_with(|| {
 		ExistentialDeposit::set(10);
@@ -456,6 +536,118 @@ fn claim_operational_reward_fails_when_insufficient() {
 			TokenError::FundsUnavailable
 		);
 		assert_eq!(Balances::balance(&42), 0);
+	});
+}
+
+#[test]
+fn burn_encumbered_bond_microgons_releases_fractional_slack_when_whole_bonds_still_cover_backing() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 10,
+				securitized_satoshis: (100 * MICROGONS_PER_ARGON) as u64,
+				sharing_percent: Permill::from_percent(20),
+				is_closed: false,
+			},
+		);
+		set_argons(2, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(2), 1, 10));
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::encumber_bond_microgons(
+			&2,
+			5 * MICROGONS_PER_ARGON,
+		));
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::burn_encumbered_bond_microgons(
+			&2,
+			(3 * MICROGONS_PER_ARGON) / 2,
+		));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("bond lot");
+		assert_eq!(bond_lot.bonds, 8);
+		assert_eq!(
+			Balances::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&2,
+			),
+			8 * MICROGONS_PER_ARGON,
+		);
+		assert_eq!(Treasury::encumbered_bond_microgons(&2), (7 * MICROGONS_PER_ARGON) / 2,);
+		assert!(System::events().iter().any(|record| match &record.event {
+			RuntimeEvent::Treasury(crate::Event::EncumberedBondMicrogonsBurned {
+				account_id,
+				burned_amount: amount,
+				released_amount,
+			}) => {
+				*account_id == 2 &&
+					*amount == (3 * MICROGONS_PER_ARGON) / 2 &&
+					*released_amount == MICROGONS_PER_ARGON / 2
+			},
+			_ => false,
+		}));
+	});
+}
+
+#[test]
+fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_released() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			TestVault {
+				account_id: 10,
+				securitized_satoshis: (100 * MICROGONS_PER_ARGON) as u64,
+				sharing_percent: Permill::from_percent(20),
+				is_closed: false,
+			},
+		);
+		set_argons(2, 10 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(RuntimeOrigin::signed(2), 1, 5));
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::encumber_bond_microgons(
+			&2,
+			5 * MICROGONS_PER_ARGON,
+		));
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::burn_encumbered_bond_microgons(
+			&2,
+			(9 * MICROGONS_PER_ARGON) / 2,
+		));
+
+		assert!(BondLotsByVault::<Test>::get(1).is_empty());
+		assert!(account_bond_lot_ids(2).is_empty());
+		assert_eq!(
+			Balances::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&2,
+			),
+			MICROGONS_PER_ARGON / 2,
+		);
+		assert_eq!(Treasury::encumbered_bond_microgons(&2), MICROGONS_PER_ARGON / 2);
+
+		assert_err!(
+			<Treasury as TreasuryPoolProvider<u64>>::release_encumbered_bond_microgons(
+				&2,
+				(MICROGONS_PER_ARGON / 2) + 1,
+			),
+			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
+		);
+		assert_ok!(<Treasury as TreasuryPoolProvider<u64>>::release_encumbered_bond_microgons(
+			&2,
+			MICROGONS_PER_ARGON / 2,
+		));
+		assert_eq!(
+			Balances::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&2,
+			),
+			0,
+		);
+		assert_eq!(Treasury::encumbered_bond_microgons(&2), 0);
 	});
 }
 

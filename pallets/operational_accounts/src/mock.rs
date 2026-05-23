@@ -7,7 +7,7 @@ use argon_primitives::{
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-use argon_primitives::{AccountId, VaultId};
+use argon_primitives::{vault::VaultError, AccountId, VaultId};
 use sp_runtime::FixedU128;
 
 pub type TestAccountId = AccountId;
@@ -93,6 +93,38 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		account_id: &Self::AccountId,
 	) -> Option<RegistrationVaultData<Self::Balance>> {
 		RegistrationVaultDataByAccount::get().get(account_id).cloned()
+	}
+
+	fn get_committed_securitization(
+		account_id: &Self::AccountId,
+		_min_frames_remaining: FrameId,
+	) -> Option<Self::Balance> {
+		Self::get_registration_vault_data(account_id).map(|entry| entry.activated_securitization)
+	}
+
+	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+		Self::get_vault_id(account_id).map(|_| Default::default())
+	}
+
+	fn encumber_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
+	}
+
+	fn release_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
+	}
+
+	fn burn_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
 	}
 
 	fn account_became_operational(vault_operator_account: &TestAccountId) {
@@ -230,11 +262,33 @@ impl MiningSlotProvider<TestAccountId> for MockMiningSlotProvider {
 pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
+	type Balance = Balance;
 
 	fn has_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		TreasuryPoolParticipantsByVaultId::get()
 			.get(&vault_id)
 			.is_some_and(|accounts| accounts.contains(account_id))
+	}
+
+	fn encumber_bond_microgons(
+		_account_id: &TestAccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn release_encumbered_bond_microgons(
+		_account_id: &TestAccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_encumbered_bond_microgons(
+		_account_id: &TestAccountId,
+		_microgon_amount: Self::Balance,
+	) -> sp_runtime::DispatchResult {
+		Ok(())
 	}
 }
 

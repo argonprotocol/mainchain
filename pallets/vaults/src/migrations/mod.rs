@@ -1,4 +1,4 @@
-use crate::{Config, VaultsById};
+use crate::{Config, RevenuePerFrameByVault, RevenuePerFrameByVaultCount, VaultsById};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, Satoshis},
 	tick::Tick,
@@ -63,11 +63,16 @@ where
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
 		use codec::Encode;
-		Ok((VaultsById::<T>::iter().count() as u64).encode())
+		Ok((
+			VaultsById::<T>::iter().count() as u64,
+			RevenuePerFrameByVault::<T>::iter_keys().count() as u64,
+		)
+			.encode())
 	}
 
 	fn on_runtime_upgrade() -> Weight {
 		let mut translated = 0u64;
+		let revenue_vaults = RevenuePerFrameByVault::<T>::iter_keys().count() as u64;
 
 		VaultsById::<T>::translate::<VaultV13<T::AccountId, T::Balance>, _>(|_, vault| {
 			translated = translated.saturating_add(1);
@@ -91,8 +96,10 @@ where
 				operational_minimum_release_tick: None,
 			})
 		});
+		RevenuePerFrameByVaultCount::<T>::put(revenue_vaults.min(u32::MAX as u64) as u32);
 
-		T::DbWeight::get().reads_writes(translated, translated)
+		T::DbWeight::get()
+			.reads_writes(translated.saturating_add(revenue_vaults), translated.saturating_add(1))
 	}
 
 	#[cfg(feature = "try-runtime")]
@@ -100,8 +107,10 @@ where
 		use codec::Decode;
 		use frame_support::ensure;
 
-		let expected = u64::decode(&mut &state[..])
-			.map_err(|_| sp_runtime::TryRuntimeError::Other("failed to decode vault count"))?;
+		let (expected_vaults, expected_revenue_vaults) = <(u64, u64)>::decode(&mut &state[..])
+			.map_err(|_| {
+				sp_runtime::TryRuntimeError::Other("failed to decode vault migration state")
+			})?;
 		let mut migrated = 0u64;
 		for (_, vault) in VaultsById::<T>::iter() {
 			ensure!(
@@ -119,7 +128,16 @@ where
 			);
 			migrated = migrated.saturating_add(1);
 		}
-		ensure!(expected == migrated, "vault count mismatch after migration");
+		ensure!(expected_vaults == migrated, "vault count mismatch after migration");
+		let revenue_vaults = RevenuePerFrameByVault::<T>::iter_keys().count() as u64;
+		ensure!(
+			expected_revenue_vaults == revenue_vaults,
+			"revenue-per-frame key count mismatch after migration"
+		);
+		ensure!(
+			RevenuePerFrameByVaultCount::<T>::get() == revenue_vaults.min(u32::MAX as u64) as u32,
+			"revenue-per-frame count storage mismatch after migration"
+		);
 		Ok(())
 	}
 }

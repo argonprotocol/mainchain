@@ -1168,9 +1168,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							248u8, 40u8, 193u8, 86u8, 132u8, 75u8, 2u8, 37u8, 132u8, 143u8, 156u8,
-							141u8, 96u8, 99u8, 254u8, 194u8, 117u8, 185u8, 143u8, 6u8, 117u8,
-							178u8, 159u8, 59u8, 128u8, 122u8, 61u8, 48u8, 13u8, 47u8, 200u8, 101u8,
+							250u8, 246u8, 148u8, 236u8, 65u8, 72u8, 183u8, 63u8, 131u8, 83u8, 32u8,
+							168u8, 209u8, 170u8, 236u8, 49u8, 11u8, 81u8, 223u8, 169u8, 18u8,
+							178u8, 227u8, 197u8, 56u8, 254u8, 194u8, 168u8, 79u8, 43u8, 200u8,
+							73u8,
 						],
 					)
 				}
@@ -1188,10 +1189,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							58u8, 73u8, 154u8, 144u8, 87u8, 100u8, 31u8, 169u8, 231u8, 189u8,
-							189u8, 33u8, 227u8, 171u8, 150u8, 86u8, 234u8, 0u8, 79u8, 92u8, 171u8,
-							111u8, 248u8, 255u8, 70u8, 251u8, 174u8, 18u8, 48u8, 137u8, 106u8,
-							104u8,
+							82u8, 55u8, 30u8, 164u8, 124u8, 178u8, 87u8, 51u8, 191u8, 27u8, 58u8,
+							88u8, 44u8, 49u8, 203u8, 32u8, 219u8, 141u8, 93u8, 38u8, 165u8, 84u8,
+							151u8, 185u8, 215u8, 199u8, 31u8, 167u8, 120u8, 103u8, 121u8, 138u8,
 						],
 					)
 				}
@@ -3395,9 +3395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				154u8, 55u8, 168u8, 170u8, 103u8, 84u8, 76u8, 251u8, 30u8, 183u8, 53u8, 154u8,
-				104u8, 67u8, 50u8, 95u8, 131u8, 148u8, 18u8, 110u8, 209u8, 101u8, 169u8, 152u8,
-				244u8, 60u8, 235u8, 66u8, 183u8, 142u8, 244u8, 125u8,
+				220u8, 198u8, 251u8, 19u8, 113u8, 158u8, 111u8, 241u8, 120u8, 241u8, 175u8, 12u8,
+				25u8, 141u8, 168u8, 152u8, 232u8, 112u8, 27u8, 93u8, 253u8, 33u8, 211u8, 176u8,
+				176u8, 49u8, 24u8, 110u8, 83u8, 225u8, 126u8, 11u8,
 			]
 	}
 	pub mod system {
@@ -4521,10 +4521,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							245u8, 117u8, 140u8, 173u8, 134u8, 235u8, 182u8, 10u8, 175u8, 106u8,
-							224u8, 104u8, 10u8, 71u8, 23u8, 246u8, 162u8, 151u8, 10u8, 114u8, 5u8,
-							194u8, 191u8, 14u8, 16u8, 210u8, 192u8, 211u8, 190u8, 23u8, 113u8,
-							48u8,
+							124u8, 15u8, 36u8, 121u8, 134u8, 124u8, 164u8, 100u8, 173u8, 117u8,
+							169u8, 229u8, 167u8, 150u8, 101u8, 52u8, 128u8, 140u8, 223u8, 218u8,
+							11u8, 53u8, 12u8, 84u8, 88u8, 234u8, 243u8, 66u8, 18u8, 90u8, 41u8,
+							143u8,
 						],
 					)
 				}
@@ -5432,10 +5432,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							217u8, 44u8, 145u8, 32u8, 50u8, 107u8, 117u8, 237u8, 81u8, 203u8,
-							155u8, 58u8, 34u8, 76u8, 38u8, 109u8, 126u8, 96u8, 122u8, 241u8, 235u8,
-							112u8, 251u8, 69u8, 203u8, 143u8, 99u8, 173u8, 175u8, 41u8, 237u8,
-							167u8,
+							33u8, 192u8, 28u8, 168u8, 75u8, 243u8, 82u8, 170u8, 200u8, 228u8,
+							167u8, 110u8, 68u8, 8u8, 88u8, 192u8, 232u8, 228u8, 231u8, 190u8, 62u8,
+							220u8, 249u8, 89u8, 16u8, 26u8, 69u8, 182u8, 161u8, 76u8, 50u8, 110u8,
 						],
 					)
 				}
@@ -5500,9 +5499,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							13u8, 89u8, 181u8, 37u8, 29u8, 88u8, 7u8, 8u8, 129u8, 80u8, 253u8,
-							16u8, 245u8, 54u8, 180u8, 171u8, 211u8, 110u8, 88u8, 203u8, 100u8,
-							101u8, 78u8, 178u8, 103u8, 131u8, 58u8, 236u8, 32u8, 81u8, 32u8, 199u8,
+							9u8, 23u8, 181u8, 117u8, 241u8, 4u8, 191u8, 117u8, 52u8, 243u8, 150u8,
+							230u8, 100u8, 198u8, 60u8, 249u8, 18u8, 114u8, 226u8, 224u8, 122u8,
+							77u8, 112u8, 173u8, 0u8, 34u8, 247u8, 95u8, 115u8, 49u8, 226u8, 183u8,
 						],
 					)
 				}
@@ -6407,9 +6406,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							22u8, 106u8, 53u8, 55u8, 177u8, 108u8, 130u8, 148u8, 12u8, 142u8,
-							142u8, 48u8, 145u8, 213u8, 1u8, 209u8, 141u8, 249u8, 79u8, 169u8, 15u8,
-							61u8, 97u8, 239u8, 174u8, 31u8, 126u8, 133u8, 98u8, 51u8, 30u8, 24u8,
+							218u8, 252u8, 70u8, 25u8, 56u8, 35u8, 130u8, 156u8, 23u8, 253u8, 70u8,
+							204u8, 227u8, 41u8, 192u8, 137u8, 123u8, 238u8, 145u8, 9u8, 128u8,
+							241u8, 186u8, 24u8, 152u8, 52u8, 67u8, 51u8, 99u8, 51u8, 29u8, 189u8,
 						],
 					)
 				}
@@ -6670,10 +6669,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							196u8, 212u8, 173u8, 155u8, 222u8, 47u8, 172u8, 30u8, 251u8, 206u8,
-							152u8, 249u8, 164u8, 146u8, 21u8, 145u8, 140u8, 108u8, 232u8, 255u8,
-							232u8, 152u8, 138u8, 109u8, 1u8, 46u8, 68u8, 228u8, 211u8, 114u8, 11u8,
-							127u8,
+							145u8, 124u8, 170u8, 63u8, 143u8, 184u8, 232u8, 16u8, 131u8, 91u8,
+							179u8, 92u8, 54u8, 41u8, 240u8, 82u8, 150u8, 176u8, 89u8, 4u8, 141u8,
+							119u8, 77u8, 214u8, 106u8, 246u8, 171u8, 22u8, 232u8, 189u8, 172u8,
+							88u8,
 						],
 					)
 				}
@@ -6722,9 +6721,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							135u8, 80u8, 240u8, 140u8, 59u8, 177u8, 250u8, 154u8, 112u8, 21u8, 4u8,
-							52u8, 23u8, 40u8, 16u8, 36u8, 225u8, 190u8, 29u8, 31u8, 52u8, 50u8,
-							167u8, 87u8, 134u8, 245u8, 224u8, 201u8, 245u8, 33u8, 122u8, 62u8,
+							176u8, 144u8, 110u8, 182u8, 35u8, 121u8, 93u8, 64u8, 89u8, 2u8, 38u8,
+							64u8, 232u8, 167u8, 25u8, 254u8, 24u8, 37u8, 14u8, 236u8, 200u8, 108u8,
+							12u8, 169u8, 236u8, 44u8, 53u8, 17u8, 98u8, 145u8, 160u8, 41u8,
 						],
 					)
 				}
@@ -9549,7 +9548,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Change the terms of this vault. The change will be applied at the next mining slot"]
+				#[doc = "Change the terms of this vault. The change will be applied at the next mining frame"]
 				#[doc = "change that is at least `MinTermsModificationBlockDelay` blocks away."]
 				pub struct ModifyTerms {
 					pub vault_id: modify_terms::VaultId,
@@ -9692,6 +9691,30 @@ pub mod api {
 					const PALLET: &'static str = "Vaults";
 					const CALL: &'static str = "set_name";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SetCommittedArgonots {
+					#[codec(compact)]
+					pub amount: set_committed_argonots::Amount,
+				}
+				pub mod set_committed_argonots {
+					use super::runtime_types;
+					pub type Amount = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetCommittedArgonots {
+					const PALLET: &'static str = "Vaults";
+					const CALL: &'static str = "set_committed_argonots";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -9737,7 +9760,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Change the terms of this vault. The change will be applied at the next mining slot"]
+				#[doc = "Change the terms of this vault. The change will be applied at the next mining frame"]
 				#[doc = "change that is at least `MinTermsModificationBlockDelay` blocks away."]
 				pub fn modify_terms(
 					&self,
@@ -9837,6 +9860,22 @@ pub mod api {
 							212u8, 127u8, 125u8, 140u8, 248u8, 76u8, 240u8, 51u8, 149u8, 197u8,
 							144u8, 28u8, 166u8, 218u8, 83u8, 181u8, 108u8, 155u8, 213u8, 52u8,
 							125u8,
+						],
+					)
+				}
+				pub fn set_committed_argonots(
+					&self,
+					amount: types::set_committed_argonots::Amount,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetCommittedArgonots>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Vaults",
+						"set_committed_argonots",
+						types::SetCommittedArgonots { amount },
+						[
+							249u8, 115u8, 188u8, 26u8, 135u8, 217u8, 72u8, 3u8, 221u8, 0u8, 184u8,
+							13u8, 111u8, 248u8, 49u8, 244u8, 203u8, 141u8, 148u8, 35u8, 38u8, 68u8,
+							15u8, 39u8, 164u8, 165u8, 82u8, 201u8, 182u8, 35u8, 215u8, 14u8,
 						],
 					)
 				}
@@ -10191,6 +10230,29 @@ pub mod api {
 				const PALLET: &'static str = "Vaults";
 				const EVENT: &'static str = "TreasuryRecordingError";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct CommittedArgonotsSet {
+				pub vault_id: committed_argonots_set::VaultId,
+				pub operator_account_id: committed_argonots_set::OperatorAccountId,
+				pub amount: committed_argonots_set::Amount,
+			}
+			pub mod committed_argonots_set {
+				use super::runtime_types;
+				pub type VaultId = ::core::primitive::u32;
+				pub type OperatorAccountId = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CommittedArgonotsSet {
+				const PALLET: &'static str = "Vaults";
+				const EVENT: &'static str = "CommittedArgonotsSet";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -10212,6 +10274,14 @@ pub mod api {
 					use super::runtime_types;
 					pub type VaultIdByOperator = ::core::primitive::u32;
 					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod argonot_commitment_by_vault_id {
+					use super::runtime_types;
+					pub type ArgonotCommitmentByVaultId =
+						runtime_types::argon_primitives::vault::VaultArgonotCommitment<
+							::core::primitive::u128,
+						>;
+					pub type Param0 = ::core::primitive::u32;
 				}
 				pub mod vault_x_pub_by_id {
 					use super::runtime_types;
@@ -10399,6 +10469,53 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Vault-side committed and crosschain-encumbered argonot backing."]
+				pub fn argonot_commitment_by_vault_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::argonot_commitment_by_vault_id::ArgonotCommitmentByVaultId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"ArgonotCommitmentByVaultId",
+						(),
+						[
+							154u8, 142u8, 195u8, 96u8, 239u8, 216u8, 167u8, 209u8, 105u8, 168u8,
+							156u8, 85u8, 9u8, 193u8, 232u8, 162u8, 167u8, 60u8, 227u8, 125u8, 31u8,
+							167u8, 181u8, 103u8, 20u8, 88u8, 9u8, 174u8, 215u8, 175u8, 166u8,
+							158u8,
+						],
+					)
+				}
+				#[doc = " Vault-side committed and crosschain-encumbered argonot backing."]
+				pub fn argonot_commitment_by_vault_id(
+					&self,
+					_0: types::argonot_commitment_by_vault_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::argonot_commitment_by_vault_id::Param0,
+					>,
+					types::argonot_commitment_by_vault_id::ArgonotCommitmentByVaultId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Vaults",
+						"ArgonotCommitmentByVaultId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							154u8, 142u8, 195u8, 96u8, 239u8, 216u8, 167u8, 209u8, 105u8, 168u8,
+							156u8, 85u8, 9u8, 193u8, 232u8, 162u8, 167u8, 60u8, 227u8, 125u8, 31u8,
+							167u8, 181u8, 103u8, 20u8, 88u8, 9u8, 174u8, 215u8, 175u8, 166u8,
+							158u8,
+						],
+					)
+				}
 				#[doc = " Vault Bitcoin Xpub and current child counter by VaultId"]
 				pub fn vault_x_pub_by_id_iter(
 					&self,
@@ -10493,8 +10610,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1 slot"]
-				#[doc = " change away)"]
+				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1"]
+				#[doc = " frame change away)"]
 				pub fn pending_terms_modifications_by_tick_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -10516,8 +10633,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1 slot"]
-				#[doc = " change away)"]
+				#[doc = " Pending terms that will be committed at the given block number (must be a minimum of 1"]
+				#[doc = " frame change away)"]
 				pub fn pending_terms_modifications_by_tick(
 					&self,
 					_0: types::pending_terms_modifications_by_tick::Param0,
@@ -15254,6 +15371,14 @@ pub mod api {
 							runtime_types::pallet_price_index::CpiMeasurementBucket,
 						>;
 				}
+				pub mod historic_argonot_floor_by_frame {
+					use super::runtime_types;
+					pub type HistoricArgonotFloorByFrame =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u64,
+							::core::primitive::u128,
+						>;
+				}
 				pub mod operator {
 					use super::runtime_types;
 					pub type Operator = crate::types::AccountId32;
@@ -15326,6 +15451,27 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Tracks the lowest Argonot floor observed in each recent frame."]
+				pub fn historic_argonot_floor_by_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::historic_argonot_floor_by_frame::HistoricArgonotFloorByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"PriceIndex",
+						"HistoricArgonotFloorByFrame",
+						(),
+						[
+							35u8, 7u8, 207u8, 167u8, 36u8, 72u8, 60u8, 223u8, 185u8, 101u8, 131u8,
+							194u8, 183u8, 69u8, 124u8, 28u8, 239u8, 101u8, 79u8, 88u8, 39u8, 109u8,
+							251u8, 126u8, 215u8, 252u8, 227u8, 255u8, 150u8, 228u8, 122u8, 131u8,
+						],
+					)
+				}
 				#[doc = " The price index operator account"]
 				pub fn operator(
 					&self,
@@ -15385,6 +15531,23 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of per-frame Argonot floor buckets to retain."]
+				pub fn max_argonot_floor_history_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"PriceIndex",
+						"MaxArgonotFloorHistoryFrames",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -18503,9 +18666,10 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							40u8, 210u8, 38u8, 164u8, 218u8, 237u8, 58u8, 98u8, 41u8, 176u8, 10u8,
-							172u8, 131u8, 147u8, 38u8, 169u8, 210u8, 117u8, 188u8, 0u8, 234u8,
-							232u8, 3u8, 86u8, 175u8, 94u8, 119u8, 75u8, 246u8, 119u8, 139u8, 185u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -18527,9 +18691,10 @@ pub mod api {
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							40u8, 210u8, 38u8, 164u8, 218u8, 237u8, 58u8, 98u8, 41u8, 176u8, 10u8,
-							172u8, 131u8, 147u8, 38u8, 169u8, 210u8, 117u8, 188u8, 0u8, 234u8,
-							232u8, 3u8, 86u8, 175u8, 94u8, 119u8, 75u8, 246u8, 119u8, 139u8, 185u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -20188,9 +20353,10 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							40u8, 210u8, 38u8, 164u8, 218u8, 237u8, 58u8, 98u8, 41u8, 176u8, 10u8,
-							172u8, 131u8, 147u8, 38u8, 169u8, 210u8, 117u8, 188u8, 0u8, 234u8,
-							232u8, 3u8, 86u8, 175u8, 94u8, 119u8, 75u8, 246u8, 119u8, 139u8, 185u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -20212,9 +20378,10 @@ pub mod api {
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							40u8, 210u8, 38u8, 164u8, 218u8, 237u8, 58u8, 98u8, 41u8, 176u8, 10u8,
-							172u8, 131u8, 147u8, 38u8, 169u8, 210u8, 117u8, 188u8, 0u8, 234u8,
-							232u8, 3u8, 86u8, 175u8, 94u8, 119u8, 75u8, 246u8, 119u8, 139u8, 185u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -21131,9 +21298,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							89u8, 157u8, 5u8, 87u8, 197u8, 201u8, 183u8, 86u8, 86u8, 2u8, 128u8,
-							229u8, 46u8, 21u8, 49u8, 103u8, 191u8, 184u8, 72u8, 205u8, 62u8, 132u8,
-							202u8, 93u8, 59u8, 178u8, 91u8, 133u8, 3u8, 82u8, 60u8, 82u8,
+							131u8, 163u8, 38u8, 54u8, 13u8, 132u8, 128u8, 239u8, 123u8, 65u8,
+							119u8, 95u8, 1u8, 250u8, 23u8, 233u8, 59u8, 23u8, 228u8, 141u8, 168u8,
+							231u8, 52u8, 232u8, 112u8, 175u8, 36u8, 26u8, 217u8, 102u8, 234u8,
+							203u8,
 						],
 					)
 				}
@@ -21163,9 +21331,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							165u8, 195u8, 179u8, 200u8, 57u8, 123u8, 48u8, 233u8, 78u8, 38u8,
-							130u8, 69u8, 86u8, 20u8, 248u8, 81u8, 210u8, 212u8, 6u8, 89u8, 195u8,
-							45u8, 0u8, 226u8, 42u8, 133u8, 95u8, 120u8, 32u8, 59u8, 199u8, 135u8,
+							52u8, 59u8, 20u8, 108u8, 98u8, 214u8, 34u8, 237u8, 20u8, 125u8, 172u8,
+							24u8, 188u8, 211u8, 149u8, 239u8, 2u8, 178u8, 60u8, 124u8, 147u8,
+							190u8, 47u8, 123u8, 170u8, 118u8, 235u8, 26u8, 25u8, 190u8, 31u8,
+							200u8,
 						],
 					)
 				}
@@ -21191,10 +21360,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							13u8, 92u8, 68u8, 210u8, 107u8, 222u8, 234u8, 104u8, 235u8, 170u8,
-							179u8, 57u8, 24u8, 129u8, 55u8, 147u8, 93u8, 10u8, 245u8, 66u8, 134u8,
-							221u8, 86u8, 77u8, 10u8, 157u8, 102u8, 101u8, 59u8, 117u8, 132u8,
-							145u8,
+							94u8, 69u8, 196u8, 14u8, 103u8, 246u8, 19u8, 235u8, 67u8, 119u8, 230u8,
+							71u8, 46u8, 125u8, 255u8, 137u8, 13u8, 167u8, 126u8, 89u8, 152u8, 70u8,
+							240u8, 109u8, 58u8, 207u8, 56u8, 23u8, 41u8, 80u8, 103u8, 251u8,
 						],
 					)
 				}
@@ -21217,9 +21385,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							75u8, 9u8, 95u8, 226u8, 27u8, 39u8, 236u8, 254u8, 139u8, 150u8, 180u8,
-							4u8, 86u8, 56u8, 195u8, 44u8, 45u8, 43u8, 25u8, 5u8, 206u8, 230u8,
-							214u8, 21u8, 160u8, 3u8, 43u8, 114u8, 65u8, 152u8, 137u8, 84u8,
+							225u8, 145u8, 177u8, 240u8, 27u8, 187u8, 144u8, 229u8, 29u8, 223u8,
+							151u8, 0u8, 102u8, 151u8, 167u8, 172u8, 141u8, 127u8, 13u8, 9u8, 202u8,
+							63u8, 124u8, 135u8, 30u8, 151u8, 121u8, 199u8, 196u8, 234u8, 33u8,
+							30u8,
 						],
 					)
 				}
@@ -21245,10 +21414,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							219u8, 149u8, 170u8, 68u8, 23u8, 36u8, 58u8, 85u8, 222u8, 197u8, 239u8,
-							233u8, 134u8, 206u8, 108u8, 43u8, 182u8, 82u8, 92u8, 157u8, 201u8,
-							180u8, 60u8, 158u8, 159u8, 219u8, 166u8, 136u8, 234u8, 222u8, 202u8,
-							212u8,
+							217u8, 53u8, 48u8, 168u8, 174u8, 211u8, 237u8, 120u8, 4u8, 253u8, 24u8,
+							250u8, 207u8, 78u8, 29u8, 172u8, 196u8, 149u8, 249u8, 85u8, 100u8, 2u8,
+							183u8, 204u8, 32u8, 162u8, 205u8, 97u8, 232u8, 243u8, 158u8, 182u8,
 						],
 					)
 				}
@@ -21271,9 +21439,9 @@ pub mod api {
 							weight,
 						},
 						[
-							232u8, 96u8, 55u8, 179u8, 92u8, 102u8, 187u8, 44u8, 100u8, 235u8,
-							175u8, 38u8, 104u8, 17u8, 50u8, 20u8, 190u8, 104u8, 233u8, 65u8, 97u8,
-							124u8, 204u8, 16u8, 34u8, 244u8, 17u8, 250u8, 175u8, 65u8, 11u8, 27u8,
+							109u8, 170u8, 91u8, 75u8, 66u8, 69u8, 196u8, 106u8, 168u8, 54u8, 249u8,
+							43u8, 138u8, 174u8, 48u8, 114u8, 36u8, 24u8, 13u8, 141u8, 179u8, 238u8,
+							237u8, 5u8, 228u8, 69u8, 249u8, 218u8, 121u8, 217u8, 123u8, 59u8,
 						],
 					)
 				}
@@ -21313,9 +21481,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							222u8, 94u8, 199u8, 127u8, 9u8, 170u8, 47u8, 114u8, 44u8, 189u8, 58u8,
-							176u8, 131u8, 186u8, 223u8, 111u8, 88u8, 99u8, 6u8, 60u8, 70u8, 167u8,
-							212u8, 70u8, 87u8, 253u8, 176u8, 95u8, 138u8, 163u8, 5u8, 40u8,
+							40u8, 49u8, 152u8, 106u8, 16u8, 132u8, 34u8, 23u8, 132u8, 110u8, 73u8,
+							46u8, 120u8, 35u8, 217u8, 240u8, 112u8, 229u8, 162u8, 7u8, 63u8, 41u8,
+							224u8, 7u8, 226u8, 123u8, 15u8, 56u8, 188u8, 19u8, 32u8, 217u8,
 						],
 					)
 				}
@@ -21338,9 +21506,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							213u8, 84u8, 241u8, 82u8, 1u8, 219u8, 102u8, 208u8, 184u8, 38u8, 191u8,
-							102u8, 39u8, 148u8, 44u8, 43u8, 45u8, 98u8, 133u8, 94u8, 159u8, 68u8,
-							116u8, 227u8, 193u8, 111u8, 161u8, 26u8, 111u8, 89u8, 136u8, 203u8,
+							200u8, 36u8, 43u8, 142u8, 153u8, 65u8, 196u8, 212u8, 180u8, 237u8, 4u8,
+							119u8, 85u8, 58u8, 121u8, 19u8, 215u8, 90u8, 227u8, 94u8, 235u8, 131u8,
+							159u8, 224u8, 118u8, 9u8, 17u8, 132u8, 157u8, 117u8, 199u8, 158u8,
 						],
 					)
 				}
@@ -21676,9 +21844,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							170u8, 130u8, 84u8, 202u8, 92u8, 22u8, 57u8, 129u8, 204u8, 128u8,
-							154u8, 113u8, 16u8, 194u8, 19u8, 199u8, 12u8, 98u8, 53u8, 0u8, 24u8,
-							33u8, 89u8, 215u8, 40u8, 131u8, 233u8, 82u8, 72u8, 217u8, 102u8, 233u8,
+							131u8, 129u8, 61u8, 89u8, 130u8, 253u8, 180u8, 119u8, 116u8, 203u8,
+							105u8, 66u8, 96u8, 174u8, 231u8, 156u8, 210u8, 25u8, 14u8, 142u8,
+							218u8, 236u8, 51u8, 240u8, 86u8, 54u8, 244u8, 7u8, 152u8, 255u8, 131u8,
+							50u8,
 						],
 					)
 				}
@@ -21701,9 +21870,9 @@ pub mod api {
 							weight,
 						},
 						[
-							5u8, 26u8, 73u8, 67u8, 121u8, 152u8, 74u8, 243u8, 219u8, 117u8, 144u8,
-							16u8, 95u8, 3u8, 222u8, 10u8, 252u8, 110u8, 88u8, 58u8, 56u8, 247u8,
-							105u8, 65u8, 15u8, 211u8, 7u8, 4u8, 15u8, 162u8, 146u8, 36u8,
+							136u8, 162u8, 218u8, 67u8, 133u8, 44u8, 19u8, 17u8, 77u8, 168u8, 34u8,
+							169u8, 220u8, 53u8, 180u8, 139u8, 8u8, 16u8, 112u8, 1u8, 107u8, 17u8,
+							175u8, 71u8, 52u8, 193u8, 141u8, 228u8, 150u8, 218u8, 203u8, 215u8,
 						],
 					)
 				}
@@ -21741,10 +21910,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							0u8, 24u8, 43u8, 57u8, 28u8, 206u8, 86u8, 139u8, 143u8, 249u8, 34u8,
-							226u8, 30u8, 61u8, 222u8, 56u8, 96u8, 242u8, 117u8, 211u8, 115u8,
-							231u8, 85u8, 89u8, 198u8, 106u8, 197u8, 106u8, 72u8, 144u8, 120u8,
-							152u8,
+							160u8, 204u8, 25u8, 145u8, 48u8, 142u8, 140u8, 201u8, 207u8, 109u8,
+							66u8, 219u8, 231u8, 232u8, 214u8, 28u8, 217u8, 184u8, 64u8, 249u8,
+							92u8, 28u8, 124u8, 116u8, 217u8, 58u8, 245u8, 238u8, 106u8, 184u8,
+							44u8, 233u8,
 						],
 					)
 				}
@@ -22217,6 +22386,31 @@ pub mod api {
 				const PALLET: &'static str = "Treasury";
 				const EVENT: &'static str = "BondLotReleased";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Encumbered treasury backing was burned and any no-longer-needed fractional hold was"]
+			#[doc = "returned."]
+			pub struct EncumberedBondMicrogonsBurned {
+				pub account_id: encumbered_bond_microgons_burned::AccountId,
+				pub burned_amount: encumbered_bond_microgons_burned::BurnedAmount,
+				pub released_amount: encumbered_bond_microgons_burned::ReleasedAmount,
+			}
+			pub mod encumbered_bond_microgons_burned {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type BurnedAmount = ::core::primitive::u128;
+				pub type ReleasedAmount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for EncumberedBondMicrogonsBurned {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "EncumberedBondMicrogonsBurned";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -22241,6 +22435,11 @@ pub mod api {
 					pub type BondLotIdsByAccount = ();
 					pub type Param0 = crate::types::AccountId32;
 					pub type Param1 = ::core::primitive::u64;
+				}
+				pub mod encumbered_bond_microgons_by_account {
+					use super::runtime_types;
+					pub type EncumberedBondMicrogonsByAccount = ::core::primitive::u128;
+					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod pending_bond_releases_by_frame {
 					use super::runtime_types;
@@ -22432,6 +22631,63 @@ pub mod api {
 							171u8, 64u8, 104u8, 112u8, 16u8, 30u8, 217u8, 145u8, 216u8, 111u8,
 							96u8, 151u8, 114u8, 24u8, 77u8, 129u8, 175u8, 249u8, 130u8, 135u8, 0u8,
 							215u8,
+						],
+					)
+				}
+				#[doc = " Exact treasury bond backing reserved for crosschain minting authorities by account."]
+				#[doc = ""]
+				#[doc = " This is an exact microgon claim, not a mirror of the account's active whole-bond lots."]
+				#[doc = " Bond lots stay coarse because participation only moves in whole bonds, while encumbrance can"]
+				#[doc = " remain fractional after a burn. The key invariant is that the non-releasing held balance"]
+				#[doc = " always covers this amount."]
+				pub fn encumbered_bond_microgons_by_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::encumbered_bond_microgons_by_account::EncumberedBondMicrogonsByAccount,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"EncumberedBondMicrogonsByAccount",
+						(),
+						[
+							33u8, 222u8, 78u8, 146u8, 158u8, 140u8, 249u8, 67u8, 157u8, 20u8, 66u8,
+							120u8, 123u8, 116u8, 188u8, 184u8, 89u8, 219u8, 254u8, 147u8, 191u8,
+							182u8, 189u8, 66u8, 180u8, 188u8, 185u8, 177u8, 112u8, 30u8, 183u8,
+							41u8,
+						],
+					)
+				}
+				#[doc = " Exact treasury bond backing reserved for crosschain minting authorities by account."]
+				#[doc = ""]
+				#[doc = " This is an exact microgon claim, not a mirror of the account's active whole-bond lots."]
+				#[doc = " Bond lots stay coarse because participation only moves in whole bonds, while encumbrance can"]
+				#[doc = " remain fractional after a burn. The key invariant is that the non-releasing held balance"]
+				#[doc = " always covers this amount."]
+				pub fn encumbered_bond_microgons_by_account(
+					&self,
+					_0: types::encumbered_bond_microgons_by_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::encumbered_bond_microgons_by_account::Param0,
+					>,
+					types::encumbered_bond_microgons_by_account::EncumberedBondMicrogonsByAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"EncumberedBondMicrogonsByAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							33u8, 222u8, 78u8, 146u8, 158u8, 140u8, 249u8, 67u8, 157u8, 20u8, 66u8,
+							120u8, 123u8, 116u8, 188u8, 184u8, 89u8, 219u8, 254u8, 147u8, 191u8,
+							182u8, 189u8, 66u8, 180u8, 188u8, 185u8, 177u8, 112u8, 30u8, 183u8,
+							41u8,
 						],
 					)
 				}
@@ -24281,10 +24537,10 @@ pub mod api {
 						"ExecutionHeaderAnchors",
 						(),
 						[
-							119u8, 129u8, 252u8, 163u8, 183u8, 230u8, 84u8, 255u8, 242u8, 27u8,
-							22u8, 195u8, 6u8, 230u8, 128u8, 84u8, 121u8, 191u8, 110u8, 168u8,
-							122u8, 46u8, 225u8, 100u8, 65u8, 39u8, 8u8, 119u8, 50u8, 113u8, 115u8,
-							9u8,
+							177u8, 246u8, 17u8, 38u8, 71u8, 150u8, 122u8, 89u8, 26u8, 33u8, 159u8,
+							108u8, 119u8, 47u8, 120u8, 68u8, 142u8, 255u8, 208u8, 228u8, 130u8,
+							223u8, 218u8, 227u8, 164u8, 200u8, 101u8, 60u8, 21u8, 200u8, 3u8,
+							119u8,
 						],
 					)
 				}
@@ -24306,10 +24562,10 @@ pub mod api {
 						"ExecutionHeaderAnchors",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							119u8, 129u8, 252u8, 163u8, 183u8, 230u8, 84u8, 255u8, 242u8, 27u8,
-							22u8, 195u8, 6u8, 230u8, 128u8, 84u8, 121u8, 191u8, 110u8, 168u8,
-							122u8, 46u8, 225u8, 100u8, 65u8, 39u8, 8u8, 119u8, 50u8, 113u8, 115u8,
-							9u8,
+							177u8, 246u8, 17u8, 38u8, 71u8, 150u8, 122u8, 89u8, 26u8, 33u8, 159u8,
+							108u8, 119u8, 47u8, 120u8, 68u8, 142u8, 255u8, 208u8, 228u8, 130u8,
+							223u8, 218u8, 227u8, 164u8, 200u8, 101u8, 60u8, 21u8, 200u8, 3u8,
+							119u8,
 						],
 					)
 				}
@@ -24590,16 +24846,246 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct SetChainConfig {
+					pub source_chain: set_chain_config::SourceChain,
 					pub config: set_chain_config::Config,
 				}
 				pub mod set_chain_config {
 					use super::runtime_types;
+					pub type SourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 					pub type Config =
 						runtime_types::pallet_crosschain_transfer::pallet::ChainConfig;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetChainConfig {
 					const PALLET: &'static str = "CrosschainTransfer";
 					const CALL: &'static str = "set_chain_config";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ForceSetGlobalIssuanceCouncil {
+					pub destination_chain: force_set_global_issuance_council::DestinationChain,
+					#[codec(compact)]
+					pub after_nonce: force_set_global_issuance_council::AfterNonce,
+					pub member_account_ids: force_set_global_issuance_council::MemberAccountIds,
+				}
+				pub mod force_set_global_issuance_council {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type AfterNonce = ::core::primitive::u64;
+					pub type MemberAccountIds =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							crate::types::AccountId32,
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ForceSetGlobalIssuanceCouncil {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "force_set_global_issuance_council";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PauseGateway {
+					pub source_chain: pause_gateway::SourceChain,
+				}
+				pub mod pause_gateway {
+					use super::runtime_types;
+					pub type SourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for PauseGateway {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "pause_gateway";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct UnpauseGateway {
+					pub source_chain: unpause_gateway::SourceChain,
+				}
+				pub mod unpause_gateway {
+					use super::runtime_types;
+					pub type SourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UnpauseGateway {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "unpause_gateway";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SetMinimumMintingAuthorityValue {
+					pub destination_chain: set_minimum_minting_authority_value::DestinationChain,
+					#[codec(compact)]
+					pub minimum_value: set_minimum_minting_authority_value::MinimumValue,
+				}
+				pub mod set_minimum_minting_authority_value {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type MinimumValue = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetMinimumMintingAuthorityValue {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "set_minimum_minting_authority_value";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SetMintingAuthorityActivationRepaymentPricing {
+					pub destination_chain:
+						set_minting_authority_activation_repayment_pricing::DestinationChain,
+					pub pricing: set_minting_authority_activation_repayment_pricing::Pricing,
+				}
+				pub mod set_minting_authority_activation_repayment_pricing {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Pricing = runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing ;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic
+					for SetMintingAuthorityActivationRepaymentPricing
+				{
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "set_minting_authority_activation_repayment_pricing";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RegisterCouncilSigner {
+					pub destination_chain: register_council_signer::DestinationChain,
+					pub signing_key: register_council_signer::SigningKey,
+					pub signature: register_council_signer::Signature,
+				}
+				pub mod register_council_signer {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SigningKey = ::subxt::ext::subxt_core::utils::H160;
+					pub type Signature = [::core::primitive::u8; 65usize];
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterCouncilSigner {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "register_council_signer";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RegisterMintingAuthority {
+					pub destination_chain: register_minting_authority::DestinationChain,
+					pub destination_signing_key: register_minting_authority::DestinationSigningKey,
+					pub signature: register_minting_authority::Signature,
+					#[codec(compact)]
+					pub microgon_collateral: register_minting_authority::MicrogonCollateral,
+					#[codec(compact)]
+					pub micronot_collateral: register_minting_authority::MicronotCollateral,
+				}
+				pub mod register_minting_authority {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+					pub type Signature = [::core::primitive::u8; 65usize];
+					pub type MicrogonCollateral = ::core::primitive::u128;
+					pub type MicronotCollateral = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterMintingAuthority {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "register_minting_authority";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct ApproveQueueEntries {
+					pub destination_chain: approve_queue_entries::DestinationChain,
+					pub signatures: approve_queue_entries::Signatures,
+				}
+				pub mod approve_queue_entries {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Signatures =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							[::core::primitive::u8; 65usize],
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ApproveQueueEntries {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "approve_queue_entries";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -24632,23 +25118,272 @@ pub mod api {
 					const PALLET: &'static str = "CrosschainTransfer";
 					const CALL: &'static str = "prove_gateway_activity";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TransferOut {
+					pub destination_chain: transfer_out::DestinationChain,
+					pub asset: transfer_out::Asset,
+					pub destination_account: transfer_out::DestinationAccount,
+					#[codec(compact)]
+					pub amount: transfer_out::Amount,
+				}
+				pub mod transfer_out {
+					use super::runtime_types;
+					pub type DestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Asset = runtime_types::pallet_crosschain_transfer::pallet::AssetKind;
+					pub type DestinationAccount = ::subxt::ext::subxt_core::utils::H160;
+					pub type Amount = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for TransferOut {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "transfer_out";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct CollateralizeTransfer {
+					pub transfer_id: collateralize_transfer::TransferId,
+					pub signature: collateralize_transfer::Signature,
+					#[codec(compact)]
+					pub microgon_collateral: collateralize_transfer::MicrogonCollateral,
+					#[codec(compact)]
+					pub micronot_collateral: collateralize_transfer::MicronotCollateral,
+				}
+				pub mod collateralize_transfer {
+					use super::runtime_types;
+					pub type TransferId = crate::types::H256;
+					pub type Signature = [::core::primitive::u8; 65usize];
+					pub type MicrogonCollateral = ::core::primitive::u128;
+					pub type MicronotCollateral = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CollateralizeTransfer {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "collateralize_transfer";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct DeactivateMintingAuthority {
+					pub destination_signing_key:
+						deactivate_minting_authority::DestinationSigningKey,
+					pub signature: deactivate_minting_authority::Signature,
+				}
+				pub mod deactivate_minting_authority {
+					use super::runtime_types;
+					pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+					pub type Signature = [::core::primitive::u8; 65usize];
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for DeactivateMintingAuthority {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "deactivate_minting_authority";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
 				pub fn set_chain_config(
 					&self,
+					source_chain: types::set_chain_config::SourceChain,
 					config: types::set_chain_config::Config,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetChainConfig>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"CrosschainTransfer",
 						"set_chain_config",
-						types::SetChainConfig { config },
+						types::SetChainConfig { source_chain, config },
 						[
-							255u8, 113u8, 163u8, 82u8, 62u8, 198u8, 84u8, 61u8, 226u8, 234u8,
-							227u8, 65u8, 206u8, 143u8, 2u8, 87u8, 244u8, 81u8, 173u8, 32u8, 88u8,
-							203u8, 48u8, 16u8, 164u8, 144u8, 104u8, 149u8, 250u8, 167u8, 152u8,
-							255u8,
+							164u8, 45u8, 21u8, 112u8, 179u8, 60u8, 133u8, 173u8, 125u8, 98u8, 61u8,
+							27u8, 174u8, 163u8, 254u8, 55u8, 68u8, 140u8, 217u8, 92u8, 185u8,
+							136u8, 184u8, 188u8, 136u8, 157u8, 236u8, 120u8, 230u8, 10u8, 46u8,
+							46u8,
+						],
+					)
+				}
+				pub fn force_set_global_issuance_council(
+					&self,
+					destination_chain: types::force_set_global_issuance_council::DestinationChain,
+					after_nonce: types::force_set_global_issuance_council::AfterNonce,
+					member_account_ids: types::force_set_global_issuance_council::MemberAccountIds,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::ForceSetGlobalIssuanceCouncil,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"force_set_global_issuance_council",
+						types::ForceSetGlobalIssuanceCouncil {
+							destination_chain,
+							after_nonce,
+							member_account_ids,
+						},
+						[
+							89u8, 5u8, 26u8, 172u8, 50u8, 5u8, 2u8, 253u8, 126u8, 142u8, 230u8,
+							104u8, 179u8, 155u8, 134u8, 155u8, 141u8, 176u8, 177u8, 185u8, 40u8,
+							222u8, 81u8, 121u8, 224u8, 205u8, 244u8, 13u8, 176u8, 9u8, 186u8, 20u8,
+						],
+					)
+				}
+				pub fn pause_gateway(
+					&self,
+					source_chain: types::pause_gateway::SourceChain,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::PauseGateway> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"pause_gateway",
+						types::PauseGateway { source_chain },
+						[
+							98u8, 126u8, 112u8, 74u8, 93u8, 29u8, 145u8, 138u8, 210u8, 135u8,
+							181u8, 164u8, 212u8, 20u8, 149u8, 245u8, 129u8, 106u8, 57u8, 208u8,
+							198u8, 57u8, 196u8, 234u8, 128u8, 182u8, 62u8, 166u8, 101u8, 92u8,
+							81u8, 111u8,
+						],
+					)
+				}
+				pub fn unpause_gateway(
+					&self,
+					source_chain: types::unpause_gateway::SourceChain,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UnpauseGateway>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"unpause_gateway",
+						types::UnpauseGateway { source_chain },
+						[
+							230u8, 29u8, 167u8, 94u8, 46u8, 94u8, 54u8, 125u8, 58u8, 154u8, 93u8,
+							178u8, 93u8, 66u8, 171u8, 14u8, 162u8, 184u8, 190u8, 168u8, 2u8, 239u8,
+							85u8, 249u8, 11u8, 77u8, 17u8, 240u8, 138u8, 137u8, 112u8, 38u8,
+						],
+					)
+				}
+				pub fn set_minimum_minting_authority_value(
+					&self,
+					destination_chain: types::set_minimum_minting_authority_value::DestinationChain,
+					minimum_value: types::set_minimum_minting_authority_value::MinimumValue,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetMinimumMintingAuthorityValue,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"set_minimum_minting_authority_value",
+						types::SetMinimumMintingAuthorityValue { destination_chain, minimum_value },
+						[
+							81u8, 83u8, 101u8, 109u8, 126u8, 174u8, 213u8, 149u8, 181u8, 195u8,
+							32u8, 82u8, 55u8, 114u8, 247u8, 83u8, 41u8, 103u8, 242u8, 173u8, 151u8,
+							140u8, 110u8, 110u8, 68u8, 171u8, 169u8, 31u8, 88u8, 197u8, 211u8,
+							202u8,
+						],
+					)
+				}
+				pub fn set_minting_authority_activation_repayment_pricing(
+					&self,
+					destination_chain : types :: set_minting_authority_activation_repayment_pricing :: DestinationChain,
+					pricing: types::set_minting_authority_activation_repayment_pricing::Pricing,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetMintingAuthorityActivationRepaymentPricing,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"set_minting_authority_activation_repayment_pricing",
+						types::SetMintingAuthorityActivationRepaymentPricing {
+							destination_chain,
+							pricing,
+						},
+						[
+							237u8, 77u8, 250u8, 146u8, 21u8, 164u8, 21u8, 241u8, 63u8, 25u8, 217u8,
+							254u8, 13u8, 168u8, 159u8, 5u8, 171u8, 230u8, 230u8, 95u8, 3u8, 34u8,
+							77u8, 238u8, 207u8, 138u8, 13u8, 171u8, 170u8, 164u8, 92u8, 144u8,
+						],
+					)
+				}
+				pub fn register_council_signer(
+					&self,
+					destination_chain: types::register_council_signer::DestinationChain,
+					signing_key: types::register_council_signer::SigningKey,
+					signature: types::register_council_signer::Signature,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::RegisterCouncilSigner,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"register_council_signer",
+						types::RegisterCouncilSigner { destination_chain, signing_key, signature },
+						[
+							186u8, 165u8, 58u8, 182u8, 3u8, 96u8, 148u8, 209u8, 173u8, 139u8,
+							233u8, 110u8, 200u8, 246u8, 135u8, 236u8, 174u8, 110u8, 146u8, 32u8,
+							118u8, 118u8, 135u8, 32u8, 143u8, 0u8, 170u8, 29u8, 86u8, 121u8, 251u8,
+							150u8,
+						],
+					)
+				}
+				pub fn register_minting_authority(
+					&self,
+					destination_chain: types::register_minting_authority::DestinationChain,
+					destination_signing_key : types :: register_minting_authority :: DestinationSigningKey,
+					signature: types::register_minting_authority::Signature,
+					microgon_collateral: types::register_minting_authority::MicrogonCollateral,
+					micronot_collateral: types::register_minting_authority::MicronotCollateral,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::RegisterMintingAuthority,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"register_minting_authority",
+						types::RegisterMintingAuthority {
+							destination_chain,
+							destination_signing_key,
+							signature,
+							microgon_collateral,
+							micronot_collateral,
+						},
+						[
+							145u8, 197u8, 223u8, 57u8, 162u8, 67u8, 167u8, 90u8, 137u8, 89u8, 51u8,
+							241u8, 136u8, 188u8, 246u8, 190u8, 119u8, 254u8, 28u8, 35u8, 244u8,
+							202u8, 119u8, 242u8, 190u8, 76u8, 10u8, 144u8, 99u8, 97u8, 223u8,
+							142u8,
+						],
+					)
+				}
+				pub fn approve_queue_entries(
+					&self,
+					destination_chain: types::approve_queue_entries::DestinationChain,
+					signatures: types::approve_queue_entries::Signatures,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::ApproveQueueEntries>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"approve_queue_entries",
+						types::ApproveQueueEntries { destination_chain, signatures },
+						[
+							155u8, 186u8, 23u8, 224u8, 249u8, 62u8, 25u8, 187u8, 79u8, 107u8,
+							158u8, 246u8, 35u8, 227u8, 14u8, 62u8, 252u8, 66u8, 223u8, 129u8, 58u8,
+							100u8, 241u8, 97u8, 41u8, 92u8, 99u8, 229u8, 77u8, 125u8, 231u8, 122u8,
 						],
 					)
 				}
@@ -24675,6 +25410,72 @@ pub mod api {
 						],
 					)
 				}
+				pub fn transfer_out(
+					&self,
+					destination_chain: types::transfer_out::DestinationChain,
+					asset: types::transfer_out::Asset,
+					destination_account: types::transfer_out::DestinationAccount,
+					amount: types::transfer_out::Amount,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::TransferOut> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"transfer_out",
+						types::TransferOut {
+							destination_chain,
+							asset,
+							destination_account,
+							amount,
+						},
+						[
+							80u8, 223u8, 42u8, 201u8, 0u8, 93u8, 220u8, 131u8, 184u8, 24u8, 57u8,
+							91u8, 182u8, 246u8, 85u8, 88u8, 118u8, 36u8, 82u8, 145u8, 198u8, 204u8,
+							129u8, 50u8, 249u8, 169u8, 32u8, 148u8, 31u8, 64u8, 100u8, 106u8,
+						],
+					)
+				}
+				pub fn collateralize_transfer(
+					&self,
+					transfer_id: types::collateralize_transfer::TransferId,
+					signature: types::collateralize_transfer::Signature,
+					microgon_collateral: types::collateralize_transfer::MicrogonCollateral,
+					micronot_collateral: types::collateralize_transfer::MicronotCollateral,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::CollateralizeTransfer,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"collateralize_transfer",
+						types::CollateralizeTransfer {
+							transfer_id,
+							signature,
+							microgon_collateral,
+							micronot_collateral,
+						},
+						[
+							236u8, 172u8, 38u8, 130u8, 76u8, 73u8, 22u8, 148u8, 163u8, 51u8, 28u8,
+							189u8, 98u8, 138u8, 151u8, 36u8, 96u8, 222u8, 78u8, 134u8, 223u8,
+							123u8, 241u8, 77u8, 170u8, 182u8, 204u8, 32u8, 43u8, 93u8, 15u8, 12u8,
+						],
+					)
+				}
+				pub fn deactivate_minting_authority(
+					&self,
+					destination_signing_key : types :: deactivate_minting_authority :: DestinationSigningKey,
+					signature: types::deactivate_minting_authority::Signature,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::DeactivateMintingAuthority,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"deactivate_minting_authority",
+						types::DeactivateMintingAuthority { destination_signing_key, signature },
+						[
+							0u8, 59u8, 13u8, 56u8, 78u8, 138u8, 88u8, 138u8, 46u8, 112u8, 216u8,
+							50u8, 241u8, 194u8, 67u8, 140u8, 45u8, 37u8, 181u8, 147u8, 59u8, 133u8,
+							188u8, 121u8, 169u8, 45u8, 79u8, 125u8, 198u8, 112u8, 123u8, 109u8,
+						],
+					)
+				}
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
@@ -24689,7 +25490,7 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A `TransferToArgonStarted` activity was proved and settled locally."]
+			#[doc = "A `TransferToArgonStarted` activity was proven and settled locally."]
 			pub struct TransferToArgonSettled {
 				pub source_chain: transfer_to_argon_settled::SourceChain,
 				pub transfer: transfer_to_argon_settled::Transfer,
@@ -24713,7 +25514,358 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "The stored gateway-state snapshot advanced after a proved contiguous batch."]
+			#[doc = "Root force-set the active Global Issuance Council for a destination chain."]
+			pub struct GlobalIssuanceCouncilForced {
+				pub destination_chain: global_issuance_council_forced::DestinationChain,
+				pub council_hash: global_issuance_council_forced::CouncilHash,
+			}
+			pub mod global_issuance_council_forced {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type CouncilHash = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GlobalIssuanceCouncilForced {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "GlobalIssuanceCouncilForced";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An account registered its council signer for one destination chain."]
+			pub struct CouncilSignerRegistered {
+				pub destination_chain: council_signer_registered::DestinationChain,
+				pub account_id: council_signer_registered::AccountId,
+				pub signer: council_signer_registered::Signer,
+			}
+			pub mod council_signer_registered {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type AccountId = crate::types::AccountId32;
+				pub type Signer = ::subxt::ext::subxt_core::utils::H160;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouncilSignerRegistered {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "CouncilSignerRegistered";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An account queued a replacement council signer for the next council update."]
+			pub struct CouncilSignerRotationQueued {
+				pub destination_chain: council_signer_rotation_queued::DestinationChain,
+				pub account_id: council_signer_rotation_queued::AccountId,
+				pub signer: council_signer_rotation_queued::Signer,
+			}
+			pub mod council_signer_rotation_queued {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type AccountId = crate::types::AccountId32;
+				pub type Signer = ::subxt::ext::subxt_core::utils::H160;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouncilSignerRotationQueued {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "CouncilSignerRotationQueued";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An operator account registered a Minting Authority and queued it for council approval."]
+			pub struct MintingAuthorityRegistered {
+				pub destination_chain: minting_authority_registered::DestinationChain,
+				pub destination_signing_key: minting_authority_registered::DestinationSigningKey,
+				pub account_id: minting_authority_registered::AccountId,
+				pub approval_queue_nonce: minting_authority_registered::ApprovalQueueNonce,
+			}
+			pub mod minting_authority_registered {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+				pub type AccountId = crate::types::AccountId32;
+				pub type ApprovalQueueNonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityRegistered {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityRegistered";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An operator queued the signer-authorized Ethereum deactivation for a Minting Authority."]
+			pub struct MintingAuthorityDeactivationQueued {
+				pub destination_chain: minting_authority_deactivation_queued::DestinationChain,
+				pub destination_signing_key:
+					minting_authority_deactivation_queued::DestinationSigningKey,
+				pub approval_queue_nonce: minting_authority_deactivation_queued::ApprovalQueueNonce,
+			}
+			pub mod minting_authority_deactivation_queued {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+				pub type ApprovalQueueNonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityDeactivationQueued {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityDeactivationQueued";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Root updated the minimum normalized microgon value required to register a Minting"]
+			#[doc = "Authority on one destination chain."]
+			pub struct MinimumMintingAuthorityValueSet {
+				pub destination_chain: minimum_minting_authority_value_set::DestinationChain,
+				pub minimum_value: minimum_minting_authority_value_set::MinimumValue,
+			}
+			pub mod minimum_minting_authority_value_set {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type MinimumValue = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MinimumMintingAuthorityValueSet {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MinimumMintingAuthorityValueSet";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"]
+			#[doc = "destination chain."]
+			pub struct MintingAuthorityActivationRepaymentPricingSet {
+				pub destination_chain:
+					minting_authority_activation_repayment_pricing_set::DestinationChain,
+			}
+			pub mod minting_authority_activation_repayment_pricing_set {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent
+				for MintingAuthorityActivationRepaymentPricingSet
+			{
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityActivationRepaymentPricingSet";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A council member recorded approval for a queued council update entry."]
+			pub struct QueueEntryApprovalRecorded {
+				pub destination_chain: queue_entry_approval_recorded::DestinationChain,
+				pub target: queue_entry_approval_recorded::Target,
+				pub approval_queue_nonce: queue_entry_approval_recorded::ApprovalQueueNonce,
+			}
+			pub mod queue_entry_approval_recorded {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type Target =
+					runtime_types::pallet_crosschain_transfer::pallet::CouncilApprovalTargetId;
+				pub type ApprovalQueueNonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for QueueEntryApprovalRecorded {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "QueueEntryApprovalRecorded";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The queued council update entry reached local quorum."]
+			pub struct QueueEntryApprovalReady {
+				pub destination_chain: queue_entry_approval_ready::DestinationChain,
+				pub target: queue_entry_approval_ready::Target,
+				pub approval_queue_nonce: queue_entry_approval_ready::ApprovalQueueNonce,
+			}
+			pub mod queue_entry_approval_ready {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type Target =
+					runtime_types::pallet_crosschain_transfer::pallet::CouncilApprovalTargetId;
+				pub type ApprovalQueueNonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for QueueEntryApprovalReady {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "QueueEntryApprovalReady";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A proven Ethereum activation filled the pending local activation fields."]
+			pub struct MintingAuthorityActivationFinalized {
+				pub source_chain: minting_authority_activation_finalized::SourceChain,
+				pub destination_signing_key:
+					minting_authority_activation_finalized::DestinationSigningKey,
+			}
+			pub mod minting_authority_activation_finalized {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityActivationFinalized {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityActivationFinalized";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A proven activation paid or released the held relayer reimbursement and made the"]
+			#[doc = "authority usable."]
+			pub struct MintingAuthorityActivationCompleted {
+				pub destination_chain: minting_authority_activation_completed::DestinationChain,
+				pub destination_signing_key:
+					minting_authority_activation_completed::DestinationSigningKey,
+				pub relayer_argon_account_id:
+					minting_authority_activation_completed::RelayerArgonAccountId,
+				pub repayment_amount: minting_authority_activation_completed::RepaymentAmount,
+			}
+			pub mod minting_authority_activation_completed {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+				pub type RelayerArgonAccountId = crate::types::AccountId32;
+				pub type RepaymentAmount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityActivationCompleted {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityActivationCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A proven Ethereum deactivation released collateral and removed the local authority"]
+			#[doc = "record."]
+			pub struct MintingAuthorityDeactivationFinalized {
+				pub source_chain: minting_authority_deactivation_finalized::SourceChain,
+				pub destination_signing_key:
+					minting_authority_deactivation_finalized::DestinationSigningKey,
+			}
+			pub mod minting_authority_deactivation_finalized {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityDeactivationFinalized {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "MintingAuthorityDeactivationFinalized";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Gateway proof application paused one source chain at a specific canonical activity."]
+			pub struct GatewaySyncPaused {
+				pub source_chain: gateway_sync_paused::SourceChain,
+				pub pause: gateway_sync_paused::Pause,
+			}
+			pub mod gateway_sync_paused {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type Pause =
+					runtime_types::pallet_crosschain_transfer::pallet::GatewaySyncPause;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewaySyncPaused {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "GatewaySyncPaused";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Root manually unpaused one source chain."]
+			pub struct GatewayUnpaused {
+				pub source_chain: gateway_unpaused::SourceChain,
+			}
+			pub mod gateway_unpaused {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewayUnpaused {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "GatewayUnpaused";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."]
 			pub struct GatewayStateAdvanced {
 				pub source_chain: gateway_state_advanced::SourceChain,
 				pub gateway_state: gateway_state_advanced::GatewayState,
@@ -24728,6 +25880,151 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewayStateAdvanced {
 				const PALLET: &'static str = "CrosschainTransfer";
 				const EVENT: &'static str = "GatewayStateAdvanced";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer out was opened."]
+			pub struct TransferOutStarted {
+				pub destination_chain: transfer_out_started::DestinationChain,
+				pub transfer_id: transfer_out_started::TransferId,
+				pub account_id: transfer_out_started::AccountId,
+				pub asset: transfer_out_started::Asset,
+				pub amount: transfer_out_started::Amount,
+				pub minting_authority_tip: transfer_out_started::MintingAuthorityTip,
+			}
+			pub mod transfer_out_started {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type TransferId = crate::types::H256;
+				pub type AccountId = crate::types::AccountId32;
+				pub type Asset = runtime_types::pallet_crosschain_transfer::pallet::AssetKind;
+				pub type Amount = ::core::primitive::u128;
+				pub type MintingAuthorityTip = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutStarted {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferOutStarted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A minting authority updated transfer collateral."]
+			pub struct TransferCollateralized {
+				pub transfer_id: transfer_collateralized::TransferId,
+				pub destination_signing_key: transfer_collateralized::DestinationSigningKey,
+				pub microgon_collateral: transfer_collateralized::MicrogonCollateral,
+				pub micronot_collateral: transfer_collateralized::MicronotCollateral,
+			}
+			pub mod transfer_collateralized {
+				use super::runtime_types;
+				pub type TransferId = crate::types::H256;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+				pub type MicrogonCollateral = ::core::primitive::u128;
+				pub type MicronotCollateral = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferCollateralized {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferCollateralized";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer is ready for finalization."]
+			pub struct TransferOutReady {
+				pub transfer_id: transfer_out_ready::TransferId,
+			}
+			pub mod transfer_out_ready {
+				use super::runtime_types;
+				pub type TransferId = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutReady {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferOutReady";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer was finalized on the source chain."]
+			pub struct TransferOutFinalized {
+				pub source_chain: transfer_out_finalized::SourceChain,
+				pub transfer_id: transfer_out_finalized::TransferId,
+			}
+			pub mod transfer_out_finalized {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type TransferId = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutFinalized {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferOutFinalized";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A transfer was canceled on the source chain."]
+			pub struct TransferOutCanceled {
+				pub source_chain: transfer_out_canceled::SourceChain,
+				pub transfer_id: transfer_out_canceled::TransferId,
+			}
+			pub mod transfer_out_canceled {
+				use super::runtime_types;
+				pub type SourceChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type TransferId = crate::types::H256;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutCanceled {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferOutCanceled";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A pending collateral reservation was invalidated."]
+			pub struct TransferCollateralInvalidated {
+				pub transfer_id: transfer_collateral_invalidated::TransferId,
+				pub destination_signing_key: transfer_collateral_invalidated::DestinationSigningKey,
+			}
+			pub mod transfer_collateral_invalidated {
+				use super::runtime_types;
+				pub type TransferId = crate::types::H256;
+				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferCollateralInvalidated {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "TransferCollateralInvalidated";
 			}
 		}
 		pub mod storage {
@@ -24748,10 +26045,25 @@ pub mod api {
 					pub type Param0 =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
+				pub mod gateway_sync_pause_by_source_chain {
+					use super::runtime_types;
+					pub type GatewaySyncPauseBySourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::GatewaySyncPause;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
 				pub mod recent_argon_transfers_by_account {
 					use super::runtime_types;
 					pub type RecentArgonTransfersByAccount = ::core::primitive::u32;
 					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod council_approval_cursor_by_destination_chain_and_account_id {
+					use super::runtime_types;
+					pub type CouncilApprovalCursorByDestinationChainAndAccountId =
+						::core::primitive::u64;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param1 = crate::types::AccountId32;
 				}
 				pub mod inbound_transfers_expiring_at {
 					use super::runtime_types;
@@ -24762,6 +26074,103 @@ pub mod api {
 				pub mod last_transfer_expiry_cleanup_tick {
 					use super::runtime_types;
 					pub type LastTransferExpiryCleanupTick = ::core::primitive::u64;
+				}
+				pub mod council_signer_by_destination_chain_and_account_id {
+					use super::runtime_types;
+					pub type CouncilSignerByDestinationChainAndAccountId =
+						::subxt::ext::subxt_core::utils::H160;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param1 = crate::types::AccountId32;
+				}
+				pub mod pending_council_signer_by_destination_chain_and_account_id {
+					use super::runtime_types;
+					pub type PendingCouncilSignerByDestinationChainAndAccountId =
+						::subxt::ext::subxt_core::utils::H160;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param1 = crate::types::AccountId32;
+				}
+				pub mod active_global_issuance_council_by_destination_chain {
+					use super::runtime_types;
+					pub type ActiveGlobalIssuanceCouncilByDestinationChain = crate::types::H256;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod global_issuance_council_by_hash {
+					use super::runtime_types;
+					pub type GlobalIssuanceCouncilByHash =
+						runtime_types::pallet_crosschain_transfer::pallet::GlobalIssuanceCouncil;
+					pub type Param0 = crate::types::H256;
+				}
+				pub mod latest_queued_council_hash_by_destination_chain {
+					use super::runtime_types;
+					pub type LatestQueuedCouncilHashByDestinationChain = crate::types::H256;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod next_council_approval_queue_nonce_by_destination_chain {
+					use super::runtime_types;
+					pub type NextCouncilApprovalQueueNonceByDestinationChain =
+						::core::primitive::u64;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod council_approval_queue_by_destination_chain_and_nonce {
+					use super::runtime_types;
+					pub type CouncilApprovalQueueByDestinationChainAndNonce = runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalQueueEntry ;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param1 = ::core::primitive::u64;
+				}
+				pub mod minting_authorities_by_signer {
+					use super::runtime_types;
+					pub type MintingAuthoritiesBySigner =
+						runtime_types::pallet_crosschain_transfer::pallet::MintingAuthority;
+					pub type Param0 = ::subxt::ext::subxt_core::utils::H160;
+				}
+				pub mod minimum_minting_authority_value_by_destination_chain {
+					use super::runtime_types;
+					pub type MinimumMintingAuthorityValueByDestinationChain =
+						::core::primitive::u128;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod minting_authority_activation_repayment_pricing_by_destination_chain {
+					use super::runtime_types;
+					pub type MintingAuthorityActivationRepaymentPricingByDestinationChain = runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing ;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod next_transfer_out_nonce_by_sending_account_id {
+					use super::runtime_types;
+					pub type NextTransferOutNonceBySendingAccountId = ::core::primitive::u64;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod transfer_out_by_id {
+					use super::runtime_types;
+					pub type TransferOutById =
+						runtime_types::pallet_crosschain_transfer::transfer_out::TransferOutOfArgon;
+					pub type Param0 = crate::types::H256;
+				}
+				pub mod pending_collateralization_requests_by_chain {
+					use super::runtime_types;
+					pub type PendingCollateralizationRequestsByChain = runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < runtime_types :: pallet_crosschain_transfer :: transfer_out :: PendingCollateralizationRequest > ;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod non_terminal_transfer_out_count_by_destination_chain {
+					use super::runtime_types;
+					pub type NonTerminalTransferOutCountByDestinationChain = ::core::primitive::u32;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
+				pub mod pending_transfer_out_circulation_by_destination_chain {
+					use super::runtime_types;
+					pub type PendingTransferOutCirculationByDestinationChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChainCirculation;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
 			}
 			pub struct StorageApi;
@@ -24781,10 +26190,9 @@ pub mod api {
 						"ChainConfigBySourceChain",
 						(),
 						[
-							235u8, 158u8, 81u8, 16u8, 215u8, 90u8, 157u8, 171u8, 243u8, 56u8,
-							119u8, 201u8, 43u8, 253u8, 115u8, 255u8, 144u8, 93u8, 235u8, 133u8,
-							242u8, 253u8, 149u8, 26u8, 39u8, 209u8, 71u8, 79u8, 132u8, 247u8, 29u8,
-							26u8,
+							1u8, 219u8, 30u8, 164u8, 222u8, 78u8, 141u8, 8u8, 228u8, 104u8, 132u8,
+							43u8, 234u8, 28u8, 234u8, 26u8, 6u8, 51u8, 25u8, 128u8, 90u8, 125u8,
+							219u8, 99u8, 206u8, 164u8, 30u8, 179u8, 135u8, 51u8, 10u8, 40u8,
 						],
 					)
 				}
@@ -24806,10 +26214,9 @@ pub mod api {
 						"ChainConfigBySourceChain",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							235u8, 158u8, 81u8, 16u8, 215u8, 90u8, 157u8, 171u8, 243u8, 56u8,
-							119u8, 201u8, 43u8, 253u8, 115u8, 255u8, 144u8, 93u8, 235u8, 133u8,
-							242u8, 253u8, 149u8, 26u8, 39u8, 209u8, 71u8, 79u8, 132u8, 247u8, 29u8,
-							26u8,
+							1u8, 219u8, 30u8, 164u8, 222u8, 78u8, 141u8, 8u8, 228u8, 104u8, 132u8,
+							43u8, 234u8, 28u8, 234u8, 26u8, 6u8, 51u8, 25u8, 128u8, 90u8, 125u8,
+							219u8, 99u8, 206u8, 164u8, 30u8, 179u8, 135u8, 51u8, 10u8, 40u8,
 						],
 					)
 				}
@@ -24858,6 +26265,51 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Pause state recorded when a canonical gateway activity cannot be applied safely."]
+				pub fn gateway_sync_pause_by_source_chain_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::gateway_sync_pause_by_source_chain::GatewaySyncPauseBySourceChain,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"GatewaySyncPauseBySourceChain",
+						(),
+						[
+							67u8, 148u8, 18u8, 205u8, 141u8, 246u8, 240u8, 163u8, 63u8, 117u8,
+							181u8, 2u8, 56u8, 54u8, 63u8, 49u8, 26u8, 80u8, 128u8, 200u8, 168u8,
+							243u8, 53u8, 65u8, 1u8, 38u8, 76u8, 201u8, 176u8, 247u8, 100u8, 11u8,
+						],
+					)
+				}
+				#[doc = " Pause state recorded when a canonical gateway activity cannot be applied safely."]
+				pub fn gateway_sync_pause_by_source_chain(
+					&self,
+					_0: types::gateway_sync_pause_by_source_chain::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::gateway_sync_pause_by_source_chain::Param0,
+					>,
+					types::gateway_sync_pause_by_source_chain::GatewaySyncPauseBySourceChain,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"GatewaySyncPauseBySourceChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							67u8, 148u8, 18u8, 205u8, 141u8, 246u8, 240u8, 163u8, 63u8, 117u8,
+							181u8, 2u8, 56u8, 54u8, 63u8, 49u8, 26u8, 80u8, 128u8, 200u8, 168u8,
+							243u8, 53u8, 65u8, 1u8, 38u8, 76u8, 201u8, 176u8, 247u8, 100u8, 11u8,
+						],
+					)
+				}
 				#[doc = " Count of still-retained qualifying Argon transfers for each local account."]
 				pub fn recent_argon_transfers_by_account_iter(
 					&self,
@@ -24902,6 +26354,45 @@ pub mod api {
 							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
 							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
 							163u8, 142u8,
+						],
+					)
+				}
+				#[doc = " Latest council approval queue nonce signed by this account for one destination chain."]				pub fn council_approval_cursor_by_destination_chain_and_account_id_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: council_approval_cursor_by_destination_chain_and_account_id :: CouncilApprovalCursorByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalCursorByDestinationChainAndAccountId",
+						(),
+						[
+							49u8, 67u8, 8u8, 150u8, 125u8, 113u8, 15u8, 18u8, 97u8, 170u8, 222u8,
+							190u8, 77u8, 69u8, 254u8, 249u8, 140u8, 66u8, 124u8, 231u8, 47u8,
+							207u8, 51u8, 109u8, 67u8, 68u8, 177u8, 81u8, 195u8, 73u8, 101u8, 239u8,
+						],
+					)
+				}
+				#[doc = " Latest council approval queue nonce signed by this account for one destination chain."]				pub fn council_approval_cursor_by_destination_chain_and_account_id_iter1 (& self , _0 : types :: council_approval_cursor_by_destination_chain_and_account_id :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_cursor_by_destination_chain_and_account_id :: Param0 > , types :: council_approval_cursor_by_destination_chain_and_account_id :: CouncilApprovalCursorByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalCursorByDestinationChainAndAccountId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							49u8, 67u8, 8u8, 150u8, 125u8, 113u8, 15u8, 18u8, 97u8, 170u8, 222u8,
+							190u8, 77u8, 69u8, 254u8, 249u8, 140u8, 66u8, 124u8, 231u8, 47u8,
+							207u8, 51u8, 109u8, 67u8, 68u8, 177u8, 81u8, 195u8, 73u8, 101u8, 239u8,
+						],
+					)
+				}
+				#[doc = " Latest council approval queue nonce signed by this account for one destination chain."]				pub fn council_approval_cursor_by_destination_chain_and_account_id (& self , _0 : types :: council_approval_cursor_by_destination_chain_and_account_id :: Param0 , _1 : types :: council_approval_cursor_by_destination_chain_and_account_id :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_cursor_by_destination_chain_and_account_id :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_cursor_by_destination_chain_and_account_id :: Param1 > ,) , types :: council_approval_cursor_by_destination_chain_and_account_id :: CouncilApprovalCursorByDestinationChainAndAccountId , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalCursorByDestinationChainAndAccountId",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							49u8, 67u8, 8u8, 150u8, 125u8, 113u8, 15u8, 18u8, 97u8, 170u8, 222u8,
+							190u8, 77u8, 69u8, 254u8, 249u8, 140u8, 66u8, 124u8, 231u8, 47u8,
+							207u8, 51u8, 109u8, 67u8, 68u8, 177u8, 81u8, 195u8, 73u8, 101u8, 239u8,
 						],
 					)
 				}
@@ -24972,6 +26463,498 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The registered council signer for each account on each destination chain."]				pub fn council_signer_by_destination_chain_and_account_id_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: council_signer_by_destination_chain_and_account_id :: CouncilSignerByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilSignerByDestinationChainAndAccountId",
+						(),
+						[
+							101u8, 3u8, 213u8, 170u8, 120u8, 180u8, 24u8, 107u8, 231u8, 203u8,
+							48u8, 29u8, 254u8, 161u8, 104u8, 46u8, 97u8, 193u8, 121u8, 14u8, 241u8,
+							250u8, 36u8, 123u8, 21u8, 170u8, 5u8, 207u8, 161u8, 211u8, 120u8,
+							156u8,
+						],
+					)
+				}
+				#[doc = " The registered council signer for each account on each destination chain."]				pub fn council_signer_by_destination_chain_and_account_id_iter1 (& self , _0 : types :: council_signer_by_destination_chain_and_account_id :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_signer_by_destination_chain_and_account_id :: Param0 > , types :: council_signer_by_destination_chain_and_account_id :: CouncilSignerByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilSignerByDestinationChainAndAccountId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							101u8, 3u8, 213u8, 170u8, 120u8, 180u8, 24u8, 107u8, 231u8, 203u8,
+							48u8, 29u8, 254u8, 161u8, 104u8, 46u8, 97u8, 193u8, 121u8, 14u8, 241u8,
+							250u8, 36u8, 123u8, 21u8, 170u8, 5u8, 207u8, 161u8, 211u8, 120u8,
+							156u8,
+						],
+					)
+				}
+				#[doc = " The registered council signer for each account on each destination chain."]				pub fn council_signer_by_destination_chain_and_account_id (& self , _0 : types :: council_signer_by_destination_chain_and_account_id :: Param0 , _1 : types :: council_signer_by_destination_chain_and_account_id :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_signer_by_destination_chain_and_account_id :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_signer_by_destination_chain_and_account_id :: Param1 > ,) , types :: council_signer_by_destination_chain_and_account_id :: CouncilSignerByDestinationChainAndAccountId , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilSignerByDestinationChainAndAccountId",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							101u8, 3u8, 213u8, 170u8, 120u8, 180u8, 24u8, 107u8, 231u8, 203u8,
+							48u8, 29u8, 254u8, 161u8, 104u8, 46u8, 97u8, 193u8, 121u8, 14u8, 241u8,
+							250u8, 36u8, 123u8, 21u8, 170u8, 5u8, 207u8, 161u8, 211u8, 120u8,
+							156u8,
+						],
+					)
+				}
+				#[doc = " A staged council signer rotation for the next council activation on each destination chain."]				pub fn pending_council_signer_by_destination_chain_and_account_id_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_council_signer_by_destination_chain_and_account_id :: PendingCouncilSignerByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingCouncilSignerByDestinationChainAndAccountId",
+						(),
+						[
+							40u8, 154u8, 61u8, 153u8, 179u8, 148u8, 137u8, 151u8, 215u8, 92u8,
+							126u8, 160u8, 162u8, 248u8, 65u8, 205u8, 60u8, 114u8, 167u8, 119u8,
+							106u8, 152u8, 36u8, 62u8, 153u8, 249u8, 1u8, 54u8, 41u8, 175u8, 111u8,
+							18u8,
+						],
+					)
+				}
+				#[doc = " A staged council signer rotation for the next council activation on each destination chain."]				pub fn pending_council_signer_by_destination_chain_and_account_id_iter1 (& self , _0 : types :: pending_council_signer_by_destination_chain_and_account_id :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_council_signer_by_destination_chain_and_account_id :: Param0 > , types :: pending_council_signer_by_destination_chain_and_account_id :: PendingCouncilSignerByDestinationChainAndAccountId , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingCouncilSignerByDestinationChainAndAccountId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							40u8, 154u8, 61u8, 153u8, 179u8, 148u8, 137u8, 151u8, 215u8, 92u8,
+							126u8, 160u8, 162u8, 248u8, 65u8, 205u8, 60u8, 114u8, 167u8, 119u8,
+							106u8, 152u8, 36u8, 62u8, 153u8, 249u8, 1u8, 54u8, 41u8, 175u8, 111u8,
+							18u8,
+						],
+					)
+				}
+				#[doc = " A staged council signer rotation for the next council activation on each destination chain."]				pub fn pending_council_signer_by_destination_chain_and_account_id (& self , _0 : types :: pending_council_signer_by_destination_chain_and_account_id :: Param0 , _1 : types :: pending_council_signer_by_destination_chain_and_account_id :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_council_signer_by_destination_chain_and_account_id :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_council_signer_by_destination_chain_and_account_id :: Param1 > ,) , types :: pending_council_signer_by_destination_chain_and_account_id :: PendingCouncilSignerByDestinationChainAndAccountId , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingCouncilSignerByDestinationChainAndAccountId",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							40u8, 154u8, 61u8, 153u8, 179u8, 148u8, 137u8, 151u8, 215u8, 92u8,
+							126u8, 160u8, 162u8, 248u8, 65u8, 205u8, 60u8, 114u8, 167u8, 119u8,
+							106u8, 152u8, 36u8, 62u8, 153u8, 249u8, 1u8, 54u8, 41u8, 175u8, 111u8,
+							18u8,
+						],
+					)
+				}
+				#[doc = " The active Global Issuance Council hash in force for each destination chain."]				pub fn active_global_issuance_council_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: active_global_issuance_council_by_destination_chain :: ActiveGlobalIssuanceCouncilByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"ActiveGlobalIssuanceCouncilByDestinationChain",
+						(),
+						[
+							92u8, 254u8, 191u8, 9u8, 243u8, 53u8, 219u8, 83u8, 130u8, 147u8, 180u8,
+							139u8, 14u8, 100u8, 76u8, 228u8, 43u8, 68u8, 153u8, 36u8, 13u8, 118u8,
+							210u8, 229u8, 59u8, 184u8, 69u8, 224u8, 50u8, 17u8, 251u8, 176u8,
+						],
+					)
+				}
+				#[doc = " The active Global Issuance Council hash in force for each destination chain."]				pub fn active_global_issuance_council_by_destination_chain (& self , _0 : types :: active_global_issuance_council_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: active_global_issuance_council_by_destination_chain :: Param0 > , types :: active_global_issuance_council_by_destination_chain :: ActiveGlobalIssuanceCouncilByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"ActiveGlobalIssuanceCouncilByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							92u8, 254u8, 191u8, 9u8, 243u8, 53u8, 219u8, 83u8, 130u8, 147u8, 180u8,
+							139u8, 14u8, 100u8, 76u8, 228u8, 43u8, 68u8, 153u8, 36u8, 13u8, 118u8,
+							210u8, 229u8, 59u8, 184u8, 69u8, 224u8, 50u8, 17u8, 251u8, 176u8,
+						],
+					)
+				}
+				#[doc = " Historical Global Issuance Council snapshots keyed by their signer-ordered council hash."]
+				pub fn global_issuance_council_by_hash_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::global_issuance_council_by_hash::GlobalIssuanceCouncilByHash,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"GlobalIssuanceCouncilByHash",
+						(),
+						[
+							134u8, 48u8, 119u8, 235u8, 83u8, 238u8, 81u8, 60u8, 214u8, 73u8, 164u8,
+							0u8, 179u8, 174u8, 163u8, 189u8, 156u8, 42u8, 125u8, 83u8, 56u8, 56u8,
+							124u8, 93u8, 241u8, 121u8, 89u8, 190u8, 91u8, 47u8, 34u8, 52u8,
+						],
+					)
+				}
+				#[doc = " Historical Global Issuance Council snapshots keyed by their signer-ordered council hash."]
+				pub fn global_issuance_council_by_hash(
+					&self,
+					_0: types::global_issuance_council_by_hash::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::global_issuance_council_by_hash::Param0,
+					>,
+					types::global_issuance_council_by_hash::GlobalIssuanceCouncilByHash,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"GlobalIssuanceCouncilByHash",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							134u8, 48u8, 119u8, 235u8, 83u8, 238u8, 81u8, 60u8, 214u8, 73u8, 164u8,
+							0u8, 179u8, 174u8, 163u8, 189u8, 156u8, 42u8, 125u8, 83u8, 56u8, 56u8,
+							124u8, 93u8, 241u8, 121u8, 89u8, 190u8, 91u8, 47u8, 34u8, 52u8,
+						],
+					)
+				}
+				#[doc = " The latest queued council hash that should govern the next queue entry on each"]
+				#[doc = " destination chain."]				pub fn latest_queued_council_hash_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: latest_queued_council_hash_by_destination_chain :: LatestQueuedCouncilHashByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"LatestQueuedCouncilHashByDestinationChain",
+						(),
+						[
+							122u8, 14u8, 1u8, 98u8, 203u8, 34u8, 22u8, 19u8, 120u8, 142u8, 209u8,
+							240u8, 214u8, 201u8, 136u8, 156u8, 48u8, 80u8, 192u8, 60u8, 179u8,
+							216u8, 161u8, 4u8, 155u8, 162u8, 46u8, 58u8, 103u8, 162u8, 195u8,
+							139u8,
+						],
+					)
+				}
+				#[doc = " The latest queued council hash that should govern the next queue entry on each"]
+				#[doc = " destination chain."]				pub fn latest_queued_council_hash_by_destination_chain (& self , _0 : types :: latest_queued_council_hash_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: latest_queued_council_hash_by_destination_chain :: Param0 > , types :: latest_queued_council_hash_by_destination_chain :: LatestQueuedCouncilHashByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"LatestQueuedCouncilHashByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							122u8, 14u8, 1u8, 98u8, 203u8, 34u8, 22u8, 19u8, 120u8, 142u8, 209u8,
+							240u8, 214u8, 201u8, 136u8, 156u8, 48u8, 80u8, 192u8, 60u8, 179u8,
+							216u8, 161u8, 4u8, 155u8, 162u8, 46u8, 58u8, 103u8, 162u8, 195u8,
+							139u8,
+						],
+					)
+				}
+				#[doc = " The next outbound approval-queue nonce to assign on each destination chain."]				pub fn next_council_approval_queue_nonce_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: next_council_approval_queue_nonce_by_destination_chain :: NextCouncilApprovalQueueNonceByDestinationChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextCouncilApprovalQueueNonceByDestinationChain",
+						(),
+						[
+							193u8, 52u8, 146u8, 163u8, 244u8, 162u8, 54u8, 131u8, 44u8, 227u8,
+							212u8, 100u8, 159u8, 154u8, 112u8, 234u8, 241u8, 190u8, 122u8, 251u8,
+							81u8, 169u8, 152u8, 242u8, 29u8, 126u8, 128u8, 184u8, 185u8, 163u8,
+							26u8, 222u8,
+						],
+					)
+				}
+				#[doc = " The next outbound approval-queue nonce to assign on each destination chain."]				pub fn next_council_approval_queue_nonce_by_destination_chain (& self , _0 : types :: next_council_approval_queue_nonce_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: next_council_approval_queue_nonce_by_destination_chain :: Param0 > , types :: next_council_approval_queue_nonce_by_destination_chain :: NextCouncilApprovalQueueNonceByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextCouncilApprovalQueueNonceByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							193u8, 52u8, 146u8, 163u8, 244u8, 162u8, 54u8, 131u8, 44u8, 227u8,
+							212u8, 100u8, 159u8, 154u8, 112u8, 234u8, 241u8, 190u8, 122u8, 251u8,
+							81u8, 169u8, 152u8, 242u8, 29u8, 126u8, 128u8, 184u8, 185u8, 163u8,
+							26u8, 222u8,
+						],
+					)
+				}
+				#[doc = " The ordered outbound council approval queue for each destination chain."]				pub fn council_approval_queue_by_destination_chain_and_nonce_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: council_approval_queue_by_destination_chain_and_nonce :: CouncilApprovalQueueByDestinationChainAndNonce , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalQueueByDestinationChainAndNonce",
+						(),
+						[
+							32u8, 124u8, 156u8, 227u8, 161u8, 114u8, 87u8, 247u8, 169u8, 167u8,
+							202u8, 106u8, 217u8, 109u8, 183u8, 7u8, 249u8, 122u8, 89u8, 9u8, 215u8,
+							157u8, 67u8, 126u8, 201u8, 46u8, 10u8, 4u8, 107u8, 230u8, 110u8, 175u8,
+						],
+					)
+				}
+				#[doc = " The ordered outbound council approval queue for each destination chain."]				pub fn council_approval_queue_by_destination_chain_and_nonce_iter1 (& self , _0 : types :: council_approval_queue_by_destination_chain_and_nonce :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_queue_by_destination_chain_and_nonce :: Param0 > , types :: council_approval_queue_by_destination_chain_and_nonce :: CouncilApprovalQueueByDestinationChainAndNonce , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalQueueByDestinationChainAndNonce",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							32u8, 124u8, 156u8, 227u8, 161u8, 114u8, 87u8, 247u8, 169u8, 167u8,
+							202u8, 106u8, 217u8, 109u8, 183u8, 7u8, 249u8, 122u8, 89u8, 9u8, 215u8,
+							157u8, 67u8, 126u8, 201u8, 46u8, 10u8, 4u8, 107u8, 230u8, 110u8, 175u8,
+						],
+					)
+				}
+				#[doc = " The ordered outbound council approval queue for each destination chain."]				pub fn council_approval_queue_by_destination_chain_and_nonce (& self , _0 : types :: council_approval_queue_by_destination_chain_and_nonce :: Param0 , _1 : types :: council_approval_queue_by_destination_chain_and_nonce :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_queue_by_destination_chain_and_nonce :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: council_approval_queue_by_destination_chain_and_nonce :: Param1 > ,) , types :: council_approval_queue_by_destination_chain_and_nonce :: CouncilApprovalQueueByDestinationChainAndNonce , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilApprovalQueueByDestinationChainAndNonce",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							32u8, 124u8, 156u8, 227u8, 161u8, 114u8, 87u8, 247u8, 169u8, 167u8,
+							202u8, 106u8, 217u8, 109u8, 183u8, 7u8, 249u8, 122u8, 89u8, 9u8, 215u8,
+							157u8, 67u8, 126u8, 201u8, 46u8, 10u8, 4u8, 107u8, 230u8, 110u8, 175u8,
+						],
+					)
+				}
+				#[doc = " Local Minting Authority records keyed by their destination signing key."]
+				pub fn minting_authorities_by_signer_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::minting_authorities_by_signer::MintingAuthoritiesBySigner,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MintingAuthoritiesBySigner",
+						(),
+						[
+							56u8, 56u8, 216u8, 152u8, 36u8, 50u8, 74u8, 7u8, 176u8, 142u8, 79u8,
+							14u8, 3u8, 224u8, 195u8, 197u8, 95u8, 99u8, 12u8, 255u8, 178u8, 104u8,
+							173u8, 46u8, 54u8, 71u8, 123u8, 136u8, 113u8, 220u8, 68u8, 102u8,
+						],
+					)
+				}
+				#[doc = " Local Minting Authority records keyed by their destination signing key."]
+				pub fn minting_authorities_by_signer(
+					&self,
+					_0: types::minting_authorities_by_signer::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::minting_authorities_by_signer::Param0,
+					>,
+					types::minting_authorities_by_signer::MintingAuthoritiesBySigner,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MintingAuthoritiesBySigner",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							56u8, 56u8, 216u8, 152u8, 36u8, 50u8, 74u8, 7u8, 176u8, 142u8, 79u8,
+							14u8, 3u8, 224u8, 195u8, 197u8, 95u8, 99u8, 12u8, 255u8, 178u8, 104u8,
+							173u8, 46u8, 54u8, 71u8, 123u8, 136u8, 113u8, 220u8, 68u8, 102u8,
+						],
+					)
+				}
+				#[doc = " Per-chain override for the minimum normalized microgon value required to register a"]
+				#[doc = " Minting Authority."]				pub fn minimum_minting_authority_value_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: minimum_minting_authority_value_by_destination_chain :: MinimumMintingAuthorityValueByDestinationChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MinimumMintingAuthorityValueByDestinationChain",
+						(),
+						[
+							214u8, 18u8, 167u8, 41u8, 29u8, 116u8, 147u8, 187u8, 253u8, 219u8,
+							209u8, 226u8, 69u8, 128u8, 47u8, 1u8, 106u8, 247u8, 77u8, 18u8, 137u8,
+							111u8, 8u8, 125u8, 254u8, 195u8, 186u8, 124u8, 131u8, 229u8, 182u8,
+							66u8,
+						],
+					)
+				}
+				#[doc = " Per-chain override for the minimum normalized microgon value required to register a"]
+				#[doc = " Minting Authority."]				pub fn minimum_minting_authority_value_by_destination_chain (& self , _0 : types :: minimum_minting_authority_value_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: minimum_minting_authority_value_by_destination_chain :: Param0 > , types :: minimum_minting_authority_value_by_destination_chain :: MinimumMintingAuthorityValueByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MinimumMintingAuthorityValueByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							214u8, 18u8, 167u8, 41u8, 29u8, 116u8, 147u8, 187u8, 253u8, 219u8,
+							209u8, 226u8, 69u8, 128u8, 47u8, 1u8, 106u8, 247u8, 77u8, 18u8, 137u8,
+							111u8, 8u8, 125u8, 254u8, 195u8, 186u8, 124u8, 131u8, 229u8, 182u8,
+							66u8,
+						],
+					)
+				}
+				#[doc = " Pricing inputs used to repay relayers for Minting Authority activation batches on each"]
+				#[doc = " destination chain."]				pub fn minting_authority_activation_repayment_pricing_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: minting_authority_activation_repayment_pricing_by_destination_chain :: MintingAuthorityActivationRepaymentPricingByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MintingAuthorityActivationRepaymentPricingByDestinationChain",
+						(),
+						[
+							57u8, 233u8, 240u8, 227u8, 152u8, 202u8, 98u8, 48u8, 70u8, 79u8, 246u8,
+							151u8, 93u8, 170u8, 173u8, 137u8, 248u8, 23u8, 163u8, 105u8, 19u8,
+							18u8, 53u8, 197u8, 179u8, 248u8, 127u8, 114u8, 151u8, 20u8, 214u8,
+							192u8,
+						],
+					)
+				}
+				#[doc = " Pricing inputs used to repay relayers for Minting Authority activation batches on each"]
+				#[doc = " destination chain."]				pub fn minting_authority_activation_repayment_pricing_by_destination_chain (& self , _0 : types :: minting_authority_activation_repayment_pricing_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: minting_authority_activation_repayment_pricing_by_destination_chain :: Param0 > , types :: minting_authority_activation_repayment_pricing_by_destination_chain :: MintingAuthorityActivationRepaymentPricingByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MintingAuthorityActivationRepaymentPricingByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							57u8, 233u8, 240u8, 227u8, 152u8, 202u8, 98u8, 48u8, 70u8, 79u8, 246u8,
+							151u8, 93u8, 170u8, 173u8, 137u8, 248u8, 23u8, 163u8, 105u8, 19u8,
+							18u8, 53u8, 197u8, 179u8, 248u8, 127u8, 114u8, 151u8, 20u8, 214u8,
+							192u8,
+						],
+					)
+				}
+				#[doc = " Next outbound transfer nonce for each sending account."]				pub fn next_transfer_out_nonce_by_sending_account_id_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: next_transfer_out_nonce_by_sending_account_id :: NextTransferOutNonceBySendingAccountId , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextTransferOutNonceBySendingAccountId",
+						(),
+						[
+							108u8, 164u8, 22u8, 204u8, 240u8, 166u8, 46u8, 10u8, 229u8, 162u8,
+							132u8, 51u8, 22u8, 146u8, 20u8, 105u8, 223u8, 116u8, 232u8, 151u8,
+							130u8, 137u8, 216u8, 117u8, 76u8, 126u8, 143u8, 176u8, 44u8, 249u8,
+							86u8, 108u8,
+						],
+					)
+				}
+				#[doc = " Next outbound transfer nonce for each sending account."]				pub fn next_transfer_out_nonce_by_sending_account_id (& self , _0 : types :: next_transfer_out_nonce_by_sending_account_id :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: next_transfer_out_nonce_by_sending_account_id :: Param0 > , types :: next_transfer_out_nonce_by_sending_account_id :: NextTransferOutNonceBySendingAccountId , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextTransferOutNonceBySendingAccountId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							108u8, 164u8, 22u8, 204u8, 240u8, 166u8, 46u8, 10u8, 229u8, 162u8,
+							132u8, 51u8, 22u8, 146u8, 20u8, 105u8, 223u8, 116u8, 232u8, 151u8,
+							130u8, 137u8, 216u8, 117u8, 76u8, 126u8, 143u8, 176u8, 44u8, 249u8,
+							86u8, 108u8,
+						],
+					)
+				}
+				#[doc = " Outbound transfers by transfer id."]
+				pub fn transfer_out_by_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::transfer_out_by_id::TransferOutById,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"TransferOutById",
+						(),
+						[
+							239u8, 11u8, 223u8, 160u8, 135u8, 172u8, 230u8, 88u8, 139u8, 55u8,
+							178u8, 120u8, 89u8, 98u8, 67u8, 2u8, 247u8, 127u8, 34u8, 66u8, 241u8,
+							60u8, 222u8, 52u8, 148u8, 92u8, 238u8, 41u8, 42u8, 204u8, 1u8, 31u8,
+						],
+					)
+				}
+				#[doc = " Outbound transfers by transfer id."]
+				pub fn transfer_out_by_id(
+					&self,
+					_0: types::transfer_out_by_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::transfer_out_by_id::Param0,
+					>,
+					types::transfer_out_by_id::TransferOutById,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"TransferOutById",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							239u8, 11u8, 223u8, 160u8, 135u8, 172u8, 230u8, 88u8, 139u8, 55u8,
+							178u8, 120u8, 89u8, 98u8, 67u8, 2u8, 247u8, 127u8, 34u8, 66u8, 241u8,
+							60u8, 222u8, 52u8, 148u8, 92u8, 238u8, 41u8, 42u8, 204u8, 1u8, 31u8,
+						],
+					)
+				}
+				#[doc = " Collateralization requests still open on each destination chain."]				pub fn pending_collateralization_requests_by_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_collateralization_requests_by_chain :: PendingCollateralizationRequestsByChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingCollateralizationRequestsByChain",
+						(),
+						[
+							188u8, 212u8, 69u8, 66u8, 127u8, 73u8, 240u8, 83u8, 63u8, 29u8, 214u8,
+							106u8, 145u8, 150u8, 134u8, 241u8, 178u8, 182u8, 222u8, 161u8, 87u8,
+							236u8, 171u8, 67u8, 151u8, 179u8, 131u8, 30u8, 62u8, 140u8, 25u8,
+							143u8,
+						],
+					)
+				}
+				#[doc = " Collateralization requests still open on each destination chain."]				pub fn pending_collateralization_requests_by_chain (& self , _0 : types :: pending_collateralization_requests_by_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_collateralization_requests_by_chain :: Param0 > , types :: pending_collateralization_requests_by_chain :: PendingCollateralizationRequestsByChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingCollateralizationRequestsByChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							188u8, 212u8, 69u8, 66u8, 127u8, 73u8, 240u8, 83u8, 63u8, 29u8, 214u8,
+							106u8, 145u8, 150u8, 134u8, 241u8, 178u8, 182u8, 222u8, 161u8, 87u8,
+							236u8, 171u8, 67u8, 151u8, 179u8, 131u8, 30u8, 62u8, 140u8, 25u8,
+							143u8,
+						],
+					)
+				}
+				#[doc = " Number of non-terminal transfer-out requests on each destination chain."]				pub fn non_terminal_transfer_out_count_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: non_terminal_transfer_out_count_by_destination_chain :: NonTerminalTransferOutCountByDestinationChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NonTerminalTransferOutCountByDestinationChain",
+						(),
+						[
+							109u8, 190u8, 175u8, 178u8, 5u8, 93u8, 152u8, 46u8, 37u8, 107u8, 105u8,
+							185u8, 190u8, 59u8, 176u8, 68u8, 113u8, 16u8, 212u8, 7u8, 48u8, 227u8,
+							208u8, 13u8, 177u8, 52u8, 195u8, 253u8, 155u8, 216u8, 118u8, 185u8,
+						],
+					)
+				}
+				#[doc = " Number of non-terminal transfer-out requests on each destination chain."]				pub fn non_terminal_transfer_out_count_by_destination_chain (& self , _0 : types :: non_terminal_transfer_out_count_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: non_terminal_transfer_out_count_by_destination_chain :: Param0 > , types :: non_terminal_transfer_out_count_by_destination_chain :: NonTerminalTransferOutCountByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NonTerminalTransferOutCountByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							109u8, 190u8, 175u8, 178u8, 5u8, 93u8, 152u8, 46u8, 37u8, 107u8, 105u8,
+							185u8, 190u8, 59u8, 176u8, 68u8, 113u8, 16u8, 212u8, 7u8, 48u8, 227u8,
+							208u8, 13u8, 177u8, 52u8, 195u8, 253u8, 155u8, 216u8, 118u8, 185u8,
+						],
+					)
+				}
+				#[doc = " Pending outbound principal by destination chain."]				pub fn pending_transfer_out_circulation_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_transfer_out_circulation_by_destination_chain :: PendingTransferOutCirculationByDestinationChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingTransferOutCirculationByDestinationChain",
+						(),
+						[
+							227u8, 169u8, 173u8, 88u8, 26u8, 148u8, 94u8, 109u8, 196u8, 133u8, 4u8,
+							145u8, 12u8, 98u8, 178u8, 55u8, 29u8, 42u8, 241u8, 90u8, 247u8, 67u8,
+							136u8, 127u8, 150u8, 105u8, 108u8, 35u8, 119u8, 32u8, 94u8, 116u8,
+						],
+					)
+				}
+				#[doc = " Pending outbound principal by destination chain."]				pub fn pending_transfer_out_circulation_by_destination_chain (& self , _0 : types :: pending_transfer_out_circulation_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_transfer_out_circulation_by_destination_chain :: Param0 > , types :: pending_transfer_out_circulation_by_destination_chain :: PendingTransferOutCirculationByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingTransferOutCirculationByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							227u8, 169u8, 173u8, 88u8, 26u8, 148u8, 94u8, 109u8, 196u8, 133u8, 4u8,
+							145u8, 12u8, 98u8, 178u8, 55u8, 29u8, 42u8, 241u8, 90u8, 247u8, 67u8,
+							136u8, 127u8, 150u8, 105u8, 108u8, 35u8, 119u8, 32u8, 94u8, 116u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -25030,7 +27013,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maximum number of proved receipt proofs that may be supplied in one extrinsic."]
+				#[doc = " Maximum number of proven receipt proofs that may be supplied in one extrinsic."]
 				pub fn max_receipt_proofs_per_extrinsic(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -25044,6 +27027,162 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of members the active Global Issuance Council may carry."]
+				pub fn max_council_members(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxCouncilMembers",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of contiguous queue approvals one council member may submit in one call."]
+				pub fn max_queue_approvals_per_call(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxQueueApprovalsPerCall",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Ethereum-block window added to the latest verified block when opening a"]
+				#[doc = " transfer out."]
+				pub fn transfer_out_validity_ethereum_blocks(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"TransferOutValidityEthereumBlocks",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " Maximum age, in ticks, of the verified Ethereum execution anchor used to open a"]
+				#[doc = " transfer out."]
+				pub fn max_verified_execution_block_age_ticks(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxVerifiedExecutionBlockAgeTicks",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " Minting authority tip rate applied to transfer-out requests in basis points."]
+				pub fn transfer_out_minting_authority_tip_basis_points(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"TransferOutMintingAuthorityTipBasisPoints",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Minimum normalized collateral increment accepted for one transfer unless the increment"]
+				#[doc = " completes the remaining uncovered amount."]
+				pub fn min_transfer_collateral_increment(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MinTransferCollateralIncrement",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Default minimum normalized microgon value required to register a Minting Authority on"]
+				#[doc = " one destination chain."]
+				pub fn default_minimum_minting_authority_microgon_value(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"DefaultMinimumMintingAuthorityMicrogonValue",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of non-terminal transfer-out requests tracked for one destination chain."]
+				pub fn max_pending_transfer_outs_per_destination_chain(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxPendingTransferOutsPerDestinationChain",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Minimum remaining frame commitment required when reading vault committed collateral"]
+				#[doc = " capacity for council weighting and Minting Authority collateral."]
+				pub fn council_rotation_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"CouncilRotationFrames",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
 						],
 					)
 				}
@@ -26813,6 +28952,24 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct VaultArgonotCommitment<_0> {
+					#[codec(compact)]
+					pub committed_micronots: _0,
+					#[codec(compact)]
+					pub encumbered_micronots: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum VaultError {
 					#[codec(index = 0)]
 					VaultClosed,
@@ -26838,6 +28995,8 @@ pub mod api {
 					InternalError,
 					#[codec(index = 11)]
 					VaultNotYetActive,
+					#[codec(index = 12)]
+					CommittedArgonotsBelowEncumberedBacking,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -27135,6 +29294,8 @@ pub mod api {
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::HoldReason),
+				#[codec(index = 36)]
+				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::HoldReason),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29462,20 +31623,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					#[codec(index = 0)]
-					set_chain_config {
-						config: runtime_types::pallet_crosschain_transfer::pallet::ChainConfig,
-					},
-					#[codec(index = 1)]
-					prove_gateway_activity {
-						source_chain:
-							runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
-						#[codec(compact)]
-						previous_gateway_activity_nonce: ::core::primitive::u64,
-						proof_batch:
-							runtime_types::argon_primitives::ethereum::EthereumReceiptLogProofBatch,
-					},
-				}
+					# [codec (index = 0)] set_chain_config { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , config : runtime_types :: pallet_crosschain_transfer :: pallet :: ChainConfig , } , # [codec (index = 1)] force_set_global_issuance_council { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] after_nonce : :: core :: primitive :: u64 , member_account_ids : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < crate :: types :: AccountId32 > , } , # [codec (index = 2)] pause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 3)] unpause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 4)] set_minimum_minting_authority_value { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 5)] set_minting_authority_activation_repayment_pricing { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pricing : runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing , } , # [codec (index = 6)] register_council_signer { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , # [codec (index = 7)] register_minting_authority { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 8)] approve_queue_entries { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signatures : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < [:: core :: primitive :: u8 ; 65usize] > , } , # [codec (index = 9)] prove_gateway_activity { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof_batch : runtime_types :: argon_primitives :: ethereum :: EthereumReceiptLogProofBatch , } , # [codec (index = 10)] transfer_out { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] amount : :: core :: primitive :: u128 , } , # [codec (index = 11)] collateralize_transfer { transfer_id : crate :: types :: H256 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 12)] deactivate_minting_authority { destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -29490,11 +31638,59 @@ pub mod api {
 				)]
 				pub enum ChainConfig {
 					#[codec(index = 0)]
-					Ethereum {
+					Evm {
+						#[codec(compact)]
+						chain_id: ::core::primitive::u64,
 						gateway: ::subxt::ext::subxt_core::utils::H160,
 						argon_token: ::subxt::ext::subxt_core::utils::H160,
 						argonot_token: ::subxt::ext::subxt_core::utils::H160,
 					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct CouncilApprovalQueueEntry {
+					pub approving_council_hash: crate::types::H256,
+					pub target:
+						runtime_types::pallet_crosschain_transfer::pallet::CouncilApprovalTargetId,
+					pub target_payload_hash: crate::types::H256,
+					#[codec(compact)]
+					pub due_frame_id: ::core::primitive::u64,
+					pub previous_approval_hash: crate::types::H256,
+					pub approval_hash: crate::types::H256,
+					pub approved_total_weight: ::core::primitive::u128,
+					pub signatures:
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::subxt::ext::subxt_core::utils::H160,
+							[::core::primitive::u8; 65usize],
+						>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum CouncilApprovalTargetId {
+					#[codec(index = 0)]
+					MintingAuthorityActivation(::subxt::ext::subxt_core::utils::H160),
+					#[codec(index = 1)]
+					MintingAuthorityDeactivation(::subxt::ext::subxt_core::utils::H160),
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29514,7 +31710,7 @@ pub mod api {
 					#[doc = "The Ethereum event topics or payload do not match `TransferToArgonStarted`."]
 					InvalidTransferToArgonActivity,
 					#[codec(index = 1)]
-					#[doc = "At least one proved gateway-activity block must be supplied."]
+					#[doc = "At least one proven gateway-activity block must be supplied."]
 					NoGatewayProofBlocksProvided,
 					#[codec(index = 2)]
 					#[doc = "At least one gateway activity log must be supplied with the receipt proof."]
@@ -29523,29 +31719,166 @@ pub mod api {
 					#[doc = "The Ethereum verifier rejected the supplied proof."]
 					InvalidProof,
 					#[codec(index = 4)]
-					#[doc = "The destination account bytes could not be decoded into a local account id."]
-					InvalidRecipient,
-					#[codec(index = 5)]
 					#[doc = "The source chain is not configured for inbound claims."]
 					UnsupportedSource,
-					#[codec(index = 6)]
+					#[codec(index = 5)]
 					#[doc = "The gateway does not match the configured gateway address."]
 					UnsupportedGateway,
-					#[codec(index = 7)]
+					#[codec(index = 6)]
 					#[doc = "The token is not supported under the configured gateway."]
 					UnsupportedToken,
-					#[codec(index = 8)]
+					#[codec(index = 7)]
 					#[doc = "The caller's expected already-proven gateway activity nonce is stale or incorrect."]
 					UnexpectedPreviousGatewayActivityNonce,
-					#[codec(index = 9)]
+					#[codec(index = 8)]
 					#[doc = "The proven gateway activity nonce is not the next contiguous nonce."]
 					UnexpectedGatewayActivityNonce,
-					#[codec(index = 10)]
+					#[codec(index = 9)]
 					#[doc = "The configured source-chain shape is incomplete or malformed."]
 					InvalidChainConfig,
-					#[codec(index = 11)]
+					#[codec(index = 10)]
 					#[doc = "The burn account lacks enough balance for the payout."]
 					InsufficientLiquidity,
+					#[codec(index = 11)]
+					#[doc = "The supplied Minting Authority signing key does not exist locally."]
+					MintingAuthorityNotFound,
+					#[codec(index = 12)]
+					#[doc = "The local Minting Authority did not match the proven Ethereum activity."]
+					MintingAuthorityMismatch,
+					#[codec(index = 13)]
+					#[doc = "The local Minting Authority was not in the expected lifecycle state."]
+					UnexpectedMintingAuthorityState,
+					#[codec(index = 14)]
+					#[doc = "The local owner vault could not be resolved."]
+					UnknownOwnerVault,
+					#[codec(index = 15)]
+					#[doc = "The supplied Minting Authority signing key is invalid."]
+					InvalidMintingAuthoritySigningKey,
+					#[codec(index = 16)]
+					#[doc = "The supplied Minting Authority signing key already has a live local authority record."]
+					MintingAuthorityAlreadyRegistered,
+					#[codec(index = 17)]
+					#[doc = "The provided Minting Authority signer proof did not match the recovered Ethereum"]
+					#[doc = "signer."]
+					InvalidMintingAuthoritySigningKeyProof,
+					#[codec(index = 18)]
+					#[doc = "The supplied Minting Authority collateral is invalid."]
+					InvalidMintingAuthorityCollateral,
+					#[codec(index = 19)]
+					#[doc = "The active Global Issuance Council has not been seeded for this destination chain."]
+					GlobalIssuanceCouncilNotFound,
+					#[codec(index = 20)]
+					#[doc = "The supplied Global Issuance Council is empty or internally inconsistent."]
+					InvalidGlobalIssuanceCouncil,
+					#[codec(index = 21)]
+					#[doc = "The supplied Global Issuance Council contains the same signer more than once."]
+					DuplicateGlobalIssuanceCouncilSigner,
+					#[codec(index = 22)]
+					#[doc = "The supplied Global Issuance Council contains the same account more than once."]
+					DuplicateGlobalIssuanceCouncilAccount,
+					#[codec(index = 23)]
+					#[doc = "The provided council signer proof did not match the recovered Ethereum signer."]
+					InvalidCouncilSignerProof,
+					#[codec(index = 24)]
+					#[doc = "The origin is not an active Global Issuance Council member for the destination chain."]
+					GlobalIssuanceCouncilMemberNotFound,
+					#[codec(index = 25)]
+					#[doc = "The account has not registered a council signer for this destination chain."]
+					CouncilSignerNotRegistered,
+					#[codec(index = 26)]
+					#[doc = "The Minting Authority approval queue entry does not exist."]
+					CouncilApprovalQueueEntryNotFound,
+					#[codec(index = 27)]
+					#[doc = "This council member already approved the queued Minting Authority."]
+					CouncilApprovalAlreadyRecorded,
+					#[codec(index = 28)]
+					#[doc = "The force-set cut point was behind already confirmed queue progress."]
+					InvalidForceSetAfterNonce,
+					#[codec(index = 29)]
+					#[doc = "The force-set cut would discard a queue entry that already has local quorum."]
+					CannotForceSetQuorumApprovedQueueEntry,
+					#[codec(index = 30)]
+					#[doc = "The provided council approval signature did not match the expected Ethereum signer."]
+					InvalidCouncilApprovalSignature,
+					#[codec(index = 31)]
+					#[doc = "At least one council approval signature must be supplied."]
+					NoCouncilApprovalSignaturesProvided,
+					#[codec(index = 32)]
+					#[doc = "The operator does not have enough remaining committed microgon collateral for this"]
+					#[doc = "Minting Authority."]
+					InsufficientCommittedMicrogonCollateral,
+					#[codec(index = 33)]
+					#[doc = "The operator does not have enough remaining committed Argonot collateral for this"]
+					#[doc = "Minting Authority."]
+					InsufficientCommittedArgonotCollateral,
+					#[codec(index = 34)]
+					#[doc = "The provided signer-authorized deactivation signature did not match the expected"]
+					#[doc = "Minting Authority signing key."]
+					InvalidMintingAuthorityDeactivationSignature,
+					#[codec(index = 35)]
+					#[doc = "The council-managed Argonot floor could not be determined from current pricing."]
+					InvalidMicrogonsPerArgonot,
+					#[codec(index = 36)]
+					#[doc = "The supplied Minting Authority collateral is below the configured per-chain minimum"]
+					#[doc = "normalized microgon value."]
+					MintingAuthorityCollateralBelowMinimum,
+					#[codec(index = 37)]
+					#[doc = "The configured activation repayment pricing is internally invalid."]
+					InvalidMintingAuthorityActivationRepaymentPricing,
+					#[codec(index = 38)]
+					#[doc = "The configured activation repayment pricing is missing for this source chain."]
+					MissingMintingAuthorityActivationRepaymentPricing,
+					#[codec(index = 39)]
+					#[doc = "The Ethereum event topics or payload do not match a supported gateway activity."]
+					InvalidGatewayActivity,
+					#[codec(index = 40)]
+					#[doc = "This source chain is paused due to gateway sync misalignment and needs operator"]
+					#[doc = "recovery."]
+					GatewaySyncPaused,
+					#[codec(index = 41)]
+					#[doc = "The transfer-out amount must be nonzero."]
+					InvalidTransferOutAmount,
+					#[codec(index = 42)]
+					#[doc = "The transfer-out recipient must be nonzero for the destination chain."]
+					InvalidTransferOutRecipient,
+					#[codec(index = 43)]
+					#[doc = "No verifier-backed Ethereum execution block is available to anchor a transfer-out"]
+					#[doc = "expiry window."]
+					MissingVerifiedExecutionBlock,
+					#[codec(index = 44)]
+					#[doc = "The latest verifier-backed Ethereum execution block is too old to safely open a new"]
+					#[doc = "transfer out."]
+					StaleVerifiedExecutionBlock,
+					#[codec(index = 45)]
+					#[doc = "The outbound transfer record does not exist."]
+					TransferOutNotFound,
+					#[codec(index = 46)]
+					#[doc = "The outbound transfer cannot accept more collateral because it is already fully"]
+					#[doc = "covered."]
+					TransferOutAlreadyReady,
+					#[codec(index = 47)]
+					#[doc = "The outbound transfer request is already expired on the latest verified Ethereum block."]
+					TransferOutExpired,
+					#[codec(index = 48)]
+					#[doc = "The provided transfer collateral row is invalid for this transfer asset."]
+					InvalidTransferCollateral,
+					#[codec(index = 49)]
+					#[doc = "The provided transfer collateral row did not advance the signer's local reservation."]
+					InvalidTransferCollateralUpdate,
+					#[codec(index = 50)]
+					#[doc = "The transfer collateral signature did not match the authority signing key."]
+					InvalidTransferCollateralSignature,
+					#[codec(index = 51)]
+					#[doc = "The authority does not have enough remaining gateway collateral for this transfer row."]
+					InsufficientMintingAuthorityCollateral,
+					#[codec(index = 52)]
+					#[doc = "The collateral increment is below the configured minimum and does not complete the"]
+					#[doc = "transfer."]
+					TransferCollateralIncrementTooSmall,
+					#[codec(index = 53)]
+					#[doc = "The destination chain already tracks the maximum number of non-terminal transfer-out"]
+					#[doc = "requests."]
+					TooManyPendingTransferOuts,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29561,7 +31894,7 @@ pub mod api {
 				)]
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
-					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proved and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "The stored gateway-state snapshot advanced after a proved contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , }
+					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 3)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 5)] # [doc = "An operator queued the signer-authorized Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 7)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 8)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 9)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 13)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 14)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 15)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , # [codec (index = 16)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 17)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 19)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -29594,9 +31927,200 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct GatewaySyncPause {
+					#[codec(compact)]
+					pub last_good_gateway_activity_nonce: ::core::primitive::u64,
+					#[codec(compact)]
+					pub failed_gateway_activity_nonce: ::core::primitive::u64,
+					pub reason:
+						runtime_types::pallet_crosschain_transfer::pallet::GatewaySyncPauseReason,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum GatewaySyncPauseReason {
+					#[codec(index = 0)]
+					Manual,
+					#[codec(index = 1)]
+					MalformedGatewayActivity,
+					#[codec(index = 2)]
+					UnsupportedToken,
+					#[codec(index = 3)]
+					MintingAuthorityNotFound,
+					#[codec(index = 4)]
+					UnexpectedMintingAuthorityState,
+					#[codec(index = 5)]
+					MintingAuthorityMismatch,
+					#[codec(index = 6)]
+					MissingMintingAuthorityActivationRepaymentPricing,
+					#[codec(index = 7)]
+					GatewayStateDrift,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GlobalIssuanceCouncil { pub epoch_microgons_per_argonot : :: core :: primitive :: u128 , pub members : runtime_types :: bounded_collections :: bounded_btree_map :: BoundedBTreeMap1 < :: subxt :: ext :: subxt_core :: utils :: H160 , runtime_types :: pallet_crosschain_transfer :: pallet :: GlobalIssuanceCouncilMember > , pub total_weight : :: core :: primitive :: u128 , }
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GlobalIssuanceCouncilMember {
+					pub account_id: crate::types::AccountId32,
+					pub signer: ::subxt::ext::subxt_core::utils::H160,
+					pub weight: ::core::primitive::u128,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum HoldReason {
+					#[codec(index = 0)]
+					TransferOutMintingAuthorityTip,
+					#[codec(index = 1)]
+					MintingAuthorityActivationRepayment,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MintingAuthority {
+					pub account_id: crate::types::AccountId32,
+					pub destination_chain:
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+					pub destination_signing_key: ::subxt::ext::subxt_core::utils::H160,
+					pub state:
+						runtime_types::pallet_crosschain_transfer::pallet::MintingAuthorityState,
+					pub gateway_remaining_microgon_collateral: ::core::primitive::u128,
+					pub gateway_remaining_micronot_collateral: ::core::primitive::u128,
+					pub pending_reserved_microgon_collateral: ::core::primitive::u128,
+					pub pending_reserved_micronot_collateral: ::core::primitive::u128,
+					pub active_pending_transfer_ids:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							crate::types::H256,
+						>,
+					pub activation_approval_queue_nonce: ::core::primitive::u64,
+					pub activation_base_repayment_due:
+						::core::option::Option<::core::primitive::u128>,
+					pub activation_signature_repayment_due:
+						::core::option::Option<::core::primitive::u128>,
+					pub activation_repayment_due: ::core::option::Option<::core::primitive::u128>,
+					pub deactivation_approval_queue_nonce:
+						::core::option::Option<::core::primitive::u64>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MintingAuthorityActivationRepaymentPricing {
+					#[codec(compact)]
+					pub activation_gas_cost: ::core::primitive::u128,
+					#[codec(compact)]
+					pub signature_gas_cost: ::core::primitive::u128,
+					#[codec(compact)]
+					pub estimated_wei_per_gas: ::core::primitive::u128,
+					pub estimated_microgons_per_eth: ::core::primitive::u128,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum MintingAuthorityState {
+					#[codec(index = 0)]
+					PendingActivation,
+					#[codec(index = 1)]
+					Active,
+					#[codec(index = 2)]
+					Deactivating,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum SourceChain {
 					#[codec(index = 0)]
 					Ethereum,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SourceChainCirculation {
+					pub argon_circulation: ::core::primitive::u128,
+					pub argonot_circulation: ::core::primitive::u128,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29618,6 +32142,75 @@ pub mod api {
 					pub to: crate::types::AccountId32,
 					#[codec(compact)]
 					pub amount: ::core::primitive::u128,
+				}
+			}
+			pub mod transfer_out {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct MintingAuthorityTransferReservation {
+					pub microgon_collateral: ::core::primitive::u128,
+					pub micronot_collateral: ::core::primitive::u128,
+					pub collateral_share: ::core::primitive::u128,
+					pub signature: [::core::primitive::u8; 65usize],
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PendingCollateralizationRequest {
+					pub transfer_id: crate::types::H256,
+					pub remaining_collateral: ::core::primitive::u128,
+					pub remaining_minting_authority_tip: ::core::primitive::u128,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TransferOutOfArgon { pub argon_account_id : crate :: types :: AccountId32 , # [codec (compact)] pub argon_transfer_nonce : :: core :: primitive :: u64 , pub destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pub council_hash : crate :: types :: H256 , pub destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] pub valid_until_ethereum_block : :: core :: primitive :: u64 , pub asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , pub amount : :: core :: primitive :: u128 , pub minting_authority_tip : :: core :: primitive :: u128 , pub total_attached_collateral : :: core :: primitive :: u128 , pub minting_authority_collateral_by_signer : runtime_types :: bounded_collections :: bounded_btree_map :: BoundedBTreeMap1 < :: subxt :: ext :: subxt_core :: utils :: H160 , runtime_types :: pallet_crosschain_transfer :: transfer_out :: MintingAuthorityTransferReservation > , pub state : runtime_types :: pallet_crosschain_transfer :: transfer_out :: TransferOutState , }
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum TransferOutState {
+					#[codec(index = 0)]
+					Started,
+					#[codec(index = 1)]
+					Ready,
 				}
 			}
 		}
@@ -30016,6 +32609,8 @@ pub mod api {
 				pub struct ExecutionHeaderAnchor {
 					#[codec(compact)]
 					pub block_number: ::core::primitive::u64,
+					#[codec(compact)]
+					pub timestamp_millis: ::core::primitive::u64,
 					pub block_hash: crate::types::H256,
 					pub parent_hash: crate::types::H256,
 					pub receipts_root: crate::types::H256,
@@ -32744,6 +35339,10 @@ pub mod api {
 					#[codec(index = 9)]
 					#[doc = "The vault doesn't have enough bitcoin security to support this bond purchase"]
 					BondPurchaseAboveSecurity,
+					#[codec(index = 10)]
+					#[doc = "Liquidating this bond lot would take the account below its crosschain-encumbered"]
+					#[doc = "treasury backing."]
+					ActiveBondAmountBelowEncumberedBacking,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32827,6 +35426,14 @@ pub mod api {
 						bond_lot_id: ::core::primitive::u64,
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
+					},
+					#[codec(index = 8)]
+					#[doc = "Encumbered treasury backing was burned and any no-longer-needed fractional hold was"]
+					#[doc = "returned."]
+					EncumberedBondMicrogonsBurned {
+						account_id: crate::types::AccountId32,
+						burned_amount: ::core::primitive::u128,
+						released_amount: ::core::primitive::u128,
 					},
 				}
 				#[derive(
@@ -33286,7 +35893,7 @@ pub mod api {
 						securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					},
 					#[codec(index = 2)]
-					#[doc = "Change the terms of this vault. The change will be applied at the next mining slot"]
+					#[doc = "Change the terms of this vault. The change will be applied at the next mining frame"]
 					#[doc = "change that is at least `MinTermsModificationBlockDelay` blocks away."]
 					modify_terms {
 						vault_id: ::core::primitive::u32,
@@ -33319,6 +35926,11 @@ pub mod api {
 								::core::primitive::u8,
 							>,
 						>,
+					},
+					#[codec(index = 8)]
+					set_committed_argonots {
+						#[codec(compact)]
+						amount: ::core::primitive::u128,
 					},
 				}
 				#[derive(
@@ -33421,8 +36033,14 @@ pub mod api {
 					#[doc = "A vault must clear out all pending orphan cosigns before it can collect"]
 					PendingOrphanedUtxoCosignsBeforeCollect,
 					#[codec(index = 29)]
+					#[doc = "A vault must clear out all overdue external collect blockers before it can collect."]
+					OverdueCollectBlockersBeforeCollect,
+					#[codec(index = 30)]
 					#[doc = "An account may only be associated with a single vault"]
 					AccountAlreadyHasVault,
+					#[codec(index = 31)]
+					#[doc = "Committed Argonots cannot be reduced below the amount already crosschain-encumbered."]
+					CommittedArgonotsBelowEncumberedBacking,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33524,6 +36142,12 @@ pub mod api {
 						frame_id: ::core::primitive::u64,
 						vault_earnings: ::core::primitive::u128,
 						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 15)]
+					CommittedArgonotsSet {
+						vault_id: ::core::primitive::u32,
+						operator_account_id: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
 					},
 				}
 				#[derive(

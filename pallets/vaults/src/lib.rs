@@ -36,10 +36,10 @@ pub mod pallet {
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{
-			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault, VaultError,
-			VaultName, VaultTerms,
+			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault,
+			VaultArgonotCommitment, VaultError, VaultName, VaultTerms,
 		},
-		MiningFrameProvider, TickProvider,
+		CollectBlockerProvider, MiningFrameProvider, TickProvider,
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
@@ -63,6 +63,11 @@ pub mod pallet {
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>;
 
+		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
+			+ Mutate<Self::AccountId, Balance = Self::Balance>
+			+ InspectHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
+			+ Inspect<Self::AccountId, Balance = Self::Balance>;
+
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec
 			+ Copy
@@ -83,13 +88,17 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxPendingTermModificationsPerTick: Get<u32>;
 
-		/// A provider of mining slot information
+		/// A provider of mining frame timing information
 		type MiningFrameProvider: MiningFrameProvider;
 
 		/// Provides the bitcoin network this blockchain is connected to
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 		/// Bitcoin time provider
 		type BitcoinBlockHeightChange: Get<(BitcoinHeight, BitcoinHeight)>;
+		/// Estimated ticks per bitcoin block for release-schedule horizon calculations.
+		type TicksPerBitcoinBlock: Get<Tick>;
+		/// Ticks in one frame for commitment horizon calculations.
+		type TicksPerFrame: Get<Tick>;
 
 		type TickProvider: TickProvider<Self::Block>;
 
@@ -125,6 +134,8 @@ pub mod pallet {
 
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
+		/// External collect blockers that must be cleared before revenue can be collected.
+		type CollectBlockerProvider: CollectBlockerProvider<Self::AccountId>;
 	}
 
 	/// A reason for the pallet placing a hold on funds.
@@ -150,6 +161,11 @@ pub mod pallet {
 	pub type VaultIdByOperator<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, VaultId, OptionQuery>;
 
+	/// Vault-side committed and crosschain-encumbered argonot backing.
+	#[pallet::storage]
+	pub type ArgonotCommitmentByVaultId<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, VaultArgonotCommitment<T::Balance>, OptionQuery>;
+
 	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
 	pub type VaultXPubById<T: Config> =
@@ -160,8 +176,8 @@ pub mod pallet {
 	pub type LastCollectFrameByVaultId<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, FrameId, OptionQuery>;
 
-	/// Pending terms that will be committed at the given block number (must be a minimum of 1 slot
-	/// change away)
+	/// Pending terms that will be committed at the given block number (must be a minimum of 1
+	/// frame change away)
 	#[pallet::storage]
 	pub type PendingTermsModificationsByTick<T: Config> = StorageMap<
 		_,
@@ -212,6 +228,9 @@ pub mod pallet {
 		BoundedVec<VaultFrameRevenue<T>, ConstU32<12>>,
 		ValueQuery,
 	>;
+
+	#[pallet::storage]
+	pub type RevenuePerFrameByVaultCount<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	/// Recent reductions in `available_for_lock`, grouped by vault.
 	#[pallet::storage]
@@ -307,6 +326,11 @@ pub mod pallet {
 			vault_earnings: T::Balance,
 			error: DispatchError,
 		},
+		CommittedArgonotsSet {
+			vault_id: VaultId,
+			operator_account_id: T::AccountId,
+			amount: T::Balance,
+		},
 	}
 
 	#[pallet::error]
@@ -367,8 +391,12 @@ pub mod pallet {
 		PendingCosignsBeforeCollect,
 		/// A vault must clear out all pending orphan cosigns before it can collect
 		PendingOrphanedUtxoCosignsBeforeCollect,
+		/// A vault must clear out all overdue external collect blockers before it can collect.
+		OverdueCollectBlockersBeforeCollect,
 		/// An account may only be associated with a single vault
 		AccountAlreadyHasVault,
+		/// Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
+		CommittedArgonotsBelowEncumberedBacking,
 	}
 
 	#[derive(
@@ -410,6 +438,8 @@ pub mod pallet {
 				VaultError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
 				VaultError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
+				VaultError::CommittedArgonotsBelowEncumberedBacking =>
+					Error::<T>::CommittedArgonotsBelowEncumberedBacking,
 			}
 		}
 	}
@@ -644,7 +674,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Change the terms of this vault. The change will be applied at the next mining slot
+		/// Change the terms of this vault. The change will be applied at the next mining frame
 		/// change that is at least `MinTermsModificationBlockDelay` blocks away.
 		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::modify_terms())]
@@ -758,6 +788,10 @@ pub mod pallet {
 			let has_orphan_cosigns =
 				OrphanedUtxoAccountsByVaultId::<T>::iter_prefix(vault_id).next().is_some();
 			ensure!(!has_orphan_cosigns, Error::<T>::PendingOrphanedUtxoCosignsBeforeCollect);
+			ensure!(
+				!T::CollectBlockerProvider::has_overdue_collect_blocker(&who),
+				Error::<T>::OverdueCollectBlockersBeforeCollect,
+			);
 
 			LastCollectFrameByVaultId::<T>::insert(vault_id, T::CurrentFrameId::get());
 			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |a| {
@@ -815,9 +849,93 @@ pub mod pallet {
 
 			Ok(())
 		}
+
+		#[pallet::call_index(8)]
+		#[pallet::weight(T::WeightInfo::set_committed_argonots())]
+		pub fn set_committed_argonots(
+			origin: OriginFor<T>,
+			#[pallet::compact] amount: T::Balance,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
+			let mut commitment = Self::argonot_commitment(vault_id, &who);
+			ensure!(
+				amount >= commitment.encumbered_micronots,
+				Error::<T>::CommittedArgonotsBelowEncumberedBacking,
+			);
+			let hold_reason = HoldReason::EnterVault;
+			let current = T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), &who);
+
+			if amount > current {
+				let additional = amount.saturating_sub(current);
+				if current.is_zero() {
+					let _ = frame_system::Pallet::<T>::inc_providers(&who);
+				}
+
+				T::OwnershipCurrency::hold(&hold_reason.into(), &who, additional).map_err(
+					|e| -> DispatchError {
+						match e {
+							Token(TokenError::BelowMinimum) =>
+								DispatchError::from(Error::<T>::AccountBelowMinimumBalance),
+							_ => {
+								let balance = T::OwnershipCurrency::balance(&who);
+								if balance.checked_sub(&additional).is_some() &&
+									balance.saturating_sub(additional) <
+										T::OwnershipCurrency::minimum_balance()
+								{
+									return DispatchError::from(
+										Error::<T>::AccountBelowMinimumBalance,
+									);
+								}
+
+								DispatchError::from(Error::<T>::InsufficientFunds)
+							},
+						}
+					},
+				)?;
+			} else if amount < current {
+				let release_amount = current.saturating_sub(amount);
+				T::OwnershipCurrency::release(
+					&hold_reason.into(),
+					&who,
+					release_amount,
+					Precision::Exact,
+				)
+				.map_err(|_| Error::<T>::UnrecoverableHold)?;
+
+				if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), &who).is_zero() {
+					let _ = frame_system::Pallet::<T>::dec_providers(&who);
+				}
+			}
+
+			commitment.committed_micronots = amount;
+			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+
+			Self::deposit_event(Event::CommittedArgonotsSet {
+				vault_id,
+				operator_account_id: who,
+				amount,
+			});
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn argonot_commitment(
+			vault_id: VaultId,
+			account_id: &T::AccountId,
+		) -> VaultArgonotCommitment<T::Balance> {
+			ArgonotCommitmentByVaultId::<T>::get(vault_id).unwrap_or_else(|| {
+				VaultArgonotCommitment {
+					committed_micronots: T::OwnershipCurrency::balance_on_hold(
+						&HoldReason::EnterVault.into(),
+						account_id,
+					),
+					encumbered_micronots: T::Balance::default(),
+				}
+			})
+		}
+
 		fn ensure_valid_name(name: &VaultName) -> Result<(), Error<T>> {
 			ensure!(!name.is_empty(), Error::<T>::InvalidVaultName);
 			ensure!(name[0].is_ascii_uppercase(), Error::<T>::InvalidVaultName);
@@ -835,14 +953,36 @@ pub mod pallet {
 			T::TickProvider::current_tick()
 		}
 
-		fn minimum_reducible_securitization(vault: &Vault<T::AccountId, T::Balance>) -> T::Balance {
+		fn minimum_reducible_securitization_at_tick(
+			vault: &Vault<T::AccountId, T::Balance>,
+			tick: Tick,
+		) -> T::Balance {
 			if vault
 				.operational_minimum_release_tick
-				.is_some_and(|unlock_tick| unlock_tick > T::TickProvider::current_tick())
+				.is_some_and(|unlock_tick| unlock_tick > tick)
 			{
 				return T::OperationalMinimumVaultSecuritization::get();
 			}
 			T::Balance::zero()
+		}
+
+		pub(crate) fn bitcoin_height_after_tick_range(
+			current_height: BitcoinHeight,
+			ticks_until_horizon: Tick,
+		) -> Option<BitcoinHeight> {
+			let ticks_per_bitcoin_block = T::TicksPerBitcoinBlock::get();
+			if ticks_per_bitcoin_block == 0 {
+				return None;
+			}
+
+			Some(
+				current_height.saturating_add(
+					ticks_until_horizon
+						.saturating_add(ticks_per_bitcoin_block.saturating_sub(1))
+						.saturating_div(ticks_per_bitcoin_block)
+						.saturated_into::<BitcoinHeight>(),
+				),
+			)
 		}
 
 		fn recent_capacity_drop_window() -> BlockNumberFor<T> {
@@ -1002,7 +1142,10 @@ pub mod pallet {
 			let available_before_drop = vault.available_for_lock();
 			let uninhibited_securitization = vault.uninhibited_securitization();
 			let minimum_remaining_securitization =
-				vault.securitization_target.max(Self::minimum_reducible_securitization(vault));
+				vault.securitization_target.max(Self::minimum_reducible_securitization_at_tick(
+					vault,
+					T::TickProvider::current_tick(),
+				));
 
 			if uninhibited_securitization.is_zero() ||
 				vault.securitization <= minimum_remaining_securitization
@@ -1041,6 +1184,7 @@ pub mod pallet {
 			frame_id: FrameId,
 			callback: impl FnOnce(&mut VaultFrameRevenue<T>) -> Result<(), VaultError>,
 		) -> Result<(), VaultError> {
+			let had_revenue = RevenuePerFrameByVault::<T>::contains_key(vault_id);
 			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |x| {
 				let vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 				let current_frame_id = T::CurrentFrameId::get();
@@ -1058,7 +1202,13 @@ pub mod pallet {
 						VaultError::InternalError
 					})
 				}
-			})
+			})?;
+			if !had_revenue {
+				RevenuePerFrameByVaultCount::<T>::mutate(|count| {
+					*count = count.saturating_add(1);
+				});
+			}
+			Ok(())
 		}
 
 		pub(crate) fn update_vault_bitcoin_metrics(
@@ -1177,12 +1327,17 @@ pub mod pallet {
 				});
 				if is_empty {
 					RevenuePerFrameByVault::<T>::remove(vault_id);
+					RevenuePerFrameByVaultCount::<T>::mutate(|count| {
+						*count = count.saturating_sub(1);
+					});
 				}
 			}
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			T::WeightInfo::on_frame_start(T::MaxVaults::get())
+			T::DbWeight::get().reads(1).saturating_add(T::WeightInfo::on_frame_start(
+				RevenuePerFrameByVaultCount::<T>::get(),
+			))
 		}
 	}
 
@@ -1303,6 +1458,110 @@ pub mod pallet {
 				activated_securitization: vault.get_activated_securitization(),
 				securitization: vault.securitization,
 			})
+		}
+
+		fn get_committed_securitization(
+			account_id: &Self::AccountId,
+			min_frames_remaining: FrameId,
+		) -> Option<Self::Balance> {
+			let vault_id = VaultIdByOperator::<T>::get(account_id)?;
+			let vault = VaultsById::<T>::get(vault_id)?;
+			let current_tick = T::TickProvider::current_tick();
+			let commitment_horizon_tick = if min_frames_remaining == 0 {
+				current_tick
+			} else {
+				let remaining_current_frame_ticks =
+					T::MiningFrameProvider::get_next_frame_tick().saturating_sub(current_tick);
+				current_tick.saturating_add(remaining_current_frame_ticks).saturating_add(
+					T::TicksPerFrame::get().saturating_mul(
+						min_frames_remaining.saturating_sub(1).saturated_into::<Tick>(),
+					),
+				)
+			};
+			let current_height = T::BitcoinBlockHeightChange::get().1;
+			let bitcoin_release_horizon_height = Self::bitcoin_height_after_tick_range(
+				current_height,
+				commitment_horizon_tick.saturating_sub(current_tick),
+			);
+			let committed_securitization = vault
+				.get_activated_securitization()
+				.saturating_add(vault.get_relock_capacity_after(bitcoin_release_horizon_height?))
+				.max(Self::minimum_reducible_securitization_at_tick(
+					&vault,
+					commitment_horizon_tick,
+				));
+
+			Some(committed_securitization)
+		}
+
+		fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+			let vault_id = VaultIdByOperator::<T>::get(account_id)?;
+			Some(Self::argonot_commitment(vault_id, account_id).committed_micronots)
+		}
+
+		fn encumber_argonots(
+			account_id: &Self::AccountId,
+			amount: Self::Balance,
+		) -> Result<(), VaultError> {
+			let vault_id =
+				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
+			let mut commitment = Self::argonot_commitment(vault_id, account_id);
+			let Some(next_encumbered) = commitment.encumbered_micronots.checked_add(&amount) else {
+				return Err(VaultError::InternalError);
+			};
+			if next_encumbered > commitment.committed_micronots {
+				return Err(VaultError::CommittedArgonotsBelowEncumberedBacking);
+			}
+			commitment.encumbered_micronots = next_encumbered;
+			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			Ok(())
+		}
+
+		fn release_encumbered_argonots(
+			account_id: &Self::AccountId,
+			amount: Self::Balance,
+		) -> Result<(), VaultError> {
+			let vault_id =
+				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
+			let mut commitment = Self::argonot_commitment(vault_id, account_id);
+			commitment.encumbered_micronots = commitment
+				.encumbered_micronots
+				.checked_sub(&amount)
+				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			Ok(())
+		}
+
+		fn burn_encumbered_argonots(
+			account_id: &Self::AccountId,
+			amount: Self::Balance,
+		) -> Result<(), VaultError> {
+			let vault_id =
+				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
+			let mut commitment = Self::argonot_commitment(vault_id, account_id);
+			commitment.committed_micronots = commitment
+				.committed_micronots
+				.checked_sub(&amount)
+				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+			commitment.encumbered_micronots = commitment
+				.encumbered_micronots
+				.checked_sub(&amount)
+				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+			T::OwnershipCurrency::burn_held(
+				&HoldReason::EnterVault.into(),
+				account_id,
+				amount,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| VaultError::UnrecoverableHold)?;
+			if T::OwnershipCurrency::balance_on_hold(&HoldReason::EnterVault.into(), account_id)
+				.is_zero()
+			{
+				let _ = frame_system::Pallet::<T>::dec_providers(account_id);
+			}
+			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			Ok(())
 		}
 
 		fn account_became_operational(vault_operator_account: &T::AccountId) {

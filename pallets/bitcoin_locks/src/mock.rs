@@ -161,6 +161,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPriceInUsd::get()
 	}
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		ArgonPriceInUsd::get()
+	}
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonTargetPriceInUsd::get()
 	}
@@ -228,6 +231,41 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 				securitization: vault.securitization,
 			}
 		})
+	}
+
+	fn get_committed_securitization(
+		account_id: &Self::AccountId,
+		_min_frames_remaining: FrameId,
+	) -> Option<Self::Balance> {
+		Self::get_vault_id(account_id).map(|_| {
+			let vault = DefaultVault::get();
+			vault.get_activated_securitization().saturating_add(vault.get_relock_capacity())
+		})
+	}
+
+	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+		Self::get_vault_id(account_id).map(|_| Default::default())
+	}
+
+	fn encumber_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
+	}
+
+	fn release_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
+	}
+
+	fn burn_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		Ok(())
 	}
 
 	fn cancel(

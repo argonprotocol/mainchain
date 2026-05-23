@@ -60,16 +60,23 @@ export default tseslint.config(
   },
   // Looser in tests and scripts
   {
-    files: ['**/*.test.ts', '**/__test__/**', 'scripts/**'],
+    files: ['**/*.test.ts', '**/__test__/**', 'scripts/**', '**/script/**', '**/test/**'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
+    },
+  },
+  {
+    files: ['**/generated.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   {

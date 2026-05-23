@@ -59,7 +59,7 @@ type GatewayContract = {
   getAddress(): Promise<Address>;
   connect(signer: AccountSigner): GatewayContract;
   getFunction(name: 'argonApprovalsHash'): () => Promise<Hex>;
-  globalIssuanceCouncil(): Promise<{ councilNumber: bigint }>;
+  globalIssuanceCouncil(): Promise<{ councilHash: Hex }>;
   migrate(
     argonMigration: MintingGatewayMigrationAssetDistribution,
     argonotMigration: MintingGatewayMigrationAssetDistribution,
@@ -116,7 +116,7 @@ type Council = {
   memberCount: bigint;
   totalWeight: bigint;
   hash: Hex;
-  microgonsPerArgonot: bigint;
+  epochMicrogonsPerArgonot: bigint;
   snapshot: MintingGatewayCouncilSnapshot;
   quorumSigners: SignerLike[];
 };
@@ -321,7 +321,7 @@ async function measureUserPaths() {
     argonAccountId: ethers.encodeBytes32String('account-cancel') as Hex,
     argonTransferNonce: 99n,
     chainId,
-    councilNumber: activeCouncil.councilNumber,
+    councilHash: activeCouncil.councilHash,
     recipient: cancelFixture.recipient.address,
     validUntilBlock: 0n,
     token: await cancelFixture.argon.getAddress(),
@@ -384,7 +384,7 @@ async function deployGatewayStack(council: Council) {
     council.hash,
     council.memberCount,
     council.totalWeight,
-    council.microgonsPerArgonot,
+    council.epochMicrogonsPerArgonot,
   ]);
 
   const gatewayProxyFactory = (await ethers.getContractFactory(
@@ -457,9 +457,7 @@ async function activateMintingAuthority(
   authorityNumber: number,
 ) {
   const signingWallet = Wallet.createRandom() as unknown as SignerLike;
-  const mintingAuthorityId = ethers.id(`minting-authority-${authorityNumber}`) as Hex;
   const target = {
-    mintingAuthorityId,
     microgonCollateral: 1_000n,
     micronotCollateral: 200n,
     signingKey: signingWallet.address,
@@ -491,7 +489,6 @@ async function activateMintingAuthority(
   );
 
   return {
-    mintingAuthorityId,
     signingWallet,
   };
 }
@@ -499,7 +496,6 @@ async function activateMintingAuthority(
 async function measureMintingAuthorityActivationGas(fixture: DeployStack, queueNonce: bigint) {
   const signingWallet = Wallet.createRandom() as unknown as SignerLike;
   const target = {
-    mintingAuthorityId: ethers.id(`activation-${queueNonce}`) as Hex,
     microgonCollateral: 1_000n,
     micronotCollateral: 200n,
     signingKey: signingWallet.address,
@@ -545,7 +541,6 @@ async function measureMintingAuthorityActivationBatchGas(
   for (let index = 0; index < activationCount; ++index) {
     const queueNonce = startQueueNonce + BigInt(index);
     const target = {
-      mintingAuthorityId: ethers.id(`activation-batch-${queueNonce}`) as Hex,
       microgonCollateral: 1_000n,
       micronotCollateral: 200n,
       signingKey: (Wallet.createRandom() as unknown as SignerLike).address,
@@ -594,14 +589,14 @@ async function measureCouncilRotationGas(
       previousUpdateHash,
       target: {
         council: nextCouncil.snapshot,
-        microgonsPerArgonot: nextCouncil.microgonsPerArgonot,
+        epochMicrogonsPerArgonot: nextCouncil.epochMicrogonsPerArgonot,
       },
     },
   );
   const signatures = await signApprovalHash(fixture.council.quorumSigners, approvalHash);
   const payload = encodeMintingGatewayGlobalIssuanceCouncilRotateTarget({
     council: nextCouncil.snapshot,
-    microgonsPerArgonot: nextCouncil.microgonsPerArgonot,
+    epochMicrogonsPerArgonot: nextCouncil.epochMicrogonsPerArgonot,
   } satisfies MintingGatewayGlobalIssuanceCouncilRotateTarget);
 
   let estimate: bigint;
@@ -670,7 +665,7 @@ async function buildTransferOutOfArgonRequest(
     argonAccountId: ethers.encodeBytes32String(`account-${transferNonce}`) as Hex,
     argonTransferNonce: transferNonce,
     chainId,
-    councilNumber: activeCouncil.councilNumber,
+    councilHash: activeCouncil.councilHash,
     recipient: fixture.recipient.address,
     validUntilBlock: 1_000_000n,
     token: await fixture.argon.getAddress(),
@@ -766,8 +761,12 @@ function createCouncil(memberCount: number): Council {
     weights,
     memberCount: BigInt(memberCount),
     totalWeight,
-    hash: hashMintingGatewayGlobalIssuanceCouncil({ signers, weights }),
-    microgonsPerArgonot: MICROGONS_PER_ARGONOT,
+    hash: hashMintingGatewayGlobalIssuanceCouncil({
+      signers,
+      weights,
+      epochMicrogonsPerArgonot: MICROGONS_PER_ARGONOT,
+    }),
+    epochMicrogonsPerArgonot: MICROGONS_PER_ARGONOT,
     snapshot: { signers, weights },
     quorumSigners: wallets.slice(0, quorumCount),
   };

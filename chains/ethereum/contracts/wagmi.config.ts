@@ -144,9 +144,6 @@ const eventMetadata: Plugin = {
           abi: [item],
           eventName: item.name,
         })[0];
-        if (!eventTopic) {
-          throw new Error(`Could not compute event topic for ${contract.name}.${item.name}`);
-        }
         const eventTypeName = `${toPascalCase(contract.name)}${item.name}`;
 
         generatedTypes.set(
@@ -155,7 +152,7 @@ const eventMetadata: Plugin = {
         );
 
         contractEvents.push(
-          `  ${formatPropertyName(item.name)}: {\n    name: '${item.name}',\n    topic: '${eventTopic.toLowerCase()}',\n  },`,
+          `  ${formatPropertyName(item.name)}: {\n    name: '${item.name}',\n    topic: '${eventTopic?.toLowerCase() ?? ''}',\n  },`,
         );
       }
 

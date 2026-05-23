@@ -159,6 +159,81 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_encumber_bond_microgons() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let account_id = seed_active_held_bond_lot::<T>()?;
+		let microgon_amount = bonds_to_balance::<T>(minimum_purchase_bonds::<T>());
+
+		#[block]
+		{
+			assert!(<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::encumber_bond_microgons(
+				&account_id,
+				microgon_amount,
+			)
+			.is_ok());
+		}
+
+		assert_eq!(EncumberedBondMicrogonsByAccount::<T>::get(&account_id), microgon_amount);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_release_encumbered_bond_microgons() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let account_id = seed_active_held_bond_lot::<T>()?;
+		let microgon_amount = bonds_to_balance::<T>(minimum_purchase_bonds::<T>());
+		<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::encumber_bond_microgons(
+			&account_id,
+			microgon_amount,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed encumbered treasury backing"))?;
+
+		#[block]
+		{
+			assert!(
+				<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::release_encumbered_bond_microgons(
+					&account_id,
+					microgon_amount,
+				)
+				.is_ok()
+			);
+		}
+
+		assert_eq!(EncumberedBondMicrogonsByAccount::<T>::get(&account_id), T::Balance::zero(),);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_burn_encumbered_bond_microgons() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let account_id = seed_active_held_bond_lot::<T>()?;
+		let microgon_amount = bonds_to_balance::<T>(minimum_purchase_bonds::<T>());
+		<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::encumber_bond_microgons(
+			&account_id,
+			microgon_amount,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed encumbered treasury backing"))?;
+
+		#[block]
+		{
+			assert!(
+				<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::burn_encumbered_bond_microgons(
+					&account_id,
+					microgon_amount,
+				)
+				.is_ok()
+			);
+		}
+
+		assert_eq!(EncumberedBondMicrogonsByAccount::<T>::get(&account_id), T::Balance::zero(),);
+		assert!(BondLotIdsByAccount::<T>::iter_prefix(&account_id).next().is_none());
+		Ok(())
+	}
+
+	#[benchmark]
 	fn release_pending_bond_lots() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 		seed_pending_bond_releases::<T>(BENCHMARK_FRAME_ID)?;
@@ -264,6 +339,7 @@ fn reset_benchmark_state<T: Config>() {
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
 		btc_price_in_usd: Some(FixedU128::saturating_from_integer(100u128)),
 		argon_price_in_usd: Some(FixedU128::one()),
+		argonot_price_in_usd: Some(FixedU128::one()),
 		argon_target_price_in_usd: Some(FixedU128::one()),
 		circulation: 1_000_000,
 	});
@@ -401,6 +477,32 @@ where
 	set_benchmark_bitcoin_vault_provider_state(benchmark_vault_state);
 
 	Ok(next_bond_lot_id)
+}
+
+fn seed_active_held_bond_lot<T: Config>() -> Result<T::AccountId, BenchmarkError>
+where
+	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	let account_id = account("encumbered-bond-holder", 0, 0);
+	let bonds = minimum_purchase_bonds::<T>();
+	let mut summaries = BoundedVec::default();
+	summaries
+		.try_push(BondLotSummary { bond_lot_id: 0, bonds })
+		.map_err(|_| BenchmarkError::Stop("failed to seed benchmark bond-lot summary"))?;
+
+	insert_bond_lot::<T>(
+		0,
+		&account_id,
+		1,
+		bonds,
+		BENCHMARK_FRAME_ID.saturating_sub(1),
+		None,
+		None,
+		true,
+	)?;
+	BondLotsByVault::<T>::insert(1, summaries);
+
+	Ok(account_id)
 }
 
 fn insert_bond_lot<T: Config>(

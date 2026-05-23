@@ -991,7 +991,7 @@ export const mintingGatewayAbi = [
   { type: 'error', inputs: [], name: 'InvalidMicrogonCollateralForArgonotPayout' },
   {
     type: 'error',
-    inputs: [{ name: 'mintingAuthorityId', internalType: 'bytes32', type: 'bytes32' }],
+    inputs: [{ name: 'signingKey', internalType: 'address', type: 'address' }],
     name: 'InvalidMintingAuthority',
   },
   {
@@ -1080,8 +1080,8 @@ export const mintingGatewayAbi = [
   },
   {
     type: 'error',
-    inputs: [{ name: 'councilNumber', internalType: 'uint64', type: 'uint64' }],
-    name: 'UnknownCouncilNumber',
+    inputs: [{ name: 'councilHash', internalType: 'bytes32', type: 'bytes32' }],
+    name: 'UnknownCouncilHash',
   },
   {
     type: 'error',
@@ -1164,10 +1164,11 @@ export const mintingGatewayAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'mintingAuthorityId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'signingKey', internalType: 'address', type: 'address', indexed: true },
       { name: 'microgonCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'micronotCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
-      { name: 'signingKey', internalType: 'address', type: 'address', indexed: false },
+      { name: 'coactivationCount', internalType: 'uint32', type: 'uint32', indexed: false },
+      { name: 'sharedSignatureCount', internalType: 'uint32', type: 'uint32', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
@@ -1188,7 +1189,7 @@ export const mintingGatewayAbi = [
     type: 'event',
     anonymous: false,
     inputs: [
-      { name: 'mintingAuthorityId', internalType: 'bytes32', type: 'bytes32', indexed: true },
+      { name: 'signingKey', internalType: 'address', type: 'address', indexed: true },
       { name: 'microgonCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'micronotCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
@@ -1247,6 +1248,8 @@ export const mintingGatewayAbi = [
     anonymous: false,
     inputs: [
       { name: 'transferId', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      { name: 'token', internalType: 'address', type: 'address', indexed: false },
+      { name: 'amount', internalType: 'uint128', type: 'uint128', indexed: false },
       {
         name: 'mintingCollateral',
         internalType: 'struct MintingGateway.MintingAuthorityCollateral[]',
@@ -1416,7 +1419,7 @@ export const mintingGatewayAbi = [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
           { name: 'argonTransferNonce', internalType: 'uint64', type: 'uint64' },
           { name: 'chainId', internalType: 'uint64', type: 'uint64' },
-          { name: 'councilNumber', internalType: 'uint64', type: 'uint64' },
+          { name: 'councilHash', internalType: 'bytes32', type: 'bytes32' },
           { name: 'recipient', internalType: 'address', type: 'address' },
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1440,7 +1443,7 @@ export const mintingGatewayAbi = [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
           { name: 'argonTransferNonce', internalType: 'uint64', type: 'uint64' },
           { name: 'chainId', internalType: 'uint64', type: 'uint64' },
-          { name: 'councilNumber', internalType: 'uint64', type: 'uint64' },
+          { name: 'councilHash', internalType: 'bytes32', type: 'bytes32' },
           { name: 'recipient', internalType: 'address', type: 'address' },
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1509,7 +1512,7 @@ export const mintingGatewayAbi = [
       { name: 'totalWeight', internalType: 'uint256', type: 'uint256' },
       { name: 'memberCount', internalType: 'uint256', type: 'uint256' },
       { name: 'councilHash', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'councilNumber', internalType: 'uint64', type: 'uint64' },
+      { name: 'epochMicrogonsPerArgonot', internalType: 'uint128', type: 'uint128' },
     ],
     stateMutability: 'view',
   },
@@ -1539,13 +1542,6 @@ export const mintingGatewayAbi = [
     inputs: [],
     name: 'latestActivityBlockLocatorIndex',
     outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'microgonsPerArgonot',
-    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
     stateMutability: 'view',
   },
   {
@@ -1604,6 +1600,13 @@ export const mintingGatewayAbi = [
     inputs: [],
     name: 'paused',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'previousGlobalIssuanceCouncilHash',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -1879,16 +1882,17 @@ export type MintingGatewayMigrationCompleted = {
 };
 
 export type MintingGatewayMintingAuthorityActivated = {
-  mintingAuthorityId: Hex;
+  signingKey: Hex;
   microgonCollateral: bigint;
   micronotCollateral: bigint;
-  signingKey: Hex;
+  coactivationCount: bigint;
+  sharedSignatureCount: bigint;
   relayerArgonAccountId: Hex;
   gatewayState: MintingGatewayActivityState;
 };
 
 export type MintingGatewayMintingAuthorityDeactivated = {
-  mintingAuthorityId: Hex;
+  signingKey: Hex;
   microgonCollateral: bigint;
   micronotCollateral: bigint;
   relayerArgonAccountId: Hex;
@@ -1917,6 +1921,8 @@ export type MintingGatewayMintingAuthorityCollateral = {
 
 export type MintingGatewayTransferOutOfArgonFinalized = {
   transferId: Hex;
+  token: Hex;
+  amount: bigint;
   mintingCollateral: readonly MintingGatewayMintingAuthorityCollateral[];
   gatewayState: MintingGatewayActivityState;
 };
@@ -2030,11 +2036,11 @@ export const MintingGatewayEvents = {
   },
   MintingAuthorityActivated: {
     name: 'MintingAuthorityActivated',
-    topic: '0x0979cc09e676df76240cc73ba72832bb245d770c4029e526bf7ed115c6bbcb36',
+    topic: '0xc0f81072946eba75f62302dad0fe56dd420d0b9d311e15b61bbe6e056c29908d',
   },
   MintingAuthorityDeactivated: {
     name: 'MintingAuthorityDeactivated',
-    topic: '0x282837b277a62657a658088ea05a123b3560686317498f8b2cc5318619c5a9f9',
+    topic: '0xf92f117a698345a1b681cf04280fb5da65a05a9ac88aaacad3e9ee273ce570fd',
   },
   OwnershipTransferred: {
     name: 'OwnershipTransferred',
@@ -2050,7 +2056,7 @@ export const MintingGatewayEvents = {
   },
   TransferOutOfArgonFinalized: {
     name: 'TransferOutOfArgonFinalized',
-    topic: '0x8ae526f6f5bc6ec0e6b4bf46b1aecd08ff639bbd259d56fea940908be08a31c7',
+    topic: '0x64d79900ed82270f744ae62db527f4e328e336d8b51e77bc72601391fe779d06',
   },
   TransferToArgonStarted: {
     name: 'TransferToArgonStarted',

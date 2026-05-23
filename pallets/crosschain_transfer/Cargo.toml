@@ -19,8 +19,10 @@ scale-info = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
 argon-primitives = { workspace = true }
+argon-ethereum-contracts = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
+k256 = { workspace = true, features = ["ecdsa"] }
 log = { workspace = true }
 
 [dev-dependencies]
@@ -32,8 +34,10 @@ default = [ "std" ]
 std = [
 	"alloy-primitives/std",
 	"alloy-sol-types/std",
+	"argon-ethereum-contracts/std",
 	"argon-primitives/std",
 	"codec/std",
+	"k256/std",
 	"log/std",
 	"pallet-prelude/std",
 	"polkadot-sdk/std",

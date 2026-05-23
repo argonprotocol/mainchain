@@ -14,7 +14,10 @@ const adminSafe = getRequiredAddress('admin-safe', 'ADMIN_SAFE_ADDRESS');
 const guardianSafe = getRequiredAddress('guardian-safe', 'GUARDIAN_SAFE_ADDRESS');
 const councilSigners = getRequiredAddressList('council-signers', 'COUNCIL_SIGNERS');
 const councilWeights = getRequiredBigIntList('council-weights', 'COUNCIL_WEIGHTS');
-const microgonsPerArgonot = getRequiredBigInt('microgons-per-argonot', 'MICROGONS_PER_ARGONOT');
+const epochMicrogonsPerArgonot = getRequiredBigInt(
+  'microgons-per-argonot',
+  'MICROGONS_PER_ARGONOT',
+);
 
 async function main() {
   const connection = await network.create(args.network);
@@ -60,8 +63,8 @@ async function main() {
     const councilTotalWeight = sortedCouncilWeights.reduce((sum, weight) => sum + weight, 0n);
     const councilHash = ethers.keccak256(
       ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address[]', 'uint256[]'],
-        [sortedCouncilSigners, sortedCouncilWeights],
+        ['address[]', 'uint256[]', 'uint128'],
+        [sortedCouncilSigners, sortedCouncilWeights, epochMicrogonsPerArgonot],
       ),
     );
 
@@ -78,7 +81,7 @@ async function main() {
       councilHash,
       councilMemberCount,
       councilTotalWeight,
-      microgonsPerArgonot,
+      epochMicrogonsPerArgonot,
     ]);
 
     const gatewayProxyFactory = await ethers.getContractFactory('TransparentUpgradeableProxy');
@@ -156,7 +159,7 @@ async function main() {
         councilHash,
         memberCount: councilMemberCount.toString(),
         totalWeight: councilTotalWeight.toString(),
-        microgonsPerArgonot: microgonsPerArgonot.toString(),
+        epochMicrogonsPerArgonot: epochMicrogonsPerArgonot.toString(),
         signers: sortedCouncilSigners,
         weights: sortedCouncilWeights.map(a => a.toString()),
       },
