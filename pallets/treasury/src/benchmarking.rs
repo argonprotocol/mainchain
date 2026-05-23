@@ -264,6 +264,7 @@ fn reset_benchmark_state<T: Config>() {
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
 		btc_price_in_usd: Some(FixedU128::saturating_from_integer(100u128)),
 		argon_price_in_usd: Some(FixedU128::one()),
+		argonot_price_in_usd: Some(FixedU128::one()),
 		argon_target_price_in_usd: Some(FixedU128::one()),
 		circulation: 1_000_000,
 	});

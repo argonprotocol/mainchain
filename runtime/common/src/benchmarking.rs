@@ -16,12 +16,15 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, UtxoId,
 	},
-	ethereum::{EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError},
-	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
+	ethereum::{
+		EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
 	},
-	EthereumVerifyProvider, MiningSlotProvider, TreasuryPoolProvider, UniswapTransferProvider,
-	VaultId,
+	vault::{
+		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
+		VaultArgonotCommitment, VaultError,
+	},
+	EthereumVerifyProvider, MiningSlotProvider, Moment, TreasuryPoolProvider,
+	UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -69,6 +72,14 @@ impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 		MaxReceiptLogs: Get<u32>,
 	{
 		Ok(())
+	}
+
+	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
+		Some(0)
+	}
+
+	fn latest_execution_block_timestamp() -> Option<Moment> {
+		Some(0)
 	}
 }
 
@@ -120,6 +131,33 @@ where
 		});
 		set_benchmark_operational_accounts_provider_state(state);
 		result
+	}
+
+	fn get_committed_securitization(
+		_account_id: &Self::AccountId,
+		_min_frames_remaining: FrameId,
+	) -> Option<Self::Balance> {
+		benchmark_operational_accounts_provider_state()
+			.vault_registration_data
+			.map(|data| data.activated_securitization.saturated_into())
+	}
+
+	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+		Self::get_vault_id(account_id).map(|_| Balance::default())
+	}
+
+	fn encumber_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
+	fn release_encumbered_argonots(
+		_account_id: &Self::AccountId,
+		_amount: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
 	}
 
 	fn account_became_operational(_vault_operator_account: &Self::AccountId) {
@@ -254,12 +292,15 @@ impl<AccountId> MiningSlotProvider<AccountId>
 	}
 }
 
-pub struct BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>(PhantomData<AccountId>);
+pub struct BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>(
+	PhantomData<(AccountId, Balance)>,
+);
 
-impl<AccountId> TreasuryPoolProvider<AccountId>
-	for BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
+impl<AccountId, Balance> TreasuryPoolProvider<AccountId>
+	for BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>
 {
 	type Weights = ();
+	type Balance = Balance;
 
 	fn has_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();
@@ -268,6 +309,20 @@ impl<AccountId> TreasuryPoolProvider<AccountId>
 		let result = state.has_bond_participation;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
+	}
+
+	fn encumber_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn release_encumbered_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
 	}
 }
 

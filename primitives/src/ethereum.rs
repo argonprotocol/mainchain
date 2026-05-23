@@ -26,6 +26,9 @@ pub const MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES: u32 = 2_048;
 /// Execution header chains should stay close to the relayed retained anchor cadence.
 pub const MAX_ETHEREUM_HEADER_CHAIN_LEN: u32 = 64;
 
+/// Canonical Ethereum execution-block height used anywhere Argon stores or compares expiry and
+/// proof targets.
+pub type EthereumBlockNumber = u64;
 pub type EthereumLogTopics = BoundedVec<H256, ConstU32<MAX_ETHEREUM_LOG_TOPICS>>;
 pub type EthereumLogData = BoundedVec<u8, ConstU32<MAX_ETHEREUM_LOG_DATA_BYTES>>;
 pub type EthereumReceiptProofNode = BoundedVec<u8, ConstU32<MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES>>;
@@ -171,7 +174,7 @@ pub struct EthereumReceiptLog {
 pub struct EthereumReceiptLogProofBlock<MaxReceiptLogs: Get<u32>> {
 	/// Target execution block number for this block's receipt proof.
 	#[codec(compact)]
-	pub target_block_number: u64,
+	pub target_block_number: EthereumBlockNumber,
 	pub receipt_proof: EthereumCombinedReceiptProof,
 	pub receipt_logs: BoundedVec<EthereumReceiptLog, MaxReceiptLogs>,
 }

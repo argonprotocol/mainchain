@@ -1,14 +1,14 @@
 use alloc::vec::Vec;
 use polkadot_sdk::*;
 
-use crate::{
+use super::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, Satoshis, UtxoId, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
-	BlockSealAuthorityId, ComputeDifficulty, NotaryId, NotebookHeader, NotebookNumber,
+	BlockSealAuthorityId, ComputeDifficulty, Moment, NotaryId, NotebookHeader, NotebookNumber,
 	NotebookSecret, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
 	MICROGONS_PER_ARGON,
 };
@@ -24,7 +24,7 @@ use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 
-use crate::ethereum::{EthereumReceiptLogProofBatch, EthereumVerifyError};
+use super::ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError};
 
 pub trait NotebookProviderWeightInfo {
 	fn notebooks_in_block() -> Weight;
@@ -78,10 +78,25 @@ impl MiningSlotProviderWeightInfo for () {
 
 pub trait TreasuryPoolProviderWeightInfo {
 	fn has_bond_participation() -> Weight;
+	fn encumber_bond_microgons() -> Weight;
+	fn release_encumbered_bond_microgons() -> Weight;
+	fn burn_encumbered_bond_microgons() -> Weight;
 }
 
 impl TreasuryPoolProviderWeightInfo for () {
 	fn has_bond_participation() -> Weight {
+		Weight::zero()
+	}
+
+	fn encumber_bond_microgons() -> Weight {
+		Weight::zero()
+	}
+
+	fn release_encumbered_bond_microgons() -> Weight {
+		Weight::zero()
+	}
+
+	fn burn_encumbered_bond_microgons() -> Weight {
 		Weight::zero()
 	}
 }
@@ -204,10 +219,20 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 
 pub trait EthereumVerifyProviderWeightInfo {
 	fn verify_receipt_logs() -> Weight;
+	fn latest_execution_block_number() -> Weight;
+	fn latest_execution_block_timestamp() -> Weight;
 }
 
 impl EthereumVerifyProviderWeightInfo for () {
 	fn verify_receipt_logs() -> Weight {
+		Weight::zero()
+	}
+
+	fn latest_execution_block_number() -> Weight {
+		Weight::zero()
+	}
+
+	fn latest_execution_block_timestamp() -> Weight {
 		Weight::zero()
 	}
 }
@@ -221,6 +246,9 @@ pub trait EthereumVerifyProvider {
 	where
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>;
+
+	fn latest_execution_block_number() -> Option<EthereumBlockNumber>;
+	fn latest_execution_block_timestamp() -> Option<Moment>;
 }
 
 impl EthereumVerifyProvider for () {
@@ -234,6 +262,14 @@ impl EthereumVerifyProvider for () {
 		MaxReceiptLogs: Get<u32>,
 	{
 		Err(EthereumVerifyError::VerifierUnavailable)
+	}
+
+	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
+		None
+	}
+
+	fn latest_execution_block_timestamp() -> Option<Moment> {
+		None
 	}
 }
 
@@ -296,8 +332,45 @@ pub trait MiningSlotProvider<AccountId> {
 
 pub trait TreasuryPoolProvider<AccountId> {
 	type Weights: TreasuryPoolProviderWeightInfo;
+	type Balance;
 
 	fn has_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
+	fn encumber_bond_microgons(
+		account_id: &AccountId,
+		microgon_amount: Self::Balance,
+	) -> DispatchResult;
+	fn release_encumbered_bond_microgons(
+		account_id: &AccountId,
+		microgon_amount: Self::Balance,
+	) -> DispatchResult;
+	fn burn_encumbered_bond_microgons(
+		account_id: &AccountId,
+		microgon_amount: Self::Balance,
+	) -> DispatchResult;
+}
+
+pub trait CollectBlockerProviderWeightInfo {
+	fn has_overdue_collect_blocker() -> Weight;
+}
+
+impl CollectBlockerProviderWeightInfo for () {
+	fn has_overdue_collect_blocker() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait CollectBlockerProvider<AccountId> {
+	type Weights: CollectBlockerProviderWeightInfo;
+
+	fn has_overdue_collect_blocker(account_id: &AccountId) -> bool;
+}
+
+impl<AccountId> CollectBlockerProvider<AccountId> for () {
+	type Weights = ();
+
+	fn has_overdue_collect_blocker(_account_id: &AccountId) -> bool {
+		false
+	}
 }
 
 pub trait BlockSealSpecProviderWeightInfo {
@@ -405,8 +478,36 @@ pub trait PriceProvider<
 	/// Prices of a single argon in USD
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128>;
 
+	/// Price of a single Argonot in USD.
+	fn get_argonot_price_in_usd() -> Option<FixedU128>;
+
 	/// Target price of a single argon in USD.
 	fn get_target_argon_price_in_usd() -> Option<FixedU128>;
+
+	/// Current council floor price of one whole Argonot, measured in microgons.
+	fn get_microgons_per_argonot() -> Option<Balance> {
+		let argon_usd_price = Self::get_latest_argon_price_in_usd()?;
+		if argon_usd_price.is_zero() {
+			return None;
+		}
+		let argonot_usd_price = Self::get_argonot_price_in_usd()?;
+		if argonot_usd_price.is_zero() {
+			return None;
+		}
+
+		Some(
+			argonot_usd_price
+				.checked_div(&argon_usd_price)?
+				.saturating_mul_int(MICROGONS_PER_ARGON)
+				.into(),
+		)
+	}
+
+	/// Lowest council floor price of one whole Argonot, measured in microgons, across the
+	/// requested trailing frame horizon.
+	fn get_lowest_microgons_per_argonot(_frames: FrameId) -> Option<Balance> {
+		Self::get_microgons_per_argonot()
+	}
 
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
 	fn get_argon_cpi() -> Option<ArgonCPI>;

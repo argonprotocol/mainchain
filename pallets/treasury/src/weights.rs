@@ -12,6 +12,9 @@ pub trait WeightInfo {
 	fn buy_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
 	fn provider_has_bond_participation() -> Weight;
+	fn provider_encumber_bond_microgons() -> Weight;
+	fn provider_release_encumbered_bond_microgons() -> Weight;
+	fn provider_burn_encumbered_bond_microgons() -> Weight;
 }
 
 pub struct WithProviderWeights<T, Base>(core::marker::PhantomData<(T, Base)>);
@@ -52,12 +55,36 @@ where
 	fn provider_has_bond_participation() -> Weight {
 		Base::provider_has_bond_participation()
 	}
+
+	fn provider_encumber_bond_microgons() -> Weight {
+		Base::provider_encumber_bond_microgons()
+	}
+
+	fn provider_release_encumbered_bond_microgons() -> Weight {
+		Base::provider_release_encumbered_bond_microgons()
+	}
+
+	fn provider_burn_encumbered_bond_microgons() -> Weight {
+		Base::provider_burn_encumbered_bond_microgons()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(core::marker::PhantomData<T>);
 impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn has_bond_participation() -> Weight {
 		<T as Config>::WeightInfo::provider_has_bond_participation()
+	}
+
+	fn encumber_bond_microgons() -> Weight {
+		<T as Config>::WeightInfo::provider_encumber_bond_microgons()
+	}
+
+	fn release_encumbered_bond_microgons() -> Weight {
+		<T as Config>::WeightInfo::provider_release_encumbered_bond_microgons()
+	}
+
+	fn burn_encumbered_bond_microgons() -> Weight {
+		<T as Config>::WeightInfo::provider_burn_encumbered_bond_microgons()
 	}
 }
 
@@ -86,6 +113,18 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_has_bond_participation() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_encumber_bond_microgons() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_release_encumbered_bond_microgons() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_burn_encumbered_bond_microgons() -> Weight {
 		Weight::zero()
 	}
 }

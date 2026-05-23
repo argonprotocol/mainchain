@@ -10,6 +10,11 @@ import {
   retryWhileExecutionRpcIndexing,
 } from './EthereumExecution';
 
+// Keep in sync with primitives/src/ethereum.rs proof decode bounds.
+export const MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES = 128;
+export const MAX_ETHEREUM_RECEIPTS_PER_PROOF = 32;
+export const MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS = 32;
+
 type EthGetBlockByHashRpc = {
   Method: 'eth_getBlockByHash';
   Parameters: [Hex, true];
@@ -27,6 +32,15 @@ export type ArgonFinalizedExecutionHeader = {
 };
 
 export class ArgonFinalizedExecutionHeaderPathError extends Error {}
+
+export class EthereumCombinedReceiptProofBoundsError extends Error {
+  constructor(
+    readonly kind: 'receipt-count' | 'shared-nodes' | 'receipt-node-refs',
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 export type EthereumEventLocator = {
   txHash: Hex;
@@ -205,7 +219,7 @@ export async function buildEthereumEventProof(
       }
     }
 
-    const receiptProof = await buildCombinedReceiptProof(
+    const receiptProof = await buildEthereumCombinedReceiptProof(
       executionClient,
       blockHash,
       transactionIndexes,
@@ -381,12 +395,19 @@ export async function buildExecutionHeaderChain(
   return headers.reverse();
 }
 
-async function buildCombinedReceiptProof(
+export async function buildEthereumCombinedReceiptProof(
   executionClient: EthereumExecutionClient,
   blockHash: Hex,
   transactionIndexes: number[],
   receiptsRoot: Hex,
 ): Promise<EthereumReceiptProof> {
+  if (transactionIndexes.length > MAX_ETHEREUM_RECEIPTS_PER_PROOF) {
+    throw new EthereumCombinedReceiptProofBoundsError(
+      'receipt-count',
+      'Ethereum combined receipt proof exceeds the runtime receipt-count bound',
+    );
+  }
+
   const { receipts } = await retryWhileExecutionRpcIndexing(async () => {
     const block = await executionClient.getBlock({ blockHash });
     const receipts = await Promise.all(
@@ -434,12 +455,27 @@ async function buildCombinedReceiptProof(
 
           const nextIndex = sharedNodes.length;
           sharedNodes.push(hexNode);
+          if (sharedNodes.length > MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES) {
+            throw new EthereumCombinedReceiptProofBoundsError(
+              'shared-nodes',
+              'Ethereum combined receipt proof exceeds the runtime shared-node bound',
+            );
+          }
           nodeIndexesByHex.set(hexNode, nextIndex);
           return nextIndex;
         }),
       } satisfies EthereumCombinedReceiptProofReceipt;
     }),
   );
+
+  for (const receipt of proofReceipts) {
+    if (receipt.nodeIndexes.length > MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS) {
+      throw new EthereumCombinedReceiptProofBoundsError(
+        'receipt-node-refs',
+        'Ethereum combined receipt proof exceeds the runtime receipt node-reference bound',
+      );
+    }
+  }
 
   return {
     nodes: sharedNodes,

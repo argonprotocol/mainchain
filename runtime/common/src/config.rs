@@ -1,5 +1,5 @@
-use crate::prelude::*;
-use argon_primitives::MICROGONS_PER_ARGON;
+use super::prelude::*;
+use argon_primitives::{EthereumBlockNumber, MICROGONS_PER_ARGON};
 use pallet_transaction_payment::Multiplier;
 use smallvec::smallvec;
 use sp_runtime::traits::{AccountIdConversion, One};
@@ -202,12 +202,36 @@ parameter_types! {
 
 	/// How many ticks to retain recent inbound Argon transfer evidence.
 	pub const RecentTransferRetentionTicks: Tick = 10 * TicksPerDay::get();
+	/// Minimum remaining frame horizon required when crosschain queries committed vault
+	/// securitization.
+	pub const CouncilRotationFrames: FrameId = 10;
+	/// Number of frame-level Argonot floor buckets retained by the price index.
+	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
+	/// Maximum size of the active Global Issuance Council member set.
+	pub const MaxCouncilMembers: u32 = 100;
+	/// Maximum number of contiguous council approval signatures accepted in one extrinsic.
+	pub const MaxQueueApprovalsPerCall: u32 = 32;
+	/// Ethereum blocks added to the latest verified execution height when opening a
+	/// transfer out. This is approximately 10 days at 12-second block times.
+	pub const TransferOutValidityEthereumBlocks: EthereumBlockNumber = 72_000;
+	/// Maximum age, in ticks, of the verified Ethereum execution anchor used to open a transfer
+	/// out.
+	pub const MaxVerifiedExecutionBlockAgeTicks: Tick = 60;
+	/// Minting authority tip charged on transfer-out requests in basis points.
+	pub const TransferOutMintingAuthorityTipBasisPoints: u32 = 10;
+	/// Minimum normalized collateral increment accepted for one transfer-out row unless the row
+	/// fills the remaining uncovered amount.
+	pub const MinTransferCollateralIncrement: Balance = 10_000;
+	/// Default minimum normalized microgon value required to register a Minting Authority.
+	pub const DefaultMinimumMintingAuthorityMicrogonValue: Balance = 10_000;
+	/// Maximum number of non-terminal transfer-out requests tracked for one destination chain.
+	pub const MaxPendingTransferOutsPerDestinationChain: u32 = 100;
 	/// Maximum number of gateway activities carried by one Ethereum receipt proof.
 	pub const MaxActivitiesPerReceiptProof: u32 = 16;
-	/// Maximum number of proved Ethereum receipt proofs accepted in one extrinsic.
+	/// Maximum number of proven Ethereum receipt proofs accepted in one extrinsic.
 	///
 	/// `10` leaves comfortable headroom below the worst-case bound proven in the config test, so
-	/// any proof accepted by the runtime envelope is submitable without extra client-side byte
+	/// any proof accepted by the runtime envelope is submittable without extra client-side byte
 	/// budgeting.
 	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
 	// ## pallet_operational_accounts

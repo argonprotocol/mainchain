@@ -48,22 +48,28 @@ parameter_types! {
 	pub const MaxDowntimeBeforeReset: Tick = 60; // 1 hour
 	pub static MaxPriceAgeInTicks: Tick = 1440; // 1 day
 	pub static CurrentTick:Tick = 0;
+	pub static CurrentFrameId: FrameId = 0;
+	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
 }
 
 impl pallet_price_index::Config for Test {
 	type CurrentTick = CurrentTick;
+	type CurrentFrameId = CurrentFrameId;
 	type WeightInfo = ();
 	type Balance = u128;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
+	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 	type Currency = Balances;
 }
 
 pub fn new_test_ext(operator: Option<u64>) -> TestState {
+	CurrentTick::set(0);
+	CurrentFrameId::set(0);
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_price_index::GenesisConfig::<Test> { operator }
 			.assimilate_storage(t)

@@ -3,7 +3,8 @@
 use super::*;
 #[allow(unused_imports)]
 use crate::Pallet as CrosschainTransferPallet;
-use alloy_primitives::keccak256;
+use alloy_sol_types::SolEvent;
+use argon_ethereum_contracts::minting_gateway::TransferToArgonStarted;
 use argon_primitives::{
 	ethereum::{
 		EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
@@ -24,7 +25,7 @@ mod benchmarks {
 		ChainConfigBySourceChain::<T>::insert(SourceChain::Ethereum, benchmark_chain_config(0x20));
 
 		#[extrinsic_call]
-		set_chain_config(RawOrigin::Root, benchmark_chain_config(0x21));
+		set_chain_config(RawOrigin::Root, SourceChain::Ethereum, benchmark_chain_config(0x21));
 
 		assert_eq!(
 			ChainConfigBySourceChain::<T>::get(SourceChain::Ethereum),
@@ -45,6 +46,9 @@ mod benchmarks {
 		let receipt_logs = (0..a)
 			.map(|index| {
 				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
+				let argon_circulation = 10_000_000_000u128.saturating_sub(
+					amount.into().saturating_mul(u128::from(index).saturating_add(1)),
+				);
 				EthereumReceiptLog {
 					transaction_index: 0,
 					event_log: transfer_to_argon_started_log(
@@ -54,6 +58,8 @@ mod benchmarks {
 						amount.into(),
 						<[u8; 32]>::from(recipient),
 						u64::from(index).saturating_add(1),
+						0,
+						argon_circulation,
 						0,
 					),
 				}
@@ -133,7 +139,8 @@ mod benchmarks {
 }
 
 fn benchmark_chain_config(gateway_byte: u8) -> ChainConfig {
-	ChainConfig::Ethereum {
+	ChainConfig::Evm {
+		chain_id: 1,
 		gateway: h160(gateway_byte),
 		argon_token: h160(0x31),
 		argonot_token: h160(0x32),
@@ -146,21 +153,23 @@ fn transfer_to_argon_started_log(
 	token: H160,
 	amount: u128,
 	destination: [u8; 32],
-	gateway_activity_nonce: u64,
-	argon_approvals_nonce: u64,
+	gateway_activity_nonce: GatewayActivityNonce,
+	argon_approvals_nonce: ArgonApprovalsNonce,
+	argon_circulation: u128,
+	argonot_circulation: u128,
 ) -> EthereumLog {
 	let mut data = Vec::with_capacity(192);
 	data.extend_from_slice(&u64_word(amount as u64));
 	data.extend_from_slice(&destination);
 	data.extend_from_slice(&u64_word(gateway_activity_nonce));
 	data.extend_from_slice(&u64_word(argon_approvals_nonce));
-	data.extend_from_slice(&u64_word(0));
-	data.extend_from_slice(&u64_word(0));
+	data.extend_from_slice(&u64_word(argon_circulation as u64));
+	data.extend_from_slice(&u64_word(argonot_circulation as u64));
 
 	EthereumLog {
 		address: gateway,
 		topics: vec![
-			H256::from_slice(keccak256(TRANSFER_TO_ARGON_STARTED_EVENT_SIGNATURE).as_slice()),
+			H256::from_slice(TransferToArgonStarted::SIGNATURE_HASH.as_slice()),
 			indexed_address_word(from),
 			indexed_address_word(token),
 		]

@@ -5,18 +5,18 @@
 //! - execution header continuity from the burn block to that anchor
 //! - receipt trie proof verification
 
-use super::*;
-use crate::{
+use super::{
 	receipt::verify_receipt_proof,
 	types::{ExecutionHeaderAnchor, ReceiptsRoot},
+	*,
 };
 use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::Header as AlloyHeader;
 use alloy_rlp::Decodable;
 use argon_primitives::{
-	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
-	EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
-	EthereumVerifyProvider,
+	EthereumBlockNumber, EthereumCombinedReceiptProof, EthereumExecutionBlockProof,
+	EthereumExecutionHeader, EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch,
+	EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
 use polkadot_sdk::{frame_support::ensure, sp_runtime::traits::Get};
 
@@ -49,6 +49,16 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		}
 
 		Ok(())
+	}
+
+	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
+		let latest_block_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get()?;
+		ExecutionHeaderAnchors::<T>::get(latest_block_hash).map(|anchor| anchor.block_number)
+	}
+
+	fn latest_execution_block_timestamp() -> Option<Moment> {
+		let latest_block_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get()?;
+		ExecutionHeaderAnchors::<T>::get(latest_block_hash).map(|anchor| anchor.timestamp_millis)
 	}
 }
 
@@ -115,7 +125,7 @@ impl<T: Config> Pallet<T> {
 
 	fn collect_receipts_roots(
 		proof: &EthereumExecutionBlockProof,
-	) -> Result<Vec<(u64, ReceiptsRoot)>, EthereumVerifyError> {
+	) -> Result<Vec<(EthereumBlockNumber, ReceiptsRoot)>, EthereumVerifyError> {
 		let anchor = ExecutionHeaderAnchors::<T>::get(proof.anchor_block_hash)
 			.ok_or(EthereumVerifyError::AnchorNotFound)?;
 		let mut receipts_roots =
@@ -164,6 +174,7 @@ impl<T: Config> Pallet<T> {
 
 		Ok(ExecutionHeaderAnchor {
 			block_number: decoded.number,
+			timestamp_millis: decoded.timestamp.saturating_mul(1_000),
 			// Recompute the sealed hash from the verified RLP bytes so the
 			// header chain is anchored to the actual encoded header contents.
 			block_hash: H256::from_slice(decoded.hash_slow().as_slice()),

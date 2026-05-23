@@ -147,6 +147,11 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
+	fn set_committed_argonots() -> Weight {
+		Weight::from_parts(18_000_000, 12552)
+			.saturating_add(T::DbWeight::get().reads(3))
+			.saturating_add(T::DbWeight::get().writes(2))
+		}
 	/// Storage: `Vaults::VaultsById` (r:1 w:0)
 	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9087), added: 11562, mode: `MaxEncodedLen`)
 	/// Storage: `Vaults::PendingCosignByVaultId` (r:1 w:0)
@@ -168,9 +173,9 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		//  Measured:  `746`
 		//  Estimated: `12552`
 		// Minimum execution time: 61_000_000 picoseconds.
-		Weight::from_parts(66_000_000, 12552)
-			.saturating_add(T::DbWeight::get().reads(7))
-			.saturating_add(T::DbWeight::get().writes(4))
+		Weight::from_parts(66_000_000, 15071)
+			.saturating_add(T::DbWeight::get().reads(8))
+			.saturating_add(T::DbWeight::get().writes(5))
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
 	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
@@ -183,6 +188,19 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		// Minimum execution time: 8_000_000 picoseconds.
 		Weight::from_parts(8_000_000, 12552)
 			.saturating_add(T::DbWeight::get().reads(2))
+		}
+	fn provider_get_committed_securitization() -> Weight {
+		Weight::from_parts(8_000_000, 12552)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
+	fn provider_get_committed_argonots() -> Weight {
+		Weight::from_parts(8_000_000, 2519)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
+	fn provider_burn_encumbered_argonots() -> Weight {
+		Weight::from_parts(22_000_000, 2519)
+			.saturating_add(T::DbWeight::get().reads(3))
+			.saturating_add(T::DbWeight::get().writes(3))
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
 	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
@@ -198,6 +216,10 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		Weight::from_parts(13_000_000, 43483)
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(2))
+		}
+	fn provider_has_overdue_collect_blocker() -> Weight {
+		Weight::from_parts(9_000_000, 2519)
+			.saturating_add(T::DbWeight::get().reads(1))
 		}
 	/// Storage: `Vaults::RevenuePerFrameByVault` (r:101 w:100)
 	/// Proof: `Vaults::RevenuePerFrameByVault` (`max_values`: None, `max_size`: Some(2653), added: 5128, mode: `MaxEncodedLen`)

@@ -24,7 +24,6 @@ type FinalizeTransferOutOfArgonArgs = ContractFunctionArgs<
   'finalizeTransferOutOfArgon'
 >;
 type MigrateArgs = ContractFunctionArgs<typeof mintingGatewayAbi, 'nonpayable', 'migrate'>;
-
 export type MintingGatewayCouncilSnapshot = ApplyGatewayUpdatesArgs[0];
 export type MintingGatewayGatewayUpdate = ApplyGatewayUpdatesArgs[1][number];
 export type MintingGatewayTransferOutOfArgonRequest = FinalizeTransferOutOfArgonArgs[0];
@@ -34,18 +33,19 @@ export type MintingGatewayMintingAuthorization =
 export type MintingGatewayMigrationAssetDistribution = MigrateArgs[0];
 export type MintingGatewayGlobalIssuanceCouncilRotateTarget = {
   council: MintingGatewayCouncilSnapshot;
-  microgonsPerArgonot: bigint;
+  epochMicrogonsPerArgonot: bigint;
+};
+export type MintingGatewayGlobalIssuanceCouncilHashArgs = MintingGatewayCouncilSnapshot & {
+  epochMicrogonsPerArgonot: bigint;
 };
 
 export type MintingGatewayMintingAuthorityActivationTarget = {
-  mintingAuthorityId: Hex;
   microgonCollateral: bigint;
   micronotCollateral: bigint;
   signingKey: Address;
 };
 
 export type MintingGatewayMintingAuthorityDeactivateTarget = {
-  mintingAuthorityId: Hex;
   signingKey: Address;
 };
 
@@ -98,7 +98,7 @@ const GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS = [
         type: 'tuple',
         components: COUNCIL_SNAPSHOT_PARAMETERS,
       },
-      { name: 'microgonsPerArgonot', type: 'uint128' },
+      { name: 'epochMicrogonsPerArgonot', type: 'uint128' },
     ],
   },
 ] as const;
@@ -107,7 +107,6 @@ const ACTIVATION_TARGET_PARAMETERS = [
   {
     type: 'tuple',
     components: [
-      { name: 'mintingAuthorityId', type: 'bytes32' },
       { name: 'microgonCollateral', type: 'uint128' },
       { name: 'micronotCollateral', type: 'uint128' },
       { name: 'signingKey', type: 'address' },
@@ -118,10 +117,7 @@ const ACTIVATION_TARGET_PARAMETERS = [
 const DEACTIVATION_TARGET_PARAMETERS = [
   {
     type: 'tuple',
-    components: [
-      { name: 'mintingAuthorityId', type: 'bytes32' },
-      { name: 'signingKey', type: 'address' },
-    ],
+    components: [{ name: 'signingKey', type: 'address' }],
   },
 ] as const;
 
@@ -138,7 +134,6 @@ const GATEWAY_UPDATE_APPROVAL_PARAMETERS = [
 ] as const;
 
 const MINTING_AUTHORITY_HASH_PARAMETERS = [
-  { type: 'bytes32' },
   { type: 'uint128' },
   { type: 'uint128' },
   { type: 'address' },
@@ -164,16 +159,19 @@ const MINTING_AUTHORITY_DEACTIVATION_PARAMETERS = [
   { type: 'uint256' },
   { type: 'address' },
   { type: 'uint64' },
-  { type: 'bytes32' },
   { type: 'address' },
   { type: 'bytes32' },
 ] as const;
+
+function signingKeyTargetId(signingKey: Address): Hex {
+  return `0x${signingKey.slice(2).padStart(64, '0').toLowerCase()}`;
+}
 
 const TRANSFER_OUT_OF_ARGON_REQUEST_PARAMETERS = [
   { type: 'bytes32' },
   { type: 'uint64' },
   { type: 'uint64' },
-  { type: 'uint64' },
+  { type: 'bytes32' },
   { type: 'address' },
   { type: 'uint64' },
   { type: 'address' },
@@ -199,7 +197,7 @@ const MINTING_AUTHORITY_ACTIVATION_TAG = keccak256(
 const MINTING_AUTHORITY_DEACTIVATION_TAG = keccak256(
   stringToHex('ARGON_MINTING_AUTHORITY_DEACTIVATION'),
 );
-const GATEWAY_UPDATE_APPROVAL_TAG = keccak256(stringToHex('ARGON_GATEWAY_UPDATE'));
+const GATEWAY_UPDATE_APPROVAL_TAG = keccak256(stringToHex('ARGON_GATEWAY_UPDATE_APPROVAL'));
 const TRANSFER_OUT_OF_ARGON_AUTHORIZATION_TAG = keccak256(
   stringToHex('ARGON_TRANSFER_OUT_OF_ARGON_AUTHORIZATION'),
 );
@@ -230,10 +228,13 @@ export function encodeMintingGatewayMintingAuthorityDeactivateTarget(
 }
 
 export function hashMintingGatewayGlobalIssuanceCouncil(
-  snapshot: MintingGatewayCouncilSnapshot,
+  council: MintingGatewayGlobalIssuanceCouncilHashArgs,
 ): Hex {
   return keccak256(
-    encodeAbiParameters(COUNCIL_SNAPSHOT_PARAMETERS, [snapshot.signers, snapshot.weights]),
+    encodeAbiParameters(
+      [{ type: 'address[]' }, { type: 'uint256[]' }, { type: 'uint128' }],
+      [council.signers, council.weights, council.epochMicrogonsPerArgonot],
+    ),
   );
 }
 
@@ -242,7 +243,6 @@ export function hashMintingGatewayMintingAuthority(
 ): Hex {
   return keccak256(
     encodeAbiParameters(MINTING_AUTHORITY_HASH_PARAMETERS, [
-      target.mintingAuthorityId,
       target.microgonCollateral,
       target.micronotCollateral,
       target.signingKey,
@@ -258,7 +258,7 @@ export function hashMintingGatewayActivateMintingAuthorityApproval(
     queueNonce: args.queueNonce,
     approvingCouncilHash: args.approvingCouncilHash,
     kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityActivate,
-    targetId: args.target.mintingAuthorityId,
+    targetId: signingKeyTargetId(args.target.signingKey),
     targetPayloadHash: hashMintingGatewayActivateMintingAuthority(context, args.target),
     previousUpdateHash: args.previousUpdateHash,
   });
@@ -268,7 +268,10 @@ export function hashMintingGatewayRotateGlobalIssuanceCouncilApproval(
   context: MintingGatewayHashContext,
   args: RotateGlobalIssuanceCouncilApprovalArgs,
 ): Hex {
-  const nextCouncilHash = hashMintingGatewayGlobalIssuanceCouncil(args.target.council);
+  const nextCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+    ...args.target.council,
+    epochMicrogonsPerArgonot: args.target.epochMicrogonsPerArgonot,
+  });
 
   return hashMintingGatewayGatewayUpdateApproval(context, {
     queueNonce: args.queueNonce,
@@ -303,8 +306,11 @@ export function hashMintingGatewayRotateGlobalIssuanceCouncil(
       GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayGlobalIssuanceCouncil(target.council),
-      target.microgonsPerArgonot,
+      hashMintingGatewayGlobalIssuanceCouncil({
+        ...target.council,
+        epochMicrogonsPerArgonot: target.epochMicrogonsPerArgonot,
+      }),
+      target.epochMicrogonsPerArgonot,
     ]),
   );
 }
@@ -338,7 +344,6 @@ export function hashMintingGatewayMintingAuthorityDeactivation(
       context.chainId,
       context.gatewayAddress,
       args.queueNonce,
-      args.target.mintingAuthorityId,
       args.target.signingKey,
       args.previousUpdateHash,
     ]),
@@ -353,7 +358,7 @@ export function hashMintingGatewayTransferOutOfArgonRequest(
       request.argonAccountId,
       request.argonTransferNonce,
       request.chainId,
-      request.councilNumber,
+      request.councilHash,
       request.recipient,
       request.validUntilBlock,
       request.token,

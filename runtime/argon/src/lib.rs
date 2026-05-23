@@ -281,12 +281,15 @@ impl pallet_vaults::Config for Runtime {
 		weights::pallet_vaults::WeightInfo<Runtime>,
 	>;
 	type Currency = Balances;
+	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MaxPendingTermModificationsPerTick = MaxPendingTermModificationsPerTick;
 	type MiningFrameProvider = MiningSlot;
 	type GetBitcoinNetwork = BitcoinUtxos;
 	type BitcoinBlockHeightChange = BitcoinUtxos;
+	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
+	type TicksPerFrame = use_unless_benchmark!(GetTicksPerFrame, ConstU64<10>);
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type CurrentFrameId = GetCurrentFrameId;
 	type MaxVaults = MaxVaults;
@@ -298,6 +301,14 @@ impl pallet_vaults::Config for Runtime {
 	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
 	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type CollectBlockerProvider = use_unless_benchmark!(CrosschainTransfer, ());
+}
+
+pub struct GetTicksPerFrame;
+impl Get<Tick> for GetTicksPerFrame {
+	fn get() -> Tick {
+		pallet_mining_slot::MiningConfig::<Runtime>::get().ticks_between_slots
+	}
 }
 
 pub struct DidStartNewFrame;
@@ -568,7 +579,10 @@ impl pallet_price_index::Config for Runtime {
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
+	type CurrentFrameId =
+		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }
@@ -658,15 +672,32 @@ impl pallet_crosschain_transfer::Config for Runtime {
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
 	type NativeCurrency = Balances;
 	type OwnershipCurrency = Ownership;
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type EthereumVerifier = use_unless_benchmark!(
 		EthereumVerifier,
 		benchmarking::BenchmarkCrosschainTransferEthereumVerifier
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type VaultProvider = use_unless_benchmark!(Vaults, benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>);
+	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>);
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
+	type CurrentFrameId =
+		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
 	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
+	type MaxCouncilMembers = MaxCouncilMembers;
+	type MaxQueueApprovalsPerCall = MaxQueueApprovalsPerCall;
+	type TransferOutValidityEthereumBlocks = TransferOutValidityEthereumBlocks;
+	type MaxVerifiedExecutionBlockAgeTicks = MaxVerifiedExecutionBlockAgeTicks;
+	type TransferOutMintingAuthorityTipBasisPoints = TransferOutMintingAuthorityTipBasisPoints;
+	type MinTransferCollateralIncrement = MinTransferCollateralIncrement;
+	type DefaultMinimumMintingAuthorityMicrogonValue = DefaultMinimumMintingAuthorityMicrogonValue;
+	type MaxPendingTransferOutsPerDestinationChain = MaxPendingTransferOutsPerDestinationChain;
+	type CouncilRotationFrames = CouncilRotationFrames;
 	type WeightInfo = pallet_crosschain_transfer::WithProviderWeights<
 		Runtime,
 		weights::pallet_crosschain_transfer::WeightInfo<Runtime>,
@@ -695,7 +726,7 @@ impl pallet_operational_accounts::Config for Runtime {
 	);
 	type TreasuryPoolProvider = use_unless_benchmark!(
 		Treasury,
-		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId>
+		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>
 	);
 	type UniswapTransferProvider = use_unless_benchmark!(
 		CrosschainTransfer,

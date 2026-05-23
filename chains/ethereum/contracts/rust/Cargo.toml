@@ -1,0 +1,22 @@
+[package]
+name = "argon-ethereum-contracts"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true, features = ["json"] }
+
+[features]
+default = [ "std" ]
+std = [ "alloy-primitives/std", "alloy-sol-types/std" ]

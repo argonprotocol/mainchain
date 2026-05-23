@@ -1,5 +1,5 @@
 use argon_primitives::{
-	providers::{TickProvider, TickProviderWeightInfo},
+	providers::{CollectBlockerProviderWeightInfo, TickProvider, TickProviderWeightInfo},
 	vault::BitcoinVaultProviderWeightInfo,
 };
 use core::marker::PhantomData;
@@ -14,6 +14,7 @@ pub trait WeightInfo {
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_bitcoin_lock_delegate() -> Weight;
 	fn set_name() -> Weight;
+	fn set_committed_argonots() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -22,7 +23,11 @@ pub trait WeightInfo {
 	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
+	fn provider_get_committed_securitization() -> Weight;
+	fn provider_get_committed_argonots() -> Weight;
+	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
+	fn provider_has_overdue_collect_blocker() -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
@@ -66,6 +71,10 @@ where
 		Base::set_name().saturating_add(TickProviderWeight::current_tick())
 	}
 
+	fn set_committed_argonots() -> Weight {
+		Base::set_committed_argonots()
+	}
+
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
@@ -81,7 +90,7 @@ where
 	}
 
 	fn collect() -> Weight {
-		Base::collect()
+		Base::collect().saturating_add(Base::provider_has_overdue_collect_blocker())
 	}
 
 	fn on_frame_start(vault_count: u32) -> Weight {
@@ -92,9 +101,25 @@ where
 		Base::provider_get_registration_vault_data()
 	}
 
+	fn provider_get_committed_securitization() -> Weight {
+		Base::provider_get_committed_securitization()
+	}
+
+	fn provider_get_committed_argonots() -> Weight {
+		Base::provider_get_committed_argonots()
+	}
+
+	fn provider_burn_encumbered_argonots() -> Weight {
+		Base::provider_burn_encumbered_argonots()
+	}
+
 	fn provider_account_became_operational() -> Weight {
 		Base::provider_account_became_operational()
 			.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn provider_has_overdue_collect_blocker() -> Weight {
+		Base::provider_has_overdue_collect_blocker()
 	}
 }
 
@@ -104,8 +129,26 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 		<T as crate::Config>::WeightInfo::provider_get_registration_vault_data()
 	}
 
+	fn get_committed_securitization() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_committed_securitization()
+	}
+
+	fn get_committed_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_committed_argonots()
+	}
+
+	fn burn_encumbered_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_burn_encumbered_argonots()
+	}
+
 	fn account_became_operational() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_account_became_operational()
+	}
+}
+
+impl<T: crate::Config> CollectBlockerProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn has_overdue_collect_blocker() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_has_overdue_collect_blocker()
 	}
 }
 
@@ -132,6 +175,9 @@ impl WeightInfo for () {
 	fn set_name() -> Weight {
 		Weight::zero()
 	}
+	fn set_committed_argonots() -> Weight {
+		Weight::zero()
+	}
 	fn on_initialize_with_vault_releases(
 		_height_range: u32,
 		_bitcoin_release_vault_count: u32,
@@ -149,7 +195,23 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn provider_get_committed_securitization() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_burn_encumbered_argonots() -> Weight {
+		Weight::zero()
+	}
+
 	fn provider_account_became_operational() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_has_overdue_collect_blocker() -> Weight {
 		Weight::zero()
 	}
 }

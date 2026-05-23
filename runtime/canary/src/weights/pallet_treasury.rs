@@ -95,6 +95,21 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		Weight::from_parts(359_000_000, 260590)
 			.saturating_add(T::DbWeight::get().reads(101))
 		}
+	fn provider_encumber_bond_microgons() -> Weight {
+		Weight::from_parts(8_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	fn provider_release_encumbered_bond_microgons() -> Weight {
+		Weight::from_parts(8_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	fn provider_burn_encumbered_bond_microgons() -> Weight {
+		Weight::from_parts(40_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(4))
+			.saturating_add(T::DbWeight::get().writes(4))
+		}
 	/// Storage: `Treasury::PendingBondReleaseRetryCursor` (r:1 w:0)
 	/// Proof: `Treasury::PendingBondReleaseRetryCursor` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::PendingBondReleasesByFrame` (r:1 w:1)

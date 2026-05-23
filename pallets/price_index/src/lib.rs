@@ -1,11 +1,9 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
-
-use core::convert::TryInto;
 use pallet_prelude::*;
 
-use argon_primitives::ArgonCPI;
+use argon_primitives::{block_seal::FrameId, ArgonCPI};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -120,6 +118,13 @@ pub mod pallet {
 		/// The current tick
 		type CurrentTick: Get<Tick>;
 
+		/// Current mining frame id for trailing floor history.
+		type CurrentFrameId: Get<FrameId>;
+
+		/// Maximum number of per-frame Argonot floor buckets to retain.
+		#[pallet::constant]
+		type MaxArgonotFloorHistoryFrames: Get<u32>;
+
 		/// The max price difference dropping below target or raising above target per tick. There's
 		/// no corresponding constant for time to recovery to target
 		#[pallet::constant]
@@ -163,6 +168,14 @@ pub mod pallet {
 	pub type HistoricArgonCPI<T> =
 		StorageValue<_, BoundedVec<CpiMeasurementBucket, ConstU32<48>>, ValueQuery>;
 
+	/// Tracks the lowest Argonot floor observed in each recent frame.
+	#[pallet::storage]
+	pub type HistoricArgonotFloorByFrame<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<FrameId, T::Balance, T::MaxArgonotFloorHistoryFrames>,
+		ValueQuery,
+	>;
+
 	/// The price index operator account
 	#[pallet::storage]
 	pub type Operator<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
@@ -185,10 +198,20 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let prev_tick = T::CurrentTick::get();
 			if let Some(current) = Current::<T>::get() {
 				LastValid::<T>::put(current);
+				if current.tick >= prev_tick.saturating_sub(T::MaxDowntimeTicksBeforeReset::get()) &&
+					let Some(microgons_per_argonot) =
+						Self::microgons_per_argonot_from_index(&current)
+				{
+					Self::record_argonot_floor_for_frame(
+						T::CurrentFrameId::get(),
+						microgons_per_argonot,
+					);
+				}
 			}
-			T::DbWeight::get().reads_writes(3, 2)
+			T::DbWeight::get().reads_writes(4, 3)
 		}
 	}
 
@@ -225,6 +248,12 @@ pub mod pallet {
 			}
 
 			Current::<T>::put(index);
+			if let Some(microgons_per_argonot) = Self::microgons_per_argonot_from_index(&index) {
+				Self::record_argonot_floor_for_frame(
+					T::CurrentFrameId::get(),
+					microgons_per_argonot,
+				);
+			}
 
 			// Get the current frame bucket (one per hour)
 			const BUCKET_TICKS: Tick = 60;
@@ -333,6 +362,40 @@ pub mod pallet {
 				}
 			}
 		}
+
+		fn microgons_per_argonot_from_index(index: &PriceIndex) -> Option<T::Balance> {
+			if index.argon_usd_price.is_zero() || index.argonot_usd_price.is_zero() {
+				return None;
+			}
+
+			Some(
+				index
+					.argonot_usd_price
+					.checked_div(&index.argon_usd_price)?
+					.saturating_mul_int(argon_primitives::MICROGONS_PER_ARGON)
+					.into(),
+			)
+		}
+
+		fn record_argonot_floor_for_frame(frame_id: FrameId, microgons_per_argonot: T::Balance) {
+			HistoricArgonotFloorByFrame::<T>::mutate(|history| {
+				if let Some(existing) = history.get_mut(&frame_id) {
+					*existing = (*existing).min(microgons_per_argonot);
+					return;
+				}
+
+				if history.is_full() {
+					let Some((&oldest_frame_id, _)) = history.iter().next() else {
+						return;
+					};
+					if frame_id <= oldest_frame_id {
+						return;
+					}
+					history.remove(&oldest_frame_id);
+				}
+				let _ = history.try_insert(frame_id, microgons_per_argonot);
+			});
+		}
 	}
 
 	impl<T: Config> PriceProvider<T::Balance> for Pallet<T> {
@@ -342,8 +405,29 @@ pub mod pallet {
 		fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_price)
 		}
+		fn get_argonot_price_in_usd() -> Option<FixedU128> {
+			Self::get_current().map(|a| a.argonot_usd_price)
+		}
 		fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_target_price)
+		}
+
+		fn get_lowest_microgons_per_argonot(frames: FrameId) -> Option<T::Balance> {
+			let mut lowest_microgons_per_argonot = Self::get_microgons_per_argonot();
+			let oldest_allowed = T::CurrentFrameId::get().saturating_sub(frames);
+
+			for entry in HistoricArgonotFloorByFrame::<T>::get().into_iter() {
+				if entry.0 < oldest_allowed {
+					continue;
+				}
+				if let Some(x) = lowest_microgons_per_argonot {
+					lowest_microgons_per_argonot = Some(entry.1.min(x));
+				} else {
+					lowest_microgons_per_argonot = Some(entry.1);
+				}
+			}
+
+			lowest_microgons_per_argonot
 		}
 
 		fn get_average_cpi_for_ticks(tick_range: (Tick, Tick)) -> ArgonCPI {

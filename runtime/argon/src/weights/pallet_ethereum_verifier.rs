@@ -144,4 +144,12 @@ impl<T: frame_system::Config> pallet_ethereum_verifier::WeightInfo for WeightInf
 		Weight::from_parts(210_000_000, 3601)
 			.saturating_add(T::DbWeight::get().reads(1))
 		}
+
+	fn provider_latest_execution_block_number() -> Weight {
+		Weight::from_parts(8_000_000, 3601).saturating_add(T::DbWeight::get().reads(2))
+	}
+
+	fn provider_latest_execution_block_timestamp() -> Weight {
+		Weight::from_parts(8_000_000, 3601).saturating_add(T::DbWeight::get().reads(2))
+	}
 	}

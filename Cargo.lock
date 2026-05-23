@@ -1021,6 +1021,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "argon-ethereum-contracts"
+version = "1.4.3"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+]
+
+[[package]]
 name = "argon-localchain"
 version = "1.4.3"
 dependencies = [
@@ -11431,7 +11439,9 @@ version = "1.4.3"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "argon-ethereum-contracts",
  "argon-primitives",
+ "k256",
  "log",
  "pallet-prelude",
  "parity-scale-codec",

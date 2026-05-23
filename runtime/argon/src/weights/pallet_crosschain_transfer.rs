@@ -45,11 +45,58 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
 		}
+	fn force_set_global_issuance_council() -> Weight {
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(2))
+		}
+	fn register_council_signer() -> Weight {
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	fn pause_gateway() -> Weight {
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	fn unpause_gateway() -> Weight {
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	fn register_minting_authority() -> Weight {
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(4))
+			.saturating_add(T::DbWeight::get().writes(5))
+		}
+	fn deactivate_minting_authority() -> Weight {
+		Weight::from_parts(28_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(5))
+			.saturating_add(T::DbWeight::get().writes(3))
+	}
+	fn approve_queue_entries(approvals: u32) -> Weight {
+		let approvals = approvals.max(1);
+		Weight::from_parts(18_000_000, 3517)
+			.saturating_mul(approvals.into())
+			.saturating_add(T::DbWeight::get().reads((3_u64).saturating_mul(approvals.into())))
+			.saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(approvals.into())))
+		}
 	fn prove_gateway_activity(activities: u32) -> Weight {
 		Weight::from_parts(86_000_000, 6196)
 			.saturating_mul(activities.into())
 			.saturating_add(T::DbWeight::get().reads((7_u64).saturating_mul(activities.into())))
 			.saturating_add(T::DbWeight::get().writes((5_u64).saturating_mul(activities.into())))
+		}
+	fn transfer_out() -> Weight {
+		Weight::from_parts(52_000_000, 6196)
+			.saturating_add(T::DbWeight::get().reads(5))
+			.saturating_add(T::DbWeight::get().writes(4))
+		}
+	fn collateralize_transfer() -> Weight {
+		Weight::from_parts(47_000_000, 6196)
+			.saturating_add(T::DbWeight::get().reads(5))
+			.saturating_add(T::DbWeight::get().writes(5))
 		}
 	/// Storage: `Ticks::CurrentTick` (r:1 w:0)
 	/// Proof: `Ticks::CurrentTick` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
@@ -93,5 +140,9 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Minimum execution time: 3_000_000 picoseconds.
 		Weight::from_parts(3_000_000, 3517)
 			.saturating_add(T::DbWeight::get().reads(1))
+		}
+	fn provider_has_overdue_collect_blocker() -> Weight {
+		Weight::from_parts(9_000_000, 3517)
+			.saturating_add(T::DbWeight::get().reads(3))
 		}
 	}

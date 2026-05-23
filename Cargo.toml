@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "chains/ethereum/contracts/rust",
     "node",
     "node/consensus",
     "node/bitcoin_utxo_tracker",
@@ -256,6 +257,7 @@ alloy-contract = { version = "1.8" }
 alloy-provider = { version = "1.8" }
 alloy-transport = { version = "1.8" }
 alloy-eips = { version = "1.8" }
+argon-ethereum-contracts = { path = "chains/ethereum/contracts/rust", default-features = false }
 
 snowbridge-beacon-primitives = { version = "0.19.0", default-features = false }
 snowbridge-pallet-ethereum-client-fixtures = { version = "=0.27.0", default-features = false }

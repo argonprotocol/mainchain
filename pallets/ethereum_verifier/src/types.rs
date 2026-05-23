@@ -5,7 +5,7 @@ use crate::{
 	ExecutionHeaderAnchorMapping, ExecutionHeaderAnchors, FinalizedBeaconState,
 	FinalizedBeaconStateIndex, FinalizedBeaconStateMapping, MaxFinalizedHeadersToKeep,
 };
-use argon_primitives::EthereumBeaconPreset;
+use argon_primitives::{EthereumBeaconPreset, EthereumBlockNumber};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	frame_support::{pallet_prelude::ConstU32, storage::types::OptionQuery, BoundedVec},
@@ -385,7 +385,7 @@ pub struct FinalizedBeaconHeaderState {
 }
 
 pub type ExecutionBlockHash = H256;
-pub type ExecutionBlockNumber = u64;
+pub type ExecutionBlockNumber = EthereumBlockNumber;
 pub type ReceiptsRoot = H256;
 
 /// Execution-layer header fields retained after the beacon proof has been accepted.
@@ -404,6 +404,8 @@ pub type ReceiptsRoot = H256;
 pub struct ExecutionHeaderAnchor {
 	#[codec(compact)]
 	pub block_number: ExecutionBlockNumber,
+	#[codec(compact)]
+	pub timestamp_millis: u64,
 	pub block_hash: ExecutionBlockHash,
 	pub parent_hash: ExecutionBlockHash,
 	pub receipts_root: ReceiptsRoot,
@@ -414,12 +416,14 @@ impl ExecutionHeaderAnchor {
 		match header {
 			VersionedExecutionPayloadHeader::Capella(header) => Self {
 				block_number: header.block_number,
+				timestamp_millis: header.timestamp.saturating_mul(1_000),
 				block_hash: header.block_hash,
 				parent_hash: header.parent_hash,
 				receipts_root: header.receipts_root,
 			},
 			VersionedExecutionPayloadHeader::Deneb(header) => Self {
 				block_number: header.block_number,
+				timestamp_millis: header.timestamp.saturating_mul(1_000),
 				block_hash: header.block_hash,
 				parent_hash: header.parent_hash,
 				receipts_root: header.receipts_root,

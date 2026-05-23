@@ -249,6 +249,28 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn set_committed_argonots() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_committed_argonots_caller", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
+		let amount: T::Balance = 25_000u128.into();
+		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), amount);
+
+		assert_eq!(
+			T::OwnershipCurrency::balance_on_hold(&HoldReason::EnterVault.into(), &caller),
+			amount,
+		);
+		assert_eq!(
+			<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
+			Some(amount),
+		);
+		assert_eq!(<Pallet<T> as BitcoinVaultProvider>::get_vault_id(&caller), Some(vault_id),);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn collect() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("collect_caller", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
@@ -313,6 +335,45 @@ mod benchmarks {
 				registration.map(|entry| entry.securitization),
 				Some(100_000u128.into()),
 				"expected provider lookup to return the vault securitization"
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_committed_securitization() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_committed_securitization", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
+		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
+		let expected =
+			vault.get_activated_securitization().saturating_add(vault.get_relock_capacity());
+
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as BitcoinVaultProvider>::get_committed_securitization(&caller, 10),
+				Some(expected),
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_committed_argonots() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_committed_argonots", 0, 0);
+		create_vault::<T>(&caller, 9, 100_000)?;
+		let amount: T::Balance = 40_000u128.into();
+		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
+		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
+
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
+				Some(amount),
 			);
 		}
 

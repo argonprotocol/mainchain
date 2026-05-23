@@ -87,6 +87,9 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		ArgonPricePerUsd::get()
+	}
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
 	}

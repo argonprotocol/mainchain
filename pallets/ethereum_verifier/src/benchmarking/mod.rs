@@ -14,9 +14,9 @@ use alloy_primitives::B256;
 use alloy_rlp::Encodable;
 use argon_primitives::{
 	ethereum::{EthereumExecutionHeader, MAX_ETHEREUM_HEADER_CHAIN_LEN},
-	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumLog, EthereumReceiptLog,
-	EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock, EthereumReceiptProofReceipt,
-	EthereumVerifyProvider,
+	EthereumBlockNumber, EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumLog,
+	EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock,
+	EthereumReceiptProofReceipt, EthereumVerifyProvider,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -292,7 +292,7 @@ mod benchmarks {
 
 fn max_header_chain(
 	anchor_block_hash: H256,
-	target_block_number: u64,
+	target_block_number: EthereumBlockNumber,
 	receipts_root: H256,
 ) -> (argon_primitives::ethereum::EthereumExecutionHeaderChain, ExecutionHeaderAnchor) {
 	let mut headers = Vec::with_capacity(MAX_ETHEREUM_HEADER_CHAIN_LEN as usize);
@@ -326,6 +326,7 @@ fn max_header_chain(
 			.expect("benchmark chain stays within bounded header chain length"),
 		ExecutionHeaderAnchor {
 			block_number: target_block_number + MAX_ETHEREUM_HEADER_CHAIN_LEN as u64,
+			timestamp_millis: 0,
 			block_hash: anchor_block_hash,
 			parent_hash: last_block_hash,
 			receipts_root: H256::repeat_byte(8),
