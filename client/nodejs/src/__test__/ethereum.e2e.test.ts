@@ -9,7 +9,7 @@ import {
   SKIP_E2E,
   teardown,
   TestEthereum,
-} from '../../../../testing/nodejs/src/index';
+} from '@argonprotocol/testing';
 import { repeatByteHex, waitForExecutionBlockAtOrAbove } from './ethereumE2eTestUtils';
 import { toHex, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
