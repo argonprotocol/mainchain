@@ -17,11 +17,12 @@ use super::*;
 use crate::mock::{
 	new_test_ext,
 	pallet_dummy::{Call, ConsumedPoolKeys, OneUseCodes},
-	Balances, FeeAmount, FeeControl, LastPayer, MockChargePaymentExtension, PrepareCount, Proxy,
-	ProxyType, RuntimeCall, Test, TipAmount, ValidateCount,
+	Balances, FeeAmount, FeeControl, LastPayer, LastPostDispatchPaysFee,
+	MockChargePaymentExtension, PrepareCount, Proxy, ProxyType, RuntimeCall, Test, TipAmount,
+	ValidateCount,
 };
 use codec::Encode;
-use frame_support::dispatch::{DispatchInfo, GetDispatchInfo};
+use frame_support::dispatch::{DispatchInfo, GetDispatchInfo, Pays};
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	argon_primitives::CurrentTransactionFeeProvider, frame_support::traits::Currency,
@@ -350,6 +351,100 @@ fn validate_rejects_stale_batched_calls() {
 			result,
 			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
 		));
+	});
+}
+
+#[test]
+fn post_dispatch_refunds_configured_batch_all_combinations_on_success() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000u128);
+		LastPostDispatchPaysFee::set(None);
+
+		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch_all {
+			calls: vec![
+				RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 7 }),
+				RuntimeCall::DummyPallet(Call::<Test>::combo_paid { should_fail: false }),
+			],
+		});
+		let info = call.get_dispatch_info();
+		let len = call.encoded_size();
+		let wrapper =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
+		let (_, val, validated_origin) = wrapper
+			.validate_only(Some(0).into(), &call, &info, len, TransactionSource::External, 0)
+			.unwrap();
+		let pre =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.prepare(val, &validated_origin, &call, &info, len)
+				.unwrap();
+
+		let dispatch_result = call.dispatch(validated_origin);
+		let dispatch_outcome = match &dispatch_result {
+			Ok(_) => Ok(()),
+			Err(err) => Err(err.error.clone()),
+		};
+		let post_info = match &dispatch_result {
+			Ok(post_info) => post_info,
+			Err(err) => &err.post_info,
+		};
+
+		CheckFeeWrapper::<Test, MockChargePaymentExtension>::post_dispatch_details(
+			pre,
+			&info,
+			post_info,
+			len,
+			&dispatch_outcome,
+		)
+		.unwrap();
+
+		assert_eq!(LastPostDispatchPaysFee::get(), Some(Pays::No));
+	});
+}
+
+#[test]
+fn post_dispatch_keeps_fees_for_failed_configured_batch_all_combinations() {
+	new_test_ext().execute_with(|| {
+		set_argons(0, 1_000_000u128);
+		LastPostDispatchPaysFee::set(None);
+
+		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch_all {
+			calls: vec![
+				RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 7 }),
+				RuntimeCall::DummyPallet(Call::<Test>::combo_paid { should_fail: true }),
+			],
+		});
+		let info = call.get_dispatch_info();
+		let len = call.encoded_size();
+		let wrapper =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
+		let (_, val, validated_origin) = wrapper
+			.validate_only(Some(0).into(), &call, &info, len, TransactionSource::External, 0)
+			.unwrap();
+		let pre =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.prepare(val, &validated_origin, &call, &info, len)
+				.unwrap();
+
+		let dispatch_result = call.dispatch(validated_origin);
+		let dispatch_outcome = match &dispatch_result {
+			Ok(_) => Ok(()),
+			Err(err) => Err(err.error.clone()),
+		};
+		let post_info = match &dispatch_result {
+			Ok(post_info) => post_info,
+			Err(err) => &err.post_info,
+		};
+
+		CheckFeeWrapper::<Test, MockChargePaymentExtension>::post_dispatch_details(
+			pre,
+			&info,
+			post_info,
+			len,
+			&dispatch_outcome,
+		)
+		.unwrap();
+
+		assert_eq!(LastPostDispatchPaysFee::get(), Some(Pays::Yes));
 	});
 }
 

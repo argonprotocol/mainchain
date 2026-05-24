@@ -130,6 +130,7 @@ mod runtime {
 }
 
 argon_runtime_common::call_filters!();
+argon_runtime_common::vault_admin_fee_refund_policy!();
 argon_runtime_common::deal_with_fees!();
 argon_runtime_common::inject_runtime_vars!();
 argon_runtime_common::inject_common_apis!();
@@ -750,4 +751,5 @@ impl pallet_fee_control::Config for Runtime {
 	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier, CrosschainTransfer);
 	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer);
 	type TransactionSponsorProviders = ProxyFeeDelegate<Runtime>;
+	type CallFeeRefundProviders = VaultAdminFeeRefundPolicy;
 }

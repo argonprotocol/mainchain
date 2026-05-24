@@ -1105,3 +1105,26 @@ impl<AccountId, RuntimeCall, Balance> TransactionSponsorProvider<AccountId, Runt
 		None
 	}
 }
+
+/// Provides runtime-defined call combinations that should be refunded after successful dispatch.
+///
+/// This is evaluated against the effective call after proxy unwrapping, allowing the runtime to
+/// keep fee-refund policy close to its own call-shape and proxy rules instead of hard-coding
+/// pallet-specific combinations inside `pallet_fee_control`.
+pub trait CallFeeRefundProvider<RuntimeCall> {
+	fn refund_fee_on_success(call: &RuntimeCall) -> bool;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> CallFeeRefundProvider<RuntimeCall> for Tuple {
+	fn refund_fee_on_success(call: &RuntimeCall) -> bool {
+		for_tuples!(
+			#(
+			if Tuple::refund_fee_on_success(call) {
+				return true;
+			}
+			)*
+		);
+		false
+	}
+}

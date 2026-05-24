@@ -9,8 +9,8 @@ use frame_support::{
 };
 use pallet_prelude::{
 	argon_primitives::{
-		CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
-		TransactionSponsorProvider, TxSponsor,
+		CallFeeRefundProvider, CallTxPoolKeyProvider, CallTxValidityProvider,
+		FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
 	},
 	sp_runtime::traits::{
 		DispatchOriginOf, Implication, PostDispatchInfoOf, StaticLookup, TransactionExtension, Zero,
@@ -56,7 +56,7 @@ impl<T, S> From<S> for CheckFeeWrapper<T, S> {
 
 pub enum Intermediate<T, O, A> {
 	/// The wrapped extension should be applied.
-	RequiresFee(T, O, A),
+	RequiresFee { inner: T, delegated_origin: O, tx_sponsor: A, refund_fee_on_success: bool },
 	/// The wrapped extension should be skipped.
 	Feeless(O),
 }
@@ -338,10 +338,10 @@ where
         let signer = origin.as_signer().cloned();
         Self::validate_freshness(call, signer.clone())?;
         let general_pool_keys = Self::collect_pool_keys(call, signer);
-        if call.is_feeless(&origin) {
+		if call.is_feeless(&origin) {
 			let synthetic_fee =
 				pallet_transaction_payment::Pallet::<T>::compute_fee(len as u32, info, Zero::zero());
-				let mut validity = ValidTransaction {
+			let mut validity = ValidTransaction {
 				priority: pallet_transaction_payment::ChargeTransactionPayment::<T>::get_priority(
 					info,
 					len,
@@ -358,13 +358,16 @@ where
                 Self::push_pool_key(&mut validity, key);
             }
 
-            Ok((validity, Feeless(origin.clone()), origin))
-        } else {
-            let mut delegated_origin = origin.clone();
-            let mut tx_sponsor = None;
-            if let Some(signer) = origin.as_signer()
-                && let Some(sponsor) =
-                    T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
+			Ok((validity, Feeless(origin.clone()), origin))
+		} else {
+			let mut delegated_origin = origin.clone();
+			let mut tx_sponsor = None;
+			// Proxy wrappers should not affect whether a runtime-defined batch combination refunds
+			// on success, so we evaluate policy against the effective inner call.
+			let refund_fee_on_success = T::CallFeeRefundProviders::refund_fee_on_success(inner_call);
+			if let Some(signer) = origin.as_signer()
+				&& let Some(sponsor) =
+					T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
                 {
                     log::debug!("fee sponsor detected: payer={:?}", sponsor.payer);
                     delegated_origin.set_caller_from_signed(sponsor.payer.clone());
@@ -395,14 +398,23 @@ where
             for key in general_pool_keys {
                 Self::push_pool_key(&mut validity, key);
             }
-            if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())
-            {
-                Self::push_pool_key(&mut validity, key);
-            }
+			if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())
+			{
+				Self::push_pool_key(&mut validity, key);
+			}
 
-            Ok((validity, RequiresFee(inner_val, delegated_origin, tx_sponsor), origin_out))
-        }
-    }
+			Ok((
+				validity,
+				RequiresFee {
+					inner: inner_val,
+					delegated_origin,
+					tx_sponsor,
+					refund_fee_on_success,
+				},
+				origin_out,
+			))
+		}
+	}
 
     fn prepare(
         self,
@@ -412,15 +424,20 @@ where
         info: &DispatchInfoOf<RuntimeCallOf<T>>,
         len: usize,
     ) -> Result<Self::Pre, TransactionValidityError> {
-        Self::validate_freshness(call, origin.as_signer().cloned())?;
+		Self::validate_freshness(call, origin.as_signer().cloned())?;
 
-        match val {
-            RequiresFee(inner, delegated_origin, sponsor) => {
-                let res = self.0.prepare(inner, &delegated_origin, call, info, len)?;
-                Ok(RequiresFee(res, delegated_origin, sponsor))
-            },
-            Feeless(origin) => Ok(Feeless(origin)),
-        }
+		match val {
+			RequiresFee { inner, delegated_origin, tx_sponsor, refund_fee_on_success } => {
+				let res = self.0.prepare(inner, &delegated_origin, call, info, len)?;
+				Ok(RequiresFee {
+					inner: res,
+					delegated_origin,
+					tx_sponsor,
+					refund_fee_on_success,
+				})
+			},
+			Feeless(origin) => Ok(Feeless(origin)),
+		}
     }
 
     fn post_dispatch_details(
@@ -428,14 +445,25 @@ where
         info: &DispatchInfoOf<RuntimeCallOf<T>>,
         post_info: &PostDispatchInfoOf<RuntimeCallOf<T>>,
         len: usize,
-        result: &DispatchResult,
-    ) -> Result<Weight, TransactionValidityError> {
-        match pre {
-            RequiresFee(pre, origin, tx_sponsor) => {
-                let result = S::post_dispatch_details(pre, info, post_info, len, result)?;
-                if let (Some(sponsor), Some(from)) = (tx_sponsor, origin.as_signer()) {
-                    Pallet::<T>::deposit_event(Event::<T>::FeeDelegated {
-                        origin: origin.clone().into_caller(),
+		result: &DispatchResult,
+	) -> Result<Weight, TransactionValidityError> {
+		match pre {
+			RequiresFee { inner: pre, delegated_origin: origin, tx_sponsor, refund_fee_on_success } => {
+				let adjusted_post_info;
+				let post_info = if refund_fee_on_success && result.is_ok() && post_info.pays_fee == Pays::Yes
+				{
+					adjusted_post_info = PostDispatchInfo {
+						actual_weight: post_info.actual_weight,
+						pays_fee: Pays::No,
+					};
+					&adjusted_post_info
+				} else {
+					post_info
+				};
+				let result = S::post_dispatch_details(pre, info, post_info, len, result)?;
+				if let (Some(sponsor), Some(from)) = (tx_sponsor, origin.as_signer()) {
+					Pallet::<T>::deposit_event(Event::<T>::FeeDelegated {
+						origin: origin.clone().into_caller(),
                         from: from.clone(),
                         to: sponsor.payer
                     });
@@ -445,7 +473,7 @@ where
             Feeless(origin) => {
                 Pallet::<T>::deposit_event(Event::<T>::FeeSkipped { origin: origin.into_caller() });
                 Ok(Weight::zero())
-            },
-        }
-    }
+			},
+		}
+	}
 }

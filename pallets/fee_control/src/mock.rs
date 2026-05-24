@@ -2,7 +2,7 @@ use pallet_prelude::*;
 
 use super::*;
 use crate as pallet_fee_control;
-use frame_support::{derive_impl, parameter_types, traits::InstanceFilter};
+use frame_support::{derive_impl, dispatch::Pays, parameter_types, traits::InstanceFilter};
 use pallet_prelude::{
 	frame_support::traits::{Imbalance, OnUnbalanced},
 	pallet_balances::AccountData,
@@ -13,7 +13,7 @@ use polkadot_sdk::{
 	sp_core::{ConstU128, ConstU8},
 };
 use sp_runtime::{
-	traits::{DispatchOriginOf, TransactionExtension},
+	traits::{DispatchOriginOf, PostDispatchInfoOf, TransactionExtension},
 	transaction_validity::ValidTransaction,
 };
 
@@ -46,6 +46,7 @@ impl pallet_fee_control::Config for Test {
 	type FeelessCallTxPoolKeyProviders = DummyPallet;
 	type CallTxPoolKeyProviders = DummyPallet;
 	type CallTxValidityProviders = DummyPallet;
+	type CallFeeRefundProviders = DummyPallet;
 }
 parameter_types! {
 	pub(crate) static TipUnbalancedAmount: Balance = 0;
@@ -179,6 +180,7 @@ parameter_types! {
 	pub static TipAmount: Balance = 500;
 	pub static FeeAmount: Balance = 1000;
 	pub static LastPayer: Option<u64> = None;
+	pub static LastPostDispatchPaysFee: Option<Pays> = None;
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo)]
@@ -257,6 +259,17 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 			},
 		}
 	}
+
+	fn post_dispatch_details(
+		_pre: Self::Pre,
+		_info: &DispatchInfoOf<RuntimeCall>,
+		post_info: &PostDispatchInfoOf<RuntimeCall>,
+		_len: usize,
+		_result: &DispatchResult,
+	) -> Result<Weight, TransactionValidityError> {
+		LastPostDispatchPaysFee::set(Some(post_info.pays_fee));
+		Ok(Weight::zero())
+	}
 }
 
 #[frame_support::pallet(dev_mode)]
@@ -264,8 +277,8 @@ pub mod pallet_dummy {
 	use crate::mock::{pallet_dummy, RuntimeCall};
 	use pallet_prelude::{
 		argon_primitives::{
-			CallTxPoolKeyProvider, CallTxValidityProvider, FeelessCallTxPoolKeyProvider,
-			TransactionSponsorProvider, TxSponsor,
+			CallFeeRefundProvider, CallTxPoolKeyProvider, CallTxValidityProvider,
+			FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
 		},
 		*,
 	};
@@ -316,6 +329,12 @@ pub mod pallet_dummy {
 
 		pub fn sponsored_pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
 			let _who = ensure_signed(_origin)?;
+			Ok(())
+		}
+
+		pub fn combo_paid(_origin: OriginFor<T>, should_fail: bool) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			ensure!(!should_fail, DispatchError::Other("combo failed"));
 			Ok(())
 		}
 	}
@@ -379,6 +398,21 @@ pub mod pallet_dummy {
 				});
 			}
 			None
+		}
+	}
+	impl<T: Config> CallFeeRefundProvider<RuntimeCall> for Pallet<T> {
+		fn refund_fee_on_success(call: &RuntimeCall) -> bool {
+			matches!(
+				call,
+				RuntimeCall::Utility(pallet_utility::Call::batch_all { calls })
+					if matches!(
+						calls.as_slice(),
+						[
+							RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { .. }),
+							RuntimeCall::DummyPallet(pallet_dummy::Call::combo_paid { should_fail: false })
+						]
+					)
+			)
 		}
 	}
 }
