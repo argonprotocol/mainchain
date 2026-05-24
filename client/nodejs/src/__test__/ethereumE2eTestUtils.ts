@@ -1,11 +1,11 @@
 import type { KeyringPair } from '@polkadot/keyring/types';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
 import {
+  type ArgonClient,
+  type EthereumReceipt,
   getLatestArgonFinalizedExecutionHeader,
   getNextEthereumBeaconSyncTxs,
   isOutdatedTransactionError,
-  type ArgonClient,
-  type EthereumReceipt,
   TxSubmitter,
 } from '../index';
 import type {
@@ -200,7 +200,6 @@ export async function syncEthereumVerifierUntilAnchorCovers(
 ) {
   const startedAt = Date.now();
   const timeoutMs = 5 * 60_000;
-  let sawAnyTx = false;
   let lastRetryableError: Error | undefined;
   let lastAnchorBlockNumber: bigint | undefined;
 
@@ -219,7 +218,6 @@ export async function syncEthereumVerifierUntilAnchorCovers(
       continue;
     }
 
-    sawAnyTx = true;
     let shouldRetry = false;
     for (const tx of txs) {
       try {

@@ -1,18 +1,17 @@
 import {
+  type ArgonClient,
   buildGatewayActivityProofPayload,
   decodeAddress,
   dispatchErrorToString,
   EvmContracts,
   getEthereumBeaconSyncBootstrapTx,
-  hexToU8a,
   Keyring,
   type KeyringPair,
   toFixedNumber,
   TxSubmitter,
   U8aFixed,
-  Vec,
   Vault,
-  type ArgonClient,
+  Vec,
 } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
@@ -20,9 +19,9 @@ import {
   createWalletClient,
   defineChain,
   encodeFunctionData,
+  type Hex,
   http,
   toHex,
-  type Hex,
 } from 'viem';
 import { getReadyEthereumGatewayUpdates } from './EthereumGatewayQueue';
 import {
