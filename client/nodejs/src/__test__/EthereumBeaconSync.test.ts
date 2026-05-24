@@ -309,6 +309,78 @@ it('steps to the next sync-committee period when finality is multiple periods ah
   ]);
 });
 
+it('submits the current-period sync committee update before the next free header window', async () => {
+  const beaconApiUrl = 'https://minimal-beacon-next-committee.example';
+
+  globalThis.fetch = createFetch({
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`]: {
+      data: createLightClientUpdate(96, {
+        attested_header: {
+          beacon: createBeaconHeader(97),
+          execution: createExecutionHeader(97),
+          execution_branch: ['0xfinality97'],
+        },
+        signature_slot: '98',
+      }),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1`]: [
+      createVersionedLightClientUpdate(64, {
+        attested_header: {
+          beacon: createBeaconHeader(65),
+          execution: createExecutionHeader(65),
+          execution_branch: ['0xperiod1-attested'],
+        },
+        signature_slot: '66',
+        next_sync_committee: {
+          pubkeys: ['0xperiod1'],
+          aggregate_pubkey: '0xperiod1-agg',
+        },
+        next_sync_committee_branch: ['0xperiod1-branch'],
+        finalized_header: {
+          beacon: createBeaconHeader(64),
+          execution: createExecutionHeader(64),
+          execution_branch: ['0xperiod1-finalized'],
+        },
+      }),
+    ],
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`]:
+      createBootstrapResponse(48, ['0xstored48']),
+    [`${beaconApiUrl}/eth/v1/config/spec`]: {
+      data: createBeaconSpec({
+        slotsPerEpoch: '8',
+        epochsPerSyncCommitteePeriod: '8',
+        slotsPerHistoricalRoot: '64',
+      }),
+    },
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({
+      beaconPreset: 'minimal',
+      hasNextSyncCommittee: true,
+      hasExecutionAnchor: true,
+      latestFinalizedSlot: 48,
+      latestSyncCommitteeUpdatePeriod: 0,
+      headerInterval: 32,
+    }),
+    beaconApiUrl,
+  );
+
+  expect(txs).toEqual([
+    {
+      method: 'submit',
+      update: expect.objectContaining({
+        finalizedHeader: expect.objectContaining({ slot: '64' }),
+        signatureSlot: '66',
+        nextSyncCommitteeUpdate: expect.objectContaining({
+          nextSyncCommittee: expect.anything(),
+          nextSyncCommitteeBranch: ['0xperiod1-branch'],
+        }),
+      }),
+    },
+  ]);
+});
+
 it('falls back to the finality update when no current-period update is available', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {

@@ -1424,7 +1424,7 @@ export const mintingGatewayAbi = [
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
           { name: 'amount', internalType: 'uint128', type: 'uint128' },
-          { name: 'finalizationTip', internalType: 'uint128', type: 'uint128' },
+          { name: 'mintingAuthorityTip', internalType: 'uint128', type: 'uint128' },
         ],
       },
     ],
@@ -1448,7 +1448,7 @@ export const mintingGatewayAbi = [
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
           { name: 'amount', internalType: 'uint128', type: 'uint128' },
-          { name: 'finalizationTip', internalType: 'uint128', type: 'uint128' },
+          { name: 'mintingAuthorityTip', internalType: 'uint128', type: 'uint128' },
         ],
       },
       {

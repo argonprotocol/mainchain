@@ -1,34 +1,24 @@
 import { Keyring } from '@polkadot/keyring';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { EvmContracts } from '../index';
 import {
-  argonTokenAbi,
-  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-  mintingGatewayAbi,
-  TxSubmitter,
-  buildGatewayActivityProofPayload,
-  dispatchErrorToString,
-  type EthereumReceipt,
-  getEthereumBeaconSyncBootstrapTx,
-  getLatestArgonFinalizedExecutionHeader,
-  getNextEthereumBeaconSyncTxs,
-  isOutdatedTransactionError,
-} from '../index';
-import type {
-  EthereumBeaconBlockResponse,
-  EthereumBeaconHeaderDetailsResponse,
-} from '../EthereumBeaconTypes';
-import type { Hex, RpcTransactionReceipt } from 'viem';
-import {
-  createPublicClient,
-  createWalletClient,
-  defineChain,
-  encodeFunctionData,
-  http,
-  parseSignature,
-  toHex,
-} from 'viem';
+  EthereumProofE2eHarness,
+  getReadyEthereumGatewayUpdates,
+  TestMintingAuthorityActor,
+  TestMintingGateway,
+  SKIP_E2E,
+  teardown,
+  TestEthereum,
+} from '../../../../testing/nodejs/src/index';
+import { repeatByteHex, waitForExecutionBlockAtOrAbove } from './ethereumE2eTestUtils';
+import { toHex, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { SKIP_E2E, sudo, teardown, TestEthereum, TestMainchain } from '@argonprotocol/testing';
+
+const {
+  hashMintingGatewayActivateMintingAuthorityApproval,
+  hashMintingGatewayGlobalIssuanceCouncil,
+  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+} = EvmContracts;
 
 const TEST_ACCOUNT = {
   address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
@@ -40,760 +30,431 @@ const TRANSFER_AMOUNT_RUNTIME_UNITS = 10_000n;
 const TRANSFER_AMOUNT_BASE_UNITS =
   TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE;
 const PROOF_RELAYER_URI = '//Charlie';
-
-afterEach(async () => {
-  await teardown();
-});
-
-async function signGatewayPermit(args: {
-  account: ReturnType<typeof privateKeyToAccount>;
-  chainId: number;
-  tokenAddress: Hex;
-  gatewayAddress: Hex;
-  owner: Hex;
-  value: bigint;
-  nonce: bigint;
-  deadline: bigint;
-}) {
-  const signature = parseSignature(
-    await args.account.signTypedData({
-      domain: {
-        name: 'Argon',
-        version: '1',
-        chainId: args.chainId,
-        verifyingContract: args.tokenAddress,
-      },
-      types: {
-        Permit: [
-          { name: 'owner', type: 'address' },
-          { name: 'spender', type: 'address' },
-          { name: 'value', type: 'uint256' },
-          { name: 'nonce', type: 'uint256' },
-          { name: 'deadline', type: 'uint256' },
-        ],
-      },
-      primaryType: 'Permit',
-      message: {
-        owner: args.owner,
-        spender: args.gatewayAddress,
-        value: args.value,
-        nonce: args.nonce,
-        deadline: args.deadline,
-      },
-    }),
-  );
-  return { v: Number(signature.v), r: signature.r, s: signature.s };
-}
+const ACTIVATION_RELAYER_URI = '//Ferdie';
+const QUEUE_RELAY_OPERATOR_URI = '//Dave';
+const ROUNDTRIP_ETHEREUM_RECIPIENT_PRIVATE_KEY = repeatByteHex('03', 32);
+const TEST_VAULT_XPUB =
+  'tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt';
+const QUEUE_RELAY_COUNCIL_PRIVATE_KEY = repeatByteHex('01', 32);
+const QUEUE_RELAY_AUTHORITY_PRIVATE_KEY = repeatByteHex('02', 32);
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
-  it('boots a real ethereum devnet and proves two MintingGateway burns in one proof batch', async () => {
-    const ethereum = new TestEthereum();
-    const endpoints = await ethereum.launch({
-      consensusClient: 'lodestar',
-      preset: 'minimal',
-      secondsPerSlot: 1,
-      prefundedAccounts: {
-        [TEST_ACCOUNT.address]: {
-          balance: TEST_ACCOUNT.balance,
-        },
-      },
-    });
-
-    const mainchain = new TestMainchain();
-    const mainchainReady = mainchain.launch();
-
-    const chain = defineChain({
-      id: Number.parseInt(endpoints.chainId, 16),
-      name: 'argon-test-ethereum',
-      nativeCurrency: {
-        name: 'Ether',
-        symbol: 'ETH',
-        decimals: 18,
-      },
-      rpcUrls: {
-        default: {
-          http: [endpoints.executionRpcUrl],
-        },
-      },
-    });
-
-    const account = privateKeyToAccount(TEST_ACCOUNT.privateKey);
-    const publicClient = createPublicClient({
-      chain,
-      transport: http(endpoints.executionRpcUrl),
-    });
-    const walletClient = createWalletClient({
-      account,
-      chain,
-      transport: http(endpoints.executionRpcUrl),
-    });
-
-    expect(await publicClient.getBalance({ address: account.address })).toBeGreaterThan(0n);
-
-    const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
-      deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS * 2n,
-      seedArgonRecipient: account.address,
-    });
-    const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
-    const charlie = new Keyring({ type: 'sr25519' }).createFromUri('//Charlie//beneficiary');
-    const firstTransferAmount = TRANSFER_AMOUNT_RUNTIME_UNITS;
-    const secondTransferAmount = TRANSFER_AMOUNT_RUNTIME_UNITS;
-    const firstArgonDestination = toHex(bob.publicKey, { size: 32 });
-    const secondArgonDestination = toHex(charlie.publicKey, { size: 32 });
-
-    const permitDeadline = (await publicClient.getBlock()).timestamp + 3600n;
-    const permitNonce = await publicClient.readContract({
-      address: gatewayDeployment.argonTokenAddress,
-      abi: argonTokenAbi,
-      functionName: 'nonces',
-      args: [account.address],
-    });
-    const permitSignature = await signGatewayPermit({
-      account,
-      chainId: chain.id,
-      tokenAddress: gatewayDeployment.argonTokenAddress,
-      gatewayAddress: gatewayDeployment.gatewayAddress,
-      owner: account.address,
-      value: firstTransferAmount * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-      nonce: permitNonce,
-      deadline: permitDeadline,
-    });
-
-    const firstBurnHash = await walletClient.sendTransaction({
-      to: gatewayDeployment.gatewayAddress,
-      data: encodeFunctionData({
-        abi: mintingGatewayAbi,
-        functionName: 'startTransferToArgon',
-        args: [
-          gatewayDeployment.argonTokenAddress,
-          firstTransferAmount,
-          firstArgonDestination,
-          permitDeadline,
-          permitSignature.v,
-          permitSignature.r,
-          permitSignature.s,
-        ],
-      }),
-    });
-    const firstBurnReceipt = await waitForExecutionReceipt(ethereum, firstBurnHash);
-    const firstBurnBlockNumber = BigInt(firstBurnReceipt.blockNumber);
-
-    expect(firstBurnReceipt.status).toBe('0x1');
-    expect(firstBurnReceipt.blockHash).toBeTruthy();
-
-    await waitForExecutionBlockAtOrAbove(publicClient, firstBurnBlockNumber + 1n);
-
-    const secondPermitSignature = await signGatewayPermit({
-      account,
-      chainId: chain.id,
-      tokenAddress: gatewayDeployment.argonTokenAddress,
-      gatewayAddress: gatewayDeployment.gatewayAddress,
-      owner: account.address,
-      value: secondTransferAmount * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-      nonce: permitNonce + 1n,
-      deadline: permitDeadline,
-    });
-    const secondBurnHash = await walletClient.sendTransaction({
-      to: gatewayDeployment.gatewayAddress,
-      data: encodeFunctionData({
-        abi: mintingGatewayAbi,
-        functionName: 'startTransferToArgon',
-        args: [
-          gatewayDeployment.argonTokenAddress,
-          secondTransferAmount,
-          secondArgonDestination,
-          permitDeadline,
-          secondPermitSignature.v,
-          secondPermitSignature.r,
-          secondPermitSignature.s,
-        ],
-      }),
-    });
-    const secondBurnReceipt = await waitForExecutionReceipt(ethereum, secondBurnHash);
-    const secondBurnBlockNumber = BigInt(secondBurnReceipt.blockNumber);
-
-    expect(secondBurnReceipt.status).toBe('0x1');
-    expect(secondBurnBlockNumber).toBeGreaterThan(firstBurnBlockNumber);
-
-    const laterReceipt = await mineLaterExecutionAnchorReceipt(
-      walletClient,
-      chain,
-      ethereum,
-      account,
-      secondBurnBlockNumber,
+  describe.sequential('roundtrip saga', () => {
+    let harness: EthereumProofE2eHarness | undefined;
+    let authorityActor: TestMintingAuthorityActor | undefined;
+    let gateway: TestMintingGateway | undefined;
+    const activationRelayer = new Keyring({ type: 'sr25519' }).createFromUri(
+      ACTIVATION_RELAYER_URI,
     );
-    await waitForFinalizedBeaconExecutionAtOrAbove(ethereum, BigInt(laterReceipt.blockNumber));
+    const outboundSender = new Keyring({ type: 'sr25519' }).createFromUri('//Eve');
+    const argonReturnRecipient = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
+    const ethereumRecipient = privateKeyToAccount(ROUNDTRIP_ETHEREUM_RECIPIENT_PRIVATE_KEY);
+    let activeCouncilHash = '' as Hex;
+    let batch: Awaited<ReturnType<typeof getReadyEthereumGatewayUpdates>> | undefined;
+    let councilApprovalSignature = '' as Hex;
+    const mintingAuthorityMicronots = 1_000_000n;
+    let transferId = '' as Hex;
+    let transferRequest:
+      | Awaited<
+          ReturnType<TestMintingAuthorityActor['collateralizeFirstPendingTransferOut']>
+        >['transferRequest']
+      | undefined;
+    let collateralizationSignature = '' as Hex;
+    const returnAmountRuntimeUnits = 4_000n;
+    const activationRepaymentPricing = {
+      activationGasCost: 100_000,
+      signatureGasCost: 50_000,
+      estimatedWeiPerGas: 1_000_000_000,
+      estimatedMicrogonsPerEth: 1_000_000,
+    };
+    const expectedActivationRepaymentDue = 150n;
 
-    await mainchainReady;
+    afterAll(async () => {
+      await teardown();
+    });
 
-    const mainchainClient = await mainchain.client();
-    const sudoSigner = sudo();
-    const proofRelayer = new Keyring({ type: 'sr25519' }).createFromUri(PROOF_RELAYER_URI);
+    it('launches the devnet and configures council, gateway, and queued activation', async () => {
+      harness = await EthereumProofE2eHarness.launch({
+        testAccount: TEST_ACCOUNT,
+        proofRelayerUri: PROOF_RELAYER_URI,
+      });
+      authorityActor = new TestMintingAuthorityActor(harness, {
+        operatorUri: QUEUE_RELAY_OPERATOR_URI,
+        councilPrivateKey: QUEUE_RELAY_COUNCIL_PRIVATE_KEY,
+        authorityPrivateKey: QUEUE_RELAY_AUTHORITY_PRIVATE_KEY,
+      });
 
-    const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
-      mainchainClient,
-      endpoints.beaconApiUrl,
-    );
-    const checkpointResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.sudo.sudo(checkpointTx),
-      sudoSigner,
-    ).submit();
-    await checkpointResult.waitForInFirstBlock;
+      expect(
+        await harness.publicClient.getBalance({ address: harness.deployer.address }),
+      ).toBeGreaterThan(0n);
 
-    const checkpointSudoEvent = checkpointResult.events.find(event =>
-      mainchainClient.events.sudo.Sudid.is(event),
-    );
-    if (!checkpointSudoEvent || !mainchainClient.events.sudo.Sudid.is(checkpointSudoEvent)) {
-      throw new Error('forceCheckpoint did not emit sudo.Sudid');
-    }
-    if (checkpointSudoEvent.data.sudoResult.isErr) {
-      const dispatchError = checkpointSudoEvent.data.sudoResult.asErr;
-      throw new Error(
-        `forceCheckpoint failed: ${dispatchErrorToString(mainchainClient, dispatchError)}`,
+      await authorityActor.prepareOperator({
+        freeBalance: 3_000_000_000n,
+        ownershipBalance: 5_000_000n,
+        committedArgonots: 1_000_000n,
+        bitcoinXpub: TEST_VAULT_XPUB,
+      });
+      await authorityActor.registerCouncilSigner();
+
+      const councilSetup = await authorityActor.forceSingleMemberCouncil();
+      activeCouncilHash = councilSetup.activeCouncilHash;
+      const configuredCouncil = councilSetup.currentCouncil;
+
+      gateway = await TestMintingGateway.deploy(harness, {
+        deployerPrivateKey: TEST_ACCOUNT.privateKey,
+        initialMicrogonsPerArgonot: councilSetup.activeCouncil.epochMicrogonsPerArgonot.toBigInt(),
+      });
+      authorityActor.attachGateway(gateway);
+
+      await harness.setEthereumChainConfig(gateway);
+      await harness.sudoSubmit(
+        harness.mainchainClient.tx.crosschainTransfer.setMintingAuthorityActivationRepaymentPricing(
+          'Ethereum',
+          activationRepaymentPricing,
+        ),
       );
-    }
+      const syncGatewayCouncilReceipt = await gateway.forceUpdateActiveCouncil(configuredCouncil);
+      expect(syncGatewayCouncilReceipt.status).toBe('success');
 
-    await syncEthereumVerifierUntilAnchorCovers(
-      mainchainClient,
-      sudoSigner,
-      endpoints.beaconApiUrl,
-      secondBurnBlockNumber,
-    );
+      await authorityActor.setMinimumValue(1n);
+      await authorityActor.registerMintingAuthority(mintingAuthorityMicronots);
 
-    const finalizedState = await mainchainClient.query.ethereumVerifier.finalizedBeaconState(
-      await mainchainClient.query.ethereumVerifier.latestFinalizedBlockRoot(),
-    );
+      const approval = await authorityActor.approveActivationQueueEntry();
+      batch = approval.batch;
+      councilApprovalSignature = approval.councilApprovalSignature;
 
-    expect(finalizedState.isSome).toBe(true);
-    expect(
-      (await mainchainClient.query.ethereumVerifier.latestExecutionHeaderAnchorBlockHash()).isSome,
-    ).toBe(true);
+      expect(batch.updates).toHaveLength(1);
+      expect(batch.firstQueueNonce).toBe(1n);
+      expect(batch.lastQueueNonce).toBe(1n);
+      expect(approval.approvalQueueEntry.isSome).toBe(true);
 
-    const setConfigResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.sudo.sudo(
-        mainchainClient.tx.crosschainTransfer.setChainConfig({
-          Ethereum: {
-            gateway: gatewayDeployment.gatewayAddress,
-            argonToken: gatewayDeployment.argonTokenAddress,
-            argonotToken: gatewayDeployment.argonotTokenAddress,
-            previousGateway: null,
-            previousReleaseExpiration: null,
+      const contractCouncil = await gateway.globalIssuanceCouncil();
+      const expectedGatewayCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+        signers: configuredCouncil.signers,
+        weights: configuredCouncil.weights,
+        epochMicrogonsPerArgonot: councilSetup.activeCouncil.epochMicrogonsPerArgonot.toBigInt(),
+      });
+
+      expect(expectedGatewayCouncilHash).toBe(activeCouncilHash);
+      expect(contractCouncil[2]).toBe(activeCouncilHash);
+      expect(
+        hashMintingGatewayActivateMintingAuthorityApproval(
+          { chainId: BigInt(harness.chain.id), gatewayAddress: gateway.gatewayAddress },
+          {
+            queueNonce: 1n,
+            approvingCouncilHash: activeCouncilHash,
+            previousUpdateHash: `0x${'00'.repeat(32)}`,
+            target: {
+              microgonCollateral: 0n,
+              micronotCollateral: mintingAuthorityMicronots,
+              signingKey: authorityActor.authoritySigner.address,
+            },
           },
-        }),
-      ),
-      sudoSigner,
-    ).submit();
-    await setConfigResult.waitForInFirstBlock;
+        ),
+      ).toBe(approval.approvalQueueEntry.unwrap().approvalHash.toHex());
+      expect(batch.updates[0]?.signatures[0]?.toLowerCase()).toBe(
+        councilApprovalSignature.toLowerCase(),
+      );
+    }, 420_000);
 
-    const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
-    const burnAccountFunding =
-      firstTransferAmount +
-      secondTransferAmount +
-      mainchainClient.consts.balances.existentialDeposit.toBigInt();
-    const proofRelayerFunding =
-      mainchainClient.consts.balances.existentialDeposit.toBigInt() + 1_000_000n;
+    it('relays the activation and proves it back to Argon', async () => {
+      if (!harness || !authorityActor || !gateway || !batch) {
+        throw new Error('roundtrip setup checkpoint did not complete');
+      }
 
-    const fundBurnAccountResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
-      sudoSigner,
-    ).submit();
-    await fundBurnAccountResult.waitForInFirstBlock;
+      const activeHarness = harness;
+      const activationRelayerBefore = await activeHarness.mainchainClient.query.system.account(
+        activationRelayer.address,
+      );
+      const relayReceipt = await gateway.relayReadyApprovals(batch, activationRelayer.address);
+      expect(await gateway.argonApprovalsNonce()).toBe(1n);
 
-    const fundProofRelayerResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.balances.transferAllowDeath(proofRelayer.address, proofRelayerFunding),
-      sudoSigner,
-    ).submit();
-    await fundProofRelayerResult.waitForInFirstBlock;
+      const [microgonCollateral, authorityMicronotCollateral] = await gateway.authorityCollateral(
+        authorityActor.authoritySigner.address,
+      );
+      expect(microgonCollateral).toBe(0n);
+      expect(authorityMicronotCollateral).toBe(mintingAuthorityMicronots);
 
-    const proofPlan = await buildGatewayActivityProofPayload(mainchainClient, {
-      executionRpcUrl: endpoints.executionRpcUrl,
-      gatewayAddress: gatewayDeployment.gatewayAddress,
-      throughExecutionBlockNumber: secondBurnBlockNumber,
-    });
-    const proofPayload = proofPlan.payload;
-    if (!proofPayload) {
-      throw new Error('Expected uncovered gateway activity to prove');
-    }
+      const nextBatch = await getReadyEthereumGatewayUpdates(
+        activeHarness.mainchainClient,
+        activeHarness.publicClient,
+      );
+      expect(nextBatch.updates).toEqual([]);
+      expect(nextBatch.argonApprovalsNonce).toBe(1n);
 
-    expect(proofPlan.latestGatewayActivityNonce).toBe(2n);
-    expect(proofPlan.payloadUpToGatewayActivityNonce).toBe(2n);
-    const { previousGatewayActivityNonce, proof: eventProof } = proofPayload;
-    const firstProofBlock = eventProof.blocks[0];
-    const secondProofBlock = eventProof.blocks[1];
-    const recipientBefore = await mainchainClient.query.system.account(bob.address);
-    const secondRecipientBefore = await mainchainClient.query.system.account(charlie.address);
-    const relayerBefore = await mainchainClient.query.system.account(proofRelayer.address);
+      await activeHarness.waitForExecutionFinalizedAfter(relayReceipt.blockNumber);
+      await activeHarness.bootstrapVerifier();
+      await activeHarness.fundProofRelayer();
+      await activeHarness.syncVerifierThrough(relayReceipt.blockNumber);
 
-    const proveGatewayActivityResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
-        'Ethereum',
-        previousGatewayActivityNonce,
-        eventProof,
-      ),
-      proofRelayer,
-    ).submit();
-    await proveGatewayActivityResult.waitForInFirstBlock;
+      const { payload, result } = await activeHarness.proveGatewayActivity(
+        gateway.gatewayAddress,
+        relayReceipt.blockNumber,
+      );
 
-    expect(previousGatewayActivityNonce).toBe(0n);
-    expect(proofPayload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 2n });
-    expect(proofPayload.executionBlockNumberRange).toEqual({
-      start: firstBurnBlockNumber,
-      end: secondBurnBlockNumber,
-    });
-    expect(eventProof.executionBlockProof.anchorBlockHash).toBeTruthy();
-    expect(eventProof.blocks).toHaveLength(2);
-    expect(firstProofBlock.receiptProof.nodes.length).toBeGreaterThan(0);
-    expect(secondProofBlock.receiptProof.nodes.length).toBeGreaterThan(0);
-    expect(firstProofBlock.receiptLogs[0]?.transactionIndex).toBe(
-      Number(BigInt(firstBurnReceipt.transactionIndex)),
-    );
-    expect(secondProofBlock.receiptLogs[0]?.transactionIndex).toBe(
-      Number(BigInt(secondBurnReceipt.transactionIndex)),
-    );
-    expect(firstProofBlock.receiptProof.receipts[0]?.transactionIndex).toBe(
-      Number(BigInt(firstBurnReceipt.transactionIndex)),
-    );
-    expect(secondProofBlock.receiptProof.receipts[0]?.transactionIndex).toBe(
-      Number(BigInt(secondBurnReceipt.transactionIndex)),
-    );
-    expect(
-      proveGatewayActivityResult.events.filter(event =>
-        mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
-      ),
-    ).toHaveLength(2);
-    expect(
-      proveGatewayActivityResult.events.some(event =>
-        mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
-      ),
-    ).toBe(true);
-    expect(proveGatewayActivityResult.finalFee ?? 0n).toBe(0n);
+      expect(payload.previousGatewayActivityNonce).toBe(0n);
+      expect(payload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
+      expect(payload.activities).toHaveLength(1);
+      expect(payload.activities[0]?.kind).toBe('MintingAuthorityActivated');
+      expect(
+        result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.MintingAuthorityActivationFinalized.is(
+            event,
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
+        ),
+      ).toBe(true);
 
-    const recipientAfter = await mainchainClient.query.system.account(bob.address);
-    const secondRecipientAfter = await mainchainClient.query.system.account(charlie.address);
-    const relayerAfter = await mainchainClient.query.system.account(proofRelayer.address);
-    expect(recipientAfter.data.free.toBigInt() - recipientBefore.data.free.toBigInt()).toBe(
-      firstTransferAmount,
-    );
-    expect(
-      secondRecipientAfter.data.free.toBigInt() - secondRecipientBefore.data.free.toBigInt(),
-    ).toBe(secondTransferAmount);
-    expect(relayerAfter.data.free.toBigInt()).toBe(relayerBefore.data.free.toBigInt());
-  }, 420_000);
+      const authorityOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.mintingAuthoritiesBySigner(
+          authorityActor.authoritySigner.address,
+        );
+      expect(authorityOption.isSome).toBe(true);
+      const authority = authorityOption.unwrap();
+      const authorityJson = authority.toJSON() as { activationRepaymentDue?: string | null };
+      expect(authority.state.isActive).toBe(true);
+      expect(authorityJson.activationRepaymentDue).toBeNull();
+      expect(
+        result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.MintingAuthorityActivationCompleted.is(
+            event,
+          ),
+        ),
+      ).toBe(true);
 
-  it('proves a burn after the first minimal sync committee transition', async () => {
-    const ethereum = new TestEthereum();
-    const endpoints = await ethereum.launch({
-      consensusClient: 'lodestar',
-      preset: 'minimal',
-      secondsPerSlot: 1,
-      prefundedAccounts: {
-        [TEST_ACCOUNT.address]: {
-          balance: TEST_ACCOUNT.balance,
-        },
-      },
-    });
+      const gatewayStateOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain(
+          'Ethereum',
+        );
+      expect(gatewayStateOption.isSome).toBe(true);
+      expect(gatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(1n);
+      expect(gatewayStateOption.unwrap().argonApprovalsNonce.toBigInt()).toBe(1n);
+      const activationRelayerAfter = await activeHarness.mainchainClient.query.system.account(
+        activationRelayer.address,
+      );
+      expect(
+        activationRelayerAfter.data.free.toBigInt() - activationRelayerBefore.data.free.toBigInt(),
+      ).toBe(expectedActivationRepaymentDue);
+    }, 420_000);
 
-    const mainchain = new TestMainchain();
-    const mainchainReady = mainchain.launch();
+    it('transfers Argon to Ethereum, collateralizes it, and proves finalization back', async () => {
+      if (!harness || !authorityActor || !gateway) {
+        throw new Error('activation checkpoint did not complete');
+      }
 
-    const chain = defineChain({
-      id: Number.parseInt(endpoints.chainId, 16),
-      name: 'argon-test-ethereum',
-      nativeCurrency: {
-        name: 'Ether',
-        symbol: 'ETH',
-        decimals: 18,
-      },
-      rpcUrls: {
-        default: {
-          http: [endpoints.executionRpcUrl],
-        },
-      },
-    });
-
-    const account = privateKeyToAccount(TEST_ACCOUNT.privateKey);
-    const publicClient = createPublicClient({
-      chain,
-      transport: http(endpoints.executionRpcUrl),
-    });
-    const walletClient = createWalletClient({
-      account,
-      chain,
-      transport: http(endpoints.executionRpcUrl),
-    });
-
-    const gatewayDeployment = await ethereum.deployMintingGatewayFixture({
-      deployerPrivateKey: TEST_ACCOUNT.privateKey,
-      seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
-      seedArgonRecipient: account.address,
-    });
-    const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
-    const argonDestination = toHex(bob.publicKey, { size: 32 });
-    const permitDeadline = (await publicClient.getBlock()).timestamp + 3600n;
-    const permitNonce = await publicClient.readContract({
-      address: gatewayDeployment.argonTokenAddress,
-      abi: argonTokenAbi,
-      functionName: 'nonces',
-      args: [account.address],
-    });
-    const permitSignature = await signGatewayPermit({
-      account,
-      chainId: chain.id,
-      tokenAddress: gatewayDeployment.argonTokenAddress,
-      gatewayAddress: gatewayDeployment.gatewayAddress,
-      owner: account.address,
-      value: TRANSFER_AMOUNT_RUNTIME_UNITS * MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-      nonce: permitNonce,
-      deadline: permitDeadline,
-    });
-    await waitForExecutionBlockAtOrAbove(publicClient, 73n);
-
-    const burnHash = await walletClient.sendTransaction({
-      to: gatewayDeployment.gatewayAddress,
-      data: encodeFunctionData({
-        abi: mintingGatewayAbi,
-        functionName: 'startTransferToArgon',
-        args: [
-          gatewayDeployment.argonTokenAddress,
+      const activeHarness = harness;
+      const outboundSenderFunding =
+        TRANSFER_AMOUNT_RUNTIME_UNITS +
+        activeHarness.mainchainClient.consts.balances.existentialDeposit.toBigInt() +
+        10_000n;
+      await activeHarness.forceSetBalance(outboundSender.address, outboundSenderFunding);
+      await activeHarness.submit(
+        activeHarness.mainchainClient.tx.crosschainTransfer.transferOut(
+          'Ethereum',
+          'Argon',
+          ethereumRecipient.address,
           TRANSFER_AMOUNT_RUNTIME_UNITS,
-          argonDestination,
-          permitDeadline,
-          permitSignature.v,
-          permitSignature.r,
-          permitSignature.s,
-        ],
-      }),
-    });
-    const burnReceipt = await waitForExecutionReceipt(ethereum, burnHash);
-    const burnBlockNumber = BigInt(burnReceipt.blockNumber);
-
-    const laterReceipt = await mineLaterExecutionAnchorReceipt(
-      walletClient,
-      chain,
-      ethereum,
-      account,
-      burnBlockNumber,
-    );
-    await waitForFinalizedBeaconExecutionAtOrAbove(ethereum, BigInt(laterReceipt.blockNumber));
-
-    await mainchainReady;
-
-    const mainchainClient = await mainchain.client();
-    const sudoSigner = sudo();
-    const proofRelayer = new Keyring({ type: 'sr25519' }).createFromUri(PROOF_RELAYER_URI);
-
-    const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
-      mainchainClient,
-      endpoints.beaconApiUrl,
-    );
-    const checkpointResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.sudo.sudo(checkpointTx),
-      sudoSigner,
-    ).submit();
-    await checkpointResult.waitForInFirstBlock;
-
-    const checkpointSudoEvent = checkpointResult.events.find(event =>
-      mainchainClient.events.sudo.Sudid.is(event),
-    );
-    if (!checkpointSudoEvent || !mainchainClient.events.sudo.Sudid.is(checkpointSudoEvent)) {
-      throw new Error('forceCheckpoint did not emit sudo.Sudid');
-    }
-    if (checkpointSudoEvent.data.sudoResult.isErr) {
-      const dispatchError = checkpointSudoEvent.data.sudoResult.asErr;
-      throw new Error(
-        `forceCheckpoint failed: ${dispatchErrorToString(mainchainClient, dispatchError)}`,
+        ),
+        outboundSender,
       );
-    }
 
-    await syncEthereumVerifierUntilAnchorCovers(
-      mainchainClient,
-      sudoSigner,
-      endpoints.beaconApiUrl,
-      burnBlockNumber,
-    );
+      const collateralizedTransfer = await authorityActor.collateralizeFirstPendingTransferOut();
+      transferId = collateralizedTransfer.transferId;
+      transferRequest = collateralizedTransfer.transferRequest;
+      collateralizationSignature = collateralizedTransfer.collateralizationSignature;
 
-    const setConfigResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.sudo.sudo(
-        mainchainClient.tx.crosschainTransfer.setChainConfig({
-          Ethereum: {
-            gateway: gatewayDeployment.gatewayAddress,
-            argonToken: gatewayDeployment.argonTokenAddress,
-            argonotToken: gatewayDeployment.argonotTokenAddress,
-            previousGateway: null,
-            previousReleaseExpiration: null,
-          },
-        }),
-      ),
-      sudoSigner,
-    ).submit();
-    await setConfigResult.waitForInFirstBlock;
+      expect(collateralizedTransfer.pendingRequest.remainingCollateral.toBigInt()).toBe(
+        TRANSFER_AMOUNT_RUNTIME_UNITS,
+      );
+      expect(
+        collateralizedTransfer.result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.TransferOutReady.is(event),
+        ),
+      ).toBe(true);
 
-    const burnAccount = mainchainClient.consts.crosschainTransfer.ethereumBurnAccount.toString();
-    const burnAccountFunding =
-      TRANSFER_AMOUNT_RUNTIME_UNITS + mainchainClient.consts.balances.existentialDeposit.toBigInt();
-    const proofRelayerFunding =
-      mainchainClient.consts.balances.existentialDeposit.toBigInt() + 1_000_000n;
+      const readyTransferOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.transferOutById(transferId);
+      expect(readyTransferOption.isSome).toBe(true);
+      expect(readyTransferOption.unwrap().state.isReady).toBe(true);
 
-    const fundBurnAccountResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.balances.transferAllowDeath(burnAccount, burnAccountFunding),
-      sudoSigner,
-    ).submit();
-    await fundBurnAccountResult.waitForInFirstBlock;
+      const finalizeTransferReceipt = await gateway.finalizeTransferOut({
+        transferRequest,
+        collateralizationSignature,
+        micronotCollateral: collateralizedTransfer.micronotCollateral,
+      });
+      expect(await gateway.isFinalizedTransferOut(transferRequest)).toBe(true);
+      expect(await gateway.argonBalance(ethereumRecipient.address)).toBe(
+        TRANSFER_AMOUNT_BASE_UNITS,
+      );
 
-    const fundProofRelayerResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.balances.transferAllowDeath(proofRelayer.address, proofRelayerFunding),
-      sudoSigner,
-    ).submit();
-    await fundProofRelayerResult.waitForInFirstBlock;
+      await activeHarness.waitForExecutionFinalizedAfter(finalizeTransferReceipt.blockNumber);
+      await activeHarness.syncVerifierThrough(finalizeTransferReceipt.blockNumber);
 
-    const proofPlan = await buildGatewayActivityProofPayload(mainchainClient, {
-      executionRpcUrl: endpoints.executionRpcUrl,
-      gatewayAddress: gatewayDeployment.gatewayAddress,
-      throughExecutionBlockNumber: burnBlockNumber,
+      const { payload, result } = await activeHarness.proveGatewayActivity(
+        gateway.gatewayAddress,
+        finalizeTransferReceipt.blockNumber,
+      );
+      expect(payload.previousGatewayActivityNonce).toBe(1n);
+      expect(payload.gatewayActivityNonceRange).toEqual({ start: 2n, end: 2n });
+      expect(payload.activities).toHaveLength(1);
+      expect(payload.activities[0]?.kind).toBe('TransferOutOfArgonFinalized');
+      expect(
+        result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.TransferOutFinalized.is(event),
+        ),
+      ).toBe(true);
+
+      const finalizedTransferOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.transferOutById(transferId);
+      expect(finalizedTransferOption.isNone).toBe(true);
+      expect(
+        await activeHarness.mainchainClient.query.crosschainTransfer.pendingCollateralizationRequestsByChain(
+          'Ethereum',
+        ),
+      ).toHaveLength(0);
+
+      const remainingAuthorityOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.mintingAuthoritiesBySigner(
+          authorityActor.authoritySigner.address,
+        );
+      expect(remainingAuthorityOption.isSome).toBe(true);
+      expect(remainingAuthorityOption.unwrap().gatewayRemainingMicronotCollateral.toBigInt()).toBe(
+        mintingAuthorityMicronots - TRANSFER_AMOUNT_RUNTIME_UNITS,
+      );
+      expect(remainingAuthorityOption.unwrap().pendingReservedMicronotCollateral.toBigInt()).toBe(
+        0n,
+      );
+
+      const gatewayStateOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain(
+          'Ethereum',
+        );
+      expect(gatewayStateOption.isSome).toBe(true);
+      expect(gatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(2n);
+    }, 420_000);
+
+    it('transfers from Ethereum back to Argon and settles it', async () => {
+      if (!harness || !gateway || !transferRequest) {
+        throw new Error('outbound finalization checkpoint did not complete');
+      }
+
+      const activeHarness = harness;
+      const fundEthereumRecipientResult = await gateway.fundExecutionAccount(
+        ethereumRecipient.address,
+        10n ** 16n,
+      );
+      expect(fundEthereumRecipientResult.status).toBe('success');
+
+      const returnTransferRecipientBefore =
+        await activeHarness.mainchainClient.query.system.account(argonReturnRecipient.address);
+      const returnTransferReceipt = await gateway.startTransferToArgon({
+        account: ethereumRecipient,
+        amountRuntimeUnits: returnAmountRuntimeUnits,
+        recipientArgonAddress: toHex(argonReturnRecipient.publicKey, { size: 32 }),
+      });
+
+      await activeHarness.waitForExecutionFinalizedAfter(BigInt(returnTransferReceipt.blockNumber));
+      await activeHarness.syncVerifierThrough(BigInt(returnTransferReceipt.blockNumber));
+
+      const { payload, result } = await activeHarness.proveGatewayActivity(
+        gateway.gatewayAddress,
+        BigInt(returnTransferReceipt.blockNumber),
+      );
+      expect(payload.previousGatewayActivityNonce).toBe(2n);
+      expect(payload.gatewayActivityNonceRange).toEqual({ start: 3n, end: 3n });
+      expect(payload.activities).toHaveLength(1);
+      expect(payload.activities[0]?.kind).toBe('TransferToArgonStarted');
+      expect(
+        result.events.some(event =>
+          activeHarness.mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
+        ),
+      ).toBe(true);
+
+      const returnTransferRecipientAfter = await activeHarness.mainchainClient.query.system.account(
+        argonReturnRecipient.address,
+      );
+      expect(
+        returnTransferRecipientAfter.data.free.toBigInt() -
+          returnTransferRecipientBefore.data.free.toBigInt(),
+      ).toBe(returnAmountRuntimeUnits);
+
+      const finalGatewayStateOption =
+        await activeHarness.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain(
+          'Ethereum',
+        );
+      expect(finalGatewayStateOption.isSome).toBe(true);
+      expect(finalGatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(3n);
+    }, 420_000);
+  });
+
+  describe('committee transition regression', () => {
+    afterAll(async () => {
+      await teardown();
     });
-    const proofPayload = proofPlan.payload;
-    if (!proofPayload) {
-      throw new Error('Expected uncovered gateway activity to prove');
-    }
 
-    expect(proofPlan.latestGatewayActivityNonce).toBe(1n);
-    expect(proofPlan.payloadUpToGatewayActivityNonce).toBe(1n);
-    const { previousGatewayActivityNonce, proof: eventProof } = proofPayload;
-    const relayerBefore = await mainchainClient.query.system.account(proofRelayer.address);
-    const proveGatewayActivityResult = await new TxSubmitter(
-      mainchainClient,
-      mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
-        'Ethereum',
-        previousGatewayActivityNonce,
-        eventProof,
-      ),
-      proofRelayer,
-    ).submit();
-    await proveGatewayActivityResult.waitForInFirstBlock;
+    it('proves a burn after the first minimal sync committee transition', async () => {
+      const harness = await EthereumProofE2eHarness.launch({
+        testAccount: TEST_ACCOUNT,
+        proofRelayerUri: PROOF_RELAYER_URI,
+      });
 
-    expect(previousGatewayActivityNonce).toBe(0n);
-    expect(proofPayload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
-    expect(proofPayload.executionBlockNumberRange).toEqual({
-      start: burnBlockNumber,
-      end: burnBlockNumber,
-    });
-    expect(
-      proveGatewayActivityResult.events.some(event =>
-        mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
-      ),
-    ).toBe(true);
-    expect(
-      proveGatewayActivityResult.events.some(event =>
-        mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
-      ),
-    ).toBe(true);
-    expect(proveGatewayActivityResult.finalFee ?? 0n).toBe(0n);
+      const gateway = await TestMintingGateway.deploy(harness, {
+        deployerPrivateKey: TEST_ACCOUNT.privateKey,
+        seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
+        seedArgonRecipient: harness.deployer.address,
+      });
+      await harness.setEthereumChainConfig(gateway);
+      const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
 
-    const relayerAfter = await mainchainClient.query.system.account(proofRelayer.address);
-    expect(relayerAfter.data.free.toBigInt()).toBe(relayerBefore.data.free.toBigInt());
-  }, 420_000);
+      await waitForExecutionBlockAtOrAbove(harness.publicClient, 73n);
+
+      const burnReceipt = await gateway.startTransferToArgon({
+        account: harness.deployer,
+        amountRuntimeUnits: TRANSFER_AMOUNT_RUNTIME_UNITS,
+        recipientArgonAddress: toHex(bob.publicKey, { size: 32 }),
+      });
+      const burnBlockNumber = BigInt(burnReceipt.blockNumber);
+
+      await harness.waitForExecutionFinalizedAfter(burnBlockNumber);
+      await harness.bootstrapVerifier();
+      await harness.syncVerifierThrough(burnBlockNumber);
+      await harness.fundBurnAccount(TRANSFER_AMOUNT_RUNTIME_UNITS);
+      await harness.fundProofRelayer();
+
+      const relayerBefore = await harness.mainchainClient.query.system.account(
+        harness.proofRelayer.address,
+      );
+      const { payload, result } = await harness.proveGatewayActivity(
+        gateway.gatewayAddress,
+        burnBlockNumber,
+      );
+
+      expect(payload.previousGatewayActivityNonce).toBe(0n);
+      expect(payload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
+      expect(payload.executionBlockNumberRange).toEqual({
+        start: burnBlockNumber,
+        end: burnBlockNumber,
+      });
+      expect(
+        result.events.some(event =>
+          harness.mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
+        ),
+      ).toBe(true);
+      expect(
+        result.events.some(event =>
+          harness.mainchainClient.events.crosschainTransfer.GatewayStateAdvanced.is(event),
+        ),
+      ).toBe(true);
+      expect(result.finalFee ?? 0n).toBe(0n);
+
+      const relayerAfter = await harness.mainchainClient.query.system.account(
+        harness.proofRelayer.address,
+      );
+      expect(relayerAfter.data.free.toBigInt()).toBe(relayerBefore.data.free.toBigInt());
+    }, 420_000);
+  });
 });
-
-async function waitForFinalizedBeaconExecutionAtOrAbove(
-  ethereum: TestEthereum,
-  minimumExecutionBlockNumber: bigint,
-) {
-  const startedAt = Date.now();
-
-  let lastSeenExecutionBlockNumber = 0n;
-  let lastSeenHeadSlot = 0n;
-  let lastSeenFinalizedSlot = 0n;
-  let lastError: Error | undefined;
-
-  while (Date.now() - startedAt < 300_000) {
-    try {
-      const [headHeader, finalizedHeader] = await Promise.all([
-        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/head'),
-        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/finalized'),
-      ]);
-      lastSeenHeadSlot = BigInt(headHeader.data.header.message.slot);
-      lastSeenFinalizedSlot = BigInt(finalizedHeader.data.header.message.slot);
-      const block = await ethereum.getBeacon<EthereumBeaconBlockResponse>(
-        `/eth/v2/beacon/blocks/${finalizedHeader.data.root}`,
-      );
-      const executionBlockNumber = BigInt(block.data.message.body.execution_payload.block_number);
-      lastSeenExecutionBlockNumber = executionBlockNumber;
-      lastError = undefined;
-
-      if (executionBlockNumber >= minimumExecutionBlockNumber) {
-        return { header: finalizedHeader, block };
-      }
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error;
-      }
-      lastError = error;
-    }
-
-    await delay(1_000);
-  }
-
-  const lastErrorSuffix = lastError ? `; last beacon error was: ${lastError.message}` : '';
-  throw new Error(
-    `Timed out waiting for finalized beacon execution block at or above ${minimumExecutionBlockNumber}; last seen head slot was ${lastSeenHeadSlot}, finalized slot was ${lastSeenFinalizedSlot}, and finalized execution block was ${lastSeenExecutionBlockNumber}${lastErrorSuffix}`,
-  );
-}
-
-async function mineLaterExecutionAnchorReceipt(
-  walletClient: ReturnType<typeof createWalletClient>,
-  chain: ReturnType<typeof defineChain>,
-  ethereum: TestEthereum,
-  account: ReturnType<typeof privateKeyToAccount>,
-  minimumBlockNumber: bigint,
-) {
-  while (true) {
-    const transactionHash = await walletClient.sendTransaction({
-      account,
-      chain,
-      to: account.address,
-      value: 0n,
-    });
-    const receipt = await waitForExecutionReceipt(ethereum, transactionHash);
-
-    if (BigInt(receipt.blockNumber) > minimumBlockNumber) {
-      return receipt;
-    }
-  }
-}
-
-async function waitForExecutionBlockAtOrAbove(
-  publicClient: ReturnType<typeof createPublicClient>,
-  minimumExecutionBlockNumber: bigint,
-) {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < 120_000) {
-    const blockNumber = await publicClient.getBlockNumber();
-    if (blockNumber >= minimumExecutionBlockNumber) {
-      return blockNumber;
-    }
-
-    await delay(500);
-  }
-
-  throw new Error(`Timed out waiting for execution block ${minimumExecutionBlockNumber}`);
-}
-
-async function waitForExecutionReceipt(
-  ethereum: TestEthereum,
-  transactionHash: Hex,
-): Promise<EthereumReceipt> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < 120_000) {
-    try {
-      const receipt = await ethereum.callExecution<RpcTransactionReceipt | null>(
-        'eth_getTransactionReceipt',
-        [transactionHash],
-      );
-
-      if (receipt) {
-        return receipt as unknown as EthereumReceipt;
-      }
-    } catch (error) {
-      const errorText =
-        error instanceof Error
-          ? [
-              error.message,
-              'details' in error && typeof error.details === 'string' ? error.details : undefined,
-            ]
-              .filter(Boolean)
-              .join(' ')
-          : String(error);
-
-      if (!errorText.includes('indexing is in progress')) {
-        throw error;
-      }
-    }
-
-    await delay(500);
-  }
-
-  throw new Error(`Timed out waiting for execution receipt ${transactionHash}`);
-}
-
-async function syncEthereumVerifierUntilAnchorCovers(
-  mainchainClient: Awaited<ReturnType<TestMainchain['client']>>,
-  relayer: ReturnType<typeof sudo>,
-  beaconApiUrl: string,
-  minimumExecutionBlockNumber: bigint,
-) {
-  const startedAt = Date.now();
-  let sawAnyTx = false;
-  let lastRetryableError: Error | undefined;
-
-  while (Date.now() - startedAt < 120_000) {
-    try {
-      const anchor = await getLatestArgonFinalizedExecutionHeader(mainchainClient);
-      if (anchor.blockNumber >= minimumExecutionBlockNumber) {
-        return;
-      }
-    } catch {}
-
-    const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, beaconApiUrl);
-    if (txs.length === 0) {
-      if (sawAnyTx && !lastRetryableError) {
-        break;
-      }
-
-      await delay(500);
-      continue;
-    }
-
-    sawAnyTx = true;
-    let shouldRetry = false;
-    for (const tx of txs) {
-      try {
-        const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
-        await result.waitForInFirstBlock;
-        lastRetryableError = undefined;
-      } catch (error) {
-        if (isRetryableEthereumVerifierSyncError(error)) {
-          lastRetryableError = error instanceof Error ? error : new Error(String(error));
-          shouldRetry = true;
-          break;
-        }
-        throw error;
-      }
-    }
-
-    if (shouldRetry) {
-      await delay(500);
-    }
-  }
-
-  throw (
-    lastRetryableError ??
-    new Error(
-      `Ethereum verifier did not retain an anchor at or above execution block ${minimumExecutionBlockNumber} within the retry window`,
-    )
-  );
-}
-
-function isRetryableEthereumVerifierSyncError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-
-  return (
-    isOutdatedTransactionError(error) ||
-    message.includes('ethereumVerifier.InvalidHeaderMerkleProof')
-  );
-}
-
-async function delay(ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms));
-}

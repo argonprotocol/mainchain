@@ -42,3 +42,4 @@ chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/*
 !chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/MintingGateway.json
 chains/ethereum/contracts/cache/
 chains/ethereum/contracts/deployments/default/
+/chains/ethereum/contracts/*.js

@@ -1,4 +1,5 @@
 use argon_primitives::{
+	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
 	TickProvider, TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 	UniswapTransferProviderWeightInfo,
@@ -34,6 +35,7 @@ type TreasuryPoolProviderWeights<T> =
 	>>::Weights;
 type TickProviderWeights<T> =
 	<<T as Config>::TickProvider as TickProvider<<T as frame_system::Config>::Block>>::Weights;
+type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -41,15 +43,40 @@ pub struct WithProviderWeights<
 	EthereumVerifyWeight = EthereumVerifyProviderWeights<T>,
 	TreasuryPoolWeight = TreasuryPoolProviderWeights<T>,
 	TickProviderWeight = TickProviderWeights<T>,
->(PhantomData<(T, Base, EthereumVerifyWeight, TreasuryPoolWeight, TickProviderWeight)>);
-impl<T, Base, EthereumVerifyWeight, TreasuryPoolWeight, TickProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, EthereumVerifyWeight, TreasuryPoolWeight, TickProviderWeight>
+	VaultProviderWeight = VaultProviderWeights<T>,
+>(
+	PhantomData<(
+		T,
+		Base,
+		EthereumVerifyWeight,
+		TreasuryPoolWeight,
+		TickProviderWeight,
+		VaultProviderWeight,
+	)>,
+);
+impl<
+		T,
+		Base,
+		EthereumVerifyWeight,
+		TreasuryPoolWeight,
+		TickProviderWeight,
+		VaultProviderWeight,
+	> WeightInfo
+	for WithProviderWeights<
+		T,
+		Base,
+		EthereumVerifyWeight,
+		TreasuryPoolWeight,
+		TickProviderWeight,
+		VaultProviderWeight,
+	>
 where
 	T: Config,
 	Base: WeightInfo,
 	EthereumVerifyWeight: EthereumVerifyProviderWeightInfo,
 	TreasuryPoolWeight: TreasuryPoolProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
+	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 {
 	fn set_chain_config() -> Weight {
 		Base::set_chain_config()
@@ -74,6 +101,7 @@ where
 	fn register_minting_authority() -> Weight {
 		Base::register_minting_authority()
 			.saturating_add(TreasuryPoolWeight::encumber_bond_microgons())
+			.saturating_add(VaultProviderWeight::encumber_argonots())
 	}
 
 	fn deactivate_minting_authority() -> Weight {

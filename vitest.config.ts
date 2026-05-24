@@ -1,7 +1,18 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import wasm from 'vite-plugin-wasm';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@argonprotocol/mainchain': fileURLToPath(
+        new URL('./client/nodejs/src/index.ts', import.meta.url),
+      ),
+      '@argonprotocol/testing': fileURLToPath(
+        new URL('./testing/nodejs/src/index.ts', import.meta.url),
+      ),
+    },
+  },
   test: {
     retry: 0,
     reporters: process.env.GITHUB_ACTIONS ? ['dot', 'github-actions'] : ['dot'],

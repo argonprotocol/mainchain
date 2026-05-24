@@ -32,9 +32,28 @@ export * from './Vault';
 export * from './convert';
 export * from './BitcoinLock';
 export * from './PriceIndex';
-export * from '@argonprotocol/ethereum-contracts';
+export * as EvmContracts from './EvmContracts';
 export * from './EthereumProof';
-export * from './EthereumGatewayActivity';
+export type {
+  EthereumBeaconBlockResponse,
+  EthereumBeaconConfigSpecResponse,
+  EthereumBeaconGenesisResponse,
+  EthereumBeaconHeaderDetailsResponse,
+  EthereumLightClientBootstrapResponse,
+  EthereumLightClientHeader,
+  EthereumLightClientUpdate,
+  EthereumVersionedLightClientUpdate,
+} from './EthereumBeaconTypes';
+export {
+  decodeEthereumGatewayActivityLog,
+  decodeEthereumTransferToArgonStartedLog,
+  findEthereumTransferToArgonStartedLogIndexes,
+  type EthereumGatewayActivity,
+} from './EthereumGatewayActivity';
+export {
+  buildGatewayActivityProofPayload,
+  type EthereumGatewayActivityProofPayload,
+} from './EthereumGatewayActivityProof';
 export * from './EthereumBeaconSync';
 export type {
   EthereumExecutionClient,

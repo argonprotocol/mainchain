@@ -22,6 +22,8 @@ pub trait BitcoinVaultProviderWeightInfo {
 	fn get_registration_vault_data() -> Weight;
 	fn get_committed_securitization() -> Weight;
 	fn get_committed_argonots() -> Weight;
+	fn encumber_argonots() -> Weight;
+	fn release_encumbered_argonots() -> Weight;
 	fn burn_encumbered_argonots() -> Weight;
 	fn account_became_operational() -> Weight;
 }
@@ -36,6 +38,14 @@ impl BitcoinVaultProviderWeightInfo for () {
 	}
 
 	fn get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn encumber_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn release_encumbered_argonots() -> Weight {
 		Weight::zero()
 	}
 

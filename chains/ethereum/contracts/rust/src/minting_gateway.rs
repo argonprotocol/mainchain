@@ -124,7 +124,7 @@ pub fn hash_transfer_out_of_argon_request(
 	valid_until_block: u64,
 	token: Address,
 	amount: u128,
-	finalization_tip: u128,
+	minting_authority_tip: u128,
 ) -> B256 {
 	keccak256(
 		(
@@ -136,7 +136,7 @@ pub fn hash_transfer_out_of_argon_request(
 			valid_until_block,
 			token,
 			amount,
-			finalization_tip,
+			minting_authority_tip,
 		)
 			.abi_encode_params(),
 	)

@@ -24,7 +24,13 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { AnyNumber, IMethod, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Call, H256, MultiAddress } from '@polkadot/types/interfaces/runtime';
+import type {
+  AccountId32,
+  Call,
+  H160,
+  H256,
+  MultiAddress,
+} from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
   ArgonPrimitivesBitcoinH256Le,
@@ -42,7 +48,9 @@ import type {
   ArgonRuntimeSessionKeys,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
+  PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
   PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
@@ -522,6 +530,43 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
     };
     crosschainTransfer: {
+      approveQueueEntries: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          signatures: Vec<U8aFixed>,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, Vec<U8aFixed>]
+      >;
+      collateralizeTransfer: AugmentedSubmittable<
+        (
+          transferId: H256 | string | Uint8Array,
+          signature: U8aFixed | string | Uint8Array,
+          microgonCollateral: Compact<u128> | AnyNumber | Uint8Array,
+          micronotCollateral: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [H256, U8aFixed, Compact<u128>, Compact<u128>]
+      >;
+      deactivateMintingAuthority: AugmentedSubmittable<
+        (
+          destinationSigningKey: H160 | string | Uint8Array,
+          signature: U8aFixed | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [H160, U8aFixed]
+      >;
+      forceSetGlobalIssuanceCouncil: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          afterNonce: Compact<u64> | AnyNumber | Uint8Array,
+          memberAccountIds: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, Compact<u64>, Vec<AccountId32>]
+      >;
+      pauseGateway: AugmentedSubmittable<
+        (
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain]
+      >;
       proveGatewayActivity: AugmentedSubmittable<
         (
           sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
@@ -538,11 +583,76 @@ declare module '@polkadot/api-base/types/submittable' {
           ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
         ]
       >;
+      registerCouncilSigner: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          signingKey: H160 | string | Uint8Array,
+          signature: U8aFixed | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, H160, U8aFixed]
+      >;
+      registerMintingAuthority: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          destinationSigningKey: H160 | string | Uint8Array,
+          signature: U8aFixed | string | Uint8Array,
+          microgonCollateral: Compact<u128> | AnyNumber | Uint8Array,
+          micronotCollateral: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, H160, U8aFixed, Compact<u128>, Compact<u128>]
+      >;
       setChainConfig: AugmentedSubmittable<
         (
-          config: PalletCrosschainTransferChainConfig | { Ethereum: any } | string | Uint8Array,
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          config: PalletCrosschainTransferChainConfig | { Evm: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [PalletCrosschainTransferChainConfig]
+        [PalletCrosschainTransferSourceChain, PalletCrosschainTransferChainConfig]
+      >;
+      setMinimumMintingAuthorityValue: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          minimumValue: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, Compact<u128>]
+      >;
+      setMintingAuthorityActivationRepaymentPricing: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          pricing:
+            | PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing
+            | {
+                activationGasCost?: any;
+                signatureGasCost?: any;
+                estimatedWeiPerGas?: any;
+                estimatedMicrogonsPerEth?: any;
+              }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          PalletCrosschainTransferSourceChain,
+          PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
+        ]
+      >;
+      transferOut: AugmentedSubmittable<
+        (
+          destinationChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          asset: PalletCrosschainTransferAssetKind | 'Argon' | 'Argonot' | number | Uint8Array,
+          destinationAccount: H160 | string | Uint8Array,
+          amount: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          PalletCrosschainTransferSourceChain,
+          PalletCrosschainTransferAssetKind,
+          H160,
+          Compact<u128>,
+        ]
+      >;
+      unpauseGateway: AugmentedSubmittable<
+        (
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain]
       >;
     };
     domains: {
@@ -2154,7 +2264,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [u32, u128, u128]
       >;
       /**
-       * Change the terms of this vault. The change will be applied at the next mining slot
+       * Change the terms of this vault. The change will be applied at the next mining frame
        * change that is at least `MinTermsModificationBlockDelay` blocks away.
        **/
       modifyTerms: AugmentedSubmittable<
@@ -2185,6 +2295,10 @@ declare module '@polkadot/api-base/types/submittable' {
           delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<AccountId32>]
+      >;
+      setCommittedArgonots: AugmentedSubmittable<
+        (amount: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [Compact<u128>]
       >;
       setName: AugmentedSubmittable<
         (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,

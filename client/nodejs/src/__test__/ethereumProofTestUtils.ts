@@ -1,6 +1,6 @@
 import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMPT } from '@ethereumjs/mpt';
-import { MintingGatewayEvents, mintingGatewayAbi } from '@argonprotocol/ethereum-contracts';
+import { MintingGatewayEvents, mintingGatewayAbi } from '../EvmContracts';
 import { bytesToHex, encodeAbiParameters, encodeEventTopics, toHex, type Hex } from 'viem';
 import type { ArgonClient, IArgonQueryable } from '../index';
 import {
@@ -10,9 +10,9 @@ import {
 } from '../EthereumProof';
 import type { EthereumExecutionClient, EthereumReceipt } from '../EthereumExecution';
 
-const ZERO_HASH = `0x${'00'.repeat(32)}` as Hex;
-const ZERO_BLOOM = `0x${'00'.repeat(256)}` as Hex;
-const ZERO_ADDRESS = `0x${'00'.repeat(20)}` as Hex;
+const ZERO_HASH: Hex = `0x${'00'.repeat(32)}`;
+const ZERO_BLOOM: Hex = `0x${'00'.repeat(256)}`;
+const ZERO_ADDRESS: Hex = `0x${'00'.repeat(20)}`;
 const EMPTY_UNCLES_HASH =
   '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
 
@@ -88,7 +88,7 @@ export async function createExecutionBlock(args: {
     transactions,
     uncles: [],
   } satisfies JSONRPCBlock;
-  const hash = bytesToHex(createBlockHeaderFromRPC(template).hash()) as Hex;
+  const hash: Hex = bytesToHex(createBlockHeaderFromRPC(template).hash());
   const block = { ...template, hash } satisfies JSONRPCBlock;
 
   for (const receipt of args.receipts ?? []) {

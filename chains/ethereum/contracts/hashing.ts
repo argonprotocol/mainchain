@@ -363,7 +363,7 @@ export function hashMintingGatewayTransferOutOfArgonRequest(
       request.validUntilBlock,
       request.token,
       request.amount,
-      request.finalizationTip,
+      request.mintingAuthorityTip,
     ]),
   );
 }

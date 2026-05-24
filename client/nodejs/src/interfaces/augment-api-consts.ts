@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -161,6 +162,16 @@ declare module '@polkadot/api-base/types/consts' {
     };
     crosschainTransfer: {
       /**
+       * Minimum remaining frame commitment required when reading vault committed collateral
+       * capacity for council weighting and Minting Authority collateral.
+       **/
+      councilRotationFrames: u64 & AugmentedConst<ApiType>;
+      /**
+       * Default minimum normalized microgon value required to register a Minting Authority on
+       * one destination chain.
+       **/
+      defaultMinimumMintingAuthorityMicrogonValue: u128 & AugmentedConst<ApiType>;
+      /**
        * Canonical Ethereum burn-accounting account representing funds moved to Ethereum.
        **/
       ethereumBurnAccount: AccountId32 & AugmentedConst<ApiType>;
@@ -169,18 +180,49 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxActivitiesPerReceiptProof: u32 & AugmentedConst<ApiType>;
       /**
+       * Maximum number of members the active Global Issuance Council may carry.
+       **/
+      maxCouncilMembers: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of non-terminal transfer-out requests tracked for one destination chain.
+       **/
+      maxPendingTransferOutsPerDestinationChain: u32 & AugmentedConst<ApiType>;
+      /**
        * Maximum execution headers carried in one receipt proof's target-to-anchor chain.
        **/
       maxProofExecutionHeaderDepth: u32 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of proved receipt proofs that may be supplied in one extrinsic.
+       * Maximum number of contiguous queue approvals one council member may submit in one call.
+       **/
+      maxQueueApprovalsPerCall: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of proven receipt proofs that may be supplied in one extrinsic.
        **/
       maxReceiptProofsPerExtrinsic: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum age, in ticks, of the verified Ethereum execution anchor used to open a
+       * transfer out.
+       **/
+      maxVerifiedExecutionBlockAgeTicks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Minimum normalized collateral increment accepted for one transfer unless the increment
+       * completes the remaining uncovered amount.
+       **/
+      minTransferCollateralIncrement: u128 & AugmentedConst<ApiType>;
       /**
        * Retention window, in ticks, for recent Argon transfer evidence used by operational
        * accounts.
        **/
       recentTransferRetentionTicks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Minting authority tip rate applied to transfer-out requests in basis points.
+       **/
+      transferOutMintingAuthorityTipBasisPoints: u32 & AugmentedConst<ApiType>;
+      /**
+       * Ethereum-block window added to the latest verified block when opening a
+       * transfer out.
+       **/
+      transferOutValidityEthereumBlocks: u64 & AugmentedConst<ApiType>;
     };
     ethereumVerifier: {
       /**
@@ -403,6 +445,10 @@ declare module '@polkadot/api-base/types/consts' {
        * no corresponding constant for time to recovery to target
        **/
       maxArgonChangePerTickAwayFromTarget: u128 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of per-frame Argonot floor buckets to retain.
+       **/
+      maxArgonotFloorHistoryFrames: u32 & AugmentedConst<ApiType>;
       maxArgonTargetChangePerTick: u128 & AugmentedConst<ApiType>;
       /**
        * The maximum number of ticks to preserve a price index
