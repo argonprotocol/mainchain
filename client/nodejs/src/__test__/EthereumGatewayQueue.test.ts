@@ -5,7 +5,7 @@ import {
   hashMintingGatewayActivateMintingAuthorityApproval,
   type MintingGatewayMintingAuthorityActivationTarget,
 } from '../EvmContracts';
-import { getReadyEthereumGatewayUpdates } from '../../../../testing/nodejs/src/index';
+import { getReadyEthereumGatewayUpdates } from '@argonprotocol/testing';
 import type { Hex } from 'viem';
 
 const ZERO_HASH: Hex = `0x${'00'.repeat(32)}`;

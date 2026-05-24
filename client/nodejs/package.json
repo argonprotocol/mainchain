@@ -19,7 +19,7 @@
     "test": "vitest --run --config vitest.config.ts",
     "tsc": "yarn workspace @argonprotocol/ethereum-contracts build && tsup",
     "watch": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "files": [
     "lib/",

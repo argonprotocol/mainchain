@@ -16,7 +16,7 @@
     "build": "yarn workspace @argonprotocol/ethereum-contracts run build && tsup",
     "tsc": "yarn workspace @argonprotocol/ethereum-contracts run build && tsup",
     "watch": "tsup --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "files": [
     "lib/"

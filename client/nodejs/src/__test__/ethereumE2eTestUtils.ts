@@ -15,7 +15,7 @@ import type {
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex, RpcTransactionReceipt } from 'viem';
 import { createPublicClient, createWalletClient, defineChain, parseSignature } from 'viem';
-import { TestEthereum } from '../../../../testing/nodejs/src/index';
+import { TestEthereum } from '@argonprotocol/testing';
 
 export async function signGatewayPermit(args: {
   account: ReturnType<typeof privateKeyToAccount>;

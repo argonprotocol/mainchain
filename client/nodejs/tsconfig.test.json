@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@argonprotocol/mainchain": ["src/index.ts"],
+      "@argonprotocol/testing": ["../../testing/nodejs/src/index.ts"],
+      "@polkadot/api/augment": ["src/interfaces/augment-api.ts"],
+      "@polkadot/types/lookup": ["src/interfaces/types-lookup.ts"],
+      "@polkadot/types/augment": ["src/interfaces/augment-types.ts"],
+      "@argonprotocol/mainchain/interfaces/*": ["src/interfaces/*/index.ts", "src/interfaces/*.ts"]
+    },
+    "module": "esnext",
+    "rootDir": "../.."
+  }
+}
