@@ -2,16 +2,20 @@
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 use crate as ethereum_beacon_client;
 use crate::{
-	fixture_conversions::{checkpoint_update_from_fixture, update_from_fixture},
+	fixture_conversions::{
+		anchored_update_from_fixture, checkpoint_update_from_fixture, committee_update_from_fixture,
+	},
 	pallet_timestamp, sp_io, sp_runtime,
 	types::{CheckpointUpdate, MainnetCheckpointUpdate, MainnetUpdate, Update},
 	Fork, ForkVersions,
 };
 use argon_primitives::EthereumBeaconPreset;
 use core::default::Default;
-use frame_support::{derive_impl, dispatch::DispatchResult, parameter_types, traits::ConstU32};
+use frame_support::{derive_impl, parameter_types, traits::ConstU32};
 use polkadot_sdk::*;
+use snowbridge::types::{BeaconHeader, VersionedExecutionPayloadHeader};
 use snowbridge_beacon_primitives as snowbridge;
+use sp_core::H256;
 use sp_runtime::BuildStorage;
 use std::{fs::File, path::PathBuf};
 
@@ -33,59 +37,93 @@ pub fn load_execution_proof_fixture() -> snowbridge::ExecutionProof {
 	load_fixture("execution-proof.json".to_string()).unwrap()
 }
 
+#[derive(serde::Deserialize)]
+struct ExecutionWitnessFixture {
+	header: BeaconHeader,
+	execution_header: VersionedExecutionPayloadHeader,
+	execution_branch: Vec<H256>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateExecutionWitnessFixture {
+	finalized_header: BeaconHeader,
+	execution_header: VersionedExecutionPayloadHeader,
+	execution_branch: Vec<H256>,
+}
+
+fn load_execution_witness_fixture(basename: &str) -> snowbridge::ExecutionProof {
+	let proof: ExecutionWitnessFixture = load_fixture(basename.to_string()).unwrap();
+	snowbridge::ExecutionProof {
+		header: proof.header,
+		ancestry_proof: None,
+		execution_header: proof.execution_header,
+		execution_branch: proof.execution_branch,
+	}
+}
+
+fn load_update_execution_witness_fixture(basename: &str) -> snowbridge::ExecutionProof {
+	let proof: UpdateExecutionWitnessFixture = load_fixture(basename.to_string()).unwrap();
+	snowbridge::ExecutionProof {
+		header: proof.finalized_header,
+		ancestry_proof: None,
+		execution_header: proof.execution_header,
+		execution_branch: proof.execution_branch,
+	}
+}
+
 pub fn load_checkpoint_update_fixture() -> CheckpointUpdate {
 	let update: MainnetCheckpointUpdate =
 		load_fixture("initial-checkpoint.json".to_string()).unwrap();
-	checkpoint_update_from_fixture(update)
+	let execution_proof = load_execution_witness_fixture("initial-checkpoint-execution-proof.json");
+	checkpoint_update_from_fixture(update, execution_proof)
 		.expect("checkpoint fixture stays within bounded branch size")
+}
+
+pub fn load_later_checkpoint_update_fixture() -> CheckpointUpdate {
+	let update: MainnetCheckpointUpdate =
+		load_fixture("initial-checkpoint-later.json".to_string()).unwrap();
+	let execution_proof =
+		load_execution_witness_fixture("initial-checkpoint-later-execution-proof.json");
+	checkpoint_update_from_fixture(update, execution_proof)
+		.expect("later checkpoint fixture stays within bounded branch size")
 }
 
 pub fn load_sync_committee_update_fixture() -> Update {
 	let update: MainnetUpdate = load_fixture("sync-committee-update.json".to_string()).unwrap();
-	update_from_fixture(update).expect("sync committee fixture stays within bounded branch size")
+	committee_update_from_fixture(
+		update,
+		load_update_execution_witness_fixture("sync-committee-update.json"),
+	)
+	.expect("sync committee fixture stays within bounded branch size")
 }
 
 pub fn load_finalized_header_update_fixture() -> Update {
 	let update: MainnetUpdate = load_fixture("finalized-header-update.json".to_string()).unwrap();
-	update_from_fixture(update).expect("finalized header fixture stays within bounded branch size")
+	anchored_update_from_fixture(
+		update,
+		load_update_execution_witness_fixture("finalized-header-update.json"),
+	)
+	.expect("finalized header fixture stays within bounded branch size")
 }
 
 pub fn load_next_sync_committee_update_fixture() -> Update {
 	let update: MainnetUpdate =
 		load_fixture("next-sync-committee-update.json".to_string()).unwrap();
-	update_from_fixture(update)
-		.expect("next sync committee fixture stays within bounded branch size")
+	committee_update_from_fixture(
+		update,
+		load_update_execution_witness_fixture("next-sync-committee-update.json"),
+	)
+	.expect("next sync committee fixture stays within bounded branch size")
 }
 
 pub fn load_next_finalized_header_update_fixture() -> Update {
 	let update: MainnetUpdate =
 		load_fixture("next-finalized-header-update.json".to_string()).unwrap();
-	update_from_fixture(update)
-		.expect("next finalized header fixture stays within bounded branch size")
-}
-
-pub fn load_sync_committee_update_period_0() -> Box<Update> {
-	let update: MainnetUpdate =
-		load_fixture("sync-committee-update-period-0.json".to_string()).unwrap();
-	Box::new(
-		update_from_fixture(update).expect("period-0 fixture stays within bounded branch size"),
+	anchored_update_from_fixture(
+		update,
+		load_update_execution_witness_fixture("next-finalized-header-update.json"),
 	)
-}
-
-pub fn load_sync_committee_update_period_0_older_fixture() -> Box<Update> {
-	let update: MainnetUpdate =
-		load_fixture("sync-committee-update-period-0-older.json".to_string()).unwrap();
-	Box::new(
-		update_from_fixture(update).expect("older period fixture stays within bounded branch size"),
-	)
-}
-
-pub fn load_sync_committee_update_period_0_newer_fixture() -> Box<Update> {
-	let update: MainnetUpdate =
-		load_fixture("sync-committee-update-period-0-newer.json".to_string()).unwrap();
-	Box::new(
-		update_from_fixture(update).expect("newer period fixture stays within bounded branch size"),
-	)
+	.expect("next finalized header fixture stays within bounded branch size")
 }
 
 frame_support::construct_runtime!(
@@ -136,7 +174,7 @@ parameter_types! {
 		},
 		fulu: Fork {
 			version: hex!("06000000"),
-			epoch: 100000000,
+			epoch: 411_392,
 		}
 	};
 }
@@ -153,10 +191,4 @@ pub fn new_tester() -> sp_io::TestExternalities {
 	let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	sp_io::TestExternalities::new(t)
-}
-
-pub fn initialize_storage() -> DispatchResult {
-	let inbound_fixture = snowbridge_pallet_ethereum_client_fixtures::make_inbound_fixture();
-	ethereum_beacon_client::ForkVersionSchedule::<Test>::put(ChainForkVersions::get());
-	EthereumBeaconClient::store_finalized_header(inbound_fixture.finalized_header)
 }

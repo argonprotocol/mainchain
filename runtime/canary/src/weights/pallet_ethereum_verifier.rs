@@ -44,30 +44,36 @@ impl<T: frame_system::Config> pallet_ethereum_verifier::WeightInfo for WeightInf
 	/// Proof: `EthereumVerifier::ForkVersionSchedule` (`max_values`: Some(1), `max_size`: Some(84), added: 579, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::InitialCheckpointRoot` (r:0 w:1)
 	/// Proof: `EthereumVerifier::InitialCheckpointRoot` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
+	/// Storage: `EthereumVerifier::ExecutionHeaderAnchors` (r:0 w:1)
+	/// Proof: `EthereumVerifier::ExecutionHeaderAnchors` (`max_values`: None, `max_size`: Some(144), added: 2619, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::ValidatorsRoot` (r:0 w:1)
 	/// Proof: `EthereumVerifier::ValidatorsRoot` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::LatestFinalizedBlockRoot` (r:0 w:1)
 	/// Proof: `EthereumVerifier::LatestFinalizedBlockRoot` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::CurrentSyncCommittee` (r:0 w:1)
 	/// Proof: `EthereumVerifier::CurrentSyncCommittee` (`max_values`: Some(1), `max_size`: Some(92374), added: 92869, mode: `MaxEncodedLen`)
+	/// Storage: `EthereumVerifier::LatestExecutionHeaderAnchorBlockHash` (r:0 w:1)
+	/// Proof: `EthereumVerifier::LatestExecutionHeaderAnchorBlockHash` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
+	/// Storage: `EthereumVerifier::FinalizedExecutionHeaderAnchor` (r:0 w:1)
+	/// Proof: `EthereumVerifier::FinalizedExecutionHeaderAnchor` (`max_values`: None, `max_size`: Some(64), added: 2539, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::FinalizedBeaconState` (r:0 w:1)
 	/// Proof: `EthereumVerifier::FinalizedBeaconState` (`max_values`: None, `max_size`: Some(40), added: 2515, mode: `MaxEncodedLen`)
 	fn force_checkpoint() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `3501`
-		// Minimum execution time: 66_295_000_000 picoseconds.
-		Weight::from_parts(66_882_000_000, 3501)
+		// Minimum execution time: 67_207_000_000 picoseconds.
+		Weight::from_parts(68_383_000_000, 3501)
 			.saturating_add(T::DbWeight::get().reads(3))
-			.saturating_add(T::DbWeight::get().writes(9))
+			.saturating_add(T::DbWeight::get().writes(12))
 		}
 	/// Storage: `EthereumVerifier::OperatingMode` (r:1 w:0)
 	/// Proof: `EthereumVerifier::OperatingMode` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::BeaconPreset` (r:1 w:0)
 	/// Proof: `EthereumVerifier::BeaconPreset` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::LatestFinalizedBlockRoot` (r:1 w:1)
+	/// Storage: `EthereumVerifier::LatestFinalizedBlockRoot` (r:1 w:0)
 	/// Proof: `EthereumVerifier::LatestFinalizedBlockRoot` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::FinalizedBeaconState` (r:1 w:1)
+	/// Storage: `EthereumVerifier::FinalizedBeaconState` (r:1 w:0)
 	/// Proof: `EthereumVerifier::FinalizedBeaconState` (`max_values`: None, `max_size`: Some(40), added: 2515, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::NextSyncCommittee` (r:1 w:0)
 	/// Proof: `EthereumVerifier::NextSyncCommittee` (`max_values`: Some(1), `max_size`: Some(92374), added: 92869, mode: `MaxEncodedLen`)
@@ -79,18 +85,13 @@ impl<T: frame_system::Config> pallet_ethereum_verifier::WeightInfo for WeightInf
 	/// Proof: `EthereumVerifier::ValidatorsRoot` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `EthereumVerifier::LatestSyncCommitteeUpdatePeriod` (r:1 w:0)
 	/// Proof: `EthereumVerifier::LatestSyncCommitteeUpdatePeriod` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::FinalizedBeaconStateIndex` (r:1 w:1)
-	/// Proof: `EthereumVerifier::FinalizedBeaconStateIndex` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::FinalizedBeaconStateMapping` (r:1 w:1)
-	/// Proof: `EthereumVerifier::FinalizedBeaconStateMapping` (`max_values`: None, `max_size`: Some(36), added: 2511, mode: `MaxEncodedLen`)
 	fn submit() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `92501`
+		//  Measured:  `92502`
 		//  Estimated: `93859`
-		// Minimum execution time: 16_411_000_000 picoseconds.
-		Weight::from_parts(16_697_000_000, 93859)
-			.saturating_add(T::DbWeight::get().reads(11))
-			.saturating_add(T::DbWeight::get().writes(4))
+		// Minimum execution time: 16_852_000_000 picoseconds.
+		Weight::from_parts(17_102_000_000, 93859)
+			.saturating_add(T::DbWeight::get().reads(9))
 		}
 	/// Storage: `EthereumVerifier::OperatingMode` (r:1 w:0)
 	/// Proof: `EthereumVerifier::OperatingMode` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
@@ -112,35 +113,12 @@ impl<T: frame_system::Config> pallet_ethereum_verifier::WeightInfo for WeightInf
 	/// Proof: `EthereumVerifier::LatestSyncCommitteeUpdatePeriod` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	fn submit_with_sync_committee() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `92571`
+		//  Measured:  `92502`
 		//  Estimated: `93859`
-		// Minimum execution time: 82_501_000_000 picoseconds.
-		Weight::from_parts(83_339_000_000, 93859)
+		// Minimum execution time: 83_940_000_000 picoseconds.
+		Weight::from_parts(85_464_000_000, 93859)
 			.saturating_add(T::DbWeight::get().reads(9))
 			.saturating_add(T::DbWeight::get().writes(2))
-		}
-	/// Storage: `EthereumVerifier::OperatingMode` (r:1 w:0)
-	/// Proof: `EthereumVerifier::OperatingMode` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::ExecutionHeaderAnchors` (r:2 w:1)
-	/// Proof: `EthereumVerifier::ExecutionHeaderAnchors` (`max_values`: None, `max_size`: Some(144), added: 2619, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::FinalizedBeaconState` (r:1 w:0)
-	/// Proof: `EthereumVerifier::FinalizedBeaconState` (`max_values`: None, `max_size`: Some(40), added: 2515, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::LatestExecutionHeaderAnchorBlockHash` (r:1 w:1)
-	/// Proof: `EthereumVerifier::LatestExecutionHeaderAnchorBlockHash` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::BeaconPreset` (r:1 w:0)
-	/// Proof: `EthereumVerifier::BeaconPreset` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::ExecutionHeaderAnchorIndex` (r:1 w:1)
-	/// Proof: `EthereumVerifier::ExecutionHeaderAnchorIndex` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `EthereumVerifier::ExecutionHeaderAnchorMapping` (r:1 w:1)
-	/// Proof: `EthereumVerifier::ExecutionHeaderAnchorMapping` (`max_values`: None, `max_size`: Some(36), added: 2511, mode: `MaxEncodedLen`)
-	fn import_execution_header_anchor() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `271`
-		//  Estimated: `6228`
-		// Minimum execution time: 54_000_000 picoseconds.
-		Weight::from_parts(77_000_000, 6228)
-			.saturating_add(T::DbWeight::get().reads(8))
-			.saturating_add(T::DbWeight::get().writes(4))
 		}
 	/// Storage: `EthereumVerifier::OperatingMode` (r:1 w:0)
 	/// Proof: `EthereumVerifier::OperatingMode` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
@@ -152,12 +130,12 @@ impl<T: frame_system::Config> pallet_ethereum_verifier::WeightInfo for WeightInf
 		// Proof Size summary in bytes:
 		//  Measured:  `71`
 		//  Estimated: `3609`
-		// Minimum execution time: 56_000_000 picoseconds.
-		Weight::from_parts(2_894_329, 3609)
-			// Standard Error: 35_405
-			.saturating_add(Weight::from_parts(5_581_528, 0).saturating_mul(b.into()))
-			// Standard Error: 21_710
-			.saturating_add(Weight::from_parts(7_007_029, 0).saturating_mul(e.into()))
+		// Minimum execution time: 62_000_000 picoseconds.
+		Weight::from_parts(63_000_000, 3609)
+			// Standard Error: 71_265
+			.saturating_add(Weight::from_parts(1_780_841, 0).saturating_mul(b.into()))
+			// Standard Error: 47_786
+			.saturating_add(Weight::from_parts(4_754_641, 0).saturating_mul(e.into()))
 			.saturating_add(T::DbWeight::get().reads(2))
 		}
 	/// Storage: `EthereumVerifier::LatestExecutionHeaderAnchorBlockHash` (r:1 w:0)

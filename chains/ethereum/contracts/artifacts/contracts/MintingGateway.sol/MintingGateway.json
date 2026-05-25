@@ -1637,7 +1637,7 @@
   "linkReferences": {},
   "deployedLinkReferences": {},
   "immutableReferences": {
-    "7414": [
+    "10415": [
       {
         "length": 32,
         "start": 1047
@@ -1663,7 +1663,7 @@
         "start": 6722
       }
     ],
-    "7417": [
+    "10418": [
       {
         "length": 32,
         "start": 684
@@ -1687,5 +1687,5 @@
     ]
   },
   "inputSourceName": "project/contracts/MintingGateway.sol",
-  "buildInfoId": "solc-0_8_24-f1f5c30085aea090f9bdeeb4fc66d4fc134fd722"
+  "buildInfoId": "solc-0_8_24-c97fc17823f46ca2bbf09a524bd4ff9df2054ce8"
 }

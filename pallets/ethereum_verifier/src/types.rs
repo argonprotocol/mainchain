@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 use crate::{
-	config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl, ExecutionHeaderAnchorIndex,
-	ExecutionHeaderAnchorMapping, ExecutionHeaderAnchors, FinalizedBeaconState,
+	config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl, FinalizedBeaconState,
 	FinalizedBeaconStateIndex, FinalizedBeaconStateMapping, MaxFinalizedHeadersToKeep,
 };
 use argon_primitives::{EthereumBeaconPreset, EthereumBlockNumber};
@@ -32,19 +31,16 @@ type RawSyncCommitteePrepared<const COMMITTEE_SIZE: usize> =
 	snowbridge::SyncCommitteePrepared<COMMITTEE_SIZE>;
 type RawSyncAggregate<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize> =
 	snowbridge::SyncAggregate<COMMITTEE_SIZE, BITS_SIZE>;
-type RawCheckpointUpdate<const COMMITTEE_SIZE: usize> =
-	snowbridge::CheckpointUpdate<COMMITTEE_SIZE>;
 type RawNextSyncCommitteeUpdate<const COMMITTEE_SIZE: usize> =
 	snowbridge::NextSyncCommitteeUpdate<COMMITTEE_SIZE>;
-type RawUpdate<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize> =
-	snowbridge::Update<COMMITTEE_SIZE, BITS_SIZE>;
 type BranchProof = BoundedVec<H256, ConstU32<{ MAX_BRANCH_PROOF_SIZE_U32 }>>;
 
 #[cfg(any(test, feature = "fuzzing"))]
-pub(crate) type MainnetCheckpointUpdate = RawCheckpointUpdate<{ MAINNET_SYNC_COMMITTEE_SIZE }>;
+pub(crate) type MainnetCheckpointUpdate =
+	snowbridge::CheckpointUpdate<{ MAINNET_SYNC_COMMITTEE_SIZE }>;
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) type MainnetUpdate =
-	RawUpdate<{ MAINNET_SYNC_COMMITTEE_SIZE }, { MAINNET_SYNC_COMMITTEE_BITS_SIZE }>;
+	snowbridge::Update<{ MAINNET_SYNC_COMMITTEE_SIZE }, { MAINNET_SYNC_COMMITTEE_BITS_SIZE }>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeError {
@@ -283,29 +279,19 @@ impl From<ForkVersions> for SnowbridgeForkVersions {
 
 /// Argon-owned bootstrap checkpoint shape without ancestry or `block_roots` data.
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
+pub struct ExecutionHeaderProof {
+	pub execution_header: VersionedExecutionPayloadHeader,
+	pub execution_branch: BranchProof,
+}
+
+/// Argon-owned bootstrap checkpoint shape without ancestry or `block_roots` data.
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
 pub struct CheckpointUpdate {
 	pub header: BeaconHeader,
 	pub current_sync_committee: SyncCommittee,
 	pub current_sync_committee_branch: BranchProof,
 	pub validators_root: H256,
-}
-
-impl<const COMMITTEE_SIZE: usize> TryFrom<RawCheckpointUpdate<COMMITTEE_SIZE>>
-	for CheckpointUpdate
-{
-	type Error = TypeError;
-
-	fn try_from(update: RawCheckpointUpdate<COMMITTEE_SIZE>) -> Result<Self, Self::Error> {
-		Ok(Self {
-			header: update.header,
-			current_sync_committee: update.current_sync_committee.try_into()?,
-			current_sync_committee_branch: update
-				.current_sync_committee_branch
-				.try_into()
-				.map_err(|_| TypeError::InvalidBoundedLength)?,
-			validators_root: update.validators_root,
-		})
-	}
+	pub execution_header_proof: ExecutionHeaderProof,
 }
 
 /// Argon-owned next sync committee witness carried inside an update.
@@ -341,29 +327,7 @@ pub struct Update {
 	pub next_sync_committee_update: Option<NextSyncCommitteeUpdate>,
 	pub finalized_header: BeaconHeader,
 	pub finality_branch: BranchProof,
-}
-
-impl<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize>
-	TryFrom<RawUpdate<COMMITTEE_SIZE, BITS_SIZE>> for Update
-{
-	type Error = TypeError;
-
-	fn try_from(update: RawUpdate<COMMITTEE_SIZE, BITS_SIZE>) -> Result<Self, Self::Error> {
-		Ok(Self {
-			attested_header: update.attested_header,
-			sync_aggregate: update.sync_aggregate.try_into()?,
-			signature_slot: update.signature_slot,
-			next_sync_committee_update: update
-				.next_sync_committee_update
-				.map(TryInto::try_into)
-				.transpose()?,
-			finalized_header: update.finalized_header,
-			finality_branch: update
-				.finality_branch
-				.try_into()
-				.map_err(|_| TypeError::InvalidBoundedLength)?,
-		})
-	}
+	pub execution_header_proof: ExecutionHeaderProof,
 }
 
 /// Minimal finalized beacon state retained by Argon for direct-finalized verification.
@@ -386,6 +350,11 @@ pub struct FinalizedBeaconHeaderState {
 
 pub type ExecutionBlockHash = H256;
 pub type ExecutionBlockNumber = EthereumBlockNumber;
+/// Big-endian execution block-number key used for ordered scans over retained anchors.
+///
+/// Clients start the scan at the target execution block number and take the first retained anchor
+/// at or after that block instead of walking every retained finalized beacon root.
+pub type ExecutionHeaderAnchorScanKey = [u8; 8];
 pub type ReceiptsRoot = H256;
 
 /// Execution-layer header fields retained after the beacon proof has been accepted.
@@ -458,6 +427,21 @@ impl TryFrom<snowbridge::ExecutionProof> for ExecutionProof {
 	}
 }
 
+impl From<ExecutionProof> for ExecutionHeaderProof {
+	fn from(proof: ExecutionProof) -> Self {
+		Self { execution_header: proof.execution_header, execution_branch: proof.execution_branch }
+	}
+}
+
+impl From<&ExecutionProof> for ExecutionHeaderProof {
+	fn from(proof: &ExecutionProof) -> Self {
+		Self {
+			execution_header: proof.execution_header.clone(),
+			execution_branch: proof.execution_branch.clone(),
+		}
+	}
+}
+
 // Storage adapters.
 
 /// Finalized state ring buffer implementation.
@@ -467,15 +451,5 @@ pub type FinalizedBeaconStateBuffer<T> = RingBufferMapImpl<
 	FinalizedBeaconStateIndex<T>,
 	FinalizedBeaconStateMapping<T>,
 	FinalizedBeaconState<T>,
-	OptionQuery,
->;
-
-/// Execution header anchor ring buffer implementation.
-pub type ExecutionHeaderAnchorBuffer<T> = RingBufferMapImpl<
-	u32,
-	MaxFinalizedHeadersToKeep<T>,
-	ExecutionHeaderAnchorIndex<T>,
-	ExecutionHeaderAnchorMapping<T>,
-	ExecutionHeaderAnchors<T>,
 	OptionQuery,
 >;

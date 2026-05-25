@@ -176,7 +176,7 @@ import type {
   PalletEthereumVerifierError,
   PalletEthereumVerifierEvent,
   PalletEthereumVerifierExecutionHeaderAnchor,
-  PalletEthereumVerifierExecutionProof,
+  PalletEthereumVerifierExecutionHeaderProof,
   PalletEthereumVerifierFinalizedBeaconHeaderState,
   PalletEthereumVerifierFork,
   PalletEthereumVerifierForkVersions,
@@ -472,7 +472,7 @@ declare module '@polkadot/types/types/registry' {
     PalletEthereumVerifierError: PalletEthereumVerifierError;
     PalletEthereumVerifierEvent: PalletEthereumVerifierEvent;
     PalletEthereumVerifierExecutionHeaderAnchor: PalletEthereumVerifierExecutionHeaderAnchor;
-    PalletEthereumVerifierExecutionProof: PalletEthereumVerifierExecutionProof;
+    PalletEthereumVerifierExecutionHeaderProof: PalletEthereumVerifierExecutionHeaderProof;
     PalletEthereumVerifierFinalizedBeaconHeaderState: PalletEthereumVerifierFinalizedBeaconHeaderState;
     PalletEthereumVerifierFork: PalletEthereumVerifierFork;
     PalletEthereumVerifierForkVersions: PalletEthereumVerifierForkVersions;

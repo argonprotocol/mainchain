@@ -37,7 +37,6 @@ pub trait WeightInfo {
 	fn force_checkpoint() -> Weight;
 	fn submit() -> Weight;
 	fn submit_with_sync_committee() -> Weight;
-	fn import_execution_header_anchor() -> Weight;
 	fn provider_verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
 	fn provider_latest_execution_block_number() -> Weight;
 	fn provider_latest_execution_block_timestamp() -> Weight;
@@ -62,9 +61,6 @@ impl WeightInfo for () {
 			.saturating_add(Weight::from_parts(0, 93857))
 			.saturating_add(RocksDbWeight::get().reads(6))
 			.saturating_add(RocksDbWeight::get().writes(1))
-	}
-	fn import_execution_header_anchor() -> Weight {
-		Self::submit()
 	}
 	fn provider_verify_receipt_logs(_proof_blocks: u32, _extra_activities: u32) -> Weight {
 		Weight::from_parts(25_000_000_000_u64, 0)

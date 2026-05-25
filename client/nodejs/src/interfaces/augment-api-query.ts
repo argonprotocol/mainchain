@@ -751,18 +751,6 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Execution header anchors: current position in ring buffer.
-       **/
-      executionHeaderAnchorIndex: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
-       * Execution header anchors: mapping of ring buffer index to a pruning candidate.
-       **/
-      executionHeaderAnchorMapping: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
-        [u32]
-      >;
-      /**
        * Retained execution-layer header anchors by execution block hash.
        **/
       executionHeaderAnchors: AugmentedQuery<
@@ -771,6 +759,21 @@ declare module '@polkadot/api-base/types/storage' {
           arg: H256 | string | Uint8Array,
         ) => Observable<Option<PalletEthereumVerifierExecutionHeaderAnchor>>,
         [H256]
+      >;
+      /**
+       * Ordered retained execution-layer anchors keyed by execution block number.
+       *
+       * The key is the big-endian execution block number so clients can start at a target execution
+       * block number and scan forward to the first retained anchor at or after that block without
+       * walking every retained finalized beacon root. `ExecutionHeaderAnchors` remains the canonical
+       * hash-keyed proof lookup.
+       **/
+      executionHeaderAnchorsByBlockNumber: AugmentedQuery<
+        ApiType,
+        (
+          arg: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletEthereumVerifierExecutionHeaderAnchor>>,
+        [U8aFixed]
       >;
       /**
        * Beacon state by finalized block root
@@ -793,6 +796,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u32 | AnyNumber | Uint8Array) => Observable<H256>,
         [u32]
+      >;
+      /**
+       * Attached execution-layer anchor hash for each retained finalized beacon header root.
+       **/
+      finalizedExecutionHeaderAnchor: AugmentedQuery<
+        ApiType,
+        (arg: H256 | string | Uint8Array) => Observable<Option<H256>>,
+        [H256]
       >;
       /**
        * Fork-version schedule used for sync-committee signing domains and beacon state paths.
