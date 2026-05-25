@@ -13,8 +13,9 @@ use crate::{
 	types::CheckpointUpdate,
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
 	ExecutionHeaderAnchors, ExecutionProof, FinalizedBeaconHeaderState, FinalizedBeaconState, Fork,
-	ForkVersionSchedule, ForkVersions, LatestFinalizedBlockRoot, LatestSyncCommitteeUpdatePeriod,
-	NextSyncCommittee, SyncCommitteePrepared,
+	ForkVersionSchedule, ForkVersions, LatestExecutionHeaderAnchorBlockHash,
+	LatestFinalizedBlockRoot, LatestSyncCommitteeUpdatePeriod, NextSyncCommittee,
+	SyncCommitteePrepared,
 };
 use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
 use alloy_primitives::{Address, Bytes, Log, B256};
@@ -1625,6 +1626,46 @@ fn import_execution_header_anchor_imports_after_beacon_update() {
 		);
 		assert_ok!(result);
 		assert_eq!(result.unwrap().pays_fee, Pays::Yes);
+	});
+}
+
+#[test]
+fn import_execution_header_anchor_keeps_latest_anchor_monotonic_when_received_out_of_order() {
+	let execution_proof = anchor_execution_proof();
+	let imported_anchor =
+		ExecutionHeaderAnchor::from_payload_header(&execution_proof.execution_header);
+	let newer_anchor = ExecutionHeaderAnchor {
+		block_number: imported_anchor.block_number.saturating_add(1),
+		timestamp_millis: imported_anchor.timestamp_millis.saturating_add(1_000),
+		block_hash: H256::repeat_byte(0x44),
+		parent_hash: H256::repeat_byte(0x33),
+		receipts_root: H256::repeat_byte(0x22),
+	};
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(newer_anchor.block_hash, newer_anchor);
+		LatestExecutionHeaderAnchorBlockHash::<Test>::set(Some(newer_anchor.block_hash));
+		assert_ok!(EthereumBeaconClient::store_finalized_header(execution_proof.header.clone()));
+
+		let result = EthereumBeaconClient::import_execution_header_anchor(
+			RuntimeOrigin::signed(1),
+			execution_proof.clone(),
+		);
+		assert_ok!(result);
+
+		assert_eq!(
+			LatestExecutionHeaderAnchorBlockHash::<Test>::get(),
+			Some(newer_anchor.block_hash),
+		);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::latest_execution_block_number(),
+			Some(newer_anchor.block_number),
+		);
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::latest_execution_block_timestamp(),
+			Some(newer_anchor.timestamp_millis),
+		);
+		assert!(ExecutionHeaderAnchors::<Test>::contains_key(imported_anchor.block_hash));
 	});
 }
 

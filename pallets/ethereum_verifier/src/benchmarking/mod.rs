@@ -117,12 +117,23 @@ mod benchmarks {
 			checkpoint_update_from_fixture(*make_checkpoint()).map_err(BenchmarkError::Stop)?;
 		let execution_proof =
 			execution_proof_from_fixture(*make_execution_proof()).map_err(BenchmarkError::Stop)?;
+		let imported_anchor =
+			ExecutionHeaderAnchor::from_payload_header(&execution_proof.execution_header);
+		let retained_anchor = ExecutionHeaderAnchor {
+			block_number: imported_anchor.block_number.saturating_sub(1),
+			timestamp_millis: imported_anchor.timestamp_millis.saturating_sub(1_000),
+			block_hash: H256::repeat_byte(0x10),
+			parent_hash: H256::repeat_byte(0x11),
+			receipts_root: H256::repeat_byte(0x12),
+		};
 		let block_hash = execution_proof.execution_header.block_hash();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
 		)?;
 		EthereumBeaconClient::<T>::store_finalized_header(execution_proof.header)?;
+		<ExecutionHeaderAnchors<T>>::insert(retained_anchor.block_hash, retained_anchor);
+		<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(retained_anchor.block_hash));
 
 		#[extrinsic_call]
 		_(RawOrigin::Signed(caller.clone()), execution_proof);
@@ -148,6 +159,53 @@ mod benchmarks {
 		{
 			<EthereumBeaconClient<T> as EthereumVerifyProvider>::verify_receipt_logs(&proof_batch)
 				.map_err(|_| BenchmarkError::Stop("provider_verify_receipt_logs failed"))?;
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_latest_execution_block_number() -> Result<(), BenchmarkError> {
+		let anchor = ExecutionHeaderAnchor {
+			block_number: 100,
+			timestamp_millis: 123_000,
+			block_hash: H256::repeat_byte(0x20),
+			parent_hash: H256::repeat_byte(0x21),
+			receipts_root: H256::repeat_byte(0x22),
+		};
+		<ExecutionHeaderAnchors<T>>::insert(anchor.block_hash, anchor);
+		<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
+
+		#[block]
+		{
+			assert_eq!(
+				<EthereumBeaconClient<T> as EthereumVerifyProvider>::latest_execution_block_number(
+				),
+				Some(anchor.block_number),
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_latest_execution_block_timestamp() -> Result<(), BenchmarkError> {
+		let anchor = ExecutionHeaderAnchor {
+			block_number: 100,
+			timestamp_millis: 123_000,
+			block_hash: H256::repeat_byte(0x30),
+			parent_hash: H256::repeat_byte(0x31),
+			receipts_root: H256::repeat_byte(0x32),
+		};
+		<ExecutionHeaderAnchors<T>>::insert(anchor.block_hash, anchor);
+		<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
+
+		#[block]
+		{
+			assert_eq!(
+				<EthereumBeaconClient<T> as EthereumVerifyProvider>::latest_execution_block_timestamp(),
+				Some(anchor.timestamp_millis),
+			);
 		}
 
 		Ok(())

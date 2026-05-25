@@ -288,8 +288,18 @@ pub mod pallet {
 
 			if !<ExecutionHeaderAnchorBuffer<T>>::contains_key(anchor.block_hash) {
 				Self::verify_execution_proof(&execution_proof)?;
+				let should_update_latest = match <LatestExecutionHeaderAnchorBlockHash<T>>::get()
+					.and_then(<ExecutionHeaderAnchors<T>>::get)
+				{
+					Some(current_anchor) => anchor.block_number > current_anchor.block_number,
+					None => true,
+				};
 				<ExecutionHeaderAnchorBuffer<T>>::insert(anchor.block_hash, anchor);
-				<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
+				if should_update_latest {
+					// Keep the provider-facing latest anchor monotonic even if valid anchors arrive
+					// out of order from relayers.
+					<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
+				}
 
 				Self::deposit_event(Event::ExecutionHeaderAnchorImported {
 					block_hash: anchor.block_hash,
