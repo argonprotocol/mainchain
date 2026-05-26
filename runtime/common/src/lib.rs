@@ -9,6 +9,7 @@ pub mod benchmarking;
 mod call_filters;
 pub mod config;
 mod deal_with_fees;
+mod fee_control;
 
 pub mod prelude {
 	pub use crate::config::*;

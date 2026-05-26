@@ -19,9 +19,9 @@ use pallet_prelude::*;
 pub mod pallet {
 	use super::*;
 	use pallet_prelude::argon_primitives::{
-		CallTxPoolKeyProvider, CallTxValidityProvider, CurrentTransactionFeeProvider,
-		CurrentTransactionFeeProviderWeightInfo, FeelessCallTxPoolKeyProvider,
-		TransactionSponsorProvider,
+		CallFeeRefundProvider, CallTxPoolKeyProvider, CallTxValidityProvider,
+		CurrentTransactionFeeProvider, CurrentTransactionFeeProviderWeightInfo,
+		FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
 	};
 
 	#[pallet::config]
@@ -56,6 +56,10 @@ pub mod pallet {
 			Self::RuntimeCall,
 			Self::Balance,
 		>;
+
+		/// Provides runtime-owned call combinations that should refund their fee after successful
+		/// dispatch.
+		type CallFeeRefundProviders: CallFeeRefundProvider<Self::RuntimeCall>;
 	}
 
 	#[pallet::pallet]

@@ -25,6 +25,38 @@ macro_rules! call_filters {
 			}
 		}
 
+		pub struct VaultAdminCallFilter;
+
+		impl VaultAdminCallFilter {
+			fn is_crosschain_vault_admin_call(call: &RuntimeCall) -> bool {
+				matches!(
+					call,
+					RuntimeCall::CrosschainTransfer(
+						pallet_crosschain_transfer::Call::register_council_signer { .. } |
+							pallet_crosschain_transfer::Call::register_minting_authority { .. } |
+							pallet_crosschain_transfer::Call::approve_queue_entries { .. } |
+							pallet_crosschain_transfer::Call::collateralize_transfer { .. } |
+							pallet_crosschain_transfer::Call::deactivate_minting_authority { .. }
+					)
+				)
+			}
+
+			fn is_single_vault_admin_call(call: &RuntimeCall) -> bool {
+				matches!(
+					call,
+					RuntimeCall::Vaults(..) |
+						RuntimeCall::Treasury(pallet_treasury::Call::buy_bonds { .. }) |
+						RuntimeCall::Treasury(pallet_treasury::Call::liquidate_bond_lot { .. }) |
+						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize { .. }) |
+						RuntimeCall::BitcoinLocks(
+							pallet_bitcoin_locks::Call::cosign_release { .. }
+						) | RuntimeCall::BitcoinLocks(
+						pallet_bitcoin_locks::Call::cosign_orphaned_utxo_release { .. }
+					)
+				) || Self::is_crosschain_vault_admin_call(call)
+			}
+		}
+
 		/// The type used to represent the kinds of proxying allowed.
 		#[derive(
 			Copy,
@@ -88,36 +120,11 @@ macro_rules! call_filters {
 						_ => false,
 					},
 					ProxyType::VaultAdmin => match c {
-						RuntimeCall::Vaults(..) |
-						RuntimeCall::Treasury(pallet_treasury::Call::buy_bonds { .. }) |
-						RuntimeCall::Treasury(pallet_treasury::Call::liquidate_bond_lot {
-							..
-						}) |
-						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize {
-							..
-						}) => true,
-						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::cosign_release {
-							..
-						}) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
-							calls.iter().all(|sc| {
-								matches!(
-									sc,
-									RuntimeCall::Vaults(..) |
-										RuntimeCall::Treasury(
-											pallet_treasury::Call::buy_bonds { .. }
-										) | RuntimeCall::Treasury(
-										pallet_treasury::Call::liquidate_bond_lot { .. }
-									) | RuntimeCall::BitcoinLocks(
-										pallet_bitcoin_locks::Call::initialize { .. }
-									) | RuntimeCall::BitcoinLocks(
-										pallet_bitcoin_locks::Call::cosign_release { .. }
-									)
-								)
-							}),
-						_ => false,
+							calls.iter().all(VaultAdminCallFilter::is_single_vault_admin_call),
+						_ => VaultAdminCallFilter::is_single_vault_admin_call(c),
 					},
 					ProxyType::BitcoinInitializeFor => match c {
 						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize_for {
